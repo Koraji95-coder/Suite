@@ -1,0 +1,7 @@
+# Requirements for Coordinates Grabber API Server
+# Install with: pip install -r requirements-api.txt
+
+flask>=3.0.0
+flask-cors>=4.0.0
+psutil>=5.9.0
+pywin32>=306

@@ -87,38 +87,47 @@ export function ProgressBar({ progress }: ProgressBarProps) {
         style={{
           background: hexToRgba(palette.background, 0.50),
           border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
+          boxShadow: `inset 0 1px 2px ${hexToRgba(palette.background, 0.8)}`,
         }}
       >
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 transition-all duration-300"
           style={{
-            background: `linear-gradient(to right, ${palette.primary}, ${palette.tertiary}, ${palette.secondary})`,
+            background: `linear-gradient(90deg, ${palette.primary}, ${palette.tertiary}, ${palette.secondary})`,
             transform: `scaleX(${scaleX})`,
             transformOrigin: '0% 50%',
             willChange: 'transform',
+            boxShadow: `0 0 12px ${hexToRgba(palette.primary, 0.4)}`,
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer" />
-          <div
-            className="absolute inset-0 opacity-30"
+          {/* Subtle shimmer that stays within the progress bar */}
+          <div 
+            className="absolute inset-0 opacity-40"
             style={{
-              background: `linear-gradient(90deg, transparent 0%, ${hexToRgba(palette.primary, 0.3)} 50%, transparent 100%)`,
+              background: `linear-gradient(90deg, transparent 0%, ${hexToRgba('#ffffff', 0.25)} 50%, transparent 100%)`,
               backgroundSize: '200% 100%',
-              animation: 'wave-shimmer 3s linear infinite',
+              animation: 'wave-shimmer 2.5s ease-in-out infinite',
+            }}
+          />
+          
+          {/* Glossy highlight on top */}
+          <div
+            className="absolute top-0 left-0 right-0 h-1/2"
+            style={{
+              background: `linear-gradient(to bottom, ${hexToRgba('#ffffff', 0.2)}, transparent)`,
+            }}
+          />
+          
+          {/* Trailing glow effect */}
+          <div
+            className="absolute top-0 right-0 h-full w-12 opacity-60"
+            style={{
+              background: `linear-gradient(to right, transparent, ${hexToRgba(palette.secondary, 0.6)})`,
+              filter: `blur(4px)`,
             }}
           />
         </div>
-        <div
-          className="absolute top-0 h-full w-8 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-          style={{ left: `${Math.max(0, pct - 8)}%` }}
-        />
       </div>
-      <div
-        className="h-px"
-        style={{
-          background: `linear-gradient(to right, transparent, ${hexToRgba(palette.primary, 0.30)}, transparent)`,
-        }}
-      />
     </div>
   );
 }

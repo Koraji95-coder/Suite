@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { coordinatesGrabberService } from '@/services/coordinatesGrabberService';
 
@@ -73,10 +73,7 @@ const DEFAULT_STATE: CoordinatesGrabberState = {
   scanSelection: false,
   includeModelspace: true,
   activeTab: 'config',
-  logs: [
-    '[INFO] Coordinates Grabber initialized',
-    '[INFO] Connecting to AutoCAD backend...',
-  ],
+  logs: [], // Logs added dynamically to prevent duplicates
   excelPath: '',
   isRunning: false,
   backendConnected: false,
@@ -197,44 +194,92 @@ export function CoordinatesGrabber() {
     });
   }, [addLog]);
 
-  // Initialize backend connection on mount
+  // Initialize backend connection on mount with real-time polling
+  const hasInitializedRef = useRef(false);
+  
   useEffect(() => {
-    const initBackend = async () => {
+    // Prevent double initialization in React StrictMode
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
+    let pollInterval: NodeJS.Timeout | null = null;
+    let isFirstCheck = true;
+
+    // Add initialization log once
+    addLog('[INFO] Coordinates Grabber initialized');
+    addLog('[INFO] Checking for AutoCAD backend...');
+
+    const checkBackendStatus = async () => {
       try {
-        // Check if backend is available
         const status = await coordinatesGrabberService.checkStatus();
-        if (status.connected) {
-          addLog('[SUCCESS] Connected to AutoCAD backend');
-          setState(prev => ({ ...prev, backendConnected: true }));
+        
+        // Update connection state
+        setState(prev => {
+          const wasConnected = prev.backendConnected;
+          const isNowConnected = status.connected && status.autocad_running;
           
-          // Load available layers
-          const layers = await coordinatesGrabberService.listLayers();
-          setState(prev => ({ ...prev, availableLayers: layers }));
-          if (layers.length > 0) {
-            addLog(`[INFO] Retrieved ${layers.length} layers from drawing`);
+          // Only log state changes after first check
+          if (!isFirstCheck && wasConnected !== isNowConnected) {
+            if (isNowConnected) {
+              addLog('[SUCCESS] ✓ AutoCAD connection established');
+            } else {
+              addLog('[INFO] AutoCAD connection lost - waiting for reconnection...');
+            }
           }
           
-          // Try to connect WebSocket for real-time updates
+          return { ...prev, backendConnected: isNowConnected };
+        });
+        
+        // On first successful connection or reconnection, load layers
+        if (status.connected && status.autocad_running) {
+          if (isFirstCheck) {
+            addLog('[SUCCESS] ✓ Connected to AutoCAD backend');
+          }
+          
           try {
-            await coordinatesGrabberService.connectWebSocket();
-            addLog('[INFO] WebSocket connection established for real-time updates');
-            // Setup event listeners for real-time progress
-            setupWebSocketListeners();
+            const layers = await coordinatesGrabberService.listLayers();
+            setState(prev => ({ ...prev, availableLayers: layers }));
+            if (layers.length > 0 && isFirstCheck) {
+              addLog(`[INFO] Retrieved ${layers.length} layers from active drawing`);
+            }
+            
+            // Try to connect WebSocket for real-time updates (only on first connection)
+            if (isFirstCheck) {
+              try {
+                await coordinatesGrabberService.connectWebSocket();
+                addLog('[INFO] Real-time updates enabled');
+                setupWebSocketListeners();
+              } catch (err) {
+                // Silent fallback to polling
+              }
+            }
           } catch (err) {
-            addLog('[INFO] WebSocket unavailable, using HTTP polling');
+            // Silent layer loading failure
           }
-        } else {
-          addLog('[WARNING] Could not connect to AutoCAD backend');
-          addLog('[INFO] AutoCAD may not be running - some features will be unavailable');
+        } else if (isFirstCheck) {
+          // Only show info message on first check if AutoCAD isn't available
+          addLog('[INFO] Waiting for AutoCAD connection...');
+          addLog('[INFO] Start AutoCAD and open a drawing to enable features');
         }
+        
+        isFirstCheck = false;
       } catch (err) {
-        addLog('[WARNING] Backend connection check failed');
+        // Silent error on polling - don't spam logs
+        if (isFirstCheck) {
+          addLog('[INFO] AutoCAD backend not detected - features will activate when available');
+          isFirstCheck = false;
+        }
       }
     };
 
-    initBackend();
+    // Initial check
+    checkBackendStatus();
+    
+    // Poll every 5 seconds for AutoCAD availability
+    pollInterval = setInterval(checkBackendStatus, 5000);
 
     return () => {
+      if (pollInterval) clearInterval(pollInterval);
       coordinatesGrabberService.disconnect();
     };
   }, [addLog, setupWebSocketListeners]);
@@ -1111,17 +1156,17 @@ export function CoordinatesGrabber() {
                 borderRadius: '6px',
                 background: state.backendConnected
                   ? hexToRgba('#51cf66', 0.1)
-                  : hexToRgba('#ff6b6b', 0.1),
+                  : hexToRgba('#ffa94d', 0.1),
                 border: `1px solid ${state.backendConnected
                   ? hexToRgba('#51cf66', 0.3)
-                  : hexToRgba('#ff6b6b', 0.3)}`,
-                color: state.backendConnected ? '#51cf66' : '#ff6b6b',
+                  : hexToRgba('#ffa94d', 0.3)}`,
+                color: state.backendConnected ? '#51cf66' : '#ffa94d',
                 fontSize: '11px',
               }}
             >
               {state.backendConnected
                 ? '● Connected to AutoCAD'
-                : '● Connection offline (AutoCAD or backend not available)'}
+                : '○ Monitoring for AutoCAD... (checking every 5s)'}
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Search, RefreshCw, Loader2, ChevronLeft, ChevronRight,
-  ArrowUpDown, ArrowUp, ArrowDown, Database,
+  ArrowUpDown, ArrowUp, ArrowDown, Database, AlertTriangle,
 } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { supabase } from '@/lib/supabase';
@@ -26,28 +26,47 @@ export function DatabaseBrowser() {
   const [totalCount, setTotalCount] = useState(0);
   const [loadingTables, setLoadingTables] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadTables = useCallback(async () => {
     setLoadingTables(true);
-    const counts: TableInfo[] = [];
-    for (const name of TABLE_NAMES) {
-      const { count } = await supabase.from(name).select('*', { count: 'exact', head: true });
-      counts.push({ name, row_count: count ?? 0 });
+    setError(null);
+    try {
+      const results = await Promise.all(
+        TABLE_NAMES.map(name =>
+          supabase.from(name).select('*', { count: 'exact', head: true }).then(({ count, error }) => {
+            if (error) throw error;
+            return { name, row_count: count ?? 0 } as TableInfo;
+          })
+        )
+      );
+      setTables(results);
+    } catch (err) {
+      setError(`Failed to load tables: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoadingTables(false);
     }
-    setTables(counts);
-    setLoadingTables(false);
   }, []);
 
   const loadData = useCallback(async () => {
     if (!selectedTable) return;
     setLoadingData(true);
-    let query = supabase.from(selectedTable).select('*', { count: 'exact' });
-    if (sortCol) query = query.order(sortCol, { ascending: sortDir === 'asc' });
-    query = query.range(page * pageSize, (page + 1) * pageSize - 1);
-    const { data, count } = await query;
-    setRows((data ?? []) as Record<string, unknown>[]);
-    setTotalCount(count ?? 0);
-    setLoadingData(false);
+    setError(null);
+    try {
+      let query = supabase.from(selectedTable).select('*', { count: 'exact' });
+      if (sortCol) query = query.order(sortCol, { ascending: sortDir === 'asc' });
+      query = query.range(page * pageSize, (page + 1) * pageSize - 1);
+      const { data, count, error } = await query;
+      if (error) throw error;
+      setRows((data ?? []) as Record<string, unknown>[]);
+      setTotalCount(count ?? 0);
+    } catch (err) {
+      setError(`Failed to load data from "${selectedTable}": ${err instanceof Error ? err.message : String(err)}`);
+      setRows([]);
+      setTotalCount(0);
+    } finally {
+      setLoadingData(false);
+    }
   }, [selectedTable, sortCol, sortDir, page, pageSize]);
 
   useEffect(() => { loadTables(); }, [loadTables]);
@@ -69,15 +88,35 @@ export function DatabaseBrowser() {
     ? rows.filter(r => Object.values(r).some(v => v != null && String(v).toLowerCase().includes(search.toLowerCase())))
     : rows;
 
-  const visibleKeys = rows.length
-    ? Object.keys(rows[0]).filter(k => rows.some(r => r[k] !== null))
-    : [];
+  const visibleKeys = useMemo(
+    () => rows.length
+      ? Object.keys(rows[0]).filter(k => rows.some(r => r[k] !== null))
+      : [],
+    [rows]
+  );
 
   const cellStyle: React.CSSProperties = { padding: '8px 12px', fontSize: 13, color: palette.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 };
   const thStyle: React.CSSProperties = { ...cellStyle, fontWeight: 600, color: palette.textMuted, cursor: 'pointer', userSelect: 'none' };
 
   return (
-    <div style={{ display: 'flex', gap: 16, minHeight: 400 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minHeight: 400 }}>
+      {error && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', marginBottom: 12,
+          borderRadius: 8, background: hexToRgba(palette.accent, 0.12),
+          border: `1px solid ${hexToRgba(palette.accent, 0.3)}`, color: palette.accent, fontSize: 13,
+        }}>
+          <AlertTriangle className="w-4 h-4" style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: palette.accent, fontWeight: 600, fontSize: 13 }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 16, flex: 1 }}>
       <div style={{
         width: 220, flexShrink: 0, padding: 12, borderRadius: 10,
         background: hexToRgba(palette.surface, 0.5), border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
@@ -212,6 +251,7 @@ export function DatabaseBrowser() {
             )}
           </>
         )}
+      </div>
       </div>
     </div>
   );

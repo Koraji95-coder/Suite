@@ -26,6 +26,7 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { palette } = useTheme();
   const simRef = useRef<d3.Simulation<SimNode, SimLink> | null>(null);
+  const nodeElsRef = useRef<d3.Selection<SVGCircleElement, SimNode, SVGGElement, unknown> | null>(null);
 
   const render = useCallback(() => {
     const svg = d3.select(svgRef.current);
@@ -76,7 +77,7 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
       .attr('stroke', hexToRgba(palette.textMuted, 0.2))
       .attr('stroke-width', d => Math.max(0.5, d.weight * 2));
 
-    const nodeEls = nodeGroup.selectAll('circle')
+    const nodeEls = nodeGroup.selectAll<SVGCircleElement, SimNode>('circle')
       .data(simNodes)
       .join('circle')
       .attr('r', d => d.gNode.data?.type === 'major' ? 18 : 10)
@@ -85,12 +86,13 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
         return d.source === 'memory' ? hexToRgba(color, 0.35) : color;
       })
       .attr('stroke', d => {
-        if (d.id === selectedNodeId) return palette.text;
         return d.source === 'memory' ? (GROUP_COLORS[d.group] ?? palette.primary) : 'none';
       })
-      .attr('stroke-width', d => d.id === selectedNodeId ? 2.5 : d.source === 'memory' ? 1.5 : 0)
+      .attr('stroke-width', d => d.source === 'memory' ? 1.5 : 0)
       .attr('cursor', 'pointer')
       .on('click', (_, d) => onSelectNode(d.gNode));
+
+    nodeElsRef.current = nodeEls;
 
     const labels = labelGroup.selectAll('text')
       .data(simNodes.filter(n => n.gNode.data?.type === 'major' || n.source === 'memory'))
@@ -143,12 +145,29 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
       });
 
     svg.call(zoom as any);
-  }, [data, selectedNodeId, onSelectNode, palette]);
+  }, [data, onSelectNode, palette]);
 
+  // Full rebuild when data, callbacks, or palette change
   useEffect(() => {
     render();
     return () => { simRef.current?.stop(); };
   }, [render]);
+
+  // Lightweight selection highlight update -- no rebuild, no simulation restart
+  useEffect(() => {
+    const nodeEls = nodeElsRef.current;
+    if (!nodeEls) return;
+
+    nodeEls
+      .attr('stroke', d => {
+        if (d.id === selectedNodeId) return palette.text;
+        return d.source === 'memory' ? (GROUP_COLORS[d.group] ?? palette.primary) : 'none';
+      })
+      .attr('stroke-width', d => {
+        if (d.id === selectedNodeId) return 2.5;
+        return d.source === 'memory' ? 1.5 : 0;
+      });
+  }, [selectedNodeId, palette]);
 
   return (
     <svg

@@ -271,6 +271,7 @@ export function ThemeProvider({ children, defaultScheme }: ThemeProviderProps) {
   const setScheme = useCallback((key: string) => {
     if (!COLOR_SCHEMES[key]) return;
     setSchemeKey(key);
+    setActiveScheme(key);
     try { localStorage.setItem(STORAGE_KEY, key); } catch { /* noop */ }
   }, []);
 

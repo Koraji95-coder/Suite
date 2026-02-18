@@ -167,11 +167,77 @@ export function AIPanel() {
   }, []);
 
   const handleSuggestionClick = useCallback(
-    (text: string) => {
+    async (text: string) => {
       const conv = createNewConversation();
-      setTimeout(() => handleSend(text), 0);
+      const userMsg: Message = {
+        id: generateId(),
+        role: 'user',
+        content: text,
+        timestamp: new Date(),
+      };
+      const assistantMsg: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+      };
+      const title = text.slice(0, 50) + (text.length > 50 ? '...' : '');
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conv.id
+            ? { ...c, messages: [userMsg, assistantMsg], title, updated_at: new Date().toISOString() }
+            : c
+        )
+      );
+
+      setIsStreaming(true);
+      const systemMsg: Message = {
+        id: 'system',
+        role: 'system',
+        content: buildSystemPrompt(memories),
+        timestamp: new Date(),
+      };
+
+      try {
+        const fullResponse = await sendMessage(
+          [systemMsg, userMsg],
+          (chunk) => {
+            assistantMsg.content += chunk;
+            setConversations((prev) =>
+              prev.map((c) =>
+                c.id === conv.id
+                  ? { ...c, messages: [userMsg, { ...assistantMsg }], title, updated_at: new Date().toISOString() }
+                  : c
+              )
+            );
+          }
+        );
+        assistantMsg.content = fullResponse;
+        const finalConv: Conversation = {
+          ...conv,
+          title,
+          messages: [userMsg, { ...assistantMsg }],
+          updated_at: new Date().toISOString(),
+        };
+        setConversations((prev) =>
+          prev.map((c) => (c.id === conv.id ? finalConv : c))
+        );
+        await saveConversation(finalConv);
+      } catch {
+        assistantMsg.content = 'Sorry, something went wrong. Please try again.';
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === conv.id
+              ? { ...c, messages: [userMsg, { ...assistantMsg }] }
+              : c
+          )
+        );
+      } finally {
+        setIsStreaming(false);
+      }
     },
-    [createNewConversation, handleSend]
+    [createNewConversation, memories]
   );
 
   return (

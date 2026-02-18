@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { EMBER_PALETTE } from '../../lib/three/emberPalette';
+import { useTheme } from '@/lib/palette';
 
 interface EmberBackgroundProps {
   opacity?: number;
@@ -9,6 +9,7 @@ interface EmberBackgroundProps {
 }
 
 export function EmberBackground({ opacity = 0.2, reducedMotion = false, className }: EmberBackgroundProps) {
+  const { palette } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -24,11 +25,11 @@ export function EmberBackground({ opacity = 0.2, reducedMotion = false, classNam
 
     const geometry = new THREE.PlaneGeometry(20, 20, 64, 64);
     const material = new THREE.MeshStandardMaterial({
-      color: EMBER_PALETTE.primary,
+      color: palette.primary,
       wireframe: true,
       transparent: true,
       opacity: opacity,
-      emissive: new THREE.Color(EMBER_PALETTE.primary).multiplyScalar(0.1),
+      emissive: new THREE.Color(palette.primary).multiplyScalar(0.1),
     });
 
     const plane = new THREE.Mesh(geometry, material);
@@ -36,9 +37,9 @@ export function EmberBackground({ opacity = 0.2, reducedMotion = false, classNam
     plane.rotation.z = 0.2;
     scene.add(plane);
 
-    const ambientLight = new THREE.AmbientLight(EMBER_PALETTE.primary, 0.1);
+    const ambientLight = new THREE.AmbientLight(palette.primary, 0.1);
     scene.add(ambientLight);
-    const pointLight = new THREE.PointLight(EMBER_PALETTE.secondary, 0.5);
+    const pointLight = new THREE.PointLight(palette.secondary, 0.5);
     pointLight.position.set(2, 3, 4);
     scene.add(pointLight);
 

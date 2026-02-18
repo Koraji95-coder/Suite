@@ -45,7 +45,7 @@ export function FileBrowser() {
   };
 
   const handleFileClick = (file: StorageFile) => {
-    if (!file.id && file.type === 'folder') {
+    if (file.type === 'folder') {
       setCurrentPath(currentPath ? `${currentPath}/${file.name}` : file.name);
       setSelected(null);
     } else {

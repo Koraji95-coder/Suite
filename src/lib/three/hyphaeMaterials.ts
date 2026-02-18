@@ -18,7 +18,7 @@ import {
   triNoise3D,
 } from 'three/tsl';
 
-import { HYPHAE_PALETTE } from './emberPalette';
+import { HYPHAE_PALETTE } from '@/lib/palette';
 
 export interface HyphaeCoreMaterialOptions {
   /** Spatial frequency of the procedural tissue/vein pattern. */

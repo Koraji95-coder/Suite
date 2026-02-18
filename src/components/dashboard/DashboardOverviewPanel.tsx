@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useCallback } from 'react';
-import { Sparkles, Clock } from 'lucide-react';
+import { Sparkles, Clock, Settings2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { PanelInfoDialog } from '../PanelInfoDialog';
 import { dashboardInfo } from '../../data/panelInfo';
@@ -8,7 +8,9 @@ import { StatsCards } from './StatsCards';
 import { CalendarWidget } from './CalendarWidget';
 import { RecentActivityList } from './RecentActivityList';
 import { ActiveProjectsList } from './ActiveProjectsList';
-import { EMBER_PALETTE, hexToRgba, glassCardInnerStyle } from '../../lib/three/emberPalette';
+import { DashboardCustomizer } from './DashboardCustomizer';
+import { useDashboardLayout } from './useDashboardLayout';
+import { useTheme, hexToRgba, glassCardInnerStyle } from '@/lib/palette';
 import { GlassPanel } from '../ui/GlassPanel';
 
 /* ── Isolated live clock (prevents full dashboard rerender every second) ── */
@@ -77,6 +79,8 @@ export function DashboardOverviewPanel({
   calendarMonth: externalMonth,
   onCalendarMonthChange,
 }: DashboardOverviewPanelProps) {
+  const { palette } = useTheme();
+  const { widgets, editMode, setEditMode, toggleWidget, reorderWidgets, resetLayout } = useDashboardLayout();
   const [projects, setProjects] = useState<Project[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [storageUsed, setStorageUsed] = useState(0);
@@ -260,40 +264,118 @@ export function DashboardOverviewPanel({
     if (onCalendarDateChange) onCalendarDateChange(date);
   };
 
+  const visibleWidgets = widgets.filter(w => w.visible);
+
+  const widgetMap: Record<string, React.ReactNode> = {
+    stats: (
+      <StatsCards
+        key="stats"
+        projectsCount={projects.length}
+        storageUsed={storageUsed}
+        activitiesCount={activities.length}
+        isLoading={isLoading}
+      />
+    ),
+    calendar: (
+      <CalendarWidget
+        key="calendar"
+        calendarMonth={calendarMonth}
+        onMonthChange={setCalendarMonth}
+        selectedDate={selectedCalendarDate ?? null}
+        onDateSelect={handleDateSelect}
+        projects={projects}
+        allTasksWithDates={allTasksWithDates}
+        allProjectsMap={allProjectsMap}
+        onNavigateToProject={onNavigateToProject}
+      />
+    ),
+    activity: (
+      <RecentActivityList key="activity" activities={activities} allProjectsMap={allProjectsMap} />
+    ),
+    projects: (
+      <ActiveProjectsList
+        key="projects"
+        projects={projects}
+        projectTaskCounts={projectTaskCounts}
+        onNavigateToProject={onNavigateToProject}
+        onNavigateToProjectsHub={onNavigateToProjectsHub}
+      />
+    ),
+  };
+
+  const gridIds = new Set(['calendar', 'activity']);
+
+  const renderWidgets = () => {
+    const elements: React.ReactNode[] = [];
+    let i = 0;
+    while (i < visibleWidgets.length) {
+      const w = visibleWidgets[i];
+      if (gridIds.has(w.id)) {
+        const gridChildren: React.ReactNode[] = [widgetMap[w.id]];
+        if (i + 1 < visibleWidgets.length && gridIds.has(visibleWidgets[i + 1].id)) {
+          gridChildren.push(widgetMap[visibleWidgets[i + 1].id]);
+          i += 2;
+        } else {
+          i += 1;
+        }
+        elements.push(
+          <div key={`grid-${w.id}`} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {gridChildren}
+          </div>
+        );
+      } else {
+        elements.push(widgetMap[w.id]);
+        i += 1;
+      }
+    }
+    return elements;
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header — glass card */}
       <GlassPanel
-        tint={EMBER_PALETTE.primary}
+        tint={palette.primary}
         hoverEffect={false}
         className="flex items-center justify-between p-5 group"
       >
-
         <div className="relative z-10 flex items-center space-x-4">
           <div
             className="p-3 rounded-xl"
             style={{
-              background: `linear-gradient(135deg, ${hexToRgba(EMBER_PALETTE.primary, 0.3)} 0%, ${hexToRgba(EMBER_PALETTE.primary, 0.08)} 100%)`,
-              boxShadow: `0 0 24px ${hexToRgba(EMBER_PALETTE.primary, 0.18)}`,
+              background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.3)} 0%, ${hexToRgba(palette.primary, 0.08)} 100%)`,
+              boxShadow: `0 0 24px ${hexToRgba(palette.primary, 0.18)}`,
             }}
           >
-            <Sparkles className="w-8 h-8 animate-pulse" style={{ color: EMBER_PALETTE.primary }} />
+            <Sparkles className="w-8 h-8 animate-pulse" style={{ color: palette.primary }} />
           </div>
           <div>
-            <h2 className="text-3xl font-bold" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.95) }}>Dashboard Overview</h2>
-            <p className="mt-1 text-sm" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.45) }}>Welcome back! Here's what's happening.</p>
+            <h2 className="text-3xl font-bold" style={{ color: hexToRgba(palette.text, 0.95) }}>Dashboard Overview</h2>
+            <p className="mt-1 text-sm" style={{ color: hexToRgba(palette.text, 0.45) }}>Welcome back! Here's what's happening.</p>
           </div>
         </div>
 
         <div className="relative z-10 flex items-center space-x-4">
+          <button
+            onClick={() => setEditMode(!editMode)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+            style={{
+              ...glassCardInnerStyle(palette, palette.primary),
+              color: editMode ? palette.text : palette.primary,
+              background: editMode ? hexToRgba(palette.primary, 0.2) : undefined,
+            }}
+            aria-label="Customize dashboard"
+          >
+            <Settings2 className="w-4 h-4" />
+            Customize
+          </button>
           <div
             className="flex items-center space-x-2 px-3 py-2 rounded-lg"
             style={{
-              ...glassCardInnerStyle(EMBER_PALETTE, EMBER_PALETTE.primary),
-              color: hexToRgba(EMBER_PALETTE.text, 0.6),
+              ...glassCardInnerStyle(palette, palette.primary),
+              color: hexToRgba(palette.text, 0.6),
             }}
           >
-            <Clock className="w-5 h-5" style={{ color: EMBER_PALETTE.primary }} />
+            <Clock className="w-5 h-5" style={{ color: palette.primary }} />
             <LiveClockBadge />
           </div>
           <PanelInfoDialog
@@ -304,37 +386,17 @@ export function DashboardOverviewPanel({
         </div>
       </GlassPanel>
 
-      {/* Stats Cards */}
-      <StatsCards
-        projectsCount={projects.length}
-        storageUsed={storageUsed}
-        activitiesCount={activities.length}
-        isLoading={isLoading}
-      />
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CalendarWidget
-          calendarMonth={calendarMonth}
-          onMonthChange={setCalendarMonth}
-          selectedDate={selectedCalendarDate ?? null}
-          onDateSelect={handleDateSelect}
-          projects={projects}
-          allTasksWithDates={allTasksWithDates}
-          allProjectsMap={allProjectsMap}
-          onNavigateToProject={onNavigateToProject}
+      {editMode && (
+        <DashboardCustomizer
+          widgets={widgets}
+          onToggle={toggleWidget}
+          onReorder={reorderWidgets}
+          onReset={resetLayout}
+          onClose={() => setEditMode(false)}
         />
-        <RecentActivityList activities={activities} allProjectsMap={allProjectsMap} />
-      </div>
+      )}
 
-      {/* Active Projects */}
-      <ActiveProjectsList
-        projects={projects}
-        projectTaskCounts={projectTaskCounts}
-        onNavigateToProject={onNavigateToProject}
-        onNavigateToProjectsHub={onNavigateToProjectsHub}
-      />
-
+      {renderWidgets()}
     </div>
   );
 }

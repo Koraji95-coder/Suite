@@ -1,6 +1,6 @@
 import { BarChart3, Folder, Activity } from 'lucide-react';
 import { formatBytes } from './dashboardUtils';
-import { EMBER_PALETTE, hexToRgba } from '../../lib/three/emberPalette';
+import { useTheme, hexToRgba } from '@/lib/palette';
 import { GlassPanel } from '../ui/GlassPanel';
 
 interface StatsCardsProps {
@@ -10,13 +10,14 @@ interface StatsCardsProps {
   isLoading: boolean;
 }
 
-const cardConfigs = [
-  { key: 'projects', label: 'Active Projects', icon: BarChart3, tint: EMBER_PALETTE.primary },
-  { key: 'storage', label: 'Storage Used', icon: Folder, tint: EMBER_PALETTE.secondary },
-  { key: 'activities', label: 'Recent Activities', icon: Activity, tint: EMBER_PALETTE.tertiary },
-] as const;
-
 export function StatsCards({ projectsCount, storageUsed, activitiesCount, isLoading }: StatsCardsProps) {
+  const { palette } = useTheme();
+
+  const cardConfigs = [
+    { key: 'projects', label: 'Active Projects', icon: BarChart3, tint: palette.primary },
+    { key: 'storage', label: 'Storage Used', icon: Folder, tint: palette.secondary },
+    { key: 'activities', label: 'Recent Activities', icon: Activity, tint: palette.tertiary },
+  ] as const;
   const values: Record<string, string> = {
     projects: isLoading ? '...' : String(projectsCount),
     storage: isLoading ? '...' : formatBytes(storageUsed),
@@ -43,8 +44,8 @@ export function StatsCards({ projectsCount, storageUsed, activitiesCount, isLoad
               <Icon className="w-6 h-6" style={{ color: tint }} />
             </div>
             <div>
-              <p className="text-sm font-medium" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.5) }}>{label}</p>
-              <p className="text-3xl font-bold tracking-tight" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.95) }}>
+              <p className="text-sm font-medium" style={{ color: hexToRgba(palette.text, 0.5) }}>{label}</p>
+              <p className="text-3xl font-bold tracking-tight" style={{ color: hexToRgba(palette.text, 0.95) }}>
                 {values[key]}
               </p>
             </div>

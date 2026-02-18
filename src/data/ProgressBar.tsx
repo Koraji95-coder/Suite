@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { EMBER_PALETTE, hexToRgba } from '../lib/three/emberPalette';
+import { useTheme, hexToRgba } from '@/lib/palette';
 
 interface ProgressBarProps {
   progress: number;
 }
 
 export function ProgressBar({ progress }: ProgressBarProps) {
+  const { palette } = useTheme();
   const p = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
   const [displayP, setDisplayP] = useState(p);
   const displayRef = useRef(displayP);
@@ -74,24 +75,24 @@ export function ProgressBar({ progress }: ProgressBarProps) {
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center text-xs">
-        <span className="font-medium tracking-wide uppercase" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.50) }}>
+        <span className="font-medium tracking-wide uppercase" style={{ color: hexToRgba(palette.text, 0.50) }}>
           Loading
         </span>
-        <span className="font-bold tabular-nums" style={{ color: EMBER_PALETTE.text }}>
+        <span className="font-bold tabular-nums" style={{ color: palette.text }}>
           {Math.round(pct)}%
         </span>
       </div>
       <div
         className="relative w-full h-1.5 rounded-full overflow-hidden backdrop-blur-sm"
         style={{
-          background: hexToRgba(EMBER_PALETTE.background, 0.50),
-          border: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.18)}`,
+          background: hexToRgba(palette.background, 0.50),
+          border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
         }}
       >
         <div
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(to right, ${EMBER_PALETTE.primary}, ${EMBER_PALETTE.tertiary}, ${EMBER_PALETTE.secondary})`,
+            background: `linear-gradient(to right, ${palette.primary}, ${palette.tertiary}, ${palette.secondary})`,
             transform: `scaleX(${scaleX})`,
             transformOrigin: '0% 50%',
             willChange: 'transform',
@@ -101,7 +102,7 @@ export function ProgressBar({ progress }: ProgressBarProps) {
           <div
             className="absolute inset-0 opacity-30"
             style={{
-              background: `linear-gradient(90deg, transparent 0%, ${hexToRgba(EMBER_PALETTE.primary, 0.3)} 50%, transparent 100%)`,
+              background: `linear-gradient(90deg, transparent 0%, ${hexToRgba(palette.primary, 0.3)} 50%, transparent 100%)`,
               backgroundSize: '200% 100%',
               animation: 'wave-shimmer 3s linear infinite',
             }}
@@ -115,7 +116,7 @@ export function ProgressBar({ progress }: ProgressBarProps) {
       <div
         className="h-px"
         style={{
-          background: `linear-gradient(to right, transparent, ${hexToRgba(EMBER_PALETTE.primary, 0.30)}, transparent)`,
+          background: `linear-gradient(to right, transparent, ${hexToRgba(palette.primary, 0.30)}, transparent)`,
         }}
       />
     </div>

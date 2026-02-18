@@ -16,24 +16,25 @@ import { useWorkspace } from "./WorkspaceContext";
 
 interface NavItem {
   icon: React.ComponentType<{ size?: number; color?: string }>;
+  label: string;
   path?: string;
   panel?: string;
   aiToggle?: boolean;
 }
 
 const topItems: NavItem[] = [
-  { icon: LayoutDashboard, path: "/dashboard" },
-  { icon: FolderKanban, path: "/projects" },
-  { icon: CalendarDays, path: "/calendar" },
-  { icon: Blocks, panel: "apps" },
-  { icon: BookOpen, panel: "knowledge" },
-  { icon: HardDrive, path: "/files" },
-  { icon: Network, path: "/graph" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: FolderKanban, label: "Projects", path: "/projects" },
+  { icon: CalendarDays, label: "Calendar", path: "/calendar" },
+  { icon: Blocks, label: "Apps", panel: "apps" },
+  { icon: BookOpen, label: "Knowledge", panel: "knowledge" },
+  { icon: HardDrive, label: "Files", path: "/files" },
+  { icon: Network, label: "Graph", path: "/graph" },
 ];
 
 const bottomItems: NavItem[] = [
-  { icon: MessageSquare, aiToggle: true },
-  { icon: Settings, path: "/settings" },
+  { icon: MessageSquare, label: "AI Chat", aiToggle: true },
+  { icon: Settings, label: "Settings", path: "/settings" },
 ];
 
 export function ActivityBar() {
@@ -62,6 +63,8 @@ export function ActivityBar() {
       <button
         key={idx}
         onClick={() => handleClick(item)}
+        aria-label={item.label}
+        title={item.label}
         style={{
           display: "flex",
           alignItems: "center",
@@ -88,7 +91,9 @@ export function ActivityBar() {
   };
 
   return (
-    <div
+    <nav
+      role="navigation"
+      aria-label="Main navigation"
       style={{
         width: 52,
         minWidth: 52,
@@ -109,6 +114,6 @@ export function ActivityBar() {
       <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
         {bottomItems.map(renderButton)}
       </div>
-    </div>
+    </nav>
   );
 }

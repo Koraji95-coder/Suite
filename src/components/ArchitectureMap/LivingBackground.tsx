@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { HYPHAE_PALETTE } from '../../lib/three/emberPalette';
+import { useTheme } from '@/lib/palette';
 
 type BoundsLike = { center: THREE.Vector3; radius: number };
 
@@ -36,6 +36,7 @@ function Tendrils({
 	thicknessPulseSpeed?: number;
 	reducedMotion?: boolean;
 }) {
+	const { palette } = useTheme();
 	const instancedRef = useRef<THREE.InstancedMesh>(null);
 	const dummy = useMemo(() => new THREE.Object3D(), []);
 	const tmp = useMemo(
@@ -138,8 +139,8 @@ function Tendrils({
 	return (
 		<instancedMesh ref={instancedRef} args={[tubeGeo, undefined as any, count]} frustumCulled={false}>
 			<meshStandardMaterial
-				color={HYPHAE_PALETTE.primary}
-				emissive={HYPHAE_PALETTE.secondary}
+				color={palette.primary}
+				emissive={palette.secondary}
 				emissiveIntensity={emissiveIntensity}
 				transparent
 				opacity={opacity}
@@ -167,6 +168,7 @@ function LivingParticles({
 	sizeScale?: number;
 	reducedMotion?: boolean;
 }) {
+	const { palette } = useTheme();
 	const pointsRef = useRef<THREE.Points>(null);
 	const geom = useMemo(() => {
 		const rng = createSeededRandom(1234);
@@ -175,8 +177,8 @@ function LivingParticles({
 
 		const c = bounds.center;
 		const spread = bounds.radius * 2.8;
-		const a = new THREE.Color(HYPHAE_PALETTE.primary);
-		const b = new THREE.Color(HYPHAE_PALETTE.tertiary);
+		const a = new THREE.Color(palette.primary);
+		const b = new THREE.Color(palette.tertiary);
 
 		for (let i = 0; i < count; i++) {
 			const u = rng();
@@ -200,7 +202,7 @@ function LivingParticles({
 		g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 		g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 		return g;
-	}, [bounds.center.x, bounds.center.y, bounds.center.z, bounds.radius, count]);
+	}, [bounds.center.x, bounds.center.y, bounds.center.z, bounds.radius, count, palette]);
 
 	useEffect(() => () => geom.dispose(), [geom]);
 
@@ -311,6 +313,7 @@ export function LivingBackground({
 	glowPulseStrength?: number;
 	reducedMotion?: boolean;
 }) {
+	const { palette } = useTheme();
 	return (
 		<group>
 			<LivingParticles
@@ -332,7 +335,7 @@ export function LivingBackground({
 			<CentralGlow
 				bounds={bounds}
 				opacity={glowOpacity}
-				color={HYPHAE_PALETTE.tertiary}
+				color={palette.tertiary}
 				pulse={glowPulse}
 				pulseSpeed={glowPulseSpeed}
 				pulseStrength={glowPulseStrength}

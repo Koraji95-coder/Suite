@@ -27,7 +27,7 @@ import {
 } from "./calendarindex";
 import { EndHour, StartHour } from "./hooks/calendarconstants";
 import { cn } from "@/lib/utils";
-import { EMBER_PALETTE, hexToRgba } from "@/lib/three/emberPalette";
+import { useTheme, hexToRgba } from "@/lib/palette";
 
 interface WeekViewProps {
   currentDate: Date;
@@ -55,6 +55,7 @@ export function WeekView({
   onEventSelect,
   onEventCreate
 }: WeekViewProps) {
+  const { palette } = useTheme();
   const days = useMemo(() => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
@@ -182,12 +183,12 @@ export function WeekView({
       <div
         className="sticky top-0 z-30 grid grid-cols-8 backdrop-blur-md"
         style={{
-          borderBottom: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.12)}`,
-          backgroundColor: hexToRgba(EMBER_PALETTE.surface, 0.6),
+          borderBottom: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
+          backgroundColor: hexToRgba(palette.surface, 0.6),
         }}>
         <div
           className="py-2 text-center text-sm"
-          style={{ color: hexToRgba(EMBER_PALETTE.text, 0.4) }}>
+          style={{ color: hexToRgba(palette.text, 0.4) }}>
           <span className="max-[479px]:sr-only">{format(new Date(), "O")}</span>
         </div>
 
@@ -203,18 +204,18 @@ export function WeekView({
               style={{
                 ...(isToday(day)
                   ? {
-                      color: EMBER_PALETTE.primary,
+                      color: palette.primary,
                       fontWeight: 600,
-                      backgroundColor: hexToRgba(EMBER_PALETTE.primary, 0.08),
+                      backgroundColor: hexToRgba(palette.primary, 0.08),
                     }
                   : isSelected
                     ? {
-                        color: hexToRgba(EMBER_PALETTE.text, 0.9),
+                        color: hexToRgba(palette.text, 0.9),
                         fontWeight: 600,
-                        backgroundColor: hexToRgba(EMBER_PALETTE.primary, 0.1),
+                        backgroundColor: hexToRgba(palette.primary, 0.1),
                       }
                     : {
-                        color: hexToRgba(EMBER_PALETTE.text, 0.5),
+                        color: hexToRgba(palette.text, 0.5),
                       }),
               }}
               data-today={isToday(day) || undefined}
@@ -230,12 +231,12 @@ export function WeekView({
 
       {showAllDaySection && (
         <div style={{
-          borderBottom: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.1)}`,
-          backgroundColor: hexToRgba(EMBER_PALETTE.surface, 0.3),
+          borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
+          backgroundColor: hexToRgba(palette.surface, 0.3),
         }}>
           <div className="grid grid-cols-8">
-            <div className="relative" style={{ borderRight: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.08)}` }}>
-              <span className="absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] sm:pe-4 sm:text-xs" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.35) }}>
+            <div className="relative" style={{ borderRight: `1px solid ${hexToRgba(palette.primary, 0.08)}` }}>
+              <span className="absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] sm:pe-4 sm:text-xs" style={{ color: hexToRgba(palette.text, 0.35) }}>
                 All day
               </span>
             </div>
@@ -258,8 +259,8 @@ export function WeekView({
                   key={day.toString()}
                   className="relative p-1 last:border-r-0"
                   style={{
-                    borderRight: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.08)}`,
-                    ...(isSelected ? { backgroundColor: hexToRgba(EMBER_PALETTE.primary, 0.06), boxShadow: `inset 0 0 0 1px ${hexToRgba(EMBER_PALETTE.primary, 0.25)}` } : {}),
+                    borderRight: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
+                    ...(isSelected ? { backgroundColor: hexToRgba(palette.primary, 0.06), boxShadow: `inset 0 0 0 1px ${hexToRgba(palette.primary, 0.25)}` } : {}),
                   }}
                   data-today={isToday(day) || undefined}
                   data-selected={isSelected || undefined}>
@@ -296,16 +297,16 @@ export function WeekView({
       )}
 
       <div className="grid flex-1 grid-cols-8 overflow-hidden">
-        <div className="grid auto-cols-fr" style={{ borderRight: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.08)}` }}>
+        <div className="grid auto-cols-fr" style={{ borderRight: `1px solid ${hexToRgba(palette.primary, 0.08)}` }}>
           {hours.map((hour, index) => (
             <div
               key={hour.toString()}
               className="relative min-h-[var(--week-cells-height)]"
-              style={{ borderBottom: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.06)}` }}>
+              style={{ borderBottom: `1px solid ${hexToRgba(palette.primary, 0.06)}` }}>
               {index > 0 && (
                 <span
                   className="absolute -top-3 left-0 flex h-6 w-16 max-w-full items-center justify-end pe-2 text-[10px] sm:pe-4 sm:text-xs"
-                  style={{ color: hexToRgba(EMBER_PALETTE.text, 0.35) }}>
+                  style={{ color: hexToRgba(palette.text, 0.35) }}>
                   {format(hour, "h a")}
                 </span>
               )}
@@ -321,11 +322,11 @@ export function WeekView({
               key={day.toString()}
               className="relative grid auto-cols-fr last:border-r-0"
               style={{
-                borderRight: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.08)}`,
+                borderRight: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
                 ...(isSelected
-                  ? { backgroundColor: hexToRgba(EMBER_PALETTE.primary, 0.05) }
+                  ? { backgroundColor: hexToRgba(palette.primary, 0.05) }
                   : isToday(day)
-                    ? { backgroundColor: hexToRgba(EMBER_PALETTE.primary, 0.02) }
+                    ? { backgroundColor: hexToRgba(palette.primary, 0.02) }
                     : {}),
               }}
               data-today={isToday(day) || undefined}
@@ -359,8 +360,8 @@ export function WeekView({
                   className="pointer-events-none absolute right-0 left-0 z-20"
                   style={{ top: `${currentTimePosition}%` }}>
                   <div className="relative flex items-center">
-                    <div className="absolute -left-1 h-2 w-2 rounded-full" style={{ backgroundColor: EMBER_PALETTE.primary }}></div>
-                    <div className="h-[2px] w-full" style={{ backgroundColor: EMBER_PALETTE.primary }}></div>
+                    <div className="absolute -left-1 h-2 w-2 rounded-full" style={{ backgroundColor: palette.primary }}></div>
+                    <div className="h-[2px] w-full" style={{ backgroundColor: palette.primary }}></div>
                   </div>
                 </div>
               )}
@@ -371,7 +372,7 @@ export function WeekView({
                   <div
                     key={hour.toString()}
                     className="relative min-h-[var(--week-cells-height)] last:border-b-0"
-                    style={{ borderBottom: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.06)}` }}>
+                    style={{ borderBottom: `1px solid ${hexToRgba(palette.primary, 0.06)}` }}>
                     {[0, 1, 2, 3].map((quarter) => {
                       const quarterHourTime = hourValue + quarter * 0.25;
                       return (

@@ -1,5 +1,5 @@
 import { forwardRef, ButtonHTMLAttributes } from 'react';
-import { EMBER_PALETTE, hexToRgba } from '../../lib/three/emberPalette';
+import { useTheme, hexToRgba } from '@/lib/palette';
 
 interface LiquidButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: number;
@@ -8,7 +8,9 @@ interface LiquidButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const LiquidButton = forwardRef<HTMLButtonElement, LiquidButtonProps>(
-  ({ children, size = 44, tint = EMBER_PALETTE.primary, active = false, className = '', style, ...props }, ref) => {
+  ({ children, size = 44, tint: tintProp, active = false, className = '', style, ...props }, ref) => {
+    const { palette } = useTheme();
+    const tint = tintProp ?? palette.primary;
     return (
       <button
         ref={ref}
@@ -22,8 +24,8 @@ export const LiquidButton = forwardRef<HTMLButtonElement, LiquidButtonProps>(
           height: size,
           background: active
             ? `linear-gradient(135deg, ${hexToRgba(tint, 0.22)} 0%, ${hexToRgba(tint, 0.10)} 100%)`
-            : `linear-gradient(135deg, ${hexToRgba(EMBER_PALETTE.surface, 0.35)} 0%, ${hexToRgba(
-                EMBER_PALETTE.surface,
+            : `linear-gradient(135deg, ${hexToRgba(palette.surface, 0.35)} 0%, ${hexToRgba(
+                palette.surface,
                 0.22,
               )} 100%)`,
           border: `1px solid ${hexToRgba(tint, active ? 0.28 : 0.14)}`,

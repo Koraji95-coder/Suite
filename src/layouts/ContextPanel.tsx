@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -8,6 +8,8 @@ import {
   Grid3X3,
   Replace,
   Printer,
+  Workflow,
+  ClipboardCheck,
   Calculator,
   ArrowUpRight,
   Triangle,
@@ -35,6 +37,8 @@ const appItems: SectionItem[] = [
   { id: "ground-grid", label: "Ground Grid", icon: Grid3X3, path: "/apps/ground-grid" },
   { id: "batch-find-replace", label: "Batch Find & Replace", icon: Replace, path: "/apps/batch-find-replace" },
   { id: "batch-print", label: "Batch Print", icon: Printer, path: "/apps/batch-print" },
+  { id: "automation", label: "Automation", icon: Workflow, path: "/apps/automation" },
+  { id: "standards", label: "Standards Checker", icon: ClipboardCheck, path: "/apps/standards" },
 ];
 
 const knowledgeItems: SectionItem[] = [
@@ -60,6 +64,10 @@ export function ContextPanel() {
   const { contextPanelOpen, contextPanelSection, openTab } = useWorkspace();
   const [search, setSearch] = useState("");
 
+  useEffect(() => {
+    setSearch("");
+  }, [contextPanelSection]);
+
   const items = useMemo(() => {
     const list = contextPanelSection ? sections[contextPanelSection] || [] : [];
     if (!search.trim()) return list;
@@ -76,6 +84,8 @@ export function ContextPanel() {
     <AnimatePresence>
       {contextPanelOpen && (
         <motion.div
+          role="complementary"
+          aria-label={contextPanelSection ? `${contextPanelSection.charAt(0).toUpperCase() + contextPanelSection.slice(1)} panel` : "Context panel"}
           initial={{ width: 0, opacity: 0 }}
           animate={{ width: 280, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
@@ -105,6 +115,7 @@ export function ContextPanel() {
               <input
                 type="text"
                 placeholder="Search..."
+                aria-label="Search panel items"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 style={{

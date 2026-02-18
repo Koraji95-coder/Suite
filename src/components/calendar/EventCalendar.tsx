@@ -37,7 +37,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { EMBER_PALETTE, hexToRgba } from "@/lib/three/emberPalette";
+import { useTheme, hexToRgba } from "@/lib/palette";
 
 export interface EventCalendarProps {
   events?: CalendarEvent[];
@@ -56,6 +56,7 @@ export function EventCalendar({
   className,
   initialView = "month"
 }: EventCalendarProps) {
+  const { palette } = useTheme();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date()); // ✅ new
   const [view, setView] = useState<CalendarView>(initialView);
@@ -203,7 +204,7 @@ export function EventCalendar({
 
   return (
     <GlassPanel
-      tint={EMBER_PALETTE.primary}
+      tint={palette.primary}
       hoverEffect={false}
       bevel
       specular
@@ -222,9 +223,9 @@ export function EventCalendar({
               onClick={handleToday}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all max-[479px]:aspect-square max-[479px]:px-0"
               style={{
-                background: `linear-gradient(135deg, ${hexToRgba(EMBER_PALETTE.primary, 0.06)} 0%, ${hexToRgba(EMBER_PALETTE.surface, 0.25)} 100%)`,
-                border: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.18)}`,
-                color: EMBER_PALETTE.primary,
+                background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.06)} 0%, ${hexToRgba(palette.surface, 0.25)} 100%)`,
+                border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
+                color: palette.primary,
               }}>
               <CalendarCheck className="min-[480px]:hidden h-4 w-4" aria-hidden="true" />
               <span className="max-[479px]:sr-only">Today</span>
@@ -234,18 +235,18 @@ export function EventCalendar({
                 onClick={handlePrevious}
                 aria-label="Previous"
                 className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.08]">
-                <ChevronLeftIcon size={16} style={{ color: hexToRgba(EMBER_PALETTE.text, 0.5) }} aria-hidden="true" />
+                <ChevronLeftIcon size={16} style={{ color: hexToRgba(palette.text, 0.5) }} aria-hidden="true" />
               </button>
               <button
                 onClick={handleNext}
                 aria-label="Next"
                 className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.08]">
-                <ChevronRightIcon size={16} style={{ color: hexToRgba(EMBER_PALETTE.text, 0.5) }} aria-hidden="true" />
+                <ChevronRightIcon size={16} style={{ color: hexToRgba(palette.text, 0.5) }} aria-hidden="true" />
               </button>
             </div>
             <h2
               className="text-sm font-semibold sm:text-lg md:text-xl"
-              style={{ color: hexToRgba(EMBER_PALETTE.text, 0.9) }}>
+              style={{ color: hexToRgba(palette.text, 0.9) }}>
               {viewTitle}
             </h2>
           </div>
@@ -256,9 +257,9 @@ export function EventCalendar({
                 <button
                   className="gap-1.5 max-[479px]:h-8 inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg transition-all"
                   style={{
-                    background: `linear-gradient(135deg, ${hexToRgba(EMBER_PALETTE.primary, 0.06)} 0%, ${hexToRgba(EMBER_PALETTE.surface, 0.25)} 100%)`,
-                    border: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.12)}`,
-                    color: hexToRgba(EMBER_PALETTE.text, 0.7),
+                    background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.06)} 0%, ${hexToRgba(palette.surface, 0.25)} 100%)`,
+                    border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
+                    color: hexToRgba(palette.text, 0.7),
                   }}>
                   <span>
                     <span className="min-[480px]:hidden" aria-hidden="true">
@@ -290,9 +291,9 @@ export function EventCalendar({
             <button
               className="max-[479px]:aspect-square max-[479px]:p-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all"
               style={{
-                backgroundColor: EMBER_PALETTE.primary,
+                backgroundColor: palette.primary,
                 color: '#fff',
-                boxShadow: `0 0 12px ${hexToRgba(EMBER_PALETTE.primary, 0.3)}`,
+                boxShadow: `0 0 12px ${hexToRgba(palette.primary, 0.3)}`,
               }}
               onClick={() => {
                 setSelectedEvent(null);

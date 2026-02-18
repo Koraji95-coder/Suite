@@ -27,7 +27,7 @@ import {
 } from "./calendarindex";
 import { DefaultStartHour } from "./hooks/calendarconstants";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/Popover";
-import { EMBER_PALETTE, hexToRgba } from "@/lib/three/emberPalette";
+import { useTheme, hexToRgba } from "@/lib/palette";
 
 interface MonthViewProps {
   currentDate: Date;
@@ -46,6 +46,7 @@ export function MonthView({
   onEventSelect,
   onEventCreate
 }: MonthViewProps) {
+  const { palette } = useTheme();
   const days = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
@@ -92,12 +93,12 @@ export function MonthView({
     <div data-slot="month-view" className="contents">
       <div
         className="grid grid-cols-7"
-        style={{ borderBottom: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.12)}` }}>
+        style={{ borderBottom: `1px solid ${hexToRgba(palette.primary, 0.12)}` }}>
         {weekdays.map((day) => (
           <div
             key={day}
             className="py-2 text-center text-sm font-medium"
-            style={{ color: hexToRgba(EMBER_PALETTE.text, 0.4) }}>
+            style={{ color: hexToRgba(palette.text, 0.4) }}>
             {day}
           </div>
         ))}
@@ -131,16 +132,16 @@ export function MonthView({
                   key={day.toString()}
                   className="group border-r border-b last:border-r-0"
                   style={{
-                    borderColor: hexToRgba(EMBER_PALETTE.primary, 0.08),
+                    borderColor: hexToRgba(palette.primary, 0.08),
                     backgroundColor: isSelected
-                      ? hexToRgba(EMBER_PALETTE.primary, 0.06)
+                      ? hexToRgba(palette.primary, 0.06)
                       : isToday(day)
-                        ? hexToRgba(EMBER_PALETTE.primary, 0.03)
+                        ? hexToRgba(palette.primary, 0.03)
                         : !isCurrentMonth
-                          ? hexToRgba(EMBER_PALETTE.surface, 0.3)
+                          ? hexToRgba(palette.surface, 0.3)
                           : undefined,
                     ...(isSelected ? {
-                      boxShadow: `inset 0 0 0 1px ${hexToRgba(EMBER_PALETTE.primary, 0.25)}`,
+                      boxShadow: `inset 0 0 0 1px ${hexToRgba(palette.primary, 0.25)}`,
                     } : {}),
                   }}
                   data-today={isToday(day) || undefined}
@@ -164,22 +165,22 @@ export function MonthView({
                       style={{
                         ...(isToday(day)
                           ? {
-                              backgroundColor: EMBER_PALETTE.primary,
+                              backgroundColor: palette.primary,
                               color: '#fff',
                               fontWeight: 'bold',
-                              boxShadow: `0 0 8px ${hexToRgba(EMBER_PALETTE.primary, 0.4)}`,
+                              boxShadow: `0 0 8px ${hexToRgba(palette.primary, 0.4)}`,
                             }
                           : isSelected
                             ? {
-                                backgroundColor: hexToRgba(EMBER_PALETTE.primary, 0.15),
-                                color: EMBER_PALETTE.primary,
+                                backgroundColor: hexToRgba(palette.primary, 0.15),
+                                color: palette.primary,
                                 fontWeight: 600,
-                                boxShadow: `0 0 0 1px ${hexToRgba(EMBER_PALETTE.primary, 0.35)}`,
+                                boxShadow: `0 0 0 1px ${hexToRgba(palette.primary, 0.35)}`,
                               }
                             : {
                                 color: !isCurrentMonth
-                                  ? hexToRgba(EMBER_PALETTE.text, 0.3)
-                                  : hexToRgba(EMBER_PALETTE.text, 0.7),
+                                  ? hexToRgba(palette.text, 0.3)
+                                  : hexToRgba(palette.text, 0.7),
                               }),
                       }}
                       onClick={(e) => {

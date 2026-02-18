@@ -1,5 +1,5 @@
 import { forwardRef, HTMLAttributes } from 'react';
-import { EMBER_PALETTE, hexToRgba } from '../../lib/three/emberPalette';
+import { useTheme, hexToRgba } from '@/lib/palette';
 
 interface LiquidContainerProps extends HTMLAttributes<HTMLDivElement> {
   size?: { width: number; height: number };
@@ -8,7 +8,9 @@ interface LiquidContainerProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 export const LiquidContainer = forwardRef<HTMLDivElement, LiquidContainerProps>(
-  ({ children, size = { width: 320, height: 220 }, tint = EMBER_PALETTE.primary, padded = true, className = '', style, ...props }, ref) => {
+  ({ children, size = { width: 320, height: 220 }, tint: tintProp, padded = true, className = '', style, ...props }, ref) => {
+    const { palette } = useTheme();
+    const tint = tintProp ?? palette.primary;
     return (
       <div
         ref={ref}
@@ -21,7 +23,7 @@ export const LiquidContainer = forwardRef<HTMLDivElement, LiquidContainerProps>(
           width: size.width,
           height: size.height,
           background: `linear-gradient(135deg, ${hexToRgba(tint, 0.10)} 0%, ${hexToRgba(
-            EMBER_PALETTE.surface,
+            palette.surface,
             0.42,
           )} 55%, ${hexToRgba(tint, 0.06)} 100%)`,
           border: `1px solid ${hexToRgba(tint, 0.16)}`,

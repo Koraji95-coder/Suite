@@ -3,7 +3,7 @@ import { CalendarEvent } from './projectmanagertypes';
 import { getEventChipStyle } from '../calendar/urgencyUtils';
 import { formatDateOnly } from './projectmanagerutils';
 import { GlassPanel } from '@/components/ui/GlassPanel';
-import { EMBER_PALETTE, hexToRgba } from '@/lib/three/emberPalette';
+import { useTheme, hexToRgba } from '@/lib/palette';
 
 interface CalendarViewProps {
   currentMonth: Date;
@@ -20,6 +20,7 @@ export function CalendarView({
   onDateSelect,
   calendarEvents,
 }: CalendarViewProps) {
+  const { palette } = useTheme();
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
@@ -59,7 +60,7 @@ export function CalendarView({
 
   return (
     <GlassPanel
-      tint={EMBER_PALETTE.primary}
+      tint={palette.primary}
       hoverEffect={false}
       bevel
       specular
@@ -68,7 +69,7 @@ export function CalendarView({
       <div className="flex items-center justify-between mb-4">
         <h3
           className="text-2xl font-bold"
-          style={{ color: hexToRgba(EMBER_PALETTE.text, 0.9) }}
+          style={{ color: hexToRgba(palette.text, 0.9) }}
         >
           {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
         </h3>
@@ -77,9 +78,9 @@ export function CalendarView({
             onClick={handlePrevMonth}
             className="px-3 py-1 rounded text-xs font-semibold transition-all"
             style={{
-              background: `linear-gradient(135deg, ${hexToRgba(EMBER_PALETTE.primary, 0.06)} 0%, ${hexToRgba(EMBER_PALETTE.surface, 0.25)} 100%)`,
-              border: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.18)}`,
-              color: EMBER_PALETTE.primary,
+              background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.06)} 0%, ${hexToRgba(palette.surface, 0.25)} 100%)`,
+              border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
+              color: palette.primary,
             }}
           >
             Prev
@@ -88,9 +89,9 @@ export function CalendarView({
             onClick={handleToday}
             className="px-3 py-1 rounded text-xs font-semibold transition-all"
             style={{
-              background: `linear-gradient(135deg, ${hexToRgba(EMBER_PALETTE.primary, 0.06)} 0%, ${hexToRgba(EMBER_PALETTE.surface, 0.25)} 100%)`,
-              border: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.18)}`,
-              color: EMBER_PALETTE.primary,
+              background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.06)} 0%, ${hexToRgba(palette.surface, 0.25)} 100%)`,
+              border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
+              color: palette.primary,
             }}
           >
             Today
@@ -99,9 +100,9 @@ export function CalendarView({
             onClick={handleNextMonth}
             className="px-3 py-1 rounded text-xs font-semibold transition-all"
             style={{
-              background: `linear-gradient(135deg, ${hexToRgba(EMBER_PALETTE.primary, 0.06)} 0%, ${hexToRgba(EMBER_PALETTE.surface, 0.25)} 100%)`,
-              border: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.18)}`,
-              color: EMBER_PALETTE.primary,
+              background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.06)} 0%, ${hexToRgba(palette.surface, 0.25)} 100%)`,
+              border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
+              color: palette.primary,
             }}
           >
             Next
@@ -113,7 +114,7 @@ export function CalendarView({
           <div
             key={day}
             className="text-center font-semibold p-2"
-            style={{ color: hexToRgba(EMBER_PALETTE.text, 0.4) }}
+            style={{ color: hexToRgba(palette.text, 0.4) }}
           >
             {day}
           </div>
@@ -134,17 +135,17 @@ export function CalendarView({
               className="p-2 min-h-[80px] rounded-lg cursor-pointer transition-all"
               style={{
                 border: isToday
-                  ? `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.5)}`
+                  ? `1px solid ${hexToRgba(palette.primary, 0.5)}`
                   : isSelected
-                    ? `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.35)}`
-                    : `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.08)}`,
+                    ? `1px solid ${hexToRgba(palette.primary, 0.35)}`
+                    : `1px solid ${hexToRgba(palette.primary, 0.08)}`,
                 backgroundColor: isToday
-                  ? hexToRgba(EMBER_PALETTE.primary, 0.12)
+                  ? hexToRgba(palette.primary, 0.12)
                   : isSelected
-                    ? hexToRgba(EMBER_PALETTE.primary, 0.06)
-                    : hexToRgba(EMBER_PALETTE.surface, 0.2),
+                    ? hexToRgba(palette.primary, 0.06)
+                    : hexToRgba(palette.surface, 0.2),
                 ...(isToday ? {
-                  boxShadow: `0 0 12px ${hexToRgba(EMBER_PALETTE.primary, 0.2)}`,
+                  boxShadow: `0 0 12px ${hexToRgba(palette.primary, 0.2)}`,
                 } : {}),
               }}
             >
@@ -152,8 +153,8 @@ export function CalendarView({
                 className="font-semibold mb-1"
                 style={{
                   color: isToday
-                    ? EMBER_PALETTE.primary
-                    : hexToRgba(EMBER_PALETTE.text, 0.9),
+                    ? palette.primary
+                    : hexToRgba(palette.text, 0.9),
                 }}
               >
                 {day}
@@ -179,21 +180,21 @@ export function CalendarView({
         <div
           className="mt-4 p-4 rounded-lg"
           style={{
-            backgroundColor: hexToRgba(EMBER_PALETTE.surface, 0.3),
-            border: `1px solid ${hexToRgba(EMBER_PALETTE.primary, 0.12)}`,
+            backgroundColor: hexToRgba(palette.surface, 0.3),
+            border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
           }}
         >
           <div className="flex items-center justify-between mb-2">
             <span
               className="font-semibold"
-              style={{ color: hexToRgba(EMBER_PALETTE.text, 0.8) }}
+              style={{ color: hexToRgba(palette.text, 0.8) }}
             >
               Selected: {formatDateOnly(selectedDate)}
             </span>
             <button
               onClick={() => onDateSelect(null)}
               className="p-1 rounded transition-colors"
-              style={{ color: EMBER_PALETTE.primary }}
+              style={{ color: palette.primary }}
               title="Clear selection"
             >
               <X className="w-4 h-4" />
@@ -203,7 +204,7 @@ export function CalendarView({
             {calendarEvents.filter(e => e.due_date === selectedDate).length === 0 ? (
               <div
                 className="text-sm"
-                style={{ color: hexToRgba(EMBER_PALETTE.text, 0.35) }}
+                style={{ color: hexToRgba(palette.text, 0.35) }}
               >
                 No events this day.
               </div>
@@ -214,7 +215,7 @@ export function CalendarView({
                   <div
                     key={e.id}
                     className="text-sm"
-                    style={{ color: hexToRgba(EMBER_PALETTE.text, 0.9) }}
+                    style={{ color: hexToRgba(palette.text, 0.9) }}
                   >
                     - {e.title}
                   </div>

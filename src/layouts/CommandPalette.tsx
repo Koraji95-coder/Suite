@@ -7,6 +7,7 @@ import {
   LayoutDashboard, FolderKanban, Calendar, FileStack, Share2, BotMessageSquare,
   Settings, Send, Blocks, ShieldCheck, Grid3X3, Calculator, Waypoints,
   Zap, Activity, ShieldEllipsis, FunctionSquare, BookOpen, LineChart, Cpu,
+  Workflow, ClipboardCheck,
 } from "lucide-react";
 
 const GROUPS = [
@@ -16,25 +17,27 @@ const GROUPS = [
     { id: "calendar", label: "Calendar", path: "/calendar", icon: Calendar },
     { id: "files", label: "Files", path: "/files", icon: FileStack },
     { id: "graph", label: "Graph", path: "/graph", icon: Share2 },
-    { id: "ai-chat", label: "AI Chat", path: "/ai-chat", icon: BotMessageSquare },
+    { id: "ai", label: "AI Chat", path: "/ai", icon: BotMessageSquare },
     { id: "settings", label: "Settings", path: "/settings", icon: Settings },
   ]},
   { name: "Apps", items: [
-    { id: "transmittal-builder", label: "Transmittal Builder", path: "/apps/transmittal-builder", icon: Send },
+    { id: "transmittal", label: "Transmittal Builder", path: "/apps/transmittal", icon: Send },
     { id: "block-library", label: "Block Library", path: "/apps/block-library", icon: Blocks },
-    { id: "qaqc-checker", label: "QA/QC Checker", path: "/apps/qaqc-checker", icon: ShieldCheck },
+    { id: "qaqc", label: "QA/QC Checker", path: "/apps/qaqc", icon: ShieldCheck },
     { id: "ground-grid", label: "Ground Grid", path: "/apps/ground-grid", icon: Grid3X3 },
+    { id: "automation", label: "Automation", path: "/apps/automation", icon: Workflow },
+    { id: "standards", label: "Standards Checker", path: "/apps/standards", icon: ClipboardCheck },
   ]},
   { name: "Knowledge", items: [
     { id: "calculator", label: "Calculator", path: "/knowledge/calculator", icon: Calculator },
     { id: "vectors", label: "Vectors", path: "/knowledge/vectors", icon: Waypoints },
-    { id: "three-phase", label: "Three-Phase", path: "/knowledge/three-phase", icon: Zap },
+    { id: "threephase", label: "Three-Phase", path: "/knowledge/threephase", icon: Zap },
     { id: "sinusoidal", label: "Sinusoidal", path: "/knowledge/sinusoidal", icon: Activity },
     { id: "symmetrical", label: "Symmetrical", path: "/knowledge/symmetrical", icon: ShieldEllipsis },
     { id: "formulas", label: "Formulas", path: "/knowledge/formulas", icon: FunctionSquare },
-    { id: "math-reference", label: "Math Reference", path: "/knowledge/math-reference", icon: BookOpen },
-    { id: "plot-generator", label: "Plot Generator", path: "/knowledge/plot-generator", icon: LineChart },
-    { id: "circuit-generator", label: "Circuit Generator", path: "/knowledge/circuit-generator", icon: Cpu },
+    { id: "math-ref", label: "Math Reference", path: "/knowledge/math-ref", icon: BookOpen },
+    { id: "plot", label: "Plot Generator", path: "/knowledge/plot", icon: LineChart },
+    { id: "circuit", label: "Circuit Generator", path: "/knowledge/circuit", icon: Cpu },
   ]},
 ];
 
@@ -66,6 +69,8 @@ export function CommandPalette() {
   const rgba = hexToRgba;
   return (
     <div
+      role="dialog"
+      aria-modal="true"
       style={{
         position: "fixed", inset: 0, zIndex: 9999, display: "flex",
         alignItems: "flex-start", justifyContent: "center", paddingTop: "20vh",
@@ -73,8 +78,12 @@ export function CommandPalette() {
         backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
       }}
       onClick={() => setOpen(false)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setOpen(false);
+      }}
     >
       <div
+        aria-label="Command palette"
         style={{
           width: "min(560px, 90vw)", overflow: "hidden", borderRadius: "1rem",
           background: `linear-gradient(135deg, ${rgba(palette.surface, 0.85)} 0%, ${rgba(palette.surfaceLight, 0.75)} 100%)`,

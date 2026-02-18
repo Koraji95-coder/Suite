@@ -54,7 +54,7 @@ export function TabBar() {
               fontWeight: active ? 500 : 400,
               cursor: "pointer",
               whiteSpace: "nowrap",
-              transition: "all 0.15s ease",
+              transition: "background 0.15s ease, color 0.15s ease, font-weight 0.15s ease",
               position: "relative",
             }}
             onMouseEnter={(e) => {

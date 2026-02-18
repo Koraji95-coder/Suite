@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Send, Bot } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import type { Message } from '@/lib/ai/types';
@@ -34,23 +34,129 @@ function StreamingDots({ color }: { color: string }) {
   );
 }
 
+/**
+ * Renders assistant message content with basic inline formatting:
+ * - `code` becomes <code> elements
+ * - **bold** becomes <strong> elements
+ * - Whitespace is preserved via pre-wrap on the container
+ */
+function renderFormattedContent(content: string, palette: { primary: string; surfaceLight: string }) {
+  if (!content) return null;
+
+  // Split by backtick-wrapped code segments first, then handle bold within non-code segments
+  const parts: React.ReactNode[] = [];
+  const codeRegex = /`([^`]+)`/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = codeRegex.exec(content)) !== null) {
+    // Process text before this code match for bold markers
+    if (match.index > lastIndex) {
+      parts.push(...renderBoldSegments(content.slice(lastIndex, match.index), parts.length, palette));
+    }
+    // Render the inline code
+    parts.push(
+      <code
+        key={`code-${match.index}`}
+        style={{
+          background: hexToRgba(palette.surfaceLight, 0.8),
+          border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+          borderRadius: 4,
+          padding: '1px 5px',
+          fontSize: '0.9em',
+          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+        }}
+      >
+        {match[1]}
+      </code>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Process remaining text after last code match
+  if (lastIndex < content.length) {
+    parts.push(...renderBoldSegments(content.slice(lastIndex), parts.length, palette));
+  }
+
+  return parts;
+}
+
+function renderBoldSegments(
+  text: string,
+  keyOffset: number,
+  _palette: { primary: string; surfaceLight: string }
+): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const boldRegex = /\*\*(.+?)\*\*/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = boldRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <strong key={`bold-${keyOffset}-${match.index}`}>
+        {match[1]}
+      </strong>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+}
+
+const TEXTAREA_MAX_HEIGHT = 160;
+const SCROLL_NEAR_BOTTOM_THRESHOLD = 80;
+
 export function ChatArea({ messages, onSend, isStreaming }: ChatAreaProps) {
   const { palette } = useTheme();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isNearBottomRef = useRef(true);
 
+  // Track whether the user is near the bottom of the scroll container
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distanceFromBottom <= SCROLL_NEAR_BOTTOM_THRESHOLD;
+  }, []);
+
+  // Auto-scroll only when already near the bottom
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && isNearBottomRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Auto-grow the textarea as the user types
+  const adjustTextareaHeight = useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    // Reset to auto so shrinking works when lines are deleted
+    el.style.height = 'auto';
+    const scrollH = el.scrollHeight;
+    el.style.height = `${Math.min(scrollH, TEXTAREA_MAX_HEIGHT)}px`;
+    el.style.overflowY = scrollH > TEXTAREA_MAX_HEIGHT ? 'auto' : 'hidden';
+  }, []);
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [input, adjustTextareaHeight]);
 
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed || isStreaming) return;
     onSend(trimmed);
     setInput('');
+    // After sending, force scroll to bottom
+    isNearBottomRef.current = true;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -59,6 +165,15 @@ export function ChatArea({ messages, onSend, isStreaming }: ChatAreaProps) {
       handleSend();
     }
   };
+
+  // Determine whether the streaming dots indicator should appear.
+  // Only show the standalone dots block when streaming AND the last
+  // assistant message has no content yet (i.e. we haven't started
+  // receiving text from the model).
+  const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+  const showStreamingDots =
+    isStreaming &&
+    (!lastMsg || lastMsg.role !== 'assistant' || !lastMsg.content);
 
   return (
     <div
@@ -72,6 +187,7 @@ export function ChatArea({ messages, onSend, isStreaming }: ChatAreaProps) {
     >
       <div
         ref={scrollRef}
+        onScroll={handleScroll}
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -83,6 +199,7 @@ export function ChatArea({ messages, onSend, isStreaming }: ChatAreaProps) {
       >
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
+          const isAssistant = msg.role === 'assistant';
           return (
             <div
               key={msg.id}
@@ -129,13 +246,24 @@ export function ChatArea({ messages, onSend, isStreaming }: ChatAreaProps) {
                   wordBreak: 'break-word',
                 }}
               >
-                {msg.content}
+                {isAssistant
+                  ? renderFormattedContent(msg.content, palette)
+                  : msg.content}
+                {/* Show dots inline for the currently-streaming assistant message when content has started */}
+                {isAssistant &&
+                  isStreaming &&
+                  msg === lastMsg &&
+                  msg.content && (
+                    <span style={{ marginLeft: 4 }}>
+                      <StreamingDots color={palette.primary} />
+                    </span>
+                  )}
               </div>
             </div>
           );
         })}
 
-        {isStreaming && (
+        {showStreamingDots && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
             <div
               style={{
@@ -172,17 +300,18 @@ export function ChatArea({ messages, onSend, isStreaming }: ChatAreaProps) {
           borderTop: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
           display: 'flex',
           gap: 8,
-          alignItems: 'center',
+          alignItems: 'flex-end',
           background: palette.surface,
         }}
       >
-        <input
-          ref={inputRef}
+        <textarea
+          ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
           disabled={isStreaming}
+          rows={1}
           style={{
             flex: 1,
             padding: '10px 14px',
@@ -191,8 +320,13 @@ export function ChatArea({ messages, onSend, isStreaming }: ChatAreaProps) {
             background: hexToRgba(palette.surfaceLight, 0.5),
             color: palette.text,
             fontSize: 13,
+            lineHeight: 1.55,
             outline: 'none',
             transition: 'border-color 0.2s ease',
+            resize: 'none',
+            fontFamily: 'inherit',
+            maxHeight: TEXTAREA_MAX_HEIGHT,
+            overflowY: 'hidden',
           }}
           onFocus={(e) => {
             e.currentTarget.style.borderColor = hexToRgba(palette.primary, 0.4);

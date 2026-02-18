@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
-import { EMBER_PALETTE } from './emberPalette';
+import { EMBER_PALETTE } from '@/lib/palette';
 
 export interface HyphaeRendererOptions {
   clearColor?: string;

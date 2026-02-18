@@ -17,15 +17,18 @@ export function useFiles(bucket = DEFAULT_BUCKET, basePath = '', projectId?: str
         .from(bucket)
         .list(path, { sortBy: { column: 'name', order: 'asc' } });
       if (listError) throw listError;
-      const mapped: StorageFile[] = (data ?? []).map(f => ({
-        name: f.name,
-        id: f.id ?? f.name,
-        size: f.metadata?.size ?? 0,
-        type: f.metadata?.mimetype ?? (f.id ? 'file' : 'folder'),
-        created_at: f.created_at ?? '',
-        updated_at: f.updated_at ?? f.created_at ?? '',
-        metadata: (f.metadata as Record<string, unknown>) ?? {},
-      }));
+      const mapped: StorageFile[] = (data ?? []).map(f => {
+        const isFolder = !f.id;
+        return {
+          name: f.name,
+          id: f.id ?? f.name,
+          size: f.metadata?.size ?? 0,
+          type: isFolder ? 'folder' : (f.metadata?.mimetype ?? 'file'),
+          created_at: f.created_at ?? '',
+          updated_at: f.updated_at ?? f.created_at ?? '',
+          metadata: (f.metadata as Record<string, unknown>) ?? {},
+        };
+      });
       const filtered = projectId
         ? mapped.filter(f => f.metadata?.projectId === projectId)
         : mapped;

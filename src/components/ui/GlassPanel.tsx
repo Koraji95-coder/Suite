@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useMemo, useRef } from 'react';
-import { EMBER_PALETTE, hexToRgba } from '../../lib/three/emberPalette';
+import { useTheme, hexToRgba } from '@/lib/palette';
 
 export interface GlassPanelProps extends React.HTMLAttributes<HTMLDivElement> {
   intensity?: 'low' | 'medium' | 'high';
@@ -31,7 +31,7 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
       intensity = 'medium',
       liquid = false,
       hoverEffect = true,
-      tint = EMBER_PALETTE.primary,
+      tint: tintProp,
       specular = true,
       bevel = true,
       pulse = false,
@@ -50,6 +50,8 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
     },
     ref,
   ) => {
+    const { palette } = useTheme();
+    const tint = tintProp ?? palette.primary;
     const blur = BLUR[intensity] ?? 22;
     const bgAlpha = BG_OPACITY[intensity] ?? 0.13;
 
@@ -122,13 +124,13 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 
       background:
         variant === 'toolbar'
-          ? `linear-gradient(180deg, ${hexToRgba(EMBER_PALETTE.surface, 0.72)} 0%, ${hexToRgba(
-              EMBER_PALETTE.surface,
+          ? `linear-gradient(180deg, ${hexToRgba(palette.surface, 0.72)} 0%, ${hexToRgba(
+              palette.surface,
               0.58,
             )} 100%)`
           : `linear-gradient(135deg,
               ${hexToRgba(tint, bgAlpha)} 0%,
-              ${hexToRgba(EMBER_PALETTE.surface, 0.50)} 48%,
+              ${hexToRgba(palette.surface, 0.50)} 48%,
               ${hexToRgba(tint, bgAlpha * 0.45)} 100%)`,
 
       backdropFilter: `blur(${blur}px) saturate(1.35)`,

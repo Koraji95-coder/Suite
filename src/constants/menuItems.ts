@@ -1,7 +1,8 @@
 import {
   LayoutDashboard, FolderOpen, HardDrive, AppWindow, BookOpen,
   FileText, Settings, Network, Calculator, Compass, Zap, GitBranch,
-  Activity, CircuitBoard, Cpu, Binary, Waves, CheckCircle, FlaskConical, CalendarDays
+  Activity, CircuitBoard, Cpu, Binary, Waves, CheckCircle, FlaskConical, CalendarDays,
+  Bot
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -68,6 +69,7 @@ export const sidebarNavItems: (MenuItem & { isCategory?: boolean })[] = [
   { id: 'appshub', icon: AppWindow, label: 'Apps', color: 'teal' },
   { id: 'knowledge', icon: BookOpen, label: 'Knowledge', color: 'blue', isCategory: true },
   { divider: true } as any,
+  { id: 'agent', icon: Bot, label: 'Agent', color: 'purple' },
   { id: 'architecture-map', icon: Network, label: 'Arch Map', color: 'purple' },
   { divider: true } as any,
   { id: 'test-preview', icon: FlaskConical, label: 'Test Preview', color: 'purple' },

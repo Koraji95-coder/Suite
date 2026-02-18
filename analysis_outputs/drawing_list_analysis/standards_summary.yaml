@@ -1,0 +1,131 @@
+standards:
+  sources:
+    - path: /workspaces/Research/drawing_list/drawing_list_manager.py
+      type: code
+      role: reference_implementation
+      notes: "Primary source for drawing list header normalization, parsing, and validation patterns."
+    - path: /workspaces/Research/transmittal_builder/transmittal_builder.py
+      type: code
+      role: reference_implementation
+      notes: "Primary source for transmittal-oriented field expectations and normalize-before-validate approach."
+    - path: /workspaces/Suite/analysis_outputs/drawing_list_analysis/drawing_list_manager.py
+      type: code
+      role: target_implementation
+      notes: "Docstrings updated to encode standards and traceability to research sources."
+
+  r3p_spec:
+    found: false
+    notes: "No explicit R3P-SPEC document/sections were found in the provided research directories. Provide the spec path to add section-level citations."
+
+  canonical_fields:
+    drawing_number:
+      description: "Primary drawing identifier used in drawing lists and transmittal registers."
+      required: true
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+        - /workspaces/Research/transmittal_builder/transmittal_builder.py
+    title:
+      description: "Human-readable drawing title/description."
+      required: true
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+        - /workspaces/Research/transmittal_builder/transmittal_builder.py
+    revision:
+      description: "Revision identifier for the drawing/sheet."
+      required: true
+      normalization:
+        strip_whitespace: true
+        uppercase: true
+        allow_multiple_formats: true
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+        - /workspaces/Research/transmittal_builder/transmittal_builder.py
+    sheet_number:
+      description: "Sheet index used for ordering/grouping when numeric."
+      required: false
+      parsing:
+        numeric_to_int: true
+        non_numeric_to_null: true
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+    date:
+      description: "Issue/transmittal date (format rules not explicitly specified in provided sources)."
+      required: false
+      evidence:
+        - /workspaces/Research/transmittal_builder/transmittal_builder.py
+    status:
+      description: "Issue status (e.g., issued/for review). Specific enumerations not found in provided sources."
+      required: false
+      evidence:
+        - /workspaces/Research/transmittal_builder/transmittal_builder.py
+    discipline:
+      description: "Discipline/trade classification. Specific code lists not found in provided sources."
+      required: false
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+
+  rules:
+    header_normalization:
+      id: header_normalization
+      statement: "Normalize raw spreadsheet headers before matching/mapping to canonical fields."
+      implemented_in:
+        - /workspaces/Suite/analysis_outputs/drawing_list_analysis/drawing_list_manager.py:normalize_column_name
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+      details:
+        lowercase: true
+        trim: true
+        collapse_whitespace: true
+        punctuation_to_space: true
+
+    header_alias_mapping:
+      id: header_alias_mapping
+      statement: "Support multiple synonymous header names mapping to the same canonical field."
+      implemented_in:
+        - /workspaces/Suite/analysis_outputs/drawing_list_analysis/drawing_list_manager.py:detect_header_mapping
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+      notes: "Exact alias sets depend on project/client; research code embodies the approach."
+
+    required_columns_presence:
+      id: required_columns_presence
+      statement: "Validate that required canonical columns exist after mapping; report missing columns."
+      implemented_in:
+        - /workspaces/Suite/analysis_outputs/drawing_list_analysis/drawing_list_manager.py:validate_required_columns
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+
+    sheet_number_parsing:
+      id: sheet_number_parsing
+      statement: "Parse sheet numbers to integers when numeric; do not fail on non-numeric values."
+      implemented_in:
+        - /workspaces/Suite/analysis_outputs/drawing_list_analysis/drawing_list_manager.py:parse_sheet_number
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+
+    revision_normalization:
+      id: revision_normalization
+      statement: "Treat revision as required identifier; normalize by trimming and uppercasing; do not enforce a single global format."
+      implemented_in:
+        - /workspaces/Suite/analysis_outputs/drawing_list_analysis/drawing_list_manager.py:parse_revision
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+        - /workspaces/Research/transmittal_builder/transmittal_builder.py
+
+    row_validation_transmittal_ready:
+      id: row_validation_transmittal_ready
+      statement: "Validate each row has enough metadata for transmittal: drawing_number, title, revision; sheet_number numeric if present."
+      implemented_in:
+        - /workspaces/Suite/analysis_outputs/drawing_list_analysis/drawing_list_manager.py:validate_row
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+        - /workspaces/Research/transmittal_builder/transmittal_builder.py
+
+    pipeline_returns_error_report:
+      id: pipeline_returns_error_report
+      statement: "Prefer returning a full error report dataframe over failing fast on first invalid row."
+      implemented_in:
+        - /workspaces/Suite/analysis_outputs/drawing_list_analysis/drawing_list_manager.py:build_drawing_list
+      evidence:
+        - /workspaces/Research/drawing_list/drawing_list_manager.py
+

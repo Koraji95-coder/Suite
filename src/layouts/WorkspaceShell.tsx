@@ -31,6 +31,7 @@ const CircuitGenerator = React.lazy(() => import("@/components/CircuitGenerator"
 const StoragePanel = React.lazy(() => import("@/components/storage/StoragePanel").then(m => ({ default: m.StoragePanel })));
 const GraphVisualization = React.lazy(() => import("@/components/graph/GraphVisualization").then(m => ({ default: m.GraphVisualization })));
 const AIPanel = React.lazy(() => import("@/components/ai-unified/AIPanel").then(m => ({ default: m.AIPanel })));
+const AgentPanel = React.lazy(() => import("@/components/AgentPanel").then(m => ({ default: m.AgentPanel })));
 const LoginPage = React.lazy(() => import("@/pages/LoginPage").then(m => ({ default: m.LoginPage })));
 const SignupPage = React.lazy(() => import("@/pages/SignupPage").then(m => ({ default: m.SignupPage })));
 const SettingsPage = React.lazy(() => import("@/components/settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
@@ -154,6 +155,7 @@ function ShellContent() {
               <Route path="/files" element={<StoragePanel />} />
               <Route path="/graph" element={<GraphVisualization />} />
               <Route path="/ai" element={<AIPanel />} />
+              <Route path="/agent" element={<AgentPanel />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />

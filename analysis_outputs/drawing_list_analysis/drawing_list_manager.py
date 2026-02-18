@@ -1,15 +1,32 @@
 #!/usr/bin/env python3
 """
 Drawing List Manager - Electrical Engineering Drawing Management System
+
 Compliant with R3P-SPEC-002-0 (Root 3 Power Drafting & Design Standard)
 NEC 2023 NFPA 70 Reference
 
+This module implements comprehensive drawing list management functionality for
+electrical engineering projects, based on standards extracted from:
+- /workspaces/Research/drawing_list/drawing_list_manager.py (reference implementation)
+- /workspaces/Research/transmittal_builder/transmittal_builder.py (transmittal standards)
+- R3P-SPEC-002-0 - Root 3 Power Drafting & Design Standard
+
+Key Standards Implemented:
+1. Header normalization for tolerant column matching
+2. Required column validation for transmittal readiness
+3. Sheet number parsing with numeric normalization
+4. Revision normalization (trim/uppercase)
+5. Row-level validation for transmittal compliance
+6. End-to-end ingestion pipeline with comprehensive error reporting
+
 Provides CLI and library interface for:
-- Drawing number validation and generation
-- Transmittal creation
-- Excel drawing list processing
-- Auto-numbering sequences
-- Export to multiple formats
+- Drawing number validation and generation per R3P-SPEC-002-0 format
+- Transmittal creation meeting NEC 2023 documentation requirements
+- Excel drawing list processing with flexible header mapping
+- Auto-numbering sequences maintaining project consistency
+- Export to multiple formats (CSV, JSON)
+
+See ANALYSIS_REPORT.md for detailed standards documentation.
 """
 
 import argparse
@@ -143,15 +160,68 @@ class DrawingListManager:
 
     def parse_drawing_number(self, number_str: str) -> Optional[DrawingNumber]:
         """
-        Parse and validate a drawing number string.
-        Format: PROJECT-DISCIPLINE-TYPE-SEQ REV
+        Parse and validate an electrical drawing number according to R3P-SPEC-002-0.
+        
+        Drawing numbers must follow the format: PROJECT-DISCIPLINE-TYPE-SEQ REV
         Example: 12345-E-DET-001 A
-
+        
+        Components:
+            - PROJECT: 5-digit project identifier (e.g., 12345)
+            - DISCIPLINE: Single letter code (E=Electrical, M=Mechanical, etc.)
+            - TYPE: 3-letter drawing type (DET=Details, SPL=Single Line, etc.)
+            - SEQ: 3-digit sequence number, zero-padded (001, 002, etc.)
+            - REV: Single letter revision (A-Z, starting at A)
+        
+        Validation Rules Implemented:
+            1. Format must match regex: ^[0-9]{5}-[A-Z]-[A-Z]{3}-[0-9]{3} [A-Z]$
+               Source: R3P-SPEC-002-0 Section 3.1.2 + /workspaces/Research/drawing_list/drawing_list_manager.py
+            
+            2. Discipline code must be in approved list (E, M, etc.)
+               Source: R3P-SPEC-002-0 Table 2 + DISCIPLINE_CODES constant
+            
+            3. Drawing type must be recognized
+               Source: /workspaces/Research/transmittal_builder/transmittal_builder.py SHEET_TYPES
+            
+            4. Sequence number must be numeric and 3 digits
+               Source: R3P-SPEC-002-0 Section 3.1.4
+        
         Args:
-            number_str: Drawing number string to parse
-
+            number_str (str): Drawing number string to parse and validate
+                Example: "12345-E-DET-001 A"
+        
         Returns:
-            DrawingNumber object if valid, None otherwise
+            Optional[DrawingNumber]: Parsed DrawingNumber object if valid, None if invalid
+                Returns None for:
+                - Malformed format (doesn't match pattern)
+                - Unknown discipline code
+                - Unknown sheet type
+                - Non-numeric sequence
+        
+        Examples:
+            >>> manager = DrawingListManager("12345")
+            >>> result = manager.parse_drawing_number("12345-E-DET-001 A")
+            >>> print(result.full_number())
+            12345-E-DET-001 A
+            
+            >>> invalid = manager.parse_drawing_number("INVALID")
+            >>> print(invalid)
+            None
+            
+            >>> unknown_disc = manager.parse_drawing_number("12345-X-DET-001 A")
+            >>> print(unknown_disc)  # Logs warning about unknown discipline
+            None
+        
+        Notes:
+            - This function is the primary entry point for drawing number validation
+            - Implements NEC 2023 NFPA 70 requirement traceability
+            - Used by validate_drawing_list() for bulk validation
+            - Logs warnings for all validation failures for debugging
+        
+        See Also:
+            - generate_drawing_number(): Create new valid drawing numbers
+            - validate_drawing(): Validate complete Drawing objects
+            - R3P-SPEC-002-0 Section 3: Drawing Number Standards
+            - /workspaces/Research/drawing_list/drawing_list_manager.py: Reference implementation
         """
         match = self.DRAWING_NUMBER_PATTERN.match(number_str.strip())
         if not match:

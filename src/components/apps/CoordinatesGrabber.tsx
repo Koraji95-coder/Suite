@@ -11,13 +11,37 @@ interface CoordinatesGrabberState {
   decimalPlaces: number;
   scanSelection: boolean;
   includeModelspace: boolean;
-  activeTab: 'config' | 'log' | 'export';
+  activeTab: 'config' | 'log' | 'export' | 'history';
   logs: string[];
   excelPath: string;
   isRunning: boolean;
   backendConnected: boolean;
   availableLayers: string[];
   selectionCount: number;
+  executionHistory: ExecutionHistoryEntry[];
+  validationErrors: string[];
+  performanceMetrics?: PerformanceMetrics;
+}
+
+interface ExecutionHistoryEntry {
+  timestamp: number;
+  config: Partial<CoordinatesGrabberState>;
+  success: boolean;
+  pointsCreated?: number;
+  duration: number;
+  fileSize?: number;
+  filePath?: string;
+  message?: string;
+}
+
+interface PerformanceMetrics {
+  startTime: number;
+  endTime?: number;
+  duration: number;
+  pointsCreated: number;
+  geometriesProcessed: number;
+  fileSize: number;
+  pointsPerSecond: number;
 }
 
 interface ToolTip {
@@ -58,6 +82,8 @@ const DEFAULT_STATE: CoordinatesGrabberState = {
   backendConnected: false,
   availableLayers: [],
   selectionCount: 0,
+  executionHistory: [],
+  validationErrors: [],
 };
 
 // Error Boundary Component
@@ -150,6 +176,27 @@ export function CoordinatesGrabber() {
     });
   }, [configHistory, historyIndex]);
 
+  // Setup WebSocket event listeners for real-time progress
+  const setupWebSocketListeners = useCallback(() => {
+    coordinatesGrabberService.on('progress', (data: any) => {
+      setProgress(data.percentage || 0);
+      if (data.message) {
+        addLog(`[PROGRESS] ${data.message}`);
+      }
+    });
+
+    coordinatesGrabberService.on('complete', (data: any) => {
+      addLog(`[SUCCESS] Operation completed`);
+      if (data.message) {
+        addLog(`[INFO] ${data.message}`);
+      }
+    });
+
+    coordinatesGrabberService.on('error', (data: any) => {
+      addLog(`[ERROR] Backend error: ${data.message || 'Unknown error'}`);
+    });
+  }, [addLog]);
+
   // Initialize backend connection on mount
   useEffect(() => {
     const initBackend = async () => {
@@ -171,6 +218,8 @@ export function CoordinatesGrabber() {
           try {
             await coordinatesGrabberService.connectWebSocket();
             addLog('[INFO] WebSocket connection established for real-time updates');
+            // Setup event listeners for real-time progress
+            setupWebSocketListeners();
           } catch (err) {
             addLog('[INFO] WebSocket unavailable, using HTTP polling');
           }
@@ -188,7 +237,7 @@ export function CoordinatesGrabber() {
     return () => {
       coordinatesGrabberService.disconnect();
     };
-  }, [addLog]);
+  }, [addLog, setupWebSocketListeners]);
 
   // Undo function
   const handleUndo = useCallback(() => {
@@ -271,26 +320,31 @@ export function CoordinatesGrabber() {
   };
 
   const handleLayerSearch = async () => {
-    if (!state.layerName.trim()) {
-      addLog('[ERROR] Please enter a layer name');
-      return;
-    }
-
     if (!state.backendConnected) {
       addLog('[ERROR] Not connected to AutoCAD backend');
       return;
     }
 
-    setState(prev => ({ ...prev, isRunning: true }));
+    // Validate configuration first
+    if (!validateConfiguration()) {
+      addLog('[ERROR] Configuration validation failed - see errors above');
+      return;
+    }
+
+    setState(prev => ({ ...prev, isRunning: true, validationErrors: [] }));
+    const executionStartTime = Date.now();
     
     addLog(`[PROCESSING] Starting layer search on layer: "${state.layerName}"`);
     addLog(`[PROCESSING] Style: ${state.extractionStyle === 'corners' ? '4 corners' : 'center point'}`);
     addLog(`[INFO] Point naming: ${state.pointPrefix}${state.startNumber}`);
+    addLog(`[INFO] Precision: ${state.decimalPlaces} decimal places`);
     
     try {
-      // Simulate progress updates
+      // Progress updates
       setProgress(10);
+      addLog('[PROCESSING] Preparing request...');
       
+      setProgress(20);
       const result = await coordinatesGrabberService.execute({
         mode: state.mode,
         precision: state.decimalPlaces,
@@ -319,13 +373,59 @@ export function CoordinatesGrabber() {
       setProgress(90);
 
       if (result.success) {
-        setState(prev => ({ ...prev, excelPath: result.excel_path || '' }));
-        addLog(`[SUCCESS] Export complete: ${result.excel_path}`);
-        addLog(`[INFO] Points created: ${result.points_created}`);
-        if (result.duration_seconds) {
-          addLog(`[INFO] Duration: ${result.duration_seconds.toFixed(2)}s`);
-        }
+        const pointsCreated = result.points_created || 0;
+        const filePath = result.excel_path || '';
+        const duration = (Date.now() - executionStartTime) / 1000;
+        
+        // Calculate and store metrics
+        const metrics = calculateMetrics(executionStartTime, pointsCreated, 0);
+        
+        // Save execution result to history
+        const historyEntry: ExecutionHistoryEntry = {
+          timestamp: Date.now(),
+          config: {
+            mode: state.mode,
+            layerName: state.layerName,
+            extractionStyle: state.extractionStyle,
+            pointPrefix: state.pointPrefix,
+            decimalPlaces: state.decimalPlaces,
+          },
+          success: true,
+          pointsCreated,
+          duration,
+          filePath,
+        };
+        
+        saveExecutionResult(historyEntry);
+        
+        // Update state with results
+        setState(prev => ({ 
+          ...prev, 
+          excelPath: filePath,
+          performanceMetrics: metrics,
+        }));
+        
+        // Log results
+        addLog(`[SUCCESS] Export complete: ${filePath}`);
+        addLog(`[INFO] Points created: ${pointsCreated}`);
+        addLog(`[INFO] Duration: ${duration.toFixed(2)}s`);
+        addLog(`[INFO] Performance: ${metrics.pointsPerSecond} points/second`);
+        addLog('[SUCCESS] Execution history updated');
       } else {
+        // Log failed execution
+        const historyEntry: ExecutionHistoryEntry = {
+          timestamp: Date.now(),
+          config: {
+            mode: state.mode,
+            layerName: state.layerName,
+          },
+          success: false,
+          duration: (Date.now() - executionStartTime) / 1000,
+          message: result.message,
+        };
+        
+        saveExecutionResult(historyEntry);
+        
         addLog(`[ERROR] ${result.message}`);
         if (result.error_details) {
           addLog(`[ERROR] Details: ${result.error_details}`);
@@ -334,6 +434,17 @@ export function CoordinatesGrabber() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       addLog(`[ERROR] Execution failed: ${message}`);
+      
+      // Save failed execution
+      const historyEntry: ExecutionHistoryEntry = {
+        timestamp: Date.now(),
+        config: { mode: state.mode },
+        success: false,
+        duration: (Date.now() - executionStartTime) / 1000,
+        message,
+      };
+      
+      saveExecutionResult(historyEntry);
     } finally {
       setState(prev => ({ ...prev, isRunning: false }));
       setProgress(0);
@@ -343,6 +454,86 @@ export function CoordinatesGrabber() {
   const handleClearLogs = () => {
     setState(prev => ({ ...prev, logs: [] }));
   };
+
+  // Validate configuration before execution
+  const validateConfiguration = useCallback((): boolean => {
+    const errors: string[] = [];
+    
+    if (state.mode === 'layer_search' && !state.layerName.trim()) {
+      errors.push('Layer name is required for layer search mode');
+    }
+    
+    if (!state.pointPrefix.trim()) {
+      errors.push('Point prefix cannot be empty');
+    }
+    
+    if (state.startNumber < 1) {
+      errors.push('Start number must be at least 1');
+    }
+    
+    if (state.decimalPlaces < 0 || state.decimalPlaces > 12) {
+      errors.push('Decimal places must be between 0 and 12');
+    }
+    
+    if (state.pointPrefix.length > 10) {
+      errors.push('Point prefix must be 10 characters or less');
+    }
+    
+    setState(prev => ({ ...prev, validationErrors: errors }));
+    
+    if (errors.length > 0) {
+      errors.forEach(err => addLog(`[VALIDATION] ${err}`));
+    }
+    
+    return errors.length === 0;
+  }, [state, addLog]);
+
+  // Save execution result to history
+  const saveExecutionResult = useCallback((entry: ExecutionHistoryEntry) => {
+    setState(prev => ({
+      ...prev,
+      executionHistory: [entry, ...prev.executionHistory].slice(0, 50), // Keep last 50
+    }));
+  }, []);
+
+  // Calculate performance metrics
+  const calculateMetrics = useCallback((startTime: number, pointsCreated: number, fileSize: number): PerformanceMetrics => {
+    const duration = (Date.now() - startTime) / 1000;
+    return {
+      startTime,
+      duration,
+      pointsCreated,
+      geometriesProcessed: 0, // Would be populated by backend
+      fileSize,
+      pointsPerSecond: Math.round((pointsCreated / duration) * 100) / 100,
+    };
+  }, []);
+
+  // Download result file
+  const downloadResult = useCallback(async () => {
+    if (!state.excelPath) {
+      addLog('[ERROR] No export file available to download');
+      return;
+    }
+    try {
+      addLog('[INFO] Initiating download...');
+      const response = await fetch(`/api/download-result?path=${encodeURIComponent(state.excelPath)}`);
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `coordinates_${Date.now()}.xlsx`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+        addLog('[SUCCESS] File downloaded successfully');
+      } else {
+        addLog('[ERROR] Failed to download file');
+      }
+    } catch (err) {
+      addLog(`[ERROR] Download failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }, [state.excelPath, addLog]);
 
   const handleSelectionRefresh = async () => {
     try {
@@ -471,7 +662,7 @@ export function CoordinatesGrabber() {
           borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
         }}
       >
-        {(['config', 'log', 'export'] as const).map(tab => (
+        {(['config', 'log', 'export', 'history'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setState(prev => ({ ...prev, activeTab: tab }))}
@@ -490,6 +681,7 @@ export function CoordinatesGrabber() {
             {tab === 'config' && 'Configuration'}
             {tab === 'log' && 'Activity Log'}
             {tab === 'export' && 'Export'}
+            {tab === 'history' && `History (${state.executionHistory.length})`}
           </button>
         ))}
       </div>
@@ -498,6 +690,28 @@ export function CoordinatesGrabber() {
       {state.activeTab === 'config' && (
         <div style={{ flex: 1, overflow: 'auto' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Validation Errors */}
+            {state.validationErrors.length > 0 && (
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: '8px',
+                  background: hexToRgba('#ff6b6b', 0.1),
+                  border: `1px solid ${hexToRgba('#ff6b6b', 0.3)}`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '14px', color: '#ff6b6b' }}>⚠️</span>
+                  <span style={{ color: '#ff6b6b', fontSize: '12px', fontWeight: '600' }}>Validation Errors</span>
+                </div>
+                <ul style={{ margin: '0', paddingLeft: '20px', color: '#ff6b6b', fontSize: '11px' }}>
+                  {state.validationErrors.map((err, idx) => (
+                    <li key={idx}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* Mode Selection */}
             <div
               style={{
@@ -850,6 +1064,26 @@ export function CoordinatesGrabber() {
               >
                 {state.isRunning ? '⏳ Running...' : '▶ Run Layer Search'}
               </button>
+              <button
+                disabled={state.isRunning || !state.backendConnected || !validateConfiguration()}
+                style={{
+                  flex: 1,
+                  minWidth: '120px',
+                  padding: '10px 16px',
+                  borderRadius: '6px',
+                  border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+                  background: 'transparent',
+                  color: state.backendConnected ? palette.primary : palette.textMuted,
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  cursor: state.backendConnected && !state.isRunning ? 'pointer' : 'not-allowed',
+                  opacity: state.isRunning ? 0.6 : 1,
+                  transition: 'opacity 0.2s',
+                }}
+                title="Coming soon: Preview extraction without saving results"
+              >
+                👁️ Dry Run (Coming Soon)
+              </button>
               {state.mode === 'blocks' && (
                 <button
                   onClick={handleSelectionRefresh}
@@ -998,6 +1232,21 @@ export function CoordinatesGrabber() {
                   >
                     📂 Open Export Location
                   </button>
+                  <button
+                    onClick={downloadResult}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '4px',
+                      border: `1px solid ${hexToRgba('#4dabf7', 0.3)}`,
+                      background: hexToRgba('#4dabf7', 0.1),
+                      color: '#4dabf7',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ⬇️ Download Excel
+                  </button>
                 </div>
               ) : (
                 <p style={{ margin: '0', color: palette.textMuted, fontSize: '12px' }}>
@@ -1047,6 +1296,89 @@ export function CoordinatesGrabber() {
                 <li>Source Name</li>
               </ul>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Tab */}
+      {state.activeTab === 'history' && (
+        <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '12px' }}>
+            {state.performanceMetrics && (
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: '8px',
+                  background: hexToRgba(palette.primary, 0.1),
+                  border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+                }}
+              >
+                <h3
+                  style={{
+                    margin: '0 0 8px 0',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: palette.text,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Latest Metrics
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: palette.textMuted }}>
+                  <div>Points: <strong>{state.performanceMetrics.pointsCreated}</strong></div>
+                  <div>Duration: <strong>{state.performanceMetrics.duration.toFixed(2)}s</strong></div>
+                  <div>Rate: <strong>{state.performanceMetrics.pointsPerSecond}</strong>/s</div>
+                  <div>Time: <strong>{new Date(state.performanceMetrics.startTime).toLocaleTimeString()}</strong></div>
+                </div>
+              </div>
+            )}
+
+            {state.executionHistory.length === 0 ? (
+              <p style={{ color: palette.textMuted, fontSize: '12px', textAlign: 'center', margin: '20px 0' }}>
+                No execution history yet. Run a search to see results here.
+              </p>
+            ) : (
+              state.executionHistory.map((entry, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: entry.success
+                      ? hexToRgba('#51cf66', 0.05)
+                      : hexToRgba('#ff6b6b', 0.05),
+                    border: `1px solid ${entry.success
+                      ? hexToRgba('#51cf66', 0.2)
+                      : hexToRgba('#ff6b6b', 0.2)}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <span style={{
+                      fontSize: '14px',
+                      color: entry.success ? '#51cf66' : '#ff6b6b',
+                    }}>
+                      {entry.success ? '✓' : '✗'}
+                    </span>
+                    <span style={{ color: palette.text, fontSize: '12px', fontWeight: '600' }}>
+                      {entry.config.layerName || entry.config.mode}
+                    </span>
+                    <span style={{ color: palette.textMuted, fontSize: '11px', marginLeft: 'auto' }}>
+                      {new Date(entry.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', color: palette.textMuted }}>
+                    <div>Extracted: {entry.pointsCreated || '-'}</div>
+                    <div>Duration: {entry.duration.toFixed(2)}s</div>
+                  </div>
+                  {entry.message && !entry.success && (
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: '#ff6b6b', fontStyle: 'italic' }}>
+                      {entry.message}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}

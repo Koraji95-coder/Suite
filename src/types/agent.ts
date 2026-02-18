@@ -9,6 +9,7 @@ export interface AgentResponse {
   error?: string;
   taskId?: string;
   status?: 'pending' | 'running' | 'complete' | 'failed';
+  executionTime?: number;
 }
 
 export interface PairingRequest {

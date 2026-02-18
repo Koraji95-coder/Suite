@@ -280,14 +280,14 @@ class AgentService {
       return {
         success: true,
         data: data,
-        execution_time: executionTime,
+        executionTime: executionTime,
       };
     } catch (error) {
       console.error('Agent request error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        execution_time: Date.now() - startTime,
+        executionTime: Date.now() - startTime,
       };
     }
   }

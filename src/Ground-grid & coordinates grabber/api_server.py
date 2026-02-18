@@ -558,7 +558,29 @@ class AutoCADManager:
             if doc is None or ms is None:
                 raise RuntimeError('Cannot access AutoCAD document or modelspace')
 
-            layer_name = config.get('layer_search_name', 'Layer 0').strip()
+            raw_layers = config.get('layer_search_names')
+            if isinstance(raw_layers, list):
+                requested_layers = [str(layer).strip() for layer in raw_layers if str(layer).strip()]
+            else:
+                requested_layers = []
+
+            if not requested_layers:
+                fallback_layer = str(config.get('layer_search_name', '')).strip()
+                if fallback_layer:
+                    requested_layers = [fallback_layer]
+
+            if not requested_layers:
+                return {
+                    'success': False,
+                    'points': [],
+                    'count': 0,
+                    'layers': [],
+                    'excel_path': '',
+                    'blocks_inserted': 0,
+                    'error': 'No layer names provided'
+                }
+
+            requested_layer_lookup = {layer.lower() for layer in requested_layers}
             prefix = config.get('prefix', 'P')
             start_num = int(config.get('initial_number', 1))
             precision = int(config.get('precision', 3))
@@ -578,7 +600,7 @@ class AutoCADManager:
                     except Exception:
                         continue
 
-                    if ent_layer.lower() != layer_name.lower():
+                    if ent_layer.lower() not in requested_layer_lookup:
                         continue
 
                     entities_scanned += 1
@@ -602,7 +624,7 @@ class AutoCADManager:
                                 'y': round(cy, precision),
                                 'z': round(z_val, precision),
                                 'corner': corner_name,
-                                'source': f'LayerSearchCorner',
+                                'source': ent_layer,
                             })
                             point_num += 1
                     else:
@@ -615,7 +637,7 @@ class AutoCADManager:
                             'x': round(cx, precision),
                             'y': round(cy, precision),
                             'z': round(cz, precision),
-                            'source': 'LayerSearchCenter',
+                            'source': ent_layer,
                         })
                         point_num += 1
 
@@ -623,17 +645,17 @@ class AutoCADManager:
                     print(f"[execute] Entity {idx} error: {e}")
                     continue
 
-            print(f"[execute] Scanned {entities_scanned} entities on layer '{layer_name}', extracted {len(points)} points")
+            print(f"[execute] Scanned {entities_scanned} entities across layers {requested_layers}, extracted {len(points)} points")
 
             if not points:
                 return {
                     'success': False,
                     'points': [],
                     'count': 0,
-                    'layer': layer_name,
+                    'layers': requested_layers,
                     'excel_path': '',
                     'blocks_inserted': 0,
-                    'error': f'No entities found on layer "{layer_name}"'
+                    'error': f'No entities found on requested layers: {", ".join(requested_layers)}'
                 }
 
             ref_dwg = config.get('ref_dwg_path', '').strip()
@@ -694,7 +716,7 @@ class AutoCADManager:
                 'success': True,
                 'points': points,
                 'count': len(points),
-                'layer': layer_name,
+                'layers': requested_layers,
                 'excel_path': excel_path,
                 'blocks_inserted': blocks_inserted,
                 'block_errors': block_errors if block_errors else None,
@@ -707,6 +729,7 @@ class AutoCADManager:
                 'success': False,
                 'points': [],
                 'count': 0,
+                'layers': [],
                 'excel_path': '',
                 'blocks_inserted': 0,
                 'error': str(e)
@@ -841,7 +864,11 @@ def api_execute():
         if result['success']:
             blocks_inserted = result.get('blocks_inserted', 0)
             block_errors = result.get('block_errors')
-            msg = f'Extracted {result["count"]} points from layer "{result["layer"]}"'
+            layers = result.get('layers', [])
+            if layers:
+                msg = f'Extracted {result["count"]} points from {len(layers)} layer(s): {", ".join(layers)}'
+            else:
+                msg = f'Extracted {result["count"]} points'
             if blocks_inserted > 0:
                 msg += f', inserted {blocks_inserted} reference blocks'
             if block_errors:

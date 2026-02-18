@@ -12,6 +12,7 @@ export interface CoordinatesConfig {
   initial_number: number;
   block_name_filter: string;
   layer_search_name: string;
+  layer_search_names?: string[];
   layer_search_use_selection: boolean;
   layer_search_include_modelspace: boolean;
   layer_search_use_corners: boolean;

@@ -5,7 +5,9 @@ import { coordinatesGrabberService } from '@/services/coordinatesGrabberService'
 interface CoordinatesGrabberState {
   mode: 'polylines' | 'blocks' | 'layer_search';
   layerName: string;
+  selectedLayers: string[];
   extractionStyle: 'center' | 'corners';
+  refScale: number;
   pointPrefix: string;
   startNumber: number;
   decimalPlaces: number;
@@ -66,7 +68,9 @@ const TOOLTIPS: Record<string, string> = {
 const DEFAULT_STATE: CoordinatesGrabberState = {
   mode: 'layer_search',
   layerName: '',
+  selectedLayers: [],
   extractionStyle: 'center',
+  refScale: 1,
   pointPrefix: 'P',
   startNumber: 1,
   decimalPlaces: 3,
@@ -147,8 +151,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode; palette
 export function CoordinatesGrabber() {
   const { palette } = useTheme();
   const [state, setState] = useState<CoordinatesGrabberState>(DEFAULT_STATE);
-  const [configHistory, setConfigHistory] = useState<CoordinatesGrabberState[]>([DEFAULT_STATE]);
-  const [historyIndex, setHistoryIndex] = useState(0);
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
 
@@ -159,19 +161,6 @@ export function CoordinatesGrabber() {
       logs: [...prev.logs, `[${new Date().toLocaleTimeString()}] ${message}`],
     }));
   }, []);
-
-  // History-aware state update
-  const updateState = useCallback((updates: Partial<CoordinatesGrabberState>) => {
-    setState(prev => {
-      const newState = { ...prev, ...updates };
-      // Update history (trim future if we're not at the end)
-      const newHistory = configHistory.slice(0, historyIndex + 1);
-      newHistory.push(newState);
-      setConfigHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
-      return newState;
-    });
-  }, [configHistory, historyIndex]);
 
   // Setup WebSocket event listeners for real-time progress
   const setupWebSocketListeners = useCallback(() => {
@@ -285,26 +274,6 @@ export function CoordinatesGrabber() {
     };
   }, [addLog, setupWebSocketListeners]);
 
-  // Undo function
-  const handleUndo = useCallback(() => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setState(configHistory[newIndex]);
-      setHistoryIndex(newIndex);
-      addLog('[INFO] Configuration reverted');
-    }
-  }, [configHistory, historyIndex, addLog]);
-
-  // Redo function
-  const handleRedo = useCallback(() => {
-    if (historyIndex < configHistory.length - 1) {
-      const newIndex = historyIndex + 1;
-      setState(configHistory[newIndex]);
-      setHistoryIndex(newIndex);
-      addLog('[INFO] Configuration restored');
-    }
-  }, [configHistory, historyIndex, addLog]);
-
   // Helper to render tooltip
   const TooltipWrapper = ({ id, children }: { id: string; children: React.ReactNode }) => {
     const tooltipText = TOOLTIPS[id];
@@ -356,14 +325,42 @@ export function CoordinatesGrabber() {
   };
 
   const handleModeChange = (newMode: CoordinatesGrabberState['mode']) => {
-    updateState({ mode: newMode });
+    setState(prev => ({ ...prev, mode: newMode }));
     addLog(`Mode changed to: ${newMode}`);
   };
 
   const handleStyleChange = (style: 'center' | 'corners') => {
-    updateState({ extractionStyle: style });
+    setState(prev => ({ ...prev, extractionStyle: style }));
     addLog(`Extraction style changed to: ${style}`);
   };
+
+  const handleAddLayer = useCallback(() => {
+    const layerToAdd = state.layerName.trim();
+    if (!layerToAdd) {
+      addLog('[WARNING] Select or enter a layer before adding');
+      return;
+    }
+    setState(prev => {
+      if (prev.selectedLayers.includes(layerToAdd)) {
+        return prev;
+      }
+      return { ...prev, selectedLayers: [...prev.selectedLayers, layerToAdd] };
+    });
+    addLog(`[INFO] Added layer: ${layerToAdd}`);
+  }, [state.layerName, addLog]);
+
+  const handleRemoveLayer = useCallback((layerToRemove: string) => {
+    setState(prev => ({
+      ...prev,
+      selectedLayers: prev.selectedLayers.filter(layer => layer !== layerToRemove),
+    }));
+    addLog(`[INFO] Removed layer: ${layerToRemove}`);
+  }, [addLog]);
+
+  const handleClearLayers = useCallback(() => {
+    setState(prev => ({ ...prev, selectedLayers: [] }));
+    addLog('[INFO] Cleared selected layers');
+  }, [addLog]);
 
   const handleLayerSearch = async () => {
     if (!state.backendConnected) {
@@ -386,8 +383,13 @@ export function CoordinatesGrabber() {
     setState(prev => ({ ...prev, isRunning: true, validationErrors: [] }));
     const executionStartTime = Date.now();
     
-    addLog(`[PROCESSING] Starting layer search on layer: "${state.layerName}"`);
+    const layersToRun = state.selectedLayers.length > 0
+      ? state.selectedLayers
+      : (state.layerName.trim() ? [state.layerName.trim()] : []);
+
+    addLog(`[PROCESSING] Starting layer search on ${layersToRun.length} layer(s): ${layersToRun.join(', ')}`);
     addLog(`[PROCESSING] Style: ${state.extractionStyle === 'corners' ? '4 corners' : 'center point'}`);
+    addLog(`[INFO] Reference block scale: ${state.refScale}`);
     addLog(`[INFO] Point naming: ${state.pointPrefix}${state.startNumber}`);
     addLog(`[INFO] Precision: ${state.decimalPlaces} decimal places`);
     
@@ -404,12 +406,13 @@ export function CoordinatesGrabber() {
         initial_number: state.startNumber,
         block_name_filter: '',
         layer_search_name: state.layerName,
+        layer_search_names: layersToRun,
         layer_search_use_selection: state.scanSelection,
         layer_search_include_modelspace: state.includeModelspace,
         layer_search_use_corners: state.extractionStyle === 'corners',
         ref_dwg_path: '',
         ref_layer_name: 'Coordinate Reference Point',
-        ref_scale: 1.0,
+        ref_scale: state.refScale,
         ref_rotation_deg: 0,
         excel_path: '',
         replace_previous: true,
@@ -437,7 +440,7 @@ export function CoordinatesGrabber() {
           timestamp: Date.now(),
           config: {
             mode: state.mode,
-            layerName: state.layerName,
+            layerName: layersToRun.join(', '),
             extractionStyle: state.extractionStyle,
             pointPrefix: state.pointPrefix,
             decimalPlaces: state.decimalPlaces,
@@ -473,7 +476,7 @@ export function CoordinatesGrabber() {
           timestamp: Date.now(),
           config: {
             mode: state.mode,
-            layerName: state.layerName,
+            layerName: layersToRun.join(', '),
           },
           success: false,
           duration: (Date.now() - executionStartTime) / 1000,
@@ -515,8 +518,11 @@ export function CoordinatesGrabber() {
   const validateConfiguration = useCallback((): string[] => {
     const errors: string[] = [];
     
-    if (state.mode === 'layer_search' && !state.layerName.trim()) {
-      errors.push('Layer name is required for layer search mode');
+    if (state.mode === 'layer_search') {
+      const hasLayerSelection = state.selectedLayers.length > 0 || !!state.layerName.trim();
+      if (!hasLayerSelection) {
+        errors.push('Add at least one layer for layer search mode');
+      }
     }
     
     if (!state.pointPrefix.trim()) {
@@ -534,9 +540,13 @@ export function CoordinatesGrabber() {
     if (state.pointPrefix.length > 10) {
       errors.push('Point prefix must be 10 characters or less');
     }
+
+    if (!Number.isFinite(state.refScale) || state.refScale <= 0) {
+      errors.push('Scale must be greater than 0');
+    }
     
     return errors;
-  }, [state.mode, state.layerName, state.pointPrefix, state.startNumber, state.decimalPlaces]);
+  }, [state.mode, state.selectedLayers, state.layerName, state.pointPrefix, state.startNumber, state.decimalPlaces, state.refScale]);
 
   // Update validation errors reactively, but only show in UI after first run attempt
   useEffect(() => {
@@ -651,41 +661,6 @@ export function CoordinatesGrabber() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-          {/* Undo/Redo buttons */}
-          <button
-            onClick={handleUndo}
-            disabled={historyIndex === 0}
-            title="Undo (Ctrl+Z)"
-            style={{
-              padding: '6px 8px',
-              borderRadius: '4px',
-              border: 'none',
-              background: historyIndex === 0 ? 'transparent' : hexToRgba(palette.primary, 0.1),
-              color: historyIndex === 0 ? palette.textMuted : palette.primary,
-              fontSize: '13px',
-              cursor: historyIndex === 0 ? 'not-allowed' : 'pointer',
-              opacity: historyIndex === 0 ? 0.5 : 1,
-            }}
-          >
-            ↶
-          </button>
-          <button
-            onClick={handleRedo}
-            disabled={historyIndex === configHistory.length - 1}
-            title="Redo (Ctrl+Y)"
-            style={{
-              padding: '6px 8px',
-              borderRadius: '4px',
-              border: 'none',
-              background: historyIndex === configHistory.length - 1 ? 'transparent' : hexToRgba(palette.primary, 0.1),
-              color: historyIndex === configHistory.length - 1 ? palette.textMuted : palette.primary,
-              fontSize: '13px',
-              cursor: historyIndex === configHistory.length - 1 ? 'not-allowed' : 'pointer',
-              opacity: historyIndex === configHistory.length - 1 ? 0.5 : 1,
-            }}
-          >
-            ↷
-          </button>
           {/* Preset button */}
           <div
             title="Coming soon: Presets"
@@ -923,6 +898,79 @@ export function CoordinatesGrabber() {
                           }}
                         />
                       )}
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={handleAddLayer}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
+                            background: hexToRgba(palette.primary, 0.1),
+                            color: palette.primary,
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          + Add Layer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearLayers}
+                          disabled={state.selectedLayers.length === 0}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+                            background: 'transparent',
+                            color: state.selectedLayers.length === 0 ? palette.textMuted : palette.text,
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: state.selectedLayers.length === 0 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          Clear Layers
+                        </button>
+                      </div>
+                      <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {state.selectedLayers.length === 0 ? (
+                          <div style={{ fontSize: '11px', color: palette.textMuted }}>
+                            No layers added yet. Add one or more layers to run together.
+                          </div>
+                        ) : (
+                          state.selectedLayers.map(layer => (
+                            <div
+                              key={layer}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '6px 8px',
+                                borderRadius: '4px',
+                                background: hexToRgba(palette.primary, 0.08),
+                                border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
+                                fontSize: '11px',
+                              }}
+                            >
+                              <span style={{ color: palette.text }}>{layer}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveLayer(layer)}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: palette.textMuted,
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1021,6 +1069,49 @@ export function CoordinatesGrabber() {
                       </span>
                     </label>
                   </div>
+                </div>
+
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: hexToRgba(palette.surface, 0.5),
+                    border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
+                  }}
+                >
+                  <h3
+                    style={{
+                      margin: '0 0 12px 0',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      color: palette.text,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                    }}
+                  >
+                    Reference Block
+                  </h3>
+                  <label style={{ fontSize: '12px', color: palette.textMuted }}>
+                    Scale:
+                  </label>
+                  <input
+                    type="number"
+                    value={state.refScale}
+                    onChange={e => setState(prev => ({ ...prev, refScale: Number(e.target.value) || 1 }))}
+                    min="0.0001"
+                    step="0.1"
+                    style={{
+                      marginTop: '4px',
+                      width: '100%',
+                      padding: '8px',
+                      borderRadius: '4px',
+                      border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+                      background: hexToRgba(palette.background, 0.8),
+                      color: palette.text,
+                      fontSize: '12px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
                 </div>
               </>
             )}
@@ -1174,26 +1265,6 @@ export function CoordinatesGrabber() {
                 }}
               >
                 {state.isRunning ? '⏳ Running...' : '▶ Run Layer Search'}
-              </button>
-              <button
-                disabled={state.isRunning || !state.backendConnected}
-                style={{
-                  flex: 1,
-                  minWidth: '120px',
-                  padding: '10px 16px',
-                  borderRadius: '6px',
-                  border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-                  background: 'transparent',
-                  color: state.backendConnected ? palette.primary : palette.textMuted,
-                  fontWeight: '600',
-                  fontSize: '13px',
-                  cursor: state.backendConnected && !state.isRunning ? 'pointer' : 'not-allowed',
-                  opacity: state.isRunning ? 0.6 : 1,
-                  transition: 'opacity 0.2s',
-                }}
-                title="Coming soon: Preview extraction without saving results"
-              >
-                👁️ Dry Run (Coming Soon)
               </button>
               {state.mode === 'blocks' && (
                 <button

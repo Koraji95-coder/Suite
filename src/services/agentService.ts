@@ -238,6 +238,25 @@ class AgentService {
     );
   }
 
+  async researchTopic(topic: string, context?: string): Promise<AgentResponse> {
+    const prompt = context
+      ? `Research and provide comprehensive information about "${topic}" in the context of ${context}. Include current standards, best practices, and any relevant regulations.`
+      : `Research and provide comprehensive information about "${topic}". Include current standards, best practices, and relevant documentation.`;
+    return this.sendMessage(prompt);
+  }
+
+  async searchElectricalStandards(query: string): Promise<AgentResponse> {
+    return this.sendMessage(
+      `Search for electrical engineering standards, codes, and regulations related to: ${query}. Include NEC 2023, NFPA 70, IEEE standards where applicable.`
+    );
+  }
+
+  async analyzeRegulations(specifications: string): Promise<AgentResponse> {
+    return this.sendMessage(
+      `Analyze the following electrical specifications against current NEC 2023 and NFPA 70 regulations: ${specifications}. Identify any compliance issues and recommend corrections.`
+    );
+  }
+
   async generateDocumentation(specs: {
     type: 'design_report' | 'calculation_sheet' | 'test_report';
     data: any;

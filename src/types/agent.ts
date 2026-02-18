@@ -94,6 +94,16 @@ export interface FloorPlanResult {
   }>;
 }
 
+export interface ResearchResult {
+  success: boolean;
+  topic: string;
+  summary: string;
+  sources?: string[];
+  keyFindings: string[];
+  relevantStandards?: string[];
+  complianceNotes?: string[];
+}
+
 export interface GatewayConfig {
   url: string;
   timeout: number;

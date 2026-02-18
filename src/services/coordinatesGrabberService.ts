@@ -1,0 +1,285 @@
+/**
+ * Coordinates Grabber Service
+ * 
+ * Handles communication with the Python AutoCAD backend application.
+ * Supports configuration management, execution, and progress tracking.
+ */
+
+export interface CoordinatesConfig {
+  mode: 'polylines' | 'blocks' | 'layer_search';
+  precision: number;
+  prefix: string;
+  initial_number: number;
+  block_name_filter: string;
+  layer_search_name: string;
+  layer_search_use_selection: boolean;
+  layer_search_include_modelspace: boolean;
+  layer_search_use_corners: boolean;
+  ref_dwg_path: string;
+  ref_layer_name: string;
+  ref_scale: number;
+  ref_rotation_deg: number;
+  excel_path: string;
+  replace_previous: boolean;
+  auto_increment: boolean;
+  // Table options
+  show_segment: boolean;
+  show_elevation: boolean;
+  show_distance: boolean;
+  show_distance_3d: boolean;
+  show_bearing: boolean;
+  show_azimuth: boolean;
+}
+
+export interface ExecutionResult {
+  success: boolean;
+  message: string;
+  excel_path?: string;
+  points_created?: number;
+  duration_seconds?: number;
+  error_details?: string;
+}
+
+export interface ProgressUpdate {
+  stage: string;
+  progress: number; // 0-100
+  current_item?: string;
+  message?: string;
+}
+
+export interface BackendStatus {
+  connected: boolean;
+  autocad_running: boolean;
+  last_config?: CoordinatesConfig;
+  last_execution_time?: string;
+}
+
+/**
+ * Singleton service for coordinating with the Python AutoCAD backend.
+ * 
+ * Can operate in three modes:
+ * 1. WebSocket (real-time, bidirectional)
+ * 2. HTTP (REST API calls)
+ * 3. Local IPC (if running on same machine via localhost)
+ */
+class CoordinatesGrabberService {
+  private baseUrl: string = 'http://localhost:5000'; // Python backend URL
+  private websocket: WebSocket | null = null;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
+  private reconnectDelay: number = 2000; // ms
+  private listeners: Map<string, Set<(data: any) => void>> = new Map();
+
+  constructor() {
+    // Initialize with localhost for development
+    // In production, this would be configured via environment variables
+    this.baseUrl = import.meta.env.VITE_COORDINATES_BACKEND_URL || 'http://localhost:5000';
+  }
+
+  /**
+   * Connect to the Python backend via WebSocket for real-time updates
+   */
+  public connectWebSocket(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const wsUrl = this.baseUrl.replace(/^http/, 'ws') + '/ws';
+        this.websocket = new WebSocket(wsUrl);
+
+        this.websocket.onopen = () => {
+          console.log('[CoordinatesGrabber] WebSocket connected');
+          this.reconnectAttempts = 0;
+          resolve();
+        };
+
+        this.websocket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            this.emit(data.type, data);
+          } catch (err) {
+            console.error('[CoordinatesGrabber] Failed to parse message:', err);
+          }
+        };
+
+        this.websocket.onerror = (error) => {
+          console.error('[CoordinatesGrabber] WebSocket error:', error);
+          reject(error);
+        };
+
+        this.websocket.onclose = () => {
+          console.log('[CoordinatesGrabber] WebSocket disconnected');
+          this.websocket = null;
+          this.attemptReconnect();
+        };
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  /**
+   * Attempt to reconnect to WebSocket after disconnect
+   */
+  private attemptReconnect(): void {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
+      console.log(`[CoordinatesGrabber] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      setTimeout(() => this.connectWebSocket().catch(err => {
+        console.error('[CoordinatesGrabber] Reconnection failed:', err);
+      }), delay);
+    } else {
+      console.error('[CoordinatesGrabber] Max reconnection attempts reached');
+    }
+  }
+
+  /**
+   * Check if backend is accessible
+   */
+  public async checkStatus(): Promise<BackendStatus> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/status`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error(`Status ${response.status}`);
+      return await response.json();
+    } catch (err) {
+      console.error('[CoordinatesGrabber] Status check failed:', err);
+      return {
+        connected: false,
+        autocad_running: false,
+      };
+    }
+  }
+
+  /**
+   * Execute coordinates grabber with the provided config
+   */
+  public async execute(config: CoordinatesConfig): Promise<ExecutionResult> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[CoordinatesGrabber] Execution failed:', message);
+      return {
+        success: false,
+        message: `Backend error: ${message}`,
+        error_details: message,
+      };
+    }
+  }
+
+  /**
+   * List available layers in the active AutoCAD drawing
+   */
+  public async listLayers(): Promise<string[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/layers`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) throw new Error(`Status ${response.status}`);
+      const data = await response.json();
+      return data.layers || [];
+    } catch (err) {
+      console.error('[CoordinatesGrabber] Failed to list layers:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Get the current selection count from AutoCAD
+   */
+  public async getSelectionCount(): Promise<number> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/selection-count`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) throw new Error(`Status ${response.status}`);
+      const data = await response.json();
+      return data.count || 0;
+    } catch (err) {
+      console.error('[CoordinatesGrabber] Failed to get selection count:', err);
+      return 0;
+    }
+  }
+
+  /**
+   * Trigger selection in AutoCAD (minimize Suite UI and focus AutoCAD)
+   */
+  public async triggerSelection(): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/trigger-selection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) throw new Error(`Status ${response.status}`);
+    } catch (err) {
+      console.error('[CoordinatesGrabber] Failed to trigger selection:', err);
+    }
+  }
+
+  /**
+   * Subscribe to a specific event type
+   */
+  public on(eventType: string, callback: (data: any) => void): () => void {
+    if (!this.listeners.has(eventType)) {
+      this.listeners.set(eventType, new Set());
+    }
+    this.listeners.get(eventType)!.add(callback);
+
+    // Return unsubscribe function
+    return () => {
+      this.listeners.get(eventType)?.delete(callback);
+    };
+  }
+
+  /**
+   * Emit an event (for testing / internal use)
+   */
+  private emit(eventType: string, data: any): void {
+    const callbacks = this.listeners.get(eventType);
+    if (callbacks) {
+      callbacks.forEach(callback => {
+        try {
+          callback(data);
+        } catch (err) {
+          console.error(`[CoordinatesGrabber] Error in listener for ${eventType}:`, err);
+        }
+      });
+    }
+  }
+
+  /**
+   * Close WebSocket connection
+   */
+  public disconnect(): void {
+    if (this.websocket) {
+      this.websocket.close();
+      this.websocket = null;
+    }
+  }
+
+  /**
+   * Get the current connection URL (for debugging)
+   */
+  public getBaseUrl(): string {
+    return this.baseUrl;
+  }
+}
+
+export const coordinatesGrabberService = new CoordinatesGrabberService();

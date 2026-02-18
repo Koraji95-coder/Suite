@@ -10,6 +10,7 @@ import {
   Network,
   MessageSquare,
   Settings,
+  MapPin,
 } from "lucide-react";
 import { useTheme, hexToRgba } from "@/lib/palette";
 import { useWorkspace } from "./WorkspaceContext";
@@ -27,6 +28,7 @@ const topItems: NavItem[] = [
   { icon: FolderKanban, label: "Projects", path: "/projects" },
   { icon: CalendarDays, label: "Calendar", path: "/calendar" },
   { icon: Blocks, label: "Apps", panel: "apps" },
+  { icon: MapPin, label: "Coordinates", path: "/apps/coordinates-grabber" },
   { icon: BookOpen, label: "Knowledge", panel: "knowledge" },
   { icon: HardDrive, label: "Files", path: "/files" },
   { icon: Network, label: "Graph", path: "/graph" },

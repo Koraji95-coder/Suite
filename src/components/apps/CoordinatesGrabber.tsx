@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { CardSection, make_button } from '@/components/ui/components';
+import { coordinatesGrabberService } from '@/services/coordinatesGrabberService';
 
 interface CoordinatesGrabberState {
   mode: 'polylines' | 'blocks' | 'layer_search';
@@ -14,6 +15,10 @@ interface CoordinatesGrabberState {
   activeTab: 'config' | 'log' | 'export';
   logs: string[];
   excelPath: string;
+  isRunning: boolean;
+  backendConnected: boolean;
+  availableLayers: string[];
+  selectionCount: number;
 }
 
 export function CoordinatesGrabber() {
@@ -30,16 +35,68 @@ export function CoordinatesGrabber() {
     activeTab: 'config',
     logs: [
       '[INFO] Coordinates Grabber initialized',
-      '[INFO] Ready for layer search or selection',
+      '[INFO] Connecting to AutoCAD backend...',
     ],
     excelPath: '',
+    isRunning: false,
+    backendConnected: false,
+    availableLayers: [],
+    selectionCount: 0,
   });
+
+  // Initialize backend connection on mount
+  useEffect(() => {
+    const initBackend = async () => {
+      try {
+        // Check if backend is available
+        const status = await coordinatesGrabberService.checkStatus();
+        if (status.connected) {
+          addLog('[SUCCESS] Connected to AutoCAD backend');
+          setState(prev => ({ ...prev, backendConnected: true }));
+          
+          // Load available layers
+          await refreshLayers();
+          
+          // Try to connect WebSocket for real-time updates
+          try {
+            await coordinatesGrabberService.connectWebSocket();
+            addLog('[INFO] WebSocket connection established for real-time updates');
+          } catch (err) {
+            addLog('[INFO] WebSocket unavailable, using HTTP polling');
+          }
+        } else {
+          addLog('[WARNING] Could not connect to AutoCAD backend');
+          addLog('[INFO] AutoCAD may not be running - some features will be unavailable');
+        }
+      } catch (err) {
+        addLog('[WARNING] Backend connection check failed');
+      }
+    };
+
+    initBackend();
+
+    return () => {
+      coordinatesGrabberService.disconnect();
+    };
+  }, []);
 
   const addLog = useCallback((message: string) => {
     setState(prev => ({
       ...prev,
       logs: [...prev.logs, `[${new Date().toLocaleTimeString()}] ${message}`],
     }));
+  }, []);
+
+  const refreshLayers = useCallback(async () => {
+    try {
+      const layers = await coordinatesGrabberService.listLayers();
+      setState(prev => ({ ...prev, availableLayers: layers }));
+      if (layers.length > 0) {
+        addLog(`[INFO] Retrieved ${layers.length} layers from drawing`);
+      }
+    } catch (err) {
+      addLog('[WARNING] Could not retrieve layer list from AutoCAD');
+    }
   }, []);
 
   const handleModeChange = (newMode: CoordinatesGrabberState['mode']) => {
@@ -52,37 +109,82 @@ export function CoordinatesGrabber() {
     addLog(`Extraction style changed to: ${style}`);
   };
 
-  const handleLayerSearch = () => {
+  const handleLayerSearch = async () => {
     if (!state.layerName.trim()) {
       addLog('[ERROR] Please enter a layer name');
       return;
     }
 
+    if (!state.backendConnected) {
+      addLog('[ERROR] Not connected to AutoCAD backend');
+      return;
+    }
+
+    setState(prev => ({ ...prev, isRunning: true }));
+    
     addLog(`[PROCESSING] Starting layer search on layer: "${state.layerName}"`);
     addLog(`[PROCESSING] Style: ${state.extractionStyle === 'corners' ? '4 corners' : 'center point'}`);
     addLog(`[INFO] Point naming: ${state.pointPrefix}${state.startNumber}`);
     
-    // Simulate processing
-    setTimeout(() => {
-      addLog('[PROCESSING] Scanning for layer geometry...');
-      addLog('[PROCESSING] Found 12 geometries on layer');
-      
-      if (state.extractionStyle === 'corners') {
-        addLog('[PROCESSING] Generating 4 corner points per geometry (48 total)');
+    try {
+      const result = await coordinatesGrabberService.execute({
+        mode: state.mode,
+        precision: state.decimalPlaces,
+        prefix: state.pointPrefix,
+        initial_number: state.startNumber,
+        block_name_filter: '',
+        layer_search_name: state.layerName,
+        layer_search_use_selection: state.scanSelection,
+        layer_search_include_modelspace: state.includeModelspace,
+        layer_search_use_corners: state.extractionStyle === 'corners',
+        ref_dwg_path: '',
+        ref_layer_name: 'Coordinate Reference Point',
+        ref_scale: 1.0,
+        ref_rotation_deg: 0,
+        excel_path: '',
+        replace_previous: true,
+        auto_increment: false,
+        show_segment: false,
+        show_elevation: true,
+        show_distance: false,
+        show_distance_3d: false,
+        show_bearing: false,
+        show_azimuth: false,
+      });
+
+      if (result.success) {
+        setState(prev => ({ ...prev, excelPath: result.excel_path || '' }));
+        addLog(`[SUCCESS] Export complete: ${result.excel_path}`);
+        addLog(`[INFO] Points created: ${result.points_created}`);
+        if (result.duration_seconds) {
+          addLog(`[INFO] Duration: ${result.duration_seconds.toFixed(2)}s`);
+        }
       } else {
-        addLog('[PROCESSING] Generating center point per geometry (12 total)');
+        addLog(`[ERROR] ${result.message}`);
+        if (result.error_details) {
+          addLog(`[ERROR] Details: ${result.error_details}`);
+        }
       }
-      
-      addLog('[EXPORT] Exporting to Excel...');
-      setTimeout(() => {
-        setState(prev => ({ ...prev, excelPath: 'coordinates_export.xlsx' }));
-        addLog('[SUCCESS] Export complete: coordinates_export.xlsx');
-      }, 500);
-    }, 1000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      addLog(`[ERROR] Execution failed: ${message}`);
+    } finally {
+      setState(prev => ({ ...prev, isRunning: false }));
+    }
   };
 
   const handleClearLogs = () => {
     setState(prev => ({ ...prev, logs: [] }));
+  };
+
+  const handleSelectionRefresh = async () => {
+    try {
+      const count = await coordinatesGrabberService.getSelectionCount();
+      setState(prev => ({ ...prev, selectionCount: count }));
+      addLog(`[INFO] Selection: ${count} entities selected`);
+    } catch (err) {
+      addLog('[WARNING] Could not get selection count');
+    }
   };
 
   return (
@@ -469,26 +571,75 @@ export function CoordinatesGrabber() {
             </div>
 
             {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 onClick={handleLayerSearch}
+                disabled={state.isRunning || !state.backendConnected}
                 style={{
                   flex: 1,
+                  minWidth: '120px',
                   padding: '10px 16px',
                   borderRadius: '6px',
                   border: 'none',
-                  background: palette.primary,
-                  color: palette.background,
+                  background: state.backendConnected ? palette.primary : palette.textMuted,
+                  color: state.backendConnected ? palette.background : 'rgba(255,255,255,0.5)',
                   fontWeight: '600',
                   fontSize: '13px',
-                  cursor: 'pointer',
+                  cursor: state.backendConnected && !state.isRunning ? 'pointer' : 'not-allowed',
+                  opacity: state.isRunning ? 0.6 : 1,
                   transition: 'opacity 0.2s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                onMouseEnter={e => {
+                  if (!state.isRunning && state.backendConnected) {
+                    (e.currentTarget as HTMLButtonElement).style.opacity = '0.9';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!state.isRunning && state.backendConnected) {
+                    (e.currentTarget as HTMLButtonElement).style.opacity = '1';
+                  }
+                }}
               >
-                ▶ Run Layer Search
+                {state.isRunning ? '⏳ Running...' : '▶ Run Layer Search'}
               </button>
+              {state.mode === 'blocks' && (
+                <button
+                  onClick={handleSelectionRefresh}
+                  disabled={!state.backendConnected}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: '6px',
+                    border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
+                    background: 'transparent',
+                    color: state.backendConnected ? palette.primary : palette.textMuted,
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    cursor: state.backendConnected ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  🔄 Refresh
+                </button>
+              )}
+            </div>
+
+            {/* Backend Status */}
+            <div
+              style={{
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: state.backendConnected
+                  ? hexToRgba('#51cf66', 0.1)
+                  : hexToRgba('#ff6b6b', 0.1),
+                border: `1px solid ${state.backendConnected
+                  ? hexToRgba('#51cf66', 0.3)
+                  : hexToRgba('#ff6b6b', 0.3)}`,
+                color: state.backendConnected ? '#51cf66' : '#ff6b6b',
+                fontSize: '11px',
+              }}
+            >
+              {state.backendConnected
+                ? '● Connected to AutoCAD'
+                : '● Connection offline (AutoCAD or backend not available)'}
             </div>
           </div>
         </div>

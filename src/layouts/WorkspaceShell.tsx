@@ -16,6 +16,7 @@ const CalendarPage = React.lazy(() => import("@/components/calendar/hooks/Calend
 const BlockLibrary = React.lazy(() => import("@/components/apps/BlockLibrary").then(m => ({ default: m.BlockLibrary })));
 const QAQCChecker = React.lazy(() => import("@/components/apps/QAQCChecker").then(m => ({ default: m.QAQCChecker })));
 const GroundGridGenerator = React.lazy(() => import("@/components/apps/GroundGridGenerator").then(m => ({ default: m.GroundGridGenerator })));
+const CoordinatesGrabber = React.lazy(() => import("@/components/apps/CoordinatesGrabber").then(m => ({ default: m.CoordinatesGrabber })));
 const AutomationWorkflows = React.lazy(() => import("@/components/apps/AutomationWorkflows").then(m => ({ default: m.AutomationWorkflows })));
 const StandardsChecker = React.lazy(() => import("@/components/apps/StandardsChecker").then(m => ({ default: m.StandardsChecker })));
 const CalculatorPanel = React.lazy(() => import("@/components/CalculatorPanel").then(m => ({ default: m.CalculatorPanel })));
@@ -138,6 +139,7 @@ function ShellContent() {
               <Route path="/apps/block-library" element={<BlockLibrary />} />
               <Route path="/apps/qaqc" element={<QAQCChecker />} />
               <Route path="/apps/ground-grid" element={<GroundGridGenerator />} />
+              <Route path="/apps/coordinates-grabber" element={<CoordinatesGrabber />} />
               <Route path="/apps/automation" element={<AutomationWorkflows />} />
               <Route path="/apps/standards" element={<StandardsChecker />} />
               <Route path="/apps/batch-find-replace" element={<Placeholder name="Batch Find & Replace" />} />

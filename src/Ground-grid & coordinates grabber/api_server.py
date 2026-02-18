@@ -34,6 +34,9 @@ import os
 import traceback
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
 
 # ── gen_py cache fix (from coordtable) ──────────────────────────
 # Prevent gen_py from writing wrappers that cause CDispatch issues
@@ -94,6 +97,291 @@ def com_call_with_retry(callable_func, max_retries: int = 25, initial_delay: flo
                 continue
             raise
     raise RuntimeError("AutoCAD COM call failed: RPC busy too long")
+
+
+def pt(x: float, y: float, z: float = 0.0):
+    return win32com.client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, (float(x), float(y), float(z)))
+
+
+def ensure_layer(doc: Any, layer_name: str) -> None:
+    doc = dyn(doc)
+    try:
+        layers = dyn(doc.Layers)
+        try:
+            layers.Item(layer_name)
+        except Exception:
+            layers.Add(layer_name)
+    except Exception:
+        pass
+
+
+def wait_for_command_finish(doc: Any, timeout_s: float = 10.0) -> bool:
+    doc = dyn(doc)
+    t0 = time.time()
+    while (time.time() - t0) < timeout_s:
+        try:
+            names = ""
+            if hasattr(doc, "GetVariable"):
+                names = str(doc.GetVariable("CMDNAMES") or "")
+            if not names.strip():
+                return True
+        except Exception:
+            pass
+        time.sleep(0.15)
+    return False
+
+
+_REF_IMPORT_CACHE: Dict[str, str] = {}
+
+
+def ensure_block_exists(doc: Any, block_name: str, dwg_path: str) -> str:
+    doc = dyn(doc)
+    dwg_path = os.path.abspath(dwg_path)
+    try:
+        doc.Blocks.Item(block_name)
+        return block_name
+    except Exception:
+        print(f"[api] Block '{block_name}' not found. Importing via Xref-Bind...")
+
+    if not os.path.exists(dwg_path):
+        raise RuntimeError(f"External file not found: {dwg_path}")
+
+    ms = dyn(doc.ModelSpace)
+    origin = pt(0, 0, 0)
+    xref_name = block_name
+
+    def _attach(name: str):
+        if hasattr(ms, "AttachExternalReference"):
+            return ms.AttachExternalReference(dwg_path, name, origin, 1.0, 1.0, 1.0, 0.0, False)
+        if hasattr(ms, "AttachXref"):
+            return ms.AttachXref(dwg_path, name, origin, 1.0, 1.0, 1.0, 0.0, False)
+        raise RuntimeError("Neither AttachExternalReference nor AttachXref available.")
+
+    try:
+        try:
+            xref_obj = com_call_with_retry(lambda: _attach(xref_name))
+        except Exception:
+            xref_name = f"TEMP_IMPORT_{block_name}_{int(time.time())}"
+            xref_obj = com_call_with_retry(lambda: _attach(xref_name))
+
+        cmd = f'_.-XREF _B "{xref_name}" \\n'
+        com_call_with_retry(lambda: doc.SendCommand(cmd))
+        wait_for_command_finish(doc, timeout_s=20.0)
+
+        try:
+            if xref_obj is not None:
+                dyn(xref_obj).Delete()
+        except Exception:
+            pass
+
+        try:
+            doc.Blocks.Item(block_name)
+            return block_name
+        except Exception:
+            try:
+                doc.Blocks.Item(xref_name)
+                return xref_name
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Xref bind completed but block not found. Tried: '{block_name}', '{xref_name}'."
+                ) from exc
+
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to import reference DWG.\nDWG: {dwg_path}\nBlock: {block_name}\nDetails: {exc}"
+        ) from exc
+
+
+def insert_reference_block(doc, ms, ref_dwg_path, layer_name, x, y, z, scale, rotation_deg):
+    doc = dyn(doc)
+    ms = dyn(ms)
+    ref_dwg_path = os.path.abspath(ref_dwg_path)
+
+    if not os.path.exists(ref_dwg_path):
+        raise RuntimeError(
+            f"Reference DWG not found: {ref_dwg_path}\n"
+            "Put 'Coordinate Reference Point.dwg' in an 'assets' folder next to api_server.py."
+        )
+
+    block_name = os.path.splitext(os.path.basename(ref_dwg_path))[0]
+    cache_key = os.path.normcase(ref_dwg_path)
+
+    if cache_key in _REF_IMPORT_CACHE:
+        insert_name = _REF_IMPORT_CACHE[cache_key]
+    else:
+        insert_name = ensure_block_exists(doc, block_name, ref_dwg_path)
+        _REF_IMPORT_CACHE[cache_key] = insert_name
+
+    ensure_layer(doc, layer_name)
+
+    def _insert():
+        return ms.InsertBlock(
+            pt(x, y, z), insert_name,
+            float(scale), float(scale), float(scale),
+            math.radians(float(rotation_deg)),
+        )
+
+    br = com_call_with_retry(_insert)
+    br = dyn(br)
+    try:
+        br.Layer = layer_name
+    except Exception:
+        pass
+    return br
+
+
+def default_ref_dwg_path() -> str:
+    base = os.path.dirname(os.path.abspath(__file__))
+    cand = os.path.join(base, "assets", "Coordinate Reference Point.dwg")
+    if os.path.exists(cand):
+        return cand
+    return os.path.join(base, "Coordinate Reference Point.dwg")
+
+
+def _entity_bbox(ent):
+    ent = dyn(ent)
+    try:
+        mn, mx = ent.GetBoundingBox()
+        minx, miny = float(mn[0]), float(mn[1])
+        maxx, maxy = float(mx[0]), float(mx[1])
+        minz = float(mn[2]) if len(mn) > 2 else 0.0
+        maxz = float(mx[2]) if len(mx) > 2 else 0.0
+        if maxx < minx:
+            minx, maxx = maxx, minx
+        if maxy < miny:
+            miny, maxy = maxy, miny
+        if maxz < minz:
+            minz, maxz = maxz, minz
+        return (minx, miny, minz, maxx, maxy, maxz)
+    except Exception:
+        return None
+
+
+def _poly_centroid(ent):
+    ent = dyn(ent)
+    try:
+        obj_name = str(ent.ObjectName)
+    except Exception:
+        obj_name = ''
+
+    coords = []
+    try:
+        raw = list(ent.Coordinates)
+        if obj_name == 'AcDb3dPolyline':
+            for i in range(0, len(raw), 3):
+                if i + 2 < len(raw):
+                    coords.append((float(raw[i]), float(raw[i+1]), float(raw[i+2])))
+        else:
+            elev = 0.0
+            try:
+                elev = float(ent.Elevation)
+            except Exception:
+                pass
+            for i in range(0, len(raw), 2):
+                if i + 1 < len(raw):
+                    coords.append((float(raw[i]), float(raw[i+1]), elev))
+    except Exception:
+        try:
+            n = int(ent.NumberOfVertices)
+            elev = 0.0
+            try:
+                elev = float(ent.Elevation)
+            except Exception:
+                pass
+            for i in range(n):
+                p = ent.Coordinate(i)
+                z = float(p[2]) if len(p) > 2 else elev
+                coords.append((float(p[0]), float(p[1]), z))
+        except Exception:
+            return None
+
+    if not coords:
+        return None
+
+    n = len(coords)
+    return (
+        sum(p[0] for p in coords) / n,
+        sum(p[1] for p in coords) / n,
+        sum(p[2] for p in coords) / n,
+    )
+
+
+def _entity_center(ent):
+    ent = dyn(ent)
+    try:
+        obj_name = str(ent.ObjectName)
+    except Exception:
+        obj_name = ''
+
+    if obj_name in ('AcDbPolyline', 'AcDb2dPolyline', 'AcDb3dPolyline'):
+        result = _poly_centroid(ent)
+        if result:
+            return result
+
+    bbox = _entity_bbox(ent)
+    if bbox:
+        minx, miny, minz, maxx, maxy, maxz = bbox
+        return ((minx + maxx) / 2.0, (miny + maxy) / 2.0, (minz + maxz) / 2.0)
+
+    return None
+
+
+def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
+    if drawing_dir:
+        out_dir = drawing_dir
+    else:
+        out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exports")
+    os.makedirs(out_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_path = os.path.join(out_dir, f"coordinates_{timestamp}.xlsx")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Coordinates"
+
+    headers = ["Point ID", "East (X)", "North (Y)", "Elevation (Z)", "Source Type"]
+    if use_corners:
+        headers.insert(1, "Corner")
+
+    ws.append(headers)
+    hdr_font = Font(bold=True)
+    hdr_fill = PatternFill("solid", fgColor="D9E1F2")
+    hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for col_idx, h in enumerate(headers, start=1):
+        c = ws.cell(row=1, column=col_idx, value=h)
+        c.font = hdr_font
+        c.fill = hdr_fill
+        c.alignment = hdr_align
+
+    num_fmt = "0" if precision <= 0 else "0." + ("0" * precision)
+    numeric_cols = {"East (X)", "North (Y)", "Elevation (Z)"}
+
+    for p in points:
+        row = [p['name'], p['x'], p['y'], p['z'], p.get('source', '')]
+        if use_corners:
+            row.insert(1, p.get('corner', ''))
+        ws.append(row)
+
+    for col_idx, h in enumerate(headers, start=1):
+        col_letter = get_column_letter(col_idx)
+        width = len(h)
+        for row_idx in range(2, len(points) + 2):
+            v = ws.cell(row=row_idx, column=col_idx).value
+            if v is not None:
+                width = max(width, len(str(v)))
+        ws.column_dimensions[col_letter].width = min(max(width + 2, 12), 70)
+        if h in numeric_cols:
+            for row_idx in range(2, len(points) + 2):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                if isinstance(cell.value, (int, float)):
+                    cell.number_format = num_fmt
+                    cell.alignment = Alignment(horizontal="right")
+
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{len(points) + 1}"
+    wb.save(out_path)
+    return out_path
 
 
 class AutoCADManager:
@@ -254,209 +542,173 @@ class AutoCADManager:
     
     def execute_layer_search(self, config: Dict) -> Dict[str, Any]:
         """
-        Execute coordinate extraction from a layer.
-        Uses the same late-bound COM pattern as coordtable.
+        Execute layer search matching the desktop coordinatesgrabber.py logic:
+        - Find entities on target layer in ModelSpace
+        - Compute ONE center point per entity (not per vertex)
+        - Insert reference blocks at each point
+        - Export Excel and auto-open it
         """
         try:
             pythoncom.CoInitialize()
-            
+
             acad = connect_autocad()
             doc = dyn(acad.ActiveDocument)
             ms = dyn(doc.ModelSpace)
-            
+
             if doc is None or ms is None:
                 raise RuntimeError('Cannot access AutoCAD document or modelspace')
-            
+
             layer_name = config.get('layer_search_name', 'Layer 0').strip()
             prefix = config.get('prefix', 'P')
             start_num = int(config.get('initial_number', 1))
             precision = int(config.get('precision', 3))
             use_corners = config.get('layer_search_use_corners', False)
-            
+
             points = []
             point_num = start_num
-            
-            # Iterate through all entities in modelspace
+            entities_scanned = 0
+
             entity_count = int(ms.Count)
             for idx in range(entity_count):
                 try:
                     ent = dyn(ms.Item(idx))
-                    
-                    # Get entity info via late-bound dispatch
-                    try:
-                        obj_name = str(ent.ObjectName)
-                    except Exception:
-                        continue
-                    
+
                     try:
                         ent_layer = str(ent.Layer)
                     except Exception:
                         continue
-                    
-                    # Check layer match
+
                     if ent_layer.lower() != layer_name.lower():
                         continue
-                    
-                    # ── Polyline vertices ──
-                    if obj_name in ('AcDbPolyline', 'AcDb2dPolyline', 'AcDb3dPolyline'):
-                        try:
-                            coords = list(ent.Coordinates)
-                            
-                            if obj_name == 'AcDb3dPolyline':
-                                for i in range(0, len(coords), 3):
-                                    if i + 2 < len(coords):
-                                        points.append({
-                                            'name': f'{prefix}{point_num}',
-                                            'x': round(float(coords[i]), precision),
-                                            'y': round(float(coords[i+1]), precision),
-                                            'z': round(float(coords[i+2]), precision),
-                                            'source': obj_name
-                                        })
-                                        point_num += 1
-                            else:
-                                elev = 0.0
-                                try:
-                                    elev = float(ent.Elevation)
-                                except Exception:
-                                    pass
-                                for i in range(0, len(coords), 2):
-                                    if i + 1 < len(coords):
-                                        points.append({
-                                            'name': f'{prefix}{point_num}',
-                                            'x': round(float(coords[i]), precision),
-                                            'y': round(float(coords[i+1]), precision),
-                                            'z': round(elev, precision),
-                                            'source': obj_name
-                                        })
-                                        point_num += 1
-                        except Exception as e:
-                            print(f"[execute] Polyline error: {e}")
-                            # Fallback: try indexed vertex access
-                            try:
-                                n = int(ent.NumberOfVertices)
-                                elev = 0.0
-                                try:
-                                    elev = float(ent.Elevation)
-                                except Exception:
-                                    pass
-                                for i in range(n):
-                                    p = ent.Coordinate(i)
-                                    z = float(p[2]) if len(p) > 2 else elev
-                                    points.append({
-                                        'name': f'{prefix}{point_num}',
-                                        'x': round(float(p[0]), precision),
-                                        'y': round(float(p[1]), precision),
-                                        'z': round(z, precision),
-                                        'source': obj_name
-                                    })
-                                    point_num += 1
-                            except Exception as e2:
-                                print(f"[execute] Vertex fallback error: {e2}")
-                                continue
-                    
-                    # ── Block reference centers ──
-                    elif obj_name in ('AcDbBlockReference', 'AcDbMInsertBlock'):
-                        try:
-                            if use_corners:
-                                # 4 corners from bounding box
-                                mn, mx = ent.GetBoundingBox()
-                                corners = [
-                                    (float(mn[0]), float(mx[1])),  # NW
-                                    (float(mx[0]), float(mx[1])),  # NE
-                                    (float(mn[0]), float(mn[1])),  # SW
-                                    (float(mx[0]), float(mn[1])),  # SE
-                                ]
-                                z_val = (float(mn[2]) + float(mx[2])) / 2.0 if len(mn) > 2 else 0.0
-                                for cx, cy in corners:
-                                    points.append({
-                                        'name': f'{prefix}{point_num}',
-                                        'x': round(cx, precision),
-                                        'y': round(cy, precision),
-                                        'z': round(z_val, precision),
-                                        'source': 'BlockCorner'
-                                    })
-                                    point_num += 1
-                            else:
-                                # Center point
-                                try:
-                                    mn, mx = ent.GetBoundingBox()
-                                    x = (float(mn[0]) + float(mx[0])) / 2.0
-                                    y = (float(mn[1]) + float(mx[1])) / 2.0
-                                    z = (float(mn[2]) + float(mx[2])) / 2.0 if len(mn) > 2 else 0.0
-                                except Exception:
-                                    ip = ent.InsertionPoint
-                                    x = float(ip[0])
-                                    y = float(ip[1])
-                                    z = float(ip[2]) if len(ip) > 2 else 0.0
-                                
-                                points.append({
-                                    'name': f'{prefix}{point_num}',
-                                    'x': round(x, precision),
-                                    'y': round(y, precision),
-                                    'z': round(z, precision),
-                                    'source': 'BlockCenter'
-                                })
-                                point_num += 1
-                        except Exception as e:
-                            print(f"[execute] Block error: {e}")
+
+                    entities_scanned += 1
+
+                    if use_corners:
+                        bbox = _entity_bbox(ent)
+                        if not bbox:
                             continue
-                    
-                    # ── Lines ──
-                    elif obj_name == 'AcDbLine':
-                        try:
-                            sp = ent.StartPoint
-                            ep = ent.EndPoint
-                            for p in [sp, ep]:
-                                points.append({
-                                    'name': f'{prefix}{point_num}',
-                                    'x': round(float(p[0]), precision),
-                                    'y': round(float(p[1]), precision),
-                                    'z': round(float(p[2]) if len(p) > 2 else 0.0, precision),
-                                    'source': 'Line'
-                                })
-                                point_num += 1
-                        except Exception as e:
-                            print(f"[execute] Line error: {e}")
+                        minx, miny, minz, maxx, maxy, maxz = bbox
+                        z_val = (minz + maxz) / 2.0
+                        corner_defs = [
+                            (minx, maxy, 'NW'),
+                            (maxx, maxy, 'NE'),
+                            (minx, miny, 'SW'),
+                            (maxx, miny, 'SE'),
+                        ]
+                        for cx, cy, corner_name in corner_defs:
+                            points.append({
+                                'name': f'{prefix}{point_num}_{corner_name}',
+                                'x': round(cx, precision),
+                                'y': round(cy, precision),
+                                'z': round(z_val, precision),
+                                'corner': corner_name,
+                                'source': f'LayerSearchCorner',
+                            })
+                            point_num += 1
+                    else:
+                        center = _entity_center(ent)
+                        if not center:
                             continue
-                    
-                    # ── Points / circles / arcs ──
-                    elif obj_name in ('AcDbPoint', 'AcDbCircle', 'AcDbArc'):
-                        try:
-                            try:
-                                c = ent.Center
-                            except Exception:
-                                c = ent.Position if hasattr(ent, 'Position') else None
-                            if c:
-                                points.append({
-                                    'name': f'{prefix}{point_num}',
-                                    'x': round(float(c[0]), precision),
-                                    'y': round(float(c[1]), precision),
-                                    'z': round(float(c[2]) if len(c) > 2 else 0.0, precision),
-                                    'source': obj_name
-                                })
-                                point_num += 1
-                        except Exception as e:
-                            print(f"[execute] Point/Circle error: {e}")
-                            continue
-                
+                        cx, cy, cz = center
+                        points.append({
+                            'name': f'{prefix}{point_num}',
+                            'x': round(cx, precision),
+                            'y': round(cy, precision),
+                            'z': round(cz, precision),
+                            'source': 'LayerSearchCenter',
+                        })
+                        point_num += 1
+
                 except Exception as e:
                     print(f"[execute] Entity {idx} error: {e}")
                     continue
-            
+
+            print(f"[execute] Scanned {entities_scanned} entities on layer '{layer_name}', extracted {len(points)} points")
+
+            if not points:
+                return {
+                    'success': False,
+                    'points': [],
+                    'count': 0,
+                    'layer': layer_name,
+                    'excel_path': '',
+                    'blocks_inserted': 0,
+                    'error': f'No entities found on layer "{layer_name}"'
+                }
+
+            ref_dwg = config.get('ref_dwg_path', '').strip()
+            if not ref_dwg:
+                ref_dwg = default_ref_dwg_path()
+            ref_layer = config.get('ref_layer_name', 'Coordinate Reference Point')
+            ref_scale = float(config.get('ref_scale', 1.0))
+            ref_rotation = float(config.get('ref_rotation_deg', 0))
+
+            blocks_inserted = 0
+            block_errors = []
+            if os.path.exists(ref_dwg):
+                print(f"[execute] Inserting reference blocks from: {ref_dwg}")
+                for p in points:
+                    try:
+                        insert_reference_block(
+                            doc, ms, ref_dwg, ref_layer,
+                            p['x'], p['y'], p['z'],
+                            ref_scale, ref_rotation
+                        )
+                        blocks_inserted += 1
+                    except Exception as e:
+                        block_errors.append(f"Block at {p['name']}: {e}")
+                        print(f"[execute] Block insert error at {p['name']}: {e}")
+
+                try:
+                    doc.Regen(1)
+                except Exception:
+                    pass
+
+                if blocks_inserted > 0:
+                    print(f"[execute] Inserted {blocks_inserted} reference blocks")
+            else:
+                block_errors.append(f"Reference DWG not found: {ref_dwg}")
+                print(f"[execute] WARNING: Reference DWG not found at {ref_dwg}, skipping block insertion")
+
+            drawing_dir = None
+            try:
+                drawing_path = str(doc.FullName)
+                if drawing_path:
+                    drawing_dir = os.path.dirname(drawing_path)
+            except Exception:
+                pass
+
+            excel_path = ''
+            try:
+                excel_path = export_points_to_excel(points, precision, use_corners, drawing_dir)
+                print(f"[execute] Excel exported to: {excel_path}")
+                try:
+                    os.startfile(excel_path)
+                except Exception:
+                    pass
+            except Exception as e:
+                block_errors.append(f"Excel export: {e}")
+                print(f"[execute] Excel export error: {e}")
+
             return {
-                'success': len(points) > 0,
+                'success': True,
                 'points': points,
                 'count': len(points),
                 'layer': layer_name,
-                'error': None if points else f'No entities found on layer "{layer_name}"'
+                'excel_path': excel_path,
+                'blocks_inserted': blocks_inserted,
+                'block_errors': block_errors if block_errors else None,
+                'error': None
             }
-        
+
         except Exception as e:
             traceback.print_exc()
             return {
                 'success': False,
                 'points': [],
                 'count': 0,
+                'excel_path': '',
+                'blocks_inserted': 0,
                 'error': str(e)
             }
         finally:
@@ -587,12 +839,22 @@ def api_execute():
         duration = time.time() - start_time
         
         if result['success']:
+            blocks_inserted = result.get('blocks_inserted', 0)
+            block_errors = result.get('block_errors')
+            msg = f'Extracted {result["count"]} points from layer "{result["layer"]}"'
+            if blocks_inserted > 0:
+                msg += f', inserted {blocks_inserted} reference blocks'
+            if block_errors:
+                msg += f' (warnings: {len(block_errors)})'
             return jsonify({
                 'success': True,
-                'message': f'Extracted {result["count"]} coordinate points from layer "{result["layer"]}"',
+                'message': msg,
                 'points_created': result['count'],
+                'blocks_inserted': blocks_inserted,
+                'excel_path': result.get('excel_path', ''),
                 'duration_seconds': round(duration, 2),
                 'points': result['points'],
+                'block_errors': block_errors,
                 'error_details': None
             }), 200
         else:
@@ -600,6 +862,8 @@ def api_execute():
                 'success': False,
                 'message': result.get('error', 'No entities found'),
                 'points_created': 0,
+                'blocks_inserted': 0,
+                'excel_path': '',
                 'duration_seconds': round(duration, 2),
                 'points': [],
                 'error_details': result.get('error')

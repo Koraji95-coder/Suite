@@ -426,13 +426,13 @@ export function CoordinatesGrabber() {
 
       if (result.success) {
         const pointsCreated = result.points_created || 0;
+        const blocksInserted = result.blocks_inserted || 0;
         const filePath = result.excel_path || '';
         const duration = (Date.now() - executionStartTime) / 1000;
-        
-        // Calculate and store metrics
+        const blockErrors = result.block_errors as string[] | null;
+
         const metrics = calculateMetrics(executionStartTime, pointsCreated, 0);
-        
-        // Save execution result to history
+
         const historyEntry: ExecutionHistoryEntry = {
           timestamp: Date.now(),
           config: {
@@ -447,22 +447,26 @@ export function CoordinatesGrabber() {
           duration,
           filePath,
         };
-        
+
         saveExecutionResult(historyEntry);
-        
-        // Update state with results
-        setState(prev => ({ 
-          ...prev, 
+
+        setState(prev => ({
+          ...prev,
           excelPath: filePath,
           performanceMetrics: metrics,
         }));
-        
-        // Log results
-        addLog(`[SUCCESS] Export complete: ${filePath}`);
-        addLog(`[INFO] Points created: ${pointsCreated}`);
+
+        addLog(`[SUCCESS] ${result.message || `Extracted ${pointsCreated} points`}`);
+        if (blocksInserted > 0) {
+          addLog(`[SUCCESS] Reference blocks inserted: ${blocksInserted}`);
+        }
+        if (filePath) {
+          addLog(`[SUCCESS] Excel exported: ${filePath}`);
+        }
         addLog(`[INFO] Duration: ${duration.toFixed(2)}s`);
-        addLog(`[INFO] Performance: ${metrics.pointsPerSecond} points/second`);
-        addLog('[SUCCESS] Execution history updated');
+        if (blockErrors && blockErrors.length > 0) {
+          blockErrors.forEach(err => addLog(`[WARNING] ${err}`));
+        }
       } else {
         // Log failed execution
         const historyEntry: ExecutionHistoryEntry = {

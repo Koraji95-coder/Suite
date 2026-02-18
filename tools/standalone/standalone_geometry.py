@@ -68,6 +68,104 @@ class StandaloneRow:
     layer: str = ""
 
 
+# -------------------------
+# Configuration History (Undo/Redo Support)
+# -------------------------
+class ConfigHistory:
+    """Manage configuration history for undo/redo operations."""
+    
+    def __init__(self, initial_config: StandaloneConfig):
+        self.history: List[StandaloneConfig] = [initial_config]
+        self.current_index: int = 0
+    
+    def add(self, config: StandaloneConfig) -> None:
+        """Add new configuration, clearing redo history."""
+        self.history = self.history[:self.current_index + 1]
+        self.history.append(config)
+        self.current_index = len(self.history) - 1
+    
+    def undo(self) -> Optional[StandaloneConfig]:
+        """Go back one step in history."""
+        if self.current_index > 0:
+            self.current_index -= 1
+            return self.history[self.current_index]
+        return None
+    
+    def redo(self) -> Optional[StandaloneConfig]:
+        """Go forward one step in history."""
+        if self.current_index < len(self.history) - 1:
+            self.current_index += 1
+            return self.history[self.current_index]
+        return None
+    
+    def current(self) -> StandaloneConfig:
+        """Get current configuration."""
+        return self.history[self.current_index]
+    
+    def can_undo(self) -> bool:
+        """Check if undo is available."""
+        return self.current_index > 0
+    
+    def can_redo(self) -> bool:
+        """Check if redo is available."""
+        return self.current_index < len(self.history) - 1
+
+
+# -------------------------
+# Tooltips & Help Text
+# -------------------------
+TOOLTIPS: Dict[str, str] = {
+    'input_file': 'Path to input DXF or DWG file',
+    'output_excel': 'Path for output Excel spreadsheet (.xlsx)',
+    'target_layer': 'CAD layer name to extract coordinates from',
+    'extraction_mode': 'Extract center point (single coord) or four corners (NW, NE, SW, SE)',
+    'point_prefix': 'Prefix for generated point IDs (e.g. "P" → P001, P002, ...)',
+    'start_number': 'Starting number for sequential point IDs (default: 1)',
+    'decimal_places': 'Number of decimal places in coordinate output (default: 3)',
+    'use_blocks': 'Include block references and block content in extraction',
+    'include_modelspace': 'Include Model space geometry (vs Paper space only)',
+    'verbose': 'Enable verbose logging to console during processing',
+}
+
+
+# -------------------------
+# Configuration Presets
+# -------------------------
+PRESETS: Dict[str, Dict[str, Any]] = {
+    'survey_standard': {
+        'description': 'Standard survey point configuration',
+        'extraction_mode': 'corners',
+        'point_prefix': 'CTRL',
+        'decimal_places': 4,
+        'use_blocks': True,
+        'include_modelspace': True,
+    },
+    'site_plan': {
+        'description': 'Site plan boundary extraction',
+        'extraction_mode': 'center',
+        'point_prefix': 'BP',
+        'decimal_places': 2,
+        'use_blocks': False,
+        'include_modelspace': True,
+    },
+    'utility_points': {
+        'description': 'Utility/infrastructure point collection',
+        'extraction_mode': 'center',
+        'point_prefix': 'UP',
+        'decimal_places': 3,
+        'use_blocks': True,
+        'include_modelspace': True,
+    },
+    'high_precision': {
+        'description': 'High-precision survey work',
+        'extraction_mode': 'corners',
+        'point_prefix': 'HP',
+        'decimal_places': 5,
+        'use_blocks': True,
+        'include_modelspace': True,
+    },
+}
+
 def bbox_center(points: List[Point3D]) -> Optional[Point3D]:
     """Calculate bounding box center from points."""
     if not points:
@@ -351,18 +449,74 @@ def process_file(
     config: StandaloneConfig,
     progress_callback=None,
 ) -> Tuple[List[StandaloneRow], str]:
-    """Complete processing pipeline: load file → extract → export."""
-    rows = extract_geometries_from_file(config, progress_callback)
+    """
+    Complete processing pipeline: load file → extract → export.
     
-    if progress_callback:
-        progress_callback(90, 100, "Exporting to Excel...")
+    Includes error handling and progress tracking for all stages.
+    """
+    try:
+        rows = extract_geometries_from_file(config, progress_callback)
+        
+        if progress_callback:
+            progress_callback(90, 100, "Exporting to Excel...")
+        
+        output_path = export_to_excel(config, rows)
+        
+        if progress_callback:
+            progress_callback(100, 100, "Complete!")
+        
+        return rows, output_path
+    except FileNotFoundError as e:
+        error_msg = f"Input file not found: {e.filename}"
+        if progress_callback:
+            progress_callback(-1, 100, f"Error: {error_msg}")
+        raise
+    except Exception as e:
+        error_msg = f"Processing failed: {str(e)}"
+        if progress_callback:
+            progress_callback(-1, 100, f"Error: {error_msg}")
+        raise
+
+
+# -------------------------
+# Preset utilities
+# -------------------------
+def apply_preset(preset_name: str, base_config: StandaloneConfig) -> StandaloneConfig:
+    """Apply a preset configuration, overriding base config values."""
+    if preset_name not in PRESETS:
+        raise ValueError(f"Unknown preset: {preset_name}. Available: {list(PRESETS.keys())}")
     
-    output_path = export_to_excel(config, rows)
+    preset = PRESETS[preset_name]
     
-    if progress_callback:
-        progress_callback(100, 100, "Complete!")
+    # Create new config with preset values
+    return StandaloneConfig(
+        input_file=base_config.input_file,
+        output_excel=base_config.output_excel,
+        target_layer=base_config.target_layer,
+        extraction_mode=preset.get('extraction_mode', base_config.extraction_mode),
+        point_prefix=preset.get('point_prefix', base_config.point_prefix),
+        start_number=base_config.start_number,
+        decimal_places=preset.get('decimal_places', base_config.decimal_places),
+        use_blocks=preset.get('use_blocks', base_config.use_blocks),
+        include_modelspace=preset.get('include_modelspace', base_config.include_modelspace),
+        verbose=base_config.verbose,
+    )
+
+
+def list_presets() -> None:
+    """Print available presets."""
+    print("\n" + "="*60)
+    print("CONFIGURATION PRESETS")
+    print("="*60)
     
-    return rows, output_path
+    for preset_name, preset_info in PRESETS.items():
+        print(f"\n  {preset_name.upper()}")
+        print(f"    {preset_info['description']}")
+        print(f"    Mode: {preset_info['extraction_mode']}")
+        print(f"    Prefix: {preset_info['point_prefix']}")
+        print(f"    Decimals: {preset_info['decimal_places']}")
+    
+    print("\n" + "="*60 + "\n")
 
 
 if __name__ == "__main__":
@@ -389,8 +543,27 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--decimals", type=int, default=3, help="Decimal places (default: 3)")
     parser.add_argument("-c", "--config", help="Load config from JSON file")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("--preset", choices=list(PRESETS.keys()), 
+                       help=f"Apply configuration preset: {', '.join(PRESETS.keys())}")
+    parser.add_argument("--list-presets", action="store_true", help="List all available presets")
+    parser.add_argument("--help-tooltips", action="store_true", help="Show help text for all config options")
     
     args = parser.parse_args()
+    
+    # Handle special commands
+    if args.list_presets:
+        list_presets()
+        sys.exit(0)
+    
+    if args.help_tooltips:
+        print("\n" + "="*60)
+        print("CONFIGURATION HELP")
+        print("="*60)
+        for key, description in TOOLTIPS.items():
+            print(f"\n  {key}")
+            print(f"    {description}")
+        print("\n" + "="*60 + "\n")
+        sys.exit(0)
     
     if args.config:
         with open(args.config, 'r') as f:
@@ -409,6 +582,11 @@ if __name__ == "__main__":
             decimal_places=args.decimals,
             verbose=args.verbose,
         )
+        
+        # Apply preset if specified
+        if args.preset:
+            print(f"Applying preset: {args.preset}")
+            config = apply_preset(args.preset, config)
     
     print(f"Loading: {config.input_file}")
     print(f"Layer: {config.target_layer}")

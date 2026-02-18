@@ -1,0 +1,74 @@
+import {
+  LayoutDashboard, FolderOpen, HardDrive, AppWindow, BookOpen,
+  FileText, Settings, Network, Calculator, Compass, Zap, GitBranch,
+  Activity, CircuitBoard, Cpu, Binary, Waves, CheckCircle, FlaskConical, CalendarDays
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+export interface MenuItem {
+  id: string;
+  icon: LucideIcon;
+  label: string;
+  color: 'cyan' | 'teal' | 'blue' | 'green' | 'orange' | 'purple';
+  isCategory?: boolean;
+}
+
+export interface MenuSection {
+  title: string;
+  items: MenuItem[];
+  subsections?: Array<{
+    subtitle: string;
+    items: MenuItem[];
+  }>;
+}
+
+export const menuSections: MenuSection[] = [
+  {
+    title: 'Main',
+    items: [
+      { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', color: 'cyan' },
+      { id: 'projects', icon: FolderOpen, label: 'Project Manager', color: 'cyan' },
+      { id: 'storage', icon: HardDrive, label: 'Storage', color: 'cyan' },
+    ],
+  },
+  {
+    title: 'Apps & Automation',
+    items: [], // Items will be filled in the grid from category 'apps'
+  },
+  {
+    title: 'Knowledge & Standards',
+    items: [
+      { id: 'calculator', icon: Calculator, label: 'Calculations', color: 'blue' },
+      { id: 'vectors', icon: Compass, label: 'Vector Analysis', color: 'blue' },
+      { id: 'threephase', icon: Zap, label: 'Three-Phase Systems', color: 'blue' },
+      { id: 'symmetrical', icon: GitBranch, label: 'Symmetrical Components', color: 'blue' },
+      { id: 'sinusoidal', icon: Activity, label: 'Sinusoidal & Per-Unit', color: 'blue' },
+      { id: 'mathref', icon: BookOpen, label: 'Math Reference', color: 'blue' },
+      { id: 'plots', icon: Zap, label: 'Plot Diagrams', color: 'blue' },
+      { id: 'circuits', icon: CircuitBoard, label: 'Circuit Generator', color: 'blue' },
+      { id: 'formulas', icon: BookOpen, label: 'Formula Bank', color: 'blue' },
+      { id: 'electronics', icon: Cpu, label: 'Electronics', color: 'blue' },
+      { id: 'digital-logic', icon: Binary, label: 'Digital Logic Design', color: 'blue' },
+      { id: 'electromagnetics', icon: Waves, label: 'Electromagnetics', color: 'blue' },
+      { id: 'qaqc', icon: CheckCircle, label: 'QA/QC Standards Checker', color: 'blue' },
+      { id: 'nec', icon: FileText, label: 'National Electric Code', color: 'blue' },
+      { id: 'ieee', icon: FileText, label: 'IEEE Standards', color: 'blue' },
+      { id: 'equipment-library', icon: Settings, label: 'Equipment Library', color: 'blue' },
+    ],
+  },
+];
+
+// Category definitions for the main navigation icons (sidebar)
+export const sidebarNavItems: (MenuItem & { isCategory?: boolean })[] = [
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', color: 'cyan' },
+  { id: 'projects', icon: FolderOpen, label: 'Projects', color: 'cyan' },
+  { id: 'storage', icon: HardDrive, label: 'Storage', color: 'cyan' },
+  { id: 'calendar', icon: CalendarDays, label: 'Calendar', color: 'cyan' },
+  { divider: true } as any, // We'll handle divider separately
+  { id: 'appshub', icon: AppWindow, label: 'Apps', color: 'teal' },
+  { id: 'knowledge', icon: BookOpen, label: 'Knowledge', color: 'blue', isCategory: true },
+  { divider: true } as any,
+  { id: 'architecture-map', icon: Network, label: 'Arch Map', color: 'purple' },
+  { divider: true } as any,
+  { id: 'test-preview', icon: FlaskConical, label: 'Test Preview', color: 'purple' },
+];

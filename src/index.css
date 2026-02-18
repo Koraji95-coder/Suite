@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── shadcn/ui compatible CSS variables (dark theme) ── */
+:root {
+  --background: 222 47% 6%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 8%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 8%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 24 95% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --ring: 24 95% 53%;
+  --radius: 0.5rem;
+}
+
+/* Only apply no-select to draggable / ornamental UI bits via .no-select class */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ember-primary, rgba(249,115,22,1)) 25%, transparent);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ember-primary, rgba(249,115,22,1)) 45%, transparent);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ember-primary, rgba(249,115,22,1)) 25%, transparent) transparent;
+}
+
+/* ── Liquid glass border-radius morphing ── */
+@keyframes liquid {
+  0%   { border-radius: 24% 76% 35% 65% / 27% 30% 70% 73%; }
+  25%  { border-radius: 58% 42% 75% 25% / 76% 46% 54% 24%; }
+  50%  { border-radius: 50% 50% 33% 67% / 55% 27% 73% 45%; }
+  75%  { border-radius: 33% 67% 58% 42% / 63% 68% 32% 37%; }
+  100% { border-radius: 24% 76% 35% 65% / 27% 30% 70% 73%; }
+}
+.animate-liquid {
+  animation: liquid 12s ease-in-out infinite;
+}
+
+/* ── Pulsing glow ── */
+@keyframes pulse-glow {
+  0%, 100% { filter: drop-shadow(0 0 8px var(--gp-tint-glow, rgba(74,144,226,0.15))); }
+  50%      { filter: drop-shadow(0 0 24px var(--gp-tint-glow, rgba(74,144,226,0.35))); }
+}
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* ── Floating / levitation ── */
+@keyframes glass-float {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-8px); }
+}
+.animate-glass-float {
+  animation: glass-float 6s ease-in-out infinite;
+}
+
+/* ── Shimmer flow (specular highlight sweep) ── */
+@keyframes shimmer-flow {
+  0%   { transform: translateX(-100%) rotate(25deg); }
+  100% { transform: translateX(200%) rotate(25deg); }
+}
+.glass-shimmer-overlay {
+  animation: shimmer-flow 4s ease-in-out infinite;
+}
+
+/* ── Rotating edge light (conic gradient) ── */
+@keyframes edge-rotate {
+  from { --edge-angle: 0deg; }
+  to   { --edge-angle: 360deg; }
+}
+@property --edge-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+.animate-edge-light {
+  animation: edge-rotate 6s linear infinite;
+}
+
+/* Better focus states (advanced / product-grade polish) */
+:focus-visible {
+  outline: 2px solid rgba(74, 144, 226, 0.55);
+  outline-offset: 2px;
+}
+
+
+/* ── Film grain noise overlay ── */
+@keyframes grain-shift {
+  0%, 100% { transform: translate(0, 0); }
+  10%      { transform: translate(-2%, -3%); }
+  20%      { transform: translate(3%, 1%); }
+  30%      { transform: translate(-1%, 2%); }
+  40%      { transform: translate(2%, -1%); }
+  50%      { transform: translate(-3%, 3%); }
+  60%      { transform: translate(1%, -2%); }
+  70%      { transform: translate(-2%, 1%); }
+  80%      { transform: translate(3%, -3%); }
+  90%      { transform: translate(-1%, 2%); }
+}
+.glass-grain-overlay {
+  animation: grain-shift 0.5s steps(10) infinite;
+}

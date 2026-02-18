@@ -2,7 +2,7 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-reac
 import { useState } from 'react';
 import { formatDateString, formatDateOnly } from './dashboardUtils';
 import { getCalendarDayUrgencyStyle, getUrgencyLevel } from '../calendar/urgencyUtils';
-import { EMBER_PALETTE, hexToRgba, glassCardInnerStyle } from '../../lib/three/emberPalette';
+import { useTheme, hexToRgba, glassCardInnerStyle } from '@/lib/palette';
 import { GlassPanel } from '../ui/GlassPanel';
 
 interface TaskDueItem {
@@ -44,6 +44,7 @@ export function CalendarWidget({
   allProjectsMap,
   onNavigateToProject,
 }: CalendarWidgetProps) {
+  const { palette } = useTheme();
   const year = calendarMonth.getFullYear();
   const month = calendarMonth.getMonth();
   const firstDay = new Date(year, month, 1);
@@ -120,15 +121,15 @@ export function CalendarWidget({
 
       if (isSelected) {
         dayStyle = {
-          backgroundColor: EMBER_PALETTE.primary,
+          backgroundColor: palette.primary,
           color: '#fff',
           fontWeight: 'bold',
-          boxShadow: `0 0 0 2px ${EMBER_PALETTE.primary}`,
+          boxShadow: `0 0 0 2px ${palette.primary}`,
         };
       } else if (isToday) {
         dayStyle = {
-          backgroundColor: hexToRgba(EMBER_PALETTE.primary, 0.3),
-          color: hexToRgba(EMBER_PALETTE.text, 0.9),
+          backgroundColor: hexToRgba(palette.primary, 0.3),
+          color: hexToRgba(palette.text, 0.9),
           fontWeight: 'bold',
         };
       } else if (hasDueDate && urgencyStyleObj) {
@@ -138,7 +139,7 @@ export function CalendarWidget({
           borderStyle: 'solid',
         };
       } else {
-        dayStyle = { color: hexToRgba(EMBER_PALETTE.text, 0.6) };
+        dayStyle = { color: hexToRgba(palette.text, 0.6) };
         extraClass = 'hover:bg-white/[0.06]';
       }
 
@@ -164,11 +165,11 @@ export function CalendarWidget({
       <div
         className="mt-4 p-3 border rounded-lg"
         style={{
-          backgroundColor: hexToRgba(EMBER_PALETTE.primary, 0.1),
-          borderColor: hexToRgba(EMBER_PALETTE.primary, 0.2),
+          backgroundColor: hexToRgba(palette.primary, 0.1),
+          borderColor: hexToRgba(palette.primary, 0.2),
         }}
       >
-        <p className="text-sm font-semibold mb-2" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.9) }}>
+        <p className="text-sm font-semibold mb-2" style={{ color: hexToRgba(palette.text, 0.9) }}>
           {(() => {
             const [y, m, d] = selectedDate.split('-').map(Number);
             return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -180,10 +181,10 @@ export function CalendarWidget({
             <div
               key={task.id}
               className={`text-sm mb-1 ${task.completed ? 'line-through' : ''}`}
-              style={{ color: task.completed ? hexToRgba(EMBER_PALETTE.text, 0.3) : hexToRgba(EMBER_PALETTE.primary, 0.9) }}
+              style={{ color: task.completed ? hexToRgba(palette.text, 0.3) : hexToRgba(palette.primary, 0.9) }}
             >
               Task: &quot;{task.name}&quot; Due {formatDateOnly(task.due_date)}
-              {project && <span className="ml-1" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.4) }}>({project.name})</span>}
+              {project && <span className="ml-1" style={{ color: hexToRgba(palette.text, 0.4) }}>({project.name})</span>}
             </div>
           );
         })}
@@ -191,20 +192,20 @@ export function CalendarWidget({
           <div
             key={project.id}
             className="text-sm cursor-pointer transition-colors"
-            style={{ color: hexToRgba(EMBER_PALETTE.primary, 0.9) }}
+            style={{ color: hexToRgba(palette.primary, 0.9) }}
             onClick={() => onNavigateToProject?.(project.id)}
           >
             📁 {project.name} — deadline
           </div>
         ))}
-        {!hasContent && <p className="text-sm" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.3) }}>No events this day</p>}
+        {!hasContent && <p className="text-sm" style={{ color: hexToRgba(palette.text, 0.3) }}>No events this day</p>}
       </div>
     );
   })();
 
   return (
     <GlassPanel
-      tint={EMBER_PALETTE.primary}
+      tint={palette.primary}
       hoverEffect={false}
       className="p-6 group"
     >
@@ -214,39 +215,39 @@ export function CalendarWidget({
             <div
               className="p-2 rounded-lg"
               style={{
-                background: `linear-gradient(135deg, ${hexToRgba(EMBER_PALETTE.primary, 0.25)} 0%, ${hexToRgba(EMBER_PALETTE.primary, 0.08)} 100%)`,
-                boxShadow: `0 0 16px ${hexToRgba(EMBER_PALETTE.primary, 0.12)}`,
+                background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.25)} 0%, ${hexToRgba(palette.primary, 0.08)} 100%)`,
+                boxShadow: `0 0 16px ${hexToRgba(palette.primary, 0.12)}`,
               }}
             >
-              <CalendarIcon className="w-5 h-5" style={{ color: EMBER_PALETTE.primary }} />
+              <CalendarIcon className="w-5 h-5" style={{ color: palette.primary }} />
             </div>
-            <h3 className="text-xl font-bold" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.9) }}>
+            <h3 className="text-xl font-bold" style={{ color: hexToRgba(palette.text, 0.9) }}>
               {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </h3>
           </div>
           <div className="flex items-center space-x-2">
             <button onClick={() => navigateMonth(-1)} className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.08]">
-              <ChevronLeft className="w-5 h-5" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.5) }} />
+              <ChevronLeft className="w-5 h-5" style={{ color: hexToRgba(palette.text, 0.5) }} />
             </button>
             <button
               onClick={handleToday}
               className="px-3 py-1 text-xs font-semibold rounded-lg transition-all"
               style={{
-                ...glassCardInnerStyle(EMBER_PALETTE.primary),
-                color: EMBER_PALETTE.primary,
+                ...glassCardInnerStyle(palette, palette.primary),
+                color: palette.primary,
               }}
             >
               Today
             </button>
             <button onClick={() => navigateMonth(1)} className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.08]">
-              <ChevronRight className="w-5 h-5" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.5) }} />
+              <ChevronRight className="w-5 h-5" style={{ color: hexToRgba(palette.text, 0.5) }} />
             </button>
           </div>
         </div>
 
         <div className="grid grid-cols-7 gap-2 mb-3">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="text-center text-xs font-semibold" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.3) }}>{day}</div>
+            <div key={day} className="text-center text-xs font-semibold" style={{ color: hexToRgba(palette.text, 0.3) }}>{day}</div>
           ))}
         </div>
 

@@ -93,4 +93,3 @@ export function MinorInspector({ node }: { node: ArchNode }) {
     </div>
   );
 }
-

@@ -72,7 +72,7 @@ export function BlockLibrary() {
           file_size: Math.floor(Math.random() * 1000000) + 50000,
           usage_count: 0,
           is_favorite: false,
-        });
+        } as any);
 
       if (!error) {
         await loadBlocks();
@@ -98,8 +98,8 @@ export function BlockLibrary() {
   };
 
   const toggleFavorite = async (block: BlockFile) => {
-    const { error } = await supabase
-      .from('block_library')
+    const { error } = await (supabase
+      .from('block_library') as any)
       .update({ is_favorite: !block.is_favorite })
       .eq('id', block.id);
 

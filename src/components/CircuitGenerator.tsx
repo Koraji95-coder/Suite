@@ -174,7 +174,7 @@ export function CircuitGenerator() {
       circuit_data: {
         components: components,
       },
-    });
+    } as any);
 
     if (!error) {
       alert('Circuit saved successfully!');

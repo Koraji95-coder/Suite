@@ -10,7 +10,7 @@ import { useGraphData } from './hooks/useGraphData';
 import { createRenderState, type RenderState } from './hooks/useCanvasRenderer';
 import { useSimulationWorker } from './hooks/useSimulationWorker';
 import { MajorInspector, MinorInspector } from './Inspectors';
-import { HYPHAE_PALETTE } from '../../lib/three/emberPalette';
+import { useTheme, type ColorScheme } from '@/lib/palette';
 import { createHyphaeRenderer } from '../../lib/three/hyphaeRenderer';
 import { createHyphaeCoreNodeMaterial } from '../../lib/three/hyphaeMaterials';
 import { LivingBackground } from './LivingBackground';
@@ -83,7 +83,7 @@ function mulberry32(seed: number) {
   };
 }
 
-function buildCurves(nodes: ArchNode[], links: ArchLink[]): LinkCurve[] {
+function buildCurves(nodes: ArchNode[], links: ArchLink[], palette: ColorScheme): LinkCurve[] {
   const byId = new Map(nodes.map((n) => [n.id, n] as const));
   const out: LinkCurve[] = [];
   for (let i = 0; i < links.length; i++) {
@@ -98,7 +98,7 @@ function buildCurves(nodes: ArchNode[], links: ArchLink[]): LinkCurve[] {
     mid.z += Math.min(40, 14 + a.distanceTo(b) * 0.05);
     const curve = new THREE.CatmullRomCurve3([a, mid, b], false, 'catmullrom', 0.6);
     const radius = l.type === 'orchestrator' ? 0.75 : l.type === 'overlap' ? 0.58 : 0.46;
-    const emissive = l.type === 'overlap' ? HYPHAE_PALETTE.secondary : HYPHAE_PALETTE.primary;
+    const emissive = l.type === 'overlap' ? palette.secondary : palette.primary;
     const opacity = l.type === 'overlap' ? 0.72 : 0.9;
     out.push({ key: `${l.type}-${i}-${s.id}->${t.id}`, curve, radius, emissive, opacity });
   }
@@ -106,6 +106,7 @@ function buildCurves(nodes: ArchNode[], links: ArchLink[]): LinkCurve[] {
 }
 
 function BackgroundStars({ bounds }: { bounds: Bounds }) {
+  const { palette } = useTheme();
   const geom = useMemo(() => {
     const g = new THREE.BufferGeometry();
     const r = mulberry32(4242);
@@ -131,7 +132,7 @@ function BackgroundStars({ bounds }: { bounds: Bounds }) {
   return (
     <points geometry={geom} frustumCulled={false}>
       <pointsMaterial
-        color={HYPHAE_PALETTE.text}
+        color={palette.text}
         size={1.25}
         sizeAttenuation
         transparent
@@ -145,6 +146,7 @@ function BackgroundStars({ bounds }: { bounds: Bounds }) {
 }
 
 function FlowParticles({ curves, count = 160 }: { curves: LinkCurve[]; count?: number }) {
+  const { palette } = useTheme();
   const inst = useRef<THREE.InstancedMesh>(null);
   const parts = useMemo(() => {
     const r = mulberry32(1337);
@@ -191,7 +193,7 @@ function FlowParticles({ curves, count = 160 }: { curves: LinkCurve[]; count?: n
     const im = inst.current;
     if (!im || curves.length === 0) return;
     const tmpC = new THREE.Color();
-    const tertiary = new THREE.Color(HYPHAE_PALETTE.tertiary);
+    const tertiary = new THREE.Color(palette.tertiary);
     for (let i = 0; i < parts.length; i++) {
       const c = curves[parts[i].ci % curves.length];
       tmpC.set(c.emissive).lerp(tertiary, 0.25);
@@ -217,6 +219,7 @@ function FlowParticles({ curves, count = 160 }: { curves: LinkCurve[]; count?: n
 }
 
 function MajorAura({ r }: { r: number }) {
+  const { palette } = useTheme();
   const mat = useRef<THREE.MeshBasicMaterial>(null);
   useFrame(({ clock }) => {
     const m = mat.current;
@@ -228,7 +231,7 @@ function MajorAura({ r }: { r: number }) {
       <sphereGeometry args={[r * 1.1, 18, 18]} />
       <meshBasicMaterial
         ref={mat}
-        color={HYPHAE_PALETTE.primary}
+        color={palette.primary}
         transparent
         opacity={0.12}
         depthWrite={false}
@@ -250,6 +253,7 @@ function Scene({
   onSelect: (n: ArchNode) => void;
   resetRef: MutableRefObject<(() => void) | null>;
 }) {
+  const { palette } = useTheme();
   const { camera, gl } = useThree();
   const controls = useRef<any>(null);
   const isWebGPU = gl instanceof WebGPURenderer;
@@ -268,7 +272,7 @@ function Scene({
       (coreMat as any)?.dispose?.();
     };
   }, [coreMat]);
-  const curves = useMemo(() => buildCurves(graph.nodes, graph.links), [graph.nodes, graph.links]);
+  const curves = useMemo(() => buildCurves(graph.nodes, graph.links, palette), [graph.nodes, graph.links, palette]);
 
   useEffect(() => {
     if (graph.nodes.length === 0) return;
@@ -302,10 +306,10 @@ function Scene({
 			<LivingBackground bounds={bounds} />
 
       <ambientLight intensity={0.32} />
-      <hemisphereLight intensity={0.18} color={HYPHAE_PALETTE.text} groundColor={HYPHAE_PALETTE.ink} />
-      <directionalLight position={[60, 80, 120]} intensity={0.95} color={HYPHAE_PALETTE.tertiary} />
-      <pointLight position={[-90, 60, 80]} intensity={0.62} color={HYPHAE_PALETTE.primary} />
-      <pointLight position={[90, -40, 60]} intensity={0.35} color={HYPHAE_PALETTE.secondary} />
+      <hemisphereLight intensity={0.18} color={palette.text} groundColor={palette.background} />
+      <directionalLight position={[60, 80, 120]} intensity={0.95} color={palette.tertiary} />
+      <pointLight position={[-90, 60, 80]} intensity={0.62} color={palette.primary} />
+      <pointLight position={[90, -40, 60]} intensity={0.35} color={palette.secondary} />
 
       {curves.map((c) => (
         <group key={c.key}>
@@ -313,7 +317,7 @@ function Scene({
           <mesh>
             <tubeGeometry args={[c.curve, 56, c.radius, 8, false]} />
             <meshStandardMaterial
-              color={HYPHAE_PALETTE.deep}
+              color={palette.background}
               emissive={c.emissive}
               emissiveIntensity={0.95}
               roughness={0.5}
@@ -357,8 +361,8 @@ function Scene({
                 <primitive object={coreMat as any} attach="material" />
               ) : (
                 <meshStandardMaterial
-                  color={n.type === 'major' ? HYPHAE_PALETTE.deep : n.color}
-                  emissive={n.type === 'major' ? HYPHAE_PALETTE.secondary : n.color}
+                  color={n.type === 'major' ? palette.background : n.color}
+                  emissive={n.type === 'major' ? palette.secondary : n.color}
                   emissiveIntensity={n.type === 'major' ? 0.65 : 0.35}
                   roughness={0.6}
                   metalness={0.08}
@@ -383,6 +387,7 @@ function Scene({
 }
 
 export function ArchitectureMap3D() {
+  const { palette } = useTheme();
   const { nodes, links } = useGraphData();
   const [frozen, setFrozen] = useState<FrozenGraph | null>(null);
   const [selected, setSelected] = useState<ArchNode | null>(null);
@@ -445,20 +450,20 @@ export function ArchitectureMap3D() {
             try {
               return await createHyphaeRenderer(p.canvas, {
                 alpha: false,
-                clearColor: HYPHAE_PALETTE.background,
+                clearColor: palette.background,
                 clearAlpha: 1,
               });
             } catch (e) {
               console.warn('[Hyphae] WebGPU renderer init failed; falling back to WebGLRenderer.', e);
               const r = new THREE.WebGLRenderer({ canvas: p.canvas as any, antialias: true, alpha: false });
-              r.setClearColor(new THREE.Color(HYPHAE_PALETTE.background), 1);
+              r.setClearColor(new THREE.Color(palette.background), 1);
               return r;
             }
           }}
           onPointerMissed={() => setSelected(null)}
         >
-          <color attach="background" args={[HYPHAE_PALETTE.background]} />
-          {bounds && <fog attach="fog" args={[HYPHAE_PALETTE.ink, bounds.radius * 1.35, bounds.radius * 6.5]} />}
+          <color attach="background" args={[palette.background]} />
+          {bounds && <fog attach="fog" args={[palette.background, bounds.radius * 1.35, bounds.radius * 6.5]} />}
           {frozen && bounds && (
             <Scene graph={frozen} bounds={bounds} onSelect={setSelected} resetRef={resetViewRef} />
           )}

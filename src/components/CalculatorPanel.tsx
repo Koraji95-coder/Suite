@@ -223,7 +223,7 @@ export function CalculatorPanel() {
       inputs: inputValues,
       results: resultValues,
       notes: notes,
-    });
+    } as any);
 
     if (!error) {
       alert('Calculation saved successfully!');

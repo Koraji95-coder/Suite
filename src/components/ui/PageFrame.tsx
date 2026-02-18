@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { EMBER_PALETTE, hexToRgba } from '../../lib/three/emberPalette';
+import { useTheme, hexToRgba } from '@/lib/palette';
 import { GlassPanel } from './GlassPanel';
 
 export type Breadcrumb = { label: string; onClick?: () => void };
@@ -29,11 +29,13 @@ export function PageFrame({
   breadcrumbs,
   actions,
   onBack,
-  tint = EMBER_PALETTE.primary,
+  tint: tintProp,
   maxWidthClassName = 'max-w-[1480px]',
   rightRail,
   children,
 }: PageFrameProps) {
+  const { palette } = useTheme();
+  const tint = tintProp ?? palette.primary;
   const hasRight = Boolean(rightRail);
 
   return (
@@ -61,13 +63,13 @@ export function PageFrame({
                       type="button"
                       onClick={b.onClick}
                       className={`hover:underline ${b.onClick ? '' : 'cursor-default'}`}
-                      style={{ color: hexToRgba(EMBER_PALETTE.text, 0.55) }}
+                      style={{ color: hexToRgba(palette.text, 0.55) }}
                       disabled={!b.onClick}
                     >
                       {b.label}
                     </button>
                     {idx < breadcrumbs.length - 1 && (
-                      <span style={{ color: hexToRgba(EMBER_PALETTE.text, 0.35) }}>•</span>
+                      <span style={{ color: hexToRgba(palette.text, 0.35) }}>•</span>
                     )}
                   </div>
                 ))}
@@ -82,7 +84,7 @@ export function PageFrame({
                   className="shrink-0 rounded-xl px-3 py-2 transition-colors hover:bg-white/[0.06]"
                   style={{
                     border: `1px solid ${hexToRgba(tint, 0.14)}`,
-                    color: hexToRgba(EMBER_PALETTE.text, 0.8),
+                    color: hexToRgba(palette.text, 0.8),
                   }}
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -92,11 +94,11 @@ export function PageFrame({
               {icon ? <div className="shrink-0">{icon}</div> : null}
 
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-semibold" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.92) }}>
+                <h2 className="truncate text-lg font-semibold" style={{ color: hexToRgba(palette.text, 0.92) }}>
                   {title}
                 </h2>
                 {subtitle ? (
-                  <p className="mt-0.5 text-sm truncate" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.55) }}>
+                  <p className="mt-0.5 text-sm truncate" style={{ color: hexToRgba(palette.text, 0.55) }}>
                     {subtitle}
                   </p>
                 ) : null}
@@ -123,7 +125,7 @@ export function FrameSection({
   subtitle,
   actions,
   children,
-  tint = EMBER_PALETTE.primary,
+  tint: tintProp,
 }: {
   title?: string;
   subtitle?: string;
@@ -131,18 +133,20 @@ export function FrameSection({
   children: ReactNode;
   tint?: string;
 }) {
+  const { palette } = useTheme();
+  const tint = tintProp ?? palette.primary;
   return (
     <GlassPanel tint={tint} intensity="medium" bevel specular hoverEffect={false} className="rounded-2xl" padded>
       {(title || actions) ? (
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
             {title ? (
-              <div className="text-sm font-semibold" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.9) }}>
+              <div className="text-sm font-semibold" style={{ color: hexToRgba(palette.text, 0.9) }}>
                 {title}
               </div>
             ) : null}
             {subtitle ? (
-              <div className="text-xs mt-0.5" style={{ color: hexToRgba(EMBER_PALETTE.text, 0.55) }}>
+              <div className="text-xs mt-0.5" style={{ color: hexToRgba(palette.text, 0.55) }}>
                 {subtitle}
               </div>
             ) : null}

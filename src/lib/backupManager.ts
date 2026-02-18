@@ -237,8 +237,7 @@ export async function restoreFromYaml(yamlStr: string): Promise<{ restored: numb
     if (!rows || rows.length === 0) continue;
 
     try {
-      const { error } = await supabase
-        .from(tableName)
+      const { error } = await (supabase.from(tableName) as any)
         .upsert(rows, { onConflict: 'id' });
 
       if (error) {

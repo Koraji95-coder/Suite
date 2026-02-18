@@ -3,7 +3,7 @@ import * as THREE from 'three';
 
 import { LoadingCard } from './LoadingCard';
 import { ProgressBar } from './ProgressBar';
-import { EMBER_PALETTE } from '../lib/three/emberPalette';
+import { useTheme } from '@/lib/palette';
 
 function usePrefersReducedMotion() {
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -31,6 +31,7 @@ export interface EmberSplashProps {
 }
 
 export function EmberSplash({ onComplete }: EmberSplashProps) {
+  const { palette } = useTheme();
   const prefersReducedMotion = usePrefersReducedMotion();
   const reducedMotion = prefersReducedMotion;
   const [step, setStep] = useState(0);
@@ -41,11 +42,11 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
   onCompleteRef.current = onComplete;
 
   const steps = useMemo(() => [
-    { id: 'seed', label: 'Seeding neural lattice', duration: reducedMotion ? 550 : 1800 },
-    { id: 'grow', label: 'Growing hyphae pathways', duration: reducedMotion ? 650 : 2200 },
-    { id: 'flow', label: 'Energizing data flow', duration: reducedMotion ? 650 : 2200 },
-    { id: 'sync', label: 'Synchronizing systems', duration: reducedMotion ? 500 : 1800 },
-    { id: 'ready', label: 'Stabilizing interface', duration: reducedMotion ? 450 : 1400 },
+    { id: 'dashboard', label: 'Loading Dashboard', duration: reducedMotion ? 550 : 1800 },
+    { id: 'projects', label: 'Initializing Projects', duration: reducedMotion ? 650 : 2200 },
+    { id: 'storage', label: 'Connecting Storage', duration: reducedMotion ? 650 : 2200 },
+    { id: 'ai', label: 'Preparing AI Assistant', duration: reducedMotion ? 500 : 1800 },
+    { id: 'workspace', label: 'Building Workspace', duration: reducedMotion ? 450 : 1400 },
   ], [reducedMotion]);
 
   const total = useMemo(() => steps.reduce((s, x) => s + x.duration, 0), [steps]);
@@ -134,11 +135,11 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
     // Primary plane – emerald green (hero accent for Frost & Steel)
     const geo1 = new THREE.PlaneGeometry(14, 14, 128, 128);
     const mat1 = new THREE.MeshStandardMaterial({
-      color: EMBER_PALETTE.secondary,
+      color: palette.secondary,
       wireframe: true,
       transparent: true,
       opacity: 0.3,
-      emissive: new THREE.Color(EMBER_PALETTE.secondary).multiplyScalar(0.3),
+      emissive: new THREE.Color(palette.secondary).multiplyScalar(0.3),
     });
     const plane1 = new THREE.Mesh(geo1, mat1);
     plane1.rotation.x = -Math.PI / 3.2;
@@ -149,11 +150,11 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
     // Secondary plane – azure blue (primary), larger, behind
     const geo2 = new THREE.PlaneGeometry(18, 18, 128, 128);
     const mat2 = new THREE.MeshStandardMaterial({
-      color: EMBER_PALETTE.primary,
+      color: palette.primary,
       wireframe: true,
       transparent: true,
       opacity: 0.15,
-      emissive: new THREE.Color(EMBER_PALETTE.primary).multiplyScalar(0.2),
+      emissive: new THREE.Color(palette.primary).multiplyScalar(0.2),
     });
     const plane2 = new THREE.Mesh(geo2, mat2);
     plane2.rotation.x = -Math.PI / 4;
@@ -162,17 +163,17 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
     plane2Ref.current = plane2;
 
     // Ambient light – faint emerald to unify the green tone
-    const ambientLight = new THREE.AmbientLight(EMBER_PALETTE.secondary, 0.15);
+    const ambientLight = new THREE.AmbientLight(palette.secondary, 0.15);
     scene.add(ambientLight);
 
     // Front point light – emerald green, intensity tied to progress
-    const frontLight = new THREE.PointLight(EMBER_PALETTE.secondary, 0.5);
+    const frontLight = new THREE.PointLight(palette.secondary, 0.5);
     frontLight.position.set(2, 3, 4);
     scene.add(frontLight);
     frontLightRef.current = frontLight;
 
     // Back point light – azure blue for subtle rim light
-    const backLight = new THREE.PointLight(EMBER_PALETTE.primary, 0.3);
+    const backLight = new THREE.PointLight(palette.primary, 0.3);
     backLight.position.set(-4, 2, -3);
     scene.add(backLight);
     backLightRef.current = backLight;
@@ -280,7 +281,7 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
       mat1.dispose();
       mat2.dispose();
     };
-  }, [exitDurationMs, reducedMotion]);
+  }, [exitDurationMs, reducedMotion, palette]);
 
   return (
     <div
@@ -288,7 +289,7 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
         isExiting ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'
       }`}
       style={{
-        backgroundColor: EMBER_PALETTE.background,
+        backgroundColor: palette.background,
         transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
@@ -296,7 +297,7 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: `radial-gradient(circle at 50% 45%, ${EMBER_PALETTE.secondary}20, ${EMBER_PALETTE.primary}0D 38%, ${EMBER_PALETTE.background} 70%)`,
+          background: `radial-gradient(circle at 50% 45%, ${palette.secondary}20, ${palette.primary}0D 38%, ${palette.background} 70%)`,
         }}
       />
       <div
@@ -321,9 +322,9 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
             >
               <defs>
                 <linearGradient id="sqrt-grad" x1="0" y1="0" x2="100" y2="0" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor={EMBER_PALETTE.secondary} />
-                  <stop offset="50%" stopColor={EMBER_PALETTE.primary} />
-                  <stop offset="100%" stopColor={EMBER_PALETTE.tertiary} />
+                  <stop offset="0%" stopColor={palette.secondary} />
+                  <stop offset="50%" stopColor={palette.primary} />
+                  <stop offset="100%" stopColor={palette.tertiary} />
                 </linearGradient>
               </defs>
               <polyline
@@ -338,7 +339,7 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
             <span
               className="relative bg-clip-text text-transparent"
               style={{
-                backgroundImage: `linear-gradient(90deg, ${EMBER_PALETTE.secondary}, ${EMBER_PALETTE.primary}, ${EMBER_PALETTE.tertiary})`,
+                backgroundImage: `linear-gradient(90deg, ${palette.secondary}, ${palette.primary}, ${palette.tertiary})`,
                 paddingLeft: '1.1em',
               }}
             >
@@ -346,7 +347,7 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
             </span>
           </span>
         </h1>
-        <p className="mt-2 text-sm sm:text-base font-semibold" style={{ color: EMBER_PALETTE.text }}>
+        <p className="mt-2 text-sm sm:text-base font-semibold" style={{ color: palette.text }}>
           Ember Flux – Engineering Intelligence
         </p>
         <div className="w-full max-w-[360px] mt-6 space-y-2">
@@ -354,7 +355,7 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
             <LoadingCard
               key={s.id}
               label={s.label}
-              icon={<span className="text-[10px] font-bold" style={{ color: EMBER_PALETTE.text }}>*</span>}
+              icon={<span className="text-[10px] font-bold" style={{ color: palette.text }}>*</span>}
               isActive={i === displayStep}
               isComplete={i < displayStep}
               index={i}
@@ -366,10 +367,10 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
         </div>
       </div>
       <div className="absolute bottom-6 right-6 text-right text-[10px] sm:text-[11px] leading-tight z-20 select-none">
-        <div className="font-medium" style={{ color: EMBER_PALETTE.textMuted }}>Root3Power Suite</div>
-        <div style={{ color: EMBER_PALETTE.textMuted, opacity: 0.6 }}>By Dustin</div>
-        <div className="text-[9px] sm:text-[10px]" style={{ color: EMBER_PALETTE.textMuted, opacity: 0.45 }}>V2.0</div>
-        <div className="text-[9px] sm:text-[10px] mt-0.5" style={{ color: EMBER_PALETTE.textMuted, opacity: 0.3 }}>
+        <div className="font-medium" style={{ color: palette.textMuted }}>Root3Power Suite</div>
+        <div style={{ color: palette.textMuted, opacity: 0.6 }}>By Dustin</div>
+        <div className="text-[9px] sm:text-[10px]" style={{ color: palette.textMuted, opacity: 0.45 }}>V2.0</div>
+        <div className="text-[9px] sm:text-[10px] mt-0.5" style={{ color: palette.textMuted, opacity: 0.3 }}>
           © {new Date().getFullYear()}
         </div>
       </div>

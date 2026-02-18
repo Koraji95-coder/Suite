@@ -189,27 +189,27 @@ export function ProjectManager({
       const { data, error } = await supabase
         .from('tasks')
         .select('id, project_id, completed, due_date, name')
-        .in('project_id', projectList.map(p => p.id));
+        .in('project_id', projectList.map(p => p.id)) as any;
       if (error) throw error;
       if (data) {
         const counts = new Map<string, TaskCount>();
         const now = new Date();
         now.setHours(0, 0, 0, 0);
         for (const p of projectList) {
-          const projectTasks = data.filter(t => t.project_id === p.id);
+          const projectTasks = (data as any[]).filter((t: any) => t.project_id === p.id);
           const total = projectTasks.length;
-          const completed = projectTasks.filter(t => t.completed).length;
+          const completed = projectTasks.filter((t: any) => t.completed).length;
           let nextDue: { name: string; date: string } | null = null;
           const upcoming = projectTasks
-            .filter(t => !t.completed && t.due_date)
-            .map(t => ({ name: t.name, date: t.due_date! }))
-            .sort((a, b) => a.date.localeCompare(b.date))
-            .find(t => {
+            .filter((t: any) => !t.completed && t.due_date)
+            .map((t: any) => ({ name: t.name, date: t.due_date! }))
+            .sort((a: any, b: any) => a.date.localeCompare(b.date))
+            .find((t: any) => {
               const [y, m, d] = t.date.split('T')[0].split('-').map(Number);
               return new Date(y, m - 1, d) >= now;
             });
           if (upcoming) nextDue = upcoming;
-          const hasOverdue = projectTasks.some(t => {
+          const hasOverdue = projectTasks.some((t: any) => {
             if (!t.completed && t.due_date) {
               const [oy, om, od] = t.due_date.split('T')[0].split('-').map(Number);
               return new Date(oy, om - 1, od) < now;
@@ -239,7 +239,7 @@ export function ProjectManager({
         user_id: 'Dustin',
       };
 
-      const { data, error } = await supabase.from('projects').insert([payload]).select();
+      const { data, error } = await (supabase.from('projects') as any).insert([payload]).select();
 
       if (error) throw error;
 
@@ -270,8 +270,8 @@ export function ProjectManager({
         status: projectForm.status as ProjectStatus,
       };
 
-      const { error } = await supabase
-        .from('projects')
+      const { error } = await (supabase
+        .from('projects') as any)
         .update(payload)
         .eq('id', editingProject.id);
 
@@ -321,8 +321,8 @@ export function ProjectManager({
     const isArchived = project.status === 'completed';
     const newStatus: ProjectStatus = isArchived ? 'active' : 'completed';
     try {
-      const { error } = await supabase
-        .from('projects')
+      const { error } = await (supabase
+        .from('projects') as any)
         .update({ status: newStatus })
         .eq('id', project.id);
 
@@ -393,8 +393,8 @@ export function ProjectManager({
         maxOrder = roots.length > 0 ? Math.max(...roots.map(t => t.order)) : -1;
       }
 
-      const { data, error } = await supabase
-        .from('tasks')
+      const { data, error } = await (supabase
+        .from('tasks') as any)
         .insert([{
           project_id: selectedProject.id,
           name: taskForm.name,
@@ -413,7 +413,7 @@ export function ProjectManager({
         await logActivity('create', `Added task: ${taskForm.name}`, selectedProject.id);
 
         if (taskForm.due_date) {
-          await supabase.from('calendar_events').insert([{
+          await (supabase.from('calendar_events') as any).insert([{
             project_id: selectedProject.id,
             task_id: data[0].id,
             due_date: toDateOnly(taskForm.due_date),
@@ -440,8 +440,8 @@ export function ProjectManager({
   const updateTask = async () => {
     if (!editingTask || !selectedProject) return;
     try {
-      const { error } = await supabase
-        .from('tasks')
+      const { error } = await (supabase
+        .from('tasks') as any)
         .update({
           name: taskForm.name,
           description: taskForm.description,
@@ -457,11 +457,11 @@ export function ProjectManager({
       if (taskForm.due_date) {
         const existingEvent = calendarEvents.find(e => e.task_id === editingTask.id);
         if (existingEvent) {
-          await supabase.from('calendar_events')
+          await (supabase.from('calendar_events') as any)
             .update({ due_date: toDateOnly(taskForm.due_date), title: taskForm.name })
             .eq('id', existingEvent.id);
         } else {
-          await supabase.from('calendar_events').insert([{
+          await (supabase.from('calendar_events') as any).insert([{
             project_id: selectedProject.id,
             task_id: editingTask.id,
             due_date: toDateOnly(taskForm.due_date),
@@ -496,8 +496,7 @@ export function ProjectManager({
     ));
 
     try {
-      const { error } = await supabase
-        .from('tasks')
+      const { error } = await (supabase.from('tasks') as any)
         .update({ completed: newCompleted })
         .eq('id', task.id);
 
@@ -576,7 +575,7 @@ export function ProjectManager({
     try {
       const updates = reordered.map((t, idx) => ({ id: t.id, order: idx }));
       for (const u of updates) {
-        await supabase.from('tasks').update({ order: u.order }).eq('id', u.id);
+        await (supabase.from('tasks') as any).update({ order: u.order }).eq('id', u.id);
       }
       triggerAutoBackup();
     } catch (err) {
@@ -606,7 +605,7 @@ export function ProjectManager({
           size: file.size,
           mime_type: file.type,
           user_id: 'Dustin',
-        }]);
+        }] as any);
 
         if (dbError) throw dbError;
 
@@ -640,7 +639,7 @@ export function ProjectManager({
       description,
       project_id: projectId,
       user_id: 'Dustin',
-    }]);
+    }] as any);
   };
 
   const resetProjectForm = () => {

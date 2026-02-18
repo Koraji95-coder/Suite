@@ -133,7 +133,7 @@ class CoordinatesGrabberService {
   }
 
   /**
-   * Check if backend is accessible
+   * Check if backend is accessible and is the correct Coordinates Grabber API
    */
   public async checkStatus(): Promise<BackendStatus> {
     try {
@@ -142,7 +142,14 @@ class CoordinatesGrabberService {
         headers: { 'Content-Type': 'application/json' },
       });
       if (!response.ok) throw new Error(`Status ${response.status}`);
-      return await response.json();
+      const data = await response.json();
+
+      if (data.backend_id !== 'coordinates-grabber-api') {
+        console.warn('[CoordinatesGrabber] Response from unknown service on', this.baseUrl);
+        return { connected: false, autocad_running: false };
+      }
+
+      return data;
     } catch (err) {
       console.error('[CoordinatesGrabber] Status check failed:', err);
       return {
@@ -164,6 +171,17 @@ class CoordinatesGrabberService {
       });
 
       if (!response.ok) {
+        if (response.status === 501) {
+          return {
+            success: false,
+            message: 'The Python backend does not support /api/execute. Ensure api_server.py is running on ' + this.baseUrl,
+            error_details: `Another service may be running on ${this.baseUrl} instead of the Coordinates Grabber API`,
+          };
+        }
+        const body = await response.json().catch(() => null);
+        if (body && typeof body.message === 'string') {
+          return { success: false, message: body.message, error_details: body.error_details };
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -171,6 +189,13 @@ class CoordinatesGrabberService {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       console.error('[CoordinatesGrabber] Execution failed:', message);
+      if (message === 'Failed to fetch' || message.includes('NetworkError')) {
+        return {
+          success: false,
+          message: `Cannot reach backend at ${this.baseUrl}. Is api_server.py running?`,
+          error_details: 'Start the Python API server: python api_server.py',
+        };
+      }
       return {
         success: false,
         message: `Backend error: ${message}`,

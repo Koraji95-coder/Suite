@@ -480,30 +480,14 @@ def get_manager() -> AutoCADManager:
 def api_status():
     """
     Health check endpoint - returns detailed AutoCAD connection status
-    
-    Response:
-    {
-        "connected": bool,          # COM connection established
-        "autocad_running": bool,     # acad.exe process detected
-        "drawing_open": bool,        # Drawing is open in AutoCAD
-        "drawing_name": str|null,    # Name of active drawing
-        "autocad_path": str|null,    # Path to acad.exe
-        "error": str|null,           # Error message if any
-        "checks": {
-            "process": bool,         # Process check result
-            "com": bool,             # COM check result
-            "document": bool         # Document check result
-        },
-        "backend_uptime": float,     # Seconds since backend started
-        "timestamp": float           # Unix timestamp
-    }
     """
     manager = get_manager()
     status = manager.get_status()
-    
-    # Return 200 if AutoCAD is running (drawing optional for initial connection)
+    status['backend_id'] = 'coordinates-grabber-api'
+    status['backend_version'] = '1.0.0'
+
     http_code = 200 if status['autocad_running'] else 503
-    
+
     return jsonify(status), http_code
 
 
@@ -667,6 +651,7 @@ def health():
     return jsonify({
         'status': 'running',
         'server': 'Coordinates Grabber API',
+        'backend_id': 'coordinates-grabber-api',
         'version': '1.0.0',
         'timestamp': time.time()
     })

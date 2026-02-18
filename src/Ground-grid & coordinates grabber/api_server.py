@@ -559,15 +559,20 @@ class AutoCADManager:
                 raise RuntimeError('Cannot access AutoCAD document or modelspace')
 
             raw_layers = config.get('layer_search_names')
+            requested_layers = []
             if isinstance(raw_layers, list):
-                requested_layers = [str(layer).strip() for layer in raw_layers if str(layer).strip()]
-            else:
-                requested_layers = []
+                requested_layers.extend(
+                    [str(layer).strip() for layer in raw_layers if str(layer).strip()]
+                )
 
-            if not requested_layers:
-                fallback_layer = str(config.get('layer_search_name', '')).strip()
-                if fallback_layer:
-                    requested_layers = [fallback_layer]
+            fallback_layers_raw = str(config.get('layer_search_name', '')).strip()
+            if fallback_layers_raw:
+                for part in re.split(r'[;,\n]+', fallback_layers_raw):
+                    layer_name_part = part.strip()
+                    if layer_name_part:
+                        requested_layers.append(layer_name_part)
+
+            requested_layers = list(dict.fromkeys(requested_layers))
 
             if not requested_layers:
                 return {
@@ -580,7 +585,7 @@ class AutoCADManager:
                     'error': 'No layer names provided'
                 }
 
-            requested_layer_lookup = {layer.lower() for layer in requested_layers}
+            requested_layer_lookup = {layer.strip().lower() for layer in requested_layers}
             prefix = config.get('prefix', 'P')
             start_num = int(config.get('initial_number', 1))
             precision = int(config.get('precision', 3))
@@ -600,7 +605,8 @@ class AutoCADManager:
                     except Exception:
                         continue
 
-                    if ent_layer.lower() not in requested_layer_lookup:
+                    ent_layer_normalized = ent_layer.strip().lower()
+                    if ent_layer_normalized not in requested_layer_lookup:
                         continue
 
                     entities_scanned += 1
@@ -624,7 +630,7 @@ class AutoCADManager:
                                 'y': round(cy, precision),
                                 'z': round(z_val, precision),
                                 'corner': corner_name,
-                                'source': ent_layer,
+                                'source': ent_layer.strip(),
                             })
                             point_num += 1
                     else:
@@ -637,7 +643,7 @@ class AutoCADManager:
                             'x': round(cx, precision),
                             'y': round(cy, precision),
                             'z': round(cz, precision),
-                            'source': ent_layer,
+                            'source': ent_layer.strip(),
                         })
                         point_num += 1
 

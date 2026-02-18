@@ -405,7 +405,7 @@ export function CoordinatesGrabber() {
         prefix: state.pointPrefix,
         initial_number: state.startNumber,
         block_name_filter: '',
-        layer_search_name: state.layerName,
+        layer_search_name: layersToRun.join(', '),
         layer_search_names: layersToRun,
         layer_search_use_selection: state.scanSelection,
         layer_search_include_modelspace: state.includeModelspace,

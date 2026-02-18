@@ -194,6 +194,9 @@ export function CoordinatesGrabber() {
     });
   }, [addLog]);
 
+  // Track whether user has attempted to run (don't show validation errors until then)
+  const hasAttemptedRunRef = useRef(false);
+
   // Initialize backend connection on mount with real-time polling
   const hasInitializedRef = useRef(false);
   
@@ -212,30 +215,28 @@ export function CoordinatesGrabber() {
     const checkBackendStatus = async () => {
       try {
         const status = await coordinatesGrabberService.checkStatus();
+        const isNowConnected = status.connected && status.autocad_running;
         
-        // Update connection state
+        // Read previous state for comparison, then update
+        let wasConnected = false;
         setState(prev => {
-          const wasConnected = prev.backendConnected;
-          const isNowConnected = status.connected && status.autocad_running;
-          
-          // Only log state changes after first check
-          if (!isFirstCheck && wasConnected !== isNowConnected) {
-            if (isNowConnected) {
-              addLog('[SUCCESS] ✓ AutoCAD connection established');
-            } else {
-              addLog('[INFO] AutoCAD connection lost - waiting for reconnection...');
-            }
-          }
-          
+          wasConnected = prev.backendConnected;
           return { ...prev, backendConnected: isNowConnected };
         });
         
+        // Log OUTSIDE setState to avoid React StrictMode double-firing
+        if (isFirstCheck && isNowConnected) {
+          addLog('[SUCCESS] ✓ Connected to AutoCAD backend');
+        } else if (!isFirstCheck && wasConnected !== isNowConnected) {
+          if (isNowConnected) {
+            addLog('[SUCCESS] ✓ AutoCAD connection established');
+          } else {
+            addLog('[INFO] AutoCAD connection lost - waiting for reconnection...');
+          }
+        }
+        
         // On first successful connection or reconnection, load layers
         if (status.connected && status.autocad_running) {
-          if (isFirstCheck) {
-            addLog('[SUCCESS] ✓ Connected to AutoCAD backend');
-          }
-          
           try {
             const layers = await coordinatesGrabberService.listLayers();
             setState(prev => ({ ...prev, availableLayers: layers }));
@@ -370,9 +371,15 @@ export function CoordinatesGrabber() {
       return;
     }
 
-    // Validate configuration first
-    if (!validateConfiguration()) {
-      addLog('[ERROR] Configuration validation failed - see errors above');
+    // Mark that user has attempted a run
+    hasAttemptedRunRef.current = true;
+
+    // Check for validation errors
+    const errors = validateConfiguration();
+    if (errors.length > 0) {
+      setState(prev => ({ ...prev, validationErrors: errors }));
+      errors.forEach(err => addLog(`[VALIDATION] ${err}`));
+      addLog('[ERROR] Configuration validation failed');
       return;
     }
 
@@ -500,8 +507,8 @@ export function CoordinatesGrabber() {
     setState(prev => ({ ...prev, logs: [] }));
   };
 
-  // Validate configuration before execution
-  const validateConfiguration = useCallback((): boolean => {
+  // Validate configuration (returns errors without setting state)
+  const validateConfiguration = useCallback((): string[] => {
     const errors: string[] = [];
     
     if (state.mode === 'layer_search' && !state.layerName.trim()) {
@@ -524,14 +531,20 @@ export function CoordinatesGrabber() {
       errors.push('Point prefix must be 10 characters or less');
     }
     
-    setState(prev => ({ ...prev, validationErrors: errors }));
-    
-    if (errors.length > 0) {
-      errors.forEach(err => addLog(`[VALIDATION] ${err}`));
+    return errors;
+  }, [state.mode, state.layerName, state.pointPrefix, state.startNumber, state.decimalPlaces]);
+
+  // Update validation errors reactively, but only show in UI after first run attempt
+  useEffect(() => {
+    const errors = validateConfiguration();
+    // Always update for button disable logic, but only surface in UI after user has tried to run
+    if (hasAttemptedRunRef.current) {
+      setState(prev => ({ ...prev, validationErrors: errors }));
+    } else {
+      // Keep internal tracking for button disable, but don't show error box
+      setState(prev => ({ ...prev, validationErrors: [] }));
     }
-    
-    return errors.length === 0;
-  }, [state, addLog]);
+  }, [validateConfiguration]);
 
   // Save execution result to history
   const saveExecutionResult = useCallback((entry: ExecutionHistoryEntry) => {
@@ -837,26 +850,75 @@ export function CoordinatesGrabber() {
                   </h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <div>
-                      <label style={{ fontSize: '12px', color: palette.textMuted }}>
-                        Layer Name:
+                      <label style={{ fontSize: '12px', color: palette.textMuted, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Layer Name:</span>
+                        <button
+                          onClick={async () => {
+                            addLog('[INFO] Refreshing layer list from AutoCAD...');
+                            try {
+                              const layers = await coordinatesGrabberService.listLayers();
+                              setState(prev => ({ ...prev, availableLayers: layers }));
+                              addLog(`[SUCCESS] Found ${layers.length} layers`);
+                            } catch (err) {
+                              addLog('[ERROR] Failed to refresh layers');
+                            }
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '3px',
+                            border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
+                            background: hexToRgba(palette.primary, 0.1),
+                            color: palette.primary,
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                          }}
+                        >
+                          🔄 Refresh
+                        </button>
                       </label>
-                      <input
-                        type="text"
-                        placeholder="Enter layer name..."
-                        value={state.layerName}
-                        onChange={e => setState(prev => ({ ...prev, layerName: e.target.value }))}
-                        style={{
-                          marginTop: '4px',
-                          width: '100%',
-                          padding: '8px',
-                          borderRadius: '4px',
-                          border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-                          background: hexToRgba(palette.background, 0.8),
-                          color: palette.text,
-                          fontSize: '12px',
-                          boxSizing: 'border-box',
-                        }}
-                      />
+                      {state.availableLayers.length > 0 ? (
+                        <select
+                          value={state.layerName}
+                          onChange={e => setState(prev => ({ ...prev, layerName: e.target.value }))}
+                          style={{
+                            marginTop: '4px',
+                            width: '100%',
+                            padding: '8px',
+                            borderRadius: '4px',
+                            border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+                            background: hexToRgba(palette.background, 0.8),
+                            color: palette.text,
+                            fontSize: '12px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          <option value="">-- Select a layer --</option>
+                          {state.availableLayers.map(layer => (
+                            <option key={layer} value={layer}>
+                              {layer}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="No layers found. Type layer name or click Refresh..."
+                          value={state.layerName}
+                          onChange={e => setState(prev => ({ ...prev, layerName: e.target.value }))}
+                          style={{
+                            marginTop: '4px',
+                            width: '100%',
+                            padding: '8px',
+                            borderRadius: '4px',
+                            border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+                            background: hexToRgba(palette.background, 0.8),
+                            color: palette.text,
+                            fontSize: '12px',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1110,7 +1172,7 @@ export function CoordinatesGrabber() {
                 {state.isRunning ? '⏳ Running...' : '▶ Run Layer Search'}
               </button>
               <button
-                disabled={state.isRunning || !state.backendConnected || !validateConfiguration()}
+                disabled={state.isRunning || !state.backendConnected}
                 style={{
                   flex: 1,
                   minWidth: '120px',

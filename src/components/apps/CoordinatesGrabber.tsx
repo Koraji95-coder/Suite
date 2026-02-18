@@ -1473,9 +1473,8 @@ export function CoordinatesGrabber() {
                 <li>East (X)</li>
                 <li>North (Y)</li>
                 <li>Elevation (Z)</li>
-                <li>Source Type</li>
-                <li>Source Handle</li>
-                <li>Source Name</li>
+                <li>Source Type (Foundation Coordinates)</li>
+                <li>Layer</li>
               </ul>
             </div>
           </div>

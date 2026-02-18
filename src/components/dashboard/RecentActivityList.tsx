@@ -49,7 +49,7 @@ export function RecentActivityList({ activities, allProjectsMap }: RecentActivit
                 <div
                   key={activity.id}
                   className="flex items-start space-x-3 p-3 transition-all duration-300 hover:scale-[1.01] hover:-translate-y-px"
-                  style={glassCardInnerStyle(EMBER_PALETTE.accent)}
+                  style={glassCardInnerStyle(EMBER_PALETTE, EMBER_PALETTE.accent)}
                 >
                   <div className="mt-1.5">
                     <div

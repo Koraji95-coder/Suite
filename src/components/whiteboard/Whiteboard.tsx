@@ -68,7 +68,7 @@ export function Whiteboard({ isOpen, onClose, panelContext, onSaved }: Whiteboar
     const thumbnail = canvas.toDataURL('image/png');
     const tagArray = tags.split(',').map(t => t.trim()).filter(t => t);
 
-    const { error } = await supabase.from('whiteboards').insert({
+    const { error } = await (supabase.from('whiteboards') as any).insert({
       title,
       panel_context: panelContext,
       canvas_data: { actions },

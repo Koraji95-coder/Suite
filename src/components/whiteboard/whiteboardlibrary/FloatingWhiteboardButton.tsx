@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pen, BookOpen } from 'lucide-react';
-import { Whiteboard } from '../Wihteboard';
+import { Whiteboard } from '../Whiteboard';
 import { WhiteboardLibrary } from '../whiteboardlibrary/WhiteboardLibrary';
 
 interface FloatingWhiteboardButtonProps {

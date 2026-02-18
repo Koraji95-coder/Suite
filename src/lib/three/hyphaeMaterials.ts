@@ -62,7 +62,7 @@ export function createHyphaeCoreNodeMaterial(
     float(0.5).add(float(0.5).mul(sin(time.mul(float(2.2)).add(n.mul(float(6.0))))))
   );
 
-  const base = color(HYPHAE_PALETTE.deep);
+  const base = color(HYPHAE_PALETTE.background);
   const energy = mix(color(HYPHAE_PALETTE.primary), color(HYPHAE_PALETTE.tertiary), pulse);
 
   // Fresnel-ish rim boost: stronger glow at grazing angles.

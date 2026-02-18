@@ -56,7 +56,7 @@ export function FormulaBank() {
       category: newFormula.category,
       formula: newFormula.formula,
       description: newFormula.description,
-    });
+    } as any);
 
     if (!error) {
       setNewFormula({ name: '', category: '', formula: '', description: '' });

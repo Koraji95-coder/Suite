@@ -232,7 +232,7 @@ export function CalendarWidget({
               onClick={handleToday}
               className="px-3 py-1 text-xs font-semibold rounded-lg transition-all"
               style={{
-                ...glassCardInnerStyle(EMBER_PALETTE.primary),
+                ...glassCardInnerStyle(EMBER_PALETTE, EMBER_PALETTE.primary),
                 color: EMBER_PALETTE.primary,
               }}
             >

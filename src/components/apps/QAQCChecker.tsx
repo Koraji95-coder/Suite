@@ -224,7 +224,7 @@ export function QAQCChecker() {
           checked_at: new Date().toISOString(),
           rules_applied: enabledRules.map(r => r.name),
           issues_found: issues.length,
-        })
+        } as any)
         .select()
         .single();
 

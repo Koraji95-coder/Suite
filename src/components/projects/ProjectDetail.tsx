@@ -64,7 +64,7 @@ export function ProjectDetail({
   onFileFilterChange,
   onFileUpload,
   onDownloadFile,
-}) {
+}: ProjectDetailProps) {
   const completionPercentage = tasks.length > 0
     ? Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)
     : 0;

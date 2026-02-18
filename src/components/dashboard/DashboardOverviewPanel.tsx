@@ -289,7 +289,7 @@ export function DashboardOverviewPanel({
           <div
             className="flex items-center space-x-2 px-3 py-2 rounded-lg"
             style={{
-              ...glassCardInnerStyle(EMBER_PALETTE.primary),
+              ...glassCardInnerStyle(EMBER_PALETTE, EMBER_PALETTE.primary),
               color: hexToRgba(EMBER_PALETTE.text, 0.6),
             }}
           >

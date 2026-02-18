@@ -22,7 +22,7 @@ export const supabase =
       detectSessionInUrl: false,
       persistSession: false,
       // No-op lock – bypasses Navigator LockManager entirely
-      lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<unknown>) => {
+      lock: async <R>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => {
         return await fn();
       },
     },

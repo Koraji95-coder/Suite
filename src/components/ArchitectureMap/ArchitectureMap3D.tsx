@@ -302,7 +302,7 @@ function Scene({
 			<LivingBackground bounds={bounds} />
 
       <ambientLight intensity={0.32} />
-      <hemisphereLight intensity={0.18} color={HYPHAE_PALETTE.text} groundColor={HYPHAE_PALETTE.ink} />
+      <hemisphereLight intensity={0.18} color={HYPHAE_PALETTE.text} groundColor={HYPHAE_PALETTE.background} />
       <directionalLight position={[60, 80, 120]} intensity={0.95} color={HYPHAE_PALETTE.tertiary} />
       <pointLight position={[-90, 60, 80]} intensity={0.62} color={HYPHAE_PALETTE.primary} />
       <pointLight position={[90, -40, 60]} intensity={0.35} color={HYPHAE_PALETTE.secondary} />
@@ -313,7 +313,7 @@ function Scene({
           <mesh>
             <tubeGeometry args={[c.curve, 56, c.radius, 8, false]} />
             <meshStandardMaterial
-              color={HYPHAE_PALETTE.deep}
+              color={HYPHAE_PALETTE.background}
               emissive={c.emissive}
               emissiveIntensity={0.95}
               roughness={0.5}
@@ -357,7 +357,7 @@ function Scene({
                 <primitive object={coreMat as any} attach="material" />
               ) : (
                 <meshStandardMaterial
-                  color={n.type === 'major' ? HYPHAE_PALETTE.deep : n.color}
+                  color={n.type === 'major' ? HYPHAE_PALETTE.background : n.color}
                   emissive={n.type === 'major' ? HYPHAE_PALETTE.secondary : n.color}
                   emissiveIntensity={n.type === 'major' ? 0.65 : 0.35}
                   roughness={0.6}
@@ -458,7 +458,7 @@ export function ArchitectureMap3D() {
           onPointerMissed={() => setSelected(null)}
         >
           <color attach="background" args={[HYPHAE_PALETTE.background]} />
-          {bounds && <fog attach="fog" args={[HYPHAE_PALETTE.ink, bounds.radius * 1.35, bounds.radius * 6.5]} />}
+          {bounds && <fog attach="fog" args={[HYPHAE_PALETTE.background, bounds.radius * 1.35, bounds.radius * 6.5]} />}
           {frozen && bounds && (
             <Scene graph={frozen} bounds={bounds} onSelect={setSelected} resetRef={resetViewRef} />
           )}

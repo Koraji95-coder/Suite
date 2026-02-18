@@ -33,7 +33,7 @@ export default function FileManagerPagination({
         <Label className="hidden lg:block" htmlFor={id}>
           Rows per page
         </Label>
-        <Select defaultValue="25">
+        <Select value="25">
           <SelectTrigger id={id} className="w-fit whitespace-nowrap">
             <SelectValue placeholder="Select number of results" />
           </SelectTrigger>

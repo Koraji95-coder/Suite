@@ -47,7 +47,7 @@ export function ActiveProjectsList({
             onClick={() => onNavigateToProjectsHub?.()}
             className="text-sm flex items-center space-x-1 px-3 py-1 rounded-lg transition-all hover:opacity-90"
             style={{
-              ...glassCardInnerStyle(EMBER_PALETTE.primary),
+              ...glassCardInnerStyle(EMBER_PALETTE, EMBER_PALETTE.primary),
               color: EMBER_PALETTE.primary,
             }}
           >
@@ -70,7 +70,7 @@ export function ActiveProjectsList({
                   key={project.id}
                   className="p-4 cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:-translate-y-px"
                   style={{
-                    ...glassCardInnerStyle(catColor),
+                    ...glassCardInnerStyle(EMBER_PALETTE, catColor),
                     borderColor: isHovered
                       ? hexToRgba(catColor, 0.3)
                       : hexToRgba(EMBER_PALETTE.text, 0.06),

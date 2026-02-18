@@ -80,7 +80,13 @@ from ui.components import CardSection, make_button
 
 
 DEBUG = False
-gencache.is_readonly = True  # fail-fast if something tries to write gen_py wrappers
+
+# Configure gencache to avoid corruption issues
+# See: https://support.pyxll.com/hc/en-gb/articles/360058200414
+try:
+    gencache.EnsureModule("{00020813-0000-0000-C000-000000000046}", 0, 1, 9)  # Excel
+except Exception:
+    pass  # If cache is corrupted or doesn't exist, fall back to late binding
 
 Point3D = Tuple[float, float, float]
 
@@ -2120,13 +2126,23 @@ class CoordinatesGrabberWindow(QMainWindow):
 
     def _place_refpoints_for_rows(self, cfg: Config, rows: List[Row]) -> None:
         ref_path = os.path.abspath(cfg.refblock.ref_dwg_path or "")
+        
+        # If configured path doesn't exist, try to auto-detect
         if not ref_path or not os.path.exists(ref_path):
-            self._append_log(
-                f"[PlaceRefPoints] WARNING: Reference DWG not found at '{ref_path}'. "
-                "Skipping block placement (export will still proceed)."
-            )
-            return
+            self._append_log(f"[PlaceRefPoints] Path from UI not found: '{ref_path}'")
+            auto_ref_path = self._default_ref_dwg_path()
+            if auto_ref_path and os.path.exists(auto_ref_path):
+                self._append_log(f"[PlaceRefPoints] Auto-detected: '{auto_ref_path}'")
+                ref_path = auto_ref_path
+            else:
+                self._append_log(
+                    f"[PlaceRefPoints] WARNING: Reference DWG not found. "
+                    f"Tried '{cfg.refblock.ref_dwg_path}' and auto-detect. "
+                    "Skipping block placement (export will still proceed)."
+                )
+                return
 
+        self._append_log(f"[PlaceRefPoints] Using: '{ref_path}'")
         placed = 0
         for r in rows:
             try:
@@ -2454,13 +2470,25 @@ def main() -> int:
     except KeyboardInterrupt:
         return 130
     except pywintypes.com_error as exc:
-        print(format_exception_text(exc, "main() top-level COM error"))
+        # Check if this might be a gencache corruption issue
+        msg = format_exception_text(exc, "main() top-level COM error")
+        if "gen_py" in str(exc).lower() or "cache" in str(exc).lower():
+            gen_py_hint = os.path.join(os.path.expanduser("~"), "AppData", "Local", "Temp", "gen_py")
+            msg += (
+                "\n\nNOTE: This might be a gen_py cache corruption issue.\n"
+                "Try clearing the cache by deleting the folder at:\n"
+                f"  {gen_py_hint}\n"
+                "Then restart the script.\n"
+                "See: https://support.pyxll.com/hc/en-gb/articles/360058200414"
+            )
+        print(msg)
         return 2
     except Exception as exc:
         print(format_exception_text(exc, "main() top-level error"))
         return 3
     finally:
         pythoncom.CoUninitialize()
+
 
 
 if __name__ == "__main__":

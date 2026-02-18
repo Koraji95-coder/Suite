@@ -1,0 +1,21 @@
+# Root3Power Transmittal Builder Dependencies
+# PyQt6 for GUI
+PyQt6>=6.0.0
+PyQt6-Qt6>=6.0.0
+
+# Document processing
+python-docx>=0.8.11
+pandas>=1.3.0
+openpyxl>=3.0.0
+
+# Image processing
+Pillow>=8.0.0
+
+# PDF conversion (optional)
+docx2pdf>=0.1.8
+
+# YAML configuration
+PyYAML>=6.0
+
+# Email functionality
+# Built-in smtplib and email modules are used

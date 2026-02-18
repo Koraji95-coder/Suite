@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useTheme, hexToRgba } from '@/lib/palette';
-import { CardSection, make_button } from '@/components/ui/components';
 import { coordinatesGrabberService } from '@/services/coordinatesGrabberService';
 
 interface CoordinatesGrabberState {
@@ -21,28 +20,135 @@ interface CoordinatesGrabberState {
   selectionCount: number;
 }
 
+interface ToolTip {
+  id: string;
+  text: string;
+  position: 'top' | 'bottom' | 'left' | 'right';
+}
+
+const TOOLTIPS: Record<string, string> = {
+  mode_polylines: 'Extract coordinates from every polyline vertex',
+  mode_blocks: 'Extract center point from selected block references',
+  mode_layer_search: 'Find geometry on specified layer inside block definitions',
+  style_center: 'Place one reference block at the center of found geometry',
+  style_corners: 'Place four reference blocks at corners (NW, NE, SW, SE) of geometry bounds',
+  scan_selection: 'Only scan selected entities instead of all blocks in drawing',
+  include_modelspace: 'Also include geometry found directly in ModelSpace (outside blocks)',
+  point_prefix: 'Prefix for generated point IDs (e.g., "P" → P1, P2, P3...)',
+  start_number: 'Starting number for point ID numbering',
+  decimal_places: 'Decimal precision for exported coordinates (0-12)',
+};
+
+const DEFAULT_STATE: CoordinatesGrabberState = {
+  mode: 'layer_search',
+  layerName: '',
+  extractionStyle: 'center',
+  pointPrefix: 'P',
+  startNumber: 1,
+  decimalPlaces: 3,
+  scanSelection: false,
+  includeModelspace: true,
+  activeTab: 'config',
+  logs: [
+    '[INFO] Coordinates Grabber initialized',
+    '[INFO] Connecting to AutoCAD backend...',
+  ],
+  excelPath: '',
+  isRunning: false,
+  backendConnected: false,
+  availableLayers: [],
+  selectionCount: 0,
+};
+
+// Error Boundary Component
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode; palette: any }, ErrorBoundaryState> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('CoordinatesGrabber Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            flexDirection: 'column',
+            padding: '20px',
+            color: this.props.palette.text,
+          }}
+        >
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
+          <h2 style={{ margin: '0 0 8px 0' }}>Something went wrong</h2>
+          <p style={{ margin: '0 0 12px 0', color: this.props.palette.textMuted, fontSize: '12px', textAlign: 'center' }}>
+            {this.state.error?.message || 'An unexpected error occurred'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '4px',
+              border: 'none',
+              background: this.props.palette.primary,
+              color: this.props.palette.background,
+              cursor: 'pointer',
+              fontWeight: '600',
+            }}
+          >
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export function CoordinatesGrabber() {
   const { palette } = useTheme();
-  const [state, setState] = useState<CoordinatesGrabberState>({
-    mode: 'layer_search',
-    layerName: '',
-    extractionStyle: 'center',
-    pointPrefix: 'P',
-    startNumber: 1,
-    decimalPlaces: 3,
-    scanSelection: false,
-    includeModelspace: true,
-    activeTab: 'config',
-    logs: [
-      '[INFO] Coordinates Grabber initialized',
-      '[INFO] Connecting to AutoCAD backend...',
-    ],
-    excelPath: '',
-    isRunning: false,
-    backendConnected: false,
-    availableLayers: [],
-    selectionCount: 0,
-  });
+  const [state, setState] = useState<CoordinatesGrabberState>(DEFAULT_STATE);
+  const [configHistory, setConfigHistory] = useState<CoordinatesGrabberState[]>([DEFAULT_STATE]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+
+  // Simple log function (doesn't trigger history)
+  const addLog = useCallback((message: string) => {
+    setState(prev => ({
+      ...prev,
+      logs: [...prev.logs, `[${new Date().toLocaleTimeString()}] ${message}`],
+    }));
+  }, []);
+
+  // History-aware state update
+  const updateState = useCallback((updates: Partial<CoordinatesGrabberState>) => {
+    setState(prev => {
+      const newState = { ...prev, ...updates };
+      // Update history (trim future if we're not at the end)
+      const newHistory = configHistory.slice(0, historyIndex + 1);
+      newHistory.push(newState);
+      setConfigHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+      return newState;
+    });
+  }, [configHistory, historyIndex]);
 
   // Initialize backend connection on mount
   useEffect(() => {
@@ -55,7 +161,11 @@ export function CoordinatesGrabber() {
           setState(prev => ({ ...prev, backendConnected: true }));
           
           // Load available layers
-          await refreshLayers();
+          const layers = await coordinatesGrabberService.listLayers();
+          setState(prev => ({ ...prev, availableLayers: layers }));
+          if (layers.length > 0) {
+            addLog(`[INFO] Retrieved ${layers.length} layers from drawing`);
+          }
           
           // Try to connect WebSocket for real-time updates
           try {
@@ -78,34 +188,85 @@ export function CoordinatesGrabber() {
     return () => {
       coordinatesGrabberService.disconnect();
     };
-  }, []);
+  }, [addLog]);
 
-  const addLog = useCallback((message: string) => {
-    setState(prev => ({
-      ...prev,
-      logs: [...prev.logs, `[${new Date().toLocaleTimeString()}] ${message}`],
-    }));
-  }, []);
-
-  const refreshLayers = useCallback(async () => {
-    try {
-      const layers = await coordinatesGrabberService.listLayers();
-      setState(prev => ({ ...prev, availableLayers: layers }));
-      if (layers.length > 0) {
-        addLog(`[INFO] Retrieved ${layers.length} layers from drawing`);
-      }
-    } catch (err) {
-      addLog('[WARNING] Could not retrieve layer list from AutoCAD');
+  // Undo function
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setState(configHistory[newIndex]);
+      setHistoryIndex(newIndex);
+      addLog('[INFO] Configuration reverted');
     }
-  }, []);
+  }, [configHistory, historyIndex, addLog]);
+
+  // Redo function
+  const handleRedo = useCallback(() => {
+    if (historyIndex < configHistory.length - 1) {
+      const newIndex = historyIndex + 1;
+      setState(configHistory[newIndex]);
+      setHistoryIndex(newIndex);
+      addLog('[INFO] Configuration restored');
+    }
+  }, [configHistory, historyIndex, addLog]);
+
+  // Helper to render tooltip
+  const TooltipWrapper = ({ id, children }: { id: string; children: React.ReactNode }) => {
+    const tooltipText = TOOLTIPS[id];
+    if (!tooltipText) return <>{children}</>;
+    
+    return (
+      <div
+        style={{ position: 'relative', display: 'inline-block' }}
+        onMouseEnter={() => setHoveredTooltip(id)}
+        onMouseLeave={() => setHoveredTooltip(null)}
+      >
+        {children}
+        {hoveredTooltip === id && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              marginBottom: '8px',
+              padding: '6px 10px',
+              borderRadius: '4px',
+              background: hexToRgba(palette.text, 0.9),
+              color: palette.background,
+              fontSize: '11px',
+              whiteSpace: 'nowrap',
+              zIndex: 1000,
+              pointerEvents: 'none',
+            }}
+          >
+            {tooltipText}
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 0,
+                height: 0,
+                borderLeft: '4px solid transparent',
+                borderRight: '4px solid transparent',
+                borderTop: `4px solid ${hexToRgba(palette.text, 0.9)}`,
+              }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const handleModeChange = (newMode: CoordinatesGrabberState['mode']) => {
-    setState(prev => ({ ...prev, mode: newMode }));
+    updateState({ mode: newMode });
     addLog(`Mode changed to: ${newMode}`);
   };
 
   const handleStyleChange = (style: 'center' | 'corners') => {
-    setState(prev => ({ ...prev, extractionStyle: style }));
+    updateState({ extractionStyle: style });
     addLog(`Extraction style changed to: ${style}`);
   };
 
@@ -127,6 +288,9 @@ export function CoordinatesGrabber() {
     addLog(`[INFO] Point naming: ${state.pointPrefix}${state.startNumber}`);
     
     try {
+      // Simulate progress updates
+      setProgress(10);
+      
       const result = await coordinatesGrabberService.execute({
         mode: state.mode,
         precision: state.decimalPlaces,
@@ -152,6 +316,8 @@ export function CoordinatesGrabber() {
         show_azimuth: false,
       });
 
+      setProgress(90);
+
       if (result.success) {
         setState(prev => ({ ...prev, excelPath: result.excel_path || '' }));
         addLog(`[SUCCESS] Export complete: ${result.excel_path}`);
@@ -170,6 +336,7 @@ export function CoordinatesGrabber() {
       addLog(`[ERROR] Execution failed: ${message}`);
     } finally {
       setState(prev => ({ ...prev, isRunning: false }));
+      setProgress(0);
     }
   };
 
@@ -230,15 +397,69 @@ export function CoordinatesGrabber() {
             Extract coordinate points from CAD drawings
           </p>
         </div>
-        <div
-          style={{
-            fontSize: '24px',
-            fontWeight: '700',
-            color: palette.primary,
-            opacity: 0.7,
-          }}
-        >
-          📍
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          {/* Undo/Redo buttons */}
+          <button
+            onClick={handleUndo}
+            disabled={historyIndex === 0}
+            title="Undo (Ctrl+Z)"
+            style={{
+              padding: '6px 8px',
+              borderRadius: '4px',
+              border: 'none',
+              background: historyIndex === 0 ? 'transparent' : hexToRgba(palette.primary, 0.1),
+              color: historyIndex === 0 ? palette.textMuted : palette.primary,
+              fontSize: '13px',
+              cursor: historyIndex === 0 ? 'not-allowed' : 'pointer',
+              opacity: historyIndex === 0 ? 0.5 : 1,
+            }}
+          >
+            ↶
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={historyIndex === configHistory.length - 1}
+            title="Redo (Ctrl+Y)"
+            style={{
+              padding: '6px 8px',
+              borderRadius: '4px',
+              border: 'none',
+              background: historyIndex === configHistory.length - 1 ? 'transparent' : hexToRgba(palette.primary, 0.1),
+              color: historyIndex === configHistory.length - 1 ? palette.textMuted : palette.primary,
+              fontSize: '13px',
+              cursor: historyIndex === configHistory.length - 1 ? 'not-allowed' : 'pointer',
+              opacity: historyIndex === configHistory.length - 1 ? 0.5 : 1,
+            }}
+          >
+            ↷
+          </button>
+          {/* Preset button */}
+          <div
+            title="Coming soon: Presets"
+            style={{
+              padding: '6px 8px',
+              borderRadius: '4px',
+              border: '1px dashed ' + hexToRgba(palette.primary, 0.3),
+              background: hexToRgba(palette.primary, 0.05),
+              color: palette.textMuted,
+              fontSize: '11px',
+              cursor: 'not-allowed',
+              opacity: 0.5,
+            }}
+          >
+            Presets (coming soon)
+          </div>
+          <div
+            style={{
+              fontSize: '24px',
+              fontWeight: '700',
+              color: palette.primary,
+              opacity: 0.7,
+              marginLeft: '8px',
+            }}
+          >
+            📍
+          </div>
         </div>
       </div>
 
@@ -571,6 +792,33 @@ export function CoordinatesGrabber() {
             </div>
 
             {/* Action Buttons */}
+            {state.isRunning && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      border: `2px solid ${hexToRgba(palette.primary, 0.3)}`,
+                      borderTopColor: palette.primary,
+                      animation: 'spin 1s linear infinite',
+                    }}
+                  />
+                  <span style={{ fontSize: '12px', color: palette.textMuted }}>Processing...</span>
+                </div>
+                <div style={{ width: '100%', height: '6px', borderRadius: '3px', background: hexToRgba(palette.primary, 0.2), overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${progress}%`,
+                      background: palette.primary,
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 onClick={handleLayerSearch}

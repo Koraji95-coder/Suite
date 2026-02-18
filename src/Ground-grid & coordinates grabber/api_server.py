@@ -32,8 +32,8 @@ import json
 import math
 import os
 import traceback
-from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
+from typing import Optional, Dict, Any, List, Tuple
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -47,6 +47,7 @@ CORS(app)  # Allow requests from React frontend (localhost:5173)
 
 # Global AutoCAD manager instance
 _manager = None
+FOUNDATION_SOURCE_TYPE = "Foundation Coordinates"
 
 
 # ── Late-bound COM helpers (from coordtable) ────────────────────
@@ -340,7 +341,7 @@ def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
     ws = wb.active
     ws.title = "Coordinates"
 
-    headers = ["Point ID", "East (X)", "North (Y)", "Elevation (Z)", "Source Type"]
+    headers = ["Point ID", "East (X)", "North (Y)", "Elevation (Z)", "Source Type", "Layer"]
     if use_corners:
         headers.insert(1, "Corner")
 
@@ -358,7 +359,14 @@ def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
     numeric_cols = {"East (X)", "North (Y)", "Elevation (Z)"}
 
     for p in points:
-        row = [p['name'], p['x'], p['y'], p['z'], p.get('source', '')]
+        row = [
+            p['name'],
+            p['x'],
+            p['y'],
+            p['z'],
+            p.get('source_type', FOUNDATION_SOURCE_TYPE),
+            p.get('layer', ''),
+        ]
         if use_corners:
             row.insert(1, p.get('corner', ''))
         ws.append(row)
@@ -630,7 +638,8 @@ class AutoCADManager:
                                 'y': round(cy, precision),
                                 'z': round(z_val, precision),
                                 'corner': corner_name,
-                                'source': ent_layer.strip(),
+                                'source_type': FOUNDATION_SOURCE_TYPE,
+                                'layer': ent_layer.strip(),
                             })
                             point_num += 1
                     else:
@@ -643,7 +652,8 @@ class AutoCADManager:
                             'x': round(cx, precision),
                             'y': round(cy, precision),
                             'z': round(cz, precision),
-                            'source': ent_layer.strip(),
+                            'source_type': FOUNDATION_SOURCE_TYPE,
+                            'layer': ent_layer.strip(),
                         })
                         point_num += 1
 

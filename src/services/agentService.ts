@@ -36,6 +36,9 @@ import type {
   GATEWAY_CONFIG,
 } from '../types/agent';
 
+// Re-export types for convenience
+export type { AgentResponse };
+
 export interface AgentTask {
   task: string;
   params?: Record<string, any>;

@@ -1,19 +1,45 @@
 /**
  * Suite Agent Bridge Service
- * Connects Suite frontend to ZeroClaw agent for automation tasks
+ * Connects Suite frontend to ZeroClaw agent (Koro) for automation tasks
+ * 
+ * IMPLEMENTATION GUIDE FOR BOLT:
+ * ==============================
+ * Agent: ZeroClaw/Koro running at http://127.0.0.1:3000/gateway
+ * 
+ * All methods must:
+ * 1. Make HTTP POST requests to the agent gateway
+ * 2. Include Authorization bearer token after pairing
+ * 3. Handle timeouts (default 30s, max 5min for long tasks)
+ * 4. Return Promise<AgentResponse> with success/data/error fields
+ * 
+ * Methods to implement:
+ * - pair(pairingCode): Get token from agent
+ * - sendMessage(message): Direct message to agent
+ * - executePythonScript(path, args): Run Python via agent
+ * - generateFloorPlan(projectId): Create floor plan
+ * - analyzeDrawingList(filePath): Validate drawings
+ * - generateTransmittal(drawingIds): Create transmittal
+ * - analyzeProject(projectId): Full project analysis
+ * 
+ * See: /workspaces/Suite/BOLT_AGENT_INTEGRATION_PROMPT.md for full spec
+ * See: /workspaces/Suite/src/types/agent.ts for TypeScript interfaces
  */
+
+import type {
+  AgentResponse,
+  PairingResponse,
+  MessageResponse,
+  DrawingListAnalysisResult,
+  TransmittalResult,
+  ProjectAnalysisResult,
+  FloorPlanResult,
+  GATEWAY_CONFIG,
+} from '../types/agent';
 
 export interface AgentTask {
   task: string;
   params?: Record<string, any>;
   timeout?: number;
-}
-
-export interface AgentResponse {
-  success: boolean;
-  data?: any;
-  error?: string;
-  execution_time?: number;
 }
 
 export interface PythonToolRequest {

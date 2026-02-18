@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTheme, hexToRgba } from "@/lib/palette";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import { supabase } from "@/lib/supabase";
 import { Save, User } from "lucide-react";
 

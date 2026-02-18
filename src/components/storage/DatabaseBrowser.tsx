@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/errorLogger';
 import type { TableInfo } from './storageTypes';
 
 const TABLE_NAMES = [
@@ -28,21 +29,51 @@ export function DatabaseBrowser() {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const formatSupabaseError = (err: unknown, table?: string) => {
+    const anyErr = err as { message?: string; details?: string; hint?: string; code?: string };
+    const base = anyErr?.message ?? String(err);
+    const parts = [base];
+    if (anyErr?.code) parts.push(`code=${anyErr.code}`);
+    if (anyErr?.details) parts.push(`details=${anyErr.details}`);
+    if (anyErr?.hint) parts.push(`hint=${anyErr.hint}`);
+    if (table) parts.push(`table=${table}`);
+    return parts.join(' | ');
+  };
+
   const loadTables = useCallback(async () => {
     setLoadingTables(true);
     setError(null);
     try {
-      const results = await Promise.all(
-        TABLE_NAMES.map(name =>
-          supabase.from(name).select('*', { count: 'exact', head: true }).then(({ count, error }) => {
-            if (error) throw error;
-            return { name, row_count: count ?? 0 } as TableInfo;
-          })
-        )
+      const results = await Promise.allSettled(
+        TABLE_NAMES.map(async (name) => {
+          const { count, error } = await supabase
+            .from(name)
+            .select('*', { count: 'exact', head: true });
+          if (error) throw { error, table: name };
+          return { name, row_count: count ?? 0 } as TableInfo;
+        })
       );
-      setTables(results);
+      const nextTables: TableInfo[] = [];
+      const errors: string[] = [];
+      for (const res of results) {
+        if (res.status === 'fulfilled') {
+          nextTables.push(res.value);
+        } else {
+          const table = (res.reason as { table?: string }).table;
+          const err = (res.reason as { error?: unknown }).error ?? res.reason;
+          const msg = formatSupabaseError(err, table);
+          errors.push(msg);
+          logger.error('DatabaseBrowser', 'Failed to load table metadata', { table, error: err });
+        }
+      }
+      setTables(nextTables);
+      if (errors.length) {
+        setError(`Some tables failed to load: ${errors.join(' | ')}`);
+      }
     } catch (err) {
-      setError(`Failed to load tables: ${err instanceof Error ? err.message : String(err)}`);
+      const msg = formatSupabaseError(err);
+      setError(`Failed to load tables: ${msg}`);
+      logger.error('DatabaseBrowser', 'Failed to load tables', { error: err });
     } finally {
       setLoadingTables(false);
     }
@@ -61,7 +92,9 @@ export function DatabaseBrowser() {
       setRows((data ?? []) as Record<string, unknown>[]);
       setTotalCount(count ?? 0);
     } catch (err) {
-      setError(`Failed to load data from "${selectedTable}": ${err instanceof Error ? err.message : String(err)}`);
+      const msg = formatSupabaseError(err, selectedTable);
+      setError(`Failed to load data from "${selectedTable}": ${msg}`);
+      logger.error('DatabaseBrowser', 'Failed to load table data', { table: selectedTable, error: err });
       setRows([]);
       setTotalCount(0);
     } finally {

@@ -351,6 +351,9 @@ function Scene({
         return (
           <group key={n.id} position={[n.x ?? 0, n.y ?? 0, z]}>
             <mesh
+              onPointerDown={(e) => {
+                e.stopPropagation();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelect(n);
@@ -470,7 +473,11 @@ export function ArchitectureMap3D() {
         </Canvas>
 
         {/* Header bar */}
-        <div className="absolute top-3 left-4 z-20 flex items-center space-x-3 pointer-events-none">
+        <div
+          className="absolute top-3 left-4 z-20 flex items-center space-x-3 pointer-events-none"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+        >
           <Network className="w-7 h-7 text-orange-400/80" />
           <div>
             <h2 className="text-xl font-bold text-white/80/80">Architecture Map (3D)</h2>
@@ -479,7 +486,11 @@ export function ArchitectureMap3D() {
         </div>
 
         {/* Top-right controls */}
-        <div className="absolute top-3 right-4 z-20 flex items-center space-x-2 pointer-events-auto">
+        <div
+          className="absolute top-3 right-4 z-20 flex items-center space-x-2 pointer-events-auto"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+        >
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -509,6 +520,8 @@ export function ArchitectureMap3D() {
         <div
           className="w-[380px] max-w-[42vw] border-l border-orange-500/20 bg-black/80 backdrop-blur-xl"
           onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
         >
           <div className="h-full flex flex-col">
             <div className="px-5 py-4 border-b border-orange-500/15">

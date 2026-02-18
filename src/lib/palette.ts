@@ -143,8 +143,8 @@ export const COLOR_SCHEMES: Record<string, ColorScheme> = {
     glow: "rgba(34, 211, 238, 0.20)",
   },
   copperCircuit: {
-    name: "Copper Circuit",
-    description: "Deep charcoal with warm copper metallics -- industrial elegance",
+    name: "Copper Lattice",
+    description: "Deep charcoal with warm copper metallics -- industrial lattice",
     background: "#111014",
     surface: "#1C1A1F",
     surfaceLight: "#2A272E",
@@ -186,7 +186,7 @@ export const COLOR_SCHEMES: Record<string, ColorScheme> = {
   },
 };
 
-export const DEFAULT_SCHEME_KEY = "graphiteCyan";
+export const DEFAULT_SCHEME_KEY = "copperCircuit";
 
 // --- Helpers (pure functions) ---
 
@@ -271,7 +271,6 @@ export function ThemeProvider({ children, defaultScheme }: ThemeProviderProps) {
   const setScheme = useCallback((key: string) => {
     if (!COLOR_SCHEMES[key]) return;
     setSchemeKey(key);
-    setActiveScheme(key);
     try { localStorage.setItem(STORAGE_KEY, key); } catch { /* noop */ }
   }, []);
 
@@ -290,16 +289,3 @@ export function ThemeProvider({ children, defaultScheme }: ThemeProviderProps) {
   return React.createElement(ThemeContext.Provider, { value }, children);
 }
 
-// --- Backward Compatibility ---
-// These are provided so that the ~30 files importing EMBER_PALETTE can be
-// migrated incrementally. New code should use useTheme() instead.
-
-export let EMBER_PALETTE: ColorScheme = { ...COLOR_SCHEMES[DEFAULT_SCHEME_KEY] };
-
-export const HYPHAE_PALETTE = EMBER_PALETTE;
-
-export function setActiveScheme(key: string) {
-  const scheme = COLOR_SCHEMES[key];
-  if (!scheme) return;
-  Object.assign(EMBER_PALETTE, scheme);
-}

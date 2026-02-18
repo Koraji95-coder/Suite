@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/errorLogger';
 import type { Message, Conversation, Memory, AIConfig } from './types';
 import { DEFAULT_AI_CONFIG } from './types';
 import { createProvider } from './providers';
@@ -27,7 +28,12 @@ export async function sendMessage(
 ): Promise<string> {
   const config = getConfig();
   const provider = createProvider(config);
-  return provider.chat(messages, onChunk);
+  try {
+    return await provider.chat(messages, onChunk);
+  } catch (err) {
+    logger.error('AIService', 'Provider chat failed', { error: err, provider: config.provider, model: config.model });
+    throw err;
+  }
 }
 
 export async function loadConversations(): Promise<Conversation[]> {
@@ -46,7 +52,7 @@ export async function loadConversations(): Promise<Conversation[]> {
       updated_at: row.updated_at,
     }));
   } catch (err) {
-    console.error('Failed to load conversations:', err);
+    logger.error('AIService', 'Failed to load conversations', { error: err });
     return [];
   }
 }
@@ -77,7 +83,7 @@ export async function saveConversation(conversation: Conversation): Promise<Conv
 
     return conversation;
   } catch (err) {
-    console.error('Failed to save conversation:', err);
+    logger.error('AIService', 'Failed to save conversation', { error: err });
     return conversation;
   }
 }
@@ -91,7 +97,7 @@ export async function deleteConversation(id: string): Promise<boolean> {
     if (error) throw error;
     return true;
   } catch (err) {
-    console.error('Failed to delete conversation:', err);
+    logger.error('AIService', 'Failed to delete conversation', { error: err });
     return false;
   }
 }
@@ -121,7 +127,7 @@ export async function loadMemories(
       created_at: row.created_at,
     }));
   } catch (err) {
-    console.error('Failed to load memories:', err);
+    logger.error('AIService', 'Failed to load memories', { error: err });
     return [];
   }
 }
@@ -153,7 +159,7 @@ export async function saveMemory(memory: Omit<Memory, 'id' | 'created_at'>): Pro
 
     return null;
   } catch (err) {
-    console.error('Failed to save memory:', err);
+    logger.error('AIService', 'Failed to save memory', { error: err });
     return null;
   }
 }
@@ -167,7 +173,7 @@ export async function deleteMemory(id: string): Promise<boolean> {
     if (error) throw error;
     return true;
   } catch (err) {
-    console.error('Failed to delete memory:', err);
+    logger.error('AIService', 'Failed to delete memory', { error: err });
     return false;
   }
 }

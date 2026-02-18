@@ -13,7 +13,6 @@ const DashboardOverviewPanel = React.lazy(() => import("@/components/dashboard/D
 const ProjectsHub = React.lazy(() => import("@/components/projects/ProjectsHub").then(m => ({ default: m.ProjectsHub })));
 const ProjectManager = React.lazy(() => import("@/components/projects/ProjectManager").then(m => ({ default: m.ProjectManager })));
 const CalendarPage = React.lazy(() => import("@/components/calendar/hooks/CalendarPage"));
-const TransmittalBuilder = React.lazy(() => import("@/components/apps/TransmittalBuilder").then(m => ({ default: m.TransmittalBuilder })));
 const BlockLibrary = React.lazy(() => import("@/components/apps/BlockLibrary").then(m => ({ default: m.BlockLibrary })));
 const QAQCChecker = React.lazy(() => import("@/components/apps/QAQCChecker").then(m => ({ default: m.QAQCChecker })));
 const GroundGridGenerator = React.lazy(() => import("@/components/apps/GroundGridGenerator").then(m => ({ default: m.GroundGridGenerator })));
@@ -135,7 +134,7 @@ function ShellContent() {
               <Route path="/projects" element={<ProjectsHub />} />
               <Route path="/projects/:id" element={<ProjectManager />} />
               <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/apps/transmittal" element={<TransmittalBuilder />} />
+              <Route path="/apps/transmittal" element={<Placeholder name="Transmittal Builder" />} />
               <Route path="/apps/block-library" element={<BlockLibrary />} />
               <Route path="/apps/qaqc" element={<QAQCChecker />} />
               <Route path="/apps/ground-grid" element={<GroundGridGenerator />} />

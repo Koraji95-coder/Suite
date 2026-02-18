@@ -46,7 +46,7 @@ export function GraphToolbar({
     ...btnBase,
     background: hexToRgba(palette.primary, 0.2),
     color: palette.primary,
-    borderColor: palette.primary,
+    border: `1px solid ${palette.primary}`,
   };
 
   return (

@@ -18,9 +18,10 @@ import {
   triNoise3D,
 } from 'three/tsl';
 
-import { HYPHAE_PALETTE } from '@/lib/palette';
+import { COLOR_SCHEMES, DEFAULT_SCHEME_KEY, type ColorScheme } from '@/lib/palette';
 
 export interface HyphaeCoreMaterialOptions {
+  palette?: ColorScheme;
   /** Spatial frequency of the procedural tissue/vein pattern. */
   noiseScale?: number;
   /** How strong the emissive energy should be. */
@@ -40,6 +41,7 @@ export function createHyphaeCoreNodeMaterial(
   opts: HyphaeCoreMaterialOptions = {},
 ) {
   const {
+    palette = COLOR_SCHEMES[DEFAULT_SCHEME_KEY],
     noiseScale = 0.9,
     emissiveIntensity = 1.35,
     roughness = 0.38,
@@ -62,8 +64,8 @@ export function createHyphaeCoreNodeMaterial(
     float(0.5).add(float(0.5).mul(sin(time.mul(float(2.2)).add(n.mul(float(6.0))))))
   );
 
-  const base = color(HYPHAE_PALETTE.background);
-  const energy = mix(color(HYPHAE_PALETTE.primary), color(HYPHAE_PALETTE.tertiary), pulse);
+  const base = color(palette.background);
+  const energy = mix(color(palette.primary), color(palette.tertiary), pulse);
 
   // Fresnel-ish rim boost: stronger glow at grazing angles.
   const ndotv = abs(dot(normalize(normalWorld), normalize(positionViewDirection)));
@@ -72,7 +74,7 @@ export function createHyphaeCoreNodeMaterial(
   mat.colorNode = mix(base, energy, ridges.mul(float(0.55)));
   mat.emissiveNode = energy
     .mul(ridges.mul(float(emissiveIntensity)))
-    .add(color(HYPHAE_PALETTE.primary).mul(rim.mul(float(0.55))));
+    .add(color(palette.primary).mul(rim.mul(float(0.55))));
 
   return mat;
 }

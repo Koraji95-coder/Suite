@@ -30,10 +30,10 @@ const topItems: NavItem[] = [
   { icon: BookOpen, label: "Knowledge", panel: "knowledge" },
   { icon: HardDrive, label: "Files", path: "/files" },
   { icon: Network, label: "Graph", path: "/graph" },
+  { icon: MessageSquare, label: "AI Chat", path: "/ai" },
 ];
 
 const bottomItems: NavItem[] = [
-  { icon: MessageSquare, label: "AI Chat", aiToggle: true },
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
 

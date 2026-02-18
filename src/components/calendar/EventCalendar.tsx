@@ -4,6 +4,7 @@ import {
   addDays,
   addMonths,
   addWeeks,
+  endOfMonth,
   endOfWeek,
   format,
   isSameMonth,
@@ -46,6 +47,9 @@ export interface EventCalendarProps {
   onEventDelete?: (eventId: string) => void;
   className?: string;
   initialView?: CalendarView;
+  compact?: boolean;
+  projectOptions?: Array<{ id: string; name: string }>;
+  taskOptions?: Array<{ id: string; name: string; project_id: string | null }>;
 }
 
 export function EventCalendar({
@@ -54,7 +58,10 @@ export function EventCalendar({
   onEventUpdate,
   onEventDelete,
   className,
-  initialView = "month"
+  initialView = "month",
+  compact = false,
+  projectOptions = [],
+  taskOptions = []
 }: EventCalendarProps) {
   const { palette } = useTheme();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -102,17 +109,45 @@ export function EventCalendar({
   }, [isEventDialogOpen]);
 
   const handlePrevious = () => {
-    if (view === "month") setCurrentDate(subMonths(currentDate, 1));
-    else if (view === "week") setCurrentDate(subWeeks(currentDate, 1));
-    else if (view === "day") setCurrentDate(addDays(currentDate, -1));
-    else if (view === "agenda") setCurrentDate(addDays(currentDate, -AgendaDaysToShow));
+    if (view === "month") {
+      const next = subMonths(currentDate, 1);
+      setCurrentDate(next);
+      if (selectedDate) {
+        const lastDay = endOfMonth(next).getDate();
+        const day = Math.min(selectedDate.getDate(), lastDay);
+        setSelectedDate(new Date(next.getFullYear(), next.getMonth(), day));
+      }
+    } else if (view === "week") {
+      setCurrentDate(subWeeks(currentDate, 1));
+      if (selectedDate) setSelectedDate(subWeeks(selectedDate, 1));
+    } else if (view === "day") {
+      setCurrentDate(addDays(currentDate, -1));
+      if (selectedDate) setSelectedDate(addDays(selectedDate, -1));
+    } else if (view === "agenda") {
+      setCurrentDate(addDays(currentDate, -AgendaDaysToShow));
+      if (selectedDate) setSelectedDate(addDays(selectedDate, -AgendaDaysToShow));
+    }
   };
 
   const handleNext = () => {
-    if (view === "month") setCurrentDate(addMonths(currentDate, 1));
-    else if (view === "week") setCurrentDate(addWeeks(currentDate, 1));
-    else if (view === "day") setCurrentDate(addDays(currentDate, 1));
-    else if (view === "agenda") setCurrentDate(addDays(currentDate, AgendaDaysToShow));
+    if (view === "month") {
+      const next = addMonths(currentDate, 1);
+      setCurrentDate(next);
+      if (selectedDate) {
+        const lastDay = endOfMonth(next).getDate();
+        const day = Math.min(selectedDate.getDate(), lastDay);
+        setSelectedDate(new Date(next.getFullYear(), next.getMonth(), day));
+      }
+    } else if (view === "week") {
+      setCurrentDate(addWeeks(currentDate, 1));
+      if (selectedDate) setSelectedDate(addWeeks(selectedDate, 1));
+    } else if (view === "day") {
+      setCurrentDate(addDays(currentDate, 1));
+      if (selectedDate) setSelectedDate(addDays(selectedDate, 1));
+    } else if (view === "agenda") {
+      setCurrentDate(addDays(currentDate, AgendaDaysToShow));
+      if (selectedDate) setSelectedDate(addDays(selectedDate, AgendaDaysToShow));
+    }
   };
 
   const handleToday = () => {
@@ -208,7 +243,11 @@ export function EventCalendar({
       hoverEffect={false}
       bevel
       specular
-      className={cn("flex flex-col has-data-[slot=month-view]:flex-1", className)}
+      className={cn(
+        "flex flex-col has-data-[slot=month-view]:flex-1",
+        compact ? "text-sm" : "",
+        className
+      )}
       style={
         {
           "--event-height": `${EventHeight}px`,
@@ -217,11 +256,17 @@ export function EventCalendar({
         } as React.CSSProperties
       }>
       <CalendarDndProvider onEventUpdate={handleEventUpdate}>
-        <div className="relative z-10 flex items-center justify-between p-2 sm:p-4">
-          <div className="flex items-center gap-1 sm:gap-4">
+        <div className={cn(
+          "relative z-10 flex items-center justify-between",
+          compact ? "p-2" : "p-2 sm:p-4"
+        )}>
+          <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-1 sm:gap-4")}>
             <button
               onClick={handleToday}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all max-[479px]:aspect-square max-[479px]:px-0"
+              className={cn(
+                "text-xs font-semibold rounded-lg transition-all max-[479px]:aspect-square max-[479px]:px-0",
+                compact ? "px-2 py-1" : "px-3 py-1.5"
+              )}
               style={{
                 background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.06)} 0%, ${hexToRgba(palette.surface, 0.25)} 100%)`,
                 border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
@@ -245,17 +290,23 @@ export function EventCalendar({
               </button>
             </div>
             <h2
-              className="text-sm font-semibold sm:text-lg md:text-xl"
+              className={cn(
+                "font-semibold",
+                compact ? "text-sm" : "text-sm sm:text-lg md:text-xl"
+              )}
               style={{ color: hexToRgba(palette.text, 0.9) }}>
               {viewTitle}
             </h2>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="gap-1.5 max-[479px]:h-8 inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg transition-all"
+                  className={cn(
+                    "gap-1.5 max-[479px]:h-8 inline-flex items-center text-xs font-semibold rounded-lg transition-all",
+                    compact ? "px-2 py-1" : "px-3 py-1.5"
+                  )}
                   style={{
                     background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.06)} 0%, ${hexToRgba(palette.surface, 0.25)} 100%)`,
                     border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
@@ -289,7 +340,10 @@ export function EventCalendar({
             </DropdownMenu>
 
             <button
-              className="max-[479px]:aspect-square max-[479px]:p-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all"
+              className={cn(
+                "max-[479px]:aspect-square max-[479px]:p-0 inline-flex items-center gap-1 text-xs font-semibold rounded-lg transition-all",
+                compact ? "px-2 py-1" : "px-3 py-1.5"
+              )}
               style={{
                 backgroundColor: palette.primary,
                 color: '#fff',
@@ -357,6 +411,8 @@ export function EventCalendar({
           }}
           onSave={handleEventSave}
           onDelete={handleEventDelete}
+          projectOptions={projectOptions}
+          taskOptions={taskOptions}
         />
       </CalendarDndProvider>
     </GlassPanel>

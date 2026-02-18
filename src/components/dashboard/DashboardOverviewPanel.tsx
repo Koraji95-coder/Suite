@@ -5,12 +5,13 @@ import { PanelInfoDialog } from '../PanelInfoDialog';
 import { dashboardInfo } from '../../data/panelInfo';
 import { logger } from '../../lib/errorLogger';
 import { StatsCards } from './StatsCards';
-import { CalendarWidget } from './CalendarWidget';
+import CalendarPage from '../calendar/hooks/CalendarPage';
 import { RecentActivityList } from './RecentActivityList';
 import { ActiveProjectsList } from './ActiveProjectsList';
 import { DashboardCustomizer } from './DashboardCustomizer';
 import { useDashboardLayout } from './useDashboardLayout';
 import { useTheme, hexToRgba, glassCardInnerStyle } from '@/lib/palette';
+import { useNavigate } from 'react-router-dom';
 import { GlassPanel } from '../ui/GlassPanel';
 
 /* ── Isolated live clock (prevents full dashboard rerender every second) ── */
@@ -80,6 +81,7 @@ export function DashboardOverviewPanel({
   onCalendarMonthChange,
 }: DashboardOverviewPanelProps) {
   const { palette } = useTheme();
+  const navigate = useNavigate();
   const { widgets, editMode, setEditMode, toggleWidget, reorderWidgets, resetLayout } = useDashboardLayout();
   const [projects, setProjects] = useState<Project[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -264,6 +266,11 @@ export function DashboardOverviewPanel({
     if (onCalendarDateChange) onCalendarDateChange(date);
   };
 
+  const handleNavigateToProject = onNavigateToProject
+    ?? ((projectId: string) => navigate(`/projects/${projectId}`));
+  const handleNavigateToProjectsHub = onNavigateToProjectsHub
+    ?? (() => navigate('/projects'));
+
   const visibleWidgets = widgets.filter(w => w.visible);
 
   const widgetMap: Record<string, React.ReactNode> = {
@@ -277,17 +284,9 @@ export function DashboardOverviewPanel({
       />
     ),
     calendar: (
-      <CalendarWidget
-        key="calendar"
-        calendarMonth={calendarMonth}
-        onMonthChange={setCalendarMonth}
-        selectedDate={selectedCalendarDate ?? null}
-        onDateSelect={handleDateSelect}
-        projects={projects}
-        allTasksWithDates={allTasksWithDates}
-        allProjectsMap={allProjectsMap}
-        onNavigateToProject={onNavigateToProject}
-      />
+      <div key="calendar" className="min-h-[420px]">
+        <CalendarPage compact />
+      </div>
     ),
     activity: (
       <RecentActivityList key="activity" activities={activities} allProjectsMap={allProjectsMap} />
@@ -297,8 +296,8 @@ export function DashboardOverviewPanel({
         key="projects"
         projects={projects}
         projectTaskCounts={projectTaskCounts}
-        onNavigateToProject={onNavigateToProject}
-        onNavigateToProjectsHub={onNavigateToProjectsHub}
+        onNavigateToProject={handleNavigateToProject}
+        onNavigateToProjectsHub={handleNavigateToProjectsHub}
       />
     ),
   };

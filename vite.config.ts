@@ -118,9 +118,46 @@ function backupServerPlugin(): Plugin {
   };
 }
 
+/**
+ * Vite dev-only log endpoint to surface client logs in the terminal.
+ * POST /__log { severity, context, message, ... }
+ */
+function devLogPlugin(): Plugin {
+  return {
+    name: 'dev-log-endpoint',
+    configureServer(server) {
+      server.middlewares.use('/__log', (req, res) => {
+        if (req.method !== 'POST') {
+          res.writeHead(405, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Method not allowed' }));
+          return;
+        }
+
+        let body = '';
+        req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+        req.on('end', () => {
+          try {
+            const payload = JSON.parse(body || '{}');
+            const line = `[${payload.severity || 'LOG'}] ${payload.context || 'Client'}: ${payload.message || ''}`;
+            // Log to terminal without exposing in the UI.
+            console.log(line);
+            if (payload.data) console.log('  data:', payload.data);
+            if (payload.stack) console.log('  stack:', payload.stack);
+            res.writeHead(204);
+            res.end();
+          } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: String(err) }));
+          }
+        });
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), backupServerPlugin(), codeAnalyzerPlugin()],
+  plugins: [react(), backupServerPlugin(), devLogPlugin(), codeAnalyzerPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

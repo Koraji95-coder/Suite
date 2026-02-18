@@ -32,21 +32,26 @@ class ErrorLogger {
   }
 
   private formatLog(log: ErrorLog): void {
-    const emoji = this.getSeverityEmoji(log.severity);
-    const style = this.getSeverityColor(log.severity);
+    const isDev = typeof import.meta !== 'undefined' && import.meta.env?.DEV;
+    if (!isDev) return;
 
-    console.groupCollapsed(
-      `%c${emoji} [${log.severity.toUpperCase()}] ${log.context}: ${log.message}`,
-      style
-    );
-    console.log('Timestamp:', log.timestamp);
-    if (log.data) {
-      console.log('Data:', log.data);
-    }
-    if (log.stack) {
-      console.log('Stack Trace:', log.stack);
-    }
-    console.groupEnd();
+    const payload = {
+      emoji: this.getSeverityEmoji(log.severity),
+      severity: log.severity.toUpperCase(),
+      context: log.context,
+      message: log.message,
+      timestamp: log.timestamp,
+      data: log.data,
+      stack: log.stack,
+    };
+
+    void fetch('/__log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(() => {
+      // If the dev server log endpoint is unavailable, drop silently.
+    });
   }
 
   log(severity: ErrorSeverity, context: string, message: string, data?: unknown, error?: Error): void {
@@ -90,7 +95,6 @@ class ErrorLogger {
 
   clearLogs(): void {
     this.logs = [];
-    console.clear();
     this.info('ErrorLogger', 'Logs cleared');
   }
 

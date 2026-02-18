@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { LoadingCard } from './LoadingCard';
 import { ProgressBar } from './ProgressBar';
 import { useTheme } from '@/lib/palette';
+import { APP_VERSION } from '@/constants/version';
 
 function usePrefersReducedMotion() {
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -369,7 +370,9 @@ export function EmberSplash({ onComplete }: EmberSplashProps) {
       <div className="absolute bottom-6 right-6 text-right text-[10px] sm:text-[11px] leading-tight z-20 select-none">
         <div className="font-medium" style={{ color: palette.textMuted }}>Root3Power Suite</div>
         <div style={{ color: palette.textMuted, opacity: 0.6 }}>By Dustin</div>
-        <div className="text-[9px] sm:text-[10px]" style={{ color: palette.textMuted, opacity: 0.45 }}>V2.0</div>
+        <div className="text-[9px] sm:text-[10px]" style={{ color: palette.textMuted, opacity: 0.45 }}>
+          V{APP_VERSION}
+        </div>
         <div className="text-[9px] sm:text-[10px] mt-0.5" style={{ color: palette.textMuted, opacity: 0.3 }}>
           © {new Date().getFullYear()}
         </div>

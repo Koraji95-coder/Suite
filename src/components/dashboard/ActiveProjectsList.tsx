@@ -35,6 +35,7 @@ export function ActiveProjectsList({
   onNavigateToProjectsHub,
 }: ActiveProjectsListProps) {
   const { palette } = useTheme();
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
   return (
     <GlassPanel
       tint={palette.secondary}
@@ -63,8 +64,8 @@ export function ActiveProjectsList({
           ) : (
             projects.map((project) => {
               const taskCount = projectTaskCounts.get(project.id);
-              const [isHovered, setIsHovered] = useState(false);
               const catColor = getCategoryColor(project.category);
+              const isHovered = hoveredProjectId === project.id;
 
               return (
                 <div
@@ -72,13 +73,13 @@ export function ActiveProjectsList({
                   className="p-4 cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:-translate-y-px"
                   style={{
                     ...glassCardInnerStyle(palette, catColor),
-                    borderColor: isHovered
+                    border: `1px solid ${isHovered
                       ? hexToRgba(catColor, 0.3)
-                      : hexToRgba(palette.text, 0.06),
+                      : hexToRgba(palette.text, 0.06)}`,
                   }}
                   onClick={() => onNavigateToProject?.(project.id)}
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
+                  onMouseEnter={() => setHoveredProjectId(project.id)}
+                  onMouseLeave={() => setHoveredProjectId(null)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start space-x-3 flex-1">

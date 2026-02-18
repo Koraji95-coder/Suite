@@ -1,14 +1,15 @@
 {
   "name": "vite-react-typescript-starter",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.1.0-aajwp8o",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "bump-version": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.29",

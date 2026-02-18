@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
-import { EMBER_PALETTE } from '@/lib/palette';
+import { COLOR_SCHEMES, DEFAULT_SCHEME_KEY, type ColorScheme } from '@/lib/palette';
 
 export interface HyphaeRendererOptions {
+  palette?: ColorScheme;
   clearColor?: string;
   /** Alpha used when clearing the framebuffer (0 = transparent, 1 = opaque). */
   clearAlpha?: number;
@@ -31,7 +32,8 @@ export async function createHyphaeRenderer(
   opts: HyphaeRendererOptions = {},
 ): Promise<HyphaeAnyRenderer> {
   const {
-    clearColor = EMBER_PALETTE.background,
+    palette = COLOR_SCHEMES[DEFAULT_SCHEME_KEY],
+    clearColor = palette.background,
     alpha = true,
     antialias = true,
   } = opts;

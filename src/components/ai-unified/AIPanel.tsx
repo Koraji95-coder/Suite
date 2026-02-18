@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Brain } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
+import { logger } from '@/lib/errorLogger';
 import type { Conversation, Message, Memory } from '@/lib/ai/types';
 import {
   loadConversations,
@@ -23,8 +24,20 @@ function generateId(): string {
 
 export function AIPanel() {
   const { palette } = useTheme();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const initialConversationRef = useRef<Conversation | null>(null);
+  if (!initialConversationRef.current) {
+    const now = new Date().toISOString();
+    initialConversationRef.current = {
+      id: generateId(),
+      title: 'New Chat',
+      messages: [],
+      created_at: now,
+      updated_at: now,
+    };
+  }
+
+  const [conversations, setConversations] = useState<Conversation[]>(() => [initialConversationRef.current!]);
+  const [selectedId, setSelectedId] = useState<string | null>(() => initialConversationRef.current!.id);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [memoryPanelOpen, setMemoryPanelOpen] = useState(false);
@@ -32,8 +45,22 @@ export function AIPanel() {
   const selectedConversation = conversations.find((c) => c.id === selectedId) ?? null;
 
   useEffect(() => {
-    loadConversations().then(setConversations);
-    loadMemories().then(setMemories);
+    loadConversations()
+      .then((loaded) => {
+        if (loaded.length > 0) {
+          setConversations(loaded);
+          setSelectedId((current) => current ?? loaded[0].id);
+        }
+      })
+      .catch((err) => {
+        logger.error('AIPanel', 'Failed to load conversations', { error: err });
+      });
+
+    loadMemories()
+      .then(setMemories)
+      .catch((err) => {
+        logger.error('AIPanel', 'Failed to load memories', { error: err });
+      });
   }, []);
 
   const createNewConversation = useCallback((): Conversation => {
@@ -128,11 +155,11 @@ export function AIPanel() {
 
         await saveConversation(finalConv);
       } catch (err) {
-        assistantMsg.content = 'Sorry, something went wrong. Please try again.';
+        logger.error('AIPanel', 'Failed to send message', { error: err });
         setConversations((prev) =>
           prev.map((c) =>
             c.id === conv!.id
-              ? { ...c, messages: [...updatedMessages, { ...assistantMsg }] }
+              ? { ...c, messages: [...updatedMessages] }
               : c
           )
         );
@@ -224,12 +251,12 @@ export function AIPanel() {
           prev.map((c) => (c.id === conv.id ? finalConv : c))
         );
         await saveConversation(finalConv);
-      } catch {
-        assistantMsg.content = 'Sorry, something went wrong. Please try again.';
+      } catch (err) {
+        logger.error('AIPanel', 'Failed to run suggestion', { error: err });
         setConversations((prev) =>
           prev.map((c) =>
             c.id === conv.id
-              ? { ...c, messages: [userMsg, { ...assistantMsg }] }
+              ? { ...c, messages: [userMsg] }
               : c
           )
         );

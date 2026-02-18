@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTheme, hexToRgba, COLOR_SCHEMES } from "@/lib/palette";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/useAuth";
 import { ChevronDown, WifiOff } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 

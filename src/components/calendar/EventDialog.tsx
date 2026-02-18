@@ -40,9 +40,11 @@ interface EventDialogProps {
   onClose: () => void;
   onSave: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
+  projectOptions?: Array<{ id: string; name: string }>;
+  taskOptions?: Array<{ id: string; name: string; project_id: string | null }>;
 }
 
-export function EventDialog({ event, isOpen, onClose, onSave, onDelete }: EventDialogProps) {
+export function EventDialog({ event, isOpen, onClose, onSave, onDelete, projectOptions = [], taskOptions = [] }: EventDialogProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -55,11 +57,8 @@ export function EventDialog({ event, isOpen, onClose, onSave, onDelete }: EventD
   const [error, setError] = useState<string | null>(null);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
-
-  // Debug log to check what event is being passed
-  useEffect(() => {
-    console.log("EventDialog received event:", event);
-  }, [event]);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     if (event) {
@@ -76,6 +75,8 @@ export function EventDialog({ event, isOpen, onClose, onSave, onDelete }: EventD
       setAllDay(event.allDay || false);
       setLocation(event.location || "");
       setColor((event.color as EventColor) || "sky");
+      setProjectId(event.projectId ?? null);
+      setTaskId(event.taskId ?? null);
       setError(null); // Reset error when opening dialog
     } else {
       resetForm();
@@ -92,6 +93,8 @@ export function EventDialog({ event, isOpen, onClose, onSave, onDelete }: EventD
     setAllDay(false);
     setLocation("");
     setColor("sky");
+    setProjectId(null);
+    setTaskId(null);
     setError(null);
   };
 
@@ -160,7 +163,9 @@ export function EventDialog({ event, isOpen, onClose, onSave, onDelete }: EventD
       end,
       allDay,
       location,
-      color
+      color,
+      projectId: projectId ?? undefined,
+      taskId: taskId ?? undefined,
     });
   };
 
@@ -230,6 +235,48 @@ export function EventDialog({ event, isOpen, onClose, onSave, onDelete }: EventD
           </div>
         )}
         <div className="grid gap-4 py-4">
+          <div className="grid gap-3">
+            <div className="*:not-first:mt-1.5">
+              <Label htmlFor="project">Project</Label>
+              <Select
+                value={projectId ?? ""}
+                onValueChange={(value) => {
+                  setProjectId(value || null);
+                  setTaskId(null);
+                }}
+              >
+                <SelectTrigger id="project" className="w-full">
+                  <SelectValue placeholder="No project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No project</SelectItem>
+                  {projectOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="*:not-first:mt-1.5">
+              <Label htmlFor="task">Task</Label>
+              <Select
+                value={taskId ?? ""}
+                onValueChange={(value) => setTaskId(value || null)}
+              >
+                <SelectTrigger id="task" className="w-full">
+                  <SelectValue placeholder="No task" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No task</SelectItem>
+                  {taskOptions
+                    .filter((t) => !projectId || t.project_id === projectId)
+                    .map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="*:not-first:mt-1.5">
             <Label htmlFor="title">Title</Label>
             <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} />

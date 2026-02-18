@@ -218,9 +218,9 @@ export function AgentPanel() {
         <div className={`rounded-lg p-6 ${result.success ? 'bg-green-50' : 'bg-red-50'}`}>
           <h4 className="font-semibold mb-2">
             {result.success ? '✅ Success' : '❌ Error'}
-            {result.execution_time && (
+            {result.executionTime && (
               <span className="text-sm text-gray-600 ml-2">
-                ({result.execution_time}ms)
+                ({result.executionTime}ms)
               </span>
             )}
           </h4>

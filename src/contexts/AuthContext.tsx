@@ -43,6 +43,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Rehydrate session from storage on mount
+    const rehydrateSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          logger.error("AuthContext", "Failed to rehydrate session", { error });
+          setLoading(false);
+          return;
+        }
+        
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+
+        if (currentUser) {
+          const p = await fetchProfile(currentUser.id);
+          setProfile(p);
+        } else {
+          setProfile(null);
+        }
+      } catch (err) {
+        logger.error("AuthContext", "Rehydration error", { err });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    rehydrateSession();
+
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
@@ -52,11 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (async () => {
           const p = await fetchProfile(currentUser.id);
           setProfile(p);
-          setLoading(false);
         })();
       } else {
         setProfile(null);
-        setLoading(false);
       }
     });
 

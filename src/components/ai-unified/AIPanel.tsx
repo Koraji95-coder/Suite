@@ -19,7 +19,31 @@ import { WelcomeScreen } from './WelcomeScreen';
 import { MemoryPanel } from './MemoryPanel';
 
 function generateId(): string {
-  return crypto.randomUUID();
+  // Fallback for environments without crypto.randomUUID (older browsers)
+  try {
+    return crypto.randomUUID();
+  } catch {
+    // Fallback using crypto.getRandomValues if available, otherwise Math.random
+    try {
+      if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+        const arr = new Uint8Array(16);
+        window.crypto.getRandomValues(arr);
+        arr[6] = (arr[6] & 0x0f) | 0x40; // version 4
+        arr[8] = (arr[8] & 0x3f) | 0x80; // variant 1
+        return [
+          Array.from(arr.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join(''),
+          Array.from(arr.slice(4, 6)).map(b => b.toString(16).padStart(2, '0')).join(''),
+          Array.from(arr.slice(6, 8)).map(b => b.toString(16).padStart(2, '0')).join(''),
+          Array.from(arr.slice(8, 10)).map(b => b.toString(16).padStart(2, '0')).join(''),
+          Array.from(arr.slice(10, 16)).map(b => b.toString(16).padStart(2, '0')).join(''),
+        ].join('-');
+      }
+    } catch {
+      // continue to Math.random fallback
+    }
+    // Ultimate fallback: timestamp + random suffix
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+  }
 }
 
 export function AIPanel() {

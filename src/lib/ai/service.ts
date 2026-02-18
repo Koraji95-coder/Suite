@@ -44,13 +44,21 @@ export async function loadConversations(): Promise<Conversation[]> {
 
     if (error) throw error;
 
-    return (data ?? []).map((row: any) => ({
-      id: row.id,
-      title: row.title ?? row.panel_context ?? 'Untitled',
-      messages: row.messages ?? [],
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-    }));
+    return (data ?? []).map((row: any) => {
+      // Rehydrate message timestamps that may have been serialized as strings
+      const messages = (row.messages ?? []).map((msg: any) => ({
+        ...msg,
+        timestamp: typeof msg.timestamp === 'string' ? new Date(msg.timestamp) : msg.timestamp,
+      }));
+
+      return {
+        id: row.id,
+        title: row.title ?? row.panel_context ?? 'Untitled',
+        messages,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      };
+    });
   } catch (err) {
     logger.error('AIService', 'Failed to load conversations', { error: err });
     return [];

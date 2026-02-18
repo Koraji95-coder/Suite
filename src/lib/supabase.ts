@@ -5,22 +5,20 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 /**
  * Reuse a single Supabase client across Vite HMR reloads and replace the
- * Navigator Lock with a no-op.  We don't use Supabase Auth in this app, so
- * the lock (used to coordinate auth-token refresh across tabs) is unnecessary
- * and only causes NavigatorLockAcquireTimeoutError noise during development.
- *
- * The custom `lock` function simply executes `fn` immediately without
- * acquiring any real lock – this is the officially-supported escape hatch
- * from auth-js when you don't need cross-tab session coordination.
+ * Navigator Lock with a no-op to avoid NavigatorLockAcquireTimeoutError.
+ * 
+ * Auth persistence is enabled (persistSession: true) to maintain session
+ * across page reloads. The custom `lock` function is a no-op to avoid
+ * cross-tab coordination overhead in development.
  */
 const _global = globalThis as unknown as { __supabase: ReturnType<typeof createClient> };
 export const supabase =
   _global.__supabase ??= createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       storageKey: 'suite-auth',
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-      persistSession: false,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      persistSession: true,
       // No-op lock – bypasses Navigator LockManager entirely
       lock: async <R>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => {
         return await fn();

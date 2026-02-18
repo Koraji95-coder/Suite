@@ -11,15 +11,54 @@ export default function CalendarPage({ compact = false }: { compact?: boolean })
   const [tasks, setTasks] = useState<Array<{ id: string; name: string; project_id: string | null }>>([]);
 
   const mapRowToEvent = useCallback((row: any): CalendarEvent => {
-    const start = row.start_at ? parseISO(row.start_at) : new Date(`${row.due_date}T00:00:00`);
-    const end = row.end_at ? parseISO(row.end_at) : addDays(start, 1);
+    // Prefer start_at/end_at for proper timed events; fall back to due_date as all-day
+    let start: Date;
+    let end: Date;
+    let allDay: boolean;
+
+    if (row.start_at) {
+      // Explicit start/end times provided; respect as timed event
+      try {
+        start = parseISO(row.start_at);
+      } catch {
+        // Invalid ISO string; default to midnight of due_date
+        const dueDate = row.due_date || new Date().toISOString().split("T")[0];
+        start = new Date(`${dueDate}T00:00:00`);
+      }
+    } else if (row.due_date) {
+      // Only due_date provided; treat as all-day
+      start = new Date(`${row.due_date}T00:00:00`);
+    } else {
+      // No date at all; default to now
+      start = new Date();
+    }
+
+    if (row.end_at) {
+      try {
+        end = parseISO(row.end_at);
+      } catch {
+        // Invalid end_at; use start + 1 hour (or 1 day if all-day)
+        end = row.all_day ? addDays(start, 1) : new Date(start.getTime() + 3600000);
+      }
+    } else {
+      // No end_at; infer from all_day flag
+      end = row.all_day ? addDays(start, 1) : new Date(start.getTime() + 3600000);
+    }
+
+    // Respect explicit all_day setting if provided; otherwise infer from presence of start_at
+    if (typeof row.all_day === "boolean") {
+      allDay = row.all_day;
+    } else {
+      allDay = !row.start_at; // If no start_at, treat as all-day
+    }
+
     return {
-      id: row.id,
+      id: row.id ?? "unknown",
       title: row.title ?? "Untitled",
       description: row.description ?? undefined,
       start,
       end,
-      allDay: row.all_day ?? true,
+      allDay,
       location: row.location ?? undefined,
       color: row.color ?? undefined,
       source: "manual",

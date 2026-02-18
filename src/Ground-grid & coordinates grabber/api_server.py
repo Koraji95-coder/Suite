@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# pyright: reportMissingImports=false, reportMissingModuleSource=false
 """
 Coordinates Grabber API Server
 Flask-based HTTP/WebSocket bridge between React frontend and AutoCAD COM interface

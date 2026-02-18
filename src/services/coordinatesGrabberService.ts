@@ -37,6 +37,8 @@ export interface ExecutionResult {
   message: string;
   excel_path?: string;
   points_created?: number;
+  blocks_inserted?: number;
+  block_errors?: string[] | null;
   duration_seconds?: number;
   error_details?: string;
 }

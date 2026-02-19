@@ -32,6 +32,14 @@ export interface CoordinatesConfig {
   show_azimuth: boolean;
 }
 
+export interface ExecutionResultPoint {
+  id: string;
+  east: number;
+  north: number;
+  elevation: number;
+  layer: string;
+}
+
 export interface ExecutionResult {
   success: boolean;
   message: string;
@@ -41,6 +49,7 @@ export interface ExecutionResult {
   block_errors?: string[] | null;
   duration_seconds?: number;
   error_details?: string;
+  points?: ExecutionResultPoint[];
 }
 
 export interface ProgressUpdate {

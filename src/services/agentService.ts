@@ -27,14 +27,9 @@
 
 import type {
   AgentResponse,
-  PairingResponse,
-  MessageResponse,
-  DrawingListAnalysisResult,
-  TransmittalResult,
-  ProjectAnalysisResult,
-  FloorPlanResult,
-  GATEWAY_CONFIG,
 } from '../types/agent';
+import { secureTokenStorage } from '../lib/secureTokenStorage';
+import { logger } from '../lib/logger';
 
 // Re-export types for convenience
 export type { AgentResponse };
@@ -53,8 +48,6 @@ export interface PythonToolRequest {
 
 class AgentService {
   private baseUrl: string;
-  private bearerToken: string | null = null;
-  private isPaired: boolean = false;
 
   constructor() {
     // Default to localhost for development
@@ -68,6 +61,8 @@ class AgentService {
    */
   async pair(pairingCode: string): Promise<boolean> {
     try {
+      logger.info('Attempting to pair with agent', 'AgentService');
+      
       const response = await fetch(`${this.baseUrl}/pair`, {
         method: 'POST',
         headers: {
@@ -77,37 +72,43 @@ class AgentService {
       });
 
       if (!response.ok) {
+        logger.error('Pairing failed', 'AgentService', new Error(response.statusText));
         throw new Error('Pairing failed');
       }
 
       const data = await response.json();
-      this.bearerToken = data.token;
-      this.isPaired = true;
       
-      // Store token in localStorage for persistence
-      localStorage.setItem('agent_bearer_token', data.token);
+      // Store token securely using obfuscated sessionStorage
+      secureTokenStorage.setToken(data.token);
       
+      logger.info('Successfully paired with agent', 'AgentService');
       return true;
     } catch (error) {
-      console.error('Agent pairing error:', error);
+      logger.error('Agent pairing error', 'AgentService', error);
       return false;
     }
   }
 
   /**
-   * Check if we're already paired (token exists)
+   * Check if we're already paired (token exists and is valid)
    */
   checkPairing(): boolean {
-    if (this.isPaired) return true;
-    
-    const stored = localStorage.getItem('agent_bearer_token');
-    if (stored) {
-      this.bearerToken = stored;
-      this.isPaired = true;
-      return true;
-    }
-    
-    return false;
+    return secureTokenStorage.hasToken();
+  }
+
+  /**
+   * Unpair from the agent (clear token)
+   */
+  unpair(): void {
+    secureTokenStorage.clearToken();
+    logger.info('Unpaired from agent', 'AgentService');
+  }
+
+  /**
+   * Get token (for internal use only - never expose to UI)
+   */
+  private getToken(): string | null {
+    return secureTokenStorage.getToken();
   }
 
   /**
@@ -271,20 +272,32 @@ class AgentService {
    */
   private async makeRequest(task: AgentTask): Promise<AgentResponse> {
     if (!this.checkPairing()) {
+      logger.warn('Attempted request without pairing', 'AgentService');
       return {
         success: false,
         error: 'Not paired with agent. Please pair first.',
       };
     }
 
+    const token = this.getToken();
+    if (!token) {
+      logger.error('Token validation failed', 'AgentService');
+      return {
+        success: false,
+        error: 'Invalid token. Please pair again.',
+      };
+    }
+
     const startTime = Date.now();
 
     try {
+      logger.debug(`Making agent request: ${task.task}`, 'AgentService');
+      
       const response = await fetch(`${this.baseUrl}/webhook`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.bearerToken}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           message: JSON.stringify(task),
@@ -293,11 +306,14 @@ class AgentService {
       });
 
       if (!response.ok) {
+        logger.error(`Agent request failed: ${response.statusText}`, 'AgentService');
         throw new Error(`Agent request failed: ${response.statusText}`);
       }
 
       const data = await response.json();
       const executionTime = Date.now() - startTime;
+
+      logger.info(`Agent request completed in ${executionTime}ms`, 'AgentService', { task: task.task });
 
       return {
         success: true,
@@ -305,11 +321,12 @@ class AgentService {
         executionTime: executionTime,
       };
     } catch (error) {
-      console.error('Agent request error:', error);
+      const executionTime = Date.now() - startTime;
+      logger.error('Agent request error', 'AgentService', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        executionTime: Date.now() - startTime,
+        executionTime,
       };
     }
   }
@@ -322,8 +339,11 @@ class AgentService {
       const response = await fetch(`${this.baseUrl}/health`, {
         method: 'GET',
       });
-      return response.ok;
-    } catch {
+      const isHealthy = response.ok;
+      logger.debug(`Agent health check: ${isHealthy ? 'healthy' : 'unhealthy'}`, 'AgentService');
+      return isHealthy;
+    } catch (error) {
+      logger.error('Agent health check failed', 'AgentService', error);
       return false;
     }
   }

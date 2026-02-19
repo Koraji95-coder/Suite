@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, useTheme, hexToRgba } from './lib/palette';
 import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { WorkspaceShell } from './layouts/WorkspaceShell';
 import { EmberSplash } from './data/EmberSplash';
-import { ToastProvider } from './components/ToastProvider';
+import { ToastContainer } from './components/ui/ToastContainer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppInner() {
   const { palette } = useTheme();
@@ -62,11 +64,14 @@ function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
-        <AuthProvider>
-          <ToastProvider>
-            <AppInner />
-          </ToastProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <NotificationProvider>
+              <AppInner />
+              <ToastContainer />
+            </NotificationProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </ThemeProvider>
     </BrowserRouter>
   );

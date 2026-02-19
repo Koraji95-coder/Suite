@@ -75,7 +75,7 @@ export interface ProjectAnalysisResult {
   riskFactors?: string[];
   timeline?: {
     estimated: string;
-    critical_path: string[];
+    criticalPath: string[];
   };
 }
 
@@ -103,17 +103,3 @@ export interface ResearchResult {
   relevantStandards?: string[];
   complianceNotes?: string[];
 }
-
-export interface GatewayConfig {
-  url: string;
-  timeout: number;
-  retryAttempts: number;
-  retryDelay: number;
-}
-
-export const GATEWAY_CONFIG: GatewayConfig = {
-  url: process.env.REACT_APP_AGENT_GATEWAY_URL || 'http://127.0.0.1:3000',
-  timeout: parseInt(process.env.REACT_APP_AGENT_TIMEOUT || '30000'),
-  retryAttempts: 3,
-  retryDelay: 1000,
-};

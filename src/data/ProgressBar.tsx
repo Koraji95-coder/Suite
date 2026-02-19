@@ -28,8 +28,8 @@ export function ProgressBar({ progress }: ProgressBarProps) {
     runningRef.current = true;
     lastTRef.current = 0;
 
-    const speed = 14;
-    const epsilon = 0.05;
+    const speed = 20; // faster animation
+    const epsilon = 0.01; // tighter epsilon for better 100% reach
     const minRenderDelta = 0.005;
 
     const tick = (t: number) => {
@@ -39,8 +39,10 @@ export function ProgressBar({ progress }: ProgressBarProps) {
 
       const cur = displayRef.current;
       const target = targetRef.current;
-      const alpha = 1 - Math.exp(-speed * dt);
-      const next = cur + (target - cur) * alpha;
+      // Linear interpolation instead of exponential easing to ensure 100% is reached
+      const diff = target - cur;
+      const moveDist = speed * dt;
+      const next = Math.abs(diff) <= moveDist ? target : cur + Math.sign(diff) * moveDist;
 
       displayRef.current = next;
       if (Math.abs(next - cur) > minRenderDelta) setDisplayP(next);

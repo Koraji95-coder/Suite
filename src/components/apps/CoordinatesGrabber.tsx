@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useTheme, hexToRgba } from '@/lib/palette';
-import { coordinatesGrabberService } from '@/services/coordinatesGrabberService';
+import { coordinatesGrabberService } from '@/Ground-Grid-Generation/coordinatesGrabberService';
 import { CoordinateYamlViewer } from './coordinates/CoordinateYamlViewer';
 import type { CoordinatePoint } from './coordinates/types';
 
@@ -90,67 +90,6 @@ const DEFAULT_STATE: CoordinatesGrabberState = {
   validationErrors: [],
   coordinateData: [],
 };
-
-// Error Boundary Component
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error?: Error;
-}
-
-class ErrorBoundary extends React.Component<{ children: React.ReactNode; palette: any }, ErrorBoundaryState> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('CoordinatesGrabber Error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '100%',
-            flexDirection: 'column',
-            padding: '20px',
-            color: this.props.palette.text,
-          }}
-        >
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
-          <h2 style={{ margin: '0 0 8px 0' }}>Something went wrong</h2>
-          <p style={{ margin: '0 0 12px 0', color: this.props.palette.textMuted, fontSize: '12px', textAlign: 'center' }}>
-            {this.state.error?.message || 'An unexpected error occurred'}
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '4px',
-              border: 'none',
-              background: this.props.palette.primary,
-              color: this.props.palette.background,
-              cursor: 'pointer',
-              fontWeight: '600',
-            }}
-          >
-            Reload Page
-          </button>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
 
 export function CoordinatesGrabber() {
   const { palette } = useTheme();

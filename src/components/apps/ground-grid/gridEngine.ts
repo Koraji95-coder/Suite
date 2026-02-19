@@ -236,6 +236,19 @@ export function computeGridMaxY(rods: GridRod[], conductors: GridConductor[]): n
   return maxY;
 }
 
+function computeGridCorners(conductors: GridConductor[]): Set<string> {
+  if (conductors.length === 0) return new Set();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const c of conductors) {
+    minX = Math.min(minX, c.x1, c.x2);
+    minY = Math.min(minY, c.y1, c.y2);
+    maxX = Math.max(maxX, c.x1, c.x2);
+    maxY = Math.max(maxY, c.y1, c.y2);
+  }
+  const corners: Point2D[] = [[minX, minY], [minX, maxY], [maxX, minY], [maxX, maxY]];
+  return new Set(corners.map(p => qpt(p)));
+}
+
 export function generatePlacements(
   rods: GridRod[],
   conductors: GridConductor[],
@@ -247,16 +260,26 @@ export function generatePlacements(
   const dirMap = buildDirectionMap(segments);
   const { tees, crosses } = classifyNodes(dirMap);
 
+  const rodKeys = new Set(rods.map(r => qpt([r.grid_x, r.grid_y])));
+  const cornerKeys = computeGridCorners(conductors);
+
   const placements: GridPlacement[] = [];
 
   for (const rod of rods) {
     const [ax, ay] = gridToAutocad(rod.grid_x, rod.grid_y, config);
-    placements.push({ type: 'ROD', grid_x: rod.grid_x, grid_y: rod.grid_y, autocad_x: ax, autocad_y: ay, rotation_deg: 0 });
+    const key = qpt([rod.grid_x, rod.grid_y]);
+    const isCorner = cornerKeys.has(key);
+    placements.push({
+      type: isCorner ? 'GROUND_ROD_TEST_WELL' : 'ROD',
+      grid_x: rod.grid_x, grid_y: rod.grid_y,
+      autocad_x: ax, autocad_y: ay, rotation_deg: 0,
+    });
   }
 
   if (config.place_tees) {
     for (const [gx, gy] of tees) {
       const key = qpt([gx, gy]);
+      if (rodKeys.has(key)) continue;
       const ds = dirMap.get(key) || new Set<Direction>();
       const rot = teeRotationFromDirs(ds);
       const [ax, ay] = gridToAutocad(gx, gy, config);
@@ -266,6 +289,8 @@ export function generatePlacements(
 
   if (config.place_crosses) {
     for (const [gx, gy] of crosses) {
+      const key = qpt([gx, gy]);
+      if (rodKeys.has(key)) continue;
       const [ax, ay] = gridToAutocad(gx, gy, config);
       placements.push({ type: 'CROSS', grid_x: gx, grid_y: gy, autocad_x: ax, autocad_y: ay, rotation_deg: 0 });
     }

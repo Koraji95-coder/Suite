@@ -37,7 +37,7 @@ export interface GridConfig {
 }
 
 export interface GridPlacement {
-  type: 'ROD' | 'TEE' | 'CROSS';
+  type: 'ROD' | 'TEE' | 'CROSS' | 'GROUND_ROD_TEST_WELL';
   grid_x: number;
   grid_y: number;
   autocad_x: number;

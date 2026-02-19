@@ -75,6 +75,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
 
   const tees = placements.filter(p => p.type === 'TEE');
   const crosses = placements.filter(p => p.type === 'CROSS');
+  const testWells = placements.filter(p => p.type === 'GROUND_ROD_TEST_WELL');
   const rodScale = Math.max(effectiveVB.w, effectiveVB.h) * 0.012;
 
   const hasData = rods.length > 0 || conductors.length > 0;
@@ -164,9 +165,42 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
           const s = rodScale * 1.2;
           return (
             <g key={`x-${i}`} transform={`translate(${c.grid_x},${c.grid_y})`}>
-              <line x1={-s} y1={0} x2={s} y2={0} stroke="#a855f7" strokeWidth={rodScale * 0.25} strokeLinecap="round" />
-              <line x1={0} y1={-s} x2={0} y2={s} stroke="#a855f7" strokeWidth={rodScale * 0.25} strokeLinecap="round" />
+              <line x1={-s} y1={0} x2={s} y2={0} stroke="#06b6d4" strokeWidth={rodScale * 0.25} strokeLinecap="round" />
+              <line x1={0} y1={-s} x2={0} y2={s} stroke="#06b6d4" strokeWidth={rodScale * 0.25} strokeLinecap="round" />
               <title>CROSS: ({c.grid_x}, {c.grid_y})</title>
+            </g>
+          );
+        })}
+
+        {testWells.map((tw, i) => {
+          const s = rodScale * 1.4;
+          return (
+            <g key={`tw-${i}`}>
+              <rect
+                x={tw.grid_x - s} y={tw.grid_y - s}
+                width={s * 2} height={s * 2}
+                fill={hexToRgba('#ef4444', 0.25)}
+                stroke="#ef4444"
+                strokeWidth={rodScale * 0.2}
+                rx={rodScale * 0.15}
+              />
+              <circle
+                cx={tw.grid_x} cy={tw.grid_y} r={rodScale * 0.6}
+                fill={hexToRgba('#ef4444', 0.4)}
+                stroke="#ef4444"
+                strokeWidth={rodScale * 0.15}
+              />
+              <line
+                x1={tw.grid_x - rodScale * 0.4} y1={tw.grid_y}
+                x2={tw.grid_x + rodScale * 0.4} y2={tw.grid_y}
+                stroke="#ef4444" strokeWidth={rodScale * 0.12}
+              />
+              <line
+                x1={tw.grid_x} y1={tw.grid_y - rodScale * 0.4}
+                x2={tw.grid_x} y2={tw.grid_y + rodScale * 0.4}
+                stroke="#ef4444" strokeWidth={rodScale * 0.12}
+              />
+              <title>GROUND ROD WITH TEST WELL: ({tw.grid_x}, {tw.grid_y})</title>
             </g>
           );
         })}
@@ -187,10 +221,11 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
           color: palette.textMuted,
         }}
       >
-        <span><b style={{ color: '#22c55e' }}>Rods:</b> {rods.length}</span>
+        <span><b style={{ color: '#22c55e' }}>Rods:</b> {rods.length - testWells.length}</span>
+        <span><b style={{ color: '#ef4444' }}>Test Wells:</b> {testWells.length}</span>
         <span><b style={{ color: '#f59e0b' }}>Segments:</b> {segmentCount}</span>
         <span><b style={{ color: '#3b82f6' }}>Tees:</b> {tees.length}</span>
-        <span><b style={{ color: '#a855f7' }}>Crosses:</b> {crosses.length}</span>
+        <span><b style={{ color: '#06b6d4' }}>Crosses:</b> {crosses.length}</span>
       </div>
 
       <div

@@ -157,6 +157,27 @@ export function CoordinatesGrabber() {
   const [state, setState] = useState<CoordinatesGrabberState>(DEFAULT_STATE);
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startProgressSimulation = useCallback(() => {
+    setProgress(5);
+    let current = 5;
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    progressIntervalRef.current = setInterval(() => {
+      current += Math.random() * 3 + 0.5;
+      if (current >= 90) current = 90;
+      setProgress(Math.round(current));
+    }, 400);
+  }, []);
+
+  const finishProgress = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    setProgress(100);
+    setTimeout(() => setProgress(0), 600);
+  }, []);
 
   // Simple log function (doesn't trigger history)
   const addLog = useCallback((message: string) => {
@@ -398,11 +419,9 @@ export function CoordinatesGrabber() {
     addLog(`[INFO] Precision: ${state.decimalPlaces} decimal places`);
     
     try {
-      // Progress updates
-      setProgress(10);
       addLog('[PROCESSING] Preparing request...');
-      
-      setProgress(20);
+      startProgressSimulation();
+
       const result = await coordinatesGrabberService.execute({
         mode: state.mode,
         precision: state.decimalPlaces,
@@ -428,8 +447,6 @@ export function CoordinatesGrabber() {
         show_bearing: false,
         show_azimuth: false,
       });
-
-      setProgress(90);
 
       if (result.success) {
         const pointsCreated = result.points_created || 0;
@@ -540,7 +557,7 @@ export function CoordinatesGrabber() {
       saveExecutionResult(historyEntry);
     } finally {
       setState(prev => ({ ...prev, isRunning: false }));
-      setProgress(0);
+      finishProgress();
     }
   };
 

@@ -5,10 +5,13 @@ const supabaseUrl =
   import.meta.env.VITE_SUPABASE_URL ?? 'https://example.supabase.co';
 const supabaseAnonKey =
   import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'public-anon-key-placeholder';
+export const isSupabaseConfigured = Boolean(
+  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY,
+);
 
 if (
   import.meta.env.DEV &&
-  (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY)
+  !isSupabaseConfigured
 ) {
   console.warn(
     '[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Running with fallback client; auth/data features may be unavailable until env vars are configured.',

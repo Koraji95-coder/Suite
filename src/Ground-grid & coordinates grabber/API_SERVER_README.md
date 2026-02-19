@@ -31,6 +31,15 @@ pip install -r requirements-api.txt
 python api_server.py
 ```
 
+### Option 3: One command from project root
+```bash
+# First time (install deps + start)
+npm run backend:coords:install
+
+# Next runs
+npm run backend:coords
+```
+
 The server will start on `http://localhost:5000`
 
 ## 📋 Prerequisites

@@ -1,7 +1,7 @@
 {
   "name": "vite-react-typescript-starter",
   "private": true,
-  "version": "2.18.0-kcwgdh1",
+  "version": "2.19.0-ghqn96l",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,8 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "bump-version": "node scripts/bump-version.mjs",
-    "backend:coords": "bash scripts/start-coordinates-backend.sh",
-    "backend:coords:install": "bash scripts/start-coordinates-backend.sh --install-deps"
+    "backend:coords": "node scripts/start-coordinates-backend.mjs",
+    "backend:coords:install": "node scripts/start-coordinates-backend.mjs --install-deps"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.29",

@@ -343,53 +343,67 @@ def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
     ws = wb.active
     ws.title = "Coordinates"
 
-    headers = ["Point ID", "East (X)", "North (Y)", "Elevation (Z)", "Source Type", "Layer"]
-    if use_corners:
-        headers.insert(1, "Corner")
+    headers = ["Point ID", "East (X)", "North (Y)", "Elevation (Z)", "Layer"]
 
-    ws.append(headers)
-    hdr_font = Font(bold=True)
-    hdr_fill = PatternFill("solid", fgColor="D9E1F2")
-    hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    title_fill = PatternFill("solid", fgColor="4F81BD")
+    title_font = Font(bold=True, color="FFFFFF", size=12)
+    header_fill = PatternFill("solid", fgColor="D9E1F2")
+    header_font = Font(bold=True)
+    alt_fill_even = PatternFill("solid", fgColor="F2F7FF")
+    alt_fill_odd = PatternFill("solid", fgColor="FFFFFF")
+    border_side = Side(style="thin", color="D9E1F2")
+    all_border = Border(left=border_side, right=border_side, top=border_side, bottom=border_side)
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    title_cell = ws.cell(row=1, column=1, value="Ground Grid Coordinates")
+    title_cell.font = title_font
+    title_cell.fill = title_fill
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
     for col_idx, h in enumerate(headers, start=1):
-        c = ws.cell(row=1, column=col_idx, value=h)
-        c.font = hdr_font
-        c.fill = hdr_fill
-        c.alignment = hdr_align
+        c = ws.cell(row=2, column=col_idx, value=h)
+        c.font = header_font
+        c.fill = header_fill
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = all_border
 
     num_fmt = "0" if precision <= 0 else "0." + ("0" * precision)
     numeric_cols = {"East (X)", "North (Y)", "Elevation (Z)"}
 
-    for p in points:
+    data_start_row = 3
+    for idx, p in enumerate(points):
         row = [
             p['name'],
             p['x'],
             p['y'],
             p['z'],
-            p.get('source_type', FOUNDATION_SOURCE_TYPE),
             p.get('layer', ''),
         ]
-        if use_corners:
-            row.insert(1, p.get('corner', ''))
-        ws.append(row)
+        excel_row = data_start_row + idx
+        for col_idx, value in enumerate(row, start=1):
+            cell = ws.cell(row=excel_row, column=col_idx, value=value)
+            cell.fill = alt_fill_even if idx % 2 == 0 else alt_fill_odd
+            cell.border = all_border
+            if headers[col_idx - 1] in numeric_cols:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                if isinstance(cell.value, (int, float)):
+                    cell.number_format = num_fmt
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
 
     for col_idx, h in enumerate(headers, start=1):
         col_letter = get_column_letter(col_idx)
         width = len(h)
-        for row_idx in range(2, len(points) + 2):
+        for row_idx in range(data_start_row, data_start_row + len(points)):
             v = ws.cell(row=row_idx, column=col_idx).value
             if v is not None:
                 width = max(width, len(str(v)))
         ws.column_dimensions[col_letter].width = min(max(width + 2, 12), 70)
-        if h in numeric_cols:
-            for row_idx in range(2, len(points) + 2):
-                cell = ws.cell(row=row_idx, column=col_idx)
-                if isinstance(cell.value, (int, float)):
-                    cell.number_format = num_fmt
-                    cell.alignment = Alignment(horizontal="right")
+    ws.row_dimensions[1].height = 24
+    ws.row_dimensions[2].height = 20
 
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{len(points) + 1}"
+    ws.freeze_panes = "A3"
+    ws.auto_filter.ref = f"A2:{get_column_letter(len(headers))}{len(points) + 2}"
     wb.save(out_path)
     return out_path
 

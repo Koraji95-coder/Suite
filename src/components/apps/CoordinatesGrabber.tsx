@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { coordinatesGrabberService } from '@/services/coordinatesGrabberService';
-import { CoordinateSpreadsheet } from './coordinates/CoordinateSpreadsheet';
 import { CoordinateYamlViewer } from './coordinates/CoordinateYamlViewer';
 import type { CoordinatePoint } from './coordinates/types';
 
@@ -16,7 +15,7 @@ interface CoordinatesGrabberState {
   decimalPlaces: number;
   scanSelection: boolean;
   includeModelspace: boolean;
-  activeTab: 'config' | 'log' | 'export' | 'history' | 'table' | 'yaml';
+  activeTab: 'config' | 'log' | 'export' | 'history' | 'yaml';
   logs: string[];
   excelPath: string;
   isRunning: boolean;
@@ -458,13 +457,26 @@ export function CoordinatesGrabber() {
 
         saveExecutionResult(historyEntry);
 
+        const toNumber = (value: unknown): number => {
+          if (typeof value === 'number' && Number.isFinite(value)) return value;
+          if (typeof value === 'string') {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : 0;
+          }
+          return 0;
+        };
+
+        const toText = (value: unknown, fallback = ''): string => {
+          return typeof value === 'string' ? value : fallback;
+        };
+
         const pointData: CoordinatePoint[] = result.points
           ? result.points.map(p => ({
-              id: p.id,
-              east: p.east,
-              north: p.north,
-              elevation: p.elevation,
-              layer: p.layer,
+              id: toText(p.id, `${state.pointPrefix}${state.startNumber}`),
+              east: toNumber(p.east),
+              north: toNumber(p.north),
+              elevation: toNumber(p.elevation),
+              layer: toText(p.layer),
             }))
           : Array.from({ length: pointsCreated }, (_, i) => ({
               id: `${state.pointPrefix}${state.startNumber + i}`,
@@ -721,7 +733,7 @@ export function CoordinatesGrabber() {
           borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
         }}
       >
-        {(['config', 'log', 'export', 'history', 'table', 'yaml'] as const).map(tab => (
+        {(['config', 'log', 'export', 'history', 'yaml'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setState(prev => ({ ...prev, activeTab: tab }))}
@@ -742,7 +754,6 @@ export function CoordinatesGrabber() {
             {tab === 'log' && 'Log'}
             {tab === 'export' && 'Export'}
             {tab === 'history' && `History (${state.executionHistory.length})`}
-            {tab === 'table' && 'Table'}
             {tab === 'yaml' && 'YAML'}
           </button>
         ))}
@@ -1541,7 +1552,7 @@ export function CoordinatesGrabber() {
                 Output Format
               </h3>
               <p style={{ margin: '0 0 8px 0', color: palette.textMuted, fontSize: '12px' }}>
-                Excel spreadsheet with the following columns:
+                Excel table format with the following columns:
               </p>
               <ul
                 style={{
@@ -1552,22 +1563,13 @@ export function CoordinatesGrabber() {
                 }}
               >
                 <li>Point ID</li>
-                {state.extractionStyle === 'corners' && <li>Corner (NW, NE, SW, SE)</li>}
                 <li>East (X)</li>
                 <li>North (Y)</li>
                 <li>Elevation (Z)</li>
-                <li>Source Type (Foundation Coordinates)</li>
                 <li>Layer</li>
               </ul>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Table Tab */}
-      {state.activeTab === 'table' && (
-        <div style={{ flex: 1, overflow: 'auto', padding: '4px 0' }}>
-          <CoordinateSpreadsheet data={state.coordinateData} />
         </div>
       )}
 

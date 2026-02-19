@@ -37,7 +37,7 @@ import traceback
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 # ── gen_py cache fix (from coordtable) ──────────────────────────
@@ -233,6 +233,26 @@ def insert_reference_block(doc, ms, ref_dwg_path, layer_name, x, y, z, scale, ro
     return br
 
 
+def add_point_label(ms, layer_name, label_text, x, y, z, scale):
+    text_height = max(scale * 1.5, 0.5)
+    x_offset = scale * 3.0
+
+    def _add():
+        return ms.AddText(label_text, pt(x + x_offset, y, z), text_height)
+
+    txt = com_call_with_retry(_add)
+    txt = dyn(txt)
+    try:
+        txt.Layer = layer_name
+    except Exception:
+        pass
+    try:
+        txt.Alignment = 0  # acAlignmentLeft
+    except Exception:
+        pass
+    return txt
+
+
 def default_ref_dwg_path() -> str:
     base = os.path.dirname(os.path.abspath(__file__))
     cand = os.path.join(base, "assets", "Coordinate Reference Point.dwg")
@@ -345,31 +365,50 @@ def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
 
     headers = ["Point ID", "East (X)", "North (Y)", "Elevation (Z)", "Layer"]
 
-    title_fill = PatternFill("solid", fgColor="4F81BD")
-    title_font = Font(bold=True, color="FFFFFF", size=12)
-    header_fill = PatternFill("solid", fgColor="D9E1F2")
-    header_font = Font(bold=True)
-    alt_fill_even = PatternFill("solid", fgColor="F2F7FF")
-    alt_fill_odd = PatternFill("solid", fgColor="FFFFFF")
-    border_side = Side(style="thin", color="D9E1F2")
+    # Row 1: Title banner -- R3P logo blue (#2B6CB5)
+    title_fill = PatternFill("solid", fgColor="2B6CB5")
+    title_font = Font(bold=True, color="FFFFFF", size=14, name="Arial")
+    # Row 2: Column headers -- dark charcoal gray
+    header_fill = PatternFill("solid", fgColor="3A3F47")
+    header_font = Font(bold=True, color="F0F0F0", size=11, name="Arial")
+    # Data rows: alternating warm neutrals
+    alt_fill_even = PatternFill("solid", fgColor="E8E6E2")
+    alt_fill_odd = PatternFill("solid", fgColor="D4D1CC")
+    data_font = Font(size=10, color="2A2A2A", name="Arial")
+    # Borders: visible but not heavy
+    border_side = Side(style="thin", color="B0ADA8")
     all_border = Border(left=border_side, right=border_side, top=border_side, bottom=border_side)
+    # Thicker border under header
+    header_border = Border(
+        left=border_side, right=border_side,
+        top=border_side,
+        bottom=Side(style="medium", color="3A3F47"),
+    )
 
+    # Row 1: merged title "Ground Grid Coordinates"
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
     title_cell = ws.cell(row=1, column=1, value="Ground Grid Coordinates")
     title_cell.font = title_font
     title_cell.fill = title_fill
     title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    title_cell.border = all_border
+    for col_idx in range(2, len(headers) + 1):
+        c = ws.cell(row=1, column=col_idx)
+        c.fill = title_fill
+        c.border = all_border
 
+    # Row 2: column header labels
     for col_idx, h in enumerate(headers, start=1):
         c = ws.cell(row=2, column=col_idx, value=h)
         c.font = header_font
         c.fill = header_fill
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        c.border = all_border
+        c.border = header_border
 
     num_fmt = "0" if precision <= 0 else "0." + ("0" * precision)
     numeric_cols = {"East (X)", "North (Y)", "Elevation (Z)"}
 
+    # Rows 3+: data with alternating fills
     data_start_row = 3
     for idx, p in enumerate(points):
         row = [
@@ -380,17 +419,23 @@ def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
             p.get('layer', ''),
         ]
         excel_row = data_start_row + idx
+        row_fill = alt_fill_even if idx % 2 == 0 else alt_fill_odd
         for col_idx, value in enumerate(row, start=1):
             cell = ws.cell(row=excel_row, column=col_idx, value=value)
-            cell.fill = alt_fill_even if idx % 2 == 0 else alt_fill_odd
+            cell.fill = row_fill
             cell.border = all_border
+            cell.font = data_font
             if headers[col_idx - 1] in numeric_cols:
                 cell.alignment = Alignment(horizontal="right", vertical="center")
                 if isinstance(cell.value, (int, float)):
                     cell.number_format = num_fmt
+            elif col_idx == 1:
+                cell.font = Font(bold=True, size=10, color="2A2A2A", name="Arial")
+                cell.alignment = Alignment(horizontal="left", vertical="center")
             else:
                 cell.alignment = Alignment(horizontal="left", vertical="center")
 
+    # Auto-fit column widths
     for col_idx, h in enumerate(headers, start=1):
         col_letter = get_column_letter(col_idx)
         width = len(h)
@@ -398,9 +443,9 @@ def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
             v = ws.cell(row=row_idx, column=col_idx).value
             if v is not None:
                 width = max(width, len(str(v)))
-        ws.column_dimensions[col_letter].width = min(max(width + 2, 12), 70)
-    ws.row_dimensions[1].height = 24
-    ws.row_dimensions[2].height = 20
+        ws.column_dimensions[col_letter].width = min(max(width + 3, 14), 70)
+    ws.row_dimensions[1].height = 28
+    ws.row_dimensions[2].height = 22
 
     ws.freeze_panes = "A3"
     ws.auto_filter.ref = f"A2:{get_column_letter(len(headers))}{len(points) + 2}"
@@ -708,6 +753,14 @@ class AutoCADManager:
                             p['x'], p['y'], p['z'],
                             ref_scale, ref_rotation
                         )
+                        try:
+                            add_point_label(
+                                ms, ref_layer, p['name'],
+                                p['x'], p['y'], p['z'],
+                                ref_scale,
+                            )
+                        except Exception as label_err:
+                            print(f"[execute] Label at {p['name']}: {label_err}")
                         blocks_inserted += 1
                     except Exception as e:
                         block_errors.append(f"Block at {p['name']}: {e}")

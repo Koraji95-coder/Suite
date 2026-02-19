@@ -43,7 +43,7 @@ import win32com.client
 import win32com.client.gencache as gencache
 
 from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from PySide6.QtCore import Qt
@@ -1452,43 +1452,84 @@ def export_excel(cfg: Config, rows: List[Row], has_3d: bool, last_export_path: O
     ws.title = "Coordinates"
 
     headers = headers_for_export(cfg, has_3d, has_corners)
-    ws.append(headers)
 
-    header_font = Font(bold=True)
-    header_fill = PatternFill("solid", fgColor="D9E1F2")
-    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    # Row 1: Title banner -- R3P logo blue (#2B6CB5)
+    title_fill = PatternFill("solid", fgColor="2B6CB5")
+    title_font = Font(bold=True, color="FFFFFF", size=14, name="Arial")
+    # Row 2: Column headers -- dark charcoal gray
+    header_fill = PatternFill("solid", fgColor="3A3F47")
+    header_font = Font(bold=True, color="F0F0F0", size=11, name="Arial")
+    # Data rows: alternating warm neutrals
+    alt_fill_even = PatternFill("solid", fgColor="E8E6E2")
+    alt_fill_odd = PatternFill("solid", fgColor="D4D1CC")
+    data_font = Font(size=10, color="2A2A2A", name="Arial")
+    # Borders
+    border_side = Side(style="thin", color="B0ADA8")
+    all_border = Border(left=border_side, right=border_side, top=border_side, bottom=border_side)
+    header_border = Border(
+        left=border_side, right=border_side,
+        top=border_side,
+        bottom=Side(style="medium", color="3A3F47"),
+    )
 
+    # Row 1: merged title "Ground Grid Coordinates"
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    title_cell = ws.cell(row=1, column=1, value="Ground Grid Coordinates")
+    title_cell.font = title_font
+    title_cell.fill = title_fill
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    title_cell.border = all_border
+    for ci in range(2, len(headers) + 1):
+        c = ws.cell(row=1, column=ci)
+        c.fill = title_fill
+        c.border = all_border
+
+    # Row 2: column header labels
     for col_idx, h in enumerate(headers, start=1):
-        c = ws.cell(row=1, column=col_idx, value=h)
+        c = ws.cell(row=2, column=col_idx, value=h)
         c.font = header_font
         c.fill = header_fill
-        c.alignment = header_align
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = header_border
 
-    for r in rows:
-        ws.append(row_values_for_export(cfg, r, has_3d, has_corners))
-
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{len(rows) + 1}"
-
+    # Data rows start at row 3
     num_fmt = excel_number_format(cfg.precision)
     numeric_headers = {"East (X)", "North (Y)", "Elevation (Z)", "Distance 2D (XY)", "Distance 3D (XYZ)"}
+    data_start_row = 3
+
+    for idx, r in enumerate(rows):
+        values = row_values_for_export(cfg, r, has_3d, has_corners)
+        excel_row = data_start_row + idx
+        row_fill = alt_fill_even if idx % 2 == 0 else alt_fill_odd
+        for col_idx, value in enumerate(values, start=1):
+            cell = ws.cell(row=excel_row, column=col_idx, value=value)
+            cell.fill = row_fill
+            cell.border = all_border
+            cell.font = data_font
+            h = headers[col_idx - 1] if col_idx <= len(headers) else ""
+            if h in numeric_headers:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                if isinstance(cell.value, (int, float)):
+                    cell.number_format = num_fmt
+            elif col_idx == 1:
+                cell.font = Font(bold=True, size=10, color="2A2A2A", name="Arial")
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+            else:
+                cell.alignment = Alignment(horizontal="left", vertical="center")
+
+    ws.row_dimensions[1].height = 28
+    ws.row_dimensions[2].height = 22
+    ws.freeze_panes = "A3"
+    ws.auto_filter.ref = f"A2:{get_column_letter(len(headers))}{len(rows) + 2}"
 
     for col_idx, h in enumerate(headers, start=1):
         col_letter = get_column_letter(col_idx)
         width = len(h)
-        for row_idx in range(2, len(rows) + 2):
+        for row_idx in range(data_start_row, data_start_row + len(rows)):
             v = ws.cell(row=row_idx, column=col_idx).value
-            if v is None:
-                continue
-            width = max(width, len(str(v)))
-        ws.column_dimensions[col_letter].width = min(max(width + 2, 12), 70)
-
-        if h in numeric_headers:
-            for row_idx in range(2, len(rows) + 2):
-                cell = ws.cell(row=row_idx, column=col_idx)
-                if isinstance(cell.value, (int, float)):
-                    cell.number_format = num_fmt
-                    cell.alignment = Alignment(horizontal="right")
+            if v is not None:
+                width = max(width, len(str(v)))
+        ws.column_dimensions[col_letter].width = min(max(width + 3, 14), 70)
 
     wb.save(out_path)
     return out_path
@@ -1636,6 +1677,35 @@ def insert_reference_block(
     except Exception:
         pass
     return br
+
+
+def add_point_label(
+    ms: Any,
+    layer_name: str,
+    label_text: str,
+    x: float,
+    y: float,
+    z: float,
+    scale: float,
+) -> Any:
+    ms = dyn(ms)
+    text_height = max(scale * 1.5, 0.5)
+    x_offset = scale * 3.0
+
+    def _add():
+        return ms.AddText(label_text, pt(x + x_offset, y, z), text_height)
+
+    txt = com_call_with_retry(_add)
+    txt = dyn(txt)
+    try:
+        txt.Layer = layer_name
+    except Exception:
+        pass
+    try:
+        txt.Alignment = 0  # acAlignmentLeft
+    except Exception:
+        pass
+    return txt
 
 
 # -------------------------
@@ -2157,9 +2227,20 @@ class CoordinatesGrabberWindow(QMainWindow):
                     scale=cfg.refblock.scale,
                     rotation_deg=cfg.refblock.rotation_deg,
                 )
+                try:
+                    add_point_label(
+                        ms=self.ms,
+                        layer_name=cfg.refblock.layer_name,
+                        label_text=r.point_name,
+                        x=r.east,
+                        y=r.north,
+                        z=r.elev,
+                        scale=cfg.refblock.scale,
+                    )
+                except BaseException as label_exc:
+                    self._append_log(f"[PlaceRefPoints] Label failed at {r.point_name}: {format_com_error(label_exc)}")
                 placed += 1
             except BaseException as exc:
-                # Keep going; log the failure and continue.
                 self._append_log(f"[PlaceRefPoints] Failed at {r.point_name}: {format_com_error(exc)}")
 
         try:

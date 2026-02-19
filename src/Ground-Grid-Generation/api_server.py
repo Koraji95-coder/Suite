@@ -364,6 +364,10 @@ def _entity_center(ent):
 
 
 def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
+    """
+    Export coordinates to Excel with points organized by layer.
+    Each layer gets its own table section with a 2-row gap between layers.
+    """
     if drawing_dir:
         out_dir = drawing_dir
     else:
@@ -379,10 +383,14 @@ def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
 
     headers = ["Point ID", "East (X)", "North (Y)", "Elevation (Z)", "Layer"]
 
+    # ── Style definitions ──
     # Row 1: Title banner -- R3P logo blue (#2B6CB5)
     title_fill = PatternFill("solid", fgColor="2B6CB5")
     title_font = Font(bold=True, color="FFFFFF", size=14, name="Arial")
-    # Row 2: Column headers -- dark charcoal gray
+    # Layer section headers -- medium blue
+    layer_header_fill = PatternFill("solid", fgColor="5B9BD5")
+    layer_header_font = Font(bold=True, color="FFFFFF", size=12, name="Arial")
+    # Column headers -- dark charcoal gray
     header_fill = PatternFill("solid", fgColor="3A3F47")
     header_font = Font(bold=True, color="F0F0F0", size=11, name="Arial")
     # Data rows: alternating warm neutrals
@@ -411,58 +419,92 @@ def export_points_to_excel(points, precision, use_corners, drawing_dir=None):
         c.fill = title_fill
         c.border = all_border
 
-    # Row 2: column header labels
-    for col_idx, h in enumerate(headers, start=1):
-        c = ws.cell(row=2, column=col_idx, value=h)
-        c.font = header_font
-        c.fill = header_fill
-        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        c.border = header_border
-
     num_fmt = "0" if precision <= 0 else "0." + ("0" * precision)
     numeric_cols = {"East (X)", "North (Y)", "Elevation (Z)"}
 
-    # Rows 3+: data with alternating fills
-    data_start_row = 3
-    for idx, p in enumerate(points):
-        row = [
-            p['name'],
-            p['x'],
-            p['y'],
-            p['z'],
-            p.get('layer', ''),
-        ]
-        excel_row = data_start_row + idx
-        row_fill = alt_fill_even if idx % 2 == 0 else alt_fill_odd
-        for col_idx, value in enumerate(row, start=1):
-            cell = ws.cell(row=excel_row, column=col_idx, value=value)
-            cell.fill = row_fill
-            cell.border = all_border
-            cell.font = data_font
-            if headers[col_idx - 1] in numeric_cols:
-                cell.alignment = Alignment(horizontal="right", vertical="center")
-                if isinstance(cell.value, (int, float)):
-                    cell.number_format = num_fmt
-            elif col_idx == 1:
-                cell.font = Font(bold=True, size=10, color="2A2A2A", name="Arial")
-                cell.alignment = Alignment(horizontal="left", vertical="center")
-            else:
-                cell.alignment = Alignment(horizontal="left", vertical="center")
+    # ── Group points by layer ──
+    from collections import defaultdict
+    points_by_layer = defaultdict(list)
+    for p in points:
+        layer_name = p.get('layer', 'Default')
+        points_by_layer[layer_name].append(p)
 
-    # Auto-fit column widths
+    # Sort layers alphabetically for consistent output
+    sorted_layers = sorted(points_by_layer.keys())
+
+    current_row = 2  # Start after title row
+
+    # ── Write each layer as a separate table ──
+    for layer_idx, layer_name in enumerate(sorted_layers):
+        layer_points = points_by_layer[layer_name]
+        
+        # Layer section header (merged across all columns)
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=len(headers))
+        layer_header_cell = ws.cell(row=current_row, column=1, value=f"Layer: {layer_name}")
+        layer_header_cell.font = layer_header_font
+        layer_header_cell.fill = layer_header_fill
+        layer_header_cell.alignment = Alignment(horizontal="left", vertical="center")
+        layer_header_cell.border = all_border
+        for col_idx in range(2, len(headers) + 1):
+            c = ws.cell(row=current_row, column=col_idx)
+            c.fill = layer_header_fill
+            c.border = all_border
+        ws.row_dimensions[current_row].height = 24
+        current_row += 1
+
+        # Column headers for this layer section
+        for col_idx, h in enumerate(headers, start=1):
+            c = ws.cell(row=current_row, column=col_idx, value=h)
+            c.font = header_font
+            c.fill = header_fill
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            c.border = header_border
+        ws.row_dimensions[current_row].height = 22
+        current_row += 1
+
+        # Data rows for this layer
+        for idx, p in enumerate(layer_points):
+            row = [
+                p['name'],
+                p['x'],
+                p['y'],
+                p['z'],
+                p.get('layer', ''),
+            ]
+            row_fill = alt_fill_even if idx % 2 == 0 else alt_fill_odd
+            for col_idx, value in enumerate(row, start=1):
+                cell = ws.cell(row=current_row, column=col_idx, value=value)
+                cell.fill = row_fill
+                cell.border = all_border
+                cell.font = data_font
+                if headers[col_idx - 1] in numeric_cols:
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                    if isinstance(cell.value, (int, float)):
+                        cell.number_format = num_fmt
+                elif col_idx == 1:
+                    cell.font = Font(bold=True, size=10, color="2A2A2A", name="Arial")
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                else:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+            current_row += 1
+
+        # Add 2-row gap between layer sections (except after last layer)
+        if layer_idx < len(sorted_layers) - 1:
+            current_row += 2
+
+    # Auto-fit column widths based on all data
     for col_idx, h in enumerate(headers, start=1):
         col_letter = get_column_letter(col_idx)
         width = len(h)
-        for row_idx in range(data_start_row, data_start_row + len(points)):
-            v = ws.cell(row=row_idx, column=col_idx).value
-            if v is not None:
-                width = max(width, len(str(v)))
+        for p in points:
+            for field_idx, field in enumerate([p['name'], p['x'], p['y'], p['z'], p.get('layer', '')]):
+                if field_idx + 1 == col_idx:
+                    width = max(width, len(str(field)))
         ws.column_dimensions[col_letter].width = min(max(width + 3, 14), 70)
+    
     ws.row_dimensions[1].height = 28
-    ws.row_dimensions[2].height = 22
-
     ws.freeze_panes = "A3"
-    ws.auto_filter.ref = f"A2:{get_column_letter(len(headers))}{len(points) + 2}"
+    
     wb.save(out_path)
     return out_path
 

@@ -4,6 +4,7 @@ import { addDays, format, parseISO } from "date-fns";
 import { EventCalendar, type CalendarEvent } from "../calendarindex";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/lib/errorLogger";
+import { safeSupabaseQuery } from "@/lib/supabaseUtils";
 
 export default function CalendarPage({ compact = false }: { compact?: boolean }) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -68,31 +69,51 @@ export default function CalendarPage({ compact = false }: { compact?: boolean })
   }, []);
 
   const loadEvents = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
+    const result = await safeSupabaseQuery(
+      () => supabase
         .from("calendar_events")
         .select("*")
-        .order("due_date", { ascending: true });
-      if (error) throw error;
-      setEvents((data ?? []).map(mapRowToEvent));
-    } catch (err) {
-      logger.error("CalendarPage", "Failed to load calendar events", { error: err });
+        .order("due_date", { ascending: true }),
+      "CalendarPage"
+    );
+
+    const { data, error } = result;
+    
+    if (error && error.code !== 'SUPABASE_NOT_CONFIGURED') {
+      logger.error("CalendarPage", "Failed to load calendar events", { error });
+    }
+    
+    if (data) {
+      setEvents(data.map(mapRowToEvent));
+    } else {
+      setEvents([]);
     }
   }, [mapRowToEvent]);
 
   const loadProjectTaskOptions = useCallback(async () => {
-    try {
-      const [{ data: projData, error: projErr }, { data: taskData, error: taskErr }] = await Promise.all([
-        supabase.from("projects").select("id, name"),
-        supabase.from("tasks").select("id, name, project_id"),
-      ]);
-      if (projErr) throw projErr;
-      if (taskErr) throw taskErr;
-      setProjects((projData ?? []) as Array<{ id: string; name: string }>);
-      setTasks((taskData ?? []) as Array<{ id: string; name: string; project_id: string | null }>);
-    } catch (err) {
-      logger.error("CalendarPage", "Failed to load project/task options", { error: err });
+    const [projectsResult, tasksResult] = await Promise.all([
+      safeSupabaseQuery(
+        () => supabase.from("projects").select("id, name"),
+        "CalendarPage"
+      ),
+      safeSupabaseQuery(
+        () => supabase.from("tasks").select("id, name, project_id"),
+        "CalendarPage"
+      ),
+    ]);
+
+    const { data: projData, error: projErr } = projectsResult;
+    const { data: taskData, error: taskErr } = tasksResult;
+
+    if (projErr && projErr.code !== 'SUPABASE_NOT_CONFIGURED') {
+      logger.error("CalendarPage", "Failed to load projects", { error: projErr });
     }
+    if (taskErr && taskErr.code !== 'SUPABASE_NOT_CONFIGURED') {
+      logger.error("CalendarPage", "Failed to load tasks", { error: taskErr });
+    }
+
+    setProjects((projData ?? []) as Array<{ id: string; name: string }>);
+    setTasks((taskData ?? []) as Array<{ id: string; name: string; project_id: string | null }>);
   }, []);
 
   useEffect(() => {

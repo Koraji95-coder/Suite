@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { PanelInfoDialog } from '../PanelInfoDialog';
 import { dashboardInfo } from '../../data/panelInfo';
 import { logger } from '../../lib/errorLogger';
+import { safeSupabaseQuery } from '../../lib/supabaseUtils';
 import { StatsCards } from './StatsCards';
 import CalendarPage from '../calendar/hooks/CalendarPage';
 import { RecentActivityList } from './RecentActivityList';
@@ -105,77 +106,85 @@ export function DashboardOverviewPanel({
   const loadAllProjectTaskCounts = useCallback(async (projectList: Project[]) => {
     if (projectList.length === 0) return;
 
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('id, project_id, completed, due_date, name')
-        .in('project_id', projectList.map(p => p.id)) as { data: TaskDueItem[] | null; error: any };
+    const result = await safeSupabaseQuery(
+      async () => {
+        return await supabase
+          .from('tasks')
+          .select('id, project_id, completed, due_date, name')
+          .in('project_id', projectList.map(p => p.id)) as { data: TaskDueItem[] | null; error: any };
+      },
+      'MainDashboard'
+    );
 
-      if (error) throw error;
-      if (!data) return;
+    const { data, error } = result;
+    
+    if (error) {
+      // Silent fallback - dashboard can function without task counts
+      logger.debug('MainDashboard', 'Task counts unavailable', { error });
+      return;
+    }
+    
+    if (!data) return;
 
-      // Group tasks by project_id once
-      const byProject = new Map<string, TaskDueItem[]>();
-      for (const t of data) {
-        const arr = byProject.get(t.project_id);
-        if (arr) arr.push(t);
-        else byProject.set(t.project_id, [t]);
-      }
+    // Group tasks by project_id once
+    const byProject = new Map<string, TaskDueItem[]>();
+    for (const t of data) {
+      const arr = byProject.get(t.project_id);
+      if (arr) arr.push(t);
+      else byProject.set(t.project_id, [t]);
+    }
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-      const counts = new Map<string, TaskCount>();
+    const counts = new Map<string, TaskCount>();
 
-      for (const p of projectList) {
-        const projectTasks = byProject.get(p.id) ?? [];
-        const total = projectTasks.length;
+    for (const p of projectList) {
+      const projectTasks = byProject.get(p.id) ?? [];
+      const total = projectTasks.length;
 
-        let completed = 0;
-        let hasOverdue = false;
-        let nextDue: { name: string; date: string } | null = null;
-        let nextDueDate: Date | null = null;
+      let completed = 0;
+      let hasOverdue = false;
+      let nextDue: { name: string; date: string } | null = null;
+      let nextDueDate: Date | null = null;
 
-        for (const t of projectTasks) {
-          if (t.completed) {
-            completed += 1;
-            continue;
-          }
-          if (!t.due_date) continue;
+      for (const t of projectTasks) {
+        if (t.completed) {
+          completed += 1;
+          continue;
+        }
+        if (!t.due_date) continue;
 
-          const due = toLocalDay(t.due_date);
+        const due = toLocalDay(t.due_date);
 
-          if (due < today) {
-            hasOverdue = true;
-            continue;
-          }
-
-          if (!nextDueDate || due < nextDueDate) {
-            nextDueDate = due;
-            nextDue = { name: t.name, date: t.due_date };
-          }
+        if (due < today) {
+          hasOverdue = true;
+          continue;
         }
 
-        counts.set(p.id, { total, completed, nextDue, hasOverdue });
+        if (!nextDueDate || due < nextDueDate) {
+          nextDueDate = due;
+          nextDue = { name: t.name, date: t.due_date };
+        }
       }
 
-      setProjectTaskCounts(counts);
-
-      // Only keep tasks with due dates for calendar
-      setAllTasksWithDates(
-        data
-          .filter(t => t.due_date)
-          .map(t => ({
-            id: t.id,
-            name: t.name,
-            due_date: t.due_date!,
-            project_id: t.project_id,
-            completed: t.completed,
-          })),
-      );
-    } catch {
-      // silent
+      counts.set(p.id, { total, completed, nextDue, hasOverdue });
     }
+
+    setProjectTaskCounts(counts);
+
+    // Only keep tasks with due dates for calendar
+    setAllTasksWithDates(
+      data
+        .filter(t => t.due_date)
+        .map(t => ({
+          id: t.id,
+          name: t.name,
+          due_date: t.due_date!,
+          project_id: t.project_id,
+          completed: t.completed,
+        })),
+    );
   }, []);
 
   const loadDashboardData = useCallback(async () => {
@@ -184,41 +193,67 @@ export function DashboardOverviewPanel({
       setIsLoading(true);
       logger.info('MainDashboard', 'Loading dashboard data...');
 
-      const projectsQ = supabase
-        .from('projects')
-        .select('*')
-        .eq('status', 'active')
-        .order('deadline', { ascending: true, nullsFirst: false })
-        .limit(5);
-
-      const activitiesQ = supabase
-        .from('activity_log')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(7);
-
-      const filesQ = supabase
-        .from('files')
-        .select('size') as any;
-
-      const [{ data: projectsData, error: projectsError }, { data: activitiesData, error: activitiesError }, { data: filesData, error: filesError }] =
-        await Promise.all([projectsQ, activitiesQ, filesQ]);
+      const [projectsResult, activitiesResult, filesResult] = await Promise.all([
+        safeSupabaseQuery(
+          () => supabase
+            .from('projects')
+            .select('*')
+            .eq('status', 'active')
+            .order('deadline', { ascending: true, nullsFirst: false })
+            .limit(5),
+          'MainDashboard'
+        ),
+        safeSupabaseQuery(
+          () => supabase
+            .from('activity_log')
+            .select('*')
+            .order('timestamp', { ascending: false })
+            .limit(7),
+          'MainDashboard'
+        ),
+        safeSupabaseQuery(
+          () => supabase
+            .from('files')
+            .select('size') as any,
+          'MainDashboard'
+        ),
+      ]);
 
       if (!alive) return;
 
-      if (projectsError) logger.error('MainDashboard', 'Failed to load projects', { error: projectsError });
-      if (activitiesError) logger.error('MainDashboard', 'Failed to load activities', { error: activitiesError });
-      if (filesError) logger.error('MainDashboard', 'Failed to load files data', { error: filesError });
+      const { data: projectsData, error: projectsError } = projectsResult;
+      const { data: activitiesData, error: activitiesError } = activitiesResult;
+      const { data: filesData, error: filesError } = filesResult;
+
+      // Only log non-configuration errors
+      if (projectsError && projectsError.code !== 'SUPABASE_NOT_CONFIGURED') {
+        logger.error('MainDashboard', 'Failed to load projects', { error: projectsError });
+      }
+      if (activitiesError && activitiesError.code !== 'SUPABASE_NOT_CONFIGURED') {
+        logger.error('MainDashboard', 'Failed to load activities', { error: activitiesError });
+      }
+      if (filesError && filesError.code !== 'SUPABASE_NOT_CONFIGURED') {
+        logger.error('MainDashboard', 'Failed to load files data', { error: filesError });
+      }
 
       if (projectsData) {
         setProjects(projectsData);
         loadAllProjectTaskCounts(projectsData);
+      } else {
+        setProjects([]);
       }
-      if (activitiesData) setActivities(activitiesData);
+      
+      if (activitiesData) {
+        setActivities(activitiesData);
+      } else {
+        setActivities([]);
+      }
 
       if (filesData) {
         const totalSize = filesData.reduce((sum: number, f: any) => sum + (f.size || 0), 0);
         setStorageUsed(totalSize);
+      } else {
+        setStorageUsed(0);
       }
     } catch (error) {
       logger.critical('MainDashboard', 'Critical error loading dashboard data', { error });

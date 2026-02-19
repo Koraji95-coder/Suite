@@ -11,7 +11,7 @@ import type { GridRod, GridConductor, GridDesign, GridPlacement, GridConfig } fr
 import { DEFAULT_CONFIG } from './types';
 import {
   parseRodsText, parseConductorsText, generatePlacements,
-  computeGridMaxY, totalConductorLength, conductorsToLines,
+  computeGridMaxY, totalConductorLength,
 } from './gridEngine';
 import { GridPreview } from './GridPreview';
 import { SAMPLE_RODS_TEXT, SAMPLE_CONDUCTORS_TEXT } from './sampleData';
@@ -120,7 +120,7 @@ export function GridGeneratorPanel() {
           );
         }
 
-        showToast('Design saved', 'success');
+        showToast('success', 'Design saved');
       } else {
         const { data } = await supabase.from('ground_grid_designs').insert({
           name: designName,
@@ -143,12 +143,12 @@ export function GridGeneratorPanel() {
             );
           }
 
-          showToast('Design created', 'success');
+          showToast('success', 'Design created');
           loadDesigns();
         }
       }
     } catch {
-      showToast('Failed to save', 'error');
+      showToast('error', 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -164,7 +164,7 @@ export function GridGeneratorPanel() {
     setPlacements([]);
     setLinkedProjectId(null);
     loadDesigns();
-    showToast('Design deleted', 'success');
+    showToast('success', 'Design deleted');
   }
 
   function newDesign() {
@@ -182,7 +182,7 @@ export function GridGeneratorPanel() {
 
   function runGeneration() {
     if (conductors.length === 0) {
-      showToast('No conductor data to process', 'error');
+      showToast('error', 'No conductor data to process');
       return;
     }
     setGenerating(true);
@@ -209,7 +209,7 @@ export function GridGeneratorPanel() {
       }
 
       setGenerating(false);
-      showToast(`Generated: ${result.placements.length} placements`, 'success');
+      showToast('success', `Generated: ${result.placements.length} placements`);
     });
   }
 
@@ -238,7 +238,7 @@ export function GridGeneratorPanel() {
         const parsed = parseConductorsText(text);
         if (parsed.length > 0) {
           setConductors(parsed);
-          showToast(`Imported ${parsed.length} conductors`, 'success');
+          showToast('success', `Imported ${parsed.length} conductors`);
           return;
         }
       }
@@ -246,18 +246,18 @@ export function GridGeneratorPanel() {
       const parsedRods = parseRodsText(text);
       if (parsedRods.length > 0) {
         setRods(parsedRods);
-        showToast(`Imported ${parsedRods.length} rods`, 'success');
+        showToast('success', `Imported ${parsedRods.length} rods`);
         return;
       }
 
       const parsedConds = parseConductorsText(text);
       if (parsedConds.length > 0) {
         setConductors(parsedConds);
-        showToast(`Imported ${parsedConds.length} conductors`, 'success');
+        showToast('success', `Imported ${parsedConds.length} conductors`);
         return;
       }
 
-      showToast('Could not parse file data', 'error');
+      showToast('error', 'Could not parse file data');
     };
     reader.readAsText(file);
   }
@@ -269,18 +269,18 @@ export function GridGeneratorPanel() {
       if (parsed.length > 0) {
         setRods(parsed);
         setPasteText('');
-        showToast(`Parsed ${parsed.length} rods`, 'success');
+        showToast('success', `Parsed ${parsed.length} rods`);
       } else {
-        showToast('Could not parse rod data', 'error');
+        showToast('error', 'Could not parse rod data');
       }
     } else {
       const parsed = parseConductorsText(pasteText);
       if (parsed.length > 0) {
         setConductors(parsed);
         setPasteText('');
-        showToast(`Parsed ${parsed.length} conductors`, 'success');
+        showToast('success', `Parsed ${parsed.length} conductors`);
       } else {
-        showToast('Could not parse conductor data', 'error');
+        showToast('error', 'Could not parse conductor data');
       }
     }
   }
@@ -290,7 +290,7 @@ export function GridGeneratorPanel() {
     const parsedConds = parseConductorsText(SAMPLE_CONDUCTORS_TEXT);
     setRods(parsedRods);
     setConductors(parsedConds);
-    showToast(`Loaded ${parsedRods.length} rods, ${parsedConds.length} conductors`, 'success');
+    showToast('success', `Loaded ${parsedRods.length} rods, ${parsedConds.length} conductors`);
   }
 
   function exportCSV() {

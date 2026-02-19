@@ -6,6 +6,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { WorkspaceShell } from './layouts/WorkspaceShell';
 import { EmberSplash } from './data/EmberSplash';
 import { ToastContainer } from './components/ui/ToastContainer';
+import { ToastProvider } from './components/ToastProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppInner() {
@@ -67,8 +68,10 @@ function App() {
         <ErrorBoundary>
           <AuthProvider>
             <NotificationProvider>
-              <AppInner />
-              <ToastContainer />
+              <ToastProvider>
+                <AppInner />
+                <ToastContainer />
+              </ToastProvider>
             </NotificationProvider>
           </AuthProvider>
         </ErrorBoundary>

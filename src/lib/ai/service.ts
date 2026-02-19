@@ -28,10 +28,11 @@ export async function sendMessage(
 ): Promise<string> {
   const config = getConfig();
   const provider = createProvider(config);
+  const activeModel = config.provider === 'openai' ? config.openaiModel : config.ollamaModel;
   try {
     return await provider.chat(messages, onChunk);
   } catch (err) {
-    logger.error('AIService', 'Provider chat failed', { error: err, provider: config.provider, model: config.model });
+    logger.error('AIService', 'Provider chat failed', { error: err, provider: config.provider, model: activeModel });
     throw err;
   }
 }

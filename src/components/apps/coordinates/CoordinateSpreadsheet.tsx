@@ -1,5 +1,5 @@
 import { useTheme, hexToRgba } from '@/lib/palette';
-import { CoordinatePoint, SPREADSHEET_COLORS, SPREADSHEET_COLUMNS, EXCEL_COLS } from './types';
+import { CoordinatePoint, SPREADSHEET_COLUMNS, EXCEL_COLS } from './types';
 
 interface CoordinateSpreadsheetProps {
   data: CoordinatePoint[];
@@ -7,7 +7,17 @@ interface CoordinateSpreadsheetProps {
 
 export function CoordinateSpreadsheet({ data }: CoordinateSpreadsheetProps) {
   const { palette } = useTheme();
-  const c = SPREADSHEET_COLORS;
+  const c = {
+    titleBg: palette.primary,
+    titleText: palette.background,
+    headerBg: hexToRgba(palette.primary, 0.14),
+    headerText: palette.text,
+    rowEven: hexToRgba(palette.background, 0.7),
+    rowOdd: hexToRgba(palette.primary, 0.05),
+    rowText: palette.text,
+    border: hexToRgba(palette.primary, 0.2),
+    cellRef: palette.textMuted,
+  };
 
   const getCellValue = (point: CoordinatePoint, colIndex: number): string => {
     switch (colIndex) {
@@ -27,7 +37,7 @@ export function CoordinateSpreadsheet({ data }: CoordinateSpreadsheetProps) {
           borderRadius: '6px',
           overflow: 'hidden',
           border: `1px solid ${c.border}`,
-          boxShadow: `0 2px 8px ${hexToRgba('#000', 0.12)}`,
+          boxShadow: `0 2px 8px ${hexToRgba(palette.text, 0.12)}`,
         }}
       >
         <table
@@ -132,7 +142,7 @@ export function CoordinateSpreadsheet({ data }: CoordinateSpreadsheetProps) {
                   style={{
                     background: c.headerBg,
                     borderBottom: `1px solid ${c.border}`,
-                    borderRight: i < SPREADSHEET_COLUMNS.length - 1 ? `1px solid ${hexToRgba('#FFF', 0.1)}` : 'none',
+                    borderRight: i < SPREADSHEET_COLUMNS.length - 1 ? `1px solid ${hexToRgba(palette.background, 0.1)}` : 'none',
                     padding: '8px 10px',
                     fontSize: '11px',
                     fontWeight: '600',

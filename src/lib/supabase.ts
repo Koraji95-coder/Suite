@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl =
   import.meta.env.VITE_SUPABASE_URL ?? 'https://example.supabase.co';
@@ -22,9 +23,10 @@ if (
  * across page reloads. The custom `lock` function is a no-op to avoid
  * cross-tab coordination overhead in development.
  */
-const _global = globalThis as unknown as { __supabase: ReturnType<typeof createClient> };
+type AppSupabaseClient = SupabaseClient<any, 'public', any>;
+const _global = globalThis as unknown as { __supabase?: AppSupabaseClient };
 export const supabase =
-  _global.__supabase ??= createClient(supabaseUrl, supabaseAnonKey, {
+  _global.__supabase ??= (createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       storageKey: 'suite-auth',
       autoRefreshToken: true,
@@ -35,7 +37,7 @@ export const supabase =
         return await fn();
       },
     },
-  });
+  }) as AppSupabaseClient);
 
 export interface Formula {
   id: string;

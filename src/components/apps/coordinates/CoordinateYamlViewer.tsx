@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import yaml from 'js-yaml';
 import { useTheme, hexToRgba } from '@/lib/palette';
-import { CoordinatePoint, SPREADSHEET_COLORS } from './types';
+import { CoordinatePoint } from './types';
 
 interface CoordinateYamlViewerProps {
   data: CoordinatePoint[];
@@ -49,13 +49,13 @@ export function CoordinateYamlViewer({ data }: CoordinateYamlViewerProps) {
       let content: React.ReactNode = line;
 
       if (line.match(/^\s*#/)) {
-        content = <span style={{ color: '#6A9955' }}>{line}</span>;
+        content = <span style={{ color: hexToRgba(palette.textMuted, 0.9) }}>{line}</span>;
       } else if (line.match(/^\s*-\s/)) {
         const dashIdx = line.indexOf('-');
         content = (
           <>
             <span>{line.slice(0, dashIdx)}</span>
-            <span style={{ color: SPREADSHEET_COLORS.titleBg }}>-</span>
+            <span style={{ color: palette.primary }}>-</span>
             <span>{line.slice(dashIdx + 1)}</span>
           </>
         );
@@ -69,14 +69,14 @@ export function CoordinateYamlViewer({ data }: CoordinateYamlViewerProps) {
 
         let valueNode: React.ReactNode = <span style={{ color: palette.text }}>{value}</span>;
         if (numMatch) {
-          valueNode = <span style={{ color: '#B5CEA8' }}>{value}</span>;
+          valueNode = <span style={{ color: palette.primary }}>{value}</span>;
         } else if (strMatch) {
-          valueNode = <span style={{ color: '#CE9178' }}>{value}</span>;
+          valueNode = <span style={{ color: hexToRgba(palette.text, 0.85) }}>{value}</span>;
         }
 
         content = (
           <>
-            <span style={{ color: '#9CDCFE' }}>{key}</span>
+            <span style={{ color: palette.primary }}>{key}</span>
             <span style={{ color: palette.textMuted }}>:</span>
             {valueNode}
           </>
@@ -140,8 +140,8 @@ export function CoordinateYamlViewer({ data }: CoordinateYamlViewerProps) {
             style={{
               padding: '2px 8px',
               borderRadius: '3px',
-              background: hexToRgba(SPREADSHEET_COLORS.titleBg, 0.12),
-              color: SPREADSHEET_COLORS.titleBg,
+              background: hexToRgba(palette.primary, 0.12),
+              color: palette.primary,
               fontSize: '10px',
               fontWeight: '600',
               letterSpacing: '0.5px',
@@ -160,8 +160,8 @@ export function CoordinateYamlViewer({ data }: CoordinateYamlViewerProps) {
             padding: '4px 10px',
             borderRadius: '4px',
             border: `1px solid ${hexToRgba(palette.primary, 0.25)}`,
-            background: copied ? hexToRgba('#51cf66', 0.12) : hexToRgba(palette.primary, 0.08),
-            color: copied ? '#51cf66' : palette.primary,
+            background: copied ? hexToRgba(palette.primary, 0.18) : hexToRgba(palette.primary, 0.08),
+            color: palette.primary,
             fontSize: '11px',
             fontWeight: '500',
             cursor: 'pointer',

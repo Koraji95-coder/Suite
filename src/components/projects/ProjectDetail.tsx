@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import { Calendar, FileDown, Archive, AlertCircle, CheckSquare } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, FileDown, Archive, AlertCircle, CheckSquare, MapPin, Plus } from 'lucide-react';
 import { Project, Task, ProjectFile, CalendarEvent, TaskFilter, ViewMode } from './projectmanagertypes';
 import { categoryColor, formatDateOnly } from './projectmanagerutils';
 import { TaskList } from './TaskList';
 import { CalendarView } from './CalanderView';
 import { FilesBrowser } from './FilesBrowser';
+import { supabase } from '@/lib/supabase';
+import type { GridDesign } from '@/components/apps/ground-grid/types';
 
 interface ProjectDetailProps {
   project: Project;
@@ -65,6 +68,29 @@ export function ProjectDetail({
   onFileUpload,
   onDownloadFile,
 }: ProjectDetailProps) {
+  const navigate = useNavigate();
+  const [gridDesigns, setGridDesigns] = useState<GridDesign[]>([]);
+
+  useEffect(() => {
+    if (project?.id) {
+      supabase.from('ground_grid_designs')
+        .select('*')
+        .eq('project_id', project.id)
+        .order('updated_at', { ascending: false })
+        .then(({ data }) => { if (data) setGridDesigns(data as GridDesign[]); });
+    }
+  }, [project?.id]);
+
+  async function createLinkedDesign() {
+    const { data } = await supabase.from('ground_grid_designs')
+      .insert({ name: `${project.name} - Grid Design`, project_id: project.id })
+      .select()
+      .maybeSingle();
+    if (data) {
+      navigate(`/apps/ground-grid-generator?design=${data.id}`);
+    }
+  }
+
   const completionPercentage = tasks.length > 0
     ? Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)
     : 0;
@@ -171,6 +197,17 @@ export function ProjectDetail({
         >
           Files
         </button>
+        <button
+          onClick={() => onViewModeChange('ground-grids')}
+          className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center space-x-2 ${
+            viewMode === 'ground-grids'
+              ? 'bg-orange-500/30 text-white/90 border border-orange-400'
+              : 'bg-black/30 text-white/60 border border-white/10 hover:border-orange-500/40'
+          }`}
+        >
+          <MapPin className="w-4 h-4" />
+          <span>Ground Grids</span>
+        </button>
       </div>
 
       {/* Content based on view mode */}
@@ -250,6 +287,58 @@ export function ProjectDetail({
           onDownload={onDownloadFile}
           projectName={project.name}
         />
+      )}
+
+      {viewMode === 'ground-grids' && (
+        <div className="bg-black/30 backdrop-blur-md border border-orange-500/30 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-xl font-bold text-white/80">Ground Grid Designs</h4>
+            <button
+              onClick={createLinkedDesign}
+              className="bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 text-white/90 px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Design</span>
+            </button>
+          </div>
+
+          {gridDesigns.length === 0 ? (
+            <div className="text-center py-12 text-orange-400/60">
+              <MapPin className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium">No ground grid designs linked</p>
+              <p className="text-sm mt-1 opacity-80">
+                Create a new design or link an existing one from the Grid Generator
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {gridDesigns.map(d => (
+                <button
+                  key={d.id}
+                  onClick={() => navigate(`/apps/ground-grid-generator?design=${d.id}`)}
+                  className="w-full text-left bg-black/20 hover:bg-black/30 border border-orange-500/20 hover:border-orange-500/40 rounded-lg p-4 transition-all flex items-center justify-between"
+                >
+                  <div className="flex items-center space-x-3">
+                    <MapPin className="w-5 h-5 text-orange-400" />
+                    <div>
+                      <div className="text-white/80 font-semibold">{d.name}</div>
+                      <div className="text-xs text-white/40 mt-0.5">
+                        {new Date(d.updated_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                    d.status === 'finalized' ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                    : d.status === 'archived' ? 'bg-white/10 text-white/40 border border-white/10'
+                    : 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                  }`}>
+                    {d.status}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -15,8 +15,8 @@ const ProjectManager = React.lazy(() => import("@/components/projects/ProjectMan
 const CalendarPage = React.lazy(() => import("@/components/calendar/hooks/CalendarPage"));
 const BlockLibrary = React.lazy(() => import("@/components/apps/BlockLibrary").then(m => ({ default: m.BlockLibrary })));
 const QAQCChecker = React.lazy(() => import("@/components/apps/QAQCChecker").then(m => ({ default: m.QAQCChecker })));
-const GroundGridGenerator = React.lazy(() => import("@/components/apps/GroundGridGenerator").then(m => ({ default: m.GroundGridGenerator })));
-const CoordinatesGrabber = React.lazy(() => import("@/components/apps/CoordinatesGrabber").then(m => ({ default: m.CoordinatesGrabber })));
+const GroundGridGeneratorApp = React.lazy(() => import("@/components/apps/ground-grid/GroundGridGeneratorApp").then(m => ({ default: m.GroundGridGeneratorApp })));
+const GroundGridSplashPreview = React.lazy(() => import("@/components/apps/ground-grid/GroundGridSplashPreview").then(m => ({ default: m.GroundGridSplashPreview })));
 const AutomationWorkflows = React.lazy(() => import("@/components/apps/AutomationWorkflows").then(m => ({ default: m.AutomationWorkflows })));
 const StandardsChecker = React.lazy(() => import("@/components/apps/StandardsChecker").then(m => ({ default: m.StandardsChecker })));
 const CalculatorPanel = React.lazy(() => import("@/components/CalculatorPanel").then(m => ({ default: m.CalculatorPanel })));
@@ -138,8 +138,8 @@ function ShellContent() {
               <Route path="/apps/transmittal" element={<Placeholder name="Transmittal Builder" />} />
               <Route path="/apps/block-library" element={<BlockLibrary />} />
               <Route path="/apps/qaqc" element={<QAQCChecker />} />
-              <Route path="/apps/ground-grid" element={<GroundGridGenerator />} />
-              <Route path="/apps/coordinates-grabber" element={<CoordinatesGrabber />} />
+              <Route path="/apps/ground-grid-generator" element={<GroundGridGeneratorApp />} />
+              <Route path="/apps/ground-grid-splash" element={<GroundGridSplashPreview />} />
               <Route path="/apps/automation" element={<AutomationWorkflows />} />
               <Route path="/apps/standards" element={<StandardsChecker />} />
               <Route path="/apps/batch-find-replace" element={<Placeholder name="Batch Find & Replace" />} />

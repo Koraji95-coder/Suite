@@ -10,6 +10,7 @@ import {
   Printer,
   Workflow,
   ClipboardCheck,
+  Sparkles,
   Calculator,
   ArrowUpRight,
   Triangle,
@@ -34,11 +35,12 @@ const appItems: SectionItem[] = [
   { id: "transmittal", label: "Transmittal Builder", icon: FileText, path: "/apps/transmittal" },
   { id: "block-library", label: "Block Library", icon: LayoutGrid, path: "/apps/block-library" },
   { id: "qaqc", label: "QA/QC Checker", icon: CheckSquare, path: "/apps/qaqc" },
-  { id: "ground-grid", label: "Ground Grid", icon: Grid3X3, path: "/apps/ground-grid" },
+  { id: "ground-grid-generator", label: "Ground Grid Generator", icon: Grid3X3, path: "/apps/ground-grid-generator" },
   { id: "batch-find-replace", label: "Batch Find & Replace", icon: Replace, path: "/apps/batch-find-replace" },
   { id: "batch-print", label: "Batch Print", icon: Printer, path: "/apps/batch-print" },
   { id: "automation", label: "Automation", icon: Workflow, path: "/apps/automation" },
   { id: "standards", label: "Standards Checker", icon: ClipboardCheck, path: "/apps/standards" },
+  { id: "gg-splash", label: "GG Splash Preview", icon: Sparkles, path: "/apps/ground-grid-splash" },
 ];
 
 const knowledgeItems: SectionItem[] = [

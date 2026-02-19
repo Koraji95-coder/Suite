@@ -1,7 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Loader } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { coordinatesGrabberService } from '@/Ground-Grid-Generation/coordinatesGrabberService';
 import { CoordinateYamlViewer } from './coordinates/CoordinateYamlViewer';
+import { ProgressBar } from '@/data/ProgressBar';
 import type { CoordinatePoint } from './coordinates/types';
 
 interface CoordinatesGrabberState {
@@ -1199,32 +1201,15 @@ export function CoordinatesGrabber() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             {state.isRunning && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      border: `2px solid ${hexToRgba(palette.primary, 0.3)}`,
-                      borderTopColor: palette.primary,
-                      animation: 'spin 1s linear infinite',
-                    }}
-                  />
-                  <span style={{ fontSize: '12px', color: palette.textMuted }}>Processing...</span>
+                  <Loader size={14} className="animate-spin" style={{ color: palette.primary }} />
+                  <span style={{ fontSize: '12px', color: palette.textMuted, fontWeight: 500 }}>
+                    {progress < 30 ? 'Scanning layers...' : progress < 60 ? 'Extracting vertices...' : progress < 90 ? 'Building Excel...' : 'Finalizing...'}
+                  </span>
                 </div>
-                <div style={{ width: '100%', height: '6px', borderRadius: '3px', background: hexToRgba(palette.primary, 0.2), overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${progress}%`,
-                      background: palette.primary,
-                      transition: 'width 0.3s ease',
-                    }}
-                  />
-                </div>
+                <ProgressBar progress={progress} />
               </div>
             )}
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>

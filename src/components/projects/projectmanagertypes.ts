@@ -13,7 +13,7 @@ export type StatusFilter = 'active' | 'all' | 'on-hold' | 'archived';
 export type TaskFilter = 'all' | 'pending' | 'completed';
 
 /** Detail-panel view mode. */
-export type ViewMode = 'tasks' | 'calendar' | 'files';
+export type ViewMode = 'tasks' | 'calendar' | 'files' | 'ground-grids';
 
 /** Calendar event type. */
 export type CalendarEventType = 'deadline' | 'milestone' | 'reminder';

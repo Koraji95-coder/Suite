@@ -15,7 +15,6 @@ import {
   useSortable,
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { useTheme, hexToRgba } from "@/lib/palette";
 import { useWorkspace, type WorkspaceTab } from "./WorkspaceContext";
 
@@ -51,7 +50,7 @@ function SortableTab({ tab, active, isSplit, onClose, onClick, onPin, onSplit, c
   } = useSortable({ id: tab.id });
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined,
     transition,
     display: "flex",
     alignItems: "center",

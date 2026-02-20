@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
-import * as THREE from 'three';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { LoadingCard } from '@/data/LoadingCard';
 import { ProgressBar } from '@/data/ProgressBar';
 import { useTheme, hexToRgba } from '@/lib/palette';
@@ -27,10 +26,28 @@ function clamp(v: number, min: number, max: number) {
 
 const AMBER = '#f59e0b';
 const COPPER = '#ea580c';
-const AMBER_HEX = 0xf59e0b;
-const GREEN_HEX = 0x22c55e;
-const COPPER_HEX = 0xea580c;
-const GROUND_HEX = 0x2a1f0e;
+
+function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+
+function heatColor(v: number): string {
+  const t = clamp(v, 0, 1);
+  if (t < 0.2) {
+    const s = t / 0.2;
+    return `rgb(${Math.round(lerp(10, 20, s))}, ${Math.round(lerp(20, 60, s))}, ${Math.round(lerp(80, 140, s))})`;
+  } else if (t < 0.4) {
+    const s = (t - 0.2) / 0.2;
+    return `rgb(${Math.round(lerp(20, 30, s))}, ${Math.round(lerp(60, 140, s))}, ${Math.round(lerp(140, 100, s))})`;
+  } else if (t < 0.6) {
+    const s = (t - 0.4) / 0.2;
+    return `rgb(${Math.round(lerp(30, 200, s))}, ${Math.round(lerp(140, 180, s))}, ${Math.round(lerp(100, 30, s))})`;
+  } else if (t < 0.8) {
+    const s = (t - 0.6) / 0.2;
+    return `rgb(${Math.round(lerp(200, 240, s))}, ${Math.round(lerp(180, 120, s))}, ${Math.round(lerp(30, 20, s))})`;
+  } else {
+    const s = (t - 0.8) / 0.2;
+    return `rgb(${Math.round(lerp(240, 255, s))}, ${Math.round(lerp(120, 60, s))}, ${Math.round(lerp(20, 20, s))})`;
+  }
+}
 
 export interface GroundGridSplashProps {
   onComplete: () => void;
@@ -50,7 +67,7 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
     { id: 'coords', label: 'Parsing coordinates', duration: reducedMotion ? 400 : 1600 },
     { id: 'topology', label: 'Building topology', duration: reducedMotion ? 500 : 2000 },
     { id: 'rods', label: 'Placing ground rods', duration: reducedMotion ? 450 : 1800 },
-    { id: 'preview', label: 'Generating grid preview', duration: reducedMotion ? 350 : 1400 },
+    { id: 'contour', label: 'Computing potential contour', duration: reducedMotion ? 350 : 1400 },
   ], [reducedMotion]);
 
   const total = useMemo(() => steps.reduce((s, x) => s + x.duration, 0), [steps]);
@@ -102,187 +119,157 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
   useEffect(() => { isExitingAnimRef.current = isExiting; }, [isExiting]);
   useEffect(() => { stepRef.current = step; }, [step]);
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
-
-    const gridGroup = new THREE.Group();
-    scene.add(gridGroup);
-
-    const groundGeo = new THREE.PlaneGeometry(8, 8);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: GROUND_HEX,
-      transparent: true,
-      opacity: 0.5,
-      side: THREE.DoubleSide,
-    });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.05;
-    gridGroup.add(ground);
-
-    const conductorMat = new THREE.MeshStandardMaterial({
-      color: AMBER_HEX,
-      emissive: new THREE.Color(AMBER_HEX).multiplyScalar(0.2),
-      metalness: 0.7,
-      roughness: 0.3,
-      transparent: true,
-      opacity: 0,
-    });
-
-    const gridLines: THREE.Mesh[] = [];
-    const gridSize = 3;
-    const spacing = 1.2;
-    for (let i = 0; i <= gridSize; i++) {
-      const x = -gridSize * spacing / 2 + i * spacing;
-      const geo = new THREE.CylinderGeometry(0.015, 0.015, gridSize * spacing, 6);
-      const meshH = new THREE.Mesh(geo, conductorMat.clone());
-      meshH.position.set(x, 0.02, 0);
-      meshH.rotation.z = Math.PI / 2;
-      meshH.rotation.y = Math.PI / 2;
-      gridGroup.add(meshH);
-      gridLines.push(meshH);
-
-      const meshV = new THREE.Mesh(geo.clone(), conductorMat.clone());
-      meshV.position.set(0, 0.02, x);
-      meshV.rotation.z = Math.PI / 2;
-      gridGroup.add(meshV);
-      gridLines.push(meshV);
-    }
-
-    const rodMat = new THREE.MeshStandardMaterial({
-      color: GREEN_HEX,
-      emissive: new THREE.Color(GREEN_HEX).multiplyScalar(0.25),
-      metalness: 0.5,
-      roughness: 0.4,
-      transparent: true,
-      opacity: 0,
-    });
-
-    const rodMeshes: THREE.Group[] = [];
+  const gridSize = 4;
+  const gridSpacing = 1;
+  const rodPositions = useMemo(() => {
+    const pts: { x: number; z: number }[] = [];
     for (let i = 0; i <= gridSize; i++) {
       for (let j = 0; j <= gridSize; j++) {
-        if ((i === 0 || i === gridSize) && (j === 0 || j === gridSize) || (i + j) % 2 === 0) {
-          const x = -gridSize * spacing / 2 + i * spacing;
-          const z = -gridSize * spacing / 2 + j * spacing;
-          const rodGroup = new THREE.Group();
-
-          const rodGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.35, 8);
-          const rod = new THREE.Mesh(rodGeo, rodMat.clone());
-          rod.position.set(0, -0.15, 0);
-          rodGroup.add(rod);
-
-          const capGeo = new THREE.SphereGeometry(0.035, 8, 6);
-          const cap = new THREE.Mesh(capGeo, rodMat.clone());
-          cap.position.set(0, 0.03, 0);
-          rodGroup.add(cap);
-
-          rodGroup.position.set(x, 0, z);
-          gridGroup.add(rodGroup);
-          rodMeshes.push(rodGroup);
+        if ((i + j) % 2 === 0 || (i === 0 || i === gridSize) && (j === 0 || j === gridSize)) {
+          pts.push({ x: i * gridSpacing - (gridSize * gridSpacing) / 2, z: j * gridSpacing - (gridSize * gridSpacing) / 2 });
         }
       }
     }
+    return pts;
+  }, []);
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.3);
-    scene.add(ambient);
+  const computePotential = useCallback((px: number, pz: number, time: number) => {
+    let v = 0;
+    for (const rod of rodPositions) {
+      const dx = px - rod.x;
+      const dz = pz - rod.z;
+      const dist = Math.sqrt(dx * dx + dz * dz) + 0.3;
+      v += 1 / dist;
+    }
+    v += Math.sin(px * 0.5 + time * 0.8) * 0.15 + Math.cos(pz * 0.4 - time * 0.6) * 0.12;
+    return v;
+  }, [rodPositions]);
 
-    const frontLight = new THREE.PointLight(AMBER_HEX, 0.8, 15);
-    frontLight.position.set(3, 5, 4);
-    scene.add(frontLight);
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    const backLight = new THREE.PointLight(COPPER_HEX, 0.4, 15);
-    backLight.position.set(-4, 3, -3);
-    scene.add(backLight);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    canvas.width = w;
+    canvas.height = h;
 
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    rimLight.position.set(0, 5, -5);
-    scene.add(rimLight);
-
-    camera.position.set(3.5, 3, 3.5);
-    camera.lookAt(0, 0, 0);
-
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-    window.addEventListener('resize', handleResize);
-
-    let rafId = 0;
     let disposed = false;
-    const clock = new THREE.Clock();
-    let gridOpacity = 0;
-    let rodOpacity = 0;
+    let rafId = 0;
+    const startTime = performance.now();
+    const res = 6;
+    const halfGrid = (gridSize * gridSpacing) / 2;
+    const worldExtent = halfGrid * 1.8;
 
     const tick = () => {
       if (disposed) return;
       rafId = requestAnimationFrame(tick);
 
-      const elapsed = clock.getElapsedTime();
+      const time = (performance.now() - startTime) / 1000;
       const prog = clamp(progressRef.current / 100, 0, 1);
       const currentStep = stepRef.current;
+      const exiting = isExitingAnimRef.current;
 
-      const targetGridOpacity = currentStep >= 1 ? 0.9 : prog * 0.4;
-      gridOpacity += (targetGridOpacity - gridOpacity) * 0.05;
-      for (const m of gridLines) {
-        (m.material as THREE.MeshStandardMaterial).opacity = gridOpacity;
-      }
+      ctx.fillStyle = palette.background;
+      ctx.fillRect(0, 0, w, h);
 
-      const targetRodOpacity = currentStep >= 2 ? 0.9 : 0;
-      rodOpacity += (targetRodOpacity - rodOpacity) * 0.05;
-      for (const rg of rodMeshes) {
-        rg.children.forEach(c => {
-          if (c instanceof THREE.Mesh) {
-            (c.material as THREE.MeshStandardMaterial).opacity = rodOpacity;
+      const contourOpacity = currentStep >= 3 ? clamp(prog, 0, 0.7) : currentStep >= 2 ? 0.3 : currentStep >= 1 ? 0.15 : 0;
+
+      if (contourOpacity > 0.01) {
+        const centerX = w * 0.5;
+        const centerY = h * 0.48;
+        const scale = Math.min(w, h) * 0.3;
+        const exitScale = exiting ? Math.max(0.3, 1 - (time - Math.floor(time)) * 0.1) : 1;
+
+        let minV = Infinity, maxV = -Infinity;
+        const cols = Math.ceil(w / res);
+        const rows = Math.ceil(h / res);
+        const values: number[] = new Array(cols * rows);
+
+        for (let gy = 0; gy < rows; gy++) {
+          for (let gx = 0; gx < cols; gx++) {
+            const sx = gx * res;
+            const sy = gy * res;
+            const wx = ((sx - centerX) / (scale * exitScale)) * worldExtent;
+            const wz = ((sy - centerY) / (scale * exitScale)) * worldExtent;
+            const v = computePotential(wx, wz, time);
+            values[gy * cols + gx] = v;
+            if (v < minV) minV = v;
+            if (v > maxV) maxV = v;
           }
-        });
+        }
+
+        const range = maxV - minV || 1;
+        ctx.globalAlpha = contourOpacity;
+        for (let gy = 0; gy < rows; gy++) {
+          for (let gx = 0; gx < cols; gx++) {
+            const norm = (values[gy * cols + gx] - minV) / range;
+            ctx.fillStyle = heatColor(norm);
+            ctx.fillRect(gx * res, gy * res, res, res);
+          }
+        }
+        ctx.globalAlpha = 1;
+
+        if (currentStep >= 1) {
+          ctx.strokeStyle = `rgba(245, 158, 11, ${0.35 * contourOpacity})`;
+          ctx.lineWidth = 1.5;
+          for (let i = 0; i <= gridSize; i++) {
+            const worldCoord = i * gridSpacing - halfGrid;
+            const screenMinX = centerX + (-halfGrid / worldExtent) * scale * exitScale;
+            const screenMaxX = centerX + (halfGrid / worldExtent) * scale * exitScale;
+            const screenY = centerY + (worldCoord / worldExtent) * scale * exitScale;
+            const screenX = centerX + (worldCoord / worldExtent) * scale * exitScale;
+            const screenMinY = centerY + (-halfGrid / worldExtent) * scale * exitScale;
+            const screenMaxY = centerY + (halfGrid / worldExtent) * scale * exitScale;
+
+            ctx.beginPath();
+            ctx.moveTo(screenMinX, screenY);
+            ctx.lineTo(screenMaxX, screenY);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(screenX, screenMinY);
+            ctx.lineTo(screenX, screenMaxY);
+            ctx.stroke();
+          }
+        }
+
+        if (currentStep >= 2) {
+          for (const rod of rodPositions) {
+            const sx = centerX + (rod.x / worldExtent) * scale * exitScale;
+            const sz = centerY + (rod.z / worldExtent) * scale * exitScale;
+            const rodR = 4 * exitScale;
+
+            ctx.beginPath();
+            ctx.arc(sx, sz, rodR + 3, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(34, 197, 94, ${0.2 * contourOpacity})`;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(sx, sz, rodR, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(34, 197, 94, ${0.8 * contourOpacity})`;
+            ctx.fill();
+          }
+        }
       }
-
-      let exitFactor = 1.0;
-      if (isExitingAnimRef.current) {
-        exitFactor = Math.max(0, 1.0 - elapsed * 0.3);
-        gridGroup.scale.setScalar(exitFactor);
-        gridGroup.rotation.y += 0.01;
-      }
-
-      const orbitSpeed = 0.15;
-      const radius = 4.5 - prog * 0.8;
-      const angle = elapsed * orbitSpeed;
-      camera.position.x = Math.cos(angle) * radius * 0.85;
-      camera.position.y = 2.5 + Math.sin(elapsed * 0.2) * 0.3;
-      camera.position.z = Math.sin(angle) * radius * 0.85;
-      camera.lookAt(0, -0.2, 0);
-
-      frontLight.intensity = 0.6 + prog * 0.8;
-
-      renderer.render(scene, camera);
     };
 
     tick();
+
+    const handleResize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', handleResize);
 
     return () => {
       disposed = true;
       cancelAnimationFrame(rafId);
       window.removeEventListener('resize', handleResize);
-      renderer.dispose();
-      scene.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
-          obj.geometry.dispose();
-          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
-          else obj.material.dispose();
-        }
-      });
     };
-  }, [exitDurationMs, reducedMotion]);
+  }, [palette.background, computePotential, rodPositions]);
 
   return (
     <div
@@ -294,11 +281,11 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
         transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
-      <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight} className="absolute inset-0 opacity-70" />
+      <canvas ref={canvasRef} className="absolute inset-0 opacity-80" />
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: `radial-gradient(circle at 50% 45%, ${hexToRgba(AMBER, 0.1)}, ${hexToRgba(COPPER, 0.04)} 38%, ${palette.background} 70%)`,
+          background: `radial-gradient(circle at 50% 45%, ${hexToRgba(AMBER, 0.08)}, ${hexToRgba(COPPER, 0.03)} 38%, ${palette.background} 68%)`,
         }}
       />
       <div

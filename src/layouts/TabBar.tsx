@@ -18,6 +18,12 @@ export function TabBar() {
 
   const handleClose = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    if (id === activeTabId && openTabs.length > 1) {
+      const idx = openTabs.findIndex((t) => t.id === id);
+      const remaining = openTabs.filter((t) => t.id !== id);
+      const sibling = idx < remaining.length ? remaining[idx] : remaining[remaining.length - 1];
+      navigate(sibling.path);
+    }
     closeTab(id);
   };
 

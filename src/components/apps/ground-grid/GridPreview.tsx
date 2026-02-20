@@ -31,7 +31,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
       maxY = Math.max(maxY, c.y1, c.y2);
     }
     if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 100, maxY: 100 };
-    const pad = Math.max((maxX - minX), (maxY - minY)) * 0.08;
+    const pad = Math.max((maxX - minX), (maxY - minY)) * 0.25;
     return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
   }, [rods, conductors]);
 
@@ -50,6 +50,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
   const boundsRef = useRef(bounds);
   const defaultWRef = useRef(defaultW);
   const defaultHRef = useRef(defaultH);
+  const isPanningRef = useRef(false);
   boundsRef.current = bounds;
   defaultWRef.current = defaultW;
   defaultHRef.current = defaultH;
@@ -58,6 +59,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
     const svg = svgRef.current;
     if (!svg) return;
     const handler = (e: WheelEvent) => {
+      if (!isPanningRef.current) return;
       e.preventDefault();
       e.stopPropagation();
       const factor = e.deltaY > 0 ? 1.05 : 0.9524;
@@ -82,6 +84,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     setIsPanning(true);
+    isPanningRef.current = true;
     const vb = viewBox || { x: bounds.minX, y: bounds.minY, w: bounds.maxX - bounds.minX, h: bounds.maxY - bounds.minY };
     panStart.current = { x: e.clientX, y: e.clientY, vx: vb.x, vy: vb.y };
   }, [viewBox, bounds]);
@@ -95,7 +98,10 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
     setViewBox({ ...vb, x: panStart.current.vx - dx, y: panStart.current.vy - dy });
   }, [isPanning, viewBox, bounds]);
 
-  const handleMouseUp = useCallback(() => setIsPanning(false), []);
+  const handleMouseUp = useCallback(() => {
+    setIsPanning(false);
+    isPanningRef.current = false;
+  }, []);
 
   const tees = placements.filter(p => p.type === 'TEE');
   const crosses = placements.filter(p => p.type === 'CROSS');
@@ -266,7 +272,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
           borderRadius: 4,
         }}
       >
-        Scroll to zoom / Drag to pan
+        Drag to pan / Scroll while panning to zoom
       </div>
     </div>
   );

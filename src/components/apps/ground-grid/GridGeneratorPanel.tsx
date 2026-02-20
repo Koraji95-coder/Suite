@@ -301,6 +301,16 @@ export function GridGeneratorPanel() {
     }
   }
 
+  function clearAll() {
+    setRods([]);
+    setConductors([]);
+    setPlacements([]);
+    setSegmentCount(0);
+    setTeeCount(0);
+    setCrossCount(0);
+    showToast('success', 'All data cleared');
+  }
+
   function loadSampleData() {
     const parsedRods = parseRodsText(SAMPLE_RODS_TEXT);
     const parsedConds = parseConductorsText(SAMPLE_CONDUCTORS_TEXT);
@@ -519,7 +529,8 @@ export function GridGeneratorPanel() {
               style={{
                 width: '100%', minHeight: 80, padding: 10, fontSize: 11, fontFamily: 'monospace',
                 background: 'transparent', border: 'none', color: palette.text, outline: 'none',
-                resize: 'none', boxSizing: 'border-box',
+                resize: 'none', boxSizing: 'border-box', textAlign: 'center',
+                tabSize: 8,
               }}
             />
             <div style={{ display: 'flex', gap: 6, padding: '6px 10px' }}>
@@ -529,35 +540,39 @@ export function GridGeneratorPanel() {
               <button onClick={loadSampleData} style={btnStyle()}>
                 Load Sample Data
               </button>
+              {(rods.length > 0 || conductors.length > 0 || placements.length > 0) && (
+                <button onClick={clearAll} style={{ ...btnStyle(), borderColor: hexToRgba('#ef4444', 0.3), color: '#ef4444' }}>
+                  <Trash2 size={12} /> Clear All
+                </button>
+              )}
             </div>
           </div>
 
           {/* Data summary tables */}
           {rods.length > 0 && (
             <div style={{ borderRadius: 8, border: `1px solid ${hexToRgba(palette.primary, 0.15)}`, overflow: 'hidden' }}>
-              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#22c55e', background: hexToRgba('#22c55e', 0.08), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Rods ({rods.length})</span>
-                <button onClick={() => setRods([])} style={{ background: 'none', border: 'none', color: palette.textMuted, cursor: 'pointer', fontSize: 10 }}>Clear</button>
+              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#22c55e', background: hexToRgba('#22c55e', 0.08) }}>
+                Rods ({rods.length})
               </div>
               <div style={{ maxHeight: 150, overflowY: 'auto' }}>
                 <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ color: palette.textMuted }}>
-                      <th style={{ padding: '3px 6px', textAlign: 'left' }}>Label</th>
-                      <th style={{ padding: '3px 6px', textAlign: 'right' }}>X</th>
-                      <th style={{ padding: '3px 6px', textAlign: 'right' }}>Y</th>
-                      <th style={{ padding: '3px 6px', textAlign: 'right' }}>Depth</th>
-                      <th style={{ padding: '3px 6px', textAlign: 'right' }}>Dia</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>Label</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>X</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>Y</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>Depth</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>Dia</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rods.map((r, i) => (
                       <tr key={i} style={{ borderTop: `1px solid ${hexToRgba(palette.primary, 0.06)}`, color: palette.text }}>
-                        <td style={{ padding: '2px 6px', fontWeight: 600 }}>{r.label}</td>
-                        <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{r.grid_x}</td>
-                        <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{r.grid_y}</td>
-                        <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{r.depth}</td>
-                        <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{r.diameter}</td>
+                        <td style={{ padding: '2px 6px', fontWeight: 600, textAlign: 'center' }}>{r.label}</td>
+                        <td style={{ padding: '2px 6px', textAlign: 'center', fontFamily: 'monospace' }}>{r.grid_x}</td>
+                        <td style={{ padding: '2px 6px', textAlign: 'center', fontFamily: 'monospace' }}>{r.grid_y}</td>
+                        <td style={{ padding: '2px 6px', textAlign: 'center', fontFamily: 'monospace' }}>{r.depth}</td>
+                        <td style={{ padding: '2px 6px', textAlign: 'center', fontFamily: 'monospace' }}>{r.diameter}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -568,29 +583,28 @@ export function GridGeneratorPanel() {
 
           {conductors.length > 0 && (
             <div style={{ borderRadius: 8, border: `1px solid ${hexToRgba(palette.primary, 0.15)}`, overflow: 'hidden' }}>
-              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#f59e0b', background: hexToRgba('#f59e0b', 0.08), display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Conductors ({conductors.length})</span>
-                <button onClick={() => setConductors([])} style={{ background: 'none', border: 'none', color: palette.textMuted, cursor: 'pointer', fontSize: 10 }}>Clear</button>
+              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#f59e0b', background: hexToRgba('#f59e0b', 0.08) }}>
+                Conductors ({conductors.length})
               </div>
               <div style={{ maxHeight: 150, overflowY: 'auto' }}>
                 <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ color: palette.textMuted }}>
-                      <th style={{ padding: '3px 6px', textAlign: 'left' }}>Label</th>
-                      <th style={{ padding: '3px 6px', textAlign: 'right' }}>X1</th>
-                      <th style={{ padding: '3px 6px', textAlign: 'right' }}>Y1</th>
-                      <th style={{ padding: '3px 6px', textAlign: 'right' }}>X2</th>
-                      <th style={{ padding: '3px 6px', textAlign: 'right' }}>Y2</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>Label</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>X1</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>Y1</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>X2</th>
+                      <th style={{ padding: '3px 6px', textAlign: 'center' }}>Y2</th>
                     </tr>
                   </thead>
                   <tbody>
                     {conductors.map((c, i) => (
                       <tr key={i} style={{ borderTop: `1px solid ${hexToRgba(palette.primary, 0.06)}`, color: palette.text }}>
-                        <td style={{ padding: '2px 6px', fontWeight: 600 }}>{c.label}</td>
-                        <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{c.x1}</td>
-                        <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{c.y1}</td>
-                        <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{c.x2}</td>
-                        <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{c.y2}</td>
+                        <td style={{ padding: '2px 6px', fontWeight: 600, textAlign: 'center' }}>{c.label}</td>
+                        <td style={{ padding: '2px 6px', textAlign: 'center', fontFamily: 'monospace' }}>{c.x1}</td>
+                        <td style={{ padding: '2px 6px', textAlign: 'center', fontFamily: 'monospace' }}>{c.y1}</td>
+                        <td style={{ padding: '2px 6px', textAlign: 'center', fontFamily: 'monospace' }}>{c.x2}</td>
+                        <td style={{ padding: '2px 6px', textAlign: 'center', fontFamily: 'monospace' }}>{c.y2}</td>
                       </tr>
                     ))}
                   </tbody>

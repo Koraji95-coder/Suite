@@ -39,7 +39,7 @@ export function generateGridReport(data: ReportData): void {
 <head>
   <title>${designName} - Ground Grid Report</title>
   <style>
-    @media print { body { margin: 0; } .no-print { display: none; } }
+    @media print { body { margin: 0; } .no-print { display: none; } @page { margin: 1cm; } }
     body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; padding: 40px; max-width: 1000px; margin: 0 auto; }
     h1 { font-size: 24px; border-bottom: 2px solid #f59e0b; padding-bottom: 8px; }
     h2 { font-size: 18px; margin-top: 32px; color: #333; }
@@ -51,12 +51,9 @@ export function generateGridReport(data: ReportData): void {
     table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
     th, td { border: 1px solid #e5e7eb; padding: 4px 8px; text-align: center; }
     th { background: #f9fafb; font-weight: 600; font-size: 10px; text-transform: uppercase; color: #555; }
-    .print-btn { position: fixed; top: 16px; right: 16px; padding: 8px 20px; background: #f59e0b; color: #fff; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; }
-    .print-btn:hover { background: #d97706; }
   </style>
 </head>
 <body>
-  <button class="print-btn no-print" onclick="window.print()">Print / Save PDF</button>
   <h1>${designName}</h1>
   <div class="meta">Generated: ${now}</div>
   <div class="stats">
@@ -67,7 +64,7 @@ export function generateGridReport(data: ReportData): void {
     <div class="stat"><div class="stat-value" style="color:#06b6d4">${crosses}</div><div class="stat-label">Crosses</div></div>
     <div class="stat"><div class="stat-value" style="color:#78716c">${totalLen}</div><div class="stat-label">Total Length (ft)</div></div>
   </div>
-  <h2>Rods (${rods.length})</h2>
+  <h2>Ground Rods (${rods.length})</h2>
   <table><thead><tr><th>Label</th><th>X</th><th>Y</th><th>Depth</th><th>Diameter</th></tr></thead><tbody>${rodRows}</tbody></table>
   <h2>Conductors (${conductors.length})</h2>
   <table><thead><tr><th>Label</th><th>X1</th><th>Y1</th><th>X2</th><th>Y2</th><th>Diameter</th></tr></thead><tbody>${conductorRows}</tbody></table>
@@ -76,9 +73,17 @@ export function generateGridReport(data: ReportData): void {
 </body>
 </html>`;
 
-  const win = window.open('', '_blank');
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-  }
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+  iframe.src = url;
+  iframe.onload = () => {
+    iframe.contentWindow?.print();
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+      URL.revokeObjectURL(url);
+    }, 1000);
+  };
 }

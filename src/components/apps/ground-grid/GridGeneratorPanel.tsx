@@ -362,6 +362,10 @@ export function GridGeneratorPanel() {
     setConductors(newConds);
   }, [rods, conductors, pushSnapshot]);
 
+  const handleManualPlacementsChange = useCallback((newPlacements: GridPlacement[]) => {
+    setPlacements(newPlacements);
+  }, []);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -569,14 +573,18 @@ export function GridGeneratorPanel() {
                 </button>
               ))}
             </div>
-            <div style={{ padding: '6px 10px 0', fontSize: 10, fontFamily: 'monospace', color: palette.textMuted, display: 'flex', gap: 0, borderBottom: `1px solid ${hexToRgba(palette.primary, 0.06)}` }}>
+            <div style={{ padding: '6px 10px 0', fontSize: 10, fontFamily: 'ui-monospace, SFMono-Regular, monospace', color: palette.textMuted, borderBottom: `1px solid ${hexToRgba(palette.primary, 0.06)}`, overflow: 'hidden' }}>
               {pasteMode === 'rods' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', width: '100%', textAlign: 'center', paddingBottom: 4 }}>
-                  <span>Label</span><span>Depth</span><span>X</span><span>Y</span><span>Dia</span><span>GridX</span><span>GridY</span>
+                <div style={{ display: 'flex', width: '100%', paddingBottom: 4 }}>
+                  {['Label', 'Depth', 'X', 'Y', 'Dia', 'GridX', 'GridY'].map(h => (
+                    <span key={h} style={{ flex: 1, textAlign: 'left', paddingLeft: 2 }}>{h}</span>
+                  ))}
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', width: '100%', textAlign: 'center', paddingBottom: 4 }}>
-                  <span>#</span><span>Label</span><span>Len</span><span>X1</span><span>Y1</span><span>Dia</span><span>X2</span><span>Y2</span>
+                <div style={{ display: 'flex', width: '100%', paddingBottom: 4 }}>
+                  {['#', 'Label', 'Len', 'X1', 'Y1', 'Dia', 'X2', 'Y2'].map(h => (
+                    <span key={h} style={{ flex: 1, textAlign: 'left', paddingLeft: 2 }}>{h}</span>
+                  ))}
                 </div>
               )}
             </div>
@@ -588,10 +596,11 @@ export function GridGeneratorPanel() {
                 : '1\tC1\t286\t0\t0\t1.5\t286\t0\n2\tC2\t286\t0\t8\t1.5\t286\t8'
               }
               style={{
-                width: '100%', minHeight: 80, padding: 10, fontSize: 11, fontFamily: 'monospace',
+                width: '100%', minHeight: 80, padding: '6px 10px', fontSize: 11,
+                fontFamily: 'ui-monospace, SFMono-Regular, monospace',
                 background: 'transparent', border: 'none', color: palette.text, outline: 'none',
-                resize: 'none', boxSizing: 'border-box', textAlign: 'center',
-                tabSize: 8,
+                resize: 'none', boxSizing: 'border-box', textAlign: 'left',
+                tabSize: 8, whiteSpace: 'pre',
               }}
             />
             <div style={{ display: 'flex', gap: 6, padding: '6px 10px' }}>
@@ -613,7 +622,7 @@ export function GridGeneratorPanel() {
           {rods.length > 0 && (
             <div style={{ borderRadius: 8, border: `1px solid ${hexToRgba(palette.primary, 0.15)}`, overflow: 'hidden' }}>
               <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: '#22c55e', background: hexToRgba('#22c55e', 0.08) }}>
-                Rods ({rods.length})
+                Ground Rods ({rods.length})
               </div>
               <div style={{ maxHeight: 150, overflowY: 'auto' }}>
                 <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse' }}>
@@ -839,8 +848,10 @@ export function GridGeneratorPanel() {
               <GridManualEditor
                 rods={rods}
                 conductors={conductors}
+                placements={placements}
                 onRodsChange={handleManualRodsChange}
                 onConductorsChange={handleManualConductorsChange}
+                onPlacementsChange={handleManualPlacementsChange}
               />
             )}
           </div>
@@ -855,7 +866,7 @@ export function GridGeneratorPanel() {
                 }}
               >
                 {[
-                  { label: 'Rods', value: rodOnlyCount, color: '#22c55e' },
+                  { label: 'Ground Rods', value: rodOnlyCount, color: '#22c55e' },
                   { label: 'Test Wells', value: testWellCount, color: '#ef4444' },
                   { label: 'Segments', value: segmentCount, color: '#f59e0b' },
                   { label: 'Tees', value: teeCount, color: '#3b82f6' },

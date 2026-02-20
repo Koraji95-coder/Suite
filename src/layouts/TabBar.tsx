@@ -1,4 +1,4 @@
-import React, { useCallback, useId, useRef, useState } from "react";
+import React, { useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Pin, PinOff, SplitSquareHorizontal } from "lucide-react";
 import {
@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -17,6 +18,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useTheme, hexToRgba } from "@/lib/palette";
 import { useWorkspace, type WorkspaceTab } from "./WorkspaceContext";
+
+const restrictToHorizontalAxis: Modifier = ({ transform }) => ({
+  ...transform,
+  y: 0,
+});
 
 interface SortableTabProps {
   tab: WorkspaceTab;
@@ -49,8 +55,8 @@ function SortableTab({ tab, active, isSplit, onClose, onClick, onPin, onSplit, c
     transition,
     display: "flex",
     alignItems: "center",
-    gap: 4,
-    padding: "0 10px",
+    gap: 3,
+    padding: "0 6px 0 10px",
     border: "none",
     borderBottom: active
       ? `2px solid ${palette.primary}`
@@ -81,6 +87,22 @@ function SortableTab({ tab, active, isSplit, onClose, onClick, onPin, onSplit, c
     setTimeout(() => document.addEventListener("click", closeCtx), 0);
   };
 
+  const iconBtnStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    cursor: "pointer",
+    opacity: 0.5,
+    transition: "opacity 0.15s ease, background 0.15s ease",
+    border: "none",
+    background: "transparent",
+    color: "inherit",
+    padding: 0,
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -93,40 +115,66 @@ function SortableTab({ tab, active, isSplit, onClose, onClick, onPin, onSplit, c
       onMouseLeave={() => { setShowActions(false); setShowCtx(false); }}
     >
       {tab.pinned && (
-        <Pin size={10} color={palette.textMuted} style={{ flexShrink: 0, opacity: 0.5 }} />
+        <Pin size={9} color={palette.textMuted} style={{ flexShrink: 0, opacity: 0.5 }} />
       )}
-      <span>{tab.label}</span>
+      <span style={{ marginRight: 2 }}>{tab.label}</span>
 
       {(showActions || active) && !isDragging && (
         <span
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 2,
-            marginLeft: 2,
+            gap: 1,
           }}
         >
+          <span
+            onClick={(e) => { e.stopPropagation(); onPin(tab.id); }}
+            style={iconBtnStyle}
+            title={tab.pinned ? "Unpin" : "Pin"}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = hexToRgba(palette.surfaceLight, 0.8);
+              e.currentTarget.style.opacity = "1";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.opacity = "0.5";
+            }}
+          >
+            {tab.pinned ? <PinOff size={10} /> : <Pin size={10} />}
+          </span>
+
+          <span
+            onClick={(e) => { e.stopPropagation(); onSplit(tab.id); }}
+            style={{
+              ...iconBtnStyle,
+              opacity: isSplit ? 0.9 : 0.5,
+              color: isSplit ? palette.primary : 'inherit',
+            }}
+            title="Split Right"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = hexToRgba(palette.surfaceLight, 0.8);
+              e.currentTarget.style.opacity = "1";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.opacity = isSplit ? "0.9" : "0.5";
+            }}
+          >
+            <SplitSquareHorizontal size={10} />
+          </span>
+
           {canClose && !tab.pinned && (
             <span
               onClick={(e) => onClose(e, tab.id)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 16,
-                height: 16,
-                borderRadius: 4,
-                cursor: "pointer",
-                opacity: 0.6,
-                transition: "opacity 0.15s ease, background 0.15s ease",
-              }}
+              style={iconBtnStyle}
+              title="Close"
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = hexToRgba(palette.surfaceLight, 0.8);
                 e.currentTarget.style.opacity = "1";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.opacity = "0.6";
+                e.currentTarget.style.opacity = "0.5";
               }}
             >
               <X size={11} />
@@ -269,6 +317,7 @@ export function TabBar() {
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
+      modifiers={[restrictToHorizontalAxis]}
     >
       <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
         <div

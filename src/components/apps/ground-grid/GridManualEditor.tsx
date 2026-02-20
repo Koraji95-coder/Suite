@@ -1,26 +1,45 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { Plus, Trash2, MousePointer, Move } from 'lucide-react';
+import { Plus, Trash2, MousePointer, X, Check } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
-import type { GridRod, GridConductor } from './types';
+import type { GridRod, GridConductor, GridPlacement } from './types';
 
-type EditorMode = 'select' | 'add-rod' | 'add-conductor' | 'delete';
+type EditorMode = 'select' | 'add-rod' | 'add-conductor' | 'add-tee' | 'add-cross' | 'delete';
+
+interface PlacementSuggestion {
+  type: EditorMode;
+  x: number;
+  y: number;
+  endX?: number;
+  endY?: number;
+  screenX: number;
+  screenY: number;
+}
 
 interface GridManualEditorProps {
   rods: GridRod[];
   conductors: GridConductor[];
+  placements: GridPlacement[];
   onRodsChange: (rods: GridRod[]) => void;
   onConductorsChange: (conductors: GridConductor[]) => void;
+  onPlacementsChange: (placements: GridPlacement[]) => void;
 }
 
-export function GridManualEditor({ rods, conductors, onRodsChange, onConductorsChange }: GridManualEditorProps) {
+export function GridManualEditor({
+  rods, conductors, placements,
+  onRodsChange, onConductorsChange, onPlacementsChange,
+}: GridManualEditorProps) {
   const { palette } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
   const [mode, setMode] = useState<EditorMode>('select');
   const [selectedRod, setSelectedRod] = useState<number | null>(null);
   const [selectedConductor, setSelectedConductor] = useState<number | null>(null);
   const [conductorStart, setConductorStart] = useState<{ x: number; y: number } | null>(null);
+  const [showRodInput, setShowRodInput] = useState(false);
+  const [showConductorInput, setShowConductorInput] = useState(false);
   const [coordInput, setCoordInput] = useState({ x: '', y: '' });
   const [lineInput, setLineInput] = useState({ x1: '', y1: '', x2: '', y2: '' });
+  const [suggestion, setSuggestion] = useState<PlacementSuggestion | null>(null);
+  const [suggestionCoords, setSuggestionCoords] = useState({ x: '', y: '', endX: '', endY: '' });
 
   const bounds = useMemo(() => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -56,35 +75,74 @@ export function GridManualEditor({ rods, conductors, onRodsChange, onConductorsC
     };
   }, [bounds]);
 
-  const handleSvgClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    const { x, y } = svgToWorld(e.clientX, e.clientY);
+  const snapToGrid = (val: number): number => Math.round(val * 100) / 100;
 
-    if (mode === 'add-rod') {
-      const newRod: GridRod = {
+  const confirmSuggestion = useCallback(() => {
+    if (!suggestion) return;
+    const x = parseFloat(suggestionCoords.x);
+    const y = parseFloat(suggestionCoords.y);
+    if (isNaN(x) || isNaN(y)) return;
+
+    if (suggestion.type === 'add-rod') {
+      onRodsChange([...rods, {
         label: `R${rods.length + 1}`,
-        grid_x: Math.round(x * 100) / 100,
-        grid_y: Math.round(y * 100) / 100,
-        depth: 20,
-        diameter: 1.5,
+        grid_x: x, grid_y: y,
+        depth: 20, diameter: 1.5,
         sort_order: rods.length,
-      };
-      onRodsChange([...rods, newRod]);
+      }]);
+    } else if (suggestion.type === 'add-conductor') {
+      const endX = parseFloat(suggestionCoords.endX);
+      const endY = parseFloat(suggestionCoords.endY);
+      if (isNaN(endX) || isNaN(endY)) return;
+      onConductorsChange([...conductors, {
+        label: `C${conductors.length + 1}`,
+        length: null,
+        x1: x, y1: y, x2: endX, y2: endY,
+        diameter: 1.5,
+        sort_order: conductors.length,
+      }]);
+      setConductorStart(null);
+    } else if (suggestion.type === 'add-tee') {
+      onPlacementsChange([...placements, {
+        type: 'TEE', grid_x: x, grid_y: y,
+        autocad_x: x, autocad_y: y, rotation_deg: 0,
+      }]);
+    } else if (suggestion.type === 'add-cross') {
+      onPlacementsChange([...placements, {
+        type: 'CROSS', grid_x: x, grid_y: y,
+        autocad_x: x, autocad_y: y, rotation_deg: 0,
+      }]);
+    }
+    setSuggestion(null);
+  }, [suggestion, suggestionCoords, rods, conductors, placements, onRodsChange, onConductorsChange, onPlacementsChange]);
+
+  const handleSvgClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (suggestion) return;
+    const { x, y } = svgToWorld(e.clientX, e.clientY);
+    const snappedX = snapToGrid(x);
+    const snappedY = snapToGrid(y);
+
+    if (mode === 'add-rod' || mode === 'add-tee' || mode === 'add-cross') {
+      setSuggestion({
+        type: mode,
+        x: snappedX, y: snappedY,
+        screenX: e.clientX, screenY: e.clientY,
+      });
+      setSuggestionCoords({ x: String(snappedX), y: String(snappedY), endX: '', endY: '' });
     } else if (mode === 'add-conductor') {
       if (!conductorStart) {
-        setConductorStart({ x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+        setConductorStart({ x: snappedX, y: snappedY });
       } else {
-        const newCond: GridConductor = {
-          label: `C${conductors.length + 1}`,
-          length: null,
-          x1: conductorStart.x,
-          y1: conductorStart.y,
-          x2: Math.round(x * 100) / 100,
-          y2: Math.round(y * 100) / 100,
-          diameter: 1.5,
-          sort_order: conductors.length,
-        };
-        onConductorsChange([...conductors, newCond]);
-        setConductorStart(null);
+        setSuggestion({
+          type: mode,
+          x: conductorStart.x, y: conductorStart.y,
+          endX: snappedX, endY: snappedY,
+          screenX: e.clientX, screenY: e.clientY,
+        });
+        setSuggestionCoords({
+          x: String(conductorStart.x), y: String(conductorStart.y),
+          endX: String(snappedX), endY: String(snappedY),
+        });
       }
     } else if (mode === 'delete') {
       const threshold = rodScale * 2;
@@ -115,21 +173,18 @@ export function GridManualEditor({ rods, conductors, onRodsChange, onConductorsC
         }
       }
     }
-  }, [mode, rods, conductors, onRodsChange, onConductorsChange, conductorStart, svgToWorld, rodScale]);
+  }, [mode, rods, conductors, onRodsChange, onConductorsChange, conductorStart, svgToWorld, rodScale, suggestion]);
 
   const addRodByCoord = () => {
     const x = parseFloat(coordInput.x);
     const y = parseFloat(coordInput.y);
     if (isNaN(x) || isNaN(y)) return;
-    const newRod: GridRod = {
+    onRodsChange([...rods, {
       label: `R${rods.length + 1}`,
-      grid_x: x,
-      grid_y: y,
-      depth: 20,
-      diameter: 1.5,
+      grid_x: x, grid_y: y,
+      depth: 20, diameter: 1.5,
       sort_order: rods.length,
-    };
-    onRodsChange([...rods, newRod]);
+    }]);
     setCoordInput({ x: '', y: '' });
   };
 
@@ -139,14 +194,12 @@ export function GridManualEditor({ rods, conductors, onRodsChange, onConductorsC
     const x2 = parseFloat(lineInput.x2);
     const y2 = parseFloat(lineInput.y2);
     if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return;
-    const newCond: GridConductor = {
+    onConductorsChange([...conductors, {
       label: `C${conductors.length + 1}`,
-      length: null,
-      x1, y1, x2, y2,
+      length: null, x1, y1, x2, y2,
       diameter: 1.5,
       sort_order: conductors.length,
-    };
-    onConductorsChange([...conductors, newCond]);
+    }]);
     setLineInput({ x1: '', y1: '', x2: '', y2: '' });
   };
 
@@ -176,19 +229,28 @@ export function GridManualEditor({ rods, conductors, onRodsChange, onConductorsC
     outline: 'none',
   };
 
+  const tees = placements.filter(p => p.type === 'TEE');
+  const crosses = placements.filter(p => p.type === 'CROSS');
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, height: '100%' }}>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button onClick={() => { setMode('select'); setConductorStart(null); }} style={btnStyle(mode === 'select')}>
+        <button onClick={() => { setMode('select'); setConductorStart(null); setSuggestion(null); }} style={btnStyle(mode === 'select')}>
           <MousePointer size={12} /> Select
         </button>
-        <button onClick={() => { setMode('add-rod'); setConductorStart(null); }} style={btnStyle(mode === 'add-rod')}>
+        <button onClick={() => { setMode('add-rod'); setConductorStart(null); setSuggestion(null); setShowRodInput(true); }} style={btnStyle(mode === 'add-rod')}>
           <Plus size={12} /> Add Rod
         </button>
-        <button onClick={() => { setMode('add-conductor'); setConductorStart(null); }} style={btnStyle(mode === 'add-conductor')}>
+        <button onClick={() => { setMode('add-conductor'); setConductorStart(null); setSuggestion(null); setShowConductorInput(true); }} style={btnStyle(mode === 'add-conductor')}>
           <Plus size={12} /> Add Conductor
         </button>
-        <button onClick={() => { setMode('delete'); setConductorStart(null); }} style={btnStyle(mode === 'delete')}>
+        <button onClick={() => { setMode('add-tee'); setConductorStart(null); setSuggestion(null); }} style={btnStyle(mode === 'add-tee')}>
+          <Plus size={12} /> Add Tee
+        </button>
+        <button onClick={() => { setMode('add-cross'); setConductorStart(null); setSuggestion(null); }} style={btnStyle(mode === 'add-cross')}>
+          <Plus size={12} /> Add Cross
+        </button>
+        <button onClick={() => { setMode('delete'); setConductorStart(null); setSuggestion(null); }} style={btnStyle(mode === 'delete')}>
           <Trash2 size={12} /> Delete
         </button>
 
@@ -199,24 +261,33 @@ export function GridManualEditor({ rods, conductors, onRodsChange, onConductorsC
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      {showRodInput && (
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 10, color: palette.textMuted }}>
           Rod:
           <input placeholder="X" value={coordInput.x} onChange={(e) => setCoordInput({ ...coordInput, x: e.target.value })} style={inputStyle} />
           <input placeholder="Y" value={coordInput.y} onChange={(e) => setCoordInput({ ...coordInput, y: e.target.value })} style={inputStyle} />
           <button onClick={addRodByCoord} style={btnStyle(false)}>Add</button>
+          <button onClick={() => setShowRodInput(false)} style={{ ...btnStyle(false), padding: '5px 6px' }}>
+            <X size={10} />
+          </button>
         </div>
+      )}
+
+      {showConductorInput && (
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 10, color: palette.textMuted }}>
-          Line:
+          Conductor:
           <input placeholder="X1" value={lineInput.x1} onChange={(e) => setLineInput({ ...lineInput, x1: e.target.value })} style={inputStyle} />
           <input placeholder="Y1" value={lineInput.y1} onChange={(e) => setLineInput({ ...lineInput, y1: e.target.value })} style={inputStyle} />
           <input placeholder="X2" value={lineInput.x2} onChange={(e) => setLineInput({ ...lineInput, x2: e.target.value })} style={inputStyle} />
           <input placeholder="Y2" value={lineInput.y2} onChange={(e) => setLineInput({ ...lineInput, y2: e.target.value })} style={inputStyle} />
           <button onClick={addConductorByCoord} style={btnStyle(false)}>Add</button>
+          <button onClick={() => setShowConductorInput(false)} style={{ ...btnStyle(false), padding: '5px 6px' }}>
+            <X size={10} />
+          </button>
         </div>
-      </div>
+      )}
 
-      <div style={{ flex: 1, minHeight: 300, borderRadius: 8, border: `1px solid ${hexToRgba(palette.primary, 0.15)}`, overflow: 'hidden' }}>
+      <div style={{ flex: 1, minHeight: 300, borderRadius: 8, border: `1px solid ${hexToRgba(palette.primary, 0.15)}`, overflow: 'hidden', position: 'relative' }}>
         <svg
           ref={svgRef}
           viewBox={viewBox}
@@ -229,15 +300,26 @@ export function GridManualEditor({ rods, conductors, onRodsChange, onConductorsC
           onClick={handleSvgClick}
         >
           {conductors.map((c, i) => (
-            <line
-              key={`c-${i}`}
-              x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2}
-              stroke={selectedConductor === i ? '#fff' : hexToRgba('#f59e0b', 0.6)}
-              strokeWidth={rodScale * (selectedConductor === i ? 0.6 : 0.4)}
-              strokeLinecap="round"
-              onClick={(e) => { e.stopPropagation(); if (mode === 'select') setSelectedConductor(i); }}
-              style={{ cursor: mode === 'select' ? 'pointer' : undefined }}
-            />
+            <g key={`c-${i}`}>
+              <line
+                x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2}
+                stroke={selectedConductor === i ? '#fff' : hexToRgba('#f59e0b', 0.6)}
+                strokeWidth={rodScale * (selectedConductor === i ? 0.6 : 0.4)}
+                strokeLinecap="round"
+                onClick={(e) => { e.stopPropagation(); if (mode === 'select') setSelectedConductor(i); }}
+                style={{ cursor: mode === 'select' ? 'pointer' : undefined }}
+              />
+              <text
+                x={(c.x1 + c.x2) / 2}
+                y={(c.y1 + c.y2) / 2 - rodScale * 0.8}
+                fontSize={rodScale * 0.7}
+                fill={palette.textMuted}
+                textAnchor="middle"
+                style={{ pointerEvents: 'none' }}
+              >
+                {c.label}
+              </text>
+            </g>
           ))}
 
           {rods.map((r, i) => (
@@ -261,6 +343,66 @@ export function GridManualEditor({ rods, conductors, onRodsChange, onConductorsC
                 x2={r.grid_x} y2={r.grid_y + rodScale * 0.7}
                 stroke={selectedRod === i ? '#fff' : '#22c55e'} strokeWidth={rodScale * 0.15}
               />
+              <text
+                x={r.grid_x}
+                y={r.grid_y - rodScale * 1.3}
+                fontSize={rodScale * 0.7}
+                fill={palette.textMuted}
+                textAnchor="middle"
+                style={{ pointerEvents: 'none' }}
+              >
+                {r.label}
+              </text>
+            </g>
+          ))}
+
+          {tees.map((p, i) => (
+            <g key={`tee-${i}`}>
+              <rect
+                x={p.grid_x - rodScale * 0.6}
+                y={p.grid_y - rodScale * 0.6}
+                width={rodScale * 1.2}
+                height={rodScale * 1.2}
+                fill={hexToRgba('#3b82f6', 0.3)}
+                stroke="#3b82f6"
+                strokeWidth={rodScale * 0.15}
+                rx={rodScale * 0.1}
+              />
+              <text
+                x={p.grid_x}
+                y={p.grid_y + rodScale * 0.25}
+                fontSize={rodScale * 0.5}
+                fill="#3b82f6"
+                textAnchor="middle"
+                style={{ pointerEvents: 'none', fontWeight: 700 }}
+              >
+                T
+              </text>
+            </g>
+          ))}
+
+          {crosses.map((p, i) => (
+            <g key={`cross-${i}`}>
+              <rect
+                x={p.grid_x - rodScale * 0.6}
+                y={p.grid_y - rodScale * 0.6}
+                width={rodScale * 1.2}
+                height={rodScale * 1.2}
+                fill={hexToRgba('#06b6d4', 0.3)}
+                stroke="#06b6d4"
+                strokeWidth={rodScale * 0.15}
+                rx={rodScale * 0.1}
+              />
+              <text
+                x={p.grid_x}
+                y={p.grid_y + rodScale * 0.25}
+                fontSize={rodScale * 0.5}
+                fill="#06b6d4"
+                textAnchor="middle"
+                style={{ pointerEvents: 'none', fontWeight: 700 }}
+              >
+                +
+              </text>
             </g>
           ))}
 
@@ -268,6 +410,82 @@ export function GridManualEditor({ rods, conductors, onRodsChange, onConductorsC
             <circle cx={conductorStart.x} cy={conductorStart.y} r={rodScale * 0.5} fill="#f59e0b" opacity={0.8} />
           )}
         </svg>
+
+        {suggestion && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: palette.surface,
+              border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
+              borderRadius: 10,
+              padding: 16,
+              boxShadow: `0 8px 32px ${hexToRgba('#000', 0.4)}`,
+              zIndex: 20,
+              minWidth: 220,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 12, fontWeight: 700, color: palette.text, marginBottom: 10 }}>
+              {suggestion.type === 'add-rod' ? 'Place Rod' :
+               suggestion.type === 'add-conductor' ? 'Place Conductor' :
+               suggestion.type === 'add-tee' ? 'Place Tee' : 'Place Cross'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <label style={{ fontSize: 10, color: palette.textMuted, width: 20 }}>
+                  {suggestion.type === 'add-conductor' ? 'X1' : 'X'}
+                </label>
+                <input
+                  value={suggestionCoords.x}
+                  onChange={e => setSuggestionCoords(s => ({ ...s, x: e.target.value }))}
+                  style={{ ...inputStyle, flex: 1 }}
+                  autoFocus
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <label style={{ fontSize: 10, color: palette.textMuted, width: 20 }}>
+                  {suggestion.type === 'add-conductor' ? 'Y1' : 'Y'}
+                </label>
+                <input
+                  value={suggestionCoords.y}
+                  onChange={e => setSuggestionCoords(s => ({ ...s, y: e.target.value }))}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+              </div>
+              {suggestion.type === 'add-conductor' && (
+                <>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <label style={{ fontSize: 10, color: palette.textMuted, width: 20 }}>X2</label>
+                    <input
+                      value={suggestionCoords.endX}
+                      onChange={e => setSuggestionCoords(s => ({ ...s, endX: e.target.value }))}
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <label style={{ fontSize: 10, color: palette.textMuted, width: 20 }}>Y2</label>
+                    <input
+                      value={suggestionCoords.endY}
+                      onChange={e => setSuggestionCoords(s => ({ ...s, endY: e.target.value }))}
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+              <button onClick={confirmSuggestion} style={{ ...btnStyle(true), flex: 1, justifyContent: 'center' }}>
+                <Check size={12} /> Confirm
+              </button>
+              <button onClick={() => { setSuggestion(null); setConductorStart(null); }} style={{ ...btnStyle(false), flex: 1, justifyContent: 'center' }}>
+                <X size={12} /> Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

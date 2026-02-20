@@ -1,5 +1,6 @@
-import { useRef, useEffect, useMemo, useState } from 'react';
+import { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import * as THREE from 'three';
+import { Pause, Play } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import type { GridRod, GridConductor, GridPlacement } from './types';
 
@@ -21,7 +22,15 @@ export function GridPreview3D({ rods, conductors, placements }: GridPreview3DPro
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const [isRotating, setIsRotating] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
+
+  const togglePause = useCallback(() => {
+    setPaused(p => {
+      pausedRef.current = !p;
+      return !p;
+    });
+  }, []);
 
   const bounds = useMemo(() => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -172,14 +181,18 @@ export function GridPreview3D({ rods, conductors, placements }: GridPreview3DPro
     pointLight.position.set(0, 1, 0);
     scene.add(pointLight);
 
-    camera.position.set(0.8, 0.6, 0.8);
-    camera.lookAt(0, 0, 0);
-
+    const radius = 1.55;
     let mouseDown = false;
     let lastMouse = { x: 0, y: 0 };
     let theta = Math.PI / 4;
     let phi = Math.PI / 4;
-    const radius = 1.2;
+
+    camera.position.set(
+      radius * Math.sin(phi) * Math.cos(theta),
+      radius * Math.cos(phi),
+      radius * Math.sin(phi) * Math.sin(theta),
+    );
+    camera.lookAt(0, 0, 0);
 
     const updateCamera = () => {
       camera.position.x = radius * Math.sin(phi) * Math.cos(theta);
@@ -191,7 +204,6 @@ export function GridPreview3D({ rods, conductors, placements }: GridPreview3DPro
     const onMouseDown = (e: MouseEvent) => {
       mouseDown = true;
       lastMouse = { x: e.clientX, y: e.clientY };
-      setIsRotating(false);
     };
     const onMouseMove = (e: MouseEvent) => {
       if (!mouseDown) return;
@@ -204,7 +216,13 @@ export function GridPreview3D({ rods, conductors, placements }: GridPreview3DPro
     };
     const onMouseUp = () => { mouseDown = false; };
 
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
     canvas.addEventListener('mousedown', onMouseDown);
+    canvas.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
 
@@ -218,13 +236,12 @@ export function GridPreview3D({ rods, conductors, placements }: GridPreview3DPro
 
     let disposed = false;
     let animId = 0;
-    const clock = new THREE.Clock();
 
     const animate = () => {
       if (disposed) return;
       animId = requestAnimationFrame(animate);
 
-      if (!mouseDown) {
+      if (!mouseDown && !pausedRef.current) {
         theta += 0.002;
         updateCamera();
       }
@@ -237,6 +254,7 @@ export function GridPreview3D({ rods, conductors, placements }: GridPreview3DPro
       disposed = true;
       cancelAnimationFrame(animId);
       canvas.removeEventListener('mousedown', onMouseDown);
+      canvas.removeEventListener('wheel', onWheel);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('resize', handleResize);
@@ -280,6 +298,29 @@ export function GridPreview3D({ rods, conductors, placements }: GridPreview3DPro
           cursor: 'grab',
         }}
       />
+      <button
+        onClick={togglePause}
+        style={{
+          position: 'absolute',
+          top: 8,
+          left: 8,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '4px 10px',
+          fontSize: 10,
+          fontWeight: 600,
+          color: palette.text,
+          background: hexToRgba(palette.background, 0.8),
+          border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+          borderRadius: 5,
+          cursor: 'pointer',
+          backdropFilter: 'blur(4px)',
+        }}
+      >
+        {paused ? <Play size={11} /> : <Pause size={11} />}
+        {paused ? 'Play' : 'Pause'}
+      </button>
       <div
         style={{
           position: 'absolute',
@@ -293,7 +334,7 @@ export function GridPreview3D({ rods, conductors, placements }: GridPreview3DPro
           pointerEvents: 'none',
         }}
       >
-        Drag to orbit / Auto-rotating
+        Drag to orbit{paused ? '' : ' / Auto-rotating'}
       </div>
     </div>
   );

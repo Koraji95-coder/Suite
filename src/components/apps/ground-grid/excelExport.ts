@@ -188,12 +188,53 @@ export async function exportGridToExcel(
 
   }
 
+  if (conductors.length > 0) {
+    currentRow++;
+    const condSectionRow = wsPlace.getRow(currentRow);
+    wsPlace.mergeCells(currentRow, 1, currentRow, placeHeaders.length);
+    condSectionRow.getCell(1).value = `Conductors (${conductors.length})`;
+    condSectionRow.getCell(1).font = SECTION_FONT;
+    condSectionRow.getCell(1).fill = CONDS_SECTION_FILL;
+    condSectionRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+    applyRowFill(condSectionRow, CONDS_SECTION_FILL, placeHeaders.length);
+    condSectionRow.height = 24;
+    currentRow++;
+
+    const condHeaders = ['Label', 'Length', 'X1', 'Y1', 'X2', 'Y2'];
+    const condHeaderRow = wsPlace.getRow(currentRow);
+    condHeaders.forEach((h, i) => {
+      const cell = condHeaderRow.getCell(i + 1);
+      cell.value = h;
+      cell.font = HEADER_FONT;
+      cell.fill = CONDS_HEADER_FILL;
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = { ...ALL_BORDER, bottom: { style: 'medium', color: { argb: 'FF3A3F47' } } };
+    });
+    condHeaderRow.height = 22;
+    currentRow++;
+
+    conductors.forEach((c, idx) => {
+      const row = wsPlace.getRow(currentRow);
+      const values = [c.label, c.length ?? '', c.x1, c.y1, c.x2, c.y2];
+      const fill = idx % 2 === 0 ? EVEN_FILL : ODD_FILL;
+      values.forEach((v, ci) => {
+        const cell = row.getCell(ci + 1);
+        cell.value = v;
+        cell.fill = fill;
+        cell.border = ALL_BORDER;
+        cell.font = ci === 0 ? BOLD_DATA_FONT : DATA_FONT;
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+      currentRow++;
+    });
+  }
+
   const placeLastRow = currentRow - 1;
   autofitColumns(wsPlace, placeHeaders.length, placeLastRow);
   hideUnusedCells(wsPlace, placeHeaders.length, placeLastRow);
 
   if (rods.length > 0) {
-    const wsRods = wb.addWorksheet('Rods');
+    const wsRods = wb.addWorksheet('Ground Rods');
     const rodHeaders = ['Label', 'Grid X', 'Grid Y', 'Depth', 'Diameter'];
 
     const rTitleRow = wsRods.getRow(1);
@@ -208,7 +249,7 @@ export async function exportGridToExcel(
 
     const rSectionRow = wsRods.getRow(2);
     wsRods.mergeCells(2, 1, 2, rodHeaders.length);
-    rSectionRow.getCell(1).value = `Rods (${rods.length})`;
+    rSectionRow.getCell(1).value = `Ground Rods (${rods.length})`;
     rSectionRow.getCell(1).font = SECTION_FONT;
     rSectionRow.getCell(1).fill = RODS_SECTION_FILL;
     rSectionRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };

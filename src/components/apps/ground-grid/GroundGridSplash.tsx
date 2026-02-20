@@ -27,6 +27,10 @@ function clamp(v: number, min: number, max: number) {
 
 const AMBER = '#f59e0b';
 const COPPER = '#ea580c';
+const AMBER_HEX = 0xf59e0b;
+const GREEN_HEX = 0x22c55e;
+const COPPER_HEX = 0xea580c;
+const GROUND_HEX = 0x2a1f0e;
 
 export interface GroundGridSplashProps {
   onComplete: () => void;
@@ -91,51 +95,120 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
     return () => cancelAnimationFrame(rafId);
   }, [step, steps, total]);
 
-  const plane1Ref = useRef<THREE.Mesh | null>(null);
-  const frontLightRef = useRef<THREE.PointLight | null>(null);
-  const backLightRef = useRef<THREE.PointLight | null>(null);
   const progressRef = useRef(progress);
   const isExitingAnimRef = useRef(isExiting);
+  const stepRef = useRef(step);
   useEffect(() => { progressRef.current = progress; }, [progress]);
   useEffect(() => { isExitingAnimRef.current = isExiting; }, [isExiting]);
+  useEffect(() => { stepRef.current = step; }, [step]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    camera.position.z = 4.5;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
 
-    const geo1 = new THREE.PlaneGeometry(14, 14, 128, 128);
-    const mat1 = new THREE.MeshStandardMaterial({
-      color: AMBER,
-      wireframe: true,
+    const gridGroup = new THREE.Group();
+    scene.add(gridGroup);
+
+    const groundGeo = new THREE.PlaneGeometry(8, 8);
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: GROUND_HEX,
       transparent: true,
-      opacity: 0.3,
-      emissive: new THREE.Color(AMBER).multiplyScalar(0.3),
+      opacity: 0.5,
+      side: THREE.DoubleSide,
     });
-    const plane1 = new THREE.Mesh(geo1, mat1);
-    plane1.rotation.x = -Math.PI / 3.2;
-    plane1.rotation.z = 0.15;
-    scene.add(plane1);
-    plane1Ref.current = plane1;
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.05;
+    gridGroup.add(ground);
 
-    const ambientLight = new THREE.AmbientLight(AMBER, 0.15);
-    scene.add(ambientLight);
+    const conductorMat = new THREE.MeshStandardMaterial({
+      color: AMBER_HEX,
+      emissive: new THREE.Color(AMBER_HEX).multiplyScalar(0.2),
+      metalness: 0.7,
+      roughness: 0.3,
+      transparent: true,
+      opacity: 0,
+    });
 
-    const frontLight = new THREE.PointLight(AMBER, 0.5);
-    frontLight.position.set(2, 3, 4);
+    const gridLines: THREE.Mesh[] = [];
+    const gridSize = 3;
+    const spacing = 1.2;
+    for (let i = 0; i <= gridSize; i++) {
+      const x = -gridSize * spacing / 2 + i * spacing;
+      const geo = new THREE.CylinderGeometry(0.015, 0.015, gridSize * spacing, 6);
+      const meshH = new THREE.Mesh(geo, conductorMat.clone());
+      meshH.position.set(x, 0.02, 0);
+      meshH.rotation.z = Math.PI / 2;
+      meshH.rotation.y = Math.PI / 2;
+      gridGroup.add(meshH);
+      gridLines.push(meshH);
+
+      const meshV = new THREE.Mesh(geo.clone(), conductorMat.clone());
+      meshV.position.set(0, 0.02, x);
+      meshV.rotation.z = Math.PI / 2;
+      gridGroup.add(meshV);
+      gridLines.push(meshV);
+    }
+
+    const rodMat = new THREE.MeshStandardMaterial({
+      color: GREEN_HEX,
+      emissive: new THREE.Color(GREEN_HEX).multiplyScalar(0.25),
+      metalness: 0.5,
+      roughness: 0.4,
+      transparent: true,
+      opacity: 0,
+    });
+
+    const rodMeshes: THREE.Group[] = [];
+    for (let i = 0; i <= gridSize; i++) {
+      for (let j = 0; j <= gridSize; j++) {
+        if ((i === 0 || i === gridSize) && (j === 0 || j === gridSize) || (i + j) % 2 === 0) {
+          const x = -gridSize * spacing / 2 + i * spacing;
+          const z = -gridSize * spacing / 2 + j * spacing;
+          const rodGroup = new THREE.Group();
+
+          const rodGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.35, 8);
+          const rod = new THREE.Mesh(rodGeo, rodMat.clone());
+          rod.position.set(0, -0.15, 0);
+          rodGroup.add(rod);
+
+          const capGeo = new THREE.SphereGeometry(0.035, 8, 6);
+          const cap = new THREE.Mesh(capGeo, rodMat.clone());
+          cap.position.set(0, 0.03, 0);
+          rodGroup.add(cap);
+
+          rodGroup.position.set(x, 0, z);
+          gridGroup.add(rodGroup);
+          rodMeshes.push(rodGroup);
+        }
+      }
+    }
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+    scene.add(ambient);
+
+    const frontLight = new THREE.PointLight(AMBER_HEX, 0.8, 15);
+    frontLight.position.set(3, 5, 4);
     scene.add(frontLight);
-    frontLightRef.current = frontLight;
 
-    const backLight = new THREE.PointLight(COPPER, 0.3);
-    backLight.position.set(-4, 2, -3);
+    const backLight = new THREE.PointLight(COPPER_HEX, 0.4, 15);
+    backLight.position.set(-4, 3, -3);
     scene.add(backLight);
-    backLightRef.current = backLight;
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    rimLight.position.set(0, 5, -5);
+    scene.add(rimLight);
+
+    camera.position.set(3.5, 3, 3.5);
+    camera.lookAt(0, 0, 0);
 
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -144,52 +217,52 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
     };
     window.addEventListener('resize', handleResize);
 
-    const clock = new THREE.Clock();
     let rafId = 0;
     let disposed = false;
-
-    const baseOpacity1 = 0.3;
-    const baseFrontIntensity = 0.5;
-    const baseBackIntensity = 0.3;
-
-    let lastTime = performance.now() / 1000;
+    const clock = new THREE.Clock();
+    let gridOpacity = 0;
+    let rodOpacity = 0;
 
     const tick = () => {
       if (disposed) return;
       rafId = requestAnimationFrame(tick);
 
-      const currentTime = performance.now() / 1000;
-      const deltaSec = Math.min(0.1, currentTime - lastTime);
-      lastTime = currentTime;
+      const elapsed = clock.getElapsedTime();
+      const prog = clamp(progressRef.current / 100, 0, 1);
+      const currentStep = stepRef.current;
 
-      const elapsedTime = clock.getElapsedTime();
+      const targetGridOpacity = currentStep >= 1 ? 0.9 : prog * 0.4;
+      gridOpacity += (targetGridOpacity - gridOpacity) * 0.05;
+      for (const m of gridLines) {
+        (m.material as THREE.MeshStandardMaterial).opacity = gridOpacity;
+      }
 
-      const progressFactor = clamp(progressRef.current / 100, 0, 1);
-      const frontIntensity = baseFrontIntensity + progressFactor * 1.0;
+      const targetRodOpacity = currentStep >= 2 ? 0.9 : 0;
+      rodOpacity += (targetRodOpacity - rodOpacity) * 0.05;
+      for (const rg of rodMeshes) {
+        rg.children.forEach(c => {
+          if (c instanceof THREE.Mesh) {
+            (c.material as THREE.MeshStandardMaterial).opacity = rodOpacity;
+          }
+        });
+      }
 
       let exitFactor = 1.0;
-      if (isExitingAnimRef.current && !reducedMotion) {
-        const exitSpeed = 1.0 / (exitDurationMs / 1000);
-        if (plane1Ref.current) {
-          exitFactor = Math.max(0, (plane1Ref.current.material as THREE.Material).opacity / baseOpacity1 - deltaSec * exitSpeed);
-        }
+      if (isExitingAnimRef.current) {
+        exitFactor = Math.max(0, 1.0 - elapsed * 0.3);
+        gridGroup.scale.setScalar(exitFactor);
+        gridGroup.rotation.y += 0.01;
       }
 
-      if (plane1Ref.current) {
-        const m = plane1Ref.current.material as THREE.Material;
-        m.opacity = baseOpacity1 * exitFactor;
-        plane1Ref.current.scale.setScalar(exitFactor);
-      }
-      if (frontLightRef.current) {
-        frontLightRef.current.intensity = frontIntensity * exitFactor;
-      }
-      if (backLightRef.current) {
-        backLightRef.current.intensity = baseBackIntensity * exitFactor;
-      }
+      const orbitSpeed = 0.15;
+      const radius = 4.5 - prog * 0.8;
+      const angle = elapsed * orbitSpeed;
+      camera.position.x = Math.cos(angle) * radius * 0.85;
+      camera.position.y = 2.5 + Math.sin(elapsed * 0.2) * 0.3;
+      camera.position.z = Math.sin(angle) * radius * 0.85;
+      camera.lookAt(0, -0.2, 0);
 
-      camera.position.x = Math.sin(elapsedTime * 0.15) * 0.4;
-      camera.position.y = Math.cos(elapsedTime * 0.1) * 0.2;
-      camera.lookAt(0, 0, 0);
+      frontLight.intensity = 0.6 + prog * 0.8;
 
       renderer.render(scene, camera);
     };
@@ -201,8 +274,13 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
       cancelAnimationFrame(rafId);
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
-      geo1.dispose();
-      mat1.dispose();
+      scene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry.dispose();
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+      });
     };
   }, [exitDurationMs, reducedMotion]);
 
@@ -216,11 +294,11 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
         transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
-      <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight} className="absolute inset-0 opacity-50" />
+      <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight} className="absolute inset-0 opacity-70" />
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: `radial-gradient(circle at 50% 45%, ${hexToRgba(AMBER, 0.12)}, ${hexToRgba(COPPER, 0.05)} 38%, ${palette.background} 70%)`,
+          background: `radial-gradient(circle at 50% 45%, ${hexToRgba(AMBER, 0.1)}, ${hexToRgba(COPPER, 0.04)} 38%, ${palette.background} 70%)`,
         }}
       />
       <div

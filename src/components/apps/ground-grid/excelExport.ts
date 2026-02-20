@@ -62,12 +62,12 @@ function autofitColumns(ws: ExcelJS.Worksheet, colCount: number, lastDataRow: nu
 }
 
 function hideUnusedCells(ws: ExcelJS.Worksheet, colCount: number, lastDataRow: number) {
-  for (let c = colCount + 1; c <= colCount + 50; c++) {
+  for (let c = colCount + 1; c <= colCount + 200; c++) {
     ws.getColumn(c).width = 0;
     ws.getColumn(c).hidden = true;
   }
 
-  for (let r = lastDataRow + 1; r <= lastDataRow + 200; r++) {
+  for (let r = lastDataRow + 1; r <= lastDataRow + 500; r++) {
     ws.getRow(r).hidden = true;
   }
 
@@ -154,7 +154,7 @@ export async function exportGridToExcel(
         cell.fill = fill;
         cell.border = ALL_BORDER;
         cell.font = ci === 0 ? BOLD_DATA_FONT : DATA_FONT;
-        cell.alignment = { horizontal: ci === 0 ? 'left' : 'center', vertical: 'middle' };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
         if (typeof v === 'number') cell.numFmt = ci >= 3 ? '0.0000' : '0';
       });
       currentRow++;
@@ -210,7 +210,7 @@ export async function exportGridToExcel(
         cell.fill = fill;
         cell.border = ALL_BORDER;
         cell.font = ci === 0 ? BOLD_DATA_FONT : DATA_FONT;
-        cell.alignment = { horizontal: ci === 0 ? 'left' : 'center', vertical: 'middle' };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
       });
     });
 
@@ -263,7 +263,7 @@ export async function exportGridToExcel(
         cell.fill = fill;
         cell.border = ALL_BORDER;
         cell.font = ci === 0 ? BOLD_DATA_FONT : DATA_FONT;
-        cell.alignment = { horizontal: ci === 0 ? 'left' : 'center', vertical: 'middle' };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
       });
     });
 

@@ -100,58 +100,69 @@ export function GridGeneratorPanel() {
 
   async function saveDesign() {
     setSaving(true);
+    addLog('generator', '[PROCESSING] Saving design...');
     try {
       if (currentDesign) {
-        await supabase.from('ground_grid_designs').update({
+        const { error: updateErr } = await supabase.from('ground_grid_designs').update({
           name: designName,
           project_id: linkedProjectId,
           config,
           updated_at: new Date().toISOString(),
         }).eq('id', currentDesign.id);
+        if (updateErr) throw updateErr;
 
         await supabase.from('ground_grid_rods').delete().eq('design_id', currentDesign.id);
         await supabase.from('ground_grid_conductors').delete().eq('design_id', currentDesign.id);
 
         if (rods.length > 0) {
-          await supabase.from('ground_grid_rods').insert(
+          const { error: rodsErr } = await supabase.from('ground_grid_rods').insert(
             rods.map(r => ({ design_id: currentDesign.id, label: r.label, grid_x: r.grid_x, grid_y: r.grid_y, depth: r.depth, diameter: r.diameter, sort_order: r.sort_order }))
           );
+          if (rodsErr) throw rodsErr;
         }
         if (conductors.length > 0) {
-          await supabase.from('ground_grid_conductors').insert(
+          const { error: condsErr } = await supabase.from('ground_grid_conductors').insert(
             conductors.map(c => ({ design_id: currentDesign.id, label: c.label, length: c.length, x1: c.x1, y1: c.y1, x2: c.x2, y2: c.y2, diameter: c.diameter, sort_order: c.sort_order }))
           );
+          if (condsErr) throw condsErr;
         }
 
+        addLog('generator', '[SUCCESS] Design saved');
         showToast('success', 'Design saved');
       } else {
-        const { data } = await supabase.from('ground_grid_designs').insert({
+        const { data, error: insertErr } = await supabase.from('ground_grid_designs').insert({
           name: designName,
           project_id: linkedProjectId,
           config,
         }).select().maybeSingle();
+        if (insertErr) throw insertErr;
 
         if (data) {
           const design = data as GridDesign;
           setCurrentDesign(design);
 
           if (rods.length > 0) {
-            await supabase.from('ground_grid_rods').insert(
+            const { error: rodsErr } = await supabase.from('ground_grid_rods').insert(
               rods.map(r => ({ design_id: design.id, label: r.label, grid_x: r.grid_x, grid_y: r.grid_y, depth: r.depth, diameter: r.diameter, sort_order: r.sort_order }))
             );
+            if (rodsErr) throw rodsErr;
           }
           if (conductors.length > 0) {
-            await supabase.from('ground_grid_conductors').insert(
+            const { error: condsErr } = await supabase.from('ground_grid_conductors').insert(
               conductors.map(c => ({ design_id: design.id, label: c.label, length: c.length, x1: c.x1, y1: c.y1, x2: c.x2, y2: c.y2, diameter: c.diameter, sort_order: c.sort_order }))
             );
+            if (condsErr) throw condsErr;
           }
 
+          addLog('generator', '[SUCCESS] Design created');
           showToast('success', 'Design created');
           loadDesigns();
         }
       }
-    } catch {
-      showToast('error', 'Failed to save');
+    } catch (err: unknown) {
+      const msg = err && typeof err === 'object' && 'message' in err ? (err as { message: string }).message : String(err);
+      addLog('generator', `[ERROR] Save failed: ${msg}`);
+      showToast('error', `Failed to save: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -605,7 +616,18 @@ export function GridGeneratorPanel() {
             {placements.length > 0 && (
               <>
                 <button
-                  onClick={() => exportGridToExcel(designName, placements, rods, conductors)}
+                  onClick={async () => {
+                    addLog('generator', '[PROCESSING] Exporting to Excel...');
+                    try {
+                      await exportGridToExcel(designName, placements, rods, conductors);
+                      addLog('generator', '[SUCCESS] Excel file exported');
+                      showToast('success', 'Excel file exported');
+                    } catch (err: unknown) {
+                      const msg = err && typeof err === 'object' && 'message' in err ? (err as { message: string }).message : String(err);
+                      addLog('generator', `[ERROR] Excel export failed: ${msg}`);
+                      showToast('error', `Excel export failed: ${msg}`);
+                    }
+                  }}
                   style={btnStyle()}
                 >
                   <FileSpreadsheet size={14} /> Export Excel

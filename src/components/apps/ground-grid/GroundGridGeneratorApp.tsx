@@ -6,7 +6,6 @@ import { GridGeneratorPanel } from './GridGeneratorPanel';
 import { UnifiedLog } from './UnifiedLog';
 import { GroundGridProvider, useGroundGrid } from './GroundGridContext';
 import { GroundGridSplash } from './GroundGridSplash';
-import { GridBackground } from './GridBackground';
 
 const SESSION_KEY = 'gg-splash-shown';
 
@@ -33,8 +32,6 @@ function GroundGridGeneratorInner() {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       {showSplash && <GroundGridSplash onComplete={handleSplashComplete} />}
-
-      <GridBackground opacity={0.12} />
 
       <div
         style={{

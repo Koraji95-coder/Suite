@@ -4,9 +4,29 @@ import { LoadingCard } from '@/data/LoadingCard';
 import { ProgressBar } from '@/data/ProgressBar';
 import { useTheme, hexToRgba } from '@/lib/palette';
 
+function usePrefersReducedMotion() {
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReducedMotion(media.matches);
+    update();
+    if (media.addEventListener) {
+      media.addEventListener('change', update);
+      return () => media.removeEventListener('change', update);
+    }
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
+  return reducedMotion;
+}
+
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
+
+const AMBER = '#f59e0b';
+const COPPER = '#ea580c';
 
 export interface GroundGridSplashProps {
   onComplete: () => void;
@@ -14,6 +34,7 @@ export interface GroundGridSplashProps {
 
 export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
   const { palette } = useTheme();
+  const reducedMotion = usePrefersReducedMotion();
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
@@ -22,14 +43,14 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
   onCompleteRef.current = onComplete;
 
   const steps = useMemo(() => [
-    { id: 'coords', label: 'Parsing coordinates', duration: 1600 },
-    { id: 'topology', label: 'Building topology', duration: 2000 },
-    { id: 'rods', label: 'Placing ground rods', duration: 1800 },
-    { id: 'preview', label: 'Generating grid preview', duration: 1400 },
-  ], []);
+    { id: 'coords', label: 'Parsing coordinates', duration: reducedMotion ? 400 : 1600 },
+    { id: 'topology', label: 'Building topology', duration: reducedMotion ? 500 : 2000 },
+    { id: 'rods', label: 'Placing ground rods', duration: reducedMotion ? 450 : 1800 },
+    { id: 'preview', label: 'Generating grid preview', duration: reducedMotion ? 350 : 1400 },
+  ], [reducedMotion]);
 
   const total = useMemo(() => steps.reduce((s, x) => s + x.duration, 0), [steps]);
-  const exitDurationMs = 1800;
+  const exitDurationMs = reducedMotion ? 450 : 1800;
   const isComplete = step >= steps.length;
 
   useEffect(() => {
@@ -46,27 +67,34 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
     setIsExiting(true);
     const t = setTimeout(() => onCompleteRef.current(), exitDurationMs);
     return () => clearTimeout(t);
-  }, [isComplete]);
+  }, [exitDurationMs, isComplete]);
 
   useEffect(() => {
     if (step >= steps.length) return;
     if (!Number.isFinite(total) || total <= 0) return;
     const elapsed = steps.slice(0, step).reduce((s, x) => s + x.duration, 0);
-    const cur = steps[step]?.duration ?? 1;
+    const curRaw = steps[Math.min(step, steps.length - 1)]?.duration ?? 1;
+    const cur = Number.isFinite(curRaw) && curRaw > 0 ? curRaw : 1;
     const startP = clamp((elapsed / total) * 100, 0, 100);
     const endP = clamp(((elapsed + cur) / total) * 100, 0, 100);
     setProgress(startP);
     const t0 = performance.now();
     let rafId = 0;
     const animate = () => {
-      const a = clamp((performance.now() - t0) / cur, 0, 1);
-      setProgress(startP + (endP - startP) * a);
+      const now = performance.now();
+      const a = clamp((now - t0) / cur, 0, 1);
+      const next = startP + (endP - startP) * a;
+      setProgress(Number.isFinite(next) ? next : startP);
       if (a < 1) rafId = requestAnimationFrame(animate);
     };
     rafId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafId);
   }, [step, steps, total]);
 
+  const plane1Ref = useRef<THREE.Mesh | null>(null);
+  const plane2Ref = useRef<THREE.Mesh | null>(null);
+  const frontLightRef = useRef<THREE.PointLight | null>(null);
+  const backLightRef = useRef<THREE.PointLight | null>(null);
   const progressRef = useRef(progress);
   const isExitingAnimRef = useRef(isExiting);
   useEffect(() => { progressRef.current = progress; }, [progress]);
@@ -85,40 +113,44 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
 
     const geo1 = new THREE.PlaneGeometry(14, 14, 128, 128);
     const mat1 = new THREE.MeshStandardMaterial({
-      color: '#f59e0b',
+      color: AMBER,
       wireframe: true,
       transparent: true,
       opacity: 0.3,
-      emissive: new THREE.Color('#f59e0b').multiplyScalar(0.3),
+      emissive: new THREE.Color(AMBER).multiplyScalar(0.3),
     });
     const plane1 = new THREE.Mesh(geo1, mat1);
     plane1.rotation.x = -Math.PI / 3.2;
     plane1.rotation.z = 0.15;
     scene.add(plane1);
+    plane1Ref.current = plane1;
 
     const geo2 = new THREE.PlaneGeometry(18, 18, 128, 128);
     const mat2 = new THREE.MeshStandardMaterial({
-      color: '#ea580c',
+      color: COPPER,
       wireframe: true,
       transparent: true,
       opacity: 0.15,
-      emissive: new THREE.Color('#ea580c').multiplyScalar(0.2),
+      emissive: new THREE.Color(COPPER).multiplyScalar(0.2),
     });
     const plane2 = new THREE.Mesh(geo2, mat2);
     plane2.rotation.x = -Math.PI / 4;
     plane2.rotation.z = -0.1;
     scene.add(plane2);
+    plane2Ref.current = plane2;
 
-    const ambientLight = new THREE.AmbientLight('#f59e0b', 0.15);
+    const ambientLight = new THREE.AmbientLight(AMBER, 0.15);
     scene.add(ambientLight);
 
-    const frontLight = new THREE.PointLight('#f59e0b', 0.5);
+    const frontLight = new THREE.PointLight(AMBER, 0.5);
     frontLight.position.set(2, 3, 4);
     scene.add(frontLight);
+    frontLightRef.current = frontLight;
 
-    const backLight = new THREE.PointLight('#ea580c', 0.3);
+    const backLight = new THREE.PointLight(COPPER, 0.3);
     backLight.position.set(-4, 2, -3);
     scene.add(backLight);
+    backLightRef.current = backLight;
 
     const handleResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -133,6 +165,9 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
 
     const baseOpacity1 = 0.3;
     const baseOpacity2 = 0.15;
+    const baseFrontIntensity = 0.5;
+    const baseBackIntensity = 0.3;
+
     let lastTime = performance.now() / 1000;
 
     const tick = () => {
@@ -146,20 +181,32 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
       const elapsedTime = clock.getElapsedTime();
 
       const progressFactor = clamp(progressRef.current / 100, 0, 1);
-      const frontIntensity = 0.5 + progressFactor * 1.0;
+      const frontIntensity = baseFrontIntensity + progressFactor * 1.0;
 
       let exitFactor = 1.0;
-      if (isExitingAnimRef.current) {
+      if (isExitingAnimRef.current && !reducedMotion) {
         const exitSpeed = 1.0 / (exitDurationMs / 1000);
-        exitFactor = Math.max(0, mat1.opacity / baseOpacity1 - deltaSec * exitSpeed);
+        if (plane1Ref.current) {
+          exitFactor = Math.max(0, (plane1Ref.current.material as THREE.Material).opacity / baseOpacity1 - deltaSec * exitSpeed);
+        }
       }
 
-      mat1.opacity = baseOpacity1 * exitFactor;
-      plane1.scale.setScalar(exitFactor);
-      mat2.opacity = baseOpacity2 * exitFactor;
-      plane2.scale.setScalar(exitFactor);
-      frontLight.intensity = frontIntensity * exitFactor;
-      backLight.intensity = 0.3 * exitFactor;
+      if (plane1Ref.current) {
+        const m = plane1Ref.current.material as THREE.Material;
+        m.opacity = baseOpacity1 * exitFactor;
+        plane1Ref.current.scale.setScalar(exitFactor);
+      }
+      if (plane2Ref.current) {
+        const m = plane2Ref.current.material as THREE.Material;
+        m.opacity = baseOpacity2 * exitFactor;
+        plane2Ref.current.scale.setScalar(exitFactor);
+      }
+      if (frontLightRef.current) {
+        frontLightRef.current.intensity = frontIntensity * exitFactor;
+      }
+      if (backLightRef.current) {
+        backLightRef.current.intensity = baseBackIntensity * exitFactor;
+      }
 
       camera.position.x = Math.sin(elapsedTime * 0.15) * 0.4;
       camera.position.y = Math.cos(elapsedTime * 0.1) * 0.2;
@@ -180,7 +227,7 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
       mat1.dispose();
       mat2.dispose();
     };
-  }, []);
+  }, [exitDurationMs, reducedMotion]);
 
   return (
     <div
@@ -196,21 +243,22 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: `radial-gradient(circle at 50% 45%, ${hexToRgba('#f59e0b', 0.12)}, ${hexToRgba('#ea580c', 0.05)} 38%, ${palette.background} 70%)`,
+          background: `radial-gradient(circle at 50% 45%, ${hexToRgba(AMBER, 0.12)}, ${hexToRgba(COPPER, 0.05)} 38%, ${palette.background} 70%)`,
         }}
       />
       <div
         className={`relative z-10 flex flex-col items-center justify-start min-h-screen px-6 text-center transition-opacity duration-1000 pt-28 ${
           isExiting ? 'opacity-0' : 'opacity-100'
         }`}
+        style={{ transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)' }}
       >
         <div className="mb-2">
           <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-            <rect x="8" y="8" width="48" height="48" rx="6" stroke="#f59e0b" strokeWidth="2" opacity="0.3" />
-            <line x1="8" y1="24" x2="56" y2="24" stroke="#f59e0b" strokeWidth="1.5" opacity="0.4" />
-            <line x1="8" y1="40" x2="56" y2="40" stroke="#f59e0b" strokeWidth="1.5" opacity="0.4" />
-            <line x1="24" y1="8" x2="24" y2="56" stroke="#f59e0b" strokeWidth="1.5" opacity="0.4" />
-            <line x1="40" y1="8" x2="40" y2="56" stroke="#f59e0b" strokeWidth="1.5" opacity="0.4" />
+            <rect x="8" y="8" width="48" height="48" rx="6" stroke={AMBER} strokeWidth="2" opacity="0.3" />
+            <line x1="8" y1="24" x2="56" y2="24" stroke={AMBER} strokeWidth="1.5" opacity="0.4" />
+            <line x1="8" y1="40" x2="56" y2="40" stroke={AMBER} strokeWidth="1.5" opacity="0.4" />
+            <line x1="24" y1="8" x2="24" y2="56" stroke={AMBER} strokeWidth="1.5" opacity="0.4" />
+            <line x1="40" y1="8" x2="40" y2="56" stroke={AMBER} strokeWidth="1.5" opacity="0.4" />
             <circle cx="24" cy="24" r="3" fill="#22c55e" opacity="0.8" />
             <circle cx="40" cy="24" r="3" fill="#22c55e" opacity="0.8" />
             <circle cx="24" cy="40" r="3" fill="#22c55e" opacity="0.8" />
@@ -222,7 +270,7 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
         <h1
           className="text-5xl sm:text-6xl font-black tracking-tight"
           style={{
-            background: 'linear-gradient(90deg, #f59e0b, #ea580c, #f59e0b)',
+            background: `linear-gradient(90deg, ${AMBER}, ${COPPER}, ${AMBER})`,
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}

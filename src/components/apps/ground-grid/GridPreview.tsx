@@ -49,7 +49,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const factor = e.deltaY > 0 ? 1.12 : 0.88;
+    const factor = e.deltaY > 0 ? 1.05 : 0.9524;
     setViewBox(prev => {
       const vb = prev || { x: bounds.minX, y: bounds.minY, w: defaultW, h: defaultH };
       const cx = vb.x + vb.w / 2;

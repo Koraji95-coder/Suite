@@ -62,13 +62,39 @@ function autofitColumns(ws: ExcelJS.Worksheet, colCount: number, lastDataRow: nu
 }
 
 function hideUnusedCells(ws: ExcelJS.Worksheet, colCount: number, lastDataRow: number) {
-  for (let c = colCount + 1; c <= colCount + 200; c++) {
-    ws.getColumn(c).width = 0;
-    ws.getColumn(c).hidden = true;
+  const blankFill: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+  const blankFont: Partial<ExcelJS.Font> = { color: { argb: 'FFFFFFFF' }, size: 1, name: 'Arial' };
+
+  const extraCols = 50;
+  const extraRows = 200;
+
+  for (let c = colCount + 1; c <= colCount + extraCols; c++) {
+    const col = ws.getColumn(c);
+    col.width = 2;
+    col.hidden = true;
   }
 
-  for (let r = lastDataRow + 1; r <= lastDataRow + 500; r++) {
-    ws.getRow(r).hidden = true;
+  for (let r = lastDataRow + 1; r <= lastDataRow + extraRows; r++) {
+    const row = ws.getRow(r);
+    row.hidden = true;
+  }
+
+  for (let r = 1; r <= lastDataRow; r++) {
+    for (let c = colCount + 1; c <= colCount + extraCols; c++) {
+      const cell = ws.getRow(r).getCell(c);
+      cell.fill = blankFill;
+      cell.font = blankFont;
+      cell.border = {};
+    }
+  }
+
+  for (let r = lastDataRow + 1; r <= lastDataRow + extraRows; r++) {
+    for (let c = 1; c <= colCount + extraCols; c++) {
+      const cell = ws.getRow(r).getCell(c);
+      cell.fill = blankFill;
+      cell.font = blankFont;
+      cell.border = {};
+    }
   }
 
   ws.views = [{ state: 'normal', rightToLeft: false, showGridLines: false }];

@@ -1,40 +1,42 @@
 import React, { Suspense } from "react";
 import { Routes, Route, Navigate, Link } from "react-router-dom";
+import { X } from "lucide-react";
 import { useTheme, hexToRgba } from "@/lib/palette";
-import { WorkspaceProvider } from "./WorkspaceContext";
+import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
 import { ActivityBar } from "./ActivityBar";
 import { ContextPanel } from "./ContextPanel";
 import { TabBar } from "./TabBar";
 import { StatusBar } from "./StatusBar";
 import { CommandPalette } from "./CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-
-const DashboardOverviewPanel = React.lazy(() => import("@/components/dashboard/DashboardOverviewPanel").then(m => ({ default: m.DashboardOverviewPanel })));
-const ProjectsHub = React.lazy(() => import("@/components/projects/ProjectsHub").then(m => ({ default: m.ProjectsHub })));
-const ProjectManager = React.lazy(() => import("@/components/projects/ProjectManager").then(m => ({ default: m.ProjectManager })));
-const CalendarPage = React.lazy(() => import("@/components/calendar/hooks/CalendarPage"));
-const BlockLibrary = React.lazy(() => import("@/components/apps/BlockLibrary").then(m => ({ default: m.BlockLibrary })));
-const QAQCChecker = React.lazy(() => import("@/components/apps/QAQCChecker").then(m => ({ default: m.QAQCChecker })));
-const GroundGridGeneratorApp = React.lazy(() => import("@/components/apps/ground-grid/GroundGridGeneratorApp").then(m => ({ default: m.GroundGridGeneratorApp })));
-
-const AutomationWorkflows = React.lazy(() => import("@/components/apps/AutomationWorkflows").then(m => ({ default: m.AutomationWorkflows })));
-const StandardsChecker = React.lazy(() => import("@/components/apps/StandardsChecker").then(m => ({ default: m.StandardsChecker })));
-const CalculatorPanel = React.lazy(() => import("@/components/CalculatorPanel").then(m => ({ default: m.CalculatorPanel })));
-const VectorCalculator = React.lazy(() => import("@/components/VectorCalculator").then(m => ({ default: m.VectorCalculator })));
-const ThreePhaseCalculator = React.lazy(() => import("@/components/ThreePhaseCalculator").then(m => ({ default: m.ThreePhaseCalculator })));
-const SinusoidalCalculator = React.lazy(() => import("@/components/SinusoidalCalculator").then(m => ({ default: m.SinusoidalCalculator })));
-const SymmetricalComponents = React.lazy(() => import("@/components/SymmetricalComponents").then(m => ({ default: m.SymmetricalComponents })));
-const FormulaBank = React.lazy(() => import("@/components/FormulaBank").then(m => ({ default: m.FormulaBank })));
-const MathReference = React.lazy(() => import("@/components/MathReference").then(m => ({ default: m.MathReference })));
-const PlotGenerator = React.lazy(() => import("@/components/PlotGenerator").then(m => ({ default: m.PlotGenerator })));
-const CircuitGenerator = React.lazy(() => import("@/components/CircuitGenerator").then(m => ({ default: m.CircuitGenerator })));
-const StoragePanel = React.lazy(() => import("@/components/storage/StoragePanel").then(m => ({ default: m.StoragePanel })));
-const GraphVisualization = React.lazy(() => import("@/components/graph/GraphVisualization").then(m => ({ default: m.GraphVisualization })));
-const AIPanel = React.lazy(() => import("@/components/ai-unified/AIPanel").then(m => ({ default: m.AIPanel })));
-const AgentPanel = React.lazy(() => import("@/components/AgentPanel").then(m => ({ default: m.AgentPanel })));
-const LoginPage = React.lazy(() => import("@/pages/LoginPage").then(m => ({ default: m.LoginPage })));
-const SignupPage = React.lazy(() => import("@/pages/SignupPage").then(m => ({ default: m.SignupPage })));
-const SettingsPage = React.lazy(() => import("@/components/settings/SettingsPage").then(m => ({ default: m.SettingsPage })));
+import {
+  DashboardOverviewPanel,
+  ProjectsHub,
+  ProjectManager,
+  CalendarPage,
+  BlockLibrary,
+  QAQCChecker,
+  GroundGridGeneratorApp,
+  AutomationWorkflows,
+  StandardsChecker,
+  CalculatorPanel,
+  VectorCalculator,
+  ThreePhaseCalculator,
+  SinusoidalCalculator,
+  SymmetricalComponents,
+  FormulaBank,
+  MathReference,
+  PlotGenerator,
+  CircuitGenerator,
+  StoragePanel,
+  GraphVisualization,
+  AIPanel,
+  AgentPanel,
+  LoginPage,
+  SignupPage,
+  SettingsPage,
+  ROUTE_MAP,
+} from "./routeComponents";
 
 function Placeholder({ name }: { name: string }) {
   const { palette } = useTheme();
@@ -109,8 +111,78 @@ function LoadingFallback() {
   );
 }
 
+function SplitPane() {
+  const { palette } = useTheme();
+  const { splitTabId, setSplitTab, openTabs, setActiveSplitPane } = useWorkspace();
+
+  if (!splitTabId) return null;
+
+  const splitTab = openTabs.find((t) => t.id === splitTabId);
+  if (!splitTab) return null;
+
+  const Component = ROUTE_MAP[splitTab.path];
+  if (!Component) return null;
+
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
+        borderLeft: `2px solid ${hexToRgba(palette.primary, 0.15)}`,
+      }}
+      onClick={() => setActiveSplitPane("secondary")}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          height: 28,
+          minHeight: 28,
+          padding: "0 8px 0 12px",
+          background: hexToRgba(palette.surfaceLight, 0.3),
+          borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
+          fontSize: 11,
+          color: palette.textMuted,
+        }}
+      >
+        <span style={{ fontWeight: 500 }}>{splitTab.label}</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); setSplitTab(null); }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 18,
+            height: 18,
+            borderRadius: 4,
+            border: "none",
+            background: "transparent",
+            color: palette.textMuted,
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = hexToRgba(palette.surfaceLight, 0.8); }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+        >
+          <X size={12} />
+        </button>
+      </div>
+      <div style={{ flex: 1, overflow: "auto" }}>
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <Component />
+          </Suspense>
+        </ErrorBoundary>
+      </div>
+    </div>
+  );
+}
+
 function ShellContent() {
   const { palette } = useTheme();
+  const { splitTabId, setActiveSplitPane } = useWorkspace();
 
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden" }}>
@@ -126,43 +198,49 @@ function ShellContent() {
         }}
       >
         <TabBar />
-        <div style={{ flex: 1, overflow: "auto" }}>
-          <ErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<DashboardOverviewPanel />} />
-              <Route path="/projects" element={<ProjectsHub />} />
-              <Route path="/projects/:id" element={<ProjectManager />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/apps/transmittal" element={<Placeholder name="Transmittal Builder" />} />
-              <Route path="/apps/block-library" element={<BlockLibrary />} />
-              <Route path="/apps/qaqc" element={<QAQCChecker />} />
-              <Route path="/apps/ground-grid-generator" element={<GroundGridGeneratorApp />} />
-              <Route path="/apps/automation" element={<AutomationWorkflows />} />
-              <Route path="/apps/standards" element={<StandardsChecker />} />
-              <Route path="/apps/batch-find-replace" element={<Placeholder name="Batch Find & Replace" />} />
-              <Route path="/apps/batch-print" element={<Placeholder name="Batch Print" />} />
-              <Route path="/knowledge/calculator" element={<CalculatorPanel />} />
-              <Route path="/knowledge/vectors" element={<VectorCalculator />} />
-              <Route path="/knowledge/threephase" element={<ThreePhaseCalculator />} />
-              <Route path="/knowledge/sinusoidal" element={<SinusoidalCalculator />} />
-              <Route path="/knowledge/symmetrical" element={<SymmetricalComponents />} />
-              <Route path="/knowledge/formulas" element={<FormulaBank />} />
-              <Route path="/knowledge/math-ref" element={<MathReference />} />
-              <Route path="/knowledge/plot" element={<PlotGenerator />} />
-              <Route path="/knowledge/circuit" element={<CircuitGenerator />} />
-              <Route path="/files" element={<StoragePanel />} />
-              <Route path="/graph" element={<GraphVisualization />} />
-              <Route path="/ai" element={<AIPanel />} />
-              <Route path="/agent" element={<AgentPanel />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/signup" element={<SignupPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-          </ErrorBoundary>
+        <div style={{ flex: 1, display: "flex", minHeight: 0, overflow: "hidden" }}>
+          <div
+            style={{ flex: 1, overflow: "auto", minWidth: 0 }}
+            onClick={() => splitTabId && setActiveSplitPane("primary")}
+          >
+            <ErrorBoundary>
+              <Suspense fallback={<LoadingFallback />}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<DashboardOverviewPanel />} />
+                  <Route path="/projects" element={<ProjectsHub />} />
+                  <Route path="/projects/:id" element={<ProjectManager />} />
+                  <Route path="/calendar" element={<CalendarPage />} />
+                  <Route path="/apps/transmittal" element={<Placeholder name="Transmittal Builder" />} />
+                  <Route path="/apps/block-library" element={<BlockLibrary />} />
+                  <Route path="/apps/qaqc" element={<QAQCChecker />} />
+                  <Route path="/apps/ground-grid-generator" element={<GroundGridGeneratorApp />} />
+                  <Route path="/apps/automation" element={<AutomationWorkflows />} />
+                  <Route path="/apps/standards" element={<StandardsChecker />} />
+                  <Route path="/apps/batch-find-replace" element={<Placeholder name="Batch Find & Replace" />} />
+                  <Route path="/apps/batch-print" element={<Placeholder name="Batch Print" />} />
+                  <Route path="/knowledge/calculator" element={<CalculatorPanel />} />
+                  <Route path="/knowledge/vectors" element={<VectorCalculator />} />
+                  <Route path="/knowledge/threephase" element={<ThreePhaseCalculator />} />
+                  <Route path="/knowledge/sinusoidal" element={<SinusoidalCalculator />} />
+                  <Route path="/knowledge/symmetrical" element={<SymmetricalComponents />} />
+                  <Route path="/knowledge/formulas" element={<FormulaBank />} />
+                  <Route path="/knowledge/math-ref" element={<MathReference />} />
+                  <Route path="/knowledge/plot" element={<PlotGenerator />} />
+                  <Route path="/knowledge/circuit" element={<CircuitGenerator />} />
+                  <Route path="/files" element={<StoragePanel />} />
+                  <Route path="/graph" element={<GraphVisualization />} />
+                  <Route path="/ai" element={<AIPanel />} />
+                  <Route path="/agent" element={<AgentPanel />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/signup" element={<SignupPage />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
+          </div>
+          {splitTabId && <SplitPane />}
         </div>
         <StatusBar />
       </div>

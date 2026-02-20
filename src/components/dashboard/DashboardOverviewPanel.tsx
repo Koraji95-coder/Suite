@@ -11,6 +11,7 @@ import { RecentActivityList } from './RecentActivityList';
 import { ActiveProjectsList } from './ActiveProjectsList';
 import { DashboardCustomizer } from './DashboardCustomizer';
 import { useDashboardLayout } from './useDashboardLayout';
+import { RecentFilesWidget } from './RecentFilesWidget';
 import { useTheme, hexToRgba, glassCardInnerStyle } from '@/lib/palette';
 import { useNavigate } from 'react-router-dom';
 import { GlassPanel } from '../ui/GlassPanel';
@@ -335,9 +336,12 @@ export function DashboardOverviewPanel({
         onNavigateToProjectsHub={handleNavigateToProjectsHub}
       />
     ),
+    'recent-files': (
+      <RecentFilesWidget key="recent-files" />
+    ),
   };
 
-  const gridIds = new Set(['calendar', 'activity']);
+  const gridIds = new Set(['calendar', 'activity', 'recent-files']);
 
   const renderWidgets = () => {
     const elements: React.ReactNode[] = [];

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Upload, Save, Trash2, Plus, FolderKanban, ChevronDown,
   FileSpreadsheet, Play, Loader, Database, Monitor,
+  Undo2, Redo2, Box, Zap, PenTool, FileText,
 } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { supabase } from '@/lib/supabase';
@@ -17,6 +18,11 @@ import { GridPreview } from './GridPreview';
 import { SAMPLE_RODS_TEXT, SAMPLE_CONDUCTORS_TEXT } from './sampleData';
 import { useGroundGrid } from './GroundGridContext';
 import { exportGridToExcel } from './excelExport';
+import { useGridHistory } from './useGridHistory';
+import { GridPreview3D } from './GridPreview3D';
+import { PotentialContour } from './PotentialContour';
+import { GridManualEditor } from './GridManualEditor';
+import { generateGridReport } from './gridPdfExport';
 
 interface ProjectOption {
   id: string;
@@ -52,6 +58,10 @@ export function GridGeneratorPanel() {
   const [pasteText, setPasteText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [previewMode, setPreviewMode] = useState<'2d' | '3d' | 'contour' | 'editor'>('2d');
+  const [soilResistivity, setSoilResistivity] = useState(100);
+  const [faultCurrent, setFaultCurrent] = useState(5000);
+  const { pushSnapshot, undo, redo, canUndo, canRedo } = useGridHistory();
 
   useEffect(() => {
     loadDesigns();
@@ -253,6 +263,7 @@ export function GridGeneratorPanel() {
       if (firstLine.length >= 8 || firstLine[0]?.match(/^\d+$/)) {
         const parsed = parseConductorsText(text);
         if (parsed.length > 0) {
+          pushSnapshot(rods, conductors);
           setConductors(parsed);
           showToast('success', `Imported ${parsed.length} conductors`);
           return;
@@ -261,6 +272,7 @@ export function GridGeneratorPanel() {
 
       const parsedRods = parseRodsText(text);
       if (parsedRods.length > 0) {
+        pushSnapshot(rods, conductors);
         setRods(parsedRods);
         showToast('success', `Imported ${parsedRods.length} rods`);
         return;
@@ -268,6 +280,7 @@ export function GridGeneratorPanel() {
 
       const parsedConds = parseConductorsText(text);
       if (parsedConds.length > 0) {
+        pushSnapshot(rods, conductors);
         setConductors(parsedConds);
         showToast('success', `Imported ${parsedConds.length} conductors`);
         return;
@@ -283,6 +296,7 @@ export function GridGeneratorPanel() {
     if (pasteMode === 'rods') {
       const parsed = parseRodsText(pasteText);
       if (parsed.length > 0) {
+        pushSnapshot(rods, conductors);
         setRods(parsed);
         setPasteText('');
         showToast('success', `Parsed ${parsed.length} rods`);
@@ -292,6 +306,7 @@ export function GridGeneratorPanel() {
     } else {
       const parsed = parseConductorsText(pasteText);
       if (parsed.length > 0) {
+        pushSnapshot(rods, conductors);
         setConductors(parsed);
         setPasteText('');
         showToast('success', `Parsed ${parsed.length} conductors`);
@@ -302,6 +317,7 @@ export function GridGeneratorPanel() {
   }
 
   function clearAll() {
+    pushSnapshot(rods, conductors);
     setRods([]);
     setConductors([]);
     setPlacements([]);
@@ -312,12 +328,57 @@ export function GridGeneratorPanel() {
   }
 
   function loadSampleData() {
+    pushSnapshot(rods, conductors);
     const parsedRods = parseRodsText(SAMPLE_RODS_TEXT);
     const parsedConds = parseConductorsText(SAMPLE_CONDUCTORS_TEXT);
     setRods(parsedRods);
     setConductors(parsedConds);
     showToast('success', `Loaded ${parsedRods.length} rods, ${parsedConds.length} conductors`);
   }
+
+  const handleUndo = useCallback(() => {
+    const snapshot = undo(rods, conductors);
+    if (snapshot) {
+      setRods(snapshot.rods);
+      setConductors(snapshot.conductors);
+    }
+  }, [undo, rods, conductors]);
+
+  const handleRedo = useCallback(() => {
+    const snapshot = redo(rods, conductors);
+    if (snapshot) {
+      setRods(snapshot.rods);
+      setConductors(snapshot.conductors);
+    }
+  }, [redo, rods, conductors]);
+
+  const handleManualRodsChange = useCallback((newRods: GridRod[]) => {
+    pushSnapshot(rods, conductors);
+    setRods(newRods);
+  }, [rods, conductors, pushSnapshot]);
+
+  const handleManualConductorsChange = useCallback((newConds: GridConductor[]) => {
+    pushSnapshot(rods, conductors);
+    setConductors(newConds);
+  }, [rods, conductors, pushSnapshot]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else {
+          e.preventDefault();
+          handleUndo();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUndo, handleRedo]);
 
   const linkedProject = projects.find(p => p.id === linkedProjectId);
 
@@ -616,7 +677,7 @@ export function GridGeneratorPanel() {
 
         {/* Right: Preview + Generate */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button onClick={runGeneration} disabled={generating || conductors.length === 0} style={{
               ...btnStyle(true),
               background: `linear-gradient(135deg, ${hexToRgba('#f59e0b', 0.25)}, ${hexToRgba('#ea580c', 0.2)})`,
@@ -627,6 +688,14 @@ export function GridGeneratorPanel() {
               {generating ? <Loader size={14} className="animate-spin" /> : <Play size={14} />}
               Generate Grid
             </button>
+
+            <button onClick={handleUndo} disabled={!canUndo} style={{ ...btnStyle(), opacity: canUndo ? 1 : 0.4 }}>
+              <Undo2 size={14} />
+            </button>
+            <button onClick={handleRedo} disabled={!canRedo} style={{ ...btnStyle(), opacity: canRedo ? 1 : 0.4 }}>
+              <Redo2 size={14} />
+            </button>
+
             {placements.length > 0 && (
               <>
                 <button
@@ -644,7 +713,16 @@ export function GridGeneratorPanel() {
                   }}
                   style={btnStyle()}
                 >
-                  <FileSpreadsheet size={14} /> Export Excel
+                  <FileSpreadsheet size={14} /> Excel
+                </button>
+                <button
+                  onClick={() => generateGridReport({
+                    designName, rods, conductors, placements,
+                    segments: segmentCount, tees: teeCount, crosses: crossCount,
+                  })}
+                  style={btnStyle()}
+                >
+                  <FileText size={14} /> PDF
                 </button>
                 <button
                   onClick={() => {
@@ -661,11 +739,68 @@ export function GridGeneratorPanel() {
                     opacity: backendConnected ? 1 : 0.5,
                   }}
                 >
-                  <Monitor size={14} /> Plot to AutoCAD
+                  <Monitor size={14} /> AutoCAD
                 </button>
               </>
             )}
           </div>
+
+          <div style={{ display: 'flex', gap: 4 }}>
+            {([
+              { id: '2d' as const, label: '2D', icon: <Monitor size={12} /> },
+              { id: '3d' as const, label: '3D', icon: <Box size={12} /> },
+              { id: 'contour' as const, label: 'Potential', icon: <Zap size={12} /> },
+              { id: 'editor' as const, label: 'Editor', icon: <PenTool size={12} /> },
+            ]).map(t => (
+              <button
+                key={t.id}
+                onClick={() => setPreviewMode(t.id)}
+                style={{
+                  ...btnStyle(previewMode === t.id),
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  borderRadius: '6px 6px 0 0',
+                }}
+              >
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+
+          {previewMode === 'contour' && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 11, color: palette.textMuted }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                Soil Resistivity:
+                <input
+                  type="number"
+                  value={soilResistivity}
+                  onChange={e => setSoilResistivity(Number(e.target.value) || 0)}
+                  style={{
+                    width: 70, padding: '3px 6px', fontSize: 11, fontFamily: 'monospace',
+                    background: hexToRgba(palette.surfaceLight, 0.3),
+                    border: `1px solid ${hexToRgba(palette.primary, 0.15)}`,
+                    borderRadius: 4, color: palette.text, outline: 'none',
+                  }}
+                />
+                ohm-m
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                Fault Current:
+                <input
+                  type="number"
+                  value={faultCurrent}
+                  onChange={e => setFaultCurrent(Number(e.target.value) || 0)}
+                  style={{
+                    width: 70, padding: '3px 6px', fontSize: 11, fontFamily: 'monospace',
+                    background: hexToRgba(palette.surfaceLight, 0.3),
+                    border: `1px solid ${hexToRgba(palette.primary, 0.15)}`,
+                    borderRadius: 4, color: palette.text, outline: 'none',
+                  }}
+                />
+                A
+              </label>
+            </div>
+          )}
 
           <div
             style={{
@@ -677,12 +812,37 @@ export function GridGeneratorPanel() {
               overflow: 'hidden',
             }}
           >
-            <GridPreview
-              rods={rods}
-              conductors={conductors}
-              placements={placements}
-              segmentCount={segmentCount}
-            />
+            {previewMode === '2d' && (
+              <GridPreview
+                rods={rods}
+                conductors={conductors}
+                placements={placements}
+                segmentCount={segmentCount}
+              />
+            )}
+            {previewMode === '3d' && (
+              <GridPreview3D
+                rods={rods}
+                conductors={conductors}
+                placements={placements}
+              />
+            )}
+            {previewMode === 'contour' && (
+              <PotentialContour
+                rods={rods}
+                conductors={conductors}
+                soilResistivity={soilResistivity}
+                faultCurrent={faultCurrent}
+              />
+            )}
+            {previewMode === 'editor' && (
+              <GridManualEditor
+                rods={rods}
+                conductors={conductors}
+                onRodsChange={handleManualRodsChange}
+                onConductorsChange={handleManualConductorsChange}
+              />
+            )}
           </div>
 
           {placements.length > 0 && (() => {

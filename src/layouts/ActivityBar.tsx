@@ -41,7 +41,7 @@ export function ActivityBar() {
   const { palette } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { toggleContextPanel, contextPanelOpen, contextPanelSection, aiDrawerOpen, setAiDrawerOpen, openTab } = useWorkspace();
+  const { toggleContextPanel, contextPanelOpen, contextPanelSection, closeContextPanel, aiDrawerOpen, setAiDrawerOpen, openTab } = useWorkspace();
 
   const isActive = (item: NavItem) => {
     if (item.path) return location.pathname.startsWith(item.path);
@@ -52,9 +52,9 @@ export function ActivityBar() {
 
   const handleClick = (item: NavItem) => {
     if (item.path) {
-      // Open tab for path-based navigation and navigate
       openTab(item.label.toLocaleLowerCase().replace(/\s+/g, '-'), item.label, item.path, item.label);
       navigate(item.path);
+      closeContextPanel();
     } else if (item.panel) {
       toggleContextPanel(item.panel);
     } else if (item.aiToggle) {

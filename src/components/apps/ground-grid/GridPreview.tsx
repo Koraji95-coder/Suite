@@ -9,12 +9,19 @@ interface GridPreviewProps {
   segmentCount: number;
 }
 
+const ELASTIC_DAMPING = 0.15;
+const SNAP_DURATION = 400;
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 5;
+
 export function GridPreview({ rods, conductors, placements, segmentCount }: GridPreviewProps) {
   const { palette } = useTheme();
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [viewBox, setViewBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
+  const snapAnimRef = useRef<number>(0);
 
   const bounds = useMemo(() => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -35,72 +42,148 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
     return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
   }, [rods, conductors]);
 
-  const effectiveVB = viewBox || {
+  const defaultVB = useMemo(() => ({
     x: bounds.minX,
     y: bounds.minY,
     w: bounds.maxX - bounds.minX,
     h: bounds.maxY - bounds.minY,
-  };
+  }), [bounds]);
 
-  const defaultW = bounds.maxX - bounds.minX;
-  const defaultH = bounds.maxY - bounds.minY;
-  const MIN_ZOOM = 0.2;
-  const MAX_ZOOM = 5;
+  const effectiveVB = viewBox || defaultVB;
 
   const boundsRef = useRef(bounds);
-  const defaultWRef = useRef(defaultW);
-  const defaultHRef = useRef(defaultH);
+  const defaultVBRef = useRef(defaultVB);
   const isPanningRef = useRef(false);
+  const viewBoxRef = useRef(viewBox);
   boundsRef.current = bounds;
-  defaultWRef.current = defaultW;
-  defaultHRef.current = defaultH;
+  defaultVBRef.current = defaultVB;
+  viewBoxRef.current = viewBox;
 
   useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
+    if (!isPanning) return;
+    const blocker = (e: WheelEvent) => {
+      e.preventDefault();
+    };
+    document.addEventListener('wheel', blocker, { passive: false });
+    return () => document.removeEventListener('wheel', blocker);
+  }, [isPanning]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
     const handler = (e: WheelEvent) => {
       if (!isPanningRef.current) return;
       e.preventDefault();
       e.stopPropagation();
       const factor = e.deltaY > 0 ? 1.05 : 0.9524;
       const b = boundsRef.current;
-      const dw = defaultWRef.current;
-      const dh = defaultHRef.current;
+      const dv = defaultVBRef.current;
       setViewBox(prev => {
-        const vb = prev || { x: b.minX, y: b.minY, w: dw, h: dh };
+        const vb = prev || { x: b.minX, y: b.minY, w: dv.w, h: dv.h };
         const cx = vb.x + vb.w / 2;
         const cy = vb.y + vb.h / 2;
         let nw = vb.w * factor;
         let nh = vb.h * factor;
-        nw = Math.max(dw * MIN_ZOOM, Math.min(dw * MAX_ZOOM, nw));
-        nh = Math.max(dh * MIN_ZOOM, Math.min(dh * MAX_ZOOM, nh));
+        nw = Math.max(dv.w * MIN_ZOOM, Math.min(dv.w * MAX_ZOOM, nw));
+        nh = Math.max(dv.h * MIN_ZOOM, Math.min(dv.h * MAX_ZOOM, nh));
         return { x: cx - nw / 2, y: cy - nh / 2, w: nw, h: nh };
       });
     };
-    svg.addEventListener('wheel', handler, { passive: false });
-    return () => svg.removeEventListener('wheel', handler);
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
+
+  const snapBack = useCallback((from: { x: number; y: number; w: number; h: number }) => {
+    cancelAnimationFrame(snapAnimRef.current);
+    const b = boundsRef.current;
+    const contentCx = (b.minX + b.maxX) / 2;
+    const contentCy = (b.minY + b.maxY) / 2;
+    const targetX = contentCx - from.w / 2;
+    const targetY = contentCy - from.h / 2;
+    const startX = from.x;
+    const startY = from.y;
+    const startTime = performance.now();
+    const animate = () => {
+      const elapsed = performance.now() - startTime;
+      const t = Math.min(1, elapsed / SNAP_DURATION);
+      const ease = 1 - Math.pow(1 - t, 3);
+      setViewBox({
+        x: startX + (targetX - startX) * ease,
+        y: startY + (targetY - startY) * ease,
+        w: from.w,
+        h: from.h,
+      });
+      if (t < 1) {
+        snapAnimRef.current = requestAnimationFrame(animate);
+      }
+    };
+    snapAnimRef.current = requestAnimationFrame(animate);
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
+    cancelAnimationFrame(snapAnimRef.current);
     setIsPanning(true);
     isPanningRef.current = true;
-    const vb = viewBox || { x: bounds.minX, y: bounds.minY, w: bounds.maxX - bounds.minX, h: bounds.maxY - bounds.minY };
+    const vb = viewBoxRef.current || defaultVBRef.current;
     panStart.current = { x: e.clientX, y: e.clientY, vx: vb.x, vy: vb.y };
-  }, [viewBox, bounds]);
+  }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isPanning || !panStart.current || !svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const vb = viewBox || { x: bounds.minX, y: bounds.minY, w: bounds.maxX - bounds.minX, h: bounds.maxY - bounds.minY };
+    const vb = viewBoxRef.current || defaultVBRef.current;
     const dx = (e.clientX - panStart.current.x) / rect.width * vb.w;
     const dy = (e.clientY - panStart.current.y) / rect.height * vb.h;
-    setViewBox({ ...vb, x: panStart.current.vx - dx, y: panStart.current.vy - dy });
-  }, [isPanning, viewBox, bounds]);
+
+    let newX = panStart.current.vx - dx;
+    let newY = panStart.current.vy - dy;
+
+    const b = boundsRef.current;
+    const span = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+    const margin = span * 0.02;
+    const minX = b.minX - margin;
+    const maxX = b.maxX - vb.w + margin;
+    const minY = b.minY - margin;
+    const maxY = b.maxY - vb.h + margin;
+
+    if (newX < minX) {
+      newX = minX + (newX - minX) * ELASTIC_DAMPING;
+    } else if (newX > maxX) {
+      newX = maxX + (newX - maxX) * ELASTIC_DAMPING;
+    }
+
+    if (newY < minY) {
+      newY = minY + (newY - minY) * ELASTIC_DAMPING;
+    } else if (newY > maxY) {
+      newY = maxY + (newY - maxY) * ELASTIC_DAMPING;
+    }
+
+    setViewBox({ x: newX, y: newY, w: vb.w, h: vb.h });
+  }, [isPanning]);
 
   const handleMouseUp = useCallback(() => {
     setIsPanning(false);
     isPanningRef.current = false;
+
+    const vb = viewBoxRef.current;
+    if (!vb) return;
+
+    const b = boundsRef.current;
+    const span = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+    const margin = span * 0.02;
+    const minX = b.minX - margin;
+    const maxX = b.maxX - vb.w + margin;
+    const minY = b.minY - margin;
+    const maxY = b.maxY - vb.h + margin;
+
+    if (vb.x < minX || vb.x > maxX || vb.y < minY || vb.y > maxY) {
+      snapBack(vb);
+    }
+  }, [snapBack]);
+
+  useEffect(() => {
+    return () => cancelAnimationFrame(snapAnimRef.current);
   }, []);
 
   const tees = placements.filter(p => p.type === 'TEE');
@@ -129,7 +212,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: 400 }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', height: '100%', minHeight: 400 }}>
       <svg
         ref={svgRef}
         viewBox={`${effectiveVB.x} ${effectiveVB.y} ${effectiveVB.w} ${effectiveVB.h}`}
@@ -251,6 +334,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
           border: `1px solid ${hexToRgba(palette.primary, 0.15)}`,
           fontSize: 10,
           color: palette.textMuted,
+          pointerEvents: 'none',
         }}
       >
         <span><b style={{ color: '#22c55e' }}>Rods:</b> {rods.length - testWells.length}</span>
@@ -270,6 +354,7 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
           background: hexToRgba(palette.background, 0.7),
           padding: '3px 8px',
           borderRadius: 4,
+          pointerEvents: 'none',
         }}
       >
         Drag to pan / Scroll while panning to zoom

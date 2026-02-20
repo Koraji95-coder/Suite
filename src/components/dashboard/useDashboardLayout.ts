@@ -13,6 +13,7 @@ const DEFAULT_LAYOUT: WidgetConfig[] = [
   { id: 'calendar', label: 'Calendar', visible: true },
   { id: 'activity', label: 'Recent Activity', visible: true },
   { id: 'projects', label: 'Active Projects', visible: true },
+  { id: 'recent-files', label: 'Recent Files', visible: true },
 ];
 
 function loadLayout(): WidgetConfig[] {

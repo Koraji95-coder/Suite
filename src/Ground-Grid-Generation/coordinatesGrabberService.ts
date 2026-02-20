@@ -81,11 +81,23 @@ class CoordinatesGrabberService {
   private maxReconnectAttempts: number = 5;
   private reconnectDelay: number = 2000; // ms
   private listeners: Map<string, Set<(data: any) => void>> = new Map();
+  private apiKey: string;
 
   constructor() {
     // Initialize with localhost for development
     // In production, this would be configured via environment variables
     this.baseUrl = import.meta.env.VITE_COORDINATES_BACKEND_URL || 'http://localhost:5000';
+    this.apiKey = import.meta.env.VITE_API_KEY || 'dev-only-insecure-key-change-in-production';
+  }
+
+  /**
+   * Get default headers with API key authentication
+   */
+  private getHeaders(): HeadersInit {
+    return {
+      'Content-Type': 'application/json',
+      'X-API-Key': this.apiKey,
+    };
   }
 
   /**
@@ -151,7 +163,7 @@ class CoordinatesGrabberService {
     try {
       const response = await fetch(`${this.baseUrl}/api/status`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
       });
       if (!response.ok) throw new Error(`Status ${response.status}`);
       const data = await response.json();
@@ -178,7 +190,7 @@ class CoordinatesGrabberService {
     try {
       const response = await fetch(`${this.baseUrl}/api/execute`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
         body: JSON.stringify(config),
       });
 
@@ -223,7 +235,7 @@ class CoordinatesGrabberService {
     try {
       const response = await fetch(`${this.baseUrl}/api/layers`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
       });
 
       if (!response.ok) throw new Error(`Status ${response.status}`);
@@ -242,7 +254,7 @@ class CoordinatesGrabberService {
     try {
       const response = await fetch(`${this.baseUrl}/api/selection-count`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
       });
 
       if (!response.ok) throw new Error(`Status ${response.status}`);
@@ -261,7 +273,7 @@ class CoordinatesGrabberService {
     try {
       const response = await fetch(`${this.baseUrl}/api/trigger-selection`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this.getHeaders(),
       });
 
       if (!response.ok) throw new Error(`Status ${response.status}`);

@@ -7,7 +7,7 @@ import {
   LayoutDashboard, FolderKanban, Calendar, FileStack, Share2, BotMessageSquare,
   Settings, Send, Blocks, ShieldCheck, MapPin, Calculator, Waypoints,
   Zap, Activity, ShieldEllipsis, FunctionSquare, BookOpen, LineChart, Cpu,
-  Workflow, ClipboardCheck,
+  Workflow, ClipboardCheck, FileSpreadsheet,
 } from "lucide-react";
 
 const GROUPS = [
@@ -24,7 +24,8 @@ const GROUPS = [
     { id: "transmittal", label: "Transmittal Builder", path: "/apps/transmittal", icon: Send },
     { id: "block-library", label: "Block Library", path: "/apps/block-library", icon: Blocks },
     { id: "qaqc", label: "QA/QC Checker", path: "/apps/qaqc", icon: ShieldCheck },
-    { id: "ground-grid", label: "Ground Grid Generator", path: "/apps/ground-grid-generator", icon: MapPin },
+    { id: "ground-grid-generator", label: "Ground Grid Generator", path: "/apps/ground-grid-generator", icon: MapPin },
+    { id: "drawing-list", label: "Drawing List Manager", path: "/apps/drawing-list", icon: FileSpreadsheet },
     { id: "automation", label: "Automation", path: "/apps/automation", icon: Workflow },
     { id: "standards", label: "Standards Checker", path: "/apps/standards", icon: ClipboardCheck },
   ]},

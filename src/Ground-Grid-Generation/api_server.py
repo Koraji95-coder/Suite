@@ -23,6 +23,8 @@ Requirements:
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import psutil
 import pythoncom
 import win32com.client
@@ -34,11 +36,24 @@ import math
 import os
 import re
 import traceback
+import logging
+from functools import wraps
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+# ── Logging configuration ────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.FileHandler('api_server.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # ── gen_py cache fix (from coordtable) ──────────────────────────
 # Prevent gen_py from writing wrappers that cause CDispatch issues
@@ -59,7 +74,115 @@ CORS(app,
      origins=ALLOWED_ORIGINS,
      supports_credentials=True,
      methods=["GET", "POST", "OPTIONS"],
-     allow_headers=["Content-Type", "Authorization"])
+     allow_headers=["Content-Type", "Authorization", "X-API-Key"])
+
+# ── Rate Limiting ────────────────────────────────────────────────
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+    strategy="fixed-window"
+)
+
+# ── Security Headers ─────────────────────────────────────────────
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses."""
+    # Prevent clickjacking attacks
+    response.headers['X-Frame-Options'] = 'DENY'
+    # Prevent MIME-type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    # Enable XSS protection
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Content Security Policy
+    response.headers['Content-Security-Policy'] = "default-src 'self'"
+    # Referrer policy
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Strict Transport Security (HTTPS only - comment out for localhost)
+    # response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
+# ── API Authentication ───────────────────────────────────────────
+API_KEY = os.environ.get('API_KEY', 'dev-only-insecure-key-change-in-production')
+
+def require_api_key(f):
+    """Decorator to require API key authentication for protected routes."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        provided_key = request.headers.get('X-API-Key')
+        
+        # Log all API requests for audit trail
+        logger.info(
+            f"API Request: {request.method} {request.path} from {request.remote_addr} "
+            f"- Auth: {'Valid' if provided_key == API_KEY else 'Invalid/Missing'}"
+        )
+        
+        if not provided_key:
+            logger.warning(f"Unauthorized request (no API key): {request.path} from {request.remote_addr}")
+            return jsonify({"error": "API key required", "code": "AUTH_REQUIRED"}), 401
+        
+        if provided_key != API_KEY:
+            logger.warning(f"Unauthorized request (invalid API key): {request.path} from {request.remote_addr}")
+            return jsonify({"error": "Invalid API key", "code": "AUTH_INVALID"}), 401
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+# ── Input Validation ─────────────────────────────────────────────
+def validate_layer_config(config: Any) -> Dict[str, Any]:
+    """
+    Validate and sanitize layer extraction configuration.
+    Prevents injection attacks and ensures data integrity.
+    """
+    if not isinstance(config, dict):
+        raise ValueError("Config must be a JSON object")
+    
+    # Validate and sanitize layers
+    layers = config.get('layers', [])
+    if not isinstance(layers, list):
+        raise ValueError("'layers' must be an array")
+    if len(layers) > 100:  # Prevent DoS via excessive layers
+        raise ValueError("Maximum 100 layers allowed")
+    
+    sanitized_layers = []
+    for layer in layers:
+        if not isinstance(layer, str):
+            continue
+        # Remove potentially dangerous characters, allow alphanumeric, dash, underscore, space
+        sanitized = re.sub(r'[^a-zA-Z0-9\-_ ]', '', layer.strip())
+        if sanitized and len(sanitized) <= 255:
+            sanitized_layers.append(sanitized)
+    
+    # Validate block reference path if provided
+    ref_dwg = config.get('ref_dwg', '')
+    if ref_dwg:
+        if not isinstance(ref_dwg, str):
+            raise ValueError("'ref_dwg' must be a string")
+        # Prevent path traversal attacks
+        if '..' in ref_dwg or ref_dwg.startswith(('/', '\\\\')):
+            raise ValueError("Invalid reference path")
+        # Ensure .dwg extension
+        if not ref_dwg.lower().endswith('.dwg'):
+            raise ValueError ("'ref_dwg' must have .dwg extension")
+    
+    # Validate block name if provided
+    block_name = config.get('block_name', '')
+    if block_name:
+        if not isinstance(block_name, str):
+            raise ValueError("'block_name' must be a string")
+        # Sanitize block name
+        block_name = re.sub(r'[^a-zA-Z0-9\-_]', '', block_name.strip())
+        if len(block_name) > 255:
+            raise ValueError("Block name too long")
+    
+    return {
+        'layers': sanitized_layers,
+        'ref_dwg': ref_dwg.strip() if ref_dwg else '',
+        'block_name': block_name,
+        'export_excel': bool(config.get('export_excel', False))
+    }
 
 # Global AutoCAD manager instance
 _manager = None
@@ -158,7 +281,7 @@ def ensure_block_exists(doc: Any, block_name: str, dwg_path: str) -> str:
         doc.Blocks.Item(block_name)
         return block_name
     except Exception:
-        print(f"[api] Block '{block_name}' not found. Importing via Xref-Bind...")
+        logger.info(f"Block '{block_name}' not found. Importing via Xref-Bind...")
 
     if not os.path.exists(dwg_path):
         raise RuntimeError(f"External file not found: {dwg_path}")
@@ -893,6 +1016,7 @@ def get_manager() -> AutoCADManager:
 # ========== API ENDPOINTS ==========
 
 @app.route('/api/status', methods=['GET'])
+@require_api_key
 def api_status():
     """
     Health check endpoint - returns detailed AutoCAD connection status
@@ -908,6 +1032,7 @@ def api_status():
 
 
 @app.route('/api/layers', methods=['GET'])
+@require_api_key
 def api_layers():
     """
     List available layers in the active AutoCAD drawing
@@ -934,6 +1059,7 @@ def api_layers():
 
 
 @app.route('/api/selection-count', methods=['GET'])
+@require_api_key
 def api_selection_count():
     """Get count of currently selected objects in AutoCAD (fresh COM)."""
     manager = get_manager()
@@ -975,6 +1101,7 @@ def api_selection_count():
 
 
 @app.route('/api/execute', methods=['POST'])
+@require_api_key
 def api_execute():
     """
     Execute coordinate extraction based on provided configuration.
@@ -992,9 +1119,12 @@ def api_execute():
         }), 400
     
     try:
-        config = request.get_json()
-        if not config:
+        raw_config = request.get_json()
+        if not raw_config:
             raise ValueError('No configuration provided')
+        
+        # Validate and sanitize input
+        config = validate_layer_config(raw_config)
         
         start_time = time.time()
         
@@ -1048,6 +1178,7 @@ def api_execute():
 
 
 @app.route('/api/trigger-selection', methods=['POST'])
+@require_api_key
 def api_trigger_selection():
     """Bring AutoCAD to foreground (fresh COM)."""
     manager = get_manager()

@@ -35,6 +35,8 @@ import {
   LoginPage,
   SignupPage,
   SettingsPage,
+  CoordinatesGrabber,
+  DrawingListManager,
   ROUTE_MAP,
 } from "./routeComponents";
 
@@ -215,8 +217,10 @@ function ShellContent() {
                   <Route path="/apps/block-library" element={<BlockLibrary />} />
                   <Route path="/apps/qaqc" element={<QAQCChecker />} />
                   <Route path="/apps/ground-grid-generator" element={<GroundGridGeneratorApp />} />
+                  <Route path="/apps/coordinates-grabber" element={<CoordinatesGrabber />} />
                   <Route path="/apps/automation" element={<AutomationWorkflows />} />
                   <Route path="/apps/standards" element={<StandardsChecker />} />
+                  <Route path="/apps/drawing-list" element={<DrawingListManager />} />
                   <Route path="/apps/batch-find-replace" element={<Placeholder name="Batch Find & Replace" />} />
                   <Route path="/apps/batch-print" element={<Placeholder name="Batch Print" />} />
                   <Route path="/knowledge/calculator" element={<CalculatorPanel />} />

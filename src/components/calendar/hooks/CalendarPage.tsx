@@ -70,7 +70,7 @@ export default function CalendarPage({ compact = false }: { compact?: boolean })
 
   const loadEvents = useCallback(async () => {
     const result = await safeSupabaseQuery(
-      () => supabase
+      async () => await supabase
         .from("calendar_events")
         .select("*")
         .order("due_date", { ascending: true }),
@@ -93,11 +93,11 @@ export default function CalendarPage({ compact = false }: { compact?: boolean })
   const loadProjectTaskOptions = useCallback(async () => {
     const [projectsResult, tasksResult] = await Promise.all([
       safeSupabaseQuery(
-        () => supabase.from("projects").select("id, name"),
+        async () => await supabase.from("projects").select("id, name"),
         "CalendarPage"
       ),
       safeSupabaseQuery(
-        () => supabase.from("tasks").select("id, name, project_id"),
+        async () => await supabase.from("tasks").select("id, name, project_id"),
         "CalendarPage"
       ),
     ]);

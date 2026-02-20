@@ -13,8 +13,10 @@ export const CalendarPage = lazy(() => import("@/components/calendar/hooks/Calen
 export const BlockLibrary = lazy(() => import("@/components/apps/BlockLibrary").then(m => ({ default: m.BlockLibrary })));
 export const QAQCChecker = lazy(() => import("@/components/apps/QAQCChecker").then(m => ({ default: m.QAQCChecker })));
 export const GroundGridGeneratorApp = lazy(() => import("@/components/apps/ground-grid/GroundGridGeneratorApp").then(m => ({ default: m.GroundGridGeneratorApp })));
+export const CoordinatesGrabber = lazy(() => import("@/components/apps/CoordinatesGrabber").then(m => ({ default: m.CoordinatesGrabber })));
 export const AutomationWorkflows = lazy(() => import("@/components/apps/AutomationWorkflows").then(m => ({ default: m.AutomationWorkflows })));
 export const StandardsChecker = lazy(() => import("@/components/apps/StandardsChecker").then(m => ({ default: m.StandardsChecker })));
+export const DrawingListManager = lazy(() => import("@/components/apps/DrawingListManager").then(m => ({ default: m.DrawingListManager })));
 export const CalculatorPanel = lazy(() => import("@/components/CalculatorPanel").then(m => ({ default: m.CalculatorPanel })));
 export const VectorCalculator = lazy(() => import("@/components/VectorCalculator").then(m => ({ default: m.VectorCalculator })));
 export const ThreePhaseCalculator = lazy(() => import("@/components/ThreePhaseCalculator").then(m => ({ default: m.ThreePhaseCalculator })));
@@ -39,8 +41,10 @@ export const ROUTE_MAP: Record<string, LazyComponent> = {
   "/apps/block-library": BlockLibrary,
   "/apps/qaqc": QAQCChecker,
   "/apps/ground-grid-generator": GroundGridGeneratorApp,
+  "/apps/coordinates-grabber": CoordinatesGrabber,
   "/apps/automation": AutomationWorkflows,
   "/apps/standards": StandardsChecker,
+  "/apps/drawing-list": DrawingListManager,
   "/knowledge/calculator": CalculatorPanel,
   "/knowledge/vectors": VectorCalculator,
   "/knowledge/threephase": ThreePhaseCalculator,

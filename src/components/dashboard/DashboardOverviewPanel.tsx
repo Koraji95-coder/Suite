@@ -196,7 +196,7 @@ export function DashboardOverviewPanel({
 
       const [projectsResult, activitiesResult, filesResult] = await Promise.all([
         safeSupabaseQuery(
-          () => supabase
+          async () => await supabase
             .from('projects')
             .select('*')
             .eq('status', 'active')
@@ -205,7 +205,7 @@ export function DashboardOverviewPanel({
           'MainDashboard'
         ),
         safeSupabaseQuery(
-          () => supabase
+          async () => await supabase
             .from('activity_log')
             .select('*')
             .order('timestamp', { ascending: false })
@@ -213,7 +213,7 @@ export function DashboardOverviewPanel({
           'MainDashboard'
         ),
         safeSupabaseQuery(
-          () => supabase
+          async () => await supabase
             .from('files')
             .select('size') as any,
           'MainDashboard'
@@ -250,7 +250,7 @@ export function DashboardOverviewPanel({
         setActivities([]);
       }
 
-      if (filesData) {
+      if (filesData && Array.isArray(filesData)) {
         const totalSize = filesData.reduce((sum: number, f: any) => sum + (f.size || 0), 0);
         setStorageUsed(totalSize);
       } else {

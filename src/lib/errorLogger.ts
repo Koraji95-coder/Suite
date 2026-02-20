@@ -88,6 +88,10 @@ class ErrorLogger {
     this.log('critical', context, message, data, error);
   }
 
+  debug(context: string, message: string, data?: unknown): void {
+    this.log('info', context, message, data);
+  }
+
   getLogs(severity?: ErrorSeverity): ErrorLog[] {
     if (!severity) return this.logs;
     return this.logs.filter(log => log.severity === severity);

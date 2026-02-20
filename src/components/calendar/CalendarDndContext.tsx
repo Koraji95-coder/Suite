@@ -13,6 +13,7 @@ import {
   type UniqueIdentifier
 } from "@dnd-kit/core";
 import { addMinutes, differenceInMinutes } from "date-fns";
+import { logger } from "@/lib/logger";
 
 import { EventItem, type CalendarEvent } from "./calendarindex";
 
@@ -107,7 +108,7 @@ export function CalendarDndProvider({ children, onEventUpdate }: CalendarDndProv
 
     // Add safety check for data.current
     if (!active.data.current) {
-      console.error("Missing data in drag start event", event);
+      logger.error('Missing data in drag start event', 'CalendarDnd', { event });
       return;
     }
 
@@ -295,7 +296,7 @@ export function CalendarDndProvider({ children, onEventUpdate }: CalendarDndProv
         });
       }
     } catch (error) {
-      console.error("Error in drag end handler:", error);
+      logger.error('Error in drag end handler', 'CalendarDnd', error);
     } finally {
       // Always reset state
       setActiveEvent(null);

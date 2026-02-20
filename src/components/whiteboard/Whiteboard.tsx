@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Pen, X, Save, Download } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { logger } from '../../lib/logger';
 import { DrawAction } from './whiteboardtypes';
 import { WhiteboardCanvas } from './WhiteboardCanvas';
 import { WhiteboardToolbar } from './WhiteboardToolbar';
@@ -77,7 +78,7 @@ export function Whiteboard({ isOpen, onClose, panelContext, onSaved }: Whiteboar
     });
 
     if (error) {
-      console.error(error);
+      logger.error('Failed to save whiteboard', 'Whiteboard', error);
       alert('Failed to save whiteboard');
     } else {
       alert('Whiteboard saved successfully!');

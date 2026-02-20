@@ -5,6 +5,8 @@
  * Supports configuration management, execution, and progress tracking.
  */
 
+import { logger } from '@/lib/logger';
+
 export interface CoordinatesConfig {
   mode: 'polylines' | 'blocks' | 'layer_search';
   precision: number;
@@ -110,7 +112,7 @@ class CoordinatesGrabberService {
         this.websocket = new WebSocket(wsUrl);
 
         this.websocket.onopen = () => {
-          console.log('[CoordinatesGrabber] WebSocket connected');
+          logger.debug('WebSocket connected', 'CoordinatesGrabber');
           this.reconnectAttempts = 0;
           resolve();
         };
@@ -120,17 +122,17 @@ class CoordinatesGrabberService {
             const data = JSON.parse(event.data);
             this.emit(data.type, data);
           } catch (err) {
-            console.error('[CoordinatesGrabber] Failed to parse message:', err);
+            logger.error('Failed to parse WebSocket message', 'CoordinatesGrabber', err);
           }
         };
 
         this.websocket.onerror = (error) => {
-          console.error('[CoordinatesGrabber] WebSocket error:', error);
+          logger.error('WebSocket connection error', 'CoordinatesGrabber', error);
           reject(error);
         };
 
         this.websocket.onclose = () => {
-          console.log('[CoordinatesGrabber] WebSocket disconnected');
+          logger.debug('WebSocket disconnected', 'CoordinatesGrabber');
           this.websocket = null;
           this.attemptReconnect();
         };
@@ -147,13 +149,13 @@ class CoordinatesGrabberService {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
-      console.log(`[CoordinatesGrabber] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+      logger.debug(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`, 'CoordinatesGrabber');
       setTimeout(() => this.connectWebSocket().catch(err => {
-        console.error('[CoordinatesGrabber] Reconnection failed:', err);
+        logger.error('Reconnection failed', 'CoordinatesGrabber', err);
       }), delay);
     } else {
       const errorMsg = 'Max WebSocket reconnection attempts reached. Service is offline. Please restart the server.';
-      console.error('[CoordinatesGrabber]', errorMsg);
+      logger.error(errorMsg, 'CoordinatesGrabber');
       // Notify UI that service is permanently disconnected
       this.emit('service-disconnected', {
         type: 'service-disconnected',
@@ -176,13 +178,13 @@ class CoordinatesGrabberService {
       const data = await response.json();
 
       if (data.backend_id !== 'coordinates-grabber-api') {
-        console.warn('[CoordinatesGrabber] Response from unknown service on', this.baseUrl);
+        logger.warn('Response from unknown service', 'CoordinatesGrabber', { url: this.baseUrl });
         return { connected: false, autocad_running: false };
       }
 
       return data;
     } catch (err) {
-      console.error('[CoordinatesGrabber] Status check failed:', err);
+      logger.error('Status check failed', 'CoordinatesGrabber', err);
       return {
         connected: false,
         autocad_running: false,
@@ -219,7 +221,7 @@ class CoordinatesGrabberService {
       return await response.json();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[CoordinatesGrabber] Execution failed:', message);
+      logger.error('Execution failed', 'CoordinatesGrabber', err);
       if (message === 'Failed to fetch' || message.includes('NetworkError')) {
         return {
           success: false,
@@ -249,7 +251,7 @@ class CoordinatesGrabberService {
       const data = await response.json();
       return data.layers || [];
     } catch (err) {
-      console.error('[CoordinatesGrabber] Failed to list layers:', err);
+      logger.error('Failed to list layers', 'CoordinatesGrabber', err);
       return [];
     }
   }
@@ -268,7 +270,7 @@ class CoordinatesGrabberService {
       const data = await response.json();
       return data.count || 0;
     } catch (err) {
-      console.error('[CoordinatesGrabber] Failed to get selection count:', err);
+      logger.error('Failed to get selection count', 'CoordinatesGrabber', err);
       return 0;
     }
   }
@@ -285,7 +287,7 @@ class CoordinatesGrabberService {
 
       if (!response.ok) throw new Error(`Status ${response.status}`);
     } catch (err) {
-      console.error('[CoordinatesGrabber] Failed to trigger selection:', err);
+      logger.error('Failed to trigger selection', 'CoordinatesGrabber', err);
     }
   }
 
@@ -314,7 +316,7 @@ class CoordinatesGrabberService {
         try {
           callback(data);
         } catch (err) {
-          console.error(`[CoordinatesGrabber] Error in listener for ${eventType}:`, err);
+          logger.error(`Error in event listener for ${eventType}`, 'CoordinatesGrabber', err);
         }
       });
     }

@@ -1,5 +1,6 @@
 import yaml from 'js-yaml';
 import { supabase } from './supabase';
+import { logger } from './logger';
 
 const BACKUP_STORAGE_KEY = 'suite_yaml_backup';
 const BACKUP_TIMESTAMP_KEY = 'suite_yaml_backup_timestamp';
@@ -266,9 +267,9 @@ export function triggerAutoBackup(): void {
   backupTimer = setTimeout(async () => {
     try {
       await runFullBackup();
-      console.log('Auto-backup completed at', new Date().toISOString());
+      logger.info('Auto-backup completed', 'BackupManager');
     } catch (e) {
-      console.warn('Auto-backup failed:', e);
+      logger.warn('Auto-backup failed', 'BackupManager', e);
     }
   }, BACKUP_DEBOUNCE_MS);
 }

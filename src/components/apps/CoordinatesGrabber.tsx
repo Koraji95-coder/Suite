@@ -4,6 +4,7 @@ import { useTheme, hexToRgba } from '@/lib/palette';
 import { coordinatesGrabberService } from '@/Ground-Grid-Generation/coordinatesGrabberService';
 import { CoordinateYamlViewer } from './coordinates/CoordinateYamlViewer';
 import { ProgressBar } from '@/data/ProgressBar';
+import { useGroundGrid } from './ground-grid/GroundGridContext';
 import type { CoordinatePoint } from './coordinates/types';
 
 interface CoordinatesGrabberState {
@@ -17,12 +18,9 @@ interface CoordinatesGrabberState {
   decimalPlaces: number;
   scanSelection: boolean;
   includeModelspace: boolean;
-  activeTab: 'config' | 'log' | 'export' | 'history' | 'yaml';
-  logs: string[];
+  activeTab: 'config' | 'export' | 'history' | 'yaml';
   excelPath: string;
   isRunning: boolean;
-  backendConnected: boolean;
-  availableLayers: string[];
   selectionCount: number;
   executionHistory: ExecutionHistoryEntry[];
   validationErrors: string[];
@@ -82,11 +80,8 @@ const DEFAULT_STATE: CoordinatesGrabberState = {
   scanSelection: false,
   includeModelspace: true,
   activeTab: 'config',
-  logs: [], // Logs added dynamically to prevent duplicates
   excelPath: '',
   isRunning: false,
-  backendConnected: false,
-  availableLayers: [],
   selectionCount: 0,
   executionHistory: [],
   validationErrors: [],
@@ -95,6 +90,7 @@ const DEFAULT_STATE: CoordinatesGrabberState = {
 
 export function CoordinatesGrabber() {
   const { palette } = useTheme();
+  const { addLog: ctxAddLog, backendConnected, availableLayers, refreshLayers } = useGroundGrid();
   const [state, setState] = useState<CoordinatesGrabberState>(DEFAULT_STATE);
   const [hoveredTooltip, setHoveredTooltip] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -120,13 +116,9 @@ export function CoordinatesGrabber() {
     setTimeout(() => setProgress(0), 600);
   }, []);
 
-  // Simple log function (doesn't trigger history)
   const addLog = useCallback((message: string) => {
-    setState(prev => ({
-      ...prev,
-      logs: [...prev.logs, `[${new Date().toLocaleTimeString()}] ${message}`],
-    }));
-  }, []);
+    ctxAddLog('grabber', message);
+  }, [ctxAddLog]);
 
   // Setup WebSocket event listeners for real-time progress
   const setupWebSocketListeners = useCallback(() => {
@@ -149,96 +141,7 @@ export function CoordinatesGrabber() {
     });
   }, [addLog]);
 
-  // Track whether user has attempted to run (don't show validation errors until then)
   const hasAttemptedRunRef = useRef(false);
-
-  // Initialize backend connection on mount with real-time polling
-  const hasInitializedRef = useRef(false);
-  
-  useEffect(() => {
-    // Prevent double initialization in React StrictMode
-    if (hasInitializedRef.current) return;
-    hasInitializedRef.current = true;
-
-    let pollInterval: NodeJS.Timeout | null = null;
-    let isFirstCheck = true;
-
-    // Add initialization log once
-    addLog('[INFO] Coordinates Grabber initialized');
-    addLog('[INFO] Checking for AutoCAD backend...');
-
-    const checkBackendStatus = async () => {
-      try {
-        const status = await coordinatesGrabberService.checkStatus();
-        const isNowConnected = status.connected && status.autocad_running;
-        
-        // Read previous state for comparison, then update
-        let wasConnected = false;
-        setState(prev => {
-          wasConnected = prev.backendConnected;
-          return { ...prev, backendConnected: isNowConnected };
-        });
-        
-        // Log OUTSIDE setState to avoid React StrictMode double-firing
-        if (isFirstCheck && isNowConnected) {
-          addLog('[SUCCESS] ✓ Connected to AutoCAD backend');
-        } else if (!isFirstCheck && wasConnected !== isNowConnected) {
-          if (isNowConnected) {
-            addLog('[SUCCESS] ✓ AutoCAD connection established');
-          } else {
-            addLog('[INFO] AutoCAD connection lost - waiting for reconnection...');
-          }
-        }
-        
-        // On first successful connection or reconnection, load layers
-        if (status.connected && status.autocad_running) {
-          try {
-            const layers = await coordinatesGrabberService.listLayers();
-            setState(prev => ({ ...prev, availableLayers: layers }));
-            if (layers.length > 0 && isFirstCheck) {
-              addLog(`[INFO] Retrieved ${layers.length} layers from active drawing`);
-            }
-            
-            // Try to connect WebSocket for real-time updates (only on first connection)
-            if (isFirstCheck) {
-              try {
-                await coordinatesGrabberService.connectWebSocket();
-                addLog('[INFO] Real-time updates enabled');
-                setupWebSocketListeners();
-              } catch (err) {
-                // Silent fallback to polling
-              }
-            }
-          } catch (err) {
-            // Silent layer loading failure
-          }
-        } else if (isFirstCheck) {
-          // Only show info message on first check if AutoCAD isn't available
-          addLog('[INFO] Waiting for AutoCAD connection...');
-          addLog('[INFO] Start AutoCAD and open a drawing to enable features');
-        }
-        
-        isFirstCheck = false;
-      } catch (err) {
-        // Silent error on polling - don't spam logs
-        if (isFirstCheck) {
-          addLog('[INFO] AutoCAD backend not detected - features will activate when available');
-          isFirstCheck = false;
-        }
-      }
-    };
-
-    // Initial check
-    checkBackendStatus();
-    
-    // Poll every 5 seconds for AutoCAD availability
-    pollInterval = setInterval(checkBackendStatus, 5000);
-
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-      coordinatesGrabberService.disconnect();
-    };
-  }, [addLog, setupWebSocketListeners]);
 
   // Helper to render tooltip
   const TooltipWrapper = ({ id, children }: { id: string; children: React.ReactNode }) => {
@@ -329,7 +232,7 @@ export function CoordinatesGrabber() {
   }, [addLog]);
 
   const handleLayerSearch = async () => {
-    if (!state.backendConnected) {
+    if (!backendConnected) {
       addLog('[ERROR] Not connected to AutoCAD backend');
       return;
     }
@@ -500,10 +403,6 @@ export function CoordinatesGrabber() {
       setState(prev => ({ ...prev, isRunning: false }));
       finishProgress();
     }
-  };
-
-  const handleClearLogs = () => {
-    setState(prev => ({ ...prev, logs: [] }));
   };
 
   // Validate configuration (returns errors without setting state)
@@ -691,7 +590,7 @@ export function CoordinatesGrabber() {
           borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
         }}
       >
-        {(['config', 'log', 'export', 'history', 'yaml'] as const).map(tab => (
+        {(['config', 'export', 'history', 'yaml'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setState(prev => ({ ...prev, activeTab: tab }))}
@@ -709,7 +608,6 @@ export function CoordinatesGrabber() {
             }}
           >
             {tab === 'config' && 'Config'}
-            {tab === 'log' && 'Log'}
             {tab === 'export' && 'Export'}
             {tab === 'history' && `History (${state.executionHistory.length})`}
             {tab === 'yaml' && 'YAML'}
@@ -828,12 +726,11 @@ export function CoordinatesGrabber() {
                         <button
                           onClick={async () => {
                             addLog('[INFO] Refreshing layer list from AutoCAD...');
-                            try {
-                              const layers = await coordinatesGrabberService.listLayers();
-                              setState(prev => ({ ...prev, availableLayers: layers }));
+                            const layers = await refreshLayers();
+                            if (layers.length > 0) {
                               addLog(`[SUCCESS] Found ${layers.length} layers`);
-                            } catch (err) {
-                              addLog('[ERROR] Failed to refresh layers');
+                            } else {
+                              addLog('[WARNING] No layers found');
                             }
                           }}
                           style={{
@@ -850,7 +747,7 @@ export function CoordinatesGrabber() {
                           🔄 Refresh
                         </button>
                       </label>
-                      {state.availableLayers.length > 0 ? (
+                      {availableLayers.length > 0 ? (
                         <select
                           value={state.layerName}
                           onChange={e => setState(prev => ({ ...prev, layerName: e.target.value }))}
@@ -867,7 +764,7 @@ export function CoordinatesGrabber() {
                           }}
                         >
                           <option value="">-- Select a layer --</option>
-                          {state.availableLayers.map(layer => (
+                          {availableLayers.map(layer => (
                             <option key={layer} value={layer}>
                               {layer}
                             </option>
@@ -1215,28 +1112,28 @@ export function CoordinatesGrabber() {
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button
                 onClick={handleLayerSearch}
-                disabled={state.isRunning || !state.backendConnected}
+                disabled={state.isRunning || !backendConnected}
                 style={{
                   flex: 1,
                   minWidth: '120px',
                   padding: '10px 16px',
                   borderRadius: '6px',
                   border: 'none',
-                  background: state.backendConnected ? palette.primary : palette.textMuted,
-                  color: state.backendConnected ? palette.background : 'rgba(255,255,255,0.5)',
+                  background: backendConnected ? palette.primary : palette.textMuted,
+                  color: backendConnected ? palette.background : 'rgba(255,255,255,0.5)',
                   fontWeight: '600',
                   fontSize: '13px',
-                  cursor: state.backendConnected && !state.isRunning ? 'pointer' : 'not-allowed',
+                  cursor: backendConnected && !state.isRunning ? 'pointer' : 'not-allowed',
                   opacity: state.isRunning ? 0.6 : 1,
                   transition: 'opacity 0.2s',
                 }}
                 onMouseEnter={e => {
-                  if (!state.isRunning && state.backendConnected) {
+                  if (!state.isRunning && backendConnected) {
                     (e.currentTarget as HTMLButtonElement).style.opacity = '0.9';
                   }
                 }}
                 onMouseLeave={e => {
-                  if (!state.isRunning && state.backendConnected) {
+                  if (!state.isRunning && backendConnected) {
                     (e.currentTarget as HTMLButtonElement).style.opacity = '1';
                   }
                 }}
@@ -1246,16 +1143,16 @@ export function CoordinatesGrabber() {
               {state.mode === 'blocks' && (
                 <button
                   onClick={handleSelectionRefresh}
-                  disabled={!state.backendConnected}
+                  disabled={!backendConnected}
                   style={{
                     padding: '10px 16px',
                     borderRadius: '6px',
                     border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
                     background: 'transparent',
-                    color: state.backendConnected ? palette.primary : palette.textMuted,
+                    color: backendConnected ? palette.primary : palette.textMuted,
                     fontWeight: '600',
                     fontSize: '13px',
-                    cursor: state.backendConnected ? 'pointer' : 'not-allowed',
+                    cursor: backendConnected ? 'pointer' : 'not-allowed',
                   }}
                 >
                   🔄 Refresh
@@ -1266,18 +1163,18 @@ export function CoordinatesGrabber() {
             {/* Backend Status */}
             <div
               style={{
-                padding: state.backendConnected ? '8px 12px' : '12px',
+                padding: backendConnected ? '8px 12px' : '12px',
                 borderRadius: '6px',
-                background: state.backendConnected
+                background: backendConnected
                   ? hexToRgba('#51cf66', 0.1)
                   : hexToRgba('#ffa94d', 0.06),
-                border: `1px solid ${state.backendConnected
+                border: `1px solid ${backendConnected
                   ? hexToRgba('#51cf66', 0.3)
                   : hexToRgba('#ffa94d', 0.2)}`,
                 fontSize: '11px',
               }}
             >
-              {state.backendConnected ? (
+              {backendConnected ? (
                 <span style={{ color: '#51cf66' }}>● Connected to AutoCAD</span>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1341,58 +1238,6 @@ export function CoordinatesGrabber() {
               )}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Log Tab */}
-      {state.activeTab === 'log' && (
-        <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div
-            style={{
-              flex: 1,
-              padding: '12px',
-              borderRadius: '6px',
-              background: hexToRgba(palette.background, 0.5),
-              border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-              fontFamily: 'monospace',
-              fontSize: '11px',
-              overflow: 'auto',
-              color: palette.textMuted,
-            }}
-          >
-            {state.logs.map((log, idx) => (
-              <div
-                key={idx}
-                style={{
-                  padding: '2px 0',
-                  color: log.includes('[ERROR]')
-                    ? '#ff6b6b'
-                    : log.includes('[SUCCESS]')
-                    ? '#51cf66'
-                    : log.includes('[PROCESSING]')
-                    ? palette.primary
-                    : palette.textMuted,
-                }}
-              >
-                {log}
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={handleClearLogs}
-            style={{
-              marginTop: '8px',
-              padding: '6px 12px',
-              borderRadius: '4px',
-              border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-              background: 'transparent',
-              color: palette.textMuted,
-              fontSize: '11px',
-              cursor: 'pointer',
-            }}
-          >
-            Clear Logs
-          </button>
         </div>
       )}
 

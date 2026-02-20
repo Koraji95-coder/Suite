@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Upload, Download, Save, Trash2, Plus, FolderKanban, ChevronDown,
-  FileSpreadsheet, Play, Loader, Database,
+  FileSpreadsheet, Play, Loader, Database, Monitor,
 } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { supabase } from '@/lib/supabase';
@@ -15,6 +15,8 @@ import {
 } from './gridEngine';
 import { GridPreview } from './GridPreview';
 import { SAMPLE_RODS_TEXT, SAMPLE_CONDUCTORS_TEXT } from './sampleData';
+import { useGroundGrid } from './GroundGridContext';
+import { exportGridToExcel } from './excelExport';
 
 interface ProjectOption {
   id: string;
@@ -25,6 +27,7 @@ interface ProjectOption {
 export function GridGeneratorPanel() {
   const { palette } = useTheme();
   const { showToast } = useToast();
+  const { addLog, backendConnected } = useGroundGrid();
   const [searchParams] = useSearchParams();
   const designIdParam = searchParams.get('design');
 
@@ -186,6 +189,7 @@ export function GridGeneratorPanel() {
       return;
     }
     setGenerating(true);
+    addLog('generator', '[PROCESSING] Generating grid placements...');
     requestAnimationFrame(() => {
       const maxY = computeGridMaxY(rods, conductors);
       const cfg = { ...config, grid_max_y: maxY };
@@ -209,6 +213,7 @@ export function GridGeneratorPanel() {
       }
 
       setGenerating(false);
+      addLog('generator', `[SUCCESS] Generated ${result.placements.length} placements (${result.teeCount} tees, ${result.crossCount} crosses, ${result.segmentCount} segments)`);
       showToast('success', `Generated: ${result.placements.length} placements`);
     });
   }
@@ -474,6 +479,14 @@ export function GridGeneratorPanel() {
               overflow: 'hidden',
             }}
           >
+            <div style={{ padding: '10px 12px 6px', borderBottom: `1px solid ${hexToRgba(palette.primary, 0.08)}` }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: palette.text, marginBottom: 2 }}>
+                Paste Coordinate Data
+              </div>
+              <div style={{ fontSize: 11, color: palette.textMuted, lineHeight: 1.4 }}>
+                Paste your tab-separated coordinates below to generate the ground grid design.
+              </div>
+            </div>
             <div style={{ display: 'flex', borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}` }}>
               {(['rods', 'conductors'] as const).map(m => (
                 <button
@@ -490,6 +503,17 @@ export function GridGeneratorPanel() {
                 </button>
               ))}
             </div>
+            <div style={{ padding: '6px 10px 0', fontSize: 10, fontFamily: 'monospace', color: palette.textMuted, display: 'flex', gap: 0, borderBottom: `1px solid ${hexToRgba(palette.primary, 0.06)}` }}>
+              {pasteMode === 'rods' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', width: '100%', textAlign: 'center', paddingBottom: 4 }}>
+                  <span>Label</span><span>Depth</span><span>X</span><span>Y</span><span>Dia</span><span>GridX</span><span>GridY</span>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', width: '100%', textAlign: 'center', paddingBottom: 4 }}>
+                  <span>#</span><span>Label</span><span>Len</span><span>X1</span><span>Y1</span><span>Dia</span><span>X2</span><span>Y2</span>
+                </div>
+              )}
+            </div>
             <textarea
               value={pasteText}
               onChange={e => setPasteText(e.target.value)}
@@ -500,7 +524,7 @@ export function GridGeneratorPanel() {
               style={{
                 width: '100%', minHeight: 80, padding: 10, fontSize: 11, fontFamily: 'monospace',
                 background: 'transparent', border: 'none', color: palette.text, outline: 'none',
-                resize: 'vertical', boxSizing: 'border-box',
+                resize: 'none', boxSizing: 'border-box',
               }}
             />
             <div style={{ display: 'flex', gap: 6, padding: '6px 10px' }}>
@@ -532,7 +556,7 @@ export function GridGeneratorPanel() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rods.slice(0, 30).map((r, i) => (
+                    {rods.map((r, i) => (
                       <tr key={i} style={{ borderTop: `1px solid ${hexToRgba(palette.primary, 0.06)}`, color: palette.text }}>
                         <td style={{ padding: '2px 6px', fontWeight: 600 }}>{r.label}</td>
                         <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{r.grid_x}</td>
@@ -541,9 +565,6 @@ export function GridGeneratorPanel() {
                         <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{r.diameter}</td>
                       </tr>
                     ))}
-                    {rods.length > 30 && (
-                      <tr><td colSpan={5} style={{ padding: '4px 6px', fontSize: 10, color: palette.textMuted, textAlign: 'center' }}>+{rods.length - 30} more</td></tr>
-                    )}
                   </tbody>
                 </table>
               </div>
@@ -568,7 +589,7 @@ export function GridGeneratorPanel() {
                     </tr>
                   </thead>
                   <tbody>
-                    {conductors.slice(0, 30).map((c, i) => (
+                    {conductors.map((c, i) => (
                       <tr key={i} style={{ borderTop: `1px solid ${hexToRgba(palette.primary, 0.06)}`, color: palette.text }}>
                         <td style={{ padding: '2px 6px', fontWeight: 600 }}>{c.label}</td>
                         <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{c.x1}</td>
@@ -577,9 +598,6 @@ export function GridGeneratorPanel() {
                         <td style={{ padding: '2px 6px', textAlign: 'right', fontFamily: 'monospace' }}>{c.y2}</td>
                       </tr>
                     ))}
-                    {conductors.length > 30 && (
-                      <tr><td colSpan={5} style={{ padding: '4px 6px', fontSize: 10, color: palette.textMuted, textAlign: 'center' }}>+{conductors.length - 30} more</td></tr>
-                    )}
                   </tbody>
                 </table>
               </div>
@@ -601,9 +619,34 @@ export function GridGeneratorPanel() {
               Generate Grid
             </button>
             {placements.length > 0 && (
-              <button onClick={exportCSV} style={btnStyle()}>
-                <Download size={14} /> Export CSV
-              </button>
+              <>
+                <button onClick={exportCSV} style={btnStyle()}>
+                  <Download size={14} /> CSV
+                </button>
+                <button
+                  onClick={() => exportGridToExcel(designName, placements, rods, conductors)}
+                  style={btnStyle()}
+                >
+                  <FileSpreadsheet size={14} /> Excel
+                </button>
+                <button
+                  onClick={() => {
+                    if (!backendConnected) {
+                      showToast('error', 'AutoCAD backend is offline. Check the log for more details.');
+                      addLog('generator', '[ERROR] Cannot plot to AutoCAD - backend is not connected');
+                      return;
+                    }
+                    addLog('generator', '[PROCESSING] Plotting to active AutoCAD drawing...');
+                    showToast('info', 'Plot to AutoCAD is not yet implemented');
+                  }}
+                  style={{
+                    ...btnStyle(),
+                    opacity: backendConnected ? 1 : 0.5,
+                  }}
+                >
+                  <Monitor size={14} /> Plot to AutoCAD
+                </button>
+              </>
             )}
           </div>
 
@@ -625,34 +668,39 @@ export function GridGeneratorPanel() {
             />
           </div>
 
-          {placements.length > 0 && (
-            <div
-              style={{
-                display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8,
-              }}
-            >
-              {[
-                { label: 'Rods', value: rods.length, color: '#22c55e' },
-                { label: 'Segments', value: segmentCount, color: '#f59e0b' },
-                { label: 'Tees', value: teeCount, color: '#3b82f6' },
-                { label: 'Crosses', value: crossCount, color: '#a855f7' },
-              ].map(s => (
-                <div
-                  key={s.label}
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    border: `1px solid ${hexToRgba(s.color, 0.2)}`,
-                    background: hexToRgba(s.color, 0.06),
-                    textAlign: 'center',
-                  }}
-                >
-                  <div style={{ fontSize: 20, fontWeight: 700, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
-                  <div style={{ fontSize: 10, color: palette.textMuted, marginTop: 2 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          {placements.length > 0 && (() => {
+            const testWellCount = placements.filter(p => p.type === 'GROUND_ROD_TEST_WELL').length;
+            const rodOnlyCount = rods.length - testWellCount;
+            return (
+              <div
+                style={{
+                  display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8,
+                }}
+              >
+                {[
+                  { label: 'Rods', value: rodOnlyCount, color: '#22c55e' },
+                  { label: 'Test Wells', value: testWellCount, color: '#ef4444' },
+                  { label: 'Segments', value: segmentCount, color: '#f59e0b' },
+                  { label: 'Tees', value: teeCount, color: '#3b82f6' },
+                  { label: 'Crosses', value: crossCount, color: '#06b6d4' },
+                ].map(s => (
+                  <div
+                    key={s.label}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: `1px solid ${hexToRgba(s.color, 0.2)}`,
+                      background: hexToRgba(s.color, 0.06),
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: 20, fontWeight: 700, color: s.color, fontVariantNumeric: 'tabular-nums' }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: palette.textMuted, marginTop: 2 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

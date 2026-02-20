@@ -25,6 +25,25 @@
 - 💾 **Code Generation** - Generates Python tools and Excel templates
 - 🎯 **Self-Improvement** - Agent analyzes and improves its own performance
 
+## 📱 Accessing Codespaces from Your Phone
+
+You can access this project's GitHub Codespaces from a mobile device in two ways:
+
+### Option A: GitHub Mobile App
+1. Install the **GitHub** app ([iOS](https://apps.apple.com/app/github/id1477376905) / [Android](https://play.google.com/store/apps/details?id=com.github.android))
+2. Sign in to your GitHub account
+3. Navigate to **Menu → Codespaces**
+4. Tap on your running codespace (or create a new one for this repo)
+5. The codespace opens in a browser-based VS Code editor — fully functional on mobile
+
+### Option B: Mobile Browser
+1. Open **github.com/codespaces** in your phone's browser
+2. Sign in if prompted
+3. Select the codespace for this repository
+4. The VS Code web editor loads directly in your browser — no app required
+
+> **Tip:** For the best mobile experience, use a Chromium-based browser (Chrome/Edge) in landscape orientation. The GitHub mobile app provides the smoothest workflow for starting and stopping codespaces.
+
 ## 📖 Getting Started
 
 ### 1. Standard Setup

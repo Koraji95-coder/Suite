@@ -1,10 +1,14 @@
-import { useState } from 'react';
-import { MapPin, ScrollText } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Map, ScrollText } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { CoordinatesGrabber } from '../CoordinatesGrabber';
 import { GridGeneratorPanel } from './GridGeneratorPanel';
 import { UnifiedLog } from './UnifiedLog';
 import { GroundGridProvider, useGroundGrid } from './GroundGridContext';
+import { GroundGridSplash } from './GroundGridSplash';
+import { GridBackground } from './GridBackground';
+
+const SESSION_KEY = 'gg-splash-shown';
 
 type TabId = 'grabber' | 'generator' | 'log';
 
@@ -18,15 +22,29 @@ function GroundGridGeneratorInner() {
   const { palette } = useTheme();
   const { backendConnected, logs } = useGroundGrid();
   const [activeTab, setActiveTab] = useState<TabId>('generator');
+  const alreadyShown = useRef(sessionStorage.getItem(SESSION_KEY) === '1');
+  const [showSplash, setShowSplash] = useState(!alreadyShown.current);
+
+  const handleSplashComplete = () => {
+    sessionStorage.setItem(SESSION_KEY, '1');
+    setShowSplash(false);
+  };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      {showSplash && <GroundGridSplash onComplete={handleSplashComplete} />}
+
+      <GridBackground opacity={0.12} />
+
       <div
         style={{
           padding: '16px 24px 0',
           borderBottom: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-          background: palette.surface,
+          background: hexToRgba(palette.surface, 0.85),
+          backdropFilter: 'blur(8px)',
           flexShrink: 0,
+          position: 'relative',
+          zIndex: 1,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
@@ -37,7 +55,7 @@ function GroundGridGeneratorInner() {
               background: `linear-gradient(135deg, ${hexToRgba('#f59e0b', 0.2)}, ${hexToRgba('#ea580c', 0.2)})`,
             }}
           >
-            <MapPin size={24} color="#f59e0b" />
+            <Map size={24} color="#f59e0b" />
           </div>
           <div style={{ flex: 1 }}>
             <h2
@@ -120,7 +138,7 @@ function GroundGridGeneratorInner() {
         </div>
       </div>
 
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>
         <div style={{ height: '100%', overflow: 'auto', display: activeTab === 'grabber' ? 'block' : 'none' }}>
           <CoordinatesGrabber />
         </div>

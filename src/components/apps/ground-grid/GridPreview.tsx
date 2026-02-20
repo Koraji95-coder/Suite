@@ -42,18 +42,29 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
     h: bounds.maxY - bounds.minY,
   };
 
+  const defaultW = bounds.maxX - bounds.minX;
+  const defaultH = bounds.maxY - bounds.minY;
+  const MIN_ZOOM = 0.2;
+  const MAX_ZOOM = 5;
+
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
     const factor = e.deltaY > 0 ? 1.12 : 0.88;
     setViewBox(prev => {
-      const vb = prev || { x: bounds.minX, y: bounds.minY, w: bounds.maxX - bounds.minX, h: bounds.maxY - bounds.minY };
+      const vb = prev || { x: bounds.minX, y: bounds.minY, w: defaultW, h: defaultH };
       const cx = vb.x + vb.w / 2;
       const cy = vb.y + vb.h / 2;
-      const nw = vb.w * factor;
-      const nh = vb.h * factor;
+      let nw = vb.w * factor;
+      let nh = vb.h * factor;
+      const minW = defaultW * MIN_ZOOM;
+      const maxW = defaultW * MAX_ZOOM;
+      const minH = defaultH * MIN_ZOOM;
+      const maxH = defaultH * MAX_ZOOM;
+      nw = Math.max(minW, Math.min(maxW, nw));
+      nh = Math.max(minH, Math.min(maxH, nh));
       return { x: cx - nw / 2, y: cy - nh / 2, w: nw, h: nh };
     });
-  }, [bounds]);
+  }, [bounds, defaultW, defaultH]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;

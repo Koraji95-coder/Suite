@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import * as THREE from 'three';
 import { LoadingCard } from '@/data/LoadingCard';
 import { ProgressBar } from '@/data/ProgressBar';
 import { useTheme, hexToRgba } from '@/lib/palette';
+import { GridBackground } from './GridBackground';
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -17,7 +17,6 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
@@ -67,134 +66,6 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
     return () => cancelAnimationFrame(rafId);
   }, [step, steps, total]);
 
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    camera.position.set(0, 3, 6);
-    camera.lookAt(0, 0, 0);
-
-    const gridGeo = new THREE.PlaneGeometry(12, 12, 80, 80);
-    const gridMat = new THREE.MeshStandardMaterial({
-      color: '#f59e0b',
-      wireframe: true,
-      transparent: true,
-      opacity: 0.18,
-      emissive: new THREE.Color('#f59e0b').multiplyScalar(0.2),
-    });
-    const gridMesh = new THREE.Mesh(gridGeo, gridMat);
-    gridMesh.rotation.x = -Math.PI / 2.8;
-    gridMesh.rotation.z = 0.1;
-    scene.add(gridMesh);
-
-    const nodeGeo = new THREE.SphereGeometry(0.06, 12, 12);
-    const nodeMat = new THREE.MeshStandardMaterial({
-      color: '#22c55e',
-      emissive: new THREE.Color('#22c55e').multiplyScalar(0.6),
-      transparent: true,
-      opacity: 0,
-    });
-    const nodes: THREE.Mesh[] = [];
-    const nodePositions: THREE.Vector3[] = [];
-    for (let i = 0; i < 40; i++) {
-      const x = (Math.random() - 0.5) * 8;
-      const z = (Math.random() - 0.5) * 8;
-      const node = new THREE.Mesh(nodeGeo, nodeMat.clone());
-      node.position.set(x, 0.1, z);
-      scene.add(node);
-      nodes.push(node);
-      nodePositions.push(new THREE.Vector3(x, 0.1, z));
-    }
-
-    const linesMat = new THREE.LineBasicMaterial({ color: '#f59e0b', transparent: true, opacity: 0 });
-    const lineGeos: THREE.BufferGeometry[] = [];
-    const lineObjs: THREE.Line[] = [];
-    for (let i = 0; i < 20; i++) {
-      const a = nodePositions[Math.floor(Math.random() * nodePositions.length)];
-      const b = nodePositions[Math.floor(Math.random() * nodePositions.length)];
-      const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
-      const line = new THREE.Line(geo, linesMat.clone());
-      scene.add(line);
-      lineGeos.push(geo);
-      lineObjs.push(line);
-    }
-
-    const ambientLight = new THREE.AmbientLight('#f59e0b', 0.1);
-    scene.add(ambientLight);
-    const pointLight = new THREE.PointLight('#f59e0b', 0.8);
-    pointLight.position.set(2, 4, 4);
-    scene.add(pointLight);
-    const backLight = new THREE.PointLight('#ea580c', 0.4);
-    backLight.position.set(-3, 2, -2);
-    scene.add(backLight);
-
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    };
-    window.addEventListener('resize', handleResize);
-
-    const clock = new THREE.Clock();
-    let rafId = 0;
-    let disposed = false;
-
-    const tick = () => {
-      if (disposed) return;
-      rafId = requestAnimationFrame(tick);
-      const elapsed = clock.getElapsedTime();
-
-      const pos = gridGeo.attributes.position.array;
-      for (let i = 0; i < pos.length; i += 3) {
-        const x = pos[i];
-        const y = pos[i + 1];
-        pos[i + 2] = Math.sin(x * 0.8 + elapsed * 0.6) * 0.12 + Math.cos(y * 0.8 + elapsed * 0.4) * 0.12;
-      }
-      gridGeo.attributes.position.needsUpdate = true;
-      gridGeo.computeVertexNormals();
-
-      const reveal = clamp(elapsed / 4, 0, 1);
-      for (let i = 0; i < nodes.length; i++) {
-        const nodeReveal = clamp((reveal - i / nodes.length) * nodes.length * 0.5, 0, 1);
-        const mat = nodes[i].material as THREE.MeshStandardMaterial;
-        mat.opacity = nodeReveal * 0.9;
-        const scale = nodeReveal * (1 + Math.sin(elapsed * 2 + i) * 0.15);
-        nodes[i].scale.setScalar(scale);
-      }
-
-      for (let i = 0; i < lineObjs.length; i++) {
-        const lineReveal = clamp((reveal - 0.3 - i / lineObjs.length * 0.5) * 3, 0, 1);
-        const mat = lineObjs[i].material as THREE.LineBasicMaterial;
-        mat.opacity = lineReveal * 0.5;
-      }
-
-      camera.position.x = Math.sin(elapsed * 0.1) * 0.3;
-      camera.position.y = 3 + Math.sin(elapsed * 0.15) * 0.2;
-      camera.lookAt(0, 0, 0);
-
-      renderer.render(scene, camera);
-    };
-
-    tick();
-
-    return () => {
-      disposed = true;
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', handleResize);
-      renderer.dispose();
-      gridGeo.dispose();
-      gridMat.dispose();
-      nodeGeo.dispose();
-      nodeMat.dispose();
-      linesMat.dispose();
-      lineGeos.forEach(g => g.dispose());
-    };
-  }, []);
-
   return (
     <div
       className={`fixed inset-0 z-[100] transition-all duration-1000 ${
@@ -205,7 +76,7 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
         transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
-      <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight} className="absolute inset-0 opacity-60" />
+      <GridBackground opacity={0.6} />
       <div
         className="absolute inset-0 pointer-events-none"
         style={{

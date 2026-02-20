@@ -104,7 +104,15 @@ def add_security_headers(response):
     return response
 
 # ── API Authentication ───────────────────────────────────────────
-API_KEY = os.environ.get('API_KEY', 'dev-only-insecure-key-change-in-production')
+# SECURITY: API_KEY must be explicitly set in environment. No defaults allowed.
+API_KEY = os.environ.get('API_KEY')
+if not API_KEY:
+    raise RuntimeError(
+        "FATAL: API_KEY environment variable is not set.\n"
+        "Please set your API key before starting the server:\n"
+        "  export API_KEY='your-secure-api-key-here'\n"
+        "Then start the server again."
+    )
 
 def require_api_key(f):
     """Decorator to require API key authentication for protected routes."""

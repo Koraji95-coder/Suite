@@ -152,7 +152,14 @@ class CoordinatesGrabberService {
         console.error('[CoordinatesGrabber] Reconnection failed:', err);
       }), delay);
     } else {
-      console.error('[CoordinatesGrabber] Max reconnection attempts reached');
+      const errorMsg = 'Max WebSocket reconnection attempts reached. Service is offline. Please restart the server.';
+      console.error('[CoordinatesGrabber]', errorMsg);
+      // Notify UI that service is permanently disconnected
+      this.emit('service-disconnected', {
+        type: 'service-disconnected',
+        message: errorMsg,
+        timestamp: new Date().toISOString(),
+      });
     }
   }
 
@@ -328,6 +335,13 @@ class CoordinatesGrabberService {
    */
   public getBaseUrl(): string {
     return this.baseUrl;
+  }
+
+  /**
+   * Check if WebSocket is connected
+   */
+  public isConnected(): boolean {
+    return this.websocket !== null && this.websocket.readyState === WebSocket.OPEN;
   }
 }
 

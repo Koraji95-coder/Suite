@@ -92,7 +92,6 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
   }, [step, steps, total]);
 
   const plane1Ref = useRef<THREE.Mesh | null>(null);
-  const plane2Ref = useRef<THREE.Mesh | null>(null);
   const frontLightRef = useRef<THREE.PointLight | null>(null);
   const backLightRef = useRef<THREE.PointLight | null>(null);
   const progressRef = useRef(progress);
@@ -125,20 +124,6 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
     scene.add(plane1);
     plane1Ref.current = plane1;
 
-    const geo2 = new THREE.PlaneGeometry(18, 18, 128, 128);
-    const mat2 = new THREE.MeshStandardMaterial({
-      color: COPPER,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.15,
-      emissive: new THREE.Color(COPPER).multiplyScalar(0.2),
-    });
-    const plane2 = new THREE.Mesh(geo2, mat2);
-    plane2.rotation.x = -Math.PI / 4;
-    plane2.rotation.z = -0.1;
-    scene.add(plane2);
-    plane2Ref.current = plane2;
-
     const ambientLight = new THREE.AmbientLight(AMBER, 0.15);
     scene.add(ambientLight);
 
@@ -164,7 +149,6 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
     let disposed = false;
 
     const baseOpacity1 = 0.3;
-    const baseOpacity2 = 0.15;
     const baseFrontIntensity = 0.5;
     const baseBackIntensity = 0.3;
 
@@ -196,11 +180,6 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
         m.opacity = baseOpacity1 * exitFactor;
         plane1Ref.current.scale.setScalar(exitFactor);
       }
-      if (plane2Ref.current) {
-        const m = plane2Ref.current.material as THREE.Material;
-        m.opacity = baseOpacity2 * exitFactor;
-        plane2Ref.current.scale.setScalar(exitFactor);
-      }
       if (frontLightRef.current) {
         frontLightRef.current.intensity = frontIntensity * exitFactor;
       }
@@ -223,9 +202,7 @@ export function GroundGridSplash({ onComplete }: GroundGridSplashProps) {
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
       geo1.dispose();
-      geo2.dispose();
       mat1.dispose();
-      mat2.dispose();
     };
   }, [exitDurationMs, reducedMotion]);
 

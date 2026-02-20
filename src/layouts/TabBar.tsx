@@ -73,7 +73,7 @@ export function TabBar() {
               data-close
               onClick={(e) => handleClose(e, tab.id)}
               style={{
-                display: "flex",
+                display: openTabs.length <= 1 ? "none" : "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 width: 16,

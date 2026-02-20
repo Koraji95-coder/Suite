@@ -304,6 +304,11 @@ export async function exportGridToExcel(
   const a = document.createElement('a');
   a.href = url;
   a.download = `${designName.replace(/\s+/g, '_')}_ground_grid.xlsx`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 250);
 }

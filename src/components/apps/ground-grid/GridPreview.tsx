@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import type { GridRod, GridConductor, GridPlacement } from './types';
 
@@ -47,24 +47,37 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
   const MIN_ZOOM = 0.2;
   const MAX_ZOOM = 5;
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const factor = e.deltaY > 0 ? 1.05 : 0.9524;
-    setViewBox(prev => {
-      const vb = prev || { x: bounds.minX, y: bounds.minY, w: defaultW, h: defaultH };
-      const cx = vb.x + vb.w / 2;
-      const cy = vb.y + vb.h / 2;
-      let nw = vb.w * factor;
-      let nh = vb.h * factor;
-      const minW = defaultW * MIN_ZOOM;
-      const maxW = defaultW * MAX_ZOOM;
-      const minH = defaultH * MIN_ZOOM;
-      const maxH = defaultH * MAX_ZOOM;
-      nw = Math.max(minW, Math.min(maxW, nw));
-      nh = Math.max(minH, Math.min(maxH, nh));
-      return { x: cx - nw / 2, y: cy - nh / 2, w: nw, h: nh };
-    });
-  }, [bounds, defaultW, defaultH]);
+  const boundsRef = useRef(bounds);
+  const defaultWRef = useRef(defaultW);
+  const defaultHRef = useRef(defaultH);
+  boundsRef.current = bounds;
+  defaultWRef.current = defaultW;
+  defaultHRef.current = defaultH;
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const factor = e.deltaY > 0 ? 1.05 : 0.9524;
+      const b = boundsRef.current;
+      const dw = defaultWRef.current;
+      const dh = defaultHRef.current;
+      setViewBox(prev => {
+        const vb = prev || { x: b.minX, y: b.minY, w: dw, h: dh };
+        const cx = vb.x + vb.w / 2;
+        const cy = vb.y + vb.h / 2;
+        let nw = vb.w * factor;
+        let nh = vb.h * factor;
+        nw = Math.max(dw * MIN_ZOOM, Math.min(dw * MAX_ZOOM, nw));
+        nh = Math.max(dh * MIN_ZOOM, Math.min(dh * MAX_ZOOM, nh));
+        return { x: cx - nw / 2, y: cy - nh / 2, w: nw, h: nh };
+      });
+    };
+    svg.addEventListener('wheel', handler, { passive: false });
+    return () => svg.removeEventListener('wheel', handler);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -123,7 +136,6 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
           userSelect: 'none',
           WebkitUserSelect: 'none',
         }}
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

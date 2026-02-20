@@ -91,6 +91,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const closeTab = useCallback((id: string) => {
     setOpenTabs((prev) => {
+      if (prev.length <= 1) return prev;
       const idx = prev.findIndex((t) => t.id === id);
       if (idx === -1) return prev;
       const next = prev.filter((t) => t.id !== id);

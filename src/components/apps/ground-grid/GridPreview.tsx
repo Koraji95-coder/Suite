@@ -109,12 +109,15 @@ export function GridPreview({ rods, conductors, placements, segmentCount }: Grid
           cursor: isPanning ? 'grabbing' : 'grab',
           background: hexToRgba(palette.background, 0.5),
           borderRadius: 8,
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onDragStart={e => e.preventDefault()}
       >
         {conductors.map((c, i) => (
           <line

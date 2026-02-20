@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Upload, Download, Save, Trash2, Plus, FolderKanban, ChevronDown,
+  Upload, Save, Trash2, Plus, FolderKanban, ChevronDown,
   FileSpreadsheet, Play, Loader, Database, Monitor,
 } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
@@ -296,22 +296,6 @@ export function GridGeneratorPanel() {
     setRods(parsedRods);
     setConductors(parsedConds);
     showToast('success', `Loaded ${parsedRods.length} rods, ${parsedConds.length} conductors`);
-  }
-
-  function exportCSV() {
-    if (placements.length === 0) return;
-    const header = 'type,grid_x,grid_y,autocad_x,autocad_y,rotation_deg';
-    const rows = placements.map(p =>
-      `${p.type},${p.grid_x},${p.grid_y},${p.autocad_x.toFixed(4)},${p.autocad_y.toFixed(4)},${p.rotation_deg}`
-    );
-    const csv = [header, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${designName.replace(/\s+/g, '_')}_placements.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   const linkedProject = projects.find(p => p.id === linkedProjectId);
@@ -620,14 +604,11 @@ export function GridGeneratorPanel() {
             </button>
             {placements.length > 0 && (
               <>
-                <button onClick={exportCSV} style={btnStyle()}>
-                  <Download size={14} /> CSV
-                </button>
                 <button
                   onClick={() => exportGridToExcel(designName, placements, rods, conductors)}
                   style={btnStyle()}
                 >
-                  <FileSpreadsheet size={14} /> Excel
+                  <FileSpreadsheet size={14} /> Export Excel
                 </button>
                 <button
                   onClick={() => {

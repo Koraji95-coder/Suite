@@ -4,10 +4,6 @@ import type { GridPlacement, GridRod, GridConductor } from './types';
 const TITLE_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2B6CB5' } };
 const TITLE_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 14, name: 'Arial' };
 
-const SECTION_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF5B9BD5' } };
-const SECTION_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12, name: 'Arial' };
-
-const HEADER_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3A3F47' } };
 const HEADER_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFF0F0F0' }, size: 11, name: 'Arial' };
 
 const EVEN_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E6E2' } };
@@ -22,10 +18,27 @@ const ALL_BORDER: Partial<ExcelJS.Borders> = {
   left: { style: 'thin', color: BORDER_COLOR },
   right: { style: 'thin', color: BORDER_COLOR },
 };
-const HEADER_BORDER: Partial<ExcelJS.Borders> = {
-  ...ALL_BORDER,
-  bottom: { style: 'medium', color: { argb: 'FF3A3F47' } },
+
+const SECTION_COLORS: Record<string, string> = {
+  GROUND_ROD_TEST_WELL: 'FFC0392B',
+  ROD: 'FF27AE60',
+  TEE: 'FF2980B9',
+  CROSS: 'FF16A085',
 };
+
+const HEADER_FILLS: Record<string, ExcelJS.FillPattern> = {
+  GROUND_ROD_TEST_WELL: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF922B21' } },
+  ROD: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E8449' } },
+  TEE: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F618D' } },
+  CROSS: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF117A65' } },
+};
+
+const RODS_SECTION_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF27AE60' } };
+const RODS_HEADER_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E8449' } };
+const CONDS_SECTION_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE67E22' } };
+const CONDS_HEADER_FILL: ExcelJS.FillPattern = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCA6F1E' } };
+
+const SECTION_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12, name: 'Arial' };
 
 function applyRowFill(row: ExcelJS.Row, fill: ExcelJS.FillPattern, colCount: number) {
   for (let c = 1; c <= colCount; c++) {
@@ -33,6 +46,15 @@ function applyRowFill(row: ExcelJS.Row, fill: ExcelJS.FillPattern, colCount: num
     cell.fill = fill;
     cell.border = ALL_BORDER;
   }
+}
+
+function lockSheetArea(ws: ExcelJS.Worksheet, colCount: number) {
+  for (let c = colCount + 1; c <= colCount + 20; c++) {
+    ws.getColumn(c).width = 0;
+    ws.getColumn(c).hidden = true;
+  }
+
+  ws.views = [{ state: 'normal', rightToLeft: false, showGridLines: false }];
 }
 
 export async function exportGridToExcel(
@@ -76,25 +98,31 @@ export async function exportGridToExcel(
       CROSS: 'Cross Connections',
     };
 
+    const sectionFill: ExcelJS.FillPattern = {
+      type: 'pattern', pattern: 'solid',
+      fgColor: { argb: SECTION_COLORS[typeName] || 'FF5B9BD5' },
+    };
+
     const sectionRow = wsPlace.getRow(currentRow);
     wsPlace.mergeCells(currentRow, 1, currentRow, placeHeaders.length);
     const sectionCell = sectionRow.getCell(1);
     sectionCell.value = `${labelMap[typeName] || typeName} (${items.length})`;
     sectionCell.font = SECTION_FONT;
-    sectionCell.fill = SECTION_FILL;
+    sectionCell.fill = sectionFill;
     sectionCell.alignment = { horizontal: 'left', vertical: 'middle' };
-    applyRowFill(sectionRow, SECTION_FILL, placeHeaders.length);
+    applyRowFill(sectionRow, sectionFill, placeHeaders.length);
     sectionRow.height = 24;
     currentRow++;
 
+    const hdrFill = HEADER_FILLS[typeName] || { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FF3A3F47' } };
     const headerRow = wsPlace.getRow(currentRow);
     placeHeaders.forEach((h, i) => {
       const cell = headerRow.getCell(i + 1);
       cell.value = h;
       cell.font = HEADER_FONT;
-      cell.fill = HEADER_FILL;
+      cell.fill = hdrFill;
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = HEADER_BORDER;
+      cell.border = { ...ALL_BORDER, bottom: { style: 'medium', color: { argb: 'FF3A3F47' } } };
     });
     headerRow.height = 22;
     currentRow++;
@@ -122,6 +150,8 @@ export async function exportGridToExcel(
     wsPlace.getColumn(i + 1).width = i === 0 ? 28 : 16;
   });
 
+  lockSheetArea(wsPlace, placeHeaders.length);
+
   if (rods.length > 0) {
     const wsRods = wb.addWorksheet('Rods');
     const rodHeaders = ['Label', 'Grid X', 'Grid Y', 'Depth', 'Diameter'];
@@ -136,19 +166,28 @@ export async function exportGridToExcel(
     applyRowFill(rTitleRow, TITLE_FILL, rodHeaders.length);
     rTitleRow.height = 28;
 
-    const rHeaderRow = wsRods.getRow(2);
+    const rSectionRow = wsRods.getRow(2);
+    wsRods.mergeCells(2, 1, 2, rodHeaders.length);
+    rSectionRow.getCell(1).value = `Rods (${rods.length})`;
+    rSectionRow.getCell(1).font = SECTION_FONT;
+    rSectionRow.getCell(1).fill = RODS_SECTION_FILL;
+    rSectionRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+    applyRowFill(rSectionRow, RODS_SECTION_FILL, rodHeaders.length);
+    rSectionRow.height = 24;
+
+    const rHeaderRow = wsRods.getRow(3);
     rodHeaders.forEach((h, i) => {
       const cell = rHeaderRow.getCell(i + 1);
       cell.value = h;
       cell.font = HEADER_FONT;
-      cell.fill = HEADER_FILL;
+      cell.fill = RODS_HEADER_FILL;
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = HEADER_BORDER;
+      cell.border = { ...ALL_BORDER, bottom: { style: 'medium', color: { argb: 'FF3A3F47' } } };
     });
     rHeaderRow.height = 22;
 
     rods.forEach((r, idx) => {
-      const row = wsRods.getRow(idx + 3);
+      const row = wsRods.getRow(idx + 4);
       const values = [r.label, r.grid_x, r.grid_y, r.depth, r.diameter];
       const fill = idx % 2 === 0 ? EVEN_FILL : ODD_FILL;
       values.forEach((v, ci) => {
@@ -164,6 +203,8 @@ export async function exportGridToExcel(
     rodHeaders.forEach((_, i) => {
       wsRods.getColumn(i + 1).width = i === 0 ? 16 : 14;
     });
+
+    lockSheetArea(wsRods, rodHeaders.length);
   }
 
   if (conductors.length > 0) {
@@ -180,19 +221,28 @@ export async function exportGridToExcel(
     applyRowFill(cTitleRow, TITLE_FILL, condHeaders.length);
     cTitleRow.height = 28;
 
-    const cHeaderRow = wsCond.getRow(2);
+    const cSectionRow = wsCond.getRow(2);
+    wsCond.mergeCells(2, 1, 2, condHeaders.length);
+    cSectionRow.getCell(1).value = `Conductors (${conductors.length})`;
+    cSectionRow.getCell(1).font = SECTION_FONT;
+    cSectionRow.getCell(1).fill = CONDS_SECTION_FILL;
+    cSectionRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+    applyRowFill(cSectionRow, CONDS_SECTION_FILL, condHeaders.length);
+    cSectionRow.height = 24;
+
+    const cHeaderRow = wsCond.getRow(3);
     condHeaders.forEach((h, i) => {
       const cell = cHeaderRow.getCell(i + 1);
       cell.value = h;
       cell.font = HEADER_FONT;
-      cell.fill = HEADER_FILL;
+      cell.fill = CONDS_HEADER_FILL;
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = HEADER_BORDER;
+      cell.border = { ...ALL_BORDER, bottom: { style: 'medium', color: { argb: 'FF3A3F47' } } };
     });
     cHeaderRow.height = 22;
 
     conductors.forEach((c, idx) => {
-      const row = wsCond.getRow(idx + 3);
+      const row = wsCond.getRow(idx + 4);
       const values = [c.label, c.length ?? '', c.x1, c.y1, c.x2, c.y2, c.diameter];
       const fill = idx % 2 === 0 ? EVEN_FILL : ODD_FILL;
       values.forEach((v, ci) => {
@@ -208,6 +258,8 @@ export async function exportGridToExcel(
     condHeaders.forEach((_, i) => {
       wsCond.getColumn(i + 1).width = i === 0 ? 16 : 14;
     });
+
+    lockSheetArea(wsCond, condHeaders.length);
   }
 
   const buffer = await wb.xlsx.writeBuffer();

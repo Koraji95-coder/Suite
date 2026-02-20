@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Map, ScrollText } from 'lucide-react';
+import { MapPin, ScrollText } from 'lucide-react';
 import { useTheme, hexToRgba } from '@/lib/palette';
 import { CoordinatesGrabber } from '../CoordinatesGrabber';
 import { GridGeneratorPanel } from './GridGeneratorPanel';
@@ -55,7 +55,7 @@ function GroundGridGeneratorInner() {
               background: `linear-gradient(135deg, ${hexToRgba('#f59e0b', 0.2)}, ${hexToRgba('#ea580c', 0.2)})`,
             }}
           >
-            <Map size={24} color="#f59e0b" />
+            <MapPin size={24} color="#f59e0b" />
           </div>
           <div style={{ flex: 1 }}>
             <h2

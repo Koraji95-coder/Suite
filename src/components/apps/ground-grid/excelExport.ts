@@ -48,10 +48,27 @@ function applyRowFill(row: ExcelJS.Row, fill: ExcelJS.FillPattern, colCount: num
   }
 }
 
-function lockSheetArea(ws: ExcelJS.Worksheet, colCount: number) {
-  for (let c = colCount + 1; c <= colCount + 20; c++) {
+function autofitColumns(ws: ExcelJS.Worksheet, colCount: number, lastDataRow: number) {
+  for (let c = 1; c <= colCount; c++) {
+    let maxLen = 0;
+    for (let r = 1; r <= lastDataRow; r++) {
+      const cell = ws.getRow(r).getCell(c);
+      const val = cell.value;
+      const len = val != null ? String(val).length : 0;
+      if (len > maxLen) maxLen = len;
+    }
+    ws.getColumn(c).width = Math.max(10, Math.min(40, maxLen + 4));
+  }
+}
+
+function hideUnusedCells(ws: ExcelJS.Worksheet, colCount: number, lastDataRow: number) {
+  for (let c = colCount + 1; c <= colCount + 50; c++) {
     ws.getColumn(c).width = 0;
     ws.getColumn(c).hidden = true;
+  }
+
+  for (let r = lastDataRow + 1; r <= lastDataRow + 200; r++) {
+    ws.getRow(r).hidden = true;
   }
 
   ws.views = [{ state: 'normal', rightToLeft: false, showGridLines: false }];
@@ -137,20 +154,17 @@ export async function exportGridToExcel(
         cell.fill = fill;
         cell.border = ALL_BORDER;
         cell.font = ci === 0 ? BOLD_DATA_FONT : DATA_FONT;
-        cell.alignment = { horizontal: ci === 0 ? 'left' : 'right', vertical: 'middle' };
+        cell.alignment = { horizontal: ci === 0 ? 'left' : 'center', vertical: 'middle' };
         if (typeof v === 'number') cell.numFmt = ci >= 3 ? '0.0000' : '0';
       });
       currentRow++;
     });
 
-    if (ti < sortedTypes.length - 1) currentRow += 2;
   }
 
-  placeHeaders.forEach((_, i) => {
-    wsPlace.getColumn(i + 1).width = i === 0 ? 28 : 16;
-  });
-
-  lockSheetArea(wsPlace, placeHeaders.length);
+  const placeLastRow = currentRow - 1;
+  autofitColumns(wsPlace, placeHeaders.length, placeLastRow);
+  hideUnusedCells(wsPlace, placeHeaders.length, placeLastRow);
 
   if (rods.length > 0) {
     const wsRods = wb.addWorksheet('Rods');
@@ -196,15 +210,13 @@ export async function exportGridToExcel(
         cell.fill = fill;
         cell.border = ALL_BORDER;
         cell.font = ci === 0 ? BOLD_DATA_FONT : DATA_FONT;
-        cell.alignment = { horizontal: ci === 0 ? 'left' : 'right', vertical: 'middle' };
+        cell.alignment = { horizontal: ci === 0 ? 'left' : 'center', vertical: 'middle' };
       });
     });
 
-    rodHeaders.forEach((_, i) => {
-      wsRods.getColumn(i + 1).width = i === 0 ? 16 : 14;
-    });
-
-    lockSheetArea(wsRods, rodHeaders.length);
+    const rodsLastRow = rods.length + 3;
+    autofitColumns(wsRods, rodHeaders.length, rodsLastRow);
+    hideUnusedCells(wsRods, rodHeaders.length, rodsLastRow);
   }
 
   if (conductors.length > 0) {
@@ -251,15 +263,13 @@ export async function exportGridToExcel(
         cell.fill = fill;
         cell.border = ALL_BORDER;
         cell.font = ci === 0 ? BOLD_DATA_FONT : DATA_FONT;
-        cell.alignment = { horizontal: ci === 0 ? 'left' : 'right', vertical: 'middle' };
+        cell.alignment = { horizontal: ci === 0 ? 'left' : 'center', vertical: 'middle' };
       });
     });
 
-    condHeaders.forEach((_, i) => {
-      wsCond.getColumn(i + 1).width = i === 0 ? 16 : 14;
-    });
-
-    lockSheetArea(wsCond, condHeaders.length);
+    const condsLastRow = conductors.length + 3;
+    autofitColumns(wsCond, condHeaders.length, condsLastRow);
+    hideUnusedCells(wsCond, condHeaders.length, condsLastRow);
   }
 
   const buffer = await wb.xlsx.writeBuffer();

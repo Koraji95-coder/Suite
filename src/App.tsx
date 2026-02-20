@@ -8,11 +8,15 @@ import { EmberSplash } from './data/EmberSplash';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { ToastProvider } from './components/ToastProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useCoordinatesServiceStatus } from './hooks/useCoordinatesServiceStatus';
 
 function AppInner() {
   const { palette } = useTheme();
   const [splashComplete, setSplashComplete] = useState(false);
   const [splashKey, setSplashKey] = useState(0);
+
+  // Monitor Coordinates service and notify user of disconnects
+  useCoordinatesServiceStatus();
 
   const replaySplash = () => {
     setSplashComplete(false);

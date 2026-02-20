@@ -8,6 +8,62 @@ Your ZeroClaw agent is **built and ready to use!**
 ✅ Analysis message: Embedded in scripts below
 ✅ Output folder: `/workspaces/Suite/analysis_outputs/drawing_list_analysis/`
 
+## 🔗 Integration with Suite
+
+ZeroClaw extends the Suite application with **autonomous AI capabilities** for drawing list analysis and electrical standards research. The agent is deeply integrated into the Suite frontend:
+
+### Suite Integration Points
+
+**Frontend Service** - [src/services/agentService.ts](src/services/agentService.ts)
+- Communicates with ZeroClaw gateway on `http://127.0.0.1:3000`
+- Handles agent pairing authorization
+- Sends analysis tasks to `/webhook` endpoint
+- Monitors agent health status
+
+**UI Component** - [src/components/AgentPanel.tsx](src/components/AgentPanel.tsx)
+- Visual interface for triggering agent analysis
+- Real-time status updates
+- Task results display
+- Error handling with user notifications
+
+### How Suite Talks to ZeroClaw
+
+```
+Suite React App (Frontend)
+    ↓
+src/services/agentService.ts
+    ↓
+HTTP POST /pair (pairing)
+HTTP POST /webhook (task execution)
+HTTP GET /health (status)
+    ↓
+ZeroClaw Gateway (http://127.0.0.1:3000)
+    ↓
+Autonomous Agent
+    ↓
+LLM Provider (OpenRouter, OpenAI, Anthropic, etc.)
+```
+
+### Environment Configuration
+
+The Suite app reads the following environment variables:
+
+```bash
+# Required to run Suite with agent support
+export ZEROCLAW_API_KEY="your_api_key_here"
+
+# Optional: Custom agent gateway URL (defaults to localhost:3000)
+export ZEROCLAW_GATEWAY="http://127.0.0.1:3000"
+```
+
+### Architecture Overview
+
+See [zeroclaw-main/README.md](zeroclaw-main/README.md) for detailed ZeroClaw documentation including:
+- Ultra-lightweight design (< 5MB, < 10ms startup)
+- 23+ LLM provider support
+- Autonomous agents with memory and tool execution
+- Security features: pairing, sandboxing, allowlists
+
 ## How to Use (Choose One)
 
 ### **Option A: Fastest (Automated Script)** ⭐ RECOMMENDED

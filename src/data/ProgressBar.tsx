@@ -93,11 +93,12 @@ export function ProgressBar({ progress }: ProgressBarProps) {
         }}
       >
         <div
-          className="absolute inset-0 transition-all duration-300"
+          className="absolute inset-0"
           style={{
             background: `linear-gradient(90deg, ${palette.primary}, ${palette.tertiary}, ${palette.secondary})`,
             transform: `scaleX(${scaleX})`,
             transformOrigin: '0% 50%',
+            transition: 'transform 50ms linear',
             willChange: 'transform',
             boxShadow: `0 0 12px ${hexToRgba(palette.primary, 0.4)}`,
           }}

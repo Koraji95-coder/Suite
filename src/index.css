@@ -1,0 +1,372 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+
+@import "tailwindcss";
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	font-family: "Inter", system-ui, -apple-system, sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes fade-in-up {
+	from {
+		opacity: 0;
+		transform: translateY(28px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes scroll-hint {
+	0%,
+	100% {
+		opacity: 0;
+		transform: translateY(0);
+	}
+	40% {
+		opacity: 1;
+	}
+	80% {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+}
+
+@keyframes grow-bar {
+	from {
+		width: 0%;
+	}
+}
+
+@keyframes glass-shimmer-sweep {
+	0% {
+		transform: translateX(-100%) rotate(15deg);
+	}
+	100% {
+		transform: translateX(200%) rotate(15deg);
+	}
+}
+
+@keyframes gradient-shift {
+	0%,
+	100% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+}
+
+.animate-fade-in-up {
+	animation: fade-in-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animation-delay-100 {
+	animation-delay: 100ms;
+}
+
+.animation-delay-150 {
+	animation-delay: 150ms;
+}
+
+.animation-delay-200 {
+	animation-delay: 200ms;
+}
+
+.animation-delay-300 {
+	animation-delay: 300ms;
+}
+
+.animation-delay-400 {
+	animation-delay: 400ms;
+}
+
+.animation-delay-450 {
+	animation-delay: 450ms;
+}
+
+.animation-delay-600 {
+	animation-delay: 600ms;
+}
+
+.animate-scroll-hint {
+	animation: scroll-hint 2s ease-in-out infinite;
+}
+
+.animate-grow-bar {
+	animation: grow-bar 1.2s ease-out both;
+}
+
+.glass-shimmer {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+}
+
+.glass-shimmer::after {
+	content: "";
+	position: absolute;
+	top: -50%;
+	left: -50%;
+	width: 50%;
+	height: 200%;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.04),
+		transparent
+	);
+	animation: glass-shimmer-sweep 2s ease-in-out infinite;
+}
+
+.glass-card {
+	box-shadow:
+		0 0 0 1px rgba(255, 255, 255, 0.03),
+		0 8px 40px rgba(0, 0, 0, 0.3),
+		inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.gradient-border-animated {
+	background: linear-gradient(
+		270deg,
+		#818cf8,
+		#34d399,
+		#fb923c,
+		#a5b4fc,
+		#818cf8
+	);
+	background-size: 300% 300%;
+	animation: gradient-shift 4s ease infinite;
+}
+
+@keyframes clip-reveal {
+	from {
+		clip-path: polygon(0 50%, 100% 50%, 100% 50%, 0 50%);
+	}
+	to {
+		clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+	}
+}
+
+@keyframes gradient-text-shimmer {
+	0% {
+		background-position: -200% center;
+	}
+	100% {
+		background-position: 200% center;
+	}
+}
+
+@keyframes hero-glow-pulse {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 0.3;
+	}
+	50% {
+		transform: scale(1.03);
+		opacity: 0.5;
+	}
+}
+
+@keyframes line-draw {
+	from {
+		transform: scaleX(0);
+	}
+	to {
+		transform: scaleX(1);
+	}
+}
+
+@keyframes ticker-slide {
+	0% {
+		transform: translateY(100%);
+		opacity: 0;
+	}
+	15% {
+		transform: translateY(0);
+		opacity: 1;
+	}
+	85% {
+		transform: translateY(0);
+		opacity: 1;
+	}
+	100% {
+		transform: translateY(-100%);
+		opacity: 0;
+	}
+}
+
+@keyframes letter-space-in {
+	from {
+		letter-spacing: -0.05em;
+		opacity: 0;
+	}
+	to {
+		letter-spacing: 0.1em;
+		opacity: 1;
+	}
+}
+
+@keyframes word-fade-up {
+	from {
+		opacity: 0;
+		transform: translateY(16px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes float-icon {
+	0%,
+	100% {
+		transform: translateY(0) scale(1.1);
+	}
+	50% {
+		transform: translateY(-3px) scale(1.1);
+	}
+}
+
+@keyframes radial-bloom {
+	from {
+		opacity: 0;
+		transform: scale(0.8);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.animate-clip-reveal {
+	animation: clip-reveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-gradient-shimmer {
+	background-size: 400% 100%;
+	animation: gradient-text-shimmer 3s ease-out 0.6s both;
+}
+
+.animate-hero-glow {
+	animation: hero-glow-pulse 4s ease-in-out infinite;
+}
+
+.animate-ticker {
+	animation: ticker-slide 4s ease-in-out both;
+}
+
+.animate-letter-space {
+	animation: letter-space-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-word-fade {
+	opacity: 0;
+	animation: word-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-float-icon {
+	animation: float-icon 2s ease-in-out infinite;
+}
+
+.animate-radial-bloom {
+	animation: radial-bloom 1s ease-out both;
+}
+
+.section-mask-top {
+	-webkit-mask-image: linear-gradient(to bottom, transparent, black 120px);
+	mask-image: linear-gradient(to bottom, transparent, black 120px);
+}
+
+.section-mask-bottom {
+	-webkit-mask-image: linear-gradient(to top, transparent, black 120px);
+	mask-image: linear-gradient(to top, transparent, black 120px);
+}
+
+.section-fade-top::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 120px;
+	background: linear-gradient(to bottom, rgba(12, 11, 16, 0.95), transparent);
+	pointer-events: none;
+	z-index: 1;
+}
+
+.section-fade-bottom::after {
+	content: "";
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 120px;
+	background: linear-gradient(to top, rgba(12, 11, 16, 0.95), transparent);
+	pointer-events: none;
+	z-index: 1;
+}
+
+.glass-shimmer-hover {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+}
+
+.glass-shimmer-hover::after {
+	content: "";
+	position: absolute;
+	top: -50%;
+	left: -50%;
+	width: 50%;
+	height: 200%;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		rgba(255, 255, 255, 0.06),
+		transparent
+	);
+	transform: translateX(-100%) rotate(15deg);
+	transition: none;
+}
+
+.group:hover .glass-shimmer-hover::after {
+	animation: glass-shimmer-sweep 0.8s ease-out forwards;
+}
+
+/* ─── Hero gradient text ─── */
+/* Inspired by the V3 metallic shimmer concept but using the Obsidian palette */
+@keyframes obsidian-shimmer {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+.hero-gradient-text {
+	background: linear-gradient(
+		110deg,
+		#a5b4fc 0%,
+		#fff 18%,
+		#34d399 42%,
+		#fb923c 68%,
+		#818cf8 100%
+	);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+	background-size: 250% 100%;
+	animation: obsidian-shimmer 7s ease-in-out infinite;
+}

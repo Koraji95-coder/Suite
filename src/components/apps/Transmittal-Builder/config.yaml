@@ -1,0 +1,42 @@
+schema_version: 1
+
+ui:
+  theme: "obsidian"
+  show_wizard: false
+  default_pe: "Andrew Simmons, PE"
+  default_firm: "TX - FIRM #20290"
+  auto_save_interval: 120  # seconds (2 minutes)
+
+business:
+  firm_numbers:
+    - "None"
+    - "TX - Firm #20290"
+    - "LA - Firm #6673"
+    - "OK - Firm #8360"
+  
+  pe_profiles:
+    - name: "Don Washington, PE"
+      title: "VP of Electrical Engineering"
+      email: "don.washington@root3power.com"
+      phone: "(832) 865-0461"
+      signature: "don_signature.png"
+
+    - name: "Andrew Simmons, PE"
+      title: "Managing Partner"
+      email: "andrew.simmons@root3power.com"
+      phone: "(713) 294-2003"
+      signature: "andrew_signature.png"
+
+email:
+  sender: "hyphaeos@gmail.com"
+  app_password: "ldxv pqqh lqvz swdm"
+  default_receiver: "dustin.ward@root3power.com"
+  subject_prefix: "[Root3Power Transmittal Builder]"
+  sender_name: "Root3Power Transmittal Builder"
+
+validation:
+  require_from_email: true
+  require_project_name: true
+  require_at_least_one_contact: true
+  email_pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+

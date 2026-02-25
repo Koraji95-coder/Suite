@@ -1,19 +1,20 @@
 // src/routes/SignupPage.tsx
 import { useMemo, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
-
-import { useAuth } from "../auth/useAuth";
+import { Link, Navigate } from "react-router-dom";
+import AuthShell from "../auth/AuthShell";
 import { useNotification } from "../auth/NotificationContext";
+import { useAuth } from "../auth/useAuth";
 import { logger } from "../lib/logger";
 
+export default function SignupPage() {
 	const { user, loading, signUp } = useAuth();
 	const notification = useNotification();
-	const navigate = useNavigate();
 
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState("");
+	const [sent, setSent] = useState(false);
 
 	const canSubmit = useMemo(() => {
 		if (loading || submitting) return false;
@@ -30,99 +31,125 @@ import { logger } from "../lib/logger";
 		setSubmitting(true);
 		try {
 			await signUp(email.trim(), password);
-			// Supabase may require email confirmation; still send them to login for clarity.
-			navigate("/login", { replace: true });
+			setSent(true);
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : "Signup failed";
-			setError(msg);
-			logger.error("Signup failed", "SignupPage", { email, error: err });
-			notification.error("Signup failed", msg);
+			const normalized = msg.toLowerCase();
+			const likelyExistingUser =
+				normalized.includes("already registered") ||
+				normalized.includes("already exists") ||
+				normalized.includes("user already") ||
+				normalized.includes("email address is already") ||
+				normalized.includes("already been registered");
+
+			if (likelyExistingUser) {
+				setSent(true);
+			} else {
+				setError(
+					"We couldn't create your account right now. Please try again.",
+				);
+				logger.error("Signup failed", "SignupPage", { email, error: err });
+				notification.error(
+					"Signup failed",
+					"We couldn't create your account right now. Please try again.",
+				);
+			}
 		} finally {
 			setSubmitting(false);
 		}
 	};
 
 	return (
-		<div className="auth-page">
-			<nav id="navbar" className="scrolled">
-				<Link to="/" className="nav-logo" aria-label="BlockFlow home">
-					<div className="nav-logo-mark">
-						<span />
-						<span />
-						<span />
-						<span />
+		<AuthShell navLink={{ to: "/", label: "Back to landing" }}>
+			<div className="auth-head">
+				<div className="hero-badge" style={{ marginBottom: 18 }}>
+					<span className="badge-dot" />
+					{sent ? "Check your email" : "Create account"}
+				</div>
+				<h1 className="auth-title">{sent ? "Almost there" : "Get started"}</h1>
+				{!sent ? (
+					<p className="auth-sub">
+						Create your account. Use a password with at least 8 characters.
+					</p>
+				) : null}
+			</div>
+
+			{sent ? (
+				<div className="auth-form">
+					<div className="auth-message is-warning">
+						If this email is available, we sent a confirmation link. If you
+						already have an account, sign in or reset your password.
 					</div>
-					<span className="nav-logo-name">BlockFlow</span>
-				</Link>
-				<div className="nav-right">
-					<Link to="/" className="btn-ghost">
-						Back to landing
+
+					<Link
+						to="/login"
+						className="btn-hero-primary auth-submit"
+						style={{ textAlign: "center" }}
+					>
+						Go to sign in
+					</Link>
+
+					<Link
+						to="/forgot-password"
+						className="auth-link"
+						style={{ textAlign: "center" }}
+					>
+						Forgot password?
 					</Link>
 				</div>
-			</nav>
+			) : (
+				<form className="auth-form" onSubmit={onSubmit} noValidate>
+					<label className="auth-label" htmlFor="email">
+						Email
+					</label>
+					<input
+						id="email"
+						className="auth-input"
+						type="email"
+						autoComplete="email"
+						value={email}
+						onChange={(e) => setEmail(e.target.value)}
+						placeholder="you@company.com"
+						required
+					/>
 
-			<main className="auth-main">
-				<div className="auth-card glass">
-					<div className="auth-head">
-						<div className="hero-badge" style={{ marginBottom: 18 }}>
-							<span className="badge-dot" />
-							Create account
-						</div>
-						<h1 className="auth-title">Get started</h1>
-						<p className="auth-sub">
-							Create your account. Use a password with at least 8 characters.
-						</p>
-					</div>
+					<label className="auth-label" htmlFor="password">
+						Password
+					</label>
+					<input
+						id="password"
+						className="auth-input"
+						type="password"
+						autoComplete="new-password"
+						value={password}
+						onChange={(e) => setPassword(e.target.value)}
+						placeholder="••••••••••"
+						required
+					/>
 
-					<form className="auth-form" onSubmit={onSubmit} noValidate>
-						<label className="auth-label" htmlFor="email">
-							Email
-						</label>
-						<input
-							id="email"
-							className="auth-input"
-							type="email"
-							autoComplete="email"
-							value={email}
-							onChange={(e) => setEmail(e.target.value)}
-							placeholder="you@company.com"
-							required
-						/>
+					{error ? <div className="auth-error">{error}</div> : null}
 
-						<label className="auth-label" htmlFor="password">
-							Password
-						</label>
-						<input
-							id="password"
-							className="auth-input"
-							type="password"
-							autoComplete="new-password"
-							value={password}
-							onChange={(e) => setPassword(e.target.value)}
-							placeholder="••••••••••"
-							required
-						/>
+					<button
+						className="btn-primary auth-submit"
+						type="submit"
+						disabled={!canSubmit}
+					>
+						{submitting ? "Creating…" : "Create account"}
+					</button>
 
-						{error ? <div className="auth-error">{error}</div> : null}
-
-						<button className="btn-primary auth-submit" type="submit" disabled={!canSubmit}>
-							{submitting ? "Creating…" : "Create account"}
-						</button>
-
-						<div className="auth-foot">
-							<span className="muted">
-								Already have an account?{" "}
-								<Link to="/login" className="auth-link">
-									Sign in
-								</Link>
-							</span>
-							<Link to="/privacy" className="auth-link">
-								Privacy
+					<div className="auth-foot">
+						<span className="muted">
+							Already have an account?{" "}
+							<Link to="/login" className="auth-link">
+								Sign in
 							</Link>
-						</div>
-					</form>
-				</div>
-			</main>
-		</div>
+						</span>
+						<Link to="/privacy" className="auth-link">
+							Privacy
+						</Link>
+					</div>
+				</form>
+			)}
+		</AuthShell>
 	);
 }

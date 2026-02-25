@@ -1,5 +1,5 @@
 import { BookOpen, Plus, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Database } from "@/types/database";
 import { useAuth } from "../../auth/useAuth";
 import { logger } from "../lib/errorLogger";
@@ -21,11 +21,7 @@ export function FormulaBank() {
 		description: "",
 	});
 
-	useEffect(() => {
-		loadFormulas();
-	}, []);
-
-	const loadFormulas = async () => {
+	const loadFormulas = useCallback(async () => {
 		setLoading(true);
 		try {
 			const { data, error } = await supabase
@@ -52,7 +48,11 @@ export function FormulaBank() {
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, []);
+
+	useEffect(() => {
+		loadFormulas();
+	}, [loadFormulas]);
 
 	const categories = [
 		"All",

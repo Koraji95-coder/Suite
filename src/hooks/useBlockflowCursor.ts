@@ -121,7 +121,9 @@ export function useBlockflowCursor(
 		if (!enabled) return;
 
 		const cur = document.getElementById("cursor") as HTMLDivElement | null;
-		const ring = document.getElementById("cursor-ring") as HTMLDivElement | null;
+		const ring = document.getElementById(
+			"cursor-ring",
+		) as HTMLDivElement | null;
 		if (!cur || !ring) return;
 
 		// Only hide OS cursor while our custom cursor is active.
@@ -148,7 +150,9 @@ export function useBlockflowCursor(
 
 		raf = requestAnimationFrame(tick);
 
-		const hoverables = Array.from(document.querySelectorAll(hoverSelector)) as HTMLElement[];
+		const hoverables = Array.from(
+			document.querySelectorAll(hoverSelector),
+		) as HTMLElement[];
 
 		const onEnter = () => {
 			cur.style.transform = "translate(-50%,-50%) scale(0.4)";

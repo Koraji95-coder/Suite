@@ -152,7 +152,7 @@ export function WhiteboardCanvas({
 
 	useEffect(() => {
 		redrawCanvas();
-	}, [actions, currentAction, redrawCanvas]);
+	}, [redrawCanvas]);
 
 	const getMousePos = (e: React.MouseEvent<HTMLCanvasElement>) => {
 		const canvas = canvasRef.current;

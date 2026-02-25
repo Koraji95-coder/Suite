@@ -36,6 +36,7 @@ interface PositionedEvent {
 	left: number;
 	width: number;
 	zIndex: number;
+	columnIndex: number;
 }
 
 export function DayView({
@@ -84,10 +85,10 @@ export function DayView({
 		});
 	}, [dayEvents]);
 
-	// Process events to calculate positions
-	const positionedEvents = useMemo(() => {
-		const result: PositionedEvent[] = [];
-		const dayStart = startOfDay(currentDate);
+		// Process events to calculate positions
+		const positionedEvents = useMemo(() => {
+			const result: PositionedEvent[] = [];
+			const dayStart = startOfDay(currentDate);
 
 		// Sort events by start time and duration
 		const sortedEvents = [...timeEvents].sort((a, b) => {
@@ -157,22 +158,28 @@ export function DayView({
 			columns[columnIndex] = currentColumn;
 			currentColumn.push({ event, end: adjustedEnd });
 
-			// First column takes full width, others are indented by 10% and take 90% width
-			const width = columnIndex === 0 ? 1 : 0.9;
-			const left = columnIndex === 0 ? 0 : columnIndex * 0.1;
-
-			result.push({
-				event,
-				top,
-				height,
-				left,
-				width,
-				zIndex: 10 + columnIndex, // Higher columns get higher z-index
+				result.push({
+					event,
+					top,
+					height,
+					left: 0,
+					width: 1,
+					zIndex: 10 + columnIndex, // Higher columns get higher z-index
+					columnIndex,
+				});
 			});
-		});
 
-		return result;
-	}, [currentDate, timeEvents]);
+			const columnCount = Math.max(columns.length, 1);
+			const gap =
+				columnCount > 1 ? Math.min(0.02, 0.4 / columnCount) : 0;
+			const width = (1 - gap * (columnCount - 1)) / columnCount;
+
+			return result.map((item) => ({
+				...item,
+				width,
+				left: item.columnIndex * (width + gap),
+			}));
+		}, [currentDate, timeEvents]);
 
 	const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
 		e.stopPropagation();
@@ -188,10 +195,10 @@ export function DayView({
 	return (
 		<div data-slot="day-view" className="contents">
 			{showAllDaySection && (
-				<div className="border-border/70 bg-muted/50 border-t">
-					<div className="grid grid-cols-[3rem_1fr] sm:grid-cols-[4rem_1fr]">
-						<div className="relative">
-							<span className="text-muted-foreground/70 absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] sm:pe-4 sm:text-xs">
+				<div className="border-border/70 border-t bg-background/35">
+					<div className="grid grid-cols-[3.5rem_1fr] sm:grid-cols-[4.5rem_1fr]">
+						<div className="relative flex items-end justify-center">
+							<span className="mb-1 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none text-white/60">
 								All day
 							</span>
 						</div>
@@ -211,8 +218,9 @@ export function DayView({
 										isFirstDay={isFirstDay}
 										isLastDay={isLastDay}
 									>
-										{/* Always show the title in day view for better usability */}
-										<div>{event.title}</div>
+										<div className="w-full text-center truncate">
+											{event.title}
+										</div>
 									</EventItem>
 								);
 							})}
@@ -221,15 +229,15 @@ export function DayView({
 				</div>
 			)}
 
-			<div className="border-border/70 grid flex-1 grid-cols-[3rem_1fr] overflow-hidden border-t sm:grid-cols-[4rem_1fr]">
+			<div className="border-border/70 grid flex-1 grid-cols-[3.5rem_1fr] overflow-hidden border-t bg-background/20 sm:grid-cols-[4.5rem_1fr]">
 				<div>
 					{hours.map((hour, index) => (
 						<div
 							key={hour.toString()}
-							className="border-border/70 relative h-[var(--week-cells-height)] border-b last:border-b-0"
+							className="border-border/70 relative flex h-[var(--week-cells-height)] items-start justify-center border-b last:border-b-0"
 						>
 							{index > 0 && (
-								<span className="bg-background text-muted-foreground/70 absolute -top-3 left-0 flex h-6 w-16 max-w-full items-center justify-end pe-2 text-[10px] sm:pe-4 sm:text-xs">
+								<span className="bg-background -translate-y-1/2 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none text-white/60">
 									{format(hour, "h a")}
 								</span>
 							)}
@@ -270,8 +278,8 @@ export function DayView({
 							style={{ top: `${currentTimePosition}%` }}
 						>
 							<div className="relative flex items-center">
-								<div className="bg-primary absolute -left-1 h-2 w-2 rounded-full"></div>
-								<div className="bg-primary h-[2px] w-full"></div>
+								<div className="bg-primary absolute -left-1 h-2 w-2 rounded-full opacity-90"></div>
+								<div className="bg-primary h-[2px] w-full opacity-85"></div>
 							</div>
 						</div>
 					)}

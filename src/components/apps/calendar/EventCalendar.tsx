@@ -1,3 +1,8 @@
+/* =========================================================
+   2) src/components/apps/calendar/EventCalendar.tsx
+   Controlled selectedDate support + same UI as before
+   ========================================================= */
+
 import {
 	addDays,
 	addMonths,
@@ -17,16 +22,16 @@ import {
 	ChevronRightIcon,
 	PlusIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { GlassPanel } from "@/components/ui/GlassPanel";
-import { hexToRgba, useTheme } from "@/lib/palette";
+} from "@/components/apps/ui/dropdown-menu";
+import { GlassPanel } from "@/components/apps/ui/GlassPanel";
+import { getContrastText, hexToRgba, useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import {
 	AgendaDaysToShow,
@@ -54,6 +59,249 @@ export interface EventCalendarProps {
 	compact?: boolean;
 	projectOptions?: Array<{ id: string; name: string }>;
 	taskOptions?: Array<{ id: string; name: string; project_id: string | null }>;
+
+	/** Controlled selection */
+	selectedDate?: Date;
+	onSelectedDateChange?: (date: Date) => void;
+}
+
+function useControllableDate(
+	controlled: Date | undefined,
+	onChange: ((d: Date) => void) | undefined,
+	initial: Date,
+) {
+	const [uncontrolled, setUncontrolled] = useState<Date>(initial);
+	const isControlled = controlled instanceof Date;
+
+	const value = isControlled ? (controlled as Date) : uncontrolled;
+
+	const setValue = (next: Date) => {
+		onChange?.(next);
+		if (!isControlled) setUncontrolled(next);
+	};
+
+	return [value, setValue] as const;
+}
+
+type ToolbarProps = {
+	compact: boolean;
+	view: CalendarView;
+	viewTitle: React.ReactNode;
+	palette: ReturnType<typeof useTheme>["palette"];
+	primaryTextColor: string;
+	onToday: () => void;
+	onPrev: () => void;
+	onNext: () => void;
+	onViewChange: (v: CalendarView) => void;
+	onNewEvent: () => void;
+};
+
+const VIEW_LABEL: Record<CalendarView, string> = {
+	month: "Month",
+	week: "Week",
+	day: "Day",
+	agenda: "Agenda",
+};
+
+function CalendarToolbar({
+	compact,
+	view,
+	viewTitle,
+	palette,
+	primaryTextColor,
+	onToday,
+	onPrev,
+	onNext,
+	onViewChange,
+	onNewEvent,
+}: ToolbarProps) {
+	const controlBase =
+		"inline-flex items-center justify-center rounded-lg font-semibold transition-all leading-none text-center whitespace-nowrap";
+	const controlSize = compact
+		? "min-h-9 px-3 py-2 text-sm"
+		: "min-h-[46px] px-5 py-2.5 text-sm sm:text-base";
+	const primaryControlSize = compact
+		? "min-h-10 px-4 py-2 text-sm"
+		: "min-h-[52px] px-6 py-3 text-sm sm:text-base";
+	const pillBg = hexToRgba(palette.surface, 0.3);
+
+	return (
+		<div
+			className={cn(
+				"sticky top-0 z-20 rounded-xl",
+				compact ? "mx-2 mt-2" : "mx-2 mt-2 sm:mx-4 sm:mt-4",
+			)}
+			style={{
+				background: hexToRgba(palette.surface, 0.45),
+				backdropFilter: "blur(10px) saturate(120%)",
+				WebkitBackdropFilter: "blur(10px) saturate(120%)",
+				border: `1px solid ${hexToRgba(palette.text, 0.1)}`,
+			}}
+		>
+			<div
+				className={cn(
+					"grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center",
+					compact ? "p-2" : "p-3 sm:p-4",
+				)}
+			>
+				<div
+					className={cn(
+						"flex flex-wrap items-center min-w-0",
+						compact ? "gap-1.5" : "gap-3",
+					)}
+				>
+					<button
+						onClick={onToday}
+						className={cn(controlBase, controlSize)}
+						style={{
+							background: pillBg,
+							border: `1px solid ${hexToRgba(palette.text, 0.16)}`,
+							color: palette.primary,
+						}}
+					>
+						<CalendarCheck className="h-4 w-4 sm:me-2" aria-hidden="true" />
+						<span className="max-[479px]:sr-only sm:not-sr-only">Today</span>
+					</button>
+
+					<div className="flex items-center gap-1">
+						<button
+							onClick={onPrev}
+							aria-label="Previous"
+							className="inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-white/[0.08]"
+						>
+							<ChevronLeftIcon
+								size={18}
+								style={{ color: hexToRgba(palette.text, 0.55) }}
+								aria-hidden="true"
+							/>
+						</button>
+						<button
+							onClick={onNext}
+							aria-label="Next"
+							className="inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-white/[0.08]"
+						>
+							<ChevronRightIcon
+								size={18}
+								style={{ color: hexToRgba(palette.text, 0.55) }}
+								aria-hidden="true"
+							/>
+						</button>
+					</div>
+
+					<div className="hidden md:flex items-center gap-1 ms-1">
+						{(["month", "week", "day", "agenda"] as CalendarView[]).map((v) => {
+							const active = v === view;
+							return (
+								<button
+									key={v}
+									type="button"
+									onClick={() => onViewChange(v)}
+									className={cn(
+										"inline-flex h-10 w-24 items-center justify-center rounded-xl border text-center text-sm leading-none transition-colors",
+										active ? "bg-white/[0.06]" : "hover:bg-white/[0.04]",
+									)}
+									style={{
+										borderColor: active
+											? hexToRgba(palette.primary, 0.22)
+											: hexToRgba(palette.text, 0.12),
+										color: active
+											? hexToRgba(palette.text, 0.92)
+											: hexToRgba(palette.text, 0.68),
+									}}
+								>
+									{VIEW_LABEL[v]}
+								</button>
+							);
+						})}
+					</div>
+				</div>
+
+				<div className="flex items-center justify-center sm:justify-self-center">
+					<h2
+						className={cn(
+							"font-semibold text-center",
+							compact ? "text-sm" : "text-sm sm:text-lg md:text-xl",
+						)}
+						style={{ color: hexToRgba(palette.text, 0.9) }}
+					>
+						{viewTitle}
+					</h2>
+				</div>
+
+				<div
+					className={cn(
+						"flex items-center justify-between sm:justify-end min-w-0 pr-2 sm:pr-3",
+						compact ? "gap-1.5" : "gap-2",
+					)}
+				>
+					<div className="md:hidden">
+						<DropdownMenu placement="bottom-end">
+							<DropdownMenuTrigger asChild>
+								<button
+									className={cn(controlBase, controlSize, "gap-1.5")}
+									style={{
+										background: pillBg,
+										border: `1px solid ${hexToRgba(palette.text, 0.16)}`,
+										color: hexToRgba(palette.text, 0.78),
+									}}
+								>
+									<span>{VIEW_LABEL[view]}</span>
+									<ChevronDownIcon
+										className="-me-1 opacity-60"
+										size={16}
+										aria-hidden="true"
+									/>
+								</button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="min-w-36">
+								<DropdownMenuItem onClick={() => onViewChange("month")}>
+									Month <DropdownMenuShortcut>M</DropdownMenuShortcut>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => onViewChange("week")}>
+									Week <DropdownMenuShortcut>W</DropdownMenuShortcut>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => onViewChange("day")}>
+									Day <DropdownMenuShortcut>D</DropdownMenuShortcut>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => onViewChange("agenda")}>
+									Agenda <DropdownMenuShortcut>A</DropdownMenuShortcut>
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					</div>
+
+					<button
+						type="button"
+						className={cn(
+							controlBase,
+							primaryControlSize,
+							"gap-1.5 rounded-xl ms-1 sm:ms-2 me-2 sm:me-3",
+						)}
+						style={{
+							backgroundColor: palette.primary,
+							color: primaryTextColor,
+							boxShadow: `0 0 12px ${hexToRgba(palette.primary, 0.3)}`,
+						}}
+						onClick={onNewEvent}
+					>
+						<PlusIcon
+							className="opacity-80 sm:-ms-1"
+							size={16}
+							aria-hidden="true"
+						/>
+						<span className="max-sm:sr-only">New event</span>
+					</button>
+				</div>
+			</div>
+
+			<div
+				className="h-px"
+				style={{
+					background: `linear-gradient(90deg, transparent, ${hexToRgba(palette.text, 0.14)}, transparent)`,
+				}}
+			/>
+		</div>
+	);
 }
 
 export function EventCalendar({
@@ -66,20 +314,34 @@ export function EventCalendar({
 	compact = false,
 	projectOptions = [],
 	taskOptions = [],
+	selectedDate: controlledSelectedDate,
+	onSelectedDateChange,
 }: EventCalendarProps) {
 	const { palette } = useTheme();
 	const [currentDate, setCurrentDate] = useState(new Date());
-	const [selectedDate, setSelectedDate] = useState<Date>(new Date()); // ✅ new
+	const [selectedDate, setSelectedDate] = useControllableDate(
+		controlledSelectedDate,
+		onSelectedDateChange,
+		new Date(),
+	);
+
 	const [view, setView] = useState<CalendarView>(initialView);
 	const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
 	const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
 		null,
 	);
 
-	// ✅ central “select a day” handler
+	useEffect(() => {
+		if (controlledSelectedDate) setCurrentDate(controlledSelectedDate);
+	}, [controlledSelectedDate]);
+
+	const primaryTextColor = useMemo(
+		() => getContrastText(palette.primary),
+		[palette.primary],
+	);
+
 	const handleDateSelect = (date: Date) => {
 		setSelectedDate(date);
-		// optional but usually desired: keep navigation context aligned to the selection
 		setCurrentDate(date);
 	};
 
@@ -93,7 +355,6 @@ export function EventCalendar({
 			) {
 				return;
 			}
-
 			switch (e.key.toLowerCase()) {
 				case "m":
 					setView("month");
@@ -118,50 +379,52 @@ export function EventCalendar({
 		if (view === "month") {
 			const next = subMonths(currentDate, 1);
 			setCurrentDate(next);
-			if (selectedDate) {
-				const lastDay = endOfMonth(next).getDate();
-				const day = Math.min(selectedDate.getDate(), lastDay);
-				setSelectedDate(new Date(next.getFullYear(), next.getMonth(), day));
-			}
-		} else if (view === "week") {
-			setCurrentDate(subWeeks(currentDate, 1));
-			if (selectedDate) setSelectedDate(subWeeks(selectedDate, 1));
-		} else if (view === "day") {
-			setCurrentDate(addDays(currentDate, -1));
-			if (selectedDate) setSelectedDate(addDays(selectedDate, -1));
-		} else if (view === "agenda") {
-			setCurrentDate(addDays(currentDate, -AgendaDaysToShow));
-			if (selectedDate)
-				setSelectedDate(addDays(selectedDate, -AgendaDaysToShow));
+			const lastDay = endOfMonth(next).getDate();
+			const day = Math.min(selectedDate.getDate(), lastDay);
+			setSelectedDate(new Date(next.getFullYear(), next.getMonth(), day));
+			return;
 		}
+		if (view === "week") {
+			setCurrentDate(subWeeks(currentDate, 1));
+			setSelectedDate(subWeeks(selectedDate, 1));
+			return;
+		}
+		if (view === "day") {
+			setCurrentDate(addDays(currentDate, -1));
+			setSelectedDate(addDays(selectedDate, -1));
+			return;
+		}
+		setCurrentDate(addDays(currentDate, -AgendaDaysToShow));
+		setSelectedDate(addDays(selectedDate, -AgendaDaysToShow));
 	};
 
 	const handleNext = () => {
 		if (view === "month") {
 			const next = addMonths(currentDate, 1);
 			setCurrentDate(next);
-			if (selectedDate) {
-				const lastDay = endOfMonth(next).getDate();
-				const day = Math.min(selectedDate.getDate(), lastDay);
-				setSelectedDate(new Date(next.getFullYear(), next.getMonth(), day));
-			}
-		} else if (view === "week") {
-			setCurrentDate(addWeeks(currentDate, 1));
-			if (selectedDate) setSelectedDate(addWeeks(selectedDate, 1));
-		} else if (view === "day") {
-			setCurrentDate(addDays(currentDate, 1));
-			if (selectedDate) setSelectedDate(addDays(selectedDate, 1));
-		} else if (view === "agenda") {
-			setCurrentDate(addDays(currentDate, AgendaDaysToShow));
-			if (selectedDate)
-				setSelectedDate(addDays(selectedDate, AgendaDaysToShow));
+			const lastDay = endOfMonth(next).getDate();
+			const day = Math.min(selectedDate.getDate(), lastDay);
+			setSelectedDate(new Date(next.getFullYear(), next.getMonth(), day));
+			return;
 		}
+		if (view === "week") {
+			setCurrentDate(addWeeks(currentDate, 1));
+			setSelectedDate(addWeeks(selectedDate, 1));
+			return;
+		}
+		if (view === "day") {
+			setCurrentDate(addDays(currentDate, 1));
+			setSelectedDate(addDays(selectedDate, 1));
+			return;
+		}
+		setCurrentDate(addDays(currentDate, AgendaDaysToShow));
+		setSelectedDate(addDays(selectedDate, AgendaDaysToShow));
 	};
 
 	const handleToday = () => {
 		const today = new Date();
 		setCurrentDate(today);
-		setSelectedDate(today); // ✅ makes “Today” also select today
+		setSelectedDate(today);
 	};
 
 	const handleEventSelect = (event: CalendarEvent) => {
@@ -191,14 +454,13 @@ export function EventCalendar({
 	};
 
 	const handleEventSave = (event: CalendarEvent) => {
-		if (event.id) {
-			onEventUpdate?.(event);
-		} else {
+		if (event.id) onEventUpdate?.(event);
+		else
 			onEventAdd?.({
 				...event,
 				id: Math.random().toString(36).substring(2, 11),
 			});
-		}
+
 		setIsEventDialogOpen(false);
 		setSelectedEvent(null);
 	};
@@ -225,13 +487,16 @@ export function EventCalendar({
 		if (view === "day") {
 			return (
 				<>
-					<span className="min-[480px]:hidden" aria-hidden="true">
+					<span className="min-[480px]:hidden leading-none" aria-hidden="true">
 						{format(currentDate, "MMM d, yyyy")}
 					</span>
-					<span className="max-[479px]:hidden min-md:hidden" aria-hidden="true">
+					<span
+						className="max-[479px]:hidden md:hidden leading-tight"
+						aria-hidden="true"
+					>
 						{format(currentDate, "MMMM d, yyyy")}
 					</span>
-					<span className="max-md:hidden">
+					<span className="max-md:hidden leading-tight">
 						{format(currentDate, "EEE MMMM d, yyyy")}
 					</span>
 				</>
@@ -251,8 +516,9 @@ export function EventCalendar({
 		<GlassPanel
 			tint={palette.primary}
 			hoverEffect={false}
-			bevel
-			specular
+			bevel={false}
+			specular={false}
+			overflow="visible"
 			className={cn(
 				"flex flex-col has-data-[slot=month-view]:flex-1",
 				compact ? "text-sm" : "",
@@ -262,149 +528,30 @@ export function EventCalendar({
 				{
 					"--event-height": `${EventHeight}px`,
 					"--event-gap": `${EventGap}px`,
-					"--week-cells-height": `${WeekCellsHeight}px`,
+					"--week-cells-height": compact
+						? `${WeekCellsHeight}px`
+						: `clamp(${Math.max(88, WeekCellsHeight - 24)}px, 11vh, ${WeekCellsHeight}px)`,
 				} as React.CSSProperties
 			}
 		>
 			<CalendarDndProvider onEventUpdate={handleEventUpdate}>
-				<div
-					className={cn(
-						"relative z-10 flex items-center justify-between",
-						compact ? "p-2" : "p-2 sm:p-4",
-					)}
-				>
-					<div
-						className={cn(
-							"flex items-center",
-							compact ? "gap-1.5" : "gap-1 sm:gap-4",
-						)}
-					>
-						<button
-							onClick={handleToday}
-							className={cn(
-								"text-xs font-semibold rounded-lg transition-all max-[479px]:aspect-square max-[479px]:px-0",
-								compact ? "px-2 py-1" : "px-3 py-1.5",
-							)}
-							style={{
-								background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.06)} 0%, ${hexToRgba(palette.surface, 0.25)} 100%)`,
-								border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
-								color: palette.primary,
-							}}
-						>
-							<CalendarCheck
-								className="min-[480px]:hidden h-4 w-4"
-								aria-hidden="true"
-							/>
-							<span className="max-[479px]:sr-only">Today</span>
-						</button>
-						<div className="flex items-center sm:gap-2">
-							<button
-								onClick={handlePrevious}
-								aria-label="Previous"
-								className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.08]"
-							>
-								<ChevronLeftIcon
-									size={16}
-									style={{ color: hexToRgba(palette.text, 0.5) }}
-									aria-hidden="true"
-								/>
-							</button>
-							<button
-								onClick={handleNext}
-								aria-label="Next"
-								className="p-1.5 rounded-lg transition-colors hover:bg-white/[0.08]"
-							>
-								<ChevronRightIcon
-									size={16}
-									style={{ color: hexToRgba(palette.text, 0.5) }}
-									aria-hidden="true"
-								/>
-							</button>
-						</div>
-						<h2
-							className={cn(
-								"font-semibold",
-								compact ? "text-sm" : "text-sm sm:text-lg md:text-xl",
-							)}
-							style={{ color: hexToRgba(palette.text, 0.9) }}
-						>
-							{viewTitle}
-						</h2>
-					</div>
+				<CalendarToolbar
+					compact={compact}
+					view={view}
+					viewTitle={viewTitle}
+					palette={palette}
+					primaryTextColor={primaryTextColor}
+					onToday={handleToday}
+					onPrev={handlePrevious}
+					onNext={handleNext}
+					onViewChange={setView}
+					onNewEvent={() => {
+						setSelectedEvent(null);
+						setIsEventDialogOpen(true);
+					}}
+				/>
 
-					<div
-						className={cn("flex items-center", compact ? "gap-1.5" : "gap-2")}
-					>
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<button
-									className={cn(
-										"gap-1.5 max-[479px]:h-8 inline-flex items-center text-xs font-semibold rounded-lg transition-all",
-										compact ? "px-2 py-1" : "px-3 py-1.5",
-									)}
-									style={{
-										background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.06)} 0%, ${hexToRgba(palette.surface, 0.25)} 100%)`,
-										border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-										color: hexToRgba(palette.text, 0.7),
-									}}
-								>
-									<span>
-										<span className="min-[480px]:hidden" aria-hidden="true">
-											{view.charAt(0).toUpperCase()}
-										</span>
-										<span className="max-[479px]:sr-only">
-											{view.charAt(0).toUpperCase() + view.slice(1)}
-										</span>
-									</span>
-									<ChevronDownIcon
-										className="-me-1 opacity-60"
-										size={16}
-										aria-hidden="true"
-									/>
-								</button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="min-w-32">
-								<DropdownMenuItem onClick={() => setView("month")}>
-									Month <DropdownMenuShortcut>M</DropdownMenuShortcut>
-								</DropdownMenuItem>
-								<DropdownMenuItem onClick={() => setView("week")}>
-									Week <DropdownMenuShortcut>W</DropdownMenuShortcut>
-								</DropdownMenuItem>
-								<DropdownMenuItem onClick={() => setView("day")}>
-									Day <DropdownMenuShortcut>D</DropdownMenuShortcut>
-								</DropdownMenuItem>
-								<DropdownMenuItem onClick={() => setView("agenda")}>
-									Agenda <DropdownMenuShortcut>A</DropdownMenuShortcut>
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
-
-						<button
-							className={cn(
-								"max-[479px]:aspect-square max-[479px]:p-0 inline-flex items-center gap-1 text-xs font-semibold rounded-lg transition-all",
-								compact ? "px-2 py-1" : "px-3 py-1.5",
-							)}
-							style={{
-								backgroundColor: palette.primary,
-								color: "#fff",
-								boxShadow: `0 0 12px ${hexToRgba(palette.primary, 0.3)}`,
-							}}
-							onClick={() => {
-								setSelectedEvent(null);
-								setIsEventDialogOpen(true);
-							}}
-						>
-							<PlusIcon
-								className="opacity-80 sm:-ms-1"
-								size={16}
-								aria-hidden="true"
-							/>
-							<span className="max-sm:sr-only">New event</span>
-						</button>
-					</div>
-				</div>
-
-				<div className="relative z-10 flex flex-1 flex-col">
+				<div className="relative z-10 flex flex-1 flex-col px-2 pb-2 sm:px-5 sm:pb-5">
 					{view === "month" && (
 						<MonthView
 							currentDate={currentDate}
@@ -450,6 +597,7 @@ export function EventCalendar({
 				<EventDialog
 					event={selectedEvent}
 					isOpen={isEventDialogOpen}
+					inline
 					onClose={() => {
 						setIsEventDialogOpen(false);
 						setSelectedEvent(null);

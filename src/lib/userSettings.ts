@@ -12,7 +12,8 @@ import { supabase } from "./supabase";
 import { isSupabaseConfigured } from "./supabaseUtils";
 
 export type UserSetting = Database["public"]["Tables"]["user_settings"]["Row"];
-export type UserPreferences = Database["public"]["Tables"]["user_preferences"]["Row"];
+export type UserPreferences =
+	Database["public"]["Tables"]["user_preferences"]["Row"];
 
 async function requireUserId(): Promise<string> {
 	const {
@@ -50,7 +51,9 @@ export async function saveSetting(
 		return { success: true };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown error";
-		logger.error(`Failed to save setting: ${key}`, "userSettings", { error: message });
+		logger.error(`Failed to save setting: ${key}`, "userSettings", {
+			error: message,
+		});
 		return { success: false, error: message };
 	}
 }
@@ -85,7 +88,11 @@ export async function loadSetting<T = unknown>(
 		return defaultValue ?? null;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown error";
-		logger.warn(`Failed to load setting: ${key}, using default`, "userSettings", { error: message });
+		logger.warn(
+			`Failed to load setting: ${key}, using default`,
+			"userSettings",
+			{ error: message },
+		);
 		return defaultValue ?? null;
 	}
 }
@@ -117,12 +124,16 @@ export async function deleteSetting(
 		return { success: true };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown error";
-		logger.error(`Failed to delete setting: ${key}`, "userSettings", { error: message });
+		logger.error(`Failed to delete setting: ${key}`, "userSettings", {
+			error: message,
+		});
 		return { success: false, error: message };
 	}
 }
 
-export async function loadProjectSettings(projectId: string): Promise<Record<string, unknown>> {
+export async function loadProjectSettings(
+	projectId: string,
+): Promise<Record<string, unknown>> {
 	try {
 		if (!isSupabaseConfigured()) return {};
 
@@ -149,7 +160,9 @@ export async function loadProjectSettings(projectId: string): Promise<Record<str
 }
 
 export async function savePreferences(
-	preferences: Partial<Omit<UserPreferences, "id" | "user_id" | "created_at" | "updated_at">>,
+	preferences: Partial<
+		Omit<UserPreferences, "id" | "user_id" | "created_at" | "updated_at">
+	>,
 ): Promise<{ success: boolean; error?: string }> {
 	try {
 		if (!isSupabaseConfigured()) {
@@ -167,10 +180,15 @@ export async function savePreferences(
 		if (existingError) throw existingError;
 
 		if (existing) {
-			const { error } = await supabase.from("user_preferences").update(preferences).eq("user_id", userId);
+			const { error } = await supabase
+				.from("user_preferences")
+				.update(preferences)
+				.eq("user_id", userId);
 			if (error) throw error;
 		} else {
-			const { error } = await supabase.from("user_preferences").insert({ user_id: userId, ...preferences });
+			const { error } = await supabase
+				.from("user_preferences")
+				.insert({ user_id: userId, ...preferences });
 			if (error) throw error;
 		}
 
@@ -178,7 +196,9 @@ export async function savePreferences(
 		return { success: true };
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown error";
-		logger.error("Failed to save preferences", "userSettings", { error: message });
+		logger.error("Failed to save preferences", "userSettings", {
+			error: message,
+		});
 		return { success: false, error: message };
 	}
 }
@@ -207,4 +227,29 @@ export async function loadPreferences(): Promise<UserPreferences | null> {
 		logger.error("Failed to load preferences", "userSettings", { error });
 		return null;
 	}
+}
+
+export async function migrateFromLocalStorage(
+	localStorageKey: string,
+	settingKey: string,
+	projectId?: string | null,
+): Promise<void> {
+	if (typeof window === "undefined") return;
+
+	const raw = window.localStorage.getItem(localStorageKey);
+	if (raw == null) return;
+
+	let parsedValue: unknown = raw;
+	try {
+		parsedValue = JSON.parse(raw);
+	} catch {
+		parsedValue = raw;
+	}
+
+	const existing = await loadSetting<unknown>(settingKey, projectId, null);
+	if (existing === null) {
+		await saveSetting(settingKey, parsedValue, projectId);
+	}
+
+	window.localStorage.removeItem(localStorageKey);
 }

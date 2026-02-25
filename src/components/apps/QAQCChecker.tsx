@@ -10,7 +10,7 @@ import {
 	XCircle,
 	Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Database, Json } from "@/types/database";
 import { supabase } from "../../lib/supabase";
 import { FrameSection } from "../ui/PageFrame";
@@ -102,12 +102,7 @@ export function QAQCChecker() {
 		name: "",
 	});
 
-	useEffect(() => {
-		loadDrawings();
-		loadRules();
-	}, []);
-
-	const loadDrawings = async () => {
+	const loadDrawings = useCallback(async () => {
 		setLoading(true);
 		const { data, error } = await supabase
 			.from("drawing_annotations")
@@ -118,9 +113,9 @@ export function QAQCChecker() {
 			setDrawings(data.map(mapDrawingRow));
 		}
 		setLoading(false);
-	};
+	}, []);
 
-	const loadRules = async () => {
+	const loadRules = useCallback(async () => {
 		const defaultRules: QARule[] = [
 			{
 				id: "1",
@@ -224,7 +219,12 @@ export function QAQCChecker() {
 		];
 
 		setRules(defaultRules);
-	};
+	}, []);
+
+	useEffect(() => {
+		loadDrawings();
+		loadRules();
+	}, [loadDrawings, loadRules]);
 
 	const checkDrawing = async (drawingName: string) => {
 		setCheckingDrawing(true);

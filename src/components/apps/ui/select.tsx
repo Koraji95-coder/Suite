@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import * as React from "react";
-import { cn } from "./..lib/utils";
+import { cn } from "@/lib/utils";
 
 interface SelectContextValue {
 	value?: string;
@@ -11,7 +11,7 @@ interface SelectContextValue {
 
 const SelectContext = React.createContext<SelectContextValue>({
 	open: false,
-	setOpen: () => {},
+	setOpen: (_open: boolean) => undefined,
 });
 
 export function Select({

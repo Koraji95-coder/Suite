@@ -1,6 +1,5 @@
 // src/components/Features.tsx
-import React, { useEffect, useMemo, useRef } from "react";
-import { useInViewOnce } from "../hooks/useInViewOnce";
+import { useEffect, useMemo, useRef } from "react";
 
 type Feature = { title: string; desc: string };
 

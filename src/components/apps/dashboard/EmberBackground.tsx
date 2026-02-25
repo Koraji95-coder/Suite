@@ -62,12 +62,12 @@ export function EmberBackground({
 		};
 		window.addEventListener("resize", handleResize);
 
-		const clock = new THREE.Clock();
+		const startTime = performance.now();
 		let rafId: number;
 
 		const animate = () => {
 			rafId = requestAnimationFrame(animate);
-			const elapsed = clock.getElapsedTime();
+			const elapsed = (performance.now() - startTime) / 1000;
 
 			const positions = geometry.attributes.position.array;
 			for (let i = 0; i < positions.length; i += 3) {

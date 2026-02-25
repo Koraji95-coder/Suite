@@ -1,5 +1,6 @@
 import { MapPin, ScrollText, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { coordinatesGrabberService } from "@/Ground-Grid-Generation/coordinatesGrabberService";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { CoordinatesGrabber } from "../CoordinatesGrabber";
 import { GridGeneratorPanel } from "./GridGeneratorPanel";
@@ -127,6 +128,8 @@ function ScrollableTabs({
 function GroundGridGeneratorInner() {
 	const { palette } = useTheme();
 	const { backendConnected, logs } = useGroundGrid();
+	const [wsLive, setWsLive] = useState(coordinatesGrabberService.isConnected());
+	const [wsLastUpdate, setWsLastUpdate] = useState<number | null>(null);
 	const [activeTab, setActiveTab] = useState<TabId>("generator");
 	const alreadyShown = useRef(sessionStorage.getItem(SESSION_KEY) === "1");
 	const [showSplash, setShowSplash] = useState(!alreadyShown.current);
@@ -140,6 +143,52 @@ function GroundGridGeneratorInner() {
 		sessionStorage.removeItem(SESSION_KEY);
 		setShowSplash(true);
 	}, []);
+
+	useEffect(() => {
+		coordinatesGrabberService.connectWebSocket().catch(() => {
+			setWsLive(false);
+		});
+
+		const unsubscribeConnected = coordinatesGrabberService.on(
+			"connected",
+			(event) => {
+				if (event.type !== "connected") return;
+				setWsLive(true);
+				setWsLastUpdate(Date.now());
+			},
+		);
+
+		const unsubscribeStatus = coordinatesGrabberService.on(
+			"status",
+			(event) => {
+				if (event.type !== "status") return;
+				setWsLive(true);
+				setWsLastUpdate(Date.now());
+			},
+		);
+
+		const unsubscribeDisconnected = coordinatesGrabberService.on(
+			"service-disconnected",
+			() => {
+				setWsLive(false);
+			},
+		);
+
+		const unsubscribeError = coordinatesGrabberService.on("error", () => {
+			setWsLive(false);
+		});
+
+		return () => {
+			unsubscribeConnected();
+			unsubscribeStatus();
+			unsubscribeDisconnected();
+			unsubscribeError();
+		};
+	}, []);
+
+	const wsLiveStamp = wsLastUpdate
+		? new Date(wsLastUpdate).toLocaleTimeString()
+		: "--";
 
 	return (
 		<div
@@ -255,6 +304,36 @@ function GroundGridGeneratorInner() {
 						/>
 						<span style={{ color: backendConnected ? "#22c55e" : "#f59e0b" }}>
 							{backendConnected ? "AutoCAD Connected" : "AutoCAD Offline"}
+						</span>
+					</div>
+					<div
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 6,
+							padding: "5px 10px",
+							borderRadius: 6,
+							background: wsLive
+								? hexToRgba("#22c55e", 0.1)
+								: hexToRgba("#f59e0b", 0.08),
+							border: `1px solid ${
+								wsLive ? hexToRgba("#22c55e", 0.3) : hexToRgba("#f59e0b", 0.2)
+							}`,
+							fontSize: 11,
+							fontWeight: 500,
+						}}
+						title={`Last WebSocket update: ${wsLiveStamp}`}
+					>
+						<span
+							style={{
+								width: 7,
+								height: 7,
+								borderRadius: "50%",
+								background: wsLive ? "#22c55e" : "#f59e0b",
+							}}
+						/>
+						<span style={{ color: wsLive ? "#22c55e" : "#f59e0b" }}>
+							{wsLive ? "WS Live" : "WS Offline"}
 						</span>
 					</div>
 				</div>

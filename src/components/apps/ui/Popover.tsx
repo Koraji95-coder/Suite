@@ -10,7 +10,7 @@ interface PopoverContextValue {
 
 const PopoverContext = React.createContext<PopoverContextValue>({
 	open: false,
-	setOpen: () => {},
+	setOpen: (_open: boolean) => undefined,
 	triggerRef: { current: null },
 	modal: false,
 });
@@ -97,6 +97,21 @@ export function PopoverTrigger({
 			onClick={() => setOpen(!open)}
 			{...props}
 		>
+			{children}
+		</div>
+	);
+}
+
+export function PopoverAnchor({
+	children,
+	className,
+	...props
+}: {
+	children: React.ReactNode;
+	className?: string;
+} & React.HTMLAttributes<HTMLDivElement>) {
+	return (
+		<div className={className} {...props}>
 			{children}
 		</div>
 	);

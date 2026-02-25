@@ -54,7 +54,6 @@ BreadcrumbSeparator.displayName = "BreadcrumbSeparator";
 const BreadcrumbLink = React.forwardRef<
 	HTMLAnchorElement,
 	React.ComponentPropsWithoutRef<"a"> & { asChild?: boolean }
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 >(({ asChild: _asChild, className, ...props }, ref) => (
 	<a
 		ref={ref}

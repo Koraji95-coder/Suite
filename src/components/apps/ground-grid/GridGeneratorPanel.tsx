@@ -89,35 +89,23 @@ export function GridGeneratorPanel() {
 	const [faultCurrent, setFaultCurrent] = useState(5000);
 	const { pushSnapshot, undo, redo, canUndo, canRedo } = useGridHistory();
 
-	useEffect(() => {
-		loadDesigns();
-		loadProjects();
-	}, []);
-
-	useEffect(() => {
-		if (designIdParam && designs.length > 0) {
-			const found = designs.find((d) => d.id === designIdParam);
-			if (found) loadDesign(found);
-		}
-	}, [designIdParam, designs]);
-
-	async function loadDesigns() {
+	const loadDesigns = useCallback(async () => {
 		const { data } = await supabase
 			.from("ground_grid_designs")
 			.select("*")
 			.order("updated_at", { ascending: false });
 		if (data) setDesigns(data as GridDesign[]);
-	}
+	}, []);
 
-	async function loadProjects() {
+	const loadProjects = useCallback(async () => {
 		const { data } = await supabase
 			.from("projects")
 			.select("id, name, color")
 			.order("name");
 		if (data) setProjects(data as ProjectOption[]);
-	}
+	}, []);
 
-	async function loadDesign(design: GridDesign) {
+	const loadDesign = useCallback(async (design: GridDesign) => {
 		setCurrentDesign(design);
 		setDesignName(design.name);
 		setLinkedProjectId(design.project_id);
@@ -146,7 +134,19 @@ export function GridGeneratorPanel() {
 		setSegmentCount(0);
 		setTeeCount(0);
 		setCrossCount(0);
-	}
+	}, []);
+
+	useEffect(() => {
+		loadDesigns();
+		loadProjects();
+	}, [loadDesigns, loadProjects]);
+
+	useEffect(() => {
+		if (designIdParam && designs.length > 0) {
+			const found = designs.find((d) => d.id === designIdParam);
+			if (found) loadDesign(found);
+		}
+	}, [designIdParam, designs, loadDesign]);
 
 	async function saveDesign() {
 		setSaving(true);

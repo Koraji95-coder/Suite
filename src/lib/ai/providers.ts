@@ -92,7 +92,6 @@ export class OllamaProvider implements AIProviderInterface {
 }
 
 export class OpenAIProvider implements AIProviderInterface {
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	async chat(
 		_messages: Message[],
 		_onChunk?: (chunk: string) => void,

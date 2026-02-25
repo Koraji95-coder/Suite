@@ -1,9 +1,9 @@
 import { Save, Zap } from "lucide-react";
 import { useState } from "react";
-import type { Database } from "../../types/database";
 import { useAuth } from "../../auth/AuthContext";
 import { logger } from "../../lib/errorLogger";
 import { supabase } from "../../lib/supabase";
+import type { Database } from "../../types/database";
 import { FrameSection } from "./ui/PageFrame";
 
 type CalculationType =

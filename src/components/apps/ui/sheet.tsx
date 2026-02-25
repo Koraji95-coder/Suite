@@ -9,7 +9,7 @@ interface SheetContextValue {
 
 const SheetContext = React.createContext<SheetContextValue>({
 	open: false,
-	onOpenChange: () => {},
+	onOpenChange: (_open: boolean) => undefined,
 });
 
 interface SheetProps {

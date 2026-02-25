@@ -4,10 +4,7 @@
  */
 
 import { AlertCircle, AlertTriangle, CheckCircle, Info, X } from "lucide-react";
-import {
-	Notification,
-	useNotifications,
-} from "../../auth/NotificationContext";
+import { Notification, useNotification } from "../../auth/NotificationContext";
 import { cn } from "../../lib/utils";
 
 const iconMap = {
@@ -32,7 +29,7 @@ const iconColorMap = {
 };
 
 function ToastItem({ notification }: { notification: Notification }) {
-	const { dismissNotification } = useNotifications();
+	const { dismissNotification } = useNotification();
 	const Icon = iconMap[notification.type];
 
 	return (
@@ -77,7 +74,7 @@ function ToastItem({ notification }: { notification: Notification }) {
 }
 
 export function ToastContainer() {
-	const { notifications } = useNotifications();
+	const { notifications } = useNotification();
 
 	if (notifications.length === 0) return null;
 

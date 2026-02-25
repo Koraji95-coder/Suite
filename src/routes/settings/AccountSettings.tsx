@@ -12,7 +12,10 @@ export default function AccountSettings() {
 	const [saving, setSaving] = useState(false);
 	const [message, setMessage] = useState<string>("");
 
-	const canUpdatePassword = useMemo(() => newPassword.length >= 8 && !saving, [newPassword, saving]);
+	const canUpdatePassword = useMemo(
+		() => newPassword.length >= 8 && !saving,
+		[newPassword, saving],
+	);
 
 	const updatePassword = async () => {
 		if (!canUpdatePassword) return;
@@ -20,12 +23,16 @@ export default function AccountSettings() {
 		setMessage("");
 
 		try {
-			const { error } = await supabase.auth.updateUser({ password: newPassword });
+			const { error } = await supabase.auth.updateUser({
+				password: newPassword,
+			});
 			if (error) throw error;
 			setNewPassword("");
 			setMessage("Password updated.");
 		} catch (err: unknown) {
-			setMessage(err instanceof Error ? err.message : "Failed to update password.");
+			setMessage(
+				err instanceof Error ? err.message : "Failed to update password.",
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -56,7 +63,12 @@ export default function AccountSettings() {
 						value={newPassword}
 						onChange={(e) => setNewPassword(e.target.value)}
 					/>
-					<button className="btn-primary" type="button" disabled={!canUpdatePassword} onClick={() => void updatePassword()}>
+					<button
+						className="btn-primary"
+						type="button"
+						disabled={!canUpdatePassword}
+						onClick={() => void updatePassword()}
+					>
 						{saving ? "Saving…" : "Update"}
 					</button>
 				</div>
@@ -73,7 +85,11 @@ export default function AccountSettings() {
 					</div>
 				</div>
 
-				<button className="btn-hero-secondary" type="button" onClick={() => void signOut()}>
+				<button
+					className="btn-hero-secondary"
+					type="button"
+					onClick={() => void signOut()}
+				>
 					Sign out
 				</button>
 			</div>
@@ -84,7 +100,8 @@ export default function AccountSettings() {
 					<div>
 						<div className="settings-card-title">Delete account</div>
 						<div className="settings-card-sub">
-							This usually requires a server-side action. We’ll wire it when your backend policy is ready.
+							This usually requires a server-side action. We’ll wire it when
+							your backend policy is ready.
 						</div>
 					</div>
 				</div>

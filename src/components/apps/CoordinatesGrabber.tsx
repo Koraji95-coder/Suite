@@ -78,7 +78,22 @@ export function CoordinatesGrabber() {
 		refreshLayers,
 	} = useGroundGrid();
 	const [state, setState] = useState<CoordinatesGrabberState>(DEFAULT_STATE);
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const [wsConnected, setWsConnected] = useState(
+		coordinatesGrabberService.isConnected(),
+	);
+	const [liveBackendStatus, setLiveBackendStatus] = useState<{
+		autocadRunning: boolean;
+		drawingOpen: boolean;
+		drawingName: string | null;
+		error: string | null;
+		lastUpdated: number | null;
+	}>({
+		autocadRunning: false,
+		drawingOpen: false,
+		drawingName: null,
+		error: null,
+		lastUpdated: null,
+	});
 	const [_hoveredTooltip, _setHoveredTooltip] = useState<string | null>(null);
 	const [progress, setProgress] = useState(0);
 	const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -393,6 +408,60 @@ export function CoordinatesGrabber() {
 		}
 	}, [validateConfiguration]);
 
+	useEffect(() => {
+		let mounted = true;
+
+		coordinatesGrabberService.connectWebSocket().catch(() => {
+			if (!mounted) return;
+			setWsConnected(false);
+		});
+
+		const unsubscribeConnected = coordinatesGrabberService.on(
+			"connected",
+			(event) => {
+				if (!mounted || event.type !== "connected") return;
+				setWsConnected(true);
+			},
+		);
+
+		const unsubscribeStatus = coordinatesGrabberService.on(
+			"status",
+			(event) => {
+				if (!mounted || event.type !== "status") return;
+				setWsConnected(true);
+				setLiveBackendStatus({
+					autocadRunning: event.autocad_running,
+					drawingOpen: event.drawing_open,
+					drawingName:
+						typeof event.drawing_name === "string" ? event.drawing_name : null,
+					error: typeof event.error === "string" ? event.error : null,
+					lastUpdated: Date.now(),
+				});
+			},
+		);
+
+		const unsubscribeDisconnected = coordinatesGrabberService.on(
+			"service-disconnected",
+			() => {
+				if (!mounted) return;
+				setWsConnected(false);
+			},
+		);
+
+		const unsubscribeError = coordinatesGrabberService.on("error", () => {
+			if (!mounted) return;
+			setWsConnected(false);
+		});
+
+		return () => {
+			mounted = false;
+			unsubscribeConnected();
+			unsubscribeStatus();
+			unsubscribeDisconnected();
+			unsubscribeError();
+		};
+	}, []);
+
 	// Save execution result to history
 	const saveExecutionResult = useCallback((entry: ExecutionHistoryEntry) => {
 		setState((prev) => ({
@@ -461,6 +530,10 @@ export function CoordinatesGrabber() {
 			addLog(`[WARNING] Could not get selection count: ${message}`);
 		}
 	};
+
+	const liveStatusStamp = liveBackendStatus.lastUpdated
+		? new Date(liveBackendStatus.lastUpdated).toLocaleTimeString()
+		: "--";
 
 	return (
 		<div
@@ -1335,8 +1408,49 @@ export function CoordinatesGrabber() {
 								fontSize: "11px",
 							}}
 						>
+							<div
+								style={{
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "space-between",
+									gap: "8px",
+									marginBottom: backendConnected ? "6px" : "10px",
+								}}
+							>
+								<span style={{ color: palette.textMuted, fontSize: "10px" }}>
+									WebSocket stream
+								</span>
+								<span
+									style={{
+										color: wsConnected ? "#51cf66" : "#ffa94d",
+										fontSize: "10px",
+										fontWeight: 600,
+									}}
+								>
+									{wsConnected ? "● LIVE" : "○ OFFLINE"}
+								</span>
+							</div>
 							{backendConnected ? (
-								<span style={{ color: "#51cf66" }}>● Connected to AutoCAD</span>
+								<div
+									style={{
+										display: "flex",
+										flexDirection: "column",
+										gap: "4px",
+									}}
+								>
+									<span style={{ color: "#51cf66" }}>
+										● Connected to AutoCAD
+									</span>
+									<span style={{ color: palette.textMuted, fontSize: "10px" }}>
+										Drawing:{" "}
+										{liveBackendStatus.drawingOpen
+											? (liveBackendStatus.drawingName ?? "Open")
+											: "No drawing open"}
+									</span>
+									<span style={{ color: palette.textMuted, fontSize: "10px" }}>
+										Last live update: {liveStatusStamp}
+									</span>
+								</div>
 							) : (
 								<div
 									style={{
@@ -1358,9 +1472,14 @@ export function CoordinatesGrabber() {
 										<span
 											style={{ color: palette.textMuted, fontSize: "10px" }}
 										>
-											(checking every 5s)
+											(live stream + 10s polling fallback)
 										</span>
 									</div>
+									{liveBackendStatus.error ? (
+										<div style={{ color: "#ffa94d", fontSize: "10px" }}>
+											Last backend error: {liveBackendStatus.error}
+										</div>
+									) : null}
 									<div
 										style={{
 											color: palette.textMuted,

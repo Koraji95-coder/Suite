@@ -493,7 +493,9 @@ export function ArchitectureMap3D() {
 	const resetViewRef = useRef<(() => void) | null>(null);
 	const destroyedRef = useRef(false);
 
-	const onTick = useCallback(() => {}, []);
+	const onTick = useCallback(() => {
+		// no-op tick handler
+	}, []);
 	const onAutoFit = useCallback((s: RenderState) => {
 		// Freeze the graph once the worker has produced a stable-ish layout.
 		// The worker calls this only once (see fittedRef inside useSimulationWorker).
@@ -557,7 +559,7 @@ export function ArchitectureMap3D() {
 					camera={{ fov: 45, position: [0, 0, 220], near: 0.1, far: 3000 }}
 					gl={async (p) => {
 						try {
-							return await createHyphaeRenderer(p.canvas, {
+							return await createHyphaeRenderer(p.canvas as HTMLCanvasElement, {
 								alpha: false,
 								clearColor: palette.background,
 								clearAlpha: 1,

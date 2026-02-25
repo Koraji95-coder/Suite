@@ -1,1 +1,11 @@
-# ...existing code from src/components/apps/Ground-Grid-Generation/API_SERVER_README.md
+# Documentation Moved
+
+This file is now a pointer.
+
+Canonical backend documentation is in:
+
+- `docs/backend/coordinates-grabber-api.md`
+
+Documentation index:
+
+- `docs/README.md`

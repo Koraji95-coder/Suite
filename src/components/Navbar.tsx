@@ -1,5 +1,6 @@
 // src/components/Navbar.tsx
-import React, { useEffect } from "react";
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import MagneticWrap from "./fx/MagneticWrap";
 
 export default function Navbar() {
@@ -34,13 +35,13 @@ export default function Navbar() {
 			</div>
 
 			<div className="nav-right">
-				<a href="#" className="btn-ghost">
+				<Link to="/login" className="btn-ghost">
 					Sign in
-				</a>
+				</Link>
 				<MagneticWrap>
-					<a href="#cta" className="btn-pill">
+					<Link to="/signup" className="btn-pill">
 						Start free
-					</a>
+					</Link>
 				</MagneticWrap>
 			</div>
 		</nav>

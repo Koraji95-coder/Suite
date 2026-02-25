@@ -46,7 +46,7 @@ export function DatabaseBrowser() {
 	const [loadingData, setLoadingData] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const formatSupabaseError = (err: unknown, table?: string) => {
+	const formatSupabaseError = useCallback((err: unknown, table?: string) => {
 		const anyErr = err as {
 			message?: string;
 			details?: string;
@@ -60,7 +60,7 @@ export function DatabaseBrowser() {
 		if (anyErr?.hint) parts.push(`hint=${anyErr.hint}`);
 		if (table) parts.push(`table=${table}`);
 		return parts.join(" | ");
-	};
+	}, []);
 
 	const loadTables = useCallback(async () => {
 		setLoadingTables(true);
@@ -103,7 +103,7 @@ export function DatabaseBrowser() {
 		} finally {
 			setLoadingTables(false);
 		}
-	}, []);
+	}, [formatSupabaseError]);
 
 	const loadData = useCallback(async () => {
 		if (!selectedTable) return;
@@ -131,7 +131,7 @@ export function DatabaseBrowser() {
 		} finally {
 			setLoadingData(false);
 		}
-	}, [selectedTable, sortCol, sortDir, page, pageSize]);
+	}, [selectedTable, sortCol, sortDir, page, pageSize, formatSupabaseError]);
 
 	useEffect(() => {
 		loadTables();
@@ -145,7 +145,7 @@ export function DatabaseBrowser() {
 		setSortCol(null);
 		setSortDir("asc");
 		setSearch("");
-	}, [selectedTable]);
+	}, []);
 
 	const handleSort = (col: string) => {
 		if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));

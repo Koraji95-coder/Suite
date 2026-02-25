@@ -40,7 +40,7 @@ export function AgendaView({
 	);
 
 	return (
-		<div className="border-border/70 border-t px-4">
+		<div className="border-border/70 border-t px-4 sm:px-5">
 			{!hasEvents ? (
 				<div className="flex min-h-[70svh] flex-col items-center justify-center py-16 text-center">
 					<CalendarDays className="text-muted-foreground/50 mb-2 h-8 w-8" />
@@ -60,13 +60,13 @@ export function AgendaView({
 						<div
 							key={day.toString()}
 							className={cn(
-								"border-border/70 relative my-12 border-t",
+								"border-border/70 relative my-8 rounded-xl border px-3 pb-3 pt-6 sm:px-4",
 								isSelected && "rounded-lg ring-1 ring-primary/30 bg-primary/5",
 							)}
 							onClick={() => onDateSelect?.(day)}
 						>
 							<span
-								className="bg-background absolute -top-3 left-0 flex h-6 items-center pe-4 text-[10px] uppercase data-today:font-medium sm:pe-4 sm:text-xs"
+								className="bg-background absolute -top-3 left-3 flex h-6 items-center rounded-md px-2 text-[10px] uppercase tracking-wide data-today:font-medium sm:left-4 sm:text-xs"
 								data-today={isToday(day) || undefined}
 							>
 								{format(day, "d MMM, EEEE")}
@@ -75,7 +75,7 @@ export function AgendaView({
 								) : null}
 							</span>
 
-							<div className="mt-6 space-y-2">
+							<div className="space-y-2">
 								{dayEvents.map((event) => (
 									<EventItem
 										key={event.id}

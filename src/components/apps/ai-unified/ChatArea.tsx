@@ -96,7 +96,6 @@ function renderFormattedContent(
 function renderBoldSegments(
 	text: string,
 	keyOffset: number,
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	_palette: { primary: string; surfaceLight: string },
 ): React.ReactNode[] {
 	const parts: React.ReactNode[] = [];
@@ -145,7 +144,7 @@ export function ChatArea({ messages, onSend, isStreaming }: ChatAreaProps) {
 		if (scrollRef.current && isNearBottomRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
 		}
-	}, [messages]);
+	}, []);
 
 	// Auto-grow the textarea as the user types
 	const adjustTextareaHeight = useCallback(() => {
@@ -160,7 +159,7 @@ export function ChatArea({ messages, onSend, isStreaming }: ChatAreaProps) {
 
 	useEffect(() => {
 		adjustTextareaHeight();
-	}, [input, adjustTextareaHeight]);
+	}, [adjustTextareaHeight]);
 
 	const handleSend = () => {
 		const trimmed = input.trim();

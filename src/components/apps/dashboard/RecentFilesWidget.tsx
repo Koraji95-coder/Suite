@@ -2,6 +2,8 @@ import { Clock, ExternalLink, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useRecentFiles } from "@/hooks/useRecentFiles";
 import { hexToRgba, useTheme } from "@/lib/palette";
+import { GlassPanel } from "../ui/GlassPanel";
+import { bubbleStyle } from "./dashboardStyles";
 
 export function RecentFilesWidget() {
 	const { palette } = useTheme();
@@ -23,126 +25,105 @@ export function RecentFilesWidget() {
 	};
 
 	return (
-		<div
-			style={{
-				borderRadius: 12,
-				border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-				background: hexToRgba(palette.surface, 0.6),
-				backdropFilter: "blur(12px)",
-				padding: 20,
-			}}
+		<GlassPanel
+			tint={palette.primary}
+			hoverEffect={false}
+			specular={false}
+			bevel={false}
+			className="p-7 group"
 		>
-			<div
-				style={{
-					display: "flex",
-					alignItems: "center",
-					gap: 8,
-					marginBottom: 16,
-				}}
-			>
-				<Clock size={16} color={palette.primary} />
-				<h3
-					style={{
-						fontSize: 14,
-						fontWeight: 600,
-						color: palette.text,
-						margin: 0,
-					}}
-				>
-					Recent Files
-				</h3>
-			</div>
+			<div className="relative z-10">
+				<div className="flex items-center space-x-2 mb-4">
+					<div
+						className="p-2 rounded-lg"
+						style={{
+							background: `linear-gradient(135deg, ${hexToRgba(
+								palette.primary,
+								0.25,
+							)} 0%, ${hexToRgba(palette.primary, 0.08)} 100%)`,
+							boxShadow: `0 0 16px ${hexToRgba(palette.primary, 0.12)}`,
+						}}
+					>
+						<Clock className="w-5 h-5" style={{ color: palette.primary }} />
+					</div>
+					<h3 className="text-xl font-bold" style={{ color: palette.primary }}>
+						Recent Files
+					</h3>
+				</div>
 
-			{loading ? (
-				<div
-					style={{ fontSize: 12, color: palette.textMuted, padding: "12px 0" }}
-				>
-					Loading...
-				</div>
-			) : files.length === 0 ? (
-				<div
-					style={{ fontSize: 12, color: palette.textMuted, padding: "12px 0" }}
-				>
-					No recent files yet. Open files to see them here.
-				</div>
-			) : (
-				<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-					{files.map((f) => (
-						<button
-							key={f.id}
-							onClick={() => navigate(f.file_path)}
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 10,
-								padding: "8px 10px",
-								borderRadius: 8,
-								border: "none",
-								background: "transparent",
-								cursor: "pointer",
-								textAlign: "left",
-								width: "100%",
-								transition: "background 0.15s",
-							}}
-							onMouseEnter={(e) => {
-								e.currentTarget.style.background = hexToRgba(
-									palette.surfaceLight,
-									0.5,
-								);
-							}}
-							onMouseLeave={(e) => {
-								e.currentTarget.style.background = "transparent";
-							}}
-						>
-							<FileText
-								size={14}
-								color={palette.textMuted}
-								style={{ flexShrink: 0 }}
-							/>
-							<div style={{ flex: 1, minWidth: 0 }}>
-								<div
+				{loading ? (
+					<div
+						className="text-sm"
+						style={{ color: hexToRgba(palette.text, 0.45) }}
+					>
+						Loading...
+					</div>
+				) : files.length === 0 ? (
+					<div
+						className="text-sm"
+						style={{ color: hexToRgba(palette.text, 0.45) }}
+					>
+						No recent files yet. Open files to see them here.
+					</div>
+				) : (
+					<div className="flex flex-col gap-3">
+						{files.map((f) => (
+							<button
+								key={f.id}
+								onClick={() => navigate(f.file_path)}
+								className="flex w-full items-center gap-3 rounded-2xl px-5 py-4 text-left transition-all duration-300 hover:-translate-y-px"
+								style={bubbleStyle(palette, palette.primary)}
+							>
+								<FileText
+									size={14}
+									color={hexToRgba(palette.text, 0.45)}
+									style={{ flexShrink: 0 }}
+								/>
+								<div style={{ flex: 1, minWidth: 0 }}>
+									<div
+										style={{
+											fontSize: 12,
+											fontWeight: 600,
+											color: hexToRgba(palette.text, 0.9),
+											overflow: "hidden",
+											textOverflow: "ellipsis",
+											whiteSpace: "nowrap",
+										}}
+									>
+										{f.file_name}
+									</div>
+									{f.context && (
+										<div
+											style={{
+												fontSize: 10,
+												color: hexToRgba(palette.text, 0.45),
+												marginTop: 2,
+											}}
+										>
+										{f.context}
+									</div>
+									)}
+								</div>
+								<span
 									style={{
-										fontSize: 12,
-										fontWeight: 500,
-										color: palette.text,
-										overflow: "hidden",
-										textOverflow: "ellipsis",
+										fontSize: 10,
+										color: hexToRgba(palette.text, 0.45),
+										flexShrink: 0,
 										whiteSpace: "nowrap",
 									}}
 								>
-									{f.file_name}
-								</div>
-								{f.context && (
-									<div
-										style={{
-											fontSize: 10,
-											color: palette.textMuted,
-											marginTop: 1,
-										}}
-									>
-										{f.context}
-									</div>
-								)}
-							</div>
-							<span
-								style={{
-									fontSize: 10,
-									color: palette.textMuted,
-									flexShrink: 0,
-									whiteSpace: "nowrap",
-								}}
-							>
-								{formatTime(f.accessed_at)}
-							</span>
-							<ExternalLink
-								size={10}
-								color={palette.textMuted}
-								style={{ flexShrink: 0, opacity: 0.4 }}
-							/>
-						</button>
-					))}
-				</div>
-			)}
-		</div>
+									{formatTime(f.accessed_at)}
+								</span>
+								<ExternalLink
+									size={10}
+									color={hexToRgba(palette.text, 0.4)}
+									style={{ flexShrink: 0, opacity: 0.5 }}
+								/>
+							</button>
+						))}
+					</div>
+				)}
+			</div>
+		</GlassPanel>
 	);
 }

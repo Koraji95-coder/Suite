@@ -153,9 +153,12 @@ export function validateFilename(filename: string): FileValidationResult {
 	}
 
 	// Check for special characters that could cause issues
-	// eslint-disable-next-line no-control-regex
-	const dangerousChars = /[<>:"|?*\x00-\x1f]/;
-	if (dangerousChars.test(filename)) {
+	const dangerousChars = /[<>:"|?*]/;
+	const hasControlChars = [...filename].some((char) => {
+		const code = char.charCodeAt(0);
+		return code <= 31 || code === 127;
+	});
+	if (dangerousChars.test(filename) || hasControlChars) {
 		errors.push("Filename contains invalid characters");
 	}
 
@@ -185,8 +188,13 @@ export function sanitizeFilename(filename: string): string {
 	safe = safe.replace(/[/\\]/g, "_");
 
 	// Replace dangerous characters
-	// eslint-disable-next-line no-control-regex
-	safe = safe.replace(/[<>:"|?*\x00-\x1f]/g, "_");
+	safe = safe.replace(/[<>:"|?*]/g, "_");
+	safe = [...safe]
+		.map((char) => {
+			const code = char.charCodeAt(0);
+			return code <= 31 || code === 127 ? "_" : char;
+		})
+		.join("");
 
 	// Trim spaces
 	safe = safe.trim();

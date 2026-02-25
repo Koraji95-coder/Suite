@@ -27,7 +27,6 @@ export const COMPONENT_LINES: Record<string, number> = {
 	"AdvancedAIFeatures.tsx": 534,
 	"AIMemoryMap.tsx": 465,
 	"ProjectManager.tsx": 1821,
-	"ProjectsHub.tsx": 323,
 	"StorageManager.tsx": 1110,
 };
 
@@ -58,7 +57,6 @@ export const COMP_TO_GROUP: Record<string, string> = {
 	"AdvancedAIFeatures.tsx": "apps",
 	"AIMemoryMap.tsx": "apps",
 	"ProjectManager.tsx": "proj",
-	"ProjectsHub.tsx": "proj",
 	"StorageManager.tsx": "proj",
 };
 
@@ -101,7 +99,7 @@ export const MINOR_TO_COMPS: Record<string, string[]> = {
 	"NEMA Standards": [],
 	"Task Management": ["ProjectManager.tsx"],
 	"File Management": ["ProjectManager.tsx", "StorageManager.tsx"],
-	"Projects Hub": ["ProjectsHub.tsx"],
+	"Projects Hub": ["ProjectManager.tsx"],
 	"Calendar Events": ["ProjectManager.tsx"],
 	"Activity Logging": ["ProjectManager.tsx"],
 };

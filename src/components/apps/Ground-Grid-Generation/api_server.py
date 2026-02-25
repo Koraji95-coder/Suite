@@ -21,25 +21,41 @@ Requirements:
     pip install flask flask-cors psutil pywin32
 """
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
+from flask_sock import Sock
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import psutil
-import pythoncom
-import win32com.client
-import win32com.client.gencache as gencache
+try:
+    import pythoncom
+    import win32com.client
+    import win32com.client.gencache as gencache
+    AUTOCAD_COM_AVAILABLE = True
+except Exception:
+    pythoncom = None
+    win32com = None
+    gencache = None
+    AUTOCAD_COM_AVAILABLE = False
 import threading
 import time
 import json
 import math
 import os
+import sys
+import tempfile
+import shutil
+import subprocess
 import re
 import traceback
 import logging
+import hmac
+import zipfile
 from functools import wraps
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
+from pathlib import Path
+from werkzeug.utils import secure_filename
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -57,9 +73,52 @@ logger = logging.getLogger(__name__)
 
 # ── gen_py cache fix (from coordtable) ──────────────────────────
 # Prevent gen_py from writing wrappers that cause CDispatch issues
-gencache.is_readonly = True
+if AUTOCAD_COM_AVAILABLE and gencache is not None:
+    gencache.is_readonly = True
 
 app = Flask(__name__)
+sock = Sock(app)
+
+# ── Transmittal Builder render helpers ──────────────────────────
+TRANSMITTAL_RENDER_AVAILABLE = False
+try:
+    transmittal_core_path = (
+        Path(__file__).resolve().parents[1]
+        / "Transmittal-Builder"
+        / "core"
+    )
+    if transmittal_core_path.exists():
+        sys.path.append(str(transmittal_core_path))
+        from transmittal_render import render_transmittal, render_cid_transmittal  # type: ignore
+
+        TRANSMITTAL_RENDER_AVAILABLE = True
+except Exception as exc:
+    logger.warning("Transmittal render helpers unavailable: %s", exc)
+
+
+def _parse_csv_env(var_name: str, fallback: List[str]) -> List[str]:
+    raw = os.environ.get(var_name, "")
+    if not raw.strip():
+        return fallback
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _parse_int_env(var_name: str, fallback: int, minimum: int = 1) -> int:
+    raw = os.environ.get(var_name)
+    if raw is None:
+        return fallback
+    try:
+        value = int(raw)
+        return max(value, minimum)
+    except ValueError:
+        logger.warning("Invalid %s=%r; using fallback %s", var_name, raw, fallback)
+        return fallback
+
+
+app.config['MAX_CONTENT_LENGTH'] = _parse_int_env(
+    'API_MAX_CONTENT_LENGTH',
+    104857600  # 100 MB
+)
 
 # CORS configuration - restrict to specific origins for security
 # In production, replace with actual frontend domain
@@ -69,6 +128,7 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
 ]
+ALLOWED_ORIGINS = _parse_csv_env('API_ALLOWED_ORIGINS', ALLOWED_ORIGINS)
 
 CORS(app, 
      origins=ALLOWED_ORIGINS,
@@ -80,7 +140,10 @@ CORS(app,
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=[
+        os.environ.get('API_RATE_LIMIT_DAY', '200 per day'),
+        os.environ.get('API_RATE_LIMIT_HOUR', '50 per hour'),
+    ],
     storage_uri="memory://",
     strategy="fixed-window"
 )
@@ -105,7 +168,7 @@ def add_security_headers(response):
 
 # ── API Authentication ───────────────────────────────────────────
 # SECURITY: API_KEY must be explicitly set in environment. No defaults allowed.
-API_KEY = os.environ.get('API_KEY')
+API_KEY = (os.environ.get('API_KEY') or '').strip()
 if not API_KEY:
     raise RuntimeError(
         "FATAL: API_KEY environment variable is not set.\n"
@@ -113,6 +176,14 @@ if not API_KEY:
         "  export API_KEY='your-secure-api-key-here'\n"
         "Then start the server again."
     )
+if len(API_KEY) < 16:
+    logger.warning("API_KEY length is under 16 characters; use a longer key for production.")
+
+
+def is_valid_api_key(provided_key: Optional[str]) -> bool:
+    if not provided_key:
+        return False
+    return hmac.compare_digest(provided_key, API_KEY)
 
 def require_api_key(f):
     """Decorator to require API key authentication for protected routes."""
@@ -123,14 +194,14 @@ def require_api_key(f):
         # Log all API requests for audit trail
         logger.info(
             f"API Request: {request.method} {request.path} from {request.remote_addr} "
-            f"- Auth: {'Valid' if provided_key == API_KEY else 'Invalid/Missing'}"
+            f"- Auth: {'Valid' if is_valid_api_key(provided_key) else 'Invalid/Missing'}"
         )
         
         if not provided_key:
             logger.warning(f"Unauthorized request (no API key): {request.path} from {request.remote_addr}")
             return jsonify({"error": "API key required", "code": "AUTH_REQUIRED"}), 401
         
-        if provided_key != API_KEY:
+        if not is_valid_api_key(provided_key):
             logger.warning(f"Unauthorized request (invalid API key): {request.path} from {request.remote_addr}")
             return jsonify({"error": "Invalid API key", "code": "AUTH_INVALID"}), 401
         
@@ -192,6 +263,81 @@ def validate_layer_config(config: Any) -> Dict[str, Any]:
         'export_excel': bool(config.get('export_excel', False))
     }
 
+
+# ── Transmittal Builder helpers ─────────────────────────────────
+def _parse_json_field(name: str, default):
+    raw = request.form.get(name)
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except Exception:
+        return default
+
+
+def _save_upload(file_storage, dest_dir: str, filename: Optional[str] = None) -> str:
+    if file_storage is None:
+        raise ValueError("Missing file upload")
+    safe_name = secure_filename(filename or file_storage.filename or "upload")
+    if not safe_name:
+        safe_name = "upload"
+    path = os.path.join(dest_dir, safe_name)
+    file_storage.save(path)
+    return path
+
+
+def _convert_docx_to_pdf(docx_path: str, output_dir: str) -> Tuple[Optional[str], str]:
+    """Convert a DOCX file to PDF. Returns (pdf_path, error_message)."""
+    errors: List[str] = []
+
+    # Attempt conversion with docx2pdf (requires Word on Windows or macOS)
+    try:
+        from docx2pdf import convert  # type: ignore
+
+        convert(docx_path, output_dir)
+        pdf_path = os.path.join(
+            output_dir, f"{Path(docx_path).stem}.pdf"
+        )
+        if os.path.exists(pdf_path):
+            return pdf_path, ""
+        errors.append("docx2pdf did not produce a PDF file.")
+    except Exception as exc:
+        errors.append(f"docx2pdf failed: {exc}")
+
+    # Attempt conversion with LibreOffice if available
+    for cmd in ("soffice", "libreoffice"):
+        exe = shutil.which(cmd)
+        if not exe:
+            continue
+        try:
+            result = subprocess.run(
+                [
+                    exe,
+                    "--headless",
+                    "--convert-to",
+                    "pdf",
+                    "--outdir",
+                    output_dir,
+                    docx_path,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                pdf_path = os.path.join(
+                    output_dir, f"{Path(docx_path).stem}.pdf"
+                )
+                if os.path.exists(pdf_path):
+                    return pdf_path, ""
+            errors.append(
+                f"{cmd} conversion failed: {(result.stderr or result.stdout).strip()}"
+            )
+        except Exception as exc:
+            errors.append(f"{cmd} conversion error: {exc}")
+
+    return None, "; ".join([e for e in errors if e]) or "No PDF converter available."
+
 # Global AutoCAD manager instance
 _manager = None
 FOUNDATION_SOURCE_TYPE = "Foundation Coordinates"
@@ -215,6 +361,8 @@ def dyn(obj: Any) -> Any:
         ole = obj
 
     try:
+        if not AUTOCAD_COM_AVAILABLE:
+            return obj
         disp = ole.QueryInterface(pythoncom.IID_IDispatch)
         return win32com.client.dynamic.Dispatch(disp)
     except Exception:
@@ -226,6 +374,8 @@ def dyn(obj: Any) -> Any:
 
 def connect_autocad() -> Any:
     """Connect to AutoCAD using late-bound dynamic dispatch (no gen_py)."""
+    if not AUTOCAD_COM_AVAILABLE:
+        raise RuntimeError("AutoCAD COM bridge unavailable on this platform. Run backend on Windows with pywin32 installed.")
     acad = win32com.client.dynamic.Dispatch("AutoCAD.Application")
     if acad is None:
         raise RuntimeError("Could not connect to AutoCAD.Application")
@@ -248,6 +398,8 @@ def com_call_with_retry(callable_func, max_retries: int = 25, initial_delay: flo
 
 
 def pt(x: float, y: float, z: float = 0.0):
+    if not AUTOCAD_COM_AVAILABLE:
+        raise RuntimeError("AutoCAD COM bridge unavailable on this platform")
     return win32com.client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, (float(x), float(y), float(z)))
 
 
@@ -679,6 +831,8 @@ class AutoCADManager:
         Never caches COM objects across calls (avoids stale ref issues).
         Returns: (acad, doc, drawing_open, drawing_name, error_message)
         """
+        if not AUTOCAD_COM_AVAILABLE:
+            return (None, None, False, None, "AutoCAD COM is unavailable in this environment (Windows + pywin32 required)")
         try:
             acad = connect_autocad()
             
@@ -713,6 +867,23 @@ class AutoCADManager:
                 if current_time - self._cached_status['timestamp'] < self._cache_ttl:
                     return self._cached_status
             
+            if not AUTOCAD_COM_AVAILABLE:
+                status = {
+                    'connected': False,
+                    'autocad_running': False,
+                    'drawing_open': False,
+                    'drawing_name': None,
+                    'autocad_path': None,
+                    'error': 'AutoCAD COM unavailable (run on Windows with pywin32 and AutoCAD)',
+                    'checks': {'process': False, 'com': False, 'document': False},
+                    'backend_uptime': current_time - self.start_time,
+                    'timestamp': current_time,
+                    'degraded_mode': True,
+                }
+                self._cached_status = status
+                self.last_check_time = current_time
+                return status
+
             process_running, acad_path = self.is_autocad_process_running()
             
             if not process_running:
@@ -1068,6 +1239,7 @@ def api_layers():
 
 @app.route('/api/selection-count', methods=['GET'])
 @require_api_key
+@limiter.limit("120 per hour")
 def api_selection_count():
     """Get count of currently selected objects in AutoCAD (fresh COM)."""
     manager = get_manager()
@@ -1110,6 +1282,7 @@ def api_selection_count():
 
 @app.route('/api/execute', methods=['POST'])
 @require_api_key
+@limiter.limit("30 per hour")
 def api_execute():
     """
     Execute coordinate extraction based on provided configuration.
@@ -1127,7 +1300,10 @@ def api_execute():
         }), 400
     
     try:
-        raw_config = request.get_json()
+        if not request.is_json:
+            raise ValueError('Expected application/json payload')
+
+        raw_config = request.get_json(silent=False)
         if not raw_config:
             raise ValueError('No configuration provided')
         
@@ -1187,6 +1363,7 @@ def api_execute():
 
 @app.route('/api/trigger-selection', methods=['POST'])
 @require_api_key
+@limiter.limit("120 per hour")
 def api_trigger_selection():
     """Bring AutoCAD to foreground (fresh COM)."""
     manager = get_manager()
@@ -1216,6 +1393,263 @@ def api_trigger_selection():
             pass
 
 
+@app.route('/api/transmittal/render', methods=['POST'])
+@require_api_key
+@limiter.limit("30 per hour")
+def api_transmittal_render():
+    """
+    Render a transmittal document (standard or CID) and return a DOCX file.
+    Expects multipart/form-data with:
+      - type: "standard" | "cid"
+      - mode: "preview" | "generate" (optional)
+      - format: "docx" | "pdf" | "both" (optional)
+      - template: DOCX file
+      - index: Excel file (standard only)
+      - documents: PDF/CID files (standard only)
+      - cid_files: CID files (cid only)
+      - fields: JSON string
+      - checks: JSON string
+      - contacts: JSON string
+      - cid_index_data: JSON string (cid only)
+    """
+    if not TRANSMITTAL_RENDER_AVAILABLE:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "Transmittal render helpers not available on server.",
+                }
+            ),
+            503,
+        )
+
+    try:
+        transmittal_type = request.form.get("type", "standard").lower()
+        mode = request.form.get("mode", "generate").lower()
+        output_format = request.form.get("format", "docx").lower()
+        if output_format not in {"docx", "pdf", "both"}:
+            output_format = "docx"
+        fields = _parse_json_field("fields", {}) or {}
+        checks = _parse_json_field("checks", {}) or {}
+        contacts = _parse_json_field("contacts", []) or []
+        cid_index_data = _parse_json_field("cid_index_data", []) or []
+
+        # Normalize checks with defaults
+        default_checks = {
+            "trans_pdf": False,
+            "trans_cad": False,
+            "trans_originals": False,
+            "via_email": False,
+            "via_ftp": False,
+            "ci_approval": False,
+            "ci_bid": False,
+            "ci_construction": False,
+            "ci_asbuilt": False,
+            "ci_reference": False,
+            "ci_preliminary": False,
+            "ci_info": False,
+            "ci_fab": False,
+            "ci_const": False,
+            "ci_record": False,
+            "ci_ref": False,
+            "vr_approved": False,
+            "vr_approved_noted": False,
+            "vr_rejected": False,
+        }
+        merged_checks = {**default_checks, **checks}
+        if not merged_checks.get("ci_const"):
+            merged_checks["ci_const"] = merged_checks.get("ci_construction", False)
+        if not merged_checks.get("ci_ref"):
+            merged_checks["ci_ref"] = merged_checks.get("ci_reference", False)
+
+        # Normalize contacts to expected keys
+        normalized_contacts = []
+        for c in contacts:
+            if not isinstance(c, dict):
+                continue
+            normalized_contacts.append(
+                {
+                    "name": str(c.get("name", "")).strip(),
+                    "company": str(c.get("company", "")).strip(),
+                    "email": str(c.get("email", "")).strip(),
+                    "phone": str(c.get("phone", "")).strip(),
+                }
+            )
+
+        work_dir = tempfile.mkdtemp(prefix="transmittal_")
+        template_file = request.files.get("template")
+        if not template_file:
+            return jsonify({"success": False, "message": "Template file is required"}), 400
+
+        template_path = _save_upload(template_file, work_dir, "template.docx")
+
+        project_num = str(fields.get("job_num", "")).strip() or "UNKNOWN"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_stem = "Transmittal"
+
+        if transmittal_type == "cid":
+            cid_files = request.files.getlist("cid_files")
+            if not cid_files:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "CID files are required for CID transmittal",
+                        }
+                    ),
+                    400,
+                )
+            if not cid_index_data:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "CID document index data is required",
+                        }
+                    ),
+                    400,
+                )
+
+            cid_dir = os.path.join(work_dir, "cid_files")
+            os.makedirs(cid_dir, exist_ok=True)
+            for f in cid_files:
+                _save_upload(f, cid_dir)
+
+            output_stem = f"CID_Transmittal_{project_num}_{timestamp}"
+            output_name = f"{output_stem}.docx"
+            out_path = os.path.join(work_dir, output_name)
+
+            render_cid_transmittal(
+                template_path,
+                cid_dir,
+                cid_index_data,
+                fields,
+                merged_checks,
+                normalized_contacts,
+                out_path,
+            )
+        else:
+            index_file = request.files.get("index")
+            if not index_file:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "Drawing index (Excel) file is required",
+                        }
+                    ),
+                    400,
+                )
+            index_path = _save_upload(index_file, work_dir, "index.xlsx")
+
+            document_files = request.files.getlist("documents")
+            if not document_files:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "Document files are required for standard transmittal",
+                        }
+                    ),
+                    400,
+                )
+
+            docs_dir = os.path.join(work_dir, "documents")
+            os.makedirs(docs_dir, exist_ok=True)
+            for f in document_files:
+                _save_upload(f, docs_dir)
+
+            output_stem = f"Transmittal_{project_num}_{timestamp}"
+            output_name = f"{output_stem}.docx"
+            out_path = os.path.join(work_dir, output_name)
+
+            render_transmittal(
+                template_path,
+                docs_dir,
+                index_path,
+                fields,
+                merged_checks,
+                normalized_contacts,
+                out_path,
+                None,
+            )
+
+        pdf_path = None
+        if output_format in {"pdf", "both"}:
+            pdf_path, pdf_error = _convert_docx_to_pdf(out_path, work_dir)
+            if not pdf_path:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "message": "PDF conversion failed.",
+                            "detail": pdf_error,
+                        }
+                    ),
+                    500,
+                )
+
+        if output_format == "pdf" and pdf_path:
+            return send_file(
+                pdf_path,
+                as_attachment=True,
+                download_name=f"{output_stem}.pdf",
+                mimetype="application/pdf",
+            )
+
+        if output_format == "both" and pdf_path:
+            zip_name = f"{output_stem}.zip"
+            zip_path = os.path.join(work_dir, zip_name)
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.write(out_path, arcname=os.path.basename(out_path))
+                zf.write(pdf_path, arcname=os.path.basename(pdf_path))
+            return send_file(
+                zip_path,
+                as_attachment=True,
+                download_name=zip_name,
+                mimetype="application/zip",
+            )
+
+        return send_file(
+            out_path,
+            as_attachment=True,
+            download_name=output_name,
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/api/transmittal/template', methods=['GET'])
+@require_api_key
+@limiter.limit("60 per hour")
+def api_transmittal_template():
+    """Download the example transmittal DOCX template bundled with the repo."""
+    template_path = (
+        Path(__file__).resolve().parents[1]
+        / "Transmittal-Builder"
+        / "R3P-PRJ#-XMTL-001 - DOCUMENT INDEX.docx"
+    )
+    if not template_path.exists():
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": "Example template not found on server.",
+                }
+            ),
+            404,
+        )
+    return send_file(
+        str(template_path),
+        as_attachment=True,
+        download_name=template_path.name,
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+
 @app.route('/health', methods=['GET'])
 def health():
     """Simple health check for backend server"""
@@ -1228,15 +1662,79 @@ def health():
     })
 
 
+@sock.route('/ws')
+def websocket_status_bridge(ws):
+    """WebSocket status stream for frontend real-time backend/AutoCAD connectivity updates."""
+    provided_key = request.args.get('api_key')
+    if not is_valid_api_key(provided_key):
+        try:
+            ws.send(json.dumps({
+                'type': 'error',
+                'message': 'Invalid API key',
+                'code': 'AUTH_INVALID'
+            }))
+        finally:
+            try:
+                ws.close()
+            except Exception:
+                pass
+        logger.warning("Unauthorized websocket connection attempt from %s", request.remote_addr)
+        return
+
+    logger.info("WebSocket connected from %s", request.remote_addr)
+
+    try:
+        ws.send(json.dumps({
+            'type': 'connected',
+            'backend_id': 'coordinates-grabber-api',
+            'backend_version': '1.0.0',
+            'timestamp': time.time(),
+        }))
+
+        while True:
+            manager = get_manager()
+            status = manager.get_status(force_refresh=True)
+
+            ws.send(json.dumps({
+                'type': 'status',
+                'backend_id': 'coordinates-grabber-api',
+                'backend_version': '1.0.0',
+                'connected': bool(status.get('connected')),
+                'autocad_running': bool(status.get('autocad_running')),
+                'drawing_open': bool(status.get('drawing_open')),
+                'drawing_name': status.get('drawing_name'),
+                'error': status.get('error'),
+                'checks': status.get('checks', {}),
+                'timestamp': time.time(),
+            }))
+
+            try:
+                incoming = ws.receive(timeout=0.1)
+                if incoming is None:
+                    break
+            except TypeError:
+                pass
+            except Exception:
+                pass
+
+            time.sleep(2.0)
+
+    except Exception as exc:
+        logger.info("WebSocket disconnected from %s (%s)", request.remote_addr, exc)
+
+
 # ========== MAIN ==========
 
 if __name__ == '__main__':
+    api_host = os.environ.get('API_HOST', '127.0.0.1').strip() or '127.0.0.1'
+    api_port = _parse_int_env('API_PORT', 5000, minimum=1)
+
     print("=" * 60)
     print("🚀 Coordinates Grabber API Server")
     print("=" * 60)
-    print(f"Server starting on: http://localhost:5000")
-    print(f"Health check: http://localhost:5000/health")
-    print(f"Status endpoint: http://localhost:5000/api/status")
+    print(f"Server starting on: http://{api_host}:{api_port}")
+    print(f"Health check: http://{api_host}:{api_port}/health")
+    print(f"Status endpoint: http://{api_host}:{api_port}/api/status")
     print("")
     print("📋 Prerequisites:")
     print("  - AutoCAD must be running")
@@ -1264,8 +1762,8 @@ if __name__ == '__main__':
     
     # Run Flask server
     app.run(
-        host='0.0.0.0',  # Listen on all interfaces
-        port=5000,
+        host=api_host,
+        port=api_port,
         debug=False,  # Set to True for development
         threaded=True
     )

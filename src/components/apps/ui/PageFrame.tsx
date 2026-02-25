@@ -1,7 +1,8 @@
 import { ArrowLeft } from "lucide-react";
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { GlassPanel } from "./GlassPanel";
+import { usePageHeader } from "./PageHeaderContext";
 
 export type Breadcrumb = { label: string; onClick?: () => void };
 
@@ -12,6 +13,8 @@ type PageFrameProps = {
 	breadcrumbs?: Breadcrumb[];
 	actions?: ReactNode;
 	onBack?: () => void;
+	hideHeader?: boolean;
+	centerContent?: ReactNode;
 
 	/** Theme tint for the header glass */
 	tint?: string;
@@ -29,59 +32,72 @@ export function PageFrame({
 	breadcrumbs,
 	actions,
 	onBack,
+	hideHeader = true,
 	tint: tintProp,
 	maxWidthClassName = "max-w-[1480px]",
 	rightRail,
 	children,
+	centerContent,
 }: PageFrameProps) {
 	const { palette } = useTheme();
+	const { setHeader, clearHeader } = usePageHeader();
 	const tint = tintProp ?? palette.primary;
 	const hasRight = Boolean(rightRail);
+
+	useEffect(() => {
+		setHeader({
+			title,
+			subtitle,
+			icon,
+			centerContent,
+		});
+		return () => clearHeader();
+	}, [title, subtitle, icon, centerContent, setHeader, clearHeader]);
 
 	return (
 		<div className={`mx-auto w-full ${maxWidthClassName} space-y-4`}>
 			{/* Page header */}
-			<GlassPanel
-				variant="toolbar"
-				padded
-				hoverEffect={false}
-				bevel
-				specular
-				tint={tint}
-				style={{
-					border: `1px solid ${hexToRgba(tint, 0.14)}`,
-				}}
-			>
-				<div className="flex items-start justify-between gap-4">
-					<div className="min-w-0">
-						{/* breadcrumbs */}
-						{breadcrumbs?.length ? (
-							<div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-								{breadcrumbs.map((b, idx) => (
-									<div
-										key={`${b.label}-${idx}`}
-										className="flex items-center gap-2"
-									>
-										<button
-											type="button"
-											onClick={b.onClick}
-											className={`hover:underline ${b.onClick ? "" : "cursor-default"}`}
-											style={{ color: hexToRgba(palette.text, 0.55) }}
-											disabled={!b.onClick}
+			{!hideHeader ? (
+				<GlassPanel
+					variant="toolbar"
+					padded
+					hoverEffect={false}
+					bevel
+					specular
+					tint={tint}
+					style={{
+						border: `1px solid ${hexToRgba(tint, 0.14)}`,
+					}}
+				>
+					<div className="grid gap-4 sm:grid-cols-[1fr_auto_1fr] sm:items-start">
+						<div className="min-w-0">
+							{/* breadcrumbs */}
+							{breadcrumbs?.length ? (
+								<div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+									{breadcrumbs.map((b, idx) => (
+										<div
+											key={`${b.label}-${idx}`}
+											className="flex items-center gap-2"
 										>
-											{b.label}
-										</button>
-										{idx < breadcrumbs.length - 1 && (
-											<span style={{ color: hexToRgba(palette.text, 0.35) }}>
-												•
-											</span>
-										)}
-									</div>
-								))}
-							</div>
-						) : null}
+											<button
+												type="button"
+												onClick={b.onClick}
+												className={`hover:underline ${b.onClick ? "" : "cursor-default"}`}
+												style={{ color: hexToRgba(palette.text, 0.55) }}
+												disabled={!b.onClick}
+											>
+												{b.label}
+											</button>
+											{idx < breadcrumbs.length - 1 && (
+												<span style={{ color: hexToRgba(palette.text, 0.35) }}>
+													•
+												</span>
+											)}
+										</div>
+									))}
+								</div>
+							) : null}
 
-						<div className="flex items-center gap-3 min-w-0">
 							{onBack ? (
 								<button
 									type="button"
@@ -95,38 +111,41 @@ export function PageFrame({
 									<ArrowLeft className="w-4 h-4" />
 								</button>
 							) : null}
+						</div>
 
-							{icon ? <div className="shrink-0">{icon}</div> : null}
-
-							<div className="min-w-0">
+						<div className="min-w-0 text-center">
+							<div className="flex items-center justify-center gap-3">
+								{icon ? <div className="shrink-0">{icon}</div> : null}
 								<h2
 									className="truncate text-lg font-semibold"
 									style={{ color: hexToRgba(palette.text, 0.92) }}
 								>
 									{title}
 								</h2>
-								{subtitle ? (
-									<p
-										className="mt-0.5 text-sm truncate"
-										style={{ color: hexToRgba(palette.text, 0.55) }}
-									>
-										{subtitle}
-									</p>
-								) : null}
 							</div>
+							{subtitle ? (
+								<p
+									className="mt-0.5 text-sm truncate"
+									style={{ color: hexToRgba(palette.text, 0.55) }}
+								>
+									{subtitle}
+								</p>
+							) : null}
+						</div>
+
+						<div className="flex items-center justify-start gap-2 sm:justify-end">
+							{actions ? actions : null}
 						</div>
 					</div>
-
-					{actions ? (
-						<div className="shrink-0 flex items-center gap-2">{actions}</div>
-					) : null}
-				</div>
-			</GlassPanel>
+				</GlassPanel>
+			) : null}
 
 			{/* Page body layout */}
 			<div
 				className={
-					hasRight ? "grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4" : ""
+					hasRight
+						? "grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4"
+						: ""
 				}
 			>
 				<div className="space-y-4">{children}</div>
@@ -143,12 +162,14 @@ export function FrameSection({
 	actions,
 	children,
 	tint: tintProp,
+	specular = true,
 }: {
 	title?: string;
 	subtitle?: string;
 	actions?: ReactNode;
 	children: ReactNode;
 	tint?: string;
+	specular?: boolean;
 }) {
 	const { palette } = useTheme();
 	const tint = tintProp ?? palette.primary;
@@ -157,7 +178,7 @@ export function FrameSection({
 			tint={tint}
 			intensity="medium"
 			bevel
-			specular
+			specular={specular}
 			hoverEffect={false}
 			className="rounded-2xl"
 			padded

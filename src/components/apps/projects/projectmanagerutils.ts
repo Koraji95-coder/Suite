@@ -1,9 +1,18 @@
+import type { CSSProperties } from "react";
+import { type ColorScheme, hexToRgba } from "@/lib/palette";
 import { PROJECT_CATEGORIES } from "./projectmanagertypes";
 
 export const categoryColor = (cat: string | null | undefined): string =>
-	PROJECT_CATEGORIES.find(
-		(c: (typeof PROJECT_CATEGORIES)[number]) => c.key === cat,
-	)?.color ?? "#a855f7";
+	PROJECT_CATEGORIES.find((c) => c.key === cat)?.color ?? "#a855f7";
+
+export const categoryBadgeStyle = (cat: string | null | undefined) => {
+	const color = categoryColor(cat);
+	return {
+		borderColor: color,
+		color,
+		backgroundColor: `${color}15`,
+	};
+};
 
 export const formatDateOnly = (isoOrDateLike: string): string => {
 	const [y, m, d] = isoOrDateLike.split("T")[0].split("-").map(Number);
@@ -22,17 +31,46 @@ export const formatDateMMDDYYYY = (isoOrDateLike: string): string => {
 export const toDateOnly = (datetimeLocal: string): string =>
 	datetimeLocal ? datetimeLocal.split("T")[0] : "";
 
-export const getPriorityColor = (priority: string): string => {
+export const getPriorityTint = (
+	palette: ColorScheme,
+	priority: string,
+): string => {
 	switch (priority) {
 		case "urgent":
-			return "border-red-500 bg-red-500/10 text-red-300";
+			return palette.accent;
 		case "high":
-			return "border-orange-500 bg-orange-500/10 text-orange-300";
+			return palette.primary;
 		case "medium":
-			return "border-yellow-500 bg-yellow-500/10 text-yellow-300";
+			return palette.tertiary;
 		default:
-			return "border-green-500 bg-green-500/10 text-green-300";
+			return palette.secondary;
 	}
+};
+
+export const getPriorityRowStyle = (
+	palette: ColorScheme,
+	priority: string,
+): CSSProperties => {
+	const tint = getPriorityTint(palette, priority);
+	return {
+		border: `1px solid ${hexToRgba(tint, 0.28)}`,
+		background: `linear-gradient(135deg, ${hexToRgba(tint, 0.12)} 0%, ${hexToRgba(
+			palette.surface,
+			0.45,
+		)} 100%)`,
+	};
+};
+
+export const getPriorityChipStyle = (
+	palette: ColorScheme,
+	priority: string,
+): CSSProperties => {
+	const tint = getPriorityTint(palette, priority);
+	return {
+		border: `1px solid ${hexToRgba(tint, 0.4)}`,
+		background: hexToRgba(tint, 0.16),
+		color: hexToRgba(palette.text, 0.85),
+	};
 };
 
 export const getUrgencyColor = (dueDate: string | null): string => {
@@ -65,10 +103,14 @@ export const getDeadlineStatus = (deadline: string | null) => {
 			color: "text-red-400",
 		};
 	if (diffDays === 0) return { text: "Due today", color: "text-red-400" };
-	if (diffDays === 1) return { text: "Due tomorrow", color: "text-orange-400" };
+	if (diffDays === 1)
+		return { text: "Due tomorrow", color: "text-orange-400" };
 	if (diffDays <= 7)
 		return { text: `${diffDays} days remaining`, color: "text-yellow-400" };
-	return { text: `${diffDays} days remaining`, color: "text-green-400" };
+	return {
+		text: `${diffDays} days remaining`,
+		color: "text-green-400",
+	};
 };
 
 export const getFileIcon = (mimeType: string): string => {

@@ -3,12 +3,12 @@
  * Listens for connection state changes and notifies user of issues
  */
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 import { useNotification } from "../auth/NotificationContext";
 import { coordinatesGrabberService } from "../components/apps/Ground-Grid-Generation/coordinatesGrabberService";
 
 export function useCoordinatesServiceStatus() {
-	const { error } = useNotifications();
+	const { error } = useNotification();
 
 	useEffect(() => {
 		// Subscribe to service-disconnected event

@@ -1,5 +1,7 @@
 import { Search } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useState } from "react";
+import { hexToRgba, useTheme } from "@/lib/palette";
 import { ProjectCard } from "./ProjectCard";
 import {
 	PROJECT_CATEGORIES,
@@ -7,6 +9,7 @@ import {
 	type StatusFilter,
 	TaskCount,
 } from "./projectmanagertypes";
+import { categoryBadgeStyle } from "./projectmanagerutils";
 
 interface ProjectListProps {
 	projects: Project[];
@@ -33,6 +36,7 @@ export function ProjectList({
 	searchQuery: externalSearch,
 	onSearchChange,
 }: ProjectListProps) {
+	const { palette } = useTheme();
 	const [internalSearch, setInternalSearch] = useState("");
 
 	const searchQuery =
@@ -72,34 +76,59 @@ export function ProjectList({
 
 	return (
 		<div className="space-y-3">
-			<h3 className="text-lg font-semibold text-white/80 mb-3">Projects</h3>
+			<h3
+				className="text-lg font-semibold mb-3"
+				style={{ color: hexToRgba(palette.text, 0.9) }}
+			>
+				Projects
+			</h3>
 			{onFilterChange && (
 				<div className="flex space-x-2 mb-3">
 					{(["active", "all", "on-hold", "archived"] as StatusFilter[]).map(
-						(s) => (
-							<button
-								key={s}
-								onClick={() => onFilterChange(s)}
-								className={`px-3 py-1 text-xs rounded-full transition-all ${
-									filter === s
-										? "bg-orange-600 text-white"
-										: "bg-black/40 text-white/60 hover:bg-orange-900/40"
-								}`}
-							>
-								{s.charAt(0).toUpperCase() + s.slice(1).replace("-", " ")}
-							</button>
-						),
+						(s) => {
+							const isActive = filter === s;
+							return (
+								<button
+									key={s}
+									onClick={() => onFilterChange(s)}
+									className="px-3 py-1 text-xs rounded-full transition-all"
+									style={{
+										background: isActive
+											? hexToRgba(palette.primary, 0.2)
+											: hexToRgba(palette.surface, 0.35),
+										border: `1px solid ${hexToRgba(
+											isActive ? palette.primary : palette.text,
+											isActive ? 0.45 : 0.08,
+										)}`,
+										color: hexToRgba(palette.text, isActive ? 0.9 : 0.6),
+									}}
+								>
+									{s.charAt(0).toUpperCase() + s.slice(1).replace("-", " ")}
+								</button>
+							);
+						},
 					)}
 				</div>
 			)}
 			<div className="relative mb-4">
-				<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-orange-400" />
+				<Search
+					className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+					style={{ color: hexToRgba(palette.primary, 0.8) }}
+				/>
 				<input
 					type="text"
 					value={searchQuery}
 					onChange={(e) => handleSearchChange(e.target.value)}
 					placeholder="Search projects..."
-					className="w-full pl-10 pr-4 py-2 bg-black/50 border border-orange-500/30 rounded-lg text-white/90 placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-orange-500"
+					className="w-full pl-10 pr-4 py-2 rounded-lg text-sm placeholder-white/30 focus:outline-none focus:ring-2"
+					style={
+						{
+							background: hexToRgba(palette.surface, 0.35),
+							border: `1px solid ${hexToRgba(palette.primary, 0.22)}`,
+							color: hexToRgba(palette.text, 0.9),
+							"--tw-ring-color": hexToRgba(palette.primary, 0.45),
+						} as CSSProperties
+					}
 				/>
 			</div>
 
@@ -112,15 +141,14 @@ export function ProjectList({
 						<div className="flex items-center space-x-2 mb-2 px-2 py-2">
 							<span
 								className="text-sm px-3 py-1 rounded border font-semibold"
-								style={{
-									borderColor: group.cat.color,
-									color: group.cat.color,
-									backgroundColor: `${group.cat.color}15`,
-								}}
+								style={categoryBadgeStyle(group.cat.key)}
 							>
 								{group.cat.key}
 							</span>
-							<span className="text-white/50 text-xs">
+							<span
+								className="text-xs"
+								style={{ color: hexToRgba(palette.text, 0.5) }}
+							>
 								({group.items.length}{" "}
 								{group.items.length === 1 ? "project" : "projects"})
 							</span>
@@ -147,14 +175,17 @@ export function ProjectList({
 							<span
 								className="text-sm px-3 py-1 rounded border font-semibold"
 								style={{
-									borderColor: "#a855f7",
-									color: "#a855f7",
-									backgroundColor: "#a855f715",
+									borderColor: palette.accent,
+									color: palette.accent,
+									backgroundColor: hexToRgba(palette.accent, 0.12),
 								}}
 							>
 								Uncategorized
 							</span>
-							<span className="text-white/50 text-xs">
+							<span
+								className="text-xs"
+								style={{ color: hexToRgba(palette.text, 0.5) }}
+							>
 								({uncategorizedProjects.length}{" "}
 								{uncategorizedProjects.length === 1 ? "project" : "projects"})
 							</span>
@@ -176,14 +207,20 @@ export function ProjectList({
 				)}
 
 				{filteredProjects.length === 0 && (
-					<div className="text-center py-12 text-orange-400/60">
+					<div
+						className="text-center py-12"
+						style={{ color: hexToRgba(palette.primary, 0.6) }}
+					>
 						<Search className="w-12 h-12 mx-auto mb-4 opacity-50" />
 						<p className="text-lg font-medium">
 							{searchQuery
 								? "No projects match your search"
 								: "No projects match your filters"}
 						</p>
-						<p className="text-sm mt-1">
+						<p
+							className="text-sm mt-1"
+							style={{ color: hexToRgba(palette.text, 0.5) }}
+						>
 							{searchQuery
 								? `No results for "${searchQuery}"`
 								: `Try changing the status filter or create a new project`}

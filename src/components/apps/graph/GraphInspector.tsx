@@ -2,7 +2,7 @@ import { Link, Trash2, X } from "lucide-react";
 import React from "react";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import type { GraphNode } from "./types";
-import { GROUP_COLORS } from "./types";
+import { getGroupColor } from "./types";
 
 interface GraphInspectorProps {
 	selectedNode: GraphNode | null;
@@ -20,7 +20,8 @@ export function GraphInspector({
 	if (!selectedNode) return null;
 
 	const isMemory = selectedNode.source === "memory";
-	const groupColor = GROUP_COLORS[selectedNode.group] ?? palette.primary;
+	const groupColor = getGroupColor(selectedNode.group, palette);
+	const destructiveColor = palette.accent;
 
 	const panelStyle: React.CSSProperties = {
 		width: 300,
@@ -192,9 +193,9 @@ export function GraphInspector({
 						gap: 6,
 						padding: "8px 0",
 						borderRadius: 6,
-						border: `1px solid ${hexToRgba("#ef4444", 0.3)}`,
-						background: hexToRgba("#ef4444", 0.1),
-						color: "#ef4444",
+						border: `1px solid ${hexToRgba(destructiveColor, 0.32)}`,
+						background: hexToRgba(destructiveColor, 0.14),
+						color: destructiveColor,
 						cursor: "pointer",
 						fontSize: 13,
 						fontWeight: 500,

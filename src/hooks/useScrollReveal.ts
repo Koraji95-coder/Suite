@@ -1,7 +1,7 @@
 import { RefObject, useEffect, useRef, useState } from "react";
 
 export function useScrollReveal(
-	sectionRef: RefObject<HTMLElement | null>,
+	_sectionRef: RefObject<HTMLElement | null>,
 	threshold = 0.15,
 ) {
 	const ref = useRef<HTMLDivElement>(null);

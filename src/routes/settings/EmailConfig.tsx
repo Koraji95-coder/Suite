@@ -78,7 +78,9 @@ function sanitizeConfig(value: unknown): EmailConfigState {
 	const safe: EmailConfigState = {
 		smtp: {
 			host: getString(smtp.host, DEFAULT_CONFIG.smtp.host),
-			port: getNumber(smtp.port, DEFAULT_CONFIG.smtp.port) || DEFAULT_CONFIG.smtp.port,
+			port:
+				getNumber(smtp.port, DEFAULT_CONFIG.smtp.port) ||
+				DEFAULT_CONFIG.smtp.port,
 			secure: getBoolean(smtp.secure, DEFAULT_CONFIG.smtp.secure),
 			auth: {
 				user: getString(smtpAuth.user, DEFAULT_CONFIG.smtp.auth.user),
@@ -89,15 +91,27 @@ function sanitizeConfig(value: unknown): EmailConfigState {
 			return {
 				from: getString(d.from, DEFAULT_CONFIG.defaults.from),
 				replyTo: getString(d.replyTo, DEFAULT_CONFIG.defaults.replyTo),
-				subject_prefix: getString(d.subject_prefix, DEFAULT_CONFIG.defaults.subject_prefix),
+				subject_prefix: getString(
+					d.subject_prefix,
+					DEFAULT_CONFIG.defaults.subject_prefix,
+				),
 			};
 		})(),
 		notifications: (() => {
 			const n = isRecord(root.notifications) ? root.notifications : {};
 			return {
-				project_updates: getBoolean(n.project_updates, DEFAULT_CONFIG.notifications.project_updates),
-				task_reminders: getBoolean(n.task_reminders, DEFAULT_CONFIG.notifications.task_reminders),
-				calendar_alerts: getBoolean(n.calendar_alerts, DEFAULT_CONFIG.notifications.calendar_alerts),
+				project_updates: getBoolean(
+					n.project_updates,
+					DEFAULT_CONFIG.notifications.project_updates,
+				),
+				task_reminders: getBoolean(
+					n.task_reminders,
+					DEFAULT_CONFIG.notifications.task_reminders,
+				),
+				calendar_alerts: getBoolean(
+					n.calendar_alerts,
+					DEFAULT_CONFIG.notifications.calendar_alerts,
+				),
 			};
 		})(),
 		templates: (() => {
@@ -177,34 +191,55 @@ export default function EmailConfig() {
 					<FileCode size={16} />
 					<div>
 						<div className="settings-card-title">Email configuration</div>
-						<div className="settings-card-sub">Form edits basics; YAML edits templates too.</div>
+						<div className="settings-card-sub">
+							Form edits basics; YAML edits templates too.
+						</div>
 					</div>
 				</div>
 
 				<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-					<button type="button" className="btn-hero-secondary" onClick={() => setViewMode("form")}>
+					<button
+						type="button"
+						className="btn-hero-secondary"
+						onClick={() => setViewMode("form")}
+					>
 						Form
 					</button>
-					<button type="button" className="btn-hero-secondary" onClick={() => setViewMode("yaml")}>
+					<button
+						type="button"
+						className="btn-hero-secondary"
+						onClick={() => setViewMode("yaml")}
+					>
 						YAML
 					</button>
 				</div>
 
 				{viewMode === "form" ? (
-					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+					<div
+						style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+					>
 						<div>
-							<label className="auth-label" htmlFor="smtp-host">SMTP Host</label>
+							<label className="auth-label" htmlFor="smtp-host">
+								SMTP Host
+							</label>
 							<input
 								id="smtp-host"
 								className="auth-input"
 								value={config.smtp.host}
-								onChange={(e) => setConfig((c) => ({ ...c, smtp: { ...c.smtp, host: e.target.value } }))}
+								onChange={(e) =>
+									setConfig((c) => ({
+										...c,
+										smtp: { ...c.smtp, host: e.target.value },
+									}))
+								}
 								placeholder="smtp.example.com"
 							/>
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="smtp-port">SMTP Port</label>
+							<label className="auth-label" htmlFor="smtp-port">
+								SMTP Port
+							</label>
 							<input
 								id="smtp-port"
 								className="auth-input"
@@ -220,7 +255,9 @@ export default function EmailConfig() {
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="smtp-user">SMTP Username</label>
+							<label className="auth-label" htmlFor="smtp-user">
+								SMTP Username
+							</label>
 							<input
 								id="smtp-user"
 								className="auth-input"
@@ -236,7 +273,9 @@ export default function EmailConfig() {
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="smtp-secure">SMTP Secure</label>
+							<label className="auth-label" htmlFor="smtp-secure">
+								SMTP Secure
+							</label>
 							<select
 								id="smtp-secure"
 								className="auth-input"
@@ -254,31 +293,45 @@ export default function EmailConfig() {
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="from">From</label>
+							<label className="auth-label" htmlFor="from">
+								From
+							</label>
 							<input
 								id="from"
 								className="auth-input"
 								value={config.defaults.from}
-								onChange={(e) => setConfig((c) => ({ ...c, defaults: { ...c.defaults, from: e.target.value } }))}
+								onChange={(e) =>
+									setConfig((c) => ({
+										...c,
+										defaults: { ...c.defaults, from: e.target.value },
+									}))
+								}
 								placeholder="noreply@blockflow.com"
 							/>
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="replyto">Reply-To</label>
+							<label className="auth-label" htmlFor="replyto">
+								Reply-To
+							</label>
 							<input
 								id="replyto"
 								className="auth-input"
 								value={config.defaults.replyTo}
 								onChange={(e) =>
-									setConfig((c) => ({ ...c, defaults: { ...c.defaults, replyTo: e.target.value } }))
+									setConfig((c) => ({
+										...c,
+										defaults: { ...c.defaults, replyTo: e.target.value },
+									}))
 								}
 								placeholder="support@blockflow.com"
 							/>
 						</div>
 
 						<div style={{ gridColumn: "1 / -1" }}>
-							<label className="auth-label" htmlFor="subj">Subject Prefix</label>
+							<label className="auth-label" htmlFor="subj">
+								Subject Prefix
+							</label>
 							<input
 								id="subj"
 								className="auth-input"
@@ -303,7 +356,8 @@ export default function EmailConfig() {
 						onChange={(e) => setYamlText(e.target.value)}
 						style={{
 							minHeight: 340,
-							fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+							fontFamily:
+								"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 							lineHeight: 1.6,
 						}}
 					/>

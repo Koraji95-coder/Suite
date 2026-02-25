@@ -47,5 +47,5 @@ export const PROJECT_CATEGORIES = [
 
 export const getCategoryColor = (category: string | null): string => {
 	const cat = PROJECT_CATEGORIES.find((c) => c.key === category);
-	return cat ? cat.color : "#a855f7"; // default purple
+	return cat ? cat.color : "#f8c67e";
 };

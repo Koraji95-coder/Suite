@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 interface DialogProps {
@@ -9,16 +10,19 @@ interface DialogProps {
 
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
 	if (!open) return null;
-	return (
-		<div className="fixed inset-0 z-50">
+	if (typeof document === "undefined") return null;
+
+	return createPortal(
+		<div className="fixed inset-0 z-[120]">
 			<div
-				className="fixed inset-0 bg-black/80"
+				className="fixed inset-0 bg-black/72"
 				onClick={() => onOpenChange?.(false)}
 			/>
-			<div className="fixed inset-0 flex items-center justify-center p-4">
+			<div className="fixed inset-0 flex items-end justify-center overflow-y-auto p-2 sm:items-center sm:p-4">
 				{children}
 			</div>
-		</div>
+		</div>,
+		document.body,
 	);
 }
 
@@ -30,7 +34,8 @@ export function DialogContent({
 	return (
 		<div
 			className={cn(
-				"relative z-50 w-full max-w-lg rounded-lg border border-border bg-background p-6 shadow-lg",
+				"relative z-50 w-full max-w-lg rounded-xl border border-border bg-background p-4 shadow-lg sm:p-6",
+				"my-2 max-h-[calc(100dvh-1rem)] overflow-y-auto sm:my-6 sm:max-h-[min(88dvh,760px)]",
 				className,
 			)}
 			{...props}

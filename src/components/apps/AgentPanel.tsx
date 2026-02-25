@@ -3,7 +3,7 @@
  * Demonstrates real-world agent automation for Suite
  */
 import { useState } from "react";
-import { AgentResponse, agentService } from "../services/agentService";
+import { AgentResponse, agentService } from "../../services/agentService";
 
 export function AgentPanel() {
 	const [isPaired, setIsPaired] = useState(agentService.checkPairing());

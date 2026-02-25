@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { coordinatesGrabberService } from "@/Ground-Grid-Generation/coordinatesGrabberService";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { type LogEntry, useGroundGrid } from "./GroundGridContext";
 
@@ -29,13 +30,61 @@ function getMessageColor(
 export function UnifiedLog() {
 	const { palette } = useTheme();
 	const { logs, clearLogs } = useGroundGrid();
+	const [wsLive, setWsLive] = useState(coordinatesGrabberService.isConnected());
+	const [wsLastUpdate, setWsLastUpdate] = useState<number | null>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		coordinatesGrabberService.connectWebSocket().catch(() => {
+			setWsLive(false);
+		});
+
+		const unsubscribeConnected = coordinatesGrabberService.on(
+			"connected",
+			(event) => {
+				if (event.type !== "connected") return;
+				setWsLive(true);
+				setWsLastUpdate(Date.now());
+			},
+		);
+
+		const unsubscribeStatus = coordinatesGrabberService.on(
+			"status",
+			(event) => {
+				if (event.type !== "status") return;
+				setWsLive(true);
+				setWsLastUpdate(Date.now());
+			},
+		);
+
+		const unsubscribeDisconnected = coordinatesGrabberService.on(
+			"service-disconnected",
+			() => {
+				setWsLive(false);
+			},
+		);
+
+		const unsubscribeError = coordinatesGrabberService.on("error", () => {
+			setWsLive(false);
+		});
+
+		return () => {
+			unsubscribeConnected();
+			unsubscribeStatus();
+			unsubscribeDisconnected();
+			unsubscribeError();
+		};
+	}, []);
 
 	useEffect(() => {
 		if (scrollRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
 		}
-	}, [logs.length]);
+	}, []);
+
+	const wsLiveStamp = wsLastUpdate
+		? new Date(wsLastUpdate).toLocaleTimeString()
+		: "--";
 
 	return (
 		<div
@@ -54,18 +103,50 @@ export function UnifiedLog() {
 					alignItems: "center",
 				}}
 			>
-				<div style={{ fontSize: 13, fontWeight: 600, color: palette.text }}>
-					Unified Log
-					<span
+				<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+					<div style={{ fontSize: 13, fontWeight: 600, color: palette.text }}>
+						Unified Log
+						<span
+							style={{
+								fontSize: 11,
+								fontWeight: 400,
+								color: palette.textMuted,
+								marginLeft: 8,
+							}}
+						>
+							{logs.length} entries
+						</span>
+					</div>
+					<div
 						style={{
-							fontSize: 11,
-							fontWeight: 400,
-							color: palette.textMuted,
-							marginLeft: 8,
+							display: "flex",
+							alignItems: "center",
+							gap: 6,
+							padding: "3px 8px",
+							borderRadius: 999,
+							fontSize: 10,
+							fontWeight: 600,
+							background: wsLive
+								? hexToRgba("#22c55e", 0.1)
+								: hexToRgba("#f59e0b", 0.08),
+							border: `1px solid ${
+								wsLive ? hexToRgba("#22c55e", 0.3) : hexToRgba("#f59e0b", 0.2)
+							}`,
 						}}
+						title={`Last WebSocket update: ${wsLiveStamp}`}
 					>
-						{logs.length} entries
-					</span>
+						<span
+							style={{
+								width: 6,
+								height: 6,
+								borderRadius: "50%",
+								background: wsLive ? "#22c55e" : "#f59e0b",
+							}}
+						/>
+						<span style={{ color: wsLive ? "#22c55e" : "#f59e0b" }}>
+							{wsLive ? "WS Live" : "WS Offline"}
+						</span>
+					</div>
 				</div>
 				<button
 					onClick={clearLogs}

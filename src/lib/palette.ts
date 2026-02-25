@@ -12,6 +12,7 @@ import React, {
 	createContext,
 	useCallback,
 	useContext,
+	useEffect,
 	useMemo,
 	useState,
 } from "react";
@@ -36,6 +37,62 @@ export interface ColorScheme {
 // --- 11 Built-in Schemes ---
 
 export const COLOR_SCHEMES: Record<string, ColorScheme> = {
+	blockflow: {
+		name: "BlockFlow",
+		description: "Default BlockFlow glass theme",
+		background: "#090b12",
+		surface: "#141826",
+		surfaceLight: "#1d2435",
+		primary: "#f8c67e",
+		secondary: "#d4d8e8",
+		tertiary: "#7ee8f8",
+		accent: "#f87e9e",
+		text: "#f5f8ff",
+		textMuted: "#94a3b8",
+		glow: "rgba(248, 198, 126, 0.20)",
+	},
+	ember: {
+		name: "Ember",
+		description: "Warm amber focus with darker surfaces",
+		background: "#0c0a08",
+		surface: "#1b1410",
+		surfaceLight: "#2a2018",
+		primary: "#eab308",
+		secondary: "#f8c67e",
+		tertiary: "#fb7185",
+		accent: "#f59e0b",
+		text: "#fef9e7",
+		textMuted: "#c4b8a2",
+		glow: "rgba(234, 179, 8, 0.22)",
+	},
+	noir: {
+		name: "Noir",
+		description: "Neutral high-contrast minimal palette",
+		background: "#070a11",
+		surface: "#0f1624",
+		surfaceLight: "#192233",
+		primary: "#e2e8f0",
+		secondary: "#94a3b8",
+		tertiary: "#22d3ee",
+		accent: "#f8fafc",
+		text: "#f8fafc",
+		textMuted: "#94a3b8",
+		glow: "rgba(226, 232, 240, 0.18)",
+	},
+	aurora: {
+		name: "Aurora",
+		description: "Cool neon accents with soft borders",
+		background: "#07101a",
+		surface: "#0f1b2d",
+		surfaceLight: "#1a2a40",
+		primary: "#7ee8f8",
+		secondary: "#2dd4bf",
+		tertiary: "#fb7185",
+		accent: "#f8c67e",
+		text: "#ecfeff",
+		textMuted: "#99b9c8",
+		glow: "rgba(126, 232, 248, 0.20)",
+	},
 	graphiteCyan: {
 		name: "Graphite Cyan",
 		description:
@@ -195,7 +252,7 @@ export const COLOR_SCHEMES: Record<string, ColorScheme> = {
 	},
 };
 
-export const DEFAULT_SCHEME_KEY = "copperCircuit";
+export const DEFAULT_SCHEME_KEY = "blockflow";
 
 // --- Helpers (pure functions) ---
 
@@ -204,6 +261,27 @@ export function hexToRgba(hex: string, alpha: number): string {
 	const g = parseInt(hex.slice(3, 5), 16);
 	const b = parseInt(hex.slice(5, 7), 16);
 	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+export function getContrastText(
+	hex: string,
+	light = "#f8fbff",
+	dark = "#0b1020",
+): string {
+	const normalized = hex.replace("#", "");
+	if (normalized.length !== 6) return light;
+
+	const r = parseInt(normalized.slice(0, 2), 16) / 255;
+	const g = parseInt(normalized.slice(2, 4), 16) / 255;
+	const b = parseInt(normalized.slice(4, 6), 16) / 255;
+
+	const toLinear = (value: number) =>
+		value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+
+	const luminance =
+		0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+
+	return luminance > 0.6 ? dark : light;
 }
 
 export function glassCardStyle(
@@ -264,6 +342,27 @@ export function useTheme() {
 }
 
 const STORAGE_KEY = "app-theme-scheme";
+const LEGACY_BLOCKFLOW_STORAGE_KEY = "blockflow-theme";
+
+const CSS_THEME_BY_SCHEME: Record<string, string> = {
+	blockflow: "v5",
+	ember: "ember",
+	noir: "noir",
+	aurora: "aurora",
+};
+
+const LEGACY_SCHEME_BY_BLOCKFLOW_THEME: Record<string, string> = {
+	v5: "blockflow",
+	ember: "ember",
+	noir: "noir",
+	aurora: "aurora",
+};
+
+function normalizeSchemeKey(raw: string | null | undefined): string | null {
+	if (!raw) return null;
+	if (COLOR_SCHEMES[raw]) return raw;
+	return LEGACY_SCHEME_BY_BLOCKFLOW_THEME[raw] ?? null;
+}
 
 interface ThemeProviderProps {
 	children: React.ReactNode;
@@ -273,12 +372,17 @@ interface ThemeProviderProps {
 export function ThemeProvider({ children, defaultScheme }: ThemeProviderProps) {
 	const [schemeKey, setSchemeKey] = useState<string>(() => {
 		try {
-			const stored = localStorage.getItem(STORAGE_KEY);
-			if (stored && COLOR_SCHEMES[stored]) return stored;
+			const stored = normalizeSchemeKey(localStorage.getItem(STORAGE_KEY));
+			if (stored) return stored;
+
+			const legacyStored = normalizeSchemeKey(
+				localStorage.getItem(LEGACY_BLOCKFLOW_STORAGE_KEY),
+			);
+			if (legacyStored) return legacyStored;
 		} catch {
 			/* noop */
 		}
-		return defaultScheme || DEFAULT_SCHEME_KEY;
+		return normalizeSchemeKey(defaultScheme) || DEFAULT_SCHEME_KEY;
 	});
 
 	const setScheme = useCallback((key: string) => {
@@ -292,6 +396,40 @@ export function ThemeProvider({ children, defaultScheme }: ThemeProviderProps) {
 	}, []);
 
 	const schemeKeys = useMemo(() => Object.keys(COLOR_SCHEMES), []);
+
+	useEffect(() => {
+		const cssTheme = CSS_THEME_BY_SCHEME[schemeKey] ?? "v5";
+		document.documentElement.dataset.theme = cssTheme;
+		const palette = COLOR_SCHEMES[schemeKey];
+		document.documentElement.style.setProperty("--app-text", palette.text);
+		document.documentElement.style.setProperty(
+			"--app-text-muted",
+			palette.textMuted,
+		);
+		document.documentElement.style.setProperty(
+			"--app-text-faint",
+			hexToRgba(palette.text, 0.3),
+		);
+		document.documentElement.style.setProperty("--white", palette.text);
+		document.documentElement.style.setProperty("--white-dim", palette.textMuted);
+		document.documentElement.style.setProperty(
+			"--white-faint",
+			hexToRgba(palette.text, 0.18),
+		);
+		document.documentElement.style.setProperty("--app-primary", palette.primary);
+		document.documentElement.style.setProperty("--app-surface", palette.surface);
+		document.documentElement.style.setProperty(
+			"--app-surface-light",
+			palette.surfaceLight,
+		);
+
+		try {
+			localStorage.setItem(STORAGE_KEY, schemeKey);
+			localStorage.setItem(LEGACY_BLOCKFLOW_STORAGE_KEY, cssTheme);
+		} catch {
+			/* noop */
+		}
+	}, [schemeKey]);
 
 	const value = useMemo<ThemeContextValue>(
 		() => ({

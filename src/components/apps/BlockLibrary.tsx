@@ -13,9 +13,9 @@ import {
 	Trash2,
 	Upload,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import type { Database } from "../../types/database";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
+import type { Database } from "../../types/database";
 
 type BlockFile = Database["public"]["Tables"]["block_library"]["Row"];
 
@@ -39,11 +39,7 @@ export function BlockLibrary() {
 		new Set(["electrical"]),
 	);
 
-	useEffect(() => {
-		loadBlocks();
-	}, []);
-
-	const loadBlocks = async () => {
+	const loadBlocks = useCallback(async () => {
 		setLoading(true);
 		const { data, error } = await supabase
 			.from("block_library")
@@ -54,7 +50,11 @@ export function BlockLibrary() {
 			setBlocks(data);
 		}
 		setLoading(false);
-	};
+	}, []);
+
+	useEffect(() => {
+		loadBlocks();
+	}, [loadBlocks]);
 
 	const handleFileUpload = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -410,7 +410,7 @@ export function BlockLibrary() {
 
 			{showUploadModal && (
 				<div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-					<div className="bg-[#0a0a0a] backdrop-blur-xl border border-orange-500/30 rounded-lg p-6 max-w-md w-full">
+					<div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg-heavy)] p-6 backdrop-blur-xl">
 						<h3 className="text-2xl font-bold text-white/80 mb-4">
 							Upload Block
 						</h3>
@@ -516,8 +516,8 @@ export function BlockLibrary() {
 
 			{selectedBlock && (
 				<div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-					<div className="bg-[#0a0a0a] backdrop-blur-xl border border-orange-500/30 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
-						<div className="flex items-center justify-between p-6 border-b border-orange-500/30 sticky top-0 bg-gray-900/95 backdrop-blur-sm z-10">
+					<div className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-lg border border-[var(--border)] bg-[var(--bg-heavy)] backdrop-blur-xl">
+						<div className="sticky top-0 z-10 flex items-center justify-between border-b border-orange-500/30 bg-[var(--bg)]/95 p-6 backdrop-blur-sm">
 							<div>
 								<h3 className="text-2xl font-bold text-white/80">
 									{selectedBlock.name}

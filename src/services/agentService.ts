@@ -46,11 +46,17 @@ export type PythonToolRequest = Record<string, unknown> & {
 
 class AgentService {
 	private baseUrl: string;
+	private gatewayUrl: string;
 
 	constructor() {
-		// Default to localhost for development
-		// Override with environment variable for production
-		this.baseUrl = import.meta.env.VITE_AGENT_URL || "http://localhost:8080";
+		// VITE_AGENT_URL → legacy alias, kept for backward compat
+		// VITE_AGENT_GATEWAY_URL → canonical ZeroClaw gateway endpoint
+		this.gatewayUrl =
+			import.meta.env.VITE_AGENT_GATEWAY_URL ||
+			import.meta.env.VITE_AGENT_URL ||
+			"http://127.0.0.1:3000";
+		// Strip trailing slash for consistency
+		this.baseUrl = this.gatewayUrl.replace(/\/+$/, "");
 	}
 
 	/**
@@ -61,21 +67,24 @@ class AgentService {
 		try {
 			logger.info("Attempting to pair with agent", "AgentService");
 
+			// ZeroClaw gateway expects the 6-digit pairing code in the
+			// X-Pairing-Code header (NOT in a JSON body).
+			// See: suite-agent/crates/gateway/src/handlers.rs → handle_pair
 			const response = await fetch(`${this.baseUrl}/pair`, {
 				method: "POST",
 				headers: {
-					"Content-Type": "application/json",
+					"X-Pairing-Code": pairingCode.trim(),
 				},
-				body: JSON.stringify({ code: pairingCode }),
 			});
 
 			if (!response.ok) {
+				const body = await response.text().catch(() => "");
 				logger.error(
-					"Pairing failed",
+					`Pairing failed: ${response.status} ${body}`,
 					"AgentService",
 					new Error(response.statusText),
 				);
-				throw new Error("Pairing failed");
+				throw new Error(`Pairing failed: ${response.statusText}`);
 			}
 
 			const data = await response.json();
@@ -299,16 +308,29 @@ class AgentService {
 		try {
 			logger.debug(`Making agent request: ${task.task}`, "AgentService");
 
+			// ZeroClaw gateway: POST /webhook
+			// Required: Authorization: Bearer <token>
+			// Optional: X-Webhook-Secret (if configured on agent side)
+			const headers: Record<string, string> = {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${token}`,
+			};
+
+			const webhookSecret = import.meta.env.VITE_AGENT_WEBHOOK_SECRET;
+			if (webhookSecret) {
+				headers["X-Webhook-Secret"] = webhookSecret;
+			}
+
+			const timeout =
+				task.timeout ?? (Number(import.meta.env.VITE_AGENT_TIMEOUT) || 30_000);
+
 			const response = await fetch(`${this.baseUrl}/webhook`, {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`,
-				},
+				headers,
 				body: JSON.stringify({
 					message: JSON.stringify(task),
 				}),
-				signal: task.timeout ? AbortSignal.timeout(task.timeout) : undefined,
+				signal: AbortSignal.timeout(timeout),
 			});
 
 			if (!response.ok) {

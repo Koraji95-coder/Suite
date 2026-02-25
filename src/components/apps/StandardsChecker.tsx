@@ -103,6 +103,11 @@ const categories = ["NEC", "IEEE", "IEC"] as const;
 
 export function StandardsChecker() {
 	const { palette } = useTheme();
+	const statusTone = {
+		pass: palette.secondary,
+		fail: palette.accent,
+		warning: palette.tertiary,
+	} as const;
 	const [activeCategory, setActiveCategory] = useState<string>("NEC");
 	const [selectedStandards, setSelectedStandards] = useState<Set<string>>(
 		new Set(),
@@ -158,15 +163,16 @@ export function StandardsChecker() {
 		results.find((r) => r.standardId === id);
 
 	const statusIcon = (status: "pass" | "fail" | "warning") => {
-		if (status === "pass") return <CheckCircle size={16} color="#22c55e" />;
-		if (status === "fail") return <XCircle size={16} color="#ef4444" />;
-		return <AlertTriangle size={16} color="#eab308" />;
+		if (status === "pass")
+			return <CheckCircle size={16} color={statusTone.pass} />;
+		if (status === "fail") return <XCircle size={16} color={statusTone.fail} />;
+		return <AlertTriangle size={16} color={statusTone.warning} />;
 	};
 
 	const statusColor = (status: "pass" | "fail" | "warning") => {
-		if (status === "pass") return "#22c55e";
-		if (status === "fail") return "#ef4444";
-		return "#eab308";
+		if (status === "pass") return statusTone.pass;
+		if (status === "fail") return statusTone.fail;
+		return statusTone.warning;
 	};
 
 	return (
@@ -489,19 +495,19 @@ export function StandardsChecker() {
 					</div>
 					<div style={{ display: "flex", gap: 16 }}>
 						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-							<CheckCircle size={14} color="#22c55e" />
+							<CheckCircle size={14} color={statusTone.pass} />
 							<span style={{ fontSize: 13, color: palette.textMuted }}>
 								Pass: {results.filter((r) => r.status === "pass").length}
 							</span>
 						</div>
 						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-							<AlertTriangle size={14} color="#eab308" />
+							<AlertTriangle size={14} color={statusTone.warning} />
 							<span style={{ fontSize: 13, color: palette.textMuted }}>
 								Warning: {results.filter((r) => r.status === "warning").length}
 							</span>
 						</div>
 						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-							<XCircle size={14} color="#ef4444" />
+							<XCircle size={14} color={statusTone.fail} />
 							<span style={{ fontSize: 13, color: palette.textMuted }}>
 								Fail: {results.filter((r) => r.status === "fail").length}
 							</span>

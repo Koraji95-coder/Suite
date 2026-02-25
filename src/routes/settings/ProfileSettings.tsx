@@ -35,7 +35,9 @@ export default function ProfileSettings() {
 		};
 
 		try {
-			const { error: upsertError } = await supabase.from("profiles").upsert(payload);
+			const { error: upsertError } = await supabase
+				.from("profiles")
+				.upsert(payload);
 			if (upsertError) throw upsertError;
 
 			setSaved(true);
@@ -59,13 +61,19 @@ export default function ProfileSettings() {
 					<User size={16} />
 					<div>
 						<div className="settings-card-title">Profile information</div>
-						<div className="settings-card-sub">Update your display name and email.</div>
+						<div className="settings-card-sub">
+							Update your display name and email.
+						</div>
 					</div>
 				</div>
 
-				<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+				<div
+					style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+				>
 					<div>
-						<label className="auth-label" htmlFor="displayName">Display Name</label>
+						<label className="auth-label" htmlFor="displayName">
+							Display Name
+						</label>
 						<input
 							id="displayName"
 							className="auth-input"
@@ -76,7 +84,9 @@ export default function ProfileSettings() {
 					</div>
 
 					<div>
-						<label className="auth-label" htmlFor="email">Email</label>
+						<label className="auth-label" htmlFor="email">
+							Email
+						</label>
 						<input
 							id="email"
 							className="auth-input"
@@ -90,7 +100,12 @@ export default function ProfileSettings() {
 
 				{error ? <div className="auth-error">{error}</div> : null}
 
-				<button type="button" className="btn-hero-primary" disabled={!canSave} onClick={() => void handleSave()}>
+				<button
+					type="button"
+					className="btn-hero-primary"
+					disabled={!canSave}
+					onClick={() => void handleSave()}
+				>
 					<Save size={14} />
 					{saving ? "Saving…" : saved ? "Saved" : "Save profile"}
 				</button>

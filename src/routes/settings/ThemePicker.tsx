@@ -1,10 +1,10 @@
 // src/routes/app/settings/ThemePicker.tsx
 import { Check } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
-type ThemeKey = "v5" | "ember" | "noir" | "aurora";
+import { useTheme } from "../../lib/palette";
 
-const STORAGE_KEY = "blockflow-theme";
+type ThemeKey = "blockflow" | "ember" | "noir" | "aurora";
 
 const THEMES: Array<{
 	key: ThemeKey;
@@ -13,7 +13,7 @@ const THEMES: Array<{
 	swatches: string[];
 }> = [
 	{
-		key: "v5",
+		key: "blockflow",
 		name: "Blockflow V5",
 		description: "Default glass + gold accent.",
 		swatches: ["#e8c97e", "#ffffff", "#7ee8f8", "#f87e9e"],
@@ -38,22 +38,11 @@ const THEMES: Array<{
 	},
 ];
 
-function getInitialTheme(): ThemeKey {
-	const stored = localStorage.getItem(STORAGE_KEY) as ThemeKey | null;
-	return stored && THEMES.some((t) => t.key === stored) ? stored : "v5";
-}
-
-function applyTheme(key: ThemeKey) {
-	document.documentElement.dataset.theme = key;
-	localStorage.setItem(STORAGE_KEY, key);
-}
-
 export default function ThemePicker() {
-	const [active, setActive] = useState<ThemeKey>(() => getInitialTheme());
-
-	useEffect(() => {
-		applyTheme(active);
-	}, [active]);
+	const { schemeKey, setScheme } = useTheme();
+	const active = (
+		THEMES.some((theme) => theme.key === schemeKey) ? schemeKey : "blockflow"
+	) as ThemeKey;
 
 	const items = useMemo(() => THEMES, []);
 
@@ -61,7 +50,9 @@ export default function ThemePicker() {
 		<div className="settings-panel">
 			<h3 className="settings-h3">
 				Theme
-				<span className="settings-h3-sub">Switches CSS variables only (safe, non-conflicting).</span>
+				<span className="settings-h3-sub">
+					Controls app theme state and BlockFlow CSS variables.
+				</span>
 			</h3>
 
 			<div className="theme-grid">
@@ -72,7 +63,7 @@ export default function ThemePicker() {
 							key={t.key}
 							type="button"
 							className={`theme-card glass ${isActive ? "active" : ""}`}
-							onClick={() => setActive(t.key)}
+							onClick={() => setScheme(t.key)}
 						>
 							<div className="theme-card-top">
 								<div className="theme-name">
@@ -89,7 +80,11 @@ export default function ThemePicker() {
 
 							<div className="theme-swatches" aria-hidden="true">
 								{t.swatches.map((c) => (
-									<span key={c} className="theme-swatch" style={{ background: c }} />
+									<span
+										key={c}
+										className="theme-swatch"
+										style={{ background: c }}
+									/>
 								))}
 							</div>
 						</button>

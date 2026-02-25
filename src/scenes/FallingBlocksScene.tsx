@@ -2,13 +2,7 @@
 import { Environment, RoundedBox } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import type {
-	Fog,
-	GridHelper,
-	Group,
-	LineBasicMaterial,
-	MeshPhysicalMaterial,
-} from "three";
+import type { Fog, Group, MeshPhysicalMaterial } from "three";
 import { useScrollContext } from "../context/ScrollContext";
 
 const COLORS = [
@@ -70,26 +64,6 @@ function AmbientCameraRig({
 	});
 
 	return null;
-}
-
-function GridPlane() {
-	const gridRef = useRef<GridHelper>(null);
-
-	useFrame(() => {
-		if (gridRef.current) {
-			(gridRef.current.material as LineBasicMaterial).opacity = 0.04;
-		}
-	});
-
-	return (
-		<gridHelper
-			ref={gridRef}
-			args={[80, 40, "#818cf8", "#1c1b24"]}
-			position={[0, -15, 0]}
-		>
-			<meshBasicMaterial transparent opacity={0.04} depthWrite={false} />
-		</gridHelper>
-	);
 }
 
 function ScrollFog({
@@ -158,7 +132,7 @@ function DriftingBlock({
 					: 0.15;
 		}
 
-		if (pos.current[1] < -18) onExpired(block.id);
+		if (pos.current[1] < -16) onExpired(block.id);
 	});
 
 	const materialProps = useMemo(
@@ -230,24 +204,24 @@ function FallingBlocks({
 	const lastBurst = useRef(0);
 	const burstQueue = useRef(0);
 
-	const spawnInterval = isMobile ? 0.9 : 0.7;
-	const maxBlocks = isMobile ? 25 : 60;
+	const spawnInterval = isMobile ? 0.85 : 0.6;
+	const maxBlocks = isMobile ? 22 : 46;
 
 	const spawnBlock = useCallback((): BlockDesc => {
 		return {
 			id: nextId.current++,
 			color: COLORS[Math.floor(Math.random() * COLORS.length)],
 			shape: SHAPES[Math.floor(Math.random() * SHAPES.length)],
-			scale: 0.2 + Math.random() * 0.7,
+			scale: 0.26 + Math.random() * 0.45,
 			position: [
-				(Math.random() - 0.5) * 50,
-				18 + Math.random() * 25,
-				(Math.random() - 0.5) * 40,
+				(Math.random() - 0.5) * 34,
+				16 + Math.random() * 20,
+				(Math.random() - 0.5) * 24,
 			],
 			velocity: [
-				(Math.random() - 0.5) * 0.8,
-				-(0.6 + Math.random() * 1.2),
-				(Math.random() - 0.5) * 0.4,
+				(Math.random() - 0.5) * 0.2,
+				-(0.95 + Math.random() * 0.65),
+				(Math.random() - 0.5) * 0.14,
 			],
 			rotation: [
 				Math.random() * Math.PI * 2,
@@ -255,9 +229,9 @@ function FallingBlocks({
 				Math.random() * Math.PI * 2,
 			],
 			rotSpeed: [
-				(Math.random() - 0.5) * 0.4,
-				(Math.random() - 0.5) * 0.4,
-				(Math.random() - 0.5) * 0.4,
+				(Math.random() - 0.5) * 0.18,
+				(Math.random() - 0.5) * 0.22,
+				(Math.random() - 0.5) * 0.18,
 			],
 			glintTime: Math.random() * 10,
 		};
@@ -272,10 +246,10 @@ function FallingBlocks({
 
 		if ((burstTrigger.current ?? 0) > lastBurst.current) {
 			lastBurst.current = burstTrigger.current ?? 0;
-			burstQueue.current = isMobile ? 2 : 4;
+			burstQueue.current = isMobile ? 1 : 2;
 		}
 
-		const interval = burstQueue.current > 0 ? 0.1 : spawnInterval;
+		const interval = burstQueue.current > 0 ? 0.2 : spawnInterval;
 		if (spawnTimer.current > interval) {
 			spawnTimer.current = 0;
 			if (burstQueue.current > 0) burstQueue.current--;
@@ -332,7 +306,6 @@ export default function FallingBlocksScene({
 
 			<Environment preset="city" environmentIntensity={isMobile ? 0.25 : 0.4} />
 
-			<GridPlane />
 			<AmbientCameraRig mouseX={mouseX} mouseY={mouseY} />
 			<FallingBlocks
 				burstTrigger={burstTrigger}

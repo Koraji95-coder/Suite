@@ -140,7 +140,10 @@ export function GridManualEditor({
 		[bounds, zoom],
 	);
 
-	const snapToGrid = (val: number): number => Math.round(val * 100) / 100;
+	const snapToGrid = useCallback(
+		(val: number): number => Math.round(val * 100) / 100,
+		[],
+	);
 
 	const clearSelection = useCallback(() => {
 		setSelectedRod(null);
@@ -220,8 +223,6 @@ export function GridManualEditor({
 		onRodsChange,
 		onConductorsChange,
 		onPlacementsChange,
-		setConductorStart,
-		setSuggestion,
 	]);
 
 	const handleSvgClick = useCallback(
@@ -309,9 +310,7 @@ export function GridManualEditor({
 			suggestion,
 			zoom,
 			clearSelection,
-			setConductorStart,
-			setSuggestion,
-			setSuggestionCoords,
+			snapToGrid,
 		],
 	);
 

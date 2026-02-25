@@ -1,8 +1,8 @@
 import { format, isBefore } from "date-fns";
 import { Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/apps/ui/button";
+import { Checkbox } from "@/components/apps/ui/checkbox";
 import {
 	Dialog,
 	DialogContent,
@@ -10,23 +10,23 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@/components/apps/ui/dialog";
+import { Input } from "@/components/apps/ui/input";
+import { Label } from "@/components/apps/ui/label";
 import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
-} from "@/components/ui/Popover";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/RadioGroup";
+} from "@/components/apps/ui/Popover";
+import { RadioGroup, RadioGroupItem } from "@/components/apps/ui/RadioGroup";
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+} from "@/components/apps/ui/select";
+import { Textarea } from "@/components/apps/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Calendar } from "./Calendar";
 import type { CalendarEvent, EventColor } from "./calendarindex";
@@ -45,6 +45,7 @@ interface EventDialogProps {
 	onDelete: (eventId: string) => void;
 	projectOptions?: Array<{ id: string; name: string }>;
 	taskOptions?: Array<{ id: string; name: string; project_id: string | null }>;
+	inline?: boolean;
 }
 
 export function EventDialog({
@@ -55,6 +56,7 @@ export function EventDialog({
 	onDelete,
 	projectOptions = [],
 	taskOptions = [],
+	inline = false,
 }: EventDialogProps) {
 	const [title, setTitle] = useState("");
 	const [description, setDescription] = useState("");
@@ -235,281 +237,297 @@ export function EventDialog({
 		},
 	];
 
-	return (
-		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="sm:max-w-[425px]">
-				<DialogHeader>
-					<DialogTitle>{event?.id ? "Edit Event" : "Create Event"}</DialogTitle>
-					<DialogDescription className="sr-only">
-						{event?.id
-							? "Edit the details of this event"
-							: "Add a new event to your calendar"}
-					</DialogDescription>
-				</DialogHeader>
-				{error && (
-					<div className="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm">
-						{error}
+	const dialogCard = (
+		<DialogContent
+			className={cn(
+				"w-[min(96vw,840px)] border-primary/30 bg-card sm:max-w-[680px]",
+				inline && "w-full sm:max-w-none",
+			)}
+		>
+			<DialogHeader>
+				<DialogTitle>{event?.id ? "Edit Event" : "Create Event"}</DialogTitle>
+				<DialogDescription className="sr-only">
+					{event?.id
+						? "Edit the details of this event"
+						: "Add a new event to your calendar"}
+				</DialogDescription>
+			</DialogHeader>
+			{error && (
+				<div className="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm">
+					{error}
+				</div>
+			)}
+			<div className="grid gap-4 py-2 sm:py-4">
+				<div className="grid gap-3">
+					<div className="*:not-first:mt-1.5">
+						<Label htmlFor="project">Project</Label>
+						<Select
+							value={projectId ?? ""}
+							onValueChange={(value) => {
+								setProjectId(value || null);
+								setTaskId(null);
+							}}
+						>
+							<SelectTrigger id="project" className="w-full">
+								<SelectValue placeholder="No project" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="">No project</SelectItem>
+								{projectOptions.map((p) => (
+									<SelectItem key={p.id} value={p.id}>
+										{p.name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
-				)}
-				<div className="grid gap-4 py-4">
-					<div className="grid gap-3">
-						<div className="*:not-first:mt-1.5">
-							<Label htmlFor="project">Project</Label>
-							<Select
-								value={projectId ?? ""}
-								onValueChange={(value) => {
-									setProjectId(value || null);
-									setTaskId(null);
-								}}
-							>
-								<SelectTrigger id="project" className="w-full">
-									<SelectValue placeholder="No project" />
+
+					<div className="*:not-first:mt-1.5">
+						<Label htmlFor="task">Task</Label>
+						<Select
+							value={taskId ?? ""}
+							onValueChange={(value) => setTaskId(value || null)}
+						>
+							<SelectTrigger id="task" className="w-full">
+								<SelectValue placeholder="No task" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="">No task</SelectItem>
+								{taskOptions
+									.filter((t) => !projectId || t.project_id === projectId)
+									.map((t) => (
+										<SelectItem key={t.id} value={t.id}>
+											{t.name}
+										</SelectItem>
+									))}
+							</SelectContent>
+						</Select>
+					</div>
+				</div>
+				<div className="*:not-first:mt-1.5">
+					<Label htmlFor="title">Title</Label>
+					<Input
+						id="title"
+						value={title}
+						onChange={(e) => setTitle(e.target.value)}
+					/>
+				</div>
+
+				<div className="*:not-first:mt-1.5">
+					<Label htmlFor="description">Description</Label>
+					<Textarea
+						id="description"
+						value={description}
+						onChange={(e) => setDescription(e.target.value)}
+						rows={3}
+					/>
+				</div>
+
+				<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_130px] sm:gap-4">
+					<div className="flex-1 *:not-first:mt-1.5">
+						<Label htmlFor="start-date">Start Date</Label>
+						<Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+							<PopoverTrigger asChild>
+								<Button
+									id="start-date"
+									variant={"outline"}
+									className={cn(
+										"group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
+										!startDate && "text-muted-foreground",
+									)}
+								>
+									<span
+										className={cn(
+											"truncate",
+											!startDate && "text-muted-foreground",
+										)}
+									>
+										{startDate ? format(startDate, "PPP") : "Pick a date"}
+									</span>
+									<CalendarIcon
+										className="text-muted-foreground/80 shrink-0 h-4 w-4"
+										aria-hidden="true"
+									/>
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent className="w-auto p-2" align="start">
+								<Calendar
+									mode="single"
+									selected={startDate}
+									defaultMonth={startDate}
+									onSelect={(date) => {
+										if (date) {
+											setStartDate(date);
+											// If end date is before the new start date, update it to match the start date
+											if (isBefore(endDate, date)) {
+												setEndDate(date);
+											}
+											setError(null);
+											setStartDateOpen(false);
+										}
+									}}
+								/>
+							</PopoverContent>
+						</Popover>
+					</div>
+
+					{!allDay && (
+						<div className="w-full *:not-first:mt-1.5">
+							<Label htmlFor="start-time">Start Time</Label>
+							<Select value={startTime} onValueChange={setStartTime}>
+								<SelectTrigger id="start-time">
+									<SelectValue placeholder="Select time" />
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value="">No project</SelectItem>
-									{projectOptions.map((p) => (
-										<SelectItem key={p.id} value={p.id}>
-											{p.name}
+									{timeOptions.map((option) => (
+										<SelectItem key={option.value} value={option.value}>
+											{option.label}
 										</SelectItem>
 									))}
 								</SelectContent>
 							</Select>
 						</div>
+					)}
+				</div>
 
-						<div className="*:not-first:mt-1.5">
-							<Label htmlFor="task">Task</Label>
-							<Select
-								value={taskId ?? ""}
-								onValueChange={(value) => setTaskId(value || null)}
-							>
-								<SelectTrigger id="task" className="w-full">
-									<SelectValue placeholder="No task" />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="">No task</SelectItem>
-									{taskOptions
-										.filter((t) => !projectId || t.project_id === projectId)
-										.map((t) => (
-											<SelectItem key={t.id} value={t.id}>
-												{t.name}
-											</SelectItem>
-										))}
-								</SelectContent>
-							</Select>
-						</div>
-					</div>
-					<div className="*:not-first:mt-1.5">
-						<Label htmlFor="title">Title</Label>
-						<Input
-							id="title"
-							value={title}
-							onChange={(e) => setTitle(e.target.value)}
-						/>
-					</div>
-
-					<div className="*:not-first:mt-1.5">
-						<Label htmlFor="description">Description</Label>
-						<Textarea
-							id="description"
-							value={description}
-							onChange={(e) => setDescription(e.target.value)}
-							rows={3}
-						/>
-					</div>
-
-					<div className="flex gap-4">
-						<div className="flex-1 *:not-first:mt-1.5">
-							<Label htmlFor="start-date">Start Date</Label>
-							<Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-								<PopoverTrigger asChild>
-									<Button
-										id="start-date"
-										variant={"outline"}
+				<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_130px] sm:gap-4">
+					<div className="flex-1 *:not-first:mt-1.5">
+						<Label htmlFor="end-date">End Date</Label>
+						<Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+							<PopoverTrigger asChild>
+								<Button
+									id="end-date"
+									variant={"outline"}
+									className={cn(
+										"group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
+										!endDate && "text-muted-foreground",
+									)}
+								>
+									<span
 										className={cn(
-											"group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
-											!startDate && "text-muted-foreground",
-										)}
-									>
-										<span
-											className={cn(
-												"truncate",
-												!startDate && "text-muted-foreground",
-											)}
-										>
-											{startDate ? format(startDate, "PPP") : "Pick a date"}
-										</span>
-										<CalendarIcon
-											className="text-muted-foreground/80 shrink-0 h-4 w-4"
-											aria-hidden="true"
-										/>
-									</Button>
-								</PopoverTrigger>
-								<PopoverContent className="w-auto p-2" align="start">
-									<Calendar
-										mode="single"
-										selected={startDate}
-										defaultMonth={startDate}
-										onSelect={(date) => {
-											if (date) {
-												setStartDate(date);
-												// If end date is before the new start date, update it to match the start date
-												if (isBefore(endDate, date)) {
-													setEndDate(date);
-												}
-												setError(null);
-												setStartDateOpen(false);
-											}
-										}}
-									/>
-								</PopoverContent>
-							</Popover>
-						</div>
-
-						{!allDay && (
-							<div className="min-w-28 *:not-first:mt-1.5">
-								<Label htmlFor="start-time">Start Time</Label>
-								<Select value={startTime} onValueChange={setStartTime}>
-									<SelectTrigger id="start-time">
-										<SelectValue placeholder="Select time" />
-									</SelectTrigger>
-									<SelectContent>
-										{timeOptions.map((option) => (
-											<SelectItem key={option.value} value={option.value}>
-												{option.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-						)}
-					</div>
-
-					<div className="flex gap-4">
-						<div className="flex-1 *:not-first:mt-1.5">
-							<Label htmlFor="end-date">End Date</Label>
-							<Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-								<PopoverTrigger asChild>
-									<Button
-										id="end-date"
-										variant={"outline"}
-										className={cn(
-											"group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
+											"truncate",
 											!endDate && "text-muted-foreground",
 										)}
 									>
-										<span
-											className={cn(
-												"truncate",
-												!endDate && "text-muted-foreground",
-											)}
-										>
-											{endDate ? format(endDate, "PPP") : "Pick a date"}
-										</span>
-										<CalendarIcon
-											className="text-muted-foreground/80 shrink-0 h-4 w-4"
-											aria-hidden="true"
-										/>
-									</Button>
-								</PopoverTrigger>
-								<PopoverContent className="w-auto p-2" align="start">
-									<Calendar
-										mode="single"
-										selected={endDate}
-										defaultMonth={endDate}
-										disabled={{ before: startDate }}
-										onSelect={(date) => {
-											if (date) {
-												setEndDate(date);
-												setError(null);
-												setEndDateOpen(false);
-											}
-										}}
+										{endDate ? format(endDate, "PPP") : "Pick a date"}
+									</span>
+									<CalendarIcon
+										className="text-muted-foreground/80 shrink-0 h-4 w-4"
+										aria-hidden="true"
 									/>
-								</PopoverContent>
-							</Popover>
-						</div>
-
-						{!allDay && (
-							<div className="min-w-28 *:not-first:mt-1.5">
-								<Label htmlFor="end-time">End Time</Label>
-								<Select value={endTime} onValueChange={setEndTime}>
-									<SelectTrigger id="end-time">
-										<SelectValue placeholder="Select time" />
-									</SelectTrigger>
-									<SelectContent>
-										{timeOptions.map((option) => (
-											<SelectItem key={option.value} value={option.value}>
-												{option.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-						)}
-					</div>
-
-					<div className="flex items-center gap-2">
-						<Checkbox
-							id="all-day"
-							checked={allDay}
-							onCheckedChange={(checked) => setAllDay(checked === true)}
-						/>
-						<Label htmlFor="all-day">All day</Label>
-					</div>
-
-					<div className="*:not-first:mt-1.5">
-						<Label htmlFor="location">Location</Label>
-						<Input
-							id="location"
-							value={location}
-							onChange={(e) => setLocation(e.target.value)}
-						/>
-					</div>
-					<fieldset className="space-y-4">
-						<legend className="text-foreground text-sm leading-none font-medium">
-							Etiquette
-						</legend>
-						<RadioGroup
-							className="flex gap-1.5"
-							defaultValue={colorOptions[0]?.value}
-							value={color}
-							onValueChange={(value: EventColor) => setColor(value)}
-						>
-							{colorOptions.map((colorOption) => (
-								<RadioGroupItem
-									key={colorOption.value}
-									id={`color-${colorOption.value}`}
-									value={colorOption.value}
-									aria-label={colorOption.label}
-									className={cn(
-										"size-6 shadow-none",
-										colorOption.bgClass,
-										colorOption.borderClass,
-									)}
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent className="w-auto p-2" align="start">
+								<Calendar
+									mode="single"
+									selected={endDate}
+									defaultMonth={endDate}
+									disabled={{ before: startDate }}
+									onSelect={(date) => {
+										if (date) {
+											setEndDate(date);
+											setError(null);
+											setEndDateOpen(false);
+										}
+									}}
 								/>
-							))}
-						</RadioGroup>
-					</fieldset>
-				</div>
-				<DialogFooter className="flex-row sm:justify-between">
-					{event?.id && (
-						<Button
-							variant="outline"
-							size="icon"
-							onClick={handleDelete}
-							aria-label="Delete event"
-						>
-							<Trash2 className="h-4 w-4" aria-hidden="true" />
-						</Button>
-					)}
-					<div className="flex flex-1 justify-end gap-2">
-						<Button variant="outline" onClick={onClose}>
-							Cancel
-						</Button>
-						<Button onClick={handleSave}>Save</Button>
+							</PopoverContent>
+						</Popover>
 					</div>
-				</DialogFooter>
-			</DialogContent>
+
+					{!allDay && (
+						<div className="w-full *:not-first:mt-1.5">
+							<Label htmlFor="end-time">End Time</Label>
+							<Select value={endTime} onValueChange={setEndTime}>
+								<SelectTrigger id="end-time">
+									<SelectValue placeholder="Select time" />
+								</SelectTrigger>
+								<SelectContent>
+									{timeOptions.map((option) => (
+										<SelectItem key={option.value} value={option.value}>
+											{option.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
+					)}
+				</div>
+
+				<div className="flex items-center gap-2">
+					<Checkbox
+						id="all-day"
+						checked={allDay}
+						onCheckedChange={(checked) => setAllDay(checked === true)}
+					/>
+					<Label htmlFor="all-day">All day</Label>
+				</div>
+
+				<div className="*:not-first:mt-1.5">
+					<Label htmlFor="location">Location</Label>
+					<Input
+						id="location"
+						value={location}
+						onChange={(e) => setLocation(e.target.value)}
+					/>
+				</div>
+				<fieldset className="space-y-4">
+					<legend className="text-foreground text-sm leading-none font-medium">
+						Etiquette
+					</legend>
+					<RadioGroup
+						className="flex gap-1.5"
+						defaultValue={colorOptions[0]?.value}
+						value={color}
+						onValueChange={(value: EventColor) => setColor(value)}
+					>
+						{colorOptions.map((colorOption) => (
+							<RadioGroupItem
+								key={colorOption.value}
+								id={`color-${colorOption.value}`}
+								value={colorOption.value}
+								aria-label={colorOption.label}
+								className={cn(
+									"size-6 shadow-none",
+									colorOption.bgClass,
+									colorOption.borderClass,
+								)}
+							/>
+						))}
+					</RadioGroup>
+				</fieldset>
+			</div>
+			<DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+				{event?.id && (
+					<Button
+						variant="outline"
+						size="icon"
+						onClick={handleDelete}
+						aria-label="Delete event"
+						className="self-start"
+					>
+						<Trash2 className="h-4 w-4" aria-hidden="true" />
+					</Button>
+				)}
+				<div className="flex w-full flex-1 justify-end gap-2">
+					<Button variant="outline" onClick={onClose}>
+						Cancel
+					</Button>
+					<Button onClick={handleSave}>Save</Button>
+				</div>
+			</DialogFooter>
+		</DialogContent>
+	);
+
+	if (!isOpen) return null;
+
+	if (inline) {
+		return <div className="px-2 pb-2 sm:px-5 sm:pb-5">{dialogCard}</div>;
+	}
+
+	return (
+		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+			{dialogCard}
 		</Dialog>
 	);
 }

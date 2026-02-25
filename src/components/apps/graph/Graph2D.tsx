@@ -2,7 +2,7 @@ import * as d3 from "d3";
 import { useCallback, useEffect, useRef } from "react";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import type { GraphData, GraphNode } from "./types";
-import { GROUP_COLORS } from "./types";
+import { getGroupColor } from "./types";
 
 interface Graph2DProps {
 	data: GraphData;
@@ -97,13 +97,11 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 			.join("circle")
 			.attr("r", (d) => (d.gNode.data?.type === "major" ? 18 : 10))
 			.attr("fill", (d) => {
-				const color = GROUP_COLORS[d.group] ?? palette.primary;
+				const color = getGroupColor(d.group, palette);
 				return d.source === "memory" ? hexToRgba(color, 0.35) : color;
 			})
 			.attr("stroke", (d) => {
-				return d.source === "memory"
-					? (GROUP_COLORS[d.group] ?? palette.primary)
-					: "none";
+				return d.source === "memory" ? getGroupColor(d.group, palette) : "none";
 			})
 			.attr("stroke-width", (d) => (d.source === "memory" ? 1.5 : 0))
 			.attr("cursor", "pointer")
@@ -198,9 +196,7 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 		nodeEls
 			.attr("stroke", (d) => {
 				if (d.id === selectedNodeId) return palette.text;
-				return d.source === "memory"
-					? (GROUP_COLORS[d.group] ?? palette.primary)
-					: "none";
+				return d.source === "memory" ? getGroupColor(d.group, palette) : "none";
 			})
 			.attr("stroke-width", (d) => {
 				if (d.id === selectedNodeId) return 2.5;

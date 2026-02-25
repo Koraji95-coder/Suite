@@ -1,7 +1,8 @@
 import { AlertCircle, AlertTriangle, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
+import { hexToRgba, useTheme } from "@/lib/palette";
 import { GlassPanel } from "../ui/GlassPanel";
+import { bubbleStyle, softButtonStyle } from "./dashboardStyles";
 import {
 	formatDateOnly,
 	formatDeadline,
@@ -46,13 +47,15 @@ export function ActiveProjectsList({
 		<GlassPanel
 			tint={palette.secondary}
 			hoverEffect={false}
-			className="p-6 group"
+			specular={false}
+			bevel={false}
+			className="p-7 group"
 		>
 			<div className="relative z-10">
 				<div className="flex items-center justify-between mb-4">
 					<h3
 						className="text-xl font-bold"
-						style={{ color: hexToRgba(palette.text, 0.9) }}
+						style={{ color: palette.primary }}
 					>
 						Active Projects
 					</h3>
@@ -60,7 +63,7 @@ export function ActiveProjectsList({
 						onClick={() => onNavigateToProjectsHub?.()}
 						className="text-sm flex items-center space-x-1 px-3 py-1 rounded-lg transition-all hover:opacity-90"
 						style={{
-							...glassCardInnerStyle(palette, palette.primary),
+							...softButtonStyle(palette, palette.primary),
 							color: palette.primary,
 						}}
 					>
@@ -69,7 +72,7 @@ export function ActiveProjectsList({
 					</button>
 				</div>
 
-				<div className="space-y-2">
+				<div className="space-y-3">
 					{projects.length === 0 ? (
 						<p
 							className="text-sm"
@@ -86,13 +89,13 @@ export function ActiveProjectsList({
 							return (
 								<div
 									key={project.id}
-									className="p-4 cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:-translate-y-px"
+									className="px-5 py-4 cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:-translate-y-px"
 									style={{
-										...glassCardInnerStyle(palette, catColor),
+										...bubbleStyle(palette, catColor),
 										border: `1px solid ${
 											isHovered
 												? hexToRgba(catColor, 0.3)
-												: hexToRgba(palette.text, 0.06)
+												: hexToRgba(palette.text, 0.08)
 										}`,
 									}}
 									onClick={() => onNavigateToProject?.(project.id)}

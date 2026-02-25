@@ -3,9 +3,11 @@ export { AgendaView } from "./AgendaView";
 // Calendar UI widget export
 export { Calendar } from "./Calendar";
 export { CalendarDndProvider, useCalendarDnd } from "./CalendarDndContext";
+export { default as CalendarPage } from "./CalendarPage";
 export { DayView } from "./DayView";
 export { DraggableEvent } from "./DraggableEvent";
 export { DroppableCell } from "./DroppableCell";
+export type { EventCalendarProps } from "./EventCalendar";
 export { EventCalendar } from "./EventCalendar";
 export { EventDialog } from "./EventDialog";
 export { EventItem } from "./EventItem";
@@ -17,12 +19,14 @@ export type {
 	CalendarEvent,
 	CalendarView,
 	EventColor,
+	EventSource,
 } from "./hooks/calendartypes";
 export * from "./hooks/calendarutils";
 
 // Hook exports
 export * from "./hooks/usecurrenttimeindicator";
 export * from "./hooks/useeventvisibility";
+export { useCalendarEvents } from "./hooks/useCalendarEvents";
 export { MonthView } from "./MonthView";
 
 // Urgency utility exports

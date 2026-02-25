@@ -1,4 +1,4 @@
-
+// src/auth/NotificationContext.tsx
 /**
  * Unified notification/toast system for the Suite application
  * Provides consistent user feedback across all components
@@ -6,7 +6,7 @@
 
 import {
 	createContext,
-	ReactNode,
+	type ReactNode,
 	useCallback,
 	useContext,
 	useState,
@@ -32,7 +32,6 @@ interface NotificationContextValue {
 	showNotification: (notification: Omit<Notification, "id">) => string;
 	dismissNotification: (id: string) => void;
 	clearAll: () => void;
-	// Convenience methods
 	success: (title: string, message?: string, duration?: number) => string;
 	error: (title: string, message?: string, duration?: number) => string;
 	warning: (title: string, message?: string, duration?: number) => string;
@@ -43,14 +42,16 @@ const NotificationContext = createContext<NotificationContextValue | undefined>(
 	undefined,
 );
 
-const DEFAULT_DURATION = 5000; // 5 seconds
+const DEFAULT_DURATION = 5000;
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
 	const [notifications, setNotifications] = useState<Notification[]>([]);
 
-	const generateId = useCallback(() => {
-		return `notification-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-	}, []);
+	const generateId = useCallback(
+		() =>
+			`notification-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+		[],
+	);
 
 	const dismissNotification = useCallback((id: string) => {
 		setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -71,11 +72,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
 			setNotifications((prev) => [...prev, newNotification]);
 
-			// Auto-dismiss if duration is set
+			if (import.meta.env.DEV) {
+				logger.debug("Notification", "showNotification", {
+					type: newNotification.type,
+					title: newNotification.title,
+					message: newNotification.message,
+					duration: newNotification.duration,
+				});
+			}
+
 			if (newNotification.duration && newNotification.duration > 0) {
-				setTimeout(() => {
-					dismissNotification(id);
-				}, newNotification.duration);
+				window.setTimeout(
+					() => dismissNotification(id),
+					newNotification.duration,
+				);
 			}
 
 			return id;
@@ -128,7 +138,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 export function useNotification() {
 	const context = useContext(NotificationContext);
 	if (!context) {
-		throw new Error("useNotification must be used within a NotificationProvider");
+		throw new Error(
+			"useNotification must be used within a NotificationProvider",
+		);
 	}
 	return context;
 }

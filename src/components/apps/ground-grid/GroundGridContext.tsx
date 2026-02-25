@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import {
 	createContext,
 	useCallback,
@@ -75,6 +74,59 @@ export function GroundGridProvider({
 
 		addLog("system", "Checking for AutoCAD backend...");
 
+		coordinatesGrabberService.connectWebSocket().catch(() => {
+			addLog(
+				"system",
+				"WebSocket status stream unavailable; using HTTP polling fallback",
+			);
+		});
+
+		const unsubscribeWsStatus = coordinatesGrabberService.on(
+			"status",
+			async (event) => {
+				if (event.type !== "status") return;
+
+				const isNowConnected = event.connected && event.autocad_running;
+				if (isFirstCheck) {
+					if (isNowConnected) {
+						addLog("system", "Connected to AutoCAD backend (WebSocket)");
+						const layers = await coordinatesGrabberService.listLayers();
+						setAvailableLayers(layers);
+						if (layers.length > 0) {
+							addLog(
+								"system",
+								`Retrieved ${layers.length} layers from active drawing`,
+							);
+						}
+					}
+				} else if (wasConnected !== isNowConnected) {
+					if (isNowConnected) {
+						addLog("system", "AutoCAD connection established (WebSocket)");
+						shownDisconnectToastRef.current = false;
+						showToast("success", "AutoCAD backend connected");
+						const layers = await coordinatesGrabberService.listLayers();
+						setAvailableLayers(layers);
+					} else {
+						addLog(
+							"system",
+							"AutoCAD connection lost - waiting for reconnection...",
+						);
+						if (!shownDisconnectToastRef.current) {
+							shownDisconnectToastRef.current = true;
+							showToast(
+								"error",
+								"AutoCAD connection lost. Check the Log tab for details.",
+							);
+						}
+					}
+				}
+
+				wasConnected = isNowConnected;
+				setBackendConnected(isNowConnected);
+				isFirstCheck = false;
+			},
+		);
+
 		const checkBackendStatus = async () => {
 			try {
 				const status = await coordinatesGrabberService.checkStatus();
@@ -149,10 +201,11 @@ export function GroundGridProvider({
 		};
 
 		checkBackendStatus();
-		pollInterval = setInterval(checkBackendStatus, 5000);
+		pollInterval = setInterval(checkBackendStatus, 10000);
 
 		return () => {
 			if (pollInterval) clearInterval(pollInterval);
+			unsubscribeWsStatus();
 		};
 	}, [addLog, showToast]);
 

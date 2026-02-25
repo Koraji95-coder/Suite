@@ -11,10 +11,12 @@ import {
 	Square,
 	Trash2,
 } from "lucide-react";
+import { hexToRgba, useTheme } from "@/lib/palette";
 import { Task } from "./projectmanagertypes";
 import {
 	formatDateOnly,
-	getPriorityColor,
+	getPriorityChipStyle,
+	getPriorityRowStyle,
 	getUrgencyColor,
 } from "./projectmanagerutils";
 
@@ -43,6 +45,7 @@ export function TaskItem({
 	onDelete,
 	isProjectArchived = false,
 }: TaskItemProps) {
+	const { palette } = useTheme();
 	const hasSubtasks = subtasks.length > 0;
 
 	const {
@@ -63,8 +66,11 @@ export function TaskItem({
 	return (
 		<div ref={setNodeRef} style={style} className="space-y-2">
 			<div
-				className={`flex items-center space-x-3 p-3 bg-black/30 border rounded-lg hover:border-orange-500/40 transition-all ${getPriorityColor(task.priority)}`}
-				style={{ marginLeft: `${level * 24}px` }}
+				className="flex items-center space-x-3 p-3 rounded-lg transition-all"
+				style={{
+					marginLeft: `${level * 24}px`,
+					...getPriorityRowStyle(palette, task.priority),
+				}}
 			>
 				{!isProjectArchived && (
 					<div
@@ -72,15 +78,24 @@ export function TaskItem({
 						{...listeners}
 						className="cursor-grab active:cursor-grabbing p-1 touch-none"
 					>
-						<GripVertical className="w-4 h-4 text-orange-400/60" />
+						<GripVertical
+							className="w-4 h-4"
+							style={{ color: hexToRgba(palette.primary, 0.6) }}
+						/>
 					</div>
 				)}
 				{hasSubtasks && (
 					<button onClick={() => onToggleExpand(task.id)} className="p-1">
 						{isExpanded ? (
-							<ChevronDown className="w-4 h-4 text-orange-400" />
+							<ChevronDown
+								className="w-4 h-4"
+								style={{ color: hexToRgba(palette.primary, 0.85) }}
+							/>
 						) : (
-							<ChevronRight className="w-4 h-4 text-orange-400" />
+							<ChevronRight
+								className="w-4 h-4"
+								style={{ color: hexToRgba(palette.primary, 0.85) }}
+							/>
 						)}
 					</button>
 				)}
@@ -88,14 +103,19 @@ export function TaskItem({
 					{task.completed ? (
 						<CheckSquare className="w-5 h-5 text-green-400" />
 					) : (
-						<Square className="w-5 h-5 text-orange-400" />
+						<Square
+							className="w-5 h-5"
+							style={{ color: hexToRgba(palette.primary, 0.85) }}
+						/>
 					)}
 				</button>
 				<div className="flex-1">
 					<span
-						className={`block ${
-							task.completed ? "line-through text-white/35" : "text-white/90"
-						}`}
+						className="block"
+						style={{
+							color: hexToRgba(palette.text, task.completed ? 0.35 : 0.9),
+							textDecoration: task.completed ? "line-through" : "none",
+						}}
 					>
 						{task.name}
 					</span>
@@ -109,7 +129,8 @@ export function TaskItem({
 					)}
 				</div>
 				<span
-					className={`text-xs px-2 py-1 rounded border ${getPriorityColor(task.priority)}`}
+					className="text-xs px-2 py-1 rounded border"
+					style={getPriorityChipStyle(palette, task.priority)}
 				>
 					{task.priority}
 				</span>
@@ -117,24 +138,33 @@ export function TaskItem({
 					<>
 						<button
 							onClick={() => onAddSubtask(task.id)}
-							className="p-1 hover:bg-orange-500/20 rounded"
+							className="p-1 rounded transition-colors hover:bg-white/5"
 							title="Add subtask"
 						>
-							<Plus className="w-4 h-4 text-orange-400" />
+							<Plus
+								className="w-4 h-4"
+								style={{ color: hexToRgba(palette.primary, 0.85) }}
+							/>
 						</button>
 						<button
 							onClick={() => onEdit(task)}
-							className="p-1 hover:bg-orange-500/20 rounded"
+							className="p-1 rounded transition-colors hover:bg-white/5"
 						>
-							<Edit className="w-4 h-4 text-orange-400" />
+							<Edit
+								className="w-4 h-4"
+								style={{ color: hexToRgba(palette.primary, 0.85) }}
+							/>
 						</button>
 					</>
 				)}
 				<button
 					onClick={() => onDelete(task.id)}
-					className="p-1 hover:bg-red-500/20 rounded"
+					className="p-1 rounded transition-colors hover:bg-white/5"
 				>
-					<Trash2 className="w-4 h-4 text-red-400" />
+					<Trash2
+						className="w-4 h-4"
+						style={{ color: hexToRgba(palette.accent, 0.9) }}
+					/>
 				</button>
 			</div>
 		</div>

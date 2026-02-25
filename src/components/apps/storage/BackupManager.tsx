@@ -7,7 +7,7 @@ import {
 	Trash2,
 	Upload,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	type BackupFileInfo,
 	deleteBackupFile,
@@ -53,15 +53,15 @@ export function BackupManager() {
 	const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
 	const fileRef = useRef<HTMLInputElement>(null);
 
-	const refreshFiles = async () => {
+	const refreshFiles = useCallback(async () => {
 		setLoadingFiles(true);
 		setFiles(await listBackupFiles());
 		setLoadingFiles(false);
-	};
+	}, []);
 
 	useEffect(() => {
 		refreshFiles();
-	}, []);
+	}, [refreshFiles]);
 
 	const handleBackup = async () => {
 		setStatus("running");

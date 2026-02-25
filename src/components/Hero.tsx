@@ -1,6 +1,5 @@
 // src/components/Hero.tsx
-import React, { useEffect, useMemo, useRef } from "react";
-import { useInViewOnce } from "../hooks/useInViewOnce";
+import { useEffect, useMemo } from "react";
 import MagneticWrap from "./fx/MagneticWrap";
 import Marquee from "./fx/Marquee";
 

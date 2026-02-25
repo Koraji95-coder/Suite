@@ -18,6 +18,7 @@ import {
 	Activity,
 	BarChart3,
 	Calendar,
+	Clock,
 	Eye,
 	EyeOff,
 	FolderKanban,
@@ -34,6 +35,7 @@ const WIDGET_ICONS: Record<string, typeof BarChart3> = {
 	calendar: Calendar,
 	activity: Activity,
 	projects: FolderKanban,
+	"recent-files": Clock,
 };
 
 interface DashboardCustomizerProps {

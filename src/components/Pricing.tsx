@@ -1,5 +1,6 @@
 // src/components/Pricing.tsx  (CTA version)
-import React, { useEffect } from "react";
+import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import MagneticWrap from "./fx/MagneticWrap";
 
 export default function Pricing() {
@@ -62,14 +63,14 @@ export default function Pricing() {
 
 						<div className="cta-actions">
 							<MagneticWrap>
-								<a href="#" className="btn-hero-primary">
+								<Link to="/signup" className="btn-hero-primary">
 									Get started for free
-								</a>
+								</Link>
 							</MagneticWrap>
 							<MagneticWrap>
-								<a href="#" className="btn-hero-secondary">
+								<Link to="/login" className="btn-hero-secondary">
 									Talk to sales
-								</a>
+								</Link>
 							</MagneticWrap>
 						</div>
 

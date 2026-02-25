@@ -6,14 +6,14 @@ export interface WidgetConfig {
 	visible: boolean;
 }
 
-const STORAGE_KEY = "r3-dashboard-layout";
+const STORAGE_KEY = "r3-dashboard-layout-v2";
 
 const DEFAULT_LAYOUT: WidgetConfig[] = [
 	{ id: "stats", label: "Stats Cards", visible: true },
-	{ id: "calendar", label: "Calendar", visible: true },
 	{ id: "activity", label: "Recent Activity", visible: true },
-	{ id: "projects", label: "Active Projects", visible: true },
+	{ id: "calendar", label: "Calendar", visible: true },
 	{ id: "recent-files", label: "Recent Files", visible: true },
+	{ id: "projects", label: "Active Projects", visible: true },
 ];
 
 function loadLayout(): WidgetConfig[] {

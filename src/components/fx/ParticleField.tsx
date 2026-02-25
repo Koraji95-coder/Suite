@@ -1,5 +1,5 @@
 // src/components/fx/ParticleField.tsx
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 type Pt = {
 	x: number;

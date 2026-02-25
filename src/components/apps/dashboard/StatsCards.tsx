@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Folder } from "lucide-react";
+import { BarChart3, Folder } from "lucide-react";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { GlassPanel } from "../ui/GlassPanel";
 import { formatBytes } from "./dashboardUtils";
@@ -6,14 +6,12 @@ import { formatBytes } from "./dashboardUtils";
 interface StatsCardsProps {
 	projectsCount: number;
 	storageUsed: number;
-	activitiesCount: number;
 	isLoading: boolean;
 }
 
 export function StatsCards({
 	projectsCount,
 	storageUsed,
-	activitiesCount,
 	isLoading,
 }: StatsCardsProps) {
 	const { palette } = useTheme();
@@ -31,26 +29,21 @@ export function StatsCards({
 			icon: Folder,
 			tint: palette.secondary,
 		},
-		{
-			key: "activities",
-			label: "Recent Activities",
-			icon: Activity,
-			tint: palette.tertiary,
-		},
 	] as const;
 	const values: Record<string, string> = {
 		projects: isLoading ? "..." : String(projectsCount),
 		storage: isLoading ? "..." : formatBytes(storageUsed),
-		activities: String(activitiesCount),
 	};
 
 	return (
-		<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+		<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 			{cardConfigs.map(({ key, label, icon: Icon, tint }) => (
 				<GlassPanel
 					key={key}
 					tint={tint}
-					className="p-6 group hover:scale-[1.03] hover:-translate-y-1"
+					specular={false}
+					bevel={false}
+					className="px-7 py-6 group hover:scale-[1.03] hover:-translate-y-1"
 					style={{ cursor: "default" }}
 				>
 					<div className="relative z-10 flex items-center space-x-4">

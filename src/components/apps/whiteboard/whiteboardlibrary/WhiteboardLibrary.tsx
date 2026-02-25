@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase";
 import { SavedWhiteboard } from "../whiteboardtypes";
 import { LibraryFilters } from "./LibraryFilters";
@@ -20,11 +20,7 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 	const [viewingWhiteboard, setViewingWhiteboard] =
 		useState<SavedWhiteboard | null>(null);
 
-	useEffect(() => {
-		loadWhiteboards();
-	}, []);
-
-	const loadWhiteboards = async () => {
+	const loadWhiteboards = useCallback(async () => {
 		setLoading(true);
 		const { data, error } = await supabase
 			.from("whiteboards")
@@ -35,7 +31,11 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 			setWhiteboards(data);
 		}
 		setLoading(false);
-	};
+	}, []);
+
+	useEffect(() => {
+		loadWhiteboards();
+	}, [loadWhiteboards]);
 
 	const deleteWhiteboard = async (id: string) => {
 		if (!confirm("Delete this whiteboard?")) return;

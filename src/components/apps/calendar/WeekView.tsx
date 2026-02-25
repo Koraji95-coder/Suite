@@ -44,6 +44,7 @@ interface PositionedEvent {
 	left: number;
 	width: number;
 	zIndex: number;
+	columnIndex: number;
 }
 
 export function WeekView({
@@ -164,20 +165,27 @@ export function WeekView({
 				columns[columnIndex] = currentColumn;
 				currentColumn.push({ event, end: adjustedEnd });
 
-				const width = columnIndex === 0 ? 1 : 0.9;
-				const left = columnIndex === 0 ? 0 : columnIndex * 0.1;
-
 				positionedEvents.push({
 					event,
 					top,
 					height,
-					left,
-					width,
+					left: 0,
+					width: 1,
 					zIndex: 10 + columnIndex,
+					columnIndex,
 				});
 			});
 
-			return positionedEvents;
+			const columnCount = Math.max(columns.length, 1);
+			const gap =
+				columnCount > 1 ? Math.min(0.02, 0.4 / columnCount) : 0;
+			const width = (1 - gap * (columnCount - 1)) / columnCount;
+
+			return positionedEvents.map((item) => ({
+				...item,
+				width,
+				left: item.columnIndex * (width + gap),
+			}));
 		});
 	}, [days, events]);
 
@@ -202,7 +210,7 @@ export function WeekView({
 				}}
 			>
 				<div
-					className="py-2 text-center text-sm"
+					className="flex min-h-11 items-center justify-center px-1 text-center text-xs leading-none sm:text-sm"
 					style={{ color: hexToRgba(palette.text, 0.4) }}
 				>
 					<span className="max-[479px]:sr-only">{format(new Date(), "O")}</span>
@@ -216,7 +224,7 @@ export function WeekView({
 							key={day.toString()}
 							type="button"
 							onClick={() => onDateSelect?.(day)}
-							className="py-2 text-center text-sm transition-all"
+							className="flex min-h-11 items-center justify-center px-1 text-center text-xs leading-none transition-all sm:text-sm"
 							style={{
 								...(isToday(day)
 									? {
@@ -237,10 +245,15 @@ export function WeekView({
 							data-today={isToday(day) || undefined}
 							data-selected={isSelected || undefined}
 						>
-							<span className="sm:hidden" aria-hidden="true">
+							<span
+								className="inline-flex items-center justify-center gap-1 leading-none sm:hidden"
+								aria-hidden="true"
+							>
 								{format(day, "E")[0]} {format(day, "d")}
 							</span>
-							<span className="max-sm:hidden">{format(day, "EEE dd")}</span>
+							<span className="max-sm:hidden leading-none">
+								{format(day, "EEE dd")}
+							</span>
 						</button>
 					);
 				})}
@@ -255,13 +268,13 @@ export function WeekView({
 				>
 					<div className="grid grid-cols-8">
 						<div
-							className="relative"
+							className="relative flex items-end justify-center"
 							style={{
 								borderRight: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
 							}}
 						>
 							<span
-								className="absolute bottom-0 left-0 h-6 w-16 max-w-full pe-2 text-right text-[10px] sm:pe-4 sm:text-xs"
+								className="mb-1 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none"
 								style={{ color: hexToRgba(palette.text, 0.35) }}
 							>
 								All day
@@ -318,7 +331,7 @@ export function WeekView({
 											>
 												<div
 													className={cn(
-														"truncate",
+														"w-full text-center truncate",
 														!shouldShowTitle && "invisible",
 													)}
 													aria-hidden={!shouldShowTitle}
@@ -345,14 +358,14 @@ export function WeekView({
 					{hours.map((hour, index) => (
 						<div
 							key={hour.toString()}
-							className="relative min-h-[var(--week-cells-height)]"
+							className="relative flex min-h-[var(--week-cells-height)] items-start justify-center"
 							style={{
 								borderBottom: `1px solid ${hexToRgba(palette.primary, 0.06)}`,
 							}}
 						>
 							{index > 0 && (
 								<span
-									className="absolute -top-3 left-0 flex h-6 w-16 max-w-full items-center justify-end pe-2 text-[10px] sm:pe-4 sm:text-xs"
+									className="-translate-y-1/2 mt-0 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none"
 									style={{ color: hexToRgba(palette.text, 0.35) }}
 								>
 									{format(hour, "h a")}

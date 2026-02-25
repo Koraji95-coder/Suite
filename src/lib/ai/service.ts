@@ -1,6 +1,6 @@
-import { logger } from "@/lib/errorLogger";
-import { supabase } from "@/lib/supabase";
-import type { Database, Json } from "@/types/database";
+import { logger } from "../../lib/errorLogger";
+import { supabase } from "../../lib/supabase";
+import type { Database, Json } from "../../types/database";
 import { createProvider } from "./providers";
 import type { AIConfig, Conversation, Memory, Message } from "./types";
 import { DEFAULT_AI_CONFIG } from "./types";

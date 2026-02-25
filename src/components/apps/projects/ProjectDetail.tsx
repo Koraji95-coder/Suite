@@ -14,11 +14,13 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { GridDesign } from "@/components/apps/ground-grid/types";
+import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/lib/supabase";
 import type { Json } from "@/types/database";
-import { CalendarView } from "./CalanderView";
+import { CalendarView } from "./CalendarView";
 import { FilesBrowser } from "./FilesBrowser";
+import { GlassPanel } from "../ui/GlassPanel";
 import {
 	CalendarEvent,
 	Project,
@@ -89,6 +91,7 @@ export function ProjectDetail({
 	onFileUpload,
 	onDownloadFile,
 }: ProjectDetailProps) {
+	const { palette } = useTheme();
 	const navigate = useNavigate();
 	const [gridDesigns, setGridDesigns] = useState<GridDesign[]>([]);
 
@@ -131,7 +134,7 @@ export function ProjectDetail({
 			.select()
 			.maybeSingle();
 		if (data) {
-			navigate(`/apps/ground-grid-generator?design=${data.id}`);
+			navigate(`/app/apps/ground-grid?design=${data.id}`);
 		}
 	}
 
@@ -142,17 +145,50 @@ export function ProjectDetail({
 				)
 			: 0;
 
+	const actionButtonStyle = (tint: string) => ({
+		...glassCardInnerStyle(palette, tint),
+		color: hexToRgba(palette.text, 0.85),
+	});
+
+	const tabButtonStyle = (active: boolean) => ({
+		background: active
+			? hexToRgba(palette.primary, 0.18)
+			: hexToRgba(palette.surface, 0.35),
+		border: `1px solid ${hexToRgba(
+			active ? palette.primary : palette.text,
+			active ? 0.4 : 0.08,
+		)}`,
+		color: hexToRgba(palette.text, active ? 0.9 : 0.6),
+	});
+
 	return (
 		<div className="space-y-6">
 			{/* Project Header */}
-			<div className="bg-black/30 backdrop-blur-md border border-orange-500/30 rounded-lg p-6">
+			<GlassPanel
+				tint={palette.primary}
+				hoverEffect={false}
+				className="p-6"
+			>
 				<div className="flex items-start justify-between mb-4">
 					<div className="flex-1">
-						<h3 className="text-2xl font-bold text-white/80">{project.name}</h3>
-						<p className="text-white/50 mt-1">{project.description}</p>
+						<h3
+							className="text-2xl font-bold"
+							style={{ color: hexToRgba(palette.text, 0.92) }}
+						>
+							{project.name}
+						</h3>
+						<p
+							className="mt-1"
+							style={{ color: hexToRgba(palette.text, 0.55) }}
+						>
+							{project.description}
+						</p>
 						<div className="flex items-center space-x-4 mt-3">
 							{project.deadline && (
-								<div className="flex items-center space-x-2 text-white/60">
+								<div
+									className="flex items-center space-x-2"
+									style={{ color: hexToRgba(palette.text, 0.6) }}
+								>
 									<Calendar className="w-4 h-4" />
 									<span className="text-sm">
 										{project.status === "completed"
@@ -173,7 +209,10 @@ export function ProjectDetail({
 								</span>
 							)}
 						</div>
-						<div className="text-xs text-orange-400/80 mt-2">
+						<div
+							className="text-xs mt-2"
+							style={{ color: hexToRgba(palette.primary, 0.75) }}
+						>
 							Status:{" "}
 							{(project.status === "completed" ? "Archived" : project.status)
 								.replace("-", " ")
@@ -183,11 +222,12 @@ export function ProjectDetail({
 					<div className="flex items-center space-x-2">
 						<button
 							onClick={() => onToggleArchive(project)}
-							className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1.5 border ${
+							className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1.5"
+							style={actionButtonStyle(
 								project.status === "completed"
-									? "bg-green-500/10 border-green-500/40 text-green-300 hover:bg-green-500/20"
-									: "bg-yellow-500/10 border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/20"
-							}`}
+									? palette.secondary
+									: palette.tertiary,
+							)}
 							title={
 								project.status === "completed"
 									? "Unarchive project"
@@ -201,7 +241,8 @@ export function ProjectDetail({
 						</button>
 						<button
 							onClick={onExportMarkdown}
-							className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1.5 border bg-orange-500/10 border-orange-500/40 text-white/60 hover:bg-orange-500/20"
+							className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center space-x-1.5"
+							style={actionButtonStyle(palette.primary)}
 							title="Copy project as Markdown"
 						>
 							<FileDown className="w-3.5 h-3.5" />
@@ -212,62 +253,60 @@ export function ProjectDetail({
 
 				<div className="space-y-2">
 					<div className="flex justify-between text-sm">
-						<span className="text-white/60">Progress</span>
-						<span className="text-white/90 font-semibold">
+						<span style={{ color: hexToRgba(palette.text, 0.6) }}>
+							Progress
+						</span>
+						<span
+							className="font-semibold"
+							style={{ color: hexToRgba(palette.text, 0.9) }}
+						>
 							{completionPercentage}%
 						</span>
 					</div>
 					<div
 						key={project.id}
-						className="w-full bg-black/50 rounded-full h-3 overflow-hidden"
+						className="w-full rounded-full h-3 overflow-hidden"
+						style={{ background: hexToRgba(palette.surface, 0.55) }}
 					>
 						<div
-							className="bg-gradient-to-r from-orange-500 to-amber-500 h-full transition-all duration-700 ease-out"
-							style={{ width: `${completionPercentage}%`, willChange: "width" }}
+							className="h-full transition-all duration-700 ease-out"
+							style={{
+								width: `${completionPercentage}%`,
+								willChange: "width",
+								background: `linear-gradient(90deg, ${palette.primary} 0%, ${palette.tertiary} 100%)`,
+							}}
 						></div>
 					</div>
 				</div>
-			</div>
+			</GlassPanel>
 
 			{/* View Mode Tabs */}
 			<div className="flex space-x-2 mb-4">
 				<button
 					onClick={() => onViewModeChange("tasks")}
-					className={`px-4 py-2 rounded-lg font-medium transition-all ${
-						viewMode === "tasks"
-							? "bg-orange-500/30 text-white/90 border border-orange-400"
-							: "bg-black/30 text-white/60 border border-white/10 hover:border-orange-500/40"
-					}`}
+					className="px-4 py-2 rounded-lg font-medium transition-all"
+					style={tabButtonStyle(viewMode === "tasks")}
 				>
 					Tasks
 				</button>
 				<button
 					onClick={() => onViewModeChange("calendar")}
-					className={`px-4 py-2 rounded-lg font-medium transition-all ${
-						viewMode === "calendar"
-							? "bg-orange-500/30 text-white/90 border border-orange-400"
-							: "bg-black/30 text-white/60 border border-white/10 hover:border-orange-500/40"
-					}`}
+					className="px-4 py-2 rounded-lg font-medium transition-all"
+					style={tabButtonStyle(viewMode === "calendar")}
 				>
 					Calendar
 				</button>
 				<button
 					onClick={() => onViewModeChange("files")}
-					className={`px-4 py-2 rounded-lg font-medium transition-all ${
-						viewMode === "files"
-							? "bg-orange-500/30 text-white/90 border border-orange-400"
-							: "bg-black/30 text-white/60 border border-white/10 hover:border-orange-500/40"
-					}`}
+					className="px-4 py-2 rounded-lg font-medium transition-all"
+					style={tabButtonStyle(viewMode === "files")}
 				>
 					Files
 				</button>
 				<button
 					onClick={() => onViewModeChange("ground-grids")}
-					className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center space-x-2 ${
-						viewMode === "ground-grids"
-							? "bg-orange-500/30 text-white/90 border border-orange-400"
-							: "bg-black/30 text-white/60 border border-white/10 hover:border-orange-500/40"
-					}`}
+					className="px-4 py-2 rounded-lg font-medium transition-all flex items-center space-x-2"
+					style={tabButtonStyle(viewMode === "ground-grids")}
 				>
 					<MapPin className="w-4 h-4" />
 					<span>Ground Grids</span>
@@ -276,12 +315,18 @@ export function ProjectDetail({
 
 			{/* Content based on view mode */}
 			{viewMode === "tasks" && (
-				<div className="bg-black/30 backdrop-blur-md border border-orange-500/30 rounded-lg p-6">
+				<GlassPanel tint={palette.secondary} hoverEffect={false} className="p-6">
 					<div className="flex items-center justify-between mb-4">
-						<h4 className="text-xl font-bold text-white/80">Tasks</h4>
+						<h4
+							className="text-xl font-bold"
+							style={{ color: hexToRgba(palette.text, 0.88) }}
+						>
+							Tasks
+						</h4>
 						<button
 							onClick={onAddTask}
-							className="bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 text-white/90 px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
+							className="px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
+							style={actionButtonStyle(palette.primary)}
 						>
 							<span>+</span>
 							<span>Add Task</span>
@@ -294,11 +339,8 @@ export function ProjectDetail({
 								<button
 									key={f}
 									onClick={() => onTaskFilterChange(f)}
-									className={`px-3 py-1 text-xs rounded-full transition-all ${
-										taskFilter === f
-											? "bg-orange-600 text-white"
-											: "bg-black/40 text-white/60 hover:bg-orange-900/40"
-									}`}
+									className="px-3 py-1 text-xs rounded-full transition-all"
+									style={tabButtonStyle(taskFilter === f)}
 								>
 									{f.charAt(0).toUpperCase() + f.slice(1)}
 								</button>
@@ -307,12 +349,24 @@ export function ProjectDetail({
 					)}
 
 					{tasks.length === 0 ? (
-						<div className="text-center py-12 text-orange-400/60">
+						<div
+							className="text-center py-12"
+							style={{ color: hexToRgba(palette.primary, 0.6) }}
+						>
 							<CheckSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
 							<p className="text-lg font-medium">No tasks in this project</p>
-							<p className="text-sm mt-1 opacity-80">
+							<p
+								className="text-sm mt-1"
+								style={{ color: hexToRgba(palette.text, 0.55) }}
+							>
 								Click{" "}
-								<span className="text-white/60 font-medium">Add Task</span> to
+								<span
+									className="font-medium"
+									style={{ color: hexToRgba(palette.text, 0.7) }}
+								>
+									Add Task
+								</span>{" "}
+								to
 								begin
 							</p>
 						</div>
@@ -331,7 +385,7 @@ export function ProjectDetail({
 							filter={taskFilter}
 						/>
 					)}
-				</div>
+				</GlassPanel>
 			)}
 
 			{viewMode === "calendar" && (
@@ -356,14 +410,18 @@ export function ProjectDetail({
 			)}
 
 			{viewMode === "ground-grids" && (
-				<div className="bg-black/30 backdrop-blur-md border border-orange-500/30 rounded-lg p-6">
+				<GlassPanel tint={palette.secondary} hoverEffect={false} className="p-6">
 					<div className="flex items-center justify-between mb-4">
-						<h4 className="text-xl font-bold text-white/80">
+						<h4
+							className="text-xl font-bold"
+							style={{ color: hexToRgba(palette.text, 0.88) }}
+						>
 							Ground Grid Designs
 						</h4>
 						<button
 							onClick={createLinkedDesign}
-							className="bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 text-white/90 px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
+							className="px-4 py-2 rounded-lg transition-all flex items-center space-x-2"
+							style={actionButtonStyle(palette.primary)}
 						>
 							<Plus className="w-4 h-4" />
 							<span>New Design</span>
@@ -371,12 +429,18 @@ export function ProjectDetail({
 					</div>
 
 					{gridDesigns.length === 0 ? (
-						<div className="text-center py-12 text-orange-400/60">
+						<div
+							className="text-center py-12"
+							style={{ color: hexToRgba(palette.primary, 0.6) }}
+						>
 							<MapPin className="w-12 h-12 mx-auto mb-4 opacity-50" />
 							<p className="text-lg font-medium">
 								No ground grid designs linked
 							</p>
-							<p className="text-sm mt-1 opacity-80">
+							<p
+								className="text-sm mt-1"
+								style={{ color: hexToRgba(palette.text, 0.55) }}
+							>
 								Create a new design or link an existing one from the Grid
 								Generator
 							</p>
@@ -387,29 +451,56 @@ export function ProjectDetail({
 								<button
 									key={d.id}
 									onClick={() =>
-										navigate(`/apps/ground-grid-generator?design=${d.id}`)
+										navigate(`/app/apps/ground-grid?design=${d.id}`)
 									}
-									className="w-full text-left bg-black/20 hover:bg-black/30 border border-orange-500/20 hover:border-orange-500/40 rounded-lg p-4 transition-all flex items-center justify-between"
+									className="w-full text-left rounded-lg p-4 transition-all flex items-center justify-between"
+									style={{
+										...glassCardInnerStyle(palette, palette.secondary),
+										border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+									}}
 								>
 									<div className="flex items-center space-x-3">
-										<MapPin className="w-5 h-5 text-orange-400" />
+										<MapPin
+											className="w-5 h-5"
+											style={{ color: hexToRgba(palette.primary, 0.8) }}
+										/>
 										<div>
-											<div className="text-white/80 font-semibold">
+											<div
+												className="font-semibold"
+												style={{ color: hexToRgba(palette.text, 0.85) }}
+											>
 												{d.name}
 											</div>
-											<div className="text-xs text-white/40 mt-0.5">
+											<div
+												className="text-xs mt-0.5"
+												style={{ color: hexToRgba(palette.text, 0.45) }}
+											>
 												{new Date(d.updated_at).toLocaleDateString()}
 											</div>
 										</div>
 									</div>
 									<span
-										className={`px-2 py-0.5 rounded text-xs font-medium ${
-											d.status === "finalized"
-												? "bg-green-500/20 text-green-300 border border-green-500/30"
-												: d.status === "archived"
-													? "bg-white/10 text-white/40 border border-white/10"
-													: "bg-orange-500/20 text-orange-300 border border-orange-500/30"
-										}`}
+										className="px-2 py-0.5 rounded text-xs font-medium border"
+										style={{
+											background:
+												d.status === "finalized"
+													? hexToRgba("#22c55e", 0.18)
+													: d.status === "archived"
+														? hexToRgba(palette.surface, 0.4)
+														: hexToRgba(palette.primary, 0.16),
+											color:
+												d.status === "finalized"
+													? "#86efac"
+													: d.status === "archived"
+														? hexToRgba(palette.text, 0.5)
+														: hexToRgba(palette.text, 0.85),
+											borderColor:
+												d.status === "finalized"
+													? hexToRgba("#22c55e", 0.35)
+													: d.status === "archived"
+														? hexToRgba(palette.text, 0.08)
+														: hexToRgba(palette.primary, 0.3),
+										}}
 									>
 										{d.status}
 									</span>
@@ -417,7 +508,7 @@ export function ProjectDetail({
 							))}
 						</div>
 					)}
-				</div>
+				</GlassPanel>
 			)}
 		</div>
 	);

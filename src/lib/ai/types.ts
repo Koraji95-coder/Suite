@@ -32,7 +32,7 @@ export interface AIConfig {
 }
 
 export const DEFAULT_AI_CONFIG: AIConfig = {
-	provider: "ollama",
+	provider: "openai",
 	ollamaUrl: "http://localhost:11434",
 	ollamaModel: "llama3.2",
 	openaiModel: "gpt-4o",

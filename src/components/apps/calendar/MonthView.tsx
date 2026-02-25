@@ -15,8 +15,8 @@ import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
-} from "@/components/ui/Popover";
-import { hexToRgba, useTheme } from "@/lib/palette";
+} from "@/components/apps/ui/Popover";
+import { getContrastText, hexToRgba, useTheme } from "@/lib/palette";
 import {
 	type CalendarEvent,
 	DraggableEvent,
@@ -50,6 +50,7 @@ export function MonthView({
 	onEventCreate,
 }: MonthViewProps) {
 	const { palette } = useTheme();
+	const dayChipTextColor = getContrastText(palette.primary);
 	const days = useMemo(() => {
 		const monthStart = startOfMonth(currentDate);
 		const monthEnd = endOfMonth(monthStart);
@@ -180,12 +181,12 @@ export function MonthView({
 									>
 										<button
 											type="button"
-											className="mt-1 inline-flex size-6 items-center justify-center rounded-full text-sm transition-all"
+											className="mt-1.5 inline-flex size-7 items-center justify-center rounded-full text-sm leading-none transition-all"
 											style={{
 												...(isToday(day)
 													? {
 															backgroundColor: palette.primary,
-															color: "#fff",
+															color: dayChipTextColor,
 															fontWeight: "bold",
 															boxShadow: `0 0 8px ${hexToRgba(palette.primary, 0.4)}`,
 														}
@@ -281,7 +282,7 @@ export function MonthView({
 												<Popover modal>
 													<PopoverTrigger asChild>
 														<button
-															className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-1 text-left text-[10px] backdrop-blur-md transition outline-none select-none focus-visible:ring-[3px] sm:px-2 sm:text-xs"
+															className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-2 text-left text-[10px] leading-tight backdrop-blur-md transition outline-none select-none focus-visible:ring-[3px] sm:px-2.5 sm:text-xs"
 															onClick={(e) => e.stopPropagation()}
 														>
 															<span>

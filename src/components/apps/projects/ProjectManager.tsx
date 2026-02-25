@@ -5,8 +5,10 @@ import {
 	useSensors,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { Clock, FolderKanban, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
+import { logActivity } from "@/services/activityService";
 import type { Database } from "@/types/database";
 import { projectsInfo } from "../../data/panelInfo";
 import { triggerAutoBackup } from "../../lib/backupManager";
@@ -18,6 +20,7 @@ import {
 } from "../../lib/userSettings";
 import { PanelInfoDialog } from "../PanelInfoDialog";
 import { useToast } from "../ToastProvider";
+import { GlassPanel } from "../ui/GlassPanel";
 import { ProjectDetail } from "./ProjectDetail";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectList } from "./ProjectList";
@@ -34,7 +37,7 @@ import {
 	TaskFormData,
 	ViewMode,
 } from "./projectmanagertypes";
-import { toDateOnly } from "./projectmanagerutils";
+import { categoryColor, toDateOnly } from "./projectmanagerutils";
 import { TaskFormModal } from "./TaskFormModal";
 
 interface TaskSummary {
@@ -46,6 +49,7 @@ interface TaskSummary {
 }
 
 interface ProjectManagerProps {
+	initialProjectId?: string;
 	selectedCalendarDate?: string | null;
 	onCalendarDateChange?: (date: string | null) => void;
 	calendarMonth?: Date;
@@ -53,12 +57,14 @@ interface ProjectManagerProps {
 }
 
 export function ProjectManager({
+	initialProjectId,
 	selectedCalendarDate: externalSelectedDate,
 	onCalendarDateChange,
 	calendarMonth: externalMonth,
 	onCalendarMonthChange,
 }: ProjectManagerProps = {}) {
 	const { showToast } = useToast();
+	const { palette } = useTheme();
 
 	// State
 	const [projects, setProjects] = useState<Project[]>([]);
@@ -81,12 +87,25 @@ export function ProjectManager({
 	>(null);
 	const [fileFilter, setFileFilter] = useState("");
 	const [projectSearch, setProjectSearch] = useState("");
-	const [currentTime, setCurrentTime] = useState(new Date());
 	const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
 	const [taskFilter, setTaskFilter] = useState<TaskFilter>("all");
 	const [projectTaskCounts, setProjectTaskCounts] = useState<
 		Map<string, TaskCount>
 	>(new Map());
+
+	const getCurrentUserId = useCallback(async (): Promise<string | null> => {
+		const {
+			data: { user },
+			error,
+		} = await supabase.auth.getUser();
+
+		if (error || !user) {
+			showToast("error", "Please sign in to access project data.");
+			return null;
+		}
+
+		return user.id;
+	}, [showToast]);
 
 	// Form states
 	const [projectForm, setProjectForm] = useState<ProjectFormData>({
@@ -128,9 +147,17 @@ export function ProjectManager({
 
 	const loadProjects = useCallback(async () => {
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) {
+				setProjects([]);
+				setSelectedProject(null);
+				return;
+			}
+
 			const { data, error } = await supabase
 				.from("projects")
 				.select("*")
+				.eq("user_id", userId)
 				.order("created_at", { ascending: false });
 
 			if (error) throw error;
@@ -145,22 +172,36 @@ export function ProjectManager({
 			const message = err instanceof Error ? err.message : "An error occurred";
 			showToast("error", `Failed to load projects: ${message}`);
 		}
-	}, [selectedProject, showToast]);
+	}, [selectedProject, showToast, getCurrentUserId]);
 
 	// Load initial data
 	useEffect(() => {
 		loadProjects();
-		const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-		return () => clearInterval(timer);
 	}, [loadProjects]);
+
+	useEffect(() => {
+		if (!initialProjectId || projects.length === 0) return;
+
+		const matched = projects.find((project) => project.id === initialProjectId);
+		if (matched && matched.id !== selectedProject?.id) {
+			setSelectedProject(matched);
+		}
+	}, [initialProjectId, projects, selectedProject?.id]);
 
 	const loadTasks = useCallback(
 		async (projectId: string) => {
 			try {
+				const userId = await getCurrentUserId();
+				if (!userId) {
+					setTasks([]);
+					return;
+				}
+
 				const { data, error } = await supabase
 					.from("tasks")
 					.select("*")
 					.eq("project_id", projectId)
+					.eq("user_id", userId)
 					.order("order", { ascending: true });
 
 				if (error) throw error;
@@ -171,16 +212,23 @@ export function ProjectManager({
 				showToast("error", `Failed to load tasks: ${message}`);
 			}
 		},
-		[showToast],
+		[showToast, getCurrentUserId],
 	);
 
 	const loadFiles = useCallback(
 		async (projectId: string) => {
 			try {
+				const userId = await getCurrentUserId();
+				if (!userId) {
+					setFiles([]);
+					return;
+				}
+
 				const { data, error } = await supabase
 					.from("files")
 					.select("*")
 					.eq("project_id", projectId)
+					.eq("user_id", userId)
 					.order("uploaded_at", { ascending: false });
 
 				if (error) throw error;
@@ -191,16 +239,23 @@ export function ProjectManager({
 				showToast("error", `Failed to load files: ${message}`);
 			}
 		},
-		[showToast],
+		[showToast, getCurrentUserId],
 	);
 
 	const loadCalendarEvents = useCallback(
 		async (projectId: string) => {
 			try {
+				const userId = await getCurrentUserId();
+				if (!userId) {
+					setCalendarEvents([]);
+					return;
+				}
+
 				const { data, error } = await supabase
 					.from("calendar_events")
 					.select("*")
 					.eq("project_id", projectId)
+					.eq("user_id", userId)
 					.order("due_date", { ascending: true });
 
 				if (error) throw error;
@@ -211,7 +266,7 @@ export function ProjectManager({
 				showToast("error", `Failed to load calendar events: ${message}`);
 			}
 		},
-		[showToast],
+		[showToast, getCurrentUserId],
 	);
 
 	useEffect(() => {
@@ -253,9 +308,13 @@ export function ProjectManager({
 		async (projectList: Project[]) => {
 			if (projectList.length === 0) return;
 			try {
+				const userId = await getCurrentUserId();
+				if (!userId) return;
+
 				const { data, error } = await supabase
 					.from("tasks")
 					.select("id, project_id, completed, due_date, name")
+					.eq("user_id", userId)
 					.in(
 						"project_id",
 						projectList.map((p) => p.id),
@@ -305,23 +364,28 @@ export function ProjectManager({
 				/* silent - non-critical */
 			}
 		},
-		[],
+		[getCurrentUserId],
 	);
 
 	useEffect(() => {
 		if (projects.length > 0) loadAllProjectTaskCounts(projects);
-	}, [projects, tasks, loadAllProjectTaskCounts]);
+	}, [projects, loadAllProjectTaskCounts]);
 
 	// CRUD operations for projects
 	const createProject = async () => {
 		if (!projectForm.name) return;
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) return;
+
 			const payload: Database["public"]["Tables"]["projects"]["Insert"] = {
 				...projectForm,
 				deadline: toDateOnly(projectForm.deadline) || null,
 				category: projectForm.category || "Uncategorized",
-				color: "#a855f7", // will be overridden by category color later
-				user_id: "Dustin",
+				color: projectForm.category
+					? categoryColor(projectForm.category)
+					: categoryColor(null),
+				user_id: userId,
 			};
 
 			const { data, error } = await supabase
@@ -332,11 +396,11 @@ export function ProjectManager({
 			if (error) throw error;
 
 			if (data) {
-				await logActivity(
-					"create",
-					`Created project: ${projectForm.name}`,
-					data[0].id,
-				);
+				await logActivity({
+					action: "create",
+					description: `Created project: ${projectForm.name}`,
+					projectId: data[0].id,
+				});
 				setProjects([data[0], ...projects]);
 				setSelectedProject(data[0]);
 				setShowProjectModal(false);
@@ -353,11 +417,16 @@ export function ProjectManager({
 	const updateProject = async () => {
 		if (!editingProject) return;
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) return;
+
 			const payload: Database["public"]["Tables"]["projects"]["Update"] = {
 				...projectForm,
 				deadline: toDateOnly(projectForm.deadline) || null,
 				category: projectForm.category || "Uncategorized",
-				color: "#a855f7",
+				color: projectForm.category
+					? categoryColor(projectForm.category)
+					: categoryColor(null),
 				priority: projectForm.priority,
 				status: projectForm.status,
 			};
@@ -365,15 +434,16 @@ export function ProjectManager({
 			const { error } = await supabase
 				.from("projects")
 				.update(payload)
-				.eq("id", editingProject.id);
+				.eq("id", editingProject.id)
+				.eq("user_id", userId);
 
 			if (error) throw error;
 
-			await logActivity(
-				"update",
-				`Updated project: ${projectForm.name}`,
-				editingProject.id,
-			);
+			await logActivity({
+				action: "update",
+				description: `Updated project: ${projectForm.name}`,
+				projectId: editingProject.id,
+			});
 			const updatedProjects = projects.map((p) =>
 				p.id === editingProject.id ? { ...p, ...payload } : p,
 			);
@@ -397,13 +467,21 @@ export function ProjectManager({
 	const deleteProject = async (projectId: string) => {
 		if (!confirm("Are you sure you want to delete this project?")) return;
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) return;
+
 			const { error } = await supabase
 				.from("projects")
 				.delete()
-				.eq("id", projectId);
+				.eq("id", projectId)
+				.eq("user_id", userId);
 			if (error) throw error;
 
-			await logActivity("delete", `Deleted a project`, null);
+			await logActivity({
+				action: "delete",
+				description: "Deleted a project",
+				projectId,
+			});
 			const remaining = projects.filter((p) => p.id !== projectId);
 			setProjects(remaining);
 
@@ -422,18 +500,22 @@ export function ProjectManager({
 		const isArchived = project.status === "completed";
 		const newStatus: ProjectStatus = isArchived ? "active" : "completed";
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) return;
+
 			const { error } = await supabase
 				.from("projects")
 				.update({ status: newStatus })
-				.eq("id", project.id);
+				.eq("id", project.id)
+				.eq("user_id", userId);
 
 			if (error) throw error;
 
-			await logActivity(
-				"update",
-				`${isArchived ? "Unarchived" : "Archived"} project: ${project.name}`,
-				project.id,
-			);
+			await logActivity({
+				action: "update",
+				description: `${isArchived ? "Unarchived" : "Archived"} project: ${project.name}`,
+				projectId: project.id,
+			});
 			const updatedProjects = projects.map((p) =>
 				p.id === project.id ? { ...p, status: newStatus } : p,
 			);
@@ -497,6 +579,9 @@ export function ProjectManager({
 	const createTask = async () => {
 		if (!taskForm.name || !selectedProject) return;
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) return;
+
 			const parentId = parentTaskForSubtask;
 			let maxOrder = -1;
 			if (parentId) {
@@ -520,7 +605,7 @@ export function ProjectManager({
 						priority: taskForm.priority,
 						parent_task_id: parentTaskForSubtask,
 						order: maxOrder + 1,
-						user_id: "Dustin",
+						user_id: userId,
 					},
 				])
 				.select();
@@ -528,11 +613,12 @@ export function ProjectManager({
 			if (error) throw error;
 
 			if (data) {
-				await logActivity(
-					"create",
-					`Added task: ${taskForm.name}`,
-					selectedProject.id,
-				);
+				await logActivity({
+					action: "create",
+					description: `Added task: ${taskForm.name}`,
+					projectId: selectedProject.id,
+					taskId: data[0].id,
+				});
 
 				if (taskForm.due_date) {
 					await supabase.from("calendar_events").insert([
@@ -542,7 +628,7 @@ export function ProjectManager({
 							due_date: toDateOnly(taskForm.due_date),
 							title: taskForm.name,
 							type: "deadline",
-							user_id: "Dustin",
+							user_id: userId,
 						},
 					]);
 				}
@@ -564,6 +650,9 @@ export function ProjectManager({
 	const updateTask = async () => {
 		if (!editingTask || !selectedProject) return;
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) return;
+
 			const { error } = await supabase
 				.from("tasks")
 				.update({
@@ -572,15 +661,17 @@ export function ProjectManager({
 					due_date: toDateOnly(taskForm.due_date) || null,
 					priority: taskForm.priority,
 				})
-				.eq("id", editingTask.id);
+				.eq("id", editingTask.id)
+				.eq("user_id", userId);
 
 			if (error) throw error;
 
-			await logActivity(
-				"update",
-				`Updated task: ${taskForm.name}`,
-				selectedProject.id,
-			);
+			await logActivity({
+				action: "update",
+				description: `Updated task: ${taskForm.name}`,
+				projectId: selectedProject.id,
+				taskId: editingTask.id,
+			});
 
 			if (taskForm.due_date) {
 				const existingEvent = calendarEvents.find(
@@ -593,7 +684,8 @@ export function ProjectManager({
 							due_date: toDateOnly(taskForm.due_date),
 							title: taskForm.name,
 						})
-						.eq("id", existingEvent.id);
+						.eq("id", existingEvent.id)
+						.eq("user_id", userId);
 				} else {
 					await supabase.from("calendar_events").insert([
 						{
@@ -602,7 +694,7 @@ export function ProjectManager({
 							due_date: toDateOnly(taskForm.due_date),
 							title: taskForm.name,
 							type: "deadline",
-							user_id: "Dustin",
+							user_id: userId,
 						},
 					]);
 				}
@@ -610,7 +702,8 @@ export function ProjectManager({
 				await supabase
 					.from("calendar_events")
 					.delete()
-					.eq("task_id", editingTask.id);
+					.eq("task_id", editingTask.id)
+					.eq("user_id", userId);
 			}
 
 			if (editingTask.project_id) {
@@ -639,18 +732,23 @@ export function ProjectManager({
 		);
 
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) return;
+
 			const { error } = await supabase
 				.from("tasks")
 				.update({ completed: newCompleted })
-				.eq("id", task.id);
+				.eq("id", task.id)
+				.eq("user_id", userId);
 
 			if (error) throw error;
 
-			await logActivity(
-				"update",
-				`${newCompleted ? "Completed" : "Uncompleted"} task: ${task.name}`,
-				selectedProject?.id || null,
-			);
+			await logActivity({
+				action: "update",
+				description: `${newCompleted ? "Completed" : "Uncompleted"} task: ${task.name}`,
+				projectId: selectedProject?.id || null,
+				taskId: task.id,
+			});
 			triggerAutoBackup();
 		} catch (err) {
 			setTasks(previousTasks);
@@ -672,24 +770,30 @@ export function ProjectManager({
 	const deleteTask = async (taskId: string) => {
 		if (!confirm("Are you sure? This will also delete all subtasks.")) return;
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) return;
+
 			const idsToDelete = collectTaskIds(taskId);
 			const { error } = await supabase
 				.from("tasks")
 				.delete()
+				.eq("user_id", userId)
 				.in("id", idsToDelete);
 			if (error) throw error;
 
 			await supabase
 				.from("calendar_events")
 				.delete()
+				.eq("user_id", userId)
 				.in("task_id", idsToDelete);
 
 			if (selectedProject) {
-				await logActivity(
-					"delete",
-					`Deleted task and ${idsToDelete.length - 1} subtasks`,
-					selectedProject.id,
-				);
+				await logActivity({
+					action: "delete",
+					description: `Deleted task and ${idsToDelete.length - 1} subtasks`,
+					projectId: selectedProject.id,
+					taskId,
+				});
 				loadTasks(selectedProject.id);
 				loadCalendarEvents(selectedProject.id);
 			}
@@ -764,9 +868,14 @@ export function ProjectManager({
 	) => {
 		if (!selectedProject || !event.target.files?.length) return;
 		const file = event.target.files[0];
-		const fileName = `${selectedProject.id}/${Date.now()}_${file.name}`;
 
 		try {
+			const userId = await getCurrentUserId();
+			if (!userId) return;
+
+			const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+			const fileName = `${userId}/${selectedProject.id}/${Date.now()}_${safeFileName}`;
+
 			const { data: uploadData, error: uploadError } = await supabase.storage
 				.from("project-files")
 				.upload(fileName, file);
@@ -780,18 +889,18 @@ export function ProjectManager({
 					file_path: uploadData.path,
 					size: file.size,
 					mime_type: file.type,
-					user_id: "Dustin",
+					user_id: userId,
 				};
 
 				const { error: dbError } = await supabase.from("files").insert(payload);
 
 				if (dbError) throw dbError;
 
-				await logActivity(
-					"upload",
-					`Uploaded file: ${file.name}`,
-					selectedProject.id,
-				);
+				await logActivity({
+					action: "upload",
+					description: `Uploaded file: ${file.name}`,
+					projectId: selectedProject.id,
+				});
 				loadFiles(selectedProject.id);
 				showToast("success", `File "${file.name}" uploaded`);
 				triggerAutoBackup();
@@ -813,20 +922,6 @@ export function ProjectManager({
 			const message = err instanceof Error ? err.message : "An error occurred";
 			showToast("error", `Failed to download: ${message}`);
 		}
-	};
-
-	const logActivity = async (
-		action: string,
-		description: string,
-		projectId: string | null,
-	) => {
-		const payload: Database["public"]["Tables"]["activity_log"]["Insert"] = {
-			action,
-			description,
-			project_id: projectId,
-			user_id: "Dustin",
-		};
-		await supabase.from("activity_log").insert(payload);
 	};
 
 	const resetProjectForm = () => {
@@ -903,51 +998,40 @@ export function ProjectManager({
 		}
 	};
 
+	const primaryActionStyle = {
+		...glassCardInnerStyle(palette, palette.primary),
+		color: hexToRgba(palette.text, 0.9),
+	};
+
 	return (
-		<div className="space-y-6">
+		<div className="space-y-4">
 			{/* Header */}
-			<div className="flex items-center justify-between">
-				<div className="flex items-center space-x-3">
-					<div className="p-3 bg-gradient-to-br from-orange-500/20 to-amber-500/10 rounded-lg">
-						<FolderKanban
-							className="w-8 h-8 text-orange-400 animate-pulse"
-							style={{ animationDuration: "2s" }}
-						/>
-					</div>
-					<div>
-						<h2 className="text-3xl font-bold text-white/80">
-							Project Manager
-						</h2>
-						<p className="text-orange-400/70 text-sm">
-							Organize and track your engineering projects
-						</p>
-					</div>
+			<GlassPanel
+				variant="toolbar"
+				padded
+				hoverEffect={false}
+				tint={palette.primary}
+			>
+				<div className="flex flex-wrap items-center justify-between gap-3">
 					<button
 						onClick={() => {
 							setEditingProject(null);
 							resetProjectForm();
 							setShowProjectModal(true);
 						}}
-						className="ml-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-orange-500/30 flex items-center space-x-2"
+						className="px-5 py-2.5 rounded-lg transition-all flex items-center space-x-2 font-semibold"
+						style={primaryActionStyle}
 					>
 						<Plus className="w-5 h-5" />
 						<span>New Project</span>
 					</button>
-				</div>
-				<div className="flex items-center space-x-4">
-					<div className="flex items-center space-x-2">
-						<Clock className="w-5 h-5 text-orange-400" />
-						<span className="text-lg font-mono text-white/90">
-							{currentTime.toLocaleTimeString()}
-						</span>
-					</div>
 					<PanelInfoDialog
 						title={projectsInfo.title}
 						sections={projectsInfo.sections}
 						colorScheme={projectsInfo.colorScheme}
 					/>
 				</div>
-			</div>
+			</GlassPanel>
 
 			{/* Project Form Modal */}
 			<ProjectFormModal
@@ -980,9 +1064,13 @@ export function ProjectManager({
 			/>
 
 			{/* Main Grid */}
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+			<div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-4">
 				{/* Left Column: Project List */}
-				<div className="lg:col-span-1">
+				<GlassPanel
+					tint={palette.secondary}
+					hoverEffect={false}
+					className="p-4"
+				>
 					<ProjectList
 						projects={projects}
 						selectedProject={selectedProject}
@@ -995,10 +1083,10 @@ export function ProjectManager({
 						searchQuery={projectSearch}
 						onSearchChange={setProjectSearch}
 					/>
-				</div>
+				</GlassPanel>
 
 				{/* Right Column: Project Details */}
-				<div className="lg:col-span-2">
+				<div className="space-y-4">
 					{selectedProject ? (
 						<ProjectDetail
 							project={selectedProject}
@@ -1035,11 +1123,18 @@ export function ProjectManager({
 							onDownloadFile={downloadFile}
 						/>
 					) : (
-						<div className="bg-black/30 backdrop-blur-md border border-orange-500/30 rounded-lg p-12 flex flex-col items-center justify-center">
-							<p className="text-white/50 text-lg">
+						<GlassPanel
+							tint={palette.secondary}
+							hoverEffect={false}
+							className="p-12 flex flex-col items-center justify-center"
+						>
+							<p
+								className="text-lg"
+								style={{ color: hexToRgba(palette.text, 0.6) }}
+							>
 								Select a project to view details
 							</p>
-						</div>
+						</GlassPanel>
 					)}
 				</div>
 			</div>

@@ -1,15 +1,9 @@
 import { Activity } from "lucide-react";
-import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
+import { hexToRgba, useTheme } from "@/lib/palette";
+import type { ActivityLogRow } from "@/services/activityService";
 import { GlassPanel } from "../ui/GlassPanel";
+import { bubbleStyle } from "./dashboardStyles";
 import { getCategoryColor } from "./dashboardUtils";
-
-interface ActivityItem {
-	id: string;
-	action: string;
-	description: string;
-	timestamp: string;
-	project_id: string | null;
-}
 
 interface ProjectSummary {
 	id: string;
@@ -17,7 +11,7 @@ interface ProjectSummary {
 }
 
 interface RecentActivityListProps {
-	activities: ActivityItem[];
+	activities: ActivityLogRow[];
 	allProjectsMap: Map<string, ProjectSummary>;
 }
 
@@ -27,7 +21,13 @@ export function RecentActivityList({
 }: RecentActivityListProps) {
 	const { palette } = useTheme();
 	return (
-		<GlassPanel tint={palette.accent} hoverEffect={false} className="p-6 group">
+		<GlassPanel
+			tint={palette.accent}
+			hoverEffect={false}
+			specular={false}
+			bevel={false}
+			className="p-7 group"
+		>
 			<div className="relative z-10">
 				<div className="flex items-center space-x-2 mb-4">
 					<div
@@ -41,13 +41,13 @@ export function RecentActivityList({
 					</div>
 					<h3
 						className="text-xl font-bold"
-						style={{ color: hexToRgba(palette.text, 0.9) }}
+						style={{ color: palette.primary }}
 					>
 						Recent Activity
 					</h3>
 				</div>
 
-				<div className="space-y-2">
+				<div className="space-y-3">
 					{activities.length === 0 ? (
 						<p
 							className="text-sm"
@@ -66,8 +66,8 @@ export function RecentActivityList({
 							return (
 								<div
 									key={activity.id}
-									className="flex items-start space-x-3 p-3 transition-all duration-300 hover:scale-[1.01] hover:-translate-y-px"
-									style={glassCardInnerStyle(palette, palette.accent)}
+									className="flex items-start space-x-3 px-5 py-4 transition-all duration-300 hover:scale-[1.01] hover:-translate-y-px"
+									style={bubbleStyle(palette, palette.accent)}
 								>
 									<div className="mt-1.5">
 										<div

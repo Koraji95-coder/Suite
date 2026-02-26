@@ -20,7 +20,7 @@ import {
 } from "../../lib/userSettings";
 import { PanelInfoDialog } from "../PanelInfoDialog";
 import { useToast } from "../ToastProvider";
-import { GlassPanel } from "../ui/GlassPanel";
+import { TieredCard } from "../ui/TieredCard";
 import { ProjectDetail } from "./ProjectDetail";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectList } from "./ProjectList";
@@ -1006,11 +1006,10 @@ export function ProjectManager({
 	return (
 		<div className="space-y-4">
 			{/* Header */}
-			<GlassPanel
-				variant="toolbar"
-				padded
-				hoverEffect={false}
+			<TieredCard
+				tier="solid"
 				tint={palette.primary}
+				padded
 			>
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<button
@@ -1031,7 +1030,7 @@ export function ProjectManager({
 						colorScheme={projectsInfo.colorScheme}
 					/>
 				</div>
-			</GlassPanel>
+			</TieredCard>
 
 			{/* Project Form Modal */}
 			<ProjectFormModal
@@ -1066,9 +1065,9 @@ export function ProjectManager({
 			{/* Main Grid */}
 			<div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-4">
 				{/* Left Column: Project List */}
-				<GlassPanel
+				<TieredCard
+					tier="solid"
 					tint={palette.secondary}
-					hoverEffect={false}
 					className="p-4"
 				>
 					<ProjectList
@@ -1083,7 +1082,7 @@ export function ProjectManager({
 						searchQuery={projectSearch}
 						onSearchChange={setProjectSearch}
 					/>
-				</GlassPanel>
+				</TieredCard>
 
 				{/* Right Column: Project Details */}
 				<div className="space-y-4">
@@ -1123,9 +1122,9 @@ export function ProjectManager({
 							onDownloadFile={downloadFile}
 						/>
 					) : (
-						<GlassPanel
+						<TieredCard
+							tier="solid"
 							tint={palette.secondary}
-							hoverEffect={false}
 							className="p-12 flex flex-col items-center justify-center"
 						>
 							<p
@@ -1134,7 +1133,7 @@ export function ProjectManager({
 							>
 								Select a project to view details
 							</p>
-						</GlassPanel>
+						</TieredCard>
 					)}
 				</div>
 			</div>

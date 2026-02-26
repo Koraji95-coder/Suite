@@ -1,6 +1,6 @@
 import { BarChart3, Folder } from "lucide-react";
 import { hexToRgba, useTheme } from "@/lib/palette";
-import { GlassPanel } from "../ui/GlassPanel";
+import { AccentBandCard } from "../ui/TieredCard";
 import { formatBytes } from "./dashboardUtils";
 
 interface StatsCardsProps {
@@ -21,13 +21,13 @@ export function StatsCards({
 			key: "projects",
 			label: "Active Projects",
 			icon: BarChart3,
-			tint: palette.primary,
+			bandColor: palette.primary,
 		},
 		{
 			key: "storage",
 			label: "Storage Used",
 			icon: Folder,
-			tint: palette.secondary,
+			bandColor: palette.secondary,
 		},
 	] as const;
 	const values: Record<string, string> = {
@@ -37,24 +37,22 @@ export function StatsCards({
 
 	return (
 		<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			{cardConfigs.map(({ key, label, icon: Icon, tint }) => (
-				<GlassPanel
+			{cardConfigs.map(({ key, label, icon: Icon, bandColor }) => (
+				<AccentBandCard
 					key={key}
-					tint={tint}
-					specular={false}
-					bevel={false}
-					className="px-7 py-6 group hover:scale-[1.03] hover:-translate-y-1"
+					bandColor={bandColor}
+					className="px-7 py-6 group hover:translate-y-[-2px]"
 					style={{ cursor: "default" }}
 				>
 					<div className="relative z-10 flex items-center space-x-4">
 						<div
 							className="p-3 rounded-xl"
 							style={{
-								background: `linear-gradient(135deg, ${hexToRgba(tint, 0.25)} 0%, ${hexToRgba(tint, 0.08)} 100%)`,
-								boxShadow: `0 0 20px ${hexToRgba(tint, 0.15)}`,
+								background: `linear-gradient(135deg, ${hexToRgba(bandColor, 0.25)} 0%, ${hexToRgba(bandColor, 0.08)} 100%)`,
+								boxShadow: `0 0 20px ${hexToRgba(bandColor, 0.15)}`,
 							}}
 						>
-							<Icon className="w-6 h-6" style={{ color: tint }} />
+							<Icon className="w-6 h-6" style={{ color: bandColor }} />
 						</div>
 						<div>
 							<p
@@ -71,15 +69,7 @@ export function StatsCards({
 							</p>
 						</div>
 					</div>
-
-					{/* Bottom accent bar */}
-					<div
-						className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full opacity-40 group-hover:opacity-70 transition-opacity"
-						style={{
-							background: `linear-gradient(90deg, transparent, ${tint}, transparent)`,
-						}}
-					/>
-				</GlassPanel>
+				</AccentBandCard>
 			))}
 		</div>
 	);

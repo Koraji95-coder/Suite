@@ -1,7 +1,7 @@
 import { AlertCircle, AlertTriangle, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { hexToRgba, useTheme } from "@/lib/palette";
-import { GlassPanel } from "../ui/GlassPanel";
+import { TieredCard } from "../ui/TieredCard";
 import { bubbleStyle, softButtonStyle } from "./dashboardStyles";
 import {
 	formatDateOnly,
@@ -44,12 +44,10 @@ export function ActiveProjectsList({
 	const { palette } = useTheme();
 	const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
 	return (
-		<GlassPanel
+		<TieredCard
+			tier="solid"
 			tint={palette.secondary}
-			hoverEffect={false}
-			specular={false}
-			bevel={false}
-			className="p-7 group"
+			className="p-7"
 		>
 			<div className="relative z-10">
 				<div className="flex items-center justify-between mb-4">
@@ -182,6 +180,6 @@ export function ActiveProjectsList({
 					)}
 				</div>
 			</div>
-		</GlassPanel>
+		</TieredCard>
 	);
 }

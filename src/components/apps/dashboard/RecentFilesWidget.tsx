@@ -2,7 +2,7 @@ import { Clock, ExternalLink, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useRecentFiles } from "@/hooks/useRecentFiles";
 import { hexToRgba, useTheme } from "@/lib/palette";
-import { GlassPanel } from "../ui/GlassPanel";
+import { TieredCard } from "../ui/TieredCard";
 import { bubbleStyle } from "./dashboardStyles";
 
 export function RecentFilesWidget() {
@@ -25,12 +25,10 @@ export function RecentFilesWidget() {
 	};
 
 	return (
-		<GlassPanel
+		<TieredCard
+			tier="solid"
 			tint={palette.primary}
-			hoverEffect={false}
-			specular={false}
-			bevel={false}
-			className="p-7 group"
+			className="p-7"
 		>
 			<div className="relative z-10">
 				<div className="flex items-center space-x-2 mb-4">
@@ -124,6 +122,6 @@ export function RecentFilesWidget() {
 					</div>
 				)}
 			</div>
-		</GlassPanel>
+		</TieredCard>
 	);
 }

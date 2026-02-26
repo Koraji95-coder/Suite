@@ -1,7 +1,7 @@
 import { Activity } from "lucide-react";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import type { ActivityLogRow } from "@/services/activityService";
-import { GlassPanel } from "../ui/GlassPanel";
+import { TieredCard } from "../ui/TieredCard";
 import { bubbleStyle } from "./dashboardStyles";
 import { getCategoryColor } from "./dashboardUtils";
 
@@ -21,12 +21,10 @@ export function RecentActivityList({
 }: RecentActivityListProps) {
 	const { palette } = useTheme();
 	return (
-		<GlassPanel
+		<TieredCard
+			tier="solid"
 			tint={palette.accent}
-			hoverEffect={false}
-			specular={false}
-			bevel={false}
-			className="p-7 group"
+			className="p-7"
 		>
 			<div className="relative z-10">
 				<div className="flex items-center space-x-2 mb-4">
@@ -98,6 +96,6 @@ export function RecentActivityList({
 					)}
 				</div>
 			</div>
-		</GlassPanel>
+		</TieredCard>
 	);
 }

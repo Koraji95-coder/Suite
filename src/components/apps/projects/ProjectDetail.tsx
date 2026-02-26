@@ -20,7 +20,7 @@ import { supabase } from "@/lib/supabase";
 import type { Json } from "@/types/database";
 import { CalendarView } from "./CalendarView";
 import { FilesBrowser } from "./FilesBrowser";
-import { GlassPanel } from "../ui/GlassPanel";
+import { TieredCard } from "../ui/TieredCard";
 import {
 	CalendarEvent,
 	Project,
@@ -164,9 +164,9 @@ export function ProjectDetail({
 	return (
 		<div className="space-y-6">
 			{/* Project Header */}
-			<GlassPanel
+			<TieredCard
+				tier="frosted"
 				tint={palette.primary}
-				hoverEffect={false}
 				className="p-6"
 			>
 				<div className="flex items-start justify-between mb-4">
@@ -278,7 +278,7 @@ export function ProjectDetail({
 						></div>
 					</div>
 				</div>
-			</GlassPanel>
+			</TieredCard>
 
 			{/* View Mode Tabs */}
 			<div className="flex space-x-2 mb-4">
@@ -315,7 +315,7 @@ export function ProjectDetail({
 
 			{/* Content based on view mode */}
 			{viewMode === "tasks" && (
-				<GlassPanel tint={palette.secondary} hoverEffect={false} className="p-6">
+				<TieredCard tier="solid" tint={palette.secondary} className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h4
 							className="text-xl font-bold"
@@ -385,7 +385,7 @@ export function ProjectDetail({
 							filter={taskFilter}
 						/>
 					)}
-				</GlassPanel>
+				</TieredCard>
 			)}
 
 			{viewMode === "calendar" && (
@@ -410,7 +410,7 @@ export function ProjectDetail({
 			)}
 
 			{viewMode === "ground-grids" && (
-				<GlassPanel tint={palette.secondary} hoverEffect={false} className="p-6">
+				<TieredCard tier="solid" tint={palette.secondary} className="p-6">
 					<div className="flex items-center justify-between mb-4">
 						<h4
 							className="text-xl font-bold"
@@ -508,7 +508,7 @@ export function ProjectDetail({
 							))}
 						</div>
 					)}
-				</GlassPanel>
+				</TieredCard>
 			)}
 		</div>
 	);

@@ -8,7 +8,7 @@
 import { endOfDay, format, isSameDay, startOfDay } from "date-fns";
 import { PlusIcon } from "lucide-react";
 import { useMemo } from "react";
-import { GlassPanel } from "@/components/apps/ui/GlassPanel";
+import { TieredCard } from "@/components/apps/ui/TieredCard";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "./calendarindex";
@@ -85,14 +85,10 @@ export function CalendarRightRail({
 			>
 				<div className="grid gap-4 overflow-auto pr-1">
 					{/* Selected day */}
-					<GlassPanel
+					<TieredCard
+						tier="frosted"
 						tint={palette.primary}
-						intensity="medium"
-						bevel
-						specular
-						hoverEffect={false}
 						className="rounded-2xl p-5"
-						style={{ border: `1px solid ${hexToRgba(palette.primary, 0.12)}` }}
 					>
 						<div className="flex items-start justify-between gap-3">
 							<div className="min-w-0">
@@ -188,17 +184,13 @@ export function CalendarRightRail({
 								</div>
 							)}
 						</div>
-					</GlassPanel>
+					</TieredCard>
 
 					{/* Upcoming list */}
-					<GlassPanel
+					<TieredCard
+						tier="solid"
 						tint={palette.primary}
-						intensity="medium"
-						bevel
-						specular
-						hoverEffect={false}
 						className="rounded-2xl p-5"
-						style={{ border: `1px solid ${hexToRgba(palette.text, 0.08)}` }}
 					>
 						<div className="flex items-center justify-between gap-3">
 							<div
@@ -273,7 +265,7 @@ export function CalendarRightRail({
 								</div>
 							) : null}
 						</div>
-					</GlassPanel>
+					</TieredCard>
 				</div>
 			</div>
 		</div>

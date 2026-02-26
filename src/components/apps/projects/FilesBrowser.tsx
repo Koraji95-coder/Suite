@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
 import { ProjectFile } from "./projectmanagertypes";
 import { formatDateOnly, getFileIcon } from "./projectmanagerutils";
-import { GlassPanel } from "../ui/GlassPanel";
+import { TieredCard } from "../ui/TieredCard";
 
 interface FilesBrowserProps {
 	files: ProjectFile[];
@@ -30,7 +30,7 @@ export function FilesBrowser({
 	);
 
 	return (
-		<GlassPanel tint={palette.secondary} hoverEffect={false} className="p-6">
+		<TieredCard tier="solid" tint={palette.secondary} className="p-6">
 			<div className="flex items-center justify-between mb-4">
 				<h4
 					className="text-xl font-bold"
@@ -118,6 +118,6 @@ export function FilesBrowser({
 					))
 				)}
 			</div>
-		</GlassPanel>
+		</TieredCard>
 	);
 }

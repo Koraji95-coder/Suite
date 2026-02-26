@@ -5,7 +5,7 @@ import { hexToRgba, useTheme } from "@/lib/palette";
 import { UpcomingBanner } from "../calendar/UpcomingBanner";
 import { getUpcomingNext7Days } from "../calendar/upcoming";
 import { useCalendarEvents } from "../calendar/hooks/useCalendarEvents";
-import { GlassPanel } from "../ui/GlassPanel";
+import { TieredCard } from "../ui/TieredCard";
 import { bubbleStyle } from "./dashboardStyles";
 
 export function DashboardUpcomingPanel() {
@@ -16,12 +16,10 @@ export function DashboardUpcomingPanel() {
 	const upcomingPreview = upcoming.slice(0, 4);
 
 	return (
-		<GlassPanel
+		<TieredCard
+			tier="frosted"
 			tint={palette.primary}
-			hoverEffect={false}
-			specular={false}
-			bevel={false}
-			className="p-7 group"
+			className="p-7"
 		>
 			<div className="relative z-10">
 				<div className="flex items-center justify-between mb-4">
@@ -107,6 +105,6 @@ export function DashboardUpcomingPanel() {
 					</div>
 				)}
 			</div>
-		</GlassPanel>
+		</TieredCard>
 	);
 }

@@ -183,6 +183,24 @@ export default function LoginPage() {
 						Forgot password?
 					</Link>
 				</div>
+
+				<button
+					type="button"
+					className="auth-submit"
+					style={{
+						marginTop: 12,
+						background: "rgba(255,255,255,0.06)",
+						border: "1px dashed rgba(255,255,255,0.15)",
+						color: "rgba(255,255,255,0.5)",
+						fontSize: 13,
+					}}
+					onClick={() => {
+						sessionStorage.setItem("dev_bypass_auth", "1");
+						navigate("/app/home", { replace: true });
+					}}
+				>
+					Dev Preview (skip auth)
+				</button>
 			</form>
 		</AuthShell>
 	);

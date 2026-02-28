@@ -1,12 +1,15 @@
+// src/lib/palette.ts
 /**
  * palette.ts -- Centralized color theme system
  *
- * Replaces the former lib/three/emberPalette.ts. Provides:
- *   - ColorScheme type and 11 built-in schemes (including new default "Graphite Cyan")
- *   - ThemeProvider / useTheme() React context for reactive theme switching
- *   - Pure helper functions: hexToRgba, glassCardStyle, glassCardInnerStyle
+ * Provides:
+ *   - ColorScheme type and built-in schemes
+ *   - ThemeProvider / useTheme()
+ *   - Helper functions: hexToRgba, getContrastText,
+ *     glassCardStyle, glassCardInnerStyle, GLASS_SPECULAR_GRADIENT
  *
- * All components should import from here instead of the old path.
+ * Theme animation:
+ *   - Adds `html.theme-animating` briefly during setScheme to avoid global perf costs.
  */
 import React, {
 	createContext,
@@ -14,11 +17,11 @@ import React, {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 
 // --- Color Scheme Type ---
-
 export interface ColorScheme {
 	name: string;
 	description: string;
@@ -34,256 +37,172 @@ export interface ColorScheme {
 	glow: string;
 }
 
-// --- 11 Built-in Schemes ---
-
+// --- Schemes ---
 export const COLOR_SCHEMES: Record<string, ColorScheme> = {
-	blockflow: {
-		name: "BlockFlow",
-		description: "Default BlockFlow glass theme",
-		background: "#090b12",
-		surface: "#141826",
-		surfaceLight: "#1d2435",
-		primary: "#f8c67e",
-		secondary: "#d4d8e8",
-		tertiary: "#7ee8f8",
-		accent: "#f87e9e",
-		text: "#f5f8ff",
-		textMuted: "#94a3b8",
-		glow: "rgba(248, 198, 126, 0.20)",
-	},
-	ember: {
-		name: "Ember",
-		description: "Warm amber focus with darker surfaces",
-		background: "#0c0a08",
-		surface: "#1b1410",
-		surfaceLight: "#2a2018",
-		primary: "#eab308",
-		secondary: "#f8c67e",
-		tertiary: "#fb7185",
-		accent: "#f59e0b",
-		text: "#fef9e7",
-		textMuted: "#c4b8a2",
-		glow: "rgba(234, 179, 8, 0.22)",
-	},
-	noir: {
-		name: "Noir",
-		description: "Neutral high-contrast minimal palette",
-		background: "#070a11",
-		surface: "#0f1624",
-		surfaceLight: "#192233",
-		primary: "#e2e8f0",
-		secondary: "#94a3b8",
-		tertiary: "#22d3ee",
-		accent: "#f8fafc",
-		text: "#f8fafc",
-		textMuted: "#94a3b8",
-		glow: "rgba(226, 232, 240, 0.18)",
-	},
-	aurora: {
-		name: "Aurora",
-		description: "Cool neon accents with soft borders",
-		background: "#07101a",
-		surface: "#0f1b2d",
-		surfaceLight: "#1a2a40",
-		primary: "#7ee8f8",
-		secondary: "#2dd4bf",
-		tertiary: "#fb7185",
-		accent: "#f8c67e",
-		text: "#ecfeff",
-		textMuted: "#99b9c8",
-		glow: "rgba(126, 232, 248, 0.20)",
-	},
 	graphiteCyan: {
 		name: "Graphite Cyan",
-		description:
-			"Cool graphite base with teal-cyan accent -- modern engineering IDE",
+		description: "Cool graphite base with teal-cyan accent",
 		background: "#0E1117",
 		surface: "#161B22",
 		surfaceLight: "#21262D",
 		primary: "#2DD4BF",
 		secondary: "#64748B",
 		tertiary: "#F59E0B",
-		accent: "#F43F5E",
+		accent: "#60A5FA",
 		text: "#F0F6FC",
 		textMuted: "#8B949E",
 		glow: "rgba(45, 212, 191, 0.15)",
 	},
-	frostSteel: {
-		name: "Frost & Steel",
-		description: "Cool, professional, modern -- like a high-tech control room",
-		background: "#0B0E14",
-		surface: "#141A24",
-		surfaceLight: "#1E2633",
-		primary: "#4A90E2",
-		secondary: "#50C878",
-		tertiary: "#9B59B6",
-		accent: "#E67E22",
-		text: "#E8ECF2",
-		textMuted: "#8F9BB3",
-		glow: "rgba(74, 144, 226, 0.20)",
-	},
-	twilightNebula: {
-		name: "Twilight Nebula",
-		description: "Purple-blue, moody, rich -- futuristic and immersive",
-		background: "#0C0717",
-		surface: "#1E1530",
-		surfaceLight: "#2E2347",
-		primary: "#7B2CBF",
-		secondary: "#3A86FF",
-		tertiary: "#FF006E",
-		accent: "#8338EC",
-		text: "#F8F0FC",
-		textMuted: "#B8B0D0",
-		glow: "rgba(123, 44, 191, 0.20)",
-	},
 	slateCoral: {
 		name: "Slate & Coral",
-		description: "Neutral base + warm accent -- clean and editorial",
+		description: "Neutral base + warm accent",
 		background: "#121212",
 		surface: "#1E1E1E",
 		surfaceLight: "#2C2C2C",
 		primary: "#FF6B6B",
 		secondary: "#4ECDC4",
 		tertiary: "#FFD93D",
-		accent: "#A8DADC",
+		accent: "#2563EB",
 		text: "#F5F5F5",
 		textMuted: "#A0A0A0",
 		glow: "rgba(255, 107, 107, 0.20)",
 	},
 	oceanDepths: {
 		name: "Ocean Depths",
-		description: "Blue-green, calm, trustworthy -- deep sea engineering",
+		description: "Blue-green, calm, trustworthy",
 		background: "#0A1929",
-		surface: "#1E3A5F",
-		surfaceLight: "#2B4C7C",
+		surface: "#0F2743",
+		surfaceLight: "#153356",
 		primary: "#00B4D8",
 		secondary: "#48CAE4",
 		tertiary: "#F9C74F",
-		accent: "#F9844A",
+		accent: "#22C55E",
 		text: "#EDF2F7",
 		textMuted: "#9CB4D4",
 		glow: "rgba(0, 180, 216, 0.20)",
 	},
-	midnightEmerald: {
-		name: "Midnight Emerald",
-		description: "Green-gold, luxury, natural -- organic and memorable",
-		background: "#0F2417",
-		surface: "#1A3A24",
-		surfaceLight: "#26592F",
-		primary: "#F4D03F",
-		secondary: "#E67E22",
-		tertiary: "#3498DB",
-		accent: "#9B59B6",
-		text: "#ECF0F1",
-		textMuted: "#95A5A6",
-		glow: "rgba(244, 208, 63, 0.20)",
-	},
-	carbonCrimson: {
-		name: "Carbon Crimson",
-		description:
-			"Dark carbon fiber with crimson edge -- high-performance racing",
-		background: "#0D0D0F",
-		surface: "#1A1A1E",
-		surfaceLight: "#27272D",
-		primary: "#DC2626",
-		secondary: "#F97316",
-		tertiary: "#FACC15",
-		accent: "#06B6D4",
-		text: "#FAFAFA",
-		textMuted: "#A1A1AA",
-		glow: "rgba(220, 38, 38, 0.20)",
-	},
-	arcticAurora: {
-		name: "Arctic Aurora",
-		description: "Northern lights over dark skies -- ethereal and luminous",
-		background: "#070B14",
-		surface: "#0F1A2E",
-		surfaceLight: "#182D4A",
-		primary: "#22D3EE",
-		secondary: "#34D399",
-		tertiary: "#C084FC",
+	twilightNebula: {
+		name: "Twilight Nebula",
+		description: "Purple-blue, moody, rich",
+		background: "#0C0717",
+		surface: "#1E1530",
+		surfaceLight: "#2E2347",
+		primary: "#7B2CBF",
+		secondary: "#3A86FF",
+		tertiary: "#FF006E",
 		accent: "#F472B6",
-		text: "#F0F9FF",
-		textMuted: "#94A3B8",
-		glow: "rgba(34, 211, 238, 0.20)",
-	},
-	copperCircuit: {
-		name: "Copper Lattice",
-		description:
-			"Deep charcoal with warm copper metallics -- industrial lattice",
-		background: "#111014",
-		surface: "#1C1A1F",
-		surfaceLight: "#2A272E",
-		primary: "#CD7F32",
-		secondary: "#DDA15E",
-		tertiary: "#BC6C25",
-		accent: "#606C38",
-		text: "#FEFAE0",
-		textMuted: "#9C9590",
-		glow: "rgba(205, 127, 50, 0.20)",
-	},
-	neonMatrix: {
-		name: "Neon Matrix",
-		description: "Cyberpunk neon green on black -- hacker terminal vibes",
-		background: "#030712",
-		surface: "#0A1120",
-		surfaceLight: "#111B2E",
-		primary: "#00FF88",
-		secondary: "#00D4FF",
-		tertiary: "#FF2E97",
-		accent: "#BF00FF",
-		text: "#E0FFE0",
-		textMuted: "#6B8F71",
-		glow: "rgba(0, 255, 136, 0.20)",
+		text: "#F8F0FC",
+		textMuted: "#B8B0D0",
+		glow: "rgba(123, 44, 191, 0.20)",
 	},
 	desertDusk: {
 		name: "Desert Dusk",
-		description: "Warm terracotta and sand -- earthy, inviting, and grounded",
+		description: "Warm terracotta and sand",
 		background: "#1A1410",
 		surface: "#2A2118",
 		surfaceLight: "#3D3024",
 		primary: "#E07A5F",
 		secondary: "#F2CC8F",
 		tertiary: "#81B29A",
-		accent: "#3D405B",
+		accent: "#F59E0B",
 		text: "#F4F1DE",
 		textMuted: "#B5A898",
 		glow: "rgba(224, 122, 95, 0.20)",
 	},
+	steelMint: {
+		name: "Steel Mint",
+		description: "Cool steel + mint accent",
+		background: "#0B1320",
+		surface: "#101F33",
+		surfaceLight: "#162A45",
+		primary: "#34D399",
+		secondary: "#93C5FD",
+		tertiary: "#F59E0B",
+		accent: "#93C5FD",
+		text: "#EAF2FF",
+		textMuted: "#9AA9C0",
+		glow: "rgba(52, 211, 153, 0.16)",
+	},
+	indigoFog: {
+		name: "Indigo Fog",
+		description: "Indigo base + soft violet",
+		background: "#0D1024",
+		surface: "#141A36",
+		surfaceLight: "#1B2450",
+		primary: "#A78BFA",
+		secondary: "#60A5FA",
+		tertiary: "#F472B6",
+		accent: "#60A5FA",
+		text: "#EFF2FF",
+		textMuted: "#A8ACD8",
+		glow: "rgba(167, 139, 250, 0.16)",
+	},
+	forestSignal: {
+		name: "Forest Signal",
+		description: "Deep green + signal lime",
+		background: "#071613",
+		surface: "#0B221D",
+		surfaceLight: "#103129",
+		primary: "#A3E635",
+		secondary: "#22C55E",
+		tertiary: "#60A5FA",
+		accent: "#22C55E",
+		text: "#EAFBF5",
+		textMuted: "#98B8AE",
+		glow: "rgba(163, 230, 53, 0.16)",
+	},
+	copperSlate: {
+		name: "Copper Slate",
+		description: "Warm slate + copper metallic",
+		background: "#0F1116",
+		surface: "#171A22",
+		surfaceLight: "#222633",
+		primary: "#FB923C",
+		secondary: "#FBBF24",
+		tertiary: "#60A5FA",
+		accent: "#FBBF24",
+		text: "#F4F7FF",
+		textMuted: "#A5AEC2",
+		glow: "rgba(251, 146, 60, 0.16)",
+	},
 };
 
-export const DEFAULT_SCHEME_KEY = "blockflow";
+export const DEFAULT_SCHEME_KEY = "graphiteCyan";
 
 // --- Helpers (pure functions) ---
-
 export function hexToRgba(hex: string, alpha: number): string {
-	const r = parseInt(hex.slice(1, 3), 16);
-	const g = parseInt(hex.slice(3, 5), 16);
-	const b = parseInt(hex.slice(5, 7), 16);
+	const normalized = hex.replace("#", "");
+	if (normalized.length !== 6) return `rgba(0, 0, 0, ${alpha})`;
+	const r = Number.parseInt(normalized.slice(0, 2), 16);
+	const g = Number.parseInt(normalized.slice(2, 4), 16);
+	const b = Number.parseInt(normalized.slice(4, 6), 16);
 	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export function getContrastText(
 	hex: string,
-	light = "#f8fbff",
+	light = "#ffffff",
 	dark = "#0b1020",
 ): string {
 	const normalized = hex.replace("#", "");
 	if (normalized.length !== 6) return light;
 
-	const r = parseInt(normalized.slice(0, 2), 16) / 255;
-	const g = parseInt(normalized.slice(2, 4), 16) / 255;
-	const b = parseInt(normalized.slice(4, 6), 16) / 255;
+	const r = Number.parseInt(normalized.slice(0, 2), 16) / 255;
+	const g = Number.parseInt(normalized.slice(2, 4), 16) / 255;
+	const b = Number.parseInt(normalized.slice(4, 6), 16) / 255;
 
-	const toLinear = (value: number) =>
-		value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+	const toLinear = (v: number) =>
+		v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
 
-	const luminance =
+	const lum =
 		0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
 
-	return luminance > 0.6 ? dark : light;
+	return lum > 0.6 ? dark : light;
 }
 
+/**
+ * ✅ RESTORED EXPORTS (so PanelInfoDialog.tsx and others keep working)
+ */
 export function glassCardStyle(
 	palette: ColorScheme,
 	tint: string = palette.primary,
@@ -317,10 +236,12 @@ export function glassCardInnerStyle(
 	};
 }
 
-export const GLASS_SPECULAR_GRADIENT = `linear-gradient(135deg, ${hexToRgba("#ffffff", 0.12)} 0%, transparent 50%)`;
+export const GLASS_SPECULAR_GRADIENT = `linear-gradient(135deg, ${hexToRgba(
+	"#ffffff",
+	0.12,
+)} 0%, transparent 50%)`;
 
 // --- Theme Context ---
-
 interface ThemeContextValue {
 	palette: ColorScheme;
 	schemeKey: string;
@@ -331,9 +252,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue>({
 	palette: COLOR_SCHEMES[DEFAULT_SCHEME_KEY],
 	schemeKey: DEFAULT_SCHEME_KEY,
-	setScheme: () => {
-		// noop
-	},
+	setScheme: () => undefined,
 	schemeKeys: Object.keys(COLOR_SCHEMES),
 });
 
@@ -344,29 +263,59 @@ export function useTheme() {
 const STORAGE_KEY = "app-theme-scheme";
 const LEGACY_BLOCKFLOW_STORAGE_KEY = "blockflow-theme";
 
-const CSS_THEME_BY_SCHEME: Record<string, string> = {
-	blockflow: "v5",
-	ember: "ember",
-	noir: "noir",
-	aurora: "aurora",
-};
-
-const LEGACY_SCHEME_BY_BLOCKFLOW_THEME: Record<string, string> = {
-	v5: "blockflow",
-	ember: "ember",
-	noir: "noir",
-	aurora: "aurora",
+/**
+ * Legacy mapping:
+ * If older builds stored "v5/ember/noir/aurora", map them to modern keys.
+ */
+const LEGACY_THEME_TO_SCHEME: Record<string, string> = {
+	v5: "graphiteCyan",
+	ember: "desertDusk",
+	noir: "graphiteCyan",
+	aurora: "oceanDepths",
 };
 
 function normalizeSchemeKey(raw: string | null | undefined): string | null {
 	if (!raw) return null;
 	if (COLOR_SCHEMES[raw]) return raw;
-	return LEGACY_SCHEME_BY_BLOCKFLOW_THEME[raw] ?? null;
+	return LEGACY_THEME_TO_SCHEME[raw] ?? null;
 }
 
 interface ThemeProviderProps {
 	children: React.ReactNode;
 	defaultScheme?: string;
+}
+
+function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
+	const rootStyle = document.documentElement.style;
+
+	document.documentElement.dataset.theme = schemeKey;
+
+	rootStyle.setProperty("--bg", palette.background);
+	rootStyle.setProperty("--bg-base", palette.background);
+	rootStyle.setProperty("--bg-mid", hexToRgba(palette.background, 0.72));
+	rootStyle.setProperty("--bg-heavy", hexToRgba(palette.background, 0.86));
+
+	rootStyle.setProperty("--surface", palette.surface);
+	rootStyle.setProperty("--surface-2", palette.surfaceLight);
+
+	rootStyle.setProperty("--border", hexToRgba(palette.text, 0.1));
+
+	rootStyle.setProperty("--text", palette.text);
+	rootStyle.setProperty("--text-muted", palette.textMuted);
+
+	rootStyle.setProperty("--primary", palette.primary);
+	rootStyle.setProperty("--primary-contrast", getContrastText(palette.primary));
+
+	rootStyle.setProperty("--accent", palette.accent);
+
+	rootStyle.setProperty("--success", "#22c55e");
+	rootStyle.setProperty("--danger", "#ef4444");
+}
+
+function startThemeAnimation(durationMs = 220) {
+	const el = document.documentElement;
+	el.classList.add("theme-animating");
+	window.setTimeout(() => el.classList.remove("theme-animating"), durationMs);
 }
 
 export function ThemeProvider({ children, defaultScheme }: ThemeProviderProps) {
@@ -375,19 +324,30 @@ export function ThemeProvider({ children, defaultScheme }: ThemeProviderProps) {
 			const stored = normalizeSchemeKey(localStorage.getItem(STORAGE_KEY));
 			if (stored) return stored;
 
-			const legacyStored = normalizeSchemeKey(
+			const legacy = normalizeSchemeKey(
 				localStorage.getItem(LEGACY_BLOCKFLOW_STORAGE_KEY),
 			);
-			if (legacyStored) return legacyStored;
+			if (legacy) return legacy;
 		} catch {
 			/* noop */
 		}
 		return normalizeSchemeKey(defaultScheme) || DEFAULT_SCHEME_KEY;
 	});
 
+	const schemeKeys = useMemo(() => Object.keys(COLOR_SCHEMES), []);
+
+	const schemeKeyRef = useRef(schemeKey);
+	useEffect(() => {
+		schemeKeyRef.current = schemeKey;
+	}, [schemeKey]);
+
 	const setScheme = useCallback((key: string) => {
 		if (!COLOR_SCHEMES[key]) return;
+		if (key === schemeKeyRef.current) return;
+
+		startThemeAnimation();
 		setSchemeKey(key);
+
 		try {
 			localStorage.setItem(STORAGE_KEY, key);
 		} catch {
@@ -395,37 +355,12 @@ export function ThemeProvider({ children, defaultScheme }: ThemeProviderProps) {
 		}
 	}, []);
 
-	const schemeKeys = useMemo(() => Object.keys(COLOR_SCHEMES), []);
-
 	useEffect(() => {
-		const cssTheme = CSS_THEME_BY_SCHEME[schemeKey] ?? "v5";
-		document.documentElement.dataset.theme = cssTheme;
-		const palette = COLOR_SCHEMES[schemeKey];
-		document.documentElement.style.setProperty("--app-text", palette.text);
-		document.documentElement.style.setProperty(
-			"--app-text-muted",
-			palette.textMuted,
-		);
-		document.documentElement.style.setProperty(
-			"--app-text-faint",
-			hexToRgba(palette.text, 0.3),
-		);
-		document.documentElement.style.setProperty("--white", palette.text);
-		document.documentElement.style.setProperty("--white-dim", palette.textMuted);
-		document.documentElement.style.setProperty(
-			"--white-faint",
-			hexToRgba(palette.text, 0.18),
-		);
-		document.documentElement.style.setProperty("--app-primary", palette.primary);
-		document.documentElement.style.setProperty("--app-surface", palette.surface);
-		document.documentElement.style.setProperty(
-			"--app-surface-light",
-			palette.surfaceLight,
-		);
+		const p = COLOR_SCHEMES[schemeKey];
+		applyThemeTokens(p, schemeKey);
 
 		try {
 			localStorage.setItem(STORAGE_KEY, schemeKey);
-			localStorage.setItem(LEGACY_BLOCKFLOW_STORAGE_KEY, cssTheme);
 		} catch {
 			/* noop */
 		}

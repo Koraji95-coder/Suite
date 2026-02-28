@@ -3,7 +3,7 @@
 import { Upload, UploadIcon, XIcon } from "lucide-react";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/apps/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -11,9 +11,9 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+} from "@/components/apps/ui/dialog";
+import { Input } from "@/components/apps/ui/input";
+import { Label } from "@/components/apps/ui/label";
 
 export function FileUploadDialog() {
 	const [open, setOpen] = React.useState(false);

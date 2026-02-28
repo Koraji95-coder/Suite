@@ -1,6 +1,7 @@
 // src/routes/LoginPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import AuthEnvDebugCard from "../auth/AuthEnvDebugCard";
 import AuthShell from "../auth/AuthShell";
 import { useNotification } from "../auth/NotificationContext";
 import { useAuth } from "../auth/useAuth";
@@ -62,25 +63,28 @@ export default function LoginPage() {
 		const redirecting = Boolean(user && !loading);
 		return (
 			<AuthShell navLink={{ to: "/", label: "Back to landing" }}>
-				<div className="auth-head">
-					<div className="hero-badge" style={{ marginBottom: 18 }}>
-						<span className="badge-dot" />
+				<div className="mb-6">
+					<div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium [background:var(--surface-2)] [color:var(--text-muted)]">
+						<span className="h-1.5 w-1.5 rounded-full [background:var(--primary)]" />
 						{redirecting ? "Redirecting" : "Preparing your session"}
 					</div>
-					<h1 className="auth-title">
+					<h1 className="text-2xl font-semibold tracking-tight">
 						{redirecting ? "Opening your dashboard" : "Checking your account"}
 					</h1>
-					<p className="auth-sub">
+					<p className="mt-2 text-sm [color:var(--text-muted)]">
 						{redirecting
 							? "Email confirmed. We’re signing you in now."
 							: "Validating your sign-in status…"}
 					</p>
 				</div>
 
-				<div className="auth-form" style={{ gap: 12 }}>
-					<div className="auth-progress-track" aria-hidden="true">
+				<div className="grid gap-3">
+					<div
+						className="h-2 w-full overflow-hidden rounded-full [background:var(--surface-2)]"
+						aria-hidden="true"
+					>
 						<div
-							className={`auth-progress-fill ${redirecting ? "" : "is-indeterminate"}`}
+							className={`h-full rounded-full [background:var(--primary)] ${redirecting ? "" : "w-[35%] animate-[loading-slide_1.2s_ease-in-out_infinite]"}`}
 							style={
 								redirecting
 									? { width: `${Math.max(8, redirectProgress)}%` }
@@ -88,9 +92,10 @@ export default function LoginPage() {
 							}
 						/>
 					</div>
-					<p className="auth-sub" style={{ margin: 0, fontSize: 13 }}>
+					<p className="m-0 text-xs [color:var(--text-muted)]">
 						{redirecting ? `${Math.max(8, redirectProgress)}%` : "Connecting…"}
 					</p>
+					<AuthEnvDebugCard />
 				</div>
 			</AuthShell>
 		);
@@ -124,22 +129,24 @@ export default function LoginPage() {
 
 	return (
 		<AuthShell navLink={{ to: "/", label: "Back to landing" }}>
-			<div className="auth-head">
-				<div className="hero-badge" style={{ marginBottom: 18 }}>
-					<span className="badge-dot" />
+			<div className="mb-6">
+				<div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium [background:var(--surface-2)] [color:var(--text-muted)]">
+					<span className="h-1.5 w-1.5 rounded-full [background:var(--primary)]" />
 					Secure login
 				</div>
-				<h1 className="auth-title">Welcome back</h1>
-				<p className="auth-sub">Sign in to continue to your dashboard.</p>
+				<h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+				<p className="mt-2 text-sm [color:var(--text-muted)]">
+					Sign in to continue to your dashboard.
+				</p>
 			</div>
 
-			<form className="auth-form" onSubmit={onSubmit} noValidate>
-				<label className="auth-label" htmlFor="email">
+			<form className="grid gap-3" onSubmit={onSubmit} noValidate>
+				<label className="text-sm font-medium" htmlFor="email">
 					Email
 				</label>
 				<input
 					id="email"
-					className="auth-input"
+					className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition [border-color:var(--border)] [background:var(--surface)] [color:var(--text)] focus:[border-color:var(--primary)]"
 					type="email"
 					autoComplete="email"
 					value={email}
@@ -148,12 +155,12 @@ export default function LoginPage() {
 					required
 				/>
 
-				<label className="auth-label" htmlFor="password">
+				<label className="text-sm font-medium" htmlFor="password">
 					Password
 				</label>
 				<input
 					id="password"
-					className="auth-input"
+					className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition [border-color:var(--border)] [background:var(--surface)] [color:var(--text)] focus:[border-color:var(--primary)]"
 					type="password"
 					autoComplete="current-password"
 					value={password}
@@ -162,45 +169,39 @@ export default function LoginPage() {
 					required
 				/>
 
-				{error ? <div className="auth-error">{error}</div> : null}
+				{error ? (
+					<div className="rounded-lg border px-3 py-2 text-sm [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">
+						{error}
+					</div>
+				) : null}
 
 				<button
-					className="btn-primary auth-submit"
+					className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
 					type="submit"
 					disabled={!canSubmit}
 				>
 					{submitting ? "Signing in…" : "Sign in"}
 				</button>
 
-				<div className="auth-foot">
-					<span className="muted">
+				<div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm [color:var(--text-muted)]">
+					<span>
 						No account yet?{" "}
-						<Link to="/signup" className="auth-link">
+						<Link
+							to="/signup"
+							className="font-medium underline-offset-2 hover:underline [color:var(--text)]"
+						>
 							Create one
 						</Link>
 					</span>
-					<Link to="/forgot-password" className="auth-link">
+					<Link
+						to="/forgot-password"
+						className="font-medium underline-offset-2 hover:underline [color:var(--text)]"
+					>
 						Forgot password?
 					</Link>
 				</div>
 
-				<button
-					type="button"
-					className="auth-submit"
-					style={{
-						marginTop: 12,
-						background: "rgba(255,255,255,0.06)",
-						border: "1px dashed rgba(255,255,255,0.15)",
-						color: "rgba(255,255,255,0.5)",
-						fontSize: 13,
-					}}
-					onClick={() => {
-						sessionStorage.setItem("dev_bypass_auth", "1");
-						navigate("/app/home", { replace: true });
-					}}
-				>
-					Dev Preview (skip auth)
-				</button>
+				<AuthEnvDebugCard />
 			</form>
 		</AuthShell>
 	);

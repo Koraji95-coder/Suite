@@ -16,7 +16,9 @@ export function LibraryGrid({
 }: LibraryGridProps) {
 	if (whiteboards.length === 0) {
 		return (
-			<div className="text-center text-white/50 py-12">{emptyMessage}</div>
+			<div className="py-12 text-center text-[var(--color-text-muted)]">
+				{emptyMessage}
+			</div>
 		);
 	}
 

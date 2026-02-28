@@ -38,81 +38,75 @@ export function WhiteboardToolbar({
 	canUndo,
 	canRedo,
 }: WhiteboardToolbarProps) {
+	const activeToolClass =
+		"border border-[var(--color-accent)] bg-[var(--color-surface)]";
+	const idleToolClass = "hover:bg-[var(--color-surface-elevated)]";
+
 	return (
-		<div className="w-20 bg-black/40 border-r border-white/[0.06] flex flex-col items-center py-4 space-y-2">
+		<div className="flex w-20 flex-col items-center space-y-2 border-r border-[var(--color-border)] bg-[var(--color-surface)] py-4">
 			<button
 				onClick={() => onToolChange("pen")}
 				className={`p-3 rounded-lg transition-all ${
-					tool === "pen"
-						? "bg-orange-500/30 border border-orange-400"
-						: "hover:bg-orange-500/10"
+					tool === "pen" ? activeToolClass : idleToolClass
 				}`}
 				title="Pen"
 			>
-				<Pen className="w-5 h-5 text-orange-300" />
+				<Pen className="h-5 w-5 text-[var(--color-accent)]" />
 			</button>
 			<button
 				onClick={() => onToolChange("eraser")}
 				className={`p-3 rounded-lg transition-all ${
-					tool === "eraser"
-						? "bg-orange-500/30 border border-orange-400"
-						: "hover:bg-orange-500/10"
+					tool === "eraser" ? activeToolClass : idleToolClass
 				}`}
 				title="Eraser"
 			>
-				<Eraser className="w-5 h-5 text-orange-300" />
+				<Eraser className="h-5 w-5 text-[var(--color-accent)]" />
 			</button>
 			<button
 				onClick={() => onToolChange("rectangle")}
 				className={`p-3 rounded-lg transition-all ${
-					tool === "rectangle"
-						? "bg-orange-500/30 border border-orange-400"
-						: "hover:bg-orange-500/10"
+					tool === "rectangle" ? activeToolClass : idleToolClass
 				}`}
 				title="Rectangle"
 			>
-				<Square className="w-5 h-5 text-orange-300" />
+				<Square className="h-5 w-5 text-[var(--color-accent)]" />
 			</button>
 			<button
 				onClick={() => onToolChange("circle")}
 				className={`p-3 rounded-lg transition-all ${
-					tool === "circle"
-						? "bg-orange-500/30 border border-orange-400"
-						: "hover:bg-orange-500/10"
+					tool === "circle" ? activeToolClass : idleToolClass
 				}`}
 				title="Circle"
 			>
-				<Circle className="w-5 h-5 text-orange-300" />
+				<Circle className="h-5 w-5 text-[var(--color-accent)]" />
 			</button>
 			<button
 				onClick={() => onToolChange("text")}
 				className={`p-3 rounded-lg transition-all ${
-					tool === "text"
-						? "bg-orange-500/30 border border-orange-400"
-						: "hover:bg-orange-500/10"
+					tool === "text" ? activeToolClass : idleToolClass
 				}`}
 				title="Text"
 			>
-				<Type className="w-5 h-5 text-orange-300" />
+				<Type className="h-5 w-5 text-[var(--color-accent)]" />
 			</button>
 
-			<div className="h-px bg-white/[0.06] w-12 my-2"></div>
+			<div className="my-2 h-px w-12 bg-[var(--color-border)]"></div>
 
 			<button
 				onClick={onUndo}
-				className="p-3 rounded-lg hover:bg-orange-500/10 transition-all disabled:opacity-30"
+				className="rounded-lg p-3 transition-all hover:bg-[var(--color-surface-elevated)] disabled:opacity-30"
 				title="Undo"
 				disabled={!canUndo}
 			>
-				<Undo className="w-5 h-5 text-orange-300" />
+				<Undo className="h-5 w-5 text-[var(--color-accent)]" />
 			</button>
 			<button
 				onClick={onRedo}
-				className="p-3 rounded-lg hover:bg-orange-500/10 transition-all disabled:opacity-30"
+				className="rounded-lg p-3 transition-all hover:bg-[var(--color-surface-elevated)] disabled:opacity-30"
 				title="Redo"
 				disabled={!canRedo}
 			>
-				<Redo className="w-5 h-5 text-orange-300" />
+				<Redo className="h-5 w-5 text-[var(--color-accent)]" />
 			</button>
 			<button
 				onClick={onClear}
@@ -122,7 +116,7 @@ export function WhiteboardToolbar({
 				<Trash2 className="w-5 h-5 text-red-400" />
 			</button>
 
-			<div className="h-px bg-white/[0.06] w-12 my-2"></div>
+			<div className="my-2 h-px w-12 bg-[var(--color-border)]"></div>
 
 			<div className="flex flex-col items-center space-y-2">
 				<input

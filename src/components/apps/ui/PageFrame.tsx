@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { ReactNode, useEffect } from "react";
 import { hexToRgba, useTheme } from "@/lib/palette";
-import { TieredCard } from "./TieredCard";
+import { GlassPanel } from "./GlassPanel";
 import { usePageHeader } from "./PageHeaderContext";
 
 export type Breadcrumb = { label: string; onClick?: () => void };
@@ -58,10 +58,16 @@ export function PageFrame({
 		<div className={`mx-auto w-full ${maxWidthClassName} space-y-4`}>
 			{/* Page header */}
 			{!hideHeader ? (
-				<TieredCard
-					tier="frosted"
-					tint={tint}
+				<GlassPanel
+					variant="toolbar"
 					padded
+					hoverEffect={false}
+					bevel
+					specular
+					tint={tint}
+					style={{
+						border: `1px solid ${hexToRgba(tint, 0.14)}`,
+					}}
 				>
 					<div className="grid gap-4 sm:grid-cols-[1fr_auto_1fr] sm:items-start">
 						<div className="min-w-0">
@@ -131,15 +137,13 @@ export function PageFrame({
 							{actions ? actions : null}
 						</div>
 					</div>
-				</TieredCard>
+				</GlassPanel>
 			) : null}
 
 			{/* Page body layout */}
 			<div
 				className={
-					hasRight
-						? "grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4"
-						: ""
+					hasRight ? "grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4" : ""
 				}
 			>
 				<div className="space-y-4">{children}</div>
@@ -162,14 +166,16 @@ export function FrameSection({
 	actions?: ReactNode;
 	children: ReactNode;
 	tint?: string;
-	specular?: boolean;
 }) {
 	const { palette } = useTheme();
 	const tint = tintProp ?? palette.primary;
 	return (
-		<TieredCard
-			tier="solid"
+		<GlassPanel
 			tint={tint}
+			intensity="medium"
+			bevel
+			specular
+			hoverEffect={false}
 			className="rounded-2xl"
 			padded
 		>
@@ -198,6 +204,6 @@ export function FrameSection({
 			) : null}
 
 			<div>{children}</div>
-		</TieredCard>
+		</GlassPanel>
 	);
 }

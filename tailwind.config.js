@@ -3,21 +3,38 @@ export default {
 	content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
 	theme: {
 		extend: {
+			fontFamily: {
+				sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+			},
 			colors: {
-				// Obsidian design system
-				base: {
-					DEFAULT: "#0c0b10",
-					elevated: "#14131a",
-					surface: "#1c1b24",
-				},
-				accent: {
-					primary: "#818cf8", // indigo-400
-					"primary-light": "#a5b4fc", // indigo-300
-					secondary: "#34d399", // emerald-400
-					"secondary-light": "#6ee7b7", // emerald-300
-					warm: "#fb923c", // orange-400
-					"warm-light": "#fdba74", // orange-300
-				},
+				bg: "var(--bg)",
+				"bg-base": "var(--bg-base)",
+				"bg-mid": "var(--bg-mid)",
+				"bg-heavy": "var(--bg-heavy)",
+
+				surface: "var(--surface)",
+				"surface-2": "var(--surface-2)",
+
+				border: "var(--border)",
+
+				text: "var(--text)",
+				"text-muted": "var(--text-muted)",
+
+				primary: "var(--primary)",
+				"primary-contrast": "var(--primary-contrast)",
+				accent: "var(--accent)",
+
+				success: "var(--success)",
+				danger: "var(--danger)",
+			},
+			borderRadius: {
+				lg: "var(--radius-lg)",
+				md: "var(--radius-md)",
+				sm: "var(--radius-sm)",
+			},
+			boxShadow: {
+				panel: "var(--shadow-panel)",
+				focus: "0 0 0 3px var(--focus-ring)",
 			},
 		},
 	},

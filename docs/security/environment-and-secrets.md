@@ -30,8 +30,16 @@ The repository ignore rules include:
 ## Agent Security Notes
 
 - Pairing now uses `X-Pairing-Code` header at `/pair`
-- Webhook requests include bearer auth and optional `X-Webhook-Secret`
+- Webhook requests include bearer auth and required `X-Webhook-Secret` by default
+- `VITE_AGENT_REQUIRE_WEBHOOK_SECRET` defaults to enforced mode (`true`)
+- Set `VITE_AGENT_WEBHOOK_SECRET` in app env and configure the same shared secret on the gateway
 - Use localhost agent gateway by default in development
+- For production, prefer the backend broker flow:
+  - Set `VITE_AGENT_TRANSPORT=backend` and `VITE_AGENT_BROKER_URL=/api/agent`
+  - Configure backend-only env vars: `AGENT_GATEWAY_URL`, `AGENT_WEBHOOK_SECRET`
+  - Enable Supabase auth validation with `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_JWT_SECRET`
+  - If your Supabase project uses new ECC JWT keys, leave `SUPABASE_JWT_SECRET` empty and rely on JWKS via `SUPABASE_URL`
+  - Tokens are stored server-side; the frontend never receives the bearer token
 
 ## Auth Module Notes
 

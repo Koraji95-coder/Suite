@@ -6,20 +6,20 @@ import {
 } from "lucide-react";
 import { useId } from "react";
 
-import { Label } from "@/components/ui/label";
+import { Label } from "@/components/apps/ui/label";
 import {
 	Pagination,
 	PaginationContent,
 	PaginationItem,
 	PaginationLink,
-} from "@/components/ui/pagination";
+} from "@/components/apps/ui/pagination";
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@/components/ui/select";
+} from "@/components/apps/ui/select";
 
 type PaginationProps = {
 	currentPage?: number;

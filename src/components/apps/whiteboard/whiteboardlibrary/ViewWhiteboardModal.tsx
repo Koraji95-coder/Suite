@@ -14,14 +14,14 @@ export function ViewWhiteboardModal({
 	if (!whiteboard) return null;
 
 	return (
-		<div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-			<div className="bg-[#0a0a0a] backdrop-blur-xl border border-white/[0.06] rounded-lg max-w-6xl w-full max-h-[90vh] overflow-auto">
-				<div className="flex items-center justify-between p-6 border-b border-white/[0.06] sticky top-0 bg-[#0a0a0a]/95 backdrop-blur-sm z-10">
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm">
+			<div className="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] backdrop-blur-xl">
+				<div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] p-6 backdrop-blur-sm">
 					<div>
-						<h3 className="text-2xl font-bold text-white/80">
+						<h3 className="text-2xl font-bold text-[var(--color-text)]">
 							{whiteboard.title}
 						</h3>
-						<div className="flex items-center space-x-4 mt-2 text-sm text-white/50">
+						<div className="mt-2 flex items-center space-x-4 text-sm text-[var(--color-text-muted)]">
 							<span>{whiteboard.panel_context}</span>
 							<span>•</span>
 							<span>{formatDate(whiteboard.created_at)}</span>
@@ -40,7 +40,7 @@ export function ViewWhiteboardModal({
 						<img
 							src={whiteboard.thumbnail_url}
 							alt={whiteboard.title}
-							className="w-full rounded-lg border border-orange-500/30"
+							className="w-full rounded-lg border border-[var(--color-border)]"
 						/>
 					)}
 
@@ -49,7 +49,7 @@ export function ViewWhiteboardModal({
 							{whiteboard.tags.map((tag, idx) => (
 								<span
 									key={idx}
-									className="flex items-center space-x-1 px-3 py-1 bg-orange-500/10 text-orange-300 rounded-full border border-orange-500/30"
+									className="flex items-center space-x-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-1 text-[var(--color-text-muted)]"
 								>
 									<Tag className="w-3 h-3" />
 									<span>{tag}</span>

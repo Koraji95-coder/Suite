@@ -85,10 +85,10 @@ export function DayView({
 		});
 	}, [dayEvents]);
 
-		// Process events to calculate positions
-		const positionedEvents = useMemo(() => {
-			const result: PositionedEvent[] = [];
-			const dayStart = startOfDay(currentDate);
+	// Process events to calculate positions
+	const positionedEvents = useMemo(() => {
+		const result: PositionedEvent[] = [];
+		const dayStart = startOfDay(currentDate);
 
 		// Sort events by start time and duration
 		const sortedEvents = [...timeEvents].sort((a, b) => {
@@ -158,28 +158,27 @@ export function DayView({
 			columns[columnIndex] = currentColumn;
 			currentColumn.push({ event, end: adjustedEnd });
 
-				result.push({
-					event,
-					top,
-					height,
-					left: 0,
-					width: 1,
-					zIndex: 10 + columnIndex, // Higher columns get higher z-index
-					columnIndex,
-				});
+			result.push({
+				event,
+				top,
+				height,
+				left: 0,
+				width: 1,
+				zIndex: 10 + columnIndex, // Higher columns get higher z-index
+				columnIndex,
 			});
+		});
 
-			const columnCount = Math.max(columns.length, 1);
-			const gap =
-				columnCount > 1 ? Math.min(0.02, 0.4 / columnCount) : 0;
-			const width = (1 - gap * (columnCount - 1)) / columnCount;
+		const columnCount = Math.max(columns.length, 1);
+		const gap = columnCount > 1 ? Math.min(0.02, 0.4 / columnCount) : 0;
+		const width = (1 - gap * (columnCount - 1)) / columnCount;
 
-			return result.map((item) => ({
-				...item,
-				width,
-				left: item.columnIndex * (width + gap),
-			}));
-		}, [currentDate, timeEvents]);
+		return result.map((item) => ({
+			...item,
+			width,
+			left: item.columnIndex * (width + gap),
+		}));
+	}, [currentDate, timeEvents]);
 
 	const handleEventClick = (event: CalendarEvent, e: React.MouseEvent) => {
 		e.stopPropagation();
@@ -198,7 +197,7 @@ export function DayView({
 				<div className="border-border/70 border-t bg-background/35">
 					<div className="grid grid-cols-[3.5rem_1fr] sm:grid-cols-[4.5rem_1fr]">
 						<div className="relative flex items-end justify-center">
-							<span className="mb-1 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none text-white/60">
+							<span className="text-muted-foreground mb-1 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none">
 								All day
 							</span>
 						</div>
@@ -237,7 +236,7 @@ export function DayView({
 							className="border-border/70 relative flex h-[var(--week-cells-height)] items-start justify-center border-b last:border-b-0"
 						>
 							{index > 0 && (
-								<span className="bg-background -translate-y-1/2 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none text-white/60">
+								<span className="text-muted-foreground bg-background -translate-y-1/2 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none">
 									{format(hour, "h a")}
 								</span>
 							)}

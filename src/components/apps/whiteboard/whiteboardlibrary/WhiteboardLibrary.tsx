@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/supabase/client";
 import { SavedWhiteboard } from "../whiteboardtypes";
 import { LibraryFilters } from "./LibraryFilters";
 import { LibraryGrid } from "./LibraryGrid";
@@ -68,7 +68,7 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 
 	if (loading) {
 		return (
-			<div className="text-center text-orange-300 py-8">
+			<div className="py-8 text-center text-[var(--color-text-muted)]">
 				Loading whiteboards...
 			</div>
 		);

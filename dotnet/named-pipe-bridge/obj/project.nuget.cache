@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "XgVQjqFBOtM=",
+  "success": true,
+  "projectFilePath": "/workspaces/Suite/dotnet/named-pipe-bridge/NamedPipeServer.csproj",
+  "expectedPackageFiles": [
+    "/home/codespace/.nuget/packages/microsoft.netcore.app.ref/6.0.36/microsoft.netcore.app.ref.6.0.36.nupkg.sha512",
+    "/home/codespace/.nuget/packages/microsoft.aspnetcore.app.ref/6.0.36/microsoft.aspnetcore.app.ref.6.0.36.nupkg.sha512",
+    "/home/codespace/.nuget/packages/microsoft.netcore.app.host.linux-x64/6.0.36/microsoft.netcore.app.host.linux-x64.6.0.36.nupkg.sha512"
+  ],
+  "logs": []
+}

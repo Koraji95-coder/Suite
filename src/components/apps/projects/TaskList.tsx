@@ -75,7 +75,7 @@ export function TaskList({
 					isProjectArchived={isProjectArchived}
 				/>
 				{expandedTasks.has(task.id) && subtasks.length > 0 && (
-					<div className="space-y-2">
+					<div className="space-y-2.5 pt-1">
 						{subtasks.map((subtask) => renderTaskTree(subtask, level + 1))}
 					</div>
 				)}
@@ -93,7 +93,7 @@ export function TaskList({
 				items={filteredRootTasks.map((t) => t.id)}
 				strategy={verticalListSortingStrategy}
 			>
-				<div className="space-y-2">
+				<div className="space-y-3">
 					{filteredRootTasks.map((task) => renderTaskTree(task))}
 				</div>
 			</SortableContext>

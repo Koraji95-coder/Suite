@@ -30,7 +30,7 @@ import {
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@/components/apps/ui/dropdown-menu";
-import { TieredCard } from "@/components/apps/ui/TieredCard";
+import { GlassPanel } from "@/components/apps/ui/GlassPanel";
 import { getContrastText, hexToRgba, useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import {
@@ -513,9 +513,11 @@ export function EventCalendar({
 	}, [currentDate, view]);
 
 	return (
-		<TieredCard
-			tier="solid"
+		<GlassPanel
 			tint={palette.primary}
+			hoverEffect={false}
+			bevel={false}
+			specular={false}
 			overflow="visible"
 			className={cn(
 				"flex flex-col has-data-[slot=month-view]:flex-1",
@@ -606,6 +608,6 @@ export function EventCalendar({
 					taskOptions={taskOptions}
 				/>
 			</CalendarDndProvider>
-		</TieredCard>
+		</GlassPanel>
 	);
 }

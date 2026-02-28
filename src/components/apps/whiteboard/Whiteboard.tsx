@@ -1,9 +1,9 @@
 import { Download, Pen, Save, X } from "lucide-react";
 import { useState } from "react";
-import type { Json } from "@/types/database";
-import { useAuth } from "../../contexts/AuthContext";
-import { logger } from "../../lib/errorLogger";
-import { supabase } from "../../lib/supabase";
+import { useAuth } from "@/auth/useAuth";
+import { logger } from "@/lib/errorLogger";
+import { supabase } from "@/supabase/client";
+import type { Json } from "@/supabase/database";
 import { WhiteboardCanvas } from "./WhiteboardCanvas";
 import { WhiteboardSaveDialog } from "./WhiteboardSaveDialog";
 import { WhiteboardToolbar } from "./WhiteboardToolbar";
@@ -146,27 +146,27 @@ export function Whiteboard({
 	if (!isOpen) return null;
 
 	return (
-		<div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-			<div className="bg-[#0a0a0a] backdrop-blur-xl border border-white/[0.06] rounded-lg w-full h-full max-w-7xl max-h-[90vh] flex flex-col">
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm">
+			<div className="flex h-full max-h-[90vh] w-full max-w-7xl flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] backdrop-blur-xl">
 				{/* Header */}
-				<div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+				<div className="flex items-center justify-between border-b border-[var(--color-border)] p-4">
 					<div className="flex items-center space-x-3">
-						<Pen className="w-6 h-6 text-orange-400" />
-						<h3 className="text-2xl font-bold text-white/80">
+						<Pen className="h-6 w-6 text-[var(--color-accent)]" />
+						<h3 className="text-2xl font-bold text-[var(--color-text)]">
 							Whiteboard - {panelContext}
 						</h3>
 					</div>
 					<div className="flex items-center space-x-2">
 						<button
 							onClick={() => setShowSaveDialog(true)}
-							className="flex items-center space-x-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 rounded-lg text-white/90 transition-all"
+							className="flex items-center space-x-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-[var(--color-text)] transition-all hover:bg-[var(--color-surface)]"
 						>
 							<Save className="w-4 h-4" />
 							<span>{isSaving ? "Saving..." : "Save"}</span>
 						</button>
 						<button
 							onClick={exportAsImage}
-							className="flex items-center space-x-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 rounded-lg text-white/90 transition-all"
+							className="flex items-center space-x-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-[var(--color-text)] transition-all hover:bg-[var(--color-surface)]"
 						>
 							<Download className="w-4 h-4" />
 							<span>Export</span>

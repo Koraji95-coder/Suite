@@ -8,13 +8,11 @@ export default function ProtectedRoute() {
 	const { user, loading } = useAuth();
 	const location = useLocation();
 
-	const devBypass = sessionStorage.getItem("dev_bypass_auth") === "1";
-
-	if (loading && !devBypass) {
+	if (loading) {
 		return <div style={{ padding: 24 }}>Loading...</div>;
 	}
 
-	if (!user && !devBypass) {
+	if (!user) {
 		return (
 			<Navigate
 				to="/login"

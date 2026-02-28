@@ -240,7 +240,7 @@ export function WhiteboardCanvas({
 			onMouseMove={draw}
 			onMouseUp={stopDrawing}
 			onMouseLeave={stopDrawing}
-			className="border border-orange-500/30 rounded-lg cursor-crosshair shadow-2xl"
+			className="cursor-crosshair rounded-lg border border-[var(--color-border)] shadow-2xl"
 		/>
 	);
 }

@@ -1,10 +1,11 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
-import { isSupabaseConfigured, safeSupabaseQuery } from "@/lib/supabaseUtils";
-import type { Database } from "@/types/database";
+import { supabase } from "@/supabase/client";
+import { isSupabaseConfigured, safeSupabaseQuery } from "@/supabase/utils";
+import type { Database } from "@/supabase/database";
 
-export type ActivityLogRow = Database["public"]["Tables"]["activity_log"]["Row"];
+export type ActivityLogRow =
+	Database["public"]["Tables"]["activity_log"]["Row"];
 export type ActivityLogInsert =
 	Database["public"]["Tables"]["activity_log"]["Insert"];
 
@@ -20,6 +21,7 @@ type ActivityListener = (entry: ActivityLogRow) => void;
 const listeners = new Set<ActivityListener>();
 let realtimeChannel: RealtimeChannel | null = null;
 let realtimeUserId: string | null = null;
+let warnedMissingUser = false;
 
 const createId = () =>
 	typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -36,9 +38,13 @@ const getCurrentUserId = async (): Promise<string | null> => {
 		error,
 	} = await supabase.auth.getUser();
 	if (error || !user) {
-		logger.error("ActivityService", "Missing authenticated user", { error });
+		if (!warnedMissingUser) {
+			logger.warn("ActivityService", "Missing authenticated user", { error });
+			warnedMissingUser = true;
+		}
 		return null;
 	}
+	warnedMissingUser = false;
 	return user.id;
 };
 

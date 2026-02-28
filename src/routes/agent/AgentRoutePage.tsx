@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { AgentTaskPanel } from "@/components/apps/ai-unified/AgentTaskPanel";
+import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/auth/useAuth";
+import { AgentTaskPanel } from "@/services/AgentTaskPanel";
 import { FrameSection, PageFrame } from "@/components/apps/ui/PageFrame";
 import { agentService } from "@/services/agentService";
 import {
@@ -156,17 +157,20 @@ function StructuredResultSection({
 	};
 
 	const badgeClassName: Record<ResultKind, string> = {
-		success: "border-emerald-300/35 text-emerald-200",
-		warning: "border-amber-300/35 text-amber-200",
-		error: "border-red-300/40 text-red-200",
-		info: "border-white/25 text-slate-200",
+		success:
+			"[border-color:color-mix(in_srgb,var(--accent)_60%,var(--border))] [color:var(--accent)]",
+		warning:
+			"[border-color:color-mix(in_srgb,var(--warning)_60%,var(--border))] [color:var(--warning)]",
+		error:
+			"[border-color:color-mix(in_srgb,var(--danger)_60%,var(--border))] [color:var(--danger)]",
+		info: "[border-color:var(--border)] [color:var(--text-muted)]",
 	};
 
 	return (
 		<FrameSection title={title} subtitle={subtitle}>
 			<div className="space-y-3">
 				<div className="flex items-center justify-between gap-2">
-					<span className="text-xs" style={{ color: "var(--white-dim)" }}>
+					<span className="text-xs [color:var(--text-muted)]">
 						Parsed result
 					</span>
 					<span
@@ -175,7 +179,7 @@ function StructuredResultSection({
 						{badgeLabel[parsed.kind]}
 					</span>
 				</div>
-				<div className="rounded-md border border-white/10 bg-black/20 p-3 text-xs text-slate-200">
+				<div className="rounded-md border p-3 text-xs [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text)]">
 					{parsed.summary}
 				</div>
 				{parsed.fields.length > 0 ? (
@@ -183,27 +187,21 @@ function StructuredResultSection({
 						{parsed.fields.map((field) => (
 							<div
 								key={field.key}
-								className="rounded-md border border-white/10 bg-black/25 p-2 text-xs"
+								className="rounded-md border p-2 text-xs [border-color:var(--border)] [background:var(--surface)]"
 							>
-								<div
-									className="uppercase tracking-wide"
-									style={{ color: "var(--white-dim)" }}
-								>
+								<div className="uppercase tracking-wide [color:var(--text-muted)]">
 									{field.key}
 								</div>
-								<div className="mt-1 text-slate-200">{field.value}</div>
+								<div className="mt-1 [color:var(--text)]">{field.value}</div>
 							</div>
 						))}
 					</div>
 				) : null}
 				<details>
-					<summary
-						className="cursor-pointer text-xs"
-						style={{ color: "var(--white-dim)" }}
-					>
+					<summary className="cursor-pointer text-xs [color:var(--text-muted)]">
 						Raw response
 					</summary>
-					<pre className="mt-2 max-h-72 overflow-auto rounded-md border border-white/10 bg-black/35 p-3 text-xs text-slate-200">
+					<pre className="mt-2 max-h-72 overflow-auto rounded-md border p-3 text-xs [border-color:var(--border)] [background:var(--bg-heavy)] [color:var(--text)]">
 						{parsed.raw}
 					</pre>
 				</details>
@@ -213,10 +211,23 @@ function StructuredResultSection({
 }
 
 export default function AgentRoutePage() {
+	const { user } = useAuth();
+	const adminRoleClaim = user?.app_metadata?.role;
+	const adminRolesClaim = user?.app_metadata?.roles;
+	const isAdminRoleActive =
+		(typeof adminRoleClaim === "string" &&
+			adminRoleClaim.trim().toLowerCase() === "admin") ||
+		(Array.isArray(adminRolesClaim) &&
+			adminRolesClaim.some(
+				(entry) =>
+					typeof entry === "string" && entry.trim().toLowerCase() === "admin",
+			));
 	const [healthy, setHealthy] = useState<boolean | null>(null);
 	const [paired, setPaired] = useState(false);
 	const [pairingCode, setPairingCode] = useState("");
 	const [isPairing, setIsPairing] = useState(false);
+	const [isRestoring, setIsRestoring] = useState(false);
+	const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
 	const [pairingError, setPairingError] = useState<string | null>(null);
 	const [isExecuting, setIsExecuting] = useState(false);
 	const [history, setHistory] = useState<ExecutedTask[]>([]);
@@ -226,23 +237,63 @@ export default function AgentRoutePage() {
 	const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(
 		null,
 	);
+	const [healthError, setHealthError] = useState<string | null>(null);
+	const [brokerConfig, setBrokerConfig] = useState<{
+		ok: boolean;
+		missing: string[];
+		warnings?: string[];
+		require_webhook_secret?: boolean;
+	} | null>(null);
+	const userId = user?.id ?? null;
+
+	const refreshConnectionState = useCallback(async () => {
+		const isHealthy = await agentService.healthCheck();
+		setHealthy(isHealthy);
+		setHealthError(agentService.getLastHealthError());
+
+		if (agentService.usesBroker()) {
+			const config = await agentService.getBrokerConfig();
+			setBrokerConfig(config);
+		}
+
+		if (isHealthy && userId) {
+			setIsRestoring(true);
+			try {
+				const restored = await agentService.restorePairingForActiveUser();
+				if (restored.restored && restored.reason === "restored") {
+					setRestoreMessage("Restored trusted pairing for this device.");
+				}
+			} finally {
+				setIsRestoring(false);
+			}
+		} else {
+			setIsRestoring(false);
+		}
+
+		const pairedState = await agentService.refreshPairingStatus();
+		setPaired(pairedState);
+
+		const recent = agentTaskManager.getRecentTasks(12);
+		setHistory(recent);
+		setSelectedHistoryId((current) => current ?? recent[0]?.id ?? null);
+	}, [userId]);
 
 	useEffect(() => {
-		let mounted = true;
-		const bootstrap = async () => {
-			const isHealthy = await agentService.healthCheck();
-			if (!mounted) return;
-			setHealthy(isHealthy);
-			setPaired(agentService.checkPairing());
-			const recent = agentTaskManager.getRecentTasks(12);
-			setHistory(recent);
-			setSelectedHistoryId((current) => current ?? recent[0]?.id ?? null);
-		};
-		void bootstrap();
+		void refreshConnectionState();
+	}, [refreshConnectionState]);
+
+	useEffect(() => {
+		if (healthy === true) return;
+		if (agentService.usesBroker() && !userId) return;
+
+		const timer = window.setInterval(() => {
+			void refreshConnectionState();
+		}, 4000);
+
 		return () => {
-			mounted = false;
+			window.clearInterval(timer);
 		};
-	}, []);
+	}, [healthy, refreshConnectionState, userId]);
 
 	const refreshHistory = () => {
 		const recent = agentTaskManager.getRecentTasks(12);
@@ -253,12 +304,6 @@ export default function AgentRoutePage() {
 			}
 			return recent[0]?.id ?? null;
 		});
-	};
-
-	const refreshConnectionState = async () => {
-		const isHealthy = await agentService.healthCheck();
-		setHealthy(isHealthy);
-		setPaired(agentService.checkPairing());
 	};
 
 	const serializeResult = (payload: unknown): string => {
@@ -347,17 +392,21 @@ export default function AgentRoutePage() {
 		}
 
 		setPairingError(null);
+		setRestoreMessage(null);
 		setIsPairing(true);
 		const ok = await agentService.pair(code);
 		if (!ok) {
 			setPairingError("Pairing failed. Confirm the code and gateway status.");
+		} else {
+			setRestoreMessage("Device trusted. Future sign-ins restore automatically.");
 		}
 		await refreshConnectionState();
 		setIsPairing(false);
 	};
 
-	const unpairAgent = () => {
-		agentService.unpair();
+	const unpairAgent = async () => {
+		setRestoreMessage(null);
+		await agentService.unpair();
 		setPaired(false);
 	};
 
@@ -367,74 +416,149 @@ export default function AgentRoutePage() {
 			: healthy
 				? "Gateway online"
 				: "Gateway offline";
+	const needsAuthForBroker =
+		agentService.usesBroker() &&
+		healthy === false &&
+		typeof healthError === "string" &&
+		healthError.toLowerCase().includes("session required");
 	const selectedTask =
 		history.find((task) => task.id === selectedHistoryId) ?? null;
 
 	return (
 		<PageFrame
-			title="Agent"
+			title="Koro Agent"
 			subtitle="Gateway status and task orchestration entrypoint."
 		>
 			<FrameSection
 				title="Gateway & Pairing"
 				subtitle="Connection health, pairing state, and execution readiness."
 			>
-				<div className="glass rounded-xl border border-white/10 p-3">
+				<div className="rounded-xl border p-3 [border-color:var(--border)] [background:var(--bg-mid)]">
 					<div className="flex flex-wrap items-center gap-3 text-sm">
-						<span
-							className="rounded-full border border-white/20 px-3 py-1"
-							style={{ color: "var(--white-dim)" }}
-						>
+						<span className="rounded-full border px-3 py-1 [border-color:var(--border)] [color:var(--text-muted)]">
 							{healthLabel}
 						</span>
-						<span style={{ color: "var(--white-dim)" }}>
-							Endpoint:{" "}
-							{import.meta.env.VITE_AGENT_GATEWAY_URL ||
-								import.meta.env.VITE_AGENT_URL ||
-								"http://127.0.0.1:3000"}
-						</span>
 						<span
-							className="rounded-full border border-white/20 px-3 py-1"
-							style={{ color: "var(--white-dim)" }}
+							className={`rounded-full border px-3 py-1 ${
+								isAdminRoleActive
+									? "[border-color:color-mix(in_srgb,var(--accent)_60%,var(--border))] [color:var(--accent)]"
+									: "[border-color:var(--border)] [color:var(--text-muted)]"
+							}`}
 						>
+							{isAdminRoleActive ? "Admin role active" : "Standard access"}
+						</span>
+						<span className="[color:var(--text-muted)]">
+							Endpoint: {agentService.getEndpoint()}
+						</span>
+						<span className="rounded-full border px-3 py-1 [border-color:var(--border)] [color:var(--text-muted)]">
 							{paired ? "Paired" : "Not paired"}
 						</span>
 						<button
 							type="button"
 							onClick={() => void refreshConnectionState()}
-							className="rounded-md border border-white/20 px-3 py-1.5 text-xs hover:bg-white/10"
+							className="rounded-md border px-3 py-1.5 text-xs transition hover:[background:var(--surface-2)] [border-color:var(--border)] [color:var(--text)]"
 						>
 							Refresh
 						</button>
 					</div>
+					{agentService.usesBroker() ? (
+						<div className="mt-3 rounded-lg border px-3 py-2 text-xs [border-color:var(--border)]">
+							{brokerConfig?.ok ? (
+								<span className="[color:var(--text)]">
+									Backend broker ready.
+								</span>
+							) : (
+								<div className="space-y-1">
+									<span className="[color:var(--text-muted)]">
+										Backend broker needs attention.
+									</span>
+									{brokerConfig?.missing?.map((item) => (
+										<div key={item} className="[color:var(--accent)]">
+											Missing: {item}
+										</div>
+									))}
+									{brokerConfig?.warnings?.map((item) => (
+										<div key={item} className="[color:var(--text-muted)]">
+											Warning: {item}
+										</div>
+									))}
+								</div>
+							)}
+						</div>
+					) : null}
 					<div className="mt-3 flex flex-wrap items-center gap-2">
 						<input
 							type="text"
 							value={pairingCode}
 							onChange={(event) => setPairingCode(event.target.value)}
 							placeholder="Enter pairing code"
-							className="w-44 rounded-md border border-white/20 bg-black/25 px-3 py-1.5 text-xs outline-none"
+							className="w-44 rounded-md border px-3 py-1.5 text-xs outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 						/>
 						<button
 							type="button"
 							onClick={() => void pairAgent()}
-							disabled={isPairing || !healthy}
-							className="rounded-md border border-white/20 px-3 py-1.5 text-xs hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+							disabled={isPairing || isRestoring || !healthy}
+							className="rounded-md border px-3 py-1.5 text-xs transition hover:[background:var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-50 [border-color:var(--border)] [color:var(--text)]"
 						>
 							{isPairing ? "Pairing…" : "Pair"}
 						</button>
 						<button
 							type="button"
-							onClick={unpairAgent}
+							onClick={() => void unpairAgent()}
 							disabled={!paired}
-							className="rounded-md border border-white/20 px-3 py-1.5 text-xs hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+							className="rounded-md border px-3 py-1.5 text-xs transition hover:[background:var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-50 [border-color:var(--border)] [color:var(--text)]"
 						>
 							Unpair
 						</button>
 						{pairingError ? (
-							<span className="text-xs text-red-300">{pairingError}</span>
+							<span className="text-xs [color:var(--danger)]">
+								{pairingError}
+							</span>
+						) : null}
+						{isRestoring ? (
+							<span className="text-xs [color:var(--text-muted)]">
+								Restoring trusted pairing…
+							</span>
+						) : null}
+						{restoreMessage ? (
+							<span className="text-xs [color:var(--accent)]">
+								{restoreMessage}
+							</span>
+						) : null}
+						{agentService.usesBroker() ? (
+							<span className="text-xs [color:var(--text-muted)]">
+								Use the code shown by the gateway, then click Pair here to bind
+								this Suite session.
+							</span>
 						) : null}
 					</div>
+
+					{!healthy ? (
+						<div className="mt-3 rounded-md border p-3 text-xs [border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)]">
+							<div className="font-medium [color:var(--text)]">
+								{needsAuthForBroker
+									? "Sign in to validate broker readiness."
+									: "Gateway is unreachable from this container."}
+							</div>
+							{healthError ? (
+								<div className="mt-1 [color:var(--danger)]">
+									{healthError}
+								</div>
+							) : null}
+							{!needsAuthForBroker ? (
+								<>
+									<div className="mt-2">
+										Start ZeroClaw gateway locally and ensure it listens on port
+										3000.
+									</div>
+									<pre className="mt-2 overflow-auto rounded border p-2 [border-color:var(--border)] [background:var(--bg-heavy)] [color:var(--text)]">
+zeroclaw gateway --host 127.0.0.1 --port 3000
+									</pre>
+								</>
+							) : null}
+							<div className="mt-2">Then click Refresh.</div>
+						</div>
+					) : null}
 				</div>
 			</FrameSection>
 
@@ -443,10 +567,10 @@ export default function AgentRoutePage() {
 				subtitle="Quick tasks, custom prompts, and history powered by the shared task panel."
 			>
 				<div className="grid gap-4 lg:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
-					<div className="glass min-h-96 rounded-xl p-2">
+					<div className="min-h-96 rounded-xl border p-2 [border-color:var(--border)] [background:var(--bg-mid)]">
 						<AgentTaskPanel
 							onExecuteTask={(prompt, taskName) => {
-								if (!healthy || !paired) {
+								if (!healthy || !paired || isRestoring) {
 									setLatestError(
 										"Gateway must be online and paired before running tasks.",
 									);
@@ -458,31 +582,33 @@ export default function AgentRoutePage() {
 						/>
 					</div>
 					<div className="space-y-3">
-						<div className="glass rounded-xl p-3">
+						<div className="rounded-xl border p-3 [border-color:var(--border)] [background:var(--bg-mid)]">
 							<div className="text-sm font-medium">Execution State</div>
 							<div className="mt-2 grid gap-2 text-xs md:grid-cols-2">
-								<div style={{ color: "var(--white-dim)" }}>
+								<div className="[color:var(--text-muted)]">
 									Task: {activeTaskName || "None"}
 								</div>
-								<div style={{ color: "var(--white-dim)" }}>
+								<div className="[color:var(--text-muted)]">
 									Status: {isExecuting ? "Running" : "Idle"}
 								</div>
-								<div style={{ color: "var(--white-dim)" }}>
+								<div className="[color:var(--text-muted)]">
 									History entries: {history.length}
 								</div>
-								<div style={{ color: "var(--white-dim)" }}>
+								<div className="[color:var(--text-muted)]">
 									Selected: {selectedTask?.name || "None"}
 								</div>
 							</div>
 							{latestError ? (
-								<p className="mt-2 text-xs text-red-300">{latestError}</p>
+								<p className="mt-2 text-xs [color:var(--danger)]">
+									{latestError}
+								</p>
 							) : null}
 						</div>
 
-						<div className="glass rounded-xl p-3">
+						<div className="rounded-xl border p-3 [border-color:var(--border)] [background:var(--bg-mid)]">
 							<div className="mb-2 text-sm font-medium">Recent Executions</div>
 							{history.length === 0 ? (
-								<p className="text-xs" style={{ color: "var(--white-dim)" }}>
+								<p className="text-xs [color:var(--text-muted)]">
 									No task history yet.
 								</p>
 							) : (
@@ -492,15 +618,15 @@ export default function AgentRoutePage() {
 											type="button"
 											key={task.id}
 											onClick={() => setSelectedHistoryId(task.id)}
-											className="w-full rounded-md border border-white/15 px-3 py-2 text-left text-xs hover:bg-white/5"
+											className="w-full rounded-md border px-3 py-2 text-left text-xs transition hover:[background:var(--surface-2)] [border-color:var(--border)]"
 										>
 											<div className="flex items-center justify-between gap-2">
 												<span>{task.name}</span>
-												<span style={{ color: "var(--white-dim)" }}>
+												<span className="[color:var(--text-muted)]">
 													{task.status}
 												</span>
 											</div>
-											<div style={{ color: "var(--white-dim)" }}>
+											<div className="[color:var(--text-muted)]">
 												{new Date(task.executedAt).toLocaleString()}
 											</div>
 										</button>
@@ -511,7 +637,7 @@ export default function AgentRoutePage() {
 								type="button"
 								onClick={clearHistory}
 								disabled={history.length === 0}
-								className="mt-3 rounded-md border border-white/20 px-3 py-1.5 text-xs hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+								className="mt-3 rounded-md border px-3 py-1.5 text-xs transition hover:[background:var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-50 [border-color:var(--border)] [color:var(--text)]"
 							>
 								Clear Stored History
 							</button>

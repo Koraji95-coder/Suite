@@ -13,8 +13,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { logger } from "@/lib/errorLogger";
 import { hexToRgba, useTheme } from "@/lib/palette";
-import { supabase } from "@/lib/supabase";
-import type { Database } from "@/types/database";
+import { supabase } from "@/supabase/client";
+import type { Database } from "@/supabase/database";
 import type { TableInfo } from "./storageTypes";
 
 const TABLE_NAMES = [

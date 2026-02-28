@@ -15,7 +15,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 	return createPortal(
 		<div className="fixed inset-0 z-[120]">
 			<div
-				className="fixed inset-0 bg-black/72"
+				className="fixed inset-0 bg-[color:rgb(10_10_10_/_0.72)]"
 				onClick={() => onOpenChange?.(false)}
 			/>
 			<div className="fixed inset-0 flex items-end justify-center overflow-y-auto p-2 sm:items-center sm:p-4">

@@ -1,10 +1,11 @@
+// src/routes/app/ui/GlassPanel.tsx (adjust path to yours)
 import {
+	type CSSProperties,
 	forwardRef,
+	type HTMLAttributes,
 	useCallback,
 	useMemo,
 	useRef,
-	type CSSProperties,
-	type HTMLAttributes,
 } from "react";
 import { hexToRgba, useTheme } from "@/lib/palette";
 
@@ -25,10 +26,7 @@ export interface GlassPanelProps extends HTMLAttributes<HTMLDivElement> {
 	grain?: boolean;
 	shimmer?: boolean;
 	edgeLight?: boolean;
-
-	/** Optional: more “app chrome” look */
 	variant?: GlassPanelVariant;
-	/** Optional: add internal padding for most layouts */
 	padded?: boolean;
 	overflow?: GlassPanelOverflow;
 }
@@ -73,32 +71,28 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 	) => {
 		const { palette } = useTheme();
 		const tint = tintProp ?? palette.primary;
+
 		const normalizedIntensity =
-			intensity === "light"
-				? "low"
-				: intensity === "strong"
-					? "high"
-					: intensity;
+			intensity === "light" ? "low" : intensity === "strong" ? "high" : intensity;
+
 		const resolvedIntensity =
 			normalizedIntensity === "low" ||
 			normalizedIntensity === "medium" ||
 			normalizedIntensity === "high"
 				? normalizedIntensity
 				: "medium";
+
 		const blur = BLUR[resolvedIntensity];
 		const bgAlpha = BG_OPACITY[resolvedIntensity];
 		const variant = variantProp === "default" ? "panel" : variantProp;
 
-		// Use CSS vars for tilt (no state updates per mouse move)
 		const hostRef = useRef<HTMLDivElement | null>(null);
 
 		const setHostRef = useCallback(
 			(node: HTMLDivElement | null) => {
 				hostRef.current = node;
 				if (typeof ref === "function") ref(node);
-				else if (ref)
-					(ref as React.MutableRefObject<HTMLDivElement | null>).current =
-						node;
+				else if (ref) (ref as { current: HTMLDivElement | null }).current = node;
 			},
 			[ref],
 		);
@@ -110,7 +104,6 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 					const rect = el.getBoundingClientRect();
 					const x = (e.clientX - rect.left) / rect.width - 0.5;
 					const y = (e.clientY - rect.top) / rect.height - 0.5;
-					// Subtle tilt (advanced look, not “toy”)
 					el.style.setProperty("--gp-rx", `${(y * 8).toFixed(2)}deg`);
 					el.style.setProperty("--gp-ry", `${(-x * 10).toFixed(2)}deg`);
 				}
@@ -133,18 +126,12 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 
 		const baseClasses = useMemo(() => {
 			const pad = padded ? (variant === "toolbar" ? "p-3" : "p-4") : "";
-
-			const rounding = liquid
-				? "animate-liquid"
-				: variant === "toolbar"
-					? "rounded-2xl"
-					: "rounded-2xl";
-
+			const rounding = liquid ? "animate-liquid" : "rounded-2xl";
 			const overflowClass =
 				overflow === "visible" ? "overflow-visible" : "overflow-hidden";
 
 			return [
-				"relative transition-all duration-300 will-change-transform",
+				"relative will-change-transform transition-all duration-300",
 				overflowClass,
 				hoverEffect ? "hover:scale-[1.01]" : "",
 				rounding,
@@ -196,7 +183,7 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 				: undefined,
 
 			...style,
-		} as React.CSSProperties;
+		} as CSSProperties;
 
 		return (
 			<div
@@ -210,7 +197,7 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 				{specular && (
 					<div
 						aria-hidden
-						className="pointer-events-none absolute inset-0 glass-specular-overlay"
+						className="glass-specular-overlay pointer-events-none absolute inset-0"
 						style={{
 							background: `linear-gradient(135deg, ${hexToRgba("#ffffff", 0.1)} 0%, transparent 55%)`,
 							borderRadius: "inherit",
@@ -239,8 +226,12 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 						className="pointer-events-none absolute inset-0 animate-edge-light"
 						style={{
 							borderRadius: "inherit",
-							background: `conic-gradient(from var(--edge-angle, 0deg), transparent 0%, ${hexToRgba(tint, 0.35)} 10%, transparent 20%)`,
-							mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+							background: `conic-gradient(from var(--edge-angle, 0deg), transparent 0%, ${hexToRgba(
+								tint,
+								0.35,
+							)} 10%, transparent 20%)`,
+							mask:
+								"linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
 							maskComposite: "exclude",
 							WebkitMaskComposite: "xor",
 							padding: "2px",
@@ -251,7 +242,7 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 				{grain && (
 					<div
 						aria-hidden
-						className="pointer-events-none absolute inset-0 glass-grain-overlay"
+						className="glass-grain-overlay pointer-events-none absolute inset-0"
 						style={{
 							borderRadius: "inherit",
 							opacity: 0.055,
@@ -267,3 +258,5 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 		);
 	},
 );
+
+GlassPanel.displayName = "GlassPanel";

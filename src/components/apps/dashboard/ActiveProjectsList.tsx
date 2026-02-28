@@ -1,7 +1,7 @@
 import { AlertCircle, AlertTriangle, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { hexToRgba, useTheme } from "@/lib/palette";
-import { TieredCard } from "../ui/TieredCard";
+import { GlassPanel } from "../ui/GlassPanel";
 import { bubbleStyle, softButtonStyle } from "./dashboardStyles";
 import {
 	formatDateOnly,
@@ -44,19 +44,33 @@ export function ActiveProjectsList({
 	const { palette } = useTheme();
 	const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
 	return (
-		<TieredCard
-			tier="solid"
+		<GlassPanel
 			tint={palette.secondary}
-			className="p-7"
+			hoverEffect={false}
+			specular={false}
+			bevel={false}
+			className="p-8 xl:p-9 group"
 		>
 			<div className="relative z-10">
-				<div className="flex items-center justify-between mb-4">
-					<h3
-						className="text-xl font-bold"
-						style={{ color: palette.primary }}
-					>
-						Active Projects
-					</h3>
+				<div className="flex items-center justify-between mb-6">
+					<div className="flex items-center gap-3">
+						<h3
+							className="text-xl font-bold"
+							style={{ color: palette.primary }}
+						>
+							Active Projects
+						</h3>
+						<span
+							className="text-xs px-2.5 py-1 rounded-full border"
+							style={{
+								color: hexToRgba(palette.text, 0.65),
+								borderColor: hexToRgba(palette.text, 0.1),
+								background: hexToRgba(palette.surface, 0.4),
+							}}
+						>
+							{projects.length} active
+						</span>
+					</div>
 					<button
 						onClick={() => onNavigateToProjectsHub?.()}
 						className="text-sm flex items-center space-x-1 px-3 py-1 rounded-lg transition-all hover:opacity-90"
@@ -70,7 +84,7 @@ export function ActiveProjectsList({
 					</button>
 				</div>
 
-				<div className="space-y-3">
+				<div className="space-y-4">
 					{projects.length === 0 ? (
 						<p
 							className="text-sm"
@@ -84,17 +98,21 @@ export function ActiveProjectsList({
 							const catColor = getCategoryColor(project.category);
 							const isHovered = hoveredProjectId === project.id;
 
+							const baseStyle = bubbleStyle(palette, catColor);
 							return (
 								<div
 									key={project.id}
-									className="px-5 py-4 cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:-translate-y-px"
+									className="px-5 py-4 cursor-pointer transition-all duration-300 hover:-translate-y-1.5"
 									style={{
-										...bubbleStyle(palette, catColor),
+										...baseStyle,
 										border: `1px solid ${
 											isHovered
 												? hexToRgba(catColor, 0.3)
 												: hexToRgba(palette.text, 0.08)
 										}`,
+										boxShadow: isHovered
+											? `0 16px 34px ${hexToRgba(catColor, 0.22)}`
+											: `0 10px 26px ${hexToRgba("#000000", 0.18)}`,
 									}}
 									onClick={() => onNavigateToProject?.(project.id)}
 									onMouseEnter={() => setHoveredProjectId(project.id)}
@@ -116,7 +134,7 @@ export function ActiveProjectsList({
 												>
 													{project.name}
 												</h4>
-												<div className="flex items-center space-x-3 mt-2">
+												<div className="flex items-center space-x-3 mt-2.5">
 													<span
 														className="text-sm"
 														style={{ color: getUrgencyColor(project.deadline) }}
@@ -133,7 +151,7 @@ export function ActiveProjectsList({
 													)}
 												</div>
 												{taskCount?.hasOverdue && (
-													<div className="flex items-center space-x-2 mt-1">
+													<div className="flex items-center space-x-2 mt-1.5">
 														<AlertCircle
 															className="w-3 h-3"
 															style={{ color: palette.tertiary }}
@@ -149,13 +167,13 @@ export function ActiveProjectsList({
 													</div>
 												)}
 												{taskCount?.nextDue && (
-													<div className="flex items-center space-x-2 mt-1">
+													<div className="flex items-center space-x-2 mt-1.5">
 														<AlertTriangle
 															className="w-3 h-3"
 															style={{ color: palette.secondary }}
 														/>
 														<span
-															className="text-xs"
+															className="text-xs leading-relaxed"
 															style={{
 																color: getTaskUrgencyColor(
 																	taskCount.nextDue.date,
@@ -180,6 +198,6 @@ export function ActiveProjectsList({
 					)}
 				</div>
 			</div>
-		</TieredCard>
+		</GlassPanel>
 	);
 }

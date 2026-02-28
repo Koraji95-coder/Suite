@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import type { StorageFile } from "@/components/storage/storageTypes";
-import { supabase } from "@/lib/supabase";
+import type { StorageFile } from "@/components/apps/storage/storageTypes";
+import { supabase } from "@/supabase/client";
 
 const DEFAULT_BUCKET = "project-files";
 

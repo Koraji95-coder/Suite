@@ -23,17 +23,26 @@ import {
 	Video,
 } from "lucide-react";
 import { useState } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Avatar,
+	AvatarFallback,
+	AvatarImage,
+} from "@/components/apps/ui/avatar";
+import { Button } from "@/components/apps/ui/button";
+import {
+	Card,
+	CardContent,
+	CardHeader,
+	CardTitle,
+} from "@/components/apps/ui/card";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+} from "@/components/apps/ui/dropdown-menu";
+import { Input } from "@/components/apps/ui/input";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/apps/ui/sheet";
 
 const sidebarItems = [
 	{ icon: BarChart3, label: "Dashboard", active: true },

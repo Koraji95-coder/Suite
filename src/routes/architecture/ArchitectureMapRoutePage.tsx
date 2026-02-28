@@ -27,10 +27,7 @@ export default function ArchitectureMapRoutePage() {
 		>
 			{MODULE_GROUPS.map((group) => (
 				<FrameSection key={group.title} title={group.title}>
-					<ul
-						className="list-disc pl-5 text-sm"
-						style={{ color: "var(--white-dim)" }}
-					>
+					<ul className="list-disc pl-5 text-sm [color:var(--text-muted)]">
 						{group.items.map((item) => (
 							<li key={item}>{item}</li>
 						))}

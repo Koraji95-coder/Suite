@@ -1,4 +1,4 @@
-import type { Memory } from "@/lib/ai/types";
+import type { Memory } from "@/lib/agent-memory/types";
 import type { GraphData, GraphLink, GraphNode } from "../types";
 
 export function adaptMemories(memories: Memory[]): GraphData {

@@ -1,7 +1,7 @@
 import { Activity } from "lucide-react";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import type { ActivityLogRow } from "@/services/activityService";
-import { TieredCard } from "../ui/TieredCard";
+import { GlassPanel } from "../ui/GlassPanel";
 import { bubbleStyle } from "./dashboardStyles";
 import { getCategoryColor } from "./dashboardUtils";
 
@@ -21,10 +21,12 @@ export function RecentActivityList({
 }: RecentActivityListProps) {
 	const { palette } = useTheme();
 	return (
-		<TieredCard
-			tier="solid"
+		<GlassPanel
 			tint={palette.accent}
-			className="p-7"
+			hoverEffect={false}
+			specular={false}
+			bevel={false}
+			className="p-8 xl:p-9 group"
 		>
 			<div className="relative z-10">
 				<div className="flex items-center space-x-2 mb-4">
@@ -37,15 +39,18 @@ export function RecentActivityList({
 					>
 						<Activity className="w-5 h-5" style={{ color: palette.accent }} />
 					</div>
-					<h3
-						className="text-xl font-bold"
-						style={{ color: palette.primary }}
-					>
+					<h3 className="text-xl font-bold" style={{ color: palette.primary }}>
 						Recent Activity
 					</h3>
 				</div>
 
-				<div className="space-y-3">
+				<div className="relative space-y-4">
+					<div
+						className="absolute left-3.5 top-2 bottom-2 w-px"
+						style={{
+							background: `linear-gradient(180deg, ${hexToRgba(palette.primary, 0.15)} 0%, ${hexToRgba(palette.text, 0.08)} 100%)`,
+						}}
+					/>
 					{activities.length === 0 ? (
 						<p
 							className="text-sm"
@@ -64,15 +69,19 @@ export function RecentActivityList({
 							return (
 								<div
 									key={activity.id}
-									className="flex items-start space-x-3 px-5 py-4 transition-all duration-300 hover:scale-[1.01] hover:-translate-y-px"
-									style={bubbleStyle(palette, palette.accent)}
+									className="relative flex items-start gap-4 px-5 py-4 ps-10 transition-all duration-300 hover:-translate-y-1"
+									style={{
+										...bubbleStyle(palette, palette.accent),
+										boxShadow: `0 10px 24px ${hexToRgba("#000000", 0.18)}`,
+									}}
 								>
-									<div className="mt-1.5">
+									<div className="absolute left-2.5 top-5">
 										<div
-											className="w-2 h-2 rounded-full"
+											className="w-2.5 h-2.5 rounded-full border"
 											style={{
 												backgroundColor: dotColor,
-												boxShadow: `0 0 8px ${hexToRgba(dotColor, 0.5)}`,
+												borderColor: hexToRgba("#ffffff", 0.35),
+												boxShadow: `0 0 10px ${hexToRgba(dotColor, 0.55)}`,
 											}}
 										/>
 									</div>
@@ -96,6 +105,6 @@ export function RecentActivityList({
 					)}
 				</div>
 			</div>
-		</TieredCard>
+		</GlassPanel>
 	);
 }

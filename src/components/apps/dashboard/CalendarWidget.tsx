@@ -8,7 +8,7 @@ import {
 	getCalendarDayUrgencyStyle,
 	getUrgencyLevel,
 } from "../calendar/urgencyUtils";
-import { TieredCard } from "../ui/TieredCard";
+import { GlassPanel } from "../ui/GlassPanel";
 import { formatDateOnly, formatDateString } from "./dashboardUtils";
 
 interface TaskDueItem {
@@ -280,10 +280,10 @@ export function CalendarWidget({
 		})();
 
 	return (
-		<TieredCard
-			tier="solid"
+		<GlassPanel
 			tint={palette.primary}
-			className="p-6"
+			hoverEffect={false}
+			className="p-6 group"
 		>
 			<div className="relative z-10">
 				<div className="flex items-center justify-between mb-4">
@@ -358,6 +358,6 @@ export function CalendarWidget({
 
 				{selectedDateContent}
 			</div>
-		</TieredCard>
+		</GlassPanel>
 	);
 }

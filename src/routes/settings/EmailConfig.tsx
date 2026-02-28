@@ -2,8 +2,10 @@
 import yaml from "js-yaml";
 import { FileCode, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { APP_NAME } from "@/app";
 
 const STORAGE_KEY = "app-email-config-yaml";
+const APP_SLUG = APP_NAME.toLowerCase().replace(/\s+/g, "");
 
 type EmailConfigState = {
 	smtp: {
@@ -37,7 +39,7 @@ const DEFAULT_CONFIG: EmailConfigState = {
 	defaults: {
 		from: "",
 		replyTo: "",
-		subject_prefix: "[BlockFlow]",
+		subject_prefix: `[${APP_NAME}]`,
 	},
 	notifications: {
 		project_updates: true,
@@ -46,7 +48,7 @@ const DEFAULT_CONFIG: EmailConfigState = {
 	},
 	templates: {
 		welcome_email: {
-			subject: "Welcome to BlockFlow",
+			subject: `Welcome to ${APP_NAME}`,
 			body: "Hi {{name}}, welcome aboard!",
 		},
 	},
@@ -178,36 +180,46 @@ export default function EmailConfig() {
 	};
 
 	return (
-		<div className="settings-panel">
-			<h3 className="settings-h3">
+		<div className="grid gap-3">
+			<h3 className="text-lg font-semibold tracking-tight [color:var(--text)]">
 				Email
-				<span className="settings-h3-sub">
+				<span className="ml-2 text-sm font-normal [color:var(--text-muted)]">
 					YAML config stored locally. Passwords are intentionally unsupported.
 				</span>
 			</h3>
 
-			<div className="glass settings-card">
-				<div className="settings-card-head">
+			<div className="grid gap-3 rounded-2xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
+				<div className="flex items-start gap-2">
 					<FileCode size={16} />
 					<div>
-						<div className="settings-card-title">Email configuration</div>
-						<div className="settings-card-sub">
+						<div className="text-sm font-semibold [color:var(--text)]">
+							Email configuration
+						</div>
+						<div className="text-xs [color:var(--text-muted)]">
 							Form edits basics; YAML edits templates too.
 						</div>
 					</div>
 				</div>
 
-				<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+				<div className="flex flex-wrap gap-2">
 					<button
 						type="button"
-						className="btn-hero-secondary"
+						className={`inline-flex items-center justify-center rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
+							viewMode === "form"
+								? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)]"
+								: "[border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:var(--surface-2)] hover:[color:var(--text)]"
+						}`}
 						onClick={() => setViewMode("form")}
 					>
 						Form
 					</button>
 					<button
 						type="button"
-						className="btn-hero-secondary"
+						className={`inline-flex items-center justify-center rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
+							viewMode === "yaml"
+								? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)]"
+								: "[border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:var(--surface-2)] hover:[color:var(--text)]"
+						}`}
 						onClick={() => setViewMode("yaml")}
 					>
 						YAML
@@ -215,16 +227,17 @@ export default function EmailConfig() {
 				</div>
 
 				{viewMode === "form" ? (
-					<div
-						style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
-					>
+					<div className="grid gap-3 md:grid-cols-2">
 						<div>
-							<label className="auth-label" htmlFor="smtp-host">
+							<label
+								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
+								htmlFor="smtp-host"
+							>
 								SMTP Host
 							</label>
 							<input
 								id="smtp-host"
-								className="auth-input"
+								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 								value={config.smtp.host}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -237,12 +250,15 @@ export default function EmailConfig() {
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="smtp-port">
+							<label
+								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
+								htmlFor="smtp-port"
+							>
 								SMTP Port
 							</label>
 							<input
 								id="smtp-port"
-								className="auth-input"
+								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 								type="number"
 								value={config.smtp.port}
 								onChange={(e) =>
@@ -255,12 +271,15 @@ export default function EmailConfig() {
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="smtp-user">
+							<label
+								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
+								htmlFor="smtp-user"
+							>
 								SMTP Username
 							</label>
 							<input
 								id="smtp-user"
-								className="auth-input"
+								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 								value={config.smtp.auth.user}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -273,12 +292,15 @@ export default function EmailConfig() {
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="smtp-secure">
+							<label
+								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
+								htmlFor="smtp-secure"
+							>
 								SMTP Secure
 							</label>
 							<select
 								id="smtp-secure"
-								className="auth-input"
+								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 								value={config.smtp.secure ? "true" : "false"}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -293,12 +315,15 @@ export default function EmailConfig() {
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="from">
+							<label
+								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
+								htmlFor="from"
+							>
 								From
 							</label>
 							<input
 								id="from"
-								className="auth-input"
+								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 								value={config.defaults.from}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -306,17 +331,20 @@ export default function EmailConfig() {
 										defaults: { ...c.defaults, from: e.target.value },
 									}))
 								}
-								placeholder="noreply@blockflow.com"
+								placeholder={`noreply@${APP_SLUG}.com`}
 							/>
 						</div>
 
 						<div>
-							<label className="auth-label" htmlFor="replyto">
+							<label
+								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
+								htmlFor="replyto"
+							>
 								Reply-To
 							</label>
 							<input
 								id="replyto"
-								className="auth-input"
+								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 								value={config.defaults.replyTo}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -324,17 +352,20 @@ export default function EmailConfig() {
 										defaults: { ...c.defaults, replyTo: e.target.value },
 									}))
 								}
-								placeholder="support@blockflow.com"
+								placeholder={`support@${APP_SLUG}.com`}
 							/>
 						</div>
 
-						<div style={{ gridColumn: "1 / -1" }}>
-							<label className="auth-label" htmlFor="subj">
+						<div className="md:col-span-2">
+							<label
+								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
+								htmlFor="subj"
+							>
 								Subject Prefix
 							</label>
 							<input
 								id="subj"
-								className="auth-input"
+								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 								value={config.defaults.subject_prefix}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -345,13 +376,13 @@ export default function EmailConfig() {
 							/>
 						</div>
 
-						<div style={{ gridColumn: "1 / -1" }} className="settings-note">
+						<div className="text-xs [color:var(--text-muted)] md:col-span-2">
 							Templates live in YAML mode under <code>templates:</code>.
 						</div>
 					</div>
 				) : (
 					<textarea
-						className="auth-input"
+						className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 						value={yamlText}
 						onChange={(e) => setYamlText(e.target.value)}
 						style={{
@@ -363,9 +394,17 @@ export default function EmailConfig() {
 					/>
 				)}
 
-				{error ? <div className="auth-error">{error}</div> : null}
+				{error ? (
+					<div className="rounded-xl border px-3 py-2 text-sm [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_18%,transparent)] [color:var(--danger)]">
+						{error}
+					</div>
+				) : null}
 
-				<button type="button" className="btn-hero-primary" onClick={handleSave}>
+				<button
+					type="button"
+					className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
+					onClick={handleSave}
+				>
 					<Save size={14} />
 					{saved ? "Saved" : "Save"}
 				</button>

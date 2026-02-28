@@ -19,21 +19,23 @@ Browsers cannot directly access Windows processes or AutoCAD due to security san
 
 Canonical implementation files live in:
 
-- `src/components/apps/Ground-Grid-Generation/api_server.py`
-- `src/components/apps/Ground-Grid-Generation/requirements-api.txt`
-- `src/components/apps/Ground-Grid-Generation/start_api_server.bat`
+- `backend/api_server.py`
+- `backend/requirements-api.txt`
+- `backend/start_api_server.bat`
+
+The backend will read a repo-root `.env` file if present (recommended for `API_KEY`).
 
 ### Option 1: Batch file (Windows)
 
 ```bat
-cd src\components\apps\Ground-Grid-Generation
+cd backend
 start_api_server.bat
 ```
 
 ### Option 2: Manual start
 
 ```bash
-cd src/components/apps/Ground-Grid-Generation
+cd backend
 pip install -r requirements-api.txt
 python api_server.py
 ```
@@ -110,12 +112,34 @@ Simple health check endpoint.
 ## Runtime Environment Variables
 
 - `API_KEY` (required): shared header key expected in `X-API-Key`
+- `API_KEY` can be set in `.env` at the repo root for local development
 - `API_HOST` (optional): bind host (default `127.0.0.1`)
 - `API_PORT` (optional): bind port (default `5000`)
 - `API_ALLOWED_ORIGINS` (optional): comma-separated CORS origins
-- `API_MAX_CONTENT_LENGTH` (optional): max request body bytes (default `65536`)
+- `API_MAX_CONTENT_LENGTH` (optional): max request body bytes (default `104857600`)
 - `API_RATE_LIMIT_DAY` (optional): global day limit (default `200 per day`)
 - `API_RATE_LIMIT_HOUR` (optional): global hour limit (default `50 per hour`)
+
+## Agent Broker (Optional)
+
+The backend can broker ZeroClaw pairing + webhook calls so the browser never sees the bearer token.
+
+Endpoints (all require Supabase auth `Authorization: Bearer <access_token>`):
+
+- `GET /api/agent/health` → proxy gateway health
+- `GET /api/agent/session` → `{ paired: boolean, expires_at?: string }`
+- `POST /api/agent/pair` → `{ pairing_code: "123456" }`
+- `POST /api/agent/unpair`
+- `POST /api/agent/webhook` → same payload as gateway `/webhook`
+
+Broker env vars (backend-only):
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` (preferred) or `SUPABASE_JWT_SECRET`
+- If using new ECC JWT keys, leave `SUPABASE_JWT_SECRET` empty and rely on JWKS via `SUPABASE_URL`
+- `AGENT_GATEWAY_URL` (default `http://127.0.0.1:3000`)
+- `AGENT_WEBHOOK_SECRET`
+- `AGENT_SESSION_TTL_SECONDS`
 
 ## WebSocket Event Shape
 

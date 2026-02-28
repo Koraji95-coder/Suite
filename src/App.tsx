@@ -4,10 +4,13 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { AuthProvider } from "./auth/AuthContext";
 import { NotificationProvider } from "./auth/NotificationContext";
-import { ErrorBoundary } from "./components/notification/ErrorBoundary";
-import { ToastContainer } from "./components/notification/ToastContainer";
-import { ToastProvider } from "./components/notification/ToastProvider";
+import Cursor from "./components/fx/Cursor";
+import { ErrorBoundary } from "./components/notification-system/ErrorBoundary";
+import { ToastContainer } from "./components/notification-system/ToastContainer";
+import { ToastProvider } from "./components/notification-system/ToastProvider";
+import { useSuiteCursor, useCursorEnabled } from "./components/fx/useSuiteCursor";
 import { logger } from "./lib/logger";
+import AppDashboardPage from "./routes/AppDashboardPage";
 import Shell from "./routes/AppShell";
 import ForgotPasswordPage from "./routes/ForgotPasswordPage";
 import LandingPage from "./routes/LandingPage";
@@ -18,7 +21,6 @@ import ResetPasswordPage from "./routes/ResetPasswordPage";
 import RouteLoadingFallback from "./routes/RouteLoadingFallback";
 import SignupPage from "./routes/SignupPage";
 
-const AppDashboardPage = lazy(() => import("./routes/AppDashboardPage"));
 const AppsRoutePage = lazy(() => import("./routes/apps/AppsRoutePage"));
 const ArchitectureMapRoutePage = lazy(
 	() => import("./routes/architecture/ArchitectureMapRoutePage"),
@@ -27,13 +29,40 @@ const AgentRoutePage = lazy(() => import("./routes/agent/AgentRoutePage"));
 const CalendarRoutePage = lazy(() => import("./routes/CalendarRoutePage"));
 const CommandCenterPage = lazy(() => import("./routes/CommandCenterPage"));
 const GroundGridRoutePage = lazy(
-	() => import("./routes/apps/GroundGridRoutePage"),
+	() =>
+		import(
+			"./routes/apps/ground-grid-generation/GroundGridGenerationRoutePage"
+		),
 );
 const TransmittalBuilderRoutePage = lazy(
-	() => import("./routes/apps/TransmittalBuilderRoutePage"),
+	() =>
+		import(
+			"./routes/apps/transmittal-builder/TransmittalBuilderRoutePage"
+		),
+);
+const GraphRoutePage = lazy(
+	() => import("./routes/apps/graph/GraphRoutePage"),
+);
+const StandardsCheckerRoutePage = lazy(
+	() => import("./routes/apps/standards-checker/StandardsCheckerRoutePage"),
+);
+const BatchFindReplaceRoutePage = lazy(
+	() => import("./routes/apps/batch-find-replace/BatchFindReplaceRoutePage"),
+);
+const DrawingListManagerRoutePage = lazy(
+	() =>
+		import(
+			"./routes/apps/drawing-list-manager/DrawingListManagerRoutePage"
+		),
 );
 const KnowledgeRoutePage = lazy(
 	() => import("./routes/knowledge/KnowledgeRoutePage"),
+);
+const MathToolsLibraryPage = lazy(
+	() => import("./routes/knowledge/math-tools/MathToolsLibraryPage"),
+);
+const WhiteboardKnowledgePage = lazy(
+	() => import("./routes/knowledge/whiteboard/WhiteboardKnowledgePage"),
 );
 const ProjectsRoutePage = lazy(() => import("./routes/ProjectsRoutePage"));
 const SettingsPage = lazy(() => import("./routes/settings/SettingsPage"));
@@ -54,6 +83,9 @@ function EnvDebug() {
 }
 
 export default function App() {
+	const cursorEnabled = useCursorEnabled();
+	useSuiteCursor(cursorEnabled);
+
 	return (
 		<BrowserRouter>
 			<ErrorBoundary>
@@ -61,6 +93,7 @@ export default function App() {
 					<NotificationProvider>
 						<ToastProvider>
 							<EnvDebug />
+							{cursorEnabled && <Cursor />}
 
 							<Routes>
 								<Route path="/" element={<LandingPage />} />
@@ -104,18 +137,42 @@ export default function App() {
 											element={withRouteSuspense(<AppsRoutePage />)}
 										/>
 										<Route
-											path="apps/ground-grid"
+											path="apps/ground-grid-generation"
 											element={withRouteSuspense(<GroundGridRoutePage />)}
 										/>
 										<Route
-											path="apps/transmittal"
+											path="apps/transmittal-builder"
 											element={withRouteSuspense(
 												<TransmittalBuilderRoutePage />,
 											)}
 										/>
 										<Route
+											path="apps/drawing-list-manager"
+											element={withRouteSuspense(<DrawingListManagerRoutePage />)}
+										/>
+										<Route
+											path="apps/graph"
+											element={withRouteSuspense(<GraphRoutePage />)}
+										/>
+										<Route
+											path="apps/standards-checker"
+											element={withRouteSuspense(<StandardsCheckerRoutePage />)}
+										/>
+										<Route
+											path="apps/batch-find-replace"
+											element={withRouteSuspense(<BatchFindReplaceRoutePage />)}
+										/>
+										<Route
 											path="knowledge"
 											element={withRouteSuspense(<KnowledgeRoutePage />)}
+										/>
+										<Route
+											path="knowledge/whiteboard"
+											element={withRouteSuspense(<WhiteboardKnowledgePage />)}
+										/>
+										<Route
+											path="knowledge/math-tools"
+											element={withRouteSuspense(<MathToolsLibraryPage />)}
 										/>
 										<Route
 											path="agent"

@@ -83,10 +83,20 @@ Provide a detailed report with actionable items.`,
 	},
 ];
 
-const TASK_HISTORY_KEY = "agent-task-history";
+const TASK_HISTORY_KEY_PREFIX = "agent-task-history";
 const MAX_HISTORY = 50; // Keep last 50 tasks
 
 class AgentTaskManager {
+	private scope = "anon";
+
+	setScope(scope: string | null): void {
+		this.scope = scope?.trim() || "anon";
+	}
+
+	private getStorageKey(): string {
+		return `${TASK_HISTORY_KEY_PREFIX}:${this.scope}`;
+	}
+
 	/**
 	 * Get predefined tasks
 	 */
@@ -114,7 +124,7 @@ class AgentTaskManager {
 				history.splice(MAX_HISTORY);
 			}
 
-			localStorage.setItem(TASK_HISTORY_KEY, JSON.stringify(history));
+			localStorage.setItem(this.getStorageKey(), JSON.stringify(history));
 		} catch (error) {
 			console.error("Failed to save task to history:", error);
 		}
@@ -125,7 +135,7 @@ class AgentTaskManager {
 	 */
 	getTaskHistory(): ExecutedTask[] {
 		try {
-			const stored = localStorage.getItem(TASK_HISTORY_KEY);
+			const stored = localStorage.getItem(this.getStorageKey());
 			return stored ? JSON.parse(stored) : [];
 		} catch (error) {
 			console.error("Failed to load task history:", error);
@@ -147,7 +157,7 @@ class AgentTaskManager {
 		try {
 			const history = this.getTaskHistory();
 			const filtered = history.filter((t) => t.id !== taskId);
-			localStorage.setItem(TASK_HISTORY_KEY, JSON.stringify(filtered));
+			localStorage.setItem(this.getStorageKey(), JSON.stringify(filtered));
 		} catch (error) {
 			console.error("Failed to delete task:", error);
 		}
@@ -158,7 +168,7 @@ class AgentTaskManager {
 	 */
 	clearHistory(): void {
 		try {
-			localStorage.removeItem(TASK_HISTORY_KEY);
+			localStorage.removeItem(this.getStorageKey());
 		} catch (error) {
 			console.error("Failed to clear history:", error);
 		}
@@ -206,7 +216,7 @@ class AgentTaskManager {
 		if (error) task.error = error;
 
 		history[taskIndex] = task;
-		localStorage.setItem(TASK_HISTORY_KEY, JSON.stringify(history));
+		localStorage.setItem(this.getStorageKey(), JSON.stringify(history));
 
 		return task;
 	}

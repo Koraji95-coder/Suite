@@ -6,7 +6,8 @@ Use this checklist before exposing the app to non-dev users.
 
 - [ ] `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are set for the target environment.
 - [ ] `VITE_AGENT_GATEWAY_URL` points to the intended gateway (or agent features are disabled by product decision).
-- [ ] `VITE_AGENT_WEBHOOK_SECRET` is set when webhook verification is enabled.
+- [ ] `VITE_AGENT_WEBHOOK_SECRET` is set and matches the gateway secret.
+- [ ] `VITE_AGENT_REQUIRE_WEBHOOK_SECRET=true` in production.
 - [ ] `VITE_COORDINATES_BACKEND_URL` targets the intended backend host.
 - [ ] `VITE_API_KEY` is rotated from the default dev placeholder.
 - [ ] `VITE_DEV_ADMIN_EMAIL` / `VITE_DEV_ADMIN_EMAILS` are set only for development workflows.

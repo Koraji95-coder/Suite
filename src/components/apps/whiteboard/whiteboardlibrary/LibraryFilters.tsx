@@ -28,16 +28,16 @@ export function LibraryFilters({
 	hidePanelFilter = false,
 }: LibraryFiltersProps) {
 	return (
-		<div className="bg-black/30 backdrop-blur-md border border-orange-500/30 rounded-lg p-6">
+		<div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 backdrop-blur-md">
 			<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
 				<div className="relative">
-					<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-orange-400" />
+					<Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-[var(--color-accent)]" />
 					<input
 						type="text"
 						value={searchTerm}
 						onChange={(e) => onSearchChange(e.target.value)}
 						placeholder="Search whiteboards..."
-						className="w-full pl-10 bg-black/50 border border-orange-500/30 rounded-lg px-4 py-2 text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+						className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 pl-10 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
 					/>
 				</div>
 
@@ -46,7 +46,7 @@ export function LibraryFilters({
 						<select
 							value={selectedPanel}
 							onChange={(e) => onPanelChange(e.target.value)}
-							className="w-full bg-black/50 border border-orange-500/30 rounded-lg px-4 py-2 text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+							className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
 						>
 							{panels.map((panel) => (
 								<option key={panel} value={panel}>
@@ -61,7 +61,7 @@ export function LibraryFilters({
 					<select
 						value={selectedTag}
 						onChange={(e) => onTagChange(e.target.value)}
-						className="w-full bg-black/50 border border-orange-500/30 rounded-lg px-4 py-2 text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+						className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
 					>
 						{tags.map((tag) => (
 							<option key={tag} value={tag}>
@@ -72,7 +72,7 @@ export function LibraryFilters({
 				</div>
 			</div>
 
-			<div className="text-orange-300 text-sm flex items-center space-x-4">
+			<div className="flex items-center space-x-4 text-sm text-[var(--color-text-muted)]">
 				<span>Total: {totalCount}</span>
 				<span>Filtered: {filteredCount}</span>
 				{!hidePanelFilter && selectedPanel !== "all" && (

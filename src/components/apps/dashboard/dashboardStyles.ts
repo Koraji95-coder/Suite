@@ -6,10 +6,10 @@ export function bubbleStyle(
 	tint: string = palette.primary,
 ): React.CSSProperties {
 	return {
-		background: `linear-gradient(180deg, ${hexToRgba(palette.surface, 0.7)} 0%, ${hexToRgba(tint, 0.08)} 100%)`,
-		border: `1px solid ${hexToRgba(palette.text, 0.08)}`,
+		background: `linear-gradient(180deg, ${hexToRgba(palette.surface, 0.68)} 0%, ${hexToRgba(tint, 0.1)} 100%)`,
+		border: `1px solid ${hexToRgba(palette.text, 0.07)}`,
 		borderRadius: "1rem",
-		boxShadow: `0 6px 18px ${hexToRgba("#000000", 0.18)}, inset 0 1px 0 ${hexToRgba("#ffffff", 0.06)}`,
+		boxShadow: `0 10px 24px ${hexToRgba("#000000", 0.16)}, inset 0 1px 0 ${hexToRgba("#ffffff", 0.07)}`,
 	};
 }
 
@@ -18,9 +18,9 @@ export function softButtonStyle(
 	tint: string = palette.primary,
 ): React.CSSProperties {
 	return {
-		background: hexToRgba(tint, 0.12),
-		border: `1px solid ${hexToRgba(tint, 0.25)}`,
+		background: hexToRgba(tint, 0.13),
+		border: `1px solid ${hexToRgba(tint, 0.27)}`,
 		borderRadius: "0.9rem",
-		boxShadow: `inset 0 1px 0 ${hexToRgba("#ffffff", 0.08)}`,
+		boxShadow: `inset 0 1px 0 ${hexToRgba("#ffffff", 0.1)}`,
 	};
 }

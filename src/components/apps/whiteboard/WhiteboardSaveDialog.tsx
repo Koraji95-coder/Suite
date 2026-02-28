@@ -27,43 +27,45 @@ export function WhiteboardSaveDialog({
 	};
 
 	return (
-		<div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-			<div className="bg-[#0a0a0a] backdrop-blur-xl border border-white/[0.06] rounded-lg p-6 max-w-md w-full m-4">
-				<h4 className="text-xl font-bold text-white/80 mb-4">
+		<div className="absolute inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] backdrop-blur-sm">
+			<div className="m-4 w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 backdrop-blur-xl">
+				<h4 className="mb-4 text-xl font-bold text-[var(--color-text)]">
 					Save Whiteboard
 				</h4>
 				<div className="space-y-4">
 					<div>
-						<label className="block text-orange-300 text-sm font-medium mb-2">
+						<label className="mb-2 block text-sm font-medium text-[var(--color-text-muted)]">
 							Title *
 						</label>
 						<input
 							type="text"
 							value={title}
 							onChange={(e) => setTitle(e.target.value)}
-							className="w-full bg-black/50 border border-orange-500/30 rounded-lg px-4 py-2 text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+							className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
 							placeholder="Enter whiteboard title"
 							autoFocus
 						/>
 					</div>
 					<div>
-						<label className="block text-orange-300 text-sm font-medium mb-2">
+						<label className="mb-2 block text-sm font-medium text-[var(--color-text-muted)]">
 							Tags (comma separated)
 						</label>
 						<input
 							type="text"
 							value={tags}
 							onChange={(e) => setTags(e.target.value)}
-							className="w-full bg-black/50 border border-orange-500/30 rounded-lg px-4 py-2 text-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+							className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
 							placeholder="e.g., calculations, circuit, notes"
 						/>
 					</div>
-					<p className="text-white/50 text-sm">
+					<p className="text-sm text-[var(--color-text-muted)]">
 						Panel Context:{" "}
-						<span className="font-semibold text-white/80">{panelContext}</span>
+						<span className="font-semibold text-[var(--color-text)]">
+							{panelContext}
+						</span>
 					</p>
 				</div>
-				<div className="flex gap-3 mt-6">
+				<div className="mt-6 flex gap-3">
 					<button
 						onClick={handleSubmit}
 						className="flex-1 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-semibold px-6 py-2 rounded-lg transition-all"
@@ -72,7 +74,7 @@ export function WhiteboardSaveDialog({
 					</button>
 					<button
 						onClick={onClose}
-						className="bg-black/50 border border-orange-500/30 text-orange-300 hover:bg-orange-500/10 px-6 py-2 rounded-lg transition-all"
+						className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-6 py-2 text-[var(--color-text-muted)] transition-all hover:bg-[var(--color-surface)]"
 					>
 						Cancel
 					</button>

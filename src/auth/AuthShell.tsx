@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Link } from "react-router-dom";
-
-import AuthGradientBackground from "./AuthGradientBackground";
+import { APP_NAME } from "@/app";
 
 type AuthPanelItem = {
 	title: string;
@@ -23,77 +22,91 @@ type AuthShellProps = {
 const DEFAULT_PANEL_ITEMS: AuthPanelItem[] = [
 	{
 		title: "Unified workspace",
-		description: "Projects, scheduling, and knowledge modules in one place.",
+		description: "Projects, scheduling, and task execution in one system.",
 	},
 	{
-		title: "Glass-first interface",
-		description: "High-contrast UI tuned for long-form, focused work.",
+		title: "Token-driven UI",
+		description: "Single source of truth for style and component behavior.",
 	},
 	{
-		title: "Theme-aware system",
-		description: "Switch palettes without losing hierarchy or readability.",
+		title: "Flexible themes",
+		description: "Switch visual mood without touching auth functionality.",
 	},
 ];
 
 export default function AuthShell({
 	children,
 	navLink,
-	panelBadge = "BlockFlow Workspace",
-	panelTitle = "Build with modular blocks",
-	panelSubtitle = "Organize engineering work into a coherent operating system for projects, calendar, and reference.",
+	panelBadge = `${APP_NAME} Workspace`,
+	panelTitle = "Access your workspace",
+	panelSubtitle = "Authentication stays secure while visuals stay easy to change.",
 	panelItems = DEFAULT_PANEL_ITEMS,
-	panelFooter = "Secure email-based sign-in with a workspace that scales.",
+	panelFooter = "Secure email-based sign-in with recoverable account access.",
 	cardClassName,
 	cardStyle,
 }: AuthShellProps) {
 	return (
-		<div className="auth-page">
-			<AuthGradientBackground />
-
-			<nav className="auth-nav">
-				<Link to="/" className="nav-logo" aria-label="BlockFlow home">
-					<div className="nav-logo-mark">
-						<span />
-						<span />
-						<span />
-						<span />
+		<div className="min-h-screen [background:var(--bg)] [color:var(--text)]">
+			<nav className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-4 md:px-8">
+				<Link
+					to="/"
+					className="inline-flex items-center gap-2 text-sm font-semibold no-underline [color:var(--text)]"
+					aria-label={`${APP_NAME} home`}
+				>
+					<div className="grid grid-cols-2 gap-0.5 rounded-md border p-1 [background:var(--surface-2)] [border-color:var(--border)]">
+						<span className="block h-1.5 w-1.5 rounded-[2px] [background:var(--primary)]" />
+						<span className="block h-1.5 w-1.5 rounded-[2px] [background:var(--primary)]" />
+						<span className="block h-1.5 w-1.5 rounded-[2px] [background:var(--primary)]" />
+						<span className="block h-1.5 w-1.5 rounded-[2px] [background:var(--primary)]" />
 					</div>
-					<span className="nav-logo-name">BlockFlow</span>
+					<span>{APP_NAME}</span>
 				</Link>
 
 				{navLink ? (
-					<div className="nav-right">
-						<Link to={navLink.to} className="btn-ghost">
+					<div className="inline-flex items-center">
+						<Link
+							to={navLink.to}
+							className="inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-semibold transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
 							{navLink.label}
 						</Link>
 					</div>
 				) : null}
 			</nav>
 
-			<main className="auth-main">
-				<div className="auth-shell-grid">
-					<section className="auth-panel glass">
-						<div className="hero-badge auth-panel-badge">
-							<span className="badge-dot" />
+			<main className="mx-auto w-full max-w-6xl px-4 pb-10 md:px-8">
+				<div className="grid gap-6 md:grid-cols-12">
+					<section className="hidden rounded-2xl border p-6 shadow-sm md:col-span-5 md:block [background:var(--surface)] [border-color:var(--border)]">
+						<div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium [background:var(--surface-2)] [color:var(--text-muted)]">
+							<span className="h-1.5 w-1.5 rounded-full [background:var(--primary)]" />
 							{panelBadge}
 						</div>
-						<h1 className="auth-panel-title">{panelTitle}</h1>
-						<p className="auth-panel-sub">{panelSubtitle}</p>
+						<h1 className="text-2xl font-semibold">{panelTitle}</h1>
+						<p className="mt-2 text-sm leading-relaxed [color:var(--text-muted)]">
+							{panelSubtitle}
+						</p>
 
-						<div className="auth-panel-grid">
+						<div className="mt-6 grid gap-3">
 							{panelItems.map((item) => (
-								<div key={item.title} className="auth-panel-item">
-									<div className="auth-panel-item-title">{item.title}</div>
-									<div className="auth-panel-item-sub">{item.description}</div>
+								<div
+									key={item.title}
+									className="rounded-xl border p-3 [background:var(--surface-2)] [border-color:var(--border)]"
+								>
+									<div className="text-sm font-semibold">{item.title}</div>
+									<div className="mt-1 text-xs [color:var(--text-muted)]">
+										{item.description}
+									</div>
 								</div>
 							))}
 						</div>
 
-						<div className="auth-panel-foot">{panelFooter}</div>
+						<div className="mt-6 text-xs [color:var(--text-muted)]">
+							{panelFooter}
+						</div>
 					</section>
 
 					<section
-						className={`auth-card glass${cardClassName ? ` ${cardClassName}` : ""}`}
+						className={`rounded-2xl border p-6 shadow-sm md:col-span-7 [background:var(--surface)] [border-color:var(--border)]${cardClassName ? ` ${cardClassName}` : ""}`}
 						style={cardStyle}
 					>
 						{children}

@@ -18,6 +18,7 @@ import {
 	PageHeaderProvider,
 	usePageHeader,
 } from "../components/apps/ui/PageHeaderContext";
+import { APP_NAME } from "../app";
 import { isDevAdminEmail } from "../lib/devAccess";
 
 const primaryNavItems = [
@@ -26,7 +27,7 @@ const primaryNavItems = [
 	{ to: "/app/calendar", label: "Calendar", icon: CalendarDays },
 	{ to: "/app/apps", label: "Apps", icon: AppWindow },
 	{ to: "/app/knowledge", label: "Knowledge", icon: BookOpen },
-	{ to: "/app/agent", label: "Agent", icon: Sparkles },
+	{ to: "/app/agent", label: "Koro Agent", icon: Sparkles },
 	{ to: "/app/architecture-map", label: "Architecture", icon: Network },
 ];
 
@@ -36,24 +37,21 @@ function AppTopbar() {
 	const [localTime, setLocalTime] = useState(() => new Date());
 
 	useEffect(() => {
-		const timer = window.setInterval(() => {
-			setLocalTime(new Date());
-		}, 1000);
-
-		return () => {
-			window.clearInterval(timer);
-		};
+		const timer = window.setInterval(() => setLocalTime(new Date()), 1000);
+		return () => window.clearInterval(timer);
 	}, []);
 
 	const displayLabel = useMemo(() => {
 		const name = profile?.display_name?.trim();
 		if (name) return name;
+
 		const metadataName =
 			typeof user?.user_metadata?.display_name === "string"
 				? user.user_metadata.display_name.trim()
 				: typeof user?.user_metadata?.full_name === "string"
 					? user.user_metadata.full_name.trim()
 					: "";
+
 		if (metadataName) return metadataName;
 		return user?.email ?? "Signed in";
 	}, [profile?.display_name, user?.email, user?.user_metadata]);
@@ -69,54 +67,62 @@ function AppTopbar() {
 	);
 
 	return (
-		<div className="app-topbar glass">
-			<div className="app-topbar-inner">
+		<div className="sticky top-0 z-40 border-b border-border [background:color-mix(in_srgb,var(--bg-base)_86%,transparent)] backdrop-blur">
+			<div className="flex w-full items-center justify-between gap-4 px-6 py-5 md:px-8">
 				<NavLink
 					to="/app/dashboard"
-					className="nav-logo"
+					className="inline-flex items-center gap-4 no-underline"
 					aria-label="Go to dashboard"
 				>
-					<div className="nav-logo-mark">
-						<span />
-						<span />
-						<span />
-						<span />
+					<div className="grid h-12 w-12 grid-cols-2 gap-1 rounded-[20px] border border-border bg-surface p-1">
+						<span className="rounded-md bg-primary" />
+						<span className="rounded-md bg-accent" />
+						<span className="rounded-md [background:color-mix(in_oklab,var(--text)_70%,transparent)]" />
+						<span className="rounded-md bg-primary" />
 					</div>
-					<span className="nav-logo-name">BlockFlow</span>
+
+					<span className="text-[26px] font-semibold leading-none tracking-tight text-text">
+						{APP_NAME}
+					</span>
 				</NavLink>
 
-				<div className="app-topbar-center">
+				<div className="hidden flex-1 justify-center px-3 md:flex">
 					{header.centerContent ? (
 						header.centerContent
 					) : header.title || header.subtitle || header.icon ? (
-						<div className="app-topbar-center-inner">
-							<div className="app-topbar-title-row">
+						<div className="grid gap-1 text-center">
+							<div className="inline-flex items-center justify-center gap-2">
 								{header.icon ? (
-									<span className="app-topbar-title-icon">
+									<span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-surface-2 text-text">
 										{header.icon}
 									</span>
 								) : null}
 								{header.title ? (
-									<span className="app-topbar-title">{header.title}</span>
+									<span className="text-base font-semibold text-text">
+										{header.title}
+									</span>
 								) : null}
 							</div>
 							{header.subtitle ? (
-								<span className="app-topbar-subtitle">
-									{header.subtitle}
-								</span>
+								<span className="text-sm text-text-muted">{header.subtitle}</span>
 							) : null}
 						</div>
 					) : null}
 				</div>
 
-				<div className="app-actions">
-					<span className="app-time-chip" aria-label="Local time">
+				<div className="flex items-center gap-2">
+					<span
+						className="rounded-lg border border-border bg-surface-2 px-2.5 py-1 text-xs text-text-muted"
+						aria-label="Local time"
+					>
 						{timeLabel}
 					</span>
-					<span className="app-user-chip">{displayLabel}</span>
+					<span className="hidden rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-text sm:inline-flex">
+						{displayLabel}
+					</span>
 					<button
 						type="button"
-						className="btn-ghost"
+						className="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text transition hover:bg-surface-2"
 						onClick={() => void signOut()}
 					>
 						Sign out
@@ -138,8 +144,8 @@ function FirstLoginNamePrompt() {
 		(typeof user?.user_metadata?.display_name === "string"
 			? user.user_metadata.display_name.trim()
 			: "");
-	const shouldShow = Boolean(user && !currentName);
 
+	const shouldShow = Boolean(user && !currentName);
 	if (!shouldShow) return null;
 
 	const submit = async (event: React.FormEvent) => {
@@ -159,42 +165,19 @@ function FirstLoginNamePrompt() {
 	};
 
 	return (
-		<div
-			style={{
-				position: "fixed",
-				inset: 0,
-				zIndex: 1200,
-				background: "var(--bg-heavy)",
-				backdropFilter: "blur(6px) saturate(110%)",
-				WebkitBackdropFilter: "blur(6px) saturate(110%)",
-				display: "grid",
-				placeItems: "center",
-				padding: "24px",
-			}}
-		>
+		<div className="fixed inset-0 z-[1200] grid place-items-center bg-bg-heavy p-6 backdrop-blur">
 			<form
 				onSubmit={(event) => void submit(event)}
-				className="glass"
-				style={{
-					width: "min(520px, 100%)",
-					borderRadius: "20px",
-					padding: "24px",
-					display: "grid",
-					gap: "12px",
-					border: "1px solid var(--border)",
-					background: "var(--bg-mid)",
-				}}
+				className="grid w-full max-w-[520px] gap-3 rounded-2xl border border-border bg-bg-mid p-6"
 			>
-				<h2 style={{ margin: 0, fontSize: "30px", fontFamily: "var(--serif)" }}>
+				<h2 className="m-0 text-3xl font-semibold tracking-tight text-text">
 					Thanks for signing up!
 				</h2>
-				<p style={{ margin: 0, color: "var(--white-dim)", fontSize: "14px" }}>
-					What should we call you?
-				</p>
+				<p className="m-0 text-sm text-text-muted">What should we call you?</p>
 
 				<input
 					type="text"
-					className="auth-input"
+					className="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-text outline-none transition focus:border-primary"
 					placeholder="Enter your name"
 					value={value}
 					onChange={(event) => setValue(event.target.value)}
@@ -203,14 +186,16 @@ function FirstLoginNamePrompt() {
 					required
 				/>
 
-				{error ? <div className="auth-error">{error}</div> : null}
+				{error ? (
+					<div className="rounded-xl border border-danger bg-[color-mix(in_srgb,var(--danger)_18%,transparent)] px-3 py-2 text-sm text-danger">
+						{error}
+					</div>
+				) : null}
 
-				<div
-					style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}
-				>
+				<div className="flex justify-end gap-2.5">
 					<button
 						type="submit"
-						className="btn-primary"
+						className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-contrast transition disabled:cursor-not-allowed disabled:opacity-60"
 						disabled={saving || value.trim().length < 2}
 					>
 						{saving ? "Saving…" : "Continue"}
@@ -225,6 +210,7 @@ function AppSidebar() {
 	const { user } = useAuth();
 	const canAccessCommandCenter = isDevAdminEmail(user?.email);
 	const navRef = useRef<HTMLElement | null>(null);
+
 	const safeNavItems = primaryNavItems.filter(
 		(item) => item.to.trim().length > 0 && item.label.trim().length > 0,
 	);
@@ -232,28 +218,34 @@ function AppSidebar() {
 	useEffect(() => {
 		const navNode = navRef.current;
 		if (!navNode) return;
-
 		for (const child of Array.from(navNode.children)) {
 			const text = child.textContent?.trim() ?? "";
 			const hasIcon = Boolean(child.querySelector("svg"));
-			if (!text && !hasIcon) {
-				child.remove();
-			}
+			if (!text && !hasIcon) child.remove();
 		}
 	}, []);
 
+	const navItemClass = (isActive: boolean) =>
+		[
+			"flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
+			isActive
+				? "bg-surface text-text"
+				: "text-text-muted hover:bg-surface-2 hover:text-text",
+		].join(" ");
+
 	return (
-		<aside className="app-sidebar glass" aria-label="Workspace navigation">
-			<nav ref={navRef} className="app-sidebar-nav">
+		<aside
+			className="rounded-2xl border border-border bg-bg-mid p-2"
+			aria-label="Workspace navigation"
+		>
+			<nav ref={navRef} className="grid gap-1">
 				{safeNavItems.map((item) => {
 					const Icon = item.icon;
 					return (
 						<NavLink
 							key={item.to}
 							to={item.to}
-							className={({ isActive }) =>
-								`app-sidebar-link ${isActive ? "active" : ""}`
-							}
+							className={({ isActive }) => navItemClass(isActive)}
 						>
 							<Icon size={16} />
 							<span>{item.label}</span>
@@ -263,9 +255,7 @@ function AppSidebar() {
 
 				<NavLink
 					to="/app/settings"
-					className={({ isActive }) =>
-						`app-sidebar-link ${isActive ? "active" : ""}`
-					}
+					className={({ isActive }) => navItemClass(isActive)}
 				>
 					<Settings size={16} />
 					<span>Settings</span>
@@ -274,9 +264,7 @@ function AppSidebar() {
 				{canAccessCommandCenter ? (
 					<NavLink
 						to="/app/command-center"
-						className={({ isActive }) =>
-							`app-sidebar-link ${isActive ? "active" : ""}`
-						}
+						className={({ isActive }) => navItemClass(isActive)}
 					>
 						<TerminalSquare size={16} />
 						<span>Command Center</span>
@@ -290,13 +278,16 @@ function AppSidebar() {
 export default function AppShell() {
 	return (
 		<PageHeaderProvider>
-			<div className="app-shell">
+			<div className="min-h-screen bg-bg-base text-text">
 				<AppTopbar />
 				<FirstLoginNamePrompt />
-				<div className="app-shell-grid">
+
+				<div className="grid w-full gap-4 px-4 py-4 md:grid-cols-[240px_minmax(0,1fr)] md:px-6 md:py-6">
 					<AppSidebar />
-					<div className="app-shell-body">
-						<Outlet />
+					<div className="min-w-0">
+						<div className="mx-auto w-full max-w-[1600px]">
+							<Outlet />
+						</div>
 					</div>
 				</div>
 			</div>

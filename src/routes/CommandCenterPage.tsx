@@ -137,7 +137,7 @@ export default function CommandCenterPage() {
 		return (
 			<PageFrame title="Command Center" subtitle={pageSubtitle}>
 				<FrameSection>
-					<div className="text-sm" style={{ color: "var(--white-dim)" }}>
+					<div className="text-sm [color:var(--text-muted)]">
 						Command Center is disabled outside development mode.
 					</div>
 				</FrameSection>
@@ -149,16 +149,16 @@ export default function CommandCenterPage() {
 		return (
 			<PageFrame title="Command Center" subtitle={pageSubtitle}>
 				<FrameSection title="Admin access required">
-					<div className="text-sm" style={{ color: "var(--white-dim)" }}>
+					<div className="text-sm [color:var(--text-muted)]">
 						Set <code>VITE_DEV_ADMIN_EMAIL</code> or{" "}
 						<code>VITE_DEV_ADMIN_EMAILS</code> in your <code>.env</code> to your
 						account email.
 					</div>
-					<div className="mt-2 text-xs" style={{ color: "var(--white-dim)" }}>
+					<div className="mt-2 text-xs [color:var(--text-muted)]">
 						Current account: {userEmail || "(unknown)"}
 					</div>
 					{allowlist.length > 0 ? (
-						<div className="mt-1 text-xs" style={{ color: "var(--white-dim)" }}>
+						<div className="mt-1 text-xs [color:var(--text-muted)]">
 							Configured admin allowlist: {allowlist.join(", ")}
 						</div>
 					) : null}
@@ -172,30 +172,33 @@ export default function CommandCenterPage() {
 			<FrameSection title="Command Groups">
 				<div className="grid gap-4 md:grid-cols-2">
 					{COMMAND_GROUPS.map((group) => (
-						<section key={group.title} className="glass rounded-xl p-4">
-							<h3 className="text-sm font-semibold mb-3">{group.title}</h3>
+						<section
+							key={group.title}
+							className="rounded-xl border p-4 [border-color:var(--border)] [background:var(--bg-mid)]"
+						>
+							<h3 className="mb-3 text-sm font-semibold">{group.title}</h3>
 							<div className="space-y-3">
 								{group.presets.map((preset) => (
-									<div key={preset.id} className="glass rounded-xl p-3">
+									<div
+										key={preset.id}
+										className="rounded-xl border p-3 [border-color:var(--border)] [background:var(--surface-2)]"
+									>
 										<div className="flex items-start justify-between gap-3">
 											<div>
 												<div className="text-sm font-medium">{preset.name}</div>
-												<p
-													className="mt-1 text-xs"
-													style={{ color: "var(--white-dim)" }}
-												>
+												<p className="mt-1 text-xs [color:var(--text-muted)]">
 													{preset.description}
 												</p>
 											</div>
 											<button
 												type="button"
 												onClick={() => void copyCommand(preset)}
-												className="rounded-md border border-white/20 px-3 py-1.5 text-xs hover:bg-white/10"
+												className="rounded-md border px-3 py-1.5 text-xs transition hover:[background:var(--surface)] [border-color:var(--border)] [color:var(--text)]"
 											>
 												{copiedId === preset.id ? "Copied" : "Copy"}
 											</button>
 										</div>
-										<pre className="mt-2 overflow-x-auto rounded-md border border-white/10 bg-black/35 p-2 text-xs text-emerald-300">
+										<pre className="mt-2 overflow-x-auto rounded-md border p-2 text-xs [border-color:var(--border)] [background:var(--bg-heavy)] [color:var(--accent)]">
 											{preset.command}
 										</pre>
 									</div>

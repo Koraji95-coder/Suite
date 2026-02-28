@@ -65,18 +65,18 @@ export function FloatingWhiteboardButton({
 			/>
 
 			{showLibrary && (
-				<div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-					<div className="bg-[#0a0a0a] backdrop-blur-xl border border-white/[0.06] rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
-						<div className="flex items-center justify-between p-6 border-b border-white/[0.06]">
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm">
+					<div className="flex max-h-[90vh] w-full max-w-7xl flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] backdrop-blur-xl">
+						<div className="flex items-center justify-between border-b border-[var(--color-border)] p-6">
 							<div className="flex items-center space-x-3">
-								<BookOpen className="w-6 h-6 text-orange-400" />
-								<h3 className="text-2xl font-bold text-white/80">
+								<BookOpen className="h-6 w-6 text-[var(--color-accent)]" />
+								<h3 className="text-2xl font-bold text-[var(--color-text)]">
 									Whiteboard Library
 								</h3>
 							</div>
 							<button
 								onClick={() => setShowLibrary(false)}
-								className="text-orange-300 hover:text-white/90 text-2xl transition-all"
+								className="text-2xl text-[var(--color-text-muted)] transition-all hover:text-[var(--color-text)]"
 							>
 								×
 							</button>

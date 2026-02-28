@@ -27,7 +27,7 @@ import {
 	X,
 } from "lucide-react";
 import { hexToRgba, useTheme } from "@/lib/palette";
-import { TieredCard } from "../ui/TieredCard";
+import { GlassPanel } from "../ui/GlassPanel";
 import type { WidgetConfig } from "./useDashboardLayout";
 
 const WIDGET_ICONS: Record<string, typeof BarChart3> = {
@@ -149,7 +149,7 @@ export function DashboardCustomizer({
 	};
 
 	return (
-		<TieredCard tier="solid" tint={palette.primary} className="p-5">
+		<GlassPanel tint={palette.primary} hoverEffect={false} className="p-5">
 			<div className="relative z-10">
 				<div className="flex items-center justify-between mb-4">
 					<h3 className="text-base font-bold" style={{ color: palette.text }}>
@@ -203,6 +203,6 @@ export function DashboardCustomizer({
 					</SortableContext>
 				</DndContext>
 			</div>
-		</TieredCard>
+		</GlassPanel>
 	);
 }

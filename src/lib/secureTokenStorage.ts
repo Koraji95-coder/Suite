@@ -18,8 +18,17 @@ interface TokenData {
 }
 
 class SecureTokenStorage {
-	private readonly STORAGE_KEY = "suite_auth_token";
+	private readonly STORAGE_KEY_PREFIX = "suite_auth_token";
 	private readonly TOKEN_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 hours
+	private scope = "anon";
+
+	setScope(scope: string | null): void {
+		this.scope = scope?.trim() || "anon";
+	}
+
+	private getStorageKey(): string {
+		return `${this.STORAGE_KEY_PREFIX}:${this.scope}`;
+	}
 
 	/**
 	 * Simple XOR cipher for obfuscation
@@ -64,6 +73,10 @@ class SecureTokenStorage {
 		return btoa(`${ua}${screen}`).substring(0, 32);
 	}
 
+	getDeviceFingerprint(): string {
+		return btoa(this.getDeviceKey()).slice(0, 24);
+	}
+
 	/**
 	 * Store a token securely in sessionStorage
 	 * sessionStorage is cleared when the tab closes, unlike localStorage
@@ -81,7 +94,7 @@ class SecureTokenStorage {
 			const obfuscated = this.obfuscate(serialized);
 
 			// Use sessionStorage instead of localStorage for better security
-			sessionStorage.setItem(this.STORAGE_KEY, obfuscated);
+			sessionStorage.setItem(this.getStorageKey(), obfuscated);
 
 			logger.debug("Token stored securely", "SecureTokenStorage");
 		} catch (error) {
@@ -95,7 +108,7 @@ class SecureTokenStorage {
 	 */
 	getToken(): string | null {
 		try {
-			const obfuscated = sessionStorage.getItem(this.STORAGE_KEY);
+			const obfuscated = sessionStorage.getItem(this.getStorageKey());
 			if (!obfuscated) {
 				return null;
 			}
@@ -127,7 +140,7 @@ class SecureTokenStorage {
 	 * Remove token from storage
 	 */
 	clearToken(): void {
-		sessionStorage.removeItem(this.STORAGE_KEY);
+		sessionStorage.removeItem(this.getStorageKey());
 		logger.debug("Token cleared", "SecureTokenStorage");
 	}
 
@@ -144,7 +157,7 @@ class SecureTokenStorage {
 	 */
 	getTimeUntilExpiry(): number {
 		try {
-			const obfuscated = sessionStorage.getItem(this.STORAGE_KEY);
+			const obfuscated = sessionStorage.getItem(this.getStorageKey());
 			if (!obfuscated) return 0;
 
 			const serialized = this.deobfuscate(obfuscated);
@@ -155,6 +168,32 @@ class SecureTokenStorage {
 			return Math.max(0, remaining);
 		} catch {
 			return 0;
+		}
+	}
+
+	exportOpaqueToken(): string | null {
+		const current = sessionStorage.getItem(this.getStorageKey());
+		return typeof current === "string" ? current : null;
+	}
+
+	importOpaqueToken(obfuscated: string): boolean {
+		if (!obfuscated?.trim()) return false;
+		try {
+			const serialized = this.deobfuscate(obfuscated);
+			if (!serialized) return false;
+
+			const tokenData: TokenData = JSON.parse(serialized);
+			if (!tokenData?.token || Date.now() > tokenData.expiresAt) {
+				return false;
+			}
+
+			sessionStorage.setItem(this.getStorageKey(), obfuscated);
+			return true;
+		} catch (error) {
+			logger.warn("Failed to import opaque token", "SecureTokenStorage", {
+				error,
+			});
+			return false;
 		}
 	}
 }

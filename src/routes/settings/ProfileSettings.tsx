@@ -3,8 +3,8 @@ import { Save, User } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useAuth } from "../../auth/useAuth";
-import { supabase } from "../../lib/supabase";
-import type { Database } from "../../types/database";
+import { supabase } from "@/supabase/client";
+import type { Database } from "@/supabase/database";
 
 export default function ProfileSettings() {
 	const { profile, user } = useAuth();
@@ -50,33 +50,38 @@ export default function ProfileSettings() {
 	};
 
 	return (
-		<div className="settings-panel">
-			<h3 className="settings-h3">
+		<div className="grid gap-3">
+			<h3 className="text-lg font-semibold tracking-tight [color:var(--text)]">
 				Profile
-				<span className="settings-h3-sub">Saved to Supabase profiles.</span>
+				<span className="ml-2 text-sm font-normal [color:var(--text-muted)]">
+					Saved to Supabase profiles.
+				</span>
 			</h3>
 
-			<div className="glass settings-card">
-				<div className="settings-card-head">
+			<div className="grid gap-3 rounded-2xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
+				<div className="flex items-start gap-2">
 					<User size={16} />
 					<div>
-						<div className="settings-card-title">Profile information</div>
-						<div className="settings-card-sub">
+						<div className="text-sm font-semibold [color:var(--text)]">
+							Profile information
+						</div>
+						<div className="text-xs [color:var(--text-muted)]">
 							Update your display name and email.
 						</div>
 					</div>
 				</div>
 
-				<div
-					style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
-				>
+				<div className="grid gap-3 md:grid-cols-2">
 					<div>
-						<label className="auth-label" htmlFor="displayName">
+						<label
+							className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
+							htmlFor="displayName"
+						>
 							Display Name
 						</label>
 						<input
 							id="displayName"
-							className="auth-input"
+							className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 							value={displayName}
 							onChange={(e) => setDisplayName(e.target.value)}
 							placeholder="Your name"
@@ -84,12 +89,15 @@ export default function ProfileSettings() {
 					</div>
 
 					<div>
-						<label className="auth-label" htmlFor="email">
+						<label
+							className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
+							htmlFor="email"
+						>
 							Email
 						</label>
 						<input
 							id="email"
-							className="auth-input"
+							className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 							value={email}
 							onChange={(e) => setEmail(e.target.value)}
 							placeholder="you@email.com"
@@ -98,11 +106,15 @@ export default function ProfileSettings() {
 					</div>
 				</div>
 
-				{error ? <div className="auth-error">{error}</div> : null}
+				{error ? (
+					<div className="rounded-xl border px-3 py-2 text-sm [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_18%,transparent)] [color:var(--danger)]">
+						{error}
+					</div>
+				) : null}
 
 				<button
 					type="button"
-					className="btn-hero-primary"
+					className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 [background:var(--primary)] [color:var(--primary-contrast)]"
 					disabled={!canSave}
 					onClick={() => void handleSave()}
 				>
@@ -110,7 +122,7 @@ export default function ProfileSettings() {
 					{saving ? "Saving…" : saved ? "Saved" : "Save profile"}
 				</button>
 
-				<div className="settings-note">
+				<div className="text-xs [color:var(--text-muted)]">
 					Role: <strong>Admin</strong> (placeholder)
 				</div>
 			</div>

@@ -1,12 +1,10 @@
-import { useCalendarEvents } from "./hooks/useCalendarEvents";
 import { useCallback, useEffect, useState } from "react";
 import { logger } from "@/lib/errorLogger";
-import { supabase } from "@/lib/supabase";
-import { safeSupabaseQuery } from "@/lib/supabaseUtils";
-import {
-	type CalendarEvent,
-	EventCalendar,
-} from "./calendarindex";
+import { supabase } from "@/supabase/client";
+import { safeSupabaseQuery } from "@/supabase/utils";
+import { EventCalendar } from "./EventCalendar";
+import { type CalendarEvent } from "./hooks/calendartypes";
+import { useCalendarEvents } from "./hooks/useCalendarEvents";
 
 type CalendarPageProps = {
 	compact?: boolean;

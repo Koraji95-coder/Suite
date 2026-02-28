@@ -2,16 +2,16 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { Settings2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { logger } from "@/lib/errorLogger";
 import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
-import { useRecentActivity } from "@/hooks/useRecentActivity";
-import { dashboardInfo } from "../../data/panelInfo";
-import { logger } from "../../lib/errorLogger";
-import { supabase } from "../../lib/supabase";
-import { safeSupabaseQuery } from "../../lib/supabaseUtils";
-import { PanelInfoDialog } from "../PanelInfoDialog";
+import { supabase } from "@/supabase/client";
+import { safeSupabaseQuery } from "@/supabase/utils";
+import type { ActivityLogRow } from "@/services/activityService";
+import { dashboardInfo } from "../../../data/panelInfo";
+import { PanelInfoDialog } from "../../../data/PanelInfoDialog";
 import { ActiveProjectsList } from "./ActiveProjectsList";
-import { DashboardUpcomingPanel } from "./DashboardUpcomingPanel";
 import { DashboardCustomizer } from "./DashboardCustomizer";
+import { DashboardUpcomingPanel } from "./DashboardUpcomingPanel";
 import { RecentActivityList } from "./RecentActivityList";
 import { RecentFilesWidget } from "./RecentFilesWidget";
 import { StatsCards } from "./StatsCards";
@@ -66,7 +66,7 @@ export function DashboardOverviewPanel({
 		resetLayout,
 	} = useDashboardLayout();
 	const [projects, setProjects] = useState<Project[]>([]);
-	const { activities, loading: activitiesLoading } = useRecentActivity(7);
+	const [activities, setActivities] = useState<ActivityLogRow[]>([]);
 	const [storageUsed, setStorageUsed] = useState(0);
 	const [isLoading, setIsLoading] = useState(true);
 	const [projectTaskCounts, setProjectTaskCounts] = useState<
@@ -174,6 +174,7 @@ export function DashboardOverviewPanel({
 			if (!userId) {
 				if (alive) {
 					setProjects([]);
+					setActivities([]);
 					setStorageUsed(0);
 					setIsLoading(false);
 				}
@@ -183,34 +184,55 @@ export function DashboardOverviewPanel({
 			setIsLoading(true);
 			logger.info("MainDashboard", "Loading dashboard data...");
 
-			const [projectsResult, filesResult] = await Promise.all([
-				safeSupabaseQuery(
-					async () =>
-						await supabase
-							.from("projects")
-							.select("*")
-							.eq("user_id", userId)
-							.eq("status", "active")
-							.order("deadline", { ascending: true, nullsFirst: false })
-							.limit(5),
-					"MainDashboard",
-				),
-				safeSupabaseQuery(
-					async () =>
-						await supabase.from("files").select("size").eq("user_id", userId),
-					"MainDashboard",
-				),
-			]);
+			const [projectsResult, activitiesResult, filesResult] = await Promise.all(
+				[
+					safeSupabaseQuery(
+						async () =>
+							await supabase
+								.from("projects")
+								.select("*")
+								.eq("user_id", userId)
+								.eq("status", "active")
+								.order("deadline", { ascending: true, nullsFirst: false })
+								.limit(5),
+						"MainDashboard",
+					),
+					safeSupabaseQuery(
+						async () =>
+							await supabase
+								.from("activity_log")
+								.select("*")
+								.eq("user_id", userId)
+								.order("timestamp", { ascending: false })
+								.limit(7),
+						"MainDashboard",
+					),
+					safeSupabaseQuery(
+						async () =>
+							await supabase.from("files").select("size").eq("user_id", userId),
+						"MainDashboard",
+					),
+				],
+			);
 
 			if (!alive) return;
 
 			const { data: projectsData, error: projectsError } = projectsResult;
+			const { data: activitiesData, error: activitiesError } = activitiesResult;
 			const { data: filesData, error: filesError } = filesResult;
 
 			// Only log non-configuration errors
 			if (projectsError && projectsError.code !== "SUPABASE_NOT_CONFIGURED") {
 				logger.error("MainDashboard", "Failed to load projects", {
 					error: projectsError,
+				});
+			}
+			if (
+				activitiesError &&
+				activitiesError.code !== "SUPABASE_NOT_CONFIGURED"
+			) {
+				logger.error("MainDashboard", "Failed to load activities", {
+					error: activitiesError,
 				});
 			}
 			if (filesError && filesError.code !== "SUPABASE_NOT_CONFIGURED") {
@@ -224,6 +246,12 @@ export function DashboardOverviewPanel({
 				loadAllProjectTaskCounts(projectsData);
 			} else {
 				setProjects([]);
+			}
+
+			if (activitiesData) {
+				setActivities(activitiesData);
+			} else {
+				setActivities([]);
 			}
 
 			if (filesData && Array.isArray(filesData)) {
@@ -297,9 +325,15 @@ export function DashboardOverviewPanel({
 		((projectId: string) => navigate(`/app/projects/${projectId}`));
 	const handleNavigateToProjectsHub =
 		onNavigateToProjectsHub ?? (() => navigate("/app/projects"));
+	const openTasks = Array.from(projectTaskCounts.values()).reduce(
+		(total, counts) => total + Math.max(counts.total - counts.completed, 0),
+		0,
+	);
+	const overdueProjects = Array.from(projectTaskCounts.values()).filter(
+		(counts) => counts.hasOverdue,
+	).length;
 
 	const visibleWidgets = widgets.filter((w) => w.visible);
-	const statsLoading = isLoading || activitiesLoading;
 
 	const widgetMap: Record<string, React.ReactNode> = {
 		stats: (
@@ -307,7 +341,9 @@ export function DashboardOverviewPanel({
 				key="stats"
 				projectsCount={projects.length}
 				storageUsed={storageUsed}
-				isLoading={statsLoading}
+				openTasks={openTasks}
+				overdueProjects={overdueProjects}
+				isLoading={isLoading}
 			/>
 		),
 		calendar: (
@@ -334,57 +370,42 @@ export function DashboardOverviewPanel({
 		"recent-files": <RecentFilesWidget key="recent-files" />,
 	};
 
-	const spanById: Record<string, 12 | 7 | 5> = {
-		stats: 7,
-		activity: 5,
-		calendar: 7,
-		"recent-files": 5,
-		projects: 12,
-	};
-
-	const spanClass: Record<12 | 7 | 5, string> = {
-		12: "lg:col-span-12",
-		7: "lg:col-span-7",
-		5: "lg:col-span-5",
-	};
+	const gridIds = new Set(["calendar", "activity", "recent-files"]);
 
 	const renderWidgets = () => {
-		const rows: Array<Array<{ id: string; span: 12 | 7 | 5 }>> = [];
-		let currentRow: Array<{ id: string; span: 12 | 7 | 5 }> = [];
-		let currentSpan = 0;
-
-		for (const widget of visibleWidgets) {
-			const span = spanById[widget.id] ?? 12;
-			if (currentSpan + span > 12 && currentRow.length > 0) {
-				rows.push(currentRow);
-				currentRow = [];
-				currentSpan = 0;
-			}
-			currentRow.push({ id: widget.id, span });
-			currentSpan += span;
-		}
-
-		if (currentRow.length > 0) rows.push(currentRow);
-
-		return rows.map((row, idx) => (
-			<div
-				key={`row-${idx}`}
-				className="grid grid-cols-1 lg:grid-cols-12 gap-8"
-			>
-				{row.map((item) => (
+		const elements: React.ReactNode[] = [];
+		let i = 0;
+		while (i < visibleWidgets.length) {
+			const w = visibleWidgets[i];
+			if (gridIds.has(w.id)) {
+				const gridChildren: React.ReactNode[] = [widgetMap[w.id]];
+				if (
+					i + 1 < visibleWidgets.length &&
+					gridIds.has(visibleWidgets[i + 1].id)
+				) {
+					gridChildren.push(widgetMap[visibleWidgets[i + 1].id]);
+					i += 2;
+				} else {
+					i += 1;
+				}
+				elements.push(
 					<div
-						key={item.id}
-						className={`min-w-0 ${spanClass[item.span]}`}
+						key={`grid-${w.id}`}
+						className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-10"
 					>
-						{widgetMap[item.id]}
-					</div>
-				))}
-			</div>
-		));
+						{gridChildren}
+					</div>,
+				);
+			} else {
+				elements.push(widgetMap[w.id]);
+				i += 1;
+			}
+		}
+		return elements;
 	};
 
 	return (
-		<div className="space-y-8">
+		<div className="space-y-10">
 			<div className="flex justify-end gap-2">
 				<button
 					onClick={() => setEditMode(!editMode)}
@@ -392,9 +413,7 @@ export function DashboardOverviewPanel({
 					style={{
 						...glassCardInnerStyle(palette, palette.primary),
 						color: editMode ? palette.text : palette.primary,
-						background: editMode
-							? hexToRgba(palette.primary, 0.2)
-							: undefined,
+						background: editMode ? hexToRgba(palette.primary, 0.2) : undefined,
 					}}
 					aria-label="Customize dashboard"
 				>

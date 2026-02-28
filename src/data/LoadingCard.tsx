@@ -21,18 +21,20 @@ export function LoadingCard({
 }: LoadingCardProps) {
 	const displayTitle = label ?? title;
 	const statusClass = isActive
-		? "border-orange-400/50"
+		? "[border-color:color-mix(in_srgb,var(--warning)_60%,var(--border))]"
 		: isComplete
-			? "border-emerald-400/40"
-			: "border-white/10";
+			? "[border-color:color-mix(in_srgb,var(--accent)_60%,var(--border))]"
+			: "[border-color:var(--border)]";
 
 	return (
-		<div className={`glass rounded-xl p-4 border ${statusClass}`}>
+		<div
+			className={`rounded-xl border p-4 [background:var(--bg-mid)] ${statusClass}`}
+		>
 			<div className="flex items-center justify-between gap-2">
 				<div className="text-sm font-medium">{displayTitle}</div>
 				{icon ? <div>{icon}</div> : null}
 			</div>
-			<div className="mt-2 text-xs" style={{ color: "var(--white-dim)" }}>
+			<div className="mt-2 text-xs [color:var(--text-muted)]">
 				{children ||
 					`Step ${typeof index === "number" ? index + 1 : ""}`.trim() ||
 					"Please wait…"}
@@ -40,5 +42,3 @@ export function LoadingCard({
 		</div>
 	);
 }
-
-export default LoadingCard;

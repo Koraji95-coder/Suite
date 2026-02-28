@@ -1,10 +1,17 @@
-import {
-	MAJOR_DESC,
-	MAJORS,
-	MINORS,
-	OVERLAPS,
-} from "@/components/ArchitectureMap/constants";
 import type { GraphData, GraphLink, GraphNode } from "../types";
+
+type ArchitectureMajor = {
+	id: string;
+	group: string;
+	sub?: string;
+	icon?: string;
+	color?: string;
+};
+
+const MAJORS: ArchitectureMajor[] = [];
+const MINORS: Record<string, string[]> = {};
+const OVERLAPS: Array<[string, string]> = [];
+const MAJOR_DESC: Record<string, string> = {};
 
 export function adaptArchitecture(): GraphData {
 	const nodes: GraphNode[] = [];

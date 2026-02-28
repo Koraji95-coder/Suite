@@ -5,6 +5,7 @@ Central documentation hub for this workspace.
 ## Sections
 
 - [Backend: Coordinates Grabber API](backend/coordinates-grabber-api.md)
+- [Backend: .NET Named Pipe Bridge](backend/named-pipe-bridge.md)
 - [Development: Command Center](development/command-center.md)
 - [Development: Public Rollout Readiness](development/public-rollout-readiness.md)
 - [Security: Environment & Secrets](security/environment-and-secrets.md)

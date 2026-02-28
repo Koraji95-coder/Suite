@@ -75,15 +75,15 @@ export function ProjectList({
 	const uncategorizedProjects = filteredProjects.filter((p) => !p.category);
 
 	return (
-		<div className="space-y-3">
+		<div className="space-y-4">
 			<h3
-				className="text-lg font-semibold mb-3"
+				className="text-xl font-semibold mb-1 tracking-tight"
 				style={{ color: hexToRgba(palette.text, 0.9) }}
 			>
 				Projects
 			</h3>
 			{onFilterChange && (
-				<div className="flex space-x-2 mb-3">
+				<div className="flex flex-wrap gap-2 mb-1">
 					{(["active", "all", "on-hold", "archived"] as StatusFilter[]).map(
 						(s) => {
 							const isActive = filter === s;
@@ -91,7 +91,7 @@ export function ProjectList({
 								<button
 									key={s}
 									onClick={() => onFilterChange(s)}
-									className="px-3 py-1 text-xs rounded-full transition-all"
+									className="px-3 py-1.5 text-xs font-semibold rounded-full transition-all"
 									style={{
 										background: isActive
 											? hexToRgba(palette.primary, 0.2)
@@ -110,7 +110,7 @@ export function ProjectList({
 					)}
 				</div>
 			)}
-			<div className="relative mb-4">
+			<div className="relative mb-2">
 				<Search
 					className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
 					style={{ color: hexToRgba(palette.primary, 0.8) }}
@@ -120,7 +120,7 @@ export function ProjectList({
 					value={searchQuery}
 					onChange={(e) => handleSearchChange(e.target.value)}
 					placeholder="Search projects..."
-					className="w-full pl-10 pr-4 py-2 rounded-lg text-sm placeholder-white/30 focus:outline-none focus:ring-2"
+					className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm placeholder-white/30 focus:outline-none focus:ring-2"
 					style={
 						{
 							background: hexToRgba(palette.surface, 0.35),
@@ -133,12 +133,22 @@ export function ProjectList({
 			</div>
 
 			<div
-				className="space-y-4 overflow-y-auto"
-				style={{ maxHeight: "calc(100vh - 320px)" }}
+				className="space-y-4 overflow-y-auto pr-1"
+				style={{
+					maxHeight: "calc(100vh - 320px)",
+					scrollBehavior: "smooth",
+				}}
 			>
 				{categorizedProjects.map((group) => (
-					<div key={group.cat.key}>
-						<div className="flex items-center space-x-2 mb-2 px-2 py-2">
+					<div
+						key={group.cat.key}
+						className="rounded-2xl border px-2.5 py-2.5"
+						style={{
+							borderColor: hexToRgba(palette.text, 0.09),
+							background: hexToRgba(palette.surface, 0.14),
+						}}
+					>
+						<div className="flex items-center space-x-2 mb-2 px-2 py-1.5">
 							<span
 								className="text-sm px-3 py-1 rounded border font-semibold"
 								style={categoryBadgeStyle(group.cat.key)}
@@ -153,7 +163,7 @@ export function ProjectList({
 								{group.items.length === 1 ? "project" : "projects"})
 							</span>
 						</div>
-						<div className="space-y-2">
+						<div className="space-y-2.5">
 							{group.items.map((project) => (
 								<ProjectCard
 									key={project.id}
@@ -170,8 +180,14 @@ export function ProjectList({
 				))}
 
 				{uncategorizedProjects.length > 0 && (
-					<div>
-						<div className="flex items-center space-x-2 mb-2 px-2 py-2">
+					<div
+						className="rounded-2xl border px-2.5 py-2.5"
+						style={{
+							borderColor: hexToRgba(palette.text, 0.09),
+							background: hexToRgba(palette.surface, 0.14),
+						}}
+					>
+						<div className="flex items-center space-x-2 mb-2 px-2 py-1.5">
 							<span
 								className="text-sm px-3 py-1 rounded border font-semibold"
 								style={{
@@ -190,7 +206,7 @@ export function ProjectList({
 								{uncategorizedProjects.length === 1 ? "project" : "projects"})
 							</span>
 						</div>
-						<div className="space-y-2">
+						<div className="space-y-2.5">
 							{uncategorizedProjects.map((project) => (
 								<ProjectCard
 									key={project.id}
@@ -208,7 +224,7 @@ export function ProjectList({
 
 				{filteredProjects.length === 0 && (
 					<div
-						className="text-center py-12"
+						className="text-center py-14 rounded-2xl border"
 						style={{ color: hexToRgba(palette.primary, 0.6) }}
 					>
 						<Search className="w-12 h-12 mx-auto mb-4 opacity-50" />

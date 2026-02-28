@@ -5,9 +5,13 @@
 
 import type { User } from "@supabase/supabase-js";
 import { createContext, type ReactNode, useEffect, useState } from "react";
+import { resolveAuthRedirect } from "./authRedirect";
+import { agentTaskManager } from "../services/agentTaskManager";
+import { agentService } from "../services/agentService";
+import { logSecurityEvent } from "../services/securityEventService";
 import { logger } from "../lib/logger";
-import { supabase } from "../lib/supabase";
-import type { Database } from "../types/database";
+import { supabase } from "@/supabase/client";
+import type { Database } from "@/supabase/database";
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -88,6 +92,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const [profile, setProfile] = useState<Profile | null>(null);
 	const [loading, setLoading] = useState(true);
 
+	const isUserAdmin = (authUser: User | null): boolean => {
+		if (!authUser) return false;
+
+		const rawRole = (authUser.app_metadata as Record<string, unknown> | undefined)
+			?.role;
+
+		if (typeof rawRole === "string") {
+			return rawRole.trim().toLowerCase() === "admin";
+		}
+
+		const rawRoles = (authUser.app_metadata as Record<string, unknown> | undefined)
+			?.roles;
+		if (Array.isArray(rawRoles)) {
+			return rawRoles.some(
+				(entry) => typeof entry === "string" && entry.trim().toLowerCase() === "admin",
+			);
+		}
+
+		return false;
+	};
+
 	useEffect(() => {
 		// Rehydrate session from storage on mount
 		const rehydrateSession = async () => {
@@ -104,6 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 				const currentUser = session?.user ?? null;
 				setUser(currentUser);
+				agentService.setActiveUser(
+					currentUser?.id ?? null,
+					currentUser?.email ?? null,
+					isUserAdmin(currentUser),
+				);
+				agentTaskManager.setScope(currentUser?.id ?? null);
 
 				if (currentUser) {
 					const p = await ensureProfileForUser(currentUser);
@@ -126,6 +157,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		} = supabase.auth.onAuthStateChange((_event, session) => {
 			const currentUser = session?.user ?? null;
 			setUser(currentUser);
+			agentService.setActiveUser(
+				currentUser?.id ?? null,
+				currentUser?.email ?? null,
+				isUserAdmin(currentUser),
+			);
+			agentTaskManager.setScope(currentUser?.id ?? null);
 
 			if (currentUser) {
 				// Async-safe pattern: avoid deadlocks by not awaiting directly inside the callback
@@ -149,17 +186,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			password,
 		});
 		if (error) throw error;
+		await logSecurityEvent("auth_sign_in_success", "User signed in successfully.");
 	};
 
 	const signUp = async (email: string, password: string) => {
-		const configuredRedirect = import.meta.env.VITE_AUTH_REDIRECT_URL;
-		const emailRedirectTo =
-			typeof configuredRedirect === "string" &&
-			configuredRedirect.trim().length > 0
-				? configuredRedirect.trim()
-				: typeof window !== "undefined"
-					? `${window.location.origin}/login`
-					: undefined;
+		const emailRedirectTo = resolveAuthRedirect("/login");
 
 		const { error } = await supabase.auth.signUp({
 			email,
@@ -167,11 +198,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			options: emailRedirectTo ? { emailRedirectTo } : undefined,
 		});
 		if (error) throw error;
+		await logSecurityEvent(
+			"auth_sign_up_success",
+			"User sign-up initiated successfully.",
+		);
 	};
 
 	const signOut = async () => {
+		try {
+			await agentService.unpair();
+		} catch (error) {
+			logger.warn("Failed to clear agent pairing on sign-out", "AuthContext", {
+				error,
+			});
+		}
+
 		const { error } = await supabase.auth.signOut();
 		if (error) throw error;
+		await logSecurityEvent("auth_sign_out", "User signed out current session.");
 	};
 
 	const updateProfile = async (

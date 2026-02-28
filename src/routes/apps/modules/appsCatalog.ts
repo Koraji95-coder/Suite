@@ -2,8 +2,8 @@ export type AppsCatalogItem = {
 	id: string;
 	title: string;
 	description: string;
-	to: string;
-	status: "active" | "in-progress";
+	to?: string;
+	status: "active" | "in-progress" | "coming-soon";
 };
 
 export const APPS_CATALOG: AppsCatalogItem[] = [
@@ -23,21 +23,55 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 	},
 	{
 		id: "ground-grid",
-		title: "Ground Grid Generator",
-		description: "Capture AutoCAD coordinates and generate grounding grid layouts.",
-		to: "/app/apps/ground-grid",
+		title: "Ground Grid Generation",
+		description:
+			"Coordinates capture backend and interactive generation in one app.",
+		to: "/app/apps/ground-grid-generation",
 		status: "active",
 	},
 	{
 		id: "transmittal-builder",
 		title: "Transmittal Builder",
-		description: "Assemble transmittal packages with contacts and document lists.",
-		to: "/app/apps/transmittal",
+		description:
+			"Assemble transmittal packages with contacts and document lists.",
+		to: "/app/apps/transmittal-builder",
+		status: "active",
+	},
+	{
+		id: "drawing-list-manager",
+		title: "Drawing List Manager",
+		description:
+			"Generate, validate, and export structured drawing lists from project files.",
+		to: "/app/apps/drawing-list-manager",
+		status: "active",
+	},
+	{
+		id: "graph-explorer",
+		title: "Graph Explorer",
+		description:
+			"Visualize architecture modules and agent memory graph relationships.",
+		to: "/app/apps/graph",
+		status: "active",
+	},
+	{
+		id: "batch-find-replace",
+		title: "Batch Find and Replace",
+		description:
+			"Run bulk find/replace jobs through the backend bridge with preview support.",
+		to: "/app/apps/batch-find-replace",
+		status: "active",
+	},
+	{
+		id: "standards-checker",
+		title: "Standards Checker",
+		description:
+			"Unified QA/QC and standards validation workflow for engineering deliverables.",
+		to: "/app/apps/standards-checker",
 		status: "active",
 	},
 	{
 		id: "agent",
-		title: "Agent",
+		title: "Koro Agent",
 		description: "Pair and run automation workflows through the gateway.",
 		to: "/app/agent",
 		status: "active",
@@ -55,5 +89,11 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		description: "Standards, security notes, and implementation docs.",
 		to: "/app/knowledge",
 		status: "active",
+	},
+	{
+		id: "block-library",
+		title: "Block Library",
+		description: "Central catalog for reusable engineering block assets.",
+		status: "coming-soon",
 	},
 ];

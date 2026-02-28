@@ -1,0 +1,526 @@
+/* src/theme.css */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+@import "tailwindcss";
+
+/* =========================================================
+   FALLBACK TOKENS
+   (palette.ts overwrites these at runtime)
+   ========================================================= */
+:root {
+	--bg: #0b1220;
+	--bg-base: var(--bg);
+	--bg-mid: rgba(11, 18, 32, 0.72);
+	--bg-heavy: rgba(11, 18, 32, 0.86);
+
+	--surface: #0f1a2e;
+	--surface-2: #16243d;
+
+	--border: rgba(255, 255, 255, 0.08);
+	--text: rgba(255, 255, 255, 0.92);
+	--text-muted: rgba(255, 255, 255, 0.62);
+
+	--primary: #2dd4bf;
+	--primary-contrast: #062a27;
+	--accent: #60a5fa;
+
+	--success: #22c55e;
+	--danger: #ef4444;
+
+	--focus-ring: color-mix(in oklab, var(--primary) 35%, transparent);
+
+	--radius-lg: 16px;
+	--radius-md: 12px;
+	--radius-sm: 10px;
+
+	--shadow-panel:
+		0 10px 30px rgba(0, 0, 0, 0.28),
+		0 1px 0 rgba(255, 255, 255, 0.04) inset;
+
+	--theme-transition-duration: 180ms;
+}
+
+/* =========================================================
+   BASE / RESET
+   ========================================================= */
+html,
+body,
+#root {
+	min-height: 100%;
+}
+
+html {
+	scroll-behavior: smooth;
+}
+
+body {
+	margin: 0;
+	font-family: "Inter", system-ui, -apple-system, sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	background: var(--bg);
+	color: var(--text);
+}
+
+/* Selection */
+::selection {
+	background: color-mix(in oklab, var(--primary) 28%, transparent);
+	color: var(--text);
+}
+
+/* =========================================================
+   CUSTOM CURSOR
+   ========================================================= */
+body.cursor-enabled,
+body.cursor-enabled * {
+	cursor: none !important;
+}
+
+#cursor,
+#cursor-ring {
+	position: fixed;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+	z-index: 9999;
+}
+
+#cursor {
+	width: 12px;
+	height: 12px;
+	border: 2px solid var(--accent);
+	background: color-mix(in oklab, var(--accent) 22%, transparent);
+	transform: translate(-50%, -50%) rotate(45deg);
+	box-shadow: 0 0 10px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+#cursor::after {
+	content: "";
+	position: absolute;
+	inset: 3px;
+	background: color-mix(in oklab, var(--primary) 70%, transparent);
+	opacity: 0.9;
+}
+
+#cursor-ring {
+	width: 34px;
+	height: 34px;
+	border-radius: 999px;
+	border: 1px solid rgba(232, 201, 126, 0.32);
+	transform: translate(-50%, -50%);
+}
+
+/* =========================================================
+   THEME ANIMATION (ONLY WHEN TOGGLING)
+   Add/remove `html.theme-animating` in ThemeProvider on theme switch.
+   ========================================================= */
+html.theme-animating,
+html.theme-animating * {
+	transition:
+		background-color var(--theme-transition-duration) ease,
+		border-color var(--theme-transition-duration) ease,
+		color var(--theme-transition-duration) ease,
+		box-shadow var(--theme-transition-duration) ease,
+		fill var(--theme-transition-duration) ease,
+		stroke var(--theme-transition-duration) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	html.theme-animating,
+	html.theme-animating * {
+		transition: none !important;
+	}
+}
+
+/* =========================================================
+   FOCUS RING (ACCESSIBLE)
+   ========================================================= */
+:where(
+	.ui-btn-primary,
+	.ui-btn-secondary,
+	.btn-ghost,
+	.btn-primary,
+	.btn-hero-primary,
+	.btn-hero-secondary,
+	.ui-input,
+	.auth-input,
+	button,
+	a,
+	[role="button"],
+	[tabindex]
+):focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* =========================================================
+   SHARED SHELL / PANELS
+   ========================================================= */
+.ui-shell {
+	min-height: 100vh;
+	background: var(--bg);
+	color: var(--text);
+}
+
+.ui-panel,
+.glass,
+.settings-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-panel);
+}
+
+.ui-panel-subtle {
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+}
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+.ui-btn-primary,
+.btn-primary,
+.btn-hero-primary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 10px 16px;
+	border-radius: var(--radius-md);
+	font-size: 14px;
+	font-weight: 600;
+	border: 1px solid transparent;
+	background: var(--primary);
+	color: var(--primary-contrast);
+	text-decoration: none;
+	cursor: pointer;
+	transition: filter 160ms ease;
+}
+
+.ui-btn-primary:hover,
+.btn-primary:hover,
+.btn-hero-primary:hover {
+	filter: brightness(1.06);
+}
+
+.ui-btn-secondary,
+.btn-ghost,
+.btn-hero-secondary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 10px 16px;
+	border-radius: var(--radius-md);
+	font-size: 14px;
+	font-weight: 600;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.ui-btn-secondary:hover,
+.btn-ghost:hover,
+.btn-hero-secondary:hover {
+	background: var(--surface-2);
+}
+
+/* =========================================================
+   INPUTS
+   ========================================================= */
+.ui-input,
+.auth-input {
+	width: 100%;
+	padding: 10px 12px;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	font-size: 14px;
+}
+
+.ui-input:focus,
+.auth-input:focus {
+	outline: 0;
+	border-color: var(--primary);
+	box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 20%, transparent);
+}
+
+/* =========================================================
+   AUTH (layout styles only)
+   ========================================================= */
+.auth-page {
+	min-height: 100vh;
+	background: var(--bg);
+	color: var(--text);
+}
+
+.auth-nav {
+	max-width: 1152px;
+	margin: 0 auto;
+	padding: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.nav-right {
+	display: inline-flex;
+	align-items: center;
+}
+
+.nav-logo {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 600;
+	text-decoration: none;
+	color: var(--text);
+}
+
+.nav-logo-mark {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 2px;
+	padding: 4px;
+	border-radius: 8px;
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+}
+
+.nav-logo-mark span {
+	display: block;
+	width: 6px;
+	height: 6px;
+	border-radius: 2px;
+	background: var(--primary);
+}
+
+.auth-main {
+	max-width: 1152px;
+	margin: 0 auto;
+	padding: 0 16px 32px;
+}
+
+.auth-shell-grid {
+	display: grid;
+	gap: 16px;
+}
+
+.auth-panel {
+	display: none;
+	padding: 24px;
+}
+
+.auth-panel-badge,
+.hero-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 12px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 500;
+	background: var(--surface-2);
+	color: var(--text-muted);
+}
+
+.badge-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 999px;
+	background: var(--primary);
+}
+
+.auth-panel-title {
+	font-size: 28px;
+	font-weight: 600;
+	margin-top: 12px;
+}
+
+.auth-panel-sub,
+.auth-panel-item-sub,
+.auth-panel-foot,
+.auth-sub,
+.muted,
+.auth-copy {
+	color: var(--text-muted);
+}
+
+.auth-panel-grid {
+	display: grid;
+	gap: 12px;
+	margin-top: 16px;
+}
+
+.auth-panel-item {
+	padding: 12px;
+	border-radius: var(--radius-md);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+}
+
+.auth-panel-item-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.auth-panel-item-sub {
+	font-size: 12px;
+	margin-top: 4px;
+}
+
+.auth-panel-foot {
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+.auth-card {
+	padding: 24px;
+}
+
+.auth-head {
+	margin-bottom: 20px;
+}
+
+.auth-title {
+	font-size: 28px;
+	font-weight: 600;
+	line-height: 1.15;
+	margin: 12px 0 0;
+}
+
+.auth-sub {
+	font-size: 14px;
+	margin-top: 8px;
+}
+
+.auth-form {
+	display: grid;
+	gap: 12px;
+}
+
+.auth-label {
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.auth-error {
+	padding: 8px 10px;
+	border-radius: var(--radius-sm);
+	border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--border));
+	background: color-mix(in oklab, var(--danger) 8%, var(--surface));
+	color: var(--danger);
+	font-size: 14px;
+}
+
+.auth-message {
+	padding: 10px 12px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--border);
+	background: var(--surface-2);
+	color: var(--text);
+	font-size: 14px;
+}
+
+.auth-message.is-success {
+	border-color: color-mix(in oklab, var(--success) 45%, var(--border));
+	color: var(--success);
+}
+
+.auth-submit {
+	margin-top: 6px;
+}
+
+.auth-foot {
+	margin-top: 8px;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 10px;
+	font-size: 14px;
+}
+
+.auth-link {
+	font-size: 14px;
+	font-weight: 600;
+	text-decoration: none;
+	color: var(--text);
+}
+
+.auth-link:hover {
+	text-decoration: underline;
+}
+
+.auth-progress-track {
+	height: 8px;
+	width: 100%;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--surface-2);
+}
+
+.auth-progress-fill {
+	height: 100%;
+	border-radius: 999px;
+	background: var(--primary);
+	transition: width 160ms ease;
+}
+
+.auth-progress-fill.is-indeterminate {
+	width: 35%;
+	animation: loading-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-slide {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(300%);
+	}
+}
+
+/* Optional legacy app padding */
+.app-shell {
+	min-height: 100vh;
+	padding: 12px;
+	background: var(--bg);
+}
+
+@media (min-width: 768px) {
+	.auth-nav,
+	.auth-main {
+		padding-left: 32px;
+		padding-right: 32px;
+	}
+
+	.auth-shell-grid {
+		grid-template-columns: repeat(12, minmax(0, 1fr));
+	}
+
+	.auth-panel {
+		display: block;
+		grid-column: span 5;
+	}
+
+	.auth-card {
+		grid-column: span 7;
+	}
+
+	.auth-card-wide {
+		grid-column: span 12;
+	}
+
+	.app-shell {
+		padding: 16px;
+	}
+}

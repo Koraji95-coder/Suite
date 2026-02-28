@@ -22,11 +22,10 @@ export type {
 	EventSource,
 } from "./hooks/calendartypes";
 export * from "./hooks/calendarutils";
-
+export { useCalendarEvents } from "./hooks/useCalendarEvents";
 // Hook exports
 export * from "./hooks/usecurrenttimeindicator";
 export * from "./hooks/useeventvisibility";
-export { useCalendarEvents } from "./hooks/useCalendarEvents";
 export { MonthView } from "./MonthView";
 
 // Urgency utility exports

@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { deleteMemory, loadMemories } from "@/lib/ai/service";
-import type { Memory } from "@/lib/ai/types";
+import { deleteMemory, loadMemories } from "@/lib/agent-memory/service";
+import type { Memory } from "@/lib/agent-memory/types";
 import { useTheme } from "@/lib/palette";
 import { adaptArchitecture } from "./adapters/architectureAdapter";
 import { adaptMemories } from "./adapters/memoryAdapter";

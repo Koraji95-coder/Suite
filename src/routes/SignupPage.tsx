@@ -1,6 +1,7 @@
 // src/routes/SignupPage.tsx
 import { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import AuthEnvDebugCard from "../auth/AuthEnvDebugCard";
 import AuthShell from "../auth/AuthShell";
 import { useNotification } from "../auth/NotificationContext";
 import { useAuth } from "../auth/useAuth";
@@ -61,29 +62,31 @@ export default function SignupPage() {
 
 	return (
 		<AuthShell navLink={{ to: "/", label: "Back to landing" }}>
-			<div className="auth-head">
-				<div className="hero-badge" style={{ marginBottom: 18 }}>
-					<span className="badge-dot" />
+			<div className="mb-6">
+				<div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium [background:var(--surface-2)] [color:var(--text-muted)]">
+					<span className="h-1.5 w-1.5 rounded-full [background:var(--primary)]" />
 					{sent ? "Check your email" : "Create account"}
 				</div>
-				<h1 className="auth-title">{sent ? "Almost there" : "Get started"}</h1>
+				<h1 className="text-2xl font-semibold tracking-tight">
+					{sent ? "Almost there" : "Get started"}
+				</h1>
 				{!sent ? (
-					<p className="auth-sub">
+					<p className="mt-2 text-sm [color:var(--text-muted)]">
 						Create your account. Use a password with at least 8 characters.
 					</p>
 				) : null}
 			</div>
 
 			{sent ? (
-				<div className="auth-form">
-					<div className="auth-message is-warning">
+				<div className="grid gap-3">
+					<div className="rounded-lg border px-3 py-2 text-sm [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text-muted)]">
 						If this email is available, we sent a confirmation link. If you
 						already have an account, sign in or reset your password.
 					</div>
 
 					<Link
 						to="/login"
-						className="btn-hero-primary auth-submit"
+						className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
 						style={{ textAlign: "center" }}
 					>
 						Go to sign in
@@ -91,20 +94,22 @@ export default function SignupPage() {
 
 					<Link
 						to="/forgot-password"
-						className="auth-link"
+						className="text-center text-sm font-medium underline-offset-2 hover:underline [color:var(--text)]"
 						style={{ textAlign: "center" }}
 					>
 						Forgot password?
 					</Link>
+
+					<AuthEnvDebugCard />
 				</div>
 			) : (
-				<form className="auth-form" onSubmit={onSubmit} noValidate>
-					<label className="auth-label" htmlFor="email">
+				<form className="grid gap-3" onSubmit={onSubmit} noValidate>
+					<label className="text-sm font-medium" htmlFor="email">
 						Email
 					</label>
 					<input
 						id="email"
-						className="auth-input"
+						className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition [border-color:var(--border)] [background:var(--surface)] [color:var(--text)] focus:[border-color:var(--primary)]"
 						type="email"
 						autoComplete="email"
 						value={email}
@@ -113,12 +118,12 @@ export default function SignupPage() {
 						required
 					/>
 
-					<label className="auth-label" htmlFor="password">
+					<label className="text-sm font-medium" htmlFor="password">
 						Password
 					</label>
 					<input
 						id="password"
-						className="auth-input"
+						className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition [border-color:var(--border)] [background:var(--surface)] [color:var(--text)] focus:[border-color:var(--primary)]"
 						type="password"
 						autoComplete="new-password"
 						value={password}
@@ -127,27 +132,39 @@ export default function SignupPage() {
 						required
 					/>
 
-					{error ? <div className="auth-error">{error}</div> : null}
+					{error ? (
+						<div className="rounded-lg border px-3 py-2 text-sm [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">
+							{error}
+						</div>
+					) : null}
 
 					<button
-						className="btn-primary auth-submit"
+						className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
 						type="submit"
 						disabled={!canSubmit}
 					>
 						{submitting ? "Creating…" : "Create account"}
 					</button>
 
-					<div className="auth-foot">
-						<span className="muted">
+					<div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm [color:var(--text-muted)]">
+						<span>
 							Already have an account?{" "}
-							<Link to="/login" className="auth-link">
+							<Link
+								to="/login"
+								className="font-medium underline-offset-2 hover:underline [color:var(--text)]"
+							>
 								Sign in
 							</Link>
 						</span>
-						<Link to="/privacy" className="auth-link">
+						<Link
+							to="/privacy"
+							className="font-medium underline-offset-2 hover:underline [color:var(--text)]"
+						>
 							Privacy
 						</Link>
 					</div>
+
+					<AuthEnvDebugCard />
 				</form>
 			)}
 		</AuthShell>

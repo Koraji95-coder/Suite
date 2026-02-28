@@ -1,8 +1,8 @@
 import { addDays, format, parseISO } from "date-fns";
 import { useCallback, useEffect, useState } from "react";
 import { logger } from "@/lib/errorLogger";
-import { supabase } from "@/lib/supabase";
-import { safeSupabaseQuery } from "@/lib/supabaseUtils";
+import { supabase } from "@/supabase/client";
+import { safeSupabaseQuery } from "@/supabase/utils";
 import { logActivity } from "@/services/activityService";
 import type { CalendarEvent, EventColor } from "./calendartypes";
 
@@ -24,7 +24,9 @@ type UseCalendarEventsOptions = {
 	enabled?: boolean;
 };
 
-export function useCalendarEvents({ enabled = true }: UseCalendarEventsOptions = {}) {
+export function useCalendarEvents({
+	enabled = true,
+}: UseCalendarEventsOptions = {}) {
 	const [events, setEvents] = useState<CalendarEvent[]>([]);
 	const [isLoading, setIsLoading] = useState(enabled);
 
@@ -214,9 +216,7 @@ export function useCalendarEvents({ enabled = true }: UseCalendarEventsOptions =
 				if (error) throw error;
 				if (data) {
 					const saved = mapRowToEvent(data as CalendarEventRow);
-					setEvents((prev) =>
-						prev.map((e) => (e.id === saved.id ? saved : e)),
-					);
+					setEvents((prev) => prev.map((e) => (e.id === saved.id ? saved : e)));
 					await logActivity({
 						action: "update",
 						description: `Updated calendar event: ${saved.title}`,

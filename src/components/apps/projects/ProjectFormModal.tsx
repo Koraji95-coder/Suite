@@ -4,8 +4,6 @@ import {
 	ProjectFormData,
 	type ProjectStatus,
 } from "./projectmanagertypes";
-import type { CSSProperties } from "react";
-import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
 import { categoryColor } from "./projectmanagerutils";
 
 interface ProjectFormModalProps {
@@ -25,97 +23,55 @@ export function ProjectFormModal({
 	setFormData,
 	isEditing,
 }: ProjectFormModalProps) {
-	const { palette } = useTheme();
 	if (!isOpen) return null;
-
-	const inputStyle: CSSProperties = {
-		background: hexToRgba(palette.surface, 0.4),
-		border: `1px solid ${hexToRgba(palette.primary, 0.22)}`,
-		color: hexToRgba(palette.text, 0.9),
-		"--tw-ring-color": hexToRgba(palette.primary, 0.45),
-	};
-
-	const modalStyle: CSSProperties = {
-		border: `1px solid ${hexToRgba(palette.primary, 0.22)}`,
-		background: `linear-gradient(145deg, ${hexToRgba(
-			palette.surface,
-			0.96,
-		)} 0%, ${hexToRgba(palette.surfaceLight, 0.92)} 100%)`,
-	};
+	const inputClass =
+		"w-full rounded-lg border px-4 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
+	const labelClass = "mb-2 block text-sm font-medium [color:var(--text-muted)]";
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-md sm:p-4">
-			<div
-				className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg p-5 backdrop-blur-xl sm:p-6"
-				style={modalStyle}
-			>
-				<h3
-					className="text-2xl font-bold mb-4"
-					style={{ color: hexToRgba(palette.text, 0.9) }}
-				>
+		<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.68)] p-3 backdrop-blur-md sm:p-4">
+			<div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg border p-5 backdrop-blur-xl [border-color:var(--border)] [background:var(--bg-heavy)] sm:p-6">
+				<h3 className="mb-4 text-2xl font-bold [color:var(--text)]">
 					{isEditing ? "Edit Project" : "Create New Project"}
 				</h3>
 				<div className="space-y-4">
 					<div>
-						<label
-							className="block text-sm font-medium mb-2"
-							style={{ color: hexToRgba(palette.text, 0.6) }}
-						>
-							Project Name
-						</label>
+						<label className={labelClass}>Project Name</label>
 						<input
 							type="text"
 							value={formData.name}
 							onChange={(e) =>
 								setFormData({ ...formData, name: e.target.value })
 							}
-							className="w-full rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2"
-							style={inputStyle}
+							className={inputClass}
 							placeholder="Enter project name"
 						/>
 					</div>
 					<div>
-						<label
-							className="block text-sm font-medium mb-2"
-							style={{ color: hexToRgba(palette.text, 0.6) }}
-						>
-							Description
-						</label>
+						<label className={labelClass}>Description</label>
 						<textarea
 							value={formData.description}
 							onChange={(e) =>
 								setFormData({ ...formData, description: e.target.value })
 							}
-							className="w-full rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 h-24"
-							style={inputStyle}
+							className={`${inputClass} h-24`}
 							placeholder="Project description"
 						/>
 					</div>
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<div>
-							<label
-								className="block text-sm font-medium mb-2"
-								style={{ color: hexToRgba(palette.text, 0.6) }}
-							>
-								Deadline
-							</label>
+							<label className={labelClass}>Deadline</label>
 							<input
 								type="date"
 								value={formData.deadline ? formData.deadline.split("T")[0] : ""}
 								onChange={(e) =>
 									setFormData({ ...formData, deadline: e.target.value })
 								}
-								className="w-full rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2"
-								style={inputStyle}
+								className={inputClass}
 							/>
 						</div>
 						<div>
-							<label
-								className="block text-sm font-medium mb-2"
-								style={{ color: hexToRgba(palette.text, 0.6) }}
-							>
-								Priority
-							</label>
+							<label className={labelClass}>Priority</label>
 							<select
 								value={formData.priority}
 								onChange={(e) =>
@@ -124,8 +80,7 @@ export function ProjectFormModal({
 										priority: e.target.value as Priority,
 									})
 								}
-								className="w-full rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2"
-								style={inputStyle}
+								className={inputClass}
 							>
 								<option value="low">Low</option>
 								<option value="medium">Medium</option>
@@ -136,19 +91,13 @@ export function ProjectFormModal({
 					</div>
 					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<div>
-							<label
-								className="block text-sm font-medium mb-2"
-								style={{ color: hexToRgba(palette.text, 0.6) }}
-							>
-								Category
-							</label>
+							<label className={labelClass}>Category</label>
 							<select
 								value={formData.category ?? ""}
 								onChange={(e) =>
 									setFormData({ ...formData, category: e.target.value })
 								}
-								className="w-full rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2"
-								style={inputStyle}
+								className={inputClass}
 							>
 								<option value="">No Category</option>
 								{PROJECT_CATEGORIES.map((c) => (
@@ -159,12 +108,7 @@ export function ProjectFormModal({
 							</select>
 						</div>
 						<div>
-							<label
-								className="block text-sm font-medium mb-2"
-								style={{ color: hexToRgba(palette.text, 0.6) }}
-							>
-								Status
-							</label>
+							<label className={labelClass}>Status</label>
 							<select
 								value={formData.status}
 								onChange={(e) =>
@@ -173,8 +117,7 @@ export function ProjectFormModal({
 										status: e.target.value as ProjectStatus,
 									})
 								}
-								className="w-full rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2"
-								style={inputStyle}
+								className={inputClass}
 							>
 								<option value="active">Active</option>
 								<option value="on-hold">On Hold</option>
@@ -190,10 +133,7 @@ export function ProjectFormModal({
 									backgroundColor: categoryColor(formData.category || null),
 								}}
 							/>
-							<span
-								className="text-xs"
-								style={{ color: hexToRgba(palette.text, 0.5) }}
-							>
+							<span className="text-xs [color:var(--text-muted)]">
 								Color auto-assigned from category
 							</span>
 						</div>
@@ -202,21 +142,13 @@ export function ProjectFormModal({
 				<div className="mt-6 flex flex-col gap-3 sm:flex-row">
 					<button
 						onClick={onSubmit}
-						className="flex-1 px-6 py-2 rounded-lg transition-all font-semibold"
-						style={{
-							...glassCardInnerStyle(palette, palette.primary),
-							color: hexToRgba(palette.text, 0.9),
-						}}
+						className="flex-1 rounded-lg px-6 py-2 font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
 					>
 						{isEditing ? "Update Project" : "Create Project"}
 					</button>
 					<button
 						onClick={onClose}
-						className="rounded-lg px-6 py-2 transition-all"
-						style={{
-							...glassCardInnerStyle(palette, palette.secondary),
-							color: hexToRgba(palette.text, 0.65),
-						}}
+						className="rounded-lg border px-6 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 					>
 						Cancel
 					</button>

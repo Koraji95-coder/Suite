@@ -5,22 +5,30 @@ import {
 	useSensors,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { Plus } from "lucide-react";
+import {
+	ChevronRight,
+	Filter,
+	FolderKanban,
+	Home,
+	Plus,
+	Search,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { triggerAutoBackup } from "@/supabase/backupManager";
 import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
-import { logActivity } from "@/services/activityService";
-import type { Database } from "@/types/database";
-import { projectsInfo } from "../../data/panelInfo";
-import { triggerAutoBackup } from "../../lib/backupManager";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "@/supabase/client";
 import {
 	loadSetting,
 	migrateFromLocalStorage,
 	saveSetting,
-} from "../../lib/userSettings";
-import { PanelInfoDialog } from "../PanelInfoDialog";
-import { useToast } from "../ToastProvider";
-import { TieredCard } from "../ui/TieredCard";
+} from "@/settings/userSettings";
+import { logActivity } from "@/services/activityService";
+import type { Database } from "@/supabase/database";
+import { projectsInfo } from "../../../data/panelInfo";
+import { PanelInfoDialog } from "../../../data/PanelInfoDialog";
+import { useToast } from "@/components/notification-system/ToastProvider";
+import { GlassPanel } from "../ui/GlassPanel";
 import { ProjectDetail } from "./ProjectDetail";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectList } from "./ProjectList";
@@ -65,6 +73,7 @@ export function ProjectManager({
 }: ProjectManagerProps = {}) {
 	const { showToast } = useToast();
 	const { palette } = useTheme();
+	const navigate = useNavigate();
 
 	// State
 	const [projects, setProjects] = useState<Project[]>([]);
@@ -1002,35 +1011,194 @@ export function ProjectManager({
 		...glassCardInnerStyle(palette, palette.primary),
 		color: hexToRgba(palette.text, 0.9),
 	};
+	const subtleActionStyle = {
+		...glassCardInnerStyle(palette, palette.secondary),
+		color: hexToRgba(palette.text, 0.75),
+	};
+	const searchInputStyle = {
+		background: hexToRgba(palette.surface, 0.45),
+		border: `1px solid ${hexToRgba(palette.primary, 0.22)}`,
+		color: hexToRgba(palette.text, 0.9),
+		"--tw-ring-color": hexToRgba(palette.primary, 0.45),
+	} as React.CSSProperties;
+
+	const totalProjects = projects.length;
+	const archivedProjects = projects.filter(
+		(p) => p.status === "completed",
+	).length;
+	const activeProjects = totalProjects - archivedProjects;
+	const currentCrumb = selectedProject?.name ?? "Overview";
 
 	return (
-		<div className="space-y-4">
+		<div className="mx-auto w-full max-w-[1760px] space-y-8">
 			{/* Header */}
-			<TieredCard
-				tier="solid"
-				tint={palette.primary}
+			<GlassPanel
+				variant="toolbar"
 				padded
+				hoverEffect={false}
+				tint={palette.primary}
+				className="p-6 xl:p-8"
 			>
-				<div className="flex flex-wrap items-center justify-between gap-3">
-					<button
-						onClick={() => {
-							setEditingProject(null);
-							resetProjectForm();
-							setShowProjectModal(true);
-						}}
-						className="px-5 py-2.5 rounded-lg transition-all flex items-center space-x-2 font-semibold"
-						style={primaryActionStyle}
-					>
-						<Plus className="w-5 h-5" />
-						<span>New Project</span>
-					</button>
-					<PanelInfoDialog
-						title={projectsInfo.title}
-						sections={projectsInfo.sections}
-						colorScheme={projectsInfo.colorScheme}
-					/>
+				<div className="flex flex-col gap-6">
+					<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+						<div className="space-y-2">
+							<div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.2em]">
+								<button
+									type="button"
+									onClick={() => navigate("/app/dashboard")}
+									className="flex items-center gap-1.5 hover:underline"
+									style={{ color: hexToRgba(palette.text, 0.45) }}
+								>
+									<Home className="h-3.5 w-3.5" />
+									Workspace
+								</button>
+								<ChevronRight
+									className="h-3 w-3"
+									style={{ color: hexToRgba(palette.text, 0.35) }}
+								/>
+								<button
+									type="button"
+									onClick={() => navigate("/app/projects")}
+									className="hover:underline"
+									style={{ color: hexToRgba(palette.text, 0.55) }}
+								>
+									Projects
+								</button>
+								<ChevronRight
+									className="h-3 w-3"
+									style={{ color: hexToRgba(palette.text, 0.35) }}
+								/>
+								<span style={{ color: hexToRgba(palette.text, 0.7) }}>
+									{currentCrumb}
+								</span>
+							</div>
+							<div>
+								<h2
+									className="text-2xl font-semibold tracking-tight"
+									style={{ color: hexToRgba(palette.text, 0.95) }}
+								>
+									Project Manager
+								</h2>
+								<p
+									className="text-sm"
+									style={{ color: hexToRgba(palette.text, 0.55) }}
+								>
+									Track workstreams, deadlines, and deliverables in one place.
+								</p>
+							</div>
+						</div>
+
+						<div className="flex flex-wrap items-center gap-3">
+							<button
+								onClick={() => {
+									setEditingProject(null);
+									resetProjectForm();
+									setShowProjectModal(true);
+								}}
+								className="px-6 py-3 rounded-xl transition-all flex items-center space-x-2 font-semibold text-sm hover:scale-[1.02]"
+								style={primaryActionStyle}
+							>
+								<Plus className="w-4 h-4" />
+								<span>New Project</span>
+							</button>
+							<div className="flex items-center gap-2">
+								<button
+									type="button"
+									className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2"
+									style={subtleActionStyle}
+								>
+									<Filter className="h-3.5 w-3.5" />
+									Filters
+								</button>
+								<PanelInfoDialog
+									title={projectsInfo.title}
+									sections={projectsInfo.sections}
+									colorScheme={projectsInfo.colorScheme}
+								/>
+							</div>
+						</div>
+					</div>
+
+					<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+						<div className="flex flex-wrap gap-2">
+							{(["active", "all", "on-hold", "archived"] as StatusFilter[]).map(
+								(status) => {
+									const isActive = statusFilter === status;
+									return (
+										<button
+											key={status}
+											onClick={() => setStatusFilter(status)}
+											className="px-4 py-2 text-xs font-semibold rounded-full transition-all"
+											style={{
+												background: isActive
+													? hexToRgba(palette.primary, 0.22)
+													: hexToRgba(palette.surface, 0.32),
+												border: `1px solid ${hexToRgba(
+													isActive ? palette.primary : palette.text,
+													isActive ? 0.5 : 0.08,
+												)}`,
+												color: hexToRgba(palette.text, isActive ? 0.92 : 0.6),
+											}}
+										>
+											{status.charAt(0).toUpperCase() +
+												status.slice(1).replace("-", " ")}
+										</button>
+									);
+								},
+							)}
+						</div>
+
+						<div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+							<div className="relative w-full sm:max-w-sm">
+								<Search
+									className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+									style={{ color: hexToRgba(palette.primary, 0.8) }}
+								/>
+								<input
+									type="text"
+									value={projectSearch}
+									onChange={(event) => setProjectSearch(event.target.value)}
+									placeholder="Search projects..."
+									className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm placeholder-white/30 focus:outline-none focus:ring-2"
+									style={searchInputStyle}
+								/>
+							</div>
+							<div className="flex flex-wrap items-center gap-2 text-xs">
+								<span
+									className="rounded-full px-3 py-1"
+									style={{
+										background: hexToRgba(palette.surface, 0.4),
+										border: `1px solid ${hexToRgba(palette.text, 0.1)}`,
+										color: hexToRgba(palette.text, 0.65),
+									}}
+								>
+									{activeProjects} active
+								</span>
+								<span
+									className="rounded-full px-3 py-1"
+									style={{
+										background: hexToRgba(palette.surface, 0.4),
+										border: `1px solid ${hexToRgba(palette.text, 0.1)}`,
+										color: hexToRgba(palette.text, 0.65),
+									}}
+								>
+									{archivedProjects} archived
+								</span>
+								<span
+									className="rounded-full px-3 py-1"
+									style={{
+										background: hexToRgba(palette.primary, 0.18),
+										border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
+										color: hexToRgba(palette.primary, 0.9),
+									}}
+								>
+									{totalProjects} total
+								</span>
+							</div>
+						</div>
+					</div>
 				</div>
-			</TieredCard>
+			</GlassPanel>
 
 			{/* Project Form Modal */}
 			<ProjectFormModal
@@ -1063,12 +1231,12 @@ export function ProjectManager({
 			/>
 
 			{/* Main Grid */}
-			<div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-4">
+			<div className="grid grid-cols-1 xl:grid-cols-[400px_minmax(0,1fr)] gap-6 xl:gap-7">
 				{/* Left Column: Project List */}
-				<TieredCard
-					tier="solid"
+				<GlassPanel
 					tint={palette.secondary}
-					className="p-4"
+					hoverEffect={false}
+					className="p-5"
 				>
 					<ProjectList
 						projects={projects}
@@ -1082,10 +1250,10 @@ export function ProjectManager({
 						searchQuery={projectSearch}
 						onSearchChange={setProjectSearch}
 					/>
-				</TieredCard>
+				</GlassPanel>
 
 				{/* Right Column: Project Details */}
-				<div className="space-y-4">
+				<div className="space-y-6">
 					{selectedProject ? (
 						<ProjectDetail
 							project={selectedProject}
@@ -1122,18 +1290,28 @@ export function ProjectManager({
 							onDownloadFile={downloadFile}
 						/>
 					) : (
-						<TieredCard
-							tier="solid"
+						<GlassPanel
 							tint={palette.secondary}
+							hoverEffect={false}
 							className="p-12 flex flex-col items-center justify-center"
 						>
+							<FolderKanban
+								className="h-12 w-12 mb-4"
+								style={{ color: hexToRgba(palette.primary, 0.65) }}
+							/>
 							<p
-								className="text-lg"
-								style={{ color: hexToRgba(palette.text, 0.6) }}
+								className="text-lg font-medium"
+								style={{ color: hexToRgba(palette.text, 0.7) }}
 							>
 								Select a project to view details
 							</p>
-						</TieredCard>
+							<p
+								className="mt-2 text-sm"
+								style={{ color: hexToRgba(palette.text, 0.48) }}
+							>
+								Pick one from the list to open tasks, files, and schedules.
+							</p>
+						</GlassPanel>
 					)}
 				</div>
 			</div>

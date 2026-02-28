@@ -17,7 +17,7 @@ import {
 	readBackupFile,
 	restoreFromYaml,
 	runFullBackup,
-} from "@/lib/backupManager";
+} from "@/supabase/backupManager";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import type { BackupHistoryEntry } from "./storageTypes";
 

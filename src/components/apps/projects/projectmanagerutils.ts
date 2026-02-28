@@ -103,8 +103,7 @@ export const getDeadlineStatus = (deadline: string | null) => {
 			color: "text-red-400",
 		};
 	if (diffDays === 0) return { text: "Due today", color: "text-red-400" };
-	if (diffDays === 1)
-		return { text: "Due tomorrow", color: "text-orange-400" };
+	if (diffDays === 1) return { text: "Due tomorrow", color: "text-orange-400" };
 	if (diffDays <= 7)
 		return { text: `${diffDays} days remaining`, color: "text-yellow-400" };
 	return {

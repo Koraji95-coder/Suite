@@ -177,8 +177,7 @@ export function WeekView({
 			});
 
 			const columnCount = Math.max(columns.length, 1);
-			const gap =
-				columnCount > 1 ? Math.min(0.02, 0.4 / columnCount) : 0;
+			const gap = columnCount > 1 ? Math.min(0.02, 0.4 / columnCount) : 0;
 			const width = (1 - gap * (columnCount - 1)) / columnCount;
 
 			return positionedEvents.map((item) => ({

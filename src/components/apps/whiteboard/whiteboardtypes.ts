@@ -1,4 +1,4 @@
-import type { Database } from "@/types/database";
+import type { Database } from "@/supabase/database";
 
 export interface DrawAction {
 	tool: "pen" | "eraser" | "rectangle" | "circle" | "text";

@@ -43,7 +43,7 @@ export function ProjectCard({
 	return (
 		<div
 			onClick={() => onSelect(project)}
-			className="p-4 rounded-lg cursor-pointer transition-all border hover:scale-[1.01]"
+			className="p-4 rounded-xl cursor-pointer transition-all border hover:scale-[1.01] hover:-translate-y-0.5"
 			style={{
 				background: isSelected
 					? `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.18)} 0%, ${hexToRgba(
@@ -58,9 +58,9 @@ export function ProjectCard({
 					isSelected ? palette.primary : palette.text,
 					isSelected ? 0.5 : 0.08,
 				)}`,
-				boxShadow: `0 12px 30px ${hexToRgba(
+				boxShadow: `0 14px 32px ${hexToRgba(
 					isSelected ? palette.primary : "#000000",
-					isSelected ? 0.12 : 0.18,
+					isSelected ? 0.14 : 0.17,
 				)}`,
 			}}
 		>
@@ -71,7 +71,7 @@ export function ProjectCard({
 						style={{ backgroundColor: categoryColor(project.category) }}
 					/>
 					<h4
-						className="font-semibold"
+						className="font-semibold leading-snug"
 						style={{ color: hexToRgba(palette.text, 0.92) }}
 					>
 						{project.name}
@@ -140,7 +140,7 @@ export function ProjectCard({
 				</div>
 			)}
 			{taskCount > 0 && (
-				<div className="flex items-center space-x-2 mt-2">
+				<div className="flex items-center space-x-2 mt-2.5">
 					<div
 						className="flex-1 rounded-full h-1.5 overflow-hidden"
 						style={{ background: hexToRgba(palette.surface, 0.6) }}
@@ -154,7 +154,7 @@ export function ProjectCard({
 						/>
 					</div>
 					<span
-						className="text-xs whitespace-nowrap"
+						className="text-xs whitespace-nowrap font-medium"
 						style={{ color: hexToRgba(palette.text, 0.45) }}
 					>
 						{completedCount}/{taskCount} • {completionPct}%

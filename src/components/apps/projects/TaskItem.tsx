@@ -66,10 +66,12 @@ export function TaskItem({
 	return (
 		<div ref={setNodeRef} style={style} className="space-y-2">
 			<div
-				className="flex items-center space-x-3 p-3 rounded-lg transition-all"
+				className="flex items-center space-x-3 p-3.5 rounded-xl transition-all"
 				style={{
 					marginLeft: `${level * 24}px`,
 					...getPriorityRowStyle(palette, task.priority),
+					border: `1px solid ${hexToRgba(palette.text, 0.08)}`,
+					boxShadow: `0 10px 24px ${hexToRgba("#000000", 0.14)}`,
 				}}
 			>
 				{!isProjectArchived && (
@@ -109,9 +111,9 @@ export function TaskItem({
 						/>
 					)}
 				</button>
-				<div className="flex-1">
+				<div className="flex-1 min-w-0">
 					<span
-						className="block"
+						className="block font-medium leading-relaxed"
 						style={{
 							color: hexToRgba(palette.text, task.completed ? 0.35 : 0.9),
 							textDecoration: task.completed ? "line-through" : "none",
@@ -121,7 +123,8 @@ export function TaskItem({
 					</span>
 					{task.due_date && (
 						<div
-							className={`flex items-center space-x-1 text-xs mt-1 ${getUrgencyColor(task.due_date)}`}
+							className={`inline-flex items-center space-x-1 text-xs mt-1.5 px-2 py-0.5 rounded-full border ${getUrgencyColor(task.due_date)}`}
+							style={{ borderColor: hexToRgba(palette.text, 0.16) }}
 						>
 							<Clock className="w-3 h-3" />
 							<span>{formatDateOnly(task.due_date)}</span>

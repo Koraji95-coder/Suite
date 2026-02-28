@@ -32,4 +32,14 @@ export const KNOWLEDGE_SECTIONS: KnowledgeSection[] = [
 			"API requests authenticated with X-API-Key",
 		],
 	},
+	{
+		title: "Math Tools (Coming Soon)",
+		description: "Planned calculation modules are documented here ahead of release.",
+		items: [
+			"Vector Calculator",
+			"Three-Phase Calculator",
+			"General Engineering Calculator Panel",
+			"Electrical Plot Generator",
+		],
+	},
 ];

@@ -77,19 +77,21 @@ export default function SettingsPage() {
 				return <AccountSettings />;
 			case "ai":
 				return (
-					<div className="settings-panel">
-						<h3 className="settings-h3">
+					<div className="grid gap-3">
+						<h3 className="text-lg font-semibold tracking-tight [color:var(--text)]">
 							AI Configuration
-							<span className="settings-h3-sub">
+							<span className="ml-2 text-sm font-normal [color:var(--text-muted)]">
 								Provider selection and prompts.
 							</span>
 						</h3>
-						<div className="glass settings-card">
-							<div className="settings-card-head">
+						<div className="grid gap-3 rounded-2xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
+							<div className="flex items-start gap-2">
 								<Bot size={16} />
 								<div>
-									<div className="settings-card-title">Coming Soon</div>
-									<div className="settings-card-sub">
+									<div className="text-sm font-semibold [color:var(--text)]">
+										Coming Soon
+									</div>
+									<div className="text-xs [color:var(--text-muted)]">
 										Model selection, temperature, and system prompts will live
 										here.
 									</div>
@@ -116,17 +118,17 @@ export default function SettingsPage() {
 			<FrameSection title="Control Center">
 				<div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
 					<aside
-						className="glass rounded-2xl border border-white/8 p-3"
+						className="rounded-2xl border p-3 [border-color:var(--border)] [background:var(--bg-mid)]"
 						aria-label="Settings sections"
 					>
-						<div className="mb-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-							<div className="text-xs uppercase tracking-wide text-white/50">
+						<div className="mb-3 rounded-xl border p-3 [border-color:var(--border)] [background:var(--surface-2)]">
+							<div className="text-xs uppercase tracking-wide [color:var(--text-muted)]">
 								Workspace profile
 							</div>
-							<div className="mt-1 text-sm font-semibold text-white/90">
+							<div className="mt-1 text-sm font-semibold [color:var(--text)]">
 								Settings coverage
 							</div>
-							<div className="mt-2 text-xs text-white/60">
+							<div className="mt-2 text-xs [color:var(--text-muted)]">
 								{completedAreas}/{totalAreas} areas configured
 							</div>
 						</div>
@@ -144,15 +146,15 @@ export default function SettingsPage() {
 										className={cn(
 											"w-full rounded-xl border px-3 py-2.5 text-left transition-colors",
 											isActive
-												? "border-[rgba(232,201,126,0.35)] bg-[rgba(232,201,126,0.12)]"
-												: "border-white/10 bg-white/[0.02] hover:bg-white/[0.04]",
+												? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_16%,var(--surface))]"
+												: "[border-color:var(--border)] [background:var(--surface)] hover:[background:var(--surface-2)]",
 										)}
 									>
-										<div className="flex items-center gap-2 text-sm font-medium text-white/90">
+										<div className="flex items-center gap-2 text-sm font-medium [color:var(--text)]">
 											<Icon size={15} />
 											<span>{tab.label}</span>
 										</div>
-										<div className="mt-1 text-xs text-white/60">
+										<div className="mt-1 text-xs [color:var(--text-muted)]">
 											{tab.description}
 										</div>
 									</button>
@@ -162,16 +164,16 @@ export default function SettingsPage() {
 					</aside>
 
 					<section className="space-y-3">
-						<div className="glass rounded-2xl border border-white/8 p-4">
+						<div className="rounded-2xl border p-4 [border-color:var(--border)] [background:var(--bg-mid)]">
 							<div className="flex flex-wrap items-center justify-between gap-3">
 								<div>
-									<div className="text-xs uppercase tracking-wide text-white/50">
+									<div className="text-xs uppercase tracking-wide [color:var(--text-muted)]">
 										Current section
 									</div>
-									<div className="mt-1 text-lg font-semibold text-white/90">
+									<div className="mt-1 text-lg font-semibold [color:var(--text)]">
 										{activeMeta.label}
 									</div>
-									<p className="mt-1 text-sm text-white/60">
+									<p className="mt-1 text-sm [color:var(--text-muted)]">
 										{activeMeta.description}
 									</p>
 								</div>
@@ -186,8 +188,8 @@ export default function SettingsPage() {
 												className={cn(
 													"rounded-full border px-3 py-1 text-xs",
 													isActive
-														? "border-[rgba(232,201,126,0.35)] bg-[rgba(232,201,126,0.12)] text-white"
-														: "border-white/15 text-white/70 hover:bg-white/[0.04]",
+														? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_16%,var(--surface))] [color:var(--text)]"
+														: "[border-color:var(--border)] [color:var(--text-muted)] hover:[background:var(--surface-2)]",
 												)}
 											>
 												{tab.label}
@@ -198,7 +200,7 @@ export default function SettingsPage() {
 							</div>
 						</div>
 
-						<div className="settings-content">{Active}</div>
+						<div>{Active}</div>
 					</section>
 				</div>
 			</FrameSection>

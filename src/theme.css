@@ -1,0 +1,1198 @@
+/* src/theme.css */
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+/* =========================================================
+   FALLBACK TOKENS
+   (palette.ts overwrites these at runtime)
+   ========================================================= */
+:root {
+	--bg: #0b1220;
+	--bg-base: var(--bg);
+	--bg-mid: rgba(11, 18, 32, 0.72);
+	--bg-heavy: rgba(11, 18, 32, 0.86);
+
+	--surface: #0f1a2e;
+	--surface-2: #16243d;
+	--surface-3: color-mix(in oklab, var(--surface-2) 82%, black 18%);
+
+	--border: rgba(255, 255, 255, 0.08);
+	--border-strong: color-mix(in oklab, var(--primary) 26%, var(--border));
+	--text: rgba(255, 255, 255, 0.92);
+	--text-muted: rgba(255, 255, 255, 0.62);
+
+	--primary: #2dd4bf;
+	--primary-contrast: #062a27;
+	--secondary: #64748b;
+	--tertiary: #f59e0b;
+	--accent: #60a5fa;
+	--glow: rgba(45, 212, 191, 0.15);
+
+	--success: #22c55e;
+	--warning: #f59e0b;
+	--danger: #ef4444;
+
+	--focus-ring: color-mix(in oklab, var(--primary) 35%, transparent);
+
+	--radius-lg: 18px;
+	--radius-md: 13px;
+	--radius-sm: 10px;
+
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 24px;
+	--space-6: 32px;
+	--space-7: 40px;
+
+	--shadow-panel:
+		0 10px 30px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+	--shadow-elevated:
+		0 18px 38px rgba(0, 0, 0, 0.34),
+		0 1px 0 color-mix(in oklab, var(--text) 10%, transparent) inset;
+	--shadow-command:
+		0 0 0 1px color-mix(in oklab, var(--primary) 24%, transparent) inset,
+		0 16px 32px rgba(0, 0, 0, 0.28);
+	--shadow-neon:
+		0 0 0 1px color-mix(in oklab, var(--primary) 30%, transparent) inset,
+		0 12px 30px color-mix(in oklab, var(--primary) 12%, transparent),
+		0 24px 44px rgba(0, 0, 0, 0.34);
+
+	--theme-transition-duration: 180ms;
+	--font-body: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+	--font-display: "Sora", "Avenir Next Condensed", "Segoe UI", sans-serif;
+	--font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
+	--font-ui: var(--font-body);
+
+	--motion-fast: 140ms;
+	--motion-base: 220ms;
+	--motion-slow: 360ms;
+	--ui-atmosphere: 1;
+	--ui-glow-scale: 1;
+	--ui-motion-scale: 1;
+
+	/* Global responsive shell tokens */
+	--shell-topbar-min-h: 82px;
+	--shell-topbar-center-min-h: 44px;
+	--shell-topbar-pad-x: clamp(1rem, 1.1vw + 0.45rem, 2rem);
+	--shell-topbar-pad-y: clamp(0.65rem, 0.35vw + 0.5rem, 0.9rem);
+	--shell-topbar-gap: clamp(0.6rem, 0.7vw, 1rem);
+	--shell-topbar-center-pad-x: clamp(0.5rem, 1vw, 1rem);
+
+	--shell-workspace-pad-x: clamp(0.9rem, 1.5vw, 2.1rem);
+	--shell-workspace-pad-y: clamp(0.7rem, 1.2vh, 1.4rem);
+	--shell-grid-gap: clamp(0.75rem, 1vw, 1.25rem);
+	--shell-sidebar-w: clamp(238px, 17vw, 312px);
+	--shell-route-radius: clamp(1.15rem, 1vw + 0.9rem, 1.85rem);
+	--shell-route-bottom-pad: clamp(1rem, 1.6vh, 3rem);
+
+	--page-frame-gap: clamp(0.9rem, 1.1vw, 1.3rem);
+	--page-frame-section-gap: clamp(0.75rem, 0.8vw, 1rem);
+	--page-frame-bottom-pad: clamp(1.3rem, 2.3vh, 3rem);
+	--suite-modal-max-h: calc(100dvh - 1.5rem);
+	--suite-sticky-rail-top: clamp(0.65rem, 1.2vh, 1rem);
+	--suite-sticky-rail-max-h: calc(100dvh - var(--shell-topbar-min-h) - 2.4rem);
+	--suite-scroll-panel-max-h: clamp(22rem, 56vh, 44rem);
+	--suite-agent-panel-h: clamp(34rem, 76dvh, 58rem);
+	--suite-agent-panel-min-h: clamp(28rem, 62dvh, 34rem);
+	--suite-app-panel-h: clamp(32rem, 74dvh, 62rem);
+	--suite-app-panel-min-h: clamp(26rem, 58dvh, 32rem);
+
+	/* Legacy token aliases used by older panels */
+	--color-bg: var(--bg-base);
+	--color-surface: var(--surface);
+	--color-surface-elevated: var(--surface-2);
+	--color-border: var(--border);
+	--color-text: var(--text);
+	--color-text-muted: var(--text-muted);
+	--color-accent: var(--accent);
+	--color-primary: var(--primary);
+	--color-success: var(--success);
+	--color-warning: var(--warning);
+	--color-danger: var(--danger);
+}
+
+@media (max-width: 1280px) {
+	:root {
+		--shell-sidebar-w: clamp(220px, 24vw, 286px);
+	}
+}
+
+@media (max-width: 1024px) {
+	:root {
+		--shell-workspace-pad-x: clamp(0.75rem, 1.2vw, 1.25rem);
+		--shell-grid-gap: clamp(0.65rem, 0.9vw, 0.95rem);
+	}
+}
+
+@media (max-width: 768px) {
+	:root {
+		--shell-workspace-pad-x: 0.85rem;
+		--shell-workspace-pad-y: 0.75rem;
+		--shell-route-bottom-pad: 1rem;
+		--page-frame-bottom-pad: 1.25rem;
+		--suite-scroll-panel-max-h: clamp(18rem, 52vh, 34rem);
+		--suite-agent-panel-h: clamp(30rem, 70dvh, 52rem);
+		--suite-app-panel-h: clamp(28rem, 68dvh, 46rem);
+		--suite-modal-max-h: calc(100dvh - 1rem);
+	}
+}
+
+@media (max-height: 860px) {
+	:root {
+		--shell-topbar-min-h: 68px;
+		--shell-topbar-center-min-h: 34px;
+		--shell-topbar-pad-y: 0.42rem;
+		--shell-workspace-pad-y: 0.55rem;
+		--shell-route-bottom-pad: 0.85rem;
+		--page-frame-bottom-pad: 1rem;
+		--suite-scroll-panel-max-h: clamp(16rem, 48vh, 30rem);
+		--suite-agent-panel-h: clamp(28rem, 72dvh, 48rem);
+		--suite-agent-panel-min-h: clamp(24rem, 56dvh, 30rem);
+		--suite-app-panel-h: clamp(26rem, 68dvh, 42rem);
+		--suite-app-panel-min-h: clamp(22rem, 52dvh, 28rem);
+		--suite-modal-max-h: calc(100dvh - 0.9rem);
+	}
+}
+
+@media (max-height: 760px) {
+	:root {
+		--shell-topbar-min-h: 60px;
+		--shell-topbar-pad-y: 0.32rem;
+		--shell-topbar-gap: 0.6rem;
+		--suite-sticky-rail-max-h: calc(
+			100dvh -
+			var(--shell-topbar-min-h) -
+			1.75rem
+		);
+		--suite-scroll-panel-max-h: clamp(14rem, 42vh, 24rem);
+		--suite-agent-panel-h: clamp(24rem, 66dvh, 40rem);
+		--suite-agent-panel-min-h: clamp(20rem, 50dvh, 26rem);
+		--suite-app-panel-h: clamp(22rem, 62dvh, 34rem);
+		--suite-app-panel-min-h: clamp(18rem, 44dvh, 24rem);
+		--suite-modal-max-h: calc(100dvh - 0.65rem);
+	}
+}
+
+/* =========================================================
+   BASE / RESET
+   ========================================================= */
+html,
+body,
+#root {
+	height: 100%;
+	min-height: 100%;
+}
+
+html {
+	scroll-behavior: smooth;
+	/* Let the document gutter be normal; reserve gutter only on inner scroll regions */
+	scrollbar-gutter: auto;
+}
+
+body {
+	margin: 0;
+	font-family: var(--font-body);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	line-height: 1.45;
+	background:
+		radial-gradient(
+			1120px 640px at 10% -16%,
+			color-mix(in oklab, var(--primary) 22%, transparent),
+			transparent 66%
+		),
+		radial-gradient(
+			1040px 560px at 100% -2%,
+			color-mix(in oklab, var(--accent) 18%, transparent),
+			transparent 67%
+		),
+		radial-gradient(
+			760px 480px at 82% 110%,
+			color-mix(in oklab, var(--tertiary) 12%, transparent),
+			transparent 72%
+		),
+		conic-gradient(
+			from 210deg at 50% 14%,
+			color-mix(in oklab, var(--primary) 6%, transparent),
+			color-mix(in oklab, var(--accent) 6%, transparent),
+			color-mix(in oklab, var(--tertiary) 5%, transparent),
+			color-mix(in oklab, var(--primary) 6%, transparent)
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in oklab, var(--bg-base) 88%, black 12%) 0%,
+			var(--bg-base) 55%,
+			color-mix(in oklab, var(--bg-base) 78%, black 22%) 100%
+		);
+	color: var(--text);
+	position: relative;
+	isolation: isolate;
+}
+
+body.suite-app-shell-active {
+	overflow: hidden;
+	overscroll-behavior: none;
+}
+
+body::before,
+body::after {
+	content: "";
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	z-index: -1;
+}
+
+body::before {
+	background-image:
+		linear-gradient(
+			to right,
+			color-mix(in oklab, var(--text) 3%, transparent) 1px,
+			transparent 1px
+		),
+		linear-gradient(
+			to bottom,
+			color-mix(in oklab, var(--text) 3%, transparent) 1px,
+			transparent 1px
+		);
+	background-size: 56px 56px;
+	opacity: calc(0.28 * var(--ui-atmosphere));
+	animation: suite-grid-pan calc(34s / var(--ui-motion-scale)) linear infinite;
+}
+
+body::after {
+	background:
+		radial-gradient(
+			620px 380px at 74% 100%,
+			color-mix(in oklab, var(--primary) 16%, transparent),
+			transparent 70%
+		),
+		radial-gradient(
+			700px 380px at 8% 88%,
+			color-mix(in oklab, var(--accent) 12%, transparent),
+			transparent 72%
+		);
+	opacity: calc(0.62 * var(--ui-atmosphere));
+	animation: suite-ambient-drift calc(14s / var(--ui-motion-scale)) ease-in-out
+		infinite;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	font-family: var(--font-display);
+	letter-spacing: -0.01em;
+}
+
+code,
+pre,
+kbd,
+samp {
+	font-family: var(--font-mono);
+}
+
+/* Selection */
+::selection {
+	background: color-mix(in oklab, var(--primary) 28%, transparent);
+	color: var(--text);
+}
+
+* {
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in oklab, var(--primary) 46%, transparent)
+		color-mix(in oklab, var(--surface) 82%, transparent);
+}
+
+*::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+	background: color-mix(in oklab, var(--surface) 76%, transparent);
+}
+
+*::-webkit-scrollbar-thumb {
+	border-radius: 999px;
+	background: linear-gradient(
+		180deg,
+		color-mix(in oklab, var(--primary) 72%, transparent),
+		color-mix(in oklab, var(--accent) 64%, transparent)
+	);
+	border: 2px solid color-mix(in oklab, var(--surface) 70%, transparent);
+}
+
+/* =========================================================
+   CUSTOM CURSOR
+   ========================================================= */
+body.cursor-enabled,
+body.cursor-enabled * {
+	cursor: none !important;
+}
+
+#cursor,
+#cursor-ring {
+	position: fixed;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+	z-index: 9999;
+}
+
+#cursor {
+	width: 12px;
+	height: 12px;
+	border: 2px solid var(--accent);
+	background: color-mix(in oklab, var(--accent) 22%, transparent);
+	transform: translate(-50%, -50%) rotate(45deg);
+	box-shadow: 0 0 10px color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+#cursor::after {
+	content: "";
+	position: absolute;
+	inset: 3px;
+	background: color-mix(in oklab, var(--primary) 70%, transparent);
+	opacity: 0.9;
+}
+
+#cursor-ring {
+	width: 34px;
+	height: 34px;
+	border-radius: 999px;
+	border: 1px solid rgba(232, 201, 126, 0.32);
+	transform: translate(-50%, -50%);
+}
+
+/* =========================================================
+   THEME ANIMATION (ONLY WHEN TOGGLING)
+   Add/remove `html.theme-animating` in ThemeProvider on theme switch.
+   ========================================================= */
+html.theme-animating,
+html.theme-animating * {
+	transition:
+		background-color var(--theme-transition-duration) ease,
+		border-color var(--theme-transition-duration) ease,
+		color var(--theme-transition-duration) ease,
+		box-shadow var(--theme-transition-duration) ease,
+		fill var(--theme-transition-duration) ease,
+		stroke var(--theme-transition-duration) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	html.theme-animating,
+	html.theme-animating * {
+		transition: none !important;
+	}
+
+	.suite-route-enter {
+		animation: none !important;
+	}
+}
+
+/* =========================================================
+   FOCUS RING (ACCESSIBLE)
+   ========================================================= */
+:where(
+		.ui-btn-primary,
+		.ui-btn-secondary,
+		.btn-ghost,
+		.btn-primary,
+		.btn-hero-primary,
+		.btn-hero-secondary,
+		.ui-input,
+		.auth-input,
+		button,
+		a,
+		[role="button"],
+		[tabindex]
+	):focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* =========================================================
+   SHARED SHELL / PANELS
+   ========================================================= */
+.ui-shell {
+	min-height: 100vh;
+	background: var(--bg);
+	color: var(--text);
+}
+
+.ui-panel,
+.glass,
+.settings-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	box-shadow: var(--shadow-panel);
+}
+
+.ui-panel-subtle {
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+}
+
+@keyframes suite-reveal-up {
+	0% {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.suite-reveal {
+	animation: suite-reveal-up var(--motion-slow) cubic-bezier(0.22, 1, 0.36, 1)
+		both;
+}
+
+.suite-route-enter {
+	will-change: opacity, transform, filter;
+	animation: suite-route-enter calc(190ms / var(--ui-motion-scale))
+		cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes suite-route-enter {
+	0% {
+		opacity: 0;
+		transform: translateY(3px) scale(0.998);
+		filter: saturate(0.96);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+		filter: saturate(1);
+	}
+}
+
+.suite-card-lite {
+	position: relative;
+	background: linear-gradient(
+		155deg,
+		color-mix(in oklab, var(--surface) 94%, transparent),
+		color-mix(in oklab, var(--surface-2) 92%, transparent)
+	);
+	box-shadow:
+		0 0 0 1px color-mix(in oklab, var(--primary) 30%, transparent) inset,
+		0 calc(12px * var(--ui-glow-scale)) calc(30px * var(--ui-glow-scale))
+		color-mix(in oklab, var(--primary) 12%, transparent),
+		0 calc(24px * var(--ui-glow-scale)) calc(44px * var(--ui-glow-scale))
+		rgba(0, 0, 0, 0.34);
+}
+
+.suite-card-lite::before {
+	content: "";
+	position: absolute;
+	inset: -2px;
+	border-radius: inherit;
+	pointer-events: none;
+	background: linear-gradient(
+		125deg,
+		color-mix(in oklab, var(--primary) 26%, transparent),
+		color-mix(in oklab, var(--accent) 20%, transparent),
+		color-mix(in oklab, var(--tertiary) 18%, transparent)
+	);
+	opacity: calc(0.2 * var(--ui-atmosphere));
+	filter: blur(14px);
+	z-index: -1;
+}
+
+.suite-card-lite::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	pointer-events: none;
+	border: 1px solid color-mix(in oklab, var(--primary) 35%, transparent);
+	mask:
+		linear-gradient(#000, #000) content-box,
+		linear-gradient(#000, #000);
+	-webkit-mask:
+		linear-gradient(#000, #000) content-box,
+		linear-gradient(#000, #000);
+	mask-composite: exclude;
+	-webkit-mask-composite: xor;
+	padding: 1px;
+	opacity: 0.52;
+}
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+.ui-btn-primary,
+.btn-primary,
+.btn-hero-primary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 10px 16px;
+	border-radius: var(--radius-md);
+	font-size: 14px;
+	font-weight: 600;
+	border: 1px solid transparent;
+	background: var(--primary);
+	color: var(--primary-contrast);
+	text-decoration: none;
+	cursor: pointer;
+	transition: filter 160ms ease;
+}
+
+.ui-btn-primary:hover,
+.btn-primary:hover,
+.btn-hero-primary:hover {
+	filter: brightness(1.06);
+}
+
+.ui-btn-secondary,
+.btn-ghost,
+.btn-hero-secondary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 10px 16px;
+	border-radius: var(--radius-md);
+	font-size: 14px;
+	font-weight: 600;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.ui-btn-secondary:hover,
+.btn-ghost:hover,
+.btn-hero-secondary:hover {
+	background: var(--surface-2);
+}
+
+/* =========================================================
+   INPUTS
+   ========================================================= */
+.ui-input,
+.auth-input {
+	width: 100%;
+	padding: 10px 12px;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+	font-size: 14px;
+}
+
+.ui-input:focus,
+.auth-input:focus {
+	outline: 0;
+	border-color: var(--primary);
+	box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 20%, transparent);
+}
+
+/* =========================================================
+   AUTH (layout styles only)
+   ========================================================= */
+.auth-page {
+	min-height: 100vh;
+	background: var(--bg);
+	color: var(--text);
+}
+
+.auth-nav {
+	max-width: 1152px;
+	margin: 0 auto;
+	padding: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.nav-right {
+	display: inline-flex;
+	align-items: center;
+}
+
+.nav-logo {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 600;
+	text-decoration: none;
+	color: var(--text);
+}
+
+.nav-logo-mark {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 2px;
+	padding: 4px;
+	border-radius: 8px;
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+}
+
+.nav-logo-mark span {
+	display: block;
+	width: 6px;
+	height: 6px;
+	border-radius: 2px;
+	background: var(--primary);
+}
+
+.auth-main {
+	max-width: 1152px;
+	margin: 0 auto;
+	padding: 0 16px 32px;
+}
+
+.auth-shell-grid {
+	display: grid;
+	gap: 16px;
+}
+
+.auth-panel {
+	display: none;
+	padding: 24px;
+}
+
+.auth-panel-badge,
+.hero-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 12px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 500;
+	background: var(--surface-2);
+	color: var(--text-muted);
+}
+
+.badge-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 999px;
+	background: var(--primary);
+}
+
+.auth-panel-title {
+	font-size: 28px;
+	font-weight: 600;
+	margin-top: 12px;
+}
+
+.auth-panel-sub,
+.auth-panel-item-sub,
+.auth-panel-foot,
+.auth-sub,
+.muted,
+.auth-copy {
+	color: var(--text-muted);
+}
+
+.auth-panel-grid {
+	display: grid;
+	gap: 12px;
+	margin-top: 16px;
+}
+
+.auth-panel-item {
+	padding: 12px;
+	border-radius: var(--radius-md);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+}
+
+.auth-panel-item-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.auth-panel-item-sub {
+	font-size: 12px;
+	margin-top: 4px;
+}
+
+.auth-panel-foot {
+	margin-top: 16px;
+	font-size: 12px;
+}
+
+.auth-card {
+	padding: 24px;
+}
+
+.auth-head {
+	margin-bottom: 20px;
+}
+
+.auth-title {
+	font-size: 28px;
+	font-weight: 600;
+	line-height: 1.15;
+	margin: 12px 0 0;
+}
+
+.auth-sub {
+	font-size: 14px;
+	margin-top: 8px;
+}
+
+.auth-form {
+	display: grid;
+	gap: 12px;
+}
+
+.auth-label {
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.auth-error {
+	padding: 8px 10px;
+	border-radius: var(--radius-sm);
+	border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--border));
+	background: color-mix(in oklab, var(--danger) 8%, var(--surface));
+	color: var(--danger);
+	font-size: 14px;
+}
+
+.auth-message {
+	padding: 10px 12px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--border);
+	background: var(--surface-2);
+	color: var(--text);
+	font-size: 14px;
+}
+
+.auth-message.is-success {
+	border-color: color-mix(in oklab, var(--success) 45%, var(--border));
+	color: var(--success);
+}
+
+.auth-submit {
+	margin-top: 6px;
+}
+
+.auth-foot {
+	margin-top: 8px;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 10px;
+	font-size: 14px;
+}
+
+.auth-link {
+	font-size: 14px;
+	font-weight: 600;
+	text-decoration: none;
+	color: var(--text);
+}
+
+.auth-link:hover {
+	text-decoration: underline;
+}
+
+.auth-progress-track {
+	height: 8px;
+	width: 100%;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--surface-2);
+}
+
+.auth-progress-fill {
+	height: 100%;
+	border-radius: 999px;
+	background: var(--primary);
+	transition: width 160ms ease;
+}
+
+.auth-progress-fill.is-indeterminate {
+	width: 35%;
+	animation: loading-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-slide {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(300%);
+	}
+}
+
+/* Optional legacy app padding */
+.app-shell {
+	min-height: 100vh;
+	padding: 12px;
+	background: var(--bg);
+}
+
+.app-shell-backdrop {
+	position: relative;
+}
+
+.app-shell-backdrop::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background:
+		radial-gradient(
+			760px 430px at 8% -8%,
+			color-mix(in oklab, var(--primary) 18%, transparent),
+			transparent 70%
+		),
+		radial-gradient(
+			820px 460px at 92% -5%,
+			color-mix(in oklab, var(--accent) 15%, transparent),
+			transparent 72%
+		);
+	opacity: calc(0.74 * var(--ui-atmosphere));
+	z-index: 0;
+	animation: suite-ambient-drift calc(18s / var(--ui-motion-scale)) ease-in-out
+		infinite;
+}
+
+.app-shell-backdrop::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background:
+		linear-gradient(
+			120deg,
+			transparent 0%,
+			color-mix(in oklab, var(--primary) 6%, transparent) 28%,
+			transparent 54%
+		),
+		linear-gradient(
+			-120deg,
+			transparent 0%,
+			color-mix(in oklab, var(--accent) 7%, transparent) 34%,
+			transparent 64%
+		);
+	mix-blend-mode: screen;
+	opacity: calc(0.46 * var(--ui-atmosphere));
+	z-index: 0;
+}
+
+.app-shell-backdrop main,
+.app-shell-backdrop section,
+.app-shell-backdrop article {
+	scroll-margin-top: 96px;
+}
+
+.suite-topbar .suite-topbar-inner {
+	min-height: var(--shell-topbar-min-h);
+	padding-inline: var(--shell-topbar-pad-x);
+	padding-block: var(--shell-topbar-pad-y);
+	gap: var(--shell-topbar-gap);
+}
+
+.suite-topbar .suite-topbar-center {
+	min-height: var(--shell-topbar-center-min-h);
+	padding-inline: var(--shell-topbar-center-pad-x);
+}
+
+.suite-workspace-shell {
+	padding-inline: var(--shell-workspace-pad-x);
+	padding-block: var(--shell-workspace-pad-y);
+}
+
+.suite-shell-grid {
+	gap: var(--shell-grid-gap);
+}
+
+.suite-route-pane {
+	border-radius: var(--shell-route-radius);
+}
+
+.suite-route-scroll-inner {
+	padding-bottom: var(--shell-route-bottom-pad);
+}
+
+.suite-page-frame-root {
+	row-gap: var(--page-frame-gap);
+	padding-bottom: var(--page-frame-bottom-pad);
+}
+
+.suite-page-frame-body {
+	gap: var(--page-frame-gap);
+}
+
+.suite-page-frame-stack {
+	gap: var(--page-frame-section-gap);
+}
+
+.suite-sticky-rail {
+	position: sticky;
+	top: var(--suite-sticky-rail-top);
+	max-height: var(--suite-sticky-rail-max-h);
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding-right: 0.25rem;
+}
+
+.suite-scroll-panel {
+	max-height: var(--suite-scroll-panel-max-h);
+	overflow-y: auto;
+	scroll-behavior: smooth;
+}
+
+.suite-modal-shell-max {
+	max-height: var(--suite-modal-max-h);
+}
+
+.suite-scroll-region {
+	scrollbar-gutter: stable;
+	scrollbar-gutter: stable both-edges;
+	overscroll-behavior: contain;
+}
+
+.suite-workspace-shell,
+.suite-sidebar-shell,
+.suite-route-scroll {
+	min-height: 0;
+}
+
+@media (min-width: 768px) {
+	.suite-shell-grid {
+		grid-template-columns: var(--shell-sidebar-w) minmax(0, 1fr);
+	}
+}
+
+.suite-loading-veil {
+	animation: suite-veil-in 120ms ease-out both;
+}
+
+@keyframes suite-veil-in {
+	0% {
+		opacity: 0;
+		transform: translateY(3px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@media (max-height: 860px) {
+	.suite-topbar .suite-topbar-logo {
+		transform: scale(0.92);
+		transform-origin: left center;
+	}
+
+	.suite-topbar .suite-topbar-chip {
+		padding-top: 0.275rem;
+		padding-bottom: 0.275rem;
+		font-size: 0.7rem;
+	}
+}
+
+@media (max-height: 760px) {
+	.suite-topbar .suite-topbar-center {
+		display: none;
+	}
+}
+
+.animate-liquid {
+	animation: liquid-shift 8s ease-in-out infinite;
+}
+
+.animate-glass-float {
+	animation: glass-float 6s ease-in-out infinite;
+}
+
+.animate-edge-light {
+	animation: edge-spin 3.6s linear infinite;
+}
+
+.animate-aurora {
+	animation: suite-ambient-drift 12s ease-in-out infinite;
+}
+
+.animate-grid-pan {
+	animation: suite-grid-pan 24s linear infinite;
+}
+
+.glass-shimmer-overlay {
+	animation: glass-shimmer 2.2s ease-in-out infinite;
+}
+
+.suite-thinking-dot {
+	width: 0.42rem;
+	height: 0.42rem;
+	border-radius: 999px;
+	background: color-mix(in oklab, var(--primary) 62%, var(--text) 38%);
+	animation: suite-thinking-dot 1.1s ease-in-out infinite;
+}
+
+.suite-thinking-dot:nth-child(2) {
+	animation-delay: 120ms;
+}
+
+.suite-thinking-dot:nth-child(3) {
+	animation-delay: 240ms;
+}
+
+.glass-specular-overlay,
+.glass-grain-overlay {
+	mix-blend-mode: screen;
+}
+
+@keyframes liquid-shift {
+	0%,
+	100% {
+		border-radius: 18px 24px 18px 28px;
+	}
+	50% {
+		border-radius: 26px 18px 28px 16px;
+	}
+}
+
+@keyframes glass-float {
+	0%,
+	100% {
+		transform: translateY(0px);
+	}
+	50% {
+		transform: translateY(-4px);
+	}
+}
+
+@keyframes edge-spin {
+	from {
+		--edge-angle: 0deg;
+	}
+	to {
+		--edge-angle: 360deg;
+	}
+}
+
+@keyframes glass-shimmer {
+	0% {
+		transform: translateX(-120%);
+	}
+	100% {
+		transform: translateX(120%);
+	}
+}
+
+@keyframes suite-thinking-dot {
+	0%,
+	80%,
+	100% {
+		transform: translateY(0);
+		opacity: 0.35;
+	}
+	40% {
+		transform: translateY(-3px);
+		opacity: 1;
+	}
+}
+
+@keyframes suite-ambient-drift {
+	0%,
+	100% {
+		transform: translate3d(0, 0, 0) scale(1);
+		filter: saturate(1);
+	}
+	50% {
+		transform: translate3d(-1.8%, 1.6%, 0) scale(1.03);
+		filter: saturate(1.08);
+	}
+}
+
+@keyframes suite-grid-pan {
+	0% {
+		background-position:
+			0 0,
+			0 0;
+	}
+	100% {
+		background-position:
+			56px 56px,
+			56px 56px;
+	}
+}
+
+@keyframes suite-glow-pulse {
+	0%,
+	100% {
+		box-shadow:
+			0 0 0 1px color-mix(in oklab, var(--primary) 24%, transparent) inset,
+			0 10px 26px color-mix(in oklab, var(--primary) 10%, transparent),
+			0 22px 40px rgba(0, 0, 0, 0.34);
+	}
+	50% {
+		box-shadow:
+			0 0 0 1px color-mix(in oklab, var(--accent) 34%, transparent) inset,
+			0 14px 30px color-mix(in oklab, var(--accent) 15%, transparent),
+			0 24px 42px rgba(0, 0, 0, 0.38);
+	}
+}
+
+@media (min-width: 768px) {
+	.auth-nav,
+	.auth-main {
+		padding-left: 32px;
+		padding-right: 32px;
+	}
+
+	.auth-shell-grid {
+		grid-template-columns: repeat(12, minmax(0, 1fr));
+	}
+
+	.auth-panel {
+		display: block;
+		grid-column: span 5;
+	}
+
+	.auth-card {
+		grid-column: span 7;
+	}
+
+	.auth-card-wide {
+		grid-column: span 12;
+	}
+
+	.app-shell {
+		padding: 16px;
+	}
+}
+
+html[data-theme="monolithMinimal"] body::before,
+html[data-theme="monolithMinimal"] body::after,
+html[data-theme="monolithMinimal"] .app-shell-backdrop::before {
+	opacity: 0 !important;
+}
+
+html[data-theme="monolithMinimal"] .suite-reveal,
+html[data-theme="monolithMinimal"] .suite-route-enter,
+html[data-theme="monolithMinimal"] .animate-liquid,
+html[data-theme="monolithMinimal"] .animate-glass-float,
+html[data-theme="monolithMinimal"] .animate-edge-light,
+html[data-theme="monolithMinimal"] .glass-shimmer-overlay,
+html[data-theme="monolithMinimal"] .animate-aurora,
+html[data-theme="monolithMinimal"] .animate-grid-pan {
+	animation: none !important;
+}

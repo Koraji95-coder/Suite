@@ -1,0 +1,57 @@
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+.venv/
+
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ── Secrets & Environment ────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# ── ZeroClaw Agent Secrets ───────────────────
+zeroclaw.toml
+agent-secrets/
+*.secret
+pairing-codes.txt
+
+# ── OS & Editor ──────────────────────────────
+Thumbs.db
+*.swp
+*~
+
+# ── Build Artifacts ──────────────────────────
+coverage/
+*.tsbuildinfo
+
+# Runtime / Local State
+.runlogs/
+backend/.agent_sessions.json
+backend/.agent_pairings.json
+backend/__pycache__/
+backend/*.pyc
+suite-agent-main/target/

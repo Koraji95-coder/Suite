@@ -16,6 +16,7 @@ import ForgotPasswordPage from "./routes/ForgotPasswordPage";
 import LandingPage from "./routes/LandingPage";
 import LoginPage from "./routes/LoginPage";
 import PrivacyPage from "./routes/PrivacyPage";
+import RoadmapPage from "./routes/RoadmapPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import ResetPasswordPage from "./routes/ResetPasswordPage";
 import RouteLoadingFallback from "./routes/RouteLoadingFallback";
@@ -105,6 +106,7 @@ export default function App() {
 								/>
 								<Route path="/reset-password" element={<ResetPasswordPage />} />
 								<Route path="/privacy" element={<PrivacyPage />} />
+								<Route path="/roadmap" element={<RoadmapPage />} />
 
 								<Route element={<ProtectedRoute />}>
 									<Route path="/app" element={<Shell />}>

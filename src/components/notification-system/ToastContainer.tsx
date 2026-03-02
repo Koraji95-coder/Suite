@@ -15,17 +15,17 @@ const iconMap = {
 };
 
 const colorMap = {
-	success: "bg-green-50 border-green-200 text-green-900",
-	error: "bg-red-50 border-red-200 text-red-900",
-	warning: "bg-yellow-50 border-yellow-200 text-yellow-900",
-	info: "bg-blue-50 border-blue-200 text-blue-900",
+	success: "[background:color-mix(in_srgb,var(--success)_10%,var(--surface))] [border-color:var(--success)] [color:var(--success)]",
+	error: "[background:color-mix(in_srgb,var(--danger)_10%,var(--surface))] [border-color:var(--danger)] [color:var(--danger)]",
+	warning: "[background:color-mix(in_srgb,var(--warning)_10%,var(--surface))] [border-color:var(--warning)] [color:var(--warning)]",
+	info: "[background:color-mix(in_srgb,var(--accent)_10%,var(--surface))] [border-color:var(--accent)] [color:var(--accent)]",
 };
 
 const iconColorMap = {
-	success: "text-green-500",
-	error: "text-red-500",
-	warning: "text-yellow-500",
-	info: "text-blue-500",
+	success: "[color:var(--success)]",
+	error: "[color:var(--danger)]",
+	warning: "[color:var(--warning)]",
+	info: "[color:var(--accent)]",
 };
 
 function ToastItem({ notification }: { notification: Notification }) {
@@ -79,7 +79,7 @@ export function ToastContainer() {
 	if (notifications.length === 0) return null;
 
 	return (
-		<div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+		<div className="fixed top-4 right-4 flex flex-col gap-2 pointer-events-none" style={{ zIndex: "var(--z-toast)" }}>
 			<div className="flex flex-col gap-2 pointer-events-auto">
 				{notifications.map((notification) => (
 					<ToastItem key={notification.id} notification={notification} />

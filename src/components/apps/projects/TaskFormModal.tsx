@@ -25,7 +25,7 @@ export function TaskFormModal({
 	const labelClass = "mb-2 block text-sm font-medium [color:var(--text-muted)]";
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.68)] p-3 backdrop-blur-md sm:p-4">
+		<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.68)] p-3 backdrop-blur-md sm:p-4" style={{ zIndex: "var(--z-dialog)" }}>
 			<div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg border p-5 backdrop-blur-xl [border-color:var(--border)] [background:var(--bg-heavy)] sm:p-6">
 				<h3 className="mb-4 text-2xl font-bold [color:var(--text)]">
 					{isEditing ? "Edit Task" : isSubtask ? "Add Subtask" : "Add Task"}

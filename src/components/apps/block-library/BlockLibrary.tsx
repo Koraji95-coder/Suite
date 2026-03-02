@@ -356,8 +356,8 @@ export function BlockLibrary() {
 															onClick={() => toggleFavorite(block)}
 															className={`p-2 border rounded-lg transition-all ${
 																block.is_favorite
-																	? "bg-yellow-500/30 border-yellow-500/50 text-yellow-200"
-																	: "bg-gray-500/20 border-gray-500/40 text-gray-300 hover:bg-yellow-500/20"
+																	? "[background:color-mix(in_srgb,var(--warning)_30%,var(--surface))] [border-color:color-mix(in_srgb,var(--warning)_50%,transparent)] [color:var(--warning)]"
+																	: "[background:var(--surface-2)] [border-color:var(--border)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--warning)_20%,var(--surface))]"
 															}`}
 															title="Toggle Favorite"
 														>
@@ -419,7 +419,7 @@ export function BlockLibrary() {
 			)}
 
 			{showUploadModal && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm">
+				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
 					<div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg-heavy)] p-6 backdrop-blur-xl">
 						<h3 className="mb-4 text-2xl font-bold [color:var(--text)]">
 							Upload Block
@@ -528,7 +528,7 @@ export function BlockLibrary() {
 			)}
 
 			{selectedBlock && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm">
+				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
 					<div className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-lg border border-[var(--border)] bg-[var(--bg-heavy)] backdrop-blur-xl">
 						<div className="sticky top-0 z-10 flex items-center justify-between border-b p-6 backdrop-blur-sm [border-color:var(--border)] [background:color-mix(in_srgb,var(--bg-base)_95%,transparent)]">
 							<div>
@@ -609,8 +609,8 @@ export function BlockLibrary() {
 									onClick={() => toggleFavorite(selectedBlock)}
 									className={`px-6 py-3 border rounded-lg transition-all flex items-center space-x-2 ${
 										selectedBlock.is_favorite
-											? "bg-yellow-500/30 border-yellow-500/50 text-yellow-200"
-											: "bg-gray-500/20 border-gray-500/40 text-gray-300 hover:bg-yellow-500/20"
+											? "[background:color-mix(in_srgb,var(--warning)_30%,var(--surface))] [border-color:color-mix(in_srgb,var(--warning)_50%,transparent)] [color:var(--warning)]"
+											: "[background:var(--surface-2)] [border-color:var(--border)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--warning)_20%,var(--surface))]"
 									}`}
 								>
 									<Star className="w-5 h-5" />

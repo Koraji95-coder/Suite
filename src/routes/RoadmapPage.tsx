@@ -10,7 +10,7 @@ import {
 	Compass,
 } from "lucide-react";
 
-import { APP_NAME } from "../app";
+import { APP_NAME } from "../appMeta";
 import {
 	CATEGORY_META,
 	ROADMAP_QUARTERS,

@@ -1214,7 +1214,7 @@ export function TransmittalBuilderApp() {
 						<div className="grid gap-2 px-2 sm:px-3 text-xs text-muted-foreground">
 							<div>Draft saved: {lastSavedAt?.toLocaleTimeString() || "-"}</div>
 							{submitAttempted && validation.errors.length > 0 ? (
-								<div className="grid gap-1 text-red-400">
+								<div className="grid gap-1 [color:var(--danger)]">
 									{validation.errors.map((error) => (
 										<div key={error}>{error}</div>
 									))}
@@ -1283,7 +1283,7 @@ export function TransmittalBuilderApp() {
 							}}
 						/>
 						{templateError ? (
-							<div className="text-xs text-red-400">{templateError}</div>
+							<div className="text-xs [color:var(--danger)]">{templateError}</div>
 						) : null}
 
 						{draft.transmittalType === "standard" ? (
@@ -1368,7 +1368,7 @@ export function TransmittalBuilderApp() {
 												}
 												className={cn(
 													isInvalid("cidDocs") &&
-														"border-red-500 focus-visible:ring-red-500",
+														"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
 												)}
 											/>
 											<Select
@@ -1418,7 +1418,7 @@ export function TransmittalBuilderApp() {
 									}
 									className={cn(
 										isInvalid("projectName") &&
-											"border-red-500 focus-visible:ring-red-500",
+											"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
 									)}
 									placeholder="Client - Site Name"
 								/>
@@ -1434,7 +1434,7 @@ export function TransmittalBuilderApp() {
 									}
 									className={cn(
 										isInvalid("projectNumber") &&
-											"border-red-500 focus-visible:ring-red-500",
+											"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
 									)}
 									placeholder="R3P-XXXX"
 								/>
@@ -1448,7 +1448,7 @@ export function TransmittalBuilderApp() {
 									onChange={(event) => updateDraft("date", event.target.value)}
 									className={cn(
 										isInvalid("date") &&
-											"border-red-500 focus-visible:ring-red-500",
+											"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
 									)}
 									placeholder="MM/DD/YYYY"
 								/>
@@ -1464,7 +1464,7 @@ export function TransmittalBuilderApp() {
 									}
 									className={cn(
 										isInvalid("transmittalNumber") &&
-											"border-red-500 focus-visible:ring-red-500",
+											"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
 									)}
 									placeholder="XMTL-###"
 								/>
@@ -1514,7 +1514,7 @@ export function TransmittalBuilderApp() {
 									}
 									className={cn(
 										isInvalid("fromTitle") &&
-											"border-red-500 focus-visible:ring-red-500",
+											"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
 									)}
 									placeholder="Managing Partner"
 								/>
@@ -1531,7 +1531,7 @@ export function TransmittalBuilderApp() {
 									}
 									className={cn(
 										isInvalid("fromEmail") &&
-											"border-red-500 focus-visible:ring-red-500",
+											"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
 									)}
 									placeholder="name@company.com"
 								/>
@@ -1578,7 +1578,7 @@ export function TransmittalBuilderApp() {
 								key={contact.id}
 								className={cn(
 									"p-4 space-y-3",
-									isInvalid("contacts") && "border-red-500/70",
+									isInvalid("contacts") && "[border-color:var(--danger)]",
 								)}
 							>
 								<div className="grid gap-2 sm:grid-cols-4">

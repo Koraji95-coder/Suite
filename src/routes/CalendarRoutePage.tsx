@@ -26,7 +26,7 @@ export default function CalendarRoutePage() {
 				className="rounded-2xl"
 				style={{
 					padding: "clamp(4px, 0.6vw, 10px)",
-					minHeight: "clamp(620px, 80vh, 1040px)",
+					minHeight: "clamp(620px, calc(100dvh - 8rem), 1040px)",
 				}}
 			>
 				<CalendarPage

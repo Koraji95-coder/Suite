@@ -63,7 +63,7 @@ export function CalendarRightRail({
 	if (!hasUpcoming) {
 		return (
 			<div className={cn("hidden xl:block", className)}>
-				<div className="sticky top-4">
+				<div className="sticky top-0">
 					<UpcomingBanner events={events} className="w-full justify-center" />
 				</div>
 			</div>
@@ -73,7 +73,7 @@ export function CalendarRightRail({
 	// NORMAL STATE: Selected day + Upcoming list
 	return (
 		<div className={cn("hidden xl:block", className)}>
-			<div className="sticky top-4 max-h-[calc(100dvh-8rem)] overflow-y-auto pr-1">
+			<div className="sticky top-0 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">
 				<div className="grid gap-4">
 					{/* Selected day */}
 					<GlassPanel

@@ -13,7 +13,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 	if (typeof document === "undefined") return null;
 
 	return createPortal(
-		<div className="fixed inset-0 z-[120]">
+		<div className="fixed inset-0" style={{ zIndex: "var(--z-dialog)" }}>
 			<div
 				className="fixed inset-0 bg-[color:rgb(10_10_10_/_0.72)]"
 				onClick={() => onOpenChange?.(false)}
@@ -34,6 +34,7 @@ export function DialogContent({
 	return (
 		<div
 			className={cn(
+				/* z-50 is local: sits above sibling backdrop within the --z-dialog portal */
 				"relative z-50 w-full max-w-lg rounded-xl border border-border bg-background p-4 shadow-lg sm:p-6",
 				"my-2 max-h-[calc(100dvh-1rem)] overflow-y-auto sm:my-6 sm:max-h-[min(88dvh,760px)]",
 				className,

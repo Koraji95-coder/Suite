@@ -1,24 +1,25 @@
-// src/routes/AppShell.tsx
 import {
 	AppWindow,
 	BookOpen,
 	CalendarDays,
 	FolderOpen,
 	LayoutDashboard,
+	Menu,
 	Network,
 	Settings,
 	Sparkles,
 	TerminalSquare,
+	X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "../auth/useAuth";
 import {
 	PageHeaderProvider,
 	usePageHeader,
 } from "../components/apps/ui/PageHeaderContext";
-import { APP_NAME } from "../app";
+import { APP_NAME } from "../appMeta";
 import { isDevAdminEmail } from "../lib/devAccess";
 
 const primaryNavItems = [
@@ -31,7 +32,7 @@ const primaryNavItems = [
 	{ to: "/app/architecture-map", label: "Architecture", icon: Network },
 ];
 
-function AppTopbar() {
+function AppTopbar({ onMenuToggle }: { onMenuToggle: () => void }) {
 	const { signOut, user, profile } = useAuth();
 	const { header } = usePageHeader();
 	const [localTime, setLocalTime] = useState(() => new Date());
@@ -67,44 +68,36 @@ function AppTopbar() {
 	);
 
 	return (
-		<div className="sticky top-0 z-40 border-b border-border [background:color-mix(in_srgb,var(--bg-base)_86%,transparent)] backdrop-blur">
-			<div className="flex w-full items-center justify-between gap-4 px-6 py-5 md:px-8">
-				<NavLink
-					to="/app/dashboard"
-					className="inline-flex items-center gap-4 no-underline"
-					aria-label="Go to dashboard"
+		<header className="flex-none border-b border-border [background:color-mix(in_srgb,var(--bg-base)_86%,transparent)] backdrop-blur" style={{ zIndex: "var(--z-topbar)" }}>
+			<div className="flex w-full items-center justify-between gap-4 px-4 py-3 md:px-6">
+				<button
+					type="button"
+					className="inline-flex items-center justify-center rounded-xl border border-border bg-surface p-2 text-text transition hover:bg-surface-2 md:hidden"
+					onClick={onMenuToggle}
+					aria-label="Toggle navigation menu"
 				>
-					<div className="grid h-12 w-12 grid-cols-2 gap-1 rounded-[20px] border border-border bg-surface p-1">
-						<span className="rounded-md bg-primary" />
-						<span className="rounded-md bg-accent" />
-						<span className="rounded-md [background:color-mix(in_oklab,var(--text)_70%,transparent)]" />
-						<span className="rounded-md bg-primary" />
-					</div>
+					<Menu size={18} />
+				</button>
 
-					<span className="text-[26px] font-semibold leading-none tracking-tight text-text">
-						{APP_NAME}
-					</span>
-				</NavLink>
-
-				<div className="hidden flex-1 justify-center px-3 md:flex">
+				<div className="hidden flex-1 justify-start px-1 md:flex">
 					{header.centerContent ? (
 						header.centerContent
 					) : header.title || header.subtitle || header.icon ? (
-						<div className="grid gap-1 text-center">
-							<div className="inline-flex items-center justify-center gap-2">
+						<div className="grid gap-0.5">
+							<div className="inline-flex items-center gap-2">
 								{header.icon ? (
-									<span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border bg-surface-2 text-text">
+									<span className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border bg-surface-2 text-text">
 										{header.icon}
 									</span>
 								) : null}
 								{header.title ? (
-									<span className="text-base font-semibold text-text">
+									<span className="text-sm font-semibold text-text">
 										{header.title}
 									</span>
 								) : null}
 							</div>
 							{header.subtitle ? (
-								<span className="text-sm text-text-muted">{header.subtitle}</span>
+								<span className="text-xs text-text-muted">{header.subtitle}</span>
 							) : null}
 						</div>
 					) : null}
@@ -129,7 +122,7 @@ function AppTopbar() {
 					</button>
 				</div>
 			</div>
-		</div>
+		</header>
 	);
 }
 
@@ -165,7 +158,7 @@ function FirstLoginNamePrompt() {
 	};
 
 	return (
-		<div className="fixed inset-0 z-[1200] grid place-items-center bg-bg-heavy p-6 backdrop-blur">
+		<div className="fixed inset-0 grid place-items-center bg-bg-heavy p-6 backdrop-blur" style={{ zIndex: "var(--z-critical-modal)" }}>
 			<form
 				onSubmit={(event) => void submit(event)}
 				className="grid w-full max-w-[520px] gap-3 rounded-2xl border border-border bg-bg-mid p-6"
@@ -198,7 +191,7 @@ function FirstLoginNamePrompt() {
 						className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-contrast transition disabled:cursor-not-allowed disabled:opacity-60"
 						disabled={saving || value.trim().length < 2}
 					>
-						{saving ? "Saving…" : "Continue"}
+						{saving ? "Saving\u2026" : "Continue"}
 					</button>
 				</div>
 			</form>
@@ -206,7 +199,15 @@ function FirstLoginNamePrompt() {
 	);
 }
 
-function AppSidebar() {
+const navItemClass = (isActive: boolean) =>
+	[
+		"flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition",
+		isActive
+			? "bg-surface text-text"
+			: "text-text-muted hover:bg-surface-2 hover:text-text",
+	].join(" ");
+
+function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 	const { user } = useAuth();
 	const canAccessCommandCenter = isDevAdminEmail(user?.email);
 	const navRef = useRef<HTMLElement | null>(null);
@@ -225,70 +226,150 @@ function AppSidebar() {
 		}
 	}, []);
 
-	const navItemClass = (isActive: boolean) =>
-		[
-			"flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
-			isActive
-				? "bg-surface text-text"
-				: "text-text-muted hover:bg-surface-2 hover:text-text",
-		].join(" ");
+	return (
+		<nav ref={navRef} className="grid gap-0.5">
+			{safeNavItems.map((item) => {
+				const Icon = item.icon;
+				return (
+					<NavLink
+						key={item.to}
+						to={item.to}
+						className={({ isActive }) => navItemClass(isActive)}
+						onClick={onNavigate}
+					>
+						<Icon size={16} />
+						<span>{item.label}</span>
+					</NavLink>
+				);
+			})}
 
+			<NavLink
+				to="/app/settings"
+				className={({ isActive }) => navItemClass(isActive)}
+				onClick={onNavigate}
+			>
+				<Settings size={16} />
+				<span>Settings</span>
+			</NavLink>
+
+			{canAccessCommandCenter ? (
+				<NavLink
+					to="/app/command-center"
+					className={({ isActive }) => navItemClass(isActive)}
+					onClick={onNavigate}
+				>
+					<TerminalSquare size={16} />
+					<span>Command Center</span>
+				</NavLink>
+			) : null}
+		</nav>
+	);
+}
+
+function SidebarBrand() {
+	return (
+		<NavLink
+			to="/app/dashboard"
+			className="inline-flex items-center gap-3 px-3 py-1 no-underline"
+			aria-label="Go to dashboard"
+		>
+			<div className="grid h-9 w-9 grid-cols-2 gap-0.5 rounded-[14px] border border-border bg-surface p-1">
+				<span className="rounded-[4px] bg-primary" />
+				<span className="rounded-[4px] bg-accent" />
+				<span className="rounded-[4px] [background:color-mix(in_oklab,var(--text)_70%,transparent)]" />
+				<span className="rounded-[4px] bg-primary" />
+			</div>
+			<span className="text-lg font-semibold leading-none tracking-tight text-text">
+				{APP_NAME}
+			</span>
+		</NavLink>
+	);
+}
+
+function DesktopSidebar() {
 	return (
 		<aside
-			className="rounded-2xl border border-border bg-bg-mid p-2"
+			className="hidden md:flex flex-col w-[220px] flex-none border-r border-border bg-bg-base"
 			aria-label="Workspace navigation"
+			style={{ zIndex: "var(--z-sidebar)" }}
 		>
-			<nav ref={navRef} className="grid gap-1">
-				{safeNavItems.map((item) => {
-					const Icon = item.icon;
-					return (
-						<NavLink
-							key={item.to}
-							to={item.to}
-							className={({ isActive }) => navItemClass(isActive)}
-						>
-							<Icon size={16} />
-							<span>{item.label}</span>
-						</NavLink>
-					);
-				})}
-
-				<NavLink
-					to="/app/settings"
-					className={({ isActive }) => navItemClass(isActive)}
-				>
-					<Settings size={16} />
-					<span>Settings</span>
-				</NavLink>
-
-				{canAccessCommandCenter ? (
-					<NavLink
-						to="/app/command-center"
-						className={({ isActive }) => navItemClass(isActive)}
-					>
-						<TerminalSquare size={16} />
-						<span>Command Center</span>
-					</NavLink>
-				) : null}
-			</nav>
+			<div className="flex-none px-3 py-4">
+				<SidebarBrand />
+			</div>
+			<div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-4">
+				<SidebarNav />
+			</div>
 		</aside>
 	);
 }
 
+function MobileDrawer({
+	open,
+	onClose,
+}: { open: boolean; onClose: () => void }) {
+	useEffect(() => {
+		if (!open) return;
+		const handler = (e: KeyboardEvent) => {
+			if (e.key === "Escape") onClose();
+		};
+		document.addEventListener("keydown", handler);
+		return () => document.removeEventListener("keydown", handler);
+	}, [open, onClose]);
+
+	if (!open) return null;
+
+	return (
+		<div className="fixed inset-0 md:hidden" style={{ zIndex: "var(--z-sheet)" }}>
+			<div
+				className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+				onClick={onClose}
+			/>
+			<aside className="absolute inset-y-0 left-0 flex w-[260px] flex-col border-r border-border bg-bg-base shadow-2xl">
+				<div className="flex items-center justify-between px-4 py-4">
+					<SidebarBrand />
+					<button
+						type="button"
+						onClick={onClose}
+						className="rounded-lg p-1.5 text-text-muted transition hover:bg-surface-2 hover:text-text"
+						aria-label="Close menu"
+					>
+						<X size={18} />
+					</button>
+				</div>
+				<div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-4">
+					<SidebarNav onNavigate={onClose} />
+				</div>
+			</aside>
+		</div>
+	);
+}
+
 export default function AppShell() {
+	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+	const scrollRef = useRef<HTMLDivElement | null>(null);
+	const { pathname } = useLocation();
+
+	const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+
+	useEffect(() => {
+		scrollRef.current?.scrollTo({ top: 0 });
+	}, [pathname]);
+
 	return (
 		<PageHeaderProvider>
-			<div className="min-h-screen bg-bg-base text-text">
-				<AppTopbar />
+			<div className="flex h-dvh flex-col overflow-hidden bg-bg-base text-text">
+				<AppTopbar onMenuToggle={() => setMobileMenuOpen((p) => !p)} />
 				<FirstLoginNamePrompt />
+				<MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu} />
 
-				<div className="grid w-full gap-4 px-4 py-4 md:grid-cols-[240px_minmax(0,1fr)] md:px-6 md:py-6">
-					<AppSidebar />
-					<div className="min-w-0">
-						<div className="mx-auto w-full max-w-[1600px]">
-							<Outlet />
-						</div>
-					</div>
+				<div className="flex flex-1 overflow-hidden">
+					<DesktopSidebar />
+					<main
+						ref={scrollRef}
+						className="flex-1 overflow-y-auto overscroll-contain scroll-smooth p-3 md:p-5"
+					>
+						<Outlet />
+					</main>
 				</div>
 			</div>
 		</PageHeaderProvider>

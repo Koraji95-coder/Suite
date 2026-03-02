@@ -1,4 +1,4 @@
-import { BatchFindReplaceApp } from "@/components/apps/Batch find and replace/BatchFindReplaceApp";
+import { BatchFindReplaceApp } from "@/components/apps/Batch_find_and_replace/BatchFindReplaceApp";
 
 export default function BatchFindReplaceRoutePage() {
 	return <BatchFindReplaceApp />;

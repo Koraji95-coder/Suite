@@ -80,13 +80,15 @@ const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
 		return (
 			<>
 				<div
-					className="fixed inset-0 z-50 bg-black/80"
+					className="fixed inset-0 bg-black/80"
+					style={{ zIndex: "var(--z-sheet)" }}
 					onClick={() => onOpenChange(false)}
 				/>
 				<div
 					ref={ref}
+					style={{ zIndex: "var(--z-sheet)" }}
 					className={cn(
-						"fixed z-50 gap-4 bg-background p-6 shadow-lg transition-transform duration-300",
+						"fixed gap-4 bg-background p-6 shadow-lg transition-transform duration-300",
 						sheetVariants[side],
 						className,
 					)}

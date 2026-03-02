@@ -83,11 +83,30 @@ Provide a detailed report with actionable items.`,
 	},
 ];
 
+export interface AgentConversationMessage {
+	id: string;
+	role: "user" | "assistant";
+	content: string;
+	timestamp: string;
+}
+
+export interface AgentConversation {
+	id: string;
+	title: string;
+	profileId: string;
+	createdAt: string;
+	updatedAt: string;
+	messages: AgentConversationMessage[];
+}
+
 const TASK_HISTORY_KEY_PREFIX = "agent-task-history";
-const MAX_HISTORY = 50; // Keep last 50 tasks
+const CONV_KEY_PREFIX = "agent-conversations";
+const MAX_HISTORY = 50;
+const MAX_CONVERSATIONS = 30;
 
 class AgentTaskManager {
 	private scope = "anon";
+	private profileScope = "koro";
 
 	setScope(scope: string | null): void {
 		this.scope = scope?.trim() || "anon";
@@ -228,9 +247,88 @@ class AgentTaskManager {
 		return this.getTaskHistory().slice(0, limit);
 	}
 
-	/**
-	 * Generate unique ID
-	 */
+	setProfileScope(profileId: string): void {
+		this.profileScope = profileId.trim() || "koro";
+	}
+
+	private getConversationsKey(): string {
+		return `${CONV_KEY_PREFIX}:${this.scope}:${this.profileScope}`;
+	}
+
+	getConversations(): AgentConversation[] {
+		try {
+			const stored = localStorage.getItem(this.getConversationsKey());
+			return stored ? JSON.parse(stored) : [];
+		} catch {
+			return [];
+		}
+	}
+
+	getConversation(conversationId: string): AgentConversation | null {
+		return this.getConversations().find((c) => c.id === conversationId) ?? null;
+	}
+
+	saveConversation(conversation: AgentConversation): void {
+		try {
+			const convs = this.getConversations();
+			const idx = convs.findIndex((c) => c.id === conversation.id);
+			if (idx >= 0) {
+				convs[idx] = conversation;
+			} else {
+				convs.unshift(conversation);
+			}
+			if (convs.length > MAX_CONVERSATIONS) convs.splice(MAX_CONVERSATIONS);
+			localStorage.setItem(this.getConversationsKey(), JSON.stringify(convs));
+		} catch {
+			/* noop */
+		}
+	}
+
+	deleteConversation(conversationId: string): void {
+		try {
+			const convs = this.getConversations().filter((c) => c.id !== conversationId);
+			localStorage.setItem(this.getConversationsKey(), JSON.stringify(convs));
+		} catch {
+			/* noop */
+		}
+	}
+
+	createConversation(profileId: string, title?: string): AgentConversation {
+		const now = new Date().toISOString();
+		return {
+			id: this.generateId(),
+			title: title || "New conversation",
+			profileId,
+			createdAt: now,
+			updatedAt: now,
+			messages: [],
+		};
+	}
+
+	addMessageToConversation(
+		conversationId: string,
+		role: "user" | "assistant",
+		content: string,
+	): AgentConversation | null {
+		const conv = this.getConversation(conversationId);
+		if (!conv) return null;
+
+		conv.messages.push({
+			id: this.generateId(),
+			role,
+			content,
+			timestamp: new Date().toISOString(),
+		});
+		conv.updatedAt = new Date().toISOString();
+
+		if (conv.messages.length === 1 && role === "user") {
+			conv.title = content.slice(0, 60) + (content.length > 60 ? "..." : "");
+		}
+
+		this.saveConversation(conv);
+		return conv;
+	}
+
 	private generateId(): string {
 		return `task-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 	}

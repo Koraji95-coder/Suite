@@ -42,7 +42,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 	return (
 		<ToastContext.Provider value={{ showToast }}>
 			{children}
-			<div className="fixed bottom-4 right-4 z-[100] space-y-2">
+			<div className="fixed bottom-4 right-4 space-y-2" style={{ zIndex: "var(--z-toast)" }}>
 				{toasts.map((toast) => (
 					<ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
 				))}
@@ -64,15 +64,15 @@ function ToastItem({
 	}, [toast.id, onRemove]);
 
 	const icons = {
-		success: <CheckCircle className="w-5 h-5 text-green-400" />,
-		error: <AlertCircle className="w-5 h-5 text-red-400" />,
-		info: <Info className="w-5 h-5 text-blue-400" />,
+		success: <CheckCircle className="w-5 h-5 [color:var(--success)]" />,
+		error: <AlertCircle className="w-5 h-5 [color:var(--danger)]" />,
+		info: <Info className="w-5 h-5 [color:var(--accent)]" />,
 	};
 
 	const colors = {
-		success: "border-green-500/50 bg-green-500/10",
-		error: "border-red-500/50 bg-red-500/10",
-		info: "border-blue-500/50 bg-blue-500/10",
+		success: "[border-color:var(--success)] [background:color-mix(in_srgb,var(--success)_10%,var(--surface))]",
+		error: "[border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_10%,var(--surface))]",
+		info: "[border-color:var(--accent)] [background:color-mix(in_srgb,var(--accent)_10%,var(--surface))]",
 	};
 
 	return (
@@ -80,12 +80,12 @@ function ToastItem({
 			className={`flex items-center space-x-3 px-4 py-3 rounded-lg border backdrop-blur-md shadow-lg animate-in slide-in-from-right ${colors[toast.type]}`}
 		>
 			{icons[toast.type]}
-			<span className="text-white text-sm">{toast.message}</span>
+			<span className="[color:var(--text)] text-sm">{toast.message}</span>
 			<button
 				onClick={() => onRemove(toast.id)}
-				className="p-1 hover:bg-white/10 rounded"
+				className="p-1 hover:[background:color-mix(in_srgb,var(--text)_10%,transparent)] rounded"
 			>
-				<X className="w-4 h-4 text-white/70" />
+				<X className="w-4 h-4 [color:var(--text)] opacity-70" />
 			</button>
 		</div>
 	);

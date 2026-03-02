@@ -162,7 +162,7 @@ export default function FileManagerDashboard() {
 			<div className="border-border border-b p-6">
 				<div className="flex items-center gap-2">
 					<div className="bg-primary flex h-8 w-8 items-center justify-center rounded-lg">
-						<Folder className="size-4 text-white" />
+						<Folder className="size-4 [color:var(--text)]" />
 					</div>
 					<span className="text-lg font-semibold">File Manager</span>
 				</div>
@@ -241,7 +241,7 @@ export default function FileManagerDashboard() {
 									stroke="currentColor"
 									strokeWidth="2"
 									strokeDasharray="65, 100"
-									className="text-purple-600"
+									className="[color:var(--primary)]"
 								/>
 							</svg>
 							<div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -284,7 +284,7 @@ export default function FileManagerDashboard() {
 					<p className="text-muted-foreground mb-4 text-sm">
 						Upgrade your account to pro to get more storage
 					</p>
-					<Button className="w-full bg-gray-900 text-white hover:bg-gray-800">
+					<Button className="w-full [background:var(--surface-2)] [color:var(--text)] hover:[background:var(--surface)]">
 						Upgrade to pro
 					</Button>
 				</CardContent>
@@ -348,7 +348,7 @@ export default function FileManagerDashboard() {
 							</SheetContent>
 						</Sheet>
 
-						<Button className="bg-primary hover:bg-purple-700" size="sm">
+						<Button className="bg-primary hover:[background:color-mix(in_srgb,var(--primary)_80%,var(--surface))]" size="sm">
 							<Upload className="h-4 w-4 lg:mr-2" />
 							<span className="hidden sm:inline">Upload file</span>
 						</Button>
@@ -404,7 +404,7 @@ export default function FileManagerDashboard() {
 								</h2>
 								<Button
 									variant="ghost"
-									className="text-sm text-purple-600 hover:text-purple-700"
+									className="text-sm [color:var(--primary)] hover:[color:var(--primary)]"
 								>
 									View all →
 								</Button>
@@ -449,25 +449,25 @@ export default function FileManagerDashboard() {
 
 							<div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2">
 								<div className="flex items-center gap-1 whitespace-nowrap">
-									<div className="h-4 w-4 rounded-sm bg-blue-500"></div>
+									<div className="h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--accent)_70%,var(--surface))]"></div>
 									<span className="text-muted-foreground text-sm">
 										Documents
 									</span>
 								</div>
 								<div className="flex items-center gap-1 whitespace-nowrap">
-									<div className="h-4 w-4 rounded-sm bg-purple-500"></div>
+									<div className="h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_70%,var(--surface))]"></div>
 									<span className="text-muted-foreground text-sm">Image</span>
 								</div>
 								<div className="flex items-center gap-1 whitespace-nowrap">
-									<div className="h-4 w-4 rounded-sm bg-purple-300"></div>
+									<div className="h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_40%,var(--surface))]"></div>
 									<span className="text-muted-foreground text-sm">Video</span>
 								</div>
 								<div className="flex items-center gap-1 whitespace-nowrap">
-									<div className="h-4 w-4 rounded-sm bg-yellow-500"></div>
+									<div className="h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--warning)_70%,var(--surface))]"></div>
 									<span className="text-muted-foreground text-sm">Audio</span>
 								</div>
 								<div className="flex items-center gap-1 whitespace-nowrap">
-									<div className="h-4 w-4 rounded-sm bg-red-500"></div>
+									<div className="h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--danger)_70%,var(--surface))]"></div>
 									<span className="text-muted-foreground text-sm">ZIP</span>
 								</div>
 							</div>

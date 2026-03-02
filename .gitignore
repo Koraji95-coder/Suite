@@ -10,7 +10,6 @@ node_modules
 dist
 dist-ssr
 *.local
-.venv/
 
 .vscode/*
 !.vscode/extensions.json
@@ -21,29 +20,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# ── Secrets & Environment ────────────────────
 .env
-.env.*
-!.env.example
-*.pem
-*.key
-*.p12
-*.pfx
-*.jks
-*.keystore
-
-# ── ZeroClaw Agent Secrets ───────────────────
-zeroclaw.toml
-agent-secrets/
-*.secret
-pairing-codes.txt
-
-# ── OS & Editor ──────────────────────────────
-Thumbs.db
-*.swp
-*~
-
-# ── Build Artifacts ──────────────────────────
-coverage/
-*.tsbuildinfo

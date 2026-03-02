@@ -2,7 +2,7 @@
 import yaml from "js-yaml";
 import { FileCode, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { APP_NAME } from "@/app";
+import { APP_NAME } from "@/appMeta";
 
 const STORAGE_KEY = "app-email-config-yaml";
 const APP_SLUG = APP_NAME.toLowerCase().replace(/\s+/g, "");

@@ -1,4 +1,3 @@
-// src/routes/ForgotPasswordPage.tsx
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -24,7 +23,7 @@ export default function ForgotPasswordPage() {
 
 	return (
 		<AuthShell navLink={{ to: "/login", label: "Back to login" }}>
-			<div className="mb-6">
+			<div className="mb-8">
 				<div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium [background:var(--surface-2)] [color:var(--text-muted)]">
 					<span className="h-1.5 w-1.5 rounded-full [background:var(--primary)]" />
 					Password reset
@@ -32,29 +31,28 @@ export default function ForgotPasswordPage() {
 				<h1 className="text-2xl font-semibold tracking-tight">
 					Reset your password
 				</h1>
-				<p className="mt-2 text-sm [color:var(--text-muted)]">
-					We’ll email you a link to reset your password.
+				<p className="mt-2 text-sm leading-relaxed [color:var(--text-muted)]">
+					Enter your email and we'll send you a link to reset your password.
 				</p>
 			</div>
 
 			{sent ? (
-				<div className="grid gap-3">
-					<div className="rounded-lg border px-3 py-2 text-sm [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text-muted)]">
-						If an account exists for <strong>{email.trim()}</strong>, a reset
-						link was sent.
+				<div className="grid gap-4">
+					<div className="rounded-lg border px-3 py-2.5 text-sm leading-relaxed [border-color:color-mix(in_oklab,var(--success)_30%,var(--border))] [background:color-mix(in_oklab,var(--success)_6%,var(--surface))] [color:var(--text-muted)]">
+						If an account exists for <strong className="[color:var(--text)]">{email.trim()}</strong>, a reset
+						link was sent. Check your inbox.
 					</div>
 
 					<Link
 						to="/login"
-						className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
-						style={{ textAlign: "center" }}
+						className="auth-submit-btn text-center no-underline"
 					>
 						Return to login
 					</Link>
 				</div>
 			) : (
 				<form
-					className="grid gap-3"
+					className="grid gap-4"
 					noValidate
 					onSubmit={async (e) => {
 						e.preventDefault();
@@ -101,19 +99,21 @@ export default function ForgotPasswordPage() {
 						}
 					}}
 				>
-					<label className="text-sm font-medium" htmlFor="email">
-						Email
-					</label>
-					<input
-						id="email"
-						className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition [border-color:var(--border)] [background:var(--surface)] [color:var(--text)] focus:[border-color:var(--primary)]"
-						type="email"
-						autoComplete="email"
-						value={email}
-						onChange={(e) => setEmail(e.target.value)}
-						placeholder="you@company.com"
-						required
-					/>
+					<div className="grid gap-1.5">
+						<label className="text-sm font-medium" htmlFor="email">
+							Email
+						</label>
+						<input
+							id="email"
+							className="auth-input-field"
+							type="email"
+							autoComplete="email"
+							value={email}
+							onChange={(e) => setEmail(e.target.value)}
+							placeholder="you@company.com"
+							required
+						/>
+					</div>
 
 					{error ? (
 						<div className="rounded-lg border px-3 py-2 text-sm [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">
@@ -122,25 +122,32 @@ export default function ForgotPasswordPage() {
 					) : null}
 
 					<button
-						className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
+						className="auth-submit-btn mt-1"
 						type="submit"
 						disabled={!canSubmit}
 					>
-						{submitting ? "Sending…" : "Send reset link"}
+						{submitting ? (
+							<span className="inline-flex items-center gap-2">
+								<span className="auth-spinner" />
+								Sending...
+							</span>
+						) : (
+							"Send reset link"
+						)}
 					</button>
 
-					<div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm [color:var(--text-muted)]">
-						<Link
-							to="/privacy"
-							className="font-medium underline-offset-2 hover:underline [color:var(--text)]"
-						>
-							Privacy
-						</Link>
+					<div className="mt-1 flex flex-wrap items-center justify-between gap-3 text-sm [color:var(--text-muted)]">
 						<Link
 							to="/signup"
-							className="font-medium underline-offset-2 hover:underline [color:var(--text)]"
+							className="font-medium underline-offset-2 hover:underline [color:var(--primary)]"
 						>
 							Create account
+						</Link>
+						<Link
+							to="/privacy"
+							className="font-medium underline-offset-2 hover:underline [color:var(--text-muted)] hover:[color:var(--text)]"
+						>
+							Privacy
 						</Link>
 					</div>
 				</form>

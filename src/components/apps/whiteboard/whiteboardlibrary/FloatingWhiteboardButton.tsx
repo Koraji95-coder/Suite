@@ -16,7 +16,7 @@ export function FloatingWhiteboardButton({
 
 	return (
 		<>
-			<div className="fixed bottom-6 right-6 z-40 flex flex-col items-end space-y-2">
+			<div className="fixed bottom-6 right-6 flex flex-col items-end space-y-2" style={{ zIndex: "var(--z-topbar)" }}>
 				{showMenu && (
 					<div className="flex flex-col space-y-2 mb-2">
 						<button
@@ -24,7 +24,7 @@ export function FloatingWhiteboardButton({
 								setShowWhiteboard(true);
 								setShowMenu(false);
 							}}
-							className="flex items-center space-x-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-semibold px-4 py-3 rounded-lg shadow-lg shadow-orange-500/50 transition-all"
+							className="flex items-center space-x-2 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-4 py-3 rounded-lg shadow-lg transition-all"
 						>
 							<Pen className="w-5 h-5" />
 							<span>New Whiteboard</span>
@@ -35,7 +35,7 @@ export function FloatingWhiteboardButton({
 								setShowLibrary(true);
 								setShowMenu(false);
 							}}
-							className="flex items-center space-x-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-semibold px-4 py-3 rounded-lg shadow-lg shadow-orange-500/50 transition-all"
+							className="flex items-center space-x-2 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-4 py-3 rounded-lg shadow-lg transition-all"
 						>
 							<BookOpen className="w-5 h-5" />
 							<span>Whiteboard Library</span>
@@ -45,7 +45,7 @@ export function FloatingWhiteboardButton({
 
 				<button
 					onClick={() => setShowMenu(!showMenu)}
-					className={`flex items-center justify-center w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white rounded-full shadow-2xl shadow-orange-500/50 transition-all ${
+					className={`flex items-center justify-center w-14 h-14 [background:linear-gradient(to_bottom_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] rounded-full shadow-2xl transition-all ${
 						showMenu ? "rotate-45" : ""
 					}`}
 					title="Whiteboard"
@@ -65,18 +65,18 @@ export function FloatingWhiteboardButton({
 			/>
 
 			{showLibrary && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm">
-					<div className="flex max-h-[90vh] w-full max-w-7xl flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] backdrop-blur-xl">
-						<div className="flex items-center justify-between border-b border-[var(--color-border)] p-6">
+				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
+					<div className="flex max-h-[90vh] w-full max-w-7xl flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl">
+						<div className="flex items-center justify-between border-b border-[var(--border)] p-6">
 							<div className="flex items-center space-x-3">
-								<BookOpen className="h-6 w-6 text-[var(--color-accent)]" />
-								<h3 className="text-2xl font-bold text-[var(--color-text)]">
+								<BookOpen className="h-6 w-6 text-[var(--accent)]" />
+								<h3 className="text-2xl font-bold text-[var(--text)]">
 									Whiteboard Library
 								</h3>
 							</div>
 							<button
 								onClick={() => setShowLibrary(false)}
-								className="text-2xl text-[var(--color-text-muted)] transition-all hover:text-[var(--color-text)]"
+								className="text-2xl text-[var(--text-muted)] transition-all hover:text-[var(--text)]"
 							>
 								×
 							</button>

@@ -81,14 +81,14 @@ export const getUrgencyColor = (dueDate: string | null): string => {
 	now.setHours(0, 0, 0, 0);
 	const diffHours = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-	if (diffHours < 0) return "text-red-400 border-red-400";
-	if (diffHours < 24) return "text-red-300 border-red-300";
-	if (diffHours < 168) return "text-yellow-300 border-yellow-300";
-	return "text-green-300 border-green-300";
+	if (diffHours < 0) return "[color:var(--danger)] [border-color:var(--danger)]";
+	if (diffHours < 24) return "[color:var(--danger)] [border-color:var(--danger)]";
+	if (diffHours < 168) return "[color:var(--warning)] [border-color:var(--warning)]";
+	return "[color:var(--success)] [border-color:var(--success)]";
 };
 
 export const getDeadlineStatus = (deadline: string | null) => {
-	if (!deadline) return { text: "No deadline", color: "text-gray-400" };
+	if (!deadline) return { text: "No deadline", color: "[color:var(--text-muted)]" };
 	const [y, m, d] = deadline.split("T")[0].split("-").map(Number);
 	const dueDate = new Date(y, m - 1, d);
 	const today = new Date();
@@ -100,15 +100,15 @@ export const getDeadlineStatus = (deadline: string | null) => {
 	if (diffDays < 0)
 		return {
 			text: `Overdue by ${Math.abs(diffDays)} days`,
-			color: "text-red-400",
+			color: "[color:var(--danger)]",
 		};
-	if (diffDays === 0) return { text: "Due today", color: "text-red-400" };
-	if (diffDays === 1) return { text: "Due tomorrow", color: "text-orange-400" };
+	if (diffDays === 0) return { text: "Due today", color: "[color:var(--danger)]" };
+	if (diffDays === 1) return { text: "Due tomorrow", color: "[color:var(--warning)]" };
 	if (diffDays <= 7)
-		return { text: `${diffDays} days remaining`, color: "text-yellow-400" };
+		return { text: `${diffDays} days remaining`, color: "[color:var(--warning)]" };
 	return {
 		text: `${diffDays} days remaining`,
-		color: "text-green-400",
+		color: "[color:var(--success)]",
 	};
 };
 

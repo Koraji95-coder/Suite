@@ -156,7 +156,7 @@ export function BackupManager() {
 					style={{
 						position: "fixed",
 						inset: 0,
-						zIndex: 50,
+						zIndex: "var(--z-dialog)",
 						display: "flex",
 						alignItems: "center",
 						justifyContent: "center",

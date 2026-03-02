@@ -1,11 +1,8 @@
-import { Link, Trash2, X } from "lucide-react";
-import React from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { X, Trash2 } from "lucide-react";
 import type { GraphNode } from "./types";
-import { getGroupColor } from "./types";
 
 interface GraphInspectorProps {
-	selectedNode: GraphNode | null;
+	selectedNode: GraphNode;
 	onClose: () => void;
 	onDeleteMemory: (id: string) => void;
 }
@@ -15,196 +12,78 @@ export function GraphInspector({
 	onClose,
 	onDeleteMemory,
 }: GraphInspectorProps) {
-	const { palette } = useTheme();
-
-	if (!selectedNode) return null;
-
 	const isMemory = selectedNode.source === "memory";
-	const groupColor = getGroupColor(selectedNode.group, palette);
-	const destructiveColor = palette.accent;
-
-	const panelStyle: React.CSSProperties = {
-		width: 300,
-		background: hexToRgba(palette.surface, 0.95),
-		borderLeft: `1px solid ${hexToRgba(palette.primary, 0.15)}`,
-		padding: 16,
-		display: "flex",
-		flexDirection: "column",
-		gap: 12,
-		overflowY: "auto",
-		color: palette.text,
-		fontSize: 13,
-	};
-
-	const badgeStyle: React.CSSProperties = {
-		display: "inline-block",
-		padding: "2px 10px",
-		borderRadius: 12,
-		background: hexToRgba(groupColor, 0.2),
-		color: groupColor,
-		fontSize: 11,
-		fontWeight: 600,
-		textTransform: "uppercase",
-		letterSpacing: 0.5,
-	};
 
 	return (
-		<div style={panelStyle}>
-			<div
-				style={{
-					display: "flex",
-					justifyContent: "space-between",
-					alignItems: "center",
-				}}
-			>
-				<span style={badgeStyle}>{selectedNode.group}</span>
+		<aside
+			className="w-72 shrink-0 overflow-y-auto border-l p-4"
+			style={{
+				borderColor: "var(--border)",
+				background: "var(--surface)",
+			}}
+		>
+			<div className="mb-3 flex items-start justify-between gap-2">
+				<h3 className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+					{selectedNode.label}
+				</h3>
 				<button
+					type="button"
 					onClick={onClose}
-					style={{
-						background: "none",
-						border: "none",
-						cursor: "pointer",
-						color: palette.textMuted,
-						padding: 4,
-					}}
+					className="rounded-md p-1 transition hover:bg-[var(--surface-2)]"
+					aria-label="Close inspector"
 				>
-					<X size={16} />
+					<X size={14} style={{ color: "var(--text-muted)" }} />
 				</button>
 			</div>
 
-			<h3
-				style={{
-					margin: 0,
-					fontSize: 16,
-					fontWeight: 600,
-					color: palette.text,
-				}}
-			>
-				{selectedNode.label}
-			</h3>
-
-			<div
-				style={{
-					fontSize: 11,
-					color: palette.textMuted,
-					textTransform: "uppercase",
-					letterSpacing: 0.5,
-				}}
-			>
-				{selectedNode.source} node
-			</div>
-
-			{!isMemory && !!selectedNode.data?.description && (
-				<p style={{ margin: 0, color: palette.textMuted, lineHeight: 1.5 }}>
-					{String(selectedNode.data.description)}
-				</p>
-			)}
-
-			{!isMemory && !!selectedNode.data?.sub && (
-				<div style={{ color: palette.textMuted, fontStyle: "italic" }}>
-					{String(selectedNode.data.sub)}
-				</div>
-			)}
-
-			{isMemory && !!selectedNode.data?.content && (
-				<div
-					style={{
-						padding: 10,
-						borderRadius: 8,
-						background: hexToRgba(palette.background, 0.6),
-						border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-						lineHeight: 1.5,
-					}}
-				>
-					{String(selectedNode.data.content)}
-				</div>
-			)}
-
-			{isMemory && typeof selectedNode.data?.strength === "number" && (
+			<dl className="grid gap-2 text-xs" style={{ color: "var(--text-muted)" }}>
 				<div>
-					<div
-						style={{ fontSize: 11, color: palette.textMuted, marginBottom: 4 }}
-					>
-						Strength: {String(selectedNode.data.strength)}%
-					</div>
-					<div
+					<dt className="font-medium" style={{ color: "var(--text)" }}>Group</dt>
+					<dd className="mt-0.5">{selectedNode.group}</dd>
+				</div>
+				<div>
+					<dt className="font-medium" style={{ color: "var(--text)" }}>Source</dt>
+					<dd className="mt-0.5">{selectedNode.source}</dd>
+				</div>
+				<div>
+					<dt className="font-medium" style={{ color: "var(--text)" }}>ID</dt>
+					<dd className="mt-0.5 break-all font-mono">{selectedNode.id}</dd>
+				</div>
+			</dl>
+
+			{selectedNode.data && Object.keys(selectedNode.data).length > 0 && (
+				<div className="mt-3">
+					<h4 className="mb-1 text-xs font-medium" style={{ color: "var(--text)" }}>
+						Metadata
+					</h4>
+					<pre
+						className="overflow-x-auto rounded-md border p-2 text-xs"
 						style={{
-							height: 6,
-							borderRadius: 3,
-							background: hexToRgba(palette.textMuted, 0.15),
-							overflow: "hidden",
+							borderColor: "var(--border)",
+							background: "var(--bg-heavy)",
+							color: "var(--text-muted)",
 						}}
 					>
-						<div
-							style={{
-								width: `${String(selectedNode.data.strength)}%`,
-								height: "100%",
-								borderRadius: 3,
-								background: `linear-gradient(90deg, ${groupColor}, ${hexToRgba(groupColor, 0.5)})`,
-							}}
-						/>
-					</div>
+						{JSON.stringify(selectedNode.data, null, 2)}
+					</pre>
 				</div>
 			)}
-
-			{Array.isArray(selectedNode.data?.connections) &&
-				(selectedNode.data!.connections as string[]).length > 0 && (
-					<div>
-						<div
-							style={{
-								fontSize: 11,
-								color: palette.textMuted,
-								marginBottom: 4,
-								display: "flex",
-								alignItems: "center",
-								gap: 4,
-							}}
-						>
-							<Link size={12} />
-							Connections
-						</div>
-						<div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-							{(selectedNode.data!.connections as string[]).map((c) => (
-								<span
-									key={c}
-									style={{
-										padding: "2px 8px",
-										borderRadius: 4,
-										background: hexToRgba(palette.surfaceLight, 0.8),
-										fontSize: 11,
-										color: palette.textMuted,
-									}}
-								>
-									{c.slice(0, 12)}
-								</span>
-							))}
-						</div>
-					</div>
-				)}
 
 			{isMemory && (
 				<button
+					type="button"
 					onClick={() => onDeleteMemory(selectedNode.id)}
+					className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition"
 					style={{
-						marginTop: "auto",
-						display: "flex",
-						alignItems: "center",
-						justifyContent: "center",
-						gap: 6,
-						padding: "8px 0",
-						borderRadius: 6,
-						border: `1px solid ${hexToRgba(destructiveColor, 0.32)}`,
-						background: hexToRgba(destructiveColor, 0.14),
-						color: destructiveColor,
-						cursor: "pointer",
-						fontSize: 13,
-						fontWeight: 500,
+						borderColor: "var(--danger)",
+						color: "var(--danger)",
+						background: "transparent",
 					}}
 				>
-					<Trash2 size={14} />
-					Delete Memory
+					<Trash2 size={13} />
+					Delete memory
 				</button>
 			)}
-		</div>
+		</aside>
 	);
 }

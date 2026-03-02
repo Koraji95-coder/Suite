@@ -146,36 +146,36 @@ export function Whiteboard({
 	if (!isOpen) return null;
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm">
-			<div className="flex h-full max-h-[90vh] w-full max-w-7xl flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] backdrop-blur-xl">
+		<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
+			<div className="flex h-full max-h-[90vh] w-full max-w-7xl flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl">
 				{/* Header */}
-				<div className="flex items-center justify-between border-b border-[var(--color-border)] p-4">
+				<div className="flex items-center justify-between border-b border-[var(--border)] p-4">
 					<div className="flex items-center space-x-3">
-						<Pen className="h-6 w-6 text-[var(--color-accent)]" />
-						<h3 className="text-2xl font-bold text-[var(--color-text)]">
+						<Pen className="h-6 w-6 text-[var(--accent)]" />
+						<h3 className="text-2xl font-bold text-[var(--text)]">
 							Whiteboard - {panelContext}
 						</h3>
 					</div>
 					<div className="flex items-center space-x-2">
 						<button
 							onClick={() => setShowSaveDialog(true)}
-							className="flex items-center space-x-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-[var(--color-text)] transition-all hover:bg-[var(--color-surface)]"
+							className="flex items-center space-x-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] transition-all hover:bg-[var(--surface)]"
 						>
 							<Save className="w-4 h-4" />
 							<span>{isSaving ? "Saving..." : "Save"}</span>
 						</button>
 						<button
 							onClick={exportAsImage}
-							className="flex items-center space-x-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-[var(--color-text)] transition-all hover:bg-[var(--color-surface)]"
+							className="flex items-center space-x-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] transition-all hover:bg-[var(--surface)]"
 						>
 							<Download className="w-4 h-4" />
 							<span>Export</span>
 						</button>
 						<button
 							onClick={onClose}
-							className="p-2 hover:bg-red-500/20 rounded-lg transition-all"
+							className="p-2 hover:[background:color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg transition-all"
 						>
-							<X className="w-5 h-5 text-red-400" />
+							<X className="w-5 h-5 [color:var(--danger)]" />
 						</button>
 					</div>
 				</div>

@@ -109,18 +109,18 @@ export function SymmetricalComponents() {
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center space-x-3 mb-6">
-				<GitBranch className="h-8 w-8 text-[var(--color-accent)]" />
-				<h2 className="text-3xl font-bold text-[var(--color-text)]">
+				<GitBranch className="h-8 w-8 text-[var(--accent)]" />
+				<h2 className="text-3xl font-bold text-[var(--text)]">
 					Symmetrical Components
 				</h2>
 			</div>
 
 			<FrameSection title="Theory">
-				<div className="space-y-3 text-[var(--color-text-muted)]">
+				<div className="space-y-3 text-[var(--text-muted)]">
 					<p>
 						Any unbalanced three-phase system can be resolved into three
 						balanced systems of phasors called
-						<strong className="text-[var(--color-text)]">
+						<strong className="text-[var(--text)]">
 							{" "}
 							symmetrical components
 						</strong>
@@ -128,21 +128,21 @@ export function SymmetricalComponents() {
 					</p>
 					<ul className="list-disc list-inside space-y-2 pl-4">
 						<li>
-							<strong className="text-[var(--color-text)]">
+							<strong className="text-[var(--text)]">
 								Positive-sequence (1):
 							</strong>{" "}
 							Three phasors equal in magnitude, displaced 120° from each other,
 							with same phase sequence as original (abc)
 						</li>
 						<li>
-							<strong className="text-[var(--color-text)]">
+							<strong className="text-[var(--text)]">
 								Negative-sequence (2):
 							</strong>{" "}
 							Three phasors equal in magnitude, displaced 120° from each other,
 							with opposite phase sequence (acb)
 						</li>
 						<li>
-							<strong className="text-[var(--color-text)]">
+							<strong className="text-[var(--text)]">
 								Zero-sequence (0):
 							</strong>{" "}
 							Three phasors equal in magnitude and phase (in phase with each
@@ -155,11 +155,11 @@ export function SymmetricalComponents() {
 			<FrameSection title="Symmetrical Components Calculator">
 				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 					<div className="space-y-3">
-						<h4 className="text-lg font-semibold text-[var(--color-text-muted)]">
+						<h4 className="text-lg font-semibold text-[var(--text-muted)]">
 							Phase A Voltage
 						</h4>
 						<div>
-							<label className="block text-sm text-[var(--color-text-muted)] mb-1">
+							<label className="block text-sm text-[var(--text-muted)] mb-1">
 								Magnitude (V)
 							</label>
 							<input
@@ -169,11 +169,11 @@ export function SymmetricalComponents() {
 								onChange={(e) =>
 									setVa({ ...va, mag: parseFloat(e.target.value) || 0 })
 								}
-								className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
 							/>
 						</div>
 						<div>
-							<label className="block text-sm text-[var(--color-text-muted)] mb-1">
+							<label className="block text-sm text-[var(--text-muted)] mb-1">
 								Angle (°)
 							</label>
 							<input
@@ -183,22 +183,22 @@ export function SymmetricalComponents() {
 								onChange={(e) =>
 									setVa({ ...va, angle: parseFloat(e.target.value) || 0 })
 								}
-								className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
 							/>
 						</div>
 						<div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-							<p className="font-mono text-sm text-[var(--color-text)]">
+							<p className="font-mono text-sm text-[var(--text)]">
 								V_a = {va.mag}∠{va.angle}°
 							</p>
 						</div>
 					</div>
 
 					<div className="space-y-3">
-						<h4 className="text-lg font-semibold text-[var(--color-text-muted)]">
+						<h4 className="text-lg font-semibold text-[var(--text-muted)]">
 							Phase B Voltage
 						</h4>
 						<div>
-							<label className="block text-sm text-[var(--color-text-muted)] mb-1">
+							<label className="block text-sm text-[var(--text-muted)] mb-1">
 								Magnitude (V)
 							</label>
 							<input
@@ -208,11 +208,11 @@ export function SymmetricalComponents() {
 								onChange={(e) =>
 									setVb({ ...vb, mag: parseFloat(e.target.value) || 0 })
 								}
-								className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
 							/>
 						</div>
 						<div>
-							<label className="block text-sm text-[var(--color-text-muted)] mb-1">
+							<label className="block text-sm text-[var(--text-muted)] mb-1">
 								Angle (°)
 							</label>
 							<input
@@ -222,22 +222,22 @@ export function SymmetricalComponents() {
 								onChange={(e) =>
 									setVb({ ...vb, angle: parseFloat(e.target.value) || 0 })
 								}
-								className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
 							/>
 						</div>
 						<div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-							<p className="font-mono text-sm text-[var(--color-text)]">
+							<p className="font-mono text-sm text-[var(--text)]">
 								V_b = {vb.mag}∠{vb.angle}°
 							</p>
 						</div>
 					</div>
 
 					<div className="space-y-3">
-						<h4 className="text-lg font-semibold text-[var(--color-text-muted)]">
+						<h4 className="text-lg font-semibold text-[var(--text-muted)]">
 							Phase C Voltage
 						</h4>
 						<div>
-							<label className="block text-sm text-[var(--color-text-muted)] mb-1">
+							<label className="block text-sm text-[var(--text-muted)] mb-1">
 								Magnitude (V)
 							</label>
 							<input
@@ -247,11 +247,11 @@ export function SymmetricalComponents() {
 								onChange={(e) =>
 									setVc({ ...vc, mag: parseFloat(e.target.value) || 0 })
 								}
-								className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
 							/>
 						</div>
 						<div>
-							<label className="block text-sm text-[var(--color-text-muted)] mb-1">
+							<label className="block text-sm text-[var(--text-muted)] mb-1">
 								Angle (°)
 							</label>
 							<input
@@ -261,11 +261,11 @@ export function SymmetricalComponents() {
 								onChange={(e) =>
 									setVc({ ...vc, angle: parseFloat(e.target.value) || 0 })
 								}
-								className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
 							/>
 						</div>
 						<div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-							<p className="font-mono text-sm text-[var(--color-text)]">
+							<p className="font-mono text-sm text-[var(--text)]">
 								V_c = {vc.mag}∠{vc.angle}°
 							</p>
 						</div>
@@ -273,7 +273,7 @@ export function SymmetricalComponents() {
 				</div>
 
 				<div className="space-y-4">
-					<h4 className="text-lg font-semibold text-[var(--color-text-muted)]">
+					<h4 className="text-lg font-semibold text-[var(--text-muted)]">
 						Sequence Components
 					</h4>
 
@@ -282,10 +282,10 @@ export function SymmetricalComponents() {
 							<p className="text-gray-400 text-sm font-semibold mb-2">
 								Zero-Sequence (V_a0)
 							</p>
-							<p className="mb-1 font-mono text-xl text-[var(--color-text)]">
+							<p className="mb-1 font-mono text-xl text-[var(--text)]">
 								{v0.mag.toFixed(2)}∠{v0.angle.toFixed(2)}°
 							</p>
-							<p className="text-xs text-[var(--color-text-muted)]">
+							<p className="text-xs text-[var(--text-muted)]">
 								{v0Rect.x.toFixed(2)} + j{v0Rect.y.toFixed(2)}
 							</p>
 						</div>
@@ -294,10 +294,10 @@ export function SymmetricalComponents() {
 							<p className="text-green-400 text-sm font-semibold mb-2">
 								Positive-Sequence (V_a1)
 							</p>
-							<p className="mb-1 font-mono text-xl text-[var(--color-text)]">
+							<p className="mb-1 font-mono text-xl text-[var(--text)]">
 								{v1.mag.toFixed(2)}∠{v1.angle.toFixed(2)}°
 							</p>
-							<p className="text-xs text-[var(--color-text-muted)]">
+							<p className="text-xs text-[var(--text-muted)]">
 								{v1Rect.x.toFixed(2)} + j{v1Rect.y.toFixed(2)}
 							</p>
 						</div>
@@ -306,10 +306,10 @@ export function SymmetricalComponents() {
 							<p className="text-red-400 text-sm font-semibold mb-2">
 								Negative-Sequence (V_a2)
 							</p>
-							<p className="mb-1 font-mono text-xl text-[var(--color-text)]">
+							<p className="mb-1 font-mono text-xl text-[var(--text)]">
 								{v2.mag.toFixed(2)}∠{v2.angle.toFixed(2)}°
 							</p>
-							<p className="text-xs text-[var(--color-text-muted)]">
+							<p className="text-xs text-[var(--text-muted)]">
 								{v2Rect.x.toFixed(2)} + j{v2Rect.y.toFixed(2)}
 							</p>
 						</div>
@@ -319,17 +319,17 @@ export function SymmetricalComponents() {
 				<div className="mt-6">
 					<button
 						onClick={() => setShowWork(!showWork)}
-						className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-4 py-2 text-[var(--color-text)] transition-all hover:bg-[var(--color-surface)]"
+						className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] transition-all hover:bg-[var(--surface)]"
 					>
 						{showWork ? "Hide" : "Show"} Step-by-Step Work
 					</button>
 
 					{showWork && (
-						<div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-							<h4 className="mb-3 font-semibold text-[var(--color-text-muted)]">
+						<div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+							<h4 className="mb-3 font-semibold text-[var(--text-muted)]">
 								Step-by-Step Analysis
 							</h4>
-							<div className="space-y-1 font-mono text-sm text-[var(--color-text-muted)]">
+							<div className="space-y-1 font-mono text-sm text-[var(--text-muted)]">
 								{getSteps().map((step, i) => (
 									<p key={i} className={step === "" ? "h-2" : ""}>
 										{step}
@@ -343,28 +343,28 @@ export function SymmetricalComponents() {
 
 			<FrameSection title="Matrix Transformation">
 				<div className="space-y-4">
-					<div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-						<h4 className="mb-3 font-semibold text-[var(--color-text-muted)]">
+					<div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+						<h4 className="mb-3 font-semibold text-[var(--text-muted)]">
 							Phase to Sequence (Analytical Method)
 						</h4>
 						<div className="overflow-x-auto">
-							<div className="space-y-2 font-mono text-sm text-[var(--color-text)]">
+							<div className="space-y-2 font-mono text-sm text-[var(--text)]">
 								<p>[V_a0] [1 1 1 ] [V_a]</p>
 								<p>[V_a1] = (1/3) [1 a a²] [V_b]</p>
 								<p>[V_a2] [1 a² a ] [V_c]</p>
 							</div>
 						</div>
-						<p className="mt-3 text-xs text-[var(--color-text-muted)]">
+						<p className="mt-3 text-xs text-[var(--text-muted)]">
 							where a = 1∠120° = e^(j2π/3) and a² = 1∠240° = 1∠-120°
 						</p>
 					</div>
 
-					<div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-						<h4 className="mb-3 font-semibold text-[var(--color-text-muted)]">
+					<div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+						<h4 className="mb-3 font-semibold text-[var(--text-muted)]">
 							Sequence to Phase (Inverse Transformation)
 						</h4>
 						<div className="overflow-x-auto">
-							<div className="space-y-2 font-mono text-sm text-[var(--color-text)]">
+							<div className="space-y-2 font-mono text-sm text-[var(--text)]">
 								<p>[V_a] [1 1 1 ] [V_a0]</p>
 								<p>[V_b] = [1 a² a ] [V_a1]</p>
 								<p>[V_c] [1 a a²] [V_a2]</p>
@@ -372,11 +372,11 @@ export function SymmetricalComponents() {
 						</div>
 					</div>
 
-					<div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-						<h4 className="mb-3 font-semibold text-[var(--color-text-muted)]">
+					<div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+						<h4 className="mb-3 font-semibold text-[var(--text-muted)]">
 							Operator Properties
 						</h4>
-						<div className="grid grid-cols-1 gap-3 font-mono text-sm text-[var(--color-text)] md:grid-cols-2">
+						<div className="grid grid-cols-1 gap-3 font-mono text-sm text-[var(--text)] md:grid-cols-2">
 							<div className="space-y-1">
 								<p>a = 1∠120° = -0.5 + j0.866</p>
 								<p>a² = 1∠-120° = -0.5 - j0.866</p>
@@ -394,22 +394,22 @@ export function SymmetricalComponents() {
 
 			<FrameSection title="Sequence Components for Other Phases">
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-						<h4 className="mb-2 font-semibold text-[var(--color-text-muted)]">
+					<div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+						<h4 className="mb-2 font-semibold text-[var(--text-muted)]">
 							Phase B Components
 						</h4>
-						<div className="space-y-1 font-mono text-sm text-[var(--color-text)]">
+						<div className="space-y-1 font-mono text-sm text-[var(--text)]">
 							<p>V_b0 = V_a0</p>
 							<p>V_b1 = a² × V_a1</p>
 							<p>V_b2 = a × V_a2</p>
 						</div>
 					</div>
 
-					<div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-						<h4 className="mb-2 font-semibold text-[var(--color-text-muted)]">
+					<div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+						<h4 className="mb-2 font-semibold text-[var(--text-muted)]">
 							Phase C Components
 						</h4>
-						<div className="space-y-1 font-mono text-sm text-[var(--color-text)]">
+						<div className="space-y-1 font-mono text-sm text-[var(--text)]">
 							<p>V_c0 = V_a0</p>
 							<p>V_c1 = a × V_a1</p>
 							<p>V_c2 = a² × V_a2</p>
@@ -417,9 +417,9 @@ export function SymmetricalComponents() {
 					</div>
 				</div>
 
-				<div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] p-4">
-					<p className="text-sm text-[var(--color-text-muted)]">
-						<strong className="text-[var(--color-text)]">Note:</strong> All
+				<div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
+					<p className="text-sm text-[var(--text-muted)]">
+						<strong className="text-[var(--text)]">Note:</strong> All
 						three phases have the same zero-sequence component. The positive and
 						negative sequence components rotate according to the operator 'a'.
 					</p>
@@ -427,12 +427,12 @@ export function SymmetricalComponents() {
 			</FrameSection>
 
 			<FrameSection title="Example: Unbalanced System">
-				<div className="space-y-2 text-[var(--color-text-muted)]">
+				<div className="space-y-2 text-[var(--text-muted)]">
 					<p>
 						Given: V_a = 100∠0° V, V_b = 100∠-110° V, V_c = 100∠125° V
 						(unbalanced angles)
 					</p>
-					<p className="mt-3 font-semibold text-[var(--color-text)]">
+					<p className="mt-3 font-semibold text-[var(--text)]">
 						Solution:
 					</p>
 					<p className="pl-4">
@@ -446,7 +446,7 @@ export function SymmetricalComponents() {
 						• Negative-sequence: V_a2 = (1/3)(V_a + a²V_b + aV_c) ≈ 8.88∠-137.5°
 						V
 					</p>
-					<p className="mt-3 text-sm text-[var(--color-text-muted)]">
+					<p className="mt-3 text-sm text-[var(--text-muted)]">
 						This shows the unbalanced system has both positive and negative
 						sequence components, plus a small zero-sequence due to angle
 						imbalance.

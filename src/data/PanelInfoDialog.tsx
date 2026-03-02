@@ -58,7 +58,7 @@ export function PanelInfoDialog({ title, sections }: PanelInfoDialogProps) {
 			</button>
 
 			{isOpen && (
-				<div className="fixed inset-0 z-[100] flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-3 backdrop-blur-sm sm:p-4">
+				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-3 backdrop-blur-sm sm:p-4" style={{ zIndex: "var(--z-dialog)" }}>
 					<div
 						className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-lg backdrop-blur-xl flex flex-col"
 						style={panelStyle}

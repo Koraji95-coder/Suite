@@ -68,7 +68,7 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 
 	if (loading) {
 		return (
-			<div className="py-8 text-center text-[var(--color-text-muted)]">
+			<div className="py-8 text-center text-[var(--text-muted)]">
 				Loading whiteboards...
 			</div>
 		);

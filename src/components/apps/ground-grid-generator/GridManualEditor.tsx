@@ -796,7 +796,7 @@ export function GridManualEditor({
 							borderRadius: 10,
 							padding: 16,
 							boxShadow: `0 8px 32px ${hexToRgba("#000", 0.4)}`,
-							zIndex: 20,
+							zIndex: "var(--z-dropdown)",
 							minWidth: 220,
 						}}
 						onClick={(e) => e.stopPropagation()}

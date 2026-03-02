@@ -84,10 +84,11 @@ export function EventsPopup({
 	return (
 		<div
 			ref={popupRef}
-			className="bg-background absolute z-50 max-h-96 w-80 overflow-auto rounded-md border shadow-lg"
+			className="bg-background absolute max-h-96 w-80 overflow-auto rounded-md border shadow-lg"
 			style={{
 				top: `${adjustedPosition.top}px`,
 				left: `${adjustedPosition.left}px`,
+				zIndex: "var(--z-dropdown)",
 			}}
 		>
 			<div className="bg-background sticky top-0 flex items-center justify-between border-b p-3">

@@ -158,7 +158,8 @@ export function PopoverContent({
 			{/* Minimal “modal” behavior: overlay exists when modal=true */}
 			{modal && (
 				<div
-					className="fixed inset-0 z-40"
+					className="fixed inset-0"
+					style={{ zIndex: "var(--z-dropdown)" }}
 					onMouseDown={() => setOpen(false)}
 					aria-hidden="true"
 				/>
@@ -168,9 +169,9 @@ export function PopoverContent({
 				ref={ref}
 				role={modal ? "dialog" : "menu"}
 				aria-modal={modal ? true : undefined}
+				style={{ zIndex: "var(--z-dropdown)" }}
 				className={cn(
-					"absolute z-50 mt-2 rounded-md border border-border bg-popover p-4 text-popover-foreground shadow-md outline-none",
-					modal && "z-50",
+					"absolute mt-2 rounded-md border border-border bg-popover p-4 text-popover-foreground shadow-md outline-none",
 					align === "start" && "left-0",
 					align === "center" && "left-1/2 -translate-x-1/2",
 					align === "end" && "right-0",

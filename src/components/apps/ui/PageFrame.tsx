@@ -20,7 +20,7 @@ type PageFrameProps = {
 	tint?: string;
 
 	/** Layout */
-	maxWidthClassName?: string; // default: max-w-[1480px]
+	maxWidthClassName?: string; // default: max-w-[1600px]
 	rightRail?: ReactNode; // optional right column
 	children: ReactNode;
 };
@@ -34,7 +34,7 @@ export function PageFrame({
 	onBack,
 	hideHeader = true,
 	tint: tintProp,
-	maxWidthClassName = "max-w-[1480px]",
+	maxWidthClassName = "max-w-[1600px]",
 	rightRail,
 	children,
 	centerContent,

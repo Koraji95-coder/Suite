@@ -91,8 +91,9 @@ export function SelectContent({
 	return (
 		<div
 			ref={ref}
+			style={{ zIndex: "var(--z-dropdown)" }}
 			className={cn(
-				"absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md",
+				"absolute mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md",
 				className,
 			)}
 		>

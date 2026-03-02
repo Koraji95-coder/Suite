@@ -176,8 +176,8 @@ export function CircuitGenerator() {
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center space-x-3">
-				<CircuitBoard className="h-8 w-8 text-[var(--color-accent)]" />
-				<h2 className="text-3xl font-bold text-[var(--color-text)]">
+				<CircuitBoard className="h-8 w-8 text-[var(--accent)]" />
+				<h2 className="text-3xl font-bold text-[var(--text)]">
 					Circuit Generator
 				</h2>
 			</div>
@@ -187,7 +187,7 @@ export function CircuitGenerator() {
 				actions={
 					<button
 						onClick={generateRandomCircuit}
-						className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-orange-500/30 flex items-center space-x-2"
+						className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-[var(--primary)]/30 flex items-center space-x-2"
 					>
 						<Shuffle className="w-5 h-5" />
 						<span>Generate Random Circuit</span>
@@ -198,25 +198,25 @@ export function CircuitGenerator() {
 					ref={canvasRef}
 					width={800}
 					height={400}
-					className="w-full rounded-lg border border-[var(--color-border)]"
+					className="w-full rounded-lg border border-[var(--border)]"
 				/>
 
 				{components.length > 0 && (
 					<div className="mt-6 space-y-4">
-						<div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-							<h4 className="mb-3 font-semibold text-[var(--color-text)]">
+						<div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+							<h4 className="mb-3 font-semibold text-[var(--text)]">
 								Components:
 							</h4>
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 								{components.map((comp, index) => (
 									<div
 										key={index}
-										className="rounded border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-3 py-2"
+										className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
 									>
-										<div className="font-medium text-[var(--color-text)]">
+										<div className="font-medium text-[var(--text)]">
 											{comp.label}
 										</div>
-										<div className="text-sm text-[var(--color-accent)]">
+										<div className="text-sm text-[var(--accent)]">
 											{comp.value}
 										</div>
 									</div>
@@ -230,12 +230,12 @@ export function CircuitGenerator() {
 								value={circuitName}
 								onChange={(e) => setCircuitName(e.target.value)}
 								placeholder="Enter circuit name..."
-								className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+								className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
 							/>
 							<button
 								onClick={saveCircuit}
 								disabled={isSavingCircuit}
-								className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 disabled:from-orange-600/50 disabled:to-amber-600/50 disabled:cursor-not-allowed text-white font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-orange-500/30 flex items-center space-x-2"
+								className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-[var(--primary)]/30 flex items-center space-x-2"
 							>
 								<Save className="w-5 h-5" />
 								<span>{isSavingCircuit ? "Saving..." : "Save Circuit"}</span>
@@ -246,7 +246,7 @@ export function CircuitGenerator() {
 			</FrameSection>
 
 			<FrameSection title="About Circuit Generator">
-				<p className="text-sm text-[var(--color-text-muted)]">
+				<p className="text-sm text-[var(--text-muted)]">
 					Click "Generate Random Circuit" to create a random circuit with
 					various components. Each circuit includes a voltage source and random
 					combinations of resistors, capacitors, and inductors. Save your

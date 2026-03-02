@@ -24,9 +24,13 @@
 	--accent: #60a5fa;
 
 	--success: #22c55e;
+	--warning: #f59e0b;
 	--danger: #ef4444;
 
 	--focus-ring: color-mix(in oklab, var(--primary) 35%, transparent);
+
+	--shadow-command: 0 -1px 0 rgba(255, 255, 255, 0.04), 0 -4px 16px rgba(0, 0, 0, 0.2);
+	--shadow-neon: 0 0 40px color-mix(in oklab, var(--primary) 12%, transparent);
 
 	--radius-lg: 16px;
 	--radius-md: 12px;
@@ -37,6 +41,35 @@
 		0 1px 0 rgba(255, 255, 255, 0.04) inset;
 
 	--theme-transition-duration: 180ms;
+
+	/*  Z-INDEX SCALE  ──────────────────────────────────────────
+	    When adding a new overlay, pick the variable whose description
+	    matches your use-case.  NEVER hardcode a raw number for any
+	    fixed/absolute overlay that competes with the global stack.
+	    Local stacking (sticky headers inside a scroll container,
+	    drag layers, overlapping siblings) can use Tailwind z-10/z-20
+	    as long as the parent is NOT position:fixed.
+
+	    Layer                     Var                        Value
+	    ─────────────────────────────────────────────────────────────
+	    Desktop sidebar           --z-sidebar                  30
+	    Top header bar, FABs      --z-topbar                   40
+	    Popovers / dropdowns      --z-dropdown                 45
+	    Side panels, drawers      --z-sheet                    50
+	    Toast notifications       --z-toast                    60
+	    Modal dialogs             --z-dialog                   70
+	    Command palette           --z-command-palette          80
+	    System-blocking modals    --z-critical-modal          100
+	    Custom cursor             (hardcoded in CSS below)   9999
+	    ───────────────────────────────────────────────────────── */
+	--z-sidebar: 30;
+	--z-topbar: 40;
+	--z-dropdown: 45;
+	--z-sheet: 50;
+	--z-toast: 60;
+	--z-dialog: 70;
+	--z-command-palette: 80;
+	--z-critical-modal: 100;
 }
 
 /* =========================================================
@@ -175,12 +208,6 @@ html.theme-animating * {
 /* =========================================================
    SHARED SHELL / PANELS
    ========================================================= */
-.ui-shell {
-	min-height: 100vh;
-	background: var(--bg);
-	color: var(--text);
-}
-
 .ui-panel,
 .glass,
 .settings-card {
@@ -505,13 +532,6 @@ html.theme-animating * {
 	}
 }
 
-/* Optional legacy app padding */
-.app-shell {
-	min-height: 100vh;
-	padding: 12px;
-	background: var(--bg);
-}
-
 @media (min-width: 768px) {
 	.auth-nav,
 	.auth-main {
@@ -535,8 +555,134 @@ html.theme-animating * {
 	.auth-card-wide {
 		grid-column: span 12;
 	}
+}
 
-	.app-shell {
-		padding: 16px;
+/* =========================================================
+   AUTH INPUT / BUTTON / SPINNER (shared across auth pages)
+   ========================================================= */
+.auth-input-field {
+	width: 100%;
+	padding: 10px 14px;
+	border-radius: var(--radius-md);
+	border: 1px solid var(--border);
+	background: var(--bg);
+	color: var(--text);
+	font-size: 14px;
+	outline: none;
+	transition:
+		border-color 200ms ease,
+		box-shadow 200ms ease;
+}
+
+.auth-input-field::placeholder {
+	color: var(--text-muted);
+	opacity: 0.6;
+}
+
+.auth-input-field:focus {
+	border-color: var(--primary);
+	box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 15%, transparent);
+}
+
+.auth-submit-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 11px 20px;
+	border-radius: var(--radius-md);
+	font-size: 14px;
+	font-weight: 600;
+	border: none;
+	background: var(--primary);
+	color: var(--primary-contrast);
+	cursor: pointer;
+	transition:
+		filter 160ms ease,
+		opacity 160ms ease;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+	filter: brightness(1.08);
+}
+
+.auth-submit-btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+@keyframes auth-spin {
+	to {
+		transform: rotate(360deg);
 	}
+}
+
+.auth-spinner {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	border: 2px solid color-mix(in oklab, var(--primary-contrast) 30%, transparent);
+	border-top-color: var(--primary-contrast);
+	animation: auth-spin 0.6s linear infinite;
+}
+
+@keyframes auth-float {
+	0%,
+	100% {
+		transform: translate(-50%, -50%) translateY(0);
+	}
+	50% {
+		transform: translate(-50%, -50%) translateY(-8px);
+	}
+}
+
+.auth-float-mark {
+	animation: auth-float 4s ease-in-out infinite;
+}
+
+/* =========================================================
+   AGENT CHAT PANEL
+   ========================================================= */
+@keyframes suite-thinking-dot {
+	0%,
+	80%,
+	100% {
+		opacity: 0.25;
+		transform: scale(0.8);
+	}
+	40% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.suite-thinking-dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--primary);
+	animation: suite-thinking-dot 1.4s ease-in-out infinite;
+}
+
+.suite-thinking-dot:nth-child(2) {
+	animation-delay: 0.16s;
+}
+
+.suite-thinking-dot:nth-child(3) {
+	animation-delay: 0.32s;
+}
+
+@keyframes suite-mark-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.7;
+	}
+}
+
+.suite-mark-pulse {
+	animation: suite-mark-pulse 2.4s ease-in-out infinite;
 }

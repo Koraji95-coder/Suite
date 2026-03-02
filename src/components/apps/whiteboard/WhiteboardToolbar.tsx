@@ -39,11 +39,11 @@ export function WhiteboardToolbar({
 	canRedo,
 }: WhiteboardToolbarProps) {
 	const activeToolClass =
-		"border border-[var(--color-accent)] bg-[var(--color-surface)]";
-	const idleToolClass = "hover:bg-[var(--color-surface-elevated)]";
+		"border border-[var(--accent)] bg-[var(--surface)]";
+	const idleToolClass = "hover:bg-[var(--surface-2)]";
 
 	return (
-		<div className="flex w-20 flex-col items-center space-y-2 border-r border-[var(--color-border)] bg-[var(--color-surface)] py-4">
+		<div className="flex w-20 flex-col items-center space-y-2 border-r border-[var(--border)] bg-[var(--surface)] py-4">
 			<button
 				onClick={() => onToolChange("pen")}
 				className={`p-3 rounded-lg transition-all ${
@@ -51,7 +51,7 @@ export function WhiteboardToolbar({
 				}`}
 				title="Pen"
 			>
-				<Pen className="h-5 w-5 text-[var(--color-accent)]" />
+				<Pen className="h-5 w-5 text-[var(--accent)]" />
 			</button>
 			<button
 				onClick={() => onToolChange("eraser")}
@@ -60,7 +60,7 @@ export function WhiteboardToolbar({
 				}`}
 				title="Eraser"
 			>
-				<Eraser className="h-5 w-5 text-[var(--color-accent)]" />
+				<Eraser className="h-5 w-5 text-[var(--accent)]" />
 			</button>
 			<button
 				onClick={() => onToolChange("rectangle")}
@@ -69,7 +69,7 @@ export function WhiteboardToolbar({
 				}`}
 				title="Rectangle"
 			>
-				<Square className="h-5 w-5 text-[var(--color-accent)]" />
+				<Square className="h-5 w-5 text-[var(--accent)]" />
 			</button>
 			<button
 				onClick={() => onToolChange("circle")}
@@ -78,7 +78,7 @@ export function WhiteboardToolbar({
 				}`}
 				title="Circle"
 			>
-				<Circle className="h-5 w-5 text-[var(--color-accent)]" />
+				<Circle className="h-5 w-5 text-[var(--accent)]" />
 			</button>
 			<button
 				onClick={() => onToolChange("text")}
@@ -87,26 +87,26 @@ export function WhiteboardToolbar({
 				}`}
 				title="Text"
 			>
-				<Type className="h-5 w-5 text-[var(--color-accent)]" />
+				<Type className="h-5 w-5 text-[var(--accent)]" />
 			</button>
 
-			<div className="my-2 h-px w-12 bg-[var(--color-border)]"></div>
+			<div className="my-2 h-px w-12 bg-[var(--border)]"></div>
 
 			<button
 				onClick={onUndo}
-				className="rounded-lg p-3 transition-all hover:bg-[var(--color-surface-elevated)] disabled:opacity-30"
+				className="rounded-lg p-3 transition-all hover:bg-[var(--surface-2)] disabled:opacity-30"
 				title="Undo"
 				disabled={!canUndo}
 			>
-				<Undo className="h-5 w-5 text-[var(--color-accent)]" />
+				<Undo className="h-5 w-5 text-[var(--accent)]" />
 			</button>
 			<button
 				onClick={onRedo}
-				className="rounded-lg p-3 transition-all hover:bg-[var(--color-surface-elevated)] disabled:opacity-30"
+				className="rounded-lg p-3 transition-all hover:bg-[var(--surface-2)] disabled:opacity-30"
 				title="Redo"
 				disabled={!canRedo}
 			>
-				<Redo className="h-5 w-5 text-[var(--color-accent)]" />
+				<Redo className="h-5 w-5 text-[var(--accent)]" />
 			</button>
 			<button
 				onClick={onClear}
@@ -116,7 +116,7 @@ export function WhiteboardToolbar({
 				<Trash2 className="w-5 h-5 text-red-400" />
 			</button>
 
-			<div className="my-2 h-px w-12 bg-[var(--color-border)]"></div>
+			<div className="my-2 h-px w-12 bg-[var(--border)]"></div>
 
 			<div className="flex flex-col items-center space-y-2">
 				<input

@@ -1,4 +1,3 @@
-// src/routes/LoginPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthEnvDebugCard from "../auth/AuthEnvDebugCard";
@@ -71,10 +70,10 @@ export default function LoginPage() {
 					<h1 className="text-2xl font-semibold tracking-tight">
 						{redirecting ? "Opening your dashboard" : "Checking your account"}
 					</h1>
-					<p className="mt-2 text-sm [color:var(--text-muted)]">
+					<p className="mt-2 text-sm leading-relaxed [color:var(--text-muted)]">
 						{redirecting
-							? "Email confirmed. We’re signing you in now."
-							: "Validating your sign-in status…"}
+							? "Email confirmed. We're signing you in now."
+							: "Validating your sign-in status\u2026"}
 					</p>
 				</div>
 
@@ -93,7 +92,7 @@ export default function LoginPage() {
 						/>
 					</div>
 					<p className="m-0 text-xs [color:var(--text-muted)]">
-						{redirecting ? `${Math.max(8, redirectProgress)}%` : "Connecting…"}
+						{redirecting ? `${Math.max(8, redirectProgress)}%` : "Connecting\u2026"}
 					</p>
 					<AuthEnvDebugCard />
 				</div>
@@ -129,45 +128,49 @@ export default function LoginPage() {
 
 	return (
 		<AuthShell navLink={{ to: "/", label: "Back to landing" }}>
-			<div className="mb-6">
+			<div className="mb-8">
 				<div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium [background:var(--surface-2)] [color:var(--text-muted)]">
 					<span className="h-1.5 w-1.5 rounded-full [background:var(--primary)]" />
 					Secure login
 				</div>
 				<h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
-				<p className="mt-2 text-sm [color:var(--text-muted)]">
-					Sign in to continue to your dashboard.
+				<p className="mt-2 text-sm leading-relaxed [color:var(--text-muted)]">
+					Sign in to continue to your workspace.
 				</p>
 			</div>
 
-			<form className="grid gap-3" onSubmit={onSubmit} noValidate>
-				<label className="text-sm font-medium" htmlFor="email">
-					Email
-				</label>
-				<input
-					id="email"
-					className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition [border-color:var(--border)] [background:var(--surface)] [color:var(--text)] focus:[border-color:var(--primary)]"
-					type="email"
-					autoComplete="email"
-					value={email}
-					onChange={(e) => setEmail(e.target.value)}
-					placeholder="you@company.com"
-					required
-				/>
+			<form className="grid gap-4" onSubmit={onSubmit} noValidate>
+				<div className="grid gap-1.5">
+					<label className="text-sm font-medium" htmlFor="email">
+						Email
+					</label>
+					<input
+						id="email"
+						className="auth-input-field"
+						type="email"
+						autoComplete="email"
+						value={email}
+						onChange={(e) => setEmail(e.target.value)}
+						placeholder="you@company.com"
+						required
+					/>
+				</div>
 
-				<label className="text-sm font-medium" htmlFor="password">
-					Password
-				</label>
-				<input
-					id="password"
-					className="w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition [border-color:var(--border)] [background:var(--surface)] [color:var(--text)] focus:[border-color:var(--primary)]"
-					type="password"
-					autoComplete="current-password"
-					value={password}
-					onChange={(e) => setPassword(e.target.value)}
-					placeholder="••••••••••"
-					required
-				/>
+				<div className="grid gap-1.5">
+					<label className="text-sm font-medium" htmlFor="password">
+						Password
+					</label>
+					<input
+						id="password"
+						className="auth-input-field"
+						type="password"
+						autoComplete="current-password"
+						value={password}
+						onChange={(e) => setPassword(e.target.value)}
+						placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+						required
+					/>
+				</div>
 
 				{error ? (
 					<div className="rounded-lg border px-3 py-2 text-sm [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">
@@ -176,26 +179,33 @@ export default function LoginPage() {
 				) : null}
 
 				<button
-					className="mt-2 inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
+					className="auth-submit-btn mt-1"
 					type="submit"
 					disabled={!canSubmit}
 				>
-					{submitting ? "Signing in…" : "Sign in"}
+					{submitting ? (
+						<span className="inline-flex items-center gap-2">
+							<span className="auth-spinner" />
+							Signing in...
+						</span>
+					) : (
+						"Sign in"
+					)}
 				</button>
 
-				<div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-sm [color:var(--text-muted)]">
+				<div className="mt-1 flex flex-wrap items-center justify-between gap-3 text-sm [color:var(--text-muted)]">
 					<span>
 						No account yet?{" "}
 						<Link
 							to="/signup"
-							className="font-medium underline-offset-2 hover:underline [color:var(--text)]"
+							className="font-medium underline-offset-2 hover:underline [color:var(--primary)]"
 						>
 							Create one
 						</Link>
 					</span>
 					<Link
 						to="/forgot-password"
-						className="font-medium underline-offset-2 hover:underline [color:var(--text)]"
+						className="font-medium underline-offset-2 hover:underline [color:var(--text-muted)] hover:[color:var(--text)]"
 					>
 						Forgot password?
 					</Link>

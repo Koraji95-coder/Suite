@@ -103,7 +103,7 @@ export function TaskItem({
 				)}
 				<button onClick={() => onToggleComplete(task)}>
 					{task.completed ? (
-						<CheckSquare className="w-5 h-5 text-green-400" />
+						<CheckSquare className="w-5 h-5 [color:var(--success)]" />
 					) : (
 						<Square
 							className="w-5 h-5"

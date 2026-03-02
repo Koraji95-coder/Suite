@@ -349,37 +349,37 @@ export function QAQCChecker() {
 	const getStatusIcon = (status: string) => {
 		switch (status) {
 			case "pass":
-				return <CheckCircle className="w-5 h-5 text-green-400" />;
+				return <CheckCircle className="w-5 h-5 [color:var(--success)]" />;
 			case "fail":
-				return <XCircle className="w-5 h-5 text-red-400" />;
+				return <XCircle className="w-5 h-5 [color:var(--danger)]" />;
 			case "warning":
-				return <AlertTriangle className="w-5 h-5 text-yellow-400" />;
+				return <AlertTriangle className="w-5 h-5 [color:var(--warning)]" />;
 			default:
-				return <FileText className="w-5 h-5 text-gray-400" />;
+				return <FileText className="w-5 h-5 [color:var(--text-muted)]" />;
 		}
 	};
 
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case "pass":
-				return "from-green-500/20 to-emerald-500/20 border-green-500/40";
+				return "[background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--success)_20%,var(--surface)),color-mix(in_srgb,var(--success)_20%,var(--surface)))] [border-color:color-mix(in_srgb,var(--success)_40%,transparent)]";
 			case "fail":
-				return "from-red-500/20 to-rose-500/20 border-red-500/40";
+				return "[background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--danger)_20%,var(--surface)),color-mix(in_srgb,var(--danger)_20%,var(--surface)))] [border-color:color-mix(in_srgb,var(--danger)_40%,transparent)]";
 			case "warning":
-				return "from-yellow-500/20 to-orange-500/20 border-yellow-500/40";
+				return "[background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--warning)_20%,var(--surface)),color-mix(in_srgb,var(--warning)_20%,var(--surface)))] [border-color:color-mix(in_srgb,var(--warning)_40%,transparent)]";
 			default:
-				return "from-gray-500/20 to-slate-500/20 border-gray-500/40";
+				return "[background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--text-muted)_20%,var(--surface)),color-mix(in_srgb,var(--text-muted)_20%,var(--surface)))] [border-color:color-mix(in_srgb,var(--text-muted)_40%,transparent)]";
 		}
 	};
 
 	const getSeverityColor = (severity: string) => {
 		switch (severity) {
 			case "error":
-				return "text-red-400 bg-red-500/10 border-red-500/30";
+				return "[color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_10%,var(--surface))] [border-color:color-mix(in_srgb,var(--danger)_30%,transparent)]";
 			case "warning":
-				return "text-yellow-400 bg-yellow-500/10 border-yellow-500/30";
+				return "[color:var(--warning)] [background:color-mix(in_srgb,var(--warning)_10%,var(--surface))] [border-color:color-mix(in_srgb,var(--warning)_30%,transparent)]";
 			default:
-				return "text-blue-400 bg-blue-500/10 border-blue-500/30";
+				return "[color:var(--accent)] [background:color-mix(in_srgb,var(--accent)_10%,var(--surface))] [border-color:color-mix(in_srgb,var(--accent)_30%,transparent)]";
 		}
 	};
 
@@ -387,17 +387,17 @@ export function QAQCChecker() {
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
 				<div className="flex items-center space-x-3">
-					<div className="p-3 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-lg">
+					<div className="p-3 [background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--success)_20%,var(--surface)),color-mix(in_srgb,var(--success)_20%,var(--surface)))] rounded-lg">
 						<CheckCircle
-							className="w-8 h-8 text-green-400 animate-pulse"
+							className="w-8 h-8 [color:var(--success)] animate-pulse"
 							style={{ animationDuration: "2s" }}
 						/>
 					</div>
 					<div>
-						<h2 className="text-3xl font-bold text-green-200">
+						<h2 className="text-3xl font-bold [color:var(--text)]">
 							QA/QC Standards Checker
 						</h2>
-						<p className="text-green-400/70">
+						<p className="[color:var(--text-muted)]">
 							Automated drawing compliance verification
 						</p>
 					</div>
@@ -405,14 +405,14 @@ export function QAQCChecker() {
 				<div className="flex items-center space-x-3">
 					<button
 						onClick={() => setShowRulesModal(true)}
-						className="flex items-center space-x-2 rounded-lg border border-green-500/30 bg-[var(--color-surface)] px-6 py-3 text-green-300 transition-all hover:border-green-500/50"
+						className="flex items-center space-x-2 rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] px-6 py-3 [color:var(--text-muted)] transition-all hover:[border-color:color-mix(in_srgb,var(--success)_50%,transparent)]"
 					>
 						<SettingsIcon className="w-5 h-5" />
 						<span>Configure Rules</span>
 					</button>
 					<button
 						onClick={() => setShowUploadModal(true)}
-						className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold px-6 py-3 rounded-lg shadow-lg shadow-green-500/30 transition-all"
+						className="flex items-center space-x-2 [background:var(--success)] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg shadow-lg [box-shadow:0_10px_15px_-3px_color-mix(in_srgb,var(--success)_30%,transparent)] transition-all"
 					>
 						<Upload className="w-5 h-5" />
 						<span>Check Drawing</span>
@@ -423,13 +423,13 @@ export function QAQCChecker() {
 			<FrameSection>
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 					<div className="relative md:col-span-2">
-						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-400" />
+						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 [color:var(--success)]" />
 						<input
 							type="text"
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
 							placeholder="Search drawings..."
-							className="w-full rounded-lg border border-green-500/30 bg-[var(--color-surface)] px-4 py-2 pl-10 text-green-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+							className="w-full rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] px-4 py-2 pl-10 [color:var(--text)] focus:outline-none focus:ring-2 focus:[--tw-ring-color:var(--success)]"
 						/>
 					</div>
 
@@ -437,7 +437,7 @@ export function QAQCChecker() {
 						<select
 							value={filterStatus}
 							onChange={(e) => setFilterStatus(e.target.value)}
-							className="w-full rounded-lg border border-green-500/30 bg-[var(--color-surface)] px-4 py-2 text-green-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+							className="w-full rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] px-4 py-2 [color:var(--text)] focus:outline-none focus:ring-2 focus:[--tw-ring-color:var(--success)]"
 						>
 							<option value="all">All Status</option>
 							<option value="pass">Pass</option>
@@ -449,7 +449,7 @@ export function QAQCChecker() {
 				</div>
 
 				<div className="flex items-center justify-between mt-4 text-sm">
-					<div className="flex items-center space-x-4 text-green-300">
+					<div className="flex items-center space-x-4 [color:var(--text-muted)]">
 						<span>Total: {drawings.length}</span>
 						<span>
 							Pass: {drawings.filter((d) => d.qa_status === "pass").length}
@@ -462,19 +462,19 @@ export function QAQCChecker() {
 							Fail: {drawings.filter((d) => d.qa_status === "fail").length}
 						</span>
 					</div>
-					<div className="text-green-400/70">
+					<div className="[color:var(--text-muted)]">
 						Active Rules: {rules.filter((r) => r.enabled).length}/{rules.length}
 					</div>
 				</div>
 			</FrameSection>
 
 			{loading ? (
-				<div className="text-center text-green-300 py-12">
+				<div className="text-center [color:var(--text-muted)] py-12">
 					Loading drawings...
 				</div>
 			) : filteredDrawings.length === 0 ? (
-				<div className="text-center text-green-300/70 py-12">
-					<CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-400/30" />
+				<div className="text-center [color:var(--text-muted)] py-12">
+					<CheckCircle className="w-16 h-16 mx-auto mb-4 [color:var(--success)] opacity-30" />
 					{searchTerm || filterStatus !== "all"
 						? "No drawings match your filters"
 						: "No drawings checked yet. Upload a drawing to perform QA/QC check!"}
@@ -484,38 +484,38 @@ export function QAQCChecker() {
 					{filteredDrawings.map((drawing) => (
 						<div
 							key={drawing.id}
-							className={`bg-gradient-to-br ${getStatusColor(drawing.qa_status)} backdrop-blur-md border rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer`}
+							className={`${getStatusColor(drawing.qa_status)} backdrop-blur-md border rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer`}
 							onClick={() => setSelectedDrawing(drawing)}
 						>
 							<div className="p-4">
 								<div className="flex items-start justify-between mb-3">
 									<div className="flex items-center space-x-2">
 										{getStatusIcon(drawing.qa_status)}
-										<h3 className="text-lg font-bold text-green-100">
+										<h3 className="text-lg font-bold [color:var(--text)]">
 											{drawing.drawing_name}
 										</h3>
 									</div>
 								</div>
 
 								<div className="space-y-2 text-sm">
-									<div className="flex items-center justify-between text-green-300/70">
+									<div className="flex items-center justify-between [color:var(--text-muted)]">
 										<span>Issues Found:</span>
-										<span className="font-semibold text-green-200">
+										<span className="font-semibold [color:var(--text)]">
 											{drawing.issues_found}
 										</span>
 									</div>
 
-									<div className="flex items-center justify-between text-green-300/70">
+									<div className="flex items-center justify-between [color:var(--text-muted)]">
 										<span>Status:</span>
 										<span
 											className={`capitalize font-semibold ${
 												drawing.qa_status === "pass"
-													? "text-green-400"
+													? "[color:var(--success)]"
 													: drawing.qa_status === "fail"
-														? "text-red-400"
+														? "[color:var(--danger)]"
 														: drawing.qa_status === "warning"
-															? "text-yellow-400"
-															: "text-gray-400"
+															? "[color:var(--warning)]"
+															: "[color:var(--text-muted)]"
 											}`}
 										>
 											{drawing.qa_status}
@@ -523,7 +523,7 @@ export function QAQCChecker() {
 									</div>
 
 									{drawing.checked_at && (
-										<div className="flex items-center justify-between text-green-300/70">
+										<div className="flex items-center justify-between [color:var(--text-muted)]">
 											<span>Checked:</span>
 											<span>
 												{new Date(drawing.checked_at).toLocaleDateString()}
@@ -538,7 +538,7 @@ export function QAQCChecker() {
 											e.stopPropagation();
 											setSelectedDrawing(drawing);
 										}}
-										className="flex-1 flex items-center justify-center space-x-1 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 text-green-100 px-3 py-2 rounded-lg transition-all text-sm"
+										className="flex-1 flex items-center justify-center space-x-1 [background:color-mix(in_srgb,var(--success)_20%,var(--surface))] hover:[background:color-mix(in_srgb,var(--success)_30%,var(--surface))] border [border-color:color-mix(in_srgb,var(--success)_40%,transparent)] [color:var(--text)] px-3 py-2 rounded-lg transition-all text-sm"
 									>
 										<Eye className="w-4 h-4" />
 										<span>Details</span>
@@ -548,7 +548,7 @@ export function QAQCChecker() {
 											e.stopPropagation();
 											deleteDrawing(drawing.id);
 										}}
-										className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-100 rounded-lg transition-all text-sm"
+										className="px-3 py-2 [background:color-mix(in_srgb,var(--danger)_20%,var(--surface))] hover:[background:color-mix(in_srgb,var(--danger)_30%,var(--surface))] border [border-color:color-mix(in_srgb,var(--danger)_40%,transparent)] [color:var(--danger)] rounded-lg transition-all text-sm"
 									>
 										<XCircle className="w-4 h-4" />
 									</button>
@@ -560,23 +560,23 @@ export function QAQCChecker() {
 			)}
 
 			{showUploadModal && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm">
-					<div className="w-full max-w-md rounded-lg border border-green-500/30 bg-[var(--color-surface)] p-6 backdrop-blur-xl">
-						<h3 className="text-2xl font-bold text-green-200 mb-4">
+				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
+					<div className="w-full max-w-md rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-6 backdrop-blur-xl">
+						<h3 className="text-2xl font-bold [color:var(--text)] mb-4">
 							Check Drawing
 						</h3>
 						{checkingDrawing ? (
 							<div className="text-center py-8">
-								<Zap className="w-12 h-12 text-green-400 animate-pulse mx-auto mb-4" />
-								<p className="text-green-300">Running QA/QC checks...</p>
-								<p className="text-green-400/60 text-sm mt-2">
+								<Zap className="w-12 h-12 [color:var(--success)] animate-pulse mx-auto mb-4" />
+								<p className="[color:var(--text-muted)]">Running QA/QC checks...</p>
+								<p className="[color:var(--text-muted)] text-sm mt-2">
 									Applying {rules.filter((r) => r.enabled).length} rules
 								</p>
 							</div>
 						) : (
 							<form onSubmit={handleUpload} className="space-y-4">
 								<div>
-									<label className="block text-green-300 text-sm font-medium mb-2">
+									<label className="block [color:var(--text-muted)] text-sm font-medium mb-2">
 										Drawing Name *
 									</label>
 									<input
@@ -586,13 +586,13 @@ export function QAQCChecker() {
 											setUploadForm({ ...uploadForm, name: e.target.value })
 										}
 										required
-										className="w-full rounded-lg border border-green-500/30 bg-[var(--color-surface-elevated)] px-4 py-2 text-green-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+										className="w-full rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface-2)] px-4 py-2 [color:var(--text)] focus:outline-none focus:ring-2 focus:[--tw-ring-color:var(--success)]"
 										placeholder="e.g., E-001-POWER-PLAN"
 									/>
 								</div>
 
-								<div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-									<p className="text-green-300 text-sm">
+								<div className="[background:color-mix(in_srgb,var(--success)_10%,var(--surface))] border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] rounded-lg p-3">
+									<p className="[color:var(--text-muted)] text-sm">
 										{rules.filter((r) => r.enabled).length} QA/QC rules will be
 										applied to this drawing.
 									</p>
@@ -601,7 +601,7 @@ export function QAQCChecker() {
 								<div className="flex gap-3 mt-6">
 									<button
 										type="submit"
-										className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold px-6 py-2 rounded-lg transition-all"
+										className="flex-1 [background:var(--success)] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-2 rounded-lg transition-all"
 									>
 										Run Check
 									</button>
@@ -611,7 +611,7 @@ export function QAQCChecker() {
 											setShowUploadModal(false);
 											setUploadForm({ name: "" });
 										}}
-										className="rounded-lg border border-green-500/30 bg-[var(--color-surface)] px-6 py-2 text-green-300 transition-all hover:bg-green-500/10"
+										className="rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] px-6 py-2 [color:var(--text-muted)] transition-all hover:[background:color-mix(in_srgb,var(--success)_10%,var(--surface))]"
 									>
 										Cancel
 									</button>
@@ -623,17 +623,17 @@ export function QAQCChecker() {
 			)}
 
 			{showRulesModal && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm">
-					<div className="max-h-[80vh] w-full max-w-3xl overflow-auto rounded-lg border border-green-500/30 bg-[var(--color-surface)] p-6 backdrop-blur-xl">
+				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
+					<div className="max-h-[80vh] w-full max-w-3xl overflow-auto rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-6 backdrop-blur-xl">
 						<div className="flex items-center justify-between mb-6">
-							<h3 className="text-2xl font-bold text-green-200">
+							<h3 className="text-2xl font-bold [color:var(--text)]">
 								QA/QC Rules Configuration
 							</h3>
 							<button
 								onClick={() => setShowRulesModal(false)}
-								className="p-2 hover:bg-red-500/20 rounded-lg transition-all"
+								className="p-2 hover:[background:color-mix(in_srgb,var(--danger)_20%,var(--surface))] rounded-lg transition-all"
 							>
-								<span className="text-red-400 text-2xl">×</span>
+								<span className="[color:var(--danger)] text-2xl">×</span>
 							</button>
 						</div>
 
@@ -641,10 +641,10 @@ export function QAQCChecker() {
 							{rules.map((rule) => (
 								<div
 									key={rule.id}
-									className={`rounded-lg border bg-[var(--color-surface-elevated)] p-4 transition-all ${
+									className={`rounded-lg border bg-[var(--surface-2)] p-4 transition-all ${
 										rule.enabled
-											? "border-green-500/30"
-											: "border-gray-500/30 opacity-60"
+											? "[border-color:color-mix(in_srgb,var(--success)_30%,transparent)]"
+											: "[border-color:color-mix(in_srgb,var(--text-muted)_30%,transparent)] opacity-60"
 									}`}
 								>
 									<div className="flex items-start justify-between">
@@ -654,9 +654,9 @@ export function QAQCChecker() {
 													type="checkbox"
 													checked={rule.enabled}
 													onChange={() => toggleRule(rule.id)}
-													className="h-5 w-5 rounded border-green-500/30 bg-[var(--color-surface)]"
+													className="h-5 w-5 rounded [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)]"
 												/>
-												<h4 className="text-lg font-semibold text-green-200">
+												<h4 className="text-lg font-semibold [color:var(--text)]">
 													{rule.name}
 												</h4>
 												<span
@@ -665,11 +665,11 @@ export function QAQCChecker() {
 													{rule.severity}
 												</span>
 											</div>
-											<p className="text-green-300/70 text-sm ml-8">
+											<p className="[color:var(--text-muted)] text-sm ml-8">
 												{rule.description}
 											</p>
 											<div className="flex items-center space-x-2 ml-8 mt-2">
-												<span className="text-xs px-2 py-1 bg-green-500/10 text-green-400 rounded-full border border-green-500/30 capitalize">
+												<span className="text-xs px-2 py-1 [background:color-mix(in_srgb,var(--success)_10%,var(--surface))] [color:var(--success)] rounded-full border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] capitalize">
 													{rule.category.replace("_", " ")}
 												</span>
 											</div>
@@ -682,7 +682,7 @@ export function QAQCChecker() {
 						<div className="mt-6 flex justify-end">
 							<button
 								onClick={() => setShowRulesModal(false)}
-								className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold px-6 py-2 rounded-lg transition-all"
+								className="[background:var(--success)] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-2 rounded-lg transition-all"
 							>
 								Done
 							</button>
@@ -692,16 +692,16 @@ export function QAQCChecker() {
 			)}
 
 			{selectedDrawing && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm">
-					<div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-lg border border-green-500/30 bg-[var(--color-surface)] backdrop-blur-xl">
-						<div className="sticky top-0 z-10 flex items-center justify-between border-b border-green-500/30 bg-[var(--color-surface)] p-6 backdrop-blur-sm">
+				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
+					<div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] backdrop-blur-xl">
+						<div className="sticky top-0 z-10 flex items-center justify-between border-b [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-6 backdrop-blur-sm">
 							<div className="flex items-center space-x-3">
 								{getStatusIcon(selectedDrawing.qa_status)}
 								<div>
-									<h3 className="text-2xl font-bold text-green-200">
+									<h3 className="text-2xl font-bold [color:var(--text)]">
 										{selectedDrawing.drawing_name}
 									</h3>
-									<p className="text-green-400/70 text-sm">
+									<p className="[color:var(--text-muted)] text-sm">
 										Checked on{" "}
 										{selectedDrawing.checked_at
 											? new Date(selectedDrawing.checked_at).toLocaleString()
@@ -711,46 +711,46 @@ export function QAQCChecker() {
 							</div>
 							<button
 								onClick={() => setSelectedDrawing(null)}
-								className="p-2 hover:bg-red-500/20 rounded-lg transition-all"
+								className="p-2 hover:[background:color-mix(in_srgb,var(--danger)_20%,var(--surface))] rounded-lg transition-all"
 							>
-								<span className="text-red-400 text-2xl">×</span>
+								<span className="[color:var(--danger)] text-2xl">×</span>
 							</button>
 						</div>
 
 						<div className="p-6 space-y-6">
 							<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-								<div className="rounded-lg border border-green-500/30 bg-[var(--color-surface-elevated)] p-4 text-center">
-									<div className="text-3xl font-bold text-green-200">
+								<div className="rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface-2)] p-4 text-center">
+									<div className="text-3xl font-bold [color:var(--text)]">
 										{selectedDrawing.issues_found}
 									</div>
-									<div className="text-green-400/70 text-sm mt-1">
+									<div className="[color:var(--text-muted)] text-sm mt-1">
 										Issues Found
 									</div>
 								</div>
-								<div className="rounded-lg border border-green-500/30 bg-[var(--color-surface-elevated)] p-4 text-center">
-									<div className="text-3xl font-bold text-green-200 capitalize">
+								<div className="rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface-2)] p-4 text-center">
+									<div className="text-3xl font-bold [color:var(--text)] capitalize">
 										{selectedDrawing.qa_status}
 									</div>
-									<div className="text-green-400/70 text-sm mt-1">Status</div>
+									<div className="[color:var(--text-muted)] text-sm mt-1">Status</div>
 								</div>
-								<div className="rounded-lg border border-green-500/30 bg-[var(--color-surface-elevated)] p-4 text-center">
-									<div className="text-3xl font-bold text-green-200">
+								<div className="rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface-2)] p-4 text-center">
+									<div className="text-3xl font-bold [color:var(--text)]">
 										{selectedDrawing.rules_applied.length}
 									</div>
-									<div className="text-green-400/70 text-sm mt-1">
+									<div className="[color:var(--text-muted)] text-sm mt-1">
 										Rules Applied
 									</div>
 								</div>
 							</div>
 
 							<div>
-								<h4 className="text-lg font-bold text-green-200 mb-3">
+								<h4 className="text-lg font-bold [color:var(--text)] mb-3">
 									Issues Detected
 								</h4>
 								{selectedDrawing.annotations.length === 0 ? (
-									<div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-center">
-										<CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-2" />
-										<p className="text-green-300">
+									<div className="[background:color-mix(in_srgb,var(--success)_10%,var(--surface))] border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] rounded-lg p-4 text-center">
+										<CheckCircle className="w-12 h-12 [color:var(--success)] mx-auto mb-2" />
+										<p className="[color:var(--text-muted)]">
 											No issues found! Drawing passes all checks.
 										</p>
 									</div>
@@ -760,23 +760,23 @@ export function QAQCChecker() {
 											(issue: Issue, idx: number) => (
 												<div
 													key={idx}
-													className={`rounded-lg border bg-[var(--color-surface-elevated)] p-4 ${
+													className={`rounded-lg border bg-[var(--surface-2)] p-4 ${
 														issue.severity === "error"
-															? "border-red-500/40"
+															? "[border-color:color-mix(in_srgb,var(--danger)_40%,transparent)]"
 															: issue.severity === "warning"
-																? "border-yellow-500/40"
-																: "border-blue-500/40"
+																? "[border-color:color-mix(in_srgb,var(--warning)_40%,transparent)]"
+																: "[border-color:color-mix(in_srgb,var(--accent)_40%,transparent)]"
 													}`}
 												>
 													<div className="flex items-start space-x-3">
 														{issue.severity === "error" && (
-															<XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+															<XCircle className="w-5 h-5 [color:var(--danger)] flex-shrink-0 mt-0.5" />
 														)}
 														{issue.severity === "warning" && (
-															<AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+															<AlertTriangle className="w-5 h-5 [color:var(--warning)] flex-shrink-0 mt-0.5" />
 														)}
 														{issue.severity === "info" && (
-															<FileText className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+															<FileText className="w-5 h-5 [color:var(--accent)] flex-shrink-0 mt-0.5" />
 														)}
 														<div className="flex-1">
 															<div className="flex items-center space-x-2 mb-1">
@@ -785,13 +785,13 @@ export function QAQCChecker() {
 																>
 																	{issue.severity}
 																</span>
-																<span className="text-xs text-green-400/60 capitalize">
+																<span className="text-xs [color:var(--text-muted)] capitalize">
 																	{issue.type.replace("_", " ")}
 																</span>
 															</div>
-															<p className="text-green-100">{issue.message}</p>
+															<p className="[color:var(--text)]">{issue.message}</p>
 															{issue.location && (
-																<p className="text-green-400/60 text-sm mt-1">
+																<p className="[color:var(--text-muted)] text-sm mt-1">
 																	Location: {issue.location}
 																</p>
 															)}
@@ -805,7 +805,7 @@ export function QAQCChecker() {
 							</div>
 
 							<div className="flex gap-3">
-								<button className="flex-1 bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 text-green-100 px-6 py-3 rounded-lg transition-all flex items-center justify-center space-x-2">
+								<button className="flex-1 [background:color-mix(in_srgb,var(--success)_20%,var(--surface))] hover:[background:color-mix(in_srgb,var(--success)_30%,var(--surface))] border [border-color:color-mix(in_srgb,var(--success)_40%,transparent)] [color:var(--text)] px-6 py-3 rounded-lg transition-all flex items-center justify-center space-x-2">
 									<Download className="w-5 h-5" />
 									<span>Export Report</span>
 								</button>
@@ -814,7 +814,7 @@ export function QAQCChecker() {
 										await checkDrawing(selectedDrawing.drawing_name);
 										setSelectedDrawing(null);
 									}}
-									className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg transition-all flex items-center space-x-2"
+									className="[background:var(--success)] hover:opacity-90 [color:var(--text)] px-6 py-3 rounded-lg transition-all flex items-center space-x-2"
 								>
 									<Zap className="w-5 h-5" />
 									<span>Re-check</span>

@@ -135,9 +135,8 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 						: "overflow-hidden";
 
 			return [
-				"relative will-change-transform transition-all duration-300",
+				"relative transition-[box-shadow,border-color] duration-300",
 				overflowClass,
-				hoverEffect ? "hover:scale-[1.01]" : "",
 				rounding,
 				pulse ? "animate-pulse-glow" : "",
 				floatProp ? "animate-glass-float" : "",
@@ -146,7 +145,7 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 			]
 				.filter(Boolean)
 				.join(" ");
-		}, [padded, variant, liquid, hoverEffect, pulse, floatProp, overflow, className]);
+		}, [padded, variant, liquid, pulse, floatProp, overflow, className]);
 
 		const tintGlow = hexToRgba(tint, 0.22);
 

@@ -1,6 +1,5 @@
-// src/routes/PrivacyPage.tsx
 import { Link } from "react-router-dom";
-import { APP_NAME } from "@/app";
+import { APP_NAME } from "@/appMeta";
 import AuthShell from "../auth/AuthShell";
 
 const APP_SLUG = APP_NAME.toLowerCase().replace(/\s+/g, "");
@@ -9,28 +8,7 @@ export default function PrivacyPage() {
 	return (
 		<AuthShell
 			navLink={{ to: "/", label: "Back to landing" }}
-			panelBadge="Privacy & Trust"
-			panelTitle="Built for clarity and control"
-			panelSubtitle="We collect only what we need to operate the workspace. Your data stays scoped to your account."
-			panelItems={[
-				{
-					title: "Minimal collection",
-					description:
-						"Email, auth identifiers, and usage events to improve UX.",
-				},
-				{
-					title: "Operational security",
-					description:
-						"We secure sessions, data access, and recovery workflows.",
-				},
-				{
-					title: "Transparent updates",
-					description:
-						"This policy will evolve with the product, with clear change logs.",
-				},
-			]}
-			panelFooter={`Have questions? privacy@${APP_SLUG}.example`}
-			cardClassName="md:col-span-12"
+			hidePanel
 		>
 			<div className="mb-6">
 				<div className="mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium [background:var(--surface-2)] [color:var(--text-muted)]">
@@ -41,7 +19,7 @@ export default function PrivacyPage() {
 					Privacy Policy
 				</h1>
 				<p className="mt-2 text-sm [color:var(--text-muted)]">
-					This is a living document. We’ll update it as features roll out.
+					This is a living document. We'll update it as features roll out.
 				</p>
 			</div>
 

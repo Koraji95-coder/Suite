@@ -3,6 +3,8 @@
  * Manages predefined tasks, task history, and execution tracking
  */
 
+import { logger } from "@/lib/logger";
+
 export interface ExecutedTask {
 	id: string;
 	name: string;
@@ -145,7 +147,7 @@ class AgentTaskManager {
 
 			localStorage.setItem(this.getStorageKey(), JSON.stringify(history));
 		} catch (error) {
-			console.error("Failed to save task to history:", error);
+			logger.error("Failed to save task to history", "AgentTaskManager", error);
 		}
 	}
 
@@ -157,7 +159,7 @@ class AgentTaskManager {
 			const stored = localStorage.getItem(this.getStorageKey());
 			return stored ? JSON.parse(stored) : [];
 		} catch (error) {
-			console.error("Failed to load task history:", error);
+			logger.error("Failed to load task history", "AgentTaskManager", error);
 			return [];
 		}
 	}
@@ -178,7 +180,7 @@ class AgentTaskManager {
 			const filtered = history.filter((t) => t.id !== taskId);
 			localStorage.setItem(this.getStorageKey(), JSON.stringify(filtered));
 		} catch (error) {
-			console.error("Failed to delete task:", error);
+			logger.error("Failed to delete task", "AgentTaskManager", error);
 		}
 	}
 
@@ -189,7 +191,7 @@ class AgentTaskManager {
 		try {
 			localStorage.removeItem(this.getStorageKey());
 		} catch (error) {
-			console.error("Failed to clear history:", error);
+			logger.error("Failed to clear history", "AgentTaskManager", error);
 		}
 	}
 

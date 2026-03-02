@@ -1,6 +1,7 @@
 import { CircuitBoard, Save, Shuffle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/auth/useAuth";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
@@ -19,6 +20,7 @@ export function CircuitGenerator() {
 	const [components, setComponents] = useState<Component[]>([]);
 	const [circuitName, setCircuitName] = useState("");
 	const [isSavingCircuit, setIsSavingCircuit] = useState(false);
+	const { showToast } = useToast();
 	const auth = useAuth();
 
 	const componentTypes = [
@@ -131,7 +133,7 @@ export function CircuitGenerator() {
 
 	const saveCircuit = async () => {
 		if (!circuitName.trim()) {
-			alert("Please enter a circuit name");
+			showToast("warning", "Please enter a circuit name.");
 			return;
 		}
 
@@ -147,30 +149,33 @@ export function CircuitGenerator() {
 
 			const { error } = await supabase.from("saved_circuits").insert(payload);
 
-			if (error) {
-				logger.error("CircuitGenerator", "Failed to save circuit", {
-					error: error.message,
-				});
-				alert("Error saving circuit: " + (error.message || "Unknown error"));
-			} else {
-				logger.info("CircuitGenerator", "Circuit saved successfully", {
-					circuitName,
-				});
-				alert("Circuit saved successfully!");
-				setCircuitName("");
-			}
-		} catch (err) {
+				if (error) {
+					logger.error("CircuitGenerator", "Failed to save circuit", {
+						error: error.message,
+					});
+					showToast(
+						"error",
+						`Error saving circuit: ${error.message || "Unknown error"}`,
+					);
+				} else {
+					logger.info("CircuitGenerator", "Circuit saved successfully", {
+						circuitName,
+					});
+					showToast("success", "Circuit saved successfully.");
+					setCircuitName("");
+				}
+			} catch (err) {
 			const message = err instanceof Error ? err.message : "Unknown error";
 			logger.error(
 				"CircuitGenerator",
 				"Unexpected error saving circuit",
-				{ error: message },
-				err as Error,
-			);
-			alert("Error saving circuit: " + message);
-		} finally {
-			setIsSavingCircuit(false);
-		}
+					{ error: message },
+					err as Error,
+				);
+				showToast("error", `Error saving circuit: ${message}`);
+			} finally {
+				setIsSavingCircuit(false);
+			}
 	};
 
 	return (

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 interface PopoverContextValue {
@@ -41,7 +42,7 @@ export function Popover({
 
 	return (
 		<PopoverContext.Provider value={{ open, setOpen, triggerRef, modal }}>
-			<div className="relative inline-block">{children}</div>
+			<div className="relative">{children}</div>
 		</PopoverContext.Provider>
 	);
 }
@@ -127,39 +128,78 @@ export function PopoverContent({
 	className?: string;
 	align?: "start" | "center" | "end";
 } & React.HTMLAttributes<HTMLDivElement>) {
-	const { open, setOpen, modal } = React.useContext(PopoverContext);
+	const { open, setOpen, modal, triggerRef } = React.useContext(PopoverContext);
 	const ref = React.useRef<HTMLDivElement>(null);
+	const [{ top, left }, setPosition] = React.useState({ top: 0, left: 0 });
+	const { style, ...restProps } = props;
+	const inDialog = Boolean(
+		triggerRef.current?.closest("[data-ui-dialog-content='true']"),
+	);
+	const layerZIndex = inDialog
+		? "calc(var(--z-dialog) + 1)"
+		: "var(--z-dropdown)";
+
+	const updatePosition = React.useCallback(() => {
+		const trigger = triggerRef.current;
+		if (!trigger) return;
+
+		const rect = trigger.getBoundingClientRect();
+		const nextLeft =
+			align === "start"
+				? rect.left
+				: align === "end"
+					? rect.right
+					: rect.left + rect.width / 2;
+		setPosition({
+			top: rect.bottom + 8,
+			left: nextLeft,
+		});
+	}, [align, triggerRef]);
+
+	React.useLayoutEffect(() => {
+		if (!open) return;
+		updatePosition();
+	}, [open, updatePosition]);
 
 	React.useEffect(() => {
 		if (!open) return;
 
 		const onMouseDown = (e: MouseEvent) => {
-			if (ref.current && !ref.current.contains(e.target as Node))
-				setOpen(false);
+			const target = e.target as Node;
+			const clickedInTrigger =
+				triggerRef.current && triggerRef.current.contains(target);
+			if (clickedInTrigger) return;
+			if (ref.current && !ref.current.contains(target)) setOpen(false);
 		};
 
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "Escape") setOpen(false);
 		};
 
+		const onReposition = () => updatePosition();
+
 		document.addEventListener("mousedown", onMouseDown);
 		document.addEventListener("keydown", onKeyDown);
+		window.addEventListener("resize", onReposition);
+		window.addEventListener("scroll", onReposition, true);
 
 		return () => {
 			document.removeEventListener("mousedown", onMouseDown);
 			document.removeEventListener("keydown", onKeyDown);
+			window.removeEventListener("resize", onReposition);
+			window.removeEventListener("scroll", onReposition, true);
 		};
-	}, [open, setOpen]);
+	}, [open, setOpen, triggerRef, updatePosition]);
 
-	if (!open) return null;
+	if (!open || typeof document === "undefined") return null;
 
-	return (
+	const content = (
 		<>
 			{/* Minimal “modal” behavior: overlay exists when modal=true */}
 			{modal && (
 				<div
 					className="fixed inset-0"
-					style={{ zIndex: "var(--z-dropdown)" }}
+					style={{ zIndex: layerZIndex }}
 					onMouseDown={() => setOpen(false)}
 					aria-hidden="true"
 				/>
@@ -169,18 +209,24 @@ export function PopoverContent({
 				ref={ref}
 				role={modal ? "dialog" : "menu"}
 				aria-modal={modal ? true : undefined}
-				style={{ zIndex: "var(--z-dropdown)" }}
+				style={{
+					top,
+					left,
+					zIndex: layerZIndex,
+					...style,
+				}}
 				className={cn(
-					"absolute mt-2 rounded-md border border-border bg-popover p-4 text-popover-foreground shadow-md outline-none",
-					align === "start" && "left-0",
-					align === "center" && "left-1/2 -translate-x-1/2",
-					align === "end" && "right-0",
+					"fixed rounded-md border border-border bg-popover p-4 text-popover-foreground shadow-md outline-none",
+					align === "center" && "-translate-x-1/2",
+					align === "end" && "-translate-x-full",
 					className,
 				)}
-				{...props}
+				{...restProps}
 			>
 				{children}
 			</div>
 		</>
 	);
+
+	return createPortal(content, document.body);
 }

@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 interface SelectContextValue {
@@ -7,11 +8,13 @@ interface SelectContextValue {
 	onValueChange?: (value: string) => void;
 	open: boolean;
 	setOpen: (open: boolean) => void;
+	triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
 const SelectContext = React.createContext<SelectContextValue>({
 	open: false,
 	setOpen: (_open: boolean) => undefined,
+	triggerRef: { current: null },
 });
 
 export function Select({
@@ -24,8 +27,11 @@ export function Select({
 	children: React.ReactNode;
 }) {
 	const [open, setOpen] = React.useState(false);
+	const triggerRef = React.useRef<HTMLButtonElement | null>(null);
 	return (
-		<SelectContext.Provider value={{ value, onValueChange, open, setOpen }}>
+		<SelectContext.Provider
+			value={{ value, onValueChange, open, setOpen, triggerRef }}
+		>
 			<div className="relative">{children}</div>
 		</SelectContext.Provider>
 	);
@@ -40,9 +46,10 @@ export function SelectTrigger({
 	children: React.ReactNode;
 	id?: string;
 }) {
-	const { open, setOpen } = React.useContext(SelectContext);
+	const { open, setOpen, triggerRef } = React.useContext(SelectContext);
 	return (
 		<button
+			ref={triggerRef}
 			id={id}
 			type="button"
 			className={cn(
@@ -74,32 +81,84 @@ export function SelectContent({
 	children: React.ReactNode;
 	className?: string;
 }) {
-	const { open, setOpen } = React.useContext(SelectContext);
+	const { open, setOpen, triggerRef } = React.useContext(SelectContext);
 	const ref = React.useRef<HTMLDivElement>(null);
+	const [{ top, left, width }, setPosition] = React.useState({
+		top: 0,
+		left: 0,
+		width: 0,
+	});
+	const inDialog = Boolean(
+		triggerRef.current?.closest("[data-ui-dialog-content='true']"),
+	);
+	const layerZIndex = inDialog
+		? "calc(var(--z-dialog) + 1)"
+		: "var(--z-dropdown)";
+
+	const updatePosition = React.useCallback(() => {
+		const trigger = triggerRef.current;
+		if (!trigger) return;
+
+		const rect = trigger.getBoundingClientRect();
+		setPosition({
+			top: rect.bottom + 4,
+			left: rect.left,
+			width: rect.width,
+		});
+	}, [triggerRef]);
+
+	React.useLayoutEffect(() => {
+		if (!open) return;
+		updatePosition();
+	}, [open, updatePosition]);
 
 	React.useEffect(() => {
 		if (!open) return;
 		const handler = (e: MouseEvent) => {
-			if (ref.current && !ref.current.contains(e.target as Node))
-				setOpen(false);
+			const target = e.target as Node;
+			const clickedInTrigger =
+				triggerRef.current && triggerRef.current.contains(target);
+			if (clickedInTrigger) return;
+			if (ref.current && !ref.current.contains(target)) setOpen(false);
 		};
-		document.addEventListener("mousedown", handler);
-		return () => document.removeEventListener("mousedown", handler);
-	}, [open, setOpen]);
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape") setOpen(false);
+		};
+		const onReposition = () => updatePosition();
 
-	if (!open) return null;
-	return (
+		document.addEventListener("mousedown", handler);
+		document.addEventListener("keydown", onKeyDown);
+		window.addEventListener("resize", onReposition);
+		window.addEventListener("scroll", onReposition, true);
+		return () => {
+			document.removeEventListener("mousedown", handler);
+			document.removeEventListener("keydown", onKeyDown);
+			window.removeEventListener("resize", onReposition);
+			window.removeEventListener("scroll", onReposition, true);
+		};
+	}, [open, setOpen, triggerRef, updatePosition]);
+
+	if (!open || typeof document === "undefined") return null;
+
+	const content = (
 		<div
 			ref={ref}
-			style={{ zIndex: "var(--z-dropdown)" }}
+			style={{
+				top,
+				left,
+				width,
+				zIndex: layerZIndex,
+			}}
 			className={cn(
-				"absolute mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md",
+				"fixed max-h-60 overflow-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md",
 				className,
 			)}
 		>
 			{children}
 		</div>
 	);
+
+	return createPortal(content, document.body);
 }
 
 export function SelectItem({

@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { type Priority, TaskFormData } from "./projectmanagertypes";
 
 interface TaskFormModalProps {
@@ -19,17 +20,18 @@ export function TaskFormModal({
 	isEditing,
 	isSubtask = false,
 }: TaskFormModalProps) {
-	if (!isOpen) return null;
 	const inputClass =
 		"w-full rounded-lg border px-4 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
 	const labelClass = "mb-2 block text-sm font-medium [color:var(--text-muted)]";
 
 	return (
-		<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.68)] p-3 backdrop-blur-md sm:p-4" style={{ zIndex: "var(--z-dialog)" }}>
-			<div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg border p-5 backdrop-blur-xl [border-color:var(--border)] [background:var(--bg-heavy)] sm:p-6">
-				<h3 className="mb-4 text-2xl font-bold [color:var(--text)]">
-					{isEditing ? "Edit Task" : isSubtask ? "Add Subtask" : "Add Task"}
-				</h3>
+		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+			<DialogContent className="max-w-2xl p-5 sm:p-6 [border-color:var(--border)] [background:var(--bg-heavy)]">
+				<DialogHeader className="mb-4">
+					<DialogTitle className="text-2xl font-bold [color:var(--text)]">
+						{isEditing ? "Edit Task" : isSubtask ? "Add Subtask" : "Add Task"}
+					</DialogTitle>
+				</DialogHeader>
 				<div className="space-y-4">
 					<div>
 						<label className={labelClass}>Task Name</label>
@@ -86,7 +88,7 @@ export function TaskFormModal({
 						</div>
 					</div>
 				</div>
-				<div className="mt-6 flex flex-col gap-3 sm:flex-row">
+				<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
 					<button
 						onClick={onSubmit}
 						className="flex-1 rounded-lg px-6 py-2 font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
@@ -100,7 +102,7 @@ export function TaskFormModal({
 						Cancel
 					</button>
 				</div>
-			</div>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

@@ -44,6 +44,13 @@ The repository ignore rules include:
     - `AGENT_PAIRING_CHALLENGE_TTL_SECONDS`
     - `AGENT_PAIRING_CHALLENGE_MAX_ENTRIES`
     - `AGENT_PAIRING_REDIRECT_PATH`
+    - `AGENT_PAIRING_ACTION_WINDOW_SECONDS`
+    - `AGENT_PAIRING_ACTION_MAX_ATTEMPTS`
+    - `AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS`
+    - `AGENT_PAIRING_ACTION_BLOCK_SECONDS`
+    - `AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS`
+    - `AGENT_PAIRING_CONFIRM_FAILURE_MAX_ATTEMPTS`
+    - `AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS`
   - Enable Supabase auth validation with `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_JWT_SECRET`
   - If your Supabase project uses new ECC JWT keys, leave `SUPABASE_JWT_SECRET` empty and rely on JWKS via `SUPABASE_URL`
   - Tokens are stored server-side; the frontend never receives the bearer token
@@ -59,6 +66,27 @@ The repository ignore rules include:
 - This app runs passwordless email-link auth only (`/login` entrypoint).
 - Ensure Supabase redirect URLs include your app origin + `/login`.
 - Keep `AUTH_ALLOWED_REDIRECT_ORIGINS` and `VITE_AUTH_ALLOWED_ORIGINS` aligned with real origins.
+- Passkey rollout is currently probe-gated (not fully active):
+  - Frontend gate: `VITE_AUTH_PASSKEY_ENABLED`
+  - Backend gate: `AUTH_PASSKEY_ENABLED`
+  - Backend provider selector: `AUTH_PASSKEY_PROVIDER` (`supabase` or `external`)
+  - External provider metadata (if using `external`): `AUTH_PASSKEY_EXTERNAL_NAME`, `AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL`
+  - External passkey start URLs (if using `external`):
+    - `AUTH_PASSKEY_EXTERNAL_SIGNIN_URL`
+    - `AUTH_PASSKEY_EXTERNAL_ENROLL_URL` (optional; falls back to sign-in URL when empty)
+  - Callback state controls:
+    - `AUTH_PASSKEY_CALLBACK_STATE_TTL_SECONDS`
+    - `AUTH_PASSKEY_CALLBACK_STATE_MAX_ENTRIES`
+  - External callback signature controls:
+    - `AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK`
+    - `AUTH_PASSKEY_CALLBACK_SIGNING_SECRET`
+    - `AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_AGE_SECONDS`
+    - `AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_CLOCK_SKEW_SECONDS`
+  - If using ZeroClaw as external bridge, configure matching gateway env:
+    - `ZC_SUITE_PASSKEY_CALLBACK_SIGNING_SECRET`
+    - `ZC_SUITE_CALLBACK_ALLOWED_ORIGINS`
+    - `ZC_SUITE_PASSKEY_PROVIDER_JWT_SECRET`
+    - optional strict checks: `ZC_SUITE_PASSKEY_PROVIDER_JWT_ISSUER`, `ZC_SUITE_PASSKEY_PROVIDER_JWT_AUDIENCE`
 - If using Cloudflare Turnstile, set:
   - `VITE_TURNSTILE_SITE_KEY` in frontend env
   - `AUTH_EMAIL_TURNSTILE_SECRET` in backend env
@@ -68,6 +96,9 @@ The repository ignore rules include:
   - `AUTH_EMAIL_MAX_ATTEMPTS`
   - `AUTH_EMAIL_MIN_INTERVAL_SECONDS`
   - `AUTH_EMAIL_BLOCK_SECONDS`
+  - `AUTH_EMAIL_IP_WINDOW_SECONDS`
+  - `AUTH_EMAIL_IP_MAX_ATTEMPTS`
+  - `AUTH_EMAIL_IP_BLOCK_SECONDS`
   - `AUTH_EMAIL_MIN_RESPONSE_MS`
   - `AUTH_EMAIL_RESPONSE_JITTER_MS`
   - `AUTH_EMAIL_REQUIRE_TURNSTILE`

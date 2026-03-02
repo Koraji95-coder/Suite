@@ -17,6 +17,14 @@ import {
 	X,
 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { useFiles } from "@/hooks/useFiles";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import type { StorageFile } from "./storageTypes";
@@ -47,11 +55,13 @@ function formatSize(bytes: number): string {
 
 export function FileBrowser() {
 	const { palette } = useTheme();
+	const { showToast } = useToast();
 	const [currentPath, setCurrentPath] = useState("");
 	const [search, setSearch] = useState("");
 	const [sortKey, setSortKey] = useState<SortKey>("name");
 	const [sortAsc, setSortAsc] = useState(true);
 	const [selected, setSelected] = useState<StorageFile | null>(null);
+	const [pendingDelete, setPendingDelete] = useState<StorageFile | null>(null);
 	const [dragging, setDragging] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const { files, loading, error, refresh, upload, download, remove } = useFiles(
@@ -116,10 +126,20 @@ export function FileBrowser() {
 		URL.revokeObjectURL(url);
 	};
 
-	const handleDelete = async (file: StorageFile) => {
-		if (!confirm(`Delete "${file.name}"? This cannot be undone.`)) return;
-		await remove(file.name);
-		if (selected?.name === file.name) setSelected(null);
+	const requestDelete = (file: StorageFile) => {
+		setPendingDelete(file);
+	};
+
+	const confirmDelete = async () => {
+		if (!pendingDelete) return;
+		const ok = await remove(pendingDelete.name);
+		if (ok) {
+			showToast("success", `Deleted "${pendingDelete.name}".`);
+			if (selected?.name === pendingDelete.name) setSelected(null);
+		} else {
+			showToast("error", `Failed to delete "${pendingDelete.name}".`);
+		}
+		setPendingDelete(null);
 	};
 
 	const filtered = files
@@ -144,7 +164,8 @@ export function FileBrowser() {
 	};
 
 	return (
-		<div style={{ display: "flex", gap: 16, minHeight: 400 }}>
+		<>
+			<div style={{ display: "flex", gap: 16, minHeight: 400 }}>
 			<div style={{ flex: 1 }}>
 				<div
 					style={{
@@ -448,11 +469,11 @@ export function FileBrowser() {
 									? new Date(file.created_at).toLocaleDateString()
 									: "--"}
 							</span>
-							<button
-								onClick={(e) => {
-									e.stopPropagation();
-									handleDelete(file);
-								}}
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										requestDelete(file);
+									}}
 								style={{
 									background: "none",
 									border: "none",
@@ -572,9 +593,9 @@ export function FileBrowser() {
 						>
 							<Download className="w-3.5 h-3.5" /> Download
 						</button>
-						<button
-							onClick={() => handleDelete(selected)}
-							style={{
+							<button
+								onClick={() => requestDelete(selected)}
+								style={{
 								padding: "8px 12px",
 								borderRadius: 6,
 								cursor: "pointer",
@@ -588,6 +609,34 @@ export function FileBrowser() {
 					</div>
 				</div>
 			)}
-		</div>
+			</div>
+			<Dialog
+				open={Boolean(pendingDelete)}
+				onOpenChange={(open) => !open && setPendingDelete(null)}
+			>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Delete file?</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						Delete "{pendingDelete?.name}"? This cannot be undone.
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setPendingDelete(null)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={() => void confirmDelete()}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						>
+							Delete
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</>
 	);
 }

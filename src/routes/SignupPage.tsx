@@ -6,6 +6,7 @@ import AuthShell from "../auth/AuthShell";
 import { useNotification } from "../auth/NotificationContext";
 import { useAuth } from "../auth/useAuth";
 import { logger } from "../lib/logger";
+import { logAuthMethodTelemetry } from "../services/securityEventService";
 
 export default function SignupPage() {
 	const { user, loading, signUp } = useAuth();
@@ -53,6 +54,11 @@ export default function SignupPage() {
 			setError(msg);
 			setCaptchaToken("");
 			logger.error("Signup link request failed", "SignupPage", { error: err });
+			await logAuthMethodTelemetry(
+				"email_link",
+				"sign_up_request_failed",
+				`Sign-up email-link request failed: ${msg}`,
+			);
 			notification.error("Signup failed", msg);
 		} finally {
 			setSubmitting(false);

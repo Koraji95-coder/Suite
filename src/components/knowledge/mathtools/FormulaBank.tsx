@@ -1,5 +1,6 @@
 import { BookOpen, Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
@@ -15,6 +16,7 @@ export function FormulaBank() {
 	const [loading, setLoading] = useState(true);
 	const [showAddForm, setShowAddForm] = useState(false);
 	const [isAddingFormula, setIsAddingFormula] = useState(false);
+	const { showToast } = useToast();
 	const auth = useAuth();
 	const [newFormula, setNewFormula] = useState({
 		name: "",
@@ -75,7 +77,7 @@ export function FormulaBank() {
 
 	const addFormula = async () => {
 		if (!newFormula.name || !newFormula.formula || !newFormula.category) {
-			alert("Please fill in all required fields");
+			showToast("warning", "Please fill in all required fields.");
 			return;
 		}
 
@@ -91,29 +93,32 @@ export function FormulaBank() {
 
 			const { error } = await supabase.from("formulas").insert(payload);
 
-			if (error) {
-				logger.error("FormulaBank", "Failed to add formula", {
-					error: error.message,
-				});
-				alert("Error adding formula: " + (error.message || "Unknown error"));
-			} else {
-				setNewFormula({ name: "", category: "", formula: "", description: "" });
-				setShowAddForm(false);
-				await loadFormulas();
-				alert("Formula added successfully!");
-			}
-		} catch (err) {
+				if (error) {
+					logger.error("FormulaBank", "Failed to add formula", {
+						error: error.message,
+					});
+					showToast(
+						"error",
+						`Error adding formula: ${error.message || "Unknown error"}`,
+					);
+				} else {
+					setNewFormula({ name: "", category: "", formula: "", description: "" });
+					setShowAddForm(false);
+					await loadFormulas();
+					showToast("success", "Formula added successfully.");
+				}
+			} catch (err) {
 			const message = err instanceof Error ? err.message : "Unknown error";
 			logger.error(
 				"FormulaBank",
 				"Unexpected error adding formula",
-				{ error: message },
-				err as Error,
-			);
-			alert("Error adding formula: " + message);
-		} finally {
-			setIsAddingFormula(false);
-		}
+					{ error: message },
+					err as Error,
+				);
+				showToast("error", `Error adding formula: ${message}`);
+			} finally {
+				setIsAddingFormula(false);
+			}
 	};
 
 	return (

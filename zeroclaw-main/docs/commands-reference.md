@@ -66,6 +66,11 @@ Tip:
 
 `--new-pairing` clears all stored paired tokens and forces generation of a fresh pairing code on gateway startup.
 
+Suite integration note:
+
+- Gateway exposes `GET /suite/passkey/callback` for Suite external passkey bridge flows.
+- Setup details: [suite-passkey-bridge.md](./suite-passkey-bridge.md)
+
 ### `estop`
 
 - `zeroclaw estop` (engage `kill-all`)

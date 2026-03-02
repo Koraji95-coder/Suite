@@ -11,6 +11,7 @@ import {
 	Wand2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { sanitizeFilename, validateFiles } from "@/lib/validation";
@@ -223,6 +224,7 @@ const buildWorkbook = async (drawings: DrawingEntry[]) => {
 
 export function DrawingListManager() {
 	const { palette } = useTheme();
+	const { showToast } = useToast();
 	const [projectConfig, setProjectConfig] = useState<ProjectConfig>({
 		projectNumber: "25074",
 		revisionDefault: "A",
@@ -393,7 +395,7 @@ export function DrawingListManager() {
 			const errorMessage =
 				errors.slice(0, 3).join("\n") +
 				(errors.length > 3 ? `\n... and ${errors.length - 3} more` : "");
-			alert(`Some files failed validation:\n\n${errorMessage}`);
+			showToast("warning", `Some files failed validation: ${errorMessage}`);
 		}
 
 		setDrawings(list);
@@ -505,7 +507,7 @@ export function DrawingListManager() {
 			URL.revokeObjectURL(url);
 		} catch (error) {
 			logger.error("DrawingListManager", "Excel export failed", { error });
-			alert("Failed to export Excel file. Please try again.");
+			showToast("error", "Failed to export Excel file. Please try again.");
 		}
 	};
 

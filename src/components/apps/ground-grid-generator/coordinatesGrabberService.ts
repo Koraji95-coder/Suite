@@ -150,9 +150,10 @@ class CoordinatesGrabberService {
 			import.meta.env.VITE_COORDINATES_BACKEND_URL || "http://localhost:5000";
 		const key = import.meta.env.VITE_API_KEY;
 		if (!key) {
-			console.warn(
+			logger.warn(
 				"[CoordinatesGrabberService] VITE_API_KEY is not set. " +
 					"Backend requests will fail until you add it to .env",
+				"CoordinatesGrabber",
 			);
 		}
 		this.apiKey = key ?? "";

@@ -38,6 +38,7 @@ Exit criteria:
 
 - Provider supports registration, authentication, revocation, and recovery flows.
 - Operational logging and audit events can be captured.
+- Provider callback contract is signed and verified server-side (HMAC/JWT claim verification).
 
 ## Phase 2: Data + Policy Layer
 

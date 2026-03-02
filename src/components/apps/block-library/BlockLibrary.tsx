@@ -14,12 +14,21 @@ import {
 	Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
 
 type BlockFile = Database["public"]["Tables"]["block_library"]["Row"];
 
 export function BlockLibrary() {
+	const { showToast } = useToast();
 	const [blocks, setBlocks] = useState<BlockFile[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [isUploading, setIsUploading] = useState(false);
@@ -29,6 +38,9 @@ export function BlockLibrary() {
 	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 	const [showUploadModal, setShowUploadModal] = useState(false);
 	const [selectedBlock, setSelectedBlock] = useState<BlockFile | null>(null);
+	const [pendingDeleteBlock, setPendingDeleteBlock] = useState<BlockFile | null>(
+		null,
+	);
 	const [uploadForm, setUploadForm] = useState({
 		name: "",
 		category: "electrical",
@@ -101,9 +113,9 @@ export function BlockLibrary() {
 		}
 	};
 
-	const deleteBlock = async (id: string) => {
-		if (!confirm("Delete this block?")) return;
-
+	const confirmDeleteBlock = async () => {
+		if (!pendingDeleteBlock) return;
+		const id = pendingDeleteBlock.id;
 		const { error } = await supabase
 			.from("block_library")
 			.delete()
@@ -114,7 +126,11 @@ export function BlockLibrary() {
 			if (selectedBlock?.id === id) {
 				setSelectedBlock(null);
 			}
+			showToast("success", "Block deleted.");
+		} else {
+			showToast("error", "Failed to delete block.");
 		}
+		setPendingDeleteBlock(null);
 	};
 
 	const toggleFavorite = async (block: BlockFile) => {
@@ -363,10 +379,10 @@ export function BlockLibrary() {
 														>
 															<Star className="w-4 h-4" />
 														</button>
-														<button
-															onClick={() => deleteBlock(block.id)}
-															className="rounded-lg border p-2 transition hover:[background:color-mix(in_srgb,var(--danger)_28%,transparent)] [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_18%,transparent)] [color:var(--danger)]"
-															title="Delete"
+															<button
+																onClick={() => setPendingDeleteBlock(block)}
+																className="rounded-lg border p-2 transition hover:[background:color-mix(in_srgb,var(--danger)_28%,transparent)] [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_18%,transparent)] [color:var(--danger)]"
+																title="Delete"
 														>
 															<Trash2 className="w-4 h-4" />
 														</button>
@@ -527,7 +543,7 @@ export function BlockLibrary() {
 				</div>
 			)}
 
-			{selectedBlock && (
+				{selectedBlock && (
 				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
 					<div className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-lg border border-[var(--border)] bg-[var(--bg-heavy)] backdrop-blur-xl">
 						<div className="sticky top-0 z-10 flex items-center justify-between border-b p-6 backdrop-blur-sm [border-color:var(--border)] [background:color-mix(in_srgb,var(--bg-base)_95%,transparent)]">
@@ -621,8 +637,35 @@ export function BlockLibrary() {
 							</div>
 						</div>
 					</div>
-				</div>
-			)}
-		</div>
-	);
-}
+					</div>
+				)}
+				<Dialog
+					open={Boolean(pendingDeleteBlock)}
+					onOpenChange={(open) => !open && setPendingDeleteBlock(null)}
+				>
+					<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+						<DialogHeader>
+							<DialogTitle>Delete block?</DialogTitle>
+						</DialogHeader>
+						<p className="text-sm text-[var(--text-muted)]">
+							Delete "{pendingDeleteBlock?.name ?? "this block"}"?
+						</p>
+						<DialogFooter className="mt-4 gap-2 sm:justify-end">
+							<button
+								onClick={() => setPendingDeleteBlock(null)}
+								className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={() => void confirmDeleteBlock()}
+								className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+							>
+								Delete
+							</button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			</div>
+		);
+	}

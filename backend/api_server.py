@@ -57,7 +57,7 @@ from functools import wraps
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Set, Tuple
 from pathlib import Path
-from urllib.parse import urlencode, urlparse, urlunparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from werkzeug.utils import secure_filename
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -298,9 +298,25 @@ def _parse_int_env(var_name: str, fallback: int, minimum: int = 1) -> int:
         return fallback
 
 
+def _parse_bool_env(var_name: str, fallback: bool = False) -> bool:
+    raw = os.environ.get(var_name)
+    if raw is None:
+        return fallback
+    normalized = str(raw).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    logger.warning("Invalid %s=%r; using fallback %s", var_name, raw, fallback)
+    return fallback
+
+
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 PAIRING_CODE_PATTERN = re.compile(r"^\d{6}$")
 PAIRING_CHALLENGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{20,200}$")
+PASSKEY_CALLBACK_STATE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{20,200}$")
+PASSKEY_CALLBACK_SIGNATURE_PATTERN = re.compile(r"^[A-Fa-f0-9]{64}$")
+PASSKEY_CALLBACK_TIMESTAMP_PATTERN = re.compile(r"^\d{10,13}$")
 
 
 app.config['MAX_CONTENT_LENGTH'] = _parse_int_env(
@@ -461,12 +477,113 @@ AGENT_PAIRING_REDIRECT_PATH = (
     (os.environ.get("AGENT_PAIRING_REDIRECT_PATH") or "/app/agent").strip()
     or "/app/agent"
 )
+AUTH_PASSKEY_ENABLED = _parse_bool_env("AUTH_PASSKEY_ENABLED", False)
+AUTH_PASSKEY_PROVIDER = (
+    (os.environ.get("AUTH_PASSKEY_PROVIDER") or "supabase").strip().lower()
+    or "supabase"
+)
+if AUTH_PASSKEY_PROVIDER not in {"supabase", "external"}:
+    logger.warning(
+        "Unsupported AUTH_PASSKEY_PROVIDER=%r; falling back to 'supabase'.",
+        AUTH_PASSKEY_PROVIDER,
+    )
+    AUTH_PASSKEY_PROVIDER = "supabase"
+AUTH_PASSKEY_EXTERNAL_NAME = (
+    (os.environ.get("AUTH_PASSKEY_EXTERNAL_NAME") or "External IdP").strip()
+    or "External IdP"
+)
+AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL = (
+    (os.environ.get("AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL") or "").strip()
+)
+AUTH_PASSKEY_EXTERNAL_SIGNIN_URL = (
+    (os.environ.get("AUTH_PASSKEY_EXTERNAL_SIGNIN_URL") or "").strip()
+)
+AUTH_PASSKEY_EXTERNAL_ENROLL_URL = (
+    (os.environ.get("AUTH_PASSKEY_EXTERNAL_ENROLL_URL") or "").strip()
+)
+AUTH_PASSKEY_CALLBACK_STATE_TTL_SECONDS = _parse_int_env(
+    "AUTH_PASSKEY_CALLBACK_STATE_TTL_SECONDS",
+    15 * 60,
+    minimum=60,
+)
+AUTH_PASSKEY_CALLBACK_STATE_MAX_ENTRIES = _parse_int_env(
+    "AUTH_PASSKEY_CALLBACK_STATE_MAX_ENTRIES",
+    10_000,
+    minimum=100,
+)
+AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK = _parse_bool_env(
+    "AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK",
+    AUTH_PASSKEY_PROVIDER == "external",
+)
+AUTH_PASSKEY_CALLBACK_SIGNING_SECRET = (
+    (os.environ.get("AUTH_PASSKEY_CALLBACK_SIGNING_SECRET") or "").strip()
+)
+AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_AGE_SECONDS = _parse_int_env(
+    "AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_AGE_SECONDS",
+    300,
+    minimum=30,
+)
+AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_CLOCK_SKEW_SECONDS = _parse_int_env(
+    "AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_CLOCK_SKEW_SECONDS",
+    90,
+    minimum=0,
+)
+AGENT_PAIRING_ACTION_WINDOW_SECONDS = _parse_int_env(
+    "AGENT_PAIRING_ACTION_WINDOW_SECONDS",
+    900,
+    minimum=60,
+)
+AGENT_PAIRING_ACTION_MAX_ATTEMPTS = _parse_int_env(
+    "AGENT_PAIRING_ACTION_MAX_ATTEMPTS",
+    8,
+    minimum=1,
+)
+AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS = _parse_int_env(
+    "AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS",
+    20,
+    minimum=0,
+)
+AGENT_PAIRING_ACTION_BLOCK_SECONDS = _parse_int_env(
+    "AGENT_PAIRING_ACTION_BLOCK_SECONDS",
+    1800,
+    minimum=60,
+)
+AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS = _parse_int_env(
+    "AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS",
+    900,
+    minimum=60,
+)
+AGENT_PAIRING_CONFIRM_FAILURE_MAX_ATTEMPTS = _parse_int_env(
+    "AGENT_PAIRING_CONFIRM_FAILURE_MAX_ATTEMPTS",
+    6,
+    minimum=1,
+)
+AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS = _parse_int_env(
+    "AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS",
+    1800,
+    minimum=60,
+)
 
 # ── Auth Email Abuse Controls ────────────────────────────────────
 AUTH_EMAIL_WINDOW_SECONDS = _parse_int_env("AUTH_EMAIL_WINDOW_SECONDS", 900, minimum=60)
 AUTH_EMAIL_MAX_ATTEMPTS = _parse_int_env("AUTH_EMAIL_MAX_ATTEMPTS", 6, minimum=1)
 AUTH_EMAIL_MIN_INTERVAL_SECONDS = _parse_int_env("AUTH_EMAIL_MIN_INTERVAL_SECONDS", 15, minimum=0)
 AUTH_EMAIL_BLOCK_SECONDS = _parse_int_env("AUTH_EMAIL_BLOCK_SECONDS", 1800, minimum=60)
+AUTH_EMAIL_IP_WINDOW_SECONDS = _parse_int_env(
+    "AUTH_EMAIL_IP_WINDOW_SECONDS",
+    900,
+    minimum=60,
+)
+AUTH_EMAIL_IP_MAX_ATTEMPTS = _parse_int_env(
+    "AUTH_EMAIL_IP_MAX_ATTEMPTS",
+    30,
+    minimum=1,
+)
+AUTH_EMAIL_IP_BLOCK_SECONDS = _parse_int_env(
+    "AUTH_EMAIL_IP_BLOCK_SECONDS",
+    1800,
+    minimum=60,
+)
 AUTH_EMAIL_MIN_RESPONSE_MS = _parse_int_env("AUTH_EMAIL_MIN_RESPONSE_MS", 450, minimum=0)
 AUTH_EMAIL_RESPONSE_JITTER_MS = _parse_int_env(
     "AUTH_EMAIL_RESPONSE_JITTER_MS",
@@ -495,7 +612,18 @@ AUTH_EMAIL_REQUIRE_TURNSTILE = (
 AUTH_EMAIL_WINDOW: Dict[str, List[float]] = {}
 AUTH_EMAIL_LAST_ATTEMPT: Dict[str, float] = {}
 AUTH_EMAIL_BLOCKED_UNTIL: Dict[str, float] = {}
+AUTH_EMAIL_IP_WINDOW: Dict[str, List[float]] = {}
+AUTH_EMAIL_IP_BLOCKED_UNTIL: Dict[str, float] = {}
 AUTH_EMAIL_ABUSE_LOCK = threading.Lock()
+PASSKEY_CALLBACK_STATES: Dict[str, Dict[str, Any]] = {}
+PASSKEY_CALLBACK_STATES_LOCK = threading.Lock()
+AGENT_PAIRING_ACTION_WINDOW: Dict[str, List[float]] = {}
+AGENT_PAIRING_ACTION_LAST_ATTEMPT: Dict[str, float] = {}
+AGENT_PAIRING_ACTION_BLOCKED_UNTIL: Dict[str, float] = {}
+AGENT_PAIRING_ACTION_ABUSE_LOCK = threading.Lock()
+AGENT_PAIRING_CONFIRM_FAILURE_WINDOW: Dict[str, List[float]] = {}
+AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL: Dict[str, float] = {}
+AGENT_PAIRING_CONFIRM_ABUSE_LOCK = threading.Lock()
 
 
 def _purge_expired_agent_sessions() -> None:
@@ -582,6 +710,309 @@ def _consume_agent_pairing_challenge(
         return challenge, "ok"
 
 
+def _purge_expired_passkey_callback_states(now: Optional[float] = None) -> None:
+    ts = time.time() if now is None else now
+    expired = [
+        state
+        for state, entry in PASSKEY_CALLBACK_STATES.items()
+        if entry.get("expires_at", 0) <= ts
+    ]
+    for state in expired:
+        PASSKEY_CALLBACK_STATES.pop(state, None)
+
+    overflow = len(PASSKEY_CALLBACK_STATES) - AUTH_PASSKEY_CALLBACK_STATE_MAX_ENTRIES
+    if overflow <= 0:
+        return
+
+    oldest = sorted(
+        PASSKEY_CALLBACK_STATES.items(),
+        key=lambda item: item[1].get("created_at", 0),
+    )[:overflow]
+    for state, _ in oldest:
+        PASSKEY_CALLBACK_STATES.pop(state, None)
+
+
+def _create_passkey_callback_state(
+    intent: str,
+    client_ip: str,
+    client_redirect_to: str = "",
+    user_id: str = "",
+    email: str = "",
+) -> Tuple[str, int]:
+    now = time.time()
+    expires_at = int(now) + AUTH_PASSKEY_CALLBACK_STATE_TTL_SECONDS
+    state = secrets.token_urlsafe(32)
+    payload = {
+        "intent": intent,
+        "user_id": user_id.strip(),
+        "email": email.strip().lower(),
+        "client_ip": client_ip.strip(),
+        "client_redirect_to": client_redirect_to.strip(),
+        "created_at": now,
+        "expires_at": expires_at,
+    }
+
+    with PASSKEY_CALLBACK_STATES_LOCK:
+        _purge_expired_passkey_callback_states(now)
+        PASSKEY_CALLBACK_STATES[state] = payload
+
+    return state, expires_at
+
+
+def _consume_passkey_callback_state(state: str) -> Tuple[Optional[Dict[str, Any]], str]:
+    now = time.time()
+    with PASSKEY_CALLBACK_STATES_LOCK:
+        _purge_expired_passkey_callback_states(now)
+        payload = PASSKEY_CALLBACK_STATES.get(state)
+        if not payload:
+            return None, "missing"
+
+        if payload.get("expires_at", 0) <= now:
+            PASSKEY_CALLBACK_STATES.pop(state, None)
+            return None, "expired"
+
+        PASSKEY_CALLBACK_STATES.pop(state, None)
+        return payload, "ok"
+
+
+def _get_passkey_callback_state(state: str) -> Tuple[Optional[Dict[str, Any]], str]:
+    now = time.time()
+    with PASSKEY_CALLBACK_STATES_LOCK:
+        _purge_expired_passkey_callback_states(now)
+        payload = PASSKEY_CALLBACK_STATES.get(state)
+        if not payload:
+            return None, "missing"
+
+        if payload.get("expires_at", 0) <= now:
+            PASSKEY_CALLBACK_STATES.pop(state, None)
+            return None, "expired"
+
+        return dict(payload), "ok"
+
+
+def _normalize_passkey_callback_timestamp(raw_value: str) -> Optional[int]:
+    value = str(raw_value or "").strip()
+    if not PASSKEY_CALLBACK_TIMESTAMP_PATTERN.match(value):
+        return None
+
+    parsed = int(value)
+    if parsed > 10_000_000_000:
+        parsed = parsed // 1000
+
+    if parsed <= 0:
+        return None
+    return parsed
+
+
+def _build_passkey_callback_signature_payload(
+    state: str,
+    intent: str,
+    status: str,
+    email: str,
+    error_message: str,
+    timestamp: int,
+) -> str:
+    return "\n".join(
+        [
+            state.strip(),
+            intent.strip().lower(),
+            status.strip().lower(),
+            email.strip().lower(),
+            error_message.replace("\r", " ").replace("\n", " ").strip(),
+            str(int(timestamp)),
+        ]
+    )
+
+
+def _verify_passkey_callback_signature(
+    state: str,
+    intent: str,
+    status: str,
+    email: str,
+    error_message: str,
+    signature: str,
+    timestamp_raw: str,
+) -> Tuple[bool, str]:
+    if not AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK:
+        return True, "disabled"
+
+    if not AUTH_PASSKEY_CALLBACK_SIGNING_SECRET:
+        return False, "missing-secret"
+
+    normalized_signature = str(signature or "").strip().lower()
+    if not PASSKEY_CALLBACK_SIGNATURE_PATTERN.match(normalized_signature):
+        return False, "invalid-signature-format"
+
+    timestamp = _normalize_passkey_callback_timestamp(timestamp_raw)
+    if timestamp is None:
+        return False, "invalid-timestamp-format"
+
+    now = int(time.time())
+    if timestamp > (now + AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_CLOCK_SKEW_SECONDS):
+        return False, "timestamp-in-future"
+
+    max_age = AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_AGE_SECONDS
+    if max_age > 0 and (now - timestamp) > max_age:
+        return False, "timestamp-expired"
+
+    payload = _build_passkey_callback_signature_payload(
+        state=state,
+        intent=intent,
+        status=status,
+        email=email,
+        error_message=error_message,
+        timestamp=timestamp,
+    )
+    expected_signature = hmac.new(
+        AUTH_PASSKEY_CALLBACK_SIGNING_SECRET.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected_signature, normalized_signature):
+        return False, "signature-mismatch"
+
+    return True, "ok"
+
+
+def _agent_pairing_action_key(user_id: str, action: str) -> str:
+    return f"{user_id}:{action}"
+
+
+def _compact_agent_pairing_action_state(now: float) -> None:
+    if len(AGENT_PAIRING_ACTION_LAST_ATTEMPT) < 5000:
+        return
+
+    stale_before = now - max(300.0, AGENT_PAIRING_ACTION_WINDOW_SECONDS * 4)
+    for key, last_seen in list(AGENT_PAIRING_ACTION_LAST_ATTEMPT.items()):
+        blocked_until = AGENT_PAIRING_ACTION_BLOCKED_UNTIL.get(key, 0.0)
+        if last_seen >= stale_before or blocked_until > now:
+            continue
+        AGENT_PAIRING_ACTION_LAST_ATTEMPT.pop(key, None)
+        AGENT_PAIRING_ACTION_WINDOW.pop(key, None)
+        AGENT_PAIRING_ACTION_BLOCKED_UNTIL.pop(key, None)
+
+
+def _is_agent_pairing_action_allowed(user_id: str, action: str) -> Tuple[bool, str, int]:
+    key = _agent_pairing_action_key(user_id, action)
+    now = time.time()
+
+    with AGENT_PAIRING_ACTION_ABUSE_LOCK:
+        _compact_agent_pairing_action_state(now)
+
+        blocked_until = AGENT_PAIRING_ACTION_BLOCKED_UNTIL.get(key, 0.0)
+        if blocked_until > now:
+            retry_after = max(1, int(math.ceil(blocked_until - now)))
+            return False, "blocked", retry_after
+
+        window = [
+            ts
+            for ts in AGENT_PAIRING_ACTION_WINDOW.get(key, [])
+            if (now - ts) <= AGENT_PAIRING_ACTION_WINDOW_SECONDS
+        ]
+        last_attempt = AGENT_PAIRING_ACTION_LAST_ATTEMPT.get(key, 0.0)
+
+        if (
+            AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS > 0
+            and last_attempt > 0
+            and (now - last_attempt) < AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS
+        ):
+            window.append(now)
+            AGENT_PAIRING_ACTION_WINDOW[key] = window
+            AGENT_PAIRING_ACTION_LAST_ATTEMPT[key] = now
+            if len(window) > AGENT_PAIRING_ACTION_MAX_ATTEMPTS:
+                AGENT_PAIRING_ACTION_BLOCKED_UNTIL[key] = now + AGENT_PAIRING_ACTION_BLOCK_SECONDS
+                return False, "window-limit", AGENT_PAIRING_ACTION_BLOCK_SECONDS
+            retry_after = max(
+                1,
+                int(
+                    math.ceil(
+                        AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS - (now - last_attempt)
+                    )
+                ),
+            )
+            return False, "min-interval", retry_after
+
+        window.append(now)
+        AGENT_PAIRING_ACTION_WINDOW[key] = window
+        AGENT_PAIRING_ACTION_LAST_ATTEMPT[key] = now
+
+        if len(window) > AGENT_PAIRING_ACTION_MAX_ATTEMPTS:
+            AGENT_PAIRING_ACTION_BLOCKED_UNTIL[key] = now + AGENT_PAIRING_ACTION_BLOCK_SECONDS
+            return False, "window-limit", AGENT_PAIRING_ACTION_BLOCK_SECONDS
+
+    return True, "ok", 0
+
+
+def _agent_pairing_confirm_key(user_id: str, client_ip: str) -> str:
+    return f"{user_id}:{client_ip or 'unknown'}"
+
+
+def _compact_agent_pairing_confirm_state(now: float) -> None:
+    if len(AGENT_PAIRING_CONFIRM_FAILURE_WINDOW) < 5000:
+        return
+
+    stale_before = now - max(300.0, AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS * 4)
+    for key, attempts in list(AGENT_PAIRING_CONFIRM_FAILURE_WINDOW.items()):
+        blocked_until = AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL.get(key, 0.0)
+        recent_attempts = [
+            ts
+            for ts in attempts
+            if (now - ts) <= AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS
+        ]
+        if recent_attempts or blocked_until > now:
+            AGENT_PAIRING_CONFIRM_FAILURE_WINDOW[key] = recent_attempts
+            continue
+        AGENT_PAIRING_CONFIRM_FAILURE_WINDOW.pop(key, None)
+        AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL.pop(key, None)
+
+
+def _is_agent_pairing_confirm_blocked(user_id: str, client_ip: str) -> Tuple[bool, int]:
+    key = _agent_pairing_confirm_key(user_id, client_ip)
+    now = time.time()
+    with AGENT_PAIRING_CONFIRM_ABUSE_LOCK:
+        _compact_agent_pairing_confirm_state(now)
+        blocked_until = AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL.get(key, 0.0)
+        if blocked_until <= now:
+            return False, 0
+        retry_after = max(1, int(math.ceil(blocked_until - now)))
+        return True, retry_after
+
+
+def _register_agent_pairing_confirm_failure(user_id: str, client_ip: str) -> Tuple[bool, int]:
+    key = _agent_pairing_confirm_key(user_id, client_ip)
+    now = time.time()
+
+    with AGENT_PAIRING_CONFIRM_ABUSE_LOCK:
+        _compact_agent_pairing_confirm_state(now)
+
+        blocked_until = AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL.get(key, 0.0)
+        if blocked_until > now:
+            retry_after = max(1, int(math.ceil(blocked_until - now)))
+            return True, retry_after
+
+        attempts = [
+            ts
+            for ts in AGENT_PAIRING_CONFIRM_FAILURE_WINDOW.get(key, [])
+            if (now - ts) <= AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS
+        ]
+        attempts.append(now)
+        AGENT_PAIRING_CONFIRM_FAILURE_WINDOW[key] = attempts
+
+        if len(attempts) > AGENT_PAIRING_CONFIRM_FAILURE_MAX_ATTEMPTS:
+            AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL[key] = now + AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS
+            return True, AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS
+
+    return False, 0
+
+
+def _clear_agent_pairing_confirm_failures(user_id: str, client_ip: str) -> None:
+    key = _agent_pairing_confirm_key(user_id, client_ip)
+    with AGENT_PAIRING_CONFIRM_ABUSE_LOCK:
+        AGENT_PAIRING_CONFIRM_FAILURE_WINDOW.pop(key, None)
+        AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL.pop(key, None)
+
+
 def _looks_like_uuid(value: str) -> bool:
     if not value:
         return False
@@ -628,6 +1059,72 @@ def _agent_broker_config_status() -> Dict[str, Any]:
     }
 
 
+def _auth_passkey_capability() -> Dict[str, Any]:
+    config_missing: List[str] = []
+    warnings: List[str] = []
+    provider_label = "Supabase"
+    handlers_ready = False
+
+    if AUTH_PASSKEY_PROVIDER == "supabase":
+        provider_label = "Supabase"
+        if not SUPABASE_URL:
+            config_missing.append("SUPABASE_URL")
+    elif AUTH_PASSKEY_PROVIDER == "external":
+        provider_label = AUTH_PASSKEY_EXTERNAL_NAME
+        if not AUTH_PASSKEY_EXTERNAL_SIGNIN_URL:
+            config_missing.append("AUTH_PASSKEY_EXTERNAL_SIGNIN_URL")
+        elif not _normalize_absolute_http_url(AUTH_PASSKEY_EXTERNAL_SIGNIN_URL):
+            config_missing.append("AUTH_PASSKEY_EXTERNAL_SIGNIN_URL (must be absolute http(s) URL)")
+        if AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK and not AUTH_PASSKEY_CALLBACK_SIGNING_SECRET:
+            config_missing.append("AUTH_PASSKEY_CALLBACK_SIGNING_SECRET")
+        if not AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK:
+            warnings.append(
+                "AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK=false; external callback trust is reduced."
+            )
+        if (
+            AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL
+            and not AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL.startswith(("http://", "https://"))
+        ):
+            warnings.append("AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL must be an absolute http(s) URL.")
+
+    if AUTH_PASSKEY_PROVIDER == "supabase":
+        warnings.append(
+            "Passkey enrollment/login handlers are not wired in this build yet."
+        )
+    else:
+        warnings.append("External provider redirect flow is enabled when configured.")
+
+    config_ready = len(config_missing) == 0
+    if not AUTH_PASSKEY_ENABLED:
+        rollout_state = "disabled"
+        next_step = "Set AUTH_PASSKEY_ENABLED=true and restart backend."
+    elif not config_ready:
+        rollout_state = "needs-config"
+        missing_list = ", ".join(config_missing)
+        next_step = f"Set missing passkey config: {missing_list}."
+    else:
+        if AUTH_PASSKEY_PROVIDER == "external":
+            handlers_ready = True
+            rollout_state = "ready"
+            next_step = "External provider passkey start handlers are ready."
+        else:
+            rollout_state = "planned"
+            next_step = "Provider selected, but passkey handlers are not available in this build."
+
+    return {
+        "enabled": AUTH_PASSKEY_ENABLED,
+        "provider": AUTH_PASSKEY_PROVIDER,
+        "provider_label": provider_label,
+        "rollout_state": rollout_state,
+        "handlers_ready": handlers_ready,
+        "signed_callback_required": AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK,
+        "config_ready": config_ready,
+        "config_missing": config_missing,
+        "warnings": warnings,
+        "next_step": next_step,
+    }
+
+
 def _get_supabase_user_id(user: Dict[str, Any]) -> Optional[str]:
     return (user.get("id") or user.get("sub") or "").strip() or None
 
@@ -666,9 +1163,14 @@ def _auth_email_key(email: str, client_ip: str) -> str:
     return f"{client_ip}:{_email_fingerprint(email, length=24)}"
 
 
+def _auth_email_ip_key(client_ip: str) -> str:
+    return client_ip or "unknown"
+
+
 def _compact_auth_email_state(now: float) -> None:
     if len(AUTH_EMAIL_LAST_ATTEMPT) < 5000:
-        return
+        if len(AUTH_EMAIL_IP_WINDOW) < 5000:
+            return
 
     stale_before = now - max(300.0, AUTH_EMAIL_WINDOW_SECONDS * 4)
     for key, last_seen in list(AUTH_EMAIL_LAST_ATTEMPT.items()):
@@ -679,9 +1181,27 @@ def _compact_auth_email_state(now: float) -> None:
         AUTH_EMAIL_WINDOW.pop(key, None)
         AUTH_EMAIL_BLOCKED_UNTIL.pop(key, None)
 
+    ip_stale_before = now - max(300.0, AUTH_EMAIL_IP_WINDOW_SECONDS * 4)
+    for key, attempts in list(AUTH_EMAIL_IP_WINDOW.items()):
+        blocked_until = AUTH_EMAIL_IP_BLOCKED_UNTIL.get(key, 0.0)
+        recent_attempts = [
+            ts
+            for ts in attempts
+            if (now - ts) <= AUTH_EMAIL_IP_WINDOW_SECONDS
+        ]
+        if recent_attempts or blocked_until > now:
+            AUTH_EMAIL_IP_WINDOW[key] = recent_attempts
+            continue
+        if attempts and attempts[-1] >= ip_stale_before:
+            AUTH_EMAIL_IP_WINDOW[key] = recent_attempts
+            continue
+        AUTH_EMAIL_IP_WINDOW.pop(key, None)
+        AUTH_EMAIL_IP_BLOCKED_UNTIL.pop(key, None)
+
 
 def _is_auth_email_request_allowed(email: str, client_ip: str) -> Tuple[bool, str]:
     key = _auth_email_key(email, client_ip)
+    ip_key = _auth_email_ip_key(client_ip)
     now = time.time()
 
     with AUTH_EMAIL_ABUSE_LOCK:
@@ -690,6 +1210,10 @@ def _is_auth_email_request_allowed(email: str, client_ip: str) -> Tuple[bool, st
         blocked_until = AUTH_EMAIL_BLOCKED_UNTIL.get(key, 0.0)
         if blocked_until > now:
             return False, "blocked"
+
+        ip_blocked_until = AUTH_EMAIL_IP_BLOCKED_UNTIL.get(ip_key, 0.0)
+        if ip_blocked_until > now:
+            return False, "ip-blocked"
 
         window = [
             ts
@@ -716,6 +1240,17 @@ def _is_auth_email_request_allowed(email: str, client_ip: str) -> Tuple[bool, st
         if len(window) > AUTH_EMAIL_MAX_ATTEMPTS:
             AUTH_EMAIL_BLOCKED_UNTIL[key] = now + AUTH_EMAIL_BLOCK_SECONDS
             return False, "window-limit"
+
+        ip_window = [
+            ts
+            for ts in AUTH_EMAIL_IP_WINDOW.get(ip_key, [])
+            if (now - ts) <= AUTH_EMAIL_IP_WINDOW_SECONDS
+        ]
+        ip_window.append(now)
+        AUTH_EMAIL_IP_WINDOW[ip_key] = ip_window
+        if len(ip_window) > AUTH_EMAIL_IP_MAX_ATTEMPTS:
+            AUTH_EMAIL_IP_BLOCKED_UNTIL[ip_key] = now + AUTH_EMAIL_IP_BLOCK_SECONDS
+            return False, "ip-window-limit"
 
     return True, "ok"
 
@@ -798,6 +1333,20 @@ def _normalize_origin(candidate: str) -> Optional[str]:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+def _normalize_absolute_http_url(candidate: str) -> Optional[str]:
+    try:
+        parsed = urlparse(candidate)
+    except Exception:
+        return None
+
+    if parsed.scheme not in ("http", "https"):
+        return None
+    if not parsed.netloc:
+        return None
+
+    return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+
+
 def _build_auth_redirect_url(
     path: str,
     client_redirect_to: str = "",
@@ -843,6 +1392,67 @@ def _build_auth_redirect_url(
     return None
 
 
+def _build_external_passkey_redirect(
+    intent: str,
+    state_token: str,
+    client_redirect_to: str = "",
+) -> Optional[str]:
+    normalized_intent = intent.strip().lower()
+    if normalized_intent not in {"sign-in", "enroll"}:
+        return None
+    if not PASSKEY_CALLBACK_STATE_PATTERN.match(state_token):
+        return None
+
+    base_url = AUTH_PASSKEY_EXTERNAL_SIGNIN_URL
+    if normalized_intent == "enroll":
+        base_url = AUTH_PASSKEY_EXTERNAL_ENROLL_URL or AUTH_PASSKEY_EXTERNAL_SIGNIN_URL
+
+    normalized_base = _normalize_absolute_http_url(base_url)
+    if not normalized_base:
+        return None
+
+    return_path = "/login" if normalized_intent == "sign-in" else "/app/settings"
+    suite_return_to = _build_auth_redirect_url(
+        return_path,
+        client_redirect_to,
+        query_params={
+            "passkey_state": state_token,
+            "passkey_intent": normalized_intent,
+        },
+    )
+    callback_api = _build_auth_redirect_url(
+        "/api/auth/passkey/callback/complete",
+        client_redirect_to,
+    )
+
+    parsed = urlparse(normalized_base)
+    query_pairs = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query_pairs["suite_intent"] = normalized_intent
+    query_pairs["suite_state"] = state_token
+    query_pairs["suite_callback_sig_required"] = (
+        "1" if AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK else "0"
+    )
+    query_pairs["suite_callback_sig_alg"] = "hmac-sha256"
+    query_pairs["suite_callback_sig_payload"] = (
+        "state,intent,status,email,error,timestamp"
+    )
+    query_pairs["suite_callback_sig_max_age_seconds"] = str(
+        AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_AGE_SECONDS
+    )
+    query_pairs["suite_claims_required"] = "1"
+    query_pairs["suite_claims_format"] = "jwt"
+    query_pairs["suite_claims_alg"] = "HS256"
+    if suite_return_to:
+        query_pairs["suite_return_to"] = suite_return_to
+    if callback_api:
+        query_pairs["suite_callback_api"] = callback_api
+
+    query = urlencode(query_pairs)
+    return urlunparse(
+        (parsed.scheme, parsed.netloc, parsed.path, parsed.params, query, parsed.fragment)
+    )
+
+
 def _send_supabase_email_link(
     email: str,
     flow: str,
@@ -881,6 +1491,54 @@ def _send_supabase_email_link(
         raise RuntimeError(
             f"Supabase email auth request failed ({response.status_code})"
         )
+
+
+def _generate_supabase_magic_link_url(
+    email: str,
+    client_redirect_to: str = "",
+    redirect_path: str = "/login",
+) -> str:
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("Supabase service role key is required for magic-link generation.")
+
+    redirect_to = _build_auth_redirect_url(
+        redirect_path,
+        client_redirect_to,
+    )
+
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": "application/json",
+    }
+
+    endpoint = f"{SUPABASE_URL.rstrip('/')}/auth/v1/admin/generate_link"
+    payload: Dict[str, Any] = {
+        "type": "magiclink",
+        "email": email,
+    }
+
+    params: Dict[str, str] = {}
+    if redirect_to:
+        params["redirect_to"] = redirect_to
+
+    response = requests.post(
+        endpoint,
+        headers=headers,
+        json=payload,
+        params=params if params else None,
+        timeout=8,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"Supabase admin generate_link failed ({response.status_code})"
+        )
+
+    body = response.json() if response.content else {}
+    action_link = str(body.get("action_link") or "").strip()
+    if not action_link:
+        raise RuntimeError("Supabase generate_link response missing action_link.")
+    return action_link
 
 
 def _verify_supabase_user_token(token: str) -> Optional[Dict[str, Any]]:
@@ -2464,6 +3122,309 @@ def get_manager() -> AutoCADManager:
 
 # ========== AGENT BROKER ENDPOINTS ==========
 
+@app.route('/api/auth/passkey-capability', methods=['GET'])
+@limiter.limit("60 per hour")
+def api_auth_passkey_capability():
+    """Expose passkey rollout capability status for frontend gating."""
+    payload = _auth_passkey_capability()
+    return jsonify({
+        "ok": True,
+        "passkey": payload,
+        "server_time": datetime.utcnow().isoformat() + "Z",
+    }), 200
+
+
+@app.route('/api/auth/passkey/sign-in', methods=['POST'])
+@limiter.limit("20 per hour")
+def api_auth_passkey_sign_in():
+    """Start a passkey sign-in flow."""
+    payload = request.get_json(silent=True) if request.is_json else {}
+    payload = payload or {}
+    client_redirect_to = str(
+        payload.get("redirectTo") or payload.get("redirect_to") or ""
+    ).strip()
+    client_ip = _get_request_ip()
+
+    capability = _auth_passkey_capability()
+    if not capability.get("enabled"):
+        return jsonify({
+            "error": "Passkey sign-in is disabled.",
+            "code": "passkey-disabled",
+        }), 503
+
+    if not capability.get("handlers_ready"):
+        return jsonify({
+            "error": "Passkey sign-in is not available for the configured provider.",
+            "code": "passkey-provider-unavailable",
+            "provider": capability.get("provider"),
+            "next_step": capability.get("next_step"),
+        }), 501
+
+    state_token, expires_at = _create_passkey_callback_state(
+        intent="sign-in",
+        client_ip=client_ip,
+        client_redirect_to=client_redirect_to,
+    )
+    redirect_url = _build_external_passkey_redirect(
+        "sign-in",
+        state_token,
+        client_redirect_to,
+    )
+    if not redirect_url:
+        with PASSKEY_CALLBACK_STATES_LOCK:
+            PASSKEY_CALLBACK_STATES.pop(state_token, None)
+        return jsonify({
+            "error": "Passkey sign-in provider URL is invalid or missing.",
+            "code": "passkey-config-invalid",
+        }), 503
+
+    return jsonify({
+        "ok": True,
+        "method": "passkey",
+        "mode": "redirect",
+        "provider": capability.get("provider"),
+        "provider_label": capability.get("provider_label"),
+        "state": state_token,
+        "state_expires_at": datetime.utcfromtimestamp(expires_at).isoformat() + "Z",
+        "redirect_url": redirect_url,
+        "message": "Continue passkey sign-in with your identity provider.",
+    }), 200
+
+
+@app.route('/api/auth/passkey/enroll', methods=['POST'])
+@require_supabase_user
+@limiter.limit("20 per hour")
+def api_auth_passkey_enroll():
+    """Start a passkey enrollment flow for an authenticated user."""
+    payload = request.get_json(silent=True) if request.is_json else {}
+    payload = payload or {}
+    client_redirect_to = str(
+        payload.get("redirectTo") or payload.get("redirect_to") or ""
+    ).strip()
+    client_ip = _get_request_ip()
+
+    user = getattr(g, "supabase_user", {}) or {}
+    user_id = _get_supabase_user_id(user) or ""
+    user_email = _get_supabase_user_email(user) or ""
+
+    capability = _auth_passkey_capability()
+    if not capability.get("enabled"):
+        return jsonify({
+            "error": "Passkey enrollment is disabled.",
+            "code": "passkey-disabled",
+        }), 503
+
+    if not capability.get("handlers_ready"):
+        return jsonify({
+            "error": "Passkey enrollment is not available for the configured provider.",
+            "code": "passkey-provider-unavailable",
+            "provider": capability.get("provider"),
+            "next_step": capability.get("next_step"),
+        }), 501
+
+    state_token, expires_at = _create_passkey_callback_state(
+        intent="enroll",
+        client_ip=client_ip,
+        client_redirect_to=client_redirect_to,
+        user_id=user_id,
+        email=user_email,
+    )
+    redirect_url = _build_external_passkey_redirect(
+        "enroll",
+        state_token,
+        client_redirect_to,
+    )
+    if not redirect_url:
+        with PASSKEY_CALLBACK_STATES_LOCK:
+            PASSKEY_CALLBACK_STATES.pop(state_token, None)
+        return jsonify({
+            "error": "Passkey enrollment provider URL is invalid or missing.",
+            "code": "passkey-config-invalid",
+        }), 503
+
+    return jsonify({
+        "ok": True,
+        "method": "passkey",
+        "mode": "redirect",
+        "provider": capability.get("provider"),
+        "provider_label": capability.get("provider_label"),
+        "state": state_token,
+        "state_expires_at": datetime.utcfromtimestamp(expires_at).isoformat() + "Z",
+        "redirect_url": redirect_url,
+        "message": "Continue passkey enrollment with your identity provider.",
+    }), 200
+
+
+@app.route('/api/auth/passkey/callback/complete', methods=['POST'])
+@limiter.limit("60 per hour")
+def api_auth_passkey_callback_complete():
+    """Complete a passkey callback by consuming one-time state and issuing the next auth step."""
+    if not request.is_json:
+        return jsonify({"error": "Expected JSON payload."}), 400
+
+    payload = request.get_json(silent=True) or {}
+    state_token = str(
+        payload.get("state")
+        or payload.get("passkey_state")
+        or ""
+    ).strip()
+    if not state_token:
+        return jsonify({"error": "state is required."}), 400
+    if not PASSKEY_CALLBACK_STATE_PATTERN.match(state_token):
+        return jsonify({"error": "Invalid state format."}), 400
+
+    status = str(payload.get("status") or payload.get("passkey_status") or "").strip().lower()
+    if status not in {"success", "failed"}:
+        return jsonify({"error": "status must be success or failed."}), 400
+
+    callback_state, reason = _get_passkey_callback_state(state_token)
+    if not callback_state:
+        if reason == "expired":
+            return jsonify({"error": "Passkey callback state expired. Start again."}), 410
+        return jsonify({"error": "Invalid passkey callback state."}), 400
+
+    intent = str(callback_state.get("intent") or "").strip().lower()
+    payload_intent = str(
+        payload.get("intent") or payload.get("passkey_intent") or ""
+    ).strip().lower()
+    if payload_intent and payload_intent != intent:
+        return jsonify({
+            "error": "Passkey callback intent mismatch.",
+            "code": "passkey-intent-mismatch",
+        }), 400
+
+    provider_error = str(
+        payload.get("error") or payload.get("passkey_error") or ""
+    ).strip()
+    email = str(payload.get("email") or payload.get("passkey_email") or "").strip().lower()
+    callback_signature = str(
+        payload.get("signature")
+        or payload.get("passkey_signature")
+        or payload.get("provider_signature")
+        or ""
+    ).strip().lower()
+    callback_timestamp_raw = str(
+        payload.get("timestamp")
+        or payload.get("passkey_timestamp")
+        or payload.get("provider_timestamp")
+        or ""
+    ).strip()
+
+    if status == "success" and intent == "sign-in" and not _is_valid_email(email):
+        return jsonify({
+            "error": "A valid email is required to complete passkey sign-in.",
+            "code": "passkey-email-required",
+        }), 400
+
+    signature_ok, signature_reason = _verify_passkey_callback_signature(
+        state=state_token,
+        intent=intent,
+        status=status,
+        email=email,
+        error_message=provider_error,
+        signature=callback_signature,
+        timestamp_raw=callback_timestamp_raw,
+    )
+    if not signature_ok:
+        state_fingerprint = hashlib.sha256(state_token.encode("utf-8")).hexdigest()[:12]
+        logger.warning(
+            "Rejected passkey callback signature: reason=%s intent=%s state_hash=%s ip=%s",
+            signature_reason,
+            intent,
+            state_fingerprint,
+            _get_request_ip(),
+        )
+        return jsonify({
+            "error": "Passkey callback signature validation failed.",
+            "code": "passkey-callback-signature-invalid",
+            "reason": signature_reason,
+        }), 401
+
+    callback_state, reason = _consume_passkey_callback_state(state_token)
+    if not callback_state:
+        if reason == "expired":
+            return jsonify({"error": "Passkey callback state expired. Start again."}), 410
+        return jsonify({
+            "error": "Passkey callback state has already been used.",
+            "code": "passkey-callback-state-used",
+        }), 409
+
+    client_redirect_to = str(callback_state.get("client_redirect_to") or "").strip()
+    expected_email = str(callback_state.get("email") or "").strip().lower()
+    if intent == "enroll" and expected_email and email and expected_email != email:
+        return jsonify({
+            "error": "Passkey enrollment email mismatch.",
+            "code": "passkey-email-mismatch",
+        }), 400
+
+    if status == "failed":
+        message = provider_error or "Passkey verification was not completed."
+        return jsonify({
+            "ok": True,
+            "completed": False,
+            "intent": intent,
+            "status": "failed",
+            "message": message,
+        }), 200
+
+    if intent == "sign-in":
+        if SUPABASE_SERVICE_ROLE_KEY:
+            try:
+                magic_link = _generate_supabase_magic_link_url(
+                    email,
+                    client_redirect_to=client_redirect_to,
+                    redirect_path="/login",
+                )
+                return jsonify({
+                    "ok": True,
+                    "completed": True,
+                    "intent": intent,
+                    "session_mode": "magic-link-direct",
+                    "resume_url": magic_link,
+                    "message": "Passkey verified. Continuing sign-in.",
+                }), 200
+            except Exception as exc:
+                logger.warning("Passkey callback direct magic-link generation failed: %s", exc)
+
+        try:
+            _send_supabase_email_link(
+                email,
+                "signin",
+                client_redirect_to=client_redirect_to,
+                redirect_path="/login",
+            )
+        except Exception as exc:
+            logger.warning("Passkey callback email-link fallback failed: %s", exc)
+            return jsonify({
+                "error": "Passkey callback completed, but sign-in continuation failed.",
+                "code": "passkey-continuation-failed",
+            }), 502
+
+        return jsonify({
+            "ok": True,
+            "completed": True,
+            "intent": intent,
+            "session_mode": "email-link-fallback",
+            "message": "Passkey verified. Check your email to finish sign-in.",
+        }), 200
+
+    if intent == "enroll":
+        settings_url = _build_auth_redirect_url("/app/settings", client_redirect_to)
+        return jsonify({
+            "ok": True,
+            "completed": True,
+            "intent": intent,
+            "status": "success",
+            "redirect_to": settings_url,
+            "message": "Passkey enrollment verified. Return to settings.",
+        }), 200
+
+    return jsonify({
+        "error": "Unsupported passkey callback intent.",
+        "code": "passkey-intent-invalid",
+    }), 400
+
+
 @app.route('/api/auth/email-link', methods=['POST'])
 @limiter.limit("12 per hour")
 def api_auth_email_link():
@@ -2584,6 +3545,27 @@ def api_agent_pairing_challenge():
         payload.get("redirectTo") or payload.get("redirect_to") or ""
     ).strip()
     client_ip = _get_request_ip()
+    allowed, reason, retry_after_seconds = _is_agent_pairing_action_allowed(
+        user_id,
+        action,
+    )
+    if not allowed:
+        logger.warning(
+            "Pairing challenge throttled action=%s reason=%s user=%s ip=%s",
+            action,
+            reason,
+            _email_fingerprint(user_email),
+            client_ip,
+        )
+        response = jsonify({
+            "error": "Too many verification requests. Please wait and try again.",
+            "reason": reason,
+            "retry_after_seconds": retry_after_seconds,
+        })
+        if retry_after_seconds > 0:
+            response.headers["Retry-After"] = str(retry_after_seconds)
+        return response, 429
+
     challenge_id, expires_at = _create_agent_pairing_challenge(
         action=action,
         user_id=user_id,
@@ -2657,6 +3639,16 @@ def api_agent_pairing_confirm():
     user_email = _get_supabase_user_email(user)
     if not user_id or not user_email:
         return jsonify({"error": "Authenticated user must have a valid email address."}), 400
+    client_ip = _get_request_ip()
+
+    blocked, retry_after_seconds = _is_agent_pairing_confirm_blocked(user_id, client_ip)
+    if blocked:
+        response = jsonify({
+            "error": "Too many invalid verification attempts. Please request a new link and try later.",
+            "retry_after_seconds": retry_after_seconds,
+        })
+        response.headers["Retry-After"] = str(retry_after_seconds)
+        return response, 429
 
     challenge, reason = _consume_agent_pairing_challenge(
         challenge_id=challenge_id,
@@ -2664,6 +3656,19 @@ def api_agent_pairing_confirm():
         email=user_email,
     )
     if not challenge:
+        should_count_failure = reason in {"missing", "user-mismatch", "email-mismatch"}
+        if should_count_failure:
+            blocked_after_failure, blocked_retry_after = _register_agent_pairing_confirm_failure(
+                user_id,
+                client_ip,
+            )
+            if blocked_after_failure:
+                response = jsonify({
+                    "error": "Too many invalid verification attempts. Please request a new link and try later.",
+                    "retry_after_seconds": blocked_retry_after,
+                })
+                response.headers["Retry-After"] = str(blocked_retry_after)
+                return response, 429
         if reason == "expired":
             return jsonify({"error": "Verification link expired. Request a new one."}), 410
         if reason in {"user-mismatch", "email-mismatch"}:
@@ -2674,8 +3679,9 @@ def api_agent_pairing_confirm():
     if action == "pair":
         pairing_code = str(challenge.get("pairing_code") or "").strip()
         if not pairing_code:
+            _register_agent_pairing_confirm_failure(user_id, client_ip)
             return jsonify({"error": "Pairing challenge is missing code."}), 400
-        return _pair_agent_session_for_user(
+        response = _pair_agent_session_for_user(
             pairing_code,
             user_id,
             extra_payload={
@@ -2683,6 +3689,9 @@ def api_agent_pairing_confirm():
                 "action": "pair",
             },
         )
+        if response[1] < 400:
+            _clear_agent_pairing_confirm_failures(user_id, client_ip)
+        return response
 
     if action == "unpair":
         session = _get_agent_session()
@@ -2701,10 +3710,12 @@ def api_agent_pairing_confirm():
             "verified": True,
             "action": "unpair",
         })
+        _clear_agent_pairing_confirm_failures(user_id, client_ip)
         resp = jsonify(payload)
         resp.delete_cookie(AGENT_SESSION_COOKIE, path="/")
         return resp, 200
 
+    _register_agent_pairing_confirm_failure(user_id, client_ip)
     return jsonify({"error": "Unsupported challenge action."}), 400
 
 

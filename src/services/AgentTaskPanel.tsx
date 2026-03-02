@@ -1,5 +1,13 @@
 import { ChevronRight, History, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/notification-system/ToastProvider";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import {
 	agentTaskManager,
@@ -18,6 +26,7 @@ export function AgentTaskPanel({
 	isExecuting = false,
 }: AgentTaskPanelProps) {
 	const { palette } = useTheme();
+	const { showToast } = useToast();
 	const [activeTab, setActiveTab] = useState<"quick" | "custom" | "history">(
 		"quick",
 	);
@@ -26,6 +35,7 @@ export function AgentTaskPanel({
 	const [selectedPredefinedTask, setSelectedPredefinedTask] = useState<
 		string | null
 	>(null);
+	const [confirmClearHistory, setConfirmClearHistory] = useState(false);
 
 	useEffect(() => {
 		setTaskHistory(agentTaskManager.getTaskHistory());
@@ -59,10 +69,14 @@ export function AgentTaskPanel({
 	};
 
 	const handleClearHistory = () => {
-		if (confirm("Clear all task history? This cannot be undone.")) {
-			agentTaskManager.clearHistory();
-			setTaskHistory([]);
-		}
+		setConfirmClearHistory(true);
+	};
+
+	const confirmClearTaskHistory = () => {
+		agentTaskManager.clearHistory();
+		setTaskHistory([]);
+		setConfirmClearHistory(false);
+		showToast("success", "Task history cleared.");
 	};
 
 	const tabButtonStyle = (isActive: boolean) => ({
@@ -80,16 +94,17 @@ export function AgentTaskPanel({
 	});
 
 	return (
-		<div
-			style={{
-				display: "flex",
-				flexDirection: "column",
-				height: "100%",
-				background: hexToRgba(palette.surfaceLight, 0.5),
-				borderRadius: "8px",
-				overflow: "hidden",
-			}}
-		>
+		<>
+			<div
+				style={{
+					display: "flex",
+					flexDirection: "column",
+					height: "100%",
+					background: hexToRgba(palette.surfaceLight, 0.5),
+					borderRadius: "8px",
+					overflow: "hidden",
+				}}
+			>
 			{/* Tab Navigation */}
 			<div
 				style={{
@@ -422,7 +437,32 @@ export function AgentTaskPanel({
 						)}
 					</div>
 				)}
+				</div>
 			</div>
-		</div>
+			<Dialog open={confirmClearHistory} onOpenChange={setConfirmClearHistory}>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Clear task history?</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						This permanently removes all saved task runs.
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setConfirmClearHistory(false)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={confirmClearTaskHistory}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						>
+							Clear
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</>
 	);
 }

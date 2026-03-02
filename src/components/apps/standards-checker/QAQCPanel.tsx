@@ -11,6 +11,14 @@ import {
 	Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
 import { FrameSection } from "../ui/PageFrame";
@@ -88,6 +96,7 @@ interface Issue {
 }
 
 export function QAQCChecker() {
+	const { showToast } = useToast();
 	const [drawings, setDrawings] = useState<DrawingAnnotation[]>([]);
 	const [rules, setRules] = useState<QARule[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -95,6 +104,8 @@ export function QAQCChecker() {
 		useState<DrawingAnnotation | null>(null);
 	const [showRulesModal, setShowRulesModal] = useState(false);
 	const [showUploadModal, setShowUploadModal] = useState(false);
+	const [pendingDeleteDrawing, setPendingDeleteDrawing] =
+		useState<DrawingAnnotation | null>(null);
 	const [filterStatus, setFilterStatus] = useState<string>("all");
 	const [searchTerm, setSearchTerm] = useState("");
 	const [checkingDrawing, setCheckingDrawing] = useState(false);
@@ -321,9 +332,9 @@ export function QAQCChecker() {
 		);
 	};
 
-	const deleteDrawing = async (id: string) => {
-		if (!confirm("Delete this drawing check?")) return;
-
+	const confirmDeleteDrawing = async () => {
+		if (!pendingDeleteDrawing) return;
+		const id = pendingDeleteDrawing.id;
 		const { error } = await supabase
 			.from("drawing_annotations")
 			.delete()
@@ -334,7 +345,11 @@ export function QAQCChecker() {
 			if (selectedDrawing?.id === id) {
 				setSelectedDrawing(null);
 			}
+			showToast("success", "Drawing check deleted.");
+		} else {
+			showToast("error", "Failed to delete drawing check.");
 		}
+		setPendingDeleteDrawing(null);
 	};
 
 	const filteredDrawings = drawings.filter((drawing) => {
@@ -543,11 +558,11 @@ export function QAQCChecker() {
 										<Eye className="w-4 h-4" />
 										<span>Details</span>
 									</button>
-									<button
-										onClick={(e) => {
-											e.stopPropagation();
-											deleteDrawing(drawing.id);
-										}}
+										<button
+											onClick={(e) => {
+												e.stopPropagation();
+												setPendingDeleteDrawing(drawing);
+											}}
 										className="px-3 py-2 [background:color-mix(in_srgb,var(--danger)_20%,var(--surface))] hover:[background:color-mix(in_srgb,var(--danger)_30%,var(--surface))] border [border-color:color-mix(in_srgb,var(--danger)_40%,transparent)] [color:var(--danger)] rounded-lg transition-all text-sm"
 									>
 										<XCircle className="w-4 h-4" />
@@ -691,7 +706,7 @@ export function QAQCChecker() {
 				</div>
 			)}
 
-			{selectedDrawing && (
+				{selectedDrawing && (
 				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
 					<div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] backdrop-blur-xl">
 						<div className="sticky top-0 z-10 flex items-center justify-between border-b [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-6 backdrop-blur-sm">
@@ -822,8 +837,35 @@ export function QAQCChecker() {
 							</div>
 						</div>
 					</div>
-				</div>
-			)}
-		</div>
-	);
-}
+					</div>
+				)}
+				<Dialog
+					open={Boolean(pendingDeleteDrawing)}
+					onOpenChange={(open) => !open && setPendingDeleteDrawing(null)}
+				>
+					<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+						<DialogHeader>
+							<DialogTitle>Delete drawing check?</DialogTitle>
+						</DialogHeader>
+						<p className="text-sm text-[var(--text-muted)]">
+							Delete "{pendingDeleteDrawing?.drawing_name ?? "this check"}"?
+						</p>
+						<DialogFooter className="mt-4 gap-2 sm:justify-end">
+							<button
+								onClick={() => setPendingDeleteDrawing(null)}
+								className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={() => void confirmDeleteDrawing()}
+								className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+							>
+								Delete
+							</button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			</div>
+		);
+	}

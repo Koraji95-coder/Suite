@@ -576,6 +576,21 @@ Notes:
 | `require_pairing` | `true` | require pairing before bearer auth |
 | `allow_public_bind` | `false` | block accidental public exposure |
 
+Suite passkey bridge environment variables:
+
+- `ZC_SUITE_PASSKEY_CALLBACK_SIGNING_SECRET`:
+  shared HMAC secret for `GET /suite/passkey/callback` when Suite sets `suite_callback_sig_required=1`.
+- `ZC_SUITE_CALLBACK_ALLOWED_ORIGINS`:
+  comma-separated allowed origins for `suite_return_to` (fallbacks to `AUTH_ALLOWED_REDIRECT_ORIGINS`, then localhost defaults).
+- `ZC_SUITE_PASSKEY_PROVIDER_JWT_SECRET`:
+  provider JWT verification secret used when Suite sets `suite_claims_required=1`.
+- `ZC_SUITE_PASSKEY_PROVIDER_JWT_ISSUER` / `ZC_SUITE_PASSKEY_PROVIDER_JWT_AUDIENCE`:
+  optional strict JWT issuer/audience checks for provider claims.
+- `ZC_SUITE_PASSKEY_PROVIDER_JWT_REQUIRE_EXP` / `ZC_SUITE_PASSKEY_PROVIDER_JWT_REQUIRE_STATE`:
+  optional claim requirement toggles (default `true` for both).
+- `ZC_SUITE_PASSKEY_PROVIDER_JWT_CLOCK_SKEW_SECONDS`:
+  allowed timestamp skew for `exp`/`nbf`/`iat` validation (default `60`).
+
 ## `[gateway.node_control]` (experimental)
 
 | Key | Default | Purpose |

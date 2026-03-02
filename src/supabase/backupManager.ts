@@ -52,7 +52,11 @@ export async function fetchAllData(): Promise<BackupData> {
 				.order("created_at", { ascending: true });
 
 			if (error) {
-				console.warn(`Backup: skipping table "${tableName}":`, error.message);
+				logger.warn(
+					`Backup: skipping table "${tableName}"`,
+					"backupManager",
+					error.message,
+				);
 				tables[tableName] = [];
 			} else {
 				tables[tableName] = (data ?? []) as Record<string, unknown>[];
@@ -102,7 +106,7 @@ export function saveToLocalStorage(yamlStr: string): void {
 		localStorage.setItem(BACKUP_STORAGE_KEY, yamlStr);
 		localStorage.setItem(BACKUP_TIMESTAMP_KEY, new Date().toISOString());
 	} catch (e) {
-		console.warn("Backup: localStorage save failed (quota?):", e);
+		logger.warn("Backup: localStorage save failed (quota?)", "backupManager", e);
 	}
 }
 

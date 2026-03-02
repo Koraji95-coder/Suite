@@ -4,14 +4,17 @@
  */
 
 import type { User } from "@supabase/supabase-js";
-import { createContext, type ReactNode, useEffect, useState } from "react";
+import { createContext, type ReactNode, useEffect, useRef, useState } from "react";
 import {
 	requestEmailAuthLink,
 	type EmailAuthRequestOptions,
 } from "./emailAuthApi";
 import { agentTaskManager } from "../services/agentTaskManager";
 import { agentService } from "../services/agentService";
-import { logSecurityEvent } from "../services/securityEventService";
+import {
+	logAuthMethodTelemetry,
+	logSecurityEvent,
+} from "../services/securityEventService";
 import { logger } from "../lib/logger";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
@@ -94,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const [user, setUser] = useState<User | null>(null);
 	const [profile, setProfile] = useState<Profile | null>(null);
 	const [loading, setLoading] = useState(true);
+	const lastSignedInTelemetryKeyRef = useRef<string>("");
 
 	const isUserAdmin = (authUser: User | null): boolean => {
 		if (!authUser) return false;
@@ -157,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		// Listen for auth state changes
 		const {
 			data: { subscription },
-		} = supabase.auth.onAuthStateChange((_event, session) => {
+		} = supabase.auth.onAuthStateChange((event, session) => {
 			const currentUser = session?.user ?? null;
 			setUser(currentUser);
 			agentService.setActiveUser(
@@ -168,6 +172,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			agentTaskManager.setScope(currentUser?.id ?? null);
 
 			if (currentUser) {
+				if (event === "SIGNED_IN") {
+					const sessionIssuedAt =
+						typeof session?.expires_at === "number"
+							? String(session.expires_at)
+							: "unknown";
+					const key = `${currentUser.id}:${sessionIssuedAt}`;
+					if (lastSignedInTelemetryKeyRef.current !== key) {
+						lastSignedInTelemetryKeyRef.current = key;
+						void logAuthMethodTelemetry(
+							"email_link",
+							"sign_in_completed",
+							"Signed in with passwordless email-link authentication.",
+						);
+					}
+				}
+
 				// Async-safe pattern: avoid deadlocks by not awaiting directly inside the callback
 				(async () => {
 					const p = await ensureProfileForUser(currentUser);
@@ -185,6 +205,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 	const signIn = async (email: string, options?: EmailAuthRequestOptions) => {
 		await requestEmailAuthLink(email, "signin", options);
+		await logAuthMethodTelemetry(
+			"email_link",
+			"sign_in_link_requested",
+			"Sign-in email-link authentication requested.",
+		);
 		await logSecurityEvent(
 			"auth_sign_in_success",
 			"Sign-in email link requested.",
@@ -193,6 +218,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 	const signUp = async (email: string, options?: EmailAuthRequestOptions) => {
 		await requestEmailAuthLink(email, "signup", options);
+		await logAuthMethodTelemetry(
+			"email_link",
+			"sign_up_link_requested",
+			"Sign-up email-link authentication requested.",
+		);
 		await logSecurityEvent(
 			"auth_sign_up_success",
 			"Sign-up email link requested.",

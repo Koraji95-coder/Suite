@@ -1,4 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNotification } from "@/auth/NotificationContext";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { supabase } from "@/supabase/client";
 import { SavedWhiteboard } from "../whiteboardtypes";
 import { LibraryFilters } from "./LibraryFilters";
@@ -19,6 +27,10 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 	const [selectedTag, setSelectedTag] = useState<string>("all");
 	const [viewingWhiteboard, setViewingWhiteboard] =
 		useState<SavedWhiteboard | null>(null);
+	const [pendingDelete, setPendingDelete] = useState<SavedWhiteboard | null>(
+		null,
+	);
+	const notifications = useNotification();
 
 	const loadWhiteboards = useCallback(async () => {
 		setLoading(true);
@@ -29,20 +41,43 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 
 		if (!error && data) {
 			setWhiteboards(data);
+		} else if (error) {
+			notifications.error("Failed to load whiteboards", error.message);
 		}
 		setLoading(false);
-	}, []);
+	}, [notifications]);
 
 	useEffect(() => {
-		loadWhiteboards();
+		void loadWhiteboards();
 	}, [loadWhiteboards]);
 
-	const deleteWhiteboard = async (id: string) => {
-		if (!confirm("Delete this whiteboard?")) return;
-		const { error } = await supabase.from("whiteboards").delete().eq("id", id);
-		if (!error) {
-			setWhiteboards(whiteboards.filter((w) => w.id !== id));
+	const requestDeleteWhiteboard = useCallback(
+		(id: string) => {
+			const found =
+				whiteboards.find((whiteboard) => whiteboard.id === id) ?? null;
+			setPendingDelete(found);
+		},
+		[whiteboards],
+	);
+
+	const confirmDeleteWhiteboard = async () => {
+		if (!pendingDelete) return;
+		const deleteId = pendingDelete.id;
+		const deleteTitle = pendingDelete.title;
+		const { error } = await supabase
+			.from("whiteboards")
+			.delete()
+			.eq("id", deleteId);
+		if (error) {
+			notifications.error("Failed to delete whiteboard", error.message);
+			return;
 		}
+
+		setWhiteboards((prev) =>
+			prev.filter((whiteboard) => whiteboard.id !== deleteId),
+		);
+		notifications.success("Whiteboard deleted", deleteTitle);
+		setPendingDelete(null);
 	};
 
 	const allPanels = [
@@ -93,7 +128,7 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 			<LibraryGrid
 				whiteboards={filteredWhiteboards}
 				onView={setViewingWhiteboard}
-				onDelete={deleteWhiteboard}
+				onDelete={requestDeleteWhiteboard}
 				emptyMessage={
 					searchTerm || selectedPanel !== "all" || selectedTag !== "all"
 						? "No whiteboards match your filters"
@@ -105,6 +140,35 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 				whiteboard={viewingWhiteboard}
 				onClose={() => setViewingWhiteboard(null)}
 			/>
+
+			<Dialog
+				open={Boolean(pendingDelete)}
+				onOpenChange={(open) => !open && setPendingDelete(null)}
+			>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Delete whiteboard?</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						This permanently deletes {pendingDelete?.title ?? "this whiteboard"}
+						.
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setPendingDelete(null)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={() => void confirmDeleteWhiteboard()}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						>
+							Delete
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

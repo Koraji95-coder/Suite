@@ -136,12 +136,37 @@ Downloads the bundled transmittal template DOCX.
 
 The backend can broker ZeroClaw pairing + webhook calls so the browser never sees the bearer token.
 
+Auth helper endpoint:
+
+- `GET /api/auth/passkey-capability` → passkey rollout gate status (`enabled`, `provider`, `rollout_state`, config diagnostics)
+- `POST /api/auth/passkey/sign-in` → starts passkey sign-in (`mode=redirect`, returns `redirect_url` when external provider path is configured)
+- `POST /api/auth/passkey/enroll` → starts passkey enrollment for authenticated users (`Authorization: Bearer <access_token>`)
+- `POST /api/auth/passkey/callback/complete` → consumes one-time passkey callback state and issues the next auth step (`resume_url` or fallback instructions)
+  - payload: `{ state, status: "success" | "failed", email?, error?, intent?, signature?, timestamp? }`
+  - when `AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK=true`, `signature` + `timestamp` are required and verified server-side
+  - signature payload contract (HMAC-SHA256):
+    - canonical string: `state + "\n" + intent + "\n" + status + "\n" + email + "\n" + error + "\n" + timestamp`
+    - key: `AUTH_PASSKEY_CALLBACK_SIGNING_SECRET`
+    - hash format: lowercase hex digest
+  - start redirect includes callback contract hints for external providers:
+    - `suite_callback_sig_required`
+    - `suite_callback_sig_alg`
+    - `suite_callback_sig_payload`
+    - `suite_callback_sig_max_age_seconds`
+    - `suite_claims_required`
+    - `suite_claims_format`
+    - `suite_claims_alg`
+  - ZeroClaw bridge implementation for this contract:
+    - `GET /suite/passkey/callback` in `zeroclaw-main/src/gateway/mod.rs`
+    - setup doc: `zeroclaw-main/docs/suite-passkey-bridge.md`
+
 Endpoints (all require Supabase auth `Authorization: Bearer <access_token>`):
 
 - `GET /api/agent/health` → proxy gateway health
 - `GET /api/agent/session` → `{ paired: boolean, expires_at?: string }`
 - `POST /api/agent/pairing-challenge` → `{ action: "pair" | "unpair", pairing_code?: "123456" }`
 - `POST /api/agent/pairing-confirm` → `{ challenge_id: "<from-email-link>" }`
+- Pairing endpoints may return `429` with `retry_after_seconds` and `Retry-After` when abuse controls are triggered
 - `POST /api/agent/session/clear` → clear broker cookie/session during sign-out cleanup
 - `POST /api/agent/pair` and `POST /api/agent/unpair` return `428` (direct pair/unpair is intentionally disabled)
 - `POST /api/agent/webhook` → same payload as gateway `/webhook`
@@ -157,6 +182,28 @@ Broker env vars (backend-only):
 - `AGENT_PAIRING_CHALLENGE_TTL_SECONDS`
 - `AGENT_PAIRING_CHALLENGE_MAX_ENTRIES`
 - `AGENT_PAIRING_REDIRECT_PATH`
+- `AGENT_PAIRING_ACTION_WINDOW_SECONDS`
+- `AGENT_PAIRING_ACTION_MAX_ATTEMPTS`
+- `AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS`
+- `AGENT_PAIRING_ACTION_BLOCK_SECONDS`
+- `AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS`
+- `AGENT_PAIRING_CONFIRM_FAILURE_MAX_ATTEMPTS`
+- `AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS`
+
+Passkey helper env vars (backend-only):
+
+- `AUTH_PASSKEY_ENABLED`
+- `AUTH_PASSKEY_PROVIDER` (`supabase` | `external`)
+- `AUTH_PASSKEY_EXTERNAL_NAME`
+- `AUTH_PASSKEY_EXTERNAL_SIGNIN_URL` (required for external start handler)
+- `AUTH_PASSKEY_EXTERNAL_ENROLL_URL` (optional; falls back to sign-in URL)
+- `AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL` (optional diagnostics/metadata)
+- `AUTH_PASSKEY_CALLBACK_STATE_TTL_SECONDS`
+- `AUTH_PASSKEY_CALLBACK_STATE_MAX_ENTRIES`
+- `AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK`
+- `AUTH_PASSKEY_CALLBACK_SIGNING_SECRET`
+- `AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_AGE_SECONDS`
+- `AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_CLOCK_SKEW_SECONDS`
 
 ## WebSocket Event Shape
 

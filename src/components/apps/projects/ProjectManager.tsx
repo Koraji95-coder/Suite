@@ -16,7 +16,15 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { triggerAutoBackup } from "@/supabase/backupManager";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
+import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import {
 	loadSetting,
@@ -101,6 +109,12 @@ export function ProjectManager({
 	const [projectTaskCounts, setProjectTaskCounts] = useState<
 		Map<string, TaskCount>
 	>(new Map());
+	const [projectIdPendingDelete, setProjectIdPendingDelete] = useState<
+		string | null
+	>(null);
+	const [taskIdPendingDelete, setTaskIdPendingDelete] = useState<string | null>(
+		null,
+	);
 
 	const getCurrentUserId = useCallback(async (): Promise<string | null> => {
 		const {
@@ -302,7 +316,11 @@ export function ProjectManager({
 					);
 					setExpandedTasks(new Set(stored || []));
 				} catch (error) {
-					console.error("Failed to load expanded tasks:", error);
+					logger.error(
+						"Failed to load expanded tasks",
+						"ProjectManager",
+						error,
+					);
 					setExpandedTasks(new Set());
 				}
 			};
@@ -473,8 +491,14 @@ export function ProjectManager({
 		}
 	};
 
-	const deleteProject = async (projectId: string) => {
-		if (!confirm("Are you sure you want to delete this project?")) return;
+	const requestDeleteProject = (projectId: string) => {
+		setProjectIdPendingDelete(projectId);
+	};
+
+	const confirmDeleteProject = async () => {
+		if (!projectIdPendingDelete) return;
+		const projectId = projectIdPendingDelete;
+		setProjectIdPendingDelete(null);
 		try {
 			const userId = await getCurrentUserId();
 			if (!userId) return;
@@ -776,8 +800,14 @@ export function ProjectManager({
 		return Array.from(ids);
 	};
 
-	const deleteTask = async (taskId: string) => {
-		if (!confirm("Are you sure? This will also delete all subtasks.")) return;
+	const requestDeleteTask = (taskId: string) => {
+		setTaskIdPendingDelete(taskId);
+	};
+
+	const confirmDeleteTask = async () => {
+		if (!taskIdPendingDelete) return;
+		const taskId = taskIdPendingDelete;
+		setTaskIdPendingDelete(null);
 		try {
 			const userId = await getCurrentUserId();
 			if (!userId) return;
@@ -995,17 +1025,21 @@ export function ProjectManager({
 
 		// Save to Supabase
 		if (selectedProject) {
-			try {
-				await saveSetting(
-					"expanded_tasks",
-					Array.from(newExpanded),
-					selectedProject.id,
-				);
-			} catch (error) {
-				console.error("Failed to save expanded tasks:", error);
+				try {
+					await saveSetting(
+						"expanded_tasks",
+						Array.from(newExpanded),
+						selectedProject.id,
+					);
+				} catch (error) {
+					logger.error(
+						"Failed to save expanded tasks",
+						"ProjectManager",
+						error,
+					);
+				}
 			}
-		}
-	};
+		};
 
 	const primaryActionStyle = {
 		...glassCardInnerStyle(palette, palette.primary),
@@ -1028,6 +1062,11 @@ export function ProjectManager({
 	).length;
 	const activeProjects = totalProjects - archivedProjects;
 	const currentCrumb = selectedProject?.name ?? "Overview";
+	const pendingProjectName =
+		projects.find((project) => project.id === projectIdPendingDelete)?.name ??
+		"this project";
+	const pendingTaskName =
+		tasks.find((task) => task.id === taskIdPendingDelete)?.name ?? "this task";
 
 	return (
 		<div className="mx-auto w-full max-w-[1760px] space-y-8">
@@ -1230,21 +1269,21 @@ export function ProjectManager({
 				isSubtask={!!parentTaskForSubtask}
 			/>
 
-			{/* Main Grid */}
-			<div className="grid grid-cols-1 xl:grid-cols-[400px_minmax(0,1fr)] gap-6 xl:gap-7">
+				{/* Main Grid */}
+				<div className="grid grid-cols-1 xl:grid-cols-[400px_minmax(0,1fr)] gap-6 xl:gap-7">
 				{/* Left Column: Project List */}
 				<GlassPanel
 					tint={palette.secondary}
 					hoverEffect={false}
 					className="p-5"
 				>
-					<ProjectList
+						<ProjectList
 						projects={projects}
 						selectedProject={selectedProject}
 						projectTaskCounts={projectTaskCounts}
 						onSelectProject={setSelectedProject}
 						onEditProject={openEditProject}
-						onDeleteProject={deleteProject}
+							onDeleteProject={requestDeleteProject}
 						filter={statusFilter}
 						onFilterChange={(f) => setStatusFilter(f as StatusFilter)}
 						searchQuery={projectSearch}
@@ -1255,7 +1294,7 @@ export function ProjectManager({
 				{/* Right Column: Project Details */}
 				<div className="space-y-6">
 					{selectedProject ? (
-						<ProjectDetail
+							<ProjectDetail
 							project={selectedProject}
 							tasks={tasks}
 							files={files}
@@ -1269,7 +1308,7 @@ export function ProjectManager({
 								setShowTaskModal(true);
 							}}
 							onEditTask={openEditTask}
-							onDeleteTask={deleteTask}
+								onDeleteTask={requestDeleteTask}
 							onToggleTaskComplete={toggleTaskComplete}
 							onAddSubtask={openAddSubtask}
 							onDragEnd={handleDragEnd}
@@ -1313,8 +1352,63 @@ export function ProjectManager({
 							</p>
 						</GlassPanel>
 					)}
+					</div>
 				</div>
+				<Dialog
+					open={Boolean(projectIdPendingDelete)}
+					onOpenChange={(open) => !open && setProjectIdPendingDelete(null)}
+				>
+					<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+						<DialogHeader>
+							<DialogTitle>Delete project?</DialogTitle>
+						</DialogHeader>
+						<p className="text-sm text-[var(--text-muted)]">
+							Delete "{pendingProjectName}"? This will permanently remove its
+							tasks, files, and related records.
+						</p>
+						<DialogFooter className="mt-4 gap-2 sm:justify-end">
+							<button
+								onClick={() => setProjectIdPendingDelete(null)}
+								className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={() => void confirmDeleteProject()}
+								className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+							>
+								Delete
+							</button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+				<Dialog
+					open={Boolean(taskIdPendingDelete)}
+					onOpenChange={(open) => !open && setTaskIdPendingDelete(null)}
+				>
+					<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+						<DialogHeader>
+							<DialogTitle>Delete task?</DialogTitle>
+						</DialogHeader>
+						<p className="text-sm text-[var(--text-muted)]">
+							Delete "{pendingTaskName}"? This will also delete all subtasks.
+						</p>
+						<DialogFooter className="mt-4 gap-2 sm:justify-end">
+							<button
+								onClick={() => setTaskIdPendingDelete(null)}
+								className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							>
+								Cancel
+							</button>
+							<button
+								onClick={() => void confirmDeleteTask()}
+								className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+							>
+								Delete
+							</button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
 			</div>
-		</div>
-	);
-}
+		);
+	}

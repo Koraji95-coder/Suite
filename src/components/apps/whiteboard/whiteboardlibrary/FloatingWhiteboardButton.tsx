@@ -1,5 +1,11 @@
 import { BookOpen, Pen } from "lucide-react";
 import { useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { Whiteboard } from "../Whiteboard";
 import { WhiteboardLibrary } from "../whiteboardlibrary/WhiteboardLibrary";
 
@@ -64,16 +70,14 @@ export function FloatingWhiteboardButton({
 				}}
 			/>
 
-			{showLibrary && (
-				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
-					<div className="flex max-h-[90vh] w-full max-w-7xl flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl">
-						<div className="flex items-center justify-between border-b border-[var(--border)] p-6">
-							<div className="flex items-center space-x-3">
+			<Dialog open={showLibrary} onOpenChange={setShowLibrary}>
+				<DialogContent className="max-h-[90vh] max-w-7xl border-[var(--border)] bg-[var(--surface)] p-0">
+					<DialogHeader className="border-b border-[var(--border)] p-6">
+						<div className="flex items-center justify-between">
+							<DialogTitle className="flex items-center space-x-3 text-[var(--text)]">
 								<BookOpen className="h-6 w-6 text-[var(--accent)]" />
-								<h3 className="text-2xl font-bold text-[var(--text)]">
-									Whiteboard Library
-								</h3>
-							</div>
+								<span>Whiteboard Library</span>
+							</DialogTitle>
 							<button
 								onClick={() => setShowLibrary(false)}
 								className="text-2xl text-[var(--text-muted)] transition-all hover:text-[var(--text)]"
@@ -81,17 +85,14 @@ export function FloatingWhiteboardButton({
 								×
 							</button>
 						</div>
-
-						<div className="flex-1 overflow-auto p-6">
-							<WhiteboardLibrary
-								filterByPanel={
-									panelContext !== "Dashboard" ? panelContext : undefined
-								}
-							/>
-						</div>
+					</DialogHeader>
+					<div className="max-h-[calc(90vh-96px)] overflow-auto p-6">
+						<WhiteboardLibrary
+							filterByPanel={panelContext !== "Dashboard" ? panelContext : undefined}
+						/>
 					</div>
-				</div>
-			)}
+				</DialogContent>
+			</Dialog>
 		</>
 	);
 }

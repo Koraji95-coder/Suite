@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 
 interface WhiteboardSaveDialogProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onSave: (title: string, tags: string) => void;
+	onSave: (title: string, tags: string) => void | Promise<void>;
 	panelContext: string;
 }
 
@@ -15,23 +21,30 @@ export function WhiteboardSaveDialog({
 }: WhiteboardSaveDialogProps) {
 	const [title, setTitle] = useState("");
 	const [tags, setTags] = useState("");
+	const [error, setError] = useState("");
 
-	if (!isOpen) return null;
+	useEffect(() => {
+		if (!isOpen) return;
+		setError("");
+	}, [isOpen]);
 
 	const handleSubmit = () => {
 		if (!title.trim()) {
-			alert("Please enter a title");
+			setError("Please enter a title.");
 			return;
 		}
-		onSave(title.trim(), tags);
+		setError("");
+		void onSave(title.trim(), tags);
 	};
 
 	return (
-		<div className="absolute inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] backdrop-blur-sm">
-			<div className="m-4 w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 backdrop-blur-xl">
-				<h4 className="mb-4 text-xl font-bold text-[var(--text)]">
-					Save Whiteboard
-				</h4>
+		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+			<DialogContent className="max-w-md border-[var(--border)] bg-[var(--surface)] p-6">
+				<DialogHeader className="mb-4">
+					<DialogTitle className="text-xl font-bold text-[var(--text)]">
+						Save Whiteboard
+					</DialogTitle>
+				</DialogHeader>
 				<div className="space-y-4">
 					<div>
 						<label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">
@@ -58,6 +71,11 @@ export function WhiteboardSaveDialog({
 							placeholder="e.g., calculations, circuit, notes"
 						/>
 					</div>
+					{error ? (
+						<div className="rounded-lg border border-[var(--danger)] bg-[color:color-mix(in_srgb,var(--danger)_18%,transparent)] px-3 py-2 text-sm text-[var(--danger)]">
+							{error}
+						</div>
+					) : null}
 					<p className="text-sm text-[var(--text-muted)]">
 						Panel Context:{" "}
 						<span className="font-semibold text-[var(--text)]">
@@ -79,7 +97,7 @@ export function WhiteboardSaveDialog({
 						Cancel
 					</button>
 				</div>
-			</div>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

@@ -1,11 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthEnvDebugCard from "../auth/AuthEnvDebugCard";
 import CaptchaChallenge from "../auth/CaptchaChallenge";
 import AuthShell from "../auth/AuthShell";
 import { useNotification } from "../auth/NotificationContext";
+import {
+	isBrowserPasskeySupported,
+	isFrontendPasskeyEnabled,
+} from "../auth/passkeyCapabilityApi";
+import {
+	completePasskeyCallback,
+	startPasskeySignIn,
+} from "../auth/passkeyAuthApi";
+import { resolveAuthRedirect } from "../auth/authRedirect";
 import { useAuth } from "../auth/useAuth";
 import { logger } from "../lib/logger";
+import { logAuthMethodTelemetry } from "../services/securityEventService";
 
 type LocationState = { from?: string };
 
@@ -20,9 +30,11 @@ export default function LoginPage() {
 	const [captchaToken, setCaptchaToken] = useState("");
 	const [honeypot, setHoneypot] = useState("");
 	const [submitting, setSubmitting] = useState(false);
+	const [passkeySubmitting, setPasskeySubmitting] = useState(false);
 	const [sent, setSent] = useState(false);
 	const [error, setError] = useState("");
 	const [redirectProgress, setRedirectProgress] = useState(0);
+	const passkeyCallbackHandledRef = useRef("");
 	const requiresCaptcha = Boolean(
 		(import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim(),
 	);
@@ -35,6 +47,10 @@ export default function LoginPage() {
 		if (requiresCaptcha) return captchaToken.trim().length > 0;
 		return true;
 	}, [email, loading, submitting, requiresCaptcha, captchaToken]);
+	const passkeyAvailable = useMemo(
+		() => isFrontendPasskeyEnabled() && isBrowserPasskeySupported(),
+		[],
+	);
 
 	useEffect(() => {
 		if (!(user && !loading)) {
@@ -65,6 +81,145 @@ export default function LoginPage() {
 			}
 		};
 	}, [from, loading, navigate, user]);
+
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		const passkeyState = (params.get("passkey_state") || "").trim();
+		const passkeyStatus = (params.get("passkey_status") || "").trim().toLowerCase();
+		const passkeyIntent = (params.get("passkey_intent") || "").trim().toLowerCase();
+		const passkeyEmail = (params.get("passkey_email") || "").trim();
+		const passkeyError = (params.get("passkey_error") || "").trim();
+		const passkeySignature = (
+			params.get("passkey_signature") ||
+			params.get("passkey_sig") ||
+			params.get("provider_signature") ||
+			params.get("signature") ||
+			""
+		).trim();
+		const passkeyTimestamp = (
+			params.get("passkey_timestamp") ||
+			params.get("passkey_ts") ||
+			params.get("provider_timestamp") ||
+			params.get("timestamp") ||
+			""
+		).trim();
+		if (!passkeyState || (passkeyStatus !== "success" && passkeyStatus !== "failed")) {
+			return;
+		}
+
+		const callbackKey = [
+			passkeyState,
+			passkeyStatus,
+			passkeyIntent,
+			passkeyEmail,
+			passkeyError,
+			passkeySignature,
+			passkeyTimestamp,
+		].join("|");
+		if (passkeyCallbackHandledRef.current === callbackKey) {
+			return;
+		}
+		passkeyCallbackHandledRef.current = callbackKey;
+
+		const clearCallbackParams = () => {
+			const next = new URLSearchParams(location.search);
+			next.delete("passkey_state");
+			next.delete("passkey_status");
+			next.delete("passkey_intent");
+			next.delete("passkey_email");
+			next.delete("passkey_error");
+			next.delete("passkey_signature");
+			next.delete("passkey_sig");
+			next.delete("provider_signature");
+			next.delete("signature");
+			next.delete("passkey_timestamp");
+			next.delete("passkey_ts");
+			next.delete("provider_timestamp");
+			next.delete("timestamp");
+			const search = next.toString();
+			navigate(
+				{
+					pathname: location.pathname,
+					search: search ? `?${search}` : "",
+				},
+				{ replace: true },
+			);
+		};
+
+		let active = true;
+		const completeCallback = async () => {
+			setPasskeySubmitting(true);
+			try {
+				const result = await completePasskeyCallback({
+					state: passkeyState,
+					status: passkeyStatus as "success" | "failed",
+					intent: passkeyIntent || undefined,
+					email: passkeyEmail || undefined,
+					error: passkeyError || undefined,
+					signature: passkeySignature || undefined,
+					timestamp: passkeyTimestamp || undefined,
+				});
+
+				if (result.intent === "sign-in" && result.completed === false) {
+					await logAuthMethodTelemetry(
+						"passkey",
+						"sign_in_failed",
+						`Passkey callback failed: ${result.message || "unknown error"}`,
+					);
+				}
+				if (result.intent === "sign-in" && result.completed === true) {
+					await logAuthMethodTelemetry(
+						"passkey",
+						"sign_in_completed",
+						`Passkey callback completed (session_mode=${result.session_mode || "unknown"}).`,
+					);
+				}
+
+				if (result.resume_url) {
+					window.location.assign(result.resume_url);
+					return;
+				}
+				if (result.redirect_to) {
+					window.location.assign(result.redirect_to);
+					return;
+				}
+
+				if (!active) return;
+				if (result.completed === false || result.status === "failed") {
+					setError(result.message || "Passkey sign-in could not be completed.");
+					notification.error(
+						"Passkey callback failed",
+						result.message || "Passkey sign-in could not be completed.",
+					);
+				} else if (result.message) {
+					notification.success("Passkey callback complete", result.message);
+				}
+			} catch (err: unknown) {
+				if (!active) return;
+				const msg =
+					err instanceof Error
+						? err.message
+						: "Unable to complete passkey callback.";
+				setError(msg);
+				await logAuthMethodTelemetry(
+					"passkey",
+					"sign_in_failed",
+					`Passkey callback completion failed: ${msg}`,
+				);
+				notification.error("Passkey callback failed", msg);
+			} finally {
+				if (active) {
+					setPasskeySubmitting(false);
+					clearCallbackParams();
+				}
+			}
+		};
+
+		void completeCallback();
+		return () => {
+			active = false;
+		};
+	}, [location.pathname, location.search, navigate, notification]);
 
 	const showSessionCard = loading || Boolean(user);
 
@@ -131,9 +286,60 @@ export default function LoginPage() {
 			setError(msg);
 			setCaptchaToken("");
 			logger.error("Login link request failed", "LoginPage", { error: err });
+			await logAuthMethodTelemetry(
+				"email_link",
+				"sign_in_request_failed",
+				`Sign-in email-link request failed: ${msg}`,
+			);
 			notification.error("Sign-in link failed", msg);
 		} finally {
 			setSubmitting(false);
+		}
+	};
+
+	const onPasskeySignIn = async () => {
+		if (!passkeyAvailable || passkeySubmitting || submitting) return;
+
+		setError("");
+		setPasskeySubmitting(true);
+		await logAuthMethodTelemetry(
+			"passkey",
+			"sign_in_started",
+			"Passkey sign-in flow started from login page.",
+		);
+
+		try {
+			const redirectTo = resolveAuthRedirect("/login");
+			const result = await startPasskeySignIn(redirectTo);
+			if (result.mode === "redirect" && result.redirect_url) {
+				await logAuthMethodTelemetry(
+					"passkey",
+					"sign_in_redirected",
+					`Passkey sign-in redirected to provider: ${result.provider_label || result.provider || "unknown"}.`,
+				);
+				window.location.assign(result.redirect_url);
+				return;
+			}
+
+			throw new Error(
+				result.message ||
+					result.error ||
+					"Passkey sign-in is not available right now.",
+			);
+		} catch (err: unknown) {
+			const msg =
+				err instanceof Error
+					? err.message
+					: "Unable to start passkey sign-in right now.";
+			setError(msg);
+			await logAuthMethodTelemetry(
+				"passkey",
+				"sign_in_failed",
+				`Passkey sign-in failed to start: ${msg}`,
+			);
+			notification.error("Passkey sign-in failed", msg);
+		} finally {
+			setPasskeySubmitting(false);
 		}
 	};
 
@@ -185,6 +391,30 @@ export default function LoginPage() {
 				</div>
 			) : (
 				<form className="grid gap-4" onSubmit={onSubmit} noValidate>
+					{passkeyAvailable ? (
+						<button
+							className="auth-submit-btn"
+							type="button"
+							disabled={passkeySubmitting || submitting}
+							onClick={() => void onPasskeySignIn()}
+						>
+							{passkeySubmitting ? (
+								<span className="inline-flex items-center gap-2">
+									<span className="auth-spinner" />
+									Starting passkey...
+								</span>
+							) : (
+								"Use passkey"
+							)}
+						</button>
+					) : null}
+
+					{passkeyAvailable ? (
+						<div className="text-center text-xs [color:var(--text-muted)]">
+							Or continue with email link
+						</div>
+					) : null}
+
 					<div className="grid gap-1.5">
 						<label className="text-sm font-medium" htmlFor="email">
 							Email

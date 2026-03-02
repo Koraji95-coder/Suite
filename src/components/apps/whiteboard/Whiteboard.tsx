@@ -1,6 +1,14 @@
 import { Download, Pen, Save, X } from "lucide-react";
 import { useState } from "react";
+import { useNotification } from "@/auth/NotificationContext";
 import { useAuth } from "@/auth/useAuth";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Json } from "@/supabase/database";
@@ -30,9 +38,17 @@ export function Whiteboard({
 	const [color, setColor] = useState("#00ffff");
 	const [lineWidth, setLineWidth] = useState(2);
 	const [showSaveDialog, setShowSaveDialog] = useState(false);
+	const [showClearDialog, setShowClearDialog] = useState(false);
+	const [showTextDialog, setShowTextDialog] = useState(false);
+	const [textValue, setTextValue] = useState("");
+	const [textPosition, setTextPosition] = useState<{
+		x: number;
+		y: number;
+	} | null>(null);
 	const [, setWhiteboardId] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const auth = useAuth();
+	const notifications = useNotification();
 
 	const handleActionAdd = (action: DrawAction) => {
 		setActions([...actions, action]);
@@ -56,29 +72,46 @@ export function Whiteboard({
 	};
 
 	const clearCanvas = () => {
-		if (confirm("Clear entire whiteboard?")) {
-			setActions([]);
-			setRedoStack([]);
-		}
+		setShowClearDialog(true);
+	};
+
+	const confirmClearCanvas = () => {
+		setActions([]);
+		setRedoStack([]);
+		setShowClearDialog(false);
 	};
 
 	const handleTextRequest = (position: { x: number; y: number }) => {
-		const text = prompt("Enter text:");
-		if (text) {
-			handleActionAdd({
-				tool: "text",
-				text,
-				position,
-				color,
-			});
+		setTextPosition(position);
+		setTextValue("");
+		setShowTextDialog(true);
+	};
+
+	const confirmAddText = () => {
+		const trimmed = textValue.trim();
+		if (!trimmed || !textPosition) {
+			setShowTextDialog(false);
+			setTextPosition(null);
+			setTextValue("");
+			return;
 		}
+
+		handleActionAdd({
+			tool: "text",
+			text: trimmed,
+			position: textPosition,
+			color,
+		});
+		setShowTextDialog(false);
+		setTextPosition(null);
+		setTextValue("");
 	};
 
 	const saveWhiteboard = async (title: string, tags: string) => {
 		const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
 		if (!canvas || !(canvas instanceof HTMLCanvasElement)) {
 			logger.warn("Whiteboard", "Canvas element not found");
-			alert("Canvas not found. Please try again.");
+			notifications.error("Canvas not found", "Please try again.");
 			return;
 		}
 
@@ -107,15 +140,19 @@ export function Whiteboard({
 				logger.error("Whiteboard", "Failed to save whiteboard", {
 					error: error.message,
 				});
-				alert(
-					"Failed to save whiteboard: " + (error.message || "Unknown error"),
+				notifications.error(
+					"Failed to save whiteboard",
+					error.message || "Unknown error",
 				);
 			} else if (data?.id) {
 				setWhiteboardId(data.id);
 				logger.info("Whiteboard", "Whiteboard saved successfully", {
 					whiteboardId: data.id,
 				});
-				alert("Whiteboard saved successfully!");
+				notifications.success(
+					"Whiteboard saved",
+					"Your whiteboard was saved successfully.",
+				);
 				setShowSaveDialog(false);
 				onSaved?.();
 				onClose();
@@ -128,7 +165,7 @@ export function Whiteboard({
 				{ error: message },
 				err as Error,
 			);
-			alert("Failed to save whiteboard: " + message);
+			notifications.error("Failed to save whiteboard", message);
 		} finally {
 			setIsSaving(false);
 		}
@@ -146,9 +183,11 @@ export function Whiteboard({
 	if (!isOpen) return null;
 
 	return (
-		<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
+		<div
+			className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm"
+			style={{ zIndex: "var(--z-dialog)" }}
+		>
 			<div className="flex h-full max-h-[90vh] w-full max-w-7xl flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl">
-				{/* Header */}
 				<div className="flex items-center justify-between border-b border-[var(--border)] p-4">
 					<div className="flex items-center space-x-3">
 						<Pen className="h-6 w-6 text-[var(--accent)]" />
@@ -180,7 +219,6 @@ export function Whiteboard({
 					</div>
 				</div>
 
-				{/* Main area */}
 				<div className="flex flex-1 overflow-hidden">
 					<WhiteboardToolbar
 						tool={tool}
@@ -208,7 +246,6 @@ export function Whiteboard({
 					</div>
 				</div>
 
-				{/* Save dialog */}
 				<WhiteboardSaveDialog
 					isOpen={showSaveDialog}
 					onClose={() => setShowSaveDialog(false)}
@@ -216,6 +253,76 @@ export function Whiteboard({
 					panelContext={panelContext}
 				/>
 			</div>
+
+			<Dialog
+				open={showClearDialog}
+				onOpenChange={(open) => !open && setShowClearDialog(false)}
+			>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Clear whiteboard?</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						This will remove all strokes and cannot be undone.
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setShowClearDialog(false)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={confirmClearCanvas}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						>
+							Clear
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog
+				open={showTextDialog}
+				onOpenChange={(open) => {
+					if (!open) {
+						setShowTextDialog(false);
+						setTextPosition(null);
+					}
+				}}
+			>
+				<DialogContent className="max-w-md border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Add Text</DialogTitle>
+					</DialogHeader>
+					<input
+						type="text"
+						value={textValue}
+						onChange={(e) => setTextValue(e.target.value)}
+						className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+						placeholder="Enter text"
+						autoFocus
+					/>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => {
+								setShowTextDialog(false);
+								setTextPosition(null);
+								setTextValue("");
+							}}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={confirmAddText}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--primary)] [color:var(--primary-contrast)]"
+						>
+							Add Text
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

@@ -1,5 +1,11 @@
 import { Info, X } from "lucide-react";
 import { useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
 
 interface InfoSection {
@@ -57,102 +63,97 @@ export function PanelInfoDialog({ title, sections }: PanelInfoDialogProps) {
 				<span>Panel Info</span>
 			</button>
 
-			{isOpen && (
-				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-3 backdrop-blur-sm sm:p-4" style={{ zIndex: "var(--z-dialog)" }}>
-					<div
-						className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-lg backdrop-blur-xl flex flex-col"
-						style={panelStyle}
+			<Dialog open={isOpen} onOpenChange={setIsOpen}>
+				<DialogContent
+					className="max-w-4xl max-h-[92vh] p-0 overflow-hidden border-0 bg-transparent flex flex-col"
+					style={panelStyle}
+				>
+					<DialogHeader
+						className="flex-row items-center justify-between space-y-0 p-6"
+						style={headerStyle}
 					>
-						<div
-							className="flex items-center justify-between p-6"
-							style={headerStyle}
-						>
-							<div className="flex items-center space-x-3">
-								<Info className="w-6 h-6" style={{ color: palette.primary }} />
-								<h3 className="text-2xl font-bold">{title}</h3>
-							</div>
-							<button
-								onClick={() => setIsOpen(false)}
-								className="p-2 rounded-lg transition-all"
-								style={{
-									background: hexToRgba(palette.surface, 0.35),
-									color: hexToRgba(palette.text, 0.8),
-								}}
-							>
-								<X className="w-5 h-5" />
-							</button>
+						<div className="flex items-center space-x-3">
+							<Info className="w-6 h-6" style={{ color: palette.primary }} />
+							<DialogTitle className="text-2xl font-bold">{title}</DialogTitle>
 						</div>
+						<button
+							onClick={() => setIsOpen(false)}
+							className="p-2 rounded-lg transition-all"
+							style={{
+								background: hexToRgba(palette.surface, 0.35),
+								color: hexToRgba(palette.text, 0.8),
+							}}
+						>
+							<X className="w-5 h-5" />
+						</button>
+					</DialogHeader>
 
-						<div className="flex-1 overflow-y-auto p-6 space-y-6">
-							{sections.map((section, index) => (
-								<div
-									key={index}
-									className="backdrop-blur-xl border rounded-lg p-6"
-									style={sectionStyle}
+					<div className="flex-1 overflow-y-auto p-6 space-y-6">
+						{sections.map((section, index) => (
+							<div
+								key={index}
+								className="backdrop-blur-xl border rounded-lg p-6"
+								style={sectionStyle}
+							>
+								<h4
+									className="text-xl font-bold mb-4"
+									style={{ color: hexToRgba(palette.text, 0.85) }}
 								>
-									<h4
-										className="text-xl font-bold mb-4"
-										style={{ color: hexToRgba(palette.text, 0.85) }}
-									>
-										{section.title}
-									</h4>
+									{section.title}
+								</h4>
 
-									{Array.isArray(section.content) ? (
-										<ul className="space-y-2" style={textStyle}>
-											{section.content.map((item, i) => (
-												<li key={i} className="flex items-start space-x-2">
-													<span style={{ color: palette.primary }}>•</span>
-													<span>{item}</span>
+								{Array.isArray(section.content) ? (
+									<ul className="space-y-2" style={textStyle}>
+										{section.content.map((item, i) => (
+											<li key={i} className="flex items-start space-x-2">
+												<span style={{ color: palette.primary }}>•</span>
+												<span>{item}</span>
+											</li>
+										))}
+									</ul>
+								) : (
+									<p style={textStyle}>{section.content}</p>
+								)}
+
+								{section.tips && section.tips.length > 0 && (
+									<div className="mt-4 border rounded-lg p-4" style={tipStyle}>
+										<p
+											className="font-semibold mb-2"
+											style={{ color: hexToRgba(palette.text, 0.85) }}
+										>
+											Tips
+										</p>
+										<ul className="space-y-1 ml-4">
+											{section.tips.map((tip, i) => (
+												<li
+													key={i}
+													className="text-sm"
+													style={{ color: hexToRgba(palette.text, 0.65) }}
+												>
+													{tip}
 												</li>
 											))}
 										</ul>
-									) : (
-										<p style={textStyle}>{section.content}</p>
-									)}
-
-									{section.tips && section.tips.length > 0 && (
-										<div
-											className="mt-4 border rounded-lg p-4"
-											style={tipStyle}
-										>
-											<p
-												className="font-semibold mb-2"
-												style={{ color: hexToRgba(palette.text, 0.85) }}
-											>
-												Tips
-											</p>
-											<ul className="space-y-1 ml-4">
-												{section.tips.map((tip, i) => (
-													<li
-														key={i}
-														className="text-sm"
-														style={{ color: hexToRgba(palette.text, 0.65) }}
-													>
-														{tip}
-													</li>
-												))}
-											</ul>
-										</div>
-									)}
-								</div>
-							))}
-						</div>
-
-						<div
-							className="p-4 border-t"
-							style={{ borderColor: hexToRgba(palette.primary, 0.12) }}
-						>
-							<button
-								onClick={() => setIsOpen(false)}
-								className="w-full px-6 py-3 rounded-lg font-semibold transition-all"
-								style={buttonStyle}
-							>
-								Close
-							</button>
-						</div>
+									</div>
+								)}
+							</div>
+						))}
 					</div>
-				</div>
-			)}
+
+					<div
+						className="p-4 border-t"
+						style={{ borderColor: hexToRgba(palette.primary, 0.12) }}
+					>
+						<button
+							onClick={() => setIsOpen(false)}
+							className="w-full px-6 py-3 rounded-lg font-semibold transition-all"
+							style={buttonStyle}
+						>
+							Close
+						</button>
+					</div>
+				</DialogContent>
+			</Dialog>
 		</>
 	);
 }

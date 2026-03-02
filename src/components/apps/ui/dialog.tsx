@@ -33,6 +33,7 @@ export function DialogContent({
 }: React.HTMLAttributes<HTMLDivElement>) {
 	return (
 		<div
+			data-ui-dialog-content="true"
 			className={cn(
 				/* z-50 is local: sits above sibling backdrop within the --z-dialog portal */
 				"relative z-50 w-full max-w-lg rounded-xl border border-border bg-background p-4 shadow-lg sm:p-6",

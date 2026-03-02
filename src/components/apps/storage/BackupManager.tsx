@@ -9,6 +9,14 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
+import { useToast } from "@/components/notification-system/ToastProvider";
+import {
 	type BackupFileInfo,
 	deleteBackupFile,
 	downloadYaml,
@@ -42,6 +50,7 @@ function formatSize(bytes: number): string {
 
 export function BackupManager() {
 	const { palette } = useTheme();
+	const { showToast } = useToast();
 	const [status, setStatus] = useState<"idle" | "running" | "done" | "error">(
 		"idle",
 	);
@@ -51,6 +60,7 @@ export function BackupManager() {
 	const [loadingFiles, setLoadingFiles] = useState(false);
 	const [history, setHistory] = useState(loadHistory);
 	const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
+	const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 	const fileRef = useRef<HTMLInputElement>(null);
 
 	const refreshFiles = useCallback(async () => {
@@ -126,11 +136,19 @@ export function BackupManager() {
 		setTimeout(() => setRestoreMsg(null), 5000);
 	};
 
-	const handleDelete = async (filename: string) => {
-		if (!confirm(`Delete "${filename}"?`)) return;
-		if (await deleteBackupFile(filename)) {
-			setFiles((prev) => prev.filter((f) => f.name !== filename));
+	const requestDelete = (filename: string) => {
+		setPendingDelete(filename);
+	};
+
+	const confirmDelete = async () => {
+		if (!pendingDelete) return;
+		if (await deleteBackupFile(pendingDelete)) {
+			setFiles((prev) => prev.filter((f) => f.name !== pendingDelete));
+			showToast("success", `Deleted "${pendingDelete}".`);
+		} else {
+			showToast("error", `Failed to delete "${pendingDelete}".`);
 		}
+		setPendingDelete(null);
 	};
 
 	const handleDownloadFile = async (filename: string) => {
@@ -151,83 +169,6 @@ export function BackupManager() {
 
 	return (
 		<div>
-			{confirmRestore && (
-				<div
-					style={{
-						position: "fixed",
-						inset: 0,
-						zIndex: "var(--z-dialog)",
-						display: "flex",
-						alignItems: "center",
-						justifyContent: "center",
-						background: "rgba(0,0,0,0.6)",
-					}}
-				>
-					<div
-						style={{
-							padding: 24,
-							borderRadius: 12,
-							width: 360,
-							background: palette.surface,
-							border: `1px solid ${hexToRgba(palette.accent, 0.3)}`,
-						}}
-					>
-						<div
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 8,
-								marginBottom: 12,
-								color: palette.accent,
-							}}
-						>
-							<AlertTriangle className="w-5 h-5" />
-							<span style={{ fontWeight: 600, fontSize: 15 }}>
-								Confirm Restore
-							</span>
-						</div>
-						<p
-							style={{
-								fontSize: 13,
-								color: palette.textMuted,
-								marginBottom: 16,
-							}}
-						>
-							This will upsert data from{" "}
-							<strong style={{ color: palette.text }}>{confirmRestore}</strong>{" "}
-							into your database. Existing rows with matching IDs will be
-							overwritten.
-						</p>
-						<div
-							style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
-						>
-							<button
-								onClick={() => setConfirmRestore(null)}
-								style={{
-									...btnBase,
-									background: hexToRgba(palette.surface, 0.8),
-									border: `1px solid ${hexToRgba(palette.textMuted, 0.3)}`,
-									color: palette.text,
-								}}
-							>
-								Cancel
-							</button>
-							<button
-								onClick={() => handleRestoreFromBackup(confirmRestore)}
-								style={{
-									...btnBase,
-									background: hexToRgba(palette.accent, 0.2),
-									border: `1px solid ${hexToRgba(palette.accent, 0.4)}`,
-									color: palette.accent,
-								}}
-							>
-								Restore
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
-
 			<div
 				style={{
 					display: "flex",
@@ -446,7 +387,7 @@ export function BackupManager() {
 									<Upload className="w-4 h-4" />
 								</button>
 								<button
-									onClick={() => handleDelete(f.name)}
+									onClick={() => requestDelete(f.name)}
 									style={{
 										background: "none",
 										border: "none",
@@ -497,6 +438,70 @@ export function BackupManager() {
 					</div>
 				</div>
 			)}
+			<Dialog
+				open={Boolean(confirmRestore)}
+				onOpenChange={(open) => !open && setConfirmRestore(null)}
+			>
+				<DialogContent className="max-w-md border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2">
+							<AlertTriangle className="h-5 w-5 [color:var(--warning)]" />
+							Confirm Restore
+						</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						This will upsert data from{" "}
+						<strong className="text-[var(--text)]">
+							{confirmRestore ?? "this backup"}
+						</strong>{" "}
+						into your database. Existing rows with matching IDs will be
+						overwritten.
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setConfirmRestore(null)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={() =>
+								confirmRestore && void handleRestoreFromBackup(confirmRestore)
+							}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--primary)] [color:var(--primary-contrast)]"
+						>
+							Restore
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+			<Dialog
+				open={Boolean(pendingDelete)}
+				onOpenChange={(open) => !open && setPendingDelete(null)}
+			>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Delete backup file?</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						Delete "{pendingDelete ?? "this backup"}"?
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setPendingDelete(null)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={() => void confirmDelete()}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						>
+							Delete
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

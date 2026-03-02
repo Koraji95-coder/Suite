@@ -33,7 +33,7 @@ use axum::{
     body::{Body, Bytes},
     extract::{ConnectInfo, Query, State},
     http::{header, HeaderMap, StatusCode},
-    response::{IntoResponse, Json, Response},
+    response::{IntoResponse, Json, Redirect, Response},
     routing::{delete, get, post, put},
     Router,
 };
@@ -726,6 +726,7 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         // ── Existing routes ──
         .route("/health", get(handle_health))
         .route("/metrics", get(handle_metrics))
+        .route("/suite/passkey/callback", get(handle_suite_passkey_callback))
         .route("/pair", post(handle_pair))
         .route("/unpair", post(handle_unpair))
         .route("/webhook", get(handle_webhook_usage).post(handle_webhook))
@@ -965,6 +966,617 @@ async fn handle_unpair(State(state): State<AppState>, headers: HeaderMap) -> imp
         "pairing_code": revoked.new_pairing_code,
     });
     (StatusCode::OK, Json(body))
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct SuitePasskeyCallbackQuery {
+    #[serde(default)]
+    suite_intent: Option<String>,
+    #[serde(default)]
+    suite_state: Option<String>,
+    #[serde(default)]
+    suite_return_to: Option<String>,
+    #[serde(default)]
+    suite_callback_sig_required: Option<String>,
+    #[serde(default)]
+    suite_claims_required: Option<String>,
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(default)]
+    passkey_status: Option<String>,
+    #[serde(default)]
+    email: Option<String>,
+    #[serde(default)]
+    passkey_email: Option<String>,
+    #[serde(default)]
+    provider_token: Option<String>,
+    #[serde(default)]
+    passkey_token: Option<String>,
+    #[serde(default)]
+    id_token: Option<String>,
+    #[serde(default)]
+    jwt: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+    #[serde(default)]
+    passkey_error: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct VerifiedSuitePasskeyClaims {
+    intent: Option<String>,
+    status: Option<String>,
+    email: Option<String>,
+    error: Option<String>,
+}
+
+fn parse_boolish(raw: Option<&str>) -> bool {
+    match raw.unwrap_or("").trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => true,
+        _ => false,
+    }
+}
+
+fn normalize_suite_passkey_intent(raw: &str) -> Option<&'static str> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "sign-in" | "signin" | "sign_in" => Some("sign-in"),
+        "enroll" | "enrollment" => Some("enroll"),
+        _ => None,
+    }
+}
+
+fn normalize_suite_passkey_status(raw: &str) -> Option<&'static str> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "success" | "ok" => Some("success"),
+        "failed" | "failure" | "error" => Some("failed"),
+        _ => None,
+    }
+}
+
+fn env_bool(var_name: &str, fallback: bool) -> bool {
+    match std::env::var(var_name) {
+        Ok(value) => parse_boolish(Some(value.as_str())),
+        Err(_) => fallback,
+    }
+}
+
+fn env_i64(var_name: &str, fallback: i64) -> i64 {
+    std::env::var(var_name)
+        .ok()
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .unwrap_or(fallback)
+}
+
+fn is_valid_suite_passkey_state(state: &str) -> bool {
+    if !(20..=200).contains(&state.len()) {
+        return false;
+    }
+    state
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+}
+
+fn sanitize_suite_passkey_field(raw: Option<String>, max_chars: usize) -> String {
+    let mut value = raw.unwrap_or_default();
+    value = value.replace('\r', " ").replace('\n', " ");
+    value = value.trim().to_string();
+    if value.chars().count() > max_chars {
+        value.chars().take(max_chars).collect()
+    } else {
+        value
+    }
+}
+
+fn decode_base64_url(value: &str) -> Option<Vec<u8>> {
+    use base64::Engine as _;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(value)
+        .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(value))
+        .ok()
+}
+
+fn json_claim_as_i64(value: Option<&serde_json::Value>) -> Option<i64> {
+    match value {
+        Some(serde_json::Value::Number(number)) => number.as_i64(),
+        Some(serde_json::Value::String(text)) => text.trim().parse::<i64>().ok(),
+        _ => None,
+    }
+}
+
+fn json_claim_as_string(value: Option<&serde_json::Value>) -> Option<String> {
+    value
+        .and_then(|item| item.as_str())
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn claim_audience_matches(claims: &serde_json::Value, expected_audience: &str) -> bool {
+    match claims.get("aud") {
+        Some(serde_json::Value::String(aud)) => aud.trim() == expected_audience,
+        Some(serde_json::Value::Array(items)) => items
+            .iter()
+            .filter_map(|item| item.as_str())
+            .map(str::trim)
+            .any(|item| item == expected_audience),
+        _ => false,
+    }
+}
+
+fn is_valid_email_like(value: &str) -> bool {
+    if value.is_empty() || value.contains(char::is_whitespace) {
+        return false;
+    }
+    let Some(at_idx) = value.find('@') else {
+        return false;
+    };
+    if at_idx == 0 || at_idx + 1 >= value.len() {
+        return false;
+    }
+    let domain = &value[at_idx + 1..];
+    domain.contains('.')
+}
+
+fn build_suite_passkey_signature_payload(
+    state: &str,
+    intent: &str,
+    status: &str,
+    email: &str,
+    error: &str,
+    timestamp: i64,
+) -> String {
+    format!("{state}\n{intent}\n{status}\n{email}\n{error}\n{timestamp}")
+}
+
+fn compute_suite_passkey_signature(secret: &str, payload: &str) -> Option<String> {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    let Ok(mut mac) = Hmac::<Sha256>::new_from_slice(secret.as_bytes()) else {
+        return None;
+    };
+    mac.update(payload.as_bytes());
+    Some(hex::encode(mac.finalize().into_bytes()))
+}
+
+fn suite_passkey_signing_secret() -> Option<String> {
+    [
+        "ZC_SUITE_PASSKEY_CALLBACK_SIGNING_SECRET",
+        "AUTH_PASSKEY_CALLBACK_SIGNING_SECRET",
+        "SUITE_PASSKEY_CALLBACK_SIGNING_SECRET",
+    ]
+    .iter()
+    .find_map(|key| {
+        std::env::var(key)
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    })
+}
+
+fn suite_provider_jwt_secret() -> Option<String> {
+    [
+        "ZC_SUITE_PASSKEY_PROVIDER_JWT_SECRET",
+        "SUITE_PASSKEY_PROVIDER_JWT_SECRET",
+        "AUTH_PASSKEY_EXTERNAL_PROVIDER_JWT_SECRET",
+    ]
+    .iter()
+    .find_map(|key| {
+        std::env::var(key)
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    })
+}
+
+fn verify_suite_provider_jwt(
+    token: &str,
+    expected_state: &str,
+    expected_intent: &str,
+) -> Result<VerifiedSuitePasskeyClaims, &'static str> {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    let mut parts = token.split('.');
+    let header_b64 = parts.next().ok_or("provider token header is missing")?;
+    let payload_b64 = parts.next().ok_or("provider token payload is missing")?;
+    let signature_b64 = parts.next().ok_or("provider token signature is missing")?;
+    if parts.next().is_some() {
+        return Err("provider token has invalid format");
+    }
+
+    let header_bytes = decode_base64_url(header_b64).ok_or("provider token header is invalid")?;
+    let payload_bytes =
+        decode_base64_url(payload_b64).ok_or("provider token payload is invalid")?;
+    let signature =
+        decode_base64_url(signature_b64).ok_or("provider token signature is invalid")?;
+
+    let header_json: serde_json::Value =
+        serde_json::from_slice(&header_bytes).map_err(|_| "provider token header is not JSON")?;
+    let payload_json: serde_json::Value =
+        serde_json::from_slice(&payload_bytes).map_err(|_| "provider token payload is not JSON")?;
+
+    let alg = header_json
+        .get("alg")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .unwrap_or("");
+    if alg != "HS256" {
+        return Err("provider token alg must be HS256");
+    }
+
+    let secret = suite_provider_jwt_secret().ok_or("provider JWT secret is not configured")?;
+    let signing_input = format!("{header_b64}.{payload_b64}");
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
+        .map_err(|_| "provider JWT secret is invalid")?;
+    mac.update(signing_input.as_bytes());
+    if mac.verify_slice(&signature).is_err() {
+        return Err("provider token signature verification failed");
+    }
+
+    let now = chrono::Utc::now().timestamp();
+    let clock_skew_seconds = env_i64("ZC_SUITE_PASSKEY_PROVIDER_JWT_CLOCK_SKEW_SECONDS", 60);
+    let require_exp = env_bool("ZC_SUITE_PASSKEY_PROVIDER_JWT_REQUIRE_EXP", true);
+    let exp = json_claim_as_i64(payload_json.get("exp"));
+    let nbf = json_claim_as_i64(payload_json.get("nbf"));
+    let iat = json_claim_as_i64(payload_json.get("iat"));
+
+    if require_exp && exp.is_none() {
+        return Err("provider token exp claim is required");
+    }
+    if let Some(expiry) = exp {
+        if now > expiry + clock_skew_seconds {
+            return Err("provider token is expired");
+        }
+    }
+    if let Some(not_before) = nbf {
+        if now + clock_skew_seconds < not_before {
+            return Err("provider token is not active yet");
+        }
+    }
+    if let Some(issued_at) = iat {
+        if issued_at > now + clock_skew_seconds {
+            return Err("provider token iat claim is in the future");
+        }
+    }
+
+    if let Ok(expected_issuer) = std::env::var("ZC_SUITE_PASSKEY_PROVIDER_JWT_ISSUER") {
+        let expected_issuer = expected_issuer.trim();
+        if !expected_issuer.is_empty() {
+            let issuer = json_claim_as_string(payload_json.get("iss"));
+            if issuer.as_deref() != Some(expected_issuer) {
+                return Err("provider token issuer mismatch");
+            }
+        }
+    }
+
+    if let Ok(expected_audience) = std::env::var("ZC_SUITE_PASSKEY_PROVIDER_JWT_AUDIENCE") {
+        let expected_audience = expected_audience.trim();
+        if !expected_audience.is_empty()
+            && !claim_audience_matches(&payload_json, expected_audience)
+        {
+            return Err("provider token audience mismatch");
+        }
+    }
+
+    let require_state = env_bool("ZC_SUITE_PASSKEY_PROVIDER_JWT_REQUIRE_STATE", true);
+    let state_claim = json_claim_as_string(
+        payload_json
+            .get("suite_state")
+            .or_else(|| payload_json.get("state")),
+    );
+    if require_state {
+        let Some(claim_state) = state_claim.as_deref() else {
+            return Err("provider token state claim is required");
+        };
+        if claim_state != expected_state {
+            return Err("provider token state mismatch");
+        }
+    }
+
+    let intent_claim = json_claim_as_string(
+        payload_json
+            .get("suite_intent")
+            .or_else(|| payload_json.get("intent"))
+            .or_else(|| payload_json.get("passkey_intent")),
+    );
+    if let Some(claim_intent_raw) = intent_claim.as_deref() {
+        let claim_intent =
+            normalize_suite_passkey_intent(claim_intent_raw).ok_or("provider token intent is invalid")?;
+        if claim_intent != expected_intent {
+            return Err("provider token intent mismatch");
+        }
+    }
+
+    let status_claim = json_claim_as_string(
+        payload_json
+            .get("passkey_status")
+            .or_else(|| payload_json.get("status")),
+    )
+    .and_then(|raw| normalize_suite_passkey_status(&raw).map(ToOwned::to_owned));
+    let email_claim = json_claim_as_string(
+        payload_json
+            .get("passkey_email")
+            .or_else(|| payload_json.get("email"))
+            .or_else(|| payload_json.get("preferred_username"))
+            .or_else(|| payload_json.get("upn")),
+    )
+    .map(|value| value.to_ascii_lowercase());
+    let error_claim = json_claim_as_string(
+        payload_json
+            .get("passkey_error")
+            .or_else(|| payload_json.get("error")),
+    );
+
+    Ok(VerifiedSuitePasskeyClaims {
+        intent: intent_claim
+            .as_deref()
+            .and_then(normalize_suite_passkey_intent)
+            .map(ToOwned::to_owned),
+        status: status_claim,
+        email: email_claim,
+        error: error_claim,
+    })
+}
+
+fn normalize_url_origin(candidate: &str) -> Option<String> {
+    let parsed = reqwest::Url::parse(candidate).ok()?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return None;
+    }
+    let host = parsed.host_str()?;
+    let origin = if let Some(port) = parsed.port() {
+        format!("{}://{}:{}", parsed.scheme(), host, port)
+    } else {
+        format!("{}://{}", parsed.scheme(), host)
+    };
+    Some(origin)
+}
+
+fn suite_callback_allowed_origins() -> Vec<String> {
+    let csv = std::env::var("ZC_SUITE_CALLBACK_ALLOWED_ORIGINS")
+        .ok()
+        .or_else(|| std::env::var("AUTH_ALLOWED_REDIRECT_ORIGINS").ok())
+        .unwrap_or_else(|| "http://localhost:5173,http://127.0.0.1:5173".to_string());
+
+    csv.split(',')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+        .filter_map(normalize_url_origin)
+        .collect()
+}
+
+fn validate_suite_return_to(raw: &str) -> Result<reqwest::Url, &'static str> {
+    let parsed = reqwest::Url::parse(raw).map_err(|_| "suite_return_to must be absolute URL")?;
+    if parsed.scheme() != "http" && parsed.scheme() != "https" {
+        return Err("suite_return_to must use http or https");
+    }
+
+    let Some(host) = parsed.host_str() else {
+        return Err("suite_return_to host is missing");
+    };
+    let origin = if let Some(port) = parsed.port() {
+        format!("{}://{}:{}", parsed.scheme(), host, port)
+    } else {
+        format!("{}://{}", parsed.scheme(), host)
+    };
+
+    let allowed = suite_callback_allowed_origins();
+    if !allowed.is_empty() && !allowed.iter().any(|item| item == &origin) {
+        return Err("suite_return_to origin is not allowed");
+    }
+
+    Ok(parsed)
+}
+
+/// GET /suite/passkey/callback — Suite passkey bridge callback.
+///
+/// This endpoint is intended to be used as `AUTH_PASSKEY_EXTERNAL_SIGNIN_URL`
+/// and `AUTH_PASSKEY_EXTERNAL_ENROLL_URL` in the Suite backend.
+async fn handle_suite_passkey_callback(
+    Query(params): Query<SuitePasskeyCallbackQuery>,
+) -> impl IntoResponse {
+    let Some(intent) = normalize_suite_passkey_intent(params.suite_intent.as_deref().unwrap_or(""))
+    else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Invalid or missing suite_intent. Expected sign-in or enroll."
+            })),
+        )
+            .into_response();
+    };
+
+    let state = params.suite_state.unwrap_or_default().trim().to_string();
+    if !is_valid_suite_passkey_state(&state) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Invalid or missing suite_state."
+            })),
+        )
+            .into_response();
+    }
+
+    let suite_return_to_raw = params.suite_return_to.unwrap_or_default();
+    if suite_return_to_raw.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Missing suite_return_to redirect URL."
+            })),
+        )
+            .into_response();
+    }
+
+    let mut suite_return_to = match validate_suite_return_to(suite_return_to_raw.trim()) {
+        Ok(url) => url,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": error })),
+            )
+                .into_response();
+        }
+    };
+
+    let claims_required = parse_boolish(params.suite_claims_required.as_deref())
+        || env_bool("ZC_SUITE_PASSKEY_PROVIDER_JWT_REQUIRED", false);
+    let provider_token = sanitize_suite_passkey_field(
+        params
+            .provider_token
+            .or(params.passkey_token)
+            .or(params.id_token)
+            .or(params.jwt),
+        4096,
+    );
+    let verified_claims = if provider_token.is_empty() {
+        if claims_required {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "Missing provider JWT claims token."
+                })),
+            )
+                .into_response();
+        }
+        None
+    } else {
+        match verify_suite_provider_jwt(&provider_token, &state, intent) {
+            Ok(claims) => Some(claims),
+            Err(error) => {
+                tracing::warn!("Suite passkey callback rejected: invalid provider JWT ({error})");
+                return (
+                    StatusCode::UNAUTHORIZED,
+                    Json(serde_json::json!({
+                        "error": "Provider JWT validation failed.",
+                        "reason": error
+                    })),
+                )
+                    .into_response();
+            }
+        }
+    };
+
+    let mut status = if let Some(claims) = verified_claims.as_ref() {
+        claims
+            .status
+            .as_deref()
+            .and_then(normalize_suite_passkey_status)
+            .unwrap_or("failed")
+    } else {
+        let status_raw = params
+            .passkey_status
+            .as_deref()
+            .or(params.status.as_deref())
+            .unwrap_or("success");
+        normalize_suite_passkey_status(status_raw).unwrap_or("failed")
+    };
+    let mut email = if let Some(claims) = verified_claims.as_ref() {
+        sanitize_suite_passkey_field(claims.email.clone(), 254)
+    } else {
+        sanitize_suite_passkey_field(
+            params.passkey_email.or(params.email).map(|v| v.to_ascii_lowercase()),
+            254,
+        )
+    };
+    let mut error = if let Some(claims) = verified_claims.as_ref() {
+        sanitize_suite_passkey_field(claims.error.clone(), 250)
+    } else {
+        sanitize_suite_passkey_field(params.passkey_error.or(params.error), 250)
+    };
+
+    if let Some(claims) = verified_claims.as_ref() {
+        if let Some(claim_intent) = claims.intent.as_deref() {
+            let Some(normalized_intent) = normalize_suite_passkey_intent(claim_intent) else {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": "Provider JWT contains invalid intent claim."
+                    })),
+                )
+                    .into_response();
+            };
+            if normalized_intent != intent {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": "Provider JWT intent claim does not match suite_intent."
+                    })),
+                )
+                    .into_response();
+            }
+        }
+    }
+
+    if intent == "sign-in" && status == "success" && !is_valid_email_like(&email) {
+        status = "failed";
+        if error.is_empty() {
+            error = "Passkey sign-in callback did not include a valid email.".to_string();
+        }
+        email.clear();
+    }
+
+    if status == "success" {
+        error.clear();
+    } else if error.is_empty() {
+        error = "Passkey verification was not completed.".to_string();
+    }
+
+    let signature_required = parse_boolish(params.suite_callback_sig_required.as_deref());
+    let mut passkey_signature = String::new();
+    let mut passkey_timestamp = String::new();
+    if signature_required {
+        let Some(secret) = suite_passkey_signing_secret() else {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Signed callback required but signing secret is not configured."
+                })),
+            )
+                .into_response();
+        };
+        let timestamp = chrono::Utc::now().timestamp();
+        let signature_payload = build_suite_passkey_signature_payload(
+            &state, intent, status, &email, &error, timestamp,
+        );
+        let Some(signature) = compute_suite_passkey_signature(&secret, &signature_payload) else {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": "Failed to compute callback signature."
+                })),
+            )
+                .into_response();
+        };
+        passkey_signature = signature;
+        passkey_timestamp = timestamp.to_string();
+    }
+
+    {
+        let mut query = suite_return_to.query_pairs_mut();
+        query.append_pair("passkey_state", &state);
+        query.append_pair("passkey_intent", intent);
+        query.append_pair("passkey_status", status);
+        if !email.is_empty() {
+            query.append_pair("passkey_email", &email);
+        }
+        if !error.is_empty() {
+            query.append_pair("passkey_error", &error);
+        }
+        if !passkey_signature.is_empty() && !passkey_timestamp.is_empty() {
+            query.append_pair("passkey_signature", &passkey_signature);
+            query.append_pair("passkey_timestamp", &passkey_timestamp);
+        }
+    }
+
+    tracing::info!(
+        "Suite passkey callback prepared (intent={}, status={}, signed={})",
+        intent,
+        status,
+        signature_required
+    );
+    Redirect::to(suite_return_to.as_str()).into_response()
 }
 
 async fn persist_pairing_tokens(config: Arc<Mutex<Config>>, pairing: &PairingGuard) -> Result<()> {
@@ -2388,6 +3000,145 @@ mod tests {
     fn app_state_is_clone() {
         fn assert_clone<T: Clone>() {}
         assert_clone::<AppState>();
+    }
+
+    #[test]
+    fn suite_passkey_state_validator_accepts_expected_format() {
+        assert!(is_valid_suite_passkey_state("AbCdEfGhIjKlMnOpQrStUvWxYz012345"));
+        assert!(!is_valid_suite_passkey_state("too-short"));
+        assert!(!is_valid_suite_passkey_state("invalid!chars with space"));
+    }
+
+    #[test]
+    fn suite_passkey_signature_payload_matches_contract() {
+        let payload = build_suite_passkey_signature_payload(
+            "abc_state",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            1_700_000_000,
+        );
+        assert_eq!(
+            payload,
+            "abc_state\nsign-in\nsuccess\nuser@example.com\n\n1700000000"
+        );
+    }
+
+    #[tokio::test]
+    async fn suite_passkey_callback_rejects_invalid_state() {
+        let response = handle_suite_passkey_callback(Query(SuitePasskeyCallbackQuery {
+            suite_intent: Some("sign-in".into()),
+            suite_state: Some("bad".into()),
+            suite_return_to: Some("http://localhost:5173/login".into()),
+            suite_callback_sig_required: Some("0".into()),
+            suite_claims_required: Some("0".into()),
+            status: Some("success".into()),
+            passkey_status: None,
+            email: Some("user@example.com".into()),
+            passkey_email: None,
+            provider_token: None,
+            passkey_token: None,
+            id_token: None,
+            jwt: None,
+            error: None,
+            passkey_error: None,
+        }))
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn suite_passkey_callback_redirects_to_suite_return_to() {
+        let response = handle_suite_passkey_callback(Query(SuitePasskeyCallbackQuery {
+            suite_intent: Some("enroll".into()),
+            suite_state: Some("AbCdEfGhIjKlMnOpQrStUvWxYz012345".into()),
+            suite_return_to: Some("http://localhost:5173/app/settings".into()),
+            suite_callback_sig_required: Some("0".into()),
+            suite_claims_required: Some("0".into()),
+            status: Some("success".into()),
+            passkey_status: None,
+            email: None,
+            passkey_email: None,
+            provider_token: None,
+            passkey_token: None,
+            id_token: None,
+            jwt: None,
+            error: None,
+            passkey_error: None,
+        }))
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        let location = response
+            .headers()
+            .get(header::LOCATION)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("");
+        assert!(location.starts_with("http://localhost:5173/app/settings?"));
+        assert!(location.contains("passkey_state=AbCdEfGhIjKlMnOpQrStUvWxYz012345"));
+        assert!(location.contains("passkey_intent=enroll"));
+        assert!(location.contains("passkey_status=success"));
+    }
+
+    #[tokio::test]
+    async fn suite_passkey_callback_signin_without_email_marks_failed() {
+        let response = handle_suite_passkey_callback(Query(SuitePasskeyCallbackQuery {
+            suite_intent: Some("sign-in".into()),
+            suite_state: Some("AbCdEfGhIjKlMnOpQrStUvWxYz012345".into()),
+            suite_return_to: Some("http://localhost:5173/login".into()),
+            suite_callback_sig_required: Some("0".into()),
+            suite_claims_required: Some("0".into()),
+            status: Some("success".into()),
+            passkey_status: None,
+            email: None,
+            passkey_email: None,
+            provider_token: None,
+            passkey_token: None,
+            id_token: None,
+            jwt: None,
+            error: None,
+            passkey_error: None,
+        }))
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        let location = response
+            .headers()
+            .get(header::LOCATION)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("");
+        assert!(location.contains("passkey_status=failed"));
+        assert!(location.contains("passkey_error=Passkey+sign-in+callback+did+not+include+a+valid+email."));
+    }
+
+    #[tokio::test]
+    async fn suite_passkey_callback_requires_provider_token_when_claims_required() {
+        let response = handle_suite_passkey_callback(Query(SuitePasskeyCallbackQuery {
+            suite_intent: Some("sign-in".into()),
+            suite_state: Some("AbCdEfGhIjKlMnOpQrStUvWxYz012345".into()),
+            suite_return_to: Some("http://localhost:5173/login".into()),
+            suite_callback_sig_required: Some("0".into()),
+            suite_claims_required: Some("1".into()),
+            status: Some("success".into()),
+            passkey_status: None,
+            email: Some("user@example.com".into()),
+            passkey_email: None,
+            provider_token: None,
+            passkey_token: None,
+            id_token: None,
+            jwt: None,
+            error: None,
+            passkey_error: None,
+        }))
+        .await
+        .into_response();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

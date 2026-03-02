@@ -1,6 +1,7 @@
 import { Save, Zap } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/auth/useAuth";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
@@ -26,6 +27,7 @@ export function CalculatorPanel() {
 	const [results, setResults] = useState<CalculationResult[]>([]);
 	const [notes, setNotes] = useState("");
 	const [isSavingCalculation, setIsSavingCalculation] = useState(false);
+	const { showToast } = useToast();
 	const auth = useAuth();
 
 	const calculations = {
@@ -244,32 +246,33 @@ export function CalculatorPanel() {
 				.from("saved_calculations")
 				.insert(payload);
 
-			if (error) {
-				logger.error("CalculatorPanel", "Failed to save calculation", {
-					error: error.message,
-				});
-				alert(
-					"Error saving calculation: " + (error.message || "Unknown error"),
-				);
-			} else {
-				logger.info("CalculatorPanel", "Calculation saved successfully", {
-					calcType,
-				});
-				alert("Calculation saved successfully!");
-				setNotes("");
-			}
-		} catch (err) {
+				if (error) {
+					logger.error("CalculatorPanel", "Failed to save calculation", {
+						error: error.message,
+					});
+					showToast(
+						"error",
+						`Error saving calculation: ${error.message || "Unknown error"}`,
+					);
+				} else {
+					logger.info("CalculatorPanel", "Calculation saved successfully", {
+						calcType,
+					});
+					showToast("success", "Calculation saved successfully.");
+					setNotes("");
+				}
+			} catch (err) {
 			const message = err instanceof Error ? err.message : "Unknown error";
 			logger.error(
 				"CalculatorPanel",
 				"Unexpected error saving calculation",
-				{ error: message },
-				err as Error,
-			);
-			alert("Error saving calculation: " + message);
-		} finally {
-			setIsSavingCalculation(false);
-		}
+					{ error: message },
+					err as Error,
+				);
+				showToast("error", `Error saving calculation: ${message}`);
+			} finally {
+				setIsSavingCalculation(false);
+			}
 	};
 
 	return (

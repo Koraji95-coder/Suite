@@ -1,4 +1,5 @@
 import { Tag, X } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/apps/ui/dialog";
 import { SavedWhiteboard } from "../whiteboardtypes";
 import { formatDate } from "../whiteboardutils";
 
@@ -14,8 +15,8 @@ export function ViewWhiteboardModal({
 	if (!whiteboard) return null;
 
 	return (
-		<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
-			<div className="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-lg border border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl">
+		<Dialog open={Boolean(whiteboard)} onOpenChange={(open) => !open && onClose()}>
+			<DialogContent className="max-h-[90vh] max-w-6xl overflow-auto border-[var(--border)] bg-[var(--surface)] p-0">
 				<div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] p-6 backdrop-blur-sm">
 					<div>
 						<h3 className="text-2xl font-bold text-[var(--text)]">
@@ -58,7 +59,7 @@ export function ViewWhiteboardModal({
 						</div>
 					)}
 				</div>
-			</div>
-		</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

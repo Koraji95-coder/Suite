@@ -135,7 +135,7 @@ export function ProjectList({
 			<div
 				className="space-y-4 overflow-y-auto pr-1"
 				style={{
-					maxHeight: "calc(100vh - 320px)",
+					maxHeight: "calc(100dvh - 20rem)",
 					scrollBehavior: "smooth",
 				}}
 			>

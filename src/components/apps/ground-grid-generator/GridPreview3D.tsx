@@ -297,14 +297,14 @@ export function GridPreview3D({ rods, conductors, placements }: GridPreview3DPro
 
 	if (!hasData) {
 		return (
-			<div className="flex min-h-[300px] h-full items-center justify-center text-sm text-text-muted">
+			<div className="flex min-h-[min(300px,50vh)] items-center justify-center text-sm text-text-muted">
 				Import data to see the 3D preview
 			</div>
 		);
 	}
 
 	return (
-		<div ref={containerRef} className="relative min-h-[400px] h-full w-full">
+		<div ref={containerRef} className="relative min-h-[min(400px,60vh)] w-full">
 			<canvas
 				ref={canvasRef}
 				className="h-full w-full rounded-md cursor-grab active:cursor-grabbing"

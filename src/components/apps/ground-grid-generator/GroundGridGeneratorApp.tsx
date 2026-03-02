@@ -184,7 +184,7 @@ function GroundGridGeneratorInner() {
 	);
 
 	return (
-		<div className="relative flex h-full flex-col overflow-hidden">
+		<div className="relative flex flex-col">
 			{/* Header */}
 			<div
 				className="relative z-10 shrink-0 border-b px-6 pt-4 backdrop-blur"
@@ -229,22 +229,22 @@ function GroundGridGeneratorInner() {
 			</div>
 
 			{/* Body */}
-			<div className="relative z-10 min-h-0 flex-1 overflow-hidden">
+			<div className="relative z-10 min-h-0 flex-1">
 				<div
-					className={activeTab === "grabber" ? "h-full overflow-auto" : "hidden"}
+					className={activeTab === "grabber" ? "overflow-auto" : "hidden"}
 				>
 					<CoordinatesGrabber />
 				</div>
 
 				<div
-					className={activeTab === "generator" ? "h-full overflow-auto" : "hidden"}
+					className={activeTab === "generator" ? "overflow-auto" : "hidden"}
 				>
 					<GridGeneratorPanel />
 				</div>
 
 				<div
 					className={
-						activeTab === "log" ? "flex h-full flex-col overflow-hidden" : "hidden"
+						activeTab === "log" ? "flex flex-col overflow-auto" : "hidden"
 					}
 				>
 					<UnifiedLog />

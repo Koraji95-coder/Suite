@@ -241,14 +241,14 @@ export function GridPreview({
 
 	if (!hasData) {
 		return (
-			<div className="flex min-h-[300px] h-full items-center justify-center text-sm text-text-muted">
+			<div className="flex min-h-[min(300px,50vh)] items-center justify-center text-sm text-text-muted">
 				Import rod and conductor data to see the grid preview
 			</div>
 		);
 	}
 
 	return (
-		<div ref={containerRef} className="relative min-h-[400px] h-full w-full">
+		<div ref={containerRef} className="relative min-h-[min(400px,60vh)] w-full">
 			<svg
 				ref={svgRef}
 				viewBox={`${effectiveVB.x} ${effectiveVB.y} ${effectiveVB.w} ${effectiveVB.h}`}

@@ -11,7 +11,7 @@ import { hexToRgba, useTheme } from "@/lib/palette";
 
 type GlassPanelIntensity = "low" | "medium" | "high" | "light" | "strong";
 type GlassPanelVariant = "panel" | "card" | "toolbar" | "default";
-type GlassPanelOverflow = "hidden" | "visible";
+type GlassPanelOverflow = "hidden" | "visible" | "auto";
 
 export interface GlassPanelProps extends HTMLAttributes<HTMLDivElement> {
 	intensity?: GlassPanelIntensity;
@@ -60,7 +60,7 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 			edgeLight = false,
 			variant: variantProp = "panel",
 			padded = false,
-			overflow = "hidden",
+			overflow = "visible",
 			className = "",
 			style,
 			onPointerMove,
@@ -128,7 +128,11 @@ export const GlassPanel = forwardRef<HTMLDivElement, GlassPanelProps>(
 			const pad = padded ? (variant === "toolbar" ? "p-3" : "p-4") : "";
 			const rounding = liquid ? "animate-liquid" : "rounded-2xl";
 			const overflowClass =
-				overflow === "visible" ? "overflow-visible" : "overflow-hidden";
+				overflow === "visible"
+					? "overflow-visible"
+					: overflow === "auto"
+						? "overflow-auto"
+						: "overflow-hidden";
 
 			return [
 				"relative will-change-transform transition-all duration-300",

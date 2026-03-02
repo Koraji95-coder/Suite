@@ -718,7 +718,7 @@ export function QAQCChecker() {
 						</div>
 
 						<div className="p-6 space-y-6">
-							<div className="grid grid-cols-3 gap-4">
+							<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 								<div className="rounded-lg border border-green-500/30 bg-[var(--color-surface-elevated)] p-4 text-center">
 									<div className="text-3xl font-bold text-green-200">
 										{selectedDrawing.issues_found}

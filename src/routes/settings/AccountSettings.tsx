@@ -1,6 +1,6 @@
 // src/routes/app/settings/AccountSettings.tsx
-import { Lock, LogOut, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { KeyRound, LogOut, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 import { useAuth } from "../../auth/useAuth";
 import { agentService } from "../../services/agentService";
@@ -10,45 +10,9 @@ import { supabase } from "@/supabase/client";
 export default function AccountSettings() {
 	const { user, signOut } = useAuth();
 
-	const [newPassword, setNewPassword] = useState("");
-	const [saving, setSaving] = useState(false);
 	const [message, setMessage] = useState<string>("");
 	const [isSigningOutAll, setIsSigningOutAll] = useState(false);
 	const [isResettingAgent, setIsResettingAgent] = useState(false);
-
-	const canUpdatePassword = useMemo(
-		() => newPassword.length >= 8 && !saving,
-		[newPassword, saving],
-	);
-
-	const updatePassword = async () => {
-		if (!canUpdatePassword) return;
-		setSaving(true);
-		setMessage("");
-
-		try {
-			const { error } = await supabase.auth.updateUser({
-				password: newPassword,
-			});
-			if (error) throw error;
-			setNewPassword("");
-			setMessage("Password updated.");
-			await logSecurityEvent(
-				"auth_password_update_success",
-				"User updated account password successfully.",
-			);
-		} catch (err: unknown) {
-			setMessage(
-				err instanceof Error ? err.message : "Failed to update password.",
-			);
-			await logSecurityEvent(
-				"auth_password_update_failed",
-				"Password update attempt failed.",
-			);
-		} finally {
-			setSaving(false);
-		}
-	};
 
 	const signOutAllSessions = async () => {
 		if (isSigningOutAll) return;
@@ -103,34 +67,21 @@ export default function AccountSettings() {
 
 			<div className="grid gap-3 rounded-2xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
 				<div className="flex items-start gap-2">
-					<Lock size={16} />
+					<KeyRound size={16} />
 					<div>
 						<div className="text-sm font-semibold [color:var(--text)]">
-							Change password
+							Passwordless mode
 						</div>
 						<div className="text-xs [color:var(--text-muted)]">
-							Minimum 8 characters.
+							This workspace uses email-link sign-in only. Password resets are
+							disabled.
 						</div>
 					</div>
 				</div>
 
-				<div className="flex flex-wrap gap-2">
-					<input
-						className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-						type="password"
-						placeholder="New password"
-						autoComplete="new-password"
-						value={newPassword}
-						onChange={(e) => setNewPassword(e.target.value)}
-					/>
-					<button
-						className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 [background:var(--primary)] [color:var(--primary-contrast)]"
-						type="button"
-						disabled={!canUpdatePassword}
-						onClick={() => void updatePassword()}
-					>
-						{saving ? "Saving…" : "Update"}
-					</button>
+				<div className="rounded-xl border px-3 py-2.5 text-sm [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text-muted)]">
+					Passkey enrollment is the next step. Until then, users sign in using
+					secure email links.
 				</div>
 
 				{message ? (

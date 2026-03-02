@@ -1,6 +1,6 @@
 import { logger } from "../lib/logger";
 
-type AuthPath = "/login" | "/reset-password";
+type AuthPath = "/login";
 
 function normalizeOrigin(value: string): string | null {
 	try {

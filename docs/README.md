@@ -11,6 +11,7 @@ Central documentation hub for this workspace.
 - [Security: Environment & Secrets](security/environment-and-secrets.md)
 - [Security: Supabase RLS Hardening](security/supabase-rls-hardening.md)
 - [Security: Supabase Apply + Verify](security/supabase-apply-and-verify.md)
+- [Security: Passkey Rollout Plan](security/passkey-rollout-plan.md)
 
 ## Documentation Policy
 

@@ -30,6 +30,7 @@ import { hexToRgba, useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { logActivity } from "@/services/activityService";
 import {
+	type PeProfile,
 	DEFAULT_FIRM,
 	DEFAULT_PE,
 	FIRM_NUMBERS,
@@ -128,6 +129,7 @@ type TransmittalPayload = {
 		transmittal_num: string;
 		client: string;
 		project_desc: string;
+		from_profile_id: string;
 		from_name: string;
 		from_title: string;
 		from_email: string;
@@ -271,11 +273,35 @@ const formatDate = (value: Date) => {
 	return `${mm}/${dd}/${yyyy}`;
 };
 
-const getProfile = (name: string) =>
-	PE_PROFILES.find((profile) => profile.name === name);
+const getProfileById = (profiles: PeProfile[], id: string) =>
+	profiles.find((profile) => profile.id === id);
 
-const buildDefaultDraft = (): DraftState => {
-	const profile = getProfile(DEFAULT_PE);
+const resolveProfileId = (profiles: PeProfile[], maybeIdOrName: string) => {
+	const candidate = safeTrim(maybeIdOrName);
+	if (!candidate) return "";
+	const byId = profiles.find((profile) => profile.id === candidate);
+	if (byId) return byId.id;
+	const byName = profiles.find((profile) => profile.name === candidate);
+	return byName?.id ?? "";
+};
+
+const buildDefaultDraft = ({
+	profiles = PE_PROFILES,
+	firms = FIRM_NUMBERS,
+	defaultProfileId = DEFAULT_PE,
+	defaultFirm = DEFAULT_FIRM,
+}: {
+	profiles?: PeProfile[];
+	firms?: string[];
+	defaultProfileId?: string;
+	defaultFirm?: string;
+} = {}): DraftState => {
+	const resolvedProfileId =
+		resolveProfileId(profiles, defaultProfileId) || profiles[0]?.id || "";
+	const profile = getProfileById(profiles, resolvedProfileId);
+	const resolvedFirm = firms.includes(defaultFirm)
+		? defaultFirm
+		: (firms[0] ?? DEFAULT_FIRM);
 	return {
 		transmittalType: "standard",
 		projectName: "",
@@ -283,12 +309,12 @@ const buildDefaultDraft = (): DraftState => {
 		date: formatDate(new Date()),
 		transmittalNumber: "",
 		description: "",
-		peName: profile?.name ?? DEFAULT_PE,
-		fromName: profile?.name ?? DEFAULT_PE,
+		peName: resolvedProfileId,
+		fromName: profile?.name ?? "",
 		fromTitle: profile?.title ?? "",
 		fromEmail: profile?.email ?? "",
 		fromPhone: profile?.phone ?? "",
-		firmNumber: DEFAULT_FIRM,
+		firmNumber: resolvedFirm,
 		contacts: [
 			{
 				id: createId(),
@@ -381,6 +407,10 @@ const validateDraft = (draft: DraftState, files: FileState) => {
 		fields.transmittalNumber = true;
 		errors.push("Transmittal number is required.");
 	}
+	if (!safeTrim(draft.peName)) {
+		fields.peName = true;
+		errors.push("Sender profile is required.");
+	}
 	if (!safeTrim(draft.fromTitle)) {
 		fields.fromTitle = true;
 		errors.push("From title is required.");
@@ -454,15 +484,16 @@ const buildPayload = (
 
 	const payload: TransmittalPayload = {
 		transmittal_type: draft.transmittalType,
-		fields: {
-			date: safeTrim(draft.date),
-			job_num: safeTrim(draft.projectNumber),
-			transmittal_num: safeTrim(draft.transmittalNumber),
-			client: safeTrim(draft.projectName),
-			project_desc: safeTrim(draft.description),
-			from_name: safeTrim(draft.fromName),
-			from_title: safeTrim(draft.fromTitle),
-			from_email: safeTrim(draft.fromEmail),
+			fields: {
+				date: safeTrim(draft.date),
+				job_num: safeTrim(draft.projectNumber),
+				transmittal_num: safeTrim(draft.transmittalNumber),
+				client: safeTrim(draft.projectName),
+				project_desc: safeTrim(draft.description),
+				from_profile_id: safeTrim(draft.peName),
+				from_name: safeTrim(draft.fromName),
+				from_title: safeTrim(draft.fromTitle),
+				from_email: safeTrim(draft.fromEmail),
 			from_phone: safeTrim(draft.fromPhone),
 			firm: safeTrim(draft.firmNumber),
 		},
@@ -523,6 +554,35 @@ const loadDraft = () => {
 	} catch {
 		return buildDefaultDraft();
 	}
+};
+
+const syncDraftToProfileCatalog = (
+	draft: DraftState,
+	profiles: PeProfile[],
+	firms: string[],
+	defaults: { profileId: string; firm: string },
+): DraftState => {
+	const resolvedProfileId =
+		resolveProfileId(profiles, draft.peName) ||
+		resolveProfileId(profiles, defaults.profileId) ||
+		profiles[0]?.id ||
+		"";
+	const resolvedProfile = getProfileById(profiles, resolvedProfileId);
+	const resolvedFirm = firms.includes(draft.firmNumber)
+		? draft.firmNumber
+		: firms.includes(defaults.firm)
+			? defaults.firm
+			: (firms[0] ?? DEFAULT_FIRM);
+
+	return {
+		...draft,
+		peName: resolvedProfileId,
+		fromName: resolvedProfile?.name ?? draft.fromName,
+		fromTitle: resolvedProfile?.title ?? draft.fromTitle,
+		fromEmail: resolvedProfile?.email ?? draft.fromEmail,
+		fromPhone: resolvedProfile?.phone ?? draft.fromPhone,
+		firmNumber: resolvedFirm,
+	};
 };
 
 const buildFormData = (
@@ -687,6 +747,15 @@ function FileRow({
 export function TransmittalBuilderApp() {
 	const { palette } = useTheme();
 	const [draft, setDraft] = useState<DraftState>(() => loadDraft());
+	const [profileOptions, setProfileOptions] = useState<PeProfile[]>(PE_PROFILES);
+	const [firmOptions, setFirmOptions] = useState<string[]>(FIRM_NUMBERS);
+	const [profileDefaults, setProfileDefaults] = useState<{
+		profileId: string;
+		firm: string;
+	}>({
+		profileId: DEFAULT_PE,
+		firm: DEFAULT_FIRM,
+	});
 	const [files, setFiles] = useState<FileState>({
 		template: null,
 		index: null,
@@ -702,9 +771,64 @@ export function TransmittalBuilderApp() {
 	const [outputFormat, setOutputFormat] = useState<OutputFormat>("both");
 	const [templateLoading, setTemplateLoading] = useState(false);
 	const [templateError, setTemplateError] = useState<string | null>(null);
+	const [profileOptionsError, setProfileOptionsError] = useState<string | null>(
+		null,
+	);
 	const saveTimer = useRef<number | null>(null);
 
 	const validation = useMemo(() => validateDraft(draft, files), [draft, files]);
+
+	useEffect(() => {
+		let active = true;
+
+		const loadProfileOptions = async () => {
+			try {
+				if (!transmittalService.hasApiKey()) return;
+				const response = await transmittalService.fetchProfileOptions();
+				if (!active) return;
+
+				const nextProfiles =
+					response.profiles.length > 0 ? response.profiles : PE_PROFILES;
+				const nextFirms =
+					response.firmNumbers.length > 0 ? response.firmNumbers : FIRM_NUMBERS;
+				const nextDefaults = {
+					profileId:
+						resolveProfileId(nextProfiles, response.defaults.profileId) ||
+						nextProfiles[0]?.id ||
+						DEFAULT_PE,
+					firm: nextFirms.includes(response.defaults.firm)
+						? response.defaults.firm
+						: (nextFirms[0] ?? DEFAULT_FIRM),
+				};
+
+				setProfileOptions(nextProfiles);
+				setFirmOptions(nextFirms);
+				setProfileDefaults(nextDefaults);
+				setProfileOptionsError(null);
+				setDraft((prev) =>
+					syncDraftToProfileCatalog(prev, nextProfiles, nextFirms, nextDefaults),
+				);
+			} catch (error) {
+				if (!active) return;
+				const message =
+					error instanceof Error
+						? error.message
+						: "Failed to load sender profiles.";
+				setProfileOptionsError(message);
+			}
+		};
+
+		void loadProfileOptions();
+		return () => {
+			active = false;
+		};
+	}, []);
+
+	useEffect(() => {
+		setDraft((prev) =>
+			syncDraftToProfileCatalog(prev, profileOptions, firmOptions, profileDefaults),
+		);
+	}, [profileOptions, firmOptions, profileDefaults]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;
@@ -732,25 +856,15 @@ export function TransmittalBuilderApp() {
 	);
 
 	const handlePeChange = (value: string) => {
-		if (!value) {
-			setDraft((prev) => ({
-				...prev,
-				peName: "",
-				fromName: "",
-				fromTitle: "",
-				fromEmail: "",
-				fromPhone: "",
-			}));
-			return;
-		}
-		const profile = getProfile(value);
+		const profile = getProfileById(profileOptions, value);
+		if (!profile) return;
 		setDraft((prev) => ({
 			...prev,
-			peName: value,
-			fromName: profile?.name ?? value,
-			fromTitle: profile?.title ?? "",
-			fromEmail: profile?.email ?? "",
-			fromPhone: profile?.phone ?? "",
+			peName: profile.id,
+			fromName: profile.name,
+			fromTitle: profile.title,
+			fromEmail: profile.email,
+			fromPhone: profile.phone,
 		}));
 	};
 
@@ -854,7 +968,12 @@ export function TransmittalBuilderApp() {
 	};
 
 	const resetSession = () => {
-		const next = buildDefaultDraft();
+		const next = buildDefaultDraft({
+			profiles: profileOptions,
+			firms: firmOptions,
+			defaultProfileId: profileDefaults.profileId,
+			defaultFirm: profileDefaults.firm,
+		});
 		setDraft(next);
 		setFiles({ template: null, index: null, pdfs: [], cid: [] });
 		setOutputs([]);
@@ -1488,65 +1607,72 @@ export function TransmittalBuilderApp() {
 
 				<TransmittalSection title="From Information">
 					<div className="grid gap-4 px-2 sm:px-3">
-						<div className="grid gap-3 sm:grid-cols-2">
-							<div className="grid gap-1">
-								<label className="text-xs text-muted-foreground">PE</label>
-								<Select value={draft.peName} onValueChange={handlePeChange}>
-									<SelectTrigger>
-										<SelectValue placeholder="Select PE" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="">(None)</SelectItem>
-										{PE_PROFILES.map((profile) => (
-											<SelectItem key={profile.name} value={profile.name}>
-												{profile.name}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-							<div className="grid gap-1">
-								<label className="text-xs text-muted-foreground">Title</label>
-								<Input
-									value={draft.fromTitle}
-									onChange={(event) =>
-										updateDraft("fromTitle", event.target.value)
-									}
-									className={cn(
-										isInvalid("fromTitle") &&
-											"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
+							<div className="grid gap-3 sm:grid-cols-2">
+								<div className="grid gap-1">
+									<label className="text-xs text-muted-foreground">PE</label>
+									<Select value={draft.peName} onValueChange={handlePeChange}>
+										<SelectTrigger
+											className={cn(
+												isInvalid("peName") &&
+													"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
+											)}
+										>
+											<SelectValue placeholder="Select PE" />
+										</SelectTrigger>
+										<SelectContent>
+											{profileOptions.map((profile) => (
+												<SelectItem key={profile.id} value={profile.id}>
+													{profile.name}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									{profileOptionsError ? (
+										<div className="text-xs [color:var(--danger)]">
+											{profileOptionsError}
+										</div>
+									) : (
+										<div className="text-xs text-muted-foreground">
+											Sender values are managed by the selected profile.
+										</div>
 									)}
-									placeholder="Managing Partner"
-								/>
+								</div>
+								<div className="grid gap-1">
+									<label className="text-xs text-muted-foreground">Title</label>
+									<Input
+										value={draft.fromTitle}
+										readOnly
+										className={cn(
+											isInvalid("fromTitle") &&
+												"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
+										)}
+										placeholder="Managed from profile"
+									/>
+								</div>
 							</div>
-						</div>
 
-						<div className="grid gap-3 sm:grid-cols-2">
-							<div className="grid gap-1">
-								<label className="text-xs text-muted-foreground">Email</label>
-								<Input
-									value={draft.fromEmail}
-									onChange={(event) =>
-										updateDraft("fromEmail", event.target.value)
-									}
-									className={cn(
-										isInvalid("fromEmail") &&
-											"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
-									)}
-									placeholder="name@company.com"
-								/>
+							<div className="grid gap-3 sm:grid-cols-2">
+								<div className="grid gap-1">
+									<label className="text-xs text-muted-foreground">Email</label>
+									<Input
+										value={draft.fromEmail}
+										readOnly
+										className={cn(
+											isInvalid("fromEmail") &&
+												"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
+										)}
+										placeholder="Managed from profile"
+									/>
+								</div>
+								<div className="grid gap-1">
+									<label className="text-xs text-muted-foreground">Phone</label>
+									<Input
+										value={draft.fromPhone}
+										readOnly
+										placeholder="Managed from profile"
+									/>
+								</div>
 							</div>
-							<div className="grid gap-1">
-								<label className="text-xs text-muted-foreground">Phone</label>
-								<Input
-									value={draft.fromPhone}
-									onChange={(event) =>
-										updateDraft("fromPhone", event.target.value)
-									}
-									placeholder="(###) ###-####"
-								/>
-							</div>
-						</div>
 
 						<div className="grid gap-1">
 							<label className="text-xs text-muted-foreground">
@@ -1556,15 +1682,15 @@ export function TransmittalBuilderApp() {
 								value={draft.firmNumber}
 								onValueChange={(value) => updateDraft("firmNumber", value)}
 							>
-								<SelectTrigger>
-									<SelectValue placeholder="Select firm" />
-								</SelectTrigger>
-								<SelectContent>
-									{FIRM_NUMBERS.map((firm) => (
-										<SelectItem key={firm} value={firm}>
-											{firm}
-										</SelectItem>
-									))}
+									<SelectTrigger>
+										<SelectValue placeholder="Select firm" />
+									</SelectTrigger>
+									<SelectContent>
+										{firmOptions.map((firm) => (
+											<SelectItem key={firm} value={firm}>
+												{firm}
+											</SelectItem>
+										))}
 								</SelectContent>
 							</Select>
 						</div>

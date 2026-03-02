@@ -1,105 +1,79 @@
-# Auth + Landing Conversation README
+# Auth + Landing Status
 
 Date: March 2, 2026  
 Repo: `Suite`
 
-## Why This File Exists
-This summarizes our conversation about:
-- Landing page layout cleanup
-- Sign-in/get-started UX
-- Supabase auth direction
-- Security best practices
-- Passwordless + passkey strategy
+## Current Auth State
 
-## Key Decisions
-1. Keep Supabase as the auth provider.
-2. Do not expose backend secrets in frontend env vars (`VITE_*`).
-3. Move toward passwordless email-link flow now, with passkeys as next-step primary auth.
-4. Remove mid-hero "Create account / Resume session" buttons from landing.
-5. Keep auth-related abuse controls and reduce account-enumeration signals.
+- Supabase remains the identity provider.
+- App auth is passwordless email-link only.
+- Supported auth flows are:
+  - `signin`
+  - `signup`
+- In-app password reset and password update UX are intentionally removed.
 
-## What Was Implemented
+## Current Agent Pairing State
 
-### Landing Page
-- Removed mid-page auth CTA buttons.
-- Kept auth actions in top nav.
-- Moved `Privacy` and `Roadmap` into top navigation.
+- Pairing/unpairing is email-verified in broker mode.
+- Pair/unpair flow:
+  1. `POST /api/agent/pairing-challenge`
+  2. User opens email link
+  3. `POST /api/agent/pairing-confirm`
+- Legacy direct broker endpoints are blocked:
+  - `POST /api/agent/pair` -> `428`
+  - `POST /api/agent/unpair` -> `428`
+- Session-only cleanup endpoint exists for sign-out:
+  - `POST /api/agent/session/clear`
+- ZeroClaw gateway supports token revocation:
+  - `POST /unpair` with bearer token
+  - Last-token revoke generates a fresh one-time pairing code
 
-Changed file:
-- `src/routes/LandingPage.tsx`
+## Security Hardening In Place
 
-### Frontend Auth Flow
-- `Login` now requests a sign-in email link.
-- `Signup` now requests a get-started email link.
-- `Forgot Password` now requests reset link through backend endpoint.
-- Auth context switched from password-based calls to email-link request flow.
+- Frontend and backend redirect allowlist validation.
+- Generic auth-email response pattern to reduce account-enumeration signal.
+- Auth abuse controls on `/api/auth/email-link`:
+  - throttle window
+  - min-interval guard
+  - temporary block
+  - honeypot field
+  - optional Turnstile verification
+  - timing floor + jitter
+- Pairing challenge controls:
+  - challenge TTL
+  - bounded challenge store
+  - user/email challenge binding
+  - one-time challenge consumption
+  - pairing code format validation (6 digits)
+  - challenge id format validation
 
-Changed files:
-- `src/auth/AuthContext.tsx`
-- `src/routes/LoginPage.tsx`
-- `src/routes/SignupPage.tsx`
-- `src/routes/ForgotPasswordPage.tsx`
-- `src/auth/emailAuthApi.ts` (new)
+## Legacy Cleanup Completed
 
-### Redirect Hardening
-- Added client-side allowed-origin checks for auth redirect handling.
+- Password-reset routes removed from app routing.
+- Password-update event types removed from security event model.
+- Roadmap text updated to passwordless wording.
+- Broker/API docs updated to current challenge-confirm flow.
+- Seed Transmittal config scrubbed of committed live credential values.
 
-Changed file:
-- `src/auth/authRedirect.ts`
+## Environment Variables In Use
 
-### Backend Email Auth Endpoint (Still Supabase)
-- Added backend endpoint for email-link requests:
-  - `POST /api/auth/email-link`
-- Endpoint forwards to Supabase Auth APIs server-side.
-- Includes input validation + rate limiting + generic response pattern.
-
-Changed file:
-- `backend/api_server.py`
-
-## Security Notes From Conversation
-1. Supabase is still the auth system.
-2. Frontend should only use public Supabase values (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
-3. Server-side secrets stay backend-only:
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `SUPABASE_JWT_SECRET` (if used)
-4. Keep strict redirect allowlists in both frontend and backend.
-5. Keep generic success text for email auth to reduce account-enumeration leakage.
-6. Keep rate limits and anti-automation controls on auth endpoints.
-
-## Environment Variables Added/Updated
-Updated template:
-- `.env.example`
-
-Added/clarified:
-- `VITE_AUTH_ALLOWED_ORIGINS`
+Primary auth:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 - `AUTH_EMAIL_REDIRECT_URL`
 - `AUTH_ALLOWED_REDIRECT_ORIGINS`
+- `VITE_AUTH_ALLOWED_ORIGINS`
+- `AUTH_EMAIL_*`
+- `VITE_TURNSTILE_SITE_KEY`
 
-Note:
-- Local `.env` was populated with blank placeholders for Supabase/auth values.
+Agent broker verification:
+- `AGENT_GATEWAY_URL`
+- `AGENT_WEBHOOK_SECRET`
+- `AGENT_SESSION_*`
+- `AGENT_PAIRING_CHALLENGE_TTL_SECONDS`
+- `AGENT_PAIRING_CHALLENGE_MAX_ENTRIES`
+- `AGENT_PAIRING_REDIRECT_PATH`
 
-## Validation Performed
-- `npm.cmd run typecheck` passed
-- `npm.cmd run build` passed
-- `python -m py_compile backend/api_server.py` passed
+## Next Security Step
 
-## Passkeys Summary (For Later)
-Passkeys (WebAuthn/FIDO2) use public/private key cryptography:
-- Private key stays on user device (or secure synced credential store).
-- Server stores public key.
-- Login is challenge-response (phishing-resistant).
-
-Recommended target model:
-1. Passkey primary sign-in.
-2. Email link fallback/recovery.
-3. Supabase remains identity provider.
-
-## Suggested Next Steps
-1. Fill real Supabase values in `.env`.
-2. Configure Supabase Auth redirect URLs for your actual app origins.
-3. Verify email templates + sender domain setup (SPF/DKIM/DMARC).
-4. Test flows end-to-end:
-   - Get started
-   - Sign in link
-   - Forgot/reset password
-5. Add passkey-first flow after email-link baseline is stable.
+- Implement passkeys as primary auth, keep email-link as recovery fallback.

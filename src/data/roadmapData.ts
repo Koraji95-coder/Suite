@@ -131,7 +131,7 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 			{
 				title: "Auth system with profiles and RLS",
 				description:
-					"Supabase email/password auth, user profiles, display name management, session handling, security event logging, and row-level security across all tables.",
+					"Supabase passwordless email-link auth, user profiles, display name management, session handling, security event logging, and row-level security across all tables.",
 				status: "completed",
 				category: "infrastructure",
 			},

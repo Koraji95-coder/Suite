@@ -6,18 +6,15 @@ import { NotificationProvider } from "./auth/NotificationContext";
 import Cursor from "./components/fx/Cursor";
 import { ErrorBoundary } from "./components/notification-system/ErrorBoundary";
 import { ToastContainer } from "./components/notification-system/ToastContainer";
-import { ToastProvider } from "./components/notification-system/ToastProvider";
 import { useSuiteCursor, useCursorEnabled } from "./components/fx/useSuiteCursor";
 import { logger } from "./lib/logger";
 import AppDashboardPage from "./routes/AppDashboardPage";
 import Shell from "./routes/AppShell";
-import ForgotPasswordPage from "./routes/ForgotPasswordPage";
 import LandingPage from "./routes/LandingPage";
 import LoginPage from "./routes/LoginPage";
 import PrivacyPage from "./routes/PrivacyPage";
 import RoadmapPage from "./routes/RoadmapPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
-import ResetPasswordPage from "./routes/ResetPasswordPage";
 import RouteLoadingFallback from "./routes/RouteLoadingFallback";
 import SignupPage from "./routes/SignupPage";
 
@@ -91,114 +88,105 @@ export default function App() {
 			<ErrorBoundary>
 				<AuthProvider>
 					<NotificationProvider>
-						<ToastProvider>
-							<EnvDebug />
-							{cursorEnabled && <Cursor />}
+						<EnvDebug />
+						{cursorEnabled && <Cursor />}
 
-							<Routes>
-								<Route path="/" element={<LandingPage />} />
-								<Route path="/login" element={<LoginPage />} />
-								<Route path="/signup" element={<SignupPage />} />
-								<Route
-									path="/forgot-password"
-									element={<ForgotPasswordPage />}
-								/>
-								<Route path="/reset-password" element={<ResetPasswordPage />} />
-								<Route path="/privacy" element={<PrivacyPage />} />
-								<Route path="/roadmap" element={<RoadmapPage />} />
+						<Routes>
+							<Route path="/" element={<LandingPage />} />
+							<Route path="/login" element={<LoginPage />} />
+							<Route path="/signup" element={<SignupPage />} />
+							<Route path="/privacy" element={<PrivacyPage />} />
+							<Route path="/roadmap" element={<RoadmapPage />} />
 
-								<Route element={<ProtectedRoute />}>
-									<Route path="/app" element={<Shell />}>
-										<Route
-											index
-											element={<Navigate to="/app/dashboard" replace />}
-										/>
-										<Route
-											path="home"
-											element={<Navigate to="/app/dashboard" replace />}
-										/>
-										<Route
-											path="dashboard"
-											element={withRouteSuspense(<AppDashboardPage />)}
-										/>
-										<Route
-											path="projects"
-											element={withRouteSuspense(<ProjectsRoutePage />)}
-										/>
-										<Route
-											path="projects/:projectId"
-											element={withRouteSuspense(<ProjectsRoutePage />)}
-										/>
-										<Route
-											path="calendar"
-											element={withRouteSuspense(<CalendarRoutePage />)}
-										/>
-										<Route
-											path="apps"
-											element={withRouteSuspense(<AppsRoutePage />)}
-										/>
-										<Route
-											path="apps/ground-grid-generation"
-											element={withRouteSuspense(<GroundGridRoutePage />)}
-										/>
-										<Route
-											path="apps/transmittal-builder"
-											element={withRouteSuspense(
-												<TransmittalBuilderRoutePage />,
-											)}
-										/>
-										<Route
-											path="apps/drawing-list-manager"
-											element={withRouteSuspense(<DrawingListManagerRoutePage />)}
-										/>
-										<Route
-											path="apps/graph"
-											element={withRouteSuspense(<GraphRoutePage />)}
-										/>
-										<Route
-											path="apps/standards-checker"
-											element={withRouteSuspense(<StandardsCheckerRoutePage />)}
-										/>
-										<Route
-											path="apps/batch-find-replace"
-											element={withRouteSuspense(<BatchFindReplaceRoutePage />)}
-										/>
-										<Route
-											path="knowledge"
-											element={withRouteSuspense(<KnowledgeRoutePage />)}
-										/>
-										<Route
-											path="knowledge/whiteboard"
-											element={withRouteSuspense(<WhiteboardKnowledgePage />)}
-										/>
-										<Route
-											path="knowledge/math-tools"
-											element={withRouteSuspense(<MathToolsLibraryPage />)}
-										/>
-										<Route
-											path="agent"
-											element={withRouteSuspense(<AgentRoutePage />)}
-										/>
-										<Route
-											path="architecture-map"
-											element={withRouteSuspense(<ArchitectureMapRoutePage />)}
-										/>
-										<Route
-											path="settings"
-											element={withRouteSuspense(<SettingsPage />)}
-										/>
-										<Route
-											path="command-center"
-											element={withRouteSuspense(<CommandCenterPage />)}
-										/>
-									</Route>
+							<Route element={<ProtectedRoute />}>
+								<Route path="/app" element={<Shell />}>
+									<Route
+										index
+										element={<Navigate to="/app/dashboard" replace />}
+									/>
+									<Route
+										path="home"
+										element={<Navigate to="/app/dashboard" replace />}
+									/>
+									<Route
+										path="dashboard"
+										element={withRouteSuspense(<AppDashboardPage />)}
+									/>
+									<Route
+										path="projects"
+										element={withRouteSuspense(<ProjectsRoutePage />)}
+									/>
+									<Route
+										path="projects/:projectId"
+										element={withRouteSuspense(<ProjectsRoutePage />)}
+									/>
+									<Route
+										path="calendar"
+										element={withRouteSuspense(<CalendarRoutePage />)}
+									/>
+									<Route
+										path="apps"
+										element={withRouteSuspense(<AppsRoutePage />)}
+									/>
+									<Route
+										path="apps/ground-grid-generation"
+										element={withRouteSuspense(<GroundGridRoutePage />)}
+									/>
+									<Route
+										path="apps/transmittal-builder"
+										element={withRouteSuspense(<TransmittalBuilderRoutePage />)}
+									/>
+									<Route
+										path="apps/drawing-list-manager"
+										element={withRouteSuspense(<DrawingListManagerRoutePage />)}
+									/>
+									<Route
+										path="apps/graph"
+										element={withRouteSuspense(<GraphRoutePage />)}
+									/>
+									<Route
+										path="apps/standards-checker"
+										element={withRouteSuspense(<StandardsCheckerRoutePage />)}
+									/>
+									<Route
+										path="apps/batch-find-replace"
+										element={withRouteSuspense(<BatchFindReplaceRoutePage />)}
+									/>
+									<Route
+										path="knowledge"
+										element={withRouteSuspense(<KnowledgeRoutePage />)}
+									/>
+									<Route
+										path="knowledge/whiteboard"
+										element={withRouteSuspense(<WhiteboardKnowledgePage />)}
+									/>
+									<Route
+										path="knowledge/math-tools"
+										element={withRouteSuspense(<MathToolsLibraryPage />)}
+									/>
+									<Route
+										path="agent"
+										element={withRouteSuspense(<AgentRoutePage />)}
+									/>
+									<Route
+										path="architecture-map"
+										element={withRouteSuspense(<ArchitectureMapRoutePage />)}
+									/>
+									<Route
+										path="settings"
+										element={withRouteSuspense(<SettingsPage />)}
+									/>
+									<Route
+										path="command-center"
+										element={withRouteSuspense(<CommandCenterPage />)}
+									/>
 								</Route>
+							</Route>
 
-								<Route path="*" element={<Navigate to="/" replace />} />
-							</Routes>
+							<Route path="*" element={<Navigate to="/" replace />} />
+						</Routes>
 
-							<ToastContainer />
-						</ToastProvider>
+						<ToastContainer />
 					</NotificationProvider>
 				</AuthProvider>
 			</ErrorBoundary>

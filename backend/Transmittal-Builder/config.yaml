@@ -3,8 +3,8 @@ schema_version: 1
 ui:
   theme: "obsidian"
   show_wizard: false
-  default_pe: "Andrew Simmons, PE"
-  default_firm: "TX - FIRM #20290"
+  default_pe: "Sample Engineer, PE"
+  default_firm: "TX - Firm #00000"
   auto_save_interval: 120  # seconds (2 minutes)
 
 business:
@@ -15,24 +15,18 @@ business:
     - "OK - Firm #8360"
   
   pe_profiles:
-    - name: "Don Washington, PE"
-      title: "VP of Electrical Engineering"
-      email: "don.washington@root3power.com"
-      phone: "(832) 865-0461"
-      signature: "don_signature.png"
-
-    - name: "Andrew Simmons, PE"
-      title: "Managing Partner"
-      email: "andrew.simmons@root3power.com"
-      phone: "(713) 294-2003"
-      signature: "andrew_signature.png"
+    - name: "Sample Engineer, PE"
+      title: "Engineering Lead"
+      email: "engineer@example.com"
+      phone: "(000) 000-0000"
+      signature: "sample_signature.png"
 
 email:
-  sender: "hyphaeos@gmail.com"
-  app_password: "ldxv pqqh lqvz swdm"
-  default_receiver: "dustin.ward@root3power.com"
-  subject_prefix: "[Root3Power Transmittal Builder]"
-  sender_name: "Root3Power Transmittal Builder"
+  sender: "sender@example.com"
+  app_password: "your_app_password"
+  default_receiver: "receiver@example.com"
+  subject_prefix: "[Transmittal Builder]"
+  sender_name: "Transmittal Builder"
 
 validation:
   require_from_email: true

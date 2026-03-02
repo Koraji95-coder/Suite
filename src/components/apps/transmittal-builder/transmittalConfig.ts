@@ -1,4 +1,5 @@
 export type PeProfile = {
+	id: string;
 	name: string;
 	title: string;
 	email: string;
@@ -7,24 +8,15 @@ export type PeProfile = {
 
 export const PE_PROFILES: PeProfile[] = [
 	{
-		name: "Don Washington, PE",
-		title: "VP of Electrical Engineering",
-		email: "don.washington@root3power.com",
-		phone: "(832) 865-0461",
-	},
-	{
-		name: "Andrew Simmons, PE",
-		title: "Managing Partner",
-		email: "andrew.simmons@root3power.com",
-		phone: "(713) 294-2003",
+		id: "sample-engineer",
+		name: "Sample Engineer, PE",
+		title: "Engineering Lead",
+		email: "engineer@example.com",
+		phone: "(000) 000-0000",
 	},
 ];
 
-export const FIRM_NUMBERS = [
-	"TX - Firm #20290",
-	"LA - Firm #6673",
-	"OK - Firm #8360",
-];
+export const FIRM_NUMBERS = ["TX - Firm #00000"];
 
-export const DEFAULT_PE = "Andrew Simmons, PE";
-export const DEFAULT_FIRM = "TX - Firm #20290";
+export const DEFAULT_PE = "sample-engineer";
+export const DEFAULT_FIRM = "TX - Firm #00000";

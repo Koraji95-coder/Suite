@@ -21,20 +21,20 @@ export default function CalendarRoutePage() {
 					onSelectDate={setSelectedDate}
 				/>
 			}
-		>
-			<div
-				className="rounded-2xl"
-				style={{
-					padding: "clamp(4px, 0.6vw, 10px)",
-					minHeight: "clamp(620px, calc(100dvh - 8rem), 1040px)",
-				}}
 			>
-				<CalendarPage
-					selectedDate={selectedDate}
-					onSelectedDateChange={setSelectedDate}
-					onEventsChange={setEvents}
-				/>
-			</div>
+				<div
+					className="rounded-2xl"
+					style={{
+						padding: "clamp(4px, 0.6vw, 10px)",
+						minHeight: "clamp(620px, 72dvh, 1040px)",
+					}}
+				>
+					<CalendarPage
+						selectedDate={selectedDate}
+						onSelectedDateChange={setSelectedDate}
+						onEventsChange={setEvents}
+					/>
+				</div>
 		</PageFrame>
 	);
 }

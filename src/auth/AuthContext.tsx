@@ -5,7 +5,10 @@
 
 import type { User } from "@supabase/supabase-js";
 import { createContext, type ReactNode, useEffect, useState } from "react";
-import { requestEmailAuthLink } from "./emailAuthApi";
+import {
+	requestEmailAuthLink,
+	type EmailAuthRequestOptions,
+} from "./emailAuthApi";
 import { agentTaskManager } from "../services/agentTaskManager";
 import { agentService } from "../services/agentService";
 import { logSecurityEvent } from "../services/securityEventService";
@@ -19,8 +22,8 @@ interface AuthContextValue {
 	user: User | null;
 	profile: Profile | null;
 	loading: boolean;
-	signIn: (email: string) => Promise<void>;
-	signUp: (email: string) => Promise<void>;
+	signIn: (email: string, options?: EmailAuthRequestOptions) => Promise<void>;
+	signUp: (email: string, options?: EmailAuthRequestOptions) => Promise<void>;
 	signOut: () => Promise<void>;
 	updateProfile: (
 		updates: Partial<
@@ -180,16 +183,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		};
 	}, []);
 
-	const signIn = async (email: string) => {
-		await requestEmailAuthLink(email, "signin");
+	const signIn = async (email: string, options?: EmailAuthRequestOptions) => {
+		await requestEmailAuthLink(email, "signin", options);
 		await logSecurityEvent(
 			"auth_sign_in_success",
 			"Sign-in email link requested.",
 		);
 	};
 
-	const signUp = async (email: string) => {
-		await requestEmailAuthLink(email, "signup");
+	const signUp = async (email: string, options?: EmailAuthRequestOptions) => {
+		await requestEmailAuthLink(email, "signup", options);
 		await logSecurityEvent(
 			"auth_sign_up_success",
 			"Sign-up email link requested.",

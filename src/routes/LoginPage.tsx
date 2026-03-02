@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthEnvDebugCard from "../auth/AuthEnvDebugCard";
+import CaptchaChallenge from "../auth/CaptchaChallenge";
 import AuthShell from "../auth/AuthShell";
 import { useNotification } from "../auth/NotificationContext";
 import { useAuth } from "../auth/useAuth";
@@ -16,15 +17,24 @@ export default function LoginPage() {
 
 	const notification = useNotification();
 	const [email, setEmail] = useState("");
+	const [captchaToken, setCaptchaToken] = useState("");
+	const [honeypot, setHoneypot] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [sent, setSent] = useState(false);
 	const [error, setError] = useState("");
 	const [redirectProgress, setRedirectProgress] = useState(0);
+	const requiresCaptcha = Boolean(
+		(import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim(),
+	);
+	const honeypotFieldName =
+		(import.meta.env.VITE_AUTH_HONEYPOT_FIELD || "company").trim() || "company";
 
 	const canSubmit = useMemo(() => {
 		if (loading || submitting) return false;
-		return email.trim().length > 0;
-	}, [email, loading, submitting]);
+		if (email.trim().length === 0) return false;
+		if (requiresCaptcha) return captchaToken.trim().length > 0;
+		return true;
+	}, [email, loading, submitting, requiresCaptcha, captchaToken]);
 
 	useEffect(() => {
 		if (!(user && !loading)) {
@@ -107,7 +117,7 @@ export default function LoginPage() {
 		setError("");
 		setSubmitting(true);
 		try {
-			await signIn(email.trim());
+			await signIn(email.trim(), { captchaToken, honeypot });
 			setSent(true);
 			notification.success(
 				"Check your email",
@@ -119,6 +129,7 @@ export default function LoginPage() {
 					? err.message
 					: "Unable to send sign-in email right now.";
 			setError(msg);
+			setCaptchaToken("");
 			logger.error("Login link request failed", "LoginPage", { error: err });
 			notification.error("Sign-in link failed", msg);
 		} finally {
@@ -190,6 +201,35 @@ export default function LoginPage() {
 						/>
 					</div>
 
+					<div
+						aria-hidden="true"
+						style={{
+							position: "absolute",
+							left: "-10000px",
+							top: "auto",
+							width: 1,
+							height: 1,
+							overflow: "hidden",
+						}}
+					>
+						<label htmlFor={`hp-${honeypotFieldName}`}>Company</label>
+						<input
+							id={`hp-${honeypotFieldName}`}
+							name={honeypotFieldName}
+							type="text"
+							autoComplete="off"
+							tabIndex={-1}
+							value={honeypot}
+							onChange={(event) => setHoneypot(event.target.value)}
+						/>
+					</div>
+
+					<CaptchaChallenge
+						token={captchaToken}
+						onTokenChange={setCaptchaToken}
+						disabled={submitting}
+					/>
+
 					{error ? (
 						<div className="rounded-lg border px-3 py-2 text-sm [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">
 							{error}
@@ -222,10 +262,10 @@ export default function LoginPage() {
 							</Link>
 						</span>
 						<Link
-							to="/forgot-password"
+							to="/privacy"
 							className="font-medium underline-offset-2 hover:underline [color:var(--text-muted)] hover:[color:var(--text)]"
 						>
-							Forgot password?
+							Privacy
 						</Link>
 					</div>
 

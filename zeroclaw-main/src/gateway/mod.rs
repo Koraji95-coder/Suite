@@ -612,6 +612,7 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
     }
     println!("  🌐 Web Dashboard: http://{display_addr}/");
     println!("  POST /pair      — pair a new client (X-Pairing-Code header)");
+    println!("  POST /unpair    — revoke the current bearer token");
     println!("  POST /webhook   — {{\"message\": \"your prompt\"}}");
     println!("  POST /api/chat  — {{\"message\": \"...\", \"context\": [...]}} (tools-enabled, OpenClaw compat)");
     if whatsapp_channel.is_some() {
@@ -726,6 +727,7 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         .route("/health", get(handle_health))
         .route("/metrics", get(handle_metrics))
         .route("/pair", post(handle_pair))
+        .route("/unpair", post(handle_unpair))
         .route("/webhook", get(handle_webhook_usage).post(handle_webhook))
         .route("/whatsapp", get(handle_whatsapp_verify))
         .route("/whatsapp", post(handle_whatsapp_message))
@@ -913,6 +915,56 @@ async fn handle_pair(
             (StatusCode::TOO_MANY_REQUESTS, Json(err))
         }
     }
+}
+
+/// POST /unpair — revoke the bearer token used by this request
+#[axum::debug_handler]
+async fn handle_unpair(State(state): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
+    if !state.pairing.require_pairing() {
+        let err = serde_json::json!({
+            "error": "Pairing is disabled; /unpair is unavailable."
+        });
+        return (StatusCode::BAD_REQUEST, Json(err));
+    }
+
+    let auth = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let token = auth.strip_prefix("Bearer ").unwrap_or("").trim();
+
+    if token.is_empty() || !state.pairing.is_authenticated(token) {
+        let err = serde_json::json!({
+            "error": "Unauthorized — provide Authorization: Bearer <token> for /unpair"
+        });
+        return (StatusCode::UNAUTHORIZED, Json(err));
+    }
+
+    let revoked = state.pairing.revoke_token(token);
+    if !revoked.revoked {
+        let err = serde_json::json!({
+            "error": "Token revoke failed."
+        });
+        return (StatusCode::CONFLICT, Json(err));
+    }
+
+    let mut persisted = true;
+    if let Err(err) = persist_pairing_tokens(state.config.clone(), &state.pairing).await {
+        persisted = false;
+        tracing::error!("🔐 Token revoke succeeded but persistence failed: {err:#}");
+    }
+
+    if let Some(code) = revoked.new_pairing_code.as_deref() {
+        tracing::info!("🔐 All pairing tokens revoked. New one-time pairing code: {code}");
+    }
+
+    let body = serde_json::json!({
+        "revoked": true,
+        "paired": revoked.paired,
+        "persisted": persisted,
+        "pairing_code": revoked.new_pairing_code,
+    });
+    (StatusCode::OK, Json(body))
 }
 
 async fn persist_pairing_tokens(config: Arc<Mutex<Config>>, pairing: &PairingGuard) -> Result<()> {

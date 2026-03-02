@@ -5,6 +5,7 @@ export default function AuthEnvDebugCard() {
 
 	const projectUrl = import.meta.env.VITE_SUPABASE_URL ?? "";
 	const redirectEnv = import.meta.env.VITE_AUTH_REDIRECT_URL ?? "";
+	const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "";
 	const origin = typeof window !== "undefined" ? window.location.origin : "";
 
 	const projectHost = useMemo(() => {
@@ -85,10 +86,16 @@ export default function AuthEnvDebugCard() {
 					<span style={labelStyle}>Auth Redirect</span>
 					<span style={valueStyle}>{redirectHost}</span>
 				</div>
+				<div style={rowStyle}>
+					<span style={labelStyle}>Captcha</span>
+					<span style={valueStyle}>
+						{turnstileSiteKey.trim() ? "Turnstile enabled" : "disabled"}
+					</span>
+				</div>
 			</div>
 			{redirectMismatch ? (
 				<div className="auth-error" style={{ marginTop: 8, marginBottom: 0 }}>
-					Redirect host does not match current host. Signup/confirm/reset links may fail.
+					Redirect host does not match current host. Email auth links may fail.
 				</div>
 			) : null}
 		</div>

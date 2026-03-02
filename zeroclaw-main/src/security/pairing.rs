@@ -51,6 +51,13 @@ pub struct PairingGuard {
     failed_attempts: Arc<Mutex<(HashMap<String, FailedAttemptState>, Instant)>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevokeTokenResult {
+    pub revoked: bool,
+    pub paired: bool,
+    pub new_pairing_code: Option<String>,
+}
+
 impl PairingGuard {
     /// Create a new pairing guard.
     ///
@@ -219,6 +226,58 @@ impl PairingGuard {
     pub fn tokens(&self) -> Vec<String> {
         let tokens = self.paired_tokens.lock();
         tokens.iter().cloned().collect()
+    }
+
+    /// Revoke a bearer token and optionally rotate back into pairing-code mode
+    /// when no paired tokens remain.
+    pub fn revoke_token(&self, token: &str) -> RevokeTokenResult {
+        if !self.require_pairing {
+            return RevokeTokenResult {
+                revoked: false,
+                paired: false,
+                new_pairing_code: None,
+            };
+        }
+
+        let hashed = hash_token(token.trim());
+        let (revoked, paired) = {
+            let mut tokens = self.paired_tokens.lock();
+            let revoked = tokens.remove(&hashed);
+            let paired = !tokens.is_empty();
+            (revoked, paired)
+        };
+
+        if !revoked {
+            return RevokeTokenResult {
+                revoked: false,
+                paired,
+                new_pairing_code: self.pairing_code(),
+            };
+        }
+
+        if paired {
+            return RevokeTokenResult {
+                revoked: true,
+                paired: true,
+                new_pairing_code: None,
+            };
+        }
+
+        // All tokens are gone: generate a fresh one-time code so the gateway can
+        // be paired again without a process restart.
+        let new_code = {
+            let mut code_guard = self.pairing_code.lock();
+            if code_guard.is_none() {
+                *code_guard = Some(generate_code());
+            }
+            code_guard.clone()
+        };
+
+        RevokeTokenResult {
+            revoked: true,
+            paired: false,
+            new_pairing_code: new_code,
+        }
     }
 }
 
@@ -416,6 +475,45 @@ mod tests {
         let token = guard.try_pair(&code, "test_client").await.unwrap().unwrap();
         assert!(guard.is_authenticated(&token));
         assert!(!guard.is_authenticated("wrong"));
+    }
+
+    #[test]
+    async fn revoke_token_removes_authentication() {
+        let guard = PairingGuard::new(true, &[]);
+        let code = guard.pairing_code().unwrap().to_string();
+        let token = guard.try_pair(&code, "test_client").await.unwrap().unwrap();
+        assert!(guard.is_authenticated(&token));
+
+        let result = guard.revoke_token(&token);
+        assert!(result.revoked);
+        assert!(!result.paired);
+        assert!(!guard.is_authenticated(&token));
+    }
+
+    #[test]
+    async fn revoke_last_token_generates_new_pairing_code() {
+        let guard = PairingGuard::new(true, &[]);
+        let original_code = guard.pairing_code().unwrap().to_string();
+        let token = guard
+            .try_pair(&original_code, "test_client")
+            .await
+            .unwrap()
+            .unwrap();
+
+        let result = guard.revoke_token(&token);
+        assert!(result.revoked);
+        assert!(!result.paired);
+        assert!(result.new_pairing_code.is_some());
+        assert!(guard.pairing_code().is_some());
+    }
+
+    #[test]
+    async fn revoke_unknown_token_does_not_change_state() {
+        let guard = PairingGuard::new(true, &["zc_valid".into()]);
+        let result = guard.revoke_token("zc_missing");
+        assert!(!result.revoked);
+        assert!(result.paired);
+        assert!(guard.is_authenticated("zc_valid"));
     }
 
     // ── Token hashing ────────────────────────────────────────

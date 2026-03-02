@@ -64,17 +64,23 @@ export function UnifiedLog() {
 			if (mounted) setWsLive(false);
 		});
 
-		const unsubscribeConnected = coordinatesGrabberService.on("connected", (event) => {
-			if (event.type !== "connected") return;
-			setWsLive(true);
-			setWsLastUpdate(Date.now());
-		});
+		const unsubscribeConnected = coordinatesGrabberService.on(
+			"connected",
+			(event) => {
+				if (event.type !== "connected") return;
+				setWsLive(true);
+				setWsLastUpdate(Date.now());
+			},
+		);
 
-		const unsubscribeStatus = coordinatesGrabberService.on("status", (event) => {
-			if (event.type !== "status") return;
-			setWsLive(true);
-			setWsLastUpdate(Date.now());
-		});
+		const unsubscribeStatus = coordinatesGrabberService.on(
+			"status",
+			(event) => {
+				if (event.type !== "status") return;
+				setWsLive(true);
+				setWsLastUpdate(Date.now());
+			},
+		);
 
 		const unsubscribeDisconnected = coordinatesGrabberService.on(
 			"service-disconnected",
@@ -98,10 +104,13 @@ export function UnifiedLog() {
 		const el = scrollRef.current;
 		if (!el) return;
 		if (!shouldAutoScrollRef.current) return;
+		if (logs.length === 0) return;
 		el.scrollTop = el.scrollHeight;
-	}, [logs.length]);
+	}, [logs]);
 
-	const wsLiveStamp = wsLastUpdate ? new Date(wsLastUpdate).toLocaleTimeString() : "--";
+	const wsLiveStamp = wsLastUpdate
+		? new Date(wsLastUpdate).toLocaleTimeString()
+		: "--";
 
 	return (
 		<div
@@ -113,7 +122,13 @@ export function UnifiedLog() {
 				gap: 8,
 			}}
 		>
-			<div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+			<div
+				style={{
+					display: "flex",
+					justifyContent: "space-between",
+					alignItems: "center",
+				}}
+			>
 				<div style={{ display: "flex", alignItems: "center", gap: 10 }}>
 					<div style={{ fontSize: 13, fontWeight: 600, color: palette.text }}>
 						Unified Log
@@ -138,7 +153,9 @@ export function UnifiedLog() {
 							borderRadius: 999,
 							fontSize: 10,
 							fontWeight: 600,
-							background: wsLive ? hexToRgba("#22c55e", 0.1) : hexToRgba("#f59e0b", 0.08),
+							background: wsLive
+								? hexToRgba("#22c55e", 0.1)
+								: hexToRgba("#f59e0b", 0.08),
 							border: `1px solid ${
 								wsLive ? hexToRgba("#22c55e", 0.3) : hexToRgba("#f59e0b", 0.2)
 							}`,
@@ -178,9 +195,19 @@ export function UnifiedLog() {
 				</button>
 			</div>
 
-			<div style={{ display: "flex", gap: 12, fontSize: 10, color: palette.textMuted }}>
+			<div
+				style={{
+					display: "flex",
+					gap: 12,
+					fontSize: 10,
+					color: palette.textMuted,
+				}}
+			>
 				{Object.entries(SOURCE_LABELS).map(([key, label]) => (
-					<span key={key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+					<span
+						key={key}
+						style={{ display: "flex", alignItems: "center", gap: 4 }}
+					>
 						<span
 							style={{
 								width: 8,
@@ -209,9 +236,15 @@ export function UnifiedLog() {
 				}}
 			>
 				{logs.length === 0 ? (
-					<div style={{ color: palette.textMuted, textAlign: "center", padding: 40 }}>
-						No log entries yet. Activity from Coordinate Grabber and Grid Generator will
-						appear here.
+					<div
+						style={{
+							color: palette.textMuted,
+							textAlign: "center",
+							padding: 40,
+						}}
+					>
+						No log entries yet. Activity from Coordinate Grabber and Grid
+						Generator will appear here.
 					</div>
 				) : (
 					logs.map((entry, idx) => (

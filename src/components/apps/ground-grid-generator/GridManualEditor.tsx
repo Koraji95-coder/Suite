@@ -1,54 +1,22 @@
-// src/components/apps/ground-grid/GridManualEditor.tsx
-import {
-	Check,
-	MousePointer,
-	Plus,
-	Trash2,
-	X,
-	ZoomIn,
-	ZoomOut,
-} from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import {
-	Dialog,
-	DialogContent,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/apps/ui/dialog";
 import { hexToRgba, useTheme } from "@/lib/palette";
-import type { GridConductor, GridPlacement, GridRod } from "./types";
-
-type EditorMode =
-	| "select"
-	| "add-rod"
-	| "add-conductor"
-	| "add-tee"
-	| "add-cross"
-	| "delete";
-
-interface PlacementSuggestion {
-	type: EditorMode;
-	x: number;
-	y: number;
-	endX?: number;
-	endY?: number;
-}
-
-interface GridManualEditorProps {
-	rods: GridRod[];
-	conductors: GridConductor[];
-	placements: GridPlacement[];
-	onRodsChange: (rods: GridRod[]) => void;
-	onConductorsChange: (conductors: GridConductor[]) => void;
-	onPlacementsChange: (placements: GridPlacement[]) => void;
-}
-
-function placementKey(
-	p: Pick<GridPlacement, "type" | "grid_x" | "grid_y">,
-): string {
-	return `${p.type}:${p.grid_x},${p.grid_y}`;
-}
+import { GridManualEditorCanvas } from "./GridManualEditorCanvas";
+import type {
+	EditorMode,
+	GridManualEditorProps,
+	PlacementSuggestion,
+	SuggestionCoords,
+} from "./GridManualEditorModels";
+import { GridManualEditorSuggestionDialog } from "./GridManualEditorSuggestionDialog";
+import { GridManualEditorTables } from "./GridManualEditorTables";
+import { GridManualEditorToolbar } from "./GridManualEditorToolbar";
+import {
+	clientPointToViewBoxPoint,
+	computeGridBounds2D,
+	computeScaleFromBounds,
+	formatViewBox,
+	zoomBoundsToViewBox,
+} from "./gridViewUtils";
 
 export function GridManualEditor({
 	rods,
@@ -66,7 +34,7 @@ export function GridManualEditor({
 		null,
 	);
 
-	// ✅ stable selection for placements (prevents index drift)
+	// Stable key-based selection prevents index drift after mutations.
 	const [selectedTeeKey, setSelectedTeeKey] = useState<string | null>(null);
 	const [selectedCrossKey, setSelectedCrossKey] = useState<string | null>(null);
 
@@ -86,7 +54,7 @@ export function GridManualEditor({
 	const [suggestion, setSuggestion] = useState<PlacementSuggestion | null>(
 		null,
 	);
-	const [suggestionCoords, setSuggestionCoords] = useState({
+	const [suggestionCoords, setSuggestionCoords] = useState<SuggestionCoords>({
 		x: "",
 		y: "",
 		endX: "",
@@ -94,48 +62,22 @@ export function GridManualEditor({
 	});
 	const [zoom, setZoom] = useState(1);
 
-	const bounds = useMemo(() => {
-		let minX = Infinity,
-			minY = Infinity,
-			maxX = -Infinity,
-			maxY = -Infinity;
+	const bounds = useMemo(
+		() =>
+			computeGridBounds2D(rods, conductors, {
+				fallback: { minX: -50, minY: -50, maxX: 50, maxY: 50 },
+				padRatio: 0.25,
+				minPad: 10,
+			}),
+		[rods, conductors],
+	);
 
-		for (const r of rods) {
-			minX = Math.min(minX, r.grid_x);
-			minY = Math.min(minY, r.grid_y);
-			maxX = Math.max(maxX, r.grid_x);
-			maxY = Math.max(maxY, r.grid_y);
-		}
-		for (const c of conductors) {
-			minX = Math.min(minX, c.x1, c.x2);
-			minY = Math.min(minY, c.y1, c.y2);
-			maxX = Math.max(maxX, c.x1, c.x2);
-			maxY = Math.max(maxY, c.y1, c.y2);
-		}
-
-		if (!isFinite(minX)) return { minX: -50, minY: -50, maxX: 50, maxY: 50 };
-		const pad = Math.max(maxX - minX, maxY - minY) * 0.25 || 10;
-		return {
-			minX: minX - pad,
-			minY: minY - pad,
-			maxX: maxX + pad,
-			maxY: maxY + pad,
-		};
-	}, [rods, conductors]);
-
-	const viewBox = useMemo(() => {
-		const fullW = bounds.maxX - bounds.minX;
-		const fullH = bounds.maxY - bounds.minY;
-		const cx = bounds.minX + fullW / 2;
-		const cy = bounds.minY + fullH / 2;
-		const zW = fullW / zoom;
-		const zH = fullH / zoom;
-		return `${cx - zW / 2} ${cy - zH / 2} ${zW} ${zH}`;
-	}, [bounds, zoom]);
-
-	const rodScale =
-		(Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.012) /
-		zoom;
+	const zoomedViewBox = useMemo(
+		() => zoomBoundsToViewBox(bounds, zoom),
+		[bounds, zoom],
+	);
+	const viewBox = useMemo(() => formatViewBox(zoomedViewBox), [zoomedViewBox]);
+	const rodScale = computeScaleFromBounds(bounds, 0.012, zoom);
 
 	const handleZoomIn = () => setZoom((z) => Math.min(z * 1.3, 4));
 	const handleZoomOut = () => setZoom((z) => Math.max(z / 1.3, 0.5));
@@ -146,24 +88,13 @@ export function GridManualEditor({
 			if (!svg) return { x: 0, y: 0 };
 			const rect = svg.getBoundingClientRect();
 
-			const fullW = bounds.maxX - bounds.minX;
-			const fullH = bounds.maxY - bounds.minY;
-			const cx = bounds.minX + fullW / 2;
-			const cy = bounds.minY + fullH / 2;
-
-			const zW = fullW / zoom;
-			const zH = fullH / zoom;
-
-			return {
-				x: cx - zW / 2 + ((clientX - rect.left) / rect.width) * zW,
-				y: cy - zH / 2 + ((clientY - rect.top) / rect.height) * zH,
-			};
+			return clientPointToViewBoxPoint(clientX, clientY, rect, zoomedViewBox);
 		},
-		[bounds, zoom],
+		[zoomedViewBox],
 	);
 
 	const snapToGrid = useCallback(
-		(val: number): number => Math.round(val * 100) / 100,
+		(value: number): number => Math.round(value * 100) / 100,
 		[],
 	);
 
@@ -172,6 +103,14 @@ export function GridManualEditor({
 		setSelectedConductor(null);
 		setSelectedTeeKey(null);
 		setSelectedCrossKey(null);
+	}, []);
+
+	const setEditorMode = useCallback((nextMode: EditorMode) => {
+		setMode(nextMode);
+		setConductorStart(null);
+		setSuggestion(null);
+		if (nextMode === "add-rod") setShowRodInput(true);
+		if (nextMode === "add-conductor") setShowConductorInput(true);
 	}, []);
 
 	const confirmSuggestion = useCallback(() => {
@@ -242,12 +181,12 @@ export function GridManualEditor({
 	}, [
 		suggestion,
 		suggestionCoords,
-		rods,
-		conductors,
-		placements,
 		onRodsChange,
 		onConductorsChange,
 		onPlacementsChange,
+		rods,
+		conductors,
+		placements,
 	]);
 
 	const handleSvgClick = useCallback(
@@ -298,7 +237,7 @@ export function GridManualEditor({
 			if (mode === "delete") {
 				const threshold = rodScale * 2 * zoom;
 
-				for (let i = 0; i < rods.length; i++) {
+				for (let i = 0; i < rods.length; i += 1) {
 					const dist = Math.sqrt(
 						(x - rods[i].grid_x) ** 2 + (y - rods[i].grid_y) ** 2,
 					);
@@ -308,7 +247,7 @@ export function GridManualEditor({
 					}
 				}
 
-				for (let i = 0; i < conductors.length; i++) {
+				for (let i = 0; i < conductors.length; i += 1) {
 					const c = conductors[i];
 					const dx = c.x2 - c.x1;
 					const dy = c.y2 - c.y1;
@@ -331,22 +270,22 @@ export function GridManualEditor({
 			}
 		},
 		[
+			suggestion,
+			svgToWorld,
+			snapToGrid,
 			mode,
+			clearSelection,
+			conductorStart,
+			rodScale,
+			zoom,
 			rods,
 			conductors,
 			onRodsChange,
 			onConductorsChange,
-			conductorStart,
-			svgToWorld,
-			rodScale,
-			suggestion,
-			zoom,
-			clearSelection,
-			snapToGrid,
 		],
 	);
 
-	const handleWheel = useCallback((e: React.WheelEvent) => {
+	const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
 		e.preventDefault();
 		if (e.deltaY < 0) setZoom((z) => Math.min(z * 1.1, 4));
 		else setZoom((z) => Math.max(z / 1.1, 0.5));
@@ -376,6 +315,7 @@ export function GridManualEditor({
 		const y1 = parseFloat(lineInput.y1);
 		const x2 = parseFloat(lineInput.x2);
 		const y2 = parseFloat(lineInput.y2);
+
 		if (
 			Number.isNaN(x1) ||
 			Number.isNaN(y1) ||
@@ -441,9 +381,6 @@ export function GridManualEditor({
 		minWidth: 0,
 	};
 
-	const tees = placements.filter((p) => p.type === "TEE");
-	const crosses = placements.filter((p) => p.type === "CROSS");
-
 	const tableRowStyle = (selected: boolean): React.CSSProperties => ({
 		cursor: "pointer",
 		background: selected ? hexToRgba(palette.primary, 0.15) : "transparent",
@@ -451,6 +388,46 @@ export function GridManualEditor({
 			? `2px solid ${palette.primary}`
 			: "2px solid transparent",
 	});
+
+	const tees = placements.filter((p) => p.type === "TEE");
+	const crosses = placements.filter((p) => p.type === "CROSS");
+
+	const handleSelectRod = useCallback(
+		(index: number) => {
+			clearSelection();
+			setSelectedRod(index);
+		},
+		[clearSelection],
+	);
+
+	const handleSelectConductor = useCallback(
+		(index: number) => {
+			clearSelection();
+			setSelectedConductor(index);
+		},
+		[clearSelection],
+	);
+
+	const handleSelectTee = useCallback(
+		(key: string) => {
+			clearSelection();
+			setSelectedTeeKey(key);
+		},
+		[clearSelection],
+	);
+
+	const handleSelectCross = useCallback(
+		(key: string) => {
+			clearSelection();
+			setSelectedCrossKey(key);
+		},
+		[clearSelection],
+	);
+
+	const cancelSuggestion = useCallback(() => {
+		setSuggestion(null);
+		setConductorStart(null);
+	}, []);
 
 	return (
 		<div
@@ -463,928 +440,83 @@ export function GridManualEditor({
 				overflow: "auto",
 			}}
 		>
-			<div
-				style={{
-					display: "flex",
-					gap: 6,
-					flexWrap: "wrap",
-					alignItems: "center",
-				}}
-			>
-				<button
-					onClick={() => {
-						setMode("select");
-						setConductorStart(null);
-						setSuggestion(null);
-					}}
-					style={btnStyle(mode === "select")}
-				>
-					<MousePointer size={12} /> Select
-				</button>
+			<GridManualEditorToolbar
+				mode={mode}
+				zoom={zoom}
+				conductorStart={conductorStart}
+				showRodInput={showRodInput}
+				showConductorInput={showConductorInput}
+				coordInput={coordInput}
+				lineInput={lineInput}
+				mutedTextColor={palette.textMuted}
+				onChangeMode={setEditorMode}
+				onZoomIn={handleZoomIn}
+				onZoomOut={handleZoomOut}
+				onCoordInputChange={setCoordInput}
+				onLineInputChange={setLineInput}
+				onAddRodByCoord={addRodByCoord}
+				onAddConductorByCoord={addConductorByCoord}
+				onToggleRodInput={setShowRodInput}
+				onToggleConductorInput={setShowConductorInput}
+				btnStyle={btnStyle}
+				inputStyle={inputStyle}
+				inputRowStyle={inputRowStyle}
+			/>
 
-				<button
-					onClick={() => {
-						setMode("add-rod");
-						setConductorStart(null);
-						setSuggestion(null);
-						setShowRodInput(true);
-					}}
-					style={btnStyle(mode === "add-rod")}
-				>
-					<Plus size={12} /> Add Rod
-				</button>
+			<GridManualEditorCanvas
+				svgRef={svgRef}
+				viewBox={viewBox}
+				mode={mode}
+				rodScale={rodScale}
+				rods={rods}
+				conductors={conductors}
+				tees={tees}
+				crosses={crosses}
+				selectedRod={selectedRod}
+				selectedConductor={selectedConductor}
+				selectedTeeKey={selectedTeeKey}
+				selectedCrossKey={selectedCrossKey}
+				conductorStart={conductorStart}
+				primaryColor={palette.primary}
+				backgroundColor={palette.background}
+				mutedTextColor={palette.textMuted}
+				onSvgClick={handleSvgClick}
+				onWheel={handleWheel}
+				onSelectRod={handleSelectRod}
+				onSelectConductor={handleSelectConductor}
+				onSelectTee={handleSelectTee}
+				onSelectCross={handleSelectCross}
+			/>
 
-				<button
-					onClick={() => {
-						setMode("add-conductor");
-						setConductorStart(null);
-						setSuggestion(null);
-						setShowConductorInput(true);
-					}}
-					style={btnStyle(mode === "add-conductor")}
-				>
-					<Plus size={12} /> Add Conductor
-				</button>
+			<GridManualEditorTables
+				rods={rods}
+				conductors={conductors}
+				tees={tees}
+				crosses={crosses}
+				selectedRod={selectedRod}
+				selectedConductor={selectedConductor}
+				selectedTeeKey={selectedTeeKey}
+				selectedCrossKey={selectedCrossKey}
+				textColor={palette.text}
+				mutedTextColor={palette.textMuted}
+				primaryColor={palette.primary}
+				onSelectRod={handleSelectRod}
+				onSelectConductor={handleSelectConductor}
+				onSelectTee={handleSelectTee}
+				onSelectCross={handleSelectCross}
+				tableRowStyle={tableRowStyle}
+			/>
 
-				<button
-					onClick={() => {
-						setMode("add-tee");
-						setConductorStart(null);
-						setSuggestion(null);
-					}}
-					style={btnStyle(mode === "add-tee")}
-				>
-					<Plus size={12} /> Add Tee
-				</button>
-
-				<button
-					onClick={() => {
-						setMode("add-cross");
-						setConductorStart(null);
-						setSuggestion(null);
-					}}
-					style={btnStyle(mode === "add-cross")}
-				>
-					<Plus size={12} /> Add Cross
-				</button>
-
-				<button
-					onClick={() => {
-						setMode("delete");
-						setConductorStart(null);
-						setSuggestion(null);
-					}}
-					style={btnStyle(mode === "delete")}
-				>
-					<Trash2 size={12} /> Delete
-				</button>
-
-				<div style={{ display: "flex", gap: 2, marginLeft: "auto" }}>
-					<button
-						onClick={handleZoomIn}
-						style={btnStyle(false)}
-						title="Zoom In"
-					>
-						<ZoomIn size={12} />
-					</button>
-					<button
-						onClick={handleZoomOut}
-						style={btnStyle(false)}
-						title="Zoom Out"
-					>
-						<ZoomOut size={12} />
-					</button>
-					<span
-						style={{
-							fontSize: 9,
-							color: palette.textMuted,
-							alignSelf: "center",
-							minWidth: 30,
-							textAlign: "center",
-						}}
-					>
-						{Math.round(zoom * 100)}%
-					</span>
-				</div>
-			</div>
-
-			{conductorStart && (
-				<div
-					style={{
-						fontSize: 10,
-						color: "#f59e0b",
-						fontWeight: 600,
-						padding: "0 4px",
-					}}
-				>
-					Start: ({conductorStart.x}, {conductorStart.y}) -- click end point
-				</div>
-			)}
-
-			<div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-				{showRodInput && (
-					<div style={inputRowStyle}>
-						<span style={{ fontWeight: 600, minWidth: 24 }}>Rod:</span>
-						<input
-							placeholder="X"
-							value={coordInput.x}
-							onChange={(e) =>
-								setCoordInput({ ...coordInput, x: e.target.value })
-							}
-							style={inputStyle}
-						/>
-						<input
-							placeholder="Y"
-							value={coordInput.y}
-							onChange={(e) =>
-								setCoordInput({ ...coordInput, y: e.target.value })
-							}
-							style={inputStyle}
-						/>
-						<button onClick={addRodByCoord} style={btnStyle(false)}>
-							Add
-						</button>
-						<button
-							onClick={() => setShowRodInput(false)}
-							style={{ ...btnStyle(false), padding: "5px 6px" }}
-						>
-							<X size={10} />
-						</button>
-					</div>
-				)}
-
-				{showConductorInput && (
-					<div style={inputRowStyle}>
-						<span style={{ fontWeight: 600, minWidth: 24 }}>Cond:</span>
-						<input
-							placeholder="X1"
-							value={lineInput.x1}
-							onChange={(e) =>
-								setLineInput({ ...lineInput, x1: e.target.value })
-							}
-							style={inputStyle}
-						/>
-						<input
-							placeholder="Y1"
-							value={lineInput.y1}
-							onChange={(e) =>
-								setLineInput({ ...lineInput, y1: e.target.value })
-							}
-							style={inputStyle}
-						/>
-						<input
-							placeholder="X2"
-							value={lineInput.x2}
-							onChange={(e) =>
-								setLineInput({ ...lineInput, x2: e.target.value })
-							}
-							style={inputStyle}
-						/>
-						<input
-							placeholder="Y2"
-							value={lineInput.y2}
-							onChange={(e) =>
-								setLineInput({ ...lineInput, y2: e.target.value })
-							}
-							style={inputStyle}
-						/>
-						<button onClick={addConductorByCoord} style={btnStyle(false)}>
-							Add
-						</button>
-						<button
-							onClick={() => setShowConductorInput(false)}
-							style={{ ...btnStyle(false), padding: "5px 6px" }}
-						>
-							<X size={10} />
-						</button>
-					</div>
-				)}
-			</div>
-
-			<div
-				style={{
-					minHeight: 300,
-					borderRadius: 8,
-					border: `1px solid ${hexToRgba(palette.primary, 0.15)}`,
-					overflow: "hidden",
-					position: "relative",
-					flexShrink: 0,
-					height: 350,
-				}}
-			>
-				<svg
-					ref={svgRef}
-					viewBox={viewBox}
-					style={{
-						width: "100%",
-						height: "100%",
-						background: hexToRgba(palette.background, 0.5),
-						cursor:
-							mode === "select"
-								? "default"
-								: mode === "delete"
-									? "crosshair"
-									: "cell",
-					}}
-					onClick={handleSvgClick}
-					onWheel={handleWheel}
-				>
-					{conductors.map((c, i) => (
-						<g key={`c-${i}`}>
-							<line
-								x1={c.x1}
-								y1={c.y1}
-								x2={c.x2}
-								y2={c.y2}
-								stroke={
-									selectedConductor === i ? "#fff" : hexToRgba("#f59e0b", 0.6)
-								}
-								strokeWidth={rodScale * (selectedConductor === i ? 0.8 : 0.4)}
-								strokeLinecap="round"
-								onClick={(e) => {
-									e.stopPropagation();
-									if (mode === "select") {
-										clearSelection();
-										setSelectedConductor(i);
-									}
-								}}
-								style={{ cursor: mode === "select" ? "pointer" : undefined }}
-							/>
-							<text
-								x={(c.x1 + c.x2) / 2}
-								y={(c.y1 + c.y2) / 2 - rodScale * 1}
-								fontSize={rodScale * 0.8}
-								fill={selectedConductor === i ? "#fff" : palette.textMuted}
-								textAnchor="middle"
-								style={{ pointerEvents: "none" }}
-							>
-								{c.label}
-							</text>
-						</g>
-					))}
-
-					{rods.map((r, i) => (
-						<g
-							key={`r-${i}`}
-							onClick={(e) => {
-								e.stopPropagation();
-								if (mode === "select") {
-									clearSelection();
-									setSelectedRod(i);
-								}
-							}}
-							style={{ cursor: mode === "select" ? "pointer" : undefined }}
-						>
-							<circle
-								cx={r.grid_x}
-								cy={r.grid_y}
-								r={rodScale}
-								fill={
-									selectedRod === i
-										? hexToRgba("#fff", 0.3)
-										: hexToRgba("#22c55e", 0.3)
-								}
-								stroke={selectedRod === i ? "#fff" : "#22c55e"}
-								strokeWidth={rodScale * 0.2}
-							/>
-							<line
-								x1={r.grid_x - rodScale * 0.7}
-								y1={r.grid_y}
-								x2={r.grid_x + rodScale * 0.7}
-								y2={r.grid_y}
-								stroke={selectedRod === i ? "#fff" : "#22c55e"}
-								strokeWidth={rodScale * 0.15}
-							/>
-							<line
-								x1={r.grid_x}
-								y1={r.grid_y - rodScale * 0.7}
-								x2={r.grid_x}
-								y2={r.grid_y + rodScale * 0.7}
-								stroke={selectedRod === i ? "#fff" : "#22c55e"}
-								strokeWidth={rodScale * 0.15}
-							/>
-							<text
-								x={r.grid_x}
-								y={r.grid_y - rodScale * 1.4}
-								fontSize={rodScale * 0.8}
-								fill={selectedRod === i ? "#fff" : palette.textMuted}
-								textAnchor="middle"
-								style={{ pointerEvents: "none" }}
-							>
-								{r.label}
-							</text>
-						</g>
-					))}
-
-					{tees.map((p, i) => {
-						const k = placementKey(p);
-						const isSelected = selectedTeeKey === k;
-						return (
-							<g
-								key={`tee-${i}`}
-								onClick={(e) => {
-									e.stopPropagation();
-									if (mode === "select") {
-										clearSelection();
-										setSelectedTeeKey(k);
-									}
-								}}
-								style={{ cursor: mode === "select" ? "pointer" : undefined }}
-							>
-								<rect
-									x={p.grid_x - rodScale * 0.6}
-									y={p.grid_y - rodScale * 0.6}
-									width={rodScale * 1.2}
-									height={rodScale * 1.2}
-									fill={
-										isSelected
-											? hexToRgba("#fff", 0.3)
-											: hexToRgba("#3b82f6", 0.3)
-									}
-									stroke={isSelected ? "#fff" : "#3b82f6"}
-									strokeWidth={rodScale * 0.15}
-									rx={rodScale * 0.1}
-								/>
-								<text
-									x={p.grid_x}
-									y={p.grid_y + rodScale * 0.25}
-									fontSize={rodScale * 0.5}
-									fill={isSelected ? "#fff" : "#3b82f6"}
-									textAnchor="middle"
-									style={{ pointerEvents: "none", fontWeight: 700 }}
-								>
-									T
-								</text>
-							</g>
-						);
-					})}
-
-					{crosses.map((p, i) => {
-						const k = placementKey(p);
-						const isSelected = selectedCrossKey === k;
-						return (
-							<g
-								key={`cross-${i}`}
-								onClick={(e) => {
-									e.stopPropagation();
-									if (mode === "select") {
-										clearSelection();
-										setSelectedCrossKey(k);
-									}
-								}}
-								style={{ cursor: mode === "select" ? "pointer" : undefined }}
-							>
-								<rect
-									x={p.grid_x - rodScale * 0.6}
-									y={p.grid_y - rodScale * 0.6}
-									width={rodScale * 1.2}
-									height={rodScale * 1.2}
-									fill={
-										isSelected
-											? hexToRgba("#fff", 0.3)
-											: hexToRgba("#06b6d4", 0.3)
-									}
-									stroke={isSelected ? "#fff" : "#06b6d4"}
-									strokeWidth={rodScale * 0.15}
-									rx={rodScale * 0.1}
-								/>
-								<text
-									x={p.grid_x}
-									y={p.grid_y + rodScale * 0.25}
-									fontSize={rodScale * 0.5}
-									fill={isSelected ? "#fff" : "#06b6d4"}
-									textAnchor="middle"
-									style={{ pointerEvents: "none", fontWeight: 700 }}
-								>
-									+
-								</text>
-							</g>
-						);
-					})}
-
-					{conductorStart && (
-						<circle
-							cx={conductorStart.x}
-							cy={conductorStart.y}
-							r={rodScale * 0.5}
-							fill="#f59e0b"
-							opacity={0.8}
-						/>
-					)}
-				</svg>
-			</div>
-
-			{(rods.length > 0 ||
-				conductors.length > 0 ||
-				tees.length > 0 ||
-				crosses.length > 0) && (
-				<div
-					style={{
-						display: "grid",
-						gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-						gap: 8,
-					}}
-				>
-					{rods.length > 0 && (
-						<div
-							style={{
-								borderRadius: 6,
-								border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-								overflow: "hidden",
-							}}
-						>
-							<div
-								style={{
-									padding: "4px 8px",
-									fontSize: 10,
-									fontWeight: 700,
-									color: "#22c55e",
-									background: hexToRgba("#22c55e", 0.08),
-								}}
-							>
-								Ground Rods ({rods.length})
-							</div>
-							<div style={{ maxHeight: 120, overflowY: "auto" }}>
-								<table
-									style={{
-										width: "100%",
-										fontSize: 9,
-										borderCollapse: "collapse",
-									}}
-								>
-									<thead>
-										<tr style={{ color: palette.textMuted }}>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												Label
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												X
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												Y
-											</th>
-										</tr>
-									</thead>
-									<tbody>
-										{rods.map((r, i) => (
-											<tr
-												key={i}
-												style={{
-													...tableRowStyle(selectedRod === i),
-													color: palette.text,
-												}}
-												onClick={() => {
-													clearSelection();
-													setSelectedRod(i);
-												}}
-											>
-												<td
-													style={{
-														padding: "1px 4px",
-														fontWeight: 600,
-														textAlign: "center",
-													}}
-												>
-													{r.label}
-												</td>
-												<td
-													style={{
-														padding: "1px 4px",
-														textAlign: "center",
-														fontFamily: "monospace",
-													}}
-												>
-													{r.grid_x}
-												</td>
-												<td
-													style={{
-														padding: "1px 4px",
-														textAlign: "center",
-														fontFamily: "monospace",
-													}}
-												>
-													{r.grid_y}
-												</td>
-											</tr>
-										))}
-									</tbody>
-								</table>
-							</div>
-						</div>
-					)}
-
-					{conductors.length > 0 && (
-						<div
-							style={{
-								borderRadius: 6,
-								border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-								overflow: "hidden",
-							}}
-						>
-							<div
-								style={{
-									padding: "4px 8px",
-									fontSize: 10,
-									fontWeight: 700,
-									color: "#f59e0b",
-									background: hexToRgba("#f59e0b", 0.08),
-								}}
-							>
-								Conductors ({conductors.length})
-							</div>
-							<div style={{ maxHeight: 120, overflowY: "auto" }}>
-								<table
-									style={{
-										width: "100%",
-										fontSize: 9,
-										borderCollapse: "collapse",
-									}}
-								>
-									<thead>
-										<tr style={{ color: palette.textMuted }}>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												Label
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												X1
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												Y1
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												X2
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												Y2
-											</th>
-										</tr>
-									</thead>
-									<tbody>
-										{conductors.map((c, i) => (
-											<tr
-												key={i}
-												style={{
-													...tableRowStyle(selectedConductor === i),
-													color: palette.text,
-												}}
-												onClick={() => {
-													clearSelection();
-													setSelectedConductor(i);
-												}}
-											>
-												<td
-													style={{
-														padding: "1px 4px",
-														fontWeight: 600,
-														textAlign: "center",
-													}}
-												>
-													{c.label}
-												</td>
-												<td
-													style={{
-														padding: "1px 4px",
-														textAlign: "center",
-														fontFamily: "monospace",
-													}}
-												>
-													{c.x1}
-												</td>
-												<td
-													style={{
-														padding: "1px 4px",
-														textAlign: "center",
-														fontFamily: "monospace",
-													}}
-												>
-													{c.y1}
-												</td>
-												<td
-													style={{
-														padding: "1px 4px",
-														textAlign: "center",
-														fontFamily: "monospace",
-													}}
-												>
-													{c.x2}
-												</td>
-												<td
-													style={{
-														padding: "1px 4px",
-														textAlign: "center",
-														fontFamily: "monospace",
-													}}
-												>
-													{c.y2}
-												</td>
-											</tr>
-										))}
-									</tbody>
-								</table>
-							</div>
-						</div>
-					)}
-
-					{tees.length > 0 && (
-						<div
-							style={{
-								borderRadius: 6,
-								border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-								overflow: "hidden",
-							}}
-						>
-							<div
-								style={{
-									padding: "4px 8px",
-									fontSize: 10,
-									fontWeight: 700,
-									color: "#3b82f6",
-									background: hexToRgba("#3b82f6", 0.08),
-								}}
-							>
-								Tees ({tees.length})
-							</div>
-							<div style={{ maxHeight: 120, overflowY: "auto" }}>
-								<table
-									style={{
-										width: "100%",
-										fontSize: 9,
-										borderCollapse: "collapse",
-									}}
-								>
-									<thead>
-										<tr style={{ color: palette.textMuted }}>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												#
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												X
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												Y
-											</th>
-										</tr>
-									</thead>
-									<tbody>
-										{tees.map((p, i) => {
-											const k = placementKey(p);
-											return (
-												<tr
-													key={i}
-													style={{
-														...tableRowStyle(selectedTeeKey === k),
-														color: palette.text,
-													}}
-													onClick={() => {
-														clearSelection();
-														setSelectedTeeKey(k);
-													}}
-												>
-													<td
-														style={{
-															padding: "1px 4px",
-															fontWeight: 600,
-															textAlign: "center",
-														}}
-													>
-														T{i + 1}
-													</td>
-													<td
-														style={{
-															padding: "1px 4px",
-															textAlign: "center",
-															fontFamily: "monospace",
-														}}
-													>
-														{p.grid_x}
-													</td>
-													<td
-														style={{
-															padding: "1px 4px",
-															textAlign: "center",
-															fontFamily: "monospace",
-														}}
-													>
-														{p.grid_y}
-													</td>
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							</div>
-						</div>
-					)}
-
-					{crosses.length > 0 && (
-						<div
-							style={{
-								borderRadius: 6,
-								border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-								overflow: "hidden",
-							}}
-						>
-							<div
-								style={{
-									padding: "4px 8px",
-									fontSize: 10,
-									fontWeight: 700,
-									color: "#06b6d4",
-									background: hexToRgba("#06b6d4", 0.08),
-								}}
-							>
-								Crosses ({crosses.length})
-							</div>
-							<div style={{ maxHeight: 120, overflowY: "auto" }}>
-								<table
-									style={{
-										width: "100%",
-										fontSize: 9,
-										borderCollapse: "collapse",
-									}}
-								>
-									<thead>
-										<tr style={{ color: palette.textMuted }}>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												#
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												X
-											</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>
-												Y
-											</th>
-										</tr>
-									</thead>
-									<tbody>
-										{crosses.map((p, i) => {
-											const k = placementKey(p);
-											return (
-												<tr
-													key={i}
-													style={{
-														...tableRowStyle(selectedCrossKey === k),
-														color: palette.text,
-													}}
-													onClick={() => {
-														clearSelection();
-														setSelectedCrossKey(k);
-													}}
-												>
-													<td
-														style={{
-															padding: "1px 4px",
-															fontWeight: 600,
-															textAlign: "center",
-														}}
-													>
-														X{i + 1}
-													</td>
-													<td
-														style={{
-															padding: "1px 4px",
-															textAlign: "center",
-															fontFamily: "monospace",
-														}}
-													>
-														{p.grid_x}
-													</td>
-													<td
-														style={{
-															padding: "1px 4px",
-															textAlign: "center",
-															fontFamily: "monospace",
-														}}
-													>
-														{p.grid_y}
-													</td>
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							</div>
-						</div>
-					)}
-				</div>
-			)}
-			<Dialog
-				open={Boolean(suggestion)}
-				onOpenChange={(open) => {
-					if (!open) {
-						setSuggestion(null);
-						setConductorStart(null);
-					}
-				}}
-			>
-				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
-					<DialogHeader>
-						<DialogTitle>
-							{suggestion?.type === "add-rod"
-								? "Place Rod"
-								: suggestion?.type === "add-conductor"
-									? "Place Conductor"
-									: suggestion?.type === "add-tee"
-										? "Place Tee"
-										: "Place Cross"}
-						</DialogTitle>
-					</DialogHeader>
-					<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-						<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-							<label
-								style={{ fontSize: 11, color: palette.textMuted, width: 24 }}
-							>
-								{suggestion?.type === "add-conductor" ? "X1" : "X"}
-							</label>
-							<input
-								value={suggestionCoords.x}
-								onChange={(e) =>
-									setSuggestionCoords((s) => ({ ...s, x: e.target.value }))
-								}
-								style={{ ...inputStyle, flex: 1 }}
-								autoFocus
-							/>
-						</div>
-						<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-							<label
-								style={{ fontSize: 11, color: palette.textMuted, width: 24 }}
-							>
-								{suggestion?.type === "add-conductor" ? "Y1" : "Y"}
-							</label>
-							<input
-								value={suggestionCoords.y}
-								onChange={(e) =>
-									setSuggestionCoords((s) => ({ ...s, y: e.target.value }))
-								}
-								style={{ ...inputStyle, flex: 1 }}
-							/>
-						</div>
-						{suggestion?.type === "add-conductor" && (
-							<>
-								<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-									<label
-										style={{
-											fontSize: 11,
-											color: palette.textMuted,
-											width: 24,
-										}}
-									>
-										X2
-									</label>
-									<input
-										value={suggestionCoords.endX}
-										onChange={(e) =>
-											setSuggestionCoords((s) => ({
-												...s,
-												endX: e.target.value,
-											}))
-										}
-										style={{ ...inputStyle, flex: 1 }}
-									/>
-								</div>
-								<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-									<label
-										style={{
-											fontSize: 11,
-											color: palette.textMuted,
-											width: 24,
-										}}
-									>
-										Y2
-									</label>
-									<input
-										value={suggestionCoords.endY}
-										onChange={(e) =>
-											setSuggestionCoords((s) => ({
-												...s,
-												endY: e.target.value,
-											}))
-										}
-										style={{ ...inputStyle, flex: 1 }}
-									/>
-								</div>
-							</>
-						)}
-					</div>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
-						<button
-							onClick={() => {
-								setSuggestion(null);
-								setConductorStart(null);
-							}}
-							style={{ ...btnStyle(false), justifyContent: "center" }}
-						>
-							<X size={12} /> Cancel
-						</button>
-						<button
-							onClick={confirmSuggestion}
-							style={{ ...btnStyle(true), justifyContent: "center" }}
-						>
-							<Check size={12} /> Confirm
-						</button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<GridManualEditorSuggestionDialog
+				suggestion={suggestion}
+				suggestionCoords={suggestionCoords}
+				mutedTextColor={palette.textMuted}
+				inputStyle={inputStyle}
+				btnStyle={btnStyle}
+				onSuggestionCoordsChange={setSuggestionCoords}
+				onCancel={cancelSuggestion}
+				onConfirm={confirmSuggestion}
+			/>
 		</div>
 	);
 }

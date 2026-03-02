@@ -1,880 +1,104 @@
-import {
-	AlertTriangle,
-	CheckCircle,
-	Download,
-	Eye,
-	FileText,
-	Search,
-	Settings as SettingsIcon,
-	Upload,
-	XCircle,
-	Zap,
-} from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import {
-	Dialog,
-	DialogContent,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/apps/ui/dialog";
-import { useToast } from "@/components/notification-system/ToastProvider";
-import { supabase } from "@/supabase/client";
-import type { Database, Json } from "@/supabase/database";
-import { FrameSection } from "../ui/PageFrame";
-
-interface DrawingAnnotation {
-	id: string;
-	drawing_name: string;
-	file_path: string;
-	annotations: Issue[];
-	qa_status: "pass" | "fail" | "warning" | "pending";
-	checked_at: string | null;
-	checked_by: string | null;
-	rules_applied: string[];
-	issues_found: number;
-	created_at: string;
-}
-
-type DrawingAnnotationRow =
-	Database["public"]["Tables"]["drawing_annotations"]["Row"];
-
-const mapDrawingRow = (row: DrawingAnnotationRow): DrawingAnnotation => {
-	const annotations = Array.isArray(row.annotation_data)
-		? (row.annotation_data as unknown as Issue[])
-		: [];
-	const rulesApplied = Array.isArray(row.qa_checks)
-		? (row.qa_checks as string[])
-		: [];
-	const issuesFound =
-		typeof row.issues_found === "number"
-			? row.issues_found
-			: annotations.length;
-	const qa_status: DrawingAnnotation["qa_status"] =
-		row.status === "approved"
-			? "pass"
-			: row.status === "rejected"
-				? "fail"
-				: row.status === "reviewed"
-					? "warning"
-					: "pending";
-
-	return {
-		id: row.id,
-		drawing_name: row.drawing_name,
-		file_path: row.file_path,
-		annotations,
-		qa_status,
-		checked_at: row.reviewed_at,
-		checked_by: null,
-		rules_applied: rulesApplied,
-		issues_found: issuesFound,
-		created_at: row.created_at,
-	};
-};
-
-interface QARule {
-	id: string;
-	name: string;
-	description: string;
-	category:
-		| "title_block"
-		| "layer"
-		| "dimension"
-		| "text"
-		| "compliance"
-		| "standard";
-	severity: "error" | "warning" | "info";
-	enabled: boolean;
-}
-
-interface Issue {
-	type: string;
-	severity: "error" | "warning" | "info";
-	message: string;
-	location?: string;
-}
+import { QAQCDeleteDialog } from "./QAQCDeleteDialog";
+import { QAQCDrawingCards } from "./QAQCDrawingCards";
+import { QAQCDrawingDetailDialog } from "./QAQCDrawingDetailDialog";
+import { QAQCFiltersPanel } from "./QAQCFiltersPanel";
+import { QAQCHeader } from "./QAQCHeader";
+import { QAQCRulesDialog } from "./QAQCRulesDialog";
+import { QAQCUploadDialog } from "./QAQCUploadDialog";
+import { useQAQCCheckerState } from "./useQAQCCheckerState";
 
 export function QAQCChecker() {
-	const { showToast } = useToast();
-	const [drawings, setDrawings] = useState<DrawingAnnotation[]>([]);
-	const [rules, setRules] = useState<QARule[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [selectedDrawing, setSelectedDrawing] =
-		useState<DrawingAnnotation | null>(null);
-	const [showRulesModal, setShowRulesModal] = useState(false);
-	const [showUploadModal, setShowUploadModal] = useState(false);
-	const [pendingDeleteDrawing, setPendingDeleteDrawing] =
-		useState<DrawingAnnotation | null>(null);
-	const [filterStatus, setFilterStatus] = useState<string>("all");
-	const [searchTerm, setSearchTerm] = useState("");
-	const [checkingDrawing, setCheckingDrawing] = useState(false);
-	const [uploadForm, setUploadForm] = useState({
-		name: "",
-	});
-
-	const loadDrawings = useCallback(async () => {
-		setLoading(true);
-		const { data, error } = await supabase
-			.from("drawing_annotations")
-			.select("*")
-			.order("created_at", { ascending: false });
-
-		if (!error && data) {
-			setDrawings(data.map(mapDrawingRow));
-		}
-		setLoading(false);
-	}, []);
-
-	const loadRules = useCallback(async () => {
-		const defaultRules: QARule[] = [
-			{
-				id: "1",
-				name: "Title Block - Project Name",
-				description:
-					"Verify project name is present and matches project standards",
-				category: "title_block",
-				severity: "error",
-				enabled: true,
-			},
-			{
-				id: "2",
-				name: "Title Block - Drawing Number",
-				description:
-					"Check drawing number format matches standard (e.g., E-001)",
-				category: "title_block",
-				severity: "error",
-				enabled: true,
-			},
-			{
-				id: "3",
-				name: "Title Block - Revision",
-				description: "Verify revision number/letter is present",
-				category: "title_block",
-				severity: "error",
-				enabled: true,
-			},
-			{
-				id: "4",
-				name: "Title Block - Date",
-				description: "Check date format and ensure it is current",
-				category: "title_block",
-				severity: "warning",
-				enabled: true,
-			},
-			{
-				id: "5",
-				name: "Title Block - Drawn By",
-				description: "Verify designer/drafter name is filled",
-				category: "title_block",
-				severity: "error",
-				enabled: true,
-			},
-			{
-				id: "6",
-				name: "Title Block - Checked By",
-				description: "Verify checker name is filled",
-				category: "title_block",
-				severity: "error",
-				enabled: true,
-			},
-			{
-				id: "7",
-				name: "Title Block - Scale",
-				description: "Check that scale is properly indicated",
-				category: "title_block",
-				severity: "warning",
-				enabled: true,
-			},
-			{
-				id: "8",
-				name: "Layer Standards",
-				description:
-					"Verify layers follow naming conventions (e.g., E-POWR, E-LTNG)",
-				category: "layer",
-				severity: "warning",
-				enabled: true,
-			},
-			{
-				id: "9",
-				name: "Text Height",
-				description: "Check text heights meet minimum readability standards",
-				category: "text",
-				severity: "warning",
-				enabled: true,
-			},
-			{
-				id: "10",
-				name: "NEC Compliance",
-				description: "Verify calculations and designs meet NEC requirements",
-				category: "compliance",
-				severity: "error",
-				enabled: true,
-			},
-			{
-				id: "11",
-				name: "Border and Margins",
-				description: "Check drawing border and print margins",
-				category: "standard",
-				severity: "info",
-				enabled: true,
-			},
-			{
-				id: "12",
-				name: "Line Weights",
-				description: "Verify line weights are appropriate for drawing type",
-				category: "standard",
-				severity: "info",
-				enabled: true,
-			},
-		];
-
-		setRules(defaultRules);
-	}, []);
-
-	useEffect(() => {
-		loadDrawings();
-		loadRules();
-	}, [loadDrawings, loadRules]);
-
-	const checkDrawing = async (drawingName: string) => {
-		setCheckingDrawing(true);
-
-		setTimeout(async () => {
-			const enabledRules = rules.filter((r) => r.enabled);
-			const issues: Issue[] = [];
-
-			const random = Math.random();
-			if (random > 0.3) {
-				issues.push({
-					type: "title_block",
-					severity: "error",
-					message: "Project name is missing or does not match standard format",
-					location: "Title Block - Project Name field",
-				});
-			}
-
-			if (random > 0.5) {
-				issues.push({
-					type: "title_block",
-					severity: "warning",
-					message: "Date format should be MM/DD/YYYY",
-					location: "Title Block - Date field",
-				});
-			}
-
-			if (random > 0.4) {
-				issues.push({
-					type: "layer",
-					severity: "warning",
-					message: 'Layer "POWER" should be renamed to "E-POWR" per standards',
-					location: "Layer Manager",
-				});
-			}
-
-			if (random > 0.6) {
-				issues.push({
-					type: "text",
-					severity: "info",
-					message: 'Some text heights are below recommended 0.1" minimum',
-					location: "Various locations",
-				});
-			}
-
-			const qa_status = issues.some((i) => i.severity === "error")
-				? "fail"
-				: issues.some((i) => i.severity === "warning")
-					? "warning"
-					: "pass";
-
-			const status =
-				qa_status === "pass"
-					? "approved"
-					: qa_status === "fail"
-						? "rejected"
-						: "reviewed";
-
-			const payload: Database["public"]["Tables"]["drawing_annotations"]["Insert"] =
-				{
-					drawing_name: drawingName,
-					file_path: `/drawings/${drawingName}.dwg`,
-					annotation_data: issues as unknown as Json,
-					qa_checks: enabledRules.map((r) => r.name),
-					issues_found: issues.length,
-					status,
-					reviewed_at: new Date().toISOString(),
-				};
-
-			const { data, error } = await supabase
-				.from("drawing_annotations")
-				.insert(payload)
-				.select()
-				.single();
-
-			if (!error && data) {
-				setDrawings([mapDrawingRow(data), ...drawings]);
-			}
-
-			setCheckingDrawing(false);
-			setShowUploadModal(false);
-			setUploadForm({ name: "" });
-		}, 2000);
-	};
-
-	const handleUpload = async (e: React.FormEvent) => {
-		e.preventDefault();
-		await checkDrawing(uploadForm.name);
-	};
-
-	const toggleRule = (ruleId: string) => {
-		setRules(
-			rules.map((r) => (r.id === ruleId ? { ...r, enabled: !r.enabled } : r)),
-		);
-	};
-
-	const confirmDeleteDrawing = async () => {
-		if (!pendingDeleteDrawing) return;
-		const id = pendingDeleteDrawing.id;
-		const { error } = await supabase
-			.from("drawing_annotations")
-			.delete()
-			.eq("id", id);
-
-		if (!error) {
-			setDrawings(drawings.filter((d) => d.id !== id));
-			if (selectedDrawing?.id === id) {
-				setSelectedDrawing(null);
-			}
-			showToast("success", "Drawing check deleted.");
-		} else {
-			showToast("error", "Failed to delete drawing check.");
-		}
-		setPendingDeleteDrawing(null);
-	};
-
-	const filteredDrawings = drawings.filter((drawing) => {
-		const matchesSearch = drawing.drawing_name
-			.toLowerCase()
-			.includes(searchTerm.toLowerCase());
-		const matchesStatus =
-			filterStatus === "all" || drawing.qa_status === filterStatus;
-		return matchesSearch && matchesStatus;
-	});
-
-	const getStatusIcon = (status: string) => {
-		switch (status) {
-			case "pass":
-				return <CheckCircle className="w-5 h-5 [color:var(--success)]" />;
-			case "fail":
-				return <XCircle className="w-5 h-5 [color:var(--danger)]" />;
-			case "warning":
-				return <AlertTriangle className="w-5 h-5 [color:var(--warning)]" />;
-			default:
-				return <FileText className="w-5 h-5 [color:var(--text-muted)]" />;
-		}
-	};
-
-	const getStatusColor = (status: string) => {
-		switch (status) {
-			case "pass":
-				return "[background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--success)_20%,var(--surface)),color-mix(in_srgb,var(--success)_20%,var(--surface)))] [border-color:color-mix(in_srgb,var(--success)_40%,transparent)]";
-			case "fail":
-				return "[background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--danger)_20%,var(--surface)),color-mix(in_srgb,var(--danger)_20%,var(--surface)))] [border-color:color-mix(in_srgb,var(--danger)_40%,transparent)]";
-			case "warning":
-				return "[background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--warning)_20%,var(--surface)),color-mix(in_srgb,var(--warning)_20%,var(--surface)))] [border-color:color-mix(in_srgb,var(--warning)_40%,transparent)]";
-			default:
-				return "[background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--text-muted)_20%,var(--surface)),color-mix(in_srgb,var(--text-muted)_20%,var(--surface)))] [border-color:color-mix(in_srgb,var(--text-muted)_40%,transparent)]";
-		}
-	};
-
-	const getSeverityColor = (severity: string) => {
-		switch (severity) {
-			case "error":
-				return "[color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_10%,var(--surface))] [border-color:color-mix(in_srgb,var(--danger)_30%,transparent)]";
-			case "warning":
-				return "[color:var(--warning)] [background:color-mix(in_srgb,var(--warning)_10%,var(--surface))] [border-color:color-mix(in_srgb,var(--warning)_30%,transparent)]";
-			default:
-				return "[color:var(--accent)] [background:color-mix(in_srgb,var(--accent)_10%,var(--surface))] [border-color:color-mix(in_srgb,var(--accent)_30%,transparent)]";
-		}
-	};
+	const {
+		checkDrawing,
+		checkingDrawing,
+		closeUploadModal,
+		confirmDeleteDrawing,
+		enabledRuleCount,
+		filterStatus,
+		filteredDrawings,
+		handleUpload,
+		loading,
+		pendingDeleteDrawing,
+		rules,
+		searchTerm,
+		selectedDrawing,
+		setFilterStatus,
+		setPendingDeleteDrawing,
+		setSearchTerm,
+		setSelectedDrawing,
+		setShowRulesModal,
+		setShowUploadModal,
+		setUploadForm,
+		showRulesModal,
+		showUploadModal,
+		stats,
+		toggleRule,
+		uploadForm,
+	} = useQAQCCheckerState();
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center space-x-3">
-					<div className="p-3 [background:linear-gradient(to_bottom_right,color-mix(in_srgb,var(--success)_20%,var(--surface)),color-mix(in_srgb,var(--success)_20%,var(--surface)))] rounded-lg">
-						<CheckCircle
-							className="w-8 h-8 [color:var(--success)] animate-pulse"
-							style={{ animationDuration: "2s" }}
-						/>
-					</div>
-					<div>
-						<h2 className="text-3xl font-bold [color:var(--text)]">
-							QA/QC Standards Checker
-						</h2>
-						<p className="[color:var(--text-muted)]">
-							Automated drawing compliance verification
-						</p>
-					</div>
-				</div>
-				<div className="flex items-center space-x-3">
-					<button
-						onClick={() => setShowRulesModal(true)}
-						className="flex items-center space-x-2 rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] px-6 py-3 [color:var(--text-muted)] transition-all hover:[border-color:color-mix(in_srgb,var(--success)_50%,transparent)]"
-					>
-						<SettingsIcon className="w-5 h-5" />
-						<span>Configure Rules</span>
-					</button>
-					<button
-						onClick={() => setShowUploadModal(true)}
-						className="flex items-center space-x-2 [background:var(--success)] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg shadow-lg [box-shadow:0_10px_15px_-3px_color-mix(in_srgb,var(--success)_30%,transparent)] transition-all"
-					>
-						<Upload className="w-5 h-5" />
-						<span>Check Drawing</span>
-					</button>
-				</div>
-			</div>
+			<QAQCHeader
+				onOpenRules={() => setShowRulesModal(true)}
+				onOpenUpload={() => setShowUploadModal(true)}
+			/>
 
-			<FrameSection>
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-					<div className="relative md:col-span-2">
-						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 [color:var(--success)]" />
-						<input
-							type="text"
-							value={searchTerm}
-							onChange={(e) => setSearchTerm(e.target.value)}
-							placeholder="Search drawings..."
-							className="w-full rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] px-4 py-2 pl-10 [color:var(--text)] focus:outline-none focus:ring-2 focus:[--tw-ring-color:var(--success)]"
-						/>
-					</div>
+			<QAQCFiltersPanel
+				searchTerm={searchTerm}
+				onSearchTermChange={setSearchTerm}
+				filterStatus={filterStatus}
+				onFilterStatusChange={setFilterStatus}
+				totalCount={stats.total}
+				passCount={stats.pass}
+				warningCount={stats.warning}
+				failCount={stats.fail}
+				enabledRuleCount={enabledRuleCount}
+				totalRuleCount={rules.length}
+			/>
 
-					<div>
-						<select
-							value={filterStatus}
-							onChange={(e) => setFilterStatus(e.target.value)}
-							className="w-full rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] px-4 py-2 [color:var(--text)] focus:outline-none focus:ring-2 focus:[--tw-ring-color:var(--success)]"
-						>
-							<option value="all">All Status</option>
-							<option value="pass">Pass</option>
-							<option value="warning">Warning</option>
-							<option value="fail">Fail</option>
-							<option value="pending">Pending</option>
-						</select>
-					</div>
-				</div>
+			<QAQCDrawingCards
+				loading={loading}
+				filteredDrawings={filteredDrawings}
+				searchTerm={searchTerm}
+				filterStatus={filterStatus}
+				onSelectDrawing={setSelectedDrawing}
+				onDeleteDrawing={setPendingDeleteDrawing}
+			/>
 
-				<div className="flex items-center justify-between mt-4 text-sm">
-					<div className="flex items-center space-x-4 [color:var(--text-muted)]">
-						<span>Total: {drawings.length}</span>
-						<span>
-							Pass: {drawings.filter((d) => d.qa_status === "pass").length}
-						</span>
-						<span>
-							Warning:{" "}
-							{drawings.filter((d) => d.qa_status === "warning").length}
-						</span>
-						<span>
-							Fail: {drawings.filter((d) => d.qa_status === "fail").length}
-						</span>
-					</div>
-					<div className="[color:var(--text-muted)]">
-						Active Rules: {rules.filter((r) => r.enabled).length}/{rules.length}
-					</div>
-				</div>
-			</FrameSection>
+			<QAQCUploadDialog
+				open={showUploadModal}
+				onOpenChange={setShowUploadModal}
+				checkingDrawing={checkingDrawing}
+				enabledRuleCount={enabledRuleCount}
+				uploadForm={uploadForm}
+				setUploadForm={setUploadForm}
+				onSubmit={(event) => {
+					void handleUpload(event);
+				}}
+				onCancel={closeUploadModal}
+			/>
 
-			{loading ? (
-				<div className="text-center [color:var(--text-muted)] py-12">
-					Loading drawings...
-				</div>
-			) : filteredDrawings.length === 0 ? (
-				<div className="text-center [color:var(--text-muted)] py-12">
-					<CheckCircle className="w-16 h-16 mx-auto mb-4 [color:var(--success)] opacity-30" />
-					{searchTerm || filterStatus !== "all"
-						? "No drawings match your filters"
-						: "No drawings checked yet. Upload a drawing to perform QA/QC check!"}
-				</div>
-			) : (
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-					{filteredDrawings.map((drawing) => (
-						<div
-							key={drawing.id}
-							className={`${getStatusColor(drawing.qa_status)} backdrop-blur-md border rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer`}
-							onClick={() => setSelectedDrawing(drawing)}
-						>
-							<div className="p-4">
-								<div className="flex items-start justify-between mb-3">
-									<div className="flex items-center space-x-2">
-										{getStatusIcon(drawing.qa_status)}
-										<h3 className="text-lg font-bold [color:var(--text)]">
-											{drawing.drawing_name}
-										</h3>
-									</div>
-								</div>
+			<QAQCRulesDialog
+				open={showRulesModal}
+				onOpenChange={setShowRulesModal}
+				rules={rules}
+				onToggleRule={toggleRule}
+				onClose={() => setShowRulesModal(false)}
+			/>
 
-								<div className="space-y-2 text-sm">
-									<div className="flex items-center justify-between [color:var(--text-muted)]">
-										<span>Issues Found:</span>
-										<span className="font-semibold [color:var(--text)]">
-											{drawing.issues_found}
-										</span>
-									</div>
+			<QAQCDrawingDetailDialog
+				selectedDrawing={selectedDrawing}
+				onClose={() => setSelectedDrawing(null)}
+				onRecheckDrawing={checkDrawing}
+			/>
 
-									<div className="flex items-center justify-between [color:var(--text-muted)]">
-										<span>Status:</span>
-										<span
-											className={`capitalize font-semibold ${
-												drawing.qa_status === "pass"
-													? "[color:var(--success)]"
-													: drawing.qa_status === "fail"
-														? "[color:var(--danger)]"
-														: drawing.qa_status === "warning"
-															? "[color:var(--warning)]"
-															: "[color:var(--text-muted)]"
-											}`}
-										>
-											{drawing.qa_status}
-										</span>
-									</div>
-
-									{drawing.checked_at && (
-										<div className="flex items-center justify-between [color:var(--text-muted)]">
-											<span>Checked:</span>
-											<span>
-												{new Date(drawing.checked_at).toLocaleDateString()}
-											</span>
-										</div>
-									)}
-								</div>
-
-								<div className="flex gap-2 mt-4">
-									<button
-										onClick={(e) => {
-											e.stopPropagation();
-											setSelectedDrawing(drawing);
-										}}
-										className="flex-1 flex items-center justify-center space-x-1 [background:color-mix(in_srgb,var(--success)_20%,var(--surface))] hover:[background:color-mix(in_srgb,var(--success)_30%,var(--surface))] border [border-color:color-mix(in_srgb,var(--success)_40%,transparent)] [color:var(--text)] px-3 py-2 rounded-lg transition-all text-sm"
-									>
-										<Eye className="w-4 h-4" />
-										<span>Details</span>
-									</button>
-									<button
-										onClick={(e) => {
-											e.stopPropagation();
-											setPendingDeleteDrawing(drawing);
-										}}
-										className="px-3 py-2 [background:color-mix(in_srgb,var(--danger)_20%,var(--surface))] hover:[background:color-mix(in_srgb,var(--danger)_30%,var(--surface))] border [border-color:color-mix(in_srgb,var(--danger)_40%,transparent)] [color:var(--danger)] rounded-lg transition-all text-sm"
-									>
-										<XCircle className="w-4 h-4" />
-									</button>
-								</div>
-							</div>
-						</div>
-					))}
-				</div>
-			)}
-
-			{showUploadModal && (
-				<Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
-					<DialogContent className="max-w-md border-[color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)]">
-						<h3 className="text-2xl font-bold [color:var(--text)] mb-4">
-							Check Drawing
-						</h3>
-						{checkingDrawing ? (
-							<div className="text-center py-8">
-								<Zap className="w-12 h-12 [color:var(--success)] animate-pulse mx-auto mb-4" />
-								<p className="[color:var(--text-muted)]">
-									Running QA/QC checks...
-								</p>
-								<p className="[color:var(--text-muted)] text-sm mt-2">
-									Applying {rules.filter((r) => r.enabled).length} rules
-								</p>
-							</div>
-						) : (
-							<form onSubmit={handleUpload} className="space-y-4">
-								<div>
-									<label className="block [color:var(--text-muted)] text-sm font-medium mb-2">
-										Drawing Name *
-									</label>
-									<input
-										type="text"
-										value={uploadForm.name}
-										onChange={(e) =>
-											setUploadForm({ ...uploadForm, name: e.target.value })
-										}
-										required
-										className="w-full rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface-2)] px-4 py-2 [color:var(--text)] focus:outline-none focus:ring-2 focus:[--tw-ring-color:var(--success)]"
-										placeholder="e.g., E-001-POWER-PLAN"
-									/>
-								</div>
-
-								<div className="[background:color-mix(in_srgb,var(--success)_10%,var(--surface))] border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] rounded-lg p-3">
-									<p className="[color:var(--text-muted)] text-sm">
-										{rules.filter((r) => r.enabled).length} QA/QC rules will be
-										applied to this drawing.
-									</p>
-								</div>
-
-								<div className="flex gap-3 mt-6">
-									<button
-										type="submit"
-										className="flex-1 [background:var(--success)] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-2 rounded-lg transition-all"
-									>
-										Run Check
-									</button>
-									<button
-										type="button"
-										onClick={() => {
-											setShowUploadModal(false);
-											setUploadForm({ name: "" });
-										}}
-										className="rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] px-6 py-2 [color:var(--text-muted)] transition-all hover:[background:color-mix(in_srgb,var(--success)_10%,var(--surface))]"
-									>
-										Cancel
-									</button>
-								</div>
-							</form>
-						)}
-					</DialogContent>
-				</Dialog>
-			)}
-
-			{showRulesModal && (
-				<Dialog open={showRulesModal} onOpenChange={setShowRulesModal}>
-					<DialogContent className="max-h-[80vh] max-w-3xl overflow-auto border-[color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)]">
-						<div className="flex items-center justify-between mb-6">
-							<h3 className="text-2xl font-bold [color:var(--text)]">
-								QA/QC Rules Configuration
-							</h3>
-							<button
-								onClick={() => setShowRulesModal(false)}
-								className="p-2 hover:[background:color-mix(in_srgb,var(--danger)_20%,var(--surface))] rounded-lg transition-all"
-							>
-								<span className="[color:var(--danger)] text-2xl">×</span>
-							</button>
-						</div>
-
-						<div className="space-y-3">
-							{rules.map((rule) => (
-								<div
-									key={rule.id}
-									className={`rounded-lg border bg-[var(--surface-2)] p-4 transition-all ${
-										rule.enabled
-											? "[border-color:color-mix(in_srgb,var(--success)_30%,transparent)]"
-											: "[border-color:color-mix(in_srgb,var(--text-muted)_30%,transparent)] opacity-60"
-									}`}
-								>
-									<div className="flex items-start justify-between">
-										<div className="flex-1">
-											<div className="flex items-center space-x-3 mb-2">
-												<input
-													type="checkbox"
-													checked={rule.enabled}
-													onChange={() => toggleRule(rule.id)}
-													className="h-5 w-5 rounded [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)]"
-												/>
-												<h4 className="text-lg font-semibold [color:var(--text)]">
-													{rule.name}
-												</h4>
-												<span
-													className={`text-xs px-2 py-1 rounded-full border ${getSeverityColor(rule.severity)}`}
-												>
-													{rule.severity}
-												</span>
-											</div>
-											<p className="[color:var(--text-muted)] text-sm ml-8">
-												{rule.description}
-											</p>
-											<div className="flex items-center space-x-2 ml-8 mt-2">
-												<span className="text-xs px-2 py-1 [background:color-mix(in_srgb,var(--success)_10%,var(--surface))] [color:var(--success)] rounded-full border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] capitalize">
-													{rule.category.replace("_", " ")}
-												</span>
-											</div>
-										</div>
-									</div>
-								</div>
-							))}
-						</div>
-
-						<div className="mt-6 flex justify-end">
-							<button
-								onClick={() => setShowRulesModal(false)}
-								className="[background:var(--success)] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-2 rounded-lg transition-all"
-							>
-								Done
-							</button>
-						</div>
-					</DialogContent>
-				</Dialog>
-			)}
-
-			{selectedDrawing && (
-				<Dialog
-					open={Boolean(selectedDrawing)}
-					onOpenChange={(open) => !open && setSelectedDrawing(null)}
-				>
-					<DialogContent className="max-h-[90vh] max-w-4xl overflow-auto border-[color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-0">
-						<div className="sticky top-0 z-10 flex items-center justify-between border-b [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-6 backdrop-blur-sm">
-							<div className="flex items-center space-x-3">
-								{getStatusIcon(selectedDrawing.qa_status)}
-								<div>
-									<h3 className="text-2xl font-bold [color:var(--text)]">
-										{selectedDrawing.drawing_name}
-									</h3>
-									<p className="[color:var(--text-muted)] text-sm">
-										Checked on{" "}
-										{selectedDrawing.checked_at
-											? new Date(selectedDrawing.checked_at).toLocaleString()
-											: "N/A"}
-									</p>
-								</div>
-							</div>
-							<button
-								onClick={() => setSelectedDrawing(null)}
-								className="p-2 hover:[background:color-mix(in_srgb,var(--danger)_20%,var(--surface))] rounded-lg transition-all"
-							>
-								<span className="[color:var(--danger)] text-2xl">×</span>
-							</button>
-						</div>
-
-						<div className="p-6 space-y-6">
-							<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-								<div className="rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface-2)] p-4 text-center">
-									<div className="text-3xl font-bold [color:var(--text)]">
-										{selectedDrawing.issues_found}
-									</div>
-									<div className="[color:var(--text-muted)] text-sm mt-1">
-										Issues Found
-									</div>
-								</div>
-								<div className="rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface-2)] p-4 text-center">
-									<div className="text-3xl font-bold [color:var(--text)] capitalize">
-										{selectedDrawing.qa_status}
-									</div>
-									<div className="[color:var(--text-muted)] text-sm mt-1">
-										Status
-									</div>
-								</div>
-								<div className="rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface-2)] p-4 text-center">
-									<div className="text-3xl font-bold [color:var(--text)]">
-										{selectedDrawing.rules_applied.length}
-									</div>
-									<div className="[color:var(--text-muted)] text-sm mt-1">
-										Rules Applied
-									</div>
-								</div>
-							</div>
-
-							<div>
-								<h4 className="text-lg font-bold [color:var(--text)] mb-3">
-									Issues Detected
-								</h4>
-								{selectedDrawing.annotations.length === 0 ? (
-									<div className="[background:color-mix(in_srgb,var(--success)_10%,var(--surface))] border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] rounded-lg p-4 text-center">
-										<CheckCircle className="w-12 h-12 [color:var(--success)] mx-auto mb-2" />
-										<p className="[color:var(--text-muted)]">
-											No issues found! Drawing passes all checks.
-										</p>
-									</div>
-								) : (
-									<div className="space-y-3">
-										{selectedDrawing.annotations.map(
-											(issue: Issue, idx: number) => (
-												<div
-													key={idx}
-													className={`rounded-lg border bg-[var(--surface-2)] p-4 ${
-														issue.severity === "error"
-															? "[border-color:color-mix(in_srgb,var(--danger)_40%,transparent)]"
-															: issue.severity === "warning"
-																? "[border-color:color-mix(in_srgb,var(--warning)_40%,transparent)]"
-																: "[border-color:color-mix(in_srgb,var(--accent)_40%,transparent)]"
-													}`}
-												>
-													<div className="flex items-start space-x-3">
-														{issue.severity === "error" && (
-															<XCircle className="w-5 h-5 [color:var(--danger)] flex-shrink-0 mt-0.5" />
-														)}
-														{issue.severity === "warning" && (
-															<AlertTriangle className="w-5 h-5 [color:var(--warning)] flex-shrink-0 mt-0.5" />
-														)}
-														{issue.severity === "info" && (
-															<FileText className="w-5 h-5 [color:var(--accent)] flex-shrink-0 mt-0.5" />
-														)}
-														<div className="flex-1">
-															<div className="flex items-center space-x-2 mb-1">
-																<span
-																	className={`text-xs px-2 py-1 rounded-full border capitalize ${getSeverityColor(issue.severity)}`}
-																>
-																	{issue.severity}
-																</span>
-																<span className="text-xs [color:var(--text-muted)] capitalize">
-																	{issue.type.replace("_", " ")}
-																</span>
-															</div>
-															<p className="[color:var(--text)]">
-																{issue.message}
-															</p>
-															{issue.location && (
-																<p className="[color:var(--text-muted)] text-sm mt-1">
-																	Location: {issue.location}
-																</p>
-															)}
-														</div>
-													</div>
-												</div>
-											),
-										)}
-									</div>
-								)}
-							</div>
-
-							<div className="flex gap-3">
-								<button className="flex-1 [background:color-mix(in_srgb,var(--success)_20%,var(--surface))] hover:[background:color-mix(in_srgb,var(--success)_30%,var(--surface))] border [border-color:color-mix(in_srgb,var(--success)_40%,transparent)] [color:var(--text)] px-6 py-3 rounded-lg transition-all flex items-center justify-center space-x-2">
-									<Download className="w-5 h-5" />
-									<span>Export Report</span>
-								</button>
-								<button
-									onClick={async () => {
-										await checkDrawing(selectedDrawing.drawing_name);
-										setSelectedDrawing(null);
-									}}
-									className="[background:var(--success)] hover:opacity-90 [color:var(--text)] px-6 py-3 rounded-lg transition-all flex items-center space-x-2"
-								>
-									<Zap className="w-5 h-5" />
-									<span>Re-check</span>
-								</button>
-							</div>
-						</div>
-					</DialogContent>
-				</Dialog>
-			)}
-			<Dialog
-				open={Boolean(pendingDeleteDrawing)}
-				onOpenChange={(open) => !open && setPendingDeleteDrawing(null)}
-			>
-				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
-					<DialogHeader>
-						<DialogTitle>Delete drawing check?</DialogTitle>
-					</DialogHeader>
-					<p className="text-sm text-[var(--text-muted)]">
-						Delete "{pendingDeleteDrawing?.drawing_name ?? "this check"}"?
-					</p>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
-						<button
-							onClick={() => setPendingDeleteDrawing(null)}
-							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-						>
-							Cancel
-						</button>
-						<button
-							onClick={() => void confirmDeleteDrawing()}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
-						>
-							Delete
-						</button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<QAQCDeleteDialog
+				pendingDeleteDrawing={pendingDeleteDrawing}
+				onCancel={() => setPendingDeleteDrawing(null)}
+				onConfirmDelete={() => {
+					void confirmDeleteDrawing();
+				}}
+			/>
 		</div>
 	);
 }

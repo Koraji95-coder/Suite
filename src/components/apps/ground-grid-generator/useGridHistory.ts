@@ -34,23 +34,23 @@ export function useGridHistory() {
 			conductors: GridConductor[],
 			placements: GridPlacement[],
 		) => {
-		if (isUndoRedo.current) {
-			isUndoRedo.current = false;
-			return;
-		}
+			if (isUndoRedo.current) {
+				isUndoRedo.current = false;
+				return;
+			}
 
-		const snapshot: GridSnapshot = {
-			rods: cloneRods(rods),
-			conductors: cloneConductors(conductors),
-			placements: clonePlacements(placements),
-		};
+			const snapshot: GridSnapshot = {
+				rods: cloneRods(rods),
+				conductors: cloneConductors(conductors),
+				placements: clonePlacements(placements),
+			};
 
-		setPast((prev) => {
-			const next = [...prev, snapshot];
-			if (next.length > MAX_HISTORY) next.shift();
-			return next;
-		});
-		setFuture([]);
+			setPast((prev) => {
+				const next = [...prev, snapshot];
+				if (next.length > MAX_HISTORY) next.shift();
+				return next;
+			});
+			setFuture([]);
 		},
 		[],
 	);

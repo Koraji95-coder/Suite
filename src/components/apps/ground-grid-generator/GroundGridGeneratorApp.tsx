@@ -132,7 +132,9 @@ function GroundGridGeneratorInner() {
 	const { palette } = useTheme();
 	const { backendConnected, logs } = useGroundGrid();
 
-	const [wsLive, setWsLive] = useState(() => coordinatesGrabberService.isConnected());
+	const [wsLive, setWsLive] = useState(() =>
+		coordinatesGrabberService.isConnected(),
+	);
 	const [wsLastUpdate, setWsLastUpdate] = useState<number | null>(null);
 	const [activeTab, setActiveTab] = useState<TabId>("generator");
 
@@ -230,15 +232,11 @@ function GroundGridGeneratorInner() {
 
 			{/* Body */}
 			<div className="relative z-10 min-h-0 flex-1">
-				<div
-					className={activeTab === "grabber" ? "overflow-auto" : "hidden"}
-				>
+				<div className={activeTab === "grabber" ? "overflow-auto" : "hidden"}>
 					<CoordinatesGrabber />
 				</div>
 
-				<div
-					className={activeTab === "generator" ? "overflow-auto" : "hidden"}
-				>
+				<div className={activeTab === "generator" ? "overflow-auto" : "hidden"}>
 					<GridGeneratorPanel />
 				</div>
 

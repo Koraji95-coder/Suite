@@ -7,8 +7,8 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { useToast } from "@/components/notification-system/ToastProvider";
 import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
+import { useToast } from "@/components/notification-system/ToastProvider";
 
 export interface LogEntry {
 	timestamp: string;
@@ -35,7 +35,11 @@ export function useGroundGrid() {
 	return ctx;
 }
 
-export function GroundGridProvider({ children }: { children: React.ReactNode }) {
+export function GroundGridProvider({
+	children,
+}: {
+	children: React.ReactNode;
+}) {
 	const { showToast } = useToast();
 	const [logs, setLogs] = useState<LogEntry[]>([]);
 	const [backendConnected, setBackendConnected] = useState(false);

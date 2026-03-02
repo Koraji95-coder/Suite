@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { useTheme } from "@/lib/palette";
+import { GridCanvasEmptyState } from "./GridCanvasEmptyState";
+import { GridPreviewOverlay } from "./GridPreviewOverlay";
+import { GridPreviewSvg } from "./GridPreviewSvg";
+import {
+	boundsToViewBox,
+	computeGridBounds2D,
+	computeScaleFromViewBox,
+} from "./gridViewUtils";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
 
 interface GridPreviewProps {
@@ -42,78 +50,45 @@ export function GridPreview({
 
 	const snapAnimRef = useRef<number>(0);
 
-	const bounds = useMemo(() => {
-		let minX = Infinity,
-			minY = Infinity,
-			maxX = -Infinity,
-			maxY = -Infinity;
-
-		for (const r of rods) {
-			minX = Math.min(minX, r.grid_x);
-			minY = Math.min(minY, r.grid_y);
-			maxX = Math.max(maxX, r.grid_x);
-			maxY = Math.max(maxY, r.grid_y);
-		}
-		for (const c of conductors) {
-			minX = Math.min(minX, c.x1, c.x2);
-			minY = Math.min(minY, c.y1, c.y2);
-			maxX = Math.max(maxX, c.x1, c.x2);
-			maxY = Math.max(maxY, c.y1, c.y2);
-		}
-
-		if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 100, maxY: 100 };
-
-		const pad = Math.max(maxX - minX, maxY - minY) * 0.25;
-		return {
-			minX: minX - pad,
-			minY: minY - pad,
-			maxX: maxX + pad,
-			maxY: maxY + pad,
-		};
-	}, [rods, conductors]);
-
-	const defaultVB = useMemo(
-		() => ({
-			x: bounds.minX,
-			y: bounds.minY,
-			w: bounds.maxX - bounds.minX,
-			h: bounds.maxY - bounds.minY,
-		}),
-		[bounds],
+	const bounds = useMemo(
+		() => computeGridBounds2D(rods, conductors, { padRatio: 0.25 }),
+		[rods, conductors],
 	);
 
-	const effectiveVB = viewBox || defaultVB;
+	const defaultViewBox = useMemo(() => boundsToViewBox(bounds), [bounds]);
+
+	const effectiveViewBox = viewBox || defaultViewBox;
 
 	const boundsRef = useRef(bounds);
-	const defaultVBRef = useRef(defaultVB);
+	const defaultViewBoxRef = useRef(defaultViewBox);
 	const isPanningRef = useRef(false);
 	const viewBoxRef = useRef(viewBox);
 
 	boundsRef.current = bounds;
-	defaultVBRef.current = defaultVB;
+	defaultViewBoxRef.current = defaultViewBox;
 	viewBoxRef.current = viewBox;
 
 	useEffect(() => {
 		if (!isPanning) return;
-		const blocker = (e: WheelEvent) => {
-			e.preventDefault();
+		const blocker = (event: WheelEvent) => {
+			event.preventDefault();
 		};
 		document.addEventListener("wheel", blocker, { passive: false });
 		return () => document.removeEventListener("wheel", blocker);
 	}, [isPanning]);
 
 	useEffect(() => {
-		const el = containerRef.current;
-		if (!el) return;
+		const container = containerRef.current;
+		if (!container) return;
 
-		const handler = (e: WheelEvent) => {
+		const handler = (event: WheelEvent) => {
 			if (!isPanningRef.current) return;
-			e.preventDefault();
-			e.stopPropagation();
+			event.preventDefault();
+			event.stopPropagation();
 
-			const factor = e.deltaY > 0 ? 1.05 : 0.9524;
+			const factor = event.deltaY > 0 ? 1.05 : 0.9524;
 			const b = boundsRef.current;
-			const dv = defaultVBRef.current;
+			const dv = defaultViewBoxRef.current;
 
 			setViewBox((prev) => {
 				const vb = prev || { x: b.minX, y: b.minY, w: dv.w, h: dv.h };
@@ -130,61 +105,69 @@ export function GridPreview({
 			});
 		};
 
-		el.addEventListener("wheel", handler, { passive: false });
-		return () => el.removeEventListener("wheel", handler);
+		container.addEventListener("wheel", handler, { passive: false });
+		return () => container.removeEventListener("wheel", handler);
 	}, []);
 
-	const snapBack = useCallback((from: { x: number; y: number; w: number; h: number }) => {
-		cancelAnimationFrame(snapAnimRef.current);
+	const snapBack = useCallback(
+		(from: { x: number; y: number; w: number; h: number }) => {
+			cancelAnimationFrame(snapAnimRef.current);
 
-		const b = boundsRef.current;
-		const contentCx = (b.minX + b.maxX) / 2;
-		const contentCy = (b.minY + b.maxY) / 2;
-		const targetX = contentCx - from.w / 2;
-		const targetY = contentCy - from.h / 2;
+			const b = boundsRef.current;
+			const contentCx = (b.minX + b.maxX) / 2;
+			const contentCy = (b.minY + b.maxY) / 2;
+			const targetX = contentCx - from.w / 2;
+			const targetY = contentCy - from.h / 2;
 
-		const startX = from.x;
-		const startY = from.y;
-		const startTime = performance.now();
+			const startX = from.x;
+			const startY = from.y;
+			const startTime = performance.now();
 
-		const animate = () => {
-			const elapsed = performance.now() - startTime;
-			const t = Math.min(1, elapsed / SNAP_DURATION);
-			const ease = 1 - Math.pow(1 - t, 3);
+			const animate = () => {
+				const elapsed = performance.now() - startTime;
+				const t = Math.min(1, elapsed / SNAP_DURATION);
+				const ease = 1 - (1 - t) ** 3;
 
-			setViewBox({
-				x: startX + (targetX - startX) * ease,
-				y: startY + (targetY - startY) * ease,
-				w: from.w,
-				h: from.h,
-			});
+				setViewBox({
+					x: startX + (targetX - startX) * ease,
+					y: startY + (targetY - startY) * ease,
+					w: from.w,
+					h: from.h,
+				});
 
-			if (t < 1) snapAnimRef.current = requestAnimationFrame(animate);
-		};
+				if (t < 1) snapAnimRef.current = requestAnimationFrame(animate);
+			};
 
-		snapAnimRef.current = requestAnimationFrame(animate);
-	}, []);
+			snapAnimRef.current = requestAnimationFrame(animate);
+		},
+		[],
+	);
 
-	const handleMouseDown = useCallback((e: React.MouseEvent) => {
-		if (e.button !== 0) return;
+	const handleMouseDown = useCallback((event: React.MouseEvent) => {
+		if (event.button !== 0) return;
 
 		cancelAnimationFrame(snapAnimRef.current);
 		setIsPanning(true);
 		isPanningRef.current = true;
 
-		const vb = viewBoxRef.current || defaultVBRef.current;
-		panStart.current = { x: e.clientX, y: e.clientY, vx: vb.x, vy: vb.y };
+		const vb = viewBoxRef.current || defaultViewBoxRef.current;
+		panStart.current = {
+			x: event.clientX,
+			y: event.clientY,
+			vx: vb.x,
+			vy: vb.y,
+		};
 	}, []);
 
 	const handleMouseMove = useCallback(
-		(e: React.MouseEvent) => {
+		(event: React.MouseEvent) => {
 			if (!isPanning || !panStart.current || !svgRef.current) return;
 
 			const rect = svgRef.current.getBoundingClientRect();
-			const vb = viewBoxRef.current || defaultVBRef.current;
+			const vb = viewBoxRef.current || defaultViewBoxRef.current;
 
-			const dx = ((e.clientX - panStart.current.x) / rect.width) * vb.w;
-			const dy = ((e.clientY - panStart.current.y) / rect.height) * vb.h;
+			const dx = ((event.clientX - panStart.current.x) / rect.width) * vb.w;
+			const dy = ((event.clientY - panStart.current.y) / rect.height) * vb.h;
 
 			let newX = panStart.current.vx - dx;
 			let newY = panStart.current.vy - dy;
@@ -232,230 +215,48 @@ export function GridPreview({
 
 	useEffect(() => () => cancelAnimationFrame(snapAnimRef.current), []);
 
-	const tees = placements.filter((p) => p.type === "TEE");
-	const crosses = placements.filter((p) => p.type === "CROSS");
-	const testWells = placements.filter((p) => p.type === "GROUND_ROD_TEST_WELL");
-	const rodScale = Math.max(effectiveVB.w, effectiveVB.h) * 0.012;
+	const tees = placements.filter((placement) => placement.type === "TEE");
+	const crosses = placements.filter((placement) => placement.type === "CROSS");
+	const testWells = placements.filter(
+		(placement) => placement.type === "GROUND_ROD_TEST_WELL",
+	);
+	const rodScale = computeScaleFromViewBox(effectiveViewBox, 0.012);
 
 	const hasData = rods.length > 0 || conductors.length > 0;
-
 	if (!hasData) {
 		return (
-			<div className="flex min-h-[min(300px,50vh)] items-center justify-center text-sm text-text-muted">
-				Import rod and conductor data to see the grid preview
-			</div>
+			<GridCanvasEmptyState message="Import rod and conductor data to see the grid preview" />
 		);
 	}
 
 	return (
 		<div ref={containerRef} className="relative min-h-[min(400px,60vh)] w-full">
-			<svg
-				ref={svgRef}
-				viewBox={`${effectiveVB.x} ${effectiveVB.y} ${effectiveVB.w} ${effectiveVB.h}`}
-				className={[
-					"h-full w-full select-none rounded-md",
-					isPanning ? "cursor-grabbing" : "cursor-grab",
-				].join(" ")}
-				style={{
-					background: hexToRgba(palette.background, 0.5),
-					WebkitUserSelect: "none",
-				}}
+			<GridPreviewSvg
+				svgRef={svgRef}
+				effectiveViewBox={effectiveViewBox}
+				isPanning={isPanning}
+				backgroundColor={palette.background}
+				rods={rods}
+				conductors={conductors}
+				tees={tees}
+				crosses={crosses}
+				testWells={testWells}
+				rodScale={rodScale}
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
-				onMouseLeave={handleMouseUp}
-				onDragStart={(e) => e.preventDefault()}
-			>
-				{conductors.map((c, i) => (
-					<line
-						key={`c-${i}`}
-						x1={c.x1}
-						y1={c.y1}
-						x2={c.x2}
-						y2={c.y2}
-						stroke={hexToRgba("#f59e0b", 0.5)}
-						strokeWidth={rodScale * 0.4}
-						strokeLinecap="round"
-					>
-						<title>
-							{c.label}: ({c.x1},{c.y1}) to ({c.x2},{c.y2})
-						</title>
-					</line>
-				))}
+			/>
 
-				{rods.map((r, i) => (
-					<g key={`r-${i}`}>
-						<circle
-							cx={r.grid_x}
-							cy={r.grid_y}
-							r={rodScale}
-							fill={hexToRgba("#22c55e", 0.3)}
-							stroke="#22c55e"
-							strokeWidth={rodScale * 0.2}
-						/>
-						<line
-							x1={r.grid_x - rodScale * 0.7}
-							y1={r.grid_y}
-							x2={r.grid_x + rodScale * 0.7}
-							y2={r.grid_y}
-							stroke="#22c55e"
-							strokeWidth={rodScale * 0.15}
-						/>
-						<line
-							x1={r.grid_x}
-							y1={r.grid_y - rodScale * 0.7}
-							x2={r.grid_x}
-							y2={r.grid_y + rodScale * 0.7}
-							stroke="#22c55e"
-							strokeWidth={rodScale * 0.15}
-						/>
-						<title>
-							{r.label}: ({r.grid_x}, {r.grid_y})
-						</title>
-					</g>
-				))}
-
-				{tees.map((t, i) => {
-					const s = rodScale * 1.2;
-					return (
-						<g
-							key={`t-${i}`}
-							transform={`translate(${t.grid_x},${t.grid_y}) rotate(${t.rotation_deg})`}
-						>
-							<line
-								x1={-s}
-								y1={0}
-								x2={s}
-								y2={0}
-								stroke="#3b82f6"
-								strokeWidth={rodScale * 0.25}
-								strokeLinecap="round"
-							/>
-							<line
-								x1={0}
-								y1={0}
-								x2={0}
-								y2={s * 0.8}
-								stroke="#3b82f6"
-								strokeWidth={rodScale * 0.25}
-								strokeLinecap="round"
-							/>
-							<title>
-								TEE: ({t.grid_x}, {t.grid_y}) rot={t.rotation_deg}
-							</title>
-						</g>
-					);
-				})}
-
-				{crosses.map((c, i) => {
-					const s = rodScale * 1.2;
-					return (
-						<g key={`x-${i}`} transform={`translate(${c.grid_x},${c.grid_y})`}>
-							<line
-								x1={-s}
-								y1={0}
-								x2={s}
-								y2={0}
-								stroke="#06b6d4"
-								strokeWidth={rodScale * 0.25}
-								strokeLinecap="round"
-							/>
-							<line
-								x1={0}
-								y1={-s}
-								x2={0}
-								y2={s}
-								stroke="#06b6d4"
-								strokeWidth={rodScale * 0.25}
-								strokeLinecap="round"
-							/>
-							<title>
-								CROSS: ({c.grid_x}, {c.grid_y})
-							</title>
-						</g>
-					);
-				})}
-
-				{testWells.map((tw, i) => {
-					const s = rodScale * 1.4;
-					return (
-						<g key={`tw-${i}`}>
-							<rect
-								x={tw.grid_x - s}
-								y={tw.grid_y - s}
-								width={s * 2}
-								height={s * 2}
-								fill={hexToRgba("#ef4444", 0.25)}
-								stroke="#ef4444"
-								strokeWidth={rodScale * 0.2}
-								rx={rodScale * 0.15}
-							/>
-							<circle
-								cx={tw.grid_x}
-								cy={tw.grid_y}
-								r={rodScale * 0.6}
-								fill={hexToRgba("#ef4444", 0.4)}
-								stroke="#ef4444"
-								strokeWidth={rodScale * 0.15}
-							/>
-							<line
-								x1={tw.grid_x - rodScale * 0.4}
-								y1={tw.grid_y}
-								x2={tw.grid_x + rodScale * 0.4}
-								y2={tw.grid_y}
-								stroke="#ef4444"
-								strokeWidth={rodScale * 0.12}
-							/>
-							<line
-								x1={tw.grid_x}
-								y1={tw.grid_y - rodScale * 0.4}
-								x2={tw.grid_x}
-								y2={tw.grid_y + rodScale * 0.4}
-								stroke="#ef4444"
-								strokeWidth={rodScale * 0.12}
-							/>
-							<title>
-								GROUND ROD WITH TEST WELL: ({tw.grid_x}, {tw.grid_y})
-							</title>
-						</g>
-					);
-				})}
-			</svg>
-
-			<div
-				className="absolute bottom-2 left-2 flex gap-3 rounded-md border px-3 py-2 text-[10px] pointer-events-none"
-				style={{
-					background: hexToRgba(palette.background, 0.85),
-					borderColor: hexToRgba(palette.primary, 0.15),
-					color: palette.textMuted,
-				}}
-			>
-				<span>
-					<b className="text-success">Rods:</b> {rods.length - testWells.length}
-				</span>
-				<span>
-					<b className="text-danger">Test Wells:</b> {testWells.length}
-				</span>
-				<span>
-					<b className="text-[color:#f59e0b]">Segments:</b> {segmentCount}
-				</span>
-				<span>
-					<b className="text-[color:#3b82f6]">Tees:</b> {tees.length}
-				</span>
-				<span>
-					<b className="text-[color:#06b6d4]">Crosses:</b> {crosses.length}
-				</span>
-			</div>
-
-			<div
-				className="absolute right-2 top-2 rounded-md px-2 py-1 text-[9px] pointer-events-none"
-				style={{
-					color: hexToRgba(palette.textMuted, 0.6),
-					background: hexToRgba(palette.background, 0.7),
-				}}
-			>
-				Drag to pan / Scroll while panning to zoom
-			</div>
+			<GridPreviewOverlay
+				backgroundColor={palette.background}
+				primaryColor={palette.primary}
+				textMutedColor={palette.textMuted}
+				rodCount={rods.length - testWells.length}
+				testWellCount={testWells.length}
+				segmentCount={segmentCount}
+				teeCount={tees.length}
+				crossCount={crosses.length}
+			/>
 		</div>
 	);
 }

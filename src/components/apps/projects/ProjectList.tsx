@@ -132,13 +132,13 @@ export function ProjectList({
 				/>
 			</div>
 
-				<div
-					className="space-y-4 overflow-y-auto pr-1"
-					style={{
-						maxHeight: "min(70dvh, 920px)",
-						scrollBehavior: "smooth",
-					}}
-				>
+			<div
+				className="space-y-4 overflow-y-auto pr-1"
+				style={{
+					maxHeight: "min(70dvh, 920px)",
+					scrollBehavior: "smooth",
+				}}
+			>
 				{categorizedProjects.map((group) => (
 					<div
 						key={group.cat.key}

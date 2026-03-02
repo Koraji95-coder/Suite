@@ -1,7 +1,7 @@
 import { Loader } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ProgressBar } from "@/data/ProgressBar";
 import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
+import { ProgressBar } from "@/data/ProgressBar";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { useGroundGrid } from "../ground-grid-generator/GroundGridContext";
 import { CoordinateYamlViewer } from "./CoordinateYamlViewer";
@@ -537,25 +537,13 @@ export function CoordinatesGrabber() {
 
 	return (
 		<div
-			style={{
-				display: "flex",
-				flexDirection: "column",
-				height: "100%",
-				padding: "16px",
-				gap: "12px",
-				overflow: "auto",
-				background: palette.background,
-			}}
+			className="flex h-full flex-col gap-3 overflow-auto p-4 sm:p-5"
+			style={{ background: palette.background }}
 		>
 			{/* Header */}
 			<div
-				style={{
-					display: "flex",
-					justifyContent: "space-between",
-					alignItems: "center",
-					paddingBottom: "12px",
-					borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-				}}
+				className="flex flex-col gap-3 border-b pb-3 sm:flex-row sm:items-center sm:justify-between"
+				style={{ borderBottomColor: hexToRgba(palette.primary, 0.1) }}
 			>
 				<div>
 					<h1
@@ -578,7 +566,7 @@ export function CoordinatesGrabber() {
 						Extract coordinate points from CAD drawings
 					</p>
 				</div>
-				<div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+				<div className="flex flex-wrap items-center gap-1">
 					{/* Preset button */}
 					<div
 						title="Coming soon: Presets"
@@ -601,7 +589,7 @@ export function CoordinatesGrabber() {
 							fontWeight: "700",
 							color: palette.primary,
 							opacity: 0.7,
-							marginLeft: "8px",
+							marginLeft: "6px",
 						}}
 					>
 						📍
@@ -611,31 +599,20 @@ export function CoordinatesGrabber() {
 
 			{/* Tabs */}
 			<div
-				style={{
-					display: "flex",
-					gap: "8px",
-					borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-				}}
+				className="flex gap-2 overflow-x-auto border-b pb-1"
+				style={{ borderBottomColor: hexToRgba(palette.primary, 0.1) }}
 			>
 				{(["config", "export", "history", "yaml"] as const).map((tab) => (
 					<button
 						key={tab}
 						onClick={() => setState((prev) => ({ ...prev, activeTab: tab }))}
+						className="whitespace-nowrap border-b-2 px-3 py-2 text-sm transition"
 						style={{
-							padding: "8px 12px",
-							border: "none",
-							background: "none",
+							borderBottomColor:
+								state.activeTab === tab ? palette.primary : "transparent",
 							color:
 								state.activeTab === tab ? palette.primary : palette.textMuted,
-							fontSize: "13px",
-							fontWeight: state.activeTab === tab ? "600" : "400",
-							cursor: "pointer",
-							borderBottom:
-								state.activeTab === tab
-									? `2px solid ${palette.primary}`
-									: "none",
-							transition: "all 0.2s",
-							whiteSpace: "nowrap",
+							fontWeight: state.activeTab === tab ? 600 : 400,
 						}}
 					>
 						{tab === "config" && "Config"}

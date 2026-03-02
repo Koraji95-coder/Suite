@@ -288,7 +288,9 @@ class AgentTaskManager {
 
 	deleteConversation(conversationId: string): void {
 		try {
-			const convs = this.getConversations().filter((c) => c.id !== conversationId);
+			const convs = this.getConversations().filter(
+				(c) => c.id !== conversationId,
+			);
 			localStorage.setItem(this.getConversationsKey(), JSON.stringify(convs));
 		} catch {
 			/* noop */

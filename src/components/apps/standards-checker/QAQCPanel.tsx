@@ -558,11 +558,11 @@ export function QAQCChecker() {
 										<Eye className="w-4 h-4" />
 										<span>Details</span>
 									</button>
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												setPendingDeleteDrawing(drawing);
-											}}
+									<button
+										onClick={(e) => {
+											e.stopPropagation();
+											setPendingDeleteDrawing(drawing);
+										}}
 										className="px-3 py-2 [background:color-mix(in_srgb,var(--danger)_20%,var(--surface))] hover:[background:color-mix(in_srgb,var(--danger)_30%,var(--surface))] border [border-color:color-mix(in_srgb,var(--danger)_40%,transparent)] [color:var(--danger)] rounded-lg transition-all text-sm"
 									>
 										<XCircle className="w-4 h-4" />
@@ -575,15 +575,17 @@ export function QAQCChecker() {
 			)}
 
 			{showUploadModal && (
-				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
-					<div className="w-full max-w-md rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-6 backdrop-blur-xl">
+				<Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
+					<DialogContent className="max-w-md border-[color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)]">
 						<h3 className="text-2xl font-bold [color:var(--text)] mb-4">
 							Check Drawing
 						</h3>
 						{checkingDrawing ? (
 							<div className="text-center py-8">
 								<Zap className="w-12 h-12 [color:var(--success)] animate-pulse mx-auto mb-4" />
-								<p className="[color:var(--text-muted)]">Running QA/QC checks...</p>
+								<p className="[color:var(--text-muted)]">
+									Running QA/QC checks...
+								</p>
 								<p className="[color:var(--text-muted)] text-sm mt-2">
 									Applying {rules.filter((r) => r.enabled).length} rules
 								</p>
@@ -633,13 +635,13 @@ export function QAQCChecker() {
 								</div>
 							</form>
 						)}
-					</div>
-				</div>
+					</DialogContent>
+				</Dialog>
 			)}
 
 			{showRulesModal && (
-				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
-					<div className="max-h-[80vh] w-full max-w-3xl overflow-auto rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-6 backdrop-blur-xl">
+				<Dialog open={showRulesModal} onOpenChange={setShowRulesModal}>
+					<DialogContent className="max-h-[80vh] max-w-3xl overflow-auto border-[color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)]">
 						<div className="flex items-center justify-between mb-6">
 							<h3 className="text-2xl font-bold [color:var(--text)]">
 								QA/QC Rules Configuration
@@ -702,13 +704,16 @@ export function QAQCChecker() {
 								Done
 							</button>
 						</div>
-					</div>
-				</div>
+					</DialogContent>
+				</Dialog>
 			)}
 
-				{selectedDrawing && (
-				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
-					<div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] backdrop-blur-xl">
+			{selectedDrawing && (
+				<Dialog
+					open={Boolean(selectedDrawing)}
+					onOpenChange={(open) => !open && setSelectedDrawing(null)}
+				>
+					<DialogContent className="max-h-[90vh] max-w-4xl overflow-auto border-[color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-0">
 						<div className="sticky top-0 z-10 flex items-center justify-between border-b [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface)] p-6 backdrop-blur-sm">
 							<div className="flex items-center space-x-3">
 								{getStatusIcon(selectedDrawing.qa_status)}
@@ -746,7 +751,9 @@ export function QAQCChecker() {
 									<div className="text-3xl font-bold [color:var(--text)] capitalize">
 										{selectedDrawing.qa_status}
 									</div>
-									<div className="[color:var(--text-muted)] text-sm mt-1">Status</div>
+									<div className="[color:var(--text-muted)] text-sm mt-1">
+										Status
+									</div>
 								</div>
 								<div className="rounded-lg border [border-color:color-mix(in_srgb,var(--success)_30%,transparent)] bg-[var(--surface-2)] p-4 text-center">
 									<div className="text-3xl font-bold [color:var(--text)]">
@@ -804,7 +811,9 @@ export function QAQCChecker() {
 																	{issue.type.replace("_", " ")}
 																</span>
 															</div>
-															<p className="[color:var(--text)]">{issue.message}</p>
+															<p className="[color:var(--text)]">
+																{issue.message}
+															</p>
 															{issue.location && (
 																<p className="[color:var(--text-muted)] text-sm mt-1">
 																	Location: {issue.location}
@@ -836,36 +845,36 @@ export function QAQCChecker() {
 								</button>
 							</div>
 						</div>
-					</div>
-					</div>
-				)}
-				<Dialog
-					open={Boolean(pendingDeleteDrawing)}
-					onOpenChange={(open) => !open && setPendingDeleteDrawing(null)}
-				>
-					<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
-						<DialogHeader>
-							<DialogTitle>Delete drawing check?</DialogTitle>
-						</DialogHeader>
-						<p className="text-sm text-[var(--text-muted)]">
-							Delete "{pendingDeleteDrawing?.drawing_name ?? "this check"}"?
-						</p>
-						<DialogFooter className="mt-4 gap-2 sm:justify-end">
-							<button
-								onClick={() => setPendingDeleteDrawing(null)}
-								className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-							>
-								Cancel
-							</button>
-							<button
-								onClick={() => void confirmDeleteDrawing()}
-								className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
-							>
-								Delete
-							</button>
-						</DialogFooter>
 					</DialogContent>
 				</Dialog>
-			</div>
-		);
-	}
+			)}
+			<Dialog
+				open={Boolean(pendingDeleteDrawing)}
+				onOpenChange={(open) => !open && setPendingDeleteDrawing(null)}
+			>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Delete drawing check?</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						Delete "{pendingDeleteDrawing?.drawing_name ?? "this check"}"?
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setPendingDeleteDrawing(null)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={() => void confirmDeleteDrawing()}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						>
+							Delete
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</div>
+	);
+}

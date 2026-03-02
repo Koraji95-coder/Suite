@@ -1,6 +1,5 @@
 import {
 	Box,
-	ChevronDown,
 	Database,
 	FileSpreadsheet,
 	FileText,
@@ -19,6 +18,12 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+} from "@/components/apps/ui/select";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { supabase } from "@/supabase/client";
@@ -73,53 +78,18 @@ export function GridGeneratorPanel() {
 	const [config, setConfig] = useState<GridConfig>(DEFAULT_CONFIG);
 	const [projects, setProjects] = useState<ProjectOption[]>([]);
 	const [linkedProjectId, setLinkedProjectId] = useState<string | null>(null);
-	const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-	const [showDesignDropdown, setShowDesignDropdown] = useState(false);
 	const [isDragging, setIsDragging] = useState(false);
 	const [generating, setGenerating] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [pasteMode, setPasteMode] = useState<"rods" | "conductors">("rods");
 	const [pasteText, setPasteText] = useState("");
 	const fileInputRef = useRef<HTMLInputElement>(null);
-	const designDropdownRef = useRef<HTMLDivElement>(null);
-	const projectDropdownRef = useRef<HTMLDivElement>(null);
 	const [previewMode, setPreviewMode] = useState<
 		"2d" | "3d" | "contour" | "editor"
 	>("2d");
 	const [soilResistivity, setSoilResistivity] = useState(100);
 	const [faultCurrent, setFaultCurrent] = useState(5000);
 	const { pushSnapshot, undo, redo, canUndo, canRedo } = useGridHistory();
-
-	const closeDropdowns = useCallback(() => {
-		setShowDesignDropdown(false);
-		setShowProjectDropdown(false);
-	}, []);
-
-	useEffect(() => {
-		const onPointerDown = (e: MouseEvent | TouchEvent) => {
-			const target = e.target as Node | null;
-			if (!target) return;
-
-			const inDesign = designDropdownRef.current?.contains(target) ?? false;
-			const inProject = projectDropdownRef.current?.contains(target) ?? false;
-
-			if (!inDesign && !inProject) closeDropdowns();
-		};
-
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Escape") closeDropdowns();
-		};
-
-		window.addEventListener("mousedown", onPointerDown, { capture: true });
-		window.addEventListener("touchstart", onPointerDown, { capture: true });
-		window.addEventListener("keydown", onKeyDown);
-
-		return () => {
-			window.removeEventListener("mousedown", onPointerDown, true);
-			window.removeEventListener("touchstart", onPointerDown, true);
-			window.removeEventListener("keydown", onKeyDown);
-		};
-	}, [closeDropdowns]);
 
 	const loadDesigns = useCallback(async () => {
 		const { data } = await supabase
@@ -539,6 +509,19 @@ export function GridGeneratorPanel() {
 	}, [handleUndo, handleRedo]);
 
 	const linkedProject = projects.find((p) => p.id === linkedProjectId);
+	const handleDesignSelect = useCallback(
+		(designId: string) => {
+			const selected = designs.find((design) => design.id === designId);
+			if (selected) {
+				void loadDesign(selected);
+			}
+		},
+		[designs, loadDesign],
+	);
+
+	const handleProjectSelect = useCallback((projectId: string) => {
+		setLinkedProjectId(projectId === "__none" ? null : projectId);
+	}, []);
 
 	const btnStyle = (active = false): React.CSSProperties => ({
 		padding: "6px 12px",
@@ -574,74 +557,44 @@ export function GridGeneratorPanel() {
 					<Plus size={14} /> New
 				</button>
 
-				<div style={{ position: "relative" }} ref={designDropdownRef}>
-					<button
-						onClick={() => {
-							setShowProjectDropdown(false);
-							setShowDesignDropdown((v) => !v);
-						}}
+				<Select value={currentDesign?.id} onValueChange={handleDesignSelect}>
+					<SelectTrigger
+						className="h-8 min-w-[240px] border px-3 py-1.5 text-xs font-semibold [border-color:color-mix(in_srgb,var(--primary)_25%,transparent)] [background:color-mix(in_srgb,var(--surface-2)_75%,transparent)] [color:var(--text)]"
+						id="grid-design-selector"
 					>
-						<Database size={14} /> Load <ChevronDown size={12} />
-					</button>
-					{showDesignDropdown && (
-						<div
-							style={{
-								position: "absolute",
-								top: "100%",
-								left: 0,
-								marginTop: 4,
-								zIndex: "var(--z-dropdown)",
-								minWidth: 240,
-								maxHeight: 260,
-								overflowY: "auto",
-								background: palette.surface,
-								border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-								borderRadius: 8,
-								boxShadow: `0 8px 24px ${hexToRgba("#000", 0.3)}`,
-							}}
-						>
-							{designs.length === 0 && (
-								<div
-									style={{
-										padding: 12,
-										fontSize: 12,
-										color: palette.textMuted,
-									}}
+						<span className="inline-flex items-center gap-2 truncate">
+							<Database className="h-3.5 w-3.5 [color:var(--primary)]" />
+							<span className="truncate">
+								{currentDesign ? currentDesign.name : "Load Design"}
+							</span>
+						</span>
+					</SelectTrigger>
+					<SelectContent className="max-h-64 min-w-[260px] border-[color:color-mix(in_srgb,var(--primary)_25%,transparent)] [background:var(--surface)]">
+						{designs.length === 0 ? (
+							<div className="px-3 py-2 text-xs [color:var(--text-muted)]">
+								No saved designs
+							</div>
+						) : (
+							designs.map((design) => (
+								<SelectItem
+									key={design.id}
+									value={design.id}
+									className="items-start py-2 text-left"
 								>
-									No saved designs
-								</div>
-							)}
-							{designs.map((d) => (
-								<button
-									key={d.id}
-									onClick={() => {
-										loadDesign(d);
-										closeDropdowns();
-									}}
-									style={{
-										display: "block",
-										width: "100%",
-										padding: "8px 12px",
-										border: "none",
-										background:
-											d.id === currentDesign?.id
-												? hexToRgba(palette.primary, 0.1)
-												: "transparent",
-										color: palette.text,
-										fontSize: 12,
-										textAlign: "left",
-										cursor: "pointer",
-									}}
-								>
-									<div style={{ fontWeight: 600 }}>{d.name}</div>
-									<div style={{ fontSize: 10, color: palette.textMuted }}>
-										{d.status} -- {new Date(d.updated_at).toLocaleDateString()}
+									<div className="w-full">
+										<div className="text-xs font-semibold [color:var(--text)]">
+											{design.name}
+										</div>
+										<div className="text-[10px] [color:var(--text-muted)]">
+											{design.status} --{" "}
+											{new Date(design.updated_at).toLocaleDateString()}
+										</div>
 									</div>
-								</button>
-							))}
-						</div>
-					)}
-				</div>
+								</SelectItem>
+							))
+						)}
+					</SelectContent>
+				</Select>
 
 				<input
 					value={designName}
@@ -682,97 +635,45 @@ export function GridGeneratorPanel() {
 					</button>
 				)}
 
-				<div style={{ position: "relative" }} ref={projectDropdownRef}>
-					<button
-						onClick={() => {
-							setShowDesignDropdown(false);
-							setShowProjectDropdown((v) => !v);
-						}}
-						style={btnStyle(!!linkedProjectId)}
+				<Select
+					value={linkedProjectId ?? "__none"}
+					onValueChange={handleProjectSelect}
+				>
+					<SelectTrigger
+						className="h-8 min-w-[220px] border px-3 py-1.5 text-xs font-semibold [border-color:color-mix(in_srgb,var(--primary)_25%,transparent)] [background:color-mix(in_srgb,var(--surface-2)_75%,transparent)] [color:var(--text)]"
+						id="grid-project-selector"
 					>
-						<FolderKanban size={14} />
-						{linkedProject ? linkedProject.name : "Link Project"}
-						<ChevronDown size={12} />
-					</button>
-					{showProjectDropdown && (
-						<div
-							style={{
-								position: "absolute",
-								top: "100%",
-								right: 0,
-								marginTop: 4,
-								zIndex: "var(--z-dropdown)",
-								minWidth: 200,
-								maxHeight: 240,
-								overflowY: "auto",
-								background: palette.surface,
-								border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-								borderRadius: 8,
-								boxShadow: `0 8px 24px ${hexToRgba("#000", 0.3)}`,
-							}}
+						<span className="inline-flex items-center gap-2 truncate">
+							<FolderKanban className="h-3.5 w-3.5 [color:var(--primary)]" />
+							<span className="truncate">
+								{linkedProject ? linkedProject.name : "Link Project"}
+							</span>
+						</span>
+					</SelectTrigger>
+					<SelectContent className="max-h-60 min-w-[220px] border-[color:color-mix(in_srgb,var(--primary)_25%,transparent)] [background:var(--surface)]">
+						<SelectItem
+							value="__none"
+							className="text-xs [color:var(--text-muted)]"
 						>
-							<button
-								onClick={() => {
-									setLinkedProjectId(null);
-									closeDropdowns();
-								}}
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 8,
-									width: "100%",
-									padding: "8px 12px",
-									border: "none",
-									background: !linkedProjectId
-										? hexToRgba(palette.primary, 0.1)
-										: "transparent",
-									color: palette.textMuted,
-									fontSize: 12,
-									cursor: "pointer",
-									textAlign: "left",
-								}}
+							No Project
+						</SelectItem>
+						{projects.map((project) => (
+							<SelectItem
+								key={project.id}
+								value={project.id}
+								className="text-xs"
 							>
-								No Project
-							</button>
-							{projects.map((p) => (
-								<button
-									key={p.id}
-									onClick={() => {
-										setLinkedProjectId(p.id);
-										closeDropdowns();
-									}}
-									style={{
-										display: "flex",
-										alignItems: "center",
-										gap: 8,
-										width: "100%",
-										padding: "8px 12px",
-										border: "none",
-										background:
-											p.id === linkedProjectId
-												? hexToRgba(palette.primary, 0.1)
-												: "transparent",
-										color: palette.text,
-										fontSize: 12,
-										cursor: "pointer",
-										textAlign: "left",
-									}}
-								>
-									<div
-										style={{
-											width: 8,
-											height: 8,
-											borderRadius: "50%",
-											background: p.color,
-											flexShrink: 0,
-										}}
+								<span className="inline-flex items-center gap-2">
+									<span
+										className="h-2 w-2 rounded-full"
+										style={{ background: project.color }}
 									/>
-									{p.name}
-								</button>
-							))}
-						</div>
-					)}
-				</div>
+									<span className="[color:var(--text)]">{project.name}</span>
+								</span>
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</div>
 
 			<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>

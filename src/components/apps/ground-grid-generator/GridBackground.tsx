@@ -8,6 +8,12 @@ const HEATMAP_SAFE = "#22c55e";
 const HEATMAP_MID = "#eab308";
 const HEATMAP_DANGER = "#ef4444";
 
+type FadeMaterial = {
+	transparent?: boolean;
+	opacity?: number;
+	userData: { baseOpacity?: number };
+};
+
 interface GridLayout {
 	rods: { x: number; y: number }[];
 	hLines: { y: number; x1: number; x2: number }[];
@@ -231,7 +237,9 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 					const t = Math.min(1, (minDist / maxRange) * pulse);
 
 					const color =
-						t < 0.5 ? lerpColor(safe, mid, t * 2) : lerpColor(mid, danger, (t - 0.5) * 2);
+						t < 0.5
+							? lerpColor(safe, mid, t * 2)
+							: lerpColor(mid, danger, (t - 0.5) * 2);
 
 					const idx = (py * size + px) * 4;
 					data[idx] = Math.round(color.r * 255);
@@ -249,13 +257,19 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 	useEffect(() => {
 		if (!containerRef.current) return;
 		const container = containerRef.current;
+		const initialWidth = Math.max(container.clientWidth, 1);
+		const initialHeight = Math.max(container.clientHeight, 1);
 
 		const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
 		renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-		renderer.setSize(container.clientWidth, container.clientHeight);
+		renderer.setSize(initialWidth, initialHeight);
+		renderer.domElement.style.pointerEvents = "none";
+		renderer.domElement.style.width = "100%";
+		renderer.domElement.style.height = "100%";
+		renderer.domElement.setAttribute("aria-hidden", "true");
 		container.appendChild(renderer.domElement);
 
-		const aspect = container.clientWidth / container.clientHeight;
+		const aspect = initialWidth / initialHeight;
 		const frustum = 10;
 
 		const camera = new THREE.OrthographicCamera(
@@ -321,7 +335,7 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 		// record baseOpacity on transparent materials
 		gridGroup.traverse((obj) => {
 			if (obj instanceof THREE.Line || obj instanceof THREE.Mesh) {
-				const mat = obj.material as unknown as { transparent?: boolean; opacity?: number; userData: any };
+				const mat = obj.material as unknown as FadeMaterial;
 				if (mat.transparent) mat.userData.baseOpacity = mat.opacity ?? 1;
 			}
 		});
@@ -334,18 +348,24 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 
 			const elapsed = state.clock.getElapsedTime();
 
-			if (state.phase === "showing" && elapsed - state.transitionStart > state.cycleDuration) {
+			if (
+				state.phase === "showing" &&
+				elapsed - state.transitionStart > state.cycleDuration
+			) {
 				state.phase = "fading";
 				state.transitionStart = elapsed;
 				state.nextGrid = generateRandomGrid();
 			}
 
 			if (state.phase === "fading") {
-				const fadeProgress = Math.min(1, (elapsed - state.transitionStart) / 1.2);
+				const fadeProgress = Math.min(
+					1,
+					(elapsed - state.transitionStart) / 1.2,
+				);
 
 				state.gridGroup.traverse((obj) => {
 					if (obj instanceof THREE.Line || obj instanceof THREE.Mesh) {
-						const mat = obj.material as unknown as { transparent?: boolean; opacity?: number; userData: any };
+						const mat = obj.material as unknown as FadeMaterial;
 						if (mat.transparent) {
 							const base = Number(mat.userData.baseOpacity ?? mat.opacity ?? 1);
 							mat.opacity = base * (1 - fadeProgress);
@@ -353,7 +373,8 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 					}
 				});
 
-				(state.heatmapMesh.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - fadeProgress);
+				(state.heatmapMesh.material as THREE.MeshBasicMaterial).opacity =
+					0.5 * (1 - fadeProgress);
 
 				if (fadeProgress >= 1) {
 					state.phase = "building";
@@ -370,7 +391,7 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 					// init baseOpacity and start invisible for fade-in
 					state.gridGroup.traverse((obj) => {
 						if (obj instanceof THREE.Line || obj instanceof THREE.Mesh) {
-							const mat = obj.material as unknown as { transparent?: boolean; opacity?: number; userData: any };
+							const mat = obj.material as unknown as FadeMaterial;
 							if (mat.transparent) {
 								mat.userData.baseOpacity = mat.opacity ?? 1;
 								mat.opacity = 0;
@@ -389,11 +410,14 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 			}
 
 			if (state.phase === "building") {
-				const buildProgress = Math.min(1, (elapsed - state.transitionStart) / 1.5);
+				const buildProgress = Math.min(
+					1,
+					(elapsed - state.transitionStart) / 1.5,
+				);
 
 				state.gridGroup.traverse((obj) => {
 					if (obj instanceof THREE.Line || obj instanceof THREE.Mesh) {
-						const mat = obj.material as unknown as { transparent?: boolean; opacity?: number; userData: any };
+						const mat = obj.material as unknown as FadeMaterial;
 						if (mat.transparent) {
 							const base = Number(mat.userData.baseOpacity ?? 1);
 							mat.opacity = base * buildProgress;
@@ -401,7 +425,8 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 					}
 				});
 
-				(state.heatmapMesh.material as THREE.MeshBasicMaterial).opacity = 0.5 * buildProgress;
+				(state.heatmapMesh.material as THREE.MeshBasicMaterial).opacity =
+					0.5 * buildProgress;
 
 				if (buildProgress >= 1) {
 					state.phase = "showing";
@@ -429,6 +454,7 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 			if (state.disposed) return;
 			const w = container.clientWidth;
 			const h = container.clientHeight;
+			if (w <= 0 || h <= 0) return;
 			const a = w / h;
 
 			camera.left = -frustum * a;
@@ -457,19 +483,21 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 			heatmapTexture.dispose();
 
 			renderer.dispose();
-			if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
+			if (container.contains(renderer.domElement))
+				container.removeChild(renderer.domElement);
 		};
 	}, [buildGridObjects, renderHeatmap]);
 
 	return (
 		<div
 			ref={containerRef}
+			aria-hidden="true"
+			className="pointer-events-none absolute inset-0 overflow-hidden"
 			style={{
-				position: "absolute",
-				inset: 0,
 				opacity,
-				pointerEvents: "none",
-				overflow: "hidden",
+				zIndex: 0,
+				borderRadius: "inherit",
+				contain: "paint",
 			}}
 		/>
 	);

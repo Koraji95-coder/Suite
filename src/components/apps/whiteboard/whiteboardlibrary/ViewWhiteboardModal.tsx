@@ -15,7 +15,10 @@ export function ViewWhiteboardModal({
 	if (!whiteboard) return null;
 
 	return (
-		<Dialog open={Boolean(whiteboard)} onOpenChange={(open) => !open && onClose()}>
+		<Dialog
+			open={Boolean(whiteboard)}
+			onOpenChange={(open) => !open && onClose()}
+		>
 			<DialogContent className="max-h-[90vh] max-w-6xl overflow-auto border-[var(--border)] bg-[var(--surface)] p-0">
 				<div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] p-6 backdrop-blur-sm">
 					<div>

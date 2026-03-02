@@ -36,7 +36,8 @@ function computePotentialField(
 			for (const rod of rods) {
 				const dist = Math.sqrt((px - rod.grid_x) ** 2 + (py - rod.grid_y) ** 2);
 				const effectiveDist = Math.max(dist, 0.5);
-				potential += (soilResistivity * currentPerRod) / (2 * Math.PI * effectiveDist);
+				potential +=
+					(soilResistivity * currentPerRod) / (2 * Math.PI * effectiveDist);
 			}
 
 			for (const c of conductors) {
@@ -56,7 +57,8 @@ function computePotentialField(
 					0.3,
 				);
 
-				potential += (soilResistivity * currentPerRod * 0.1) / (2 * Math.PI * dist);
+				potential +=
+					(soilResistivity * currentPerRod * 0.1) / (2 * Math.PI * dist);
 			}
 
 			row.push(potential);
@@ -98,7 +100,13 @@ function getCanvasSize(container: HTMLDivElement) {
 	const cssW = container.clientWidth;
 	const cssH = container.clientHeight;
 	const dpr = Math.min(window.devicePixelRatio || 1, 2);
-	return { cssW, cssH, dpr, pxW: Math.max(1, Math.floor(cssW * dpr)), pxH: Math.max(1, Math.floor(cssH * dpr)) };
+	return {
+		cssW,
+		cssH,
+		dpr,
+		pxW: Math.max(1, Math.floor(cssW * dpr)),
+		pxH: Math.max(1, Math.floor(cssH * dpr)),
+	};
 }
 
 export function PotentialContour({
@@ -110,7 +118,11 @@ export function PotentialContour({
 	const { palette } = useTheme();
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	const [hoveredValue, setHoveredValue] = useState<{ x: number; y: number; v: number } | null>(null);
+	const [hoveredValue, setHoveredValue] = useState<{
+		x: number;
+		y: number;
+		v: number;
+	} | null>(null);
 
 	// triggers redraw on resize
 	const [renderTick, setRenderTick] = useState(0);
@@ -127,7 +139,7 @@ export function PotentialContour({
 		return () => ro.disconnect();
 	}, []);
 
-		const bounds = useMemo(() => {
+	const bounds = useMemo(() => {
 		let minX = Infinity,
 			minY = Infinity,
 			maxX = -Infinity,
@@ -148,11 +160,23 @@ export function PotentialContour({
 
 		if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 100, maxY: 100 };
 		const pad = Math.max(maxX - minX, maxY - minY) * 0.3;
-		return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
+		return {
+			minX: minX - pad,
+			minY: minY - pad,
+			maxX: maxX + pad,
+			maxY: maxY + pad,
+		};
 	}, [rods, conductors]);
 
 	const field = useMemo(
-		() => computePotentialField(rods, conductors, bounds, soilResistivity, faultCurrent),
+		() =>
+			computePotentialField(
+				rods,
+				conductors,
+				bounds,
+				soilResistivity,
+				faultCurrent,
+			),
 		[rods, conductors, bounds, soilResistivity, faultCurrent],
 	);
 
@@ -172,6 +196,7 @@ export function PotentialContour({
 		const canvas = canvasRef.current;
 		const container = containerRef.current;
 		if (!canvas || !container || field.length === 0) return;
+		void renderTick;
 
 		const { cssW, cssH, dpr, pxW, pxH } = getCanvasSize(container);
 
@@ -286,6 +311,14 @@ export function PotentialContour({
 	};
 
 	const hasData = rods.length > 0 || conductors.length > 0;
+	const overlayCardStyle: React.CSSProperties = {
+		borderRadius: 6,
+		background: hexToRgba(palette.background, 0.86),
+		border: `1px solid ${hexToRgba(palette.primary, 0.16)}`,
+		padding: "6px 10px",
+		pointerEvents: "none",
+		backdropFilter: "blur(4px)",
+	};
 
 	if (!hasData) {
 		return (
@@ -308,12 +341,7 @@ export function PotentialContour({
 	return (
 		<div
 			ref={containerRef}
-			style={{
-				position: "relative",
-				width: "100%",
-				height: "100%",
-				minHeight: 400,
-			}}
+			className="relative h-full min-h-[320px] w-full sm:min-h-[400px]"
 		>
 			<canvas
 				ref={canvasRef}
@@ -321,79 +349,76 @@ export function PotentialContour({
 				onMouseMove={handleMouseMove}
 				onMouseLeave={() => setHoveredValue(null)}
 			/>
-
-			{hoveredValue && (
-				<div
-					style={{
-						position: "absolute",
-						top: 8,
-						left: 8,
-						padding: "6px 10px",
-						borderRadius: 6,
-						background: hexToRgba(palette.background, 0.9),
-						border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-						fontSize: 10,
-						color: palette.text,
-						pointerEvents: "none",
-						fontFamily: "monospace",
-					}}
-				>
-					<div>
-						Position: ({hoveredValue.x.toFixed(1)}, {hoveredValue.y.toFixed(1)})
+			<div className="pointer-events-none absolute inset-0 p-2 sm:p-3">
+				<div className="flex h-full flex-col justify-between gap-2">
+					<div className="flex flex-wrap items-start justify-between gap-2">
+						{hoveredValue ? (
+							<div
+								style={{
+									...overlayCardStyle,
+									fontSize: 10,
+									color: palette.text,
+									fontFamily: "monospace",
+								}}
+							>
+								<div>
+									Position: ({hoveredValue.x.toFixed(1)},{" "}
+									{hoveredValue.y.toFixed(1)})
+								</div>
+								<div>Potential: {hoveredValue.v.toFixed(2)} V</div>
+							</div>
+						) : (
+							<div />
+						)}
+						<div
+							style={{
+								...overlayCardStyle,
+								fontSize: 9,
+								color: hexToRgba(palette.textMuted, 0.7),
+								padding: "4px 8px",
+							}}
+						>
+							Hover to inspect voltage
+						</div>
 					</div>
-					<div>Potential: {hoveredValue.v.toFixed(2)} V</div>
-				</div>
-			)}
 
-			<div
-				style={{
-					position: "absolute",
-					bottom: 8,
-					right: 8,
-					display: "flex",
-					flexDirection: "column",
-					gap: 2,
-					padding: "6px 10px",
-					borderRadius: 6,
-					background: hexToRgba(palette.background, 0.85),
-					border: `1px solid ${hexToRgba(palette.primary, 0.15)}`,
-					fontSize: 9,
-					color: palette.textMuted,
-					pointerEvents: "none",
-				}}
-			>
-				<div style={{ fontWeight: 600, marginBottom: 2 }}>Touch/Step Potential</div>
-				<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
 					<div
+						className="self-start sm:self-end"
 						style={{
-							width: 60,
-							height: 8,
-							borderRadius: 2,
-							background:
-								"linear-gradient(90deg, #228b22, #3b82f6, #eab308, #f59e0b, #ef4444)",
+							...overlayCardStyle,
+							display: "flex",
+							flexDirection: "column",
+							gap: 2,
+							fontSize: 9,
+							color: palette.textMuted,
 						}}
-					/>
+					>
+						<div style={{ fontWeight: 600, marginBottom: 2 }}>
+							Touch/Step Potential
+						</div>
+						<div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+							<div
+								style={{
+									width: 72,
+									height: 8,
+									borderRadius: 2,
+									background:
+										"linear-gradient(90deg, #228b22, #3b82f6, #eab308, #f59e0b, #ef4444)",
+								}}
+							/>
+						</div>
+						<div
+							style={{
+								display: "flex",
+								justifyContent: "space-between",
+								width: 72,
+							}}
+						>
+							<span>{minVal.toFixed(0)}V</span>
+							<span>{maxVal.toFixed(0)}V</span>
+						</div>
+					</div>
 				</div>
-				<div style={{ display: "flex", justifyContent: "space-between", width: 60 }}>
-					<span>{minVal.toFixed(0)}V</span>
-					<span>{maxVal.toFixed(0)}V</span>
-				</div>
-			</div>
-
-			<div
-				style={{
-					position: "absolute",
-					top: 8,
-					right: 8,
-					fontSize: 9,
-					color: hexToRgba(palette.textMuted, 0.6),
-					background: hexToRgba(palette.background, 0.7),
-					padding: "3px 8px",
-					borderRadius: 4,
-					pointerEvents: "none",
-				}}
-			>
-				Hover to inspect voltage
 			</div>
 		</div>
 	);

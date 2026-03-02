@@ -246,33 +246,33 @@ export function CalculatorPanel() {
 				.from("saved_calculations")
 				.insert(payload);
 
-				if (error) {
-					logger.error("CalculatorPanel", "Failed to save calculation", {
-						error: error.message,
-					});
-					showToast(
-						"error",
-						`Error saving calculation: ${error.message || "Unknown error"}`,
-					);
-				} else {
-					logger.info("CalculatorPanel", "Calculation saved successfully", {
-						calcType,
-					});
-					showToast("success", "Calculation saved successfully.");
-					setNotes("");
-				}
-			} catch (err) {
+			if (error) {
+				logger.error("CalculatorPanel", "Failed to save calculation", {
+					error: error.message,
+				});
+				showToast(
+					"error",
+					`Error saving calculation: ${error.message || "Unknown error"}`,
+				);
+			} else {
+				logger.info("CalculatorPanel", "Calculation saved successfully", {
+					calcType,
+				});
+				showToast("success", "Calculation saved successfully.");
+				setNotes("");
+			}
+		} catch (err) {
 			const message = err instanceof Error ? err.message : "Unknown error";
 			logger.error(
 				"CalculatorPanel",
 				"Unexpected error saving calculation",
-					{ error: message },
-					err as Error,
-				);
-				showToast("error", `Error saving calculation: ${message}`);
-			} finally {
-				setIsSavingCalculation(false);
-			}
+				{ error: message },
+				err as Error,
+			);
+			showToast("error", `Error saving calculation: ${message}`);
+		} finally {
+			setIsSavingCalculation(false);
+		}
 	};
 
 	return (

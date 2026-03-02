@@ -93,32 +93,32 @@ export function FormulaBank() {
 
 			const { error } = await supabase.from("formulas").insert(payload);
 
-				if (error) {
-					logger.error("FormulaBank", "Failed to add formula", {
-						error: error.message,
-					});
-					showToast(
-						"error",
-						`Error adding formula: ${error.message || "Unknown error"}`,
-					);
-				} else {
-					setNewFormula({ name: "", category: "", formula: "", description: "" });
-					setShowAddForm(false);
-					await loadFormulas();
-					showToast("success", "Formula added successfully.");
-				}
-			} catch (err) {
+			if (error) {
+				logger.error("FormulaBank", "Failed to add formula", {
+					error: error.message,
+				});
+				showToast(
+					"error",
+					`Error adding formula: ${error.message || "Unknown error"}`,
+				);
+			} else {
+				setNewFormula({ name: "", category: "", formula: "", description: "" });
+				setShowAddForm(false);
+				await loadFormulas();
+				showToast("success", "Formula added successfully.");
+			}
+		} catch (err) {
 			const message = err instanceof Error ? err.message : "Unknown error";
 			logger.error(
 				"FormulaBank",
 				"Unexpected error adding formula",
-					{ error: message },
-					err as Error,
-				);
-				showToast("error", `Error adding formula: ${message}`);
-			} finally {
-				setIsAddingFormula(false);
-			}
+				{ error: message },
+				err as Error,
+			);
+			showToast("error", `Error adding formula: ${message}`);
+		} finally {
+			setIsAddingFormula(false);
+		}
 	};
 
 	return (
@@ -237,11 +237,7 @@ export function FormulaBank() {
 							className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] [&>option]:bg-[var(--surface-2)] [&>option]:text-[var(--text)]"
 						>
 							{categories.map((cat) => (
-								<option
-									key={cat}
-									value={cat}
-									className="text-[var(--text)]"
-								>
+								<option key={cat} value={cat} className="text-[var(--text)]">
 									{cat}
 								</option>
 							))}

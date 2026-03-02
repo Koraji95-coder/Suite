@@ -149,33 +149,33 @@ export function CircuitGenerator() {
 
 			const { error } = await supabase.from("saved_circuits").insert(payload);
 
-				if (error) {
-					logger.error("CircuitGenerator", "Failed to save circuit", {
-						error: error.message,
-					});
-					showToast(
-						"error",
-						`Error saving circuit: ${error.message || "Unknown error"}`,
-					);
-				} else {
-					logger.info("CircuitGenerator", "Circuit saved successfully", {
-						circuitName,
-					});
-					showToast("success", "Circuit saved successfully.");
-					setCircuitName("");
-				}
-			} catch (err) {
+			if (error) {
+				logger.error("CircuitGenerator", "Failed to save circuit", {
+					error: error.message,
+				});
+				showToast(
+					"error",
+					`Error saving circuit: ${error.message || "Unknown error"}`,
+				);
+			} else {
+				logger.info("CircuitGenerator", "Circuit saved successfully", {
+					circuitName,
+				});
+				showToast("success", "Circuit saved successfully.");
+				setCircuitName("");
+			}
+		} catch (err) {
 			const message = err instanceof Error ? err.message : "Unknown error";
 			logger.error(
 				"CircuitGenerator",
 				"Unexpected error saving circuit",
-					{ error: message },
-					err as Error,
-				);
-				showToast("error", `Error saving circuit: ${message}`);
-			} finally {
-				setIsSavingCircuit(false);
-			}
+				{ error: message },
+				err as Error,
+			);
+			showToast("error", `Error saving circuit: ${message}`);
+		} finally {
+			setIsSavingCircuit(false);
+		}
 	};
 
 	return (

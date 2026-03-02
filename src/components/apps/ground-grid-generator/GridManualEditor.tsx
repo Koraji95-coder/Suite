@@ -9,6 +9,13 @@ import {
 	ZoomOut,
 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
 
@@ -37,7 +44,9 @@ interface GridManualEditorProps {
 	onPlacementsChange: (placements: GridPlacement[]) => void;
 }
 
-function placementKey(p: Pick<GridPlacement, "type" | "grid_x" | "grid_y">): string {
+function placementKey(
+	p: Pick<GridPlacement, "type" | "grid_x" | "grid_y">,
+): string {
 	return `${p.type}:${p.grid_x},${p.grid_y}`;
 }
 
@@ -53,18 +62,30 @@ export function GridManualEditor({
 	const svgRef = useRef<SVGSVGElement>(null);
 	const [mode, setMode] = useState<EditorMode>("select");
 	const [selectedRod, setSelectedRod] = useState<number | null>(null);
-	const [selectedConductor, setSelectedConductor] = useState<number | null>(null);
+	const [selectedConductor, setSelectedConductor] = useState<number | null>(
+		null,
+	);
 
 	// ✅ stable selection for placements (prevents index drift)
 	const [selectedTeeKey, setSelectedTeeKey] = useState<string | null>(null);
 	const [selectedCrossKey, setSelectedCrossKey] = useState<string | null>(null);
 
-	const [conductorStart, setConductorStart] = useState<{ x: number; y: number } | null>(null);
+	const [conductorStart, setConductorStart] = useState<{
+		x: number;
+		y: number;
+	} | null>(null);
 	const [showRodInput, setShowRodInput] = useState(false);
 	const [showConductorInput, setShowConductorInput] = useState(false);
 	const [coordInput, setCoordInput] = useState({ x: "", y: "" });
-	const [lineInput, setLineInput] = useState({ x1: "", y1: "", x2: "", y2: "" });
-	const [suggestion, setSuggestion] = useState<PlacementSuggestion | null>(null);
+	const [lineInput, setLineInput] = useState({
+		x1: "",
+		y1: "",
+		x2: "",
+		y2: "",
+	});
+	const [suggestion, setSuggestion] = useState<PlacementSuggestion | null>(
+		null,
+	);
 	const [suggestionCoords, setSuggestionCoords] = useState({
 		x: "",
 		y: "",
@@ -94,7 +115,12 @@ export function GridManualEditor({
 
 		if (!isFinite(minX)) return { minX: -50, minY: -50, maxX: 50, maxY: 50 };
 		const pad = Math.max(maxX - minX, maxY - minY) * 0.25 || 10;
-		return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
+		return {
+			minX: minX - pad,
+			minY: minY - pad,
+			maxX: maxX + pad,
+			maxY: maxY + pad,
+		};
 	}, [rods, conductors]);
 
 	const viewBox = useMemo(() => {
@@ -108,12 +134,13 @@ export function GridManualEditor({
 	}, [bounds, zoom]);
 
 	const rodScale =
-		(Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.012) / zoom;
+		(Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.012) /
+		zoom;
 
 	const handleZoomIn = () => setZoom((z) => Math.min(z * 1.3, 4));
 	const handleZoomOut = () => setZoom((z) => Math.max(z / 1.3, 0.5));
 
-		const svgToWorld = useCallback(
+	const svgToWorld = useCallback(
 		(clientX: number, clientY: number) => {
 			const svg = svgRef.current;
 			if (!svg) return { x: 0, y: 0 };
@@ -135,7 +162,10 @@ export function GridManualEditor({
 		[bounds, zoom],
 	);
 
-	const snapToGrid = useCallback((val: number): number => Math.round(val * 100) / 100, []);
+	const snapToGrid = useCallback(
+		(val: number): number => Math.round(val * 100) / 100,
+		[],
+	);
 
 	const clearSelection = useCallback(() => {
 		setSelectedRod(null);
@@ -235,7 +265,12 @@ export function GridManualEditor({
 
 			if (mode === "add-rod" || mode === "add-tee" || mode === "add-cross") {
 				setSuggestion({ type: mode, x: snappedX, y: snappedY });
-				setSuggestionCoords({ x: String(snappedX), y: String(snappedY), endX: "", endY: "" });
+				setSuggestionCoords({
+					x: String(snappedX),
+					y: String(snappedY),
+					endX: "",
+					endY: "",
+				});
 				return;
 			}
 
@@ -264,7 +299,9 @@ export function GridManualEditor({
 				const threshold = rodScale * 2 * zoom;
 
 				for (let i = 0; i < rods.length; i++) {
-					const dist = Math.sqrt((x - rods[i].grid_x) ** 2 + (y - rods[i].grid_y) ** 2);
+					const dist = Math.sqrt(
+						(x - rods[i].grid_x) ** 2 + (y - rods[i].grid_y) ** 2,
+					);
 					if (dist < threshold) {
 						onRodsChange(rods.filter((_, idx) => idx !== i));
 						return;
@@ -339,7 +376,13 @@ export function GridManualEditor({
 		const y1 = parseFloat(lineInput.y1);
 		const x2 = parseFloat(lineInput.x2);
 		const y2 = parseFloat(lineInput.y2);
-		if (Number.isNaN(x1) || Number.isNaN(y1) || Number.isNaN(x2) || Number.isNaN(y2)) return;
+		if (
+			Number.isNaN(x1) ||
+			Number.isNaN(y1) ||
+			Number.isNaN(x2) ||
+			Number.isNaN(y2)
+		)
+			return;
 
 		onConductorsChange([
 			...conductors,
@@ -404,10 +447,12 @@ export function GridManualEditor({
 	const tableRowStyle = (selected: boolean): React.CSSProperties => ({
 		cursor: "pointer",
 		background: selected ? hexToRgba(palette.primary, 0.15) : "transparent",
-		borderLeft: selected ? `2px solid ${palette.primary}` : "2px solid transparent",
+		borderLeft: selected
+			? `2px solid ${palette.primary}`
+			: "2px solid transparent",
 	});
 
-		return (
+	return (
 		<div
 			style={{
 				display: "flex",
@@ -418,7 +463,14 @@ export function GridManualEditor({
 				overflow: "auto",
 			}}
 		>
-			<div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+			<div
+				style={{
+					display: "flex",
+					gap: 6,
+					flexWrap: "wrap",
+					alignItems: "center",
+				}}
+			>
 				<button
 					onClick={() => {
 						setMode("select");
@@ -488,10 +540,18 @@ export function GridManualEditor({
 				</button>
 
 				<div style={{ display: "flex", gap: 2, marginLeft: "auto" }}>
-					<button onClick={handleZoomIn} style={btnStyle(false)} title="Zoom In">
+					<button
+						onClick={handleZoomIn}
+						style={btnStyle(false)}
+						title="Zoom In"
+					>
 						<ZoomIn size={12} />
 					</button>
-					<button onClick={handleZoomOut} style={btnStyle(false)} title="Zoom Out">
+					<button
+						onClick={handleZoomOut}
+						style={btnStyle(false)}
+						title="Zoom Out"
+					>
 						<ZoomOut size={12} />
 					</button>
 					<span
@@ -509,7 +569,14 @@ export function GridManualEditor({
 			</div>
 
 			{conductorStart && (
-				<div style={{ fontSize: 10, color: "#f59e0b", fontWeight: 600, padding: "0 4px" }}>
+				<div
+					style={{
+						fontSize: 10,
+						color: "#f59e0b",
+						fontWeight: 600,
+						padding: "0 4px",
+					}}
+				>
 					Start: ({conductorStart.x}, {conductorStart.y}) -- click end point
 				</div>
 			)}
@@ -521,13 +588,17 @@ export function GridManualEditor({
 						<input
 							placeholder="X"
 							value={coordInput.x}
-							onChange={(e) => setCoordInput({ ...coordInput, x: e.target.value })}
+							onChange={(e) =>
+								setCoordInput({ ...coordInput, x: e.target.value })
+							}
 							style={inputStyle}
 						/>
 						<input
 							placeholder="Y"
 							value={coordInput.y}
-							onChange={(e) => setCoordInput({ ...coordInput, y: e.target.value })}
+							onChange={(e) =>
+								setCoordInput({ ...coordInput, y: e.target.value })
+							}
 							style={inputStyle}
 						/>
 						<button onClick={addRodByCoord} style={btnStyle(false)}>
@@ -548,25 +619,33 @@ export function GridManualEditor({
 						<input
 							placeholder="X1"
 							value={lineInput.x1}
-							onChange={(e) => setLineInput({ ...lineInput, x1: e.target.value })}
+							onChange={(e) =>
+								setLineInput({ ...lineInput, x1: e.target.value })
+							}
 							style={inputStyle}
 						/>
 						<input
 							placeholder="Y1"
 							value={lineInput.y1}
-							onChange={(e) => setLineInput({ ...lineInput, y1: e.target.value })}
+							onChange={(e) =>
+								setLineInput({ ...lineInput, y1: e.target.value })
+							}
 							style={inputStyle}
 						/>
 						<input
 							placeholder="X2"
 							value={lineInput.x2}
-							onChange={(e) => setLineInput({ ...lineInput, x2: e.target.value })}
+							onChange={(e) =>
+								setLineInput({ ...lineInput, x2: e.target.value })
+							}
 							style={inputStyle}
 						/>
 						<input
 							placeholder="Y2"
 							value={lineInput.y2}
-							onChange={(e) => setLineInput({ ...lineInput, y2: e.target.value })}
+							onChange={(e) =>
+								setLineInput({ ...lineInput, y2: e.target.value })
+							}
 							style={inputStyle}
 						/>
 						<button onClick={addConductorByCoord} style={btnStyle(false)}>
@@ -617,7 +696,9 @@ export function GridManualEditor({
 								y1={c.y1}
 								x2={c.x2}
 								y2={c.y2}
-								stroke={selectedConductor === i ? "#fff" : hexToRgba("#f59e0b", 0.6)}
+								stroke={
+									selectedConductor === i ? "#fff" : hexToRgba("#f59e0b", 0.6)
+								}
 								strokeWidth={rodScale * (selectedConductor === i ? 0.8 : 0.4)}
 								strokeLinecap="round"
 								onClick={(e) => {
@@ -659,7 +740,9 @@ export function GridManualEditor({
 								cy={r.grid_y}
 								r={rodScale}
 								fill={
-									selectedRod === i ? hexToRgba("#fff", 0.3) : hexToRgba("#22c55e", 0.3)
+									selectedRod === i
+										? hexToRgba("#fff", 0.3)
+										: hexToRgba("#22c55e", 0.3)
 								}
 								stroke={selectedRod === i ? "#fff" : "#22c55e"}
 								strokeWidth={rodScale * 0.2}
@@ -713,7 +796,11 @@ export function GridManualEditor({
 									y={p.grid_y - rodScale * 0.6}
 									width={rodScale * 1.2}
 									height={rodScale * 1.2}
-									fill={isSelected ? hexToRgba("#fff", 0.3) : hexToRgba("#3b82f6", 0.3)}
+									fill={
+										isSelected
+											? hexToRgba("#fff", 0.3)
+											: hexToRgba("#3b82f6", 0.3)
+									}
 									stroke={isSelected ? "#fff" : "#3b82f6"}
 									strokeWidth={rodScale * 0.15}
 									rx={rodScale * 0.1}
@@ -753,7 +840,9 @@ export function GridManualEditor({
 									width={rodScale * 1.2}
 									height={rodScale * 1.2}
 									fill={
-										isSelected ? hexToRgba("#fff", 0.3) : hexToRgba("#06b6d4", 0.3)
+										isSelected
+											? hexToRgba("#fff", 0.3)
+											: hexToRgba("#06b6d4", 0.3)
 									}
 									stroke={isSelected ? "#fff" : "#06b6d4"}
 									strokeWidth={rodScale * 0.15}
@@ -783,111 +872,12 @@ export function GridManualEditor({
 						/>
 					)}
 				</svg>
-
-				{suggestion && (
-					<div
-						style={{
-							position: "absolute",
-							top: "50%",
-							left: "50%",
-							transform: "translate(-50%, -50%)",
-							background: palette.surface,
-							border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
-							borderRadius: 10,
-							padding: 16,
-							boxShadow: `0 8px 32px ${hexToRgba("#000", 0.4)}`,
-							zIndex: "var(--z-dropdown)",
-							minWidth: 220,
-						}}
-						onClick={(e) => e.stopPropagation()}
-					>
-						<div style={{ fontSize: 12, fontWeight: 700, color: palette.text, marginBottom: 10 }}>
-							{suggestion.type === "add-rod"
-								? "Place Rod"
-								: suggestion.type === "add-conductor"
-									? "Place Conductor"
-									: suggestion.type === "add-tee"
-										? "Place Tee"
-										: "Place Cross"}
-						</div>
-
-						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-							<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-								<label style={{ fontSize: 10, color: palette.textMuted, width: 20 }}>
-									{suggestion.type === "add-conductor" ? "X1" : "X"}
-								</label>
-								<input
-									value={suggestionCoords.x}
-									onChange={(e) => setSuggestionCoords((s) => ({ ...s, x: e.target.value }))}
-									style={{ ...inputStyle, flex: 1 }}
-									autoFocus
-								/>
-							</div>
-
-							<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-								<label style={{ fontSize: 10, color: palette.textMuted, width: 20 }}>
-									{suggestion.type === "add-conductor" ? "Y1" : "Y"}
-								</label>
-								<input
-									value={suggestionCoords.y}
-									onChange={(e) => setSuggestionCoords((s) => ({ ...s, y: e.target.value }))}
-									style={{ ...inputStyle, flex: 1 }}
-								/>
-							</div>
-
-							{suggestion.type === "add-conductor" && (
-								<>
-									<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-										<label style={{ fontSize: 10, color: palette.textMuted, width: 20 }}>
-											X2
-										</label>
-										<input
-											value={suggestionCoords.endX}
-											onChange={(e) =>
-												setSuggestionCoords((s) => ({ ...s, endX: e.target.value }))
-											}
-											style={{ ...inputStyle, flex: 1 }}
-										/>
-									</div>
-
-									<div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-										<label style={{ fontSize: 10, color: palette.textMuted, width: 20 }}>
-											Y2
-										</label>
-										<input
-											value={suggestionCoords.endY}
-											onChange={(e) =>
-												setSuggestionCoords((s) => ({ ...s, endY: e.target.value }))
-											}
-											style={{ ...inputStyle, flex: 1 }}
-										/>
-									</div>
-								</>
-							)}
-						</div>
-
-						<div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-							<button
-								onClick={confirmSuggestion}
-								style={{ ...btnStyle(true), flex: 1, justifyContent: "center" }}
-							>
-								<Check size={12} /> Confirm
-							</button>
-							<button
-								onClick={() => {
-									setSuggestion(null);
-									setConductorStart(null);
-								}}
-								style={{ ...btnStyle(false), flex: 1, justifyContent: "center" }}
-							>
-								<X size={12} /> Cancel
-							</button>
-						</div>
-					</div>
-				)}
 			</div>
 
-			{(rods.length > 0 || conductors.length > 0 || tees.length > 0 || crosses.length > 0) && (
+			{(rods.length > 0 ||
+				conductors.length > 0 ||
+				tees.length > 0 ||
+				crosses.length > 0) && (
 				<div
 					style={{
 						display: "grid",
@@ -915,31 +905,64 @@ export function GridManualEditor({
 								Ground Rods ({rods.length})
 							</div>
 							<div style={{ maxHeight: 120, overflowY: "auto" }}>
-								<table style={{ width: "100%", fontSize: 9, borderCollapse: "collapse" }}>
+								<table
+									style={{
+										width: "100%",
+										fontSize: 9,
+										borderCollapse: "collapse",
+									}}
+								>
 									<thead>
 										<tr style={{ color: palette.textMuted }}>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>Label</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>X</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>Y</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												Label
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												X
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												Y
+											</th>
 										</tr>
 									</thead>
 									<tbody>
 										{rods.map((r, i) => (
 											<tr
 												key={i}
-												style={{ ...tableRowStyle(selectedRod === i), color: palette.text }}
+												style={{
+													...tableRowStyle(selectedRod === i),
+													color: palette.text,
+												}}
 												onClick={() => {
 													clearSelection();
 													setSelectedRod(i);
 												}}
 											>
-												<td style={{ padding: "1px 4px", fontWeight: 600, textAlign: "center" }}>
+												<td
+													style={{
+														padding: "1px 4px",
+														fontWeight: 600,
+														textAlign: "center",
+													}}
+												>
 													{r.label}
 												</td>
-												<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+												<td
+													style={{
+														padding: "1px 4px",
+														textAlign: "center",
+														fontFamily: "monospace",
+													}}
+												>
 													{r.grid_x}
 												</td>
-												<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+												<td
+													style={{
+														padding: "1px 4px",
+														textAlign: "center",
+														fontFamily: "monospace",
+													}}
+												>
 													{r.grid_y}
 												</td>
 											</tr>
@@ -970,14 +993,30 @@ export function GridManualEditor({
 								Conductors ({conductors.length})
 							</div>
 							<div style={{ maxHeight: 120, overflowY: "auto" }}>
-								<table style={{ width: "100%", fontSize: 9, borderCollapse: "collapse" }}>
+								<table
+									style={{
+										width: "100%",
+										fontSize: 9,
+										borderCollapse: "collapse",
+									}}
+								>
 									<thead>
 										<tr style={{ color: palette.textMuted }}>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>Label</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>X1</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>Y1</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>X2</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>Y2</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												Label
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												X1
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												Y1
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												X2
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												Y2
+											</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -993,19 +1032,49 @@ export function GridManualEditor({
 													setSelectedConductor(i);
 												}}
 											>
-												<td style={{ padding: "1px 4px", fontWeight: 600, textAlign: "center" }}>
+												<td
+													style={{
+														padding: "1px 4px",
+														fontWeight: 600,
+														textAlign: "center",
+													}}
+												>
 													{c.label}
 												</td>
-												<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+												<td
+													style={{
+														padding: "1px 4px",
+														textAlign: "center",
+														fontFamily: "monospace",
+													}}
+												>
 													{c.x1}
 												</td>
-												<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+												<td
+													style={{
+														padding: "1px 4px",
+														textAlign: "center",
+														fontFamily: "monospace",
+													}}
+												>
 													{c.y1}
 												</td>
-												<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+												<td
+													style={{
+														padding: "1px 4px",
+														textAlign: "center",
+														fontFamily: "monospace",
+													}}
+												>
 													{c.x2}
 												</td>
-												<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+												<td
+													style={{
+														padding: "1px 4px",
+														textAlign: "center",
+														fontFamily: "monospace",
+													}}
+												>
 													{c.y2}
 												</td>
 											</tr>
@@ -1036,12 +1105,24 @@ export function GridManualEditor({
 								Tees ({tees.length})
 							</div>
 							<div style={{ maxHeight: 120, overflowY: "auto" }}>
-								<table style={{ width: "100%", fontSize: 9, borderCollapse: "collapse" }}>
+								<table
+									style={{
+										width: "100%",
+										fontSize: 9,
+										borderCollapse: "collapse",
+									}}
+								>
 									<thead>
 										<tr style={{ color: palette.textMuted }}>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>#</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>X</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>Y</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												#
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												X
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												Y
+											</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -1050,19 +1131,40 @@ export function GridManualEditor({
 											return (
 												<tr
 													key={i}
-													style={{ ...tableRowStyle(selectedTeeKey === k), color: palette.text }}
+													style={{
+														...tableRowStyle(selectedTeeKey === k),
+														color: palette.text,
+													}}
 													onClick={() => {
 														clearSelection();
 														setSelectedTeeKey(k);
 													}}
 												>
-													<td style={{ padding: "1px 4px", fontWeight: 600, textAlign: "center" }}>
+													<td
+														style={{
+															padding: "1px 4px",
+															fontWeight: 600,
+															textAlign: "center",
+														}}
+													>
 														T{i + 1}
 													</td>
-													<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+													<td
+														style={{
+															padding: "1px 4px",
+															textAlign: "center",
+															fontFamily: "monospace",
+														}}
+													>
 														{p.grid_x}
 													</td>
-													<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+													<td
+														style={{
+															padding: "1px 4px",
+															textAlign: "center",
+															fontFamily: "monospace",
+														}}
+													>
 														{p.grid_y}
 													</td>
 												</tr>
@@ -1094,12 +1196,24 @@ export function GridManualEditor({
 								Crosses ({crosses.length})
 							</div>
 							<div style={{ maxHeight: 120, overflowY: "auto" }}>
-								<table style={{ width: "100%", fontSize: 9, borderCollapse: "collapse" }}>
+								<table
+									style={{
+										width: "100%",
+										fontSize: 9,
+										borderCollapse: "collapse",
+									}}
+								>
 									<thead>
 										<tr style={{ color: palette.textMuted }}>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>#</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>X</th>
-											<th style={{ padding: "2px 4px", textAlign: "center" }}>Y</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												#
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												X
+											</th>
+											<th style={{ padding: "2px 4px", textAlign: "center" }}>
+												Y
+											</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -1108,19 +1222,40 @@ export function GridManualEditor({
 											return (
 												<tr
 													key={i}
-													style={{ ...tableRowStyle(selectedCrossKey === k), color: palette.text }}
+													style={{
+														...tableRowStyle(selectedCrossKey === k),
+														color: palette.text,
+													}}
 													onClick={() => {
 														clearSelection();
 														setSelectedCrossKey(k);
 													}}
 												>
-													<td style={{ padding: "1px 4px", fontWeight: 600, textAlign: "center" }}>
+													<td
+														style={{
+															padding: "1px 4px",
+															fontWeight: 600,
+															textAlign: "center",
+														}}
+													>
 														X{i + 1}
 													</td>
-													<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+													<td
+														style={{
+															padding: "1px 4px",
+															textAlign: "center",
+															fontFamily: "monospace",
+														}}
+													>
 														{p.grid_x}
 													</td>
-													<td style={{ padding: "1px 4px", textAlign: "center", fontFamily: "monospace" }}>
+													<td
+														style={{
+															padding: "1px 4px",
+															textAlign: "center",
+															fontFamily: "monospace",
+														}}
+													>
 														{p.grid_y}
 													</td>
 												</tr>
@@ -1133,6 +1268,123 @@ export function GridManualEditor({
 					)}
 				</div>
 			)}
+			<Dialog
+				open={Boolean(suggestion)}
+				onOpenChange={(open) => {
+					if (!open) {
+						setSuggestion(null);
+						setConductorStart(null);
+					}
+				}}
+			>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>
+							{suggestion?.type === "add-rod"
+								? "Place Rod"
+								: suggestion?.type === "add-conductor"
+									? "Place Conductor"
+									: suggestion?.type === "add-tee"
+										? "Place Tee"
+										: "Place Cross"}
+						</DialogTitle>
+					</DialogHeader>
+					<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+						<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<label
+								style={{ fontSize: 11, color: palette.textMuted, width: 24 }}
+							>
+								{suggestion?.type === "add-conductor" ? "X1" : "X"}
+							</label>
+							<input
+								value={suggestionCoords.x}
+								onChange={(e) =>
+									setSuggestionCoords((s) => ({ ...s, x: e.target.value }))
+								}
+								style={{ ...inputStyle, flex: 1 }}
+								autoFocus
+							/>
+						</div>
+						<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<label
+								style={{ fontSize: 11, color: palette.textMuted, width: 24 }}
+							>
+								{suggestion?.type === "add-conductor" ? "Y1" : "Y"}
+							</label>
+							<input
+								value={suggestionCoords.y}
+								onChange={(e) =>
+									setSuggestionCoords((s) => ({ ...s, y: e.target.value }))
+								}
+								style={{ ...inputStyle, flex: 1 }}
+							/>
+						</div>
+						{suggestion?.type === "add-conductor" && (
+							<>
+								<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+									<label
+										style={{
+											fontSize: 11,
+											color: palette.textMuted,
+											width: 24,
+										}}
+									>
+										X2
+									</label>
+									<input
+										value={suggestionCoords.endX}
+										onChange={(e) =>
+											setSuggestionCoords((s) => ({
+												...s,
+												endX: e.target.value,
+											}))
+										}
+										style={{ ...inputStyle, flex: 1 }}
+									/>
+								</div>
+								<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+									<label
+										style={{
+											fontSize: 11,
+											color: palette.textMuted,
+											width: 24,
+										}}
+									>
+										Y2
+									</label>
+									<input
+										value={suggestionCoords.endY}
+										onChange={(e) =>
+											setSuggestionCoords((s) => ({
+												...s,
+												endY: e.target.value,
+											}))
+										}
+										style={{ ...inputStyle, flex: 1 }}
+									/>
+								</div>
+							</>
+						)}
+					</div>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => {
+								setSuggestion(null);
+								setConductorStart(null);
+							}}
+							style={{ ...btnStyle(false), justifyContent: "center" }}
+						>
+							<X size={12} /> Cancel
+						</button>
+						<button
+							onClick={confirmSuggestion}
+							style={{ ...btnStyle(true), justifyContent: "center" }}
+						>
+							<Check size={12} /> Confirm
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

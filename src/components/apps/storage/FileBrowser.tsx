@@ -162,453 +162,454 @@ export function FileBrowser() {
 			<ArrowDown className="w-3 h-3" />
 		);
 	};
+	const listGridColumns = "minmax(220px, 1fr) 80px 120px 40px";
 
 	return (
 		<>
-			<div style={{ display: "flex", gap: 16, minHeight: 400 }}>
-			<div style={{ flex: 1 }}>
-				<div
-					style={{
-						display: "flex",
-						gap: 8,
-						marginBottom: 12,
-						alignItems: "center",
-					}}
-				>
-					<div style={{ position: "relative", flex: 1 }}>
-						<Search
-							className="w-4 h-4"
+			<div className="flex min-h-[400px] flex-col gap-4 lg:flex-row">
+				<div className="min-w-0 flex-1">
+					<div
+						className="mb-3 flex flex-wrap items-center gap-2"
+						style={{
+							alignItems: "center",
+						}}
+					>
+						<div className="relative min-w-[220px] flex-1 basis-full sm:basis-auto">
+							<Search
+								className="w-4 h-4"
+								style={{
+									position: "absolute",
+									left: 10,
+									top: 10,
+									color: palette.primary,
+								}}
+							/>
+							<input
+								value={search}
+								onChange={(e) => setSearch(e.target.value)}
+								placeholder="Search files..."
+								style={{
+									width: "100%",
+									padding: "8px 12px 8px 34px",
+									background: hexToRgba(palette.background, 0.6),
+									border: `1px solid ${hexToRgba(palette.primary, 0.25)}`,
+									borderRadius: 8,
+									color: palette.text,
+									outline: "none",
+									fontSize: 14,
+								}}
+							/>
+						</div>
+						<button
+							onClick={() => fileInputRef.current?.click()}
 							style={{
-								position: "absolute",
-								left: 10,
-								top: 10,
-								color: palette.primary,
-							}}
-						/>
-						<input
-							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-							placeholder="Search files..."
-							style={{
-								width: "100%",
-								padding: "8px 12px 8px 34px",
-								background: hexToRgba(palette.background, 0.6),
-								border: `1px solid ${hexToRgba(palette.primary, 0.25)}`,
+								display: "flex",
+								alignItems: "center",
+								gap: 6,
+								padding: "8px 14px",
+								background: hexToRgba(palette.primary, 0.15),
+								border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
 								borderRadius: 8,
 								color: palette.text,
-								outline: "none",
+								cursor: "pointer",
 								fontSize: 14,
 							}}
+						>
+							<Upload className="w-4 h-4" /> Upload
+						</button>
+						<input
+							ref={fileInputRef}
+							type="file"
+							multiple
+							className="hidden"
+							onChange={(e) => handleUpload(e.target.files)}
 						/>
-					</div>
-					<button
-						onClick={() => fileInputRef.current?.click()}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 6,
-							padding: "8px 14px",
-							background: hexToRgba(palette.primary, 0.15),
-							border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
-							borderRadius: 8,
-							color: palette.text,
-							cursor: "pointer",
-							fontSize: 14,
-						}}
-					>
-						<Upload className="w-4 h-4" /> Upload
-					</button>
-					<input
-						ref={fileInputRef}
-						type="file"
-						multiple
-						className="hidden"
-						onChange={(e) => handleUpload(e.target.files)}
-					/>
-					<button
-						onClick={() => refresh()}
-						disabled={loading}
-						style={{
-							padding: 8,
-							background: hexToRgba(palette.primary, 0.1),
-							border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-							borderRadius: 8,
-							color: palette.text,
-							cursor: "pointer",
-						}}
-					>
-						<RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-					</button>
-				</div>
-
-				<div
-					style={{
-						display: "flex",
-						gap: 4,
-						marginBottom: 12,
-						alignItems: "center",
-						flexWrap: "wrap",
-					}}
-				>
-					<button
-						onClick={() => {
-							setCurrentPath("");
-							setSelected(null);
-						}}
-						style={{
-							padding: "2px 8px",
-							borderRadius: 4,
-							cursor: "pointer",
-							background: hexToRgba(palette.primary, 0.1),
-							border: "none",
-							color: palette.primary,
-							fontSize: 13,
-						}}
-					>
-						root
-					</button>
-					{pathSegments.map((seg, i) => (
-						<span
-							key={i}
-							style={{ display: "flex", alignItems: "center", gap: 2 }}
+						<button
+							onClick={() => refresh()}
+							disabled={loading}
+							style={{
+								padding: 8,
+								background: hexToRgba(palette.primary, 0.1),
+								border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
+								borderRadius: 8,
+								color: palette.text,
+								cursor: "pointer",
+							}}
 						>
-							<ChevronRight
-								className="w-3 h-3"
-								style={{ color: palette.textMuted }}
+							<RefreshCw
+								className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
 							/>
-							<button
-								onClick={() => navigateTo(i)}
-								style={{
-									padding: "2px 8px",
-									borderRadius: 4,
-									cursor: "pointer",
-									background: hexToRgba(palette.primary, 0.1),
-									border: "none",
-									color: palette.primary,
-									fontSize: 13,
-								}}
-							>
-								{seg}
-							</button>
-						</span>
-					))}
-				</div>
+						</button>
+					</div>
 
-				<div
-					onDragOver={(e) => {
-						e.preventDefault();
-						setDragging(true);
-					}}
-					onDragLeave={() => setDragging(false)}
-					onDrop={handleDrop}
-					style={{
-						border: `2px dashed ${dragging ? palette.primary : hexToRgba(palette.primary, 0.15)}`,
-						borderRadius: 10,
-						transition: "border-color 0.2s",
-						background: dragging
-							? hexToRgba(palette.primary, 0.05)
-							: "transparent",
-					}}
-				>
 					<div
+						className="mb-3 flex flex-wrap items-center gap-1 overflow-x-auto"
 						style={{
-							display: "grid",
-							gridTemplateColumns: "1fr 80px 120px 40px",
-							padding: "8px 16px",
-							fontSize: 12,
-							fontWeight: 600,
-							color: palette.textMuted,
-							borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
+							alignItems: "center",
 						}}
 					>
 						<button
-							onClick={() => toggleSort("name")}
+							onClick={() => {
+								setCurrentPath("");
+								setSelected(null);
+							}}
 							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 4,
-								background: "none",
+								padding: "2px 8px",
+								borderRadius: 4,
+								cursor: "pointer",
+								background: hexToRgba(palette.primary, 0.1),
 								border: "none",
-								color: palette.textMuted,
-								cursor: "pointer",
-								padding: 0,
-								fontSize: 12,
-								fontWeight: 600,
+								color: palette.primary,
+								fontSize: 13,
 							}}
 						>
-							Name <SortIcon col="name" />
+							root
 						</button>
-						<button
-							onClick={() => toggleSort("size")}
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 4,
-								background: "none",
-								border: "none",
-								color: palette.textMuted,
-								cursor: "pointer",
-								padding: 0,
-								fontSize: 12,
-								fontWeight: 600,
-							}}
-						>
-							Size <SortIcon col="size" />
-						</button>
-						<button
-							onClick={() => toggleSort("created_at")}
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 4,
-								background: "none",
-								border: "none",
-								color: palette.textMuted,
-								cursor: "pointer",
-								padding: 0,
-								fontSize: 12,
-								fontWeight: 600,
-							}}
-						>
-							Date <SortIcon col="created_at" />
-						</button>
-						<span />
-					</div>
-
-					{error && (
-						<div style={{ padding: 12, color: palette.accent, fontSize: 13 }}>
-							{error}
-						</div>
-					)}
-
-					{loading && !files.length && (
-						<div
-							style={{
-								padding: 32,
-								textAlign: "center",
-								color: palette.textMuted,
-							}}
-						>
-							Loading...
-						</div>
-					)}
-
-					{!loading && filtered.length === 0 && (
-						<div
-							style={{
-								padding: 32,
-								textAlign: "center",
-								color: palette.textMuted,
-								fontSize: 14,
-							}}
-						>
-							{search
-								? "No files match your search"
-								: "Drop files here or click Upload"}
-						</div>
-					)}
-
-					{filtered.map((file) => (
-						<div
-							key={file.id || file.name}
-							onClick={() => handleFileClick(file)}
-							style={{
-								display: "grid",
-								gridTemplateColumns: "1fr 80px 120px 40px",
-								alignItems: "center",
-								padding: "10px 16px",
-								cursor: "pointer",
-								background:
-									selected?.name === file.name
-										? hexToRgba(palette.primary, 0.08)
-										: "transparent",
-								borderBottom: `1px solid ${hexToRgba(palette.primary, 0.05)}`,
-								transition: "background 0.15s",
-							}}
-							onMouseEnter={(e) => {
-								e.currentTarget.style.background = hexToRgba(
-									palette.primary,
-									0.06,
-								);
-							}}
-							onMouseLeave={(e) => {
-								e.currentTarget.style.background =
-									selected?.name === file.name
-										? hexToRgba(palette.primary, 0.08)
-										: "transparent";
-							}}
-						>
-							<div
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 10,
-									color: palette.text,
-									overflow: "hidden",
-								}}
+						{pathSegments.map((seg, i) => (
+							<span
+								key={i}
+								style={{ display: "flex", alignItems: "center", gap: 2 }}
 							>
-								<span style={{ color: palette.primary, flexShrink: 0 }}>
-									{getFileIcon(file.type)}
-								</span>
-								<span
+								<ChevronRight
+									className="w-3 h-3"
+									style={{ color: palette.textMuted }}
+								/>
+								<button
+									onClick={() => navigateTo(i)}
 									style={{
-										fontSize: 14,
-										whiteSpace: "nowrap",
-										overflow: "hidden",
-										textOverflow: "ellipsis",
+										padding: "2px 8px",
+										borderRadius: 4,
+										cursor: "pointer",
+										background: hexToRgba(palette.primary, 0.1),
+										border: "none",
+										color: palette.primary,
+										fontSize: 13,
 									}}
 								>
-									{file.name}
-								</span>
-							</div>
-							<span style={{ fontSize: 13, color: palette.textMuted }}>
-								{file.size ? formatSize(file.size) : "--"}
+									{seg}
+								</button>
 							</span>
-							<span style={{ fontSize: 13, color: palette.textMuted }}>
-								{file.created_at
-									? new Date(file.created_at).toLocaleDateString()
-									: "--"}
-							</span>
+						))}
+					</div>
+
+					<div
+						onDragOver={(e) => {
+							e.preventDefault();
+							setDragging(true);
+						}}
+						onDragLeave={() => setDragging(false)}
+						onDrop={handleDrop}
+						style={{
+							border: `2px dashed ${dragging ? palette.primary : hexToRgba(palette.primary, 0.15)}`,
+							borderRadius: 10,
+							transition: "border-color 0.2s",
+							background: dragging
+								? hexToRgba(palette.primary, 0.05)
+								: "transparent",
+							overflowX: "auto",
+						}}
+					>
+						<div style={{ minWidth: 520 }}>
+							<div
+								style={{
+									display: "grid",
+									gridTemplateColumns: listGridColumns,
+									padding: "8px 16px",
+									fontSize: 12,
+									fontWeight: 600,
+									color: palette.textMuted,
+									borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
+								}}
+							>
 								<button
-									onClick={(e) => {
-										e.stopPropagation();
-										requestDelete(file);
+									onClick={() => toggleSort("name")}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 4,
+										background: "none",
+										border: "none",
+										color: palette.textMuted,
+										cursor: "pointer",
+										padding: 0,
+										fontSize: 12,
+										fontWeight: 600,
 									}}
+								>
+									Name <SortIcon col="name" />
+								</button>
+								<button
+									onClick={() => toggleSort("size")}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 4,
+										background: "none",
+										border: "none",
+										color: palette.textMuted,
+										cursor: "pointer",
+										padding: 0,
+										fontSize: 12,
+										fontWeight: 600,
+									}}
+								>
+									Size <SortIcon col="size" />
+								</button>
+								<button
+									onClick={() => toggleSort("created_at")}
+									style={{
+										display: "flex",
+										alignItems: "center",
+										gap: 4,
+										background: "none",
+										border: "none",
+										color: palette.textMuted,
+										cursor: "pointer",
+										padding: 0,
+										fontSize: 12,
+										fontWeight: 600,
+									}}
+								>
+									Date <SortIcon col="created_at" />
+								</button>
+								<span />
+							</div>
+							{error && (
+								<div
+									style={{ padding: 12, color: palette.accent, fontSize: 13 }}
+								>
+									{error}
+								</div>
+							)}
+
+							{loading && !files.length && (
+								<div
+									style={{
+										padding: 32,
+										textAlign: "center",
+										color: palette.textMuted,
+									}}
+								>
+									Loading...
+								</div>
+							)}
+
+							{!loading && filtered.length === 0 && (
+								<div
+									style={{
+										padding: 32,
+										textAlign: "center",
+										color: palette.textMuted,
+										fontSize: 14,
+									}}
+								>
+									{search
+										? "No files match your search"
+										: "Drop files here or click Upload"}
+								</div>
+							)}
+
+							{filtered.map((file) => (
+								<div
+									key={file.id || file.name}
+									onClick={() => handleFileClick(file)}
+									style={{
+										display: "grid",
+										gridTemplateColumns: listGridColumns,
+										alignItems: "center",
+										padding: "10px 16px",
+										cursor: "pointer",
+										background:
+											selected?.name === file.name
+												? hexToRgba(palette.primary, 0.08)
+												: "transparent",
+										borderBottom: `1px solid ${hexToRgba(palette.primary, 0.05)}`,
+										transition: "background 0.15s",
+									}}
+									onMouseEnter={(e) => {
+										e.currentTarget.style.background = hexToRgba(
+											palette.primary,
+											0.06,
+										);
+									}}
+									onMouseLeave={(e) => {
+										e.currentTarget.style.background =
+											selected?.name === file.name
+												? hexToRgba(palette.primary, 0.08)
+												: "transparent";
+									}}
+								>
+									<div
+										style={{
+											display: "flex",
+											alignItems: "center",
+											gap: 10,
+											color: palette.text,
+											overflow: "hidden",
+										}}
+									>
+										<span style={{ color: palette.primary, flexShrink: 0 }}>
+											{getFileIcon(file.type)}
+										</span>
+										<span
+											style={{
+												fontSize: 14,
+												whiteSpace: "nowrap",
+												overflow: "hidden",
+												textOverflow: "ellipsis",
+											}}
+										>
+											{file.name}
+										</span>
+									</div>
+									<span style={{ fontSize: 13, color: palette.textMuted }}>
+										{file.size ? formatSize(file.size) : "--"}
+									</span>
+									<span style={{ fontSize: 13, color: palette.textMuted }}>
+										{file.created_at
+											? new Date(file.created_at).toLocaleDateString()
+											: "--"}
+									</span>
+									<button
+										onClick={(e) => {
+											e.stopPropagation();
+											requestDelete(file);
+										}}
+										style={{
+											background: "none",
+											border: "none",
+											cursor: "pointer",
+											padding: 4,
+											color: palette.textMuted,
+										}}
+									>
+										<Trash2 className="w-4 h-4" />
+									</button>
+								</div>
+							))}
+						</div>
+					</div>
+				</div>
+
+				{selected && (
+					<div
+						className="w-full lg:w-[260px] lg:shrink-0"
+						style={{
+							padding: 16,
+							borderRadius: 10,
+							background: hexToRgba(palette.surface, 0.6),
+							border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
+						}}
+					>
+						<div
+							style={{
+								display: "flex",
+								justifyContent: "space-between",
+								alignItems: "center",
+								marginBottom: 16,
+							}}
+						>
+							<span
+								style={{ fontWeight: 600, fontSize: 14, color: palette.text }}
+							>
+								Details
+							</span>
+							<button
+								onClick={() => setSelected(null)}
 								style={{
 									background: "none",
 									border: "none",
 									cursor: "pointer",
-									padding: 4,
 									color: palette.textMuted,
 								}}
 							>
-								<Trash2 className="w-4 h-4" />
+								<X className="w-4 h-4" />
 							</button>
 						</div>
-					))}
-				</div>
-			</div>
-
-			{selected && (
-				<div
-					style={{
-						width: 260,
-						flexShrink: 0,
-						padding: 16,
-						borderRadius: 10,
-						background: hexToRgba(palette.surface, 0.6),
-						border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-					}}
-				>
-					<div
-						style={{
-							display: "flex",
-							justifyContent: "space-between",
-							alignItems: "center",
-							marginBottom: 16,
-						}}
-					>
-						<span
-							style={{ fontWeight: 600, fontSize: 14, color: palette.text }}
-						>
-							Details
-						</span>
-						<button
-							onClick={() => setSelected(null)}
+						<div
 							style={{
-								background: "none",
-								border: "none",
-								cursor: "pointer",
-								color: palette.textMuted,
-							}}
-						>
-							<X className="w-4 h-4" />
-						</button>
-					</div>
-					<div
-						style={{
-							display: "flex",
-							justifyContent: "center",
-							marginBottom: 16,
-							color: palette.primary,
-						}}
-					>
-						{getFileIcon(selected.type)}
-					</div>
-					{[
-						["Name", selected.name],
-						["Type", selected.type || "Unknown"],
-						["Size", selected.size ? formatSize(selected.size) : "--"],
-						[
-							"Created",
-							selected.created_at
-								? new Date(selected.created_at).toLocaleString()
-								: "--",
-						],
-						[
-							"Updated",
-							selected.updated_at
-								? new Date(selected.updated_at).toLocaleString()
-								: "--",
-						],
-					].map(([label, value]) => (
-						<div key={label} style={{ marginBottom: 10 }}>
-							<div
-								style={{
-									fontSize: 11,
-									color: palette.textMuted,
-									marginBottom: 2,
-								}}
-							>
-								{label}
-							</div>
-							<div
-								style={{
-									fontSize: 13,
-									color: palette.text,
-									wordBreak: "break-all",
-								}}
-							>
-								{value}
-							</div>
-						</div>
-					))}
-					<div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-						<button
-							onClick={() => handleDownload(selected)}
-							style={{
-								flex: 1,
 								display: "flex",
-								alignItems: "center",
 								justifyContent: "center",
-								gap: 4,
-								padding: "8px 0",
-								borderRadius: 6,
-								fontSize: 13,
-								cursor: "pointer",
-								background: hexToRgba(palette.primary, 0.15),
-								border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
-								color: palette.text,
+								marginBottom: 16,
+								color: palette.primary,
 							}}
 						>
-							<Download className="w-3.5 h-3.5" /> Download
-						</button>
+							{getFileIcon(selected.type)}
+						</div>
+						{[
+							["Name", selected.name],
+							["Type", selected.type || "Unknown"],
+							["Size", selected.size ? formatSize(selected.size) : "--"],
+							[
+								"Created",
+								selected.created_at
+									? new Date(selected.created_at).toLocaleString()
+									: "--",
+							],
+							[
+								"Updated",
+								selected.updated_at
+									? new Date(selected.updated_at).toLocaleString()
+									: "--",
+							],
+						].map(([label, value]) => (
+							<div key={label} style={{ marginBottom: 10 }}>
+								<div
+									style={{
+										fontSize: 11,
+										color: palette.textMuted,
+										marginBottom: 2,
+									}}
+								>
+									{label}
+								</div>
+								<div
+									style={{
+										fontSize: 13,
+										color: palette.text,
+										wordBreak: "break-all",
+									}}
+								>
+									{value}
+								</div>
+							</div>
+						))}
+						<div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+							<button
+								onClick={() => handleDownload(selected)}
+								style={{
+									flex: 1,
+									display: "flex",
+									alignItems: "center",
+									justifyContent: "center",
+									gap: 4,
+									padding: "8px 0",
+									borderRadius: 6,
+									fontSize: 13,
+									cursor: "pointer",
+									background: hexToRgba(palette.primary, 0.15),
+									border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
+									color: palette.text,
+								}}
+							>
+								<Download className="w-3.5 h-3.5" /> Download
+							</button>
 							<button
 								onClick={() => requestDelete(selected)}
 								style={{
-								padding: "8px 12px",
-								borderRadius: 6,
-								cursor: "pointer",
-								background: hexToRgba(palette.accent, 0.15),
-								border: `1px solid ${hexToRgba(palette.accent, 0.3)}`,
-								color: palette.accent,
-							}}
-						>
-							<Trash2 className="w-3.5 h-3.5" />
-						</button>
+									padding: "8px 12px",
+									borderRadius: 6,
+									cursor: "pointer",
+									background: hexToRgba(palette.accent, 0.15),
+									border: `1px solid ${hexToRgba(palette.accent, 0.3)}`,
+									color: palette.accent,
+								}}
+							>
+								<Trash2 className="w-3.5 h-3.5" />
+							</button>
+						</div>
 					</div>
-				</div>
-			)}
+				)}
 			</div>
 			<Dialog
 				open={Boolean(pendingDelete)}

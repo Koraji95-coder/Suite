@@ -38,9 +38,8 @@ export function BlockLibrary() {
 	const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 	const [showUploadModal, setShowUploadModal] = useState(false);
 	const [selectedBlock, setSelectedBlock] = useState<BlockFile | null>(null);
-	const [pendingDeleteBlock, setPendingDeleteBlock] = useState<BlockFile | null>(
-		null,
-	);
+	const [pendingDeleteBlock, setPendingDeleteBlock] =
+		useState<BlockFile | null>(null);
 	const [uploadForm, setUploadForm] = useState({
 		name: "",
 		category: "electrical",
@@ -379,10 +378,10 @@ export function BlockLibrary() {
 														>
 															<Star className="w-4 h-4" />
 														</button>
-															<button
-																onClick={() => setPendingDeleteBlock(block)}
-																className="rounded-lg border p-2 transition hover:[background:color-mix(in_srgb,var(--danger)_28%,transparent)] [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_18%,transparent)] [color:var(--danger)]"
-																title="Delete"
+														<button
+															onClick={() => setPendingDeleteBlock(block)}
+															className="rounded-lg border p-2 transition hover:[background:color-mix(in_srgb,var(--danger)_28%,transparent)] [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_18%,transparent)] [color:var(--danger)]"
+															title="Delete"
 														>
 															<Trash2 className="w-4 h-4" />
 														</button>
@@ -434,118 +433,119 @@ export function BlockLibrary() {
 				</div>
 			)}
 
-			{showUploadModal && (
-				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.62)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
-					<div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg-heavy)] p-6 backdrop-blur-xl">
-						<h3 className="mb-4 text-2xl font-bold [color:var(--text)]">
-							Upload Block
-						</h3>
-						<form onSubmit={handleFileUpload} className="space-y-4">
-							<div>
-								<label className="mb-2 block text-sm font-medium [color:var(--text-muted)]">
-									Block Name *
-								</label>
-								<input
-									type="text"
-									value={uploadForm.name}
-									onChange={(e) =>
-										setUploadForm({ ...uploadForm, name: e.target.value })
-									}
-									required
-									className={inputClass}
-									placeholder="e.g., Transformer-3Phase"
-								/>
-							</div>
+			<Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
+				<DialogContent className="max-h-[92vh] max-w-md overflow-y-auto border-[var(--border)] bg-[var(--bg-heavy)]">
+					<h3 className="mb-4 text-2xl font-bold [color:var(--text)]">
+						Upload Block
+					</h3>
+					<form onSubmit={handleFileUpload} className="space-y-4">
+						<div>
+							<label className="mb-2 block text-sm font-medium [color:var(--text-muted)]">
+								Block Name *
+							</label>
+							<input
+								type="text"
+								value={uploadForm.name}
+								onChange={(e) =>
+									setUploadForm({ ...uploadForm, name: e.target.value })
+								}
+								required
+								className={inputClass}
+								placeholder="e.g., Transformer-3Phase"
+							/>
+						</div>
 
-							<div>
-								<label className="mb-2 block text-sm font-medium [color:var(--text-muted)]">
-									Category *
-								</label>
-								<select
-									value={uploadForm.category}
-									onChange={(e) =>
-										setUploadForm({ ...uploadForm, category: e.target.value })
-									}
-									className={inputClass}
-								>
-									<option value="electrical">Electrical</option>
-									<option value="mechanical">Mechanical</option>
-									<option value="structural">Structural</option>
-									<option value="instrumentation">Instrumentation</option>
-									<option value="symbols">Symbols</option>
-									<option value="other">Other</option>
-								</select>
-							</div>
+						<div>
+							<label className="mb-2 block text-sm font-medium [color:var(--text-muted)]">
+								Category *
+							</label>
+							<select
+								value={uploadForm.category}
+								onChange={(e) =>
+									setUploadForm({ ...uploadForm, category: e.target.value })
+								}
+								className={inputClass}
+							>
+								<option value="electrical">Electrical</option>
+								<option value="mechanical">Mechanical</option>
+								<option value="structural">Structural</option>
+								<option value="instrumentation">Instrumentation</option>
+								<option value="symbols">Symbols</option>
+								<option value="other">Other</option>
+							</select>
+						</div>
 
-							<div>
-								<label className="mb-2 block text-sm font-medium [color:var(--text-muted)]">
-									Tags (comma separated)
-								</label>
-								<input
-									type="text"
-									value={uploadForm.tags}
-									onChange={(e) =>
-										setUploadForm({ ...uploadForm, tags: e.target.value })
-									}
-									className={inputClass}
-									placeholder="e.g., transformer, 3phase, 480v"
-								/>
-							</div>
+						<div>
+							<label className="mb-2 block text-sm font-medium [color:var(--text-muted)]">
+								Tags (comma separated)
+							</label>
+							<input
+								type="text"
+								value={uploadForm.tags}
+								onChange={(e) =>
+									setUploadForm({ ...uploadForm, tags: e.target.value })
+								}
+								className={inputClass}
+								placeholder="e.g., transformer, 3phase, 480v"
+							/>
+						</div>
 
-							<div className="flex items-center space-x-2">
-								<input
-									type="checkbox"
-									id="is_dynamic"
-									checked={uploadForm.is_dynamic}
-									onChange={(e) =>
-										setUploadForm({
-											...uploadForm,
-											is_dynamic: e.target.checked,
-										})
-									}
-									className="h-4 w-4 rounded border [border-color:var(--border)] [background:var(--surface)]"
-								/>
-								<label
-									htmlFor="is_dynamic"
-									className="text-sm [color:var(--text-muted)]"
-								>
-									Dynamic Block (with variations)
-								</label>
-							</div>
+						<div className="flex items-center space-x-2">
+							<input
+								type="checkbox"
+								id="is_dynamic"
+								checked={uploadForm.is_dynamic}
+								onChange={(e) =>
+									setUploadForm({
+										...uploadForm,
+										is_dynamic: e.target.checked,
+									})
+								}
+								className="h-4 w-4 rounded border [border-color:var(--border)] [background:var(--surface)]"
+							/>
+							<label
+								htmlFor="is_dynamic"
+								className="text-sm [color:var(--text-muted)]"
+							>
+								Dynamic Block (with variations)
+							</label>
+						</div>
 
-							<div className="flex gap-3 mt-6">
-								<button
-									type="submit"
-									disabled={isUploading}
-									className={`flex-1 ${primaryButtonClass}`}
-								>
-									{isUploading ? "Uploading..." : "Upload Block"}
-								</button>
-								<button
-									type="button"
-									disabled={isUploading}
-									onClick={() => {
-										setShowUploadModal(false);
-										setUploadForm({
-											name: "",
-											category: "electrical",
-											tags: "",
-											is_dynamic: false,
-										});
-									}}
-									className={secondaryButtonClass}
-								>
-									Cancel
-								</button>
-							</div>
-						</form>
-					</div>
-				</div>
-			)}
+						<div className="flex gap-3 mt-6">
+							<button
+								type="submit"
+								disabled={isUploading}
+								className={`flex-1 ${primaryButtonClass}`}
+							>
+								{isUploading ? "Uploading..." : "Upload Block"}
+							</button>
+							<button
+								type="button"
+								disabled={isUploading}
+								onClick={() => {
+									setShowUploadModal(false);
+									setUploadForm({
+										name: "",
+										category: "electrical",
+										tags: "",
+										is_dynamic: false,
+									});
+								}}
+								className={secondaryButtonClass}
+							>
+								Cancel
+							</button>
+						</div>
+					</form>
+				</DialogContent>
+			</Dialog>
 
-				{selectedBlock && (
-				<div className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-dialog)" }}>
-					<div className="max-h-[92vh] w-full max-w-4xl overflow-auto rounded-lg border border-[var(--border)] bg-[var(--bg-heavy)] backdrop-blur-xl">
+			{selectedBlock && (
+				<Dialog
+					open={Boolean(selectedBlock)}
+					onOpenChange={(open) => !open && setSelectedBlock(null)}
+				>
+					<DialogContent className="max-h-[92vh] max-w-4xl overflow-auto border-[var(--border)] bg-[var(--bg-heavy)] p-0">
 						<div className="sticky top-0 z-10 flex items-center justify-between border-b p-6 backdrop-blur-sm [border-color:var(--border)] [background:color-mix(in_srgb,var(--bg-base)_95%,transparent)]">
 							<div>
 								<h3 className="text-2xl font-bold [color:var(--text)]">
@@ -569,7 +569,7 @@ export function BlockLibrary() {
 
 						<div className="p-6 space-y-6">
 							<div className="aspect-video flex items-center justify-center rounded-lg border [border-color:var(--border)] [background:var(--surface-2)]">
-								{selectedBlock.thumbnail_url ? (
+								{selectedBlock?.thumbnail_url ? (
 									<img
 										src={selectedBlock.thumbnail_url}
 										alt={selectedBlock.name}
@@ -585,7 +585,7 @@ export function BlockLibrary() {
 								)}
 							</div>
 
-							{selectedBlock.tags.length > 0 && (
+							{selectedBlock?.tags.length > 0 && (
 								<div>
 									<h4 className="mb-3 text-lg font-bold [color:var(--text)]">
 										Tags
@@ -604,7 +604,7 @@ export function BlockLibrary() {
 								</div>
 							)}
 
-							{selectedBlock.is_dynamic && (
+							{selectedBlock?.is_dynamic && (
 								<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]">
 									<h4 className="mb-2 text-lg font-bold [color:var(--text)]">
 										Dynamic Block
@@ -622,50 +622,50 @@ export function BlockLibrary() {
 									<span>Download</span>
 								</button>
 								<button
-									onClick={() => toggleFavorite(selectedBlock)}
+									onClick={() => selectedBlock && toggleFavorite(selectedBlock)}
 									className={`px-6 py-3 border rounded-lg transition-all flex items-center space-x-2 ${
-										selectedBlock.is_favorite
+										selectedBlock?.is_favorite
 											? "[background:color-mix(in_srgb,var(--warning)_30%,var(--surface))] [border-color:color-mix(in_srgb,var(--warning)_50%,transparent)] [color:var(--warning)]"
 											: "[background:var(--surface-2)] [border-color:var(--border)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--warning)_20%,var(--surface))]"
 									}`}
 								>
 									<Star className="w-5 h-5" />
 									<span>
-										{selectedBlock.is_favorite ? "Favorited" : "Favorite"}
+										{selectedBlock?.is_favorite ? "Favorited" : "Favorite"}
 									</span>
 								</button>
 							</div>
 						</div>
-					</div>
-					</div>
-				)}
-				<Dialog
-					open={Boolean(pendingDeleteBlock)}
-					onOpenChange={(open) => !open && setPendingDeleteBlock(null)}
-				>
-					<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
-						<DialogHeader>
-							<DialogTitle>Delete block?</DialogTitle>
-						</DialogHeader>
-						<p className="text-sm text-[var(--text-muted)]">
-							Delete "{pendingDeleteBlock?.name ?? "this block"}"?
-						</p>
-						<DialogFooter className="mt-4 gap-2 sm:justify-end">
-							<button
-								onClick={() => setPendingDeleteBlock(null)}
-								className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-							>
-								Cancel
-							</button>
-							<button
-								onClick={() => void confirmDeleteBlock()}
-								className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
-							>
-								Delete
-							</button>
-						</DialogFooter>
 					</DialogContent>
 				</Dialog>
-			</div>
-		);
-	}
+			)}
+			<Dialog
+				open={Boolean(pendingDeleteBlock)}
+				onOpenChange={(open) => !open && setPendingDeleteBlock(null)}
+			>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Delete block?</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						Delete "{pendingDeleteBlock?.name ?? "this block"}"?
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setPendingDeleteBlock(null)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={() => void confirmDeleteBlock()}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						>
+							Delete
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</div>
+	);
+}

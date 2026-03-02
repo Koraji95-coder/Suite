@@ -233,11 +233,10 @@ export function DatabaseBrowser() {
 					</button>
 				</div>
 			)}
-			<div style={{ display: "flex", gap: 16, flex: 1 }}>
+			<div className="flex flex-1 flex-col gap-4 xl:flex-row">
 				<div
+					className="w-full xl:w-[220px] xl:shrink-0"
 					style={{
-						width: 220,
-						flexShrink: 0,
 						padding: 12,
 						borderRadius: 10,
 						background: hexToRgba(palette.surface, 0.5),
@@ -319,7 +318,7 @@ export function DatabaseBrowser() {
 					)}
 				</div>
 
-				<div style={{ flex: 1, minWidth: 0 }}>
+				<div className="min-w-0 flex-1">
 					{!selectedTable ? (
 						<div
 							style={{
@@ -340,11 +339,9 @@ export function DatabaseBrowser() {
 					) : (
 						<>
 							<div
+								className="mb-3 flex flex-wrap items-center gap-2"
 								style={{
-									display: "flex",
-									gap: 8,
 									alignItems: "center",
-									marginBottom: 12,
 								}}
 							>
 								<span
@@ -355,7 +352,7 @@ export function DatabaseBrowser() {
 								<span style={{ fontSize: 12, color: palette.textMuted }}>
 									{loadingData ? "Loading..." : `${totalCount} rows`}
 								</span>
-								<div style={{ flex: 1 }} />
+								<div className="hidden sm:block sm:flex-1" />
 								<select
 									value={pageSize}
 									onChange={(e) => {
@@ -414,6 +411,7 @@ export function DatabaseBrowser() {
 												fontSize: 11,
 												color: palette.textMuted,
 											}}
+											className="hidden sm:block"
 										>
 											{filtered.length} of {rows.length}
 										</span>
@@ -541,11 +539,9 @@ export function DatabaseBrowser() {
 
 							{totalCount > pageSize && (
 								<div
+									className="mt-3 flex flex-wrap items-center justify-between gap-2"
 									style={{
-										display: "flex",
-										justifyContent: "space-between",
 										alignItems: "center",
-										marginTop: 12,
 									}}
 								>
 									<span style={{ fontSize: 12, color: palette.textMuted }}>
@@ -554,7 +550,8 @@ export function DatabaseBrowser() {
 										{totalCount}
 									</span>
 									<div
-										style={{ display: "flex", gap: 8, alignItems: "center" }}
+										className="flex items-center gap-2"
+										style={{ alignItems: "center" }}
 									>
 										<button
 											disabled={page === 0}

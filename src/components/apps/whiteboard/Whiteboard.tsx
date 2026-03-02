@@ -183,76 +183,77 @@ export function Whiteboard({
 	if (!isOpen) return null;
 
 	return (
-		<div
-			className="fixed inset-0 flex items-center justify-center bg-[color:rgb(10_10_10_/_0.72)] p-4 backdrop-blur-sm"
-			style={{ zIndex: "var(--z-dialog)" }}
-		>
-			<div className="flex h-full max-h-[90vh] w-full max-w-7xl flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] backdrop-blur-xl">
-				<div className="flex items-center justify-between border-b border-[var(--border)] p-4">
-					<div className="flex items-center space-x-3">
-						<Pen className="h-6 w-6 text-[var(--accent)]" />
-						<h3 className="text-2xl font-bold text-[var(--text)]">
-							Whiteboard - {panelContext}
-						</h3>
-					</div>
-					<div className="flex items-center space-x-2">
-						<button
-							onClick={() => setShowSaveDialog(true)}
-							className="flex items-center space-x-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] transition-all hover:bg-[var(--surface)]"
-						>
-							<Save className="w-4 h-4" />
-							<span>{isSaving ? "Saving..." : "Save"}</span>
-						</button>
-						<button
-							onClick={exportAsImage}
-							className="flex items-center space-x-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] transition-all hover:bg-[var(--surface)]"
-						>
-							<Download className="w-4 h-4" />
-							<span>Export</span>
-						</button>
-						<button
-							onClick={onClose}
-							className="p-2 hover:[background:color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg transition-all"
-						>
-							<X className="w-5 h-5 [color:var(--danger)]" />
-						</button>
-					</div>
-				</div>
+		<>
+			<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+				<DialogContent className="max-h-[90vh] max-w-7xl border-[var(--border)] bg-[var(--surface)] p-0">
+					<div className="flex h-full w-full flex-col overflow-hidden rounded-lg backdrop-blur-xl">
+						<div className="flex items-center justify-between border-b border-[var(--border)] p-4">
+							<div className="flex items-center space-x-3">
+								<Pen className="h-6 w-6 text-[var(--accent)]" />
+								<h3 className="text-2xl font-bold text-[var(--text)]">
+									Whiteboard - {panelContext}
+								</h3>
+							</div>
+							<div className="flex items-center space-x-2">
+								<button
+									onClick={() => setShowSaveDialog(true)}
+									className="flex items-center space-x-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] transition-all hover:bg-[var(--surface)]"
+								>
+									<Save className="w-4 h-4" />
+									<span>{isSaving ? "Saving..." : "Save"}</span>
+								</button>
+								<button
+									onClick={exportAsImage}
+									className="flex items-center space-x-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] transition-all hover:bg-[var(--surface)]"
+								>
+									<Download className="w-4 h-4" />
+									<span>Export</span>
+								</button>
+								<button
+									onClick={onClose}
+									className="rounded-lg p-2 transition-all hover:[background:color-mix(in_srgb,var(--danger)_20%,transparent)]"
+								>
+									<X className="w-5 h-5 [color:var(--danger)]" />
+								</button>
+							</div>
+						</div>
 
-				<div className="flex flex-1 overflow-hidden">
-					<WhiteboardToolbar
-						tool={tool}
-						onToolChange={setTool}
-						color={color}
-						onColorChange={setColor}
-						lineWidth={lineWidth}
-						onLineWidthChange={setLineWidth}
-						onUndo={undo}
-						onRedo={redo}
-						onClear={clearCanvas}
-						canUndo={actions.length > 0}
-						canRedo={redoStack.length > 0}
-					/>
+						<div className="flex flex-1 overflow-hidden">
+							<WhiteboardToolbar
+								tool={tool}
+								onToolChange={setTool}
+								color={color}
+								onColorChange={setColor}
+								lineWidth={lineWidth}
+								onLineWidthChange={setLineWidth}
+								onUndo={undo}
+								onRedo={redo}
+								onClear={clearCanvas}
+								canUndo={actions.length > 0}
+								canRedo={redoStack.length > 0}
+							/>
 
-					<div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-						<WhiteboardCanvas
-							actions={actions}
-							onActionAdd={handleActionAdd}
-							tool={tool}
-							color={color}
-							lineWidth={lineWidth}
-							onTextRequest={handleTextRequest}
+							<div className="flex flex-1 items-center justify-center overflow-auto p-4">
+								<WhiteboardCanvas
+									actions={actions}
+									onActionAdd={handleActionAdd}
+									tool={tool}
+									color={color}
+									lineWidth={lineWidth}
+									onTextRequest={handleTextRequest}
+								/>
+							</div>
+						</div>
+
+						<WhiteboardSaveDialog
+							isOpen={showSaveDialog}
+							onClose={() => setShowSaveDialog(false)}
+							onSave={saveWhiteboard}
+							panelContext={panelContext}
 						/>
 					</div>
-				</div>
-
-				<WhiteboardSaveDialog
-					isOpen={showSaveDialog}
-					onClose={() => setShowSaveDialog(false)}
-					onSave={saveWhiteboard}
-					panelContext={panelContext}
-				/>
-			</div>
+				</DialogContent>
+			</Dialog>
 
 			<Dialog
 				open={showClearDialog}
@@ -323,6 +324,6 @@ export function Whiteboard({
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
-		</div>
+		</>
 	);
 }

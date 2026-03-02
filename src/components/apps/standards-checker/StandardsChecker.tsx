@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { GlassPanel } from "../ui/GlassPanel";
 import { QAQCChecker } from "./QAQCPanel";
 
 interface Standard {
@@ -102,14 +102,83 @@ const sampleStandards: Standard[] = [
 
 const categories = ["NEC", "IEEE", "IEC"] as const;
 
+const statusToneClasses: Record<
+	CheckResult["status"],
+	{
+		badge: string;
+		text: string;
+		icon: string;
+	}
+> = {
+	pass: {
+		badge:
+			"[background:color-mix(in_srgb,var(--success)_12%,transparent)] [border-color:color-mix(in_srgb,var(--success)_35%,transparent)]",
+		text: "[color:var(--success)]",
+		icon: "[color:var(--success)]",
+	},
+	warning: {
+		badge:
+			"[background:color-mix(in_srgb,var(--warning)_12%,transparent)] [border-color:color-mix(in_srgb,var(--warning)_35%,transparent)]",
+		text: "[color:var(--warning)]",
+		icon: "[color:var(--warning)]",
+	},
+	fail: {
+		badge:
+			"[background:color-mix(in_srgb,var(--danger)_12%,transparent)] [border-color:color-mix(in_srgb,var(--danger)_35%,transparent)]",
+		text: "[color:var(--danger)]",
+		icon: "[color:var(--danger)]",
+	},
+};
+
+function StatusIcon({ status }: { status: CheckResult["status"] }) {
+	if (status === "pass")
+		return <CheckCircle className="h-4 w-4 [color:var(--success)]" />;
+	if (status === "warning") {
+		return <AlertTriangle className="h-4 w-4 [color:var(--warning)]" />;
+	}
+	return <XCircle className="h-4 w-4 [color:var(--danger)]" />;
+}
+
+function ModeTabs({
+	mode,
+	onModeChange,
+}: {
+	mode: "standards" | "qaqc";
+	onModeChange: (mode: "standards" | "qaqc") => void;
+}) {
+	const baseTabClass =
+		"rounded-lg border px-3 py-1.5 text-xs font-semibold transition";
+
+	return (
+		<div className="flex gap-2">
+			<button
+				type="button"
+				onClick={() => onModeChange("standards")}
+				className={`${baseTabClass} ${
+					mode === "standards"
+						? "[border-color:color-mix(in_srgb,var(--primary)_40%,transparent)] [background:color-mix(in_srgb,var(--primary)_16%,transparent)] [color:var(--text)]"
+						: "[border-color:color-mix(in_srgb,var(--primary)_24%,transparent)] [background:color-mix(in_srgb,var(--surface-2)_70%,transparent)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--primary)_10%,transparent)]"
+				}`}
+			>
+				Standards
+			</button>
+			<button
+				type="button"
+				onClick={() => onModeChange("qaqc")}
+				className={`${baseTabClass} ${
+					mode === "qaqc"
+						? "[border-color:color-mix(in_srgb,var(--primary)_40%,transparent)] [background:color-mix(in_srgb,var(--primary)_16%,transparent)] [color:var(--text)]"
+						: "[border-color:color-mix(in_srgb,var(--primary)_24%,transparent)] [background:color-mix(in_srgb,var(--surface-2)_70%,transparent)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--primary)_10%,transparent)]"
+				}`}
+			>
+				QA/QC
+			</button>
+		</div>
+	);
+}
+
 export function StandardsChecker() {
-	const { palette } = useTheme();
 	const [mode, setMode] = useState<"standards" | "qaqc">("standards");
-	const statusTone = {
-		pass: palette.secondary,
-		fail: palette.accent,
-		warning: palette.tertiary,
-	} as const;
 	const [activeCategory, setActiveCategory] = useState<string>("NEC");
 	const [selectedStandards, setSelectedStandards] = useState<Set<string>>(
 		new Set(),
@@ -118,7 +187,7 @@ export function StandardsChecker() {
 	const [running, setRunning] = useState(false);
 
 	const filteredStandards = sampleStandards.filter(
-		(s) => s.category === activeCategory,
+		(standard) => standard.category === activeCategory,
 	);
 
 	const toggleStandard = (id: string) => {
@@ -139,85 +208,42 @@ export function StandardsChecker() {
 		setResults([]);
 
 		setTimeout(() => {
-			const newResults: CheckResult[] = [];
+			const nextResults: CheckResult[] = [];
 			selectedStandards.forEach((id) => {
-				const rand = Math.random();
-				let status: "pass" | "fail" | "warning";
+				const random = Math.random();
+				let status: CheckResult["status"];
 				let message: string;
-				if (rand < 0.5) {
+				if (random < 0.5) {
 					status = "pass";
 					message = "All criteria met. Design compliant.";
-				} else if (rand < 0.8) {
+				} else if (random < 0.8) {
 					status = "warning";
 					message = "Minor deviations detected. Review recommended.";
 				} else {
 					status = "fail";
 					message = "Non-compliance found. Corrective action required.";
 				}
-				newResults.push({ standardId: id, status, message });
+				nextResults.push({ standardId: id, status, message });
 			});
-			setResults(newResults);
+			setResults(nextResults);
 			setRunning(false);
 		}, 1500);
 	};
 
 	const getResultForStandard = (id: string) =>
-		results.find((r) => r.standardId === id);
+		results.find((result) => result.standardId === id);
 
-	const statusIcon = (status: "pass" | "fail" | "warning") => {
-		if (status === "pass")
-			return <CheckCircle size={16} color={statusTone.pass} />;
-		if (status === "fail") return <XCircle size={16} color={statusTone.fail} />;
-		return <AlertTriangle size={16} color={statusTone.warning} />;
-	};
-
-	const statusColor = (status: "pass" | "fail" | "warning") => {
-		if (status === "pass") return statusTone.pass;
-		if (status === "fail") return statusTone.fail;
-		return statusTone.warning;
-	};
+	const passCount = results.filter((result) => result.status === "pass").length;
+	const warningCount = results.filter(
+		(result) => result.status === "warning",
+	).length;
+	const failCount = results.filter((result) => result.status === "fail").length;
 
 	if (mode === "qaqc") {
 		return (
-			<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-				<div
-					style={{
-						display: "flex",
-						gap: 8,
-						padding: "0 24px",
-						marginTop: 12,
-					}}
-				>
-					<button
-						type="button"
-						onClick={() => setMode("standards")}
-						style={{
-							padding: "6px 12px",
-							borderRadius: 6,
-							border: `1px solid ${hexToRgba(palette.primary, 0.22)}`,
-							background: hexToRgba(palette.surfaceLight, 0.4),
-							color: palette.textMuted,
-							fontSize: 12,
-							cursor: "pointer",
-						}}
-					>
-						Standards
-					</button>
-					<button
-						type="button"
-						style={{
-							padding: "6px 12px",
-							borderRadius: 6,
-							border: `1px solid ${hexToRgba(palette.primary, 0.38)}`,
-							background: hexToRgba(palette.primary, 0.15),
-							color: palette.text,
-							fontSize: 12,
-							fontWeight: 600,
-							cursor: "pointer",
-						}}
-					>
-						QA/QC
-					</button>
+			<div className="space-y-3">
+				<div className="px-6 pt-3">
+					<ModeTabs mode={mode} onModeChange={setMode} />
 				</div>
 				<QAQCChecker />
 			</div>
@@ -225,376 +251,159 @@ export function StandardsChecker() {
 	}
 
 	return (
-		<div
-			style={{
-				height: "100%",
-				overflowY: "auto",
-				padding: 24,
-				display: "flex",
-				flexDirection: "column",
-				gap: 24,
-			}}
-		>
-			<div style={{ display: "flex", gap: 8 }}>
-				<button
-					type="button"
-					style={{
-						padding: "6px 12px",
-						borderRadius: 6,
-						border: `1px solid ${hexToRgba(palette.primary, 0.38)}`,
-						background: hexToRgba(palette.primary, 0.15),
-						color: palette.text,
-						fontSize: 12,
-						fontWeight: 600,
-						cursor: "pointer",
-					}}
-				>
-					Standards
-				</button>
-				<button
-					type="button"
-					onClick={() => setMode("qaqc")}
-					style={{
-						padding: "6px 12px",
-						borderRadius: 6,
-						border: `1px solid ${hexToRgba(palette.primary, 0.22)}`,
-						background: hexToRgba(palette.surfaceLight, 0.4),
-						color: palette.textMuted,
-						fontSize: 12,
-						cursor: "pointer",
-					}}
-				>
-					QA/QC
-				</button>
-			</div>
-			{/* Header */}
-			<div
-				style={{
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-				}}
-			>
-				<div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-					<div
-						style={{
-							width: 48,
-							height: 48,
-							borderRadius: 12,
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.2)} 0%, ${hexToRgba(palette.primary, 0.08)} 100%)`,
-							border: `1px solid ${hexToRgba(palette.primary, 0.25)}`,
-						}}
+		<div className="flex h-full flex-col gap-6 overflow-y-auto p-6">
+			<ModeTabs mode={mode} onModeChange={setMode} />
+
+			<GlassPanel variant="toolbar" padded className="space-y-5">
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+					<div className="flex items-center gap-4">
+						<div className="flex h-12 w-12 items-center justify-center rounded-xl border [border-color:color-mix(in_srgb,var(--primary)_30%,transparent)] [background:linear-gradient(135deg,color-mix(in_srgb,var(--primary)_24%,transparent),color-mix(in_srgb,var(--primary)_10%,transparent))]">
+							<ClipboardCheck className="h-6 w-6 [color:var(--primary)]" />
+						</div>
+						<div>
+							<h1 className="text-2xl font-bold tracking-tight [color:var(--text)]">
+								Standards Checker
+							</h1>
+							<p className="text-sm [color:var(--text-muted)]">
+								Verify designs against NEC, IEEE, and IEC standards.
+							</p>
+						</div>
+					</div>
+					<Link
+						to="/apps/qaqc"
+						className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition [border-color:color-mix(in_srgb,var(--primary)_30%,transparent)] [background:color-mix(in_srgb,var(--primary)_14%,transparent)] [color:var(--primary)] hover:[background:color-mix(in_srgb,var(--primary)_20%,transparent)]"
 					>
-						<ClipboardCheck size={24} color={palette.primary} />
-					</div>
-					<div>
-						<h1
-							style={{
-								fontSize: 24,
-								fontWeight: 700,
-								color: palette.text,
-								margin: 0,
-							}}
-						>
-							Standards Checker
-						</h1>
-						<p style={{ fontSize: 13, color: palette.textMuted, margin: 0 }}>
-							Verify designs against NEC, IEEE, and IEC standards
-						</p>
-					</div>
+						Open QA/QC Checker
+						<ArrowRight className="h-3.5 w-3.5" />
+					</Link>
 				</div>
-				<Link
-					to="/apps/qaqc"
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 6,
-						padding: "8px 16px",
-						borderRadius: 8,
-						background: hexToRgba(palette.primary, 0.12),
-						border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-						color: palette.primary,
-						fontSize: 13,
-						fontWeight: 600,
-						textDecoration: "none",
-						transition: "background 0.15s ease",
-					}}
-				>
-					Open QA/QC Checker
-					<ArrowRight size={14} />
-				</Link>
-			</div>
 
-			{/* Category tabs */}
-			<div
-				style={{
-					display: "flex",
-					gap: 8,
-					padding: 4,
-					borderRadius: 10,
-					background: hexToRgba(palette.surfaceLight, 0.4),
-					border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-					alignSelf: "flex-start",
-				}}
-			>
-				{categories.map((cat) => (
-					<button
-						key={cat}
-						onClick={() => setActiveCategory(cat)}
-						style={{
-							padding: "8px 20px",
-							borderRadius: 8,
-							border: "none",
-							cursor: "pointer",
-							fontSize: 13,
-							fontWeight: 600,
-							background:
-								activeCategory === cat
-									? hexToRgba(palette.primary, 0.2)
-									: "transparent",
-							color:
-								activeCategory === cat ? palette.primary : palette.textMuted,
-							transition: "all 0.15s ease",
-						}}
-					>
-						{cat}
-					</button>
-				))}
-			</div>
+				<div className="inline-flex flex-wrap items-center gap-2 rounded-xl border p-1 [border-color:color-mix(in_srgb,var(--primary)_18%,transparent)] [background:color-mix(in_srgb,var(--surface-2)_70%,transparent)]">
+					{categories.map((category) => {
+						const isActive = activeCategory === category;
+						return (
+							<button
+								key={category}
+								type="button"
+								onClick={() => setActiveCategory(category)}
+								className={`rounded-lg px-4 py-2 text-xs font-semibold transition ${
+									isActive
+										? "[background:color-mix(in_srgb,var(--primary)_22%,transparent)] [color:var(--primary)]"
+										: "[color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--primary)_10%,transparent)] hover:[color:var(--text)]"
+								}`}
+							>
+								{category}
+							</button>
+						);
+					})}
+				</div>
+			</GlassPanel>
 
-			{/* Standards list */}
-			<div
-				style={{
-					display: "flex",
-					flexDirection: "column",
-					gap: 8,
-					padding: 16,
-					borderRadius: 12,
-					background: hexToRgba(palette.surface, 0.6),
-					border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-				}}
-			>
-				<div
-					style={{
-						fontSize: 12,
-						fontWeight: 600,
-						textTransform: "uppercase",
-						letterSpacing: "0.05em",
-						color: palette.textMuted,
-						marginBottom: 4,
-					}}
-				>
+			<GlassPanel padded className="space-y-4">
+				<div className="text-xs font-semibold uppercase tracking-[0.16em] [color:var(--text-muted)]">
 					{activeCategory} Standards
 				</div>
-				{filteredStandards.map((std) => {
-					const result = getResultForStandard(std.id);
-					const isSelected = selectedStandards.has(std.id);
-					return (
-						<div
-							key={std.id}
-							onClick={() => toggleStandard(std.id)}
-							style={{
-								display: "flex",
-								alignItems: "flex-start",
-								gap: 12,
-								padding: "12px 14px",
-								borderRadius: 8,
-								cursor: "pointer",
-								background: isSelected
-									? hexToRgba(palette.primary, 0.08)
-									: "transparent",
-								border: `1px solid ${
-									isSelected
-										? hexToRgba(palette.primary, 0.2)
-										: hexToRgba(palette.surfaceLight, 0.5)
-								}`,
-								transition: "all 0.15s ease",
-							}}
-						>
-							<div
-								style={{
-									width: 20,
-									height: 20,
-									borderRadius: 4,
-									border: `2px solid ${
-										isSelected ? palette.primary : palette.textMuted
-									}`,
-									background: isSelected
-										? hexToRgba(palette.primary, 0.2)
-										: "transparent",
-									display: "flex",
-									alignItems: "center",
-									justifyContent: "center",
-									flexShrink: 0,
-									marginTop: 2,
-								}}
-							>
-								{isSelected && (
-									<div
-										style={{
-											width: 10,
-											height: 10,
-											borderRadius: 2,
-											background: palette.primary,
-										}}
-									/>
-								)}
-							</div>
-							<div style={{ flex: 1, minWidth: 0 }}>
-								<div
-									style={{
-										display: "flex",
-										alignItems: "center",
-										justifyContent: "space-between",
-										gap: 8,
-									}}
-								>
-									<span
-										style={{
-											fontSize: 14,
-											fontWeight: 600,
-											color: palette.text,
-										}}
-									>
-										{std.name}
-									</span>
-									{result && (
-										<div
-											style={{
-												display: "flex",
-												alignItems: "center",
-												gap: 6,
-												padding: "2px 10px",
-												borderRadius: 12,
-												background: hexToRgba(statusColor(result.status), 0.12),
-												border: `1px solid ${hexToRgba(statusColor(result.status), 0.25)}`,
-												flexShrink: 0,
-											}}
-										>
-											{statusIcon(result.status)}
-											<span
-												style={{
-													fontSize: 11,
-													fontWeight: 600,
-													color: statusColor(result.status),
-													textTransform: "uppercase",
-												}}
-											>
-												{result.status}
-											</span>
-										</div>
-									)}
-								</div>
-								<p
-									style={{
-										fontSize: 12,
-										color: palette.textMuted,
-										margin: "4px 0 0",
-										lineHeight: 1.4,
-									}}
-								>
-									{std.description}
-								</p>
-								{result && (
-									<p
-										style={{
-											fontSize: 12,
-											color: statusColor(result.status),
-											margin: "6px 0 0",
-											fontStyle: "italic",
-										}}
-									>
-										{result.message}
-									</p>
-								)}
-							</div>
-						</div>
-					);
-				})}
-			</div>
 
-			{/* Run checks button */}
-			<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+				<div className="space-y-2">
+					{filteredStandards.map((standard) => {
+						const result = getResultForStandard(standard.id);
+						const isSelected = selectedStandards.has(standard.id);
+						return (
+							<button
+								key={standard.id}
+								type="button"
+								onClick={() => toggleStandard(standard.id)}
+								className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+									isSelected
+										? "[border-color:color-mix(in_srgb,var(--primary)_45%,transparent)] [background:color-mix(in_srgb,var(--primary)_14%,transparent)]"
+										: "[border-color:color-mix(in_srgb,var(--border)_75%,transparent)] hover:[border-color:color-mix(in_srgb,var(--primary)_28%,transparent)] hover:[background:color-mix(in_srgb,var(--primary)_8%,transparent)]"
+								}`}
+							>
+								<div className="flex items-start gap-3">
+									<div
+										className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border-2 transition ${
+											isSelected
+												? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_20%,transparent)]"
+												: "[border-color:var(--text-muted)]"
+										}`}
+									>
+										{isSelected && (
+											<div className="h-2.5 w-2.5 rounded-sm [background:var(--primary)]" />
+										)}
+									</div>
+									<div className="min-w-0 flex-1 space-y-1">
+										<div className="flex items-start justify-between gap-3">
+											<div>
+												<p className="text-sm font-semibold [color:var(--text)]">
+													{standard.name}
+												</p>
+												<p className="text-xs [color:var(--text-muted)]">
+													{standard.code}
+												</p>
+											</div>
+											{result && (
+												<span
+													className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${statusToneClasses[result.status].badge} ${statusToneClasses[result.status].text}`}
+												>
+													<StatusIcon status={result.status} />
+													{result.status}
+												</span>
+											)}
+										</div>
+										<p className="text-xs leading-relaxed [color:var(--text-muted)]">
+											{standard.description}
+										</p>
+										{result && (
+											<p
+												className={`text-xs italic ${statusToneClasses[result.status].text}`}
+											>
+												{result.message}
+											</p>
+										)}
+									</div>
+								</div>
+							</button>
+						);
+					})}
+				</div>
+			</GlassPanel>
+
+			<div className="flex flex-wrap items-center gap-3">
 				<button
+					type="button"
 					onClick={runChecks}
 					disabled={selectedStandards.size === 0 || running}
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 8,
-						padding: "10px 24px",
-						borderRadius: 8,
-						border: "none",
-						cursor:
-							selectedStandards.size === 0 || running
-								? "not-allowed"
-								: "pointer",
-						fontSize: 14,
-						fontWeight: 600,
-						background:
-							selectedStandards.size === 0 || running
-								? hexToRgba(palette.textMuted, 0.15)
-								: `linear-gradient(135deg, ${palette.primary}, ${hexToRgba(palette.primary, 0.8)})`,
-						color:
-							selectedStandards.size === 0 || running
-								? palette.textMuted
-								: palette.background,
-						transition: "all 0.15s ease",
-					}}
+					className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 [background:linear-gradient(135deg,var(--primary),color-mix(in_srgb,var(--primary)_78%,var(--accent)))] [color:var(--primary-contrast)]"
 				>
-					<Play size={16} />
+					<Play className="h-4 w-4" />
 					{running ? "Running Checks..." : "Run Selected Checks"}
 				</button>
-				<span style={{ fontSize: 13, color: palette.textMuted }}>
+				<span className="text-sm [color:var(--text-muted)]">
 					{selectedStandards.size} standard
 					{selectedStandards.size !== 1 ? "s" : ""} selected
 				</span>
 			</div>
 
-			{/* Results summary */}
 			{results.length > 0 && (
-				<div
-					style={{
-						padding: 16,
-						borderRadius: 12,
-						background: hexToRgba(palette.surface, 0.6),
-						border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-					}}
-				>
-					<div
-						style={{
-							fontSize: 14,
-							fontWeight: 600,
-							color: palette.text,
-							marginBottom: 12,
-						}}
-					>
+				<GlassPanel padded className="space-y-3">
+					<h2 className="text-sm font-semibold [color:var(--text)]">
 						Results Summary
-					</div>
-					<div style={{ display: "flex", gap: 16 }}>
-						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-							<CheckCircle size={14} color={statusTone.pass} />
-							<span style={{ fontSize: 13, color: palette.textMuted }}>
-								Pass: {results.filter((r) => r.status === "pass").length}
-							</span>
+					</h2>
+					<div className="flex flex-wrap items-center gap-4 text-sm">
+						<div className="inline-flex items-center gap-2 [color:var(--text-muted)]">
+							<CheckCircle className="h-4 w-4 [color:var(--success)]" />
+							Pass: {passCount}
 						</div>
-						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-							<AlertTriangle size={14} color={statusTone.warning} />
-							<span style={{ fontSize: 13, color: palette.textMuted }}>
-								Warning: {results.filter((r) => r.status === "warning").length}
-							</span>
+						<div className="inline-flex items-center gap-2 [color:var(--text-muted)]">
+							<AlertTriangle className="h-4 w-4 [color:var(--warning)]" />
+							Warning: {warningCount}
 						</div>
-						<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-							<XCircle size={14} color={statusTone.fail} />
-							<span style={{ fontSize: 13, color: palette.textMuted }}>
-								Fail: {results.filter((r) => r.status === "fail").length}
-							</span>
+						<div className="inline-flex items-center gap-2 [color:var(--text-muted)]">
+							<XCircle className="h-4 w-4 [color:var(--danger)]" />
+							Fail: {failCount}
 						</div>
 					</div>
-				</div>
+				</GlassPanel>
 			)}
 		</div>
 	);

@@ -51,17 +51,13 @@ export function GraphToolbar({
 
 	return (
 		<div
+			className="flex flex-wrap items-center gap-2 px-3 py-2"
 			style={{
-				display: "flex",
-				alignItems: "center",
-				gap: 8,
-				padding: "8px 12px",
 				background: hexToRgba(palette.surface, 0.85),
 				borderBottom: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-				flexWrap: "wrap",
 			}}
 		>
-			<div style={{ display: "flex", gap: 4 }}>
+			<div className="flex flex-wrap gap-1">
 				{SOURCE_OPTIONS.map((opt) => (
 					<button
 						key={opt.value}
@@ -74,15 +70,13 @@ export function GraphToolbar({
 			</div>
 
 			<div
+				className="hidden h-6 w-px md:block"
 				style={{
-					width: 1,
-					height: 24,
 					background: hexToRgba(palette.textMuted, 0.2),
-					margin: "0 4px",
 				}}
 			/>
 
-			<div style={{ display: "flex", gap: 4 }}>
+			<div className="flex flex-wrap gap-1">
 				<button
 					onClick={() => onViewModeChange("3d")}
 					style={viewMode === "3d" ? btnActive : btnBase}
@@ -99,15 +93,18 @@ export function GraphToolbar({
 				</button>
 			</div>
 
-			<div style={{ flex: 1, minWidth: 120, position: "relative" }}>
+			<div
+				className="order-last flex min-w-[220px] flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 md:order-none"
+				style={{
+					borderColor: hexToRgba(palette.primary, 0.2),
+					background: hexToRgba(palette.background, 0.8),
+				}}
+			>
 				<Search
 					size={14}
 					style={{
-						position: "absolute",
-						left: 10,
-						top: "50%",
-						transform: "translateY(-50%)",
 						color: palette.textMuted,
+						flexShrink: 0,
 					}}
 				/>
 				<input
@@ -116,11 +113,11 @@ export function GraphToolbar({
 					value={searchQuery}
 					onChange={(e) => onSearchChange(e.target.value)}
 					style={{
-						width: "100%",
-						padding: "6px 10px 6px 30px",
-						borderRadius: 6,
-						border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-						background: hexToRgba(palette.background, 0.8),
+						flex: 1,
+						minWidth: 0,
+						padding: "0",
+						border: "none",
+						background: "transparent",
 						color: palette.text,
 						fontSize: 13,
 						outline: "none",
@@ -128,7 +125,12 @@ export function GraphToolbar({
 				/>
 			</div>
 
-			<button onClick={onAddMemory} style={btnBase} title="Add Memory">
+			<button
+				onClick={onAddMemory}
+				className="inline-flex items-center"
+				style={btnBase}
+				title="Add Memory"
+			>
 				<Plus size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
 				Memory
 			</button>

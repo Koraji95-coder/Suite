@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { triggerAutoBackup } from "@/supabase/backupManager";
 import {
 	Dialog,
 	DialogContent,
@@ -23,19 +22,20 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
-import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/logger";
-import { supabase } from "@/supabase/client";
+import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
+import { logActivity } from "@/services/activityService";
 import {
 	loadSetting,
 	migrateFromLocalStorage,
 	saveSetting,
 } from "@/settings/userSettings";
-import { logActivity } from "@/services/activityService";
+import { triggerAutoBackup } from "@/supabase/backupManager";
+import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
-import { projectsInfo } from "../../../data/panelInfo";
 import { PanelInfoDialog } from "../../../data/PanelInfoDialog";
-import { useToast } from "@/components/notification-system/ToastProvider";
+import { projectsInfo } from "../../../data/panelInfo";
 import { GlassPanel } from "../ui/GlassPanel";
 import { ProjectDetail } from "./ProjectDetail";
 import { ProjectFormModal } from "./ProjectFormModal";
@@ -1025,21 +1025,17 @@ export function ProjectManager({
 
 		// Save to Supabase
 		if (selectedProject) {
-				try {
-					await saveSetting(
-						"expanded_tasks",
-						Array.from(newExpanded),
-						selectedProject.id,
-					);
-				} catch (error) {
-					logger.error(
-						"Failed to save expanded tasks",
-						"ProjectManager",
-						error,
-					);
-				}
+			try {
+				await saveSetting(
+					"expanded_tasks",
+					Array.from(newExpanded),
+					selectedProject.id,
+				);
+			} catch (error) {
+				logger.error("Failed to save expanded tasks", "ProjectManager", error);
 			}
-		};
+		}
+	};
 
 	const primaryActionStyle = {
 		...glassCardInnerStyle(palette, palette.primary),
@@ -1269,21 +1265,21 @@ export function ProjectManager({
 				isSubtask={!!parentTaskForSubtask}
 			/>
 
-				{/* Main Grid */}
-				<div className="grid grid-cols-1 xl:grid-cols-[400px_minmax(0,1fr)] gap-6 xl:gap-7">
+			{/* Main Grid */}
+			<div className="grid grid-cols-1 xl:grid-cols-[400px_minmax(0,1fr)] gap-6 xl:gap-7">
 				{/* Left Column: Project List */}
 				<GlassPanel
 					tint={palette.secondary}
 					hoverEffect={false}
 					className="p-5"
 				>
-						<ProjectList
+					<ProjectList
 						projects={projects}
 						selectedProject={selectedProject}
 						projectTaskCounts={projectTaskCounts}
 						onSelectProject={setSelectedProject}
 						onEditProject={openEditProject}
-							onDeleteProject={requestDeleteProject}
+						onDeleteProject={requestDeleteProject}
 						filter={statusFilter}
 						onFilterChange={(f) => setStatusFilter(f as StatusFilter)}
 						searchQuery={projectSearch}
@@ -1294,7 +1290,7 @@ export function ProjectManager({
 				{/* Right Column: Project Details */}
 				<div className="space-y-6">
 					{selectedProject ? (
-							<ProjectDetail
+						<ProjectDetail
 							project={selectedProject}
 							tasks={tasks}
 							files={files}
@@ -1308,7 +1304,7 @@ export function ProjectManager({
 								setShowTaskModal(true);
 							}}
 							onEditTask={openEditTask}
-								onDeleteTask={requestDeleteTask}
+							onDeleteTask={requestDeleteTask}
 							onToggleTaskComplete={toggleTaskComplete}
 							onAddSubtask={openAddSubtask}
 							onDragEnd={handleDragEnd}
@@ -1352,63 +1348,63 @@ export function ProjectManager({
 							</p>
 						</GlassPanel>
 					)}
-					</div>
 				</div>
-				<Dialog
-					open={Boolean(projectIdPendingDelete)}
-					onOpenChange={(open) => !open && setProjectIdPendingDelete(null)}
-				>
-					<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
-						<DialogHeader>
-							<DialogTitle>Delete project?</DialogTitle>
-						</DialogHeader>
-						<p className="text-sm text-[var(--text-muted)]">
-							Delete "{pendingProjectName}"? This will permanently remove its
-							tasks, files, and related records.
-						</p>
-						<DialogFooter className="mt-4 gap-2 sm:justify-end">
-							<button
-								onClick={() => setProjectIdPendingDelete(null)}
-								className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-							>
-								Cancel
-							</button>
-							<button
-								onClick={() => void confirmDeleteProject()}
-								className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
-							>
-								Delete
-							</button>
-						</DialogFooter>
-					</DialogContent>
-				</Dialog>
-				<Dialog
-					open={Boolean(taskIdPendingDelete)}
-					onOpenChange={(open) => !open && setTaskIdPendingDelete(null)}
-				>
-					<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
-						<DialogHeader>
-							<DialogTitle>Delete task?</DialogTitle>
-						</DialogHeader>
-						<p className="text-sm text-[var(--text-muted)]">
-							Delete "{pendingTaskName}"? This will also delete all subtasks.
-						</p>
-						<DialogFooter className="mt-4 gap-2 sm:justify-end">
-							<button
-								onClick={() => setTaskIdPendingDelete(null)}
-								className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-							>
-								Cancel
-							</button>
-							<button
-								onClick={() => void confirmDeleteTask()}
-								className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
-							>
-								Delete
-							</button>
-						</DialogFooter>
-					</DialogContent>
-				</Dialog>
 			</div>
-		);
-	}
+			<Dialog
+				open={Boolean(projectIdPendingDelete)}
+				onOpenChange={(open) => !open && setProjectIdPendingDelete(null)}
+			>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Delete project?</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						Delete "{pendingProjectName}"? This will permanently remove its
+						tasks, files, and related records.
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setProjectIdPendingDelete(null)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={() => void confirmDeleteProject()}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						>
+							Delete
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+			<Dialog
+				open={Boolean(taskIdPendingDelete)}
+				onOpenChange={(open) => !open && setTaskIdPendingDelete(null)}
+			>
+				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+					<DialogHeader>
+						<DialogTitle>Delete task?</DialogTitle>
+					</DialogHeader>
+					<p className="text-sm text-[var(--text-muted)]">
+						Delete "{pendingTaskName}"? This will also delete all subtasks.
+					</p>
+					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+						<button
+							onClick={() => setTaskIdPendingDelete(null)}
+							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							Cancel
+						</button>
+						<button
+							onClick={() => void confirmDeleteTask()}
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						>
+							Delete
+						</button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</div>
+	);
+}

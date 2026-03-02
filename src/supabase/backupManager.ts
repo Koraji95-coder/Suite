@@ -106,7 +106,11 @@ export function saveToLocalStorage(yamlStr: string): void {
 		localStorage.setItem(BACKUP_STORAGE_KEY, yamlStr);
 		localStorage.setItem(BACKUP_TIMESTAMP_KEY, new Date().toISOString());
 	} catch (e) {
-		logger.warn("Backup: localStorage save failed (quota?)", "backupManager", e);
+		logger.warn(
+			"Backup: localStorage save failed (quota?)",
+			"backupManager",
+			e,
+		);
 	}
 }
 

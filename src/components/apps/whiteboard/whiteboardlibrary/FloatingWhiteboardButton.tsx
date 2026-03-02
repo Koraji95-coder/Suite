@@ -1,5 +1,5 @@
 import { BookOpen, Pen } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 	Dialog,
 	DialogContent,
@@ -20,20 +20,33 @@ export function FloatingWhiteboardButton({
 	const [showLibrary, setShowLibrary] = useState(false);
 	const [showMenu, setShowMenu] = useState(false);
 
+	useEffect(() => {
+		if (showWhiteboard || showLibrary) {
+			setShowMenu(false);
+		}
+	}, [showWhiteboard, showLibrary]);
+
 	return (
 		<>
-			<div className="fixed bottom-6 right-6 flex flex-col items-end space-y-2" style={{ zIndex: "var(--z-topbar)" }}>
+			<div
+				className="fixed bottom-4 right-4 flex flex-col items-end gap-2 sm:bottom-6 sm:right-6"
+				style={{
+					zIndex: "var(--z-topbar)",
+					paddingBottom: "env(safe-area-inset-bottom, 0px)",
+					paddingRight: "env(safe-area-inset-right, 0px)",
+				}}
+			>
 				{showMenu && (
-					<div className="flex flex-col space-y-2 mb-2">
+					<div className="mb-2 flex w-[min(86vw,18rem)] flex-col gap-2 rounded-xl border p-2 shadow-xl backdrop-blur-sm [border-color:var(--border)] [background:color-mix(in_srgb,var(--bg-base)_92%,transparent)] sm:w-64">
 						<button
 							onClick={() => {
 								setShowWhiteboard(true);
 								setShowMenu(false);
 							}}
-							className="flex items-center space-x-2 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-4 py-3 rounded-lg shadow-lg transition-all"
+							className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] [color:var(--text)] hover:opacity-90"
 						>
-							<Pen className="w-5 h-5" />
-							<span>New Whiteboard</span>
+							<Pen className="h-4 w-4 shrink-0" />
+							<span className="truncate">New Whiteboard</span>
 						</button>
 
 						<button
@@ -41,22 +54,24 @@ export function FloatingWhiteboardButton({
 								setShowLibrary(true);
 								setShowMenu(false);
 							}}
-							className="flex items-center space-x-2 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-4 py-3 rounded-lg shadow-lg transition-all"
+							className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] [color:var(--text)] hover:opacity-90"
 						>
-							<BookOpen className="w-5 h-5" />
-							<span>Whiteboard Library</span>
+							<BookOpen className="h-4 w-4 shrink-0" />
+							<span className="truncate">Whiteboard Library</span>
 						</button>
 					</div>
 				)}
 
 				<button
 					onClick={() => setShowMenu(!showMenu)}
-					className={`flex items-center justify-center w-14 h-14 [background:linear-gradient(to_bottom_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] rounded-full shadow-2xl transition-all ${
+					className={`flex h-12 w-12 items-center justify-center rounded-full shadow-2xl transition-all [background:linear-gradient(to_bottom_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] [color:var(--text)] hover:opacity-90 sm:h-14 sm:w-14 ${
 						showMenu ? "rotate-45" : ""
 					}`}
 					title="Whiteboard"
+					aria-label="Toggle whiteboard actions"
+					aria-expanded={showMenu}
 				>
-					<Pen className="w-6 h-6" />
+					<Pen className="h-5 w-5 sm:h-6 sm:w-6" />
 				</button>
 			</div>
 
@@ -88,7 +103,9 @@ export function FloatingWhiteboardButton({
 					</DialogHeader>
 					<div className="max-h-[calc(90vh-96px)] overflow-auto p-6">
 						<WhiteboardLibrary
-							filterByPanel={panelContext !== "Dashboard" ? panelContext : undefined}
+							filterByPanel={
+								panelContext !== "Dashboard" ? panelContext : undefined
+							}
 						/>
 					</div>
 				</DialogContent>

@@ -16,6 +16,7 @@ import {
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
 import { useToast } from "@/components/notification-system/ToastProvider";
+import { hexToRgba, useTheme } from "@/lib/palette";
 import {
 	type BackupFileInfo,
 	deleteBackupFile,
@@ -26,7 +27,6 @@ import {
 	restoreFromYaml,
 	runFullBackup,
 } from "@/supabase/backupManager";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import type { BackupHistoryEntry } from "./storageTypes";
 
 const HISTORY_KEY = "backup_history";
@@ -170,10 +170,8 @@ export function BackupManager() {
 	return (
 		<div>
 			<div
+				className="mb-4 flex flex-wrap items-center gap-2"
 				style={{
-					display: "flex",
-					gap: 8,
-					marginBottom: 16,
 					alignItems: "center",
 				}}
 			>
@@ -227,9 +225,12 @@ export function BackupManager() {
 						className={`w-4 h-4 ${loadingFiles ? "animate-spin" : ""}`}
 					/>
 				</button>
-				<div style={{ flex: 1 }} />
+				<div className="hidden sm:block sm:flex-1" />
 				{lastBackup && (
-					<span style={{ fontSize: 12, color: palette.textMuted }}>
+					<span
+						className="w-full text-left text-xs sm:w-auto sm:text-right"
+						style={{ color: palette.textMuted }}
+					>
 						Last: {new Date(lastBackup).toLocaleString()}
 					</span>
 				)}
@@ -322,10 +323,8 @@ export function BackupManager() {
 						{files.map((f) => (
 							<div
 								key={f.name}
+								className="flex flex-wrap items-center gap-2 sm:gap-3"
 								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 12,
 									padding: "10px 14px",
 									borderRadius: 8,
 									background: hexToRgba(palette.surface, 0.5),
@@ -333,8 +332,8 @@ export function BackupManager() {
 								}}
 							>
 								<span
+									className="min-w-0 flex-1 basis-full sm:basis-auto"
 									style={{
-										flex: 1,
 										fontSize: 13,
 										color: palette.text,
 										overflow: "hidden",
@@ -344,60 +343,55 @@ export function BackupManager() {
 								>
 									{f.name}
 								</span>
-								<span
+								<div
+									className="flex items-center gap-3"
 									style={{
-										fontSize: 12,
 										color: palette.textMuted,
-										flexShrink: 0,
 									}}
 								>
-									{formatSize(f.size)}
-								</span>
-								<span
-									style={{
-										fontSize: 12,
-										color: palette.textMuted,
-										flexShrink: 0,
-									}}
-								>
-									{new Date(f.modified).toLocaleDateString()}
-								</span>
-								<button
-									onClick={() => handleDownloadFile(f.name)}
-									style={{
-										background: "none",
-										border: "none",
-										cursor: "pointer",
-										color: palette.primary,
-										padding: 4,
-									}}
-								>
-									<Download className="w-4 h-4" />
-								</button>
-								<button
-									onClick={() => setConfirmRestore(f.name)}
-									style={{
-										background: "none",
-										border: "none",
-										cursor: "pointer",
-										color: palette.secondary,
-										padding: 4,
-									}}
-								>
-									<Upload className="w-4 h-4" />
-								</button>
-								<button
-									onClick={() => requestDelete(f.name)}
-									style={{
-										background: "none",
-										border: "none",
-										cursor: "pointer",
-										color: palette.accent,
-										padding: 4,
-									}}
-								>
-									<Trash2 className="w-4 h-4" />
-								</button>
+									<span style={{ fontSize: 12 }}>{formatSize(f.size)}</span>
+									<span className="hidden text-xs sm:inline">
+										{new Date(f.modified).toLocaleDateString()}
+									</span>
+								</div>
+								<div className="ml-auto flex items-center gap-1">
+									<button
+										onClick={() => handleDownloadFile(f.name)}
+										style={{
+											background: "none",
+											border: "none",
+											cursor: "pointer",
+											color: palette.primary,
+											padding: 4,
+										}}
+									>
+										<Download className="w-4 h-4" />
+									</button>
+									<button
+										onClick={() => setConfirmRestore(f.name)}
+										style={{
+											background: "none",
+											border: "none",
+											cursor: "pointer",
+											color: palette.secondary,
+											padding: 4,
+										}}
+									>
+										<Upload className="w-4 h-4" />
+									</button>
+									<button
+										onClick={() => requestDelete(f.name)}
+										style={{
+											background: "none",
+											border: "none",
+											cursor: "pointer",
+											color: palette.accent,
+											padding: 4,
+										}}
+									>
+										<Trash2 className="w-4 h-4" />
+									</button>
+								</div>
 							</div>
 						))}
 					</div>

@@ -48,6 +48,8 @@ export interface AgentTask {
 	timeout?: number;
 }
 
+export type AgentPairingAction = "pair" | "unpair";
+
 export type PythonToolRequest = Record<string, unknown> & {
 	script: string;
 	args: Record<string, unknown>;
@@ -213,6 +215,124 @@ class AgentService {
 		}
 	}
 
+	private async readBrokerError(
+		response: Response,
+		fallback: string,
+	): Promise<string> {
+		try {
+			const payload = (await response.json()) as
+				| { error?: string; message?: string }
+				| null;
+			const message = payload?.error || payload?.message;
+			if (typeof message === "string" && message.trim().length > 0) {
+				return message.trim();
+			}
+		} catch (_error) {
+			// Ignore JSON parse failures and use fallback below.
+		}
+		return fallback;
+	}
+
+	async requestPairingVerificationLink(
+		action: AgentPairingAction,
+		pairingCode?: string,
+	): Promise<void> {
+		if (!this.useBroker) {
+			throw new Error(
+				"Pairing verification email flow is only available in broker transport mode.",
+			);
+		}
+
+		const accessToken = await this.getSupabaseAccessToken();
+		if (!accessToken) {
+			throw new Error("Supabase session required for brokered pairing.");
+		}
+
+		const payload: Record<string, string> = { action };
+		if (action === "pair") {
+			const code = (pairingCode || "").trim();
+			if (!code) {
+				throw new Error("Pairing code required.");
+			}
+			payload.pairing_code = code;
+		}
+
+		const response = await fetch(`${this.brokerUrl}/pairing-challenge`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${accessToken}`,
+			},
+			credentials: "include",
+			body: JSON.stringify(payload),
+		});
+
+		if (!response.ok) {
+			const message = await this.readBrokerError(
+				response,
+				"Unable to send verification email for pairing action.",
+			);
+			throw new Error(message);
+		}
+	}
+
+	async confirmPairingVerification(
+		action: AgentPairingAction,
+		challengeId: string,
+	): Promise<boolean> {
+		if (!this.useBroker) {
+			throw new Error(
+				"Pairing verification email flow is only available in broker transport mode.",
+			);
+		}
+
+		const accessToken = await this.getSupabaseAccessToken();
+		if (!accessToken) {
+			throw new Error("Supabase session required for brokered pairing.");
+		}
+
+		const response = await fetch(`${this.brokerUrl}/pairing-confirm`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${accessToken}`,
+			},
+			credentials: "include",
+			body: JSON.stringify({ challenge_id: challengeId.trim() }),
+		});
+
+		if (!response.ok) {
+			const message = await this.readBrokerError(
+				response,
+				"Unable to verify pairing action.",
+			);
+			throw new Error(message);
+		}
+
+		const data = (await response.json()) as
+			| { paired?: boolean; action?: AgentPairingAction }
+			| undefined;
+		this.brokerPaired = Boolean(data?.paired);
+
+		if (action === "pair") {
+			await logSecurityEvent(
+				"agent_pair_success",
+				"Agent pair action verified and completed via email challenge.",
+			);
+		}
+
+		if (action === "unpair") {
+			secureTokenStorage.clearToken();
+			await this.clearPersistedPairingForActiveUser();
+			await logSecurityEvent(
+				"agent_unpair",
+				"Agent unpair action verified and completed via email challenge.",
+			);
+		}
+
+		return this.brokerPaired;
+	}
+
 	private isTaskAllowedForCurrentUser(taskName: string): boolean {
 		if (this.isAdminUser()) return true;
 
@@ -344,37 +464,10 @@ class AgentService {
 			logger.info("Attempting to pair with agent", "AgentService");
 
 			if (this.useBroker) {
-				const accessToken = await this.getSupabaseAccessToken();
-				if (!accessToken) {
-					throw new Error(
-						"Supabase session required for brokered pairing. Please sign in.",
-					);
-				}
-
-				const response = await fetch(`${this.brokerUrl}/pair`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${accessToken}`,
-					},
-					credentials: "include",
-					body: JSON.stringify({ pairing_code: pairingCode.trim() }),
-				});
-
-				if (!response.ok) {
-					const body = await response.text().catch(() => "");
-					logger.error(
-						`Brokered pairing failed: ${response.status} ${body}`,
-						"AgentService",
-						new Error(response.statusText),
-					);
-					throw new Error(`Pairing failed: ${response.statusText}`);
-				}
-
-				this.brokerPaired = true;
+				await this.requestPairingVerificationLink("pair", pairingCode.trim());
 				await logSecurityEvent(
 					"agent_pair_success",
-					"Agent paired via backend broker.",
+					"Agent pairing verification link sent via backend broker.",
 				);
 				return true;
 			}
@@ -475,7 +568,7 @@ class AgentService {
 		if (this.useBroker) {
 			const accessToken = await this.getSupabaseAccessToken();
 			if (accessToken) {
-				await fetch(`${this.brokerUrl}/unpair`, {
+				await fetch(`${this.brokerUrl}/session/clear`, {
 					method: "POST",
 					headers: { Authorization: `Bearer ${accessToken}` },
 					credentials: "include",

@@ -55,9 +55,9 @@ import zipfile
 import secrets
 from functools import wraps
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Set, Tuple
 from pathlib import Path
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlencode, urlparse, urlunparse
 from werkzeug.utils import secure_filename
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -111,12 +111,31 @@ sock = Sock(app)
 
 # ── Transmittal Builder render helpers ──────────────────────────
 TRANSMITTAL_RENDER_AVAILABLE = False
+TRANSMITTAL_BUILDER_DIR = Path(__file__).resolve().parent / "Transmittal-Builder"
+TRANSMITTAL_TEMPLATE_PATH = (
+    TRANSMITTAL_BUILDER_DIR / "R3P-PRJ#-XMTL-001 - DOCUMENT INDEX.docx"
+)
+TRANSMITTAL_CONFIG_PATH = TRANSMITTAL_BUILDER_DIR / "config.yaml"
+
+TRANSMITTAL_FALLBACK_PROFILES: List[Dict[str, str]] = [
+    {
+        "id": "sample-engineer",
+        "name": "Sample Engineer, PE",
+        "title": "Engineering Lead",
+        "email": "engineer@example.com",
+        "phone": "(000) 000-0000",
+    }
+]
+TRANSMITTAL_FALLBACK_FIRMS = ["TX - Firm #00000"]
+
+TRANSMITTAL_PROFILES_CACHE: Dict[str, Any] = {
+    "mtime": None,
+    "payload": None,
+}
+TRANSMITTAL_PROFILES_CACHE_LOCK = threading.Lock()
+
 try:
-    transmittal_core_path = (
-        Path(__file__).resolve().parent
-        / "Transmittal-Builder"
-        / "core"
-    )
+    transmittal_core_path = TRANSMITTAL_BUILDER_DIR / "core"
     if transmittal_core_path.exists():
         sys.path.append(str(transmittal_core_path))
         from transmittal_render import render_transmittal, render_cid_transmittal  # type: ignore
@@ -124,6 +143,140 @@ try:
         TRANSMITTAL_RENDER_AVAILABLE = True
 except Exception as exc:
     logger.warning("Transmittal render helpers unavailable: %s", exc)
+
+
+def _slugify_transmittal_profile_id(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
+    normalized = normalized.strip("-")
+    return normalized[:64]
+
+
+def _normalize_transmittal_profile(
+    row: Dict[str, Any], fallback_index: int
+) -> Optional[Dict[str, str]]:
+    name = str(row.get("name") or "").strip()
+    if not name:
+        return None
+
+    profile_id = str(row.get("id") or "").strip()
+    if not profile_id:
+        profile_id = _slugify_transmittal_profile_id(name) or f"profile-{fallback_index}"
+    else:
+        profile_id = _slugify_transmittal_profile_id(profile_id) or f"profile-{fallback_index}"
+
+    title = str(row.get("title") or "").strip()[:120]
+    email = str(row.get("email") or "").strip().lower()[:254]
+    if email and not _is_valid_email(email):
+        email = ""
+    phone = str(row.get("phone") or "").strip()[:64]
+
+    return {
+        "id": profile_id,
+        "name": name[:120],
+        "title": title,
+        "email": email,
+        "phone": phone,
+    }
+
+
+def _load_transmittal_profiles_payload() -> Dict[str, Any]:
+    cfg_mtime = None
+    try:
+        if TRANSMITTAL_CONFIG_PATH.exists():
+            cfg_mtime = TRANSMITTAL_CONFIG_PATH.stat().st_mtime
+    except Exception:
+        cfg_mtime = None
+
+    with TRANSMITTAL_PROFILES_CACHE_LOCK:
+        cached = TRANSMITTAL_PROFILES_CACHE.get("payload")
+        if cached and TRANSMITTAL_PROFILES_CACHE.get("mtime") == cfg_mtime:
+            return cached
+
+        raw_cfg: Dict[str, Any] = {}
+        if TRANSMITTAL_CONFIG_PATH.exists():
+            try:
+                raw_text = TRANSMITTAL_CONFIG_PATH.read_text(encoding="utf-8")
+                if raw_text.strip():
+                    try:
+                        import yaml  # type: ignore
+
+                        loaded = yaml.safe_load(raw_text)
+                        if isinstance(loaded, dict):
+                            raw_cfg = loaded
+                    except Exception:
+                        parsed = json.loads(raw_text)
+                        if isinstance(parsed, dict):
+                            raw_cfg = parsed
+            except Exception as exc:
+                logger.warning("Failed to load transmittal config yaml: %s", exc)
+
+        business = raw_cfg.get("business", {})
+        ui = raw_cfg.get("ui", {})
+
+        raw_profiles = business.get("pe_profiles", [])
+        normalized_profiles: List[Dict[str, str]] = []
+        seen_ids: Set[str] = set()
+        if isinstance(raw_profiles, list):
+            for index, row in enumerate(raw_profiles, start=1):
+                if not isinstance(row, dict):
+                    continue
+                normalized = _normalize_transmittal_profile(row, index)
+                if not normalized:
+                    continue
+                base_id = normalized["id"]
+                dedupe_id = base_id
+                suffix = 2
+                while dedupe_id in seen_ids:
+                    dedupe_id = f"{base_id}-{suffix}"
+                    suffix += 1
+                normalized["id"] = dedupe_id
+                seen_ids.add(dedupe_id)
+                normalized_profiles.append(normalized)
+
+        if not normalized_profiles:
+            normalized_profiles = [dict(item) for item in TRANSMITTAL_FALLBACK_PROFILES]
+
+        raw_firms = business.get("firm_numbers", [])
+        firm_numbers: List[str] = []
+        seen_firms: Set[str] = set()
+        if isinstance(raw_firms, list):
+            for value in raw_firms:
+                firm = str(value or "").strip()[:80]
+                if not firm or firm in seen_firms:
+                    continue
+                seen_firms.add(firm)
+                firm_numbers.append(firm)
+
+        if not firm_numbers:
+            firm_numbers = list(TRANSMITTAL_FALLBACK_FIRMS)
+
+        default_profile = str(ui.get("default_pe") or "").strip()
+        default_profile_id = ""
+        if default_profile:
+            for profile in normalized_profiles:
+                if default_profile in {profile["id"], profile["name"]}:
+                    default_profile_id = profile["id"]
+                    break
+        if not default_profile_id:
+            default_profile_id = normalized_profiles[0]["id"]
+
+        default_firm = str(ui.get("default_firm") or "").strip()
+        if default_firm not in firm_numbers:
+            default_firm = firm_numbers[0]
+
+        payload = {
+            "profiles": normalized_profiles,
+            "firm_numbers": firm_numbers,
+            "defaults": {
+                "profile_id": default_profile_id,
+                "firm": default_firm,
+            },
+            "source": str(TRANSMITTAL_CONFIG_PATH),
+        }
+
+        TRANSMITTAL_PROFILES_CACHE["mtime"] = cfg_mtime
+        TRANSMITTAL_PROFILES_CACHE["payload"] = payload
+        return payload
 
 
 def _parse_csv_env(var_name: str, fallback: List[str]) -> List[str]:
@@ -146,6 +299,8 @@ def _parse_int_env(var_name: str, fallback: int, minimum: int = 1) -> int:
 
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+PAIRING_CODE_PATTERN = re.compile(r"^\d{6}$")
+PAIRING_CHALLENGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{20,200}$")
 
 
 app.config['MAX_CONTENT_LENGTH'] = _parse_int_env(
@@ -290,6 +445,57 @@ AGENT_DEFAULT_TIMEOUT_SECONDS = _parse_int_env("AGENT_TIMEOUT_SECONDS", 30, mini
 AGENT_MAX_TIMEOUT_SECONDS = _parse_int_env("AGENT_MAX_TIMEOUT_SECONDS", 300, minimum=30)
 
 AGENT_SESSIONS: Dict[str, Dict[str, Any]] = {}
+AGENT_PAIRING_CHALLENGES: Dict[str, Dict[str, Any]] = {}
+AGENT_PAIRING_CHALLENGE_LOCK = threading.Lock()
+AGENT_PAIRING_CHALLENGE_TTL_SECONDS = _parse_int_env(
+    "AGENT_PAIRING_CHALLENGE_TTL_SECONDS",
+    15 * 60,
+    minimum=60,
+)
+AGENT_PAIRING_CHALLENGE_MAX_ENTRIES = _parse_int_env(
+    "AGENT_PAIRING_CHALLENGE_MAX_ENTRIES",
+    10_000,
+    minimum=100,
+)
+AGENT_PAIRING_REDIRECT_PATH = (
+    (os.environ.get("AGENT_PAIRING_REDIRECT_PATH") or "/app/agent").strip()
+    or "/app/agent"
+)
+
+# ── Auth Email Abuse Controls ────────────────────────────────────
+AUTH_EMAIL_WINDOW_SECONDS = _parse_int_env("AUTH_EMAIL_WINDOW_SECONDS", 900, minimum=60)
+AUTH_EMAIL_MAX_ATTEMPTS = _parse_int_env("AUTH_EMAIL_MAX_ATTEMPTS", 6, minimum=1)
+AUTH_EMAIL_MIN_INTERVAL_SECONDS = _parse_int_env("AUTH_EMAIL_MIN_INTERVAL_SECONDS", 15, minimum=0)
+AUTH_EMAIL_BLOCK_SECONDS = _parse_int_env("AUTH_EMAIL_BLOCK_SECONDS", 1800, minimum=60)
+AUTH_EMAIL_MIN_RESPONSE_MS = _parse_int_env("AUTH_EMAIL_MIN_RESPONSE_MS", 450, minimum=0)
+AUTH_EMAIL_RESPONSE_JITTER_MS = _parse_int_env(
+    "AUTH_EMAIL_RESPONSE_JITTER_MS",
+    120,
+    minimum=0,
+)
+AUTH_EMAIL_HONEYPOT_FIELD = (os.environ.get("AUTH_EMAIL_HONEYPOT_FIELD") or "company").strip() or "company"
+AUTH_EMAIL_TURNSTILE_SECRET = (os.environ.get("AUTH_EMAIL_TURNSTILE_SECRET") or "").strip()
+AUTH_EMAIL_TURNSTILE_VERIFY_URL = (
+    (os.environ.get("AUTH_EMAIL_TURNSTILE_VERIFY_URL") or "").strip()
+    or "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+)
+AUTH_EMAIL_TURNSTILE_TIMEOUT_SECONDS = _parse_int_env(
+    "AUTH_EMAIL_TURNSTILE_TIMEOUT_SECONDS",
+    5,
+    minimum=1,
+)
+_default_require_turnstile = "true" if AUTH_EMAIL_TURNSTILE_SECRET else "false"
+AUTH_EMAIL_REQUIRE_TURNSTILE = (
+    (os.environ.get("AUTH_EMAIL_REQUIRE_TURNSTILE") or _default_require_turnstile)
+    .strip()
+    .lower()
+    != "false"
+)
+
+AUTH_EMAIL_WINDOW: Dict[str, List[float]] = {}
+AUTH_EMAIL_LAST_ATTEMPT: Dict[str, float] = {}
+AUTH_EMAIL_BLOCKED_UNTIL: Dict[str, float] = {}
+AUTH_EMAIL_ABUSE_LOCK = threading.Lock()
 
 
 def _purge_expired_agent_sessions() -> None:
@@ -297,6 +503,83 @@ def _purge_expired_agent_sessions() -> None:
     expired = [sid for sid, session in AGENT_SESSIONS.items() if session["expires_at"] <= now]
     for sid in expired:
         AGENT_SESSIONS.pop(sid, None)
+
+
+def _purge_expired_agent_pairing_challenges(now: Optional[float] = None) -> None:
+    ts = time.time() if now is None else now
+    expired = [
+        cid
+        for cid, challenge in AGENT_PAIRING_CHALLENGES.items()
+        if challenge.get("expires_at", 0) <= ts
+    ]
+    for cid in expired:
+        AGENT_PAIRING_CHALLENGES.pop(cid, None)
+
+    overflow = len(AGENT_PAIRING_CHALLENGES) - AGENT_PAIRING_CHALLENGE_MAX_ENTRIES
+    if overflow <= 0:
+        return
+
+    oldest = sorted(
+        AGENT_PAIRING_CHALLENGES.items(),
+        key=lambda item: item[1].get("created_at", 0),
+    )[:overflow]
+    for cid, _ in oldest:
+        AGENT_PAIRING_CHALLENGES.pop(cid, None)
+
+
+def _create_agent_pairing_challenge(
+    action: str,
+    user_id: str,
+    email: str,
+    pairing_code: str,
+    client_ip: str,
+) -> Tuple[str, int]:
+    now = time.time()
+    expires_at = int(now) + AGENT_PAIRING_CHALLENGE_TTL_SECONDS
+    challenge_id = secrets.token_urlsafe(32)
+    payload = {
+        "action": action,
+        "user_id": user_id,
+        "email": email.strip().lower(),
+        "pairing_code": pairing_code,
+        "created_at": now,
+        "expires_at": expires_at,
+        "client_ip": client_ip,
+    }
+
+    with AGENT_PAIRING_CHALLENGE_LOCK:
+        _purge_expired_agent_pairing_challenges(now)
+        AGENT_PAIRING_CHALLENGES[challenge_id] = payload
+
+    return challenge_id, expires_at
+
+
+def _consume_agent_pairing_challenge(
+    challenge_id: str,
+    user_id: str,
+    email: str,
+) -> Tuple[Optional[Dict[str, Any]], str]:
+    now = time.time()
+    normalized_email = email.strip().lower()
+
+    with AGENT_PAIRING_CHALLENGE_LOCK:
+        _purge_expired_agent_pairing_challenges(now)
+        challenge = AGENT_PAIRING_CHALLENGES.get(challenge_id)
+        if not challenge:
+            return None, "missing"
+
+        if challenge.get("expires_at", 0) <= now:
+            AGENT_PAIRING_CHALLENGES.pop(challenge_id, None)
+            return None, "expired"
+
+        if challenge.get("user_id") != user_id:
+            return None, "user-mismatch"
+
+        if normalized_email and challenge.get("email") != normalized_email:
+            return None, "email-mismatch"
+
+        AGENT_PAIRING_CHALLENGES.pop(challenge_id, None)
+        return challenge, "ok"
 
 
 def _looks_like_uuid(value: str) -> bool:
@@ -349,6 +632,13 @@ def _get_supabase_user_id(user: Dict[str, Any]) -> Optional[str]:
     return (user.get("id") or user.get("sub") or "").strip() or None
 
 
+def _get_supabase_user_email(user: Dict[str, Any]) -> Optional[str]:
+    email = str(user.get("email") or "").strip().lower()
+    if not _is_valid_email(email):
+        return None
+    return email
+
+
 def _get_bearer_token() -> Optional[str]:
     auth = request.headers.get("Authorization", "")
     if not auth:
@@ -356,6 +646,137 @@ def _get_bearer_token() -> Optional[str]:
     if auth.lower().startswith("bearer "):
         return auth.split(" ", 1)[1].strip()
     return None
+
+
+def _get_request_ip() -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For", "")
+    if forwarded_for:
+        first_hop = forwarded_for.split(",", 1)[0].strip()
+        if first_hop:
+            return first_hop
+    return (request.remote_addr or "").strip() or "unknown"
+
+
+def _email_fingerprint(email: str, length: int = 12) -> str:
+    digest = hashlib.sha256(email.encode("utf-8")).hexdigest()
+    return digest[: max(6, length)]
+
+
+def _auth_email_key(email: str, client_ip: str) -> str:
+    return f"{client_ip}:{_email_fingerprint(email, length=24)}"
+
+
+def _compact_auth_email_state(now: float) -> None:
+    if len(AUTH_EMAIL_LAST_ATTEMPT) < 5000:
+        return
+
+    stale_before = now - max(300.0, AUTH_EMAIL_WINDOW_SECONDS * 4)
+    for key, last_seen in list(AUTH_EMAIL_LAST_ATTEMPT.items()):
+        blocked_until = AUTH_EMAIL_BLOCKED_UNTIL.get(key, 0.0)
+        if last_seen >= stale_before or blocked_until > now:
+            continue
+        AUTH_EMAIL_LAST_ATTEMPT.pop(key, None)
+        AUTH_EMAIL_WINDOW.pop(key, None)
+        AUTH_EMAIL_BLOCKED_UNTIL.pop(key, None)
+
+
+def _is_auth_email_request_allowed(email: str, client_ip: str) -> Tuple[bool, str]:
+    key = _auth_email_key(email, client_ip)
+    now = time.time()
+
+    with AUTH_EMAIL_ABUSE_LOCK:
+        _compact_auth_email_state(now)
+
+        blocked_until = AUTH_EMAIL_BLOCKED_UNTIL.get(key, 0.0)
+        if blocked_until > now:
+            return False, "blocked"
+
+        window = [
+            ts
+            for ts in AUTH_EMAIL_WINDOW.get(key, [])
+            if (now - ts) <= AUTH_EMAIL_WINDOW_SECONDS
+        ]
+        last_attempt = AUTH_EMAIL_LAST_ATTEMPT.get(key, 0.0)
+
+        if (
+            AUTH_EMAIL_MIN_INTERVAL_SECONDS > 0
+            and last_attempt > 0
+            and (now - last_attempt) < AUTH_EMAIL_MIN_INTERVAL_SECONDS
+        ):
+            AUTH_EMAIL_WINDOW[key] = window
+            AUTH_EMAIL_LAST_ATTEMPT[key] = now
+            if len(window) >= AUTH_EMAIL_MAX_ATTEMPTS:
+                AUTH_EMAIL_BLOCKED_UNTIL[key] = now + AUTH_EMAIL_BLOCK_SECONDS
+            return False, "min-interval"
+
+        window.append(now)
+        AUTH_EMAIL_WINDOW[key] = window
+        AUTH_EMAIL_LAST_ATTEMPT[key] = now
+
+        if len(window) > AUTH_EMAIL_MAX_ATTEMPTS:
+            AUTH_EMAIL_BLOCKED_UNTIL[key] = now + AUTH_EMAIL_BLOCK_SECONDS
+            return False, "window-limit"
+
+    return True, "ok"
+
+
+def _auth_email_generic_response() -> Dict[str, Any]:
+    return {
+        "ok": True,
+        "message": "If the email is eligible, a link has been sent.",
+    }
+
+
+def _apply_auth_email_response_floor(start_time: float) -> None:
+    target_ms = AUTH_EMAIL_MIN_RESPONSE_MS
+    if AUTH_EMAIL_RESPONSE_JITTER_MS > 0:
+        target_ms += secrets.randbelow(AUTH_EMAIL_RESPONSE_JITTER_MS + 1)
+
+    if target_ms <= 0:
+        return
+
+    elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+    remaining_ms = target_ms - elapsed_ms
+    if remaining_ms > 0:
+        time.sleep(remaining_ms / 1000.0)
+
+
+def _verify_turnstile_token(token: str, client_ip: str) -> bool:
+    if not AUTH_EMAIL_TURNSTILE_SECRET:
+        return True
+
+    if not token:
+        return False
+
+    try:
+        response = requests.post(
+            AUTH_EMAIL_TURNSTILE_VERIFY_URL,
+            data={
+                "secret": AUTH_EMAIL_TURNSTILE_SECRET,
+                "response": token,
+                "remoteip": client_ip,
+            },
+            timeout=AUTH_EMAIL_TURNSTILE_TIMEOUT_SECONDS,
+        )
+        if response.status_code != 200:
+            logger.warning(
+                "Turnstile verification failed with status=%s",
+                response.status_code,
+            )
+            return False
+
+        payload = response.json() if response.content else {}
+        if payload.get("success") is True:
+            return True
+
+        logger.warning(
+            "Turnstile verification rejected request: codes=%s",
+            payload.get("error-codes"),
+        )
+        return False
+    except Exception as exc:
+        logger.warning("Turnstile verification error: %s", exc)
+        return False
 
 
 def _is_valid_email(value: str) -> bool:
@@ -377,7 +798,11 @@ def _normalize_origin(candidate: str) -> Optional[str]:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-def _build_auth_redirect_url(path: str) -> Optional[str]:
+def _build_auth_redirect_url(
+    path: str,
+    client_redirect_to: str = "",
+    query_params: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
     safe_path = path if path.startswith("/") else f"/{path}"
     allowed = {
         origin
@@ -389,6 +814,7 @@ def _build_auth_redirect_url(path: str) -> Optional[str]:
     }
 
     candidates = [
+        client_redirect_to,
         AUTH_EMAIL_REDIRECT_URL,
         request.headers.get("Origin", "").strip(),
         request.headers.get("Referer", "").strip(),
@@ -403,20 +829,38 @@ def _build_auth_redirect_url(path: str) -> Optional[str]:
             continue
 
         parsed = urlparse(origin)
-        return urlunparse((parsed.scheme, parsed.netloc, safe_path, "", "", ""))
+        query = ""
+        if query_params:
+            normalized_query = {
+                str(key): str(value)
+                for key, value in query_params.items()
+                if str(key).strip() and str(value).strip()
+            }
+            if normalized_query:
+                query = urlencode(normalized_query)
+        return urlunparse((parsed.scheme, parsed.netloc, safe_path, "", query, ""))
 
     return None
 
 
-def _send_supabase_email_link(email: str, flow: str) -> None:
+def _send_supabase_email_link(
+    email: str,
+    flow: str,
+    client_redirect_to: str = "",
+    redirect_path: str = "/login",
+    redirect_query: Optional[Dict[str, str]] = None,
+) -> None:
     if not SUPABASE_URL or not SUPABASE_API_KEY:
         raise RuntimeError("Supabase auth is not configured for backend email auth.")
 
-    if flow not in {"signin", "signup", "reset"}:
+    if flow not in {"signin", "signup"}:
         raise ValueError("Unsupported email auth flow.")
 
-    redirect_path = "/reset-password" if flow == "reset" else "/login"
-    redirect_to = _build_auth_redirect_url(redirect_path)
+    redirect_to = _build_auth_redirect_url(
+        redirect_path,
+        client_redirect_to,
+        query_params=redirect_query,
+    )
 
     headers = {
         "Authorization": f"Bearer {SUPABASE_API_KEY}",
@@ -424,19 +868,13 @@ def _send_supabase_email_link(email: str, flow: str) -> None:
         "Content-Type": "application/json",
     }
 
-    if flow == "reset":
-        endpoint = f"{SUPABASE_URL.rstrip('/')}/auth/v1/recover"
-        payload: Dict[str, Any] = {"email": email}
-        if redirect_to:
-            payload["redirect_to"] = redirect_to
-    else:
-        endpoint = f"{SUPABASE_URL.rstrip('/')}/auth/v1/otp"
-        payload = {
-            "email": email,
-            "create_user": flow == "signup",
-        }
-        if redirect_to:
-            payload["email_redirect_to"] = redirect_to
+    endpoint = f"{SUPABASE_URL.rstrip('/')}/auth/v1/otp"
+    payload: Dict[str, Any] = {
+        "email": email,
+        "create_user": flow == "signup",
+    }
+    if redirect_to:
+        payload["email_redirect_to"] = redirect_to
 
     response = requests.post(endpoint, headers=headers, json=payload, timeout=8)
     if response.status_code >= 400:
@@ -570,6 +1008,12 @@ def _get_agent_session() -> Optional[Dict[str, Any]]:
         AGENT_SESSIONS.pop(session_id, None)
         return None
     return session
+
+
+def _clear_agent_session_for_request() -> None:
+    session_id = request.cookies.get(AGENT_SESSION_COOKIE)
+    if session_id:
+        AGENT_SESSIONS.pop(session_id, None)
 
 
 def require_agent_session(f):
@@ -2023,36 +2467,246 @@ def get_manager() -> AutoCADManager:
 @app.route('/api/auth/email-link', methods=['POST'])
 @limiter.limit("12 per hour")
 def api_auth_email_link():
-    """Request a Supabase email link for sign-in/sign-up/password reset."""
+    """Request a Supabase email link for passwordless sign-in/sign-up."""
+    started_at = time.perf_counter()
+
+    def _finalize(payload: Dict[str, Any], status: int):
+        _apply_auth_email_response_floor(started_at)
+        return jsonify(payload), status
+
     if not SUPABASE_URL or not SUPABASE_API_KEY:
-        return jsonify({
+        return _finalize({
             "error": "Email authentication backend is not configured.",
             "missing": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY"],
-        }), 503
+        }, 503)
 
     if not request.is_json:
-        return jsonify({"error": "Expected JSON payload."}), 400
+        return _finalize({"error": "Expected JSON payload."}, 400)
 
     payload = request.get_json(silent=True) or {}
     email = str(payload.get("email") or "").strip().lower()
     flow = str(payload.get("flow") or "signin").strip().lower()
+    client_redirect_to = str(
+        payload.get("redirectTo") or payload.get("redirect_to") or ""
+    ).strip()
+    captcha_token = str(
+        payload.get("captchaToken") or payload.get("turnstileToken") or ""
+    ).strip()
+    honeypot_value = str(payload.get(AUTH_EMAIL_HONEYPOT_FIELD) or "").strip()
 
-    if flow not in {"signin", "signup", "reset"}:
-        return jsonify({"error": "Invalid flow. Use signin, signup, or reset."}), 400
+    if flow not in {"signin", "signup"}:
+        return _finalize({"error": "Invalid flow. Use signin or signup."}, 400)
 
     if not _is_valid_email(email):
-        return jsonify({"error": "Enter a valid email address."}), 400
+        return _finalize({"error": "Enter a valid email address."}, 400)
+
+    if honeypot_value:
+        logger.warning(
+            "Auth email honeypot triggered for flow=%s ip=%s",
+            flow,
+            _get_request_ip(),
+        )
+        return _finalize(_auth_email_generic_response(), 202)
+
+    client_ip = _get_request_ip()
+    allowed, reason = _is_auth_email_request_allowed(email, client_ip)
+    if not allowed:
+        logger.warning(
+            "Auth email throttled flow=%s reason=%s ip=%s email_hash=%s",
+            flow,
+            reason,
+            client_ip,
+            _email_fingerprint(email),
+        )
+        return _finalize(_auth_email_generic_response(), 202)
+
+    if AUTH_EMAIL_TURNSTILE_SECRET:
+        captcha_ok = _verify_turnstile_token(captcha_token, client_ip)
+        if not captcha_ok:
+            logger.warning(
+                "Auth email captcha verification failed flow=%s ip=%s email_hash=%s",
+                flow,
+                client_ip,
+                _email_fingerprint(email),
+            )
+            if AUTH_EMAIL_REQUIRE_TURNSTILE:
+                return _finalize(_auth_email_generic_response(), 202)
 
     try:
-        _send_supabase_email_link(email, flow)
+        _send_supabase_email_link(email, flow, client_redirect_to=client_redirect_to)
     except Exception as exc:
         # Do not leak delivery failures to clients to reduce account enumeration signal.
         logger.warning("Email auth request failed for flow=%s: %s", flow, exc)
 
+    return _finalize(_auth_email_generic_response(), 202)
+
+
+@app.route('/api/agent/pairing-challenge', methods=['POST'])
+@require_supabase_user
+@limiter.limit("12 per hour")
+def api_agent_pairing_challenge():
+    """Request an email link to authorize a pair/unpair action."""
+    config_status = _agent_broker_config_status()
+    if not config_status["ok"]:
+        return jsonify({
+            "error": "Agent broker misconfigured",
+            "missing": config_status["missing"],
+            "warnings": config_status["warnings"],
+        }), 503
+
+    if not request.is_json:
+        return jsonify({"error": "Expected JSON payload"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action") or "").strip().lower()
+    if action not in {"pair", "unpair"}:
+        return jsonify({"error": "Invalid action. Use pair or unpair."}), 400
+
+    user = getattr(g, "supabase_user", {}) or {}
+    user_id = _get_supabase_user_id(user)
+    user_email = _get_supabase_user_email(user)
+    if not user_id or not user_email:
+        return jsonify({"error": "Authenticated user must have a valid email address."}), 400
+
+    pairing_code = ""
+    if action == "pair":
+        pairing_code = str(
+            payload.get("pairing_code")
+            or payload.get("pairingCode")
+            or ""
+        ).strip()
+        if not pairing_code:
+            return jsonify({"error": "Pairing code required for pair action."}), 400
+        if not PAIRING_CODE_PATTERN.match(pairing_code):
+            return jsonify({"error": "Pairing code must be a 6-digit value."}), 400
+
+    client_redirect_to = str(
+        payload.get("redirectTo") or payload.get("redirect_to") or ""
+    ).strip()
+    client_ip = _get_request_ip()
+    challenge_id, expires_at = _create_agent_pairing_challenge(
+        action=action,
+        user_id=user_id,
+        email=user_email,
+        pairing_code=pairing_code,
+        client_ip=client_ip,
+    )
+
+    try:
+        _send_supabase_email_link(
+            user_email,
+            "signin",
+            client_redirect_to=client_redirect_to,
+            redirect_path=AGENT_PAIRING_REDIRECT_PATH,
+            redirect_query={
+                "agent_action": action,
+                "agent_challenge": challenge_id,
+            },
+        )
+    except Exception as exc:
+        logger.warning(
+            "Agent pairing challenge email failed action=%s user=%s ip=%s: %s",
+            action,
+            _email_fingerprint(user_email),
+            client_ip,
+            exc,
+        )
+        with AGENT_PAIRING_CHALLENGE_LOCK:
+            AGENT_PAIRING_CHALLENGES.pop(challenge_id, None)
+        return jsonify({
+            "error": "Unable to send verification email right now. Please retry.",
+        }), 502
+
     return jsonify({
         "ok": True,
-        "message": "If the email is eligible, a link has been sent.",
+        "action": action,
+        "message": "Verification link sent to your email.",
+        "expires_at": datetime.utcfromtimestamp(expires_at).isoformat() + "Z",
     }), 202
+
+
+@app.route('/api/agent/pairing-confirm', methods=['POST'])
+@require_supabase_user
+@limiter.limit("20 per hour")
+def api_agent_pairing_confirm():
+    """Confirm a pair/unpair action using the emailed challenge link."""
+    config_status = _agent_broker_config_status()
+    if not config_status["ok"]:
+        return jsonify({
+            "error": "Agent broker misconfigured",
+            "missing": config_status["missing"],
+            "warnings": config_status["warnings"],
+        }), 503
+
+    if not request.is_json:
+        return jsonify({"error": "Expected JSON payload"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    challenge_id = str(
+        payload.get("challenge_id")
+        or payload.get("challengeId")
+        or ""
+    ).strip()
+    if not challenge_id:
+        return jsonify({"error": "challenge_id is required"}), 400
+    if not PAIRING_CHALLENGE_ID_PATTERN.match(challenge_id):
+        return jsonify({"error": "Invalid challenge_id format."}), 400
+
+    user = getattr(g, "supabase_user", {}) or {}
+    user_id = _get_supabase_user_id(user)
+    user_email = _get_supabase_user_email(user)
+    if not user_id or not user_email:
+        return jsonify({"error": "Authenticated user must have a valid email address."}), 400
+
+    challenge, reason = _consume_agent_pairing_challenge(
+        challenge_id=challenge_id,
+        user_id=user_id,
+        email=user_email,
+    )
+    if not challenge:
+        if reason == "expired":
+            return jsonify({"error": "Verification link expired. Request a new one."}), 410
+        if reason in {"user-mismatch", "email-mismatch"}:
+            return jsonify({"error": "Verification link does not match this user."}), 403
+        return jsonify({"error": "Invalid verification link."}), 400
+
+    action = str(challenge.get("action") or "").strip().lower()
+    if action == "pair":
+        pairing_code = str(challenge.get("pairing_code") or "").strip()
+        if not pairing_code:
+            return jsonify({"error": "Pairing challenge is missing code."}), 400
+        return _pair_agent_session_for_user(
+            pairing_code,
+            user_id,
+            extra_payload={
+                "verified": True,
+                "action": "pair",
+            },
+        )
+
+    if action == "unpair":
+        session = _get_agent_session()
+        session_token = ""
+        if session and session.get("user_id") == user_id:
+            session_token = str(session.get("token") or "")
+
+        revoke_response, revoke_status = _revoke_gateway_agent_token(session_token)
+        if revoke_status >= 500:
+            return revoke_response, revoke_status
+
+        _clear_agent_session_for_request()
+        payload = revoke_response.get_json(silent=True) or {}
+        payload.update({
+            "paired": False,
+            "verified": True,
+            "action": "unpair",
+        })
+        resp = jsonify(payload)
+        resp.delete_cookie(AGENT_SESSION_COOKIE, path="/")
+        return resp, 200
+
+    return jsonify({"error": "Unsupported challenge action."}), 400
+
 
 @app.route('/api/agent/health', methods=['GET'])
 @require_supabase_user
@@ -2083,6 +2737,91 @@ def api_agent_config():
     return jsonify(_agent_broker_config_status()), 200
 
 
+def _pair_agent_session_for_user(
+    pairing_code: str,
+    user_id: str,
+    extra_payload: Optional[Dict[str, Any]] = None,
+):
+    try:
+        response = requests.post(
+            f"{AGENT_GATEWAY_URL.rstrip('/')}/pair",
+            headers={"X-Pairing-Code": pairing_code},
+            timeout=10,
+        )
+    except Exception as exc:
+        logger.warning("Pairing proxy failed: %s", exc)
+        return jsonify({"error": "Agent gateway unavailable"}), 503
+
+    if response.status_code != 200:
+        return jsonify({
+            "error": "Pairing failed",
+            "details": response.text,
+        }), response.status_code
+
+    try:
+        data = response.json()
+    except Exception:
+        data = {}
+
+    token = data.get("token")
+    if not token:
+        return jsonify({"error": "Gateway did not return a token"}), 502
+
+    session_id, expires_at = _create_agent_session(token, user_id)
+    response_payload = {
+        "paired": True,
+        "expires_at": datetime.utcfromtimestamp(expires_at).isoformat() + "Z",
+    }
+    if extra_payload:
+        response_payload.update(extra_payload)
+    resp = jsonify(response_payload)
+    resp.set_cookie(
+        AGENT_SESSION_COOKIE,
+        session_id,
+        httponly=True,
+        samesite=AGENT_SESSION_SAMESITE,
+        secure=AGENT_SESSION_SECURE,
+        max_age=AGENT_SESSION_TTL_SECONDS,
+        path="/",
+    )
+    return resp, 200
+
+
+def _revoke_gateway_agent_token(token: str):
+    if not token:
+        return jsonify({"revoked": False, "paired": False}), 200
+
+    try:
+        response = requests.post(
+            f"{AGENT_GATEWAY_URL.rstrip('/')}/unpair",
+            headers={
+                "Authorization": f"Bearer {token}",
+            },
+            timeout=10,
+        )
+    except Exception as exc:
+        logger.warning("Unpair proxy failed: %s", exc)
+        return jsonify({"error": "Agent gateway unavailable"}), 503
+
+    if response.status_code in (200, 401, 403, 404):
+        payload: Dict[str, Any] = {}
+        try:
+            payload = response.json()
+        except Exception:
+            payload = {}
+        return jsonify({
+            "revoked": response.status_code == 200 or payload.get("revoked") is True,
+            "gateway_status": response.status_code,
+            "paired": bool(payload.get("paired")),
+            "pairing_code": payload.get("pairing_code"),
+        }), 200
+
+    return jsonify({
+        "error": "Gateway unpair failed",
+        "details": response.text,
+    }), response.status_code
+
+
 @app.route('/api/agent/session', methods=['GET'])
 @require_supabase_user
 def api_agent_session():
@@ -2109,80 +2848,31 @@ def api_agent_session():
 @require_supabase_user
 @limiter.limit("10 per hour")
 def api_agent_pair():
-    """Pair with ZeroClaw using a 6-digit code. Sets HttpOnly session cookie."""
-    config_status = _agent_broker_config_status()
-    if not config_status["ok"]:
-        return jsonify({
-            "error": "Agent broker misconfigured",
-            "missing": config_status["missing"],
-            "warnings": config_status["warnings"],
-        }), 503
-    payload = request.get_json(silent=True) or {}
-    pairing_code = (
-        payload.get("pairing_code")
-        or payload.get("pairingCode")
-        or request.headers.get("X-Pairing-Code")
-        or ""
-    )
-    pairing_code = str(pairing_code).strip()
-
-    if not pairing_code:
-        return jsonify({"error": "Pairing code required"}), 400
-
-    try:
-        response = requests.post(
-            f"{AGENT_GATEWAY_URL.rstrip('/')}/pair",
-            headers={"X-Pairing-Code": pairing_code},
-            timeout=10,
-        )
-    except Exception as exc:
-        logger.warning("Pairing proxy failed: %s", exc)
-        return jsonify({"error": "Agent gateway unavailable"}), 503
-
-    if response.status_code != 200:
-        return jsonify({
-            "error": "Pairing failed",
-            "details": response.text,
-        }), response.status_code
-
-    try:
-        data = response.json()
-    except Exception:
-        data = {}
-
-    token = data.get("token")
-    if not token:
-        return jsonify({"error": "Gateway did not return a token"}), 502
-
-    user_id = _get_supabase_user_id(getattr(g, "supabase_user", {}) or {})
-    if not user_id:
-        return jsonify({"error": "Invalid Supabase user"}), 401
-
-    session_id, expires_at = _create_agent_session(token, user_id)
-
-    response_payload = {
-        "paired": True,
-        "expires_at": datetime.utcfromtimestamp(expires_at).isoformat() + "Z",
-    }
-    resp = jsonify(response_payload)
-    resp.set_cookie(
-        AGENT_SESSION_COOKIE,
-        session_id,
-        httponly=True,
-        samesite=AGENT_SESSION_SAMESITE,
-        secure=AGENT_SESSION_SECURE,
-        max_age=AGENT_SESSION_TTL_SECONDS,
-        path="/",
-    )
-    return resp
+    return jsonify({
+        "error": "Direct pair is disabled. Request email verification first.",
+        "next": [
+            "POST /api/agent/pairing-challenge",
+            "POST /api/agent/pairing-confirm",
+        ],
+    }), 428
 
 
 @app.route('/api/agent/unpair', methods=['POST'])
 @require_supabase_user
 def api_agent_unpair():
-    session_id = request.cookies.get(AGENT_SESSION_COOKIE)
-    if session_id:
-        AGENT_SESSIONS.pop(session_id, None)
+    return jsonify({
+        "error": "Direct unpair is disabled. Request email verification first.",
+        "next": [
+            "POST /api/agent/pairing-challenge",
+            "POST /api/agent/pairing-confirm",
+        ],
+    }), 428
+
+
+@app.route('/api/agent/session/clear', methods=['POST'])
+@require_supabase_user
+def api_agent_session_clear():
+    _clear_agent_session_for_request()
 
     resp = jsonify({"paired": False})
     resp.delete_cookie(AGENT_SESSION_COOKIE, path="/")
@@ -2513,9 +3203,62 @@ def api_transmittal_render():
         if output_format not in {"docx", "pdf", "both"}:
             output_format = "docx"
         fields = _parse_json_field("fields", {}) or {}
+        if not isinstance(fields, dict):
+            fields = {}
         checks = _parse_json_field("checks", {}) or {}
+        if not isinstance(checks, dict):
+            checks = {}
         contacts = _parse_json_field("contacts", []) or []
+        if not isinstance(contacts, list):
+            contacts = []
         cid_index_data = _parse_json_field("cid_index_data", []) or []
+        if not isinstance(cid_index_data, list):
+            cid_index_data = []
+
+        profile_options = _load_transmittal_profiles_payload()
+        available_profiles = profile_options.get("profiles", [])
+        available_firms = set(profile_options.get("firm_numbers", []))
+        defaults = (
+            profile_options.get("defaults", {})
+            if isinstance(profile_options.get("defaults"), dict)
+            else {}
+        )
+        requested_profile_id = str(
+            fields.get("from_profile_id")
+            or fields.get("fromProfileId")
+            or ""
+        ).strip()
+        if requested_profile_id:
+            selected_profile = next(
+                (p for p in available_profiles if p.get("id") == requested_profile_id),
+                None,
+            )
+            if not selected_profile:
+                return jsonify(
+                    {
+                        "success": False,
+                        "message": "Invalid transmittal profile selection.",
+                    }
+                ), 400
+
+            fields["from_profile_id"] = requested_profile_id
+            fields["from_name"] = selected_profile.get("name", "")
+            fields["from_title"] = selected_profile.get("title", "")
+            fields["from_email"] = selected_profile.get("email", "")
+            fields["from_phone"] = selected_profile.get("phone", "")
+
+        firm_value = str(fields.get("firm") or "").strip()
+        if firm_value and available_firms and firm_value not in available_firms:
+            return jsonify(
+                {
+                    "success": False,
+                    "message": "Invalid firm selection.",
+                }
+            ), 400
+        if not firm_value:
+            default_firm = str(defaults.get("firm") or "").strip()
+            if default_firm:
+                fields["firm"] = default_firm
 
         # Normalize checks with defaults
         default_checks = {
@@ -2706,16 +3449,28 @@ def api_transmittal_render():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
+@app.route('/api/transmittal/profiles', methods=['GET'])
+@require_api_key
+@limiter.limit("120 per hour")
+def api_transmittal_profiles():
+    """Return allowed sender profiles and firm names for transmittal generation."""
+    payload = _load_transmittal_profiles_payload()
+    return jsonify(
+        {
+            "success": True,
+            "profiles": payload.get("profiles", []),
+            "firm_numbers": payload.get("firm_numbers", []),
+            "defaults": payload.get("defaults", {}),
+        }
+    )
+
+
 @app.route('/api/transmittal/template', methods=['GET'])
 @require_api_key
 @limiter.limit("60 per hour")
 def api_transmittal_template():
     """Download the example transmittal DOCX template bundled with the repo."""
-    template_path = (
-        Path(__file__).resolve().parent
-        / "Transmittal-Builder"
-        / "R3P-PRJ#-XMTL-001 - DOCUMENT INDEX.docx"
-    )
+    template_path = TRANSMITTAL_TEMPLATE_PATH
     if not template_path.exists():
         return (
             jsonify(

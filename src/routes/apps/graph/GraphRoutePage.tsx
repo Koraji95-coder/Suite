@@ -8,7 +8,7 @@ export default function GraphRoutePage() {
 			subtitle="Architecture and agent-memory graph visualization."
 		>
 			<FrameSection>
-				<div style={{ height: "calc(100dvh - 10rem)", minHeight: 520 }}>
+				<div style={{ minHeight: 520, height: "clamp(520px, 70dvh, 980px)" }}>
 					<GraphVisualization />
 				</div>
 			</FrameSection>

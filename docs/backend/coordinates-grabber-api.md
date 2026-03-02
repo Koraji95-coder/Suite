@@ -74,6 +74,18 @@ WebSocket stream for real-time backend/AutoCAD connection status.
 ### `GET /health`
 Simple health check endpoint.
 
+### `GET /api/transmittal/profiles`
+Returns allowed transmittal sender profiles and firm numbers from backend config.
+
+### `POST /api/transmittal/render`
+Generates a transmittal file from uploaded inputs.
+
+Security note: include `fields.from_profile_id` to select a server-authoritative sender profile.  
+When provided, backend resolves sender name/title/email/phone from the profile and does not trust client-edited sender values.
+
+### `GET /api/transmittal/template`
+Downloads the bundled transmittal template DOCX.
+
 ## Status States
 
 | State | Process | COM | Document | Meaning |
@@ -128,8 +140,10 @@ Endpoints (all require Supabase auth `Authorization: Bearer <access_token>`):
 
 - `GET /api/agent/health` → proxy gateway health
 - `GET /api/agent/session` → `{ paired: boolean, expires_at?: string }`
-- `POST /api/agent/pair` → `{ pairing_code: "123456" }`
-- `POST /api/agent/unpair`
+- `POST /api/agent/pairing-challenge` → `{ action: "pair" | "unpair", pairing_code?: "123456" }`
+- `POST /api/agent/pairing-confirm` → `{ challenge_id: "<from-email-link>" }`
+- `POST /api/agent/session/clear` → clear broker cookie/session during sign-out cleanup
+- `POST /api/agent/pair` and `POST /api/agent/unpair` return `428` (direct pair/unpair is intentionally disabled)
 - `POST /api/agent/webhook` → same payload as gateway `/webhook`
 
 Broker env vars (backend-only):
@@ -140,6 +154,9 @@ Broker env vars (backend-only):
 - `AGENT_GATEWAY_URL` (default `http://127.0.0.1:3000`)
 - `AGENT_WEBHOOK_SECRET`
 - `AGENT_SESSION_TTL_SECONDS`
+- `AGENT_PAIRING_CHALLENGE_TTL_SECONDS`
+- `AGENT_PAIRING_CHALLENGE_MAX_ENTRIES`
+- `AGENT_PAIRING_REDIRECT_PATH`
 
 ## WebSocket Event Shape
 

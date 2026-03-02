@@ -5,8 +5,6 @@ export type SecurityEventType =
 	| "auth_sign_up_success"
 	| "auth_sign_out"
 	| "auth_sign_out_global"
-	| "auth_password_update_success"
-	| "auth_password_update_failed"
 	| "agent_pair_success"
 	| "agent_pair_failed"
 	| "agent_restore_success"

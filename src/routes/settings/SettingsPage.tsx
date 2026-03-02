@@ -40,7 +40,7 @@ const TABS = [
 	{
 		id: "account",
 		label: "Account",
-		description: "Password, sessions, and account actions.",
+		description: "Passkeys, sessions, and account actions.",
 		icon: Shield,
 	},
 	{

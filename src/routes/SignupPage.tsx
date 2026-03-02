@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import AuthEnvDebugCard from "../auth/AuthEnvDebugCard";
+import CaptchaChallenge from "../auth/CaptchaChallenge";
 import AuthShell from "../auth/AuthShell";
 import { useNotification } from "../auth/NotificationContext";
 import { useAuth } from "../auth/useAuth";
@@ -11,14 +12,23 @@ export default function SignupPage() {
 	const notification = useNotification();
 
 	const [email, setEmail] = useState("");
+	const [captchaToken, setCaptchaToken] = useState("");
+	const [honeypot, setHoneypot] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState("");
 	const [sent, setSent] = useState(false);
+	const requiresCaptcha = Boolean(
+		(import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim(),
+	);
+	const honeypotFieldName =
+		(import.meta.env.VITE_AUTH_HONEYPOT_FIELD || "company").trim() || "company";
 
 	const canSubmit = useMemo(() => {
 		if (loading || submitting) return false;
-		return email.trim().length > 0;
-	}, [email, loading, submitting]);
+		if (email.trim().length === 0) return false;
+		if (requiresCaptcha) return captchaToken.trim().length > 0;
+		return true;
+	}, [email, loading, submitting, requiresCaptcha, captchaToken]);
 
 	if (user && !loading) return <Navigate to="/app/home" replace />;
 
@@ -29,7 +39,7 @@ export default function SignupPage() {
 		setError("");
 		setSubmitting(true);
 		try {
-			await signUp(email.trim());
+			await signUp(email.trim(), { captchaToken, honeypot });
 			setSent(true);
 			notification.success(
 				"Check your email",
@@ -41,6 +51,7 @@ export default function SignupPage() {
 					? err.message
 					: "We couldn't send your signup link right now.";
 			setError(msg);
+			setCaptchaToken("");
 			logger.error("Signup link request failed", "SignupPage", { error: err });
 			notification.error("Signup failed", msg);
 		} finally {
@@ -107,6 +118,35 @@ export default function SignupPage() {
 							required
 						/>
 					</div>
+
+					<div
+						aria-hidden="true"
+						style={{
+							position: "absolute",
+							left: "-10000px",
+							top: "auto",
+							width: 1,
+							height: 1,
+							overflow: "hidden",
+						}}
+					>
+						<label htmlFor={`hp-${honeypotFieldName}`}>Company</label>
+						<input
+							id={`hp-${honeypotFieldName}`}
+							name={honeypotFieldName}
+							type="text"
+							autoComplete="off"
+							tabIndex={-1}
+							value={honeypot}
+							onChange={(event) => setHoneypot(event.target.value)}
+						/>
+					</div>
+
+					<CaptchaChallenge
+						token={captchaToken}
+						onTokenChange={setCaptchaToken}
+						disabled={submitting}
+					/>
 
 					{error ? (
 						<div className="rounded-lg border px-3 py-2 text-sm [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">

@@ -1,9 +1,9 @@
 import { Clock, ExternalLink, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useRecentFiles } from "./useRecentFiles";
-import { hexToRgba, useTheme } from "@/lib/palette";
-import { GlassPanel } from "@/components/apps/ui/GlassPanel";
 import { bubbleStyle } from "@/components/apps/dashboard/dashboardStyles";
+import { GlassPanel } from "@/components/apps/ui/GlassPanel";
+import { hexToRgba, useTheme } from "@/lib/palette";
+import { useRecentFiles } from "./useRecentFiles";
 
 export function RecentFilesWidget() {
 	const { palette } = useTheme();

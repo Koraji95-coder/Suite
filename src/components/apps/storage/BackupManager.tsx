@@ -1,501 +1,91 @@
-import {
-	AlertTriangle,
-	Download,
-	Loader2,
-	RefreshCw,
-	Shield,
-	Trash2,
-	Upload,
-} from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	Dialog,
-	DialogContent,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/apps/ui/dialog";
-import { useToast } from "@/components/notification-system/ToastProvider";
-import { hexToRgba, useTheme } from "@/lib/palette";
-import {
-	type BackupFileInfo,
-	deleteBackupFile,
-	downloadYaml,
-	getLastBackupTimestamp,
-	listBackupFiles,
-	readBackupFile,
-	restoreFromYaml,
-	runFullBackup,
-} from "@/supabase/backupManager";
-import type { BackupHistoryEntry } from "./storageTypes";
-
-const HISTORY_KEY = "backup_history";
-
-function loadHistory(): BackupHistoryEntry[] {
-	try {
-		return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
-	} catch {
-		return [];
-	}
-}
-function saveHistory(h: BackupHistoryEntry[]) {
-	localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 50)));
-}
-
-function formatSize(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-}
+import { useTheme } from "@/lib/palette";
+import { BackupManagerActionBar } from "./BackupManagerActionBar";
+import { BackupManagerDeleteDialog } from "./BackupManagerDeleteDialog";
+import { BackupManagerFilesList } from "./BackupManagerFilesList";
+import { BackupManagerHistoryList } from "./BackupManagerHistoryList";
+import { BackupManagerRestoreDialog } from "./BackupManagerRestoreDialog";
+import { BackupManagerStatusBanners } from "./BackupManagerStatusBanners";
+import { useBackupManagerState } from "./useBackupManagerState";
 
 export function BackupManager() {
 	const { palette } = useTheme();
-	const { showToast } = useToast();
-	const [status, setStatus] = useState<"idle" | "running" | "done" | "error">(
-		"idle",
-	);
-	const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
-	const [lastBackup, setLastBackup] = useState(getLastBackupTimestamp());
-	const [files, setFiles] = useState<BackupFileInfo[]>([]);
-	const [loadingFiles, setLoadingFiles] = useState(false);
-	const [history, setHistory] = useState(loadHistory);
-	const [confirmRestore, setConfirmRestore] = useState<string | null>(null);
-	const [pendingDelete, setPendingDelete] = useState<string | null>(null);
-	const fileRef = useRef<HTMLInputElement>(null);
-
-	const refreshFiles = useCallback(async () => {
-		setLoadingFiles(true);
-		setFiles(await listBackupFiles());
-		setLoadingFiles(false);
-	}, []);
-
-	useEffect(() => {
-		refreshFiles();
-	}, [refreshFiles]);
-
-	const handleBackup = async () => {
-		setStatus("running");
-		try {
-			const yaml = await runFullBackup();
-			setLastBackup(getLastBackupTimestamp());
-			const entry: BackupHistoryEntry = {
-				timestamp: new Date().toISOString(),
-				tableCount: 15,
-				size: new Blob([yaml]).size,
-			};
-			const next = [entry, ...history];
-			setHistory(next);
-			saveHistory(next);
-			await refreshFiles();
-			setStatus("done");
-			setTimeout(() => setStatus("idle"), 3000);
-		} catch {
-			setStatus("error");
-			setTimeout(() => setStatus("idle"), 3000);
-		}
-	};
-
-	const handleFileRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
-		if (!file) return;
-		setRestoreMsg("Reading file...");
-		try {
-			const text = await file.text();
-			setRestoreMsg("Restoring data...");
-			const { restored, errors } = await restoreFromYaml(text);
-			setRestoreMsg(
-				errors.length
-					? `Restored ${restored} rows with ${errors.length} errors`
-					: `Restored ${restored} rows successfully`,
-			);
-		} catch {
-			setRestoreMsg("Restore failed");
-		}
-		setTimeout(() => setRestoreMsg(null), 5000);
-		if (fileRef.current) fileRef.current.value = "";
-	};
-
-	const handleRestoreFromBackup = async (filename: string) => {
-		setConfirmRestore(null);
-		setRestoreMsg(`Restoring ${filename}...`);
-		try {
-			const content = await readBackupFile(filename);
-			if (!content) {
-				setRestoreMsg("Failed to read backup");
-				return;
-			}
-			const { restored, errors } = await restoreFromYaml(content);
-			setRestoreMsg(
-				errors.length
-					? `Restored ${restored} rows with ${errors.length} errors`
-					: `Restored ${restored} rows successfully`,
-			);
-		} catch {
-			setRestoreMsg("Restore failed");
-		}
-		setTimeout(() => setRestoreMsg(null), 5000);
-	};
-
-	const requestDelete = (filename: string) => {
-		setPendingDelete(filename);
-	};
-
-	const confirmDelete = async () => {
-		if (!pendingDelete) return;
-		if (await deleteBackupFile(pendingDelete)) {
-			setFiles((prev) => prev.filter((f) => f.name !== pendingDelete));
-			showToast("success", `Deleted "${pendingDelete}".`);
-		} else {
-			showToast("error", `Failed to delete "${pendingDelete}".`);
-		}
-		setPendingDelete(null);
-	};
-
-	const handleDownloadFile = async (filename: string) => {
-		const content = await readBackupFile(filename);
-		if (content) downloadYaml(content, filename);
-	};
-
-	const btnBase: React.CSSProperties = {
-		display: "flex",
-		alignItems: "center",
-		gap: 6,
-		padding: "8px 14px",
-		borderRadius: 8,
-		fontSize: 13,
-		cursor: "pointer",
-		transition: "all 0.15s",
-	};
+	const {
+		confirmDelete,
+		confirmRestore,
+		fileRef,
+		files,
+		formatSize,
+		handleBackup,
+		handleDownloadFile,
+		handleFileRestore,
+		handleRestoreFromBackup,
+		history,
+		lastBackup,
+		loadingFiles,
+		pendingDelete,
+		refreshFiles,
+		restoreMsg,
+		setConfirmRestore,
+		setPendingDelete,
+		status,
+	} = useBackupManagerState();
 
 	return (
 		<div>
-			<div
-				className="mb-4 flex flex-wrap items-center gap-2"
-				style={{
-					alignItems: "center",
+			<BackupManagerActionBar
+				palette={palette}
+				status={status}
+				lastBackup={lastBackup}
+				loadingFiles={loadingFiles}
+				fileRef={fileRef}
+				onBackup={() => {
+					void handleBackup();
 				}}
-			>
-				<button
-					onClick={handleBackup}
-					disabled={status === "running"}
-					style={{
-						...btnBase,
-						background: hexToRgba(palette.primary, 0.15),
-						border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
-						color: palette.text,
-						opacity: status === "running" ? 0.6 : 1,
-					}}
-				>
-					{status === "running" ? (
-						<Loader2 className="w-4 h-4 animate-spin" />
-					) : (
-						<Download className="w-4 h-4" />
-					)}
-					{status === "running" ? "Backing up..." : "New Backup"}
-				</button>
-				<button
-					onClick={() => fileRef.current?.click()}
-					style={{
-						...btnBase,
-						background: hexToRgba(palette.secondary, 0.15),
-						border: `1px solid ${hexToRgba(palette.secondary, 0.3)}`,
-						color: palette.text,
-					}}
-				>
-					<Upload className="w-4 h-4" /> Restore from File
-				</button>
-				<input
-					ref={fileRef}
-					type="file"
-					accept=".yaml,.yml"
-					onChange={handleFileRestore}
-					className="hidden"
-				/>
-				<button
-					onClick={refreshFiles}
-					disabled={loadingFiles}
-					style={{
-						...btnBase,
-						background: hexToRgba(palette.primary, 0.1),
-						border: `1px solid ${hexToRgba(palette.primary, 0.15)}`,
-						color: palette.text,
-					}}
-				>
-					<RefreshCw
-						className={`w-4 h-4 ${loadingFiles ? "animate-spin" : ""}`}
-					/>
-				</button>
-				<div className="hidden sm:block sm:flex-1" />
-				{lastBackup && (
-					<span
-						className="w-full text-left text-xs sm:w-auto sm:text-right"
-						style={{ color: palette.textMuted }}
-					>
-						Last: {new Date(lastBackup).toLocaleString()}
-					</span>
-				)}
-			</div>
+				onFileRestore={handleFileRestore}
+				onRefreshFiles={() => {
+					void refreshFiles();
+				}}
+			/>
 
-			{status === "done" && (
-				<div
-					style={{
-						marginBottom: 12,
-						padding: "8px 14px",
-						borderRadius: 8,
-						fontSize: 13,
-						background: hexToRgba("#22c55e", 0.12),
-						border: `1px solid ${hexToRgba("#22c55e", 0.3)}`,
-						color: "#4ade80",
-					}}
-				>
-					Backup saved successfully
-				</div>
-			)}
-			{status === "error" && (
-				<div
-					style={{
-						marginBottom: 12,
-						padding: "8px 14px",
-						borderRadius: 8,
-						fontSize: 13,
-						background: hexToRgba(palette.accent, 0.12),
-						border: `1px solid ${hexToRgba(palette.accent, 0.3)}`,
-						color: palette.accent,
-					}}
-				>
-					Backup failed
-				</div>
-			)}
-			{restoreMsg && (
-				<div
-					style={{
-						marginBottom: 12,
-						padding: "8px 14px",
-						borderRadius: 8,
-						fontSize: 13,
-						background: hexToRgba(palette.secondary, 0.12),
-						border: `1px solid ${hexToRgba(palette.secondary, 0.3)}`,
-						color: palette.secondary,
-					}}
-				>
-					{restoreMsg}
-				</div>
-			)}
+			<BackupManagerStatusBanners
+				palette={palette}
+				status={status}
+				restoreMsg={restoreMsg}
+			/>
 
-			<div style={{ marginBottom: 20 }}>
-				<div
-					style={{
-						fontWeight: 600,
-						fontSize: 14,
-						color: palette.text,
-						marginBottom: 10,
-						display: "flex",
-						alignItems: "center",
-						gap: 8,
-					}}
-				>
-					<Shield className="w-4 h-4" style={{ color: palette.primary }} />{" "}
-					Backup Files
-				</div>
-				{loadingFiles ? (
-					<div
-						style={{
-							textAlign: "center",
-							padding: 24,
-							color: palette.textMuted,
-						}}
-					>
-						<Loader2 className="w-5 h-5 animate-spin mx-auto" />
-					</div>
-				) : files.length === 0 ? (
-					<div
-						style={{
-							textAlign: "center",
-							padding: 24,
-							color: palette.textMuted,
-							fontSize: 13,
-						}}
-					>
-						No backup files yet
-					</div>
-				) : (
-					<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-						{files.map((f) => (
-							<div
-								key={f.name}
-								className="flex flex-wrap items-center gap-2 sm:gap-3"
-								style={{
-									padding: "10px 14px",
-									borderRadius: 8,
-									background: hexToRgba(palette.surface, 0.5),
-									border: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
-								}}
-							>
-								<span
-									className="min-w-0 flex-1 basis-full sm:basis-auto"
-									style={{
-										fontSize: 13,
-										color: palette.text,
-										overflow: "hidden",
-										textOverflow: "ellipsis",
-										whiteSpace: "nowrap",
-									}}
-								>
-									{f.name}
-								</span>
-								<div
-									className="flex items-center gap-3"
-									style={{
-										color: palette.textMuted,
-									}}
-								>
-									<span style={{ fontSize: 12 }}>{formatSize(f.size)}</span>
-									<span className="hidden text-xs sm:inline">
-										{new Date(f.modified).toLocaleDateString()}
-									</span>
-								</div>
-								<div className="ml-auto flex items-center gap-1">
-									<button
-										onClick={() => handleDownloadFile(f.name)}
-										style={{
-											background: "none",
-											border: "none",
-											cursor: "pointer",
-											color: palette.primary,
-											padding: 4,
-										}}
-									>
-										<Download className="w-4 h-4" />
-									</button>
-									<button
-										onClick={() => setConfirmRestore(f.name)}
-										style={{
-											background: "none",
-											border: "none",
-											cursor: "pointer",
-											color: palette.secondary,
-											padding: 4,
-										}}
-									>
-										<Upload className="w-4 h-4" />
-									</button>
-									<button
-										onClick={() => requestDelete(f.name)}
-										style={{
-											background: "none",
-											border: "none",
-											cursor: "pointer",
-											color: palette.accent,
-											padding: 4,
-										}}
-									>
-										<Trash2 className="w-4 h-4" />
-									</button>
-								</div>
-							</div>
-						))}
-					</div>
-				)}
-			</div>
+			<BackupManagerFilesList
+				palette={palette}
+				files={files}
+				loadingFiles={loadingFiles}
+				formatSize={formatSize}
+				onDownloadFile={(filename) => {
+					void handleDownloadFile(filename);
+				}}
+				onRequestRestore={setConfirmRestore}
+				onRequestDelete={setPendingDelete}
+			/>
 
-			{history.length > 0 && (
-				<div>
-					<div
-						style={{
-							fontWeight: 600,
-							fontSize: 14,
-							color: palette.text,
-							marginBottom: 10,
-						}}
-					>
-						Backup History
-					</div>
-					<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-						{history.slice(0, 10).map((h, i) => (
-							<div
-								key={i}
-								style={{
-									display: "flex",
-									gap: 16,
-									padding: "6px 12px",
-									borderRadius: 6,
-									fontSize: 12,
-									background: hexToRgba(palette.surface, 0.3),
-									color: palette.textMuted,
-								}}
-							>
-								<span>{new Date(h.timestamp).toLocaleString()}</span>
-								<span>{h.tableCount} tables</span>
-								<span>{formatSize(h.size)}</span>
-							</div>
-						))}
-					</div>
-				</div>
-			)}
-			<Dialog
-				open={Boolean(confirmRestore)}
-				onOpenChange={(open) => !open && setConfirmRestore(null)}
-			>
-				<DialogContent className="max-w-md border-[var(--border)] bg-[var(--surface)]">
-					<DialogHeader>
-						<DialogTitle className="flex items-center gap-2">
-							<AlertTriangle className="h-5 w-5 [color:var(--warning)]" />
-							Confirm Restore
-						</DialogTitle>
-					</DialogHeader>
-					<p className="text-sm text-[var(--text-muted)]">
-						This will upsert data from{" "}
-						<strong className="text-[var(--text)]">
-							{confirmRestore ?? "this backup"}
-						</strong>{" "}
-						into your database. Existing rows with matching IDs will be
-						overwritten.
-					</p>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
-						<button
-							onClick={() => setConfirmRestore(null)}
-							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-						>
-							Cancel
-						</button>
-						<button
-							onClick={() =>
-								confirmRestore && void handleRestoreFromBackup(confirmRestore)
-							}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--primary)] [color:var(--primary-contrast)]"
-						>
-							Restore
-						</button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-			<Dialog
-				open={Boolean(pendingDelete)}
-				onOpenChange={(open) => !open && setPendingDelete(null)}
-			>
-				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
-					<DialogHeader>
-						<DialogTitle>Delete backup file?</DialogTitle>
-					</DialogHeader>
-					<p className="text-sm text-[var(--text-muted)]">
-						Delete "{pendingDelete ?? "this backup"}"?
-					</p>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
-						<button
-							onClick={() => setPendingDelete(null)}
-							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-						>
-							Cancel
-						</button>
-						<button
-							onClick={() => void confirmDelete()}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
-						>
-							Delete
-						</button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<BackupManagerHistoryList
+				palette={palette}
+				history={history}
+				formatSize={formatSize}
+			/>
+
+			<BackupManagerRestoreDialog
+				confirmRestore={confirmRestore}
+				onCancel={() => setConfirmRestore(null)}
+				onConfirm={(filename) => {
+					void handleRestoreFromBackup(filename);
+				}}
+			/>
+
+			<BackupManagerDeleteDialog
+				pendingDelete={pendingDelete}
+				onCancel={() => setPendingDelete(null)}
+				onConfirm={() => {
+					void confirmDelete();
+				}}
+			/>
 		</div>
 	);
 }

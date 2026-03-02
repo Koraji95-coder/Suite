@@ -129,93 +129,95 @@ export function StatsCards({
 
 	return (
 		<div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:gap-7 2xl:grid-cols-3">
-			{cards.map(({ key, label, icon: Icon, tint, value, helper, sparkline, trend }) => (
-				<GlassPanel
-					key={key}
-					tint={tint}
-					specular={false}
-					bevel={false}
-					className="group px-7 py-6 transition-transform duration-300 hover:-translate-y-1 hover:scale-[1.015] md:px-8 md:py-7"
-					style={{ cursor: "default" }}
-				>
-					<div className="relative z-10 flex items-start justify-between gap-5">
-						<div className="flex items-start gap-4">
-							<div
-								className="rounded-2xl p-3.5"
-								style={{
-									background: `linear-gradient(135deg, ${hexToRgba(tint, 0.25)} 0%, ${hexToRgba(
-										tint,
-										0.08,
-									)} 100%)`,
-									boxShadow: `0 0 20px ${hexToRgba(tint, 0.15)}`,
-								}}
-							>
-								<Icon
-									className="h-6 w-6 md:h-7 md:w-7"
-									style={{ color: tint }}
-								/>
-							</div>
-
-							<div className="space-y-1.5">
-								<p
-									className="text-xs uppercase tracking-[0.2em]"
-									style={{ color: hexToRgba(palette.text, 0.5) }}
-								>
-									{label}
-								</p>
-
-								{isLoading ? (
-									/* ✅ theme-safe shimmer (no bg-white/10) */
-									<div
-										className="h-9 w-24 animate-pulse rounded-full"
-										style={{ background: hexToRgba(palette.text, 0.1) }}
-									/>
-								) : (
-									<p
-										className="text-3xl font-semibold tracking-tight md:text-[2rem]"
-										style={{ color: hexToRgba(palette.text, 0.95) }}
-									>
-										{value}
-									</p>
-								)}
-
+			{cards.map(
+				({ key, label, icon: Icon, tint, value, helper, sparkline, trend }) => (
+					<GlassPanel
+						key={key}
+						tint={tint}
+						specular={false}
+						bevel={false}
+						className="group px-7 py-6 transition-transform duration-300 hover:-translate-y-1 hover:scale-[1.015] md:px-8 md:py-7"
+						style={{ cursor: "default" }}
+					>
+						<div className="relative z-10 flex items-start justify-between gap-5">
+							<div className="flex items-start gap-4">
 								<div
-									className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]"
+									className="rounded-2xl p-3.5"
 									style={{
-										color: hexToRgba(tint, 0.9),
-										border: `1px solid ${hexToRgba(tint, 0.35)}`,
-										background: hexToRgba(tint, 0.1),
+										background: `linear-gradient(135deg, ${hexToRgba(tint, 0.25)} 0%, ${hexToRgba(
+											tint,
+											0.08,
+										)} 100%)`,
+										boxShadow: `0 0 20px ${hexToRgba(tint, 0.15)}`,
 									}}
 								>
-									{trend}
+									<Icon
+										className="h-6 w-6 md:h-7 md:w-7"
+										style={{ color: tint }}
+									/>
 								</div>
 
-								{helper ? (
-									<div
-										className="flex items-center gap-1 text-xs"
-										style={{ color: hexToRgba(palette.text, 0.55) }}
+								<div className="space-y-1.5">
+									<p
+										className="text-xs uppercase tracking-[0.2em]"
+										style={{ color: hexToRgba(palette.text, 0.5) }}
 									>
-										<Sparkles className="h-3 w-3" style={{ color: tint }} />
-										<span>{helper}</span>
+										{label}
+									</p>
+
+									{isLoading ? (
+										/* ✅ theme-safe shimmer (no bg-white/10) */
+										<div
+											className="h-9 w-24 animate-pulse rounded-full"
+											style={{ background: hexToRgba(palette.text, 0.1) }}
+										/>
+									) : (
+										<p
+											className="text-3xl font-semibold tracking-tight md:text-[2rem]"
+											style={{ color: hexToRgba(palette.text, 0.95) }}
+										>
+											{value}
+										</p>
+									)}
+
+									<div
+										className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.14em]"
+										style={{
+											color: hexToRgba(tint, 0.9),
+											border: `1px solid ${hexToRgba(tint, 0.35)}`,
+											background: hexToRgba(tint, 0.1),
+										}}
+									>
+										{trend}
 									</div>
-								) : null}
+
+									{helper ? (
+										<div
+											className="flex items-center gap-1 text-xs"
+											style={{ color: hexToRgba(palette.text, 0.55) }}
+										>
+											<Sparkles className="h-3 w-3" style={{ color: tint }} />
+											<span>{helper}</span>
+										</div>
+									) : null}
+								</div>
+							</div>
+
+							<div className="hidden opacity-75 transition-opacity group-hover:opacity-100 sm:block">
+								{renderSparkline(sparkline, tint)}
 							</div>
 						</div>
 
-						<div className="hidden opacity-75 transition-opacity group-hover:opacity-100 sm:block">
-							{renderSparkline(sparkline, tint)}
-						</div>
-					</div>
-
-					{/* Bottom accent bar */}
-					<div
-						className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full opacity-40 transition-opacity group-hover:opacity-70"
-						style={{
-							background: `linear-gradient(90deg, transparent, ${tint}, transparent)`,
-						}}
-					/>
-				</GlassPanel>
-			))}
+						{/* Bottom accent bar */}
+						<div
+							className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full opacity-40 transition-opacity group-hover:opacity-70"
+							style={{
+								background: `linear-gradient(90deg, transparent, ${tint}, transparent)`,
+							}}
+						/>
+					</GlassPanel>
+				),
+			)}
 		</div>
 	);
 }

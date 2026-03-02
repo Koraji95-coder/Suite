@@ -1,9 +1,9 @@
 import { addDays, format, parseISO } from "date-fns";
 import { useCallback, useEffect, useState } from "react";
 import { logger } from "@/lib/errorLogger";
+import { logActivity } from "@/services/activityService";
 import { supabase } from "@/supabase/client";
 import { safeSupabaseQuery } from "@/supabase/utils";
-import { logActivity } from "@/services/activityService";
 import type { CalendarEvent, EventColor } from "./calendartypes";
 
 export interface CalendarEventRow {

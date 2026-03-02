@@ -200,7 +200,11 @@ export function WeekView({
 	);
 
 	return (
-		<div data-slot="week-view" className="flex h-full flex-col overflow-x-auto" style={{ minWidth: 0 }}>
+		<div
+			data-slot="week-view"
+			className="flex h-full flex-col overflow-x-auto"
+			style={{ minWidth: 0 }}
+		>
 			<div
 				className="sticky top-0 z-30 grid grid-cols-8 backdrop-blur-md"
 				style={{

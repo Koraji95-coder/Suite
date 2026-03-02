@@ -94,7 +94,10 @@ export function MonthView({
 	useEffect(() => setIsMounted(true), []);
 
 	return (
-		<div data-slot="month-view" className="flex flex-1 flex-col min-w-0 overflow-x-auto">
+		<div
+			data-slot="month-view"
+			className="flex flex-1 flex-col min-w-0 overflow-x-auto"
+		>
 			<div
 				className="grid grid-cols-7"
 				style={{

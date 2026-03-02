@@ -1,0 +1,15 @@
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\bin\Debug\net10.0\NamedPipeServer.exe
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\bin\Debug\net10.0\NamedPipeServer.deps.json
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\bin\Debug\net10.0\NamedPipeServer.runtimeconfig.json
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\bin\Debug\net10.0\NamedPipeServer.dll
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\bin\Debug\net10.0\NamedPipeServer.pdb
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\NamedPipeServer.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\NamedPipeServer.AssemblyInfoInputs.cache
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\NamedPipeServer.AssemblyInfo.cs
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\NamedPipeServer.csproj.CoreCompileInputs.cache
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\NamedPipeServer.sourcelink.json
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\NamedPipeServer.dll
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\refint\NamedPipeServer.dll
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\NamedPipeServer.pdb
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\NamedPipeServer.genruntimeconfig.cache
+C:\Users\koraj\OneDrive\Documents\GitHub\Suite\dotnet\named-pipe-bridge\obj\Debug\net10.0\ref\NamedPipeServer.dll

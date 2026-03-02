@@ -57,6 +57,7 @@ from functools import wraps
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 from werkzeug.utils import secure_filename
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -144,6 +145,9 @@ def _parse_int_env(var_name: str, fallback: int, minimum: int = 1) -> int:
         return fallback
 
 
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
 app.config['MAX_CONTENT_LENGTH'] = _parse_int_env(
     'API_MAX_CONTENT_LENGTH',
     104857600  # 100 MB
@@ -158,6 +162,14 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 ALLOWED_ORIGINS = _parse_csv_env('API_ALLOWED_ORIGINS', ALLOWED_ORIGINS)
+AUTH_ALLOWED_REDIRECT_ORIGINS = _parse_csv_env(
+    "AUTH_ALLOWED_REDIRECT_ORIGINS",
+    ALLOWED_ORIGINS,
+)
+AUTH_EMAIL_REDIRECT_URL = (
+    (os.environ.get("AUTH_EMAIL_REDIRECT_URL") or "").strip()
+    or (os.environ.get("VITE_AUTH_REDIRECT_URL") or "").strip()
+)
 
 CORS(app, 
      origins=ALLOWED_ORIGINS,
@@ -344,6 +356,93 @@ def _get_bearer_token() -> Optional[str]:
     if auth.lower().startswith("bearer "):
         return auth.split(" ", 1)[1].strip()
     return None
+
+
+def _is_valid_email(value: str) -> bool:
+    if not value:
+        return False
+    return bool(EMAIL_PATTERN.match(value))
+
+
+def _normalize_origin(candidate: str) -> Optional[str]:
+    try:
+        parsed = urlparse(candidate)
+    except Exception:
+        return None
+
+    if parsed.scheme not in ("http", "https"):
+        return None
+    if not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _build_auth_redirect_url(path: str) -> Optional[str]:
+    safe_path = path if path.startswith("/") else f"/{path}"
+    allowed = {
+        origin
+        for origin in (
+            _normalize_origin(entry.strip())
+            for entry in AUTH_ALLOWED_REDIRECT_ORIGINS
+        )
+        if origin
+    }
+
+    candidates = [
+        AUTH_EMAIL_REDIRECT_URL,
+        request.headers.get("Origin", "").strip(),
+        request.headers.get("Referer", "").strip(),
+    ]
+
+    for candidate in candidates:
+        origin = _normalize_origin(candidate.strip())
+        if not origin:
+            continue
+        if allowed and origin not in allowed:
+            logger.warning("Rejected auth redirect origin outside allowlist: %s", origin)
+            continue
+
+        parsed = urlparse(origin)
+        return urlunparse((parsed.scheme, parsed.netloc, safe_path, "", "", ""))
+
+    return None
+
+
+def _send_supabase_email_link(email: str, flow: str) -> None:
+    if not SUPABASE_URL or not SUPABASE_API_KEY:
+        raise RuntimeError("Supabase auth is not configured for backend email auth.")
+
+    if flow not in {"signin", "signup", "reset"}:
+        raise ValueError("Unsupported email auth flow.")
+
+    redirect_path = "/reset-password" if flow == "reset" else "/login"
+    redirect_to = _build_auth_redirect_url(redirect_path)
+
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_API_KEY}",
+        "apikey": SUPABASE_API_KEY,
+        "Content-Type": "application/json",
+    }
+
+    if flow == "reset":
+        endpoint = f"{SUPABASE_URL.rstrip('/')}/auth/v1/recover"
+        payload: Dict[str, Any] = {"email": email}
+        if redirect_to:
+            payload["redirect_to"] = redirect_to
+    else:
+        endpoint = f"{SUPABASE_URL.rstrip('/')}/auth/v1/otp"
+        payload = {
+            "email": email,
+            "create_user": flow == "signup",
+        }
+        if redirect_to:
+            payload["email_redirect_to"] = redirect_to
+
+    response = requests.post(endpoint, headers=headers, json=payload, timeout=8)
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"Supabase email auth request failed ({response.status_code})"
+        )
 
 
 def _verify_supabase_user_token(token: str) -> Optional[Dict[str, Any]]:
@@ -1920,6 +2019,40 @@ def get_manager() -> AutoCADManager:
 # ========== API ENDPOINTS ==========
 
 # ========== AGENT BROKER ENDPOINTS ==========
+
+@app.route('/api/auth/email-link', methods=['POST'])
+@limiter.limit("12 per hour")
+def api_auth_email_link():
+    """Request a Supabase email link for sign-in/sign-up/password reset."""
+    if not SUPABASE_URL or not SUPABASE_API_KEY:
+        return jsonify({
+            "error": "Email authentication backend is not configured.",
+            "missing": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY"],
+        }), 503
+
+    if not request.is_json:
+        return jsonify({"error": "Expected JSON payload."}), 400
+
+    payload = request.get_json(silent=True) or {}
+    email = str(payload.get("email") or "").strip().lower()
+    flow = str(payload.get("flow") or "signin").strip().lower()
+
+    if flow not in {"signin", "signup", "reset"}:
+        return jsonify({"error": "Invalid flow. Use signin, signup, or reset."}), 400
+
+    if not _is_valid_email(email):
+        return jsonify({"error": "Enter a valid email address."}), 400
+
+    try:
+        _send_supabase_email_link(email, flow)
+    except Exception as exc:
+        # Do not leak delivery failures to clients to reduce account enumeration signal.
+        logger.warning("Email auth request failed for flow=%s: %s", flow, exc)
+
+    return jsonify({
+        "ok": True,
+        "message": "If the email is eligible, a link has been sent.",
+    }), 202
 
 @app.route('/api/agent/health', methods=['GET'])
 @require_supabase_user

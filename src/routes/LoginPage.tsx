@@ -16,15 +16,15 @@ export default function LoginPage() {
 
 	const notification = useNotification();
 	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
 	const [submitting, setSubmitting] = useState(false);
+	const [sent, setSent] = useState(false);
 	const [error, setError] = useState("");
 	const [redirectProgress, setRedirectProgress] = useState(0);
 
 	const canSubmit = useMemo(() => {
 		if (loading || submitting) return false;
-		return email.trim().length > 0 && password.length > 0;
-	}, [email, password, loading, submitting]);
+		return email.trim().length > 0;
+	}, [email, loading, submitting]);
 
 	useEffect(() => {
 		if (!(user && !loading)) {
@@ -107,20 +107,20 @@ export default function LoginPage() {
 		setError("");
 		setSubmitting(true);
 		try {
-			await signIn(email.trim(), password);
-			navigate(from, { replace: true });
+			await signIn(email.trim());
+			setSent(true);
+			notification.success(
+				"Check your email",
+				"If your account exists, a sign-in link has been sent.",
+			);
 		} catch (err: unknown) {
-			const rawMsg = err instanceof Error ? err.message : "Login failed";
-			const normalized = rawMsg.toLowerCase();
-			const msg = normalized.includes("invalid login credentials")
-				? "Email or password is incorrect."
-				: normalized.includes("email not confirmed")
-					? "Please confirm your email before signing in."
-					: "Unable to sign in right now. Please try again.";
-
+			const msg =
+				err instanceof Error
+					? err.message
+					: "Unable to send sign-in email right now.";
 			setError(msg);
-			logger.error("Login failed", "LoginPage", { email, error: err });
-			notification.error("Login failed", msg);
+			logger.error("Login link request failed", "LoginPage", { error: err });
+			notification.error("Sign-in link failed", msg);
 		} finally {
 			setSubmitting(false);
 		}
@@ -139,80 +139,99 @@ export default function LoginPage() {
 				</p>
 			</div>
 
-			<form className="grid gap-4" onSubmit={onSubmit} noValidate>
-				<div className="grid gap-1.5">
-					<label className="text-sm font-medium" htmlFor="email">
-						Email
-					</label>
-					<input
-						id="email"
-						className="auth-input-field"
-						type="email"
-						autoComplete="email"
-						value={email}
-						onChange={(e) => setEmail(e.target.value)}
-						placeholder="you@company.com"
-						required
-					/>
-				</div>
-
-				<div className="grid gap-1.5">
-					<label className="text-sm font-medium" htmlFor="password">
-						Password
-					</label>
-					<input
-						id="password"
-						className="auth-input-field"
-						type="password"
-						autoComplete="current-password"
-						value={password}
-						onChange={(e) => setPassword(e.target.value)}
-						placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-						required
-					/>
-				</div>
-
-				{error ? (
-					<div className="rounded-lg border px-3 py-2 text-sm [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">
-						{error}
+			{sent ? (
+				<div className="grid gap-4">
+					<div className="rounded-lg border px-3 py-2.5 text-sm leading-relaxed [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text-muted)]">
+						If your account exists for{" "}
+						<strong className="[color:var(--text)]">{email.trim()}</strong>, we
+						sent a sign-in link. Open that email on this device to continue.
 					</div>
-				) : null}
 
-				<button
-					className="auth-submit-btn mt-1"
-					type="submit"
-					disabled={!canSubmit}
-				>
-					{submitting ? (
-						<span className="inline-flex items-center gap-2">
-							<span className="auth-spinner" />
-							Signing in...
-						</span>
-					) : (
-						"Sign in"
-					)}
-				</button>
+					<button
+						type="button"
+						className="auth-submit-btn"
+						onClick={() => setSent(false)}
+					>
+						Send another link
+					</button>
 
-				<div className="mt-1 flex flex-wrap items-center justify-between gap-3 text-sm [color:var(--text-muted)]">
-					<span>
-						No account yet?{" "}
+					<div className="flex flex-wrap items-center justify-between gap-3 text-sm [color:var(--text-muted)]">
 						<Link
 							to="/signup"
 							className="font-medium underline-offset-2 hover:underline [color:var(--primary)]"
 						>
-							Create one
+							Need an account? Get started
 						</Link>
-					</span>
-					<Link
-						to="/forgot-password"
-						className="font-medium underline-offset-2 hover:underline [color:var(--text-muted)] hover:[color:var(--text)]"
-					>
-						Forgot password?
-					</Link>
-				</div>
+						<Link
+							to="/privacy"
+							className="font-medium underline-offset-2 hover:underline [color:var(--text-muted)] hover:[color:var(--text)]"
+						>
+							Privacy
+						</Link>
+					</div>
 
-				<AuthEnvDebugCard />
-			</form>
+					<AuthEnvDebugCard />
+				</div>
+			) : (
+				<form className="grid gap-4" onSubmit={onSubmit} noValidate>
+					<div className="grid gap-1.5">
+						<label className="text-sm font-medium" htmlFor="email">
+							Email
+						</label>
+						<input
+							id="email"
+							className="auth-input-field"
+							type="email"
+							autoComplete="email"
+							value={email}
+							onChange={(e) => setEmail(e.target.value)}
+							placeholder="you@company.com"
+							required
+						/>
+					</div>
+
+					{error ? (
+						<div className="rounded-lg border px-3 py-2 text-sm [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">
+							{error}
+						</div>
+					) : null}
+
+					<button
+						className="auth-submit-btn mt-1"
+						type="submit"
+						disabled={!canSubmit}
+					>
+						{submitting ? (
+							<span className="inline-flex items-center gap-2">
+								<span className="auth-spinner" />
+								Sending link...
+							</span>
+						) : (
+							"Send sign-in link"
+						)}
+					</button>
+
+					<div className="mt-1 flex flex-wrap items-center justify-between gap-3 text-sm [color:var(--text-muted)]">
+						<span>
+							No account yet?{" "}
+							<Link
+								to="/signup"
+								className="font-medium underline-offset-2 hover:underline [color:var(--primary)]"
+							>
+								Get started
+							</Link>
+						</span>
+						<Link
+							to="/forgot-password"
+							className="font-medium underline-offset-2 hover:underline [color:var(--text-muted)] hover:[color:var(--text)]"
+						>
+							Forgot password?
+						</Link>
+					</div>
+
+					<AuthEnvDebugCard />
+				</form>
+			)}
 		</AuthShell>
 	);
 }

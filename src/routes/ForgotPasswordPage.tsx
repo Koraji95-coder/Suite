@@ -2,11 +2,9 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import AuthShell from "../auth/AuthShell";
-import { resolveAuthRedirect } from "../auth/authRedirect";
+import { requestEmailAuthLink } from "../auth/emailAuthApi";
 import { useNotification } from "../auth/NotificationContext";
 import { logger } from "../lib/logger";
-import { supabase } from "@/supabase/client";
-import { isSupabaseConfigured } from "@/supabase/utils";
 
 export default function ForgotPasswordPage() {
 	const [email, setEmail] = useState("");
@@ -58,25 +56,11 @@ export default function ForgotPasswordPage() {
 						e.preventDefault();
 						if (!canSubmit) return;
 
-						if (!isSupabaseConfigured()) {
-							const msg =
-								"Supabase is not configured. Add VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY.";
-							setError(msg);
-							notification.error("Password reset unavailable", msg);
-							return;
-						}
-
 						setError("");
 						setSubmitting(true);
 
 						try {
-							const redirectTo = resolveAuthRedirect("/reset-password");
-
-							const { error: supaErr } =
-								await supabase.auth.resetPasswordForEmail(email.trim(), {
-									redirectTo,
-								});
-							if (supaErr) throw supaErr;
+							await requestEmailAuthLink(email.trim(), "reset");
 
 							setSent(true);
 							notification.success(
@@ -87,10 +71,9 @@ export default function ForgotPasswordPage() {
 							const msg =
 								err instanceof Error
 									? err.message
-									: "Failed to send reset email";
+									: "Failed to send reset link";
 							setError(msg);
 							logger.error("ForgotPasswordPage", "Password reset failed", {
-								email,
 								error: err,
 							});
 							notification.error("Password reset failed", msg);

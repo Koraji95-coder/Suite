@@ -1,6 +1,18 @@
 // src/routes/app/settings/AccountSettings.tsx
-import { KeyRound, LogOut, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+	Bot,
+	Database,
+	HardDrive,
+	KeyRound,
+	LogOut,
+	RefreshCw,
+	Save,
+	Settings2,
+	Shield,
+	ShieldCheck,
+	User,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import {
@@ -11,40 +23,211 @@ import {
 } from "../../auth/passkeyCapabilityApi";
 import {
 	completePasskeyCallback,
-	startPasskeyEnrollment,
 } from "../../auth/passkeyAuthApi";
 import { useAuth } from "../../auth/useAuth";
-import { agentService } from "../../services/agentService";
+import {
+	agentService,
+	type AgentPairingAction,
+} from "../../services/agentService";
 import {
 	logAuthMethodTelemetry,
 	logSecurityEvent,
 } from "../../services/securityEventService";
 import { supabase } from "@/supabase/client";
 
+type StatusTone = "success" | "danger" | "warning" | "muted";
+type PanelTone = "primary" | "accent" | "neutral";
+
+function getPanelToneColor(tone: PanelTone) {
+	if (tone === "accent") return "var(--accent)";
+	if (tone === "neutral") return "var(--text-muted)";
+	return "var(--primary)";
+}
+
+function getPanelGradientStyle(tone: PanelTone) {
+	const main = getPanelToneColor(tone);
+	return {
+		borderColor: `color-mix(in_srgb,${main} 26%,var(--border))`,
+		background: `linear-gradient(128deg,color-mix(in_srgb,${main} 15%,var(--surface)) 0%,var(--surface) 56%,color-mix(in_srgb,var(--accent) 10%,var(--surface)) 100%)`,
+		boxShadow: `inset 0 1px 0 color-mix(in_srgb,#ffffff 7%,transparent), 0 10px 30px color-mix(in_srgb,${main} 12%,transparent)`,
+	} as const;
+}
+
+function SectionIconBadge({
+	icon: Icon,
+	tone = "primary",
+}: {
+	icon: any;
+	tone?: "primary" | "accent" | "neutral";
+}) {
+	const toneColor =
+		tone === "accent"
+			? "var(--accent)"
+			: tone === "neutral"
+				? "var(--text-muted)"
+				: "var(--primary)";
+	return (
+		<span
+			className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-lg border"
+			style={{
+				borderColor: `color-mix(in_srgb,${toneColor} 38%,var(--border))`,
+				background: `linear-gradient(145deg,color-mix(in_srgb,${toneColor} 28%,transparent),color-mix(in_srgb,var(--surface-2) 92%,transparent))`,
+				color: "var(--text)",
+				boxShadow: `0 8px 24px color-mix(in_srgb,${toneColor} 24%,transparent)`,
+			}}
+		>
+			<Icon size={15} />
+		</span>
+	);
+}
+
+function SecurityStatusTile({
+	title,
+	value,
+	tone,
+	icon: Icon,
+}: {
+	title: string;
+	value: string;
+	tone: StatusTone;
+	icon: any;
+}) {
+	const toneStyles: Record<StatusTone, { main: string }> = {
+		success: {
+			main: "var(--success)",
+		},
+		danger: {
+			main: "var(--danger)",
+		},
+		warning: {
+			main: "var(--warning)",
+		},
+		muted: {
+			main: "var(--text-muted)",
+		},
+	};
+	const style = toneStyles[tone];
+
+	return (
+		<div
+			className="relative overflow-hidden rounded-xl border px-3 py-2.5"
+			style={{
+				borderColor: "var(--border)",
+				background: `linear-gradient(125deg,color-mix(in_srgb,${style.main} 16%,var(--surface)) 0%,var(--surface) 52%,color-mix(in_srgb,var(--accent) 12%,var(--surface)) 100%)`,
+				boxShadow: `inset 0 1px 0 color-mix(in_srgb,#ffffff 7%,transparent), 0 10px 28px color-mix(in_srgb,${style.main} 12%,transparent)`,
+			}}
+		>
+			<div
+				className="pointer-events-none absolute -right-4 -top-6 h-12 w-12 rounded-full blur-xl"
+				style={{
+					background: `color-mix(in_srgb,${style.main} 34%,transparent)`,
+				}}
+			/>
+			<div className="relative z-[1] flex items-start justify-between gap-2">
+				<div className="flex items-center gap-2">
+					<span
+						className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-md border"
+						style={{
+							borderColor: `color-mix(in_srgb,${style.main} 46%,var(--border))`,
+							background: `color-mix(in_srgb,${style.main} 20%,transparent)`,
+							color: "var(--text)",
+						}}
+					>
+						<Icon size={13} />
+					</span>
+					<div className="text-[11px] font-medium uppercase tracking-wide [color:var(--text-muted)]">
+						{title}
+					</div>
+				</div>
+				<div className="flex items-center">
+					<span className="relative inline-flex h-2.5 w-2.5">
+						<span
+							className="absolute inline-flex h-full w-full rounded-full opacity-60 motion-safe:animate-ping"
+							style={{
+								background: `color-mix(in_srgb,${style.main} 62%,transparent)`,
+							}}
+						/>
+						<span
+							className="relative inline-flex h-2.5 w-2.5 rounded-full border"
+							style={{
+								borderColor: `color-mix(in_srgb,${style.main} 58%,var(--border))`,
+								background: style.main,
+								boxShadow: `0 0 10px color-mix(in_srgb,${style.main} 60%,transparent)`,
+							}}
+						/>
+					</span>
+				</div>
+			</div>
+			<div className="relative z-[1] mt-2">
+				<span
+					className="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+					style={{
+						borderColor: `color-mix(in_srgb,${style.main} 50%,var(--border))`,
+						background: `color-mix(in_srgb,${style.main} 18%,transparent)`,
+						color: "var(--text)",
+					}}
+				>
+					{value}
+				</span>
+			</div>
+		</div>
+	);
+}
+
 export default function AccountSettings() {
-	const { user, signOut } = useAuth();
+	const { user, profile, signOut, sessionAuthMethod, updateProfile } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const [message, setMessage] = useState<string>("");
+	const usesBroker = useMemo(() => agentService.usesBroker(), []);
+	const passkeyCallbackHandledRef = useRef("");
+	const agentChallengeHandledRef = useRef("");
+
+	const [displayName, setDisplayName] = useState("");
+	const [accountEmail, setAccountEmail] = useState("");
+	const [isSavingProfile, setIsSavingProfile] = useState(false);
+	const [profileSaved, setProfileSaved] = useState(false);
+	const [profileError, setProfileError] = useState("");
+
 	const [isSigningOutAll, setIsSigningOutAll] = useState(false);
-	const [isResettingAgent, setIsResettingAgent] = useState(false);
-	const [isStartingPasskeyEnroll, setIsStartingPasskeyEnroll] = useState(false);
+	const [accountActionMessage, setAccountActionMessage] = useState("");
+
+	const [, setIsStartingPasskeyEnroll] = useState(false);
 	const [passkeyCapability, setPasskeyCapability] =
 		useState<PasskeyCapability | null>(null);
 	const [passkeyLoading, setPasskeyLoading] = useState(true);
-	const [passkeyError, setPasskeyError] = useState("");
-	const passkeyCallbackHandledRef = useRef("");
+	const [, setPasskeyError] = useState("");
+	const [, setPasskeyNotice] = useState("");
+
+	const [agentHealthy, setAgentHealthy] = useState<boolean | null>(null);
+	const [agentPaired, setAgentPaired] = useState(false);
+	const [agentLoading, setAgentLoading] = useState(true);
+	const [agentPairingCode, setAgentPairingCode] = useState("");
+	const [isAgentActionBusy, setIsAgentActionBusy] = useState(false);
+	const [agentError, setAgentError] = useState("");
+	const [agentNotice, setAgentNotice] = useState("");
 
 	const frontendPasskeyEnabled = useMemo(() => isFrontendPasskeyEnabled(), []);
 	const browserPasskeySupported = useMemo(() => isBrowserPasskeySupported(), []);
-	const canStartPasskeyEnrollment = Boolean(
-		frontendPasskeyEnabled &&
-			browserPasskeySupported &&
-			passkeyCapability?.enabled &&
-			passkeyCapability?.handlers_ready &&
-			passkeyCapability?.config_ready,
-	);
+	const canSaveProfile = useMemo(() => {
+		if (!user || isSavingProfile) return false;
+		return displayName.trim().length > 0 && accountEmail.trim().length > 0;
+	}, [accountEmail, displayName, isSavingProfile, user]);
+
+	const clearAgentChallengeParams = useCallback(() => {
+		const params = new URLSearchParams(location.search);
+		if (!params.has("agent_challenge") && !params.has("agent_action")) return;
+		params.delete("agent_challenge");
+		params.delete("agent_action");
+		const search = params.toString();
+		navigate(
+			{
+				pathname: location.pathname,
+				search: search ? `?${search}` : "",
+			},
+			{ replace: true },
+		);
+	}, [location.pathname, location.search, navigate]);
 
 	const loadPasskeyCapability = async () => {
 		setPasskeyLoading(true);
@@ -65,9 +248,46 @@ export default function AccountSettings() {
 		}
 	};
 
+	const refreshAgentStatus = useCallback(async () => {
+		setAgentLoading(true);
+		try {
+			const isHealthy = await agentService.healthCheck();
+			setAgentHealthy(isHealthy);
+
+			if (isHealthy && user?.id) {
+				await agentService.restorePairingForActiveUser();
+			}
+
+			const pairedState = await agentService.refreshPairingStatus();
+			setAgentPaired(pairedState);
+		} catch (err: unknown) {
+			setAgentError(
+				err instanceof Error
+					? err.message
+					: "Unable to refresh agent status.",
+			);
+		} finally {
+			setAgentLoading(false);
+		}
+	}, [user?.id]);
+
 	useEffect(() => {
 		void loadPasskeyCapability();
-	}, []);
+		void refreshAgentStatus();
+	}, [refreshAgentStatus]);
+
+	useEffect(() => {
+		if (agentHealthy === true && agentPaired) return;
+		const timer = window.setInterval(() => {
+			void refreshAgentStatus();
+		}, 5000);
+		return () => window.clearInterval(timer);
+	}, [agentHealthy, agentPaired, refreshAgentStatus]);
+
+	useEffect(() => {
+		setDisplayName(profile?.display_name ?? "");
+		setAccountEmail(profile?.email ?? user?.email ?? "");
+	}, [profile?.display_name, profile?.email, user?.email]);
 
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
@@ -172,7 +392,7 @@ export default function AccountSettings() {
 				}
 
 				if (!active) return;
-				setMessage(result.message || "Passkey callback processed.");
+				setPasskeyNotice(result.message || "Passkey callback processed.");
 				void loadPasskeyCapability();
 			} catch (err: unknown) {
 				if (!active) return;
@@ -180,7 +400,7 @@ export default function AccountSettings() {
 					err instanceof Error
 						? err.message
 						: "Unable to complete passkey callback.";
-				setMessage(msg);
+				setPasskeyNotice(msg);
 				await logAuthMethodTelemetry(
 					"passkey",
 					"enroll_failed",
@@ -200,58 +420,173 @@ export default function AccountSettings() {
 		};
 	}, [location.pathname, location.search, navigate]);
 
-	const startPasskeyEnrollFlow = async () => {
-		if (isStartingPasskeyEnroll) return;
-		setIsStartingPasskeyEnroll(true);
-		setMessage("");
+	useEffect(() => {
+		if (!usesBroker || !user?.id) return;
+		const params = new URLSearchParams(location.search);
+		const challengeId = (params.get("agent_challenge") || "").trim();
+		const action = (params.get("agent_action") || "").trim().toLowerCase();
+		if (!challengeId || (action !== "pair" && action !== "unpair")) return;
 
-		await logAuthMethodTelemetry(
-			"passkey",
-			"enroll_started",
-			"Passkey enrollment flow started from account settings.",
-		);
+		const handleKey = `${action}:${challengeId}`;
+		if (agentChallengeHandledRef.current === handleKey) {
+			return;
+		}
+		agentChallengeHandledRef.current = handleKey;
+
+		let active = true;
+		const confirm = async () => {
+			setAgentError("");
+			setAgentNotice(
+				action === "pair"
+					? "Verifying pair request..."
+					: "Verifying unpair request...",
+			);
+			setIsAgentActionBusy(true);
+			try {
+				await agentService.confirmPairingVerification(
+					action as AgentPairingAction,
+					challengeId,
+				);
+				if (!active) return;
+				setAgentNotice(
+					action === "pair"
+						? "Pairing verified. Agent access is active."
+						: "Unpair verified. Agent access has been removed.",
+				);
+			} catch (err: unknown) {
+				if (!active) return;
+				setAgentError(
+					err instanceof Error
+						? err.message
+						: "Unable to verify pairing action.",
+				);
+				setAgentNotice("");
+			} finally {
+				await refreshAgentStatus();
+				if (active) {
+					setIsAgentActionBusy(false);
+					clearAgentChallengeParams();
+				}
+			}
+		};
+
+		void confirm();
+		return () => {
+			active = false;
+		};
+	}, [
+		clearAgentChallengeParams,
+		location.search,
+		refreshAgentStatus,
+		usesBroker,
+		user?.id,
+	]);
+
+	const saveAccountProfile = async () => {
+		if (!canSaveProfile) return;
+		setIsSavingProfile(true);
+		setProfileSaved(false);
+		setProfileError("");
 
 		try {
-			const redirectTo =
-				typeof window !== "undefined"
-					? `${window.location.origin}/app/settings`
-					: undefined;
-			const result = await startPasskeyEnrollment(redirectTo);
-			if (result.mode === "redirect" && result.redirect_url) {
-				await logAuthMethodTelemetry(
-					"passkey",
-					"enroll_redirected",
-					`Passkey enrollment redirected to provider: ${result.provider_label || result.provider || "unknown"}.`,
-				);
-				window.location.assign(result.redirect_url);
-				return;
-			}
-
-			throw new Error(
-				result.message ||
-					result.error ||
-					"Passkey enrollment is not available right now.",
-			);
-		} catch (err: unknown) {
-			const msg =
-				err instanceof Error
-					? err.message
-					: "Unable to start passkey enrollment right now.";
-			setMessage(msg);
-			await logAuthMethodTelemetry(
-				"passkey",
-				"enroll_failed",
-				`Passkey enrollment failed to start: ${msg}`,
+			await updateProfile({
+				display_name: displayName,
+				email: accountEmail,
+			});
+			setProfileSaved(true);
+			window.setTimeout(() => setProfileSaved(false), 1500);
+		} catch (error) {
+			setProfileError(
+				error instanceof Error ? error.message : "Failed to save account profile.",
 			);
 		} finally {
-			setIsStartingPasskeyEnroll(false);
+			setIsSavingProfile(false);
+		}
+	};
+
+	const pairAgent = async () => {
+		const code = agentPairingCode.trim();
+		if (!code) {
+			setAgentError("Enter a 6-digit pairing code.");
+			return;
+		}
+		setAgentError("");
+		setAgentNotice("");
+		setIsAgentActionBusy(true);
+		try {
+			if (usesBroker) {
+				const redirectTo =
+					typeof window !== "undefined"
+						? `${window.location.origin}/app/settings`
+						: undefined;
+				await agentService.requestPairingVerificationLink("pair", code, {
+					redirectTo,
+					redirectPath: "/app/settings",
+				});
+				setAgentNotice(
+					"Verification link sent. Open it from your email to finish pairing.",
+				);
+			} else {
+				const pairedNow = await agentService.pair(code);
+				if (!pairedNow) {
+					throw new Error("Unable to pair with the gateway using this code.");
+				}
+				setAgentNotice("Agent paired for this browser session.");
+				await refreshAgentStatus();
+			}
+			setAgentPairingCode("");
+		} catch (err: unknown) {
+			setAgentError(
+				err instanceof Error
+					? err.message
+					: usesBroker
+						? "Unable to send pairing verification link."
+						: "Unable to pair with the gateway.",
+			);
+		} finally {
+			setIsAgentActionBusy(false);
+		}
+	};
+
+	const unpairAgent = async () => {
+		setAgentError("");
+		setAgentNotice("");
+		setIsAgentActionBusy(true);
+		try {
+			if (usesBroker) {
+				const redirectTo =
+					typeof window !== "undefined"
+						? `${window.location.origin}/app/settings`
+						: undefined;
+				await agentService.requestPairingVerificationLink("unpair", undefined, {
+					redirectTo,
+					redirectPath: "/app/settings",
+				});
+				setAgentNotice(
+					"Verification link sent. Open it from your email to finish unpairing.",
+				);
+			} else {
+				await agentService.unpair();
+				setAgentNotice("Agent pairing removed for this browser session.");
+				await refreshAgentStatus();
+			}
+		} catch (err: unknown) {
+			setAgentError(
+				err instanceof Error
+					? err.message
+					: usesBroker
+						? "Unable to send unpair verification link."
+						: "Unable to unpair from the gateway.",
+			);
+		} finally {
+			setIsAgentActionBusy(false);
 		}
 	};
 
 	const signOutAllSessions = async () => {
 		if (isSigningOutAll) return;
 		setIsSigningOutAll(true);
-		setMessage("");
+		setAccountActionMessage("");
 
 		try {
 			await agentService.unpair();
@@ -261,9 +596,9 @@ export default function AccountSettings() {
 				"auth_sign_out_global",
 				"User signed out all active sessions.",
 			);
-			setMessage("Signed out all sessions.");
+			setAccountActionMessage("Signed out all active sessions.");
 		} catch (err: unknown) {
-			setMessage(
+			setAccountActionMessage(
 				err instanceof Error ? err.message : "Failed to sign out all sessions.",
 			);
 		} finally {
@@ -271,229 +606,361 @@ export default function AccountSettings() {
 		}
 	};
 
-	const resetTrustedAgentDevice = async () => {
-		if (isResettingAgent) return;
-		setIsResettingAgent(true);
-		setMessage("");
+	const sessionAuthStatus = useMemo(
+		() => ({
+			value:
+				sessionAuthMethod === "passkey" ? "Passkey session" : "Email link session",
+			tone: (sessionAuthMethod === "passkey" ? "success" : "muted") as StatusTone,
+		}),
+		[sessionAuthMethod],
+	);
 
-		try {
-			await agentService.unpair();
-			setMessage("Trusted agent pairing removed for this device.");
-		} catch (err: unknown) {
-			setMessage(
-				err instanceof Error
-					? err.message
-					: "Failed to reset trusted agent pairing.",
-			);
-		} finally {
-			setIsResettingAgent(false);
+	const passkeyAuthStatus = useMemo(
+		() => ({
+			value:
+				sessionAuthMethod === "passkey"
+					? "Class II WebAuthn verified"
+					: "Class II WebAuthn ready",
+			tone: (sessionAuthMethod === "passkey" ? "success" : "muted") as StatusTone,
+		}),
+		[sessionAuthMethod],
+	);
+
+	const passkeyBrowserStatus = useMemo(
+		() => ({
+			value: browserPasskeySupported ? "Supported" : "Unsupported",
+			tone: (browserPasskeySupported ? "success" : "danger") as StatusTone,
+		}),
+		[browserPasskeySupported],
+	);
+
+	const passkeyFrontendStatus = useMemo(
+		() => ({
+			value: frontendPasskeyEnabled ? "Enabled" : "Disabled",
+			tone: (frontendPasskeyEnabled ? "success" : "warning") as StatusTone,
+		}),
+		[frontendPasskeyEnabled],
+	);
+
+	const passkeyBackendStatus = useMemo(() => {
+		if (passkeyLoading) {
+			return { value: "Checking", tone: "muted" as const };
 		}
-	};
+		if (!passkeyCapability?.enabled) {
+			return { value: "Rollout off", tone: "warning" as const };
+		}
+		if (!passkeyCapability.config_ready) {
+			return { value: "Needs config", tone: "warning" as const };
+		}
+		if (!passkeyCapability.handlers_ready) {
+			return { value: "Handlers missing", tone: "warning" as const };
+		}
+		return { value: "Ready", tone: "success" as const };
+	}, [passkeyCapability, passkeyLoading]);
+
+	const agentGatewayStatus = useMemo(() => {
+		if (agentHealthy === null) {
+			return { value: "Checking", tone: "muted" as const };
+		}
+		return agentHealthy
+			? { value: "Online", tone: "success" as const }
+			: { value: "Offline", tone: "danger" as const };
+	}, [agentHealthy]);
+
+	const agentPairingStatus = useMemo(
+		() =>
+			agentPaired
+				? { value: "Paired", tone: "success" as const }
+				: { value: "Not paired", tone: "warning" as const },
+		[agentPaired],
+	);
+
+	const agentModeStatus = useMemo(
+		() => ({
+			value: usesBroker ? "Brokered email verification" : "Direct local gateway",
+			tone: "muted" as const,
+		}),
+		[usesBroker],
+	);
 
 	return (
-		<div className="grid gap-3">
+		<div className="grid gap-4">
 			<h3 className="text-lg font-semibold tracking-tight [color:var(--text)]">
 				Account
 				<span className="ml-2 text-sm font-normal [color:var(--text-muted)]">
-					Security and account actions.
+					Authentication, identity, and trusted device controls.
 				</span>
 			</h3>
 
-			<div className="grid gap-3 rounded-2xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
+			<div
+				className="grid gap-3 rounded-2xl border p-4"
+				style={getPanelGradientStyle("primary")}
+			>
 				<div className="flex items-start gap-2">
-					<KeyRound size={16} />
+					<SectionIconBadge icon={ShieldCheck} />
 					<div>
 						<div className="text-sm font-semibold [color:var(--text)]">
-							Passwordless mode
+							Security overview
 						</div>
 						<div className="text-xs [color:var(--text-muted)]">
-							This workspace uses email-link sign-in only. Password resets are
-							disabled.
+							Current session and trust posture for this workspace.
 						</div>
 					</div>
 				</div>
 
-				<div className="grid gap-2 rounded-xl border px-3 py-2.5 text-sm [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text-muted)]">
-					<div className="flex flex-wrap items-center gap-2">
-						<span className="rounded-md border px-2 py-0.5 text-[11px] font-semibold [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]">
-							Passkey rollout
-						</span>
-						<span className="rounded-md border px-2 py-0.5 text-[11px] [border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)]">
-							Browser: {browserPasskeySupported ? "supported" : "unsupported"}
-						</span>
-						<span className="rounded-md border px-2 py-0.5 text-[11px] [border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)]">
-							Frontend flag: {frontendPasskeyEnabled ? "on" : "off"}
-						</span>
-						<span className="rounded-md border px-2 py-0.5 text-[11px] [border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)]">
-							Backend:{" "}
-							{passkeyLoading
-								? "checking"
-								: passkeyCapability?.rollout_state || "unknown"}
-						</span>
-					</div>
+				<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+					<SecurityStatusTile
+						title="Passkey authentication"
+						value={passkeyAuthStatus.value}
+						tone={passkeyAuthStatus.tone}
+						icon={KeyRound}
+					/>
+					<SecurityStatusTile
+						title="Session auth"
+						value={sessionAuthStatus.value}
+						tone={sessionAuthStatus.tone}
+						icon={Shield}
+					/>
+					<SecurityStatusTile
+						title="Passkey browser"
+						value={passkeyBrowserStatus.value}
+						tone={passkeyBrowserStatus.tone}
+						icon={HardDrive}
+					/>
+					<SecurityStatusTile
+						title="Passkey frontend"
+						value={passkeyFrontendStatus.value}
+						tone={passkeyFrontendStatus.tone}
+						icon={Settings2}
+					/>
+					<SecurityStatusTile
+						title="Passkey backend"
+						value={passkeyBackendStatus.value}
+						tone={passkeyBackendStatus.tone}
+						icon={Database}
+					/>
+					<SecurityStatusTile
+						title="Agent gateway"
+						value={agentGatewayStatus.value}
+						tone={agentGatewayStatus.tone}
+						icon={Bot}
+					/>
+					<SecurityStatusTile
+						title="Agent pairing"
+						value={agentPairingStatus.value}
+						tone={agentPairingStatus.tone}
+						icon={KeyRound}
+					/>
+					<SecurityStatusTile
+						title="Agent mode"
+						value={agentModeStatus.value}
+						tone={agentModeStatus.tone}
+						icon={Settings2}
+					/>
+				</div>
+			</div>
 
-					{passkeyLoading ? (
-						<div>Checking passkey capability…</div>
-					) : passkeyError ? (
-						<div className="[color:var(--danger)]">{passkeyError}</div>
-					) : !browserPasskeySupported ? (
-						<div>
-							This browser does not expose passkey APIs. Use a compatible
-							browser/device for enrollment.
-						</div>
-					) : !frontendPasskeyEnabled ? (
-						<div>
-							Passkey UI is disabled in frontend env
-							(<code>VITE_AUTH_PASSKEY_ENABLED=false</code>).
-						</div>
-					) : !passkeyCapability ? (
-						<div>Passkey capability data is unavailable.</div>
-					) : !passkeyCapability.enabled ? (
-						<div>
-							Backend passkey rollout is disabled
-							(<code>AUTH_PASSKEY_ENABLED=false</code>).
-						</div>
-					) : !passkeyCapability.config_ready ? (
-						<div>
-							Passkey backend config is incomplete. Missing:{" "}
-							{passkeyCapability.config_missing.length > 0
-								? passkeyCapability.config_missing.join(", ")
-								: "unknown"}
-						</div>
-					) : !passkeyCapability.handlers_ready ? (
-						<div>
-							Passkey provider is selected, but start handlers are not available
-							for this provider in the current build.
-						</div>
-					) : (
-						<div>
-							Passkey capability probe is configured for{" "}
-							<strong>{passkeyCapability.provider_label}</strong>. Enrollment
-							and sign-in start handlers are enabled.
-						</div>
-					)}
-
-					{passkeyCapability?.warnings?.length ? (
+			<div
+				className="grid gap-2.5 rounded-2xl border p-3.5"
+				style={getPanelGradientStyle("accent")}
+			>
+				<div className="flex items-start gap-2">
+					<SectionIconBadge icon={User} tone="accent" />
+					<div>
+						<div className="text-sm font-semibold [color:var(--text)]">Profile</div>
 						<div className="text-xs [color:var(--text-muted)]">
-							{passkeyCapability.warnings.join(" ")}
+							Your display identity and contact email.
 						</div>
-					) : null}
-					{passkeyCapability?.next_step ? (
-						<div className="text-xs [color:var(--text-muted)]">
-							Next: {passkeyCapability.next_step}
-						</div>
-					) : null}
-
-					<div className="flex flex-wrap items-center gap-2">
-						<button
-							className="inline-flex items-center justify-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:[background:var(--surface)] [border-color:var(--border)] [background:transparent] [color:var(--text)]"
-							type="button"
-							onClick={() => void loadPasskeyCapability()}
-							disabled={passkeyLoading}
-						>
-							{passkeyLoading ? "Refreshing…" : "Refresh passkey status"}
-						</button>
-
-						<button
-							className="inline-flex items-center justify-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 hover:[background:var(--surface)] [border-color:var(--border)] [background:transparent] [color:var(--text)]"
-							type="button"
-							onClick={() => void startPasskeyEnrollFlow()}
-							disabled={
-								isStartingPasskeyEnroll ||
-								passkeyLoading ||
-								!canStartPasskeyEnrollment
-							}
-							title={
-								canStartPasskeyEnrollment
-									? "Start passkey enrollment"
-									: "Passkey enrollment is unavailable until rollout flags/provider config are ready."
-							}
-						>
-							{isStartingPasskeyEnroll
-								? "Starting enrollment…"
-								: "Start passkey enrollment"}
-						</button>
 					</div>
 				</div>
 
-				{message ? (
-					<div className="text-xs [color:var(--text-muted)]">{message}</div>
+				<div className="grid gap-2 md:grid-cols-[minmax(0,16rem)_minmax(0,22rem)_auto] md:items-end">
+					<div>
+						<label
+							className="mb-1 block text-[11px] font-medium uppercase tracking-wide [color:var(--text-muted)]"
+							htmlFor="accountDisplayName"
+						>
+							Display Name
+						</label>
+						<input
+							id="accountDisplayName"
+							className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							value={displayName}
+							onChange={(event) => setDisplayName(event.target.value)}
+							placeholder="Your name"
+						/>
+					</div>
+
+					<div>
+						<label
+							className="mb-1 block text-[11px] font-medium uppercase tracking-wide [color:var(--text-muted)]"
+							htmlFor="accountEmail"
+						>
+							Email
+						</label>
+						<input
+							id="accountEmail"
+							className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							value={accountEmail}
+							onChange={(event) => setAccountEmail(event.target.value)}
+							placeholder="you@email.com"
+							type="email"
+						/>
+					</div>
+
+					<button
+						type="button"
+						className="inline-flex w-fit items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 [background:var(--primary)] [color:var(--primary-contrast)]"
+						disabled={!canSaveProfile}
+						onClick={() => void saveAccountProfile()}
+					>
+						<Save size={14} />
+						{isSavingProfile
+							? "Saving..."
+							: profileSaved
+								? "Saved"
+								: "Save profile"}
+					</button>
+				</div>
+
+				{profileError ? (
+					<div className="rounded-xl border px-3 py-2 text-sm [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_18%,transparent)] [color:var(--danger)]">
+						{profileError}
+					</div>
 				) : null}
 			</div>
 
-			<div className="grid gap-3 rounded-2xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
+			<div
+				className="grid gap-3 rounded-2xl border p-4"
+				style={getPanelGradientStyle("primary")}
+			>
 				<div className="flex items-start gap-2">
-					<LogOut size={16} />
+					<SectionIconBadge icon={Bot} />
 					<div>
-						<div className="text-sm font-semibold [color:var(--text)]">
-							Sign out
-						</div>
+						<div className="text-sm font-semibold [color:var(--text)]">Agent pairing</div>
 						<div className="text-xs [color:var(--text-muted)]">
-							End your current session.
+							Trust this browser session with ZeroClaw agent access.
 						</div>
 					</div>
 				</div>
 
-				<button
-					className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-					type="button"
-					onClick={() => void signOut()}
-				>
-					Sign out
-				</button>
+				<div className="flex flex-wrap items-center gap-2">
+					<input
+						type="text"
+						value={agentPairingCode}
+						onChange={(event) => {
+							const digitsOnly = event.target.value.replace(/\D+/g, "");
+							setAgentPairingCode(digitsOnly.slice(0, 6));
+						}}
+						placeholder="Pairing code"
+						autoComplete="off"
+						inputMode="numeric"
+						pattern="[0-9]{6}"
+						maxLength={6}
+						className="w-40 rounded-lg border px-3 py-1.5 text-xs outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+					/>
 
-				<button
-					className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-					type="button"
-					disabled={isSigningOutAll}
-					onClick={() => void signOutAllSessions()}
-				>
-					{isSigningOutAll ? "Signing out all…" : "Sign out all devices"}
-				</button>
+					<button
+						type="button"
+						onClick={() => void pairAgent()}
+						disabled={
+							isAgentActionBusy ||
+							agentPairingCode.trim().length !== 6 ||
+							(!usesBroker && agentHealthy !== true)
+						}
+						className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+					>
+						{isAgentActionBusy ? "Working..." : "Pair"}
+					</button>
 
-				<button
-					className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-					type="button"
-					disabled={isResettingAgent}
-					onClick={() => void resetTrustedAgentDevice()}
-				>
-					{isResettingAgent
-						? "Resetting agent trust…"
-						: "Reset trusted agent pairing"}
-				</button>
+					<button
+						type="button"
+						onClick={() => void unpairAgent()}
+						disabled={isAgentActionBusy || !agentPaired}
+						className="rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+					>
+						Unpair
+					</button>
+
+					<button
+						type="button"
+						onClick={() => void refreshAgentStatus()}
+						disabled={agentLoading}
+						className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+					>
+						<RefreshCw size={12} />
+						{agentLoading ? "Refreshing..." : "Refresh"}
+					</button>
+				</div>
+
+				{agentError ? (
+					<div className="text-xs [color:var(--danger)]">{agentError}</div>
+				) : null}
+				{agentNotice ? (
+					<div className="text-xs [color:var(--text-muted)]">{agentNotice}</div>
+				) : null}
+
+				{agentHealthy === false ? (
+					<div className="text-xs [color:var(--text-muted)]">
+						Gateway is offline. Refresh and try again.
+					</div>
+				) : null}
+				{usesBroker ? (
+					<div className="text-xs [color:var(--text-muted)]">
+						Pair and unpair actions are email-verified in broker mode.
+					</div>
+				) : (
+					<div className="text-xs [color:var(--text-muted)]">
+						Direct mode stores pairing only in this browser session.
+					</div>
+				)}
+			</div>
+
+			<div
+				className="grid gap-3 rounded-2xl border p-4"
+				style={getPanelGradientStyle("neutral")}
+			>
+				<div className="flex items-start gap-2">
+					<SectionIconBadge icon={LogOut} tone="neutral" />
+					<div>
+						<div className="text-sm font-semibold [color:var(--text)]">Session actions</div>
+						<div className="text-xs [color:var(--text-muted)]">
+							Sign out this device or revoke all active sessions.
+						</div>
+					</div>
+				</div>
+
+				<div className="flex flex-wrap items-center gap-2">
+					<button
+						className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						type="button"
+						onClick={() => void signOut()}
+					>
+						Sign out
+					</button>
+
+					<button
+						className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						type="button"
+						disabled={isSigningOutAll}
+						onClick={() => void signOutAllSessions()}
+					>
+						{isSigningOutAll ? "Signing out all..." : "Sign out all devices"}
+					</button>
+				</div>
+
+				{accountActionMessage ? (
+					<div className="text-xs [color:var(--text-muted)]">{accountActionMessage}</div>
+				) : null}
 
 				<div className="text-xs [color:var(--text-muted)]">
 					Last sign-in: {user?.last_sign_in_at ?? "unknown"}
 				</div>
-			</div>
-
-			<div className="grid gap-3 rounded-2xl border p-4 [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_10%,var(--surface))]">
-				<div className="flex items-start gap-2">
-					<Trash2 size={16} />
-					<div>
-						<div className="text-sm font-semibold [color:var(--text)]">
-							Delete account
-						</div>
-						<div className="text-xs [color:var(--text-muted)]">
-							This usually requires a server-side action. We’ll wire it when
-							your backend policy is ready.
-						</div>
-					</div>
-				</div>
-
-				<button
-					className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_18%,transparent)] [color:var(--danger)]"
-					type="button"
-					disabled
-					title="Requires server-side endpoint / admin policy"
-				>
-					Delete account (coming soon)
-				</button>
-
 				<div className="text-xs [color:var(--text-muted)]">
 					Signed in as: <strong>{user?.email ?? "unknown"}</strong>
 				</div>
 			</div>
+
 		</div>
 	);
 }

@@ -9,6 +9,14 @@ import {
 	requestEmailAuthLink,
 	type EmailAuthRequestOptions,
 } from "./emailAuthApi";
+import {
+	buildSessionAuthKey,
+	clearSessionAuthMarkers,
+	consumePasskeySignInPending,
+	readSessionAuthMethod,
+	storeSessionAuthMethod,
+	type SessionAuthMethod,
+} from "./passkeySessionState";
 import { agentTaskManager } from "../services/agentTaskManager";
 import { agentService } from "../services/agentService";
 import {
@@ -25,6 +33,7 @@ interface AuthContextValue {
 	user: User | null;
 	profile: Profile | null;
 	loading: boolean;
+	sessionAuthMethod: SessionAuthMethod;
 	signIn: (email: string, options?: EmailAuthRequestOptions) => Promise<void>;
 	signUp: (email: string, options?: EmailAuthRequestOptions) => Promise<void>;
 	signOut: () => Promise<void>;
@@ -96,6 +105,8 @@ async function ensureProfileForUser(user: User): Promise<Profile | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
 	const [user, setUser] = useState<User | null>(null);
 	const [profile, setProfile] = useState<Profile | null>(null);
+	const [sessionAuthMethod, setSessionAuthMethod] =
+		useState<SessionAuthMethod>("email_link");
 	const [loading, setLoading] = useState(true);
 	const lastSignedInTelemetryKeyRef = useRef<string>("");
 
@@ -136,6 +147,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 				const currentUser = session?.user ?? null;
 				setUser(currentUser);
+				const sessionKey = buildSessionAuthKey(
+					currentUser?.id,
+					session?.expires_at ?? null,
+				);
 				agentService.setActiveUser(
 					currentUser?.id ?? null,
 					currentUser?.email ?? null,
@@ -144,9 +159,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				agentTaskManager.setScope(currentUser?.id ?? null);
 
 				if (currentUser) {
+					const restoredMethod = readSessionAuthMethod(sessionKey);
+					setSessionAuthMethod(restoredMethod ?? "email_link");
 					const p = await ensureProfileForUser(currentUser);
 					setProfile(p);
 				} else {
+					setSessionAuthMethod("email_link");
 					setProfile(null);
 				}
 			} catch (err) {
@@ -164,6 +182,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		} = supabase.auth.onAuthStateChange((event, session) => {
 			const currentUser = session?.user ?? null;
 			setUser(currentUser);
+			const sessionKey = buildSessionAuthKey(
+				currentUser?.id,
+				session?.expires_at ?? null,
+			);
 			agentService.setActiveUser(
 				currentUser?.id ?? null,
 				currentUser?.email ?? null,
@@ -173,6 +195,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 			if (currentUser) {
 				if (event === "SIGNED_IN") {
+					const isPasskeySession = consumePasskeySignInPending();
+					const method: SessionAuthMethod = isPasskeySession
+						? "passkey"
+						: "email_link";
+					setSessionAuthMethod(method);
+					storeSessionAuthMethod(sessionKey, method);
+
 					const sessionIssuedAt =
 						typeof session?.expires_at === "number"
 							? String(session.expires_at)
@@ -181,11 +210,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					if (lastSignedInTelemetryKeyRef.current !== key) {
 						lastSignedInTelemetryKeyRef.current = key;
 						void logAuthMethodTelemetry(
-							"email_link",
+							method,
 							"sign_in_completed",
-							"Signed in with passwordless email-link authentication.",
+							method === "passkey"
+								? "Signed in with passkey-verified authentication."
+								: "Signed in with passwordless email-link authentication.",
 						);
 					}
+				} else {
+					const restoredMethod = readSessionAuthMethod(sessionKey);
+					setSessionAuthMethod(restoredMethod ?? "email_link");
 				}
 
 				// Async-safe pattern: avoid deadlocks by not awaiting directly inside the callback
@@ -194,6 +228,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					setProfile(p);
 				})();
 			} else {
+				setSessionAuthMethod("email_link");
+				clearSessionAuthMarkers();
 				setProfile(null);
 			}
 		});
@@ -240,6 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 		const { error } = await supabase.auth.signOut();
 		if (error) throw error;
+		clearSessionAuthMarkers();
 		await logSecurityEvent("auth_sign_out", "User signed out current session.");
 	};
 
@@ -347,7 +384,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 	return (
 		<AuthContext.Provider
-			value={{ user, profile, loading, signIn, signUp, signOut, updateProfile }}
+			value={{
+				user,
+				profile,
+				loading,
+				sessionAuthMethod,
+				signIn,
+				signUp,
+				signOut,
+				updateProfile,
+			}}
 		>
 			{children}
 		</AuthContext.Provider>

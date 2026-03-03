@@ -12,8 +12,9 @@ This is the exact execution flow to apply database/storage hardening and verify 
 
 Run in Supabase SQL Editor:
 
-1. `backend/supabase/rls_hardening.sql`
-2. `backend/supabase/storage_policies.sql`
+1. `supabase/consolidated_migration.sql`
+2. `backend/supabase/rls_hardening.sql`
+3. `backend/supabase/storage_policies.sql`
 
 ## 2) Confirm RLS is enabled
 

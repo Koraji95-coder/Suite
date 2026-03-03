@@ -65,6 +65,40 @@ from openpyxl.utils import get_column_letter
 import requests
 import jwt
 from jwt import PyJWKClient
+try:
+    from webauthn import (
+        generate_registration_options,
+        verify_registration_response,
+        generate_authentication_options,
+        verify_authentication_response,
+    )
+    from webauthn.helpers import options_to_json
+    from webauthn.helpers.base64url_to_bytes import base64url_to_bytes
+    from webauthn.helpers.bytes_to_base64url import bytes_to_base64url
+    from webauthn.helpers.structs import (
+        AuthenticatorSelectionCriteria,
+        ResidentKeyRequirement,
+        UserVerificationRequirement,
+        PublicKeyCredentialDescriptor,
+        AuthenticatorTransport,
+    )
+    WEBAUTHN_AVAILABLE = True
+    WEBAUTHN_IMPORT_ERROR = ""
+except Exception as _webauthn_error:  # pragma: no cover - import-time environment variance
+    generate_registration_options = None  # type: ignore[assignment]
+    verify_registration_response = None  # type: ignore[assignment]
+    generate_authentication_options = None  # type: ignore[assignment]
+    verify_authentication_response = None  # type: ignore[assignment]
+    options_to_json = None  # type: ignore[assignment]
+    base64url_to_bytes = None  # type: ignore[assignment]
+    bytes_to_base64url = None  # type: ignore[assignment]
+    AuthenticatorSelectionCriteria = None  # type: ignore[assignment]
+    ResidentKeyRequirement = None  # type: ignore[assignment]
+    UserVerificationRequirement = None  # type: ignore[assignment]
+    PublicKeyCredentialDescriptor = None  # type: ignore[assignment]
+    AuthenticatorTransport = None  # type: ignore[assignment]
+    WEBAUTHN_AVAILABLE = False
+    WEBAUTHN_IMPORT_ERROR = str(_webauthn_error)
 
 # ── Logging configuration ────────────────────────────────────────
 logging.basicConfig(
@@ -317,6 +351,7 @@ PAIRING_CHALLENGE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{20,200}$")
 PASSKEY_CALLBACK_STATE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{20,200}$")
 PASSKEY_CALLBACK_SIGNATURE_PATTERN = re.compile(r"^[A-Fa-f0-9]{64}$")
 PASSKEY_CALLBACK_TIMESTAMP_PATTERN = re.compile(r"^\d{10,13}$")
+PASSKEY_CREDENTIAL_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,1024}$")
 
 
 app.config['MAX_CONTENT_LENGTH'] = _parse_int_env(
@@ -482,7 +517,7 @@ AUTH_PASSKEY_PROVIDER = (
     (os.environ.get("AUTH_PASSKEY_PROVIDER") or "supabase").strip().lower()
     or "supabase"
 )
-if AUTH_PASSKEY_PROVIDER not in {"supabase", "external"}:
+if AUTH_PASSKEY_PROVIDER not in {"supabase", "external", "first-party"}:
     logger.warning(
         "Unsupported AUTH_PASSKEY_PROVIDER=%r; falling back to 'supabase'.",
         AUTH_PASSKEY_PROVIDER,
@@ -527,6 +562,51 @@ AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_CLOCK_SKEW_SECONDS = _parse_int_env(
     "AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_CLOCK_SKEW_SECONDS",
     90,
     minimum=0,
+)
+AUTH_PASSKEY_ALLOWED_ORIGINS = _parse_csv_env(
+    "AUTH_PASSKEY_ALLOWED_ORIGINS",
+    AUTH_ALLOWED_REDIRECT_ORIGINS,
+)
+_DEFAULT_PASSKEY_RP_ID = ""
+for _candidate_origin in AUTH_PASSKEY_ALLOWED_ORIGINS:
+    try:
+        _parsed_origin = urlparse(_candidate_origin)
+    except Exception:
+        continue
+    if _parsed_origin.scheme in {"http", "https"} and _parsed_origin.hostname:
+        _DEFAULT_PASSKEY_RP_ID = _parsed_origin.hostname.strip().lower()
+        break
+AUTH_PASSKEY_RP_ID = (
+    (os.environ.get("AUTH_PASSKEY_RP_ID") or _DEFAULT_PASSKEY_RP_ID or "localhost")
+    .strip()
+    .lower()
+)
+AUTH_PASSKEY_RP_NAME = (
+    (os.environ.get("AUTH_PASSKEY_RP_NAME") or "Suite").strip()
+    or "Suite"
+)
+AUTH_PASSKEY_WEBAUTHN_STATE_TTL_SECONDS = _parse_int_env(
+    "AUTH_PASSKEY_WEBAUTHN_STATE_TTL_SECONDS",
+    5 * 60,
+    minimum=30,
+)
+AUTH_PASSKEY_WEBAUTHN_STATE_MAX_ENTRIES = _parse_int_env(
+    "AUTH_PASSKEY_WEBAUTHN_STATE_MAX_ENTRIES",
+    10_000,
+    minimum=100,
+)
+AUTH_PASSKEY_WEBAUTHN_TIMEOUT_MS = _parse_int_env(
+    "AUTH_PASSKEY_WEBAUTHN_TIMEOUT_MS",
+    60_000,
+    minimum=1000,
+)
+AUTH_PASSKEY_REQUIRE_USER_VERIFICATION = _parse_bool_env(
+    "AUTH_PASSKEY_REQUIRE_USER_VERIFICATION",
+    True,
+)
+AUTH_PASSKEY_REQUIRE_RESIDENT_KEY = _parse_bool_env(
+    "AUTH_PASSKEY_REQUIRE_RESIDENT_KEY",
+    True,
 )
 AGENT_PAIRING_ACTION_WINDOW_SECONDS = _parse_int_env(
     "AGENT_PAIRING_ACTION_WINDOW_SECONDS",
@@ -617,6 +697,8 @@ AUTH_EMAIL_IP_BLOCKED_UNTIL: Dict[str, float] = {}
 AUTH_EMAIL_ABUSE_LOCK = threading.Lock()
 PASSKEY_CALLBACK_STATES: Dict[str, Dict[str, Any]] = {}
 PASSKEY_CALLBACK_STATES_LOCK = threading.Lock()
+PASSKEY_WEBAUTHN_STATES: Dict[str, Dict[str, Any]] = {}
+PASSKEY_WEBAUTHN_STATES_LOCK = threading.Lock()
 AGENT_PAIRING_ACTION_WINDOW: Dict[str, List[float]] = {}
 AGENT_PAIRING_ACTION_LAST_ATTEMPT: Dict[str, float] = {}
 AGENT_PAIRING_ACTION_BLOCKED_UNTIL: Dict[str, float] = {}
@@ -788,6 +870,136 @@ def _get_passkey_callback_state(state: str) -> Tuple[Optional[Dict[str, Any]], s
             return None, "expired"
 
         return dict(payload), "ok"
+
+
+def _purge_expired_passkey_webauthn_states(now: Optional[float] = None) -> None:
+    ts = time.time() if now is None else now
+    expired = [
+        state
+        for state, entry in PASSKEY_WEBAUTHN_STATES.items()
+        if entry.get("expires_at", 0) <= ts
+    ]
+    for state in expired:
+        PASSKEY_WEBAUTHN_STATES.pop(state, None)
+
+    overflow = len(PASSKEY_WEBAUTHN_STATES) - AUTH_PASSKEY_WEBAUTHN_STATE_MAX_ENTRIES
+    if overflow <= 0:
+        return
+
+    oldest = sorted(
+        PASSKEY_WEBAUTHN_STATES.items(),
+        key=lambda item: item[1].get("created_at", 0),
+    )[:overflow]
+    for state, _ in oldest:
+        PASSKEY_WEBAUTHN_STATES.pop(state, None)
+
+
+def _create_passkey_webauthn_state(
+    intent: str,
+    challenge: str,
+    expected_origin: str,
+    client_ip: str,
+    client_redirect_to: str = "",
+    user_id: str = "",
+    email: str = "",
+) -> Tuple[str, int]:
+    now = time.time()
+    expires_at = int(now) + AUTH_PASSKEY_WEBAUTHN_STATE_TTL_SECONDS
+    state = secrets.token_urlsafe(32)
+    payload = {
+        "intent": intent.strip().lower(),
+        "user_id": user_id.strip(),
+        "email": email.strip().lower(),
+        "challenge": challenge.strip(),
+        "expected_origin": expected_origin.strip(),
+        "client_ip": client_ip.strip(),
+        "client_redirect_to": client_redirect_to.strip(),
+        "created_at": now,
+        "expires_at": expires_at,
+    }
+
+    with PASSKEY_WEBAUTHN_STATES_LOCK:
+        _purge_expired_passkey_webauthn_states(now)
+        PASSKEY_WEBAUTHN_STATES[state] = payload
+
+    return state, expires_at
+
+
+def _consume_passkey_webauthn_state(
+    state: str,
+    expected_intent: str = "",
+) -> Tuple[Optional[Dict[str, Any]], str]:
+    now = time.time()
+    normalized_expected_intent = expected_intent.strip().lower()
+
+    with PASSKEY_WEBAUTHN_STATES_LOCK:
+        _purge_expired_passkey_webauthn_states(now)
+        payload = PASSKEY_WEBAUTHN_STATES.get(state)
+        if not payload:
+            return None, "missing"
+
+        if payload.get("expires_at", 0) <= now:
+            PASSKEY_WEBAUTHN_STATES.pop(state, None)
+            return None, "expired"
+
+        if normalized_expected_intent:
+            payload_intent = str(payload.get("intent") or "").strip().lower()
+            if payload_intent != normalized_expected_intent:
+                return None, "intent-mismatch"
+
+        PASSKEY_WEBAUTHN_STATES.pop(state, None)
+        return payload, "ok"
+
+
+def _normalize_passkey_transports(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+
+    allowed = {"usb", "nfc", "ble", "hybrid", "internal"}
+    deduped: List[str] = []
+    seen: Set[str] = set()
+    for entry in value:
+        normalized = str(entry or "").strip().lower()
+        if normalized not in allowed or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _normalize_passkey_friendly_name(value: Any) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    normalized = normalized.replace("\r", " ").replace("\n", " ").strip()
+    return normalized[:80]
+
+
+def _extract_passkey_credential_id(credential_payload: Any) -> str:
+    if not isinstance(credential_payload, dict):
+        return ""
+
+    credential_id = str(
+        credential_payload.get("id")
+        or credential_payload.get("rawId")
+        or ""
+    ).strip()
+    if not credential_id:
+        return ""
+    if not PASSKEY_CREDENTIAL_ID_PATTERN.match(credential_id):
+        return ""
+    return credential_id
+
+
+def _coerce_webauthn_enum_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if hasattr(value, "value"):
+        try:
+            return str(value.value)
+        except Exception:
+            return str(value)
+    return str(value)
 
 
 def _normalize_passkey_callback_timestamp(raw_value: str) -> Optional[int]:
@@ -1086,10 +1298,42 @@ def _auth_passkey_capability() -> Dict[str, Any]:
             and not AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL.startswith(("http://", "https://"))
         ):
             warnings.append("AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL must be an absolute http(s) URL.")
+    elif AUTH_PASSKEY_PROVIDER == "first-party":
+        provider_label = "Suite First-Party WebAuthn"
+        if not WEBAUTHN_AVAILABLE:
+            config_missing.append("python package webauthn")
+        if not SUPABASE_URL:
+            config_missing.append("SUPABASE_URL")
+        if not SUPABASE_SERVICE_ROLE_KEY:
+            config_missing.append("SUPABASE_SERVICE_ROLE_KEY")
+        if not AUTH_PASSKEY_RP_ID:
+            config_missing.append("AUTH_PASSKEY_RP_ID")
+        if not AUTH_PASSKEY_RP_NAME:
+            config_missing.append("AUTH_PASSKEY_RP_NAME")
+
+        allowed_origins = _normalized_auth_passkey_allowed_origins()
+        if not allowed_origins:
+            config_missing.append("AUTH_PASSKEY_ALLOWED_ORIGINS")
+        elif AUTH_PASSKEY_RP_ID:
+            invalid_origins = [
+                origin
+                for origin in allowed_origins
+                if not _is_valid_webauthn_rp_id_for_origin(AUTH_PASSKEY_RP_ID, origin)
+            ]
+            if invalid_origins:
+                config_missing.append(
+                    "AUTH_PASSKEY_RP_ID must match AUTH_PASSKEY_ALLOWED_ORIGINS hostname."
+                )
+        if WEBAUTHN_IMPORT_ERROR:
+            warnings.append(f"WebAuthn import warning: {WEBAUTHN_IMPORT_ERROR}")
 
     if AUTH_PASSKEY_PROVIDER == "supabase":
         warnings.append(
             "Passkey enrollment/login handlers are not wired in this build yet."
+        )
+    elif AUTH_PASSKEY_PROVIDER == "first-party":
+        warnings.append(
+            "First-party passkey flow is active; keep AUTH_PASSKEY_ALLOWED_ORIGINS restricted to trusted app origins."
         )
     else:
         warnings.append("External provider redirect flow is enabled when configured.")
@@ -1107,6 +1351,10 @@ def _auth_passkey_capability() -> Dict[str, Any]:
             handlers_ready = True
             rollout_state = "ready"
             next_step = "External provider passkey start handlers are ready."
+        elif AUTH_PASSKEY_PROVIDER == "first-party":
+            handlers_ready = True
+            rollout_state = "ready"
+            next_step = "First-party WebAuthn passkey start/verify handlers are ready."
         else:
             rollout_state = "planned"
             next_step = "Provider selected, but passkey handlers are not available in this build."
@@ -1347,6 +1595,66 @@ def _normalize_absolute_http_url(candidate: str) -> Optional[str]:
     return urlunparse((parsed.scheme, parsed.netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
 
 
+def _normalized_auth_passkey_allowed_origins() -> List[str]:
+    normalized: List[str] = []
+    seen: Set[str] = set()
+    for entry in AUTH_PASSKEY_ALLOWED_ORIGINS:
+        candidate = _normalize_origin(entry.strip())
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        normalized.append(candidate)
+    return normalized
+
+
+def _is_valid_webauthn_rp_id_for_origin(rp_id: str, origin: str) -> bool:
+    normalized_rp_id = str(rp_id or "").strip().lower()
+    if not normalized_rp_id:
+        return False
+
+    try:
+        hostname = (urlparse(origin).hostname or "").strip().lower()
+    except Exception:
+        return False
+    if not hostname:
+        return False
+    return hostname == normalized_rp_id or hostname.endswith(f".{normalized_rp_id}")
+
+
+def _resolve_passkey_webauthn_expected_origin() -> Tuple[Optional[str], str]:
+    allowed = _normalized_auth_passkey_allowed_origins()
+    candidates = [
+        request.headers.get("Origin", "").strip(),
+        request.headers.get("Referer", "").strip(),
+        AUTH_EMAIL_REDIRECT_URL,
+    ]
+    for candidate in candidates:
+        origin = _normalize_origin(candidate)
+        if not origin:
+            continue
+        if allowed and origin not in allowed:
+            continue
+        return origin, "ok"
+
+    if allowed:
+        return allowed[0], "fallback"
+
+    return None, "missing-origin"
+
+
+def _options_to_json_dict(options: Any) -> Dict[str, Any]:
+    if options_to_json is None:
+        raise RuntimeError("webauthn options serializer is unavailable.")
+
+    serialized = options_to_json(options)
+    if isinstance(serialized, bytes):
+        serialized = serialized.decode("utf-8")
+    parsed = json.loads(serialized)
+    if not isinstance(parsed, dict):
+        raise RuntimeError("WebAuthn options serialization returned unexpected payload.")
+    return parsed
+
+
 def _build_auth_redirect_url(
     path: str,
     client_redirect_to: str = "",
@@ -1451,6 +1759,174 @@ def _build_external_passkey_redirect(
     return urlunparse(
         (parsed.scheme, parsed.netloc, parsed.path, parsed.params, query, parsed.fragment)
     )
+
+
+def _supabase_rest_base_url() -> str:
+    return f"{SUPABASE_URL.rstrip('/')}/rest/v1"
+
+
+def _supabase_service_rest_headers(
+    extra_headers: Optional[Dict[str, str]] = None,
+) -> Optional[Dict[str, str]]:
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": "application/json",
+    }
+    if extra_headers:
+        headers.update(extra_headers)
+    return headers
+
+
+def _extract_supabase_error_message(response: requests.Response) -> str:
+    try:
+        payload = response.json()
+        if isinstance(payload, dict):
+            for key in ("msg", "message", "error_description", "error", "hint", "details"):
+                value = str(payload.get(key) or "").strip()
+                if value:
+                    return value
+    except Exception:
+        pass
+
+    body = response.text.strip()
+    if body:
+        return body[:240]
+    return f"HTTP {response.status_code}"
+
+
+def _supabase_service_rest_request(
+    method: str,
+    table_path: str,
+    params: Optional[Dict[str, str]] = None,
+    payload: Optional[Any] = None,
+    extra_headers: Optional[Dict[str, str]] = None,
+    timeout: int = 8,
+) -> Tuple[Optional[Any], Optional[str], int]:
+    headers = _supabase_service_rest_headers(extra_headers)
+    if not headers:
+        return None, "Supabase service role credentials are not configured.", 0
+
+    endpoint = f"{_supabase_rest_base_url()}/{table_path.lstrip('/')}"
+    try:
+        response = requests.request(
+            method=method,
+            url=endpoint,
+            headers=headers,
+            params=params,
+            json=payload,
+            timeout=timeout,
+        )
+    except Exception as exc:
+        return None, f"Supabase REST request failed: {exc}", 0
+
+    if response.status_code >= 400:
+        return None, _extract_supabase_error_message(response), response.status_code
+
+    if response.status_code == 204 or not response.content:
+        return None, None, response.status_code
+
+    try:
+        return response.json(), None, response.status_code
+    except Exception:
+        return response.text, None, response.status_code
+
+
+def _fetch_active_passkeys_for_user_id(user_id: str) -> List[Dict[str, Any]]:
+    normalized_user_id = user_id.strip()
+    if not normalized_user_id:
+        return []
+
+    payload, error, status_code = _supabase_service_rest_request(
+        "GET",
+        "user_passkeys",
+        params={
+            "select": "id,user_id,user_email,credential_id,public_key,sign_count,aaguid,device_type,backed_up,transports,friendly_name,last_used_at,revoked_at,created_at",
+            "user_id": f"eq.{normalized_user_id}",
+            "revoked_at": "is.null",
+            "order": "created_at.asc",
+        },
+    )
+    if error:
+        logger.warning(
+            "Failed to query passkeys by user_id (status=%s user_id=%s): %s",
+            status_code,
+            normalized_user_id,
+            error,
+        )
+        return []
+
+    if not isinstance(payload, list):
+        return []
+    return [row for row in payload if isinstance(row, dict)]
+
+
+def _fetch_active_passkey_by_credential_id(credential_id: str) -> Optional[Dict[str, Any]]:
+    normalized_credential_id = credential_id.strip()
+    if not normalized_credential_id:
+        return None
+
+    payload, error, status_code = _supabase_service_rest_request(
+        "GET",
+        "user_passkeys",
+        params={
+            "select": "id,user_id,user_email,credential_id,public_key,sign_count,aaguid,device_type,backed_up,transports,friendly_name,last_used_at,revoked_at,created_at",
+            "credential_id": f"eq.{normalized_credential_id}",
+            "revoked_at": "is.null",
+            "limit": "1",
+        },
+    )
+    if error:
+        logger.warning(
+            "Failed to query passkey by credential_id (status=%s id_hash=%s): %s",
+            status_code,
+            hashlib.sha256(normalized_credential_id.encode("utf-8")).hexdigest()[:12],
+            error,
+        )
+        return None
+
+    if not isinstance(payload, list) or not payload:
+        return None
+    first = payload[0]
+    return first if isinstance(first, dict) else None
+
+
+def _insert_user_passkey_row(passkey_row: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[str], int]:
+    payload, error, status_code = _supabase_service_rest_request(
+        "POST",
+        "user_passkeys",
+        payload=passkey_row,
+        extra_headers={"Prefer": "return=representation"},
+    )
+    if error:
+        return None, error, status_code
+
+    if isinstance(payload, list) and payload:
+        first = payload[0]
+        if isinstance(first, dict):
+            return first, None, status_code
+    if isinstance(payload, dict):
+        return payload, None, status_code
+    return None, None, status_code
+
+
+def _update_user_passkey_row(passkey_id: str, patch: Dict[str, Any]) -> Tuple[bool, Optional[str], int]:
+    normalized_passkey_id = passkey_id.strip()
+    if not normalized_passkey_id:
+        return False, "passkey id is required.", 0
+
+    _, error, status_code = _supabase_service_rest_request(
+        "PATCH",
+        "user_passkeys",
+        params={"id": f"eq.{normalized_passkey_id}"},
+        payload=patch,
+    )
+    if error:
+        return False, error, status_code
+    return True, None, status_code
 
 
 def _send_supabase_email_link(
@@ -3143,6 +3619,12 @@ def api_auth_passkey_sign_in():
     client_redirect_to = str(
         payload.get("redirectTo") or payload.get("redirect_to") or ""
     ).strip()
+    requested_redirect_path = str(
+        payload.get("redirectPath") or payload.get("redirect_path") or ""
+    ).strip()
+    redirect_path = AGENT_PAIRING_REDIRECT_PATH
+    if requested_redirect_path in {"/app/agent", "/app/settings"}:
+        redirect_path = requested_redirect_path
     client_ip = _get_request_ip()
 
     capability = _auth_passkey_capability()
@@ -3159,6 +3641,75 @@ def api_auth_passkey_sign_in():
             "provider": capability.get("provider"),
             "next_step": capability.get("next_step"),
         }), 501
+
+    if capability.get("provider") == "first-party":
+        expected_origin, origin_reason = _resolve_passkey_webauthn_expected_origin()
+        if not expected_origin:
+            return jsonify({
+                "error": "Passkey origin is not allowed or could not be resolved.",
+                "code": "passkey-origin-invalid",
+                "reason": origin_reason,
+            }), 503
+
+        if not _is_valid_webauthn_rp_id_for_origin(AUTH_PASSKEY_RP_ID, expected_origin):
+            return jsonify({
+                "error": "Passkey RP ID does not match this origin.",
+                "code": "passkey-rp-mismatch",
+                "rp_id": AUTH_PASSKEY_RP_ID,
+                "origin": expected_origin,
+            }), 503
+
+        if not WEBAUTHN_AVAILABLE or generate_authentication_options is None:
+            return jsonify({
+                "error": "WebAuthn server dependency is unavailable.",
+                "code": "passkey-webauthn-unavailable",
+            }), 503
+
+        user_verification = (
+            UserVerificationRequirement.REQUIRED
+            if AUTH_PASSKEY_REQUIRE_USER_VERIFICATION
+            else UserVerificationRequirement.PREFERRED
+        )
+        try:
+            authentication_options = generate_authentication_options(
+                rp_id=AUTH_PASSKEY_RP_ID,
+                user_verification=user_verification,
+                timeout=AUTH_PASSKEY_WEBAUTHN_TIMEOUT_MS,
+            )
+            public_key_options = _options_to_json_dict(authentication_options)
+            challenge = str(public_key_options.get("challenge") or "").strip()
+        except Exception as exc:
+            logger.exception("Failed to generate passkey sign-in options: %s", exc)
+            return jsonify({
+                "error": "Unable to generate passkey sign-in options.",
+                "code": "passkey-options-generation-failed",
+            }), 500
+
+        if not challenge:
+            return jsonify({
+                "error": "Generated passkey options were missing challenge.",
+                "code": "passkey-options-invalid",
+            }), 500
+
+        state_token, expires_at = _create_passkey_webauthn_state(
+            intent="sign-in",
+            challenge=challenge,
+            expected_origin=expected_origin,
+            client_ip=client_ip,
+            client_redirect_to=client_redirect_to,
+        )
+
+        return jsonify({
+            "ok": True,
+            "method": "passkey",
+            "mode": "webauthn",
+            "provider": capability.get("provider"),
+            "provider_label": capability.get("provider_label"),
+            "state": state_token,
+            "state_expires_at": datetime.utcfromtimestamp(expires_at).isoformat() + "Z",
+            "public_key": public_key_options,
+            "message": "Complete passkey verification on this device.",
+        }), 200
 
     state_token, expires_at = _create_passkey_callback_state(
         intent="sign-in",
@@ -3222,6 +3773,130 @@ def api_auth_passkey_enroll():
             "next_step": capability.get("next_step"),
         }), 501
 
+    if capability.get("provider") == "first-party":
+        if not user_id or not user_email:
+            return jsonify({
+                "error": "Authenticated user context is incomplete.",
+                "code": "passkey-user-context-missing",
+            }), 401
+
+        expected_origin, origin_reason = _resolve_passkey_webauthn_expected_origin()
+        if not expected_origin:
+            return jsonify({
+                "error": "Passkey origin is not allowed or could not be resolved.",
+                "code": "passkey-origin-invalid",
+                "reason": origin_reason,
+            }), 503
+
+        if not _is_valid_webauthn_rp_id_for_origin(AUTH_PASSKEY_RP_ID, expected_origin):
+            return jsonify({
+                "error": "Passkey RP ID does not match this origin.",
+                "code": "passkey-rp-mismatch",
+                "rp_id": AUTH_PASSKEY_RP_ID,
+                "origin": expected_origin,
+            }), 503
+
+        if (
+            not WEBAUTHN_AVAILABLE
+            or generate_registration_options is None
+            or PublicKeyCredentialDescriptor is None
+            or AuthenticatorSelectionCriteria is None
+            or ResidentKeyRequirement is None
+            or UserVerificationRequirement is None
+        ):
+            return jsonify({
+                "error": "WebAuthn server dependency is unavailable.",
+                "code": "passkey-webauthn-unavailable",
+            }), 503
+
+        existing_passkeys = _fetch_active_passkeys_for_user_id(user_id)
+        exclude_credentials: List[Any] = []
+        for row in existing_passkeys:
+            credential_id = str(row.get("credential_id") or "").strip()
+            if not PASSKEY_CREDENTIAL_ID_PATTERN.match(credential_id):
+                continue
+
+            try:
+                descriptor_kwargs: Dict[str, Any] = {
+                    "id": base64url_to_bytes(credential_id),
+                }
+                transports_raw = _normalize_passkey_transports(row.get("transports"))
+                if transports_raw and AuthenticatorTransport is not None:
+                    parsed_transports: List[Any] = []
+                    for transport in transports_raw:
+                        try:
+                            parsed_transports.append(AuthenticatorTransport(transport))
+                        except Exception:
+                            continue
+                    if parsed_transports:
+                        descriptor_kwargs["transports"] = parsed_transports
+
+                exclude_credentials.append(PublicKeyCredentialDescriptor(**descriptor_kwargs))
+            except Exception:
+                continue
+
+        user_verification = (
+            UserVerificationRequirement.REQUIRED
+            if AUTH_PASSKEY_REQUIRE_USER_VERIFICATION
+            else UserVerificationRequirement.PREFERRED
+        )
+        resident_key = (
+            ResidentKeyRequirement.REQUIRED
+            if AUTH_PASSKEY_REQUIRE_RESIDENT_KEY
+            else ResidentKeyRequirement.PREFERRED
+        )
+
+        try:
+            registration_options = generate_registration_options(
+                rp_id=AUTH_PASSKEY_RP_ID,
+                rp_name=AUTH_PASSKEY_RP_NAME,
+                user_id=user_id.encode("utf-8"),
+                user_name=user_email,
+                user_display_name=user_email,
+                timeout=AUTH_PASSKEY_WEBAUTHN_TIMEOUT_MS,
+                exclude_credentials=exclude_credentials,
+                authenticator_selection=AuthenticatorSelectionCriteria(
+                    resident_key=resident_key,
+                    user_verification=user_verification,
+                ),
+            )
+            public_key_options = _options_to_json_dict(registration_options)
+            challenge = str(public_key_options.get("challenge") or "").strip()
+        except Exception as exc:
+            logger.exception("Failed to generate passkey enrollment options: %s", exc)
+            return jsonify({
+                "error": "Unable to generate passkey enrollment options.",
+                "code": "passkey-options-generation-failed",
+            }), 500
+
+        if not challenge:
+            return jsonify({
+                "error": "Generated passkey options were missing challenge.",
+                "code": "passkey-options-invalid",
+            }), 500
+
+        state_token, expires_at = _create_passkey_webauthn_state(
+            intent="enroll",
+            challenge=challenge,
+            expected_origin=expected_origin,
+            client_ip=client_ip,
+            client_redirect_to=client_redirect_to,
+            user_id=user_id,
+            email=user_email,
+        )
+
+        return jsonify({
+            "ok": True,
+            "method": "passkey",
+            "mode": "webauthn",
+            "provider": capability.get("provider"),
+            "provider_label": capability.get("provider_label"),
+            "state": state_token,
+            "state_expires_at": datetime.utcfromtimestamp(expires_at).isoformat() + "Z",
+            "public_key": public_key_options,
+            "message": "Complete passkey enrollment on this device.",
+        }), 200
+
     state_token, expires_at = _create_passkey_callback_state(
         intent="enroll",
         client_ip=client_ip,
@@ -3252,6 +3927,379 @@ def api_auth_passkey_enroll():
         "state_expires_at": datetime.utcfromtimestamp(expires_at).isoformat() + "Z",
         "redirect_url": redirect_url,
         "message": "Continue passkey enrollment with your identity provider.",
+    }), 200
+
+
+@app.route('/api/auth/passkey/auth/verify', methods=['POST'])
+@limiter.limit("40 per hour")
+def api_auth_passkey_auth_verify():
+    """Verify a first-party WebAuthn assertion and continue sign-in."""
+    capability = _auth_passkey_capability()
+    if not capability.get("enabled"):
+        return jsonify({
+            "error": "Passkey sign-in is disabled.",
+            "code": "passkey-disabled",
+        }), 503
+    if capability.get("provider") != "first-party":
+        return jsonify({
+            "error": "Passkey provider does not support first-party verify endpoint.",
+            "code": "passkey-provider-mode-mismatch",
+            "provider": capability.get("provider"),
+        }), 409
+    if not capability.get("handlers_ready"):
+        return jsonify({
+            "error": "Passkey sign-in handlers are not ready.",
+            "code": "passkey-provider-unavailable",
+            "next_step": capability.get("next_step"),
+        }), 503
+    if not request.is_json:
+        return jsonify({"error": "Expected JSON payload."}), 400
+
+    if (
+        verify_authentication_response is None
+        or base64url_to_bytes is None
+        or not WEBAUTHN_AVAILABLE
+    ):
+        return jsonify({
+            "error": "WebAuthn verification dependencies are unavailable.",
+            "code": "passkey-webauthn-unavailable",
+        }), 503
+
+    payload = request.get_json(silent=True) or {}
+    state_token = str(payload.get("state") or "").strip()
+    credential_payload = payload.get("credential")
+
+    if not state_token:
+        return jsonify({"error": "state is required."}), 400
+    if not PASSKEY_CALLBACK_STATE_PATTERN.match(state_token):
+        return jsonify({"error": "Invalid state format."}), 400
+    if not isinstance(credential_payload, dict):
+        return jsonify({"error": "credential payload is required."}), 400
+
+    webauthn_state, reason = _consume_passkey_webauthn_state(
+        state_token,
+        expected_intent="sign-in",
+    )
+    if not webauthn_state:
+        if reason == "expired":
+            return jsonify({"error": "Passkey challenge expired. Start again."}), 410
+        if reason == "intent-mismatch":
+            return jsonify({"error": "Passkey challenge intent mismatch."}), 400
+        return jsonify({"error": "Invalid passkey challenge state."}), 400
+
+    credential_id = _extract_passkey_credential_id(credential_payload)
+    if not credential_id:
+        return jsonify({
+            "error": "Passkey credential id is missing or malformed.",
+            "code": "passkey-credential-invalid",
+        }), 400
+
+    passkey_row = _fetch_active_passkey_by_credential_id(credential_id)
+    if not passkey_row:
+        return jsonify({
+            "error": "Passkey credential was not recognized.",
+            "code": "passkey-credential-not-found",
+        }), 401
+
+    user_email = str(passkey_row.get("user_email") or "").strip().lower()
+    if not _is_valid_email(user_email):
+        return jsonify({
+            "error": "Passkey record is missing a valid account email.",
+            "code": "passkey-account-email-invalid",
+        }), 502
+
+    expected_challenge = str(webauthn_state.get("challenge") or "").strip()
+    expected_origin = str(webauthn_state.get("expected_origin") or "").strip()
+    if not expected_challenge or not expected_origin:
+        return jsonify({
+            "error": "Passkey challenge state was malformed.",
+            "code": "passkey-state-invalid",
+        }), 400
+
+    credential_public_key = str(passkey_row.get("public_key") or "").strip()
+    try:
+        current_sign_count = int(passkey_row.get("sign_count") or 0)
+    except Exception:
+        current_sign_count = 0
+
+    try:
+        verification = verify_authentication_response(
+            credential=credential_payload,
+            expected_challenge=base64url_to_bytes(expected_challenge),
+            expected_rp_id=AUTH_PASSKEY_RP_ID,
+            expected_origin=expected_origin,
+            credential_public_key=base64url_to_bytes(credential_public_key),
+            credential_current_sign_count=current_sign_count,
+            require_user_verification=AUTH_PASSKEY_REQUIRE_USER_VERIFICATION,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Passkey sign-in verification failed credential_hash=%s reason=%s",
+            hashlib.sha256(credential_id.encode("utf-8")).hexdigest()[:12],
+            exc,
+        )
+        return jsonify({
+            "error": "Passkey verification failed.",
+            "code": "passkey-verification-failed",
+        }), 401
+
+    try:
+        new_sign_count = int(getattr(verification, "new_sign_count", current_sign_count))
+    except Exception:
+        new_sign_count = current_sign_count
+
+    passkey_id = str(passkey_row.get("id") or "").strip()
+    if passkey_id:
+        ok, patch_error, patch_status = _update_user_passkey_row(
+            passkey_id,
+            {
+                "sign_count": max(new_sign_count, 0),
+                "last_used_at": datetime.utcnow().isoformat() + "Z",
+            },
+        )
+        if not ok:
+            logger.warning(
+                "Passkey usage update failed passkey_id=%s status=%s error=%s",
+                passkey_id,
+                patch_status,
+                patch_error,
+            )
+
+    client_redirect_to = str(webauthn_state.get("client_redirect_to") or "").strip()
+    if SUPABASE_SERVICE_ROLE_KEY:
+        try:
+            magic_link = _generate_supabase_magic_link_url(
+                user_email,
+                client_redirect_to=client_redirect_to,
+                redirect_path="/login",
+            )
+            return jsonify({
+                "ok": True,
+                "completed": True,
+                "intent": "sign-in",
+                "status": "success",
+                "session_mode": "magic-link-direct",
+                "resume_url": magic_link,
+                "message": "Passkey verified. Continuing sign-in.",
+            }), 200
+        except Exception as exc:
+            logger.warning("Passkey sign-in direct magic-link generation failed: %s", exc)
+
+    try:
+        _send_supabase_email_link(
+            user_email,
+            "signin",
+            client_redirect_to=client_redirect_to,
+            redirect_path="/login",
+        )
+    except Exception as exc:
+        logger.warning("Passkey sign-in email-link fallback failed: %s", exc)
+        return jsonify({
+            "error": "Passkey verified, but sign-in continuation failed.",
+            "code": "passkey-continuation-failed",
+        }), 502
+
+    return jsonify({
+        "ok": True,
+        "completed": True,
+        "intent": "sign-in",
+        "status": "success",
+        "session_mode": "email-link-fallback",
+        "message": "Passkey verified. Check your email to finish sign-in.",
+    }), 200
+
+
+@app.route('/api/auth/passkey/register/verify', methods=['POST'])
+@require_supabase_user
+@limiter.limit("40 per hour")
+def api_auth_passkey_register_verify():
+    """Verify a first-party WebAuthn registration response and store passkey metadata."""
+    capability = _auth_passkey_capability()
+    if not capability.get("enabled"):
+        return jsonify({
+            "error": "Passkey enrollment is disabled.",
+            "code": "passkey-disabled",
+        }), 503
+    if capability.get("provider") != "first-party":
+        return jsonify({
+            "error": "Passkey provider does not support first-party verify endpoint.",
+            "code": "passkey-provider-mode-mismatch",
+            "provider": capability.get("provider"),
+        }), 409
+    if not capability.get("handlers_ready"):
+        return jsonify({
+            "error": "Passkey enrollment handlers are not ready.",
+            "code": "passkey-provider-unavailable",
+            "next_step": capability.get("next_step"),
+        }), 503
+    if not request.is_json:
+        return jsonify({"error": "Expected JSON payload."}), 400
+
+    if (
+        verify_registration_response is None
+        or base64url_to_bytes is None
+        or bytes_to_base64url is None
+        or not WEBAUTHN_AVAILABLE
+    ):
+        return jsonify({
+            "error": "WebAuthn verification dependencies are unavailable.",
+            "code": "passkey-webauthn-unavailable",
+        }), 503
+
+    user = getattr(g, "supabase_user", {}) or {}
+    user_id = _get_supabase_user_id(user) or ""
+    user_email = _get_supabase_user_email(user) or ""
+    if not user_id or not user_email:
+        return jsonify({
+            "error": "Authenticated user context is incomplete.",
+            "code": "passkey-user-context-missing",
+        }), 401
+
+    payload = request.get_json(silent=True) or {}
+    state_token = str(payload.get("state") or "").strip()
+    credential_payload = payload.get("credential")
+    friendly_name = _normalize_passkey_friendly_name(
+        payload.get("friendly_name") or payload.get("friendlyName")
+    )
+
+    if not state_token:
+        return jsonify({"error": "state is required."}), 400
+    if not PASSKEY_CALLBACK_STATE_PATTERN.match(state_token):
+        return jsonify({"error": "Invalid state format."}), 400
+    if not isinstance(credential_payload, dict):
+        return jsonify({"error": "credential payload is required."}), 400
+
+    webauthn_state, reason = _consume_passkey_webauthn_state(
+        state_token,
+        expected_intent="enroll",
+    )
+    if not webauthn_state:
+        if reason == "expired":
+            return jsonify({"error": "Passkey challenge expired. Start again."}), 410
+        if reason == "intent-mismatch":
+            return jsonify({"error": "Passkey challenge intent mismatch."}), 400
+        return jsonify({"error": "Invalid passkey challenge state."}), 400
+
+    expected_user_id = str(webauthn_state.get("user_id") or "").strip()
+    expected_email = str(webauthn_state.get("email") or "").strip().lower()
+    if expected_user_id and expected_user_id != user_id:
+        return jsonify({
+            "error": "Passkey challenge user mismatch.",
+            "code": "passkey-user-mismatch",
+        }), 403
+    if expected_email and expected_email != user_email:
+        return jsonify({
+            "error": "Passkey challenge email mismatch.",
+            "code": "passkey-email-mismatch",
+        }), 403
+
+    expected_challenge = str(webauthn_state.get("challenge") or "").strip()
+    expected_origin = str(webauthn_state.get("expected_origin") or "").strip()
+    if not expected_challenge or not expected_origin:
+        return jsonify({
+            "error": "Passkey challenge state was malformed.",
+            "code": "passkey-state-invalid",
+        }), 400
+
+    try:
+        verification = verify_registration_response(
+            credential=credential_payload,
+            expected_challenge=base64url_to_bytes(expected_challenge),
+            expected_rp_id=AUTH_PASSKEY_RP_ID,
+            expected_origin=expected_origin,
+            require_user_verification=AUTH_PASSKEY_REQUIRE_USER_VERIFICATION,
+        )
+    except Exception as exc:
+        logger.warning("Passkey enrollment verification failed user_id=%s reason=%s", user_id, exc)
+        return jsonify({
+            "error": "Passkey enrollment verification failed.",
+            "code": "passkey-verification-failed",
+        }), 401
+
+    credential_id = bytes_to_base64url(getattr(verification, "credential_id", b""))
+    public_key = bytes_to_base64url(getattr(verification, "credential_public_key", b""))
+    if not credential_id or not public_key:
+        return jsonify({
+            "error": "Passkey registration payload was missing credential data.",
+            "code": "passkey-registration-invalid",
+        }), 400
+
+    try:
+        sign_count = int(getattr(verification, "sign_count", 0) or 0)
+    except Exception:
+        sign_count = 0
+
+    aaguid = _coerce_webauthn_enum_value(getattr(verification, "aaguid", "")).strip()
+    device_type = _coerce_webauthn_enum_value(
+        getattr(verification, "credential_device_type", "")
+    ).strip()
+    backed_up = bool(getattr(verification, "credential_backed_up", False))
+
+    transports: List[str] = []
+    response_payload = credential_payload.get("response")
+    if isinstance(response_payload, dict):
+        transports = _normalize_passkey_transports(response_payload.get("transports"))
+    if not transports:
+        transports = _normalize_passkey_transports(credential_payload.get("transports"))
+
+    passkey_row = {
+        "user_id": user_id,
+        "user_email": user_email,
+        "credential_id": credential_id,
+        "public_key": public_key,
+        "sign_count": max(sign_count, 0),
+        "aaguid": aaguid or None,
+        "device_type": device_type or None,
+        "backed_up": backed_up,
+        "transports": transports,
+        "friendly_name": friendly_name or None,
+        "last_used_at": None,
+        "revoked_at": None,
+    }
+
+    inserted, insert_error, insert_status = _insert_user_passkey_row(passkey_row)
+    if insert_error:
+        lowered = insert_error.lower()
+        if (
+            insert_status == 409
+            or "duplicate" in lowered
+            or "already exists" in lowered
+            or "23505" in lowered
+        ):
+            return jsonify({
+                "error": "This passkey is already enrolled.",
+                "code": "passkey-duplicate",
+            }), 409
+        logger.warning(
+            "Passkey insert failed user_id=%s status=%s error=%s",
+            user_id,
+            insert_status,
+            insert_error,
+        )
+        return jsonify({
+            "error": "Passkey enrollment succeeded, but storing metadata failed.",
+            "code": "passkey-store-failed",
+        }), 502
+
+    settings_url = _build_auth_redirect_url(
+        "/app/settings",
+        str(webauthn_state.get("client_redirect_to") or "").strip(),
+    )
+    passkey_summary = {
+        "id": str((inserted or {}).get("id") or ""),
+        "credential_id": credential_id,
+        "friendly_name": str((inserted or {}).get("friendly_name") or "") or None,
+        "device_type": str((inserted or {}).get("device_type") or "") or None,
+        "created_at": (inserted or {}).get("created_at"),
+    }
+    return jsonify({
+        "ok": True,
+        "completed": True,
+        "intent": "enroll",
+        "status": "success",
+        "passkey": passkey_summary,
+        "redirect_to": settings_url,
+        "message": "Passkey enrollment complete.",
     }), 200
 
 
@@ -3579,7 +4627,7 @@ def api_agent_pairing_challenge():
             user_email,
             "signin",
             client_redirect_to=client_redirect_to,
-            redirect_path=AGENT_PAIRING_REDIRECT_PATH,
+            redirect_path=redirect_path,
             redirect_query={
                 "agent_action": action,
                 "agent_challenge": challenge_id,
@@ -4651,13 +5699,13 @@ if __name__ == '__main__':
     api_port = _parse_int_env('API_PORT', 5000, minimum=1)
 
     print("=" * 60)
-    print("🚀 Coordinates Grabber API Server")
+    print("Coordinates Grabber API Server")
     print("=" * 60)
     print(f"Server starting on: http://{api_host}:{api_port}")
     print(f"Health check: http://{api_host}:{api_port}/health")
     print(f"Status endpoint: http://{api_host}:{api_port}/api/status")
     print("")
-    print("📋 Prerequisites:")
+    print("Prerequisites:")
     print("  - AutoCAD must be running")
     print("  - A drawing must be open in AutoCAD")
     print("  - React frontend should connect to localhost:5000")
@@ -4670,13 +5718,13 @@ if __name__ == '__main__':
     initial_status = manager.get_status()
     
     if initial_status['autocad_running']:
-        print(f"✅ AutoCAD detected: {initial_status['autocad_path']}")
+        print(f"[OK] AutoCAD detected: {initial_status['autocad_path']}")
         if initial_status['drawing_open']:
-            print(f"✅ Drawing open: {initial_status['drawing_name']}")
+            print(f"[OK] Drawing open: {initial_status['drawing_name']}")
         else:
-            print("⚠️  No drawing is currently open")
+            print("[WARN] No drawing is currently open")
     else:
-        print("❌ AutoCAD not detected - waiting for it to start...")
+        print("[WARN] AutoCAD not detected - waiting for it to start...")
     
     print("=" * 60)
     print("")

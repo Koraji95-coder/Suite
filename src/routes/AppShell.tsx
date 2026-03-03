@@ -3,6 +3,7 @@ import {
 	BookOpen,
 	CalendarDays,
 	FolderOpen,
+	KeyRound,
 	LayoutDashboard,
 	Menu,
 	Network,
@@ -33,7 +34,7 @@ const primaryNavItems = [
 ];
 
 function AppTopbar({ onMenuToggle }: { onMenuToggle: () => void }) {
-	const { signOut, user, profile } = useAuth();
+	const { signOut, user, profile, sessionAuthMethod } = useAuth();
 	const { header } = usePageHeader();
 	const [localTime, setLocalTime] = useState(() => new Date());
 
@@ -66,6 +67,8 @@ function AppTopbar({ onMenuToggle }: { onMenuToggle: () => void }) {
 			}),
 		[localTime],
 	);
+
+	const passkeySessionActive = sessionAuthMethod === "passkey";
 
 	return (
 		<header className="flex-none border-b border-border [background:color-mix(in_srgb,var(--bg-base)_86%,transparent)] backdrop-blur" style={{ zIndex: "var(--z-topbar)" }}>
@@ -110,6 +113,12 @@ function AppTopbar({ onMenuToggle }: { onMenuToggle: () => void }) {
 					>
 						{timeLabel}
 					</span>
+					{passkeySessionActive ? (
+						<span className="hidden items-center gap-1 rounded-lg border px-2.5 py-1 text-xs sm:inline-flex [border-color:color-mix(in_oklab,var(--primary)_40%,var(--border))] [background:color-mix(in_oklab,var(--primary)_12%,var(--surface))] [color:var(--primary)]">
+							<KeyRound size={12} />
+							Passkey session
+						</span>
+					) : null}
 					<span className="hidden rounded-lg border border-border bg-surface px-2.5 py-1 text-xs text-text sm:inline-flex">
 						{displayLabel}
 					</span>

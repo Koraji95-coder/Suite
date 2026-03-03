@@ -10,10 +10,11 @@ Frontend filtering is not enough for security. Real isolation must be enforced b
 
 Use:
 
+- `supabase/consolidated_migration.sql`
 - `backend/supabase/rls_hardening.sql`
 - `backend/supabase/storage_policies.sql`
 
-Apply in Supabase SQL Editor (dev first, then production).
+Apply in Supabase SQL Editor (dev first, then production) in that order.
 
 ## What the script does
 

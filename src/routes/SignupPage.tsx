@@ -42,10 +42,6 @@ export default function SignupPage() {
 		try {
 			await signUp(email.trim(), { captchaToken, honeypot });
 			setSent(true);
-			notification.success(
-				"Check your email",
-				"If this email can be used, a secure signup link was sent.",
-			);
 		} catch (err: unknown) {
 			const msg =
 				err instanceof Error

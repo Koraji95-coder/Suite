@@ -1,19 +1,15 @@
 // src/routes/app/settings/SettingsPage.tsx
 import {
 	Bot,
-	Mail,
 	Palette,
 	Settings as SettingsIcon,
 	Shield,
-	User,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { FrameSection, PageFrame } from "@/components/apps/ui/PageFrame";
 import { cn } from "@/lib/utils";
 
 import AccountSettings from "./AccountSettings";
-import EmailConfig from "./EmailConfig";
-import ProfileSettings from "./ProfileSettings";
 import ThemePicker from "./ThemePicker";
 
 const STORAGE_KEY = "app-settings-active-tab";
@@ -26,21 +22,9 @@ const TABS = [
 		icon: Palette,
 	},
 	{
-		id: "profile",
-		label: "Profile",
-		description: "Identity and account contact details.",
-		icon: User,
-	},
-	{
-		id: "email",
-		label: "Email",
-		description: "SMTP defaults, templates, and notifications.",
-		icon: Mail,
-	},
-	{
 		id: "account",
 		label: "Account",
-		description: "Passkeys, sessions, and account actions.",
+		description: "Profile, passkeys, sessions, and account actions.",
 		icon: Shield,
 	},
 	{
@@ -54,8 +38,13 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 
 function getInitialTab(): TabId {
-	const stored = localStorage.getItem(STORAGE_KEY) as TabId | null;
-	return stored && TABS.some((t) => t.id === stored) ? stored : "theme";
+	const storedRaw = localStorage.getItem(STORAGE_KEY) || "";
+	const stored =
+		storedRaw === "email" || storedRaw === "profile" ? "account" : storedRaw;
+	if (stored && TABS.some((tab) => tab.id === stored)) {
+		return stored as TabId;
+	}
+	return "theme";
 }
 
 export default function SettingsPage() {
@@ -69,10 +58,6 @@ export default function SettingsPage() {
 		switch (activeTab) {
 			case "theme":
 				return <ThemePicker />;
-			case "profile":
-				return <ProfileSettings />;
-			case "email":
-				return <EmailConfig />;
 			case "account":
 				return <AccountSettings />;
 			case "ai":
@@ -106,7 +91,7 @@ export default function SettingsPage() {
 	}, [activeTab]);
 
 	const activeMeta = TABS.find((tab) => tab.id === activeTab) ?? TABS[0];
-	const completedAreas = 4;
+	const completedAreas = TABS.length;
 	const totalAreas = TABS.length;
 
 	return (

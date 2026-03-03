@@ -9,9 +9,15 @@ import {
 	isFrontendPasskeyEnabled,
 } from "../auth/passkeyCapabilityApi";
 import {
+	completePasskeySignInVerification,
 	completePasskeyCallback,
 	startPasskeySignIn,
 } from "../auth/passkeyAuthApi";
+import { markPasskeySignInPending } from "../auth/passkeySessionState";
+import {
+	startAuthentication,
+	type PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/browser";
 import { resolveAuthRedirect } from "../auth/authRedirect";
 import { useAuth } from "../auth/useAuth";
 import { logger } from "../lib/logger";
@@ -173,6 +179,7 @@ export default function LoginPage() {
 						"sign_in_completed",
 						`Passkey callback completed (session_mode=${result.session_mode || "unknown"}).`,
 					);
+					markPasskeySignInPending();
 				}
 
 				if (result.resume_url) {
@@ -274,10 +281,6 @@ export default function LoginPage() {
 		try {
 			await signIn(email.trim(), { captchaToken, honeypot });
 			setSent(true);
-			notification.success(
-				"Check your email",
-				"If your account exists, a sign-in link has been sent.",
-			);
 		} catch (err: unknown) {
 			const msg =
 				err instanceof Error
@@ -318,6 +321,52 @@ export default function LoginPage() {
 					`Passkey sign-in redirected to provider: ${result.provider_label || result.provider || "unknown"}.`,
 				);
 				window.location.assign(result.redirect_url);
+				return;
+			}
+			if (result.mode === "webauthn" && result.state && result.public_key) {
+				const options = result.public_key as PublicKeyCredentialRequestOptionsJSON;
+				const credential = await startAuthentication({
+					optionsJSON: options,
+				});
+
+				const verification = await completePasskeySignInVerification({
+					state: result.state,
+					credential,
+					redirectTo,
+				});
+				markPasskeySignInPending();
+
+				if (verification.resume_url) {
+					await logAuthMethodTelemetry(
+						"passkey",
+						"sign_in_completed",
+						"Passkey sign-in verified and resumed via direct magic link.",
+					);
+					window.location.assign(verification.resume_url);
+					return;
+				}
+				if (verification.redirect_to) {
+					await logAuthMethodTelemetry(
+						"passkey",
+						"sign_in_completed",
+						"Passkey sign-in verified and redirected to continuation URL.",
+					);
+					window.location.assign(verification.redirect_to);
+					return;
+				}
+				if (verification.completed === false || verification.status === "failed") {
+					throw new Error(
+						verification.message || "Passkey sign-in could not be completed.",
+					);
+				}
+				if (verification.message) {
+					notification.success("Passkey sign-in complete", verification.message);
+				}
+				await logAuthMethodTelemetry(
+					"passkey",
+					"sign_in_completed",
+					"Passkey sign-in completed.",
+				);
 				return;
 			}
 

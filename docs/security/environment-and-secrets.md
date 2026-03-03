@@ -69,7 +69,18 @@ The repository ignore rules include:
 - Passkey rollout is currently probe-gated (not fully active):
   - Frontend gate: `VITE_AUTH_PASSKEY_ENABLED`
   - Backend gate: `AUTH_PASSKEY_ENABLED`
-  - Backend provider selector: `AUTH_PASSKEY_PROVIDER` (`supabase` or `external`)
+  - Backend provider selector: `AUTH_PASSKEY_PROVIDER` (`supabase`, `external`, or `first-party`)
+  - First-party WebAuthn mode (`AUTH_PASSKEY_PROVIDER=first-party`) requires:
+    - `SUPABASE_SERVICE_ROLE_KEY` (backend reads/writes `public.user_passkeys`)
+    - `AUTH_PASSKEY_RP_ID`
+    - `AUTH_PASSKEY_RP_NAME`
+    - `AUTH_PASSKEY_ALLOWED_ORIGINS`
+    - optional tuning:
+      - `AUTH_PASSKEY_WEBAUTHN_STATE_TTL_SECONDS`
+      - `AUTH_PASSKEY_WEBAUTHN_STATE_MAX_ENTRIES`
+      - `AUTH_PASSKEY_WEBAUTHN_TIMEOUT_MS`
+      - `AUTH_PASSKEY_REQUIRE_USER_VERIFICATION`
+      - `AUTH_PASSKEY_REQUIRE_RESIDENT_KEY`
   - External provider metadata (if using `external`): `AUTH_PASSKEY_EXTERNAL_NAME`, `AUTH_PASSKEY_EXTERNAL_DISCOVERY_URL`
   - External passkey start URLs (if using `external`):
     - `AUTH_PASSKEY_EXTERNAL_SIGNIN_URL`

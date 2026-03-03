@@ -31,6 +31,7 @@ In Supabase project settings:
 - [ ] Browser-exposed env values (`VITE_*`) contain no server-only secrets.
 - [ ] Supabase RLS script has been applied and verified (`backend/supabase/rls_hardening.sql`).
 - [ ] Supabase storage policies are applied (`backend/supabase/storage_policies.sql`).
+- [ ] Supabase schema bootstrap has been applied (`supabase/consolidated_migration.sql`).
 - [ ] Passwordless auth abuse controls are tuned in backend env (`AUTH_EMAIL_*`).
 - [ ] CAPTCHA enforcement mode is explicitly set (`AUTH_EMAIL_REQUIRE_TURNSTILE`).
 

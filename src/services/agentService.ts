@@ -49,6 +49,10 @@ export interface AgentTask {
 }
 
 export type AgentPairingAction = "pair" | "unpair";
+export interface AgentPairingVerificationOptions {
+	redirectTo?: string;
+	redirectPath?: "/app/agent" | "/app/settings";
+}
 
 export type PythonToolRequest = Record<string, unknown> & {
 	script: string;
@@ -233,9 +237,16 @@ class AgentService {
 		return fallback;
 	}
 
+	private getDefaultPairingRedirectTo(path = "/app/agent"): string | undefined {
+		if (typeof window === "undefined") return undefined;
+		const safePath = path.startsWith("/") ? path : `/${path}`;
+		return `${window.location.origin}${safePath}`;
+	}
+
 	async requestPairingVerificationLink(
 		action: AgentPairingAction,
 		pairingCode?: string,
+		options?: AgentPairingVerificationOptions,
 	): Promise<void> {
 		if (!this.useBroker) {
 			throw new Error(
@@ -255,6 +266,14 @@ class AgentService {
 				throw new Error("Pairing code required.");
 			}
 			payload.pairing_code = code;
+		}
+		const redirectTo = (options?.redirectTo || "").trim();
+		if (redirectTo) {
+			payload.redirect_to = redirectTo;
+		}
+		const redirectPath = (options?.redirectPath || "").trim();
+		if (redirectPath) {
+			payload.redirect_path = redirectPath;
 		}
 
 		const response = await fetch(`${this.brokerUrl}/pairing-challenge`, {
@@ -312,6 +331,11 @@ class AgentService {
 		const data = (await response.json()) as
 			| { paired?: boolean; action?: AgentPairingAction }
 			| undefined;
+		if (data?.action && data.action !== action) {
+			throw new Error(
+				`Verification action mismatch. Expected ${action}, received ${data.action}.`,
+			);
+		}
 		this.brokerPaired = Boolean(data?.paired);
 
 		if (action === "pair") {
@@ -464,7 +488,10 @@ class AgentService {
 			logger.info("Attempting to pair with agent", "AgentService");
 
 			if (this.useBroker) {
-				await this.requestPairingVerificationLink("pair", pairingCode.trim());
+				await this.requestPairingVerificationLink("pair", pairingCode.trim(), {
+					redirectTo: this.getDefaultPairingRedirectTo("/app/agent"),
+					redirectPath: "/app/agent",
+				});
 				await logSecurityEvent(
 					"agent_pair_success",
 					"Agent pairing verification link sent via backend broker.",

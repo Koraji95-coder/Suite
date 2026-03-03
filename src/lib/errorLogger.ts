@@ -12,6 +12,33 @@ interface ErrorLog {
 class ErrorLogger {
 	private logs: ErrorLog[] = [];
 	private maxLogs = 100;
+	private devLogEndpoint: string | null;
+	private endpointUnavailable = false;
+
+	constructor() {
+		const isDev = typeof import.meta !== "undefined" && import.meta.env?.DEV;
+		if (!isDev) {
+			this.devLogEndpoint = null;
+			return;
+		}
+
+		const rawEndpoint = import.meta.env?.VITE_DEV_LOG_ENDPOINT;
+		if (!rawEndpoint) {
+			this.devLogEndpoint = null;
+			return;
+		}
+
+		const normalized = String(rawEndpoint).trim();
+		if (!normalized) {
+			this.devLogEndpoint = null;
+			return;
+		}
+
+		this.devLogEndpoint =
+			normalized === "1" || normalized.toLowerCase() === "true"
+				? "/__log"
+				: normalized;
+	}
 
 	private getSeverityEmoji(severity: ErrorSeverity): string {
 		switch (severity) {
@@ -28,7 +55,7 @@ class ErrorLogger {
 
 	private formatLog(log: ErrorLog): void {
 		const isDev = typeof import.meta !== "undefined" && import.meta.env?.DEV;
-		if (!isDev) return;
+		if (!isDev || !this.devLogEndpoint || this.endpointUnavailable) return;
 
 		const payload = {
 			emoji: this.getSeverityEmoji(log.severity),
@@ -40,12 +67,20 @@ class ErrorLogger {
 			stack: log.stack,
 		};
 
-		void fetch("/__log", {
+		void fetch(this.devLogEndpoint, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify(payload),
-		}).catch(() => {
-			// If the dev server log endpoint is unavailable, drop silently.
+		})
+			.then((response) => {
+				if (!response.ok) {
+					// Disable repeated failed requests (e.g. missing /__log endpoint).
+					this.endpointUnavailable = true;
+				}
+			})
+			.catch(() => {
+				// If the dev server log endpoint is unavailable, drop silently.
+				this.endpointUnavailable = true;
 		});
 	}
 

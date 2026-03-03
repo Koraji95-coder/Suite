@@ -237,12 +237,6 @@ class AgentService {
 		return fallback;
 	}
 
-	private getDefaultPairingRedirectTo(path = "/app/agent"): string | undefined {
-		if (typeof window === "undefined") return undefined;
-		const safePath = path.startsWith("/") ? path : `/${path}`;
-		return `${window.location.origin}${safePath}`;
-	}
-
 	async requestPairingVerificationLink(
 		action: AgentPairingAction,
 		pairingCode?: string,
@@ -290,6 +284,49 @@ class AgentService {
 			const message = await this.readBrokerError(
 				response,
 				"Unable to send verification email for pairing action.",
+			);
+			throw new Error(message);
+		}
+	}
+
+	async requestPairingCodeByEmail(
+		options?: AgentPairingVerificationOptions,
+	): Promise<void> {
+		if (!this.useBroker) {
+			throw new Error(
+				"Email pairing-code request is only available in broker transport mode.",
+			);
+		}
+
+		const accessToken = await this.getSupabaseAccessToken();
+		if (!accessToken) {
+			throw new Error("Supabase session required for brokered pairing.");
+		}
+
+		const payload: Record<string, string> = {};
+		const redirectTo = (options?.redirectTo || "").trim();
+		if (redirectTo) {
+			payload.redirect_to = redirectTo;
+		}
+		const redirectPath = (options?.redirectPath || "").trim();
+		if (redirectPath) {
+			payload.redirect_path = redirectPath;
+		}
+
+		const response = await fetch(`${this.brokerUrl}/pairing-code/request`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${accessToken}`,
+			},
+			credentials: "include",
+			body: JSON.stringify(payload),
+		});
+
+		if (!response.ok) {
+			const message = await this.readBrokerError(
+				response,
+				"Unable to request pairing code email.",
 			);
 			throw new Error(message);
 		}
@@ -488,15 +525,36 @@ class AgentService {
 			logger.info("Attempting to pair with agent", "AgentService");
 
 			if (this.useBroker) {
-				await this.requestPairingVerificationLink("pair", pairingCode.trim(), {
-					redirectTo: this.getDefaultPairingRedirectTo("/app/agent"),
-					redirectPath: "/app/agent",
+				const accessToken = await this.getSupabaseAccessToken();
+				if (!accessToken) {
+					throw new Error("Supabase session required for brokered pairing.");
+				}
+
+				const response = await fetch(`${this.brokerUrl}/pair`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${accessToken}`,
+					},
+					credentials: "include",
+					body: JSON.stringify({ pairing_code: pairingCode.trim() }),
 				});
+
+				if (!response.ok) {
+					const message = await this.readBrokerError(
+						response,
+						"Unable to pair with the provided code.",
+					);
+					throw new Error(message);
+				}
+
+				const data = (await response.json()) as { paired?: boolean } | undefined;
+				this.brokerPaired = Boolean(data?.paired);
 				await logSecurityEvent(
 					"agent_pair_success",
-					"Agent pairing verification link sent via backend broker.",
+					"Agent paired successfully via backend broker.",
 				);
-				return true;
+				return this.brokerPaired;
 			}
 
 			// ZeroClaw gateway expects the 6-digit pairing code in the

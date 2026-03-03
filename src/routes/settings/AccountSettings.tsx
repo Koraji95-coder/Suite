@@ -5,6 +5,7 @@ import {
 	HardDrive,
 	KeyRound,
 	LogOut,
+	Mail,
 	RefreshCw,
 	Save,
 	Settings2,
@@ -229,6 +230,23 @@ export default function AccountSettings() {
 		);
 	}, [location.pathname, location.search, navigate]);
 
+	const clearAgentPairingCodeParams = useCallback(() => {
+		const params = new URLSearchParams(location.search);
+		if (!params.has("agent_pairing_code") && !params.has("agent_pairing_notice")) {
+			return;
+		}
+		params.delete("agent_pairing_code");
+		params.delete("agent_pairing_notice");
+		const search = params.toString();
+		navigate(
+			{
+				pathname: location.pathname,
+				search: search ? `?${search}` : "",
+			},
+			{ replace: true },
+		);
+	}, [location.pathname, location.search, navigate]);
+
 	const loadPasskeyCapability = async () => {
 		setPasskeyLoading(true);
 		setPasskeyError("");
@@ -288,6 +306,20 @@ export default function AccountSettings() {
 		setDisplayName(profile?.display_name ?? "");
 		setAccountEmail(profile?.email ?? user?.email ?? "");
 	}, [profile?.display_name, profile?.email, user?.email]);
+
+	useEffect(() => {
+		const params = new URLSearchParams(location.search);
+		const candidateCode = (params.get("agent_pairing_code") || "")
+			.trim()
+			.replace(/\D+/g, "")
+			.slice(0, 6);
+		if (candidateCode.length !== 6) return;
+
+		setAgentPairingCode(candidateCode);
+		setAgentNotice("Pairing code loaded from your email link.");
+		setAgentError("");
+		clearAgentPairingCodeParams();
+	}, [clearAgentPairingCodeParams, location.search]);
 
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
@@ -504,6 +536,38 @@ export default function AccountSettings() {
 		}
 	};
 
+	const requestAgentPairingCodeByEmail = async () => {
+		if (!usesBroker) {
+			setAgentError("Email pairing-code request is only available in broker mode.");
+			return;
+		}
+
+		setAgentError("");
+		setAgentNotice("");
+		setIsAgentActionBusy(true);
+		try {
+			const redirectTo =
+				typeof window !== "undefined"
+					? `${window.location.origin}/app/settings`
+					: undefined;
+			await agentService.requestPairingCodeByEmail({
+				redirectTo,
+				redirectPath: "/app/settings",
+			});
+			setAgentNotice(
+				"Pairing code email sent. Open the link from your inbox to load the code here.",
+			);
+		} catch (err: unknown) {
+			setAgentError(
+				err instanceof Error
+					? err.message
+					: "Unable to request pairing code email.",
+			);
+		} finally {
+			setIsAgentActionBusy(false);
+		}
+	};
+
 	const pairAgent = async () => {
 		const code = agentPairingCode.trim();
 		if (!code) {
@@ -515,17 +579,12 @@ export default function AccountSettings() {
 		setIsAgentActionBusy(true);
 		try {
 			if (usesBroker) {
-				const redirectTo =
-					typeof window !== "undefined"
-						? `${window.location.origin}/app/settings`
-						: undefined;
-				await agentService.requestPairingVerificationLink("pair", code, {
-					redirectTo,
-					redirectPath: "/app/settings",
-				});
-				setAgentNotice(
-					"Verification link sent. Open it from your email to finish pairing.",
-				);
+				const pairedNow = await agentService.pair(code);
+				if (!pairedNow) {
+					throw new Error("Unable to pair with the gateway using this code.");
+				}
+				setAgentNotice("Agent paired for this session.");
+				await refreshAgentStatus();
 			} else {
 				const pairedNow = await agentService.pair(code);
 				if (!pairedNow) {
@@ -539,9 +598,7 @@ export default function AccountSettings() {
 			setAgentError(
 				err instanceof Error
 					? err.message
-					: usesBroker
-						? "Unable to send pairing verification link."
-						: "Unable to pair with the gateway.",
+					: "Unable to pair with the gateway.",
 			);
 		} finally {
 			setIsAgentActionBusy(false);
@@ -860,6 +917,18 @@ export default function AccountSettings() {
 						className="w-40 rounded-lg border px-3 py-1.5 text-xs outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
 					/>
 
+					{usesBroker ? (
+						<button
+							type="button"
+							onClick={() => void requestAgentPairingCodeByEmail()}
+							disabled={isAgentActionBusy}
+							className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						>
+							<Mail size={12} />
+							Email code
+						</button>
+					) : null}
+
 					<button
 						type="button"
 						onClick={() => void pairAgent()}
@@ -907,7 +976,7 @@ export default function AccountSettings() {
 				) : null}
 				{usesBroker ? (
 					<div className="text-xs [color:var(--text-muted)]">
-						Pair and unpair actions are email-verified in broker mode.
+						Request a code by email, open the link, then pair with the 6-digit code.
 					</div>
 				) : (
 					<div className="text-xs [color:var(--text-muted)]">

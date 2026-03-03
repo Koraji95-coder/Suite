@@ -96,6 +96,27 @@ impl PairingGuard {
         self.pairing_code.lock().clone()
     }
 
+    /// Issue (or rotate) a one-time pairing code.
+    ///
+    /// When `rotate` is `false`, this returns the current code if one already
+    /// exists, or generates a new code if none exists.
+    ///
+    /// When `rotate` is `true`, a fresh code is always generated and replaces
+    /// any existing pending code.
+    ///
+    /// Returns `None` when pairing is disabled.
+    pub fn issue_pairing_code(&self, rotate: bool) -> Option<String> {
+        if !self.require_pairing {
+            return None;
+        }
+
+        let mut code_guard = self.pairing_code.lock();
+        if rotate || code_guard.is_none() {
+            *code_guard = Some(generate_code());
+        }
+        code_guard.clone()
+    }
+
     /// Whether pairing is required at all.
     pub fn require_pairing(&self) -> bool {
         self.require_pairing
@@ -400,6 +421,24 @@ mod tests {
     async fn new_guard_no_code_when_pairing_disabled() {
         let guard = PairingGuard::new(false, &[]);
         assert!(guard.pairing_code().is_none());
+    }
+
+    #[test]
+    async fn issue_pairing_code_generates_when_missing() {
+        let guard = PairingGuard::new(true, &["zc_existing".into()]);
+        assert!(guard.pairing_code().is_none());
+        let issued = guard.issue_pairing_code(false);
+        assert!(issued.is_some());
+        assert_eq!(issued, guard.pairing_code());
+    }
+
+    #[test]
+    async fn issue_pairing_code_rotate_replaces_existing() {
+        let guard = PairingGuard::new(true, &[]);
+        let original = guard.pairing_code().unwrap_or_default();
+        let rotated = guard.issue_pairing_code(true).unwrap_or_default();
+        assert_eq!(rotated.len(), 6);
+        assert_ne!(original, rotated);
     }
 
     #[test]

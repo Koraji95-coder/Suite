@@ -4592,6 +4592,12 @@ def api_agent_pairing_challenge():
     client_redirect_to = str(
         payload.get("redirectTo") or payload.get("redirect_to") or ""
     ).strip()
+    requested_redirect_path = str(
+        payload.get("redirectPath") or payload.get("redirect_path") or ""
+    ).strip()
+    redirect_path = AGENT_PAIRING_REDIRECT_PATH
+    if requested_redirect_path in {"/app/agent", "/app/settings"}:
+        redirect_path = requested_redirect_path
     client_ip = _get_request_ip()
     allowed, reason, retry_after_seconds = _is_agent_pairing_action_allowed(
         user_id,
@@ -4652,6 +4658,99 @@ def api_agent_pairing_challenge():
         "action": action,
         "message": "Verification link sent to your email.",
         "expires_at": datetime.utcfromtimestamp(expires_at).isoformat() + "Z",
+    }), 202
+
+
+@app.route('/api/agent/pairing-code/request', methods=['POST'])
+@require_supabase_user
+@limiter.limit("6 per hour")
+def api_agent_pairing_code_request():
+    """Request a one-time gateway pairing code and deliver it through email link flow."""
+    config_status = _agent_broker_config_status()
+    if not config_status["ok"]:
+        return jsonify({
+            "error": "Agent broker misconfigured",
+            "missing": config_status["missing"],
+            "warnings": config_status["warnings"],
+        }), 503
+
+    payload = request.get_json(silent=True) if request.is_json else {}
+    payload = payload or {}
+    client_redirect_to = str(
+        payload.get("redirectTo") or payload.get("redirect_to") or ""
+    ).strip()
+    requested_redirect_path = str(
+        payload.get("redirectPath") or payload.get("redirect_path") or ""
+    ).strip()
+    redirect_path = "/app/settings"
+    if requested_redirect_path in {"/app/agent", "/app/settings"}:
+        redirect_path = requested_redirect_path
+
+    user = getattr(g, "supabase_user", {}) or {}
+    user_id = _get_supabase_user_id(user)
+    user_email = _get_supabase_user_email(user)
+    if not user_id or not user_email:
+        return jsonify({"error": "Authenticated user must have a valid email address."}), 400
+
+    client_ip = _get_request_ip()
+    allowed, reason, retry_after_seconds = _is_agent_pairing_action_allowed(
+        user_id,
+        "pairing-code-request",
+    )
+    if not allowed:
+        logger.warning(
+            "Pairing code request throttled reason=%s user=%s ip=%s",
+            reason,
+            _email_fingerprint(user_email),
+            client_ip,
+        )
+        response = jsonify({
+            "error": "Too many pairing code requests. Please wait and try again.",
+            "reason": reason,
+            "retry_after_seconds": retry_after_seconds,
+        })
+        if retry_after_seconds > 0:
+            response.headers["Retry-After"] = str(retry_after_seconds)
+        return response, 429
+
+    pairing_code, gateway_error, gateway_status = _request_gateway_pairing_code()
+    if not pairing_code:
+        logger.warning(
+            "Pairing code request failed user=%s ip=%s status=%s err=%s",
+            _email_fingerprint(user_email),
+            client_ip,
+            gateway_status,
+            gateway_error,
+        )
+        return jsonify({
+            "error": gateway_error or "Unable to request pairing code from gateway.",
+        }), gateway_status if gateway_status >= 400 else 502
+
+    try:
+        _send_supabase_email_link(
+            user_email,
+            "signin",
+            client_redirect_to=client_redirect_to,
+            redirect_path=redirect_path,
+            redirect_query={
+                "agent_pairing_code": pairing_code,
+                "agent_pairing_notice": "code-loaded",
+            },
+        )
+    except Exception as exc:
+        logger.warning(
+            "Pairing code email failed user=%s ip=%s: %s",
+            _email_fingerprint(user_email),
+            client_ip,
+            exc,
+        )
+        return jsonify({
+            "error": "Unable to send pairing code email right now. Please retry.",
+        }), 502
+
+    return jsonify({
+        "ok": True,
+        "message": "Pairing code email sent.",
     }), 202
 
 
@@ -4796,6 +4895,39 @@ def api_agent_config():
     return jsonify(_agent_broker_config_status()), 200
 
 
+def _request_gateway_pairing_code() -> Tuple[Optional[str], Optional[str], int]:
+    headers: Dict[str, str] = {}
+    if AGENT_WEBHOOK_SECRET:
+        headers["X-Webhook-Secret"] = AGENT_WEBHOOK_SECRET
+
+    try:
+        response = requests.post(
+            f"{AGENT_GATEWAY_URL.rstrip('/')}/pairing-code",
+            headers=headers if headers else None,
+            timeout=10,
+        )
+    except Exception as exc:
+        logger.warning("Pairing code request proxy failed: %s", exc)
+        return None, "Agent gateway unavailable", 503
+
+    if response.status_code != 200:
+        details = response.text.strip() if response.text else ""
+        if details:
+            return None, details, response.status_code
+        return None, "Gateway pairing code request failed", response.status_code
+
+    try:
+        payload = response.json() if response.content else {}
+    except Exception:
+        payload = {}
+
+    pairing_code = str(payload.get("pairing_code") or "").strip()
+    if not PAIRING_CODE_PATTERN.match(pairing_code):
+        return None, "Gateway did not return a valid pairing code.", 502
+
+    return pairing_code, None, 200
+
+
 def _pair_agent_session_for_user(
     pairing_code: str,
     user_id: str,
@@ -4907,13 +5039,63 @@ def api_agent_session():
 @require_supabase_user
 @limiter.limit("10 per hour")
 def api_agent_pair():
-    return jsonify({
-        "error": "Direct pair is disabled. Request email verification first.",
-        "next": [
-            "POST /api/agent/pairing-challenge",
-            "POST /api/agent/pairing-confirm",
-        ],
-    }), 428
+    config_status = _agent_broker_config_status()
+    if not config_status["ok"]:
+        return jsonify({
+            "error": "Agent broker misconfigured",
+            "missing": config_status["missing"],
+            "warnings": config_status["warnings"],
+        }), 503
+
+    if not request.is_json:
+        return jsonify({"error": "Expected JSON payload"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    pairing_code = str(
+        payload.get("pairing_code")
+        or payload.get("pairingCode")
+        or ""
+    ).strip()
+    if not pairing_code:
+        return jsonify({"error": "pairing_code is required"}), 400
+    if not PAIRING_CODE_PATTERN.match(pairing_code):
+        return jsonify({"error": "Pairing code must be a 6-digit value."}), 400
+
+    user = getattr(g, "supabase_user", {}) or {}
+    user_id = _get_supabase_user_id(user)
+    user_email = _get_supabase_user_email(user)
+    if not user_id or not user_email:
+        return jsonify({"error": "Authenticated user must have a valid email address."}), 400
+
+    client_ip = _get_request_ip()
+    allowed, reason, retry_after_seconds = _is_agent_pairing_action_allowed(
+        user_id,
+        "pair",
+    )
+    if not allowed:
+        logger.warning(
+            "Direct pair throttled reason=%s user=%s ip=%s",
+            reason,
+            _email_fingerprint(user_email),
+            client_ip,
+        )
+        response = jsonify({
+            "error": "Too many pairing attempts. Please wait and try again.",
+            "reason": reason,
+            "retry_after_seconds": retry_after_seconds,
+        })
+        if retry_after_seconds > 0:
+            response.headers["Retry-After"] = str(retry_after_seconds)
+        return response, 429
+
+    return _pair_agent_session_for_user(
+        pairing_code,
+        user_id,
+        extra_payload={
+            "verified": False,
+            "action": "pair",
+        },
+    )
 
 
 @app.route('/api/agent/unpair', methods=['POST'])

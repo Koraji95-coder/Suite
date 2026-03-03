@@ -611,6 +611,7 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         println!("  🌐 Public URL: {url}");
     }
     println!("  🌐 Web Dashboard: http://{display_addr}/");
+    println!("  POST /pairing-code — issue a one-time pairing code (backend/broker)");
     println!("  POST /pair      — pair a new client (X-Pairing-Code header)");
     println!("  POST /unpair    — revoke the current bearer token");
     println!("  POST /webhook   — {{\"message\": \"your prompt\"}}");
@@ -726,7 +727,11 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         // ── Existing routes ──
         .route("/health", get(handle_health))
         .route("/metrics", get(handle_metrics))
-        .route("/suite/passkey/callback", get(handle_suite_passkey_callback))
+        .route(
+            "/suite/passkey/callback",
+            get(handle_suite_passkey_callback),
+        )
+        .route("/pairing-code", post(handle_pairing_code))
         .route("/pair", post(handle_pair))
         .route("/unpair", post(handle_unpair))
         .route("/webhook", get(handle_webhook_usage).post(handle_webhook))
@@ -853,6 +858,64 @@ async fn handle_metrics(
         [(header::CONTENT_TYPE, PROMETHEUS_CONTENT_TYPE)],
         body,
     )
+}
+
+/// POST /pairing-code — issue a fresh one-time pairing code.
+///
+/// Intended for trusted broker/backend callers that need to deliver
+/// an operator pairing code over a controlled channel (for example email).
+#[axum::debug_handler]
+async fn handle_pairing_code(
+    State(state): State<AppState>,
+    ConnectInfo(peer_addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    if !state.pairing.require_pairing() {
+        let err = serde_json::json!({
+            "error": "Pairing is disabled; no pairing code is available."
+        });
+        return (StatusCode::BAD_REQUEST, Json(err));
+    }
+
+    // Gate this endpoint behind webhook secret when configured.
+    // Without a configured secret, only loopback callers are allowed.
+    if let Some(ref secret_hash) = state.webhook_secret_hash {
+        let header_hash = headers
+            .get("X-Webhook-Secret")
+            .and_then(|v| v.to_str().ok())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(hash_webhook_secret);
+        match header_hash {
+            Some(val) if constant_time_eq(&val, secret_hash.as_ref()) => {}
+            _ => {
+                let err = serde_json::json!({
+                    "error": "Unauthorized — invalid or missing X-Webhook-Secret header"
+                });
+                return (StatusCode::UNAUTHORIZED, Json(err));
+            }
+        }
+    } else if !peer_addr.ip().is_loopback() {
+        let err = serde_json::json!({
+            "error": "Unauthorized — pairing code endpoint is loopback-only without X-Webhook-Secret"
+        });
+        return (StatusCode::UNAUTHORIZED, Json(err));
+    }
+
+    let Some(pairing_code) = state.pairing.issue_pairing_code(true) else {
+        let err = serde_json::json!({
+            "error": "Unable to generate pairing code."
+        });
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(err));
+    };
+
+    let body = serde_json::json!({
+        "ok": true,
+        "pairing_code": pairing_code,
+        "paired": state.pairing.is_paired(),
+        "require_pairing": state.pairing.require_pairing(),
+    });
+    (StatusCode::OK, Json(body))
 }
 
 /// POST /pair — exchange one-time code for bearer token
@@ -1281,8 +1344,8 @@ fn verify_suite_provider_jwt(
             .or_else(|| payload_json.get("passkey_intent")),
     );
     if let Some(claim_intent_raw) = intent_claim.as_deref() {
-        let claim_intent =
-            normalize_suite_passkey_intent(claim_intent_raw).ok_or("provider token intent is invalid")?;
+        let claim_intent = normalize_suite_passkey_intent(claim_intent_raw)
+            .ok_or("provider token intent is invalid")?;
         if claim_intent != expected_intent {
             return Err("provider token intent mismatch");
         }
@@ -1476,7 +1539,10 @@ async fn handle_suite_passkey_callback(
         sanitize_suite_passkey_field(claims.email.clone(), 254)
     } else {
         sanitize_suite_passkey_field(
-            params.passkey_email.or(params.email).map(|v| v.to_ascii_lowercase()),
+            params
+                .passkey_email
+                .or(params.email)
+                .map(|v| v.to_ascii_lowercase()),
             254,
         )
     };
@@ -3004,7 +3070,9 @@ mod tests {
 
     #[test]
     fn suite_passkey_state_validator_accepts_expected_format() {
-        assert!(is_valid_suite_passkey_state("AbCdEfGhIjKlMnOpQrStUvWxYz012345"));
+        assert!(is_valid_suite_passkey_state(
+            "AbCdEfGhIjKlMnOpQrStUvWxYz012345"
+        ));
         assert!(!is_valid_suite_passkey_state("too-short"));
         assert!(!is_valid_suite_passkey_state("invalid!chars with space"));
     }
@@ -3113,7 +3181,8 @@ mod tests {
             .and_then(|value| value.to_str().ok())
             .unwrap_or("");
         assert!(location.contains("passkey_status=failed"));
-        assert!(location.contains("passkey_error=Passkey+sign-in+callback+did+not+include+a+valid+email."));
+        assert!(location
+            .contains("passkey_error=Passkey+sign-in+callback+did+not+include+a+valid+email."));
     }
 
     #[tokio::test]

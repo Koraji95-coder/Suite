@@ -28,7 +28,8 @@ export function BlockLibraryDeleteDialog({
 					<DialogTitle>Delete block?</DialogTitle>
 				</DialogHeader>
 				<p className="text-sm [color:var(--text-muted)]">
-					This will permanently remove "{pendingDeleteBlock?.name ?? "this block"}".
+					This will permanently remove "
+					{pendingDeleteBlock?.name ?? "this block"}".
 				</p>
 				<DialogFooter className="mt-4 gap-2 sm:justify-end">
 					<button

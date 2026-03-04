@@ -1,5 +1,5 @@
-import { Button } from "@/components/apps/ui/button";
-import { Card } from "@/components/apps/ui/card";
+import { Button } from "@/components/primitives/Button";
+import { Panel } from "@/components/primitives/Panel";
 import { recentFiles } from "./file-manager-dashboard-models";
 
 export function FileManagerDashboardRecentFiles() {
@@ -16,7 +16,7 @@ export function FileManagerDashboardRecentFiles() {
 			</div>
 			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{recentFiles.map((file) => (
-					<Card key={file.name} className="p-4">
+					<Panel key={file.name} padding="none" className="p-4">
 						<div className="flex items-center gap-3">
 							<div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
 								<file.icon className="text-muted-foreground h-5 w-5" />
@@ -28,7 +28,7 @@ export function FileManagerDashboardRecentFiles() {
 								</p>
 							</div>
 						</div>
-					</Card>
+					</Panel>
 				))}
 			</div>
 		</div>

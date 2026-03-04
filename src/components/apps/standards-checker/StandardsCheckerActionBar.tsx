@@ -1,4 +1,5 @@
 import { Play } from "lucide-react";
+import styles from "./StandardsChecker.module.css";
 
 interface StandardsCheckerActionBarProps {
 	selectedCount: number;
@@ -12,18 +13,18 @@ export function StandardsCheckerActionBar({
 	onRunChecks,
 }: StandardsCheckerActionBarProps) {
 	return (
-		<div className="flex flex-wrap items-center gap-3">
+		<div className={styles.actionBar}>
 			<button
 				type="button"
 				onClick={onRunChecks}
 				disabled={selectedCount === 0 || running}
-				className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 [background:linear-gradient(135deg,var(--primary),color-mix(in_srgb,var(--primary)_78%,var(--accent)))] [color:var(--primary-contrast)]"
+				className={styles.runButton}
 			>
-				<Play className="h-4 w-4" />
+				<Play className={styles.iconSm} />
 				{running ? "Running Checks..." : "Run Selected Checks"}
 			</button>
 
-			<span className="text-sm [color:var(--text-muted)]">
+			<span className={styles.actionMeta}>
 				{selectedCount} standard
 				{selectedCount !== 1 ? "s" : ""} selected
 			</span>

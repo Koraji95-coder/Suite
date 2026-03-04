@@ -1,4 +1,3 @@
-import { useTheme } from "@/lib/palette";
 import { BackupManagerActionBar } from "./BackupManagerActionBar";
 import { BackupManagerDeleteDialog } from "./BackupManagerDeleteDialog";
 import { BackupManagerFilesList } from "./BackupManagerFilesList";
@@ -8,7 +7,6 @@ import { BackupManagerStatusBanners } from "./BackupManagerStatusBanners";
 import { useBackupManagerState } from "./useBackupManagerState";
 
 export function BackupManager() {
-	const { palette } = useTheme();
 	const {
 		confirmDelete,
 		confirmRestore,
@@ -33,58 +31,38 @@ export function BackupManager() {
 	return (
 		<div>
 			<BackupManagerActionBar
-				palette={palette}
 				status={status}
 				lastBackup={lastBackup}
 				loadingFiles={loadingFiles}
 				fileRef={fileRef}
-				onBackup={() => {
-					void handleBackup();
-				}}
+				onBackup={() => void handleBackup()}
 				onFileRestore={handleFileRestore}
-				onRefreshFiles={() => {
-					void refreshFiles();
-				}}
+				onRefreshFiles={() => void refreshFiles()}
 			/>
 
-			<BackupManagerStatusBanners
-				palette={palette}
-				status={status}
-				restoreMsg={restoreMsg}
-			/>
+			<BackupManagerStatusBanners status={status} restoreMsg={restoreMsg} />
 
 			<BackupManagerFilesList
-				palette={palette}
 				files={files}
 				loadingFiles={loadingFiles}
 				formatSize={formatSize}
-				onDownloadFile={(filename) => {
-					void handleDownloadFile(filename);
-				}}
+				onDownloadFile={(filename) => void handleDownloadFile(filename)}
 				onRequestRestore={setConfirmRestore}
 				onRequestDelete={setPendingDelete}
 			/>
 
-			<BackupManagerHistoryList
-				palette={palette}
-				history={history}
-				formatSize={formatSize}
-			/>
+			<BackupManagerHistoryList history={history} formatSize={formatSize} />
 
 			<BackupManagerRestoreDialog
 				confirmRestore={confirmRestore}
 				onCancel={() => setConfirmRestore(null)}
-				onConfirm={(filename) => {
-					void handleRestoreFromBackup(filename);
-				}}
+				onConfirm={(filename) => void handleRestoreFromBackup(filename)}
 			/>
 
 			<BackupManagerDeleteDialog
 				pendingDelete={pendingDelete}
 				onCancel={() => setPendingDelete(null)}
-				onConfirm={() => {
-					void confirmDelete();
-				}}
+				onConfirm={() => void confirmDelete()}
 			/>
 		</div>
 	);

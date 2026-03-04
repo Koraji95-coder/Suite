@@ -15,9 +15,12 @@ const iconMap = {
 };
 
 const colorMap = {
-	success: "[background:color-mix(in_srgb,var(--success)_10%,var(--surface))] [border-color:var(--success)] [color:var(--success)]",
-	error: "[background:color-mix(in_srgb,var(--danger)_10%,var(--surface))] [border-color:var(--danger)] [color:var(--danger)]",
-	warning: "[background:color-mix(in_srgb,var(--warning)_10%,var(--surface))] [border-color:var(--warning)] [color:var(--warning)]",
+	success:
+		"[background:color-mix(in_srgb,var(--success)_10%,var(--surface))] [border-color:var(--success)] [color:var(--success)]",
+	error:
+		"[background:color-mix(in_srgb,var(--danger)_10%,var(--surface))] [border-color:var(--danger)] [color:var(--danger)]",
+	warning:
+		"[background:color-mix(in_srgb,var(--warning)_10%,var(--surface))] [border-color:var(--warning)] [color:var(--warning)]",
 	info: "[background:color-mix(in_srgb,var(--accent)_10%,var(--surface))] [border-color:var(--accent)] [color:var(--accent)]",
 };
 
@@ -42,7 +45,7 @@ function ToastItem({ notification }: { notification: Notification }) {
 		>
 			<Icon
 				className={cn(
-					"w-5 h-5 mt-0.5 flex-shrink-0",
+					"w-5 h-5 mt-0.5 shrink-0",
 					iconColorMap[notification.type],
 				)}
 			/>
@@ -64,7 +67,7 @@ function ToastItem({ notification }: { notification: Notification }) {
 
 			<button
 				onClick={() => dismissNotification(notification.id)}
-				className="flex-shrink-0 hover:opacity-70 transition-opacity"
+				className="shrink-0 hover:opacity-70 transition-opacity"
 				aria-label="Dismiss notification"
 			>
 				<X className="w-4 h-4" />
@@ -79,7 +82,10 @@ export function ToastContainer() {
 	if (notifications.length === 0) return null;
 
 	return (
-		<div className="fixed top-4 right-4 flex flex-col gap-2 pointer-events-none" style={{ zIndex: "var(--z-toast)" }}>
+		<div
+			className="fixed top-4 right-4 flex flex-col gap-2 pointer-events-none"
+			style={{ zIndex: "var(--z-toast)" }}
+		>
 			<div className="flex flex-col gap-2 pointer-events-auto">
 				{notifications.map((notification) => (
 					<ToastItem key={notification.id} notification={notification} />

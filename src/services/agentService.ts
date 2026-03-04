@@ -25,13 +25,17 @@
  * See: src/services/agentService.ts for TypeScript interfaces
  */
 
+import { isDevAdminEmail } from "../lib/devAccess";
 import { logger } from "../lib/logger";
 import { secureTokenStorage } from "../lib/secureTokenStorage";
-import { deleteSetting, loadSetting, saveSetting } from "../settings/userSettings";
-import { isDevAdminEmail } from "../lib/devAccess";
-import { logSecurityEvent } from "./securityEventService";
+import {
+	deleteSetting,
+	loadSetting,
+	saveSetting,
+} from "../settings/userSettings";
 import { supabase } from "../supabase/client";
 import { isSupabaseConfigured } from "../supabase/utils";
+import { logSecurityEvent } from "./securityEventService";
 
 export interface AgentResponse {
 	success: boolean;
@@ -84,9 +88,8 @@ class AgentService {
 	private activeUserIsAdmin = false;
 
 	constructor() {
-		const transport = String(
-			import.meta.env.VITE_AGENT_TRANSPORT || "",
-		).trim()
+		const transport = String(import.meta.env.VITE_AGENT_TRANSPORT || "")
+			.trim()
 			.toLowerCase();
 		this.useBroker = transport === "backend" || transport === "broker";
 		this.brokerUrl = String(
@@ -224,9 +227,10 @@ class AgentService {
 		fallback: string,
 	): Promise<string> {
 		try {
-			const payload = (await response.json()) as
-				| { error?: string; message?: string }
-				| null;
+			const payload = (await response.json()) as {
+				error?: string;
+				message?: string;
+			} | null;
 			const message = payload?.error || payload?.message;
 			if (typeof message === "string" && message.trim().length > 0) {
 				return message.trim();
@@ -458,7 +462,10 @@ class AgentService {
 		}
 
 		const updatedAt = Date.parse(saved.updatedAt);
-		if (!Number.isFinite(updatedAt) || Date.now() - updatedAt > MAX_RESTORE_AGE_MS) {
+		if (
+			!Number.isFinite(updatedAt) ||
+			Date.now() - updatedAt > MAX_RESTORE_AGE_MS
+		) {
 			await this.clearPersistedPairingForActiveUser();
 			await logSecurityEvent(
 				"agent_restore_failed",
@@ -548,7 +555,9 @@ class AgentService {
 					throw new Error(message);
 				}
 
-				const data = (await response.json()) as { paired?: boolean } | undefined;
+				const data = (await response.json()) as
+					| { paired?: boolean }
+					| undefined;
 				this.brokerPaired = Boolean(data?.paired);
 				await logSecurityEvent(
 					"agent_pair_success",

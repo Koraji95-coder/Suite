@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
-import { GlassPanel } from "../ui/GlassPanel";
+import styles from "./StandardsChecker.module.css";
 
 interface StandardsCheckerResultsSummaryProps {
 	passCount: number;
@@ -13,24 +13,22 @@ export function StandardsCheckerResultsSummary({
 	failCount,
 }: StandardsCheckerResultsSummaryProps) {
 	return (
-		<GlassPanel padded className="space-y-3">
-			<h2 className="text-sm font-semibold [color:var(--text)]">
-				Results Summary
-			</h2>
-			<div className="flex flex-wrap items-center gap-4 text-sm">
-				<div className="inline-flex items-center gap-2 [color:var(--text-muted)]">
-					<CheckCircle className="h-4 w-4 [color:var(--success)]" />
+		<section className={styles.panel}>
+			<h2 className={styles.summaryTitle}>Results Summary</h2>
+			<div className={styles.summaryGrid}>
+				<div className={styles.summaryItem}>
+					<CheckCircle className={`${styles.iconSm} ${styles.iconPass}`} />
 					Pass: {passCount}
 				</div>
-				<div className="inline-flex items-center gap-2 [color:var(--text-muted)]">
-					<AlertTriangle className="h-4 w-4 [color:var(--warning)]" />
+				<div className={styles.summaryItem}>
+					<AlertTriangle className={`${styles.iconSm} ${styles.iconWarning}`} />
 					Warning: {warningCount}
 				</div>
-				<div className="inline-flex items-center gap-2 [color:var(--text-muted)]">
-					<XCircle className="h-4 w-4 [color:var(--danger)]" />
+				<div className={styles.summaryItem}>
+					<XCircle className={`${styles.iconSm} ${styles.iconFail}`} />
 					Fail: {failCount}
 				</div>
 			</div>
-		</GlassPanel>
+		</section>
 	);
 }

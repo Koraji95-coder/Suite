@@ -1,0 +1,147 @@
+.dialogContent {
+	max-width: min(44rem, calc(100vw - 1.5rem));
+	padding: clamp(1rem, 1.8vw, 1.5rem);
+	border: 1px solid var(--line-soft);
+	background: var(--surface);
+}
+
+.header {
+	margin-bottom: 0.9rem;
+}
+
+.title {
+	margin: 0;
+	font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+	font-weight: 700;
+	color: var(--text);
+}
+
+.fields {
+	display: grid;
+	gap: 0.95rem;
+}
+
+.label {
+	display: block;
+	margin-bottom: 0.42rem;
+	font-size: 0.76rem;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.input,
+.select,
+.textarea {
+	width: 100%;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	padding: 0.58rem 0.75rem;
+	font-size: 0.86rem;
+	color: var(--text);
+	background: var(--surface);
+	outline: none;
+	transition:
+		border-color 0.16s ease,
+		box-shadow 0.16s ease,
+		background 0.16s ease;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+	border-color: color-mix(in srgb, var(--primary) 44%, var(--border));
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+	background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.textarea {
+	min-height: 5.8rem;
+	resize: vertical;
+}
+
+.textareaShort {
+	min-height: 4.8rem;
+}
+
+.gridTwo {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.8rem;
+}
+
+.categoryPreview {
+	margin-top: 0.15rem;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.46rem;
+}
+
+.colorSwatch {
+	width: 0.86rem;
+	height: 0.86rem;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--border) 95%, transparent);
+}
+
+.previewHint {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+
+.footer {
+	margin-top: 1.1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+}
+
+.buttonPrimary,
+.buttonSecondary {
+	border-radius: var(--radius-2);
+	padding: 0.56rem 0.86rem;
+	font-size: 0.82rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition:
+		background 0.16s ease,
+		border-color 0.16s ease,
+		color 0.16s ease;
+}
+
+.buttonPrimary {
+	border: 1px solid transparent;
+	color: var(--primary-contrast);
+	background: var(--primary);
+}
+
+.buttonPrimary:hover {
+	background: var(--primary-hover);
+}
+
+.buttonSecondary {
+	border: 1px solid var(--line-soft);
+	color: var(--text);
+	background: var(--surface);
+}
+
+.buttonSecondary:hover {
+	background: var(--surface-2);
+}
+
+@media (min-width: 40rem) {
+	.gridTwo {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.footer {
+		flex-direction: row;
+		justify-content: flex-end;
+	}
+
+	.buttonPrimary,
+	.buttonSecondary {
+		min-width: 8.8rem;
+	}
+}

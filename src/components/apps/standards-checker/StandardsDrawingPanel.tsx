@@ -1,13 +1,14 @@
-import { QAQCDeleteDialog } from "./QAQCDeleteDialog";
-import { QAQCDrawingCards } from "./QAQCDrawingCards";
-import { QAQCDrawingDetailDialog } from "./QAQCDrawingDetailDialog";
-import { QAQCFiltersPanel } from "./QAQCFiltersPanel";
-import { QAQCHeader } from "./QAQCHeader";
-import { QAQCRulesDialog } from "./QAQCRulesDialog";
-import { QAQCUploadDialog } from "./QAQCUploadDialog";
-import { useQAQCCheckerState } from "./useQAQCCheckerState";
+import { StandardsDrawingCards } from "./StandardsDrawingCards";
+import { StandardsDrawingDeleteDialog } from "./StandardsDrawingDeleteDialog";
+import { StandardsDrawingDetailDialog } from "./StandardsDrawingDetailDialog";
+import { StandardsDrawingFiltersPanel } from "./StandardsDrawingFiltersPanel";
+import { StandardsDrawingHeader } from "./StandardsDrawingHeader";
+import styles from "./StandardsDrawingPanel.module.css";
+import { StandardsDrawingRulesDialog } from "./StandardsDrawingRulesDialog";
+import { StandardsDrawingUploadDialog } from "./StandardsDrawingUploadDialog";
+import { useStandardsDrawingCheckerState } from "./useStandardsDrawingCheckerState";
 
-export function QAQCChecker() {
+export function StandardsDrawingChecker() {
 	const {
 		checkDrawing,
 		checkingDrawing,
@@ -34,16 +35,16 @@ export function QAQCChecker() {
 		stats,
 		toggleRule,
 		uploadForm,
-	} = useQAQCCheckerState();
+	} = useStandardsDrawingCheckerState();
 
 	return (
-		<div className="space-y-6">
-			<QAQCHeader
+		<div className={styles.root}>
+			<StandardsDrawingHeader
 				onOpenRules={() => setShowRulesModal(true)}
 				onOpenUpload={() => setShowUploadModal(true)}
 			/>
 
-			<QAQCFiltersPanel
+			<StandardsDrawingFiltersPanel
 				searchTerm={searchTerm}
 				onSearchTermChange={setSearchTerm}
 				filterStatus={filterStatus}
@@ -56,7 +57,7 @@ export function QAQCChecker() {
 				totalRuleCount={rules.length}
 			/>
 
-			<QAQCDrawingCards
+			<StandardsDrawingCards
 				loading={loading}
 				filteredDrawings={filteredDrawings}
 				searchTerm={searchTerm}
@@ -65,7 +66,7 @@ export function QAQCChecker() {
 				onDeleteDrawing={setPendingDeleteDrawing}
 			/>
 
-			<QAQCUploadDialog
+			<StandardsDrawingUploadDialog
 				open={showUploadModal}
 				onOpenChange={setShowUploadModal}
 				checkingDrawing={checkingDrawing}
@@ -78,7 +79,7 @@ export function QAQCChecker() {
 				onCancel={closeUploadModal}
 			/>
 
-			<QAQCRulesDialog
+			<StandardsDrawingRulesDialog
 				open={showRulesModal}
 				onOpenChange={setShowRulesModal}
 				rules={rules}
@@ -86,13 +87,13 @@ export function QAQCChecker() {
 				onClose={() => setShowRulesModal(false)}
 			/>
 
-			<QAQCDrawingDetailDialog
+			<StandardsDrawingDetailDialog
 				selectedDrawing={selectedDrawing}
 				onClose={() => setSelectedDrawing(null)}
 				onRecheckDrawing={checkDrawing}
 			/>
 
-			<QAQCDeleteDialog
+			<StandardsDrawingDeleteDialog
 				pendingDeleteDrawing={pendingDeleteDrawing}
 				onCancel={() => setPendingDeleteDrawing(null)}
 				onConfirmDelete={() => {

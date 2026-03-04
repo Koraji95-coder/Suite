@@ -1,89 +1,61 @@
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
 import type { DrawingListManagerFilteredDrawing } from "./useDrawingListManagerState";
 
 interface DrawingListManagerTableProps {
-	palette: ColorScheme;
 	drawings: DrawingListManagerFilteredDrawing[];
 	onTitleChange: (id: string, title: string) => void;
 }
 
 export function DrawingListManagerTable({
-	palette,
 	drawings,
 	onTitleChange,
 }: DrawingListManagerTableProps) {
 	return (
-		<div
-			style={{
-				padding: 18,
-				borderRadius: 16,
-				border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-				background: hexToRgba(palette.surface, 0.7),
-			}}
-		>
-			<div
-				style={{
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-				}}
-			>
-				<h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+		<div className="rounded-xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
+			<div className="flex items-center justify-between">
+				<h3 className="text-sm font-semibold [color:var(--text)]">
 					Drawing List
 				</h3>
-				<div style={{ fontSize: 12, color: palette.textMuted }}>
+				<div className="text-xs [color:var(--text-muted)]">
 					{drawings.length} entries
 				</div>
 			</div>
-			<div style={{ overflowX: "auto", marginTop: 12 }}>
-				<table
-					style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}
-				>
+
+			<div className="mt-3 overflow-x-auto">
+				<table className="w-full border-collapse text-xs">
 					<thead>
-						<tr style={{ textAlign: "left", color: palette.textMuted }}>
-							<th style={{ padding: "8px 6px" }}>Drawing Number</th>
-							<th style={{ padding: "8px 6px" }}>Title</th>
-							<th style={{ padding: "8px 6px" }}>File</th>
-							<th style={{ padding: "8px 6px" }}>Status</th>
+						<tr className="text-left [color:var(--text-muted)]">
+							<th className="px-1.5 py-2">Drawing Number</th>
+							<th className="px-1.5 py-2">Title</th>
+							<th className="px-1.5 py-2">File</th>
+							<th className="px-1.5 py-2">Status</th>
 						</tr>
 					</thead>
 					<tbody>
 						{drawings.map((drawing) => (
 							<tr
 								key={drawing.id}
-								style={{
-									borderTop: `1px solid ${hexToRgba(palette.surfaceLight, 0.3)}`,
-								}}
+								className="border-t [border-color:var(--border)]"
 							>
-								<td style={{ padding: "8px 6px", fontWeight: 600 }}>
+								<td className="px-1.5 py-2 font-semibold [color:var(--text)]">
 									{drawing.drawingNumber}
 								</td>
-								<td style={{ padding: "8px 6px" }}>
+								<td className="px-1.5 py-2">
 									<input
 										value={drawing.title}
-										onChange={(event) =>
-											onTitleChange(drawing.id, event.target.value)
-										}
-										style={{
-											width: "100%",
-											padding: "4px 6px",
-											borderRadius: 6,
-											border: `1px solid ${hexToRgba(palette.primary, 0.15)}`,
-											background: "transparent",
-											color: palette.text,
-										}}
+										onChange={(e) => onTitleChange(drawing.id, e.target.value)}
+										className="w-full rounded-md border bg-transparent px-1.5 py-1 text-xs outline-none transition focus:[border-color:var(--primary)] border-[color-mix(in_srgb,var(--primary)_15%,transparent)] [color:var(--text)]"
 									/>
 								</td>
-								<td style={{ padding: "8px 6px", color: palette.textMuted }}>
-									{drawing.fileName || "-"}
+								<td className="px-1.5 py-2 [color:var(--text-muted)]">
+									{drawing.fileName || "–"}
 								</td>
-								<td style={{ padding: "8px 6px" }}>
+								<td className="px-1.5 py-2">
 									{drawing.issues.length === 0 ? (
-										<span style={{ color: "#22c55e", fontWeight: 600 }}>
+										<span className="font-semibold [color:var(--success)]">
 											Ready
 										</span>
 									) : (
-										<span style={{ color: "#f59e0b", fontWeight: 600 }}>
+										<span className="font-semibold [color:var(--warning)]">
 											{drawing.issues.join(", ")}
 										</span>
 									)}

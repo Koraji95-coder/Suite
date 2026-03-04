@@ -1,4 +1,4 @@
-import { useTheme } from "@/lib/palette";
+import { PageFrame } from "@/components/apps/ui/PageFrame";
 import { DrawingListManagerArchitectureMap } from "./DrawingListManagerArchitectureMap";
 import { DrawingListManagerConfigPanels } from "./DrawingListManagerConfigPanels";
 import { DrawingListManagerOverview } from "./DrawingListManagerOverview";
@@ -7,7 +7,6 @@ import { DrawingListManagerTable } from "./DrawingListManagerTable";
 import { useDrawingListManagerState } from "./useDrawingListManagerState";
 
 export function DrawingListManager() {
-	const { palette } = useTheme();
 	const {
 		architectureMap,
 		filteredDrawings,
@@ -29,55 +28,43 @@ export function DrawingListManager() {
 	} = useDrawingListManagerState();
 
 	return (
-		<div
-			style={{
-				minHeight: "100%",
-				padding: 24,
-				display: "flex",
-				flexDirection: "column",
-				gap: 24,
-				color: palette.text,
-			}}
+		<PageFrame
+			title="Drawing List Manager"
+			description="Validate naming, generate lists, and audit drawing folders in seconds."
+			actions={
+				<DrawingListManagerOverview
+					summary={summary}
+					onGenerateList={handleGenerateList}
+					onExport={() => void handleExport()}
+				/>
+			}
 		>
-			<DrawingListManagerOverview
-				palette={palette}
-				summary={summary}
-				onGenerateList={handleGenerateList}
-				onExport={() => {
-					void handleExport();
-				}}
-			/>
+			<div className="space-y-6">
+				<DrawingListManagerConfigPanels
+					projectConfig={projectConfig}
+					setProjectConfig={setProjectConfig}
+					templateCounts={templateCounts}
+					setTemplateCounts={setTemplateCounts}
+					swapRules={swapRules}
+					setSwapRules={setSwapRules}
+					onApplySwap={handleApplySwap}
+				/>
 
-			<DrawingListManagerConfigPanels
-				palette={palette}
-				projectConfig={projectConfig}
-				setProjectConfig={setProjectConfig}
-				templateCounts={templateCounts}
-				setTemplateCounts={setTemplateCounts}
-				swapRules={swapRules}
-				setSwapRules={setSwapRules}
-				onApplySwap={handleApplySwap}
-			/>
+				<DrawingListManagerScanPanel
+					scanQuery={scanQuery}
+					setScanQuery={setScanQuery}
+					onFolderScan={handleFolderScan}
+					onRenumber={handleRenumber}
+					skipped={summary.skipped}
+				/>
 
-			<DrawingListManagerScanPanel
-				palette={palette}
-				scanQuery={scanQuery}
-				setScanQuery={setScanQuery}
-				onFolderScan={handleFolderScan}
-				onRenumber={handleRenumber}
-				skipped={summary.skipped}
-			/>
+				<DrawingListManagerTable
+					drawings={filteredDrawings}
+					onTitleChange={updateDrawingTitle}
+				/>
 
-			<DrawingListManagerTable
-				palette={palette}
-				drawings={filteredDrawings}
-				onTitleChange={updateDrawingTitle}
-			/>
-
-			<DrawingListManagerArchitectureMap
-				palette={palette}
-				architectureMap={architectureMap}
-			/>
-		</div>
+				<DrawingListManagerArchitectureMap architectureMap={architectureMap} />
+			</div>
+		</PageFrame>
 	);
 }

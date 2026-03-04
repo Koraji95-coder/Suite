@@ -77,14 +77,19 @@ export function WhiteboardSaveDialog({
 					</div>
 
 					{error && (
-						<div className="rounded-lg border px-3 py-2 text-sm
-							[border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_10%,transparent)] [color:var(--danger)]">
+						<div
+							className="rounded-lg border px-3 py-2 text-sm
+							[border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_10%,transparent)] [color:var(--danger)]"
+						>
 							{error}
 						</div>
 					)}
 
 					<p className="text-xs [color:var(--text-muted)]">
-						Panel: <span className="font-medium [color:var(--text)]">{panelContext}</span>
+						Panel:{" "}
+						<span className="font-medium [color:var(--text)]">
+							{panelContext}
+						</span>
 					</p>
 				</div>
 

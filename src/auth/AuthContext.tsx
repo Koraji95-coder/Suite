@@ -4,28 +4,34 @@
  */
 
 import type { User } from "@supabase/supabase-js";
-import { createContext, type ReactNode, useEffect, useRef, useState } from "react";
 import {
-	requestEmailAuthLink,
+	createContext,
+	type ReactNode,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
+import { supabase } from "@/supabase/client";
+import type { Database } from "@/supabase/database";
+import { logger } from "../lib/logger";
+import { agentService } from "../services/agentService";
+import { agentTaskManager } from "../services/agentTaskManager";
+import {
+	logAuthMethodTelemetry,
+	logSecurityEvent,
+} from "../services/securityEventService";
+import {
 	type EmailAuthRequestOptions,
+	requestEmailAuthLink,
 } from "./emailAuthApi";
 import {
 	buildSessionAuthKey,
 	clearSessionAuthMarkers,
 	consumePasskeySignInPending,
 	readSessionAuthMethod,
-	storeSessionAuthMethod,
 	type SessionAuthMethod,
+	storeSessionAuthMethod,
 } from "./passkeySessionState";
-import { agentTaskManager } from "../services/agentTaskManager";
-import { agentService } from "../services/agentService";
-import {
-	logAuthMethodTelemetry,
-	logSecurityEvent,
-} from "../services/securityEventService";
-import { logger } from "../lib/logger";
-import { supabase } from "@/supabase/client";
-import type { Database } from "@/supabase/database";
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -113,18 +119,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const isUserAdmin = (authUser: User | null): boolean => {
 		if (!authUser) return false;
 
-		const rawRole = (authUser.app_metadata as Record<string, unknown> | undefined)
-			?.role;
+		const rawRole = (
+			authUser.app_metadata as Record<string, unknown> | undefined
+		)?.role;
 
 		if (typeof rawRole === "string") {
 			return rawRole.trim().toLowerCase() === "admin";
 		}
 
-		const rawRoles = (authUser.app_metadata as Record<string, unknown> | undefined)
-			?.roles;
+		const rawRoles = (
+			authUser.app_metadata as Record<string, unknown> | undefined
+		)?.roles;
 		if (Array.isArray(rawRoles)) {
 			return rawRoles.some(
-				(entry) => typeof entry === "string" && entry.trim().toLowerCase() === "admin",
+				(entry) =>
+					typeof entry === "string" && entry.trim().toLowerCase() === "admin",
 			);
 		}
 

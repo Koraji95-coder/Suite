@@ -1,5 +1,4 @@
 import type { CSSProperties } from "react";
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
 import { PROJECT_CATEGORIES } from "./projectmanagertypes";
 
 export const categoryColor = (cat: string | null | undefined): string =>
@@ -31,68 +30,54 @@ export const formatDateMMDDYYYY = (isoOrDateLike: string): string => {
 export const toDateOnly = (datetimeLocal: string): string =>
 	datetimeLocal ? datetimeLocal.split("T")[0] : "";
 
-export const getPriorityTint = (
-	palette: ColorScheme,
-	priority: string,
-): string => {
+/** Returns a CSS variable string for the priority's semantic color. */
+export const getPriorityColor = (priority: string): string => {
 	switch (priority) {
 		case "urgent":
-			return palette.accent;
+			return "var(--danger)";
 		case "high":
-			return palette.primary;
+			return "var(--warning)";
 		case "medium":
-			return palette.tertiary;
+			return "var(--primary)";
 		default:
-			return palette.secondary;
+			return "var(--text-muted)";
 	}
 };
 
-export const getPriorityRowStyle = (
-	palette: ColorScheme,
-	priority: string,
-): CSSProperties => {
-	const tint = getPriorityTint(palette, priority);
+export const getPriorityRowStyle = (priority: string): CSSProperties => {
+	const color = getPriorityColor(priority);
 	return {
-		border: `1px solid ${hexToRgba(tint, 0.28)}`,
-		background: `linear-gradient(135deg, ${hexToRgba(tint, 0.12)} 0%, ${hexToRgba(
-			palette.surface,
-			0.45,
-		)} 100%)`,
+		border: `1px solid color-mix(in srgb, ${color} 28%, transparent)`,
+		background: `linear-gradient(135deg, color-mix(in srgb, ${color} 12%, transparent) 0%, color-mix(in srgb, var(--surface) 45%, transparent) 100%)`,
 	};
 };
 
-export const getPriorityChipStyle = (
-	palette: ColorScheme,
-	priority: string,
-): CSSProperties => {
-	const tint = getPriorityTint(palette, priority);
+export const getPriorityChipStyle = (priority: string): CSSProperties => {
+	const color = getPriorityColor(priority);
 	return {
-		border: `1px solid ${hexToRgba(tint, 0.4)}`,
-		background: hexToRgba(tint, 0.16),
-		color: hexToRgba(palette.text, 0.85),
+		border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`,
+		background: `color-mix(in srgb, ${color} 16%, transparent)`,
+		color: "var(--text)",
 	};
 };
 
-export const getUrgencyColor = (dueDate: string | null): string => {
-	if (!dueDate) return "";
+export type UrgencyTone = "none" | "danger" | "warning" | "success";
+
+export const getUrgencyTone = (dueDate: string | null): UrgencyTone => {
+	if (!dueDate) return "none";
 	const [y, m, d] = dueDate.split("T")[0].split("-").map(Number);
 	const due = new Date(y, m - 1, d);
 	const now = new Date();
 	now.setHours(0, 0, 0, 0);
 	const diffHours = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-	if (diffHours < 0)
-		return "[color:var(--danger)] [border-color:var(--danger)]";
-	if (diffHours < 24)
-		return "[color:var(--danger)] [border-color:var(--danger)]";
-	if (diffHours < 168)
-		return "[color:var(--warning)] [border-color:var(--warning)]";
-	return "[color:var(--success)] [border-color:var(--success)]";
+	if (diffHours < 24) return "danger";
+	if (diffHours < 168) return "warning";
+	return "success";
 };
 
 export const getDeadlineStatus = (deadline: string | null) => {
-	if (!deadline)
-		return { text: "No deadline", color: "[color:var(--text-muted)]" };
+	if (!deadline) return { text: "No deadline", color: "var(--text-muted)" };
 	const [y, m, d] = deadline.split("T")[0].split("-").map(Number);
 	const dueDate = new Date(y, m - 1, d);
 	const today = new Date();
@@ -104,20 +89,18 @@ export const getDeadlineStatus = (deadline: string | null) => {
 	if (diffDays < 0)
 		return {
 			text: `Overdue by ${Math.abs(diffDays)} days`,
-			color: "[color:var(--danger)]",
+			color: "var(--danger)",
 		};
-	if (diffDays === 0)
-		return { text: "Due today", color: "[color:var(--danger)]" };
-	if (diffDays === 1)
-		return { text: "Due tomorrow", color: "[color:var(--warning)]" };
+	if (diffDays === 0) return { text: "Due today", color: "var(--danger)" };
+	if (diffDays === 1) return { text: "Due tomorrow", color: "var(--warning)" };
 	if (diffDays <= 7)
 		return {
 			text: `${diffDays} days remaining`,
-			color: "[color:var(--warning)]",
+			color: "var(--warning)",
 		};
 	return {
 		text: `${diffDays} days remaining`,
-		color: "[color:var(--success)]",
+		color: "var(--success)",
 	};
 };
 

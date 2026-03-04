@@ -5,6 +5,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
+import styles from "./ProjectManagerDeleteDialogs.module.css";
 
 interface ProjectManagerDeleteDialogsProps {
 	projectIdPendingDelete: string | null;
@@ -33,24 +34,26 @@ export function ProjectManagerDeleteDialogs({
 				open={Boolean(projectIdPendingDelete)}
 				onOpenChange={(open) => !open && onCancelProjectDelete()}
 			>
-				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+				<DialogContent className={styles.dialogShell}>
 					<DialogHeader>
 						<DialogTitle>Delete project?</DialogTitle>
 					</DialogHeader>
-					<p className="text-sm text-[var(--text-muted)]">
+					<p className={styles.copy}>
 						Delete "{pendingProjectName}"? This will permanently remove its
 						tasks, files, and related records.
 					</p>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+					<DialogFooter className={styles.footer}>
 						<button
 							onClick={onCancelProjectDelete}
-							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							className={`${styles.button} ${styles.buttonSecondary}`}
+							type="button"
 						>
 							Cancel
 						</button>
 						<button
 							onClick={onConfirmProjectDelete}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+							className={`${styles.button} ${styles.buttonDanger}`}
+							type="button"
 						>
 							Delete
 						</button>
@@ -61,23 +64,25 @@ export function ProjectManagerDeleteDialogs({
 				open={Boolean(taskIdPendingDelete)}
 				onOpenChange={(open) => !open && onCancelTaskDelete()}
 			>
-				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+				<DialogContent className={styles.dialogShell}>
 					<DialogHeader>
 						<DialogTitle>Delete task?</DialogTitle>
 					</DialogHeader>
-					<p className="text-sm text-[var(--text-muted)]">
+					<p className={styles.copy}>
 						Delete "{pendingTaskName}"? This will also delete all subtasks.
 					</p>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+					<DialogFooter className={styles.footer}>
 						<button
 							onClick={onCancelTaskDelete}
-							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							className={`${styles.button} ${styles.buttonSecondary}`}
+							type="button"
 						>
 							Cancel
 						</button>
 						<button
 							onClick={onConfirmTaskDelete}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+							className={`${styles.button} ${styles.buttonDanger}`}
+							type="button"
 						>
 							Delete
 						</button>

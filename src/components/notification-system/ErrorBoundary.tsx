@@ -1,6 +1,5 @@
 import React from "react";
 import { logger } from "../../lib/logger";
-import { type ColorScheme, hexToRgba, useTheme } from "../../lib/palette";
 
 interface ErrorBoundaryState {
 	hasError: boolean;
@@ -8,13 +7,8 @@ interface ErrorBoundaryState {
 	errorInfo: React.ErrorInfo | null;
 }
 
-interface ErrorBoundaryProps {
-	children: React.ReactNode;
-	palette: ColorScheme;
-}
-
-class ErrorBoundaryInner extends React.Component<
-	ErrorBoundaryProps,
+export class ErrorBoundary extends React.Component<
+	{ children: React.ReactNode },
 	ErrorBoundaryState
 > {
 	state: ErrorBoundaryState = { hasError: false, error: null, errorInfo: null };
@@ -38,67 +32,22 @@ class ErrorBoundaryInner extends React.Component<
 	render() {
 		if (!this.state.hasError) return this.props.children;
 
-		const { palette } = this.props;
 		const isDev = import.meta.env.DEV;
 
 		return (
-			<div
-				style={{
-					display: "flex",
-					flexDirection: "column",
-					alignItems: "center",
-					justifyContent: "center",
-					height: "100%",
-					gap: 16,
-					padding: 32,
-					color: palette.text,
-				}}
-			>
-				<div
-					style={{
-						padding: "24px 32px",
-						borderRadius: 12,
-						background: hexToRgba(palette.surface, 0.8),
-						border: `1px solid ${hexToRgba(palette.accent, 0.3)}`,
-						textAlign: "center",
-						maxWidth: 600,
-					}}
-				>
-					<h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-						Something went wrong
-					</h2>
-					<p
-						style={{ fontSize: 13, color: palette.textMuted, marginBottom: 16 }}
-					>
+			<div className="flex h-full flex-col items-center justify-center gap-4 p-8 [color:var(--text)]">
+				<div className="max-w-150 rounded-xl border p-6 text-center [background:color-mix(in_srgb,var(--surface)_80%,transparent)] border-[color-mix(in_srgb,var(--danger)_30%,transparent)]">
+					<h2 className="mb-2 text-lg font-semibold">Something went wrong</h2>
+					<p className="mb-4 text-[13px] [color:var(--text-muted)]">
 						{this.state.error?.message || "An unexpected error occurred."}
 					</p>
 
 					{isDev && this.state.error?.stack && (
-						<details
-							style={{
-								marginBottom: 16,
-								textAlign: "left",
-								fontSize: 11,
-								fontFamily: "monospace",
-								background: hexToRgba(palette.background, 0.5),
-								padding: 12,
-								borderRadius: 8,
-								maxHeight: 200,
-								overflow: "auto",
-							}}
-						>
-							<summary
-								style={{ cursor: "pointer", marginBottom: 8, fontSize: 12 }}
-							>
+						<details className="mb-4 max-h-50 overflow-auto rounded-lg p-3 text-left font-mono text-[11px] [background:color-mix(in_srgb,var(--background)_50%,transparent)]">
+							<summary className="mb-2 cursor-pointer text-xs">
 								Stack Trace
 							</summary>
-							<pre
-								style={{
-									margin: 0,
-									whiteSpace: "pre-wrap",
-									wordBreak: "break-word",
-								}}
-							>
+							<pre className="m-0 wrap-break-word whitespace-pre-wrap">
 								{this.state.error.stack}
 							</pre>
 						</details>
@@ -109,16 +58,7 @@ class ErrorBoundaryInner extends React.Component<
 							this.setState({ hasError: false, error: null, errorInfo: null });
 							window.location.reload();
 						}}
-						style={{
-							padding: "8px 20px",
-							borderRadius: 8,
-							border: "none",
-							background: palette.primary,
-							color: palette.background,
-							fontSize: 13,
-							fontWeight: 600,
-							cursor: "pointer",
-						}}
+						className="rounded-lg border-none px-5 py-2 text-[13px] font-semibold [background:var(--primary)] [color:var(--primary-contrast)]"
 					>
 						Reload
 					</button>
@@ -126,9 +66,4 @@ class ErrorBoundaryInner extends React.Component<
 			</div>
 		);
 	}
-}
-
-export function ErrorBoundary({ children }: { children: React.ReactNode }) {
-	const { palette } = useTheme();
-	return <ErrorBoundaryInner palette={palette}>{children}</ErrorBoundaryInner>;
 }

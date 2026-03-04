@@ -30,14 +30,18 @@ export function BlockLibraryUploadDialog({
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-md border-(--border) bg-(--bg-heavy)">
-				<h3 className="text-lg font-semibold [color:var(--text)]">Upload Block</h3>
+				<h3 className="text-lg font-semibold [color:var(--text)]">
+					Upload Block
+				</h3>
 
 				<div className="mt-4 space-y-4" role="form" onSubmit={onSubmit}>
 					<Field label="Block Name">
 						<input
 							type="text"
 							value={uploadForm.name}
-							onChange={(e) => setUploadForm((p) => ({ ...p, name: e.target.value }))}
+							onChange={(e) =>
+								setUploadForm((p) => ({ ...p, name: e.target.value }))
+							}
 							required
 							className={inputClass}
 							placeholder="e.g., Transformer-3Phase"
@@ -47,7 +51,9 @@ export function BlockLibraryUploadDialog({
 					<Field label="Category">
 						<select
 							value={uploadForm.category}
-							onChange={(e) => setUploadForm((p) => ({ ...p, category: e.target.value }))}
+							onChange={(e) =>
+								setUploadForm((p) => ({ ...p, category: e.target.value }))
+							}
 							className={inputClass}
 						>
 							{UPLOAD_CATEGORY_OPTIONS.map((opt) => (
@@ -62,7 +68,9 @@ export function BlockLibraryUploadDialog({
 						<input
 							type="text"
 							value={uploadForm.tags}
-							onChange={(e) => setUploadForm((p) => ({ ...p, tags: e.target.value }))}
+							onChange={(e) =>
+								setUploadForm((p) => ({ ...p, tags: e.target.value }))
+							}
 							className={inputClass}
 							placeholder="e.g., transformer, 3phase, 480v"
 						/>
@@ -72,7 +80,9 @@ export function BlockLibraryUploadDialog({
 						<input
 							type="checkbox"
 							checked={uploadForm.is_dynamic}
-							onChange={(e) => setUploadForm((p) => ({ ...p, is_dynamic: e.target.checked }))}
+							onChange={(e) =>
+								setUploadForm((p) => ({ ...p, is_dynamic: e.target.checked }))
+							}
 							className="rounded"
 						/>
 						Dynamic block (with variations)
@@ -106,7 +116,13 @@ export function BlockLibraryUploadDialog({
 	);
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+	label,
+	children,
+}: {
+	label: string;
+	children: React.ReactNode;
+}) {
 	return (
 		<div>
 			<label className="mb-1.5 block text-xs font-medium [color:var(--text-muted)]">

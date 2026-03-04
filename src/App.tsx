@@ -4,17 +4,20 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
 import { NotificationProvider } from "./auth/NotificationContext";
 import Cursor from "./components/fx/Cursor";
+import {
+	useCursorEnabled,
+	useSuiteCursor,
+} from "./components/fx/useSuiteCursor";
 import { ErrorBoundary } from "./components/notification-system/ErrorBoundary";
 import { ToastContainer } from "./components/notification-system/ToastContainer";
-import { useSuiteCursor, useCursorEnabled } from "./components/fx/useSuiteCursor";
 import { logger } from "./lib/logger";
 import AppDashboardPage from "./routes/AppDashboardPage";
 import Shell from "./routes/AppShell";
 import LandingPage from "./routes/LandingPage";
 import LoginPage from "./routes/LoginPage";
 import PrivacyPage from "./routes/PrivacyPage";
-import RoadmapPage from "./routes/RoadmapPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import RoadmapPage from "./routes/RoadmapPage";
 import RouteLoadingFallback from "./routes/RouteLoadingFallback";
 import SignupPage from "./routes/SignupPage";
 
@@ -32,14 +35,9 @@ const GroundGridRoutePage = lazy(
 		),
 );
 const TransmittalBuilderRoutePage = lazy(
-	() =>
-		import(
-			"./routes/apps/transmittal-builder/TransmittalBuilderRoutePage"
-		),
+	() => import("./routes/apps/transmittal-builder/TransmittalBuilderRoutePage"),
 );
-const GraphRoutePage = lazy(
-	() => import("./routes/apps/graph/GraphRoutePage"),
-);
+const GraphRoutePage = lazy(() => import("./routes/apps/graph/GraphRoutePage"));
 const StandardsCheckerRoutePage = lazy(
 	() => import("./routes/apps/standards-checker/StandardsCheckerRoutePage"),
 );
@@ -48,9 +46,7 @@ const BatchFindReplaceRoutePage = lazy(
 );
 const DrawingListManagerRoutePage = lazy(
 	() =>
-		import(
-			"./routes/apps/drawing-list-manager/DrawingListManagerRoutePage"
-		),
+		import("./routes/apps/drawing-list-manager/DrawingListManagerRoutePage"),
 );
 const KnowledgeRoutePage = lazy(
 	() => import("./routes/knowledge/KnowledgeRoutePage"),

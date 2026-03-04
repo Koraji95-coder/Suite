@@ -1,6 +1,6 @@
 import { Activity } from "lucide-react";
 import { useState } from "react";
-import { FrameSection } from "../../apps/ui/PageFrame";
+import { Section } from "@/components/apps/ui/PageFrame";
 
 export function SinusoidalCalculator() {
 	const [amplitude, setAmplitude] = useState(220);
@@ -104,7 +104,7 @@ export function SinusoidalCalculator() {
 				</h2>
 			</div>
 
-			<FrameSection title="Sinusoidal Waveform Calculator">
+			<Section title="Sinusoidal Waveform Calculator">
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 					<div className="space-y-4">
 						<div>
@@ -281,9 +281,9 @@ export function SinusoidalCalculator() {
 						</div>
 					)}
 				</div>
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="Per-Unit System Calculator">
+			<Section title="Per-Unit System Calculator">
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 					<div className="space-y-4">
 						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
@@ -481,9 +481,9 @@ export function SinusoidalCalculator() {
 						</div>
 					)}
 				</div>
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="Example: Sinusoidal Voltage">
+			<Section title="Example: Sinusoidal Voltage">
 				<div className="space-y-2 [color:var(--text)]">
 					<p className="font-semibold">
 						Given: v(t) = 220√2 × sin(2π × 50t + 30°)
@@ -500,7 +500,7 @@ export function SinusoidalCalculator() {
 					<p className="pl-4">• Phase Angle (φ) = 30° = 0.524 rad</p>
 					<p className="pl-4">• Phasor Form: V = 220∠30° V</p>
 				</div>
-			</FrameSection>
+			</Section>
 		</div>
 	);
 }

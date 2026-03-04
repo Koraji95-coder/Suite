@@ -1,6 +1,5 @@
 import * as d3 from "d3";
 import { useCallback, useEffect, useRef } from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import type { GraphData, GraphNode } from "./types";
 import { getGroupColor } from "./types";
 
@@ -24,7 +23,6 @@ interface SimLink extends d3.SimulationLinkDatum<SimNode> {
 
 export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 	const svgRef = useRef<SVGSVGElement>(null);
-	const { palette } = useTheme();
 	const simRef = useRef<d3.Simulation<SimNode, SimLink> | null>(null);
 	const nodeElsRef = useRef<d3.Selection<
 		SVGCircleElement,
@@ -88,7 +86,7 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 			.selectAll("line")
 			.data(simLinks)
 			.join("line")
-			.attr("stroke", hexToRgba(palette.textMuted, 0.2))
+			.style("stroke", "color-mix(in srgb, var(--text-muted) 20%, transparent)")
 			.attr("stroke-width", (d) => Math.max(0.5, d.weight * 2));
 
 		const nodeEls = nodeGroup
@@ -96,12 +94,14 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 			.data(simNodes)
 			.join("circle")
 			.attr("r", (d) => (d.gNode.data?.type === "major" ? 18 : 10))
-			.attr("fill", (d) => {
-				const color = getGroupColor(d.group, palette);
-				return d.source === "memory" ? hexToRgba(color, 0.35) : color;
+			.style("fill", (d) => {
+				const color = getGroupColor(d.group);
+				return d.source === "memory"
+					? `color-mix(in srgb, ${color} 35%, transparent)`
+					: color;
 			})
-			.attr("stroke", (d) => {
-				return d.source === "memory" ? getGroupColor(d.group, palette) : "none";
+			.style("stroke", (d) => {
+				return d.source === "memory" ? getGroupColor(d.group) : "none";
 			})
 			.attr("stroke-width", (d) => (d.source === "memory" ? 1.5 : 0))
 			.attr("cursor", "pointer")
@@ -124,7 +124,7 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 				d.label.length > 20 ? d.label.slice(0, 18) + "..." : d.label,
 			)
 			.attr("font-size", 10)
-			.attr("fill", palette.textMuted)
+			.style("fill", "var(--text-muted)")
 			.attr("text-anchor", "middle")
 			.attr("dy", (d) => (d.gNode.data?.type === "major" ? 28 : 18))
 			.attr("pointer-events", "none");
@@ -181,9 +181,9 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 				selection: d3.Selection<SVGSVGElement | null, unknown, null, undefined>,
 			) => void,
 		);
-	}, [data, onSelectNode, palette]);
+	}, [data, onSelectNode]);
 
-	// Full rebuild when data, callbacks, or palette change
+	// Full rebuild when data or callbacks change
 	useEffect(() => {
 		render();
 		return () => {
@@ -191,31 +191,26 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 		};
 	}, [render]);
 
-	// Lightweight selection highlight update -- no rebuild, no simulation restart
+	// Lightweight selection highlight — no rebuild, no simulation restart
 	useEffect(() => {
 		const nodeEls = nodeElsRef.current;
 		if (!nodeEls) return;
 
 		nodeEls
-			.attr("stroke", (d) => {
-				if (d.id === selectedNodeId) return palette.text;
-				return d.source === "memory" ? getGroupColor(d.group, palette) : "none";
+			.style("stroke", (d) => {
+				if (d.id === selectedNodeId) return "var(--text)";
+				return d.source === "memory" ? getGroupColor(d.group) : "none";
 			})
 			.attr("stroke-width", (d) => {
 				if (d.id === selectedNodeId) return 2.5;
 				return d.source === "memory" ? 1.5 : 0;
 			});
-	}, [selectedNodeId, palette]);
+	}, [selectedNodeId]);
 
 	return (
 		<svg
 			ref={svgRef}
-			style={{
-				width: "100%",
-				height: "100%",
-				background: palette.background,
-				display: "block",
-			}}
+			className="block h-full w-full [background:var(--background)]"
 		/>
 	);
 }

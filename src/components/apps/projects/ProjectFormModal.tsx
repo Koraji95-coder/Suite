@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import styles from "./ProjectManagerFormModal.module.css";
 import {
 	PROJECT_CATEGORIES,
 	type Priority,
@@ -24,56 +25,52 @@ export function ProjectFormModal({
 	setFormData,
 	isEditing,
 }: ProjectFormModalProps) {
-	const inputClass =
-		"w-full rounded-lg border px-4 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
-	const labelClass = "mb-2 block text-sm font-medium [color:var(--text-muted)]";
-
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="max-w-2xl p-5 sm:p-6 [border-color:var(--border)] [background:var(--bg-heavy)]">
-				<DialogHeader className="mb-4">
-					<DialogTitle className="text-2xl font-bold [color:var(--text)]">
+			<DialogContent className={styles.dialogContent}>
+				<DialogHeader className={styles.header}>
+					<DialogTitle className={styles.title}>
 						{isEditing ? "Edit Project" : "Create New Project"}
 					</DialogTitle>
 				</DialogHeader>
-				<div className="space-y-4">
+				<div className={styles.fields}>
 					<div>
-						<label className={labelClass}>Project Name</label>
+						<label className={styles.label}>Project Name</label>
 						<input
 							type="text"
 							value={formData.name}
 							onChange={(e) =>
 								setFormData({ ...formData, name: e.target.value })
 							}
-							className={inputClass}
+							className={styles.input}
 							placeholder="Enter project name"
 						/>
 					</div>
 					<div>
-						<label className={labelClass}>Description</label>
+						<label className={styles.label}>Description</label>
 						<textarea
 							value={formData.description}
 							onChange={(e) =>
 								setFormData({ ...formData, description: e.target.value })
 							}
-							className={`${inputClass} h-24`}
+							className={styles.textarea}
 							placeholder="Project description"
 						/>
 					</div>
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<div className={styles.gridTwo}>
 						<div>
-							<label className={labelClass}>Deadline</label>
+							<label className={styles.label}>Deadline</label>
 							<input
 								type="date"
 								value={formData.deadline ? formData.deadline.split("T")[0] : ""}
 								onChange={(e) =>
 									setFormData({ ...formData, deadline: e.target.value })
 								}
-								className={inputClass}
+								className={styles.input}
 							/>
 						</div>
 						<div>
-							<label className={labelClass}>Priority</label>
+							<label className={styles.label}>Priority</label>
 							<select
 								value={formData.priority}
 								onChange={(e) =>
@@ -82,7 +79,7 @@ export function ProjectFormModal({
 										priority: e.target.value as Priority,
 									})
 								}
-								className={inputClass}
+								className={styles.select}
 							>
 								<option value="low">Low</option>
 								<option value="medium">Medium</option>
@@ -91,15 +88,15 @@ export function ProjectFormModal({
 							</select>
 						</div>
 					</div>
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<div className={styles.gridTwo}>
 						<div>
-							<label className={labelClass}>Category</label>
+							<label className={styles.label}>Category</label>
 							<select
 								value={formData.category ?? ""}
 								onChange={(e) =>
 									setFormData({ ...formData, category: e.target.value })
 								}
-								className={inputClass}
+								className={styles.select}
 							>
 								<option value="">No Category</option>
 								{PROJECT_CATEGORIES.map((c) => (
@@ -110,7 +107,7 @@ export function ProjectFormModal({
 							</select>
 						</div>
 						<div>
-							<label className={labelClass}>Status</label>
+							<label className={styles.label}>Status</label>
 							<select
 								value={formData.status}
 								onChange={(e) =>
@@ -119,7 +116,7 @@ export function ProjectFormModal({
 										status: e.target.value as ProjectStatus,
 									})
 								}
-								className={inputClass}
+								className={styles.select}
 							>
 								<option value="active">Active</option>
 								<option value="on-hold">On Hold</option>
@@ -128,30 +125,24 @@ export function ProjectFormModal({
 						</div>
 					</div>
 					{formData.category && (
-						<div className="flex items-center space-x-2 mt-2">
+						<div className={styles.categoryPreview}>
 							<div
-								className="w-4 h-4 rounded-full"
+								className={styles.colorSwatch}
 								style={{
 									backgroundColor: categoryColor(formData.category || null),
 								}}
 							/>
-							<span className="text-xs [color:var(--text-muted)]">
+							<span className={styles.previewHint}>
 								Color auto-assigned from category
 							</span>
 						</div>
 					)}
 				</div>
-				<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-					<button
-						onClick={onSubmit}
-						className="flex-1 rounded-lg px-6 py-2 font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
-					>
+				<div className={styles.footer}>
+					<button onClick={onSubmit} className={styles.buttonPrimary}>
 						{isEditing ? "Update Project" : "Create Project"}
 					</button>
-					<button
-						onClick={onClose}
-						className="rounded-lg border px-6 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-					>
+					<button onClick={onClose} className={styles.buttonSecondary}>
 						Cancel
 					</button>
 				</div>

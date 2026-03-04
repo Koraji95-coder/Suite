@@ -1,10 +1,10 @@
-import { supabase } from "@/supabase/client";
 import type {
 	AuthenticationResponseJSON,
 	PublicKeyCredentialCreationOptionsJSON,
 	PublicKeyCredentialRequestOptionsJSON,
 	RegistrationResponseJSON,
 } from "@simplewebauthn/browser";
+import { supabase } from "@/supabase/client";
 
 export type PasskeyStartResponse = {
 	ok?: boolean;

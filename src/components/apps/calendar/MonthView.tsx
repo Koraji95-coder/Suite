@@ -143,9 +143,15 @@ export function MonthView({
 									className={cn(
 										"group border-r border-b last:border-r-0",
 										"border-[color-mix(in_srgb,var(--primary)_8%,transparent)]",
-										isSelected && "[background:color-mix(in_srgb,var(--primary)_6%,transparent)] [box-shadow:inset_0_0_0_1px_color-mix(in_srgb,var(--primary)_25%,transparent)]",
-										!isSelected && today && "[background:color-mix(in_srgb,var(--primary)_3%,transparent)]",
-										!isSelected && !today && !isCurrentMonth && "[background:color-mix(in_srgb,var(--surface)_30%,transparent)]",
+										isSelected &&
+											"[background:color-mix(in_srgb,var(--primary)_6%,transparent)] [box-shadow:inset_0_0_0_1px_color-mix(in_srgb,var(--primary)_25%,transparent)]",
+										!isSelected &&
+											today &&
+											"[background:color-mix(in_srgb,var(--primary)_3%,transparent)]",
+										!isSelected &&
+											!today &&
+											!isCurrentMonth &&
+											"[background:color-mix(in_srgb,var(--surface)_30%,transparent)]",
 									)}
 									data-today={today || undefined}
 									data-selected={isSelected || undefined}
@@ -166,10 +172,19 @@ export function MonthView({
 											type="button"
 											className={cn(
 												"mt-1.5 inline-flex size-7 items-center justify-center rounded-full text-sm leading-none transition-all",
-												today && "font-bold [background:var(--primary)] [color:var(--primary-contrast)] [box-shadow:0_0_8px_color-mix(in_srgb,var(--primary)_40%,transparent)]",
-												!today && isSelected && "font-semibold [background:color-mix(in_srgb,var(--primary)_15%,transparent)] [color:var(--primary)] [box-shadow:0_0_0_1px_color-mix(in_srgb,var(--primary)_35%,transparent)]",
-												!today && !isSelected && !isCurrentMonth && "[color:var(--text-muted)]",
-												!today && !isSelected && isCurrentMonth && "[color:var(--text)]",
+												today &&
+													"font-bold [background:var(--primary)] [color:var(--primary-contrast)] [box-shadow:0_0_8px_color-mix(in_srgb,var(--primary)_40%,transparent)]",
+												!today &&
+													isSelected &&
+													"font-semibold [background:color-mix(in_srgb,var(--primary)_15%,transparent)] [color:var(--primary)] [box-shadow:0_0_0_1px_color-mix(in_srgb,var(--primary)_35%,transparent)]",
+												!today &&
+													!isSelected &&
+													!isCurrentMonth &&
+													"[color:var(--text-muted)]",
+												!today &&
+													!isSelected &&
+													isCurrentMonth &&
+													"[color:var(--text)]",
 											)}
 											onClick={(e) => {
 												e.stopPropagation();
@@ -212,7 +227,10 @@ export function MonthView({
 																<div className="invisible" aria-hidden={true}>
 																	{!event.allDay && (
 																		<span>
-																			{format(new Date(event.start), "h:mm")}{" "}
+																			{format(
+																				new Date(event.start),
+																				"h:mm",
+																			)}{" "}
 																		</span>
 																	)}
 																	{event.title}
@@ -270,10 +288,7 @@ export function MonthView({
 																{sortEvents(allEvents).map((event) => {
 																	const eventStart = new Date(event.start);
 																	const eventEnd = new Date(event.end);
-																	const isFirstDay = isSameDay(
-																		day,
-																		eventStart,
-																	);
+																	const isFirstDay = isSameDay(day, eventStart);
 																	const isLastDay = isSameDay(day, eventEnd);
 
 																	return (

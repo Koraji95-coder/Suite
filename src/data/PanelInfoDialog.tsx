@@ -6,7 +6,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
-import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
 
 interface InfoSection {
 	title: string;
@@ -22,113 +21,77 @@ interface PanelInfoDialogProps {
 
 export function PanelInfoDialog({ title, sections }: PanelInfoDialogProps) {
 	const [isOpen, setIsOpen] = useState(false);
-	const { palette } = useTheme();
-	const buttonStyle = {
-		...glassCardInnerStyle(palette, palette.primary),
-		color: hexToRgba(palette.text, 0.85),
-	};
-	const panelStyle = {
-		border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
-		background: `linear-gradient(145deg, ${hexToRgba(
-			palette.surface,
-			0.97,
-		)} 0%, ${hexToRgba(palette.surfaceLight, 0.93)} 100%)`,
-	};
-	const headerStyle = {
-		borderBottom: `1px solid ${hexToRgba(palette.primary, 0.16)}`,
-		background: hexToRgba(palette.surface, 0.7),
-		color: hexToRgba(palette.text, 0.9),
-	};
-	const sectionStyle = {
-		...glassCardInnerStyle(palette, palette.secondary),
-	};
-	const textStyle = {
-		color: hexToRgba(palette.text, 0.6),
-		fontSize: 13,
-		lineHeight: 1.55,
-	};
-	const tipStyle = {
-		...glassCardInnerStyle(palette, palette.tertiary),
-		color: hexToRgba(palette.text, 0.8),
-	};
 
 	return (
 		<>
 			<button
 				onClick={() => setIsOpen(true)}
-				className="flex items-center space-x-2 px-4 py-2 rounded-lg transition-all"
-				style={buttonStyle}
+				className="flex items-center space-x-2 rounded-lg border px-4 py-2 transition-all border-[color-mix(in_srgb,var(--primary)_18%,var(--border))] [background:color-mix(in_srgb,var(--primary)_8%,var(--surface))] text-[color-mix(in_srgb,var(--text)_85%,transparent)]"
 			>
-				<Info className="w-4 h-4" style={{ color: palette.primary }} />
+				<Info className="h-4 w-4 [color:var(--primary)]" />
 				<span>Panel Info</span>
 			</button>
 
 			<Dialog open={isOpen} onOpenChange={setIsOpen}>
 				<DialogContent
-					className="max-w-4xl max-h-[92vh] p-0 overflow-hidden border-0 bg-transparent flex flex-col"
-					style={panelStyle}
+					className="flex max-h-[92vh] max-w-4xl flex-col overflow-hidden border-0 bg-transparent p-0"
+					style={{
+						border:
+							"1px solid color-mix(in srgb, var(--primary) 18%, transparent)",
+						background:
+							"linear-gradient(145deg, color-mix(in srgb, var(--surface) 97%, transparent) 0%, color-mix(in srgb, var(--surface-2) 93%, transparent) 100%)",
+					}}
 				>
-					<DialogHeader
-						className="flex-row items-center justify-between space-y-0 p-6"
-						style={headerStyle}
-					>
+					<DialogHeader className="flex-row items-center justify-between space-y-0 border-b p-6 border-[color-mix(in_srgb,var(--primary)_16%,transparent)] [background:color-mix(in_srgb,var(--surface)_70%,transparent)]">
 						<div className="flex items-center space-x-3">
-							<Info className="w-6 h-6" style={{ color: palette.primary }} />
-							<DialogTitle className="text-2xl font-bold">{title}</DialogTitle>
+							<Info className="h-6 w-6 [color:var(--primary)]" />
+							<DialogTitle className="text-2xl font-bold text-[color-mix(in_srgb,var(--text)_90%,transparent)]">
+								{title}
+							</DialogTitle>
 						</div>
 						<button
 							onClick={() => setIsOpen(false)}
-							className="p-2 rounded-lg transition-all"
-							style={{
-								background: hexToRgba(palette.surface, 0.35),
-								color: hexToRgba(palette.text, 0.8),
-							}}
+							className="rounded-lg p-2 transition-all [background:color-mix(in_srgb,var(--surface)_35%,transparent)] text-[color-mix(in_srgb,var(--text)_80%,transparent)]"
 						>
-							<X className="w-5 h-5" />
+							<X className="h-5 w-5" />
 						</button>
 					</DialogHeader>
 
-					<div className="flex-1 overflow-y-auto p-6 space-y-6">
+					<div className="flex-1 space-y-6 overflow-y-auto p-6">
 						{sections.map((section, index) => (
 							<div
 								key={index}
-								className="backdrop-blur-xl border rounded-lg p-6"
-								style={sectionStyle}
+								className="rounded-lg border p-6 backdrop-blur-xl border-[color-mix(in_srgb,var(--secondary)_18%,var(--border))] [background:color-mix(in_srgb,var(--secondary)_8%,var(--surface))]"
 							>
-								<h4
-									className="text-xl font-bold mb-4"
-									style={{ color: hexToRgba(palette.text, 0.85) }}
-								>
+								<h4 className="mb-4 text-xl font-bold text-[color-mix(in_srgb,var(--text)_85%,transparent)]">
 									{section.title}
 								</h4>
 
 								{Array.isArray(section.content) ? (
-									<ul className="space-y-2" style={textStyle}>
+									<ul className="space-y-2 text-[13px] leading-relaxed text-[color-mix(in_srgb,var(--text)_60%,transparent)]">
 										{section.content.map((item, i) => (
 											<li key={i} className="flex items-start space-x-2">
-												<span style={{ color: palette.primary }}>•</span>
+												<span className="[color:var(--primary)]">•</span>
 												<span>{item}</span>
 											</li>
 										))}
 									</ul>
 								) : (
-									<p style={textStyle}>{section.content}</p>
+									<p className="text-[13px] leading-relaxed text-[color-mix(in_srgb,var(--text)_60%,transparent)]">
+										{section.content}
+									</p>
 								)}
 
 								{section.tips && section.tips.length > 0 && (
-									<div className="mt-4 border rounded-lg p-4" style={tipStyle}>
-										<p
-											className="font-semibold mb-2"
-											style={{ color: hexToRgba(palette.text, 0.85) }}
-										>
+									<div className="mt-4 rounded-lg border p-4 border-[color-mix(in_srgb,var(--tertiary)_18%,var(--border))] [background:color-mix(in_srgb,var(--tertiary)_8%,var(--surface))]">
+										<p className="mb-2 font-semibold text-[color-mix(in_srgb,var(--text)_85%,transparent)]">
 											Tips
 										</p>
-										<ul className="space-y-1 ml-4">
+										<ul className="ml-4 space-y-1">
 											{section.tips.map((tip, i) => (
 												<li
 													key={i}
-													className="text-sm"
-													style={{ color: hexToRgba(palette.text, 0.65) }}
+													className="text-sm text-[color-mix(in_srgb,var(--text)_65%,transparent)]"
 												>
 													{tip}
 												</li>
@@ -140,14 +103,10 @@ export function PanelInfoDialog({ title, sections }: PanelInfoDialogProps) {
 						))}
 					</div>
 
-					<div
-						className="p-4 border-t"
-						style={{ borderColor: hexToRgba(palette.primary, 0.12) }}
-					>
+					<div className="border-t p-4 border-[color-mix(in_srgb,var(--primary)_12%,transparent)]">
 						<button
 							onClick={() => setIsOpen(false)}
-							className="w-full px-6 py-3 rounded-lg font-semibold transition-all"
-							style={buttonStyle}
+							className="w-full rounded-lg border px-6 py-3 font-semibold transition-all border-[color-mix(in_srgb,var(--primary)_18%,var(--border))] [background:color-mix(in_srgb,var(--primary)_8%,var(--surface))] text-[color-mix(in_srgb,var(--text)_85%,transparent)]"
 						>
 							Close
 						</button>

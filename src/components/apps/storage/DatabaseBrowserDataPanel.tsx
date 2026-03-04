@@ -8,11 +8,8 @@ import {
 	Loader2,
 	Search,
 } from "lucide-react";
-import type { CSSProperties } from "react";
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
 
 interface DatabaseBrowserDataPanelProps {
-	palette: ColorScheme;
 	selectedTable: string;
 	loadingData: boolean;
 	rows: Record<string, unknown>[];
@@ -32,8 +29,16 @@ interface DatabaseBrowserDataPanelProps {
 	onSort: (column: string) => void;
 }
 
+const cellClass =
+	"max-w-[240px] truncate whitespace-nowrap px-3 py-2 text-[13px] [color:var(--text)]";
+
+const thClass =
+	"max-w-[240px] truncate whitespace-nowrap px-3 py-2 text-[13px] font-semibold select-none [color:var(--text-muted)]";
+
+const pageBtnClass =
+	"inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs disabled:opacity-40 [border-color:color-mix(in_srgb,var(--primary)_20%,transparent)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)] [color:var(--text)]";
+
 export function DatabaseBrowserDataPanel({
-	palette,
 	selectedTable,
 	loadingData,
 	rows,
@@ -52,66 +57,30 @@ export function DatabaseBrowserDataPanel({
 	sortDir,
 	onSort,
 }: DatabaseBrowserDataPanelProps) {
-	const cellStyle: CSSProperties = {
-		padding: "8px 12px",
-		fontSize: 13,
-		color: palette.text,
-		whiteSpace: "nowrap",
-		overflow: "hidden",
-		textOverflow: "ellipsis",
-		maxWidth: 240,
-	};
-
-	const thStyle: CSSProperties = {
-		...cellStyle,
-		fontWeight: 600,
-		color: palette.textMuted,
-		cursor: "pointer",
-		userSelect: "none",
-	};
-
 	if (!selectedTable) {
 		return (
-			<div
-				style={{
-					display: "flex",
-					flexDirection: "column",
-					alignItems: "center",
-					justifyContent: "center",
-					height: "100%",
-					color: palette.textMuted,
-				}}
-			>
-				<DatabaseIcon
-					className="w-12 h-12"
-					style={{ opacity: 0.3, marginBottom: 12 }}
-				/>
-				<span style={{ fontSize: 14 }}>Select a table to view data</span>
+			<div className="flex h-full flex-col items-center justify-center [color:var(--text-muted)]">
+				<DatabaseIcon className="mb-3 h-12 w-12 opacity-30" />
+				<span className="text-sm">Select a table to view data</span>
 			</div>
 		);
 	}
 
 	return (
 		<>
+			{/* Toolbar */}
 			<div className="mb-3 flex flex-wrap items-center gap-2">
-				<span style={{ fontWeight: 600, fontSize: 15, color: palette.text }}>
+				<span className="text-[15px] font-semibold [color:var(--text)]">
 					{selectedTable}
 				</span>
-				<span style={{ fontSize: 12, color: palette.textMuted }}>
+				<span className="text-xs [color:var(--text-muted)]">
 					{loadingData ? "Loading..." : `${totalCount} rows`}
 				</span>
 				<div className="hidden sm:block sm:flex-1" />
 				<select
 					value={pageSize}
 					onChange={(event) => onPageSizeChange(Number(event.target.value))}
-					style={{
-						padding: "4px 8px",
-						borderRadius: 6,
-						fontSize: 12,
-						background: hexToRgba(palette.background, 0.6),
-						border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-						color: palette.text,
-					}}
+					className="rounded-md border px-2 py-1 text-xs border-[color-mix(in_srgb,var(--primary)_20%,transparent)] [background:color-mix(in_srgb,var(--background)_60%,transparent)] [color:var(--text)]"
 				>
 					{[25, 50, 100].map((value) => (
 						<option key={value} value={value}>
@@ -121,97 +90,59 @@ export function DatabaseBrowserDataPanel({
 				</select>
 			</div>
 
-			{rows.length > 0 ? (
-				<div style={{ position: "relative", marginBottom: 10 }}>
-					<Search
-						className="w-4 h-4"
-						style={{
-							position: "absolute",
-							left: 10,
-							top: 9,
-							color: palette.primary,
-						}}
-					/>
+			{/* Search */}
+			{rows.length > 0 && (
+				<div className="relative mb-2.5">
+					<Search className="absolute left-2.5 top-2.25 h-4 w-4 [color:var(--primary)]" />
 					<input
 						value={search}
 						onChange={(event) => onSearchChange(event.target.value)}
 						placeholder="Filter rows..."
-						style={{
-							width: "100%",
-							padding: "8px 12px 8px 34px",
-							borderRadius: 8,
-							fontSize: 13,
-							background: hexToRgba(palette.background, 0.6),
-							border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-							color: palette.text,
-							outline: "none",
-						}}
+						className="w-full rounded-lg border py-2 pr-3 pl-8.5 text-[13px] outline-none border-[color-mix(in_srgb,var(--primary)_20%,transparent)] [background:color-mix(in_srgb,var(--background)_60%,transparent)] [color:var(--text)]"
 					/>
-					{search ? (
-						<span
-							style={{
-								position: "absolute",
-								right: 10,
-								top: 10,
-								fontSize: 11,
-								color: palette.textMuted,
-							}}
-							className="hidden sm:block"
-						>
+					{search && (
+						<span className="absolute right-2.5 top-2.5 hidden text-[11px] sm:block [color:var(--text-muted)]">
 							{filteredRows.length} of {rows.length}
 						</span>
-					) : null}
+					)}
 				</div>
-			) : null}
+			)}
 
+			{/* States */}
 			{loadingData ? (
-				<div
-					style={{ textAlign: "center", padding: 40, color: palette.textMuted }}
-				>
-					<Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+				<div className="py-10 text-center [color:var(--text-muted)]">
+					<Loader2 className="mx-auto mb-2 h-6 w-6 animate-spin" />
 					Loading...
 				</div>
 			) : rows.length === 0 ? (
-				<div
-					style={{ textAlign: "center", padding: 40, color: palette.textMuted }}
-				>
+				<div className="py-10 text-center [color:var(--text-muted)]">
 					No data in this table
 				</div>
 			) : filteredRows.length === 0 ? (
-				<div
-					style={{ textAlign: "center", padding: 40, color: palette.textMuted }}
-				>
+				<div className="py-10 text-center [color:var(--text-muted)]">
 					No rows match "{search}"
 				</div>
 			) : (
-				<div
-					style={{
-						overflowX: "auto",
-						borderRadius: 8,
-						border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-					}}
-				>
-					<table style={{ width: "100%", borderCollapse: "collapse" }}>
+				<div className="overflow-x-auto rounded-lg border border-[color-mix(in_srgb,var(--primary)_10%,transparent)]">
+					<table className="w-full border-collapse">
 						<thead>
-							<tr style={{ background: hexToRgba(palette.primary, 0.08) }}>
+							<tr className="[background:color-mix(in_srgb,var(--primary)_8%,transparent)]">
 								{visibleKeys.map((key) => (
-									<th key={key} onClick={() => onSort(key)} style={thStyle}>
-										<span
-											style={{
-												display: "inline-flex",
-												alignItems: "center",
-												gap: 4,
-											}}
-										>
+									<th
+										key={key}
+										onClick={() => onSort(key)}
+										className={`${thClass} cursor-pointer`}
+									>
+										<span className="inline-flex items-center gap-1">
 											{key}
 											{sortCol === key ? (
 												sortDir === "asc" ? (
-													<ArrowUp className="w-3 h-3" />
+													<ArrowUp className="h-3 w-3" />
 												) : (
-													<ArrowDown className="w-3 h-3" />
+													<ArrowDown className="h-3 w-3" />
 												)
 											) : (
-												<ArrowUpDown className="w-3 h-3 opacity-30" />
+												<ArrowUpDown className="h-3 w-3 opacity-30" />
 											)}
 										</span>
 									</th>
@@ -222,33 +153,28 @@ export function DatabaseBrowserDataPanel({
 							{filteredRows.map((row, rowIndex) => (
 								<tr
 									key={`row-${rowIndex}`}
-									style={{
-										borderBottom: `1px solid ${hexToRgba(palette.primary, 0.04)}`,
-									}}
+									className="border-b border-[color-mix(in_srgb,var(--primary)_4%,transparent)]"
 								>
 									{visibleKeys.map((key) => {
 										const value = row[key];
 										return (
-											<td key={key} style={cellStyle}>
+											<td key={key} className={cellClass}>
 												{value === null ? (
-													<span
-														style={{
-															color: palette.textMuted,
-															fontStyle: "italic",
-														}}
-													>
+													<span className="italic [color:var(--text-muted)]">
 														null
 													</span>
 												) : typeof value === "boolean" ? (
 													<span
-														style={{
-															color: value ? "#22c55e" : palette.accent,
-														}}
+														className={
+															value
+																? "[color:var(--success)]"
+																: "[color:var(--danger)]"
+														}
 													>
 														{String(value)}
 													</span>
 												) : typeof value === "object" ? (
-													<span style={{ color: palette.textMuted }}>
+													<span className="[color:var(--text-muted)]">
 														{JSON.stringify(value)}
 													</span>
 												) : (
@@ -264,52 +190,34 @@ export function DatabaseBrowserDataPanel({
 				</div>
 			)}
 
-			{totalCount > pageSize ? (
+			{/* Pagination */}
+			{totalCount > pageSize && (
 				<div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-					<span style={{ fontSize: 12, color: palette.textMuted }}>
-						{page * pageSize + 1}--{Math.min((page + 1) * pageSize, totalCount)}{" "}
+					<span className="text-xs [color:var(--text-muted)]">
+						{page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)}{" "}
 						of {totalCount}
 					</span>
 					<div className="flex items-center gap-2">
 						<button
 							disabled={page === 0}
 							onClick={onPrevPage}
-							style={pageButtonStyle(palette, page === 0)}
+							className={pageBtnClass}
 						>
-							<ChevronLeft className="w-3.5 h-3.5" /> Prev
+							<ChevronLeft className="h-3.5 w-3.5" /> Prev
 						</button>
-						<span style={{ fontSize: 12, color: palette.textMuted }}>
+						<span className="text-xs [color:var(--text-muted)]">
 							Page {page + 1} / {totalPages}
 						</span>
 						<button
 							disabled={page >= totalPages - 1}
 							onClick={onNextPage}
-							style={pageButtonStyle(palette, page >= totalPages - 1)}
+							className={pageBtnClass}
 						>
-							Next <ChevronRight className="w-3.5 h-3.5" />
+							Next <ChevronRight className="h-3.5 w-3.5" />
 						</button>
 					</div>
 				</div>
-			) : null}
+			)}
 		</>
 	);
-}
-
-function pageButtonStyle(
-	palette: ColorScheme,
-	disabled: boolean,
-): CSSProperties {
-	return {
-		display: "flex",
-		alignItems: "center",
-		gap: 4,
-		padding: "4px 10px",
-		borderRadius: 6,
-		fontSize: 12,
-		cursor: "pointer",
-		background: hexToRgba(palette.primary, 0.12),
-		border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-		color: palette.text,
-		opacity: disabled ? 0.4 : 1,
-	};
 }

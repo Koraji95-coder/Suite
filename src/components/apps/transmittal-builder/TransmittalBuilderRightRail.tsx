@@ -5,10 +5,10 @@ import {
 	Loader2,
 	RefreshCcw,
 } from "lucide-react";
-import { Button } from "@/components/apps/ui/button";
-import { FrameSection } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/apps/ui/PageFrame";
 import { RadioGroup, RadioGroupItem } from "@/components/apps/ui/RadioGroup";
-import { Surface } from "@/components/apps/ui/Surface";
+import { Button } from "@/components/primitives/Button";
+import { Panel } from "@/components/primitives/Panel";
 import { cn } from "@/lib/utils";
 import {
 	bytesToSize,
@@ -19,7 +19,7 @@ import {
 	type OutputFormat,
 } from "./transmittalBuilderModels";
 
-const TransmittalSection = FrameSection;
+const TransmittalSection = Section;
 
 interface TransmittalBuilderRightRailProps {
 	outputFormat: OutputFormat;
@@ -67,9 +67,11 @@ export function TransmittalBuilderRightRail({
 						<div className="text-xs font-semibold [color:var(--text)]">
 							Output format
 						</div>
-						<RadioGroup<OutputFormat>
+						<RadioGroup
 							value={outputFormat}
-							onValueChange={onOutputFormatChange}
+							onValueChange={(value) =>
+								onOutputFormatChange(value as OutputFormat)
+							}
 							className="grid gap-2"
 						>
 							{OUTPUT_FORMATS.map((format) => {
@@ -92,7 +94,7 @@ export function TransmittalBuilderRightRail({
 											<div className="text-sm font-semibold [color:var(--text)]">
 												{format.label}
 											</div>
-											<div className="text-xs text-muted-foreground">
+											<div className="text-xs text-text-muted">
 												{format.description}
 											</div>
 										</div>
@@ -106,12 +108,14 @@ export function TransmittalBuilderRightRail({
 						type="button"
 						onClick={onGenerate}
 						disabled={generationState.state === "loading"}
+						iconLeft={
+							generationState.state === "loading" ? (
+								<Loader2 size={16} className="animate-spin" />
+							) : (
+								<Download size={16} />
+							)
+						}
 					>
-						{generationState.state === "loading" ? (
-							<Loader2 size={16} className="animate-spin" />
-						) : (
-							<Download size={16} />
-						)}
 						Generate documents
 					</Button>
 
@@ -122,7 +126,7 @@ export function TransmittalBuilderRightRail({
 			</TransmittalSection>
 
 			<TransmittalSection title="Output">
-				<div className="grid gap-3 px-2 text-xs text-muted-foreground sm:px-3">
+				<div className="grid gap-3 px-2 text-xs text-text-muted sm:px-3">
 					<div className="flex items-center gap-2">
 						{generationState.state === "success" ? (
 							<CheckCircle2 size={14} />
@@ -140,7 +144,7 @@ export function TransmittalBuilderRightRail({
 					) : (
 						<div className="grid gap-2">
 							{outputs.map((output) => (
-								<Surface key={output.id} className="p-4">
+								<Panel key={output.id} variant="inset" padding="md">
 									<div className="grid gap-1 text-xs">
 										<div className="font-semibold [color:var(--text)]">
 											{output.label}
@@ -163,7 +167,7 @@ export function TransmittalBuilderRightRail({
 											Download again
 										</Button>
 									</div>
-								</Surface>
+								</Panel>
 							))}
 						</div>
 					)}
@@ -171,63 +175,57 @@ export function TransmittalBuilderRightRail({
 			</TransmittalSection>
 
 			<TransmittalSection title="Summary">
-				<Surface className="space-y-3 p-5 text-xs">
+				<Panel variant="inset" padding="lg" className="space-y-3 text-xs">
 					<div>
-						<div className="text-muted-foreground">Project</div>
+						<div className="text-text-muted">Project</div>
 						<div className="text-sm font-semibold [color:var(--text)]">
 							{draft.projectName || "Untitled project"}
 						</div>
-						<div className="text-muted-foreground">
+						<div className="text-text-muted">
 							{draft.projectNumber || "R3P-"} ·{" "}
 							{draft.transmittalNumber || "XMTL-"} · {draft.date || "--"}
 						</div>
 					</div>
 
 					<div>
-						<div className="text-muted-foreground">From</div>
-						<div className="[color:var(--text)]">
-							{draft.fromName || "—"}
-						</div>
-						<div className="text-muted-foreground">
-							{draft.fromTitle || "—"}
-						</div>
+						<div className="text-text-muted">From</div>
+						<div className="[color:var(--text)]">{draft.fromName || "—"}</div>
+						<div className="text-text-muted">{draft.fromTitle || "—"}</div>
 					</div>
 
 					<div>
-						<div className="text-muted-foreground">Contacts</div>
+						<div className="text-text-muted">Contacts</div>
 						<div className="[color:var(--text)]">
 							{completeContactsCount} complete
 						</div>
 					</div>
 
 					<div>
-						<div className="text-muted-foreground">Files</div>
+						<div className="text-text-muted">Files</div>
 						<div className="[color:var(--text)]">
 							Template: {fileSummary.template}
 						</div>
-						<div className="text-muted-foreground">
+						<div className="text-text-muted">
 							Index: {fileSummary.index} · {fileSummary.documents}
 						</div>
 					</div>
 
 					<div>
-						<div className="text-muted-foreground">Options</div>
+						<div className="text-text-muted">Options</div>
 						<div className="grid gap-1">
 							{optionSummary.map((group) => (
 								<div key={group.label}>
-									<span className="[color:var(--text)]">
-										{group.label}:
-									</span>{" "}
-									<span className="text-muted-foreground">{group.value}</span>
+									<span className="[color:var(--text)]">{group.label}:</span>{" "}
+									<span className="text-text-muted">{group.value}</span>
 								</div>
 							))}
 						</div>
 					</div>
-				</Surface>
+				</Panel>
 			</TransmittalSection>
 
 			<TransmittalSection title="Validation">
-				<div className="grid gap-2 px-2 text-xs text-muted-foreground sm:px-3">
+				<div className="grid gap-2 px-2 text-xs text-text-muted sm:px-3">
 					<div>Draft saved: {lastSavedAt?.toLocaleTimeString() || "-"}</div>
 					{submitAttempted && validationErrors.length > 0 ? (
 						<div className="grid gap-1 [color:var(--danger)]">

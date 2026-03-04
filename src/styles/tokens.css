@@ -1,0 +1,24 @@
+:root {
+	--space-1: 0.25rem;
+	--space-2: 0.5rem;
+	--space-3: 0.75rem;
+	--space-4: 1rem;
+	--space-5: 1.5rem;
+	--space-6: 2rem;
+	--space-8: 3rem;
+	--space-10: 4rem;
+
+	--radius-1: 8px;
+	--radius-2: 12px;
+	--radius-3: 16px;
+	--radius-4: 24px;
+
+	--container-max: 1100px;
+	--container-wide: 1700px;
+	--gutter: clamp(1rem, 3vw, 2rem);
+
+	--panel-soft: color-mix(in srgb, var(--surface) 92%, transparent);
+	--panel-strong: color-mix(in srgb, var(--surface-2) 84%, transparent);
+	--line-soft: color-mix(in srgb, var(--border) 85%, transparent);
+	--line-accent: color-mix(in srgb, var(--primary) 34%, transparent);
+}

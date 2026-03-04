@@ -1,0 +1,185 @@
+.loading,
+.empty {
+	text-align: center;
+	color: var(--text-muted);
+	padding: var(--space-10) var(--space-4);
+}
+
+.emptyIcon {
+	width: 4rem;
+	height: 4rem;
+	margin-inline: auto;
+	margin-bottom: var(--space-3);
+	color: color-mix(in srgb, var(--success) 60%, transparent);
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+	gap: var(--space-4);
+}
+
+.card {
+	border-radius: var(--radius-2);
+	border: 1px solid transparent;
+	overflow: hidden;
+	cursor: pointer;
+	transition:
+		transform 120ms ease,
+		border-color 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.card:hover {
+	transform: translateY(-2px);
+	box-shadow: var(--shadow-md);
+}
+
+.statusPass {
+	background: linear-gradient(
+		145deg,
+		color-mix(in srgb, var(--success) 14%, var(--surface)),
+		color-mix(in srgb, var(--success) 6%, var(--surface-2))
+	);
+	border-color: color-mix(in srgb, var(--success) 36%, var(--border));
+}
+
+.statusFail {
+	background: linear-gradient(
+		145deg,
+		color-mix(in srgb, var(--danger) 14%, var(--surface)),
+		color-mix(in srgb, var(--danger) 6%, var(--surface-2))
+	);
+	border-color: color-mix(in srgb, var(--danger) 36%, var(--border));
+}
+
+.statusWarning {
+	background: linear-gradient(
+		145deg,
+		color-mix(in srgb, var(--warning) 16%, var(--surface)),
+		color-mix(in srgb, var(--warning) 7%, var(--surface-2))
+	);
+	border-color: color-mix(in srgb, var(--warning) 36%, var(--border));
+}
+
+.statusPending {
+	background: linear-gradient(
+		145deg,
+		color-mix(in srgb, var(--text-muted) 12%, var(--surface)),
+		color-mix(in srgb, var(--text-muted) 6%, var(--surface-2))
+	);
+	border-color: color-mix(in srgb, var(--text-muted) 30%, var(--border));
+}
+
+.cardBody {
+	padding: var(--space-4);
+}
+
+.cardHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	margin-bottom: var(--space-3);
+}
+
+.cardTitleRow {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.cardTitle {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.meta {
+	display: grid;
+	gap: 0.45rem;
+	font-size: 0.84rem;
+}
+
+.metaRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	color: var(--text-muted);
+}
+
+.metaValue {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.statusLabel {
+	text-transform: capitalize;
+	font-weight: 700;
+}
+
+.statusPassText {
+	color: var(--success);
+}
+
+.statusFailText {
+	color: var(--danger);
+}
+
+.statusWarningText {
+	color: var(--warning);
+}
+
+.statusPendingText {
+	color: var(--text-muted);
+}
+
+.actions {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: var(--space-4);
+}
+
+.detailsButton,
+.deleteButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	border-radius: var(--radius-2);
+	border: 1px solid transparent;
+	padding: 0.5rem 0.72rem;
+	font-size: 0.8rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.detailsButton {
+	flex: 1;
+	background: color-mix(in srgb, var(--success) 18%, var(--surface));
+	border-color: color-mix(in srgb, var(--success) 38%, var(--border));
+	color: var(--text);
+}
+
+.detailsButton:hover {
+	background: color-mix(in srgb, var(--success) 26%, var(--surface));
+}
+
+.deleteButton {
+	background: color-mix(in srgb, var(--danger) 16%, var(--surface));
+	border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+	color: var(--danger);
+}
+
+.deleteButton:hover {
+	background: color-mix(in srgb, var(--danger) 24%, var(--surface));
+}
+
+.iconSm {
+	width: 1rem;
+	height: 1rem;
+}

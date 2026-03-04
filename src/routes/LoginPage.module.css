@@ -1,0 +1,250 @@
+.pageRoot {
+	transition:
+		opacity 500ms ease,
+		transform 500ms ease;
+}
+
+.visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.hidden {
+	opacity: 0;
+	transform: translateY(1rem);
+}
+
+.agentShowcase {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding-block: 2rem;
+	transition:
+		opacity 700ms ease 300ms,
+		transform 700ms ease 300ms;
+}
+
+.mainAgentWrap {
+	position: relative;
+	margin-bottom: 1.5rem;
+}
+
+.agentGlow {
+	position: absolute;
+	inset: 0;
+	opacity: 0.2;
+	filter: blur(2rem);
+	border-radius: 999px;
+	background: var(--primary);
+	animation: pulse 2.2s ease-in-out infinite;
+}
+
+.mainAgentInner {
+	position: relative;
+	animation: floatY 4s ease-in-out infinite;
+}
+
+.secondaryAgent {
+	padding: 0.38rem;
+	border: 1px solid var(--line-soft);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--surface) 60%, transparent);
+	transition:
+		transform 300ms ease,
+		border-color 300ms ease;
+	animation: fadeInScale 400ms ease-out forwards;
+	opacity: 0;
+}
+
+.secondaryAgent:hover {
+	transform: scale(1.1);
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.headerCenter {
+	text-align: center;
+}
+
+.statusBadge {
+	margin-bottom: 1rem;
+	display: inline-flex;
+}
+
+.statusDot {
+	width: 0.38rem;
+	height: 0.38rem;
+	border-radius: 999px;
+}
+
+.dotPrimary {
+	background: var(--primary);
+}
+
+.dotSuccess {
+	background: var(--success);
+}
+
+.dotPulse {
+	animation: pulse 2.2s ease-in-out infinite;
+}
+
+.headerCopy {
+	margin-top: 0.5rem;
+	line-height: 1.6;
+}
+
+.progressLabel {
+	text-align: center;
+}
+
+.loadingTrack {
+	height: 0.5rem;
+	width: 100%;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--surface-2);
+}
+
+.loadingFill {
+	height: 100%;
+	width: 35%;
+	border-radius: 999px;
+	background: var(--primary);
+	animation: loadingSlide 1.2s ease-in-out infinite;
+}
+
+.emailPreview {
+	text-align: center;
+}
+
+.footerLinks {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.primaryLink {
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--primary);
+	text-underline-offset: 2px;
+}
+
+.primaryLink:hover {
+	text-decoration: underline;
+}
+
+.mutedLink {
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	text-underline-offset: 2px;
+}
+
+.mutedLink:hover {
+	color: var(--text);
+	text-decoration: underline;
+}
+
+.formContents {
+	display: contents;
+}
+
+.divider {
+	position: relative;
+}
+
+.dividerLineWrap {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+}
+
+.dividerLine {
+	width: 100%;
+	border-top: 1px solid var(--line-soft);
+}
+
+.dividerLabelWrap {
+	position: relative;
+	display: flex;
+	justify-content: center;
+}
+
+.dividerLabel {
+	padding-inline: 0.75rem;
+	background: var(--bg);
+}
+
+.errorPanel {
+	border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+	background: color-mix(in srgb, var(--danger) 5%, transparent);
+	animation: shake 400ms ease-out;
+}
+
+.passkeyTag {
+	margin-bottom: 1rem;
+	display: inline-flex;
+}
+
+@keyframes floatY {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-0.4rem);
+	}
+}
+
+@keyframes fadeInScale {
+	from {
+		opacity: 0;
+		transform: scale(0.92);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes loadingSlide {
+	0% {
+		transform: translateX(-100%);
+	}
+	50% {
+		transform: translateX(200%);
+	}
+	100% {
+		transform: translateX(-100%);
+	}
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 0.2;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+
+@keyframes shake {
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+	20%,
+	60% {
+		transform: translateX(-4px);
+	}
+	40%,
+	80% {
+		transform: translateX(4px);
+	}
+}

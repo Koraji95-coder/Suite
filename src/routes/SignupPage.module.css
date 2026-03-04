@@ -1,0 +1,65 @@
+.badge {
+	margin-bottom: 1rem;
+}
+
+.badgeDot {
+	width: 0.38rem;
+	height: 0.38rem;
+	border-radius: 999px;
+}
+
+.badgeDotPrimary {
+	background: var(--primary);
+}
+
+.badgeDotSuccess {
+	background: var(--success);
+}
+
+.blockLink {
+	display: block;
+}
+
+.headerCopy {
+	margin-top: 0.5rem;
+	line-height: 1.55;
+}
+
+.formContents {
+	display: contents;
+}
+
+.errorPanel {
+	border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+	background: color-mix(in srgb, var(--danger) 5%, transparent);
+}
+
+.footerLinks {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.primaryLink {
+	font-weight: 500;
+	color: var(--primary);
+	text-underline-offset: 2px;
+}
+
+.primaryLink:hover {
+	text-decoration: underline;
+}
+
+.mutedLink {
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	text-underline-offset: 2px;
+}
+
+.mutedLink:hover {
+	color: var(--text);
+	text-decoration: underline;
+}

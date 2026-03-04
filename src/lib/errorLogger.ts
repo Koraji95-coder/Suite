@@ -81,7 +81,7 @@ class ErrorLogger {
 			.catch(() => {
 				// If the dev server log endpoint is unavailable, drop silently.
 				this.endpointUnavailable = true;
-		});
+			});
 	}
 
 	log(

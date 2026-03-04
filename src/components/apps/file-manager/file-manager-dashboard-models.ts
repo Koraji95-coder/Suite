@@ -153,17 +153,17 @@ export const fileTypeLegendItems: FileManagerLegendItem[] = [
 	{
 		label: "Documents",
 		colorClassName:
-			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--accent)_70%,var(--surface))]",
+			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_70%,var(--surface))]",
 	},
 	{
 		label: "Image",
 		colorClassName:
-			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_70%,var(--surface))]",
+			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_50%,var(--surface))]",
 	},
 	{
 		label: "Video",
 		colorClassName:
-			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_40%,var(--surface))]",
+			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_30%,var(--surface))]",
 	},
 	{
 		label: "Audio",

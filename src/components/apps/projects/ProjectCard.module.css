@@ -1,0 +1,165 @@
+.root {
+	padding: 0.82rem 0.9rem;
+	border-radius: var(--radius-3);
+	border: 1px solid var(--line-soft);
+	background: var(--surface);
+	cursor: pointer;
+	transition:
+		transform 120ms ease,
+		border-color 120ms ease,
+		box-shadow 120ms ease,
+		background 120ms ease;
+}
+
+.root:hover {
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.selected {
+	background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+	border-color: var(--primary);
+	box-shadow: var(--shadow-md);
+}
+
+.header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.4rem;
+	margin-bottom: 0.45rem;
+}
+
+.identity {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	min-width: 0;
+}
+
+.categoryDot {
+	width: 0.7rem;
+	height: 0.7rem;
+	border-radius: 999px;
+	flex-shrink: 0;
+}
+
+.title {
+	margin: 0;
+	font-size: 0.87rem;
+	font-weight: 700;
+	line-height: 1.32;
+	color: var(--text);
+}
+
+.actions {
+	display: inline-flex;
+	gap: 0.2rem;
+}
+
+.iconButton {
+	border: 0;
+	background: transparent;
+	border-radius: 0.45rem;
+	padding: 0.2rem;
+	cursor: pointer;
+}
+
+.iconButton:hover {
+	background: var(--surface-2);
+}
+
+.editIcon {
+	width: 0.9rem;
+	height: 0.9rem;
+	color: var(--primary);
+}
+
+.deleteIcon {
+	width: 0.9rem;
+	height: 0.9rem;
+	color: var(--danger);
+}
+
+.statusRow {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.statusText {
+	font-size: 0.72rem;
+	text-transform: capitalize;
+	color: var(--text-muted);
+}
+
+.priorityChip {
+	font-size: 0.68rem;
+	padding: 0.16rem 0.45rem;
+	border-radius: var(--radius-1);
+	border: 1px solid transparent;
+	text-transform: capitalize;
+}
+
+.dueText {
+	margin-top: 0.4rem;
+	font-size: 0.72rem;
+	color: var(--primary);
+}
+
+.progressRow {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	width: 100%;
+	margin-top: 0.55rem;
+}
+
+.progressTrack {
+	flex: 1;
+	height: 0.36rem;
+	border-radius: 999px;
+	background: var(--surface-2);
+	overflow: hidden;
+}
+
+.progressFill {
+	height: 100%;
+	background: linear-gradient(90deg, var(--primary), var(--accent));
+	transition: width 500ms ease;
+}
+
+.progressMeta {
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+	font-weight: 600;
+}
+
+.alert {
+	margin-top: 0.34rem;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	font-size: 0.7rem;
+}
+
+.alertIcon {
+	width: 0.75rem;
+	height: 0.75rem;
+}
+
+.alertDanger {
+	color: var(--danger);
+}
+
+.alertWarning {
+	color: var(--warning);
+}
+
+.alertText {
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

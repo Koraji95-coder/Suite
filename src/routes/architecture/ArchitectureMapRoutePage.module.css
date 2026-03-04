@@ -1,0 +1,252 @@
+.root {
+	display: grid;
+	gap: 2rem;
+}
+
+.domainsGrid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.domainCard {
+	border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+	border-radius: var(--radius-3);
+	padding: 0.8rem;
+	background: color-mix(in srgb, var(--surface-2) 30%, transparent);
+}
+
+.title {
+	margin: 0;
+	font-size: 0.88rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.mutedText {
+	margin-top: 0.25rem;
+	font-size: 0.74rem;
+	color: var(--text-muted);
+}
+
+.smallText {
+	margin-top: 0.4rem;
+	font-size: 0.76rem;
+	color: var(--text);
+}
+
+.chipRow {
+	margin-top: 0.5rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.38rem;
+}
+
+.chip {
+	border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
+	border-radius: 0.48rem;
+	padding: 0.18rem 0.42rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 11px;
+	color: var(--text-muted);
+	background: color-mix(in srgb, var(--surface) 62%, transparent);
+}
+
+.modulesStack {
+	display: grid;
+	gap: 1rem;
+}
+
+.moduleGroupCard {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 0.8rem;
+}
+
+.moduleGrid {
+	margin-top: 0.5rem;
+	display: grid;
+	gap: 0.5rem;
+}
+
+.moduleCard {
+	border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
+	border-radius: var(--radius-2);
+	padding: 0.65rem;
+	background: color-mix(in srgb, var(--surface-2) 26%, transparent);
+}
+
+.moduleName {
+	margin: 0;
+	font-size: 0.76rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.modulePath {
+	margin-top: 0.25rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 11px;
+	color: var(--text-muted);
+}
+
+.moduleSummary {
+	margin-top: 0.42rem;
+	font-size: 0.73rem;
+	line-height: 1.35;
+	color: var(--text-muted);
+}
+
+.autoBadge {
+	margin-top: 0.45rem;
+	display: inline-flex;
+	border-radius: 0.35rem;
+	padding: 0.13rem 0.36rem;
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.flowList {
+	display: grid;
+	gap: 0.7rem;
+}
+
+.flowCard {
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+	border-radius: var(--radius-3);
+	padding: 0.72rem;
+	background: color-mix(in srgb, var(--surface) 52%, transparent);
+}
+
+.flowSteps {
+	margin-top: 0.45rem;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.36rem;
+}
+
+.flowStep {
+	display: contents;
+}
+
+.arrow {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+
+.snapshotCard {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 0.8rem;
+}
+
+.snapshotSubCard {
+	margin-top: 0.65rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 0.8rem;
+}
+
+.mono {
+	font-family: var(--font-mono, monospace);
+	color: var(--text-muted);
+}
+
+.statusYes {
+	color: var(--primary);
+}
+
+.statusNo {
+	color: var(--warning);
+}
+
+.hotspots {
+	margin-top: 0.5rem;
+	display: grid;
+	gap: 0.35rem;
+}
+
+.hotspotRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
+	border-radius: 0.5rem;
+	padding: 0.33rem 0.45rem;
+	background: color-mix(in srgb, var(--surface) 54%, transparent);
+}
+
+.hotspotPath {
+	font-family: var(--font-mono, monospace);
+	font-size: 11px;
+	color: var(--text-muted);
+}
+
+.hotspotLines {
+	font-size: 0.75rem;
+	color: var(--text);
+}
+
+.checkpoints {
+	display: grid;
+	gap: 0.65rem;
+}
+
+.checkpointCard {
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+	border-radius: var(--radius-3);
+	padding: 0.72rem;
+	background: color-mix(in srgb, var(--surface-2) 24%, transparent);
+}
+
+.checkpointHigh {
+	border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+}
+
+.checkpointBadge {
+	display: inline-flex;
+	border-radius: 0.4rem;
+	padding: 0.14rem 0.45rem;
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.badgeDefault {
+	color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.badgeHigh {
+	color: var(--warning);
+	background: color-mix(in srgb, var(--warning) 20%, transparent);
+}
+
+.checkpointHeader {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+@media (min-width: 40rem) {
+	.domainsGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.moduleGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 78rem) {
+	.domainsGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}

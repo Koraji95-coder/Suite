@@ -1,0 +1,29 @@
+.toolsRow {
+	margin-bottom: 1rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.toolButton {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	padding: 0.5rem 0.75rem;
+	font-size: 0.85rem;
+	color: var(--text-muted);
+	background: var(--surface);
+	transition:
+		background 160ms ease,
+		border-color 160ms ease,
+		color 160ms ease;
+}
+
+.toolButton:hover {
+	background: var(--surface-2);
+}
+
+.toolButtonActive {
+	border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
+	color: var(--text);
+	background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+}

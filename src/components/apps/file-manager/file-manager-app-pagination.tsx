@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import { useId } from "react";
 
-import { Label } from "@/components/apps/ui/label";
 import {
 	Pagination,
 	PaginationContent,
@@ -20,6 +19,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/apps/ui/select";
+import { Label } from "@/components/primitives/Text";
 
 type PaginationProps = {
 	currentPage?: number;

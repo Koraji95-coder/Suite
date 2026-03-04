@@ -14,13 +14,13 @@ import {
 	type Issue,
 	mapDrawingRow,
 	type QARule,
-} from "./qaqcModels";
+} from "./standardsDrawingModels";
 
 const DEFAULT_UPLOAD_FORM = {
 	name: "",
 };
 
-export function useQAQCCheckerState() {
+export function useStandardsDrawingCheckerState() {
 	const { showToast } = useToast();
 	const [drawings, setDrawings] = useState<DrawingAnnotation[]>([]);
 	const [rules, setRules] = useState<QARule[]>([]);
@@ -128,9 +128,9 @@ export function useQAQCCheckerState() {
 
 						if (!error && data) {
 							setDrawings((prev) => [mapDrawingRow(data), ...prev]);
-							showToast("success", "QA/QC check completed.");
+							showToast("success", "Standards check completed.");
 						} else {
-							showToast("error", "Failed to save QA/QC check.");
+							showToast("error", "Failed to save standards check.");
 						}
 					} finally {
 						setCheckingDrawing(false);

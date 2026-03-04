@@ -1,37 +1,38 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
 import {
-	ChevronDown,
-	ChevronRight,
 	ArrowLeft,
 	CheckCircle2,
+	ChevronDown,
+	ChevronRight,
 	Circle,
 	Clock,
 	Compass,
 } from "lucide-react";
-
+import { type ReactNode, useState } from "react";
+import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { APP_NAME } from "../appMeta";
 import {
 	CATEGORY_META,
-	ROADMAP_QUARTERS,
-	STATUS_META,
 	type MilestoneCategory,
 	type MilestoneStatus,
 	type Quarter,
+	ROADMAP_QUARTERS,
+	STATUS_META,
 } from "../data/roadmapData";
+import styles from "./RoadmapPage.module.css";
 
-const STATUS_ICONS: Record<MilestoneStatus, React.ReactNode> = {
-	completed: <CheckCircle2 className="h-4 w-4" />,
-	"in-progress": <Clock className="h-4 w-4" />,
-	planned: <Circle className="h-4 w-4" />,
-	future: <Compass className="h-4 w-4" />,
+const STATUS_ICONS: Record<MilestoneStatus, ReactNode> = {
+	completed: <CheckCircle2 className={styles.statusIcon} />,
+	"in-progress": <Clock className={styles.statusIcon} />,
+	planned: <Circle className={styles.statusIcon} />,
+	future: <Compass className={styles.statusIcon} />,
 };
 
 function StatusBadge({ status }: { status: MilestoneStatus }) {
 	const meta = STATUS_META[status];
 	return (
 		<span
-			className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium"
+			className={styles.statusBadge}
 			style={{ color: meta.color, background: meta.bg }}
 		>
 			{STATUS_ICONS[status]}
@@ -42,9 +43,7 @@ function StatusBadge({ status }: { status: MilestoneStatus }) {
 
 function CategoryTag({ category }: { category: MilestoneCategory }) {
 	return (
-		<span className="rounded-md px-2 py-0.5 text-[11px] font-medium [background:var(--surface-2)] [color:var(--text-muted)]">
-			{CATEGORY_META[category].label}
-		</span>
+		<span className={styles.categoryTag}>{CATEGORY_META[category].label}</span>
 	);
 }
 
@@ -61,10 +60,10 @@ function QuarterProgress({ quarter }: { quarter: Quarter }) {
 		total > 0 ? Math.round(((completed + inProgress * 0.5) / total) * 100) : 0;
 
 	return (
-		<div className="flex items-center gap-3">
-			<div className="h-1.5 flex-1 overflow-hidden rounded-full [background:var(--surface-2)]">
+		<div className={styles.progressRow}>
+			<div className={styles.progressTrack}>
 				<div
-					className="h-full rounded-full transition-all duration-500"
+					className={styles.progressFill}
 					style={{
 						width: `${activePct}%`,
 						background:
@@ -76,7 +75,7 @@ function QuarterProgress({ quarter }: { quarter: Quarter }) {
 					}}
 				/>
 			</div>
-			<span className="text-xs tabular-nums [color:var(--text-muted)]">
+			<span className={styles.progressCount}>
 				{completed}/{total}
 			</span>
 		</div>
@@ -87,15 +86,13 @@ function QuarterSection({ quarter }: { quarter: Quarter }) {
 	const allCompleted = quarter.milestones.every(
 		(m) => m.status === "completed",
 	);
-	const hasActive = quarter.milestones.some(
-		(m) => m.status === "in-progress",
-	);
+	const hasActive = quarter.milestones.some((m) => m.status === "in-progress");
 	const [open, setOpen] = useState(hasActive || !allCompleted);
 
 	return (
-		<div className="relative">
+		<div className={styles.quarterRoot}>
 			<div
-				className="absolute top-0 left-5 h-full w-px md:left-6"
+				className={styles.timelineLine}
 				style={{
 					background: allCompleted
 						? "var(--success)"
@@ -105,68 +102,57 @@ function QuarterSection({ quarter }: { quarter: Quarter }) {
 				}}
 			/>
 
-			<div className="relative pl-12 md:pl-14">
+			<div className={styles.quarterInner}>
 				<div
-					className="absolute top-3 left-3 z-10 flex h-4 w-4 items-center justify-center rounded-full md:left-4 md:h-4 md:w-4"
+					className={styles.quarterMarker}
 					style={{
 						background: allCompleted
 							? "var(--success)"
 							: hasActive
 								? "var(--primary)"
 								: "var(--surface-2)",
-						boxShadow: `0 0 0 3px var(--bg-base)`,
+						boxShadow: "0 0 0 3px var(--bg-base)",
 					}}
 				/>
 
 				<button
 					type="button"
 					onClick={() => setOpen((p) => !p)}
-					className="flex w-full items-start gap-3 rounded-xl border p-4 text-left transition hover:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--bg-mid)] md:p-5"
+					className={styles.quarterCard}
 				>
-					<div className="min-w-0 flex-1">
-						<div className="flex flex-wrap items-center gap-2">
-							<span className="text-lg font-semibold tracking-tight md:text-xl">
-								{quarter.label}
-							</span>
-							<span className="rounded-full px-2.5 py-0.5 text-xs font-medium [background:var(--surface-2)] [color:var(--primary)]">
-								{quarter.theme}
-							</span>
+					<div className={styles.quarterContent}>
+						<div className={styles.quarterHead}>
+							<span className={styles.quarterTitle}>{quarter.label}</span>
+							<span className={styles.quarterTheme}>{quarter.theme}</span>
 						</div>
-						<p className="mt-1 text-xs [color:var(--text-muted)]">
-							{quarter.period}
-						</p>
-						<p className="mt-2 text-sm leading-relaxed [color:var(--text-muted)]">
-							{quarter.summary}
-						</p>
-						<div className="mt-3">
+						<p className={styles.quarterPeriod}>{quarter.period}</p>
+						<p className={styles.quarterSummary}>{quarter.summary}</p>
+						<div className={styles.quarterProgress}>
 							<QuarterProgress quarter={quarter} />
 						</div>
 					</div>
-					<div className="mt-1 shrink-0 [color:var(--text-muted)]">
+					<div className={styles.chevronWrap}>
 						{open ? (
-							<ChevronDown className="h-5 w-5" />
+							<ChevronDown className={styles.chevronIcon} />
 						) : (
-							<ChevronRight className="h-5 w-5" />
+							<ChevronRight className={styles.chevronIcon} />
 						)}
 					</div>
 				</button>
 
 				{open && (
-					<div className="mt-2 grid gap-2 pb-8">
+					<div className={styles.milestonesList}>
 						{quarter.milestones.map((milestone) => (
-							<div
-								key={milestone.title}
-								className="rounded-xl border p-4 transition [border-color:var(--border)] [background:var(--surface)]"
-							>
-								<div className="flex flex-wrap items-start justify-between gap-2">
-									<div className="min-w-0 flex-1">
-										<div className="flex flex-wrap items-center gap-2">
-											<h4 className="text-sm font-semibold">
+							<div key={milestone.title} className={styles.milestoneCard}>
+								<div className={styles.milestoneHead}>
+									<div className={styles.milestoneContent}>
+										<div className={styles.milestoneTitleRow}>
+											<h4 className={styles.milestoneTitle}>
 												{milestone.title}
 											</h4>
 											<CategoryTag category={milestone.category} />
 										</div>
-										<p className="mt-1.5 text-xs leading-relaxed [color:var(--text-muted)]">
+										<p className={styles.milestoneDescription}>
 											{milestone.description}
 										</p>
 									</div>
@@ -177,7 +163,7 @@ function QuarterSection({ quarter }: { quarter: Quarter }) {
 					</div>
 				)}
 
-				{!open && <div className="h-6" />}
+				{!open && <div className={styles.collapsedSpacer} />}
 			</div>
 		</div>
 	);
@@ -197,40 +183,30 @@ function StatsBar() {
 	}
 
 	return (
-		<div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+		<div className={styles.statsGrid}>
 			{(Object.keys(counts) as MilestoneStatus[]).map((status) => {
 				const meta = STATUS_META[status];
 				return (
-					<div
-						key={status}
-						className="rounded-xl border p-3 [border-color:var(--border)] [background:var(--surface)]"
-					>
-						<div
-							className="text-2xl font-bold tabular-nums"
-							style={{ color: meta.color }}
-						>
+					<div key={status} className={styles.statCard}>
+						<div className={styles.statValue} style={{ color: meta.color }}>
 							{counts[status]}
 						</div>
-						<div className="mt-0.5 text-xs [color:var(--text-muted)]">
-							{meta.label}
-						</div>
+						<div className={styles.statLabel}>{meta.label}</div>
 					</div>
 				);
 			})}
-			<div className="col-span-2 flex items-center justify-between rounded-xl border p-3 md:col-span-4 [border-color:var(--border)] [background:var(--surface)]">
-				<span className="text-sm font-medium [color:var(--text-muted)]">
-					Overall progress
-				</span>
-				<div className="flex items-center gap-3">
-					<div className="h-2 w-32 overflow-hidden rounded-full [background:var(--surface-2)]">
+			<div className={styles.overallCard}>
+				<span className={styles.overallLabel}>Overall progress</span>
+				<div className={styles.overallMetric}>
+					<div className={styles.overallTrack}>
 						<div
-							className="h-full rounded-full [background:var(--success)]"
+							className={styles.overallFill}
 							style={{
 								width: `${Math.round((counts.completed / total) * 100)}%`,
 							}}
 						/>
 					</div>
-					<span className="text-sm font-semibold tabular-nums">
+					<span className={styles.overallValue}>
 						{Math.round((counts.completed / total) * 100)}%
 					</span>
 				</div>
@@ -241,42 +217,40 @@ function StatsBar() {
 
 export default function RoadmapPage() {
 	return (
-		<div className="min-h-screen [background:var(--bg-base)] [color:var(--text)]">
-			<div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 md:px-8 md:py-10">
-				<header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3 [border-color:var(--border)] [background:var(--bg-mid)] md:p-4">
-					<div className="inline-flex items-center gap-2">
-						<Link
-							to="/"
-							className="inline-flex items-center gap-2 text-sm font-semibold no-underline [color:var(--text)]"
-						>
-							<div className="grid h-6 w-6 grid-cols-2 gap-0.5 rounded-md p-0.5 [background:var(--surface-2)]">
-								<span className="rounded-sm [background:var(--primary)]" />
-								<span className="rounded-sm [background:var(--accent)]" />
-								<span className="rounded-sm [background:var(--text)]" />
-								<span className="rounded-sm [background:var(--primary)]" />
+		<div className={styles.pageRoot}>
+			<div className={styles.pageContainer}>
+				<header className={styles.topHeader}>
+					<div className={styles.brandWrap}>
+						<Link to="/" className={styles.brandLink}>
+							<div className={styles.brandMark}>
+								<span
+									className={cn(styles.brandCell, styles.brandCellPrimary)}
+								/>
+								<span
+									className={cn(styles.brandCell, styles.brandCellAccent)}
+								/>
+								<span className={cn(styles.brandCell, styles.brandCellText)} />
+								<span
+									className={cn(styles.brandCell, styles.brandCellPrimary)}
+								/>
 							</div>
 							{APP_NAME} Workspace
 						</Link>
 					</div>
 
-					<Link
-						to="/"
-						className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium no-underline transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-					>
-						<ArrowLeft className="h-3.5 w-3.5" />
+					<Link to="/" className={styles.homeLink}>
+						<ArrowLeft className={styles.homeIcon} />
 						Home
 					</Link>
 				</header>
 
-				<section className="rounded-2xl border p-6 [border-color:var(--border)] [background:var(--bg-mid)] md:p-8">
-					<div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium [background:var(--surface-2)] [color:var(--text-muted)]">
-						<span className="h-1.5 w-1.5 rounded-full [background:var(--primary)]" />
+				<section className={styles.heroSection}>
+					<div className={styles.heroBadge}>
+						<span className={styles.heroBadgeDot} />
 						Product Roadmap
 					</div>
-					<h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-4xl">
-						Where Suite is headed
-					</h1>
-					<p className="mt-3 max-w-2xl text-sm leading-relaxed md:text-base [color:var(--text-muted)]">
+					<h1 className={styles.heroTitle}>Where Suite is headed</h1>
+					<p className={styles.heroCopy}>
 						A quarter-by-quarter view of what we have shipped, what we are
 						building now, and what is coming next. This roadmap covers Q1 2026
 						through Q4 2027.
@@ -285,11 +259,9 @@ export default function RoadmapPage() {
 
 				<StatsBar />
 
-				<section className="rounded-2xl border p-4 [border-color:var(--border)] [background:var(--bg-mid)] md:p-6">
-					<div className="flex flex-wrap items-center gap-3 pb-4">
-						<span className="text-xs font-medium [color:var(--text-muted)]">
-							Legend:
-						</span>
+				<section className={styles.timelinePanel}>
+					<div className={styles.legendRow}>
+						<span className={styles.legendLabel}>Legend:</span>
 						{(Object.keys(STATUS_META) as MilestoneStatus[]).map((s) => (
 							<StatusBadge key={s} status={s} />
 						))}
@@ -302,7 +274,7 @@ export default function RoadmapPage() {
 					</div>
 				</section>
 
-				<footer className="rounded-2xl border p-4 text-center text-xs [border-color:var(--border)] [background:var(--bg-mid)] [color:var(--text-muted)]">
+				<footer className={styles.footer}>
 					Last updated: March 2026. Roadmap items and timelines are subject to
 					change based on feedback and priorities.
 				</footer>

@@ -1,65 +1,31 @@
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
-
 interface BackupManagerStatusBannersProps {
-	palette: ColorScheme;
 	status: "idle" | "running" | "done" | "error";
 	restoreMsg: string | null;
 }
 
 export function BackupManagerStatusBanners({
-	palette,
 	status,
 	restoreMsg,
 }: BackupManagerStatusBannersProps) {
 	return (
 		<>
-			{status === "done" ? (
-				<div
-					style={{
-						marginBottom: 12,
-						padding: "8px 14px",
-						borderRadius: 8,
-						fontSize: 13,
-						background: hexToRgba("#22c55e", 0.12),
-						border: `1px solid ${hexToRgba("#22c55e", 0.3)}`,
-						color: "#4ade80",
-					}}
-				>
+			{status === "done" && (
+				<div className="mb-3 rounded-lg border px-3.5 py-2 text-[13px] border-[color-mix(in_srgb,var(--success)_30%,transparent)] [background:color-mix(in_srgb,var(--success)_12%,transparent)] [color:var(--success)]">
 					Backup saved successfully
 				</div>
-			) : null}
+			)}
 
-			{status === "error" ? (
-				<div
-					style={{
-						marginBottom: 12,
-						padding: "8px 14px",
-						borderRadius: 8,
-						fontSize: 13,
-						background: hexToRgba(palette.accent, 0.12),
-						border: `1px solid ${hexToRgba(palette.accent, 0.3)}`,
-						color: palette.accent,
-					}}
-				>
+			{status === "error" && (
+				<div className="mb-3 rounded-lg border px-3.5 py-2 text-[13px] border-[color-mix(in_srgb,var(--danger)_30%,transparent)] [background:color-mix(in_srgb,var(--danger)_12%,transparent)] [color:var(--danger)]">
 					Backup failed
 				</div>
-			) : null}
+			)}
 
-			{restoreMsg ? (
-				<div
-					style={{
-						marginBottom: 12,
-						padding: "8px 14px",
-						borderRadius: 8,
-						fontSize: 13,
-						background: hexToRgba(palette.secondary, 0.12),
-						border: `1px solid ${hexToRgba(palette.secondary, 0.3)}`,
-						color: palette.secondary,
-					}}
-				>
+			{restoreMsg && (
+				<div className="mb-3 rounded-lg border px-3.5 py-2 text-[13px] border-[color-mix(in_srgb,var(--secondary)_30%,transparent)] [background:color-mix(in_srgb,var(--secondary)_12%,transparent)] [color:var(--secondary)]">
 					{restoreMsg}
 				</div>
-			) : null}
+			)}
 		</>
 	);
 }

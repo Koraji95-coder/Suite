@@ -1,6 +1,7 @@
 import { AlertCircle, Edit, Trash2 } from "lucide-react";
-import { hexToRgba, useTheme } from "@/lib/palette";
-import { Project, TaskCount } from "./projectmanagertypes";
+import { cn } from "@/lib/utils";
+import styles from "./ProjectCard.module.css";
+import { type Project, type TaskCount } from "./projectmanagertypes";
 import {
 	categoryColor,
 	formatDateOnly,
@@ -25,7 +26,6 @@ export function ProjectCard({
 	onEdit,
 	onDelete,
 }: ProjectCardProps) {
-	const { palette } = useTheme();
 	const isArchived = project.status === "completed";
 	const taskCount = taskInfo?.total ?? 0;
 	const completedCount = taskInfo?.completed ?? 0;
@@ -43,140 +43,89 @@ export function ProjectCard({
 	return (
 		<div
 			onClick={() => onSelect(project)}
-			className="p-4 rounded-xl cursor-pointer transition-all border hover:scale-[1.01] hover:-translate-y-0.5"
-			style={{
-				background: isSelected
-					? `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.18)} 0%, ${hexToRgba(
-							palette.surface,
-							0.55,
-						)} 100%)`
-					: `linear-gradient(135deg, ${hexToRgba(palette.surface, 0.4)} 0%, ${hexToRgba(
-							palette.surface,
-							0.6,
-						)} 100%)`,
-				border: `1px solid ${hexToRgba(
-					isSelected ? palette.primary : palette.text,
-					isSelected ? 0.5 : 0.08,
-				)}`,
-				boxShadow: `0 14px 32px ${hexToRgba(
-					isSelected ? palette.primary : "#000000",
-					isSelected ? 0.14 : 0.17,
-				)}`,
-			}}
+			className={cn(styles.root, isSelected && styles.selected)}
 		>
-			<div className="flex items-start justify-between mb-2">
-				<div className="flex items-center space-x-2">
+			<div className={styles.header}>
+				<div className={styles.identity}>
 					<div
-						className="w-4 h-4 rounded-full flex-shrink-0"
+						className={styles.categoryDot}
 						style={{ backgroundColor: categoryColor(project.category) }}
 					/>
-					<h4
-						className="font-semibold leading-snug"
-						style={{ color: hexToRgba(palette.text, 0.92) }}
-					>
-						{project.name}
-					</h4>
+					<h4 className={styles.title}>{project.name}</h4>
 				</div>
-				<div className="flex space-x-1">
+				<div className={styles.actions}>
 					<button
-						onClick={(e) => {
-							e.stopPropagation();
+						onClick={(event) => {
+							event.stopPropagation();
 							onEdit(project);
 						}}
-						className="p-1 rounded transition-colors hover:bg-white/5"
+						className={styles.iconButton}
+						type="button"
 					>
-						<Edit
-							className="w-4 h-4"
-							style={{ color: hexToRgba(palette.primary, 0.85) }}
-						/>
+						<Edit className={styles.editIcon} />
 					</button>
 					<button
-						onClick={(e) => {
-							e.stopPropagation();
+						onClick={(event) => {
+							event.stopPropagation();
 							onDelete(project.id);
 						}}
-						className="p-1 rounded transition-colors hover:bg-white/5"
+						className={styles.iconButton}
+						type="button"
 					>
-						<Trash2
-							className="w-4 h-4"
-							style={{ color: hexToRgba(palette.accent, 0.9) }}
-						/>
+						<Trash2 className={styles.deleteIcon} />
 					</button>
 				</div>
 			</div>
-			<div className="flex items-center space-x-2">
+
+			<div className={styles.statusRow}>
 				{isArchived ? (
-					<span
-						className="text-xs capitalize"
-						style={{ color: hexToRgba(palette.text, 0.4) }}
-					>
-						Archived
-					</span>
+					<span className={styles.statusText}>Archived</span>
 				) : (
 					<>
+						<span className={styles.statusText}>{project.status}</span>
 						<span
-							className="text-xs capitalize"
-							style={{ color: hexToRgba(palette.text, 0.45) }}
-						>
-							{project.status}
-						</span>
-						<span
-							className="text-xs px-2 py-1 rounded border"
-							style={getPriorityChipStyle(palette, project.priority)}
+							className={styles.priorityChip}
+							style={getPriorityChipStyle(project.priority)}
 						>
 							{project.priority}
 						</span>
 					</>
 				)}
 			</div>
+
 			{project.deadline && (
-				<div
-					className="text-xs mt-2"
-					style={{ color: hexToRgba(palette.primary, 0.85) }}
-				>
+				<div className={styles.dueText}>
 					{isArchived
 						? `Archived ${formatDateOnly(project.deadline)}`
 						: `Due ${formatDateOnly(project.deadline)}`}
 				</div>
 			)}
+
 			{taskCount > 0 && (
-				<div className="flex items-center space-x-2 mt-2.5">
-					<div
-						className="flex-1 rounded-full h-1.5 overflow-hidden"
-						style={{ background: hexToRgba(palette.surface, 0.6) }}
-					>
+				<div className={styles.progressRow}>
+					<div className={styles.progressTrack}>
 						<div
-							className="h-full transition-all duration-500"
-							style={{
-								background: `linear-gradient(90deg, ${palette.primary} 0%, ${palette.tertiary} 100%)`,
-								width: `${completionPct}%`,
-							}}
+							className={styles.progressFill}
+							style={{ width: `${completionPct}%` }}
 						/>
 					</div>
-					<span
-						className="text-xs whitespace-nowrap font-medium"
-						style={{ color: hexToRgba(palette.text, 0.45) }}
-					>
+					<span className={styles.progressMeta}>
 						{completedCount}/{taskCount} • {completionPct}%
 					</span>
 				</div>
 			)}
+
 			{!isArchived && hasOverdue && (
-				<div
-					className="text-xs mt-1 flex items-center space-x-1"
-					style={{ color: hexToRgba(palette.accent, 0.9) }}
-				>
-					<AlertCircle className="w-3 h-3" />
-					<span>Overdue tasks</span>
+				<div className={cn(styles.alert, styles.alertDanger)}>
+					<AlertCircle className={styles.alertIcon} />
+					<span className={styles.alertText}>Overdue tasks</span>
 				</div>
 			)}
+
 			{showUpcomingTask && nextDue && (
-				<div
-					className="text-xs mt-1 flex items-center space-x-1"
-					style={{ color: hexToRgba(palette.tertiary, 0.9) }}
-				>
-					<AlertCircle className="w-3 h-3" />
-					<span className="truncate">
+				<div className={cn(styles.alert, styles.alertWarning)}>
+					<AlertCircle className={styles.alertIcon} />
+					<span className={styles.alertText}>
 						Task "{nextDue.name}" due {formatDateOnly(nextDue.date)}
 					</span>
 				</div>

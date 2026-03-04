@@ -1,6 +1,5 @@
 import { Shuffle } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
 import {
 	buildProjectCode,
 	type ProjectConfig,
@@ -8,7 +7,6 @@ import {
 } from "./drawingListManagerModels";
 
 interface DrawingListManagerConfigPanelsProps {
-	palette: ColorScheme;
 	projectConfig: ProjectConfig;
 	setProjectConfig: Dispatch<SetStateAction<ProjectConfig>>;
 	templateCounts: Record<string, number>;
@@ -18,8 +16,13 @@ interface DrawingListManagerConfigPanelsProps {
 	onApplySwap: () => void;
 }
 
+const panelClass =
+	"rounded-xl border p-4 [border-color:var(--border)] [background:var(--surface)]";
+const inputClass =
+	"w-full rounded-lg border px-2.5 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text)]";
+const labelClass = "grid gap-1.5 text-xs [color:var(--text-muted)]";
+
 export function DrawingListManagerConfigPanels({
-	palette,
 	projectConfig,
 	setProjectConfig,
 	templateCounts,
@@ -29,157 +32,72 @@ export function DrawingListManagerConfigPanels({
 	onApplySwap,
 }: DrawingListManagerConfigPanelsProps) {
 	return (
-		<div
-			style={{
-				display: "grid",
-				gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-				gap: 18,
-				alignItems: "start",
-			}}
-		>
-			<div
-				style={{
-					padding: 18,
-					borderRadius: 16,
-					background: `linear-gradient(135deg, ${hexToRgba(palette.surfaceLight, 0.4)} 0%, ${hexToRgba(palette.surface, 0.8)} 100%)`,
-					border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-				}}
-			>
-				<h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+		<div className="grid gap-4 xl:grid-cols-3" style={{ alignItems: "start" }}>
+			{/* Project Standard */}
+			<div className={panelClass}>
+				<h3 className="text-sm font-semibold [color:var(--text)]">
 					Project Standard
 				</h3>
-				<div style={{ display: "grid", gap: 12, marginTop: 14 }}>
-					<label
-						style={{
-							display: "grid",
-							gap: 6,
-							fontSize: 12,
-							color: palette.textMuted,
-						}}
-					>
+				<div className="mt-3 grid gap-3">
+					<label className={labelClass}>
 						Project number (XXX)
 						<input
 							value={projectConfig.projectNumber}
-							onChange={(event) => {
-								const next = event.target.value
-									.toUpperCase()
-									.replace(/^R3P-/, "");
+							onChange={(e) => {
+								const next = e.target.value.toUpperCase().replace(/^R3P-/, "");
 								setProjectConfig((prev) => ({
 									...prev,
 									projectNumber: next,
 								}));
 							}}
 							placeholder="25074"
-							style={{
-								padding: "8px 10px",
-								borderRadius: 8,
-								border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-								background: hexToRgba(palette.surfaceLight, 0.35),
-								color: palette.text,
-							}}
+							className={inputClass}
 						/>
 					</label>
-					<label
-						style={{
-							display: "grid",
-							gap: 6,
-							fontSize: 12,
-							color: palette.textMuted,
-						}}
-					>
+					<label className={labelClass}>
 						Default revision
 						<input
 							value={projectConfig.revisionDefault}
-							onChange={(event) =>
+							onChange={(e) =>
 								setProjectConfig((prev) => ({
 									...prev,
-									revisionDefault: event.target.value.toUpperCase(),
+									revisionDefault: e.target.value.toUpperCase(),
 								}))
 							}
-							style={{
-								padding: "8px 10px",
-								borderRadius: 8,
-								border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-								background: hexToRgba(palette.surfaceLight, 0.35),
-								color: palette.text,
-								width: "100%",
-							}}
+							className={inputClass}
 						/>
 					</label>
-					<label
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 10,
-							fontSize: 12,
-							color: palette.textMuted,
-						}}
-					>
+					<label className="flex items-center gap-2.5 text-xs [color:var(--text-muted)]">
 						<input
 							type="checkbox"
 							checked={projectConfig.enforceProjectCode}
-							onChange={(event) =>
+							onChange={(e) =>
 								setProjectConfig((prev) => ({
 									...prev,
-									enforceProjectCode: event.target.checked,
+									enforceProjectCode: e.target.checked,
 								}))
 							}
 						/>
 						Enforce project code in naming convention
 					</label>
-					<div
-						style={{
-							fontSize: 12,
-							color: palette.textMuted,
-							display: "grid",
-							gap: 6,
-						}}
-					>
+					<div className="grid gap-1.5 text-xs [color:var(--text-muted)]">
 						Naming pattern
-						<div
-							style={{
-								padding: "8px 10px",
-								borderRadius: 8,
-								background: hexToRgba(palette.primary, 0.08),
-								border: `1px dashed ${hexToRgba(palette.primary, 0.3)}`,
-								color: palette.text,
-								fontSize: 12,
-							}}
-						>
+						<div className="rounded-lg border border-dashed px-2.5 py-2 font-mono text-xs border-[color-mix(in_srgb,var(--primary)_30%,transparent)] [background:color-mix(in_srgb,var(--primary)_8%,transparent)] [color:var(--text)]">
 							{buildProjectCode(projectConfig.projectNumber)}-DISC-TYPE-### REV
 						</div>
 					</div>
 				</div>
 			</div>
 
-			<div
-				style={{
-					padding: 18,
-					borderRadius: 16,
-					background: `linear-gradient(135deg, ${hexToRgba(palette.surfaceLight, 0.25)} 0%, ${hexToRgba(palette.surface, 0.85)} 100%)`,
-					border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-				}}
-			>
-				<h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+			{/* Drawing Types & Counts */}
+			<div className={panelClass}>
+				<h3 className="text-sm font-semibold [color:var(--text)]">
 					Drawing Types & Counts
 				</h3>
-				<p
-					style={{
-						margin: "6px 0 0 0",
-						fontSize: 12,
-						color: palette.textMuted,
-					}}
-				>
+				<p className="mt-1 text-xs [color:var(--text-muted)]">
 					Set how many drawings of each type to generate.
 				</p>
-				<div
-					style={{
-						display: "grid",
-						gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
-						gap: 12,
-						marginTop: 12,
-					}}
-				>
+				<div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-3">
 					{projectConfig.allowedDisciplines.flatMap((discipline) =>
 						projectConfig.allowedSheetTypes.map((sheetType) => {
 							const typeKey = `${discipline}-${sheetType}`;
@@ -187,21 +105,9 @@ export function DrawingListManagerConfigPanels({
 							return (
 								<div
 									key={typeKey}
-									style={{
-										padding: 12,
-										borderRadius: 8,
-										border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-										background: hexToRgba(palette.surfaceLight, 0.4),
-									}}
+									className="rounded-lg border p-2.5 [border-color:var(--border)] [background:var(--surface-2)]"
 								>
-									<label
-										style={{
-											display: "block",
-											fontSize: 12,
-											fontWeight: 500,
-											marginBottom: 6,
-										}}
-									>
+									<label className="mb-1.5 block text-xs font-medium [color:var(--text)]">
 										{typeKey}
 									</label>
 									<input
@@ -209,22 +115,13 @@ export function DrawingListManagerConfigPanels({
 										min={0}
 										max={99}
 										value={count}
-										onChange={(event) =>
+										onChange={(e) =>
 											setTemplateCounts((prev) => ({
 												...prev,
-												[typeKey]: Math.max(0, Number(event.target.value)),
+												[typeKey]: Math.max(0, Number(e.target.value)),
 											}))
 										}
-										style={{
-											width: "100%",
-											padding: "6px 8px",
-											borderRadius: 6,
-											border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-											background: hexToRgba(palette.surfaceLight, 0.35),
-											color: palette.text,
-											fontSize: 12,
-											boxSizing: "border-box",
-										}}
+										className={inputClass}
 									/>
 								</div>
 							);
@@ -233,87 +130,45 @@ export function DrawingListManagerConfigPanels({
 				</div>
 			</div>
 
-			<div
-				style={{
-					padding: 18,
-					borderRadius: 16,
-					background: `linear-gradient(135deg, ${hexToRgba(palette.surfaceLight, 0.2)} 0%, ${hexToRgba(palette.surface, 0.75)} 100%)`,
-					border: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-				}}
-			>
-				<h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+			{/* Hot Swap Names */}
+			<div className={panelClass}>
+				<h3 className="text-sm font-semibold [color:var(--text)]">
 					Hot Swap Names
 				</h3>
-				<p
-					style={{
-						margin: "6px 0 0",
-						fontSize: 12,
-						color: palette.textMuted,
-					}}
-				>
+				<p className="mt-1 text-xs [color:var(--text-muted)]">
 					Replace naming fragments across titles and regenerate naming
 					consistency.
 				</p>
-				<div
-					style={{
-						display: "grid",
-						gap: 8,
-						marginTop: 12,
-						maxHeight: 240,
-						overflowY: "auto",
-						paddingRight: 8,
-					}}
-				>
+				<div className="mt-3 grid max-h-60 gap-2 overflow-y-auto pr-2">
 					{swapRules.map((rule) => (
-						<div
-							key={rule.id}
-							style={{
-								display: "grid",
-								gridTemplateColumns: "1fr 1fr",
-								gap: 8,
-							}}
-						>
+						<div key={rule.id} className="grid grid-cols-2 gap-2">
 							<input
 								value={rule.from}
-								onChange={(event) =>
+								onChange={(e) =>
 									setSwapRules((prev) =>
 										prev.map((item) =>
 											item.id === rule.id
-												? { ...item, from: event.target.value }
+												? { ...item, from: e.target.value }
 												: item,
 										),
 									)
 								}
 								placeholder="From"
-								style={{
-									padding: "6px 8px",
-									borderRadius: 8,
-									border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-									background: hexToRgba(palette.surfaceLight, 0.35),
-									color: palette.text,
-									fontSize: 12,
-								}}
+								className={inputClass}
 							/>
 							<input
 								value={rule.to}
-								onChange={(event) =>
+								onChange={(e) =>
 									setSwapRules((prev) =>
 										prev.map((item) =>
 											item.id === rule.id
-												? { ...item, to: event.target.value }
+												? { ...item, to: e.target.value }
 												: item,
 										),
 									)
 								}
 								placeholder="To"
-								style={{
-									padding: "6px 8px",
-									borderRadius: 8,
-									border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-									background: hexToRgba(palette.surfaceLight, 0.35),
-									color: palette.text,
-									fontSize: 12,
-								}}
+								className={inputClass}
 							/>
 						</div>
 					))}
@@ -321,20 +176,10 @@ export function DrawingListManagerConfigPanels({
 				<button
 					type="button"
 					onClick={onApplySwap}
-					style={{
-						marginTop: 12,
-						display: "inline-flex",
-						alignItems: "center",
-						gap: 8,
-						padding: "8px 12px",
-						borderRadius: 8,
-						border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-						background: hexToRgba(palette.primary, 0.12),
-						color: palette.primary,
-						fontSize: 12,
-						fontWeight: 600,
-						cursor: "pointer",
-					}}
+					className="mt-3 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition
+						border-[color-mix(in_srgb,var(--primary)_20%,transparent)]
+						[background:color-mix(in_srgb,var(--primary)_12%,transparent)]
+						[color:var(--primary)] hover:opacity-80"
 				>
 					<Shuffle size={14} />
 					Apply Swap Rules

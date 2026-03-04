@@ -1,4 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import styles from "./ProjectManagerFormModal.module.css";
 import { type Priority, TaskFormData } from "./projectmanagertypes";
 
 interface TaskFormModalProps {
@@ -20,56 +21,52 @@ export function TaskFormModal({
 	isEditing,
 	isSubtask = false,
 }: TaskFormModalProps) {
-	const inputClass =
-		"w-full rounded-lg border px-4 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
-	const labelClass = "mb-2 block text-sm font-medium [color:var(--text-muted)]";
-
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="max-w-2xl p-5 sm:p-6 [border-color:var(--border)] [background:var(--bg-heavy)]">
-				<DialogHeader className="mb-4">
-					<DialogTitle className="text-2xl font-bold [color:var(--text)]">
+			<DialogContent className={styles.dialogContent}>
+				<DialogHeader className={styles.header}>
+					<DialogTitle className={styles.title}>
 						{isEditing ? "Edit Task" : isSubtask ? "Add Subtask" : "Add Task"}
 					</DialogTitle>
 				</DialogHeader>
-				<div className="space-y-4">
+				<div className={styles.fields}>
 					<div>
-						<label className={labelClass}>Task Name</label>
+						<label className={styles.label}>Task Name</label>
 						<input
 							type="text"
 							value={formData.name}
 							onChange={(e) =>
 								setFormData({ ...formData, name: e.target.value })
 							}
-							className={inputClass}
+							className={styles.input}
 							placeholder="Enter task name"
 						/>
 					</div>
 					<div>
-						<label className={labelClass}>Description</label>
+						<label className={styles.label}>Description</label>
 						<textarea
 							value={formData.description}
 							onChange={(e) =>
 								setFormData({ ...formData, description: e.target.value })
 							}
-							className={`${inputClass} h-20`}
+							className={`${styles.textarea} ${styles.textareaShort}`}
 							placeholder="Task description (optional)"
 						/>
 					</div>
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<div className={styles.gridTwo}>
 						<div>
-							<label className={labelClass}>Due Date</label>
+							<label className={styles.label}>Due Date</label>
 							<input
 								type="date"
 								value={formData.due_date ? formData.due_date.split("T")[0] : ""}
 								onChange={(e) =>
 									setFormData({ ...formData, due_date: e.target.value })
 								}
-								className={inputClass}
+								className={styles.input}
 							/>
 						</div>
 						<div>
-							<label className={labelClass}>Priority</label>
+							<label className={styles.label}>Priority</label>
 							<select
 								value={formData.priority}
 								onChange={(e) =>
@@ -78,7 +75,7 @@ export function TaskFormModal({
 										priority: e.target.value as Priority,
 									})
 								}
-								className={inputClass}
+								className={styles.select}
 							>
 								<option value="low">Low</option>
 								<option value="medium">Medium</option>
@@ -88,17 +85,11 @@ export function TaskFormModal({
 						</div>
 					</div>
 				</div>
-				<div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-					<button
-						onClick={onSubmit}
-						className="flex-1 rounded-lg px-6 py-2 font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
-					>
+				<div className={styles.footer}>
+					<button onClick={onSubmit} className={styles.buttonPrimary}>
 						{isEditing ? "Update Task" : "Create Task"}
 					</button>
-					<button
-						onClick={onClose}
-						className="rounded-lg border px-6 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-					>
+					<button onClick={onClose} className={styles.buttonSecondary}>
 						Cancel
 					</button>
 				</div>

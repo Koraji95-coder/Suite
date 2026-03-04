@@ -1,5 +1,4 @@
-import { Input } from "@/components/apps/ui/input";
-import { FrameSection } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/apps/ui/PageFrame";
 import {
 	Select,
 	SelectContent,
@@ -7,12 +6,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/apps/ui/select";
-import { Textarea } from "@/components/apps/ui/textarea";
+import { Input, TextArea } from "@/components/primitives/Input";
 import { cn } from "@/lib/utils";
 import type { DraftState } from "./transmittalBuilderModels";
 import type { PeProfile } from "./transmittalConfig";
 
-const TransmittalSection = FrameSection;
+const TransmittalSection = Section;
 
 interface TransmittalBuilderProjectAndSenderSectionProps {
 	draft: DraftState;
@@ -42,9 +41,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 				<div className="grid gap-4 px-2 sm:px-3">
 					<div className="grid gap-3 sm:grid-cols-2">
 						<div className="grid gap-1">
-							<label className="text-xs text-muted-foreground">
-								Project Name
-							</label>
+							<label className="text-xs text-text-muted">Project Name</label>
 							<Input
 								value={draft.projectName}
 								onChange={(event) =>
@@ -58,9 +55,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 							/>
 						</div>
 						<div className="grid gap-1">
-							<label className="text-xs text-muted-foreground">
-								Project Number
-							</label>
+							<label className="text-xs text-text-muted">Project Number</label>
 							<Input
 								value={draft.projectNumber}
 								onChange={(event) =>
@@ -76,7 +71,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 					</div>
 					<div className="grid gap-3 sm:grid-cols-2">
 						<div className="grid gap-1">
-							<label className="text-xs text-muted-foreground">Date</label>
+							<label className="text-xs text-text-muted">Date</label>
 							<Input
 								value={draft.date}
 								onChange={(event) => updateDraft("date", event.target.value)}
@@ -88,9 +83,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 							/>
 						</div>
 						<div className="grid gap-1">
-							<label className="text-xs text-muted-foreground">
-								Transmittal
-							</label>
+							<label className="text-xs text-text-muted">Transmittal</label>
 							<Input
 								value={draft.transmittalNumber}
 								onChange={(event) =>
@@ -105,8 +98,8 @@ export function TransmittalBuilderProjectAndSenderSection({
 						</div>
 					</div>
 					<div className="grid gap-1">
-						<label className="text-xs text-muted-foreground">Description</label>
-						<Textarea
+						<label className="text-xs text-text-muted">Description</label>
+						<TextArea
 							value={draft.description}
 							onChange={(event) =>
 								updateDraft("description", event.target.value)
@@ -122,7 +115,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 				<div className="grid gap-4 px-2 sm:px-3">
 					<div className="grid gap-3 sm:grid-cols-2">
 						<div className="grid gap-1">
-							<label className="text-xs text-muted-foreground">PE</label>
+							<label className="text-xs text-text-muted">PE</label>
 							<Select value={draft.peName} onValueChange={handlePeChange}>
 								<SelectTrigger
 									className={cn(
@@ -145,13 +138,13 @@ export function TransmittalBuilderProjectAndSenderSection({
 									{profileOptionsError}
 								</div>
 							) : (
-								<div className="text-xs text-muted-foreground">
+								<div className="text-xs text-text-muted">
 									Sender values are managed by the selected profile.
 								</div>
 							)}
 						</div>
 						<div className="grid gap-1">
-							<label className="text-xs text-muted-foreground">Title</label>
+							<label className="text-xs text-text-muted">Title</label>
 							<Input
 								value={draft.fromTitle}
 								readOnly
@@ -166,7 +159,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 
 					<div className="grid gap-3 sm:grid-cols-2">
 						<div className="grid gap-1">
-							<label className="text-xs text-muted-foreground">Email</label>
+							<label className="text-xs text-text-muted">Email</label>
 							<Input
 								value={draft.fromEmail}
 								readOnly
@@ -178,7 +171,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 							/>
 						</div>
 						<div className="grid gap-1">
-							<label className="text-xs text-muted-foreground">Phone</label>
+							<label className="text-xs text-text-muted">Phone</label>
 							<Input
 								value={draft.fromPhone}
 								readOnly
@@ -188,7 +181,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 					</div>
 
 					<div className="grid gap-1">
-						<label className="text-xs text-muted-foreground">Firm Number</label>
+						<label className="text-xs text-text-muted">Firm Number</label>
 						<Select
 							value={draft.firmNumber}
 							onValueChange={(value) => updateDraft("firmNumber", value)}

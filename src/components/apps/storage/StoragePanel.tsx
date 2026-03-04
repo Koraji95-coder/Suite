@@ -1,6 +1,5 @@
 import { Database, FileText, HardDrive, Shield } from "lucide-react";
 import { useState } from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import { BackupManager } from "./BackupManager";
 import { DatabaseBrowser } from "./DatabaseBrowser";
 import { FileBrowser } from "./FileBrowser";
@@ -12,76 +11,46 @@ const TABS: { key: StorageTab; label: string; icon: typeof FileText }[] = [
 	{ key: "backups", label: "Backups", icon: Shield },
 ];
 
+const TAB_DESCRIPTIONS: Record<StorageTab, string> = {
+	browser: "File management",
+	database: "Database browser",
+	backups: "Backup & restore",
+};
+
 export function StoragePanel() {
-	const { palette } = useTheme();
 	const [tab, setTab] = useState<StorageTab>("browser");
 
 	return (
-		<div style={{ padding: 24 }}>
-			<div
-				style={{
-					display: "flex",
-					alignItems: "center",
-					justifyContent: "space-between",
-					marginBottom: 24,
-				}}
-			>
-				<div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-					<div
-						style={{
-							padding: 10,
-							borderRadius: 10,
-							background: `linear-gradient(135deg, ${hexToRgba(palette.primary, 0.2)}, ${hexToRgba(palette.primary, 0.05)})`,
-						}}
-					>
-						<HardDrive className="w-7 h-7" style={{ color: palette.primary }} />
+		<div className="p-6">
+			<div className="mb-6 flex items-center justify-between">
+				<div className="flex items-center gap-3">
+					<div className="rounded-[10px] p-2.5 [background:color-mix(in_srgb,var(--primary)_15%,transparent)]">
+						<HardDrive className="h-7 w-7 [color:var(--primary)]" />
 					</div>
 					<div>
-						<h2
-							style={{
-								margin: 0,
-								fontSize: 22,
-								fontWeight: 700,
-								color: palette.text,
-							}}
-						>
+						<h2 className="text-[22px] font-bold [color:var(--text)]">
 							Storage
 						</h2>
-						<p style={{ margin: 0, fontSize: 13, color: palette.textMuted }}>
-							{tab === "browser" && "File management"}
-							{tab === "database" && "Database browser"}
-							{tab === "backups" && "Backup & restore"}
+						<p className="text-[13px] [color:var(--text-muted)]">
+							{TAB_DESCRIPTIONS[tab]}
 						</p>
 					</div>
 				</div>
 
-				<div style={{ display: "flex", gap: 6 }}>
+				<div className="flex gap-1.5">
 					{TABS.map(({ key, label, icon: Icon }) => {
 						const active = tab === key;
 						return (
 							<button
 								key={key}
 								onClick={() => setTab(key)}
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: 6,
-									padding: "8px 16px",
-									borderRadius: 8,
-									fontSize: 14,
-									fontWeight: 500,
-									cursor: "pointer",
-									transition: "all 0.2s",
-									background: active
-										? hexToRgba(palette.primary, 0.18)
-										: hexToRgba(palette.surface, 0.4),
-									border: active
-										? `1px solid ${palette.primary}`
-										: `1px solid ${hexToRgba(palette.textMuted, 0.15)}`,
-									color: active ? palette.text : palette.textMuted,
-								}}
+								className={`inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition ${
+									active
+										? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)]"
+										: "border-[color-mix(in_srgb,var(--text-muted)_15%,transparent)] [background:color-mix(in_srgb,var(--surface)_40%,transparent)] [color:var(--text-muted)]"
+								}`}
 							>
-								<Icon className="w-4 h-4" />
+								<Icon className="h-4 w-4" />
 								{label}
 							</button>
 						);
@@ -89,14 +58,7 @@ export function StoragePanel() {
 				</div>
 			</div>
 
-			<div
-				style={{
-					padding: 20,
-					borderRadius: 12,
-					background: hexToRgba(palette.surface, 0.35),
-					border: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
-				}}
-			>
+			<div className="rounded-xl border p-5 border-[color-mix(in_srgb,var(--primary)_8%,transparent)] [background:color-mix(in_srgb,var(--surface)_35%,transparent)]">
 				{tab === "browser" && <FileBrowser />}
 				{tab === "database" && <DatabaseBrowser />}
 				{tab === "backups" && <BackupManager />}

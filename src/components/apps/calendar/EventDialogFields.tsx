@@ -1,9 +1,6 @@
 import { format, isBefore } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { Button } from "@/components/apps/ui/button";
 import { Checkbox } from "@/components/apps/ui/checkbox";
-import { Input } from "@/components/apps/ui/input";
-import { Label } from "@/components/apps/ui/label";
 import {
 	Popover,
 	PopoverContent,
@@ -17,7 +14,9 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/apps/ui/select";
-import { Textarea } from "@/components/apps/ui/textarea";
+import { Button } from "@/components/primitives/Button";
+import { Input, TextArea } from "@/components/primitives/Input";
+import { Label } from "@/components/primitives/Text";
 import { cn } from "@/lib/utils";
 import { Calendar } from "./Calendar";
 import type { EventColor } from "./calendarindex";
@@ -151,7 +150,7 @@ export function EventDialogFields({
 
 			<div className="*:not-first:mt-1.5">
 				<Label htmlFor="description">Description</Label>
-				<Textarea
+				<TextArea
 					id="description"
 					value={description}
 					onChange={(event) => setDescription(event.target.value)}

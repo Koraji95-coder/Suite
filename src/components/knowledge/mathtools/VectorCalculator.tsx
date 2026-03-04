@@ -1,6 +1,6 @@
 import { Compass, Divide, Minus, Plus, X } from "lucide-react";
 import { useState } from "react";
-import { FrameSection } from "../../apps/ui/PageFrame";
+import { Section } from "@/components/apps/ui/PageFrame";
 
 export function VectorCalculator() {
 	const [rectangular, setRectangular] = useState({ x: 3, y: 4 });
@@ -169,7 +169,7 @@ export function VectorCalculator() {
 				</h2>
 			</div>
 
-			<FrameSection title="Vector Converter">
+			<Section title="Vector Converter">
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 					<div className="space-y-4">
 						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
@@ -305,9 +305,9 @@ export function VectorCalculator() {
 						</div>
 					)}
 				</div>
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="Vector Operations">
+			<Section title="Vector Operations">
 				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 					<div className="space-y-4">
 						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
@@ -471,9 +471,12 @@ export function VectorCalculator() {
 						</div>
 					</div>
 				</div>
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="Formulas">
+			<Section
+				title="Formulas"
+				description="Key formulas for vector operations in rectangular and polar forms."
+			>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div className={cardClass}>
 						<h4 className="mb-2 font-semibold [color:var(--text-muted)]">
@@ -516,9 +519,9 @@ export function VectorCalculator() {
 						</div>
 					</div>
 				</div>
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="Example: Vector Multiplication">
+			<Section title="Example: Vector Multiplication">
 				<div className="space-y-2 [color:var(--text)]">
 					<p>Given: Z₁ = 3 + j4, Z₂ = 2 - j1</p>
 					<p className="pl-4">
@@ -532,7 +535,7 @@ export function VectorCalculator() {
 					<p className="pl-4">• Add angles: 53.13° + (-26.57°) = 26.56°</p>
 					<p className="pl-4">• Result: Z = 11.18∠26.56° = 10 + j5</p>
 				</div>
-			</FrameSection>
+			</Section>
 		</div>
 	);
 }

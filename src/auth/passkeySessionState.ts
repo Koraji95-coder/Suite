@@ -15,7 +15,10 @@ type SessionMethodPayload = {
 };
 
 function canUseSessionStorage(): boolean {
-	return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
+	return (
+		typeof window !== "undefined" &&
+		typeof window.sessionStorage !== "undefined"
+	);
 }
 
 function safeParseJson<T>(raw: string | null): T | null {
@@ -89,4 +92,3 @@ export function clearSessionAuthMarkers(): void {
 	window.sessionStorage.removeItem(PASSKEY_PENDING_KEY);
 	window.sessionStorage.removeItem(SESSION_METHOD_KEY);
 }
-

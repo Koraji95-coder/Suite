@@ -72,7 +72,9 @@ export function LibraryFilters({
 			</div>
 
 			<div className="flex items-center gap-4 text-xs [color:var(--text-muted)]">
-				<span>{totalCount} total · {filteredCount} shown</span>
+				<span>
+					{totalCount} total · {filteredCount} shown
+				</span>
 				{!hidePanelFilter && selectedPanel !== "all" && (
 					<span className="flex items-center gap-1">
 						<Filter className="h-3 w-3" /> {selectedPanel}

@@ -136,7 +136,9 @@ function BlockCard({
 				${isList ? "flex items-center" : ""}`}
 		>
 			{/* Thumbnail */}
-			<div className={`relative ${isList ? "h-20 w-20 shrink-0" : "aspect-square w-full"}`}>
+			<div
+				className={`relative ${isList ? "h-20 w-20 shrink-0" : "aspect-square w-full"}`}
+			>
 				{block.thumbnail_url ? (
 					<img
 						src={block.thumbnail_url}
@@ -161,7 +163,11 @@ function BlockCard({
 					>
 						<Star className="h-3.5 w-3.5" />
 					</OverlayButton>
-					<OverlayButton title="Delete" onClick={() => onDelete(block)} variant="danger">
+					<OverlayButton
+						title="Delete"
+						onClick={() => onDelete(block)}
+						variant="danger"
+					>
 						<Trash2 className="h-3.5 w-3.5" />
 					</OverlayButton>
 				</div>
@@ -176,7 +182,9 @@ function BlockCard({
 
 			{/* Info */}
 			<div className={`p-2.5 ${isList ? "flex-1 min-w-0" : ""}`}>
-				<h4 className="truncate text-sm font-medium [color:var(--text)]">{block.name}</h4>
+				<h4 className="truncate text-sm font-medium [color:var(--text)]">
+					{block.name}
+				</h4>
 				<div className="mt-0.5 flex items-center gap-2 text-xs [color:var(--text-muted)]">
 					<span>{(block.file_size / 1024).toFixed(1)} KB</span>
 					<span>·</span>

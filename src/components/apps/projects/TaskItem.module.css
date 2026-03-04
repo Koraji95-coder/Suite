@@ -1,0 +1,134 @@
+.root {
+	display: grid;
+	gap: 0.45rem;
+}
+
+.row {
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+	padding: 0.75rem 0.82rem;
+	border-radius: var(--radius-3);
+	transition: box-shadow 120ms ease;
+	box-shadow: var(--shadow-sm);
+}
+
+.dragHandle {
+	cursor: grab;
+	padding: 0.2rem;
+	touch-action: none;
+	border-radius: 0.4rem;
+}
+
+.dragHandle:active {
+	cursor: grabbing;
+}
+
+.dragIcon {
+	width: 0.9rem;
+	height: 0.9rem;
+	color: var(--text-muted);
+}
+
+.iconButton {
+	border: 0;
+	background: transparent;
+	padding: 0.2rem;
+	border-radius: 0.45rem;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.iconButton:hover {
+	background: var(--surface-2);
+}
+
+.chevronIcon {
+	width: 0.9rem;
+	height: 0.9rem;
+	color: var(--primary);
+}
+
+.checkIcon {
+	width: 1rem;
+	height: 1rem;
+}
+
+.checkDone {
+	color: var(--success);
+}
+
+.checkOpen {
+	color: var(--primary);
+}
+
+.content {
+	flex: 1;
+	min-width: 0;
+}
+
+.title {
+	display: block;
+	font-weight: 600;
+	line-height: 1.4;
+	color: var(--text);
+}
+
+.titleDone {
+	color: var(--text-muted);
+	text-decoration: line-through;
+}
+
+.dueChip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	font-size: 0.7rem;
+	margin-top: 0.35rem;
+	padding: 0.1rem 0.45rem;
+	border-radius: 999px;
+	border: 1px solid var(--line-soft);
+}
+
+.urgencyDanger {
+	color: var(--danger);
+	border-color: var(--danger);
+}
+
+.urgencyWarning {
+	color: var(--warning);
+	border-color: var(--warning);
+}
+
+.urgencySuccess {
+	color: var(--success);
+	border-color: var(--success);
+}
+
+.clockIcon {
+	width: 0.72rem;
+	height: 0.72rem;
+}
+
+.priorityChip {
+	font-size: 0.68rem;
+	padding: 0.16rem 0.45rem;
+	border-radius: var(--radius-1);
+	border: 1px solid transparent;
+	text-transform: capitalize;
+}
+
+.actionIcon {
+	width: 0.9rem;
+	height: 0.9rem;
+}
+
+.actionPrimary {
+	color: var(--primary);
+}
+
+.actionDanger {
+	color: var(--danger);
+}

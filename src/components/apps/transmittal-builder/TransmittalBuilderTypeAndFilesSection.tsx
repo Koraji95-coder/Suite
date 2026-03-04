@@ -1,7 +1,5 @@
 import { RefreshCcw, Trash2 } from "lucide-react";
-import { Button } from "@/components/apps/ui/button";
-import { Input } from "@/components/apps/ui/input";
-import { FrameSection } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/apps/ui/PageFrame";
 import { RadioGroup, RadioGroupItem } from "@/components/apps/ui/RadioGroup";
 import {
 	Select,
@@ -10,6 +8,8 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/apps/ui/select";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Input";
 import { cn } from "@/lib/utils";
 import { TransmittalBuilderFileRow as FileRow } from "./TransmittalBuilderFileRow";
 import {
@@ -19,7 +19,7 @@ import {
 	type TransmittalType,
 } from "./transmittalBuilderModels";
 
-const TransmittalSection = FrameSection;
+const TransmittalSection = Section;
 
 interface TransmittalBuilderTypeAndFilesSectionProps {
 	draft: DraftState;
@@ -65,9 +65,11 @@ export function TransmittalBuilderTypeAndFilesSection({
 		<>
 			<TransmittalSection title="Transmittal Type">
 				<div className="px-2 sm:px-3">
-					<RadioGroup<TransmittalType>
+					<RadioGroup
 						value={draft.transmittalType}
-						onValueChange={(value) => updateDraft("transmittalType", value)}
+						onValueChange={(value) =>
+							updateDraft("transmittalType", value as TransmittalType)
+						}
 						className="grid gap-3 sm:grid-cols-2"
 					>
 						<label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-4">
@@ -76,7 +78,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 								<div className="text-sm font-semibold [color:var(--text)]">
 									Standard
 								</div>
-								<div className="text-xs text-muted-foreground">
+								<div className="text-xs text-text-muted">
 									PDF documents with an Excel index.
 								</div>
 							</div>
@@ -87,7 +89,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 								<div className="text-sm font-semibold [color:var(--text)]">
 									CID
 								</div>
-								<div className="text-xs text-muted-foreground">
+								<div className="text-xs text-text-muted">
 									CID files with document index entries.
 								</div>
 							</div>
@@ -151,8 +153,8 @@ export function TransmittalBuilderTypeAndFilesSection({
 								variant="outline"
 								onClick={handleScanCid}
 								disabled={files.cid.length === 0}
+								iconLeft={<RefreshCcw size={16} />}
 							>
-								<RefreshCcw size={16} />
 								Refresh CID table
 							</Button>
 						</div>
@@ -164,12 +166,12 @@ export function TransmittalBuilderTypeAndFilesSection({
 				<TransmittalSection title="CID Document Index">
 					<div className="grid gap-3 px-2 sm:px-3">
 						{draft.cidDocuments.length === 0 ? (
-							<div className="text-sm text-muted-foreground">
+							<div className="text-sm text-text-muted">
 								Select CID files to populate the list.
 							</div>
 						) : (
 							<div className="grid gap-2">
-								<div className="grid grid-cols-1 gap-2 text-xs font-semibold text-muted-foreground sm:grid-cols-[2fr_4fr_1fr_auto]">
+								<div className="grid grid-cols-1 gap-2 text-xs font-semibold text-text-muted sm:grid-cols-[2fr_4fr_1fr_auto]">
 									<span>File</span>
 									<span>Description</span>
 									<span>Revision</span>
@@ -181,7 +183,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 										className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[2fr_4fr_1fr_auto]"
 									>
 										<div
-											className="truncate rounded-lg border border-border bg-background px-2 py-2 font-mono text-xs"
+											className="truncate rounded-lg border border-border bg-surface px-2 py-2 font-mono text-xs"
 											title={doc.fileName}
 										>
 											{doc.fileName}
@@ -220,11 +222,12 @@ export function TransmittalBuilderTypeAndFilesSection({
 										<Button
 											type="button"
 											variant="ghost"
-											size="icon"
+											size="sm"
+											iconOnly
+											iconLeft={<Trash2 size={14} />}
+											aria-label={`Remove ${doc.fileName}`}
 											onClick={() => removeCidDocument(doc.fileName)}
-										>
-											<Trash2 size={14} />
-										</Button>
+										/>
 									</div>
 								))}
 							</div>

@@ -1,13 +1,13 @@
 import { Checkbox } from "@/components/apps/ui/checkbox";
-import { FrameSection } from "@/components/apps/ui/PageFrame";
-import { Surface } from "@/components/apps/ui/Surface";
+import { Section } from "@/components/apps/ui/PageFrame";
+import { Panel } from "@/components/primitives/Panel";
 import {
 	type DraftState,
 	OPTION_GROUPS,
 	type OptionKey,
 } from "./transmittalBuilderModels";
 
-const TransmittalSection = FrameSection;
+const TransmittalSection = Section;
 
 interface TransmittalBuilderOptionsSectionProps {
 	draft: DraftState;
@@ -22,8 +22,13 @@ export function TransmittalBuilderOptionsSection({
 		<TransmittalSection title="Transmittal Options">
 			<div className="grid gap-4 px-2 sm:grid-cols-2 sm:px-3 lg:grid-cols-4">
 				{OPTION_GROUPS.map((group) => (
-					<Surface key={group.id} className="space-y-3 p-4">
-						<div className="text-xs font-semibold text-muted-foreground">
+					<Panel
+						key={group.id}
+						variant="inset"
+						padding="md"
+						className="space-y-3"
+					>
+						<div className="text-xs font-semibold text-text-muted">
 							{group.label}
 						</div>
 						<div className="grid gap-2">
@@ -35,14 +40,14 @@ export function TransmittalBuilderOptionsSection({
 									<Checkbox
 										checked={draft.options[option.key]}
 										onCheckedChange={(checked) =>
-											handleOptionToggle(option.key, checked)
+											handleOptionToggle(option.key, checked === true)
 										}
 									/>
 									<span>{option.label}</span>
 								</label>
 							))}
 						</div>
-					</Surface>
+					</Panel>
 				))}
 			</div>
 		</TransmittalSection>

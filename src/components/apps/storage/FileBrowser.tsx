@@ -1,4 +1,3 @@
-import { useTheme } from "@/lib/palette";
 import { FileBrowserBreadcrumbs } from "./FileBrowserBreadcrumbs";
 import { FileBrowserDeleteDialog } from "./FileBrowserDeleteDialog";
 import { FileBrowserDetailsPanel } from "./FileBrowserDetailsPanel";
@@ -7,7 +6,6 @@ import { FileBrowserToolbar } from "./FileBrowserToolbar";
 import { useFileBrowserState } from "./useFileBrowserState";
 
 export function FileBrowser() {
-	const { palette } = useTheme();
 	const {
 		confirmDelete,
 		dragging,
@@ -39,29 +37,24 @@ export function FileBrowser() {
 
 	return (
 		<>
-			<div className="flex min-h-[400px] flex-col gap-4 lg:flex-row">
+			<div className="flex min-h-100 flex-col gap-4 lg:flex-row">
 				<div className="min-w-0 flex-1">
 					<FileBrowserToolbar
-						palette={palette}
 						search={search}
 						onSearchChange={setSearch}
 						fileInputRef={fileInputRef}
 						onFileInputChange={handleFileInputChange}
-						onRefresh={() => {
-							void refresh();
-						}}
+						onRefresh={() => void refresh()}
 						loading={loading}
 					/>
 
 					<FileBrowserBreadcrumbs
-						palette={palette}
 						pathSegments={pathSegments}
 						onNavigateRoot={navigateRoot}
 						onNavigateTo={navigateTo}
 					/>
 
 					<FileBrowserTable
-						palette={palette}
 						dragging={dragging}
 						onDragStateChange={setDragging}
 						onDrop={handleDrop}
@@ -79,25 +72,20 @@ export function FileBrowser() {
 					/>
 				</div>
 
-				{selected ? (
+				{selected && (
 					<FileBrowserDetailsPanel
-						palette={palette}
 						selected={selected}
 						onClose={() => setSelected(null)}
-						onDownload={(file) => {
-							void handleDownload(file);
-						}}
+						onDownload={(file) => void handleDownload(file)}
 						onRequestDelete={requestDelete}
 					/>
-				) : null}
+				)}
 			</div>
 
 			<FileBrowserDeleteDialog
 				pendingDelete={pendingDelete}
 				onCancel={() => setPendingDelete(null)}
-				onConfirm={() => {
-					void confirmDelete();
-				}}
+				onConfirm={() => void confirmDelete()}
 			/>
 		</>
 	);

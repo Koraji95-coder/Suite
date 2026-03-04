@@ -1,11 +1,11 @@
 import { CircuitBoard, Save, Shuffle } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/auth/useAuth";
+import { Section } from "@/components/apps/ui/PageFrame";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
-import { FrameSection } from "../../apps/ui/PageFrame";
 
 interface Component {
 	type: string;
@@ -181,18 +181,16 @@ export function CircuitGenerator() {
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center space-x-3">
-				<CircuitBoard className="h-8 w-8 text-[var(--accent)]" />
-				<h2 className="text-3xl font-bold text-[var(--text)]">
-					Circuit Generator
-				</h2>
+				<CircuitBoard className="h-8 w-8 text-(--accent)" />
+				<h2 className="text-3xl font-bold text-(--text)">Circuit Generator</h2>
 			</div>
 
-			<FrameSection
+			<Section
 				title="Generated Circuit"
 				actions={
 					<button
 						onClick={generateRandomCircuit}
-						className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-[var(--primary)]/30 flex items-center space-x-2"
+						className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30 flex items-center space-x-2"
 					>
 						<Shuffle className="w-5 h-5" />
 						<span>Generate Random Circuit</span>
@@ -203,27 +201,23 @@ export function CircuitGenerator() {
 					ref={canvasRef}
 					width={800}
 					height={400}
-					className="w-full rounded-lg border border-[var(--border)]"
+					className="w-full rounded-lg border border-(--border)"
 				/>
 
 				{components.length > 0 && (
 					<div className="mt-6 space-y-4">
-						<div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
-							<h4 className="mb-3 font-semibold text-[var(--text)]">
-								Components:
-							</h4>
+						<div className="rounded-lg border border-(--border) bg-(--surface) p-4">
+							<h4 className="mb-3 font-semibold text-(--text)">Components:</h4>
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
 								{components.map((comp, index) => (
 									<div
 										key={index}
-										className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2"
+										className="rounded border border-(--border) bg-(--surface-2) px-3 py-2"
 									>
-										<div className="font-medium text-[var(--text)]">
+										<div className="font-medium text-(--text)">
 											{comp.label}
 										</div>
-										<div className="text-sm text-[var(--accent)]">
-											{comp.value}
-										</div>
+										<div className="text-sm text-(--accent)">{comp.value}</div>
 									</div>
 								))}
 							</div>
@@ -235,12 +229,12 @@ export function CircuitGenerator() {
 								value={circuitName}
 								onChange={(e) => setCircuitName(e.target.value)}
 								placeholder="Enter circuit name..."
-								className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+								className="flex-1 rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
 							/>
 							<button
 								onClick={saveCircuit}
 								disabled={isSavingCircuit}
-								className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-[var(--primary)]/30 flex items-center space-x-2"
+								className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30 flex items-center space-x-2"
 							>
 								<Save className="w-5 h-5" />
 								<span>{isSavingCircuit ? "Saving..." : "Save Circuit"}</span>
@@ -248,16 +242,16 @@ export function CircuitGenerator() {
 						</div>
 					</div>
 				)}
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="About Circuit Generator">
-				<p className="text-sm text-[var(--text-muted)]">
+			<Section title="About Circuit Generator">
+				<p className="text-sm text-(--text-muted)">
 					Click "Generate Random Circuit" to create a random circuit with
 					various components. Each circuit includes a voltage source and random
 					combinations of resistors, capacitors, and inductors. Save your
 					favorite circuits to the database for future reference.
 				</p>
-			</FrameSection>
+			</Section>
 		</div>
 	);
 }

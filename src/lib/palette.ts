@@ -41,7 +41,7 @@ export const COLOR_SCHEMES: Record<string, ColorScheme> = {
 	// ═══════════════════════════════════════════════════════════════════════════
 	// NEUTRAL / PROFESSIONAL
 	// ═══════════════════════════════════════════════════════════════════════════
-	
+
 	midnight: {
 		name: "Midnight",
 		description: "Deep navy with cyan accents — focused and modern",
@@ -227,12 +227,21 @@ export function getContrastText(
 function lightenHex(hex: string, percent: number): string {
 	const normalized = hex.replace("#", "");
 	if (normalized.length !== 6) return hex;
-	
-	const r = Math.min(255, Math.floor(Number.parseInt(normalized.slice(0, 2), 16) * (1 + percent)));
-	const g = Math.min(255, Math.floor(Number.parseInt(normalized.slice(2, 4), 16) * (1 + percent)));
-	const b = Math.min(255, Math.floor(Number.parseInt(normalized.slice(4, 6), 16) * (1 + percent)));
-	
-	return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+
+	const r = Math.min(
+		255,
+		Math.floor(Number.parseInt(normalized.slice(0, 2), 16) * (1 + percent)),
+	);
+	const g = Math.min(
+		255,
+		Math.floor(Number.parseInt(normalized.slice(2, 4), 16) * (1 + percent)),
+	);
+	const b = Math.min(
+		255,
+		Math.floor(Number.parseInt(normalized.slice(4, 6), 16) * (1 + percent)),
+	);
+
+	return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
 /**
@@ -356,7 +365,7 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 	rootStyle.setProperty("--primary", palette.primary);
 	rootStyle.setProperty("--primary-hover", lightenHex(palette.primary, 0.15));
 	rootStyle.setProperty("--primary-contrast", getContrastText(palette.primary));
-	
+
 	rootStyle.setProperty("--accent", palette.accent);
 	rootStyle.setProperty("--secondary", palette.secondary);
 
@@ -377,7 +386,10 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 	// ═══════════════════════════════════════════════════════════════════════════
 	// SHADOWS
 	// ═══════════════════════════════════════════════════════════════════════════
-	rootStyle.setProperty("--shadow-sm", "0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)");
+	rootStyle.setProperty(
+		"--shadow-sm",
+		"0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)",
+	);
 	rootStyle.setProperty("--shadow-md", "0 4px 12px rgba(0,0,0,0.35)");
 	rootStyle.setProperty("--shadow-lg", "0 8px 30px rgba(0,0,0,0.4)");
 }

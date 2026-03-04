@@ -4,11 +4,11 @@ import type {
 	SensorOptions,
 } from "@dnd-kit/core";
 import { CheckSquare, Plus } from "lucide-react";
-import type { ChangeEvent, CSSProperties } from "react";
-import { glassCardInnerStyle, hexToRgba, useTheme } from "@/lib/palette";
-import { GlassPanel } from "../ui/GlassPanel";
+import { type ChangeEvent } from "react";
+import { cn } from "@/lib/utils";
 import { CalendarView } from "./CalendarView";
 import { FilesBrowser } from "./FilesBrowser";
+import styles from "./ProjectDetail.module.css";
 import { ProjectDetailGroundGridsView } from "./ProjectDetailGroundGridsView";
 import { ProjectDetailHeader } from "./ProjectDetailHeader";
 import { ProjectDetailViewTabs } from "./ProjectDetailViewTabs";
@@ -82,35 +82,14 @@ export function ProjectDetail({
 	onFileUpload,
 	onDownloadFile,
 }: ProjectDetailProps) {
-	const { palette } = useTheme();
 	const { createLinkedDesign, gridDesigns, openGridDesign } =
 		useProjectDetailGridDesigns(project);
 
-	const actionButtonStyle = (tint: string): CSSProperties => ({
-		...glassCardInnerStyle(palette, tint),
-		color: hexToRgba(palette.text, 0.85),
-	});
-
-	const tabButtonStyle = (active: boolean): CSSProperties => ({
-		background: active
-			? `linear-gradient(120deg, ${hexToRgba(palette.primary, 0.2)} 0%, ${hexToRgba(palette.secondary, 0.18)} 100%)`
-			: hexToRgba(palette.surface, 0.32),
-		border: `1px solid ${hexToRgba(
-			active ? palette.primary : palette.text,
-			active ? 0.45 : 0.09,
-		)}`,
-		color: hexToRgba(palette.text, active ? 0.9 : 0.6),
-		boxShadow: active
-			? `0 8px 24px ${hexToRgba(palette.primary, 0.18)}`
-			: "none",
-	});
-
 	return (
-		<div className="space-y-7">
+		<div className={styles.root}>
 			<ProjectDetailHeader
 				project={project}
 				tasks={tasks}
-				palette={palette}
 				onToggleArchive={onToggleArchive}
 				onExportMarkdown={onExportMarkdown}
 			/>
@@ -118,45 +97,35 @@ export function ProjectDetail({
 			<ProjectDetailViewTabs
 				viewMode={viewMode}
 				onViewModeChange={onViewModeChange}
-				tabButtonStyle={tabButtonStyle}
 			/>
 
 			{viewMode === "tasks" && (
-				<GlassPanel
-					tint={palette.secondary}
-					hoverEffect={false}
-					className="p-7 xl:p-8 soft-fade-up"
-				>
-					<div className="flex items-center justify-between mb-5">
-						<h4
-							className="text-xl font-bold"
-							style={{ color: hexToRgba(palette.text, 0.88) }}
-						>
-							Tasks
-						</h4>
+				<section className={styles.tasksPanel}>
+					<div className={styles.tasksHead}>
+						<h4 className={styles.tasksTitle}>Tasks</h4>
 						<button
 							onClick={onAddTask}
-							className="px-4 py-2.5 rounded-xl transition-all flex items-center space-x-2 font-medium"
-							style={actionButtonStyle(palette.primary)}
+							className={styles.addButton}
+							type="button"
 						>
-							<Plus className="w-4 h-4" />
+							<Plus className={styles.addIcon} />
 							<span>Add Task</span>
 						</button>
 					</div>
 
-					<div
-						className="h-px mb-5"
-						style={{ background: hexToRgba(palette.text, 0.1) }}
-					/>
+					<div className={styles.divider} />
 
 					{tasks.length > 0 && (
-						<div className="flex flex-wrap gap-2 mb-5">
+						<div className={styles.taskFilters}>
 							{(["all", "pending", "completed"] as const).map((filter) => (
 								<button
 									key={filter}
+									type="button"
 									onClick={() => onTaskFilterChange(filter)}
-									className="px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all"
-									style={tabButtonStyle(taskFilter === filter)}
+									className={cn(
+										styles.taskFilterButton,
+										taskFilter === filter && styles.taskFilterActive,
+									)}
 								>
 									{filter.charAt(0).toUpperCase() + filter.slice(1)}
 								</button>
@@ -165,24 +134,12 @@ export function ProjectDetail({
 					)}
 
 					{tasks.length === 0 ? (
-						<div
-							className="text-center py-14 rounded-2xl border"
-							style={{ color: hexToRgba(palette.primary, 0.6) }}
-						>
-							<CheckSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-							<p className="text-lg font-medium">No tasks in this project</p>
-							<p
-								className="text-sm mt-1"
-								style={{ color: hexToRgba(palette.text, 0.55) }}
-							>
-								Click{" "}
-								<span
-									className="font-medium"
-									style={{ color: hexToRgba(palette.text, 0.7) }}
-								>
-									Add Task
-								</span>{" "}
-								to begin
+						<div className={styles.empty}>
+							<CheckSquare className={styles.emptyIcon} />
+							<p className={styles.emptyTitle}>No tasks in this project</p>
+							<p className={styles.emptySub}>
+								Click <span className={styles.emptyHint}>Add Task</span> to
+								begin
 							</p>
 						</div>
 					) : (
@@ -200,43 +157,37 @@ export function ProjectDetail({
 							filter={taskFilter}
 						/>
 					)}
-				</GlassPanel>
+				</section>
 			)}
 
 			{viewMode === "calendar" && (
-				<div className="soft-fade-up">
-					<CalendarView
-						currentMonth={currentMonth}
-						onMonthChange={onMonthChange}
-						selectedDate={selectedCalendarDate}
-						onDateSelect={onCalendarDateSelect}
-						calendarEvents={calendarEvents}
-					/>
-				</div>
+				<CalendarView
+					currentMonth={currentMonth}
+					onMonthChange={onMonthChange}
+					selectedDate={selectedCalendarDate}
+					onDateSelect={onCalendarDateSelect}
+					calendarEvents={calendarEvents}
+				/>
 			)}
 
 			{viewMode === "files" && (
-				<div className="soft-fade-up">
-					<FilesBrowser
-						files={files}
-						filter={fileFilter}
-						onFilterChange={onFileFilterChange}
-						onUpload={onFileUpload}
-						onDownload={onDownloadFile}
-						projectName={project.name}
-					/>
-				</div>
+				<FilesBrowser
+					files={files}
+					filter={fileFilter}
+					onFilterChange={onFileFilterChange}
+					onUpload={onFileUpload}
+					onDownload={onDownloadFile}
+					projectName={project.name}
+				/>
 			)}
 
 			{viewMode === "ground-grids" && (
 				<ProjectDetailGroundGridsView
-					palette={palette}
 					gridDesigns={gridDesigns}
 					onCreateDesign={() => {
 						void createLinkedDesign();
 					}}
 					onOpenDesign={openGridDesign}
-					actionButtonStyle={actionButtonStyle}
 				/>
 			)}
 		</div>

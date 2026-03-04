@@ -8,7 +8,7 @@ export default function ProjectsRoutePage() {
 	return (
 		<PageFrame
 			title="Project Manager"
-			subtitle="Organize and track your engineering projects."
+			description="Organize and track your engineering projects."
 		>
 			<ProjectManager initialProjectId={projectId} />
 		</PageFrame>

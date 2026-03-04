@@ -3,6 +3,8 @@ import yaml from "js-yaml";
 import { FileCode, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { APP_NAME } from "@/appMeta";
+import { cn } from "@/lib/utils";
+import styles from "./EmailConfig.module.css";
 
 const STORAGE_KEY = "app-email-config-yaml";
 const APP_SLUG = APP_NAME.toLowerCase().replace(/\s+/g, "");
@@ -180,46 +182,46 @@ export default function EmailConfig() {
 	};
 
 	return (
-		<div className="grid gap-3">
-			<h3 className="text-lg font-semibold tracking-tight [color:var(--text)]">
+		<div className={styles.root}>
+			<h3 className={styles.title}>
 				Email
-				<span className="ml-2 text-sm font-normal [color:var(--text-muted)]">
+				<span className={styles.titleNote}>
 					YAML config stored locally. Passwords are intentionally unsupported.
 				</span>
 			</h3>
 
-			<div className="grid gap-3 rounded-2xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
-				<div className="flex items-start gap-2">
+			<div className={styles.panel}>
+				<div className={styles.introRow}>
 					<FileCode size={16} />
 					<div>
-						<div className="text-sm font-semibold [color:var(--text)]">
-							Email configuration
-						</div>
-						<div className="text-xs [color:var(--text-muted)]">
+						<div className={styles.introTitle}>Email configuration</div>
+						<div className={styles.introCopy}>
 							Form edits basics; YAML edits templates too.
 						</div>
 					</div>
 				</div>
 
-				<div className="flex flex-wrap gap-2">
+				<div className={styles.modeRow}>
 					<button
 						type="button"
-						className={`inline-flex items-center justify-center rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
+						className={cn(
+							styles.modeButton,
 							viewMode === "form"
-								? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)]"
-								: "[border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:var(--surface-2)] hover:[color:var(--text)]"
-						}`}
+								? styles.modeButtonActive
+								: styles.modeButtonInactive,
+						)}
 						onClick={() => setViewMode("form")}
 					>
 						Form
 					</button>
 					<button
 						type="button"
-						className={`inline-flex items-center justify-center rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
+						className={cn(
+							styles.modeButton,
 							viewMode === "yaml"
-								? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)]"
-								: "[border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:var(--surface-2)] hover:[color:var(--text)]"
-						}`}
+								? styles.modeButtonActive
+								: styles.modeButtonInactive,
+						)}
 						onClick={() => setViewMode("yaml")}
 					>
 						YAML
@@ -227,17 +229,14 @@ export default function EmailConfig() {
 				</div>
 
 				{viewMode === "form" ? (
-					<div className="grid gap-3 md:grid-cols-2">
-						<div>
-							<label
-								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
-								htmlFor="smtp-host"
-							>
+					<div className={styles.formGrid}>
+						<div className={styles.field}>
+							<label className={styles.label} htmlFor="smtp-host">
 								SMTP Host
 							</label>
 							<input
 								id="smtp-host"
-								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+								className={styles.input}
 								value={config.smtp.host}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -249,16 +248,13 @@ export default function EmailConfig() {
 							/>
 						</div>
 
-						<div>
-							<label
-								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
-								htmlFor="smtp-port"
-							>
+						<div className={styles.field}>
+							<label className={styles.label} htmlFor="smtp-port">
 								SMTP Port
 							</label>
 							<input
 								id="smtp-port"
-								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+								className={styles.input}
 								type="number"
 								value={config.smtp.port}
 								onChange={(e) =>
@@ -270,16 +266,13 @@ export default function EmailConfig() {
 							/>
 						</div>
 
-						<div>
-							<label
-								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
-								htmlFor="smtp-user"
-							>
+						<div className={styles.field}>
+							<label className={styles.label} htmlFor="smtp-user">
 								SMTP Username
 							</label>
 							<input
 								id="smtp-user"
-								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+								className={styles.input}
 								value={config.smtp.auth.user}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -291,16 +284,13 @@ export default function EmailConfig() {
 							/>
 						</div>
 
-						<div>
-							<label
-								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
-								htmlFor="smtp-secure"
-							>
+						<div className={styles.field}>
+							<label className={styles.label} htmlFor="smtp-secure">
 								SMTP Secure
 							</label>
 							<select
 								id="smtp-secure"
-								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+								className={styles.select}
 								value={config.smtp.secure ? "true" : "false"}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -314,16 +304,13 @@ export default function EmailConfig() {
 							</select>
 						</div>
 
-						<div>
-							<label
-								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
-								htmlFor="from"
-							>
+						<div className={styles.field}>
+							<label className={styles.label} htmlFor="from">
 								From
 							</label>
 							<input
 								id="from"
-								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+								className={styles.input}
 								value={config.defaults.from}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -335,16 +322,13 @@ export default function EmailConfig() {
 							/>
 						</div>
 
-						<div>
-							<label
-								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
-								htmlFor="replyto"
-							>
+						<div className={styles.field}>
+							<label className={styles.label} htmlFor="replyto">
 								Reply-To
 							</label>
 							<input
 								id="replyto"
-								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+								className={styles.input}
 								value={config.defaults.replyTo}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -356,16 +340,13 @@ export default function EmailConfig() {
 							/>
 						</div>
 
-						<div className="md:col-span-2">
-							<label
-								className="mb-1.5 block text-xs font-medium uppercase tracking-wide [color:var(--text-muted)]"
-								htmlFor="subj"
-							>
+						<div className={cn(styles.field, styles.fieldFull)}>
+							<label className={styles.label} htmlFor="subj">
 								Subject Prefix
 							</label>
 							<input
 								id="subj"
-								className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+								className={styles.input}
 								value={config.defaults.subject_prefix}
 								onChange={(e) =>
 									setConfig((c) => ({
@@ -376,36 +357,26 @@ export default function EmailConfig() {
 							/>
 						</div>
 
-						<div className="text-xs [color:var(--text-muted)] md:col-span-2">
+						<div className={styles.templatesHint}>
 							Templates live in YAML mode under <code>templates:</code>.
 						</div>
 					</div>
 				) : (
 					<textarea
-						className="w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						className={styles.textarea}
 						value={yamlText}
 						onChange={(e) => setYamlText(e.target.value)}
-						style={{
-							minHeight: 340,
-							fontFamily:
-								"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-							lineHeight: 1.6,
-						}}
 					/>
 				)}
 
-				{error ? (
-					<div className="rounded-xl border px-3 py-2 text-sm [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_18%,transparent)] [color:var(--danger)]">
-						{error}
-					</div>
-				) : null}
+				{error ? <div className={styles.error}>{error}</div> : null}
 
 				<button
 					type="button"
-					className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition [background:var(--primary)] [color:var(--primary-contrast)]"
+					className={styles.saveButton}
 					onClick={handleSave}
 				>
-					<Save size={14} />
+					<Save className={styles.saveIcon} />
 					{saved ? "Saved" : "Save"}
 				</button>
 			</div>

@@ -1,11 +1,11 @@
 import { BookOpen, Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { Section } from "@/components/apps/ui/PageFrame";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
 import { useAuth } from "../../../auth/useAuth";
-import { FrameSection } from "../../apps/ui/PageFrame";
 
 type Formula = Database["public"]["Tables"]["formulas"]["Row"];
 
@@ -125,14 +125,12 @@ export function FormulaBank() {
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
 				<div className="flex items-center space-x-3">
-					<BookOpen className="h-8 w-8 text-[var(--accent)]" />
-					<h2 className="text-3xl font-bold text-[var(--text)]">
-						Formula Bank
-					</h2>
+					<BookOpen className="h-8 w-8 text-(--accent)" />
+					<h2 className="text-3xl font-bold text-(--text)">Formula Bank</h2>
 				</div>
 				<button
 					onClick={() => setShowAddForm(!showAddForm)}
-					className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-[var(--primary)]/30 flex items-center space-x-2"
+					className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30 flex items-center space-x-2"
 				>
 					<Plus className="w-5 h-5" />
 					<span>Add Formula</span>
@@ -140,10 +138,10 @@ export function FormulaBank() {
 			</div>
 
 			{showAddForm && (
-				<FrameSection title="Add New Formula">
+				<Section title="Add New Formula">
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<div>
-							<label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">
+							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
 								Name
 							</label>
 							<input
@@ -152,12 +150,12 @@ export function FormulaBank() {
 								onChange={(e) =>
 									setNewFormula({ ...newFormula, name: e.target.value })
 								}
-								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
 								placeholder="e.g., Ohm's Law"
 							/>
 						</div>
 						<div>
-							<label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">
+							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
 								Category
 							</label>
 							<input
@@ -166,12 +164,12 @@ export function FormulaBank() {
 								onChange={(e) =>
 									setNewFormula({ ...newFormula, category: e.target.value })
 								}
-								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
 								placeholder="e.g., Basic Laws"
 							/>
 						</div>
 						<div>
-							<label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">
+							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
 								Formula
 							</label>
 							<input
@@ -180,12 +178,12 @@ export function FormulaBank() {
 								onChange={(e) =>
 									setNewFormula({ ...newFormula, formula: e.target.value })
 								}
-								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
 								placeholder="e.g., V = I × R"
 							/>
 						</div>
 						<div>
-							<label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">
+							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
 								Description
 							</label>
 							<input
@@ -194,7 +192,7 @@ export function FormulaBank() {
 								onChange={(e) =>
 									setNewFormula({ ...newFormula, description: e.target.value })
 								}
-								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
 								placeholder="Brief description"
 							/>
 						</div>
@@ -210,52 +208,52 @@ export function FormulaBank() {
 						<button
 							onClick={() => setShowAddForm(false)}
 							disabled={isAddingFormula}
-							className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-6 py-2 text-[var(--text-muted)] transition-all hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-50"
+							className="rounded-lg border border-(--border) bg-(--surface) px-6 py-2 text-(--text-muted) transition-all hover:bg-(--surface-2) disabled:cursor-not-allowed disabled:opacity-50"
 						>
 							Cancel
 						</button>
 					</div>
-				</FrameSection>
+				</Section>
 			)}
 
-			<FrameSection>
+			<Section>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div className="relative">
-						<Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-[var(--accent)]" />
+						<Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-(--accent)" />
 						<input
 							type="text"
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
 							placeholder="Search formulas..."
-							className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 pl-10 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+							className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 pl-10 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
 						/>
 					</div>
 					<div>
 						<select
 							value={selectedCategory}
 							onChange={(e) => setSelectedCategory(e.target.value)}
-							className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] [&>option]:bg-[var(--surface-2)] [&>option]:text-[var(--text)]"
+							className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent) [&>option]:bg-(--surface-2) [&>option]:text-(--text)"
 						>
 							{categories.map((cat) => (
-								<option key={cat} value={cat} className="text-[var(--text)]">
+								<option key={cat} value={cat} className="text-(--text)">
 									{cat}
 								</option>
 							))}
 						</select>
 					</div>
 				</div>
-			</FrameSection>
+			</Section>
 
-			<FrameSection>
-				<div className="text-sm text-[var(--text-muted)]">
+			<Section>
+				<div className="text-sm text-(--text-muted)">
 					<p>Total Formulas: {formulas.length}</p>
 					<p>Filtered Formulas: {filteredFormulas.length}</p>
 					<p>Selected Category: {selectedCategory}</p>
 				</div>
-			</FrameSection>
+			</Section>
 
 			{loading ? (
-				<div className="py-8 text-center text-[var(--text-muted)]">
+				<div className="py-8 text-center text-(--text-muted)">
 					Loading formulas...
 				</div>
 			) : (
@@ -263,22 +261,22 @@ export function FormulaBank() {
 					{filteredFormulas.map((formula) => (
 						<div
 							key={formula.id}
-							className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 transition-all hover:border-[var(--accent)]"
+							className="rounded-lg border border-(--border) bg-(--surface) p-5 transition-all hover:border-(--accent)"
 						>
 							<div className="flex items-start justify-between mb-2">
-								<h3 className="text-lg font-bold text-[var(--text)]">
+								<h3 className="text-lg font-bold text-(--text)">
 									{formula.name}
 								</h3>
-								<span className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs text-[var(--text-muted)]">
+								<span className="rounded border border-(--border) bg-(--surface-2) px-2 py-1 text-xs text-(--text-muted)">
 									{formula.category}
 								</span>
 							</div>
-							<div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
-								<code className="font-mono text-lg text-[var(--accent)]">
+							<div className="mb-3 rounded-lg border border-(--border) bg-(--surface-2) px-4 py-3">
+								<code className="font-mono text-lg text-(--accent)">
 									{formula.formula}
 								</code>
 							</div>
-							<p className="text-sm text-[var(--text-muted)]">
+							<p className="text-sm text-(--text-muted)">
 								{formula.description}
 							</p>
 						</div>
@@ -287,7 +285,7 @@ export function FormulaBank() {
 			)}
 
 			{!loading && filteredFormulas.length === 0 && (
-				<div className="py-8 text-center text-[var(--text-muted)]">
+				<div className="py-8 text-center text-(--text-muted)">
 					No formulas found matching your search.
 				</div>
 			)}

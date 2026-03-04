@@ -1,6 +1,6 @@
 import { Plus, Search, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
-import { PageFrame } from "@/components/layout/PageFrame";
+import { PageFrame } from "@/components/apps/ui/PageFrame";
 
 type ReplaceRule = {
 	id: string;
@@ -45,7 +45,9 @@ export function BatchFindReplaceApp() {
 	};
 
 	const removeRule = (id: string) => {
-		setRules((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
+		setRules((prev) =>
+			prev.length > 1 ? prev.filter((r) => r.id !== id) : prev,
+		);
 	};
 
 	const ensureBatchSession = async () => {
@@ -184,7 +186,9 @@ export function BatchFindReplaceApp() {
 
 			{/* File upload */}
 			<section className="space-y-3">
-				<h3 className="text-sm font-medium [color:var(--text-muted)]">Input Files</h3>
+				<h3 className="text-sm font-medium [color:var(--text-muted)]">
+					Input Files
+				</h3>
 				<label
 					className="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition
 						[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
@@ -221,7 +225,9 @@ export function BatchFindReplaceApp() {
 							<div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
 								<input
 									value={rule.find}
-									onChange={(e) => updateRule(rule.id, { find: e.target.value })}
+									onChange={(e) =>
+										updateRule(rule.id, { find: e.target.value })
+									}
 									placeholder="Find"
 									className="rounded-md border px-3 py-2 text-sm outline-none transition
 										focus:[border-color:var(--primary)]
@@ -229,7 +235,9 @@ export function BatchFindReplaceApp() {
 								/>
 								<input
 									value={rule.replace}
-									onChange={(e) => updateRule(rule.id, { replace: e.target.value })}
+									onChange={(e) =>
+										updateRule(rule.id, { replace: e.target.value })
+									}
 									placeholder="Replace"
 									className="rounded-md border px-3 py-2 text-sm outline-none transition
 										focus:[border-color:var(--primary)]
@@ -250,7 +258,9 @@ export function BatchFindReplaceApp() {
 									<input
 										type="checkbox"
 										checked={rule.useRegex}
-										onChange={(e) => updateRule(rule.id, { useRegex: e.target.checked })}
+										onChange={(e) =>
+											updateRule(rule.id, { useRegex: e.target.checked })
+										}
 										className="rounded"
 									/>
 									Regex
@@ -259,7 +269,9 @@ export function BatchFindReplaceApp() {
 									<input
 										type="checkbox"
 										checked={rule.matchCase}
-										onChange={(e) => updateRule(rule.id, { matchCase: e.target.checked })}
+										onChange={(e) =>
+											updateRule(rule.id, { matchCase: e.target.checked })
+										}
 										className="rounded"
 									/>
 									Case sensitive
@@ -296,11 +308,15 @@ export function BatchFindReplaceApp() {
 								</span>
 								<div className="mt-1 space-y-0.5 [color:var(--text-muted)]">
 									<div>
-										<span className="inline-block w-12 font-medium [color:var(--danger)]">−</span>
+										<span className="inline-block w-12 font-medium [color:var(--danger)]">
+											−
+										</span>
 										{m.before}
 									</div>
 									<div>
-										<span className="inline-block w-12 font-medium [color:var(--success)]">+</span>
+										<span className="inline-block w-12 font-medium [color:var(--success)]">
+											+
+										</span>
 										{m.after}
 									</div>
 								</div>

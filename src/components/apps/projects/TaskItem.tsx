@@ -11,14 +11,15 @@ import {
 	Square,
 	Trash2,
 } from "lucide-react";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import { Task } from "./projectmanagertypes";
 import {
 	formatDateOnly,
 	getPriorityChipStyle,
 	getPriorityRowStyle,
-	getUrgencyColor,
+	getUrgencyTone,
 } from "./projectmanagerutils";
+import styles from "./TaskItem.module.css";
 
 interface TaskItemProps {
 	task: Task;
@@ -45,8 +46,8 @@ export function TaskItem({
 	onDelete,
 	isProjectArchived = false,
 }: TaskItemProps) {
-	const { palette } = useTheme();
 	const hasSubtasks = subtasks.length > 0;
+	const urgencyTone = getUrgencyTone(task.due_date);
 
 	const {
 		attributes,
@@ -64,110 +65,100 @@ export function TaskItem({
 	};
 
 	return (
-		<div ref={setNodeRef} style={style} className="space-y-2">
+		<div ref={setNodeRef} style={style} className={styles.root}>
 			<div
-				className="flex items-center space-x-3 p-3.5 rounded-xl transition-all"
+				className={styles.row}
 				style={{
 					marginLeft: `${level * 24}px`,
-					...getPriorityRowStyle(palette, task.priority),
-					border: `1px solid ${hexToRgba(palette.text, 0.08)}`,
-					boxShadow: `0 10px 24px ${hexToRgba("#000000", 0.14)}`,
+					...getPriorityRowStyle(task.priority),
 				}}
 			>
 				{!isProjectArchived && (
-					<div
-						{...attributes}
-						{...listeners}
-						className="cursor-grab active:cursor-grabbing p-1 touch-none"
-					>
-						<GripVertical
-							className="w-4 h-4"
-							style={{ color: hexToRgba(palette.primary, 0.6) }}
-						/>
+					<div {...attributes} {...listeners} className={styles.dragHandle}>
+						<GripVertical className={styles.dragIcon} />
 					</div>
 				)}
+
 				{hasSubtasks && (
-					<button onClick={() => onToggleExpand(task.id)} className="p-1">
+					<button
+						onClick={() => onToggleExpand(task.id)}
+						className={styles.iconButton}
+						type="button"
+					>
 						{isExpanded ? (
-							<ChevronDown
-								className="w-4 h-4"
-								style={{ color: hexToRgba(palette.primary, 0.85) }}
-							/>
+							<ChevronDown className={styles.chevronIcon} />
 						) : (
-							<ChevronRight
-								className="w-4 h-4"
-								style={{ color: hexToRgba(palette.primary, 0.85) }}
-							/>
+							<ChevronRight className={styles.chevronIcon} />
 						)}
 					</button>
 				)}
-				<button onClick={() => onToggleComplete(task)}>
+
+				<button
+					onClick={() => onToggleComplete(task)}
+					className={styles.iconButton}
+					type="button"
+				>
 					{task.completed ? (
-						<CheckSquare className="w-5 h-5 [color:var(--success)]" />
+						<CheckSquare className={cn(styles.checkIcon, styles.checkDone)} />
 					) : (
-						<Square
-							className="w-5 h-5"
-							style={{ color: hexToRgba(palette.primary, 0.85) }}
-						/>
+						<Square className={cn(styles.checkIcon, styles.checkOpen)} />
 					)}
 				</button>
-				<div className="flex-1 min-w-0">
+
+				<div className={styles.content}>
 					<span
-						className="block font-medium leading-relaxed"
-						style={{
-							color: hexToRgba(palette.text, task.completed ? 0.35 : 0.9),
-							textDecoration: task.completed ? "line-through" : "none",
-						}}
+						className={cn(styles.title, task.completed && styles.titleDone)}
 					>
 						{task.name}
 					</span>
 					{task.due_date && (
 						<div
-							className={`inline-flex items-center space-x-1 text-xs mt-1.5 px-2 py-0.5 rounded-full border ${getUrgencyColor(task.due_date)}`}
-							style={{ borderColor: hexToRgba(palette.text, 0.16) }}
+							className={cn(
+								styles.dueChip,
+								urgencyTone === "danger" && styles.urgencyDanger,
+								urgencyTone === "warning" && styles.urgencyWarning,
+								urgencyTone === "success" && styles.urgencySuccess,
+							)}
 						>
-							<Clock className="w-3 h-3" />
+							<Clock className={styles.clockIcon} />
 							<span>{formatDateOnly(task.due_date)}</span>
 						</div>
 					)}
 				</div>
+
 				<span
-					className="text-xs px-2 py-1 rounded border"
-					style={getPriorityChipStyle(palette, task.priority)}
+					className={styles.priorityChip}
+					style={getPriorityChipStyle(task.priority)}
 				>
 					{task.priority}
 				</span>
+
 				{!isProjectArchived && (
 					<>
 						<button
 							onClick={() => onAddSubtask(task.id)}
-							className="p-1 rounded transition-colors hover:bg-white/5"
+							className={styles.iconButton}
 							title="Add subtask"
+							type="button"
 						>
-							<Plus
-								className="w-4 h-4"
-								style={{ color: hexToRgba(palette.primary, 0.85) }}
-							/>
+							<Plus className={cn(styles.actionIcon, styles.actionPrimary)} />
 						</button>
 						<button
 							onClick={() => onEdit(task)}
-							className="p-1 rounded transition-colors hover:bg-white/5"
+							className={styles.iconButton}
+							type="button"
 						>
-							<Edit
-								className="w-4 h-4"
-								style={{ color: hexToRgba(palette.primary, 0.85) }}
-							/>
+							<Edit className={cn(styles.actionIcon, styles.actionPrimary)} />
 						</button>
 					</>
 				)}
+
 				<button
 					onClick={() => onDelete(task.id)}
-					className="p-1 rounded transition-colors hover:bg-white/5"
+					className={styles.iconButton}
+					type="button"
 				>
-					<Trash2
-						className="w-4 h-4"
-						style={{ color: hexToRgba(palette.accent, 0.9) }}
-					/>
+					<Trash2 className={cn(styles.actionIcon, styles.actionDanger)} />
 				</button>
 			</div>
 		</div>

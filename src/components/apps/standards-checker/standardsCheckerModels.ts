@@ -1,4 +1,4 @@
-export type StandardsCheckerMode = "standards" | "qaqc";
+export type StandardsCheckerMode = "standards" | "standards-drawing";
 export type StandardsCategory = "NEC" | "IEEE" | "IEC";
 
 export interface Standard {
@@ -91,27 +91,3 @@ export const sampleStandards: Standard[] = [
 			"Fundamental principles, protection for safety, and selection of equipment.",
 	},
 ];
-
-export const statusToneClasses: Record<
-	CheckResult["status"],
-	{
-		badge: string;
-		text: string;
-	}
-> = {
-	pass: {
-		badge:
-			"[background:color-mix(in_srgb,var(--success)_12%,transparent)] [border-color:color-mix(in_srgb,var(--success)_35%,transparent)]",
-		text: "[color:var(--success)]",
-	},
-	warning: {
-		badge:
-			"[background:color-mix(in_srgb,var(--warning)_12%,transparent)] [border-color:color-mix(in_srgb,var(--warning)_35%,transparent)]",
-		text: "[color:var(--warning)]",
-	},
-	fail: {
-		badge:
-			"[background:color-mix(in_srgb,var(--danger)_12%,transparent)] [border-color:color-mix(in_srgb,var(--danger)_35%,transparent)]",
-		text: "[color:var(--danger)]",
-	},
-};

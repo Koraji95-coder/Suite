@@ -1,52 +1,37 @@
 import { Calendar, CheckSquare, FileDown, MapPin } from "lucide-react";
-import type { CSSProperties } from "react";
+import { cn } from "@/lib/utils";
+import styles from "./ProjectDetailViewTabs.module.css";
 import type { ViewMode } from "./projectmanagertypes";
 
 interface ProjectDetailViewTabsProps {
 	viewMode: ViewMode;
 	onViewModeChange: (mode: ViewMode) => void;
-	tabButtonStyle: (active: boolean) => CSSProperties;
 }
+
+const tabs: { mode: ViewMode; label: string; icon: typeof CheckSquare }[] = [
+	{ mode: "tasks", label: "Tasks", icon: CheckSquare },
+	{ mode: "calendar", label: "Calendar", icon: Calendar },
+	{ mode: "files", label: "Files", icon: FileDown },
+	{ mode: "ground-grids", label: "Ground Grids", icon: MapPin },
+];
 
 export function ProjectDetailViewTabs({
 	viewMode,
 	onViewModeChange,
-	tabButtonStyle,
 }: ProjectDetailViewTabsProps) {
 	return (
-		<div className="flex flex-wrap items-center gap-2 mb-2">
-			<button
-				onClick={() => onViewModeChange("tasks")}
-				className="px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2"
-				style={tabButtonStyle(viewMode === "tasks")}
-			>
-				<CheckSquare className="w-4 h-4" />
-				<span>Tasks</span>
-			</button>
-			<button
-				onClick={() => onViewModeChange("calendar")}
-				className="px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2"
-				style={tabButtonStyle(viewMode === "calendar")}
-			>
-				<Calendar className="w-4 h-4" />
-				<span>Calendar</span>
-			</button>
-			<button
-				onClick={() => onViewModeChange("files")}
-				className="px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2"
-				style={tabButtonStyle(viewMode === "files")}
-			>
-				<FileDown className="w-4 h-4" />
-				<span>Files</span>
-			</button>
-			<button
-				onClick={() => onViewModeChange("ground-grids")}
-				className="px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2"
-				style={tabButtonStyle(viewMode === "ground-grids")}
-			>
-				<MapPin className="w-4 h-4" />
-				<span>Ground Grids</span>
-			</button>
+		<div className={styles.root}>
+			{tabs.map(({ mode, label, icon: Icon }) => (
+				<button
+					key={mode}
+					type="button"
+					onClick={() => onViewModeChange(mode)}
+					className={cn(styles.tab, viewMode === mode && styles.tabActive)}
+				>
+					<Icon className={styles.icon} />
+					<span>{label}</span>
+				</button>
+			))}
 		</div>
 	);
 }

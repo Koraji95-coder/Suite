@@ -1,9 +1,8 @@
 import { Loader2, RefreshCw } from "lucide-react";
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import type { TableInfo } from "./storageTypes";
 
 interface DatabaseBrowserSidebarProps {
-	palette: ColorScheme;
 	tables: TableInfo[];
 	selectedTable: string;
 	loadingTables: boolean;
@@ -12,7 +11,6 @@ interface DatabaseBrowserSidebarProps {
 }
 
 export function DatabaseBrowserSidebar({
-	palette,
 	tables,
 	selectedTable,
 	loadingTables,
@@ -20,78 +18,40 @@ export function DatabaseBrowserSidebar({
 	onSelectTable,
 }: DatabaseBrowserSidebarProps) {
 	return (
-		<div
-			className="w-full xl:w-[220px] xl:shrink-0"
-			style={{
-				padding: 12,
-				borderRadius: 10,
-				background: hexToRgba(palette.surface, 0.5),
-				border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-				overflowY: "auto",
-				maxHeight: 600,
-			}}
-		>
-			<div
-				style={{
-					display: "flex",
-					justifyContent: "space-between",
-					alignItems: "center",
-					marginBottom: 10,
-				}}
-			>
-				<span style={{ fontWeight: 600, fontSize: 13, color: palette.text }}>
+		<div className="max-h-150 w-full overflow-y-auto rounded-[10px] border p-3 xl:w-55 xl:shrink-0 border-[color-mix(in_srgb,var(--primary)_10%,transparent)] [background:color-mix(in_srgb,var(--surface)_50%,transparent)]">
+			<div className="mb-2.5 flex items-center justify-between">
+				<span className="text-[13px] font-semibold [color:var(--text)]">
 					Tables
 				</span>
 				<button
 					onClick={onRefreshTables}
 					disabled={loadingTables}
-					style={{
-						background: "none",
-						border: "none",
-						cursor: "pointer",
-						color: palette.primary,
-					}}
+					className="border-none bg-transparent [color:var(--primary)]"
 				>
 					<RefreshCw
-						className={`w-3.5 h-3.5 ${loadingTables ? "animate-spin" : ""}`}
+						className={`h-3.5 w-3.5 ${loadingTables ? "animate-spin" : ""}`}
 					/>
 				</button>
 			</div>
 
 			{loadingTables ? (
-				<div
-					style={{ textAlign: "center", padding: 24, color: palette.textMuted }}
-				>
-					<Loader2 className="w-5 h-5 animate-spin mx-auto" />
+				<div className="py-6 text-center [color:var(--text-muted)]">
+					<Loader2 className="mx-auto h-5 w-5 animate-spin" />
 				</div>
 			) : (
 				tables.map((table) => (
 					<button
 						key={table.name}
 						onClick={() => onSelectTable(table.name)}
-						style={{
-							display: "flex",
-							justifyContent: "space-between",
-							width: "100%",
-							padding: "8px 10px",
-							borderRadius: 6,
-							marginBottom: 4,
-							fontSize: 13,
-							cursor: "pointer",
-							background:
-								selectedTable === table.name
-									? hexToRgba(palette.primary, 0.15)
-									: "transparent",
-							border:
-								selectedTable === table.name
-									? `1px solid ${palette.primary}`
-									: "1px solid transparent",
-							color: palette.text,
-							transition: "all 0.15s",
-						}}
+						className={cn(
+							"mb-1 flex w-full justify-between rounded-md border px-2.5 py-2 text-[13px] transition [color:var(--text)]",
+							selectedTable === table.name
+								? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_15%,transparent)]"
+								: "border-transparent bg-transparent",
+						)}
 					>
 						<span>{table.name}</span>
-						<span style={{ color: palette.textMuted, fontSize: 12 }}>
+						<span className="text-xs [color:var(--text-muted)]">
 							{table.row_count}
 						</span>
 					</button>

@@ -1,6 +1,6 @@
 import { Zap } from "lucide-react";
 import { useState } from "react";
-import { FrameSection } from "../../apps/ui/PageFrame";
+import { Section } from "@/components/apps/ui/PageFrame";
 
 export function ThreePhaseCalculator() {
 	const [lineVoltage, setLineVoltage] = useState(415);
@@ -96,7 +96,7 @@ export function ThreePhaseCalculator() {
 				</h2>
 			</div>
 
-			<FrameSection title="Voltage Relationships in 3-Phase System">
+			<Section title="Voltage Relationships in 3-Phase System">
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 					<div className="space-y-4">
 						<div>
@@ -216,9 +216,9 @@ export function ThreePhaseCalculator() {
 						</p>
 					</div>
 				</div>
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="Power Calculations">
+			<Section title="Power Calculations">
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 					<div className="rounded-lg border p-4 [border-color:var(--accent)] [background:color-mix(in_srgb,var(--accent)_14%,transparent)]">
 						<p className="mb-1 text-sm font-semibold [color:var(--accent)]">
@@ -291,9 +291,9 @@ export function ThreePhaseCalculator() {
 						</div>
 					)}
 				</div>
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="Fault Analysis">
+			<Section title="Fault Analysis">
 				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 					<div className="space-y-4">
 						<div>
@@ -369,9 +369,9 @@ export function ThreePhaseCalculator() {
 						</div>
 					</div>
 				</div>
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="Δ-Y Transformation">
+			<Section title="Δ-Y Transformation">
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div className={cardClass}>
 						<h4 className="mb-3 font-semibold [color:var(--text-muted)]">
@@ -429,7 +429,7 @@ export function ThreePhaseCalculator() {
 						</div>
 					</div>
 				</div>
-			</FrameSection>
+			</Section>
 		</div>
 	);
 }

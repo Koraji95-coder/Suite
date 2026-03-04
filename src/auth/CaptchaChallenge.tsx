@@ -20,7 +20,10 @@ type TurnstileRenderOptions = {
 };
 
 type TurnstileApi = {
-	render: (container: HTMLElement, options: TurnstileRenderOptions) => TurnstileWidgetId;
+	render: (
+		container: HTMLElement,
+		options: TurnstileRenderOptions,
+	) => TurnstileWidgetId;
 	remove: (widgetId: TurnstileWidgetId) => void;
 	reset: (widgetId: TurnstileWidgetId) => void;
 };
@@ -66,8 +69,7 @@ function ensureTurnstileScript(): Promise<void> {
 		script.async = true;
 		script.defer = true;
 		script.onload = () => resolve();
-		script.onerror = () =>
-			reject(new Error("Failed to load Turnstile script"));
+		script.onerror = () => reject(new Error("Failed to load Turnstile script"));
 		document.head.appendChild(script);
 	});
 }
@@ -156,7 +158,10 @@ export default function CaptchaChallenge({
 
 	return (
 		<div className="grid gap-2">
-			<div ref={containerRef} className={disabled ? "pointer-events-none opacity-75" : ""} />
+			<div
+				ref={containerRef}
+				className={disabled ? "pointer-events-none opacity-75" : ""}
+			/>
 			{loadError ? (
 				<div className="rounded-lg border px-3 py-2 text-xs [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">
 					{loadError}

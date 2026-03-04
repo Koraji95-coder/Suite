@@ -1,0 +1,210 @@
+.root {
+	margin-inline: auto;
+	max-width: 96rem;
+}
+
+.header {
+	margin-bottom: 1.5rem;
+}
+
+.headerRow {
+	margin-bottom: 0.5rem;
+}
+
+.headerIcon {
+	display: flex;
+	width: 2.5rem;
+	height: 2.5rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-3);
+	color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.layout {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.coverageCard {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 0.75rem;
+	background: color-mix(in srgb, var(--surface-2) 62%, transparent);
+}
+
+.capsLabel {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.coverageTitle {
+	margin-top: 0.25rem;
+}
+
+.coverageRow {
+	margin-top: 0.5rem;
+}
+
+.coverageTrack {
+	flex: 1;
+	height: 0.38rem;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--surface-2);
+}
+
+.coverageFill {
+	height: 100%;
+	border-radius: 999px;
+	background: var(--primary);
+	transition: width 160ms ease;
+}
+
+.tabButton {
+	width: 100%;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 0.62rem 0.75rem;
+	text-align: left;
+	transition:
+		border-color 160ms ease,
+		background 160ms ease;
+}
+
+.tabButtonActive {
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.tabButtonInactive {
+	background: var(--surface);
+}
+
+.tabButtonInactive:hover {
+	background: var(--surface-2);
+}
+
+.tabIcon {
+	display: flex;
+	width: 1.75rem;
+	height: 1.75rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.6rem;
+}
+
+.tabIconActive {
+	color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.tabIconInactive {
+	color: var(--text-muted);
+	background: var(--surface-2);
+}
+
+.tabText {
+	flex: 1;
+	min-width: 0;
+}
+
+.activeDot {
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 999px;
+	background: var(--primary);
+}
+
+.sectionHeaderRow {
+	gap: 1rem;
+}
+
+.sectionLabel {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.quickTabs {
+	justify-content: flex-end;
+}
+
+.quickButton {
+	border: 1px solid var(--line-soft);
+	border-radius: 999px;
+	padding: 0.36rem 0.7rem;
+	font-size: 0.72rem;
+	font-weight: 600;
+	transition:
+		border-color 160ms ease,
+		background 160ms ease,
+		color 160ms ease;
+}
+
+.quickButtonActive {
+	color: var(--text);
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.quickButtonInactive {
+	color: var(--text-muted);
+}
+
+.quickButtonInactive:hover {
+	color: var(--text);
+	background: var(--surface-2);
+}
+
+.aiIcon {
+	display: flex;
+	width: 2.5rem;
+	height: 2.5rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-3);
+	color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.aiInset {
+	text-align: center;
+}
+
+.aiInsetCenter {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding-block: 1.5rem;
+}
+
+.aiGlyphWrap {
+	margin-bottom: 1rem;
+	display: flex;
+	width: 4rem;
+	height: 4rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-4);
+	background: var(--surface-2);
+}
+
+.aiGlyph {
+	color: var(--text-muted);
+}
+
+.aiSubtext {
+	margin-top: 0.25rem;
+	max-width: 18rem;
+}
+
+.aiBadge {
+	margin-top: 1rem;
+}
+
+@media (min-width: 80rem) {
+	.layout {
+		grid-template-columns: 17.5rem minmax(0, 1fr);
+	}
+}

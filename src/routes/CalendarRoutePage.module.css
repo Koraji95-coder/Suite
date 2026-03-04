@@ -1,0 +1,58 @@
+.root {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+}
+
+.mainColumn {
+	flex: 1;
+	min-width: 0;
+}
+
+.header {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: var(--space-6);
+}
+
+.iconBox {
+	display: grid;
+	place-items: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--primary) 16%, transparent);
+	color: var(--primary);
+	border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+}
+
+.calendarPanel {
+	overflow: hidden;
+	border-color: color-mix(in srgb, var(--border) 92%, transparent);
+	background:
+		linear-gradient(
+			185deg,
+			color-mix(in srgb, var(--surface) 90%, transparent),
+			color-mix(in srgb, var(--surface-2) 76%, transparent)
+		),
+		var(--surface);
+}
+
+.calendarViewport {
+	min-height: clamp(620px, 72dvh, 1040px);
+}
+
+.rightRail {
+	width: 100%;
+	flex-shrink: 0;
+}
+
+@media (min-width: 1024px) {
+	.root {
+		flex-direction: row;
+	}
+	.rightRail {
+		width: 20rem;
+	}
+}

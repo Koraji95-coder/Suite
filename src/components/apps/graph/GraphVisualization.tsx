@@ -1,7 +1,6 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { deleteMemory, loadMemories } from "@/lib/agent-memory/service";
 import type { Memory } from "@/lib/agent-memory/types";
-import { useTheme } from "@/lib/palette";
 import { adaptArchitecture } from "./adapters/architectureAdapter";
 import { adaptMemories } from "./adapters/memoryAdapter";
 import { Graph2D } from "./Graph2D";
@@ -20,7 +19,6 @@ function mergeGraphData(...sources: GraphData[]): GraphData {
 }
 
 export function GraphVisualization() {
-	const { palette } = useTheme();
 	const [viewMode, setViewMode] = useState<ViewMode>("2d");
 	const [sourceFilter, setSourceFilter] =
 		useState<SourceFilter>("architecture");
@@ -81,14 +79,7 @@ export function GraphVisualization() {
 	}, []);
 
 	return (
-		<div
-			style={{
-				display: "flex",
-				flexDirection: "column",
-				height: "100%",
-				background: palette.background,
-			}}
-		>
+		<div className="flex h-full flex-col [background:var(--background)]">
 			<GraphToolbar
 				viewMode={viewMode}
 				onViewModeChange={setViewMode}
@@ -98,18 +89,10 @@ export function GraphVisualization() {
 				onSearchChange={setSearchQuery}
 				onAddMemory={handleAddMemory}
 			/>
-			<div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-				<div style={{ flex: 1, position: "relative" }}>
+			<div className="flex min-h-0 flex-1">
+				<div className="relative flex-1">
 					{!loaded ? (
-						<div
-							style={{
-								display: "flex",
-								alignItems: "center",
-								justifyContent: "center",
-								height: "100%",
-								color: palette.textMuted,
-							}}
-						>
+						<div className="flex h-full items-center justify-center [color:var(--text-muted)]">
 							Loading graph data...
 						</div>
 					) : (

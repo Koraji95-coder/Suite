@@ -1,0 +1,180 @@
+.root {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.title {
+	margin: 0;
+	font-size: 1.1rem;
+	font-weight: 650;
+	letter-spacing: -0.01em;
+	color: var(--text);
+}
+
+.titleNote {
+	margin-left: 0.5rem;
+	font-size: 0.86rem;
+	font-weight: 400;
+	color: var(--text-muted);
+}
+
+.panel {
+	display: grid;
+	gap: 0.75rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-4);
+	padding: 1rem;
+	background: var(--surface);
+}
+
+.introRow {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+}
+
+.introTitle {
+	font-size: 0.86rem;
+	font-weight: 650;
+	color: var(--text);
+}
+
+.introCopy {
+	font-size: 0.76rem;
+	color: var(--text-muted);
+}
+
+.modeRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.modeButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 0.48rem 0.85rem;
+	font-size: 0.84rem;
+	font-weight: 700;
+	transition:
+		border-color 160ms ease,
+		background 160ms ease,
+		color 160ms ease;
+}
+
+.modeButtonActive {
+	color: var(--text);
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.modeButtonInactive {
+	color: var(--text-muted);
+	background: var(--surface);
+}
+
+.modeButtonInactive:hover {
+	color: var(--text);
+	background: var(--surface-2);
+}
+
+.formGrid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.field {
+	display: block;
+}
+
+.fieldFull {
+	grid-column: 1 / -1;
+}
+
+.label {
+	display: block;
+	margin-bottom: 0.38rem;
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.input,
+.select,
+.textarea {
+	width: 100%;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 0.62rem 0.78rem;
+	font-size: 0.84rem;
+	color: var(--text);
+	background: var(--surface);
+	outline: none;
+	transition:
+		border-color 160ms ease,
+		box-shadow 160ms ease;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+	border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.textarea {
+	min-height: 21.25rem;
+	line-height: 1.6;
+	font-family:
+		ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+}
+
+.templatesHint {
+	grid-column: 1 / -1;
+	font-size: 0.74rem;
+	color: var(--text-muted);
+}
+
+.error {
+	border: 1px solid var(--danger);
+	border-radius: var(--radius-3);
+	padding: 0.5rem 0.66rem;
+	font-size: 0.84rem;
+	color: var(--danger);
+	background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+.saveButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	border: 0;
+	border-radius: var(--radius-3);
+	padding: 0.58rem 0.9rem;
+	font-size: 0.84rem;
+	font-weight: 700;
+	color: var(--primary-contrast);
+	background: var(--primary);
+	transition: background 160ms ease;
+}
+
+.saveButton:hover {
+	background: var(--primary-hover);
+}
+
+.saveIcon {
+	width: 0.88rem;
+	height: 0.88rem;
+}
+
+@media (min-width: 48rem) {
+	.formGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}

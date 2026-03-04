@@ -1,6 +1,6 @@
-import { logger } from "../../lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
+import { logger } from "../../lib/errorLogger";
 import type { Memory } from "./types";
 
 export async function loadMemories(

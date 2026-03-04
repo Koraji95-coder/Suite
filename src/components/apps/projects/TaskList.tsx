@@ -7,6 +7,7 @@ import {
 import { useMemo } from "react";
 import { Task } from "./projectmanagertypes";
 import { TaskItem } from "./TaskItem";
+import styles from "./TaskList.module.css";
 
 interface TaskListProps {
 	tasks: Task[];
@@ -75,7 +76,7 @@ export function TaskList({
 					isProjectArchived={isProjectArchived}
 				/>
 				{expandedTasks.has(task.id) && subtasks.length > 0 && (
-					<div className="space-y-2.5 pt-1">
+					<div className={styles.subtree}>
 						{subtasks.map((subtask) => renderTaskTree(subtask, level + 1))}
 					</div>
 				)}
@@ -93,7 +94,7 @@ export function TaskList({
 				items={filteredRootTasks.map((t) => t.id)}
 				strategy={verticalListSortingStrategy}
 			>
-				<div className="space-y-3">
+				<div className={styles.root}>
 					{filteredRootTasks.map((task) => renderTaskTree(task))}
 				</div>
 			</SortableContext>

@@ -1,29 +1,31 @@
 // src/components/primitives/index.ts
 
-// Layout
-export { Stack, HStack, VStack, Spacer } from './Stack';
-export type { StackProps } from './Stack';
-
-// Typography
-export { Text, Heading, Label, Caption, Code } from './Text';
-export type { TextProps, HeadingProps } from './Text';
-
-// Button
-export { Button, IconButton, ButtonGroup } from './Button';
-export type { ButtonProps, IconButtonProps, ButtonGroupProps } from './Button';
-
-// Panel
-export { Panel, PanelHeader, PanelBody, PanelFooter, PanelGroup } from './Panel';
-export type { PanelProps, PanelSectionProps, PanelGroupProps } from './Panel';
-
+export type { BadgeProps, CountBadgeProps, StatusBadgeProps } from "./Badge";
 // Badge
-export { Badge, StatusBadge, CountBadge } from './Badge';
-export type { BadgeProps, StatusBadgeProps, CountBadgeProps } from './Badge';
-
-// Progress
-export { Progress, SegmentedProgress } from './Progress';
-export type { ProgressProps, SegmentedProgressProps } from './Progress';
-
+export { Badge, CountBadge, StatusBadge } from "./Badge";
+export type { ButtonGroupProps, ButtonProps, IconButtonProps } from "./Button";
+// Button
+export { Button, ButtonGroup, IconButton } from "./Button";
+// Layout
+export type { ContainerProps } from "./Container";
+export { Container } from "./Container";
+export type { InputProps, SearchInputProps, TextAreaProps } from "./Input";
 // Input
-export { Input, TextArea, SearchInput } from './Input';
-export type { InputProps, TextAreaProps, SearchInputProps } from './Input';
+export { Input, SearchInput, TextArea } from "./Input";
+export type { PanelGroupProps, PanelProps, PanelSectionProps } from "./Panel";
+// Panel
+export {
+	Panel,
+	PanelBody,
+	PanelFooter,
+	PanelGroup,
+	PanelHeader,
+} from "./Panel";
+export type { ProgressProps, SegmentedProgressProps } from "./Progress";
+// Progress
+export { Progress, SegmentedProgress } from "./Progress";
+export type { StackProps } from "./Stack";
+export { HStack, Spacer, Stack, VStack } from "./Stack";
+export type { HeadingProps, TextProps } from "./Text";
+// Typography
+export { Caption, Code, Heading, Label, Text } from "./Text";

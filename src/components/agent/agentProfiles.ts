@@ -44,6 +44,8 @@ export const AGENT_PROFILES: Record<AgentProfileId, AgentProfile> = {
 	},
 };
 
-export const AGENT_PROFILE_IDS = Object.keys(AGENT_PROFILES) as AgentProfileId[];
+export const AGENT_PROFILE_IDS = Object.keys(
+	AGENT_PROFILES,
+) as AgentProfileId[];
 
 export const DEFAULT_AGENT_PROFILE: AgentProfileId = "koro";

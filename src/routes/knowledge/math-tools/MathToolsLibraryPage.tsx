@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageFrame, Section } from "@/components/apps/ui/PageFrame";
 import { CalculatorPanel } from "@/components/knowledge/mathtools/CalculatorPanel";
 import { CircuitGenerator } from "@/components/knowledge/mathtools/CircuitGenerator";
 import { FormulaBank } from "@/components/knowledge/mathtools/FormulaBank";
@@ -8,7 +9,8 @@ import { SinusoidalCalculator } from "@/components/knowledge/mathtools/Sinusoida
 import { SymmetricalComponents } from "@/components/knowledge/mathtools/SymmetricalComponents";
 import { ThreePhaseCalculator } from "@/components/knowledge/mathtools/ThreePhaseCalculator";
 import { VectorCalculator } from "@/components/knowledge/mathtools/VectorCalculator";
-import { FrameSection, PageFrame } from "@/components/apps/ui/PageFrame";
+import { cn } from "@/lib/utils";
+import styles from "./MathToolsLibraryPage.module.css";
 
 type ToolKey =
 	| "vector"
@@ -62,10 +64,10 @@ export default function MathToolsLibraryPage() {
 	return (
 		<PageFrame
 			title="Math Tools Library"
-			subtitle="Legacy calculators and engineering utilities collected in one place."
+			description="Legacy calculators and engineering utilities collected in one place."
 		>
-			<FrameSection title="Tools">
-				<div className="mb-4 flex flex-wrap gap-2">
+			<Section title="Tools">
+				<div className={styles.toolsRow}>
 					{TOOL_OPTIONS.map((tool) => {
 						const active = tool.key === activeTool;
 						return (
@@ -73,11 +75,10 @@ export default function MathToolsLibraryPage() {
 								key={tool.key}
 								type="button"
 								onClick={() => setActiveTool(tool.key)}
-								className={`rounded-xl border px-3 py-2 text-sm transition ${
-									active
-										? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_16%,var(--surface))] [color:var(--text)]"
-										: "[border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:var(--surface-2)]"
-								}`}
+								className={cn(
+									styles.toolButton,
+									active && styles.toolButtonActive,
+								)}
 							>
 								{tool.label}
 							</button>
@@ -85,7 +86,7 @@ export default function MathToolsLibraryPage() {
 					})}
 				</div>
 				{renderTool()}
-			</FrameSection>
+			</Section>
 		</PageFrame>
 	);
 }

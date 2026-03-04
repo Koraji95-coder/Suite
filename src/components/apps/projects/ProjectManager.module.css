@@ -1,0 +1,73 @@
+.root {
+	margin-inline: auto;
+	width: 100%;
+	max-width: min(110rem, 100%);
+	display: grid;
+	gap: var(--space-8);
+}
+
+.contentGrid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--space-6);
+}
+
+.listPane {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: clamp(0.9rem, 1.7vw, 1.3rem);
+	background:
+		linear-gradient(
+			185deg,
+			color-mix(in srgb, var(--surface) 88%, transparent),
+			color-mix(in srgb, var(--surface-2) 72%, transparent)
+		),
+		var(--surface);
+}
+
+.detailColumn {
+	display: grid;
+	gap: var(--space-6);
+}
+
+.emptyDetail {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: clamp(2rem, 5vw, 3rem);
+	display: grid;
+	justify-items: center;
+	text-align: center;
+	background:
+		radial-gradient(
+			100% 80% at 90% 5%,
+			color-mix(in srgb, var(--primary) 14%, transparent),
+			transparent 65%
+		),
+		color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.emptyIcon {
+	width: 3rem;
+	height: 3rem;
+	margin-bottom: 0.9rem;
+	color: color-mix(in srgb, var(--primary) 80%, transparent);
+}
+
+.emptyTitle {
+	margin: 0;
+	font-size: 1.05rem;
+	color: var(--text);
+}
+
+.emptyCopy {
+	margin: 0.35rem 0 0;
+	font-size: 0.86rem;
+	color: var(--text-muted);
+}
+
+@media (min-width: 1280px) {
+	.contentGrid {
+		grid-template-columns: 25rem minmax(0, 1fr);
+		gap: 1.75rem;
+	}
+}

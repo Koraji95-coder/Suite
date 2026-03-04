@@ -4,14 +4,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { AgentChatPanel } from "@/components/agent/AgentChatPanel";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import { agentService } from "@/services/agentService";
+import styles from "./AgentRoutePage.module.css";
 
 export default function AgentRoutePage() {
 	const { user } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const { palette } = useTheme();
 	const [healthy, setHealthy] = useState<boolean | null>(null);
 	const [paired, setPaired] = useState(false);
 	const userId = user?.id ?? null;
@@ -57,82 +57,61 @@ export default function AgentRoutePage() {
 	const isReady = healthy === true && paired;
 
 	return (
-		<PageFrame title="Agent" subtitle="AI-powered task orchestration">
-			<div
-				className="rounded-xl border"
-				style={{
-					borderColor: hexToRgba(palette.text, 0.06),
-					background: hexToRgba(palette.surface, 0.5),
-				}}
-			>
-				<div
-					className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs"
-					style={{ color: hexToRgba(palette.text, 0.6) }}
-				>
-					<div className="flex flex-wrap items-center gap-3">
-						<span className="flex items-center gap-1.5">
+		<PageFrame title="Agent" description="AI-powered task orchestration">
+			<div className={styles.statusPanel}>
+				<div className={styles.statusRow}>
+					<div className={styles.statusInfo}>
+						<span className={styles.statusItem}>
 							<span
-								className="h-1.5 w-1.5 rounded-full"
-								style={{
-									background:
-										healthy === null
-											? "var(--text-muted)"
-											: healthy
-												? "var(--success)"
-												: "var(--danger)",
-								}}
+								className={cn(
+									styles.statusDot,
+									healthy === null && styles.statusUnknown,
+									healthy === true && styles.statusOnline,
+									healthy === false && styles.statusOffline,
+								)}
 							/>
 							{healthy === null ? "Checking" : healthy ? "Online" : "Offline"}
 						</span>
-						<span
-							className="h-3"
-							style={{ borderLeft: `1px solid ${hexToRgba(palette.text, 0.1)}` }}
-						/>
-						<span className="flex items-center gap-1.5">
+						<span className={styles.separator} />
+						<span className={styles.statusItem}>
 							<span
-								className="h-1.5 w-1.5 rounded-full"
-								style={{
-									background: paired ? "var(--success)" : "var(--warning)",
-								}}
+								className={cn(
+									styles.statusDot,
+									paired
+										? styles.statusPairingReady
+										: styles.statusPairingPending,
+								)}
 							/>
 							{paired ? "Paired" : "Not paired"}
 						</span>
-						<span style={{ color: hexToRgba(palette.text, 0.35) }}>
+						<span className={styles.endpoint}>
 							{agentService.getEndpoint()}
 						</span>
 					</div>
 
-					<div className="flex items-center gap-2">
+					<div className={styles.actions}>
 						<button
 							type="button"
 							onClick={() => void refreshConnectionState()}
-							className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:[background:var(--surface)]"
-							style={{
-								borderColor: hexToRgba(palette.text, 0.16),
-								color: hexToRgba(palette.text, 0.7),
-							}}
+							className={styles.button}
 						>
-							<RefreshCw size={12} />
+							<RefreshCw className={styles.buttonIcon} />
 							Refresh
 						</button>
 
 						<button
 							type="button"
 							onClick={() => navigate("/app/settings")}
-							className="inline-flex items-center justify-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition hover:[background:var(--surface)]"
-							style={{
-								borderColor: hexToRgba(palette.primary, 0.35),
-								color: palette.primary,
-							}}
+							className={cn(styles.button, styles.buttonPrimary)}
 						>
-							<Settings2 size={12} />
+							<Settings2 className={styles.buttonIcon} />
 							Manage Pairing
 						</button>
 					</div>
 				</div>
 			</div>
 
-			<div style={{ minHeight: 480, height: "clamp(480px, 68dvh, 960px)" }}>
+			<div className={styles.chatWrap}>
 				<AgentChatPanel healthy={isReady} paired={paired} />
 			</div>
 		</PageFrame>

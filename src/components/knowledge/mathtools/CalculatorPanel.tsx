@@ -1,11 +1,11 @@
 import { Save, Zap } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/auth/useAuth";
+import { Section } from "@/components/apps/ui/PageFrame";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
-import { FrameSection } from "../../apps/ui/PageFrame";
 
 type CalculationType =
 	| "ohms-law"
@@ -278,23 +278,23 @@ export function CalculatorPanel() {
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center space-x-3">
-				<div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3">
+				<div className="rounded-lg border border-(--border) bg-(--surface-2) p-3">
 					<Zap
-						className="h-8 w-8 animate-pulse text-[var(--accent)]"
+						className="h-8 w-8 animate-pulse text-(--accent)"
 						style={{ animationDuration: "1.5s" }}
 					/>
 				</div>
 				<div>
-					<h2 className="text-3xl font-bold text-[var(--text)]">
+					<h2 className="text-3xl font-bold text-(--text)">
 						Electrical Calculations
 					</h2>
-					<p className="text-sm text-[var(--text-muted)]">
+					<p className="text-sm text-(--text-muted)">
 						Power, impedance, and circuit analysis
 					</p>
 				</div>
 			</div>
 
-			<FrameSection title="Calculation Type">
+			<Section title="Calculation Type">
 				<select
 					value={calcType}
 					onChange={(e) => {
@@ -302,7 +302,7 @@ export function CalculatorPanel() {
 						setInputs({});
 						setResults([]);
 					}}
-					className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+					className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
 				>
 					{Object.entries(calculations).map(([key, calc]) => (
 						<option key={key} value={key}>
@@ -310,13 +310,13 @@ export function CalculatorPanel() {
 						</option>
 					))}
 				</select>
-			</FrameSection>
+			</Section>
 
-			<FrameSection title="Input Values">
+			<Section title="Input Values">
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					{calculations[calcType].fields.map((field) => (
 						<div key={field.id}>
-							<label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">
+							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
 								{field.label}
 							</label>
 							<input
@@ -326,7 +326,7 @@ export function CalculatorPanel() {
 								onChange={(e) =>
 									setInputs({ ...inputs, [field.id]: e.target.value })
 								}
-								className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
 								placeholder={`Enter ${field.label.toLowerCase()}`}
 							/>
 						</div>
@@ -335,24 +335,24 @@ export function CalculatorPanel() {
 
 				<button
 					onClick={calculate}
-					className="mt-6 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-[var(--primary)]/30"
+					className="mt-6 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30"
 				>
 					Calculate
 				</button>
-			</FrameSection>
+			</Section>
 
 			{results.length > 0 && (
-				<FrameSection title="Results">
+				<Section title="Results">
 					<div className="space-y-3">
 						{results.map((result, index) => (
 							<div
 								key={index}
-								className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
+								className="flex items-center justify-between rounded-lg border border-(--border) bg-(--surface) px-4 py-3"
 							>
-								<span className="font-medium text-[var(--text-muted)]">
+								<span className="font-medium text-(--text-muted)">
 									{result.label}:
 								</span>
-								<span className="font-bold text-[var(--text)]">
+								<span className="font-bold text-(--text)">
 									{result.value} {result.unit}
 								</span>
 							</div>
@@ -360,13 +360,13 @@ export function CalculatorPanel() {
 					</div>
 
 					<div className="mt-6">
-						<label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">
+						<label className="mb-2 block text-sm font-medium text-(--text-muted)">
 							Notes (Optional)
 						</label>
 						<textarea
 							value={notes}
 							onChange={(e) => setNotes(e.target.value)}
-							className="min-h-[80px] w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+							className="min-h-20 w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
 							placeholder="Add notes about this calculation..."
 						/>
 					</div>
@@ -374,14 +374,14 @@ export function CalculatorPanel() {
 					<button
 						onClick={saveCalculation}
 						disabled={isSavingCalculation}
-						className="mt-4 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-[var(--primary)]/30 flex items-center space-x-2"
+						className="mt-4 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30 flex items-center space-x-2"
 					>
 						<Save className="w-5 h-5" />
 						<span>
 							{isSavingCalculation ? "Saving..." : "Save Calculation"}
 						</span>
 					</button>
-				</FrameSection>
+				</Section>
 			)}
 		</div>
 	);

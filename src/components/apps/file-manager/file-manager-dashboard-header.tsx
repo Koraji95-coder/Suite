@@ -12,14 +12,14 @@ import {
 	AvatarFallback,
 	AvatarImage,
 } from "@/components/apps/ui/avatar";
-import { Button } from "@/components/apps/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/apps/ui/dropdown-menu";
-import { Input } from "@/components/apps/ui/input";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Input";
 
 interface FileManagerDashboardHeaderProps {
 	searchQuery: string;
@@ -39,12 +39,13 @@ export function FileManagerDashboardHeader({
 			<div className="flex flex-1 items-center gap-4">
 				<Button
 					variant="ghost"
-					size="icon"
+					size="sm"
+					iconOnly
+					iconLeft={<Menu className="h-5 w-5" />}
 					className="lg:hidden"
 					onClick={onOpenMobileSidebar}
-				>
-					<Menu className="h-5 w-5" />
-				</Button>
+					aria-label="Open file navigation"
+				/>
 
 				<div className="relative max-w-md flex-1">
 					<Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
@@ -60,18 +61,15 @@ export function FileManagerDashboardHeader({
 			<div className="flex items-center gap-2 lg:gap-4">
 				<Button
 					variant="ghost"
-					size="icon"
+					size="sm"
+					iconOnly
+					iconLeft={<BarChart3 className="h-4 w-4" />}
 					className="xl:hidden"
 					onClick={onOpenStoragePanel}
-				>
-					<BarChart3 className="h-4 w-4" />
-				</Button>
+					aria-label="Open storage panel"
+				/>
 
-				<Button
-					className="bg-primary hover:[background:color-mix(in_srgb,var(--primary)_80%,var(--surface))]"
-					size="sm"
-				>
-					<Upload className="h-4 w-4 lg:mr-2" />
+				<Button size="sm" iconLeft={<Upload className="h-4 w-4" />}>
 					<span className="hidden sm:inline">Upload file</span>
 				</Button>
 				<Button
@@ -82,9 +80,13 @@ export function FileManagerDashboardHeader({
 					<Plus className="mr-2 h-4 w-4" />
 					Create
 				</Button>
-				<Button variant="ghost" size="icon">
-					<Bell className="h-4 w-4" />
-				</Button>
+				<Button
+					variant="ghost"
+					size="sm"
+					iconOnly
+					iconLeft={<Bell className="h-4 w-4" />}
+					aria-label="Notifications"
+				/>
 
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>

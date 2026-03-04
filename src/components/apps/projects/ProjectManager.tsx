@@ -1,10 +1,9 @@
 import { FolderKanban } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { hexToRgba, useTheme } from "@/lib/palette";
-import { GlassPanel } from "../ui/GlassPanel";
 import { ProjectDetail } from "./ProjectDetail";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectList } from "./ProjectList";
+import styles from "./ProjectManager.module.css";
 import { ProjectManagerDeleteDialogs } from "./ProjectManagerDeleteDialogs";
 import { ProjectManagerHeader } from "./ProjectManagerHeader";
 import type { StatusFilter } from "./projectmanagertypes";
@@ -26,7 +25,6 @@ export function ProjectManager({
 	calendarMonth: externalMonth,
 	onCalendarMonthChange,
 }: ProjectManagerProps = {}) {
-	const { palette } = useTheme();
 	const navigate = useNavigate();
 	const {
 		projects,
@@ -105,9 +103,8 @@ export function ProjectManager({
 	});
 
 	return (
-		<div className="mx-auto w-full max-w-[1760px] space-y-8">
+		<div className={styles.root}>
 			<ProjectManagerHeader
-				palette={palette}
 				currentCrumb={currentCrumb}
 				statusFilter={statusFilter}
 				onStatusFilterChange={setStatusFilter}
@@ -153,12 +150,8 @@ export function ProjectManager({
 				isSubtask={Boolean(parentTaskForSubtask)}
 			/>
 
-			<div className="grid grid-cols-1 xl:grid-cols-[400px_minmax(0,1fr)] gap-6 xl:gap-7">
-				<GlassPanel
-					tint={palette.secondary}
-					hoverEffect={false}
-					className="p-5"
-				>
+			<div className={styles.contentGrid}>
+				<div className={styles.listPane}>
 					<ProjectList
 						projects={projects}
 						selectedProject={selectedProject}
@@ -171,9 +164,9 @@ export function ProjectManager({
 						searchQuery={projectSearch}
 						onSearchChange={setProjectSearch}
 					/>
-				</GlassPanel>
+				</div>
 
-				<div className="space-y-6">
+				<div className={styles.detailColumn}>
 					{selectedProject ? (
 						<ProjectDetail
 							project={selectedProject}
@@ -210,31 +203,19 @@ export function ProjectManager({
 							onDownloadFile={downloadFile}
 						/>
 					) : (
-						<GlassPanel
-							tint={palette.secondary}
-							hoverEffect={false}
-							className="p-12 flex flex-col items-center justify-center"
-						>
-							<FolderKanban
-								className="h-12 w-12 mb-4"
-								style={{ color: hexToRgba(palette.primary, 0.65) }}
-							/>
-							<p
-								className="text-lg font-medium"
-								style={{ color: hexToRgba(palette.text, 0.7) }}
-							>
+						<div className={styles.emptyDetail}>
+							<FolderKanban className={styles.emptyIcon} />
+							<p className={styles.emptyTitle}>
 								Select a project to view details
 							</p>
-							<p
-								className="mt-2 text-sm"
-								style={{ color: hexToRgba(palette.text, 0.48) }}
-							>
+							<p className={styles.emptyCopy}>
 								Pick one from the list to open tasks, files, and schedules.
 							</p>
-						</GlassPanel>
+						</div>
 					)}
 				</div>
 			</div>
+
 			<ProjectManagerDeleteDialogs
 				projectIdPendingDelete={projectIdPendingDelete}
 				taskIdPendingDelete={taskIdPendingDelete}

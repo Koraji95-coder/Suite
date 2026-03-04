@@ -1,0 +1,107 @@
+.statusPanel {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+.statusRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.78rem 0.95rem;
+	font-size: 0.74rem;
+	color: color-mix(in srgb, var(--text) 68%, transparent);
+}
+
+.statusInfo {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.statusItem {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.statusDot {
+	width: 0.38rem;
+	height: 0.38rem;
+	border-radius: 999px;
+}
+
+.statusUnknown {
+	background: var(--text-muted);
+}
+
+.statusOnline {
+	background: var(--success);
+}
+
+.statusOffline {
+	background: var(--danger);
+}
+
+.statusPairingReady {
+	background: var(--success);
+}
+
+.statusPairingPending {
+	background: var(--warning);
+}
+
+.separator {
+	width: 1px;
+	height: 0.8rem;
+	background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.endpoint {
+	color: color-mix(in srgb, var(--text) 38%, transparent);
+}
+
+.actions {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.25rem;
+	border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+	border-radius: var(--radius-2);
+	padding: 0.36rem 0.62rem;
+	font-size: 0.72rem;
+	font-weight: 700;
+	color: color-mix(in srgb, var(--text) 72%, transparent);
+	background: transparent;
+	transition:
+		border-color 160ms ease,
+		background 160ms ease;
+}
+
+.button:hover {
+	background: var(--surface);
+}
+
+.buttonPrimary {
+	border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+	color: var(--primary);
+}
+
+.buttonIcon {
+	width: 0.74rem;
+	height: 0.74rem;
+}
+
+.chatWrap {
+	min-height: 30rem;
+	height: clamp(30rem, 68dvh, 60rem);
+}

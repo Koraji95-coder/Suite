@@ -1,6 +1,5 @@
 import { Box, Layers, Plus, Search } from "lucide-react";
-import React from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import type { SourceFilter, ViewMode } from "./types";
 
 interface GraphToolbarProps {
@@ -19,6 +18,12 @@ const SOURCE_OPTIONS: { value: SourceFilter; label: string }[] = [
 	{ value: "both", label: "Both" },
 ];
 
+const btnBase =
+	"rounded-md border px-3.5 py-1.5 text-[13px] font-medium transition-all cursor-pointer [border-color:color-mix(in_srgb,var(--primary)_25%,transparent)] [background:color-mix(in_srgb,var(--surface)_60%,transparent)] [color:var(--text-muted)]";
+
+const btnActive =
+	"rounded-md border px-3.5 py-1.5 text-[13px] font-medium transition-all cursor-pointer [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_20%,transparent)] [color:var(--primary)]";
+
 export function GraphToolbar({
 	viewMode,
 	onViewModeChange,
@@ -28,110 +33,62 @@ export function GraphToolbar({
 	onSearchChange,
 	onAddMemory,
 }: GraphToolbarProps) {
-	const { palette } = useTheme();
-
-	const btnBase: React.CSSProperties = {
-		padding: "6px 14px",
-		borderRadius: 6,
-		border: `1px solid ${hexToRgba(palette.primary, 0.25)}`,
-		background: hexToRgba(palette.surface, 0.6),
-		color: palette.textMuted,
-		cursor: "pointer",
-		fontSize: 13,
-		fontWeight: 500,
-		transition: "all 0.2s",
-	};
-
-	const btnActive: React.CSSProperties = {
-		...btnBase,
-		background: hexToRgba(palette.primary, 0.2),
-		color: palette.primary,
-		border: `1px solid ${palette.primary}`,
-	};
-
 	return (
-		<div
-			className="flex flex-wrap items-center gap-2 px-3 py-2"
-			style={{
-				background: hexToRgba(palette.surface, 0.85),
-				borderBottom: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-			}}
-		>
+		<div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 [background:color-mix(in_srgb,var(--surface)_85%,transparent)] border-[color-mix(in_srgb,var(--primary)_12%,transparent)]">
 			<div className="flex flex-wrap gap-1">
 				{SOURCE_OPTIONS.map((opt) => (
 					<button
 						key={opt.value}
 						onClick={() => onSourceFilterChange(opt.value)}
-						style={sourceFilter === opt.value ? btnActive : btnBase}
+						className={sourceFilter === opt.value ? btnActive : btnBase}
 					>
 						{opt.label}
 					</button>
 				))}
 			</div>
 
-			<div
-				className="hidden h-6 w-px md:block"
-				style={{
-					background: hexToRgba(palette.textMuted, 0.2),
-				}}
-			/>
+			<div className="hidden h-6 w-px md:block [background:color-mix(in_srgb,var(--text-muted)_20%,transparent)]" />
 
 			<div className="flex flex-wrap gap-1">
 				<button
 					onClick={() => onViewModeChange("3d")}
-					style={viewMode === "3d" ? btnActive : btnBase}
+					className={cn(
+						viewMode === "3d" ? btnActive : btnBase,
+						"inline-flex items-center",
+					)}
 				>
-					<Box size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
+					<Box size={14} className="mr-1" />
 					3D
 				</button>
 				<button
 					onClick={() => onViewModeChange("2d")}
-					style={viewMode === "2d" ? btnActive : btnBase}
+					className={cn(
+						viewMode === "2d" ? btnActive : btnBase,
+						"inline-flex items-center",
+					)}
 				>
-					<Layers size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
+					<Layers size={14} className="mr-1" />
 					2D
 				</button>
 			</div>
 
-			<div
-				className="order-last flex min-w-[220px] flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 md:order-none"
-				style={{
-					borderColor: hexToRgba(palette.primary, 0.2),
-					background: hexToRgba(palette.background, 0.8),
-				}}
-			>
-				<Search
-					size={14}
-					style={{
-						color: palette.textMuted,
-						flexShrink: 0,
-					}}
-				/>
+			<div className="order-last flex min-w-55 flex-1 items-center gap-2 rounded-md border px-2.5 py-1.5 md:order-0 border-[color-mix(in_srgb,var(--primary)_20%,transparent)] [background:color-mix(in_srgb,var(--background)_80%,transparent)]">
+				<Search size={14} className="shrink-0 [color:var(--text-muted)]" />
 				<input
 					type="text"
 					placeholder="Search nodes..."
 					value={searchQuery}
 					onChange={(e) => onSearchChange(e.target.value)}
-					style={{
-						flex: 1,
-						minWidth: 0,
-						padding: "0",
-						border: "none",
-						background: "transparent",
-						color: palette.text,
-						fontSize: 13,
-						outline: "none",
-					}}
+					className="min-w-0 flex-1 border-none bg-transparent p-0 text-[13px] outline-none [color:var(--text)]"
 				/>
 			</div>
 
 			<button
 				onClick={onAddMemory}
-				className="inline-flex items-center"
-				style={btnBase}
+				className={cn(btnBase, "inline-flex items-center")}
 				title="Add Memory"
 			>
-				<Plus size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
+				<Plus size={14} className="mr-1" />
 				Memory
 			</button>
 		</div>

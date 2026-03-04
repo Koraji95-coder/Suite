@@ -1,0 +1,637 @@
+.root {
+	min-height: 100vh;
+	color: var(--text);
+	background: var(--bg);
+}
+
+.nav {
+	position: sticky;
+	top: 0;
+	z-index: 50;
+	border-bottom: 1px solid transparent;
+	transition:
+		background 300ms ease,
+		backdrop-filter 300ms ease,
+		border-color 300ms ease,
+		box-shadow 300ms ease;
+}
+
+.navTop {
+	background: transparent;
+}
+
+.navScrolled {
+	background: color-mix(in srgb, var(--bg) 80%, transparent);
+	backdrop-filter: blur(12px);
+	border-bottom-color: var(--line-soft);
+	box-shadow: 0 12px 24px rgb(0 0 0 / 12%);
+}
+
+.navContainer {
+	margin-inline: auto;
+	display: flex;
+	width: 100%;
+	max-width: 84rem;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.75rem 1rem;
+}
+
+.brandLink {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.62rem;
+	font-size: 0.875rem;
+	font-weight: 650;
+	color: var(--text);
+	text-decoration: none;
+}
+
+.brandMarkScale {
+	transition: transform 300ms ease;
+}
+
+.brandMarkNormal {
+	transform: scale(1);
+}
+
+.brandMarkSmall {
+	transform: scale(0.9);
+}
+
+.brandLabel {
+	letter-spacing: -0.01em;
+}
+
+.navAuxLink {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-2);
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	transition:
+		background 200ms ease,
+		color 200ms ease;
+}
+
+.navAuxLink:hover {
+	color: var(--text);
+	background: var(--surface-2);
+}
+
+.main {
+	margin-inline: auto;
+	width: 100%;
+	max-width: 84rem;
+	padding-inline: 1rem;
+	padding-bottom: 4rem;
+}
+
+.hero {
+	position: relative;
+	margin-top: 1rem;
+	overflow: hidden;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-4);
+	transition:
+		opacity 700ms ease,
+		transform 700ms ease;
+}
+
+.visible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.hiddenDown {
+	opacity: 0;
+	transform: translateY(1.5rem);
+}
+
+.heroBackground {
+	position: absolute;
+	inset: 0;
+	background:
+		radial-gradient(
+			ellipse 90% 70% at 50% 30%,
+			color-mix(in srgb, var(--primary) 10%, transparent),
+			transparent
+		),
+		radial-gradient(
+			ellipse 60% 60% at 80% 70%,
+			color-mix(in srgb, var(--accent) 6%, transparent),
+			transparent
+		),
+		var(--surface);
+}
+
+.heroPattern {
+	position: absolute;
+	inset: 0;
+	opacity: 0.03;
+	background-image: radial-gradient(
+		circle,
+		var(--text-muted) 1px,
+		transparent 1px
+	);
+	background-size: 24px 24px;
+}
+
+.heroGrid {
+	position: relative;
+	display: grid;
+	gap: 2rem;
+	align-items: center;
+	padding: 4rem 1.5rem;
+}
+
+.heroLeft {
+	transition:
+		opacity 700ms ease 200ms,
+		transform 700ms ease 200ms;
+}
+
+.heroLeftVisible {
+	opacity: 1;
+	transform: translateX(0);
+}
+
+.heroLeftHidden {
+	opacity: 0;
+	transform: translateX(-2rem);
+}
+
+.heroBadge {
+	margin-bottom: 1.25rem;
+}
+
+.heroBadgeDot {
+	width: 0.38rem;
+	height: 0.38rem;
+	border-radius: 999px;
+	background: var(--primary);
+	animation: pulse 2.2s ease-in-out infinite;
+}
+
+.heroTitle {
+	font-size: clamp(1.9rem, 3.6vw, 3rem);
+	font-weight: 650;
+	line-height: 1.15;
+	letter-spacing: -0.02em;
+}
+
+.heroHighlight {
+	color: var(--primary);
+}
+
+.heroCopy {
+	margin-top: 1.25rem;
+	max-width: 34rem;
+	line-height: 1.7;
+}
+
+.heroFeatureBadges {
+	margin-top: 2rem;
+}
+
+.heroRight {
+	display: none;
+	transition:
+		opacity 700ms ease 400ms,
+		transform 700ms ease 400ms;
+}
+
+.heroRightVisible {
+	opacity: 1;
+	transform: translateX(0);
+}
+
+.heroRightHidden {
+	opacity: 0;
+	transform: translateX(2rem);
+}
+
+.mainAgentWrap {
+	position: relative;
+}
+
+.mainAgentInner {
+	position: relative;
+}
+
+.mainAgentGlow {
+	position: absolute;
+	inset: 0;
+	opacity: 0.3;
+	filter: blur(2rem);
+	border-radius: 999px;
+	background: var(--primary);
+	animation: pulse 2.2s ease-in-out infinite;
+}
+
+.mainAgentFloat {
+	position: relative;
+	animation: floatY 4s ease-in-out infinite;
+}
+
+.heroSecondaryRow {
+	margin-top: 1.5rem;
+}
+
+.heroSecondaryAgent {
+	padding: 0.5rem;
+	border: 1px solid var(--line-soft);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--surface) 60%, transparent);
+	transition:
+		transform 300ms ease,
+		border-color 300ms ease,
+		background 300ms ease;
+	animation: fadeInScale 400ms ease-out forwards;
+	opacity: 0;
+}
+
+.heroSecondaryAgent:hover {
+	transform: scale(1.1);
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	background: var(--surface);
+}
+
+.featuresGrid {
+	margin-top: 1.5rem;
+	display: grid;
+	gap: 1rem;
+}
+
+.featureCard {
+	position: relative;
+	padding: 1.25rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-4);
+	text-decoration: none;
+	background: var(--surface);
+	transition:
+		border-color 300ms ease,
+		transform 300ms ease,
+		box-shadow 300ms ease,
+		opacity 400ms ease,
+		transform 400ms ease;
+}
+
+.featureCard:hover {
+	transform: translateY(-0.25rem);
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	box-shadow: 0 14px 24px color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.featureVisible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.featureHidden {
+	opacity: 0;
+	transform: translateY(2rem);
+}
+
+.featureIconWrap {
+	margin-bottom: 0.75rem;
+	display: inline-flex;
+	padding: 0.5rem;
+	border-radius: 0.7rem;
+	background: var(--surface-2);
+	transition: background 220ms ease;
+}
+
+.featureCard:hover .featureIconWrap {
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.featureIcon {
+	width: 1rem;
+	height: 1rem;
+	color: var(--primary);
+}
+
+.featureCopy {
+	margin-top: 0.35rem;
+	line-height: 1.55;
+}
+
+.featureArrow {
+	position: absolute;
+	top: 1.25rem;
+	right: 1rem;
+	width: 0.9rem;
+	height: 0.9rem;
+	color: var(--text-muted);
+	opacity: 0;
+	transition:
+		opacity 240ms ease,
+		transform 240ms ease;
+}
+
+.featureCard:hover .featureArrow {
+	opacity: 0.6;
+	transform: translateX(0.25rem);
+}
+
+.agentsSection {
+	margin-top: 1.5rem;
+	display: grid;
+	gap: 1.5rem;
+}
+
+.agentsPanel {
+	transition:
+		opacity 500ms ease,
+		transform 500ms ease;
+}
+
+.agentsPanelVisible {
+	opacity: 1;
+	transform: translateX(0);
+}
+
+.agentsPanelHidden {
+	opacity: 0;
+	transform: translateX(-2rem);
+}
+
+.agentsBadge {
+	margin-bottom: 1.25rem;
+}
+
+.agentsBadgeDot {
+	width: 0.38rem;
+	height: 0.38rem;
+	border-radius: 999px;
+	background: var(--accent);
+}
+
+.agentsCopy {
+	margin-top: 0.5rem;
+	max-width: 36rem;
+	line-height: 1.65;
+}
+
+.agentGrid {
+	margin-top: 1.5rem;
+	display: grid;
+	gap: 0.75rem;
+}
+
+.agentCard {
+	display: flex;
+	gap: 0.75rem;
+	align-items: flex-start;
+	padding: 0.75rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	background: var(--surface-2);
+	transition:
+		border-color 300ms ease,
+		background 300ms ease,
+		opacity 300ms ease,
+		transform 300ms ease;
+}
+
+.agentCard:hover {
+	border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+	background: var(--surface);
+}
+
+.agentCardVisible {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.agentCardHidden {
+	opacity: 0;
+	transform: translateY(1rem);
+}
+
+.agentMark {
+	transition: transform 240ms ease;
+}
+
+.agentCard:hover .agentMark {
+	transform: scale(1.1);
+}
+
+.agentTagline {
+	margin-top: 0.1rem;
+}
+
+.themePanel {
+	transition:
+		opacity 500ms ease 200ms,
+		transform 500ms ease 200ms;
+}
+
+.themePanelVisible {
+	opacity: 1;
+	transform: translateX(0);
+}
+
+.themePanelHidden {
+	opacity: 0;
+	transform: translateX(2rem);
+}
+
+.themeCopy {
+	margin-top: 0.25rem;
+}
+
+.themeButtons {
+	margin-top: 1rem;
+}
+
+.themeButton {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	text-align: left;
+	font-size: 0.875rem;
+	transition:
+		border-color 200ms ease,
+		background 200ms ease,
+		transform 200ms ease;
+}
+
+.themeButtonActive {
+	border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+	background: var(--surface-2);
+	transform: scale(1.02);
+}
+
+.themeButtonInactive {
+	background: transparent;
+}
+
+.themeButtonInactive:hover {
+	background: var(--surface);
+	border-color: var(--border-strong, var(--border));
+}
+
+.themeDot {
+	width: 0.75rem;
+	height: 0.75rem;
+	border-radius: 999px;
+	flex-shrink: 0;
+	transition: transform 200ms ease;
+}
+
+.themeDotActive {
+	transform: scale(1.25);
+}
+
+.themeActiveMarker {
+	margin-left: auto;
+	width: 0.38rem;
+	height: 0.38rem;
+	border-radius: 999px;
+	background: var(--primary);
+	animation: pulse 2.2s ease-in-out infinite;
+}
+
+.footer {
+	margin-top: 2.5rem;
+	padding-top: 1.5rem;
+	padding-inline: 0.25rem;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	border-top: 1px solid var(--line-soft);
+	transition: opacity 500ms ease 500ms;
+}
+
+.footerVisible {
+	opacity: 1;
+}
+
+.footerHidden {
+	opacity: 0;
+}
+
+.footerBrand {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.footerLinks {
+	display: inline-flex;
+	gap: 1rem;
+	align-items: center;
+}
+
+.footerLink {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	text-underline-offset: 2px;
+	transition: color 200ms ease;
+}
+
+.footerLink:hover {
+	color: var(--text);
+	text-decoration: underline;
+}
+
+@keyframes floatY {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-0.5rem);
+	}
+}
+
+@keyframes fadeInScale {
+	from {
+		opacity: 0;
+		transform: scale(0.9);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 0.25;
+	}
+	50% {
+		opacity: 0.4;
+	}
+}
+
+@media (min-width: 48rem) {
+	.navContainer {
+		padding-inline: 2rem;
+	}
+
+	.navAuxLink {
+		display: inline-flex;
+	}
+
+	.main {
+		padding-inline: 2rem;
+	}
+
+	.heroGrid {
+		grid-template-columns: repeat(12, minmax(0, 1fr));
+		padding: 5rem 3rem;
+	}
+
+	.heroLeft {
+		grid-column: span 7 / span 7;
+	}
+
+	.heroRight {
+		display: flex;
+		grid-column: span 5 / span 5;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.featuresGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.agentsSection {
+		grid-template-columns: repeat(12, minmax(0, 1fr));
+	}
+
+	.agentsPanel {
+		grid-column: span 8 / span 8;
+	}
+
+	.themePanel {
+		grid-column: span 4 / span 4;
+	}
+
+	.agentGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 64rem) {
+	.featuresGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}

@@ -1,0 +1,120 @@
+.root {
+	display: grid;
+	gap: 1.75rem;
+}
+
+.tasksPanel {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: clamp(1rem, 2vw, 1.8rem);
+	background:
+		linear-gradient(
+			185deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 74%, transparent)
+		),
+		var(--surface);
+}
+
+.tasksHead {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.65rem;
+	margin-bottom: 1rem;
+}
+
+.tasksTitle {
+	margin: 0;
+	font-size: 1.15rem;
+	font-weight: 700;
+}
+
+.addButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	border-radius: var(--radius-2);
+	border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--border));
+	background: color-mix(in srgb, var(--primary) 18%, transparent);
+	color: var(--text);
+	padding: 0.5rem 0.72rem;
+	font-size: 0.8rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.addButton:hover {
+	background: color-mix(in srgb, var(--primary) 26%, transparent);
+}
+
+.addIcon {
+	width: 0.92rem;
+	height: 0.92rem;
+}
+
+.divider {
+	height: 1px;
+	background: var(--line-soft);
+	margin-bottom: 1rem;
+}
+
+.taskFilters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	margin-bottom: 1rem;
+}
+
+.taskFilterButton {
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: var(--surface);
+	color: var(--text-muted);
+	padding: 0.34rem 0.62rem;
+	font-size: 0.72rem;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.taskFilterButton:hover {
+	background: var(--surface-2);
+}
+
+.taskFilterActive {
+	border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+	background: color-mix(in srgb, var(--primary) 18%, transparent);
+	color: var(--text);
+}
+
+.empty {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: clamp(2rem, 5vw, 3rem);
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.emptyIcon {
+	width: 3rem;
+	height: 3rem;
+	margin: 0 auto 0.8rem;
+	opacity: 0.5;
+}
+
+.emptyTitle {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.emptySub {
+	margin: 0.3rem 0 0;
+	font-size: 0.84rem;
+}
+
+.emptyHint {
+	color: var(--text);
+	font-weight: 600;
+}

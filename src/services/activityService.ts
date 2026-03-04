@@ -1,8 +1,8 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
-import { isSupabaseConfigured, safeSupabaseQuery } from "@/supabase/utils";
 import type { Database } from "@/supabase/database";
+import { isSupabaseConfigured, safeSupabaseQuery } from "@/supabase/utils";
 
 export type ActivityLogRow =
 	Database["public"]["Tables"]["activity_log"]["Row"];

@@ -1,0 +1,51 @@
+.root {
+	display: grid;
+	gap: var(--space-6);
+}
+
+.headerRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-4);
+}
+
+.headerIdentity {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3);
+}
+
+.heroMark {
+	display: grid;
+	place-items: center;
+	width: 3rem;
+	height: 3rem;
+	border-radius: var(--radius-3);
+	background:
+		linear-gradient(
+			145deg,
+			color-mix(in srgb, var(--primary) 24%, transparent),
+			color-mix(in srgb, var(--accent) 16%, transparent)
+		),
+		var(--surface);
+	border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+	color: var(--primary);
+}
+
+.titleRow {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.subtitle {
+	color: var(--text-muted);
+	margin-top: 0.18rem;
+}
+
+.customizerPanel {
+	border-color: color-mix(in srgb, var(--warning) 34%, var(--border));
+	background: color-mix(in srgb, var(--warning) 7%, transparent);
+}

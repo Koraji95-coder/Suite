@@ -1,0 +1,28 @@
+.root {
+	margin-inline: auto;
+	width: 100%;
+}
+
+.padded {
+	padding-inline: var(--gutter, clamp(1rem, 3vw, 2rem));
+}
+
+.sm {
+	max-width: 42rem;
+}
+
+.md {
+	max-width: 56rem;
+}
+
+.lg {
+	max-width: 72rem;
+}
+
+.xl {
+	max-width: var(--container-max, 1100px);
+}
+
+.full {
+	max-width: var(--container-wide, 1700px);
+}

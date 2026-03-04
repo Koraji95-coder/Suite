@@ -8,59 +8,66 @@
    Values below are fallbacks (graphiteCyan theme).
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Backgrounds */
-  --bg: #0e1117;
-  --bg-subtle: #0e1117;
-  --surface: #161b22;
-  --surface-2: #21262d;
+	/* Backgrounds */
+	--bg: #0e1117;
+	--bg-subtle: #0e1117;
+	--surface: #161b22;
+	--surface-2: #21262d;
+	/* Compatibility aliases for canonical class suggestions */
+	--background: var(--bg);
+	--bg-base: var(--bg);
+	--bg-mid: var(--surface);
+	--bg-heavy: var(--surface-2);
 
-  /* Borders */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.04);
-  --border-strong: rgba(255, 255, 255, 0.14);
+	/* Borders */
+	--border: rgba(255, 255, 255, 0.08);
+	--border-subtle: rgba(255, 255, 255, 0.04);
+	--border-strong: rgba(255, 255, 255, 0.14);
 
-  /* Text */
-  --text: #f0f6fc;
-  --text-muted: #8b949e;
+	/* Text */
+	--text: #f0f6fc;
+	--text-muted: #8b949e;
 
-  /* Brand Colors */
-  --primary: #2dd4bf;
-  --primary-hover: #5eead4;
-  --primary-contrast: #042f2e;
-  --accent: #60a5fa;
-  --secondary: #64748b;
+	/* Brand Colors */
+	--primary: #2dd4bf;
+	--primary-hover: #5eead4;
+	--primary-contrast: #042f2e;
+	--accent: #60a5fa;
+	--secondary: #64748b;
+	--tertiary: var(--secondary);
 
-  /* Status Colors */
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --info: #3b82f6;
+	/* Status Colors */
+	--success: #22c55e;
+	--warning: #f59e0b;
+	--danger: #ef4444;
+	--info: #3b82f6;
 
-  /* Effects */
-  --glow: rgba(45, 212, 191, 0.15);
-  --focus-ring: color-mix(in oklab, var(--primary) 25%, transparent);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.4);
+	/* Effects */
+	--glow: rgba(45, 212, 191, 0.15);
+	--focus-ring: color-mix(in oklab, var(--primary) 25%, transparent);
+	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+	--shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.4);
 
-  /* Transitions */
-  --transition-fast: 100ms;
-  --transition-base: 150ms;
-  --transition-slow: 250ms;
+	/* Transitions */
+	--transition-fast: 100ms;
+	--transition-base: 150ms;
+	--transition-slow: 250ms;
 
-  /* Z-Index Scale */
-  --z-dropdown: 45;
-  --z-sheet: 50;
-  --z-toast: 60;
-  --z-dialog: 70;
-  --z-command: 80;
+	/* Z-Index Scale */
+	--z-dropdown: 45;
+	--z-topbar: 48;
+	--z-sheet: 50;
+	--z-toast: 60;
+	--z-dialog: 70;
+	--z-command: 80;
 
-  /* Border Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-full: 9999px;
+	/* Border Radius */
+	--radius-sm: 6px;
+	--radius-md: 10px;
+	--radius-lg: 14px;
+	--radius-xl: 20px;
+	--radius-full: 9999px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -69,7 +76,11 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 @theme {
   --color-bg: var(--bg);
+  --color-background: var(--background);
   --color-bg-subtle: var(--bg-subtle);
+  --color-bg-base: var(--bg-base);
+  --color-bg-mid: var(--bg-mid);
+  --color-bg-heavy: var(--bg-heavy);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
 
@@ -85,6 +96,7 @@
   --color-primary-contrast: var(--primary-contrast);
   --color-accent: var(--accent);
   --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
 
   --color-success: var(--success);
   --color-warning: var(--warning);
@@ -111,75 +123,77 @@
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
 }
 
 html {
-  scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+	scroll-behavior: smooth;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 }
 
 html,
 body,
 #root {
-  min-height: 100%;
+	min-height: 100%;
 }
 
 body {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-  background-color: var(--bg);
-  color: var(--text);
+	font-family: "Inter", system-ui, -apple-system, sans-serif;
+	font-size: 14px;
+	line-height: 1.5;
+	background-color: var(--bg);
+	color: var(--text);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    GLOBAL FOCUS STYLES
    ═══════════════════════════════════════════════════════════════════════════ */
 :focus {
-  outline: none;
+	outline: none;
 }
 
 :focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--bg),
+		0 0 0 4px var(--primary);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SELECTION
    ═══════════════════════════════════════════════════════════════════════════ */
 ::selection {
-  background-color: var(--focus-ring);
-  color: var(--text);
+	background-color: var(--focus-ring);
+	color: var(--text);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SCROLLBAR
    ═══════════════════════════════════════════════════════════════════════════ */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+	width: 8px;
+	height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+	background: rgba(255, 255, 255, 0.1);
+	border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
+	background: rgba(255, 255, 255, 0.18);
 }
 
 * {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -187,62 +201,74 @@ body {
    ═══════════════════════════════════════════════════════════════════════════ */
 html.theme-animating,
 html.theme-animating * {
-  transition:
-    background-color var(--transition-base) ease,
-    border-color var(--transition-base) ease,
-    color var(--transition-base) ease !important;
+	transition:
+		background-color var(--transition-base) ease,
+		border-color var(--transition-base) ease,
+		color var(--transition-base) ease !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  html.theme-animating,
-  html.theme-animating * {
-    transition: none !important;
-  }
+	html {
+		scroll-behavior: auto;
+	}
+	html.theme-animating,
+	html.theme-animating * {
+		transition: none !important;
+	}
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    UTILITY CLASSES
    ═══════════════════════════════════════════════════════════════════════════ */
 .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    AGENT ANIMATIONS (for your pixel avatars)
    ═══════════════════════════════════════════════════════════════════════════ */
 @keyframes pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.6;
+	}
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-6px);
+	}
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 .animate-pulse-soft {
-  animation: pulse-soft 2s ease-in-out infinite;
+	animation: pulse-soft 2s ease-in-out infinite;
 }
 
 .animate-float {
-  animation: float 3s ease-in-out infinite;
+	animation: float 3s ease-in-out infinite;
 }
 
 .animate-spin {
-  animation: spin 1s linear infinite;
+	animation: spin 1s linear infinite;
 }

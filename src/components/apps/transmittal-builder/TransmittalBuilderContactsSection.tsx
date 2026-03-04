@@ -1,12 +1,12 @@
 import { Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/apps/ui/button";
-import { Input } from "@/components/apps/ui/input";
-import { FrameSection } from "@/components/apps/ui/PageFrame";
-import { Surface } from "@/components/apps/ui/Surface";
+import { Section } from "@/components/apps/ui/PageFrame";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Input";
+import { Panel } from "@/components/primitives/Panel";
 import { cn } from "@/lib/utils";
 import type { Contact, DraftState } from "./transmittalBuilderModels";
 
-const TransmittalSection = FrameSection;
+const TransmittalSection = Section;
 
 interface TransmittalBuilderContactsSectionProps {
 	draft: DraftState;
@@ -31,10 +31,12 @@ export function TransmittalBuilderContactsSection({
 		<TransmittalSection title="To - Contacts">
 			<div className="grid gap-3 px-2 sm:px-3">
 				{draft.contacts.map((contact) => (
-					<Surface
+					<Panel
 						key={contact.id}
+						variant="inset"
+						padding="md"
 						className={cn(
-							"space-y-3 p-4",
+							"space-y-3",
 							isInvalid("contacts") && "[border-color:var(--danger)]",
 						)}
 					>
@@ -73,17 +75,21 @@ export function TransmittalBuilderContactsSection({
 								type="button"
 								variant="ghost"
 								size="sm"
+								iconLeft={<Trash2 size={14} />}
 								onClick={() => removeContact(contact.id)}
 								disabled={draft.contacts.length <= 1}
 							>
-								<Trash2 size={14} />
 								Remove
 							</Button>
 						</div>
-					</Surface>
+					</Panel>
 				))}
-				<Button type="button" variant="outline" onClick={addContact}>
-					<Plus size={16} />
+				<Button
+					type="button"
+					variant="outline"
+					onClick={addContact}
+					iconLeft={<Plus size={16} />}
+				>
 					Add contact
 				</Button>
 			</div>

@@ -23,16 +23,16 @@ export function BackupManagerRestoreDialog({
 			open={Boolean(confirmRestore)}
 			onOpenChange={(open) => !open && onCancel()}
 		>
-			<DialogContent className="max-w-md border-[var(--border)] bg-[var(--surface)]">
+			<DialogContent className="max-w-md border-(--border) bg-(--surface)">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<AlertTriangle className="h-5 w-5 [color:var(--warning)]" />
 						Confirm Restore
 					</DialogTitle>
 				</DialogHeader>
-				<p className="text-sm text-[var(--text-muted)]">
+				<p className="text-sm text-(--text-muted)">
 					This will upsert data from{" "}
-					<strong className="text-[var(--text)]">
+					<strong className="text-(--text)">
 						{confirmRestore ?? "this backup"}
 					</strong>{" "}
 					into your database. Existing rows with matching IDs will be

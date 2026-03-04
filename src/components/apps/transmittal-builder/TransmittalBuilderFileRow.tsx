@@ -1,9 +1,9 @@
 import { Upload } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useMemo, useRef } from "react";
-import { Button } from "@/components/apps/ui/button";
-import { Input } from "@/components/apps/ui/input";
-import { Surface } from "@/components/apps/ui/Surface";
+import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Input";
+import { Panel } from "@/components/primitives/Panel";
 import { cn } from "@/lib/utils";
 
 interface TransmittalBuilderFileRowProps {
@@ -54,11 +54,10 @@ export function TransmittalBuilderFileRow({
 	}, [files]);
 
 	return (
-		<Surface
-			className={cn(
-				"space-y-3 p-5",
-				invalid && "[border-color:var(--danger)]",
-			)}
+		<Panel
+			variant="inset"
+			padding="lg"
+			className={cn("space-y-3", invalid && "[border-color:var(--danger)]")}
 		>
 			<div className="flex items-start justify-between gap-3">
 				<div className="space-y-1">
@@ -93,7 +92,7 @@ export function TransmittalBuilderFileRow({
 					)}
 				</div>
 			</div>
-			<div className="flex items-center gap-2 text-xs text-muted-foreground">
+			<div className="flex items-center gap-2 text-xs text-text-muted">
 				<Upload size={14} />
 				<span>Choose files or drag into the picker.</span>
 			</div>
@@ -105,6 +104,6 @@ export function TransmittalBuilderFileRow({
 				onChange={handleChange}
 			/>
 			<div className="text-xs [color:var(--text-muted)]">{previewLabel}</div>
-		</Surface>
+		</Panel>
 	);
 }

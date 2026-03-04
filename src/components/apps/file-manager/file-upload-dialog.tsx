@@ -3,7 +3,6 @@
 import { Upload, UploadIcon, XIcon } from "lucide-react";
 import * as React from "react";
 
-import { Button } from "@/components/apps/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -12,8 +11,8 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
-import { Input } from "@/components/apps/ui/input";
-import { Label } from "@/components/apps/ui/label";
+import { Button } from "@/components/primitives/Button";
+import { Label } from "@/components/primitives/Text";
 
 export function FileUploadDialog() {
 	const [open, setOpen] = React.useState(false);
@@ -61,8 +60,7 @@ export function FileUploadDialog() {
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
-			<Button onClick={() => setOpen(true)}>
-				<UploadIcon />
+			<Button onClick={() => setOpen(true)} iconLeft={<UploadIcon />}>
 				Upload
 			</Button>
 			<DialogContent className="sm:max-w-xl">
@@ -86,11 +84,11 @@ export function FileUploadDialog() {
 						<div className="mt-4 flex text-sm leading-none">
 							<Label htmlFor="file-upload" className="relative cursor-pointer">
 								<span>Upload a file</span>
-								<Input
+								<input
 									id="file-upload"
 									name="file-upload"
 									type="file"
-									className="sr-only h-auto p-0"
+									className="sr-only"
 									onChange={handleChange}
 									multiple
 								/>
@@ -122,12 +120,12 @@ export function FileUploadDialog() {
 									<div className="shrink-0">
 										<Button
 											variant="ghost"
-											size="icon"
+											size="sm"
+											iconOnly
+											iconLeft={<XIcon />}
+											aria-label={`Remove ${file.name}`}
 											onClick={() => removeFile(index)}
-										>
-											<XIcon />
-											<span className="sr-only">Remove file</span>
-										</Button>
+										/>
 									</div>
 								</li>
 							))}

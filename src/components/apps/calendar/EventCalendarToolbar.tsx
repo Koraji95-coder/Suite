@@ -108,26 +108,24 @@ export function EventCalendarToolbar({
 
 					{/* Desktop view tabs */}
 					<div className="ms-1 hidden items-center gap-1 md:flex">
-						{(["month", "week", "day", "agenda"] as CalendarView[]).map(
-							(v) => {
-								const active = v === view;
-								return (
-									<button
-										key={v}
-										type="button"
-										onClick={() => onViewChange(v)}
-										className={cn(
-											"inline-flex h-10 w-24 items-center justify-center rounded-xl border text-center text-sm leading-none transition-colors",
-											active
-												? "border-[color-mix(in_srgb,var(--primary)_22%,transparent)] [background:var(--surface-2)] [color:var(--text)]"
-												: "[border-color:var(--border)] [color:var(--text-muted)] hover:[background:var(--surface)]",
-										)}
-									>
-										{viewLabel[v]}
-									</button>
-								);
-							},
-						)}
+						{(["month", "week", "day", "agenda"] as CalendarView[]).map((v) => {
+							const active = v === view;
+							return (
+								<button
+									key={v}
+									type="button"
+									onClick={() => onViewChange(v)}
+									className={cn(
+										"inline-flex h-10 w-24 items-center justify-center rounded-xl border text-center text-sm leading-none transition-colors",
+										active
+											? "border-[color-mix(in_srgb,var(--primary)_22%,transparent)] [background:var(--surface-2)] [color:var(--text)]"
+											: "[border-color:var(--border)] [color:var(--text-muted)] hover:[background:var(--surface)]",
+									)}
+								>
+									{viewLabel[v]}
+								</button>
+							);
+						})}
 					</div>
 				</div>
 

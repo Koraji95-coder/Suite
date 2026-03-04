@@ -56,8 +56,11 @@ export function WeekViewTimeGrid({
 						className={cn(
 							"relative grid auto-cols-fr border-r last:border-r-0",
 							"border-[color-mix(in_srgb,var(--primary)_8%,transparent)]",
-							isSelected && "[background:color-mix(in_srgb,var(--primary)_5%,transparent)]",
-							today && !isSelected && "[background:color-mix(in_srgb,var(--primary)_2%,transparent)]",
+							isSelected &&
+								"[background:color-mix(in_srgb,var(--primary)_5%,transparent)]",
+							today &&
+								!isSelected &&
+								"[background:color-mix(in_srgb,var(--primary)_2%,transparent)]",
 						)}
 						data-today={today || undefined}
 						data-selected={isSelected || undefined}
@@ -123,9 +126,12 @@ export function WeekViewTimeGrid({
 												className={cn(
 													"absolute h-[calc(var(--week-cells-height)/4)] w-full",
 													quarter === 0 && "top-0",
-													quarter === 1 && "top-[calc(var(--week-cells-height)/4)]",
-													quarter === 2 && "top-[calc(var(--week-cells-height)/4*2)]",
-													quarter === 3 && "top-[calc(var(--week-cells-height)/4*3)]",
+													quarter === 1 &&
+														"top-[calc(var(--week-cells-height)/4)]",
+													quarter === 2 &&
+														"top-[calc(var(--week-cells-height)/4*2)]",
+													quarter === 3 &&
+														"top-[calc(var(--week-cells-height)/4*3)]",
 												)}
 												onClick={() => {
 													const startTime = new Date(day);

@@ -1,9 +1,7 @@
 import { RefreshCw, Search, Upload } from "lucide-react";
 import type { ChangeEvent, RefObject } from "react";
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
 
 interface FileBrowserToolbarProps {
-	palette: ColorScheme;
 	search: string;
 	onSearchChange: (value: string) => void;
 	fileInputRef: RefObject<HTMLInputElement | null>;
@@ -13,7 +11,6 @@ interface FileBrowserToolbarProps {
 }
 
 export function FileBrowserToolbar({
-	palette,
 	search,
 	onSearchChange,
 	fileInputRef,
@@ -23,48 +20,20 @@ export function FileBrowserToolbar({
 }: FileBrowserToolbarProps) {
 	return (
 		<div className="mb-3 flex flex-wrap items-center gap-2">
-			<div className="relative min-w-[220px] flex-1 basis-full sm:basis-auto">
-				<Search
-					className="w-4 h-4"
-					style={{
-						position: "absolute",
-						left: 10,
-						top: 10,
-						color: palette.primary,
-					}}
-				/>
+			<div className="relative min-w-55 flex-1 basis-full sm:basis-auto">
+				<Search className="absolute left-2.5 top-2.5 h-4 w-4 [color:var(--primary)]" />
 				<input
 					value={search}
 					onChange={(event) => onSearchChange(event.target.value)}
 					placeholder="Search files..."
-					style={{
-						width: "100%",
-						padding: "8px 12px 8px 34px",
-						background: hexToRgba(palette.background, 0.6),
-						border: `1px solid ${hexToRgba(palette.primary, 0.25)}`,
-						borderRadius: 8,
-						color: palette.text,
-						outline: "none",
-						fontSize: 14,
-					}}
+					className="w-full rounded-lg border py-2 pr-3 pl-8.5 text-sm outline-none border-[color-mix(in_srgb,var(--primary)_25%,transparent)] [background:color-mix(in_srgb,var(--background)_60%,transparent)] [color:var(--text)]"
 				/>
 			</div>
 			<button
 				onClick={() => fileInputRef.current?.click()}
-				style={{
-					display: "flex",
-					alignItems: "center",
-					gap: 6,
-					padding: "8px 14px",
-					background: hexToRgba(palette.primary, 0.15),
-					border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
-					borderRadius: 8,
-					color: palette.text,
-					cursor: "pointer",
-					fontSize: 14,
-				}}
+				className="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm border-[color-mix(in_srgb,var(--primary)_30%,transparent)] [background:color-mix(in_srgb,var(--primary)_15%,transparent)] [color:var(--text)]"
 			>
-				<Upload className="w-4 h-4" /> Upload
+				<Upload className="h-4 w-4" /> Upload
 			</button>
 			<input
 				ref={fileInputRef}
@@ -76,16 +45,9 @@ export function FileBrowserToolbar({
 			<button
 				onClick={onRefresh}
 				disabled={loading}
-				style={{
-					padding: 8,
-					background: hexToRgba(palette.primary, 0.1),
-					border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-					borderRadius: 8,
-					color: palette.text,
-					cursor: "pointer",
-				}}
+				className="rounded-lg border p-2 border-[color-mix(in_srgb,var(--primary)_20%,transparent)] [background:color-mix(in_srgb,var(--primary)_10%,transparent)] [color:var(--text)]"
 			>
-				<RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+				<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
 			</button>
 		</div>
 	);

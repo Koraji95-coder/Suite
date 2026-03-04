@@ -1,6 +1,6 @@
 import { BookOpen, Calculator, TrendingUp } from "lucide-react";
 import { useState } from "react";
-import { FrameSection } from "../../apps/ui/PageFrame";
+import { Section } from "@/components/apps/ui/PageFrame";
 
 export function MathReference() {
 	const [activeTab, setActiveTab] = useState<"algebra" | "trig" | "complex">(
@@ -24,7 +24,7 @@ export function MathReference() {
 				</h2>
 			</div>
 
-			<FrameSection>
+			<Section>
 				<div className="flex space-x-2 mb-6">
 					<button
 						onClick={() => setActiveTab("algebra")}
@@ -212,28 +212,28 @@ export function MathReference() {
 										</tr>
 									</thead>
 									<tbody className="font-mono [color:var(--text)]">
-										<tr className="border-b border-white/\[0.06\]">
+										<tr className="border-b [border-color:var(--border)]">
 											<td className="p-2">0°</td>
 											<td className="p-2">0</td>
 											<td className="p-2">0</td>
 											<td className="p-2">1</td>
 											<td className="p-2">0</td>
 										</tr>
-										<tr className="border-b border-white/\[0.06\]">
+										<tr className="border-b [border-color:var(--border)]">
 											<td className="p-2">30°</td>
 											<td className="p-2">π/6</td>
 											<td className="p-2">1/2</td>
 											<td className="p-2">√3/2</td>
 											<td className="p-2">√3/3</td>
 										</tr>
-										<tr className="border-b border-white/\[0.06\]">
+										<tr className="border-b [border-color:var(--border)]">
 											<td className="p-2">45°</td>
 											<td className="p-2">π/4</td>
 											<td className="p-2">√2/2</td>
 											<td className="p-2">√2/2</td>
 											<td className="p-2">1</td>
 										</tr>
-										<tr className="border-b border-white/\[0.06\]">
+										<tr className="border-b [border-color:var(--border)]">
 											<td className="p-2">60°</td>
 											<td className="p-2">π/3</td>
 											<td className="p-2">√3/2</td>
@@ -515,7 +515,7 @@ export function MathReference() {
 						</div>
 					</div>
 				)}
-			</FrameSection>
+			</Section>
 		</div>
 	);
 }

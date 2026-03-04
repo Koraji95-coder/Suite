@@ -1,10 +1,7 @@
 import { Download, Loader2, Shield, Trash2, Upload } from "lucide-react";
-import type { CSSProperties } from "react";
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
 import type { BackupFileInfo } from "@/supabase/backupManager";
 
 interface BackupManagerFilesListProps {
-	palette: ColorScheme;
 	files: BackupFileInfo[];
 	loadingFiles: boolean;
 	formatSize: (bytes: number) => string;
@@ -14,7 +11,6 @@ interface BackupManagerFilesListProps {
 }
 
 export function BackupManagerFilesList({
-	palette,
 	files,
 	loadingFiles,
 	formatSize,
@@ -23,69 +19,33 @@ export function BackupManagerFilesList({
 	onRequestDelete,
 }: BackupManagerFilesListProps) {
 	return (
-		<div style={{ marginBottom: 20 }}>
-			<div
-				style={{
-					fontWeight: 600,
-					fontSize: 14,
-					color: palette.text,
-					marginBottom: 10,
-					display: "flex",
-					alignItems: "center",
-					gap: 8,
-				}}
-			>
-				<Shield className="w-4 h-4" style={{ color: palette.primary }} /> Backup
-				Files
+		<div className="mb-5">
+			<div className="mb-2.5 flex items-center gap-2 text-sm font-semibold [color:var(--text)]">
+				<Shield className="h-4 w-4 [color:var(--primary)]" /> Backup Files
 			</div>
 
 			{loadingFiles ? (
-				<div
-					style={{ textAlign: "center", padding: 24, color: palette.textMuted }}
-				>
-					<Loader2 className="w-5 h-5 animate-spin mx-auto" />
+				<div className="py-6 text-center [color:var(--text-muted)]">
+					<Loader2 className="mx-auto h-5 w-5 animate-spin" />
 				</div>
 			) : files.length === 0 ? (
-				<div
-					style={{
-						textAlign: "center",
-						padding: 24,
-						color: palette.textMuted,
-						fontSize: 13,
-					}}
-				>
+				<div className="py-6 text-center text-[13px] [color:var(--text-muted)]">
 					No backup files yet
 				</div>
 			) : (
-				<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+				<div className="grid gap-1.5">
 					{files.map((file) => (
 						<div
 							key={file.name}
-							className="flex flex-wrap items-center gap-2 sm:gap-3"
-							style={{
-								padding: "10px 14px",
-								borderRadius: 8,
-								background: hexToRgba(palette.surface, 0.5),
-								border: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
-							}}
+							className="flex flex-wrap items-center gap-2 rounded-lg border px-3.5 py-2.5 sm:gap-3
+								border-[color-mix(in_srgb,var(--primary)_8%,transparent)]
+								[background:color-mix(in_srgb,var(--surface)_50%,transparent)]"
 						>
-							<span
-								className="min-w-0 flex-1 basis-full sm:basis-auto"
-								style={{
-									fontSize: 13,
-									color: palette.text,
-									overflow: "hidden",
-									textOverflow: "ellipsis",
-									whiteSpace: "nowrap",
-								}}
-							>
+							<span className="min-w-0 flex-1 basis-full truncate text-[13px] sm:basis-auto [color:var(--text)]">
 								{file.name}
 							</span>
-							<div
-								className="flex items-center gap-3"
-								style={{ color: palette.textMuted }}
-							>
-								<span style={{ fontSize: 12 }}>{formatSize(file.size)}</span>
+							<div className="flex items-center gap-3 [color:var(--text-muted)]">
+								<span className="text-xs">{formatSize(file.size)}</span>
 								<span className="hidden text-xs sm:inline">
 									{new Date(file.modified).toLocaleDateString()}
 								</span>
@@ -93,21 +53,21 @@ export function BackupManagerFilesList({
 							<div className="ml-auto flex items-center gap-1">
 								<button
 									onClick={() => onDownloadFile(file.name)}
-									style={iconButtonStyle(palette.primary)}
+									className="border-none bg-transparent p-1 [color:var(--primary)]"
 								>
-									<Download className="w-4 h-4" />
+									<Download className="h-4 w-4" />
 								</button>
 								<button
 									onClick={() => onRequestRestore(file.name)}
-									style={iconButtonStyle(palette.secondary)}
+									className="border-none bg-transparent p-1 [color:var(--secondary)]"
 								>
-									<Upload className="w-4 h-4" />
+									<Upload className="h-4 w-4" />
 								</button>
 								<button
 									onClick={() => onRequestDelete(file.name)}
-									style={iconButtonStyle(palette.accent)}
+									className="border-none bg-transparent p-1 [color:var(--danger)]"
 								>
-									<Trash2 className="w-4 h-4" />
+									<Trash2 className="h-4 w-4" />
 								</button>
 							</div>
 						</div>
@@ -116,14 +76,4 @@ export function BackupManagerFilesList({
 			)}
 		</div>
 	);
-}
-
-function iconButtonStyle(color: string): CSSProperties {
-	return {
-		background: "none",
-		border: "none",
-		cursor: "pointer",
-		color,
-		padding: 4,
-	};
 }

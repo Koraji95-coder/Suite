@@ -5,7 +5,7 @@ export default function GroundGridGenerationRoutePage() {
 	return (
 		<PageFrame
 			title="Ground Grid Generation"
-			subtitle="Coordinates capture and interactive grid generation in one workspace."
+			description="Coordinates capture and interactive grid generation in one workspace."
 		>
 			<GroundGridGeneratorApp />
 		</PageFrame>

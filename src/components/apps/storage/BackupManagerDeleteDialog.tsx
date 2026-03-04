@@ -22,11 +22,11 @@ export function BackupManagerDeleteDialog({
 			open={Boolean(pendingDelete)}
 			onOpenChange={(open) => !open && onCancel()}
 		>
-			<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+			<DialogContent className="max-w-sm border-(--border) bg-(--surface)">
 				<DialogHeader>
 					<DialogTitle>Delete backup file?</DialogTitle>
 				</DialogHeader>
-				<p className="text-sm text-[var(--text-muted)]">
+				<p className="text-sm text-(--text-muted)">
 					Delete "{pendingDelete ?? "this backup"}"?
 				</p>
 				<DialogFooter className="mt-4 gap-2 sm:justify-end">
@@ -38,7 +38,7 @@ export function BackupManagerDeleteDialog({
 					</button>
 					<button
 						onClick={onConfirm}
-						className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] text-[white]"
 					>
 						Delete
 					</button>

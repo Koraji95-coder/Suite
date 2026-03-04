@@ -1,11 +1,9 @@
-import { useTheme } from "@/lib/palette";
 import { DatabaseBrowserDataPanel } from "./DatabaseBrowserDataPanel";
 import { DatabaseBrowserErrorBanner } from "./DatabaseBrowserErrorBanner";
 import { DatabaseBrowserSidebar } from "./DatabaseBrowserSidebar";
 import { useDatabaseBrowserState } from "./useDatabaseBrowserState";
 
 export function DatabaseBrowser() {
-	const { palette } = useTheme();
 	const {
 		error,
 		filteredRows,
@@ -32,35 +30,23 @@ export function DatabaseBrowser() {
 	} = useDatabaseBrowserState();
 
 	return (
-		<div
-			style={{
-				display: "flex",
-				flexDirection: "column",
-				gap: 0,
-				minHeight: 400,
-			}}
-		>
+		<div className="flex min-h-100 flex-col">
 			<DatabaseBrowserErrorBanner
-				palette={palette}
 				error={error}
 				onDismiss={() => setError(null)}
 			/>
 
 			<div className="flex flex-1 flex-col gap-4 xl:flex-row">
 				<DatabaseBrowserSidebar
-					palette={palette}
 					tables={tables}
 					selectedTable={selectedTable}
 					loadingTables={loadingTables}
-					onRefreshTables={() => {
-						void loadTables();
-					}}
+					onRefreshTables={() => void loadTables()}
 					onSelectTable={selectTable}
 				/>
 
 				<div className="min-w-0 flex-1">
 					<DatabaseBrowserDataPanel
-						palette={palette}
 						selectedTable={selectedTable}
 						loadingData={loadingData}
 						rows={rows}

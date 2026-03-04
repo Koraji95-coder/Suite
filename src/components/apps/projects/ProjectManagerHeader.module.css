@@ -1,0 +1,237 @@
+.root {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	background: linear-gradient(
+		160deg,
+		color-mix(in srgb, var(--panel-soft) 85%, transparent),
+		color-mix(in srgb, var(--panel-strong) 70%, transparent)
+	);
+	padding: clamp(1rem, 2vw, 2rem);
+}
+
+.stack {
+	display: grid;
+	gap: var(--space-6);
+}
+
+.topRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-5);
+	align-items: flex-start;
+	justify-content: space-between;
+}
+
+.intro {
+	display: grid;
+	gap: var(--space-3);
+}
+
+.crumbs {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.18em;
+	color: var(--text-muted);
+}
+
+.crumbButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.2rem 0.35rem;
+	border: 0;
+	border-radius: var(--radius-1);
+	color: inherit;
+	background: transparent;
+	cursor: pointer;
+}
+
+.crumbButton:hover {
+	color: var(--text);
+	background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+}
+
+.crumbCurrent {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.chevron {
+	width: 0.8rem;
+	height: 0.8rem;
+	opacity: 0.5;
+}
+
+.title {
+	margin: 0;
+	font-size: clamp(1.3rem, 1.2rem + 0.6vw, 1.8rem);
+	letter-spacing: -0.015em;
+}
+
+.subtitle {
+	margin: 0.25rem 0 0;
+	font-size: 0.92rem;
+	color: var(--text-muted);
+}
+
+.actions {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: var(--space-3);
+	align-items: center;
+}
+
+.createButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	border: 0;
+	border-radius: var(--radius-2);
+	background: var(--primary);
+	color: var(--primary-contrast);
+	padding: 0.72rem 1.1rem;
+	font-size: 0.86rem;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.createButton:hover {
+	filter: brightness(1.08);
+}
+
+.filtersButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	background: var(--surface-2);
+	color: var(--text-muted);
+	padding: 0.62rem 0.85rem;
+	font-size: 0.78rem;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.filtersButton:hover {
+	background: var(--surface);
+	color: var(--text);
+}
+
+.bottomRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-4);
+	align-items: center;
+	justify-content: space-between;
+}
+
+.statusChips {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+}
+
+.statusChip {
+	border: 1px solid var(--line-soft);
+	background: var(--surface);
+	color: var(--text-muted);
+	padding: 0.45rem 0.8rem;
+	border-radius: var(--radius-2);
+	font-size: 0.74rem;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.statusChip:hover {
+	background: var(--surface-2);
+	color: var(--text);
+}
+
+.statusChipActive {
+	border-color: var(--line-accent);
+	background: color-mix(in srgb, var(--primary) 18%, transparent);
+	color: var(--text);
+}
+
+.meta {
+	display: flex;
+	flex-wrap: wrap;
+	flex: 1;
+	min-width: min(100%, 20rem);
+	gap: var(--space-3);
+	justify-content: flex-end;
+	align-items: center;
+}
+
+.searchWrap {
+	position: relative;
+	width: min(100%, 23rem);
+}
+
+.searchIcon {
+	position: absolute;
+	left: 0.78rem;
+	top: 50%;
+	width: 0.95rem;
+	height: 0.95rem;
+	transform: translateY(-50%);
+	color: var(--primary);
+	pointer-events: none;
+}
+
+.searchInput {
+	width: 100%;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	background: var(--surface-2);
+	color: var(--text);
+	padding: 0.62rem 0.85rem 0.62rem 2.15rem;
+	font-size: 0.86rem;
+}
+
+.searchInput:focus-visible {
+	outline: none;
+	border-color: var(--line-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.stats {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.statBadge {
+	border: 1px solid var(--line-soft);
+	background: var(--surface);
+	color: var(--text-muted);
+	padding: 0.38rem 0.64rem;
+	border-radius: var(--radius-2);
+	font-size: 0.74rem;
+	font-weight: 600;
+}
+
+.statBadgeHighlight {
+	border-color: var(--line-accent);
+	background: color-mix(in srgb, var(--primary) 16%, transparent);
+	color: var(--primary);
+}
+
+.iconSm {
+	width: 0.9rem;
+	height: 0.9rem;
+}
+
+@media (max-width: 860px) {
+	.meta {
+		justify-content: stretch;
+	}
+	.searchWrap {
+		width: 100%;
+	}
+}

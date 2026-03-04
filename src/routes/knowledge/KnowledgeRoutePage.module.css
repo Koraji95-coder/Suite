@@ -1,0 +1,73 @@
+.libraryGrid {
+	display: grid;
+	gap: 0.8rem;
+}
+
+.libraryCard {
+	display: grid;
+	gap: 0.5rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 1rem;
+	background:
+		linear-gradient(
+			185deg,
+			color-mix(in srgb, var(--surface) 90%, transparent),
+			color-mix(in srgb, var(--surface-2) 72%, transparent)
+		),
+		var(--surface);
+}
+
+.libraryTitle {
+	margin: 0;
+	font-size: 0.9rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.libraryDescription {
+	margin: 0;
+	font-size: 0.76rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+
+.libraryAction {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	padding: 0.5rem 0.75rem;
+	font-size: 0.82rem;
+	font-weight: 700;
+	color: var(--text);
+	text-decoration: none;
+	background: var(--surface-2);
+	transition:
+		background 160ms ease,
+		border-color 160ms ease;
+}
+
+.libraryAction:hover {
+	background: color-mix(in srgb, var(--surface-2) 72%, var(--surface));
+	border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+
+.sectionList {
+	margin: 0;
+	padding-left: 1.15rem;
+	font-size: 0.88rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.sectionList li + li {
+	margin-top: 0.2rem;
+}
+
+@media (min-width: 48rem) {
+	.libraryGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}

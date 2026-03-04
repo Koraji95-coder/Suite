@@ -1,5 +1,5 @@
 import { Grid, List, Upload } from "lucide-react";
-import { PageFrame } from "@/components/layout/PageFrame";
+import { PageFrame } from "@/components/apps/ui/PageFrame";
 import { BlockLibraryCatalog } from "./BlockLibraryCatalog";
 import { BlockLibraryDeleteDialog } from "./BlockLibraryDeleteDialog";
 import { BlockLibraryDetailsDialog } from "./BlockLibraryDetailsDialog";
@@ -50,7 +50,9 @@ export function BlockLibrary() {
 			actions={
 				<div className="flex items-center gap-2">
 					<button
-						onClick={() => setViewMode((prev) => (prev === "grid" ? "list" : "grid"))}
+						onClick={() =>
+							setViewMode((prev) => (prev === "grid" ? "list" : "grid"))
+						}
 						className="rounded-lg border p-2 transition
 							[border-color:var(--border)] [background:var(--surface)]
 							hover:[background:var(--surface-2)]"

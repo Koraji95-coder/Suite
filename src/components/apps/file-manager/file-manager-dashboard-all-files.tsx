@@ -1,6 +1,6 @@
 import { ChevronDown, Filter, List, MoreHorizontal } from "lucide-react";
-import { Button } from "@/components/apps/ui/button";
-import { Card } from "@/components/apps/ui/card";
+import { Button } from "@/components/primitives/Button";
+import { Panel } from "@/components/primitives/Panel";
 import { allFiles, fileTypeLegendItems } from "./file-manager-dashboard-models";
 
 export function FileManagerDashboardAllFiles() {
@@ -35,7 +35,7 @@ export function FileManagerDashboardAllFiles() {
 
 			<div className="space-y-3 lg:hidden">
 				{allFiles.map((file) => (
-					<Card key={file.name} className="p-4">
+					<Panel key={file.name} padding="none" className="p-4">
 						<div className="flex items-center gap-3">
 							<div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
 								<file.icon className="text-muted-foreground h-5 w-5" />
@@ -50,11 +50,15 @@ export function FileManagerDashboardAllFiles() {
 									<span>{file.date}</span>
 								</div>
 							</div>
-							<Button variant="ghost" size="icon">
-								<MoreHorizontal className="h-4 w-4" />
-							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
+								iconOnly
+								iconLeft={<MoreHorizontal className="h-4 w-4" />}
+								aria-label={`More actions for ${file.name}`}
+							/>
 						</div>
-					</Card>
+					</Panel>
 				))}
 			</div>
 
@@ -86,9 +90,13 @@ export function FileManagerDashboardAllFiles() {
 							{file.date}
 						</div>
 						<div className="col-span-1 flex justify-end">
-							<Button variant="ghost" size="icon">
-								<MoreHorizontal className="h-4 w-4" />
-							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
+								iconOnly
+								iconLeft={<MoreHorizontal className="h-4 w-4" />}
+								aria-label={`More actions for ${file.name}`}
+							/>
 						</div>
 					</div>
 				))}

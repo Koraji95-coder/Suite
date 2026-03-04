@@ -34,7 +34,8 @@ export const KNOWLEDGE_SECTIONS: KnowledgeSection[] = [
 	},
 	{
 		title: "Math Tools (Coming Soon)",
-		description: "Planned calculation modules are documented here ahead of release.",
+		description:
+			"Planned calculation modules are documented here ahead of release.",
 		items: [
 			"Vector Calculator",
 			"Three-Phase Calculator",

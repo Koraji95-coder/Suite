@@ -1,0 +1,81 @@
+.root {
+	border: 1px solid color-mix(in srgb, var(--success) 24%, var(--border));
+	border-radius: var(--radius-3);
+	padding: clamp(0.85rem, 1.5vw, 1.2rem);
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--surface) 90%, transparent),
+		color-mix(in srgb, var(--surface-2) 68%, transparent)
+	);
+	display: grid;
+	gap: var(--space-4);
+}
+
+.controls {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--space-3);
+}
+
+.searchWrap {
+	position: relative;
+}
+
+.searchIcon {
+	position: absolute;
+	top: 50%;
+	left: 0.8rem;
+	width: 1rem;
+	height: 1rem;
+	transform: translateY(-50%);
+	color: var(--success);
+	pointer-events: none;
+}
+
+.searchInput,
+.statusSelect {
+	width: 100%;
+	border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border));
+	border-radius: var(--radius-2);
+	background: var(--surface);
+	color: var(--text);
+	font-size: 0.86rem;
+	padding: 0.62rem 0.85rem;
+}
+
+.searchInput {
+	padding-left: 2.2rem;
+}
+
+.searchInput:focus-visible,
+.statusSelect:focus-visible {
+	outline: none;
+	border-color: color-mix(in srgb, var(--success) 52%, var(--border));
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 18%, transparent);
+}
+
+.metrics {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem 1rem;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 0.82rem;
+	color: var(--text-muted);
+}
+
+.counts {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.35rem 0.8rem;
+}
+
+.rules {
+	font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 900px) {
+	.controls {
+		grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+	}
+}

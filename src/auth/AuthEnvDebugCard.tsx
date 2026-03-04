@@ -36,7 +36,9 @@ export default function AuthEnvDebugCard() {
 	}, [origin]);
 
 	const redirectMismatch =
-		Boolean(redirectEnv) && redirectHost !== "(using current origin)" && redirectHost !== originHost;
+		Boolean(redirectEnv) &&
+		redirectHost !== "(using current origin)" &&
+		redirectHost !== originHost;
 
 	const rowStyle: CSSProperties = {
 		display: "flex",
@@ -56,7 +58,8 @@ export default function AuthEnvDebugCard() {
 	const valueStyle: CSSProperties = {
 		opacity: 0.95,
 		textAlign: "right",
-		fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+		fontFamily:
+			"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
 		wordBreak: "break-all",
 	};
 

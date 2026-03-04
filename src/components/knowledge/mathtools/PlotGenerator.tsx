@@ -1,6 +1,6 @@
 import { TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FrameSection } from "../../apps/ui/PageFrame";
+import { Section } from "@/components/apps/ui/PageFrame";
 
 type PlotType =
 	| "sine"
@@ -125,18 +125,18 @@ export function PlotGenerator() {
 
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 				<div className="lg:col-span-2">
-					<FrameSection>
+					<Section>
 						<canvas
 							ref={canvasRef}
 							width={800}
 							height={400}
 							className="w-full rounded-lg border [border-color:var(--border)]"
 						/>
-					</FrameSection>
+					</Section>
 				</div>
 
 				<div className="space-y-4">
-					<FrameSection title="Plot Type">
+					<Section title="Plot Type">
 						<select
 							value={plotType}
 							onChange={(e) => setPlotType(e.target.value as PlotType)}
@@ -149,12 +149,12 @@ export function PlotGenerator() {
 							<option value="rl-response">RL Response</option>
 							<option value="bode">Bode Plot</option>
 						</select>
-					</FrameSection>
+					</Section>
 
 					{(plotType === "sine" ||
 						plotType === "square" ||
 						plotType === "sawtooth") && (
-						<FrameSection title={`Frequency (Hz): ${frequency}`}>
+						<Section title={`Frequency (Hz): ${frequency}`}>
 							<input
 								type="range"
 								min="0.1"
@@ -164,11 +164,11 @@ export function PlotGenerator() {
 								onChange={(e) => setFrequency(parseFloat(e.target.value))}
 								className="w-full"
 							/>
-						</FrameSection>
+						</Section>
 					)}
 
 					{(plotType === "rc-charge" || plotType === "rl-response") && (
-						<FrameSection title={`Time Constant (s): ${timeConstant}`}>
+						<Section title={`Time Constant (s): ${timeConstant}`}>
 							<input
 								type="range"
 								min="0.1"
@@ -178,10 +178,10 @@ export function PlotGenerator() {
 								onChange={(e) => setTimeConstant(parseFloat(e.target.value))}
 								className="w-full"
 							/>
-						</FrameSection>
+						</Section>
 					)}
 
-					<FrameSection title={`Amplitude: ${amplitude}`}>
+					<Section title={`Amplitude: ${amplitude}`}>
 						<input
 							type="range"
 							min="0.1"
@@ -191,11 +191,11 @@ export function PlotGenerator() {
 							onChange={(e) => setAmplitude(parseFloat(e.target.value))}
 							className="w-full"
 						/>
-					</FrameSection>
+					</Section>
 				</div>
 			</div>
 
-			<FrameSection title="Plot Information">
+			<Section title="Plot Information">
 				<div className="space-y-2 text-sm [color:var(--text-muted)]">
 					{plotType === "sine" && (
 						<p>
@@ -233,7 +233,7 @@ export function PlotGenerator() {
 						</p>
 					)}
 				</div>
-			</FrameSection>
+			</Section>
 		</div>
 	);
 }

@@ -1,69 +1,93 @@
-// src/components/layout/PageFrame.tsx
-import { type ReactNode } from 'react';
-import { cn } from '@/lib/utils';
-import { Stack, Text, Heading } from '@/components/primitives';
+// src/components/apps/ui/PageFrame.tsx
+import { type ReactNode } from "react";
+import { Container, Heading, Stack, Text } from "@/components/primitives";
+import { cn } from "@/lib/utils";
+import styles from "./PageFrame.module.css";
 
 interface PageFrameProps {
-  children: ReactNode;
-  /** Page title */
-  title?: string;
-  /** Page description */
-  description?: string;
-  /** Right-aligned actions */
-  actions?: ReactNode;
-  /** Max width constraint */
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  /** Additional padding */
-  padded?: boolean;
-  className?: string;
+	children: ReactNode;
+	/** Page title */
+	title?: string;
+	/** Page description */
+	description?: string;
+	/** Right-aligned actions */
+	actions?: ReactNode;
+	/** Max width constraint */
+	maxWidth?: "sm" | "md" | "lg" | "xl" | "full";
+	/** Additional padding */
+	padded?: boolean;
+	className?: string;
 }
 
-const maxWidthClasses = {
-  sm: 'max-w-2xl',
-  md: 'max-w-4xl',
-  lg: 'max-w-6xl',
-  xl: 'max-w-7xl',
-  full: 'max-w-full',
-};
-
 export function PageFrame({
-  children,
-  title,
-  description,
-  actions,
-  maxWidth = 'xl',
-  padded = true,
-  className,
+	children,
+	title,
+	description,
+	actions,
+	maxWidth = "xl",
+	padded = true,
+	className,
 }: PageFrameProps) {
-  return (
-    <div
-      className={cn(
-        'min-h-full w-full',
-        padded && 'p-6 lg:p-8',
-        className
-      )}
-    >
-      <div className={cn('mx-auto w-full', maxWidthClasses[maxWidth])}>
-        {/* Header */}
-        {(title || actions) && (
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <Stack gap={1}>
-              {title && <Heading level={1}>{title}</Heading>}
-              {description && (
-                <Text color="muted" size="md">{description}</Text>
-              )}
-            </Stack>
-            {actions && (
-              <div className="flex items-center gap-3 shrink-0">
-                {actions}
-              </div>
-            )}
-          </div>
-        )}
+	return (
+		<div className={cn(styles.root, padded && styles.padded, className)}>
+			<Container size={maxWidth} padded={padded}>
+				{/* Header */}
+				{(title || actions) && (
+					<div className={styles.header}>
+						<Stack gap={1} className={styles.headerText}>
+							{title && <Heading level={1}>{title}</Heading>}
+							{description && (
+								<Text color="muted" size="md">
+									{description}
+								</Text>
+							)}
+						</Stack>
+						{actions && <div className={styles.headerActions}>{actions}</div>}
+					</div>
+				)}
 
-        {/* Content */}
-        {children}
-      </div>
-    </div>
-  );
+				{/* Content */}
+				{children}
+			</Container>
+		</div>
+	);
+}
+
+interface SectionProps {
+	children: ReactNode;
+	title?: string;
+	description?: string;
+	actions?: ReactNode;
+	className?: string;
+}
+
+export function Section({
+	children,
+	title,
+	description,
+	actions,
+	className,
+}: SectionProps) {
+	return (
+		<section className={cn(styles.section, className)}>
+			{(title || description || actions) && (
+				<div className={styles.sectionHeader}>
+					<Stack gap={0} className={styles.sectionText}>
+						{title && <Heading level={3}>{title}</Heading>}
+						{description && (
+							<Text
+								color="muted"
+								size="xs"
+								className={styles.sectionDescription}
+							>
+								{description}
+							</Text>
+						)}
+					</Stack>
+					{actions && <div className={styles.sectionActions}>{actions}</div>}
+				</div>
+			)}
+			{children}
+		</section>
+	);
 }

@@ -1,0 +1,42 @@
+.root {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.45rem;
+	margin-bottom: 0.5rem;
+}
+
+.tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	border-radius: 999px;
+	border: 1px solid var(--line-soft);
+	background: var(--surface);
+	color: var(--text-muted);
+	padding: 0.42rem 0.75rem;
+	font-size: 0.8rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		border-color 120ms ease,
+		background 120ms ease,
+		color 120ms ease;
+}
+
+.tab:hover {
+	background: var(--surface-2);
+	color: var(--text);
+}
+
+.tabActive {
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	background: color-mix(in srgb, var(--primary) 18%, transparent);
+	color: var(--text);
+	box-shadow: var(--shadow-sm);
+}
+
+.icon {
+	width: 0.9rem;
+	height: 0.9rem;
+}

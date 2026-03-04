@@ -1,5 +1,3 @@
-import type { ColorScheme } from "@/lib/palette";
-
 export interface GraphNode {
 	id: string;
 	label: string;
@@ -26,39 +24,31 @@ export type ViewMode = "2d" | "3d";
 
 export type SourceFilter = "architecture" | "memory" | "both";
 
-export const getGroupColor = (group: string, palette: ColorScheme): string => {
+/** Returns a CSS custom-property reference for the given group. */
+export const getGroupColor = (group: string): string => {
 	switch (group) {
 		case "frontend":
-			return palette.primary;
-		case "backend":
-			return palette.tertiary;
-		case "data":
-			return palette.accent;
-		case "agent":
-			return palette.secondary;
-		case "docs":
-			return palette.textMuted;
 		case "dash":
-			return palette.primary;
-		case "know":
-			return palette.secondary;
-		case "apps":
-			return palette.accent;
-		case "equip":
-			return palette.tertiary;
-		case "std":
-			return palette.secondary;
 		case "proj":
-			return palette.primary;
-		case "preference":
-			return palette.tertiary;
-		case "knowledge":
-			return palette.secondary;
+			return "var(--primary)";
+		case "backend":
+		case "equip":
+			return "var(--tertiary)";
+		case "data":
+		case "apps":
 		case "pattern":
-			return palette.accent;
 		case "relationship":
-			return palette.accent;
+			return "var(--accent)";
+		case "agent":
+		case "know":
+		case "std":
+		case "knowledge":
+			return "var(--secondary)";
+		case "docs":
+			return "var(--text-muted)";
+		case "preference":
+			return "var(--tertiary)";
 		default:
-			return palette.primary;
+			return "var(--primary)";
 	}
 };

@@ -52,7 +52,9 @@ export function BlockLibraryDetailsDialog({
 						) : (
 							<div className="text-center">
 								<Package className="mx-auto mb-2 h-16 w-16 text-[color-mix(in_srgb,var(--primary)_30%,transparent)]" />
-								<p className="text-sm [color:var(--text-muted)]">No preview available</p>
+								<p className="text-sm [color:var(--text-muted)]">
+									No preview available
+								</p>
 							</div>
 						)}
 					</div>
@@ -76,9 +78,12 @@ export function BlockLibraryDetailsDialog({
 					{/* Dynamic info */}
 					{selectedBlock.is_dynamic && (
 						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_8%,transparent)]">
-							<p className="text-sm font-medium [color:var(--text)]">Dynamic Block</p>
+							<p className="text-sm font-medium [color:var(--text)]">
+								Dynamic Block
+							</p>
 							<p className="mt-1 text-xs [color:var(--text-muted)]">
-								Includes dynamic variations and can be customized with different parameters.
+								Includes dynamic variations and can be customized with different
+								parameters.
 							</p>
 						</div>
 					)}

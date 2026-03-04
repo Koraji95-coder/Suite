@@ -27,7 +27,7 @@ export function CoordinatesGrabberValidationPanel({
 					marginBottom: "8px",
 				}}
 			>
-				<span style={{ fontSize: "14px", color: "#ff6b6b" }}>⚠️</span>
+				<span style={{ fontSize: "14px", color: "#ff6b6b" }}>!</span>
 				<span
 					style={{
 						color: "#ff6b6b",

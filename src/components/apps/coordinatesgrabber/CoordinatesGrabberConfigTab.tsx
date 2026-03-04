@@ -29,7 +29,10 @@ interface CoordinatesGrabberConfigTabProps {
 	wsConnected: boolean;
 	liveBackendStatus: LiveBackendStatus;
 	liveStatusStamp: string;
+	wsLastEventStamp: string;
+	reconnectLiveStream: () => Promise<void>;
 	progress: number;
+	progressStage: string;
 }
 
 export function CoordinatesGrabberConfigTab({
@@ -50,7 +53,10 @@ export function CoordinatesGrabberConfigTab({
 	wsConnected,
 	liveBackendStatus,
 	liveStatusStamp,
+	wsLastEventStamp,
+	reconnectLiveStream,
 	progress,
+	progressStage,
 }: CoordinatesGrabberConfigTabProps) {
 	return (
 		<div style={{ flex: 1, overflow: "auto" }}>
@@ -93,6 +99,7 @@ export function CoordinatesGrabberConfigTab({
 					state={state}
 					palette={palette}
 					progress={progress}
+					progressStage={progressStage}
 					backendConnected={backendConnected}
 					handleLayerSearch={handleLayerSearch}
 					handleSelectionRefresh={handleSelectionRefresh}
@@ -104,6 +111,8 @@ export function CoordinatesGrabberConfigTab({
 					wsConnected={wsConnected}
 					liveBackendStatus={liveBackendStatus}
 					liveStatusStamp={liveStatusStamp}
+					wsLastEventStamp={wsLastEventStamp}
+					reconnectLiveStream={reconnectLiveStream}
 					addLog={addLog}
 				/>
 			</div>

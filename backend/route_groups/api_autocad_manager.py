@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from .api_autocad_ground_grid_plot import (
+    plot_ground_grid_entities as autocad_plot_ground_grid_entities_helper,
+)
+
 
 class AutoCADManager:
     """
@@ -28,6 +32,9 @@ class AutoCADManager:
         insert_reference_block_fn: Any,
         add_point_label_fn: Any,
         export_points_to_excel_fn: Any,
+        ensure_layer_fn: Any,
+        pt_fn: Any,
+        com_call_with_retry_fn: Any,
         foundation_source_type: str,
         print_fn: Any = print,
     ) -> None:
@@ -47,6 +54,9 @@ class AutoCADManager:
         self.insert_reference_block = insert_reference_block_fn
         self.add_point_label = add_point_label_fn
         self.export_points_to_excel = export_points_to_excel_fn
+        self.ensure_layer = ensure_layer_fn
+        self.pt = pt_fn
+        self.com_call_with_retry = com_call_with_retry_fn
         self.foundation_source_type = foundation_source_type
         self.print_fn = print_fn
 
@@ -55,8 +65,82 @@ class AutoCADManager:
         self._cached_status = None
         self._cache_ttl = 2.0
         self.last_check_time = 0
+        self._progress_lock = self.threading.Lock()
+        self._progress_event_id = 0
+        self._progress_events: List[Dict[str, Any]] = []
+        self._progress_event_max = 500
+        self._allowed_export_paths: List[str] = []
+        self._allowed_export_paths_max = 200
+        self._progress_state: Dict[str, Any] = {
+            "event_id": 0,
+            "run_id": None,
+            "stage": "idle",
+            "progress": 0,
+            "current_item": None,
+            "message": "",
+            "active": False,
+            "timestamp": self.time.time(),
+        }
 
         self.print_fn("[AutoCADManager] Initialized")
+
+    def _normalize_path(self, path_value: str) -> str:
+        return self.os.path.normcase(self.os.path.normpath(self.os.path.abspath(path_value or "")))
+
+    def register_export_path(self, path_value: str) -> None:
+        normalized = self._normalize_path(path_value)
+        if not normalized:
+            return
+        with self._lock:
+            self._allowed_export_paths.append(normalized)
+            if len(self._allowed_export_paths) > self._allowed_export_paths_max:
+                self._allowed_export_paths = self._allowed_export_paths[-self._allowed_export_paths_max :]
+
+    def is_allowed_export_path(self, path_value: str) -> bool:
+        normalized = self._normalize_path(path_value)
+        if not normalized:
+            return False
+        with self._lock:
+            return normalized in self._allowed_export_paths
+
+    def _set_progress(
+        self,
+        *,
+        run_id: Optional[str],
+        stage: str,
+        progress: int,
+        current_item: Optional[str] = None,
+        message: str = "",
+        active: bool = True,
+    ) -> None:
+        clamped = max(0, min(100, int(progress)))
+        with self._progress_lock:
+            self._progress_event_id += 1
+            self._progress_state = {
+                "event_id": self._progress_event_id,
+                "run_id": run_id,
+                "stage": stage,
+                "progress": clamped,
+                "current_item": current_item,
+                "message": message,
+                "active": active,
+                "timestamp": self.time.time(),
+            }
+            self._progress_events.append(dict(self._progress_state))
+            if len(self._progress_events) > self._progress_event_max:
+                self._progress_events = self._progress_events[-self._progress_event_max :]
+
+    def get_progress(self) -> Dict[str, Any]:
+        with self._progress_lock:
+            return dict(self._progress_state)
+
+    def get_progress_events_since(self, last_event_id: int) -> List[Dict[str, Any]]:
+        with self._progress_lock:
+            return [
+                dict(event)
+                for event in self._progress_events
+                if int(event.get("event_id") or 0) > int(last_event_id)
+            ]
 
     def is_autocad_process_running(self) -> Tuple[bool, Optional[str]]:
         """
@@ -222,7 +306,7 @@ class AutoCADManager:
             except Exception:
                 pass
 
-    def execute_layer_search(self, config: Dict) -> Dict[str, Any]:
+    def execute_layer_search(self, config: Dict, run_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Execute layer search matching the desktop coordinatesgrabber.py logic:
         - Find entities on target layer in ModelSpace
@@ -230,7 +314,15 @@ class AutoCADManager:
         - Insert reference blocks at each point
         - Export Excel and auto-open it
         """
+        run_key = run_id or "default"
         try:
+            self._set_progress(
+                run_id=run_key,
+                stage="initializing",
+                progress=3,
+                message="Initializing AutoCAD connection",
+                active=True,
+            )
             self.pythoncom.CoInitialize()
 
             acad = self.connect_autocad()
@@ -255,8 +347,22 @@ class AutoCADManager:
                         requested_layers.append(layer_name_part)
 
             requested_layers = list(dict.fromkeys(requested_layers))
+            self._set_progress(
+                run_id=run_key,
+                stage="preparing",
+                progress=8,
+                message=f"Resolved {len(requested_layers)} target layer(s)",
+                active=True,
+            )
 
             if not requested_layers:
+                self._set_progress(
+                    run_id=run_key,
+                    stage="failed",
+                    progress=100,
+                    message="No layer names provided",
+                    active=False,
+                )
                 return {
                     "success": False,
                     "points": [],
@@ -272,78 +378,244 @@ class AutoCADManager:
             start_num = int(config.get("initial_number", 1))
             precision = int(config.get("precision", 3))
             use_corners = config.get("layer_search_use_corners", False)
+            use_selection_only = bool(config.get("layer_search_use_selection", False))
+            include_modelspace = bool(config.get("layer_search_include_modelspace", True))
+
+            if not include_modelspace and not use_selection_only:
+                self._set_progress(
+                    run_id=run_key,
+                    stage="failed",
+                    progress=100,
+                    message="No scan source enabled (selection/modelspace)",
+                    active=False,
+                )
+                return {
+                    "success": False,
+                    "points": [],
+                    "count": 0,
+                    "layers": requested_layers,
+                    "excel_path": "",
+                    "blocks_inserted": 0,
+                    "error": "No scan source enabled: enable modelspace or selection scan",
+                }
 
             points = []
             point_num = start_num
             entities_scanned = 0
 
-            entity_count = int(ms.Count)
-            for idx in range(entity_count):
+            def _entity_handle(entity_obj: Any) -> Optional[str]:
                 try:
-                    ent = self.dyn(ms.Item(idx))
+                    handle = str(entity_obj.Handle).strip().upper()
+                    return handle or None
+                except Exception:
+                    return None
 
+            selected_entities: List[Any] = []
+            selected_handles: set[str] = set()
+            if use_selection_only:
+                selection_sets = []
+                try:
+                    selection_sets.append(self.dyn(doc.PickfirstSelectionSet))
+                except Exception:
+                    pass
+                try:
+                    selection_sets.append(self.dyn(doc.ActiveSelectionSet))
+                except Exception:
+                    pass
+
+                seen_selection_handles: set[str] = set()
+                for ss in selection_sets:
+                    if ss is None:
+                        continue
                     try:
-                        ent_layer = str(ent.Layer)
+                        ss_count = int(ss.Count)
                     except Exception:
                         continue
-
-                    ent_layer_normalized = ent_layer.strip().lower()
-                    if ent_layer_normalized not in requested_layer_lookup:
-                        continue
-
-                    entities_scanned += 1
-
-                    if use_corners:
-                        bbox = self.entity_bbox(ent)
-                        if not bbox:
+                    for sel_idx in range(ss_count):
+                        try:
+                            sel_ent = self.dyn(ss.Item(sel_idx))
+                        except Exception:
                             continue
-                        minx, miny, minz, maxx, maxy, maxz = bbox
-                        z_val = (minz + maxz) / 2.0
-                        corner_defs = [
-                            (minx, maxy, "NW"),
-                            (maxx, maxy, "NE"),
-                            (minx, miny, "SW"),
-                            (maxx, miny, "SE"),
-                        ]
-                        for cx, cy, corner_name in corner_defs:
-                            points.append(
-                                {
-                                    "name": f"{prefix}{point_num}_{corner_name}",
-                                    "x": round(cx, precision),
-                                    "y": round(cy, precision),
-                                    "z": round(z_val, precision),
-                                    "corner": corner_name,
-                                    "source_type": self.foundation_source_type,
-                                    "layer": ent_layer.strip(),
-                                }
-                            )
-                            point_num += 1
-                    else:
-                        center = self.entity_center(ent)
-                        if not center:
+                        sel_handle = _entity_handle(sel_ent)
+                        if sel_handle and sel_handle in seen_selection_handles:
                             continue
-                        cx, cy, cz = center
+                        if sel_handle:
+                            seen_selection_handles.add(sel_handle)
+                            selected_handles.add(sel_handle)
+                        selected_entities.append(sel_ent)
+
+                if not selected_entities and not include_modelspace:
+                    self._set_progress(
+                        run_id=run_key,
+                        stage="failed",
+                        progress=100,
+                        message="No selected entities found",
+                        active=False,
+                    )
+                    return {
+                        "success": False,
+                        "points": [],
+                        "count": 0,
+                        "layers": requested_layers,
+                        "excel_path": "",
+                        "blocks_inserted": 0,
+                        "error": (
+                            "Selection scan enabled but no selected entities were found. "
+                            "Select objects in AutoCAD first or enable modelspace scan."
+                        ),
+                    }
+
+            modelspace_count = int(ms.Count) if include_modelspace else 0
+            total_sources = len(selected_entities) + modelspace_count
+            if total_sources <= 0:
+                self._set_progress(
+                    run_id=run_key,
+                    stage="failed",
+                    progress=100,
+                    message="No entities available to scan",
+                    active=False,
+                )
+                return {
+                    "success": False,
+                    "points": [],
+                    "count": 0,
+                    "layers": requested_layers,
+                    "excel_path": "",
+                    "blocks_inserted": 0,
+                    "error": "No entities available to scan from configured sources",
+                }
+
+            scan_step = max(1, total_sources // 25)
+            source_parts = []
+            if selected_entities:
+                source_parts.append(f"{len(selected_entities)} selected")
+            if include_modelspace:
+                source_parts.append(f"{modelspace_count} modelspace")
+            self._set_progress(
+                run_id=run_key,
+                stage="scanning",
+                progress=12,
+                message=f"Scanning {' + '.join(source_parts)} entities",
+                active=True,
+            )
+
+            scanned_count = 0
+
+            def _scan_entity(ent: Any, source_name: str, source_index: int) -> None:
+                nonlocal point_num, entities_scanned
+                try:
+                    ent_layer = str(ent.Layer)
+                except Exception:
+                    return
+
+                ent_layer_normalized = ent_layer.strip().lower()
+                if ent_layer_normalized not in requested_layer_lookup:
+                    return
+
+                entities_scanned += 1
+
+                if use_corners:
+                    bbox = self.entity_bbox(ent)
+                    if not bbox:
+                        return
+                    minx, miny, minz, maxx, maxy, maxz = bbox
+                    z_val = (minz + maxz) / 2.0
+                    corner_defs = [
+                        (minx, maxy, "NW"),
+                        (maxx, maxy, "NE"),
+                        (minx, miny, "SW"),
+                        (maxx, miny, "SE"),
+                    ]
+                    for cx, cy, corner_name in corner_defs:
                         points.append(
                             {
-                                "name": f"{prefix}{point_num}",
+                                "name": f"{prefix}{point_num}_{corner_name}",
                                 "x": round(cx, precision),
                                 "y": round(cy, precision),
-                                "z": round(cz, precision),
+                                "z": round(z_val, precision),
+                                "corner": corner_name,
                                 "source_type": self.foundation_source_type,
                                 "layer": ent_layer.strip(),
                             }
                         )
                         point_num += 1
+                else:
+                    center = self.entity_center(ent)
+                    if not center:
+                        return
+                    cx, cy, cz = center
+                    points.append(
+                        {
+                            "name": f"{prefix}{point_num}",
+                            "x": round(cx, precision),
+                            "y": round(cy, precision),
+                            "z": round(cz, precision),
+                            "source_type": self.foundation_source_type,
+                            "layer": ent_layer.strip(),
+                        }
+                    )
+                    point_num += 1
 
+                if scanned_count % scan_step == 0 or scanned_count == total_sources:
+                    pct = 12 + int((scanned_count / max(1, total_sources)) * 48)
+                    self._set_progress(
+                        run_id=run_key,
+                        stage="scanning",
+                        progress=pct,
+                        message=(
+                            f"Scanned {scanned_count}/{total_sources} entities "
+                            f"({len(points)} point(s) found)"
+                        ),
+                        current_item=f"{source_name}:{source_index}",
+                        active=True,
+                    )
+
+            for sel_idx, sel_ent in enumerate(selected_entities):
+                scanned_count += 1
+                try:
+                    _scan_entity(sel_ent, "selection", sel_idx)
                 except Exception as exc:
-                    self.print_fn(f"[execute] Entity {idx} error: {exc}")
-                    continue
+                    self.print_fn(f"[execute] Selection entity {sel_idx} error: {exc}")
+
+            if include_modelspace:
+                for idx in range(modelspace_count):
+                    scanned_count += 1
+                    try:
+                        ent = self.dyn(ms.Item(idx))
+                        if use_selection_only:
+                            ent_handle = _entity_handle(ent)
+                            if ent_handle and ent_handle in selected_handles:
+                                if scanned_count % scan_step == 0 or scanned_count == total_sources:
+                                    pct = 12 + int((scanned_count / max(1, total_sources)) * 48)
+                                    self._set_progress(
+                                        run_id=run_key,
+                                        stage="scanning",
+                                        progress=pct,
+                                        message=(
+                                            f"Scanned {scanned_count}/{total_sources} entities "
+                                            f"({len(points)} point(s) found)"
+                                        ),
+                                        current_item=f"modelspace:{idx}",
+                                        active=True,
+                                    )
+                                continue
+                        _scan_entity(ent, "modelspace", idx)
+                    except Exception as exc:
+                        self.print_fn(f"[execute] ModelSpace entity {idx} error: {exc}")
+                        continue
 
             self.print_fn(
                 f"[execute] Scanned {entities_scanned} entities across layers {requested_layers}, extracted {len(points)} points"
             )
 
             if not points:
+                self._set_progress(
+                    run_id=run_key,
+                    stage="failed",
+                    progress=100,
+                    message="No points found on requested layers",
+                    active=False,
+                )
                 return {
                     "success": False,
                     "points": [],
@@ -365,6 +637,14 @@ class AutoCADManager:
             block_errors = []
             if self.os.path.exists(ref_dwg):
                 self.print_fn(f"[execute] Inserting reference blocks from: {ref_dwg}")
+                total_blocks = max(1, len(points))
+                self._set_progress(
+                    run_id=run_key,
+                    stage="inserting_blocks",
+                    progress=65,
+                    message=f"Inserting {len(points)} reference block(s)",
+                    active=True,
+                )
                 for p in points:
                     try:
                         self.insert_reference_block(
@@ -391,6 +671,18 @@ class AutoCADManager:
                         except Exception as label_err:
                             self.print_fn(f"[execute] Label at {p['name']}: {label_err}")
                         blocks_inserted += 1
+                        if blocks_inserted % max(1, total_blocks // 20) == 0 or blocks_inserted == total_blocks:
+                            pct = 65 + int((blocks_inserted / total_blocks) * 20)
+                            self._set_progress(
+                                run_id=run_key,
+                                stage="inserting_blocks",
+                                progress=pct,
+                                current_item=p.get("name"),
+                                message=(
+                                    f"Inserted {blocks_inserted}/{total_blocks} reference block(s)"
+                                ),
+                                active=True,
+                            )
                     except Exception as exc:
                         block_errors.append(f"Block at {p['name']}: {exc}")
                         self.print_fn(f"[execute] Block insert error at {p['name']}: {exc}")
@@ -418,8 +710,16 @@ class AutoCADManager:
 
             excel_path = ""
             try:
+                self._set_progress(
+                    run_id=run_key,
+                    stage="exporting_excel",
+                    progress=90,
+                    message="Exporting Excel output",
+                    active=True,
+                )
                 excel_path = self.export_points_to_excel(points, precision, use_corners, drawing_dir)
                 self.print_fn(f"[execute] Excel exported to: {excel_path}")
+                self.register_export_path(excel_path)
                 try:
                     if hasattr(self.os, "startfile"):
                         self.os.startfile(excel_path)
@@ -429,6 +729,13 @@ class AutoCADManager:
                 block_errors.append(f"Excel export: {exc}")
                 self.print_fn(f"[execute] Excel export error: {exc}")
 
+            self._set_progress(
+                run_id=run_key,
+                stage="completed",
+                progress=100,
+                message=f"Extracted {len(points)} point(s)",
+                active=False,
+            )
             return {
                 "success": True,
                 "points": points,
@@ -442,6 +749,13 @@ class AutoCADManager:
 
         except Exception as exc:
             self.traceback.print_exc()
+            self._set_progress(
+                run_id=run_key,
+                stage="failed",
+                progress=100,
+                message=str(exc),
+                active=False,
+            )
             return {
                 "success": False,
                 "points": [],
@@ -449,6 +763,74 @@ class AutoCADManager:
                 "layers": [],
                 "excel_path": "",
                 "blocks_inserted": 0,
+                "error": str(exc),
+            }
+        finally:
+            try:
+                self.pythoncom.CoUninitialize()
+            except Exception:
+                pass
+
+    def plot_ground_grid(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Plot generated ground-grid lines and block placements into active AutoCAD drawing."""
+        try:
+            self.pythoncom.CoInitialize()
+
+            conductors = payload.get("conductors")
+            placements = payload.get("placements")
+            config = payload.get("config") or {}
+
+            if not isinstance(conductors, list):
+                raise ValueError("Payload field 'conductors' must be an array")
+            if not isinstance(placements, list):
+                raise ValueError("Payload field 'placements' must be an array")
+            if len(conductors) == 0 and len(placements) == 0:
+                raise ValueError("Nothing to plot: conductors and placements are both empty")
+
+            acad = self.connect_autocad()
+            doc = self.dyn(acad.ActiveDocument)
+            ms = self.dyn(doc.ModelSpace)
+            if doc is None or ms is None:
+                raise RuntimeError("Cannot access AutoCAD document or modelspace")
+
+            result = autocad_plot_ground_grid_entities_helper(
+                doc=doc,
+                modelspace=ms,
+                conductors=conductors,
+                placements=placements,
+                config=config,
+                ensure_layer_fn=self.ensure_layer,
+                pt_fn=self.pt,
+                dyn_fn=self.dyn,
+                com_call_with_retry_fn=self.com_call_with_retry,
+            )
+
+            try:
+                doc.Regen(1)
+            except Exception:
+                pass
+
+            return {
+                "success": True,
+                "message": (
+                    f"Plotted {result['lines_drawn']} conductor lines and "
+                    f"{result['blocks_inserted']} placements on layer '{result['layer_name']}'"
+                ),
+                "lines_drawn": result["lines_drawn"],
+                "blocks_inserted": result["blocks_inserted"],
+                "layer_name": result["layer_name"],
+                "test_well_block_name": result.get("test_well_block_name", ""),
+            }
+
+        except Exception as exc:
+            self.traceback.print_exc()
+            return {
+                "success": False,
+                "message": f"Ground grid plot failed: {str(exc)}",
+                "lines_drawn": 0,
+                "blocks_inserted": 0,
+                "layer_name": "",
+                "test_well_block_name": "",
                 "error": str(exc),
             }
         finally:

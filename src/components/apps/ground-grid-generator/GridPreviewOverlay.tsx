@@ -8,7 +8,7 @@ interface GridPreviewOverlayProps {
 	textMutedColor: string;
 	rodCount: number;
 	testWellCount: number;
-	segmentCount: number;
+	conductorCount: number;
 	teeCount: number;
 	crossCount: number;
 }
@@ -19,7 +19,7 @@ export function GridPreviewOverlay({
 	textMutedColor,
 	rodCount,
 	testWellCount,
-	segmentCount,
+	conductorCount,
 	teeCount,
 	crossCount,
 }: GridPreviewOverlayProps) {
@@ -35,13 +35,13 @@ export function GridPreviewOverlay({
 				padding="8px 12px"
 			>
 				<span>
-					<b className={styles.rods}>Rods:</b> {rodCount}
+					<b className={styles.rods}>Rods (incl. TW):</b> {rodCount}
 				</span>
 				<span>
 					<b className={styles.testWells}>Test Wells:</b> {testWellCount}
 				</span>
 				<span>
-					<b className={styles.segments}>Segments:</b> {segmentCount}
+					<b className={styles.conductors}>Conductors:</b> {conductorCount}
 				</span>
 				<span>
 					<b className={styles.tees}>Tees:</b> {teeCount}
@@ -60,6 +60,8 @@ export function GridPreviewOverlay({
 				style={{ color: hexToRgba(textMutedColor, 0.6) }}
 			>
 				Drag to pan / Scroll while panning to zoom
+				<br />
+				* Rod totals include test wells.
 			</GridOverlayCard>
 		</>
 	);

@@ -11,9 +11,16 @@ from backend.route_groups.api_websocket_status import (
 
 
 class _RequestStub:
-    def __init__(self, *, args: dict[str, str], remote_addr: str) -> None:
+    def __init__(
+        self,
+        *,
+        args: dict[str, str],
+        remote_addr: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self.args = args
         self.remote_addr = remote_addr
+        self.headers = headers or {}
 
 
 class _LoggerStub:
@@ -175,6 +182,31 @@ class TestApiWebsocketStatus(unittest.TestCase):
             ws,
             request_obj=_RequestStub(args={"api_key": "good"}, remote_addr="127.0.0.1"),
             is_valid_api_key_fn=lambda _provided: True,
+            logger=logger,
+            get_manager=lambda: manager,
+            json_module=json,
+            time_module=_TimeStub([1.0, 2.0]),
+            backend_id="coordinates-grabber-api",
+            backend_version="1.0.0",
+            max_iterations=1,
+        )
+
+        self.assertEqual(len(ws.sent), 2)
+        self.assertEqual(manager.calls, [True])
+
+    def test_websocket_status_bridge_accepts_api_key_from_subprotocol(self) -> None:
+        ws = _WsStub(receive_result=None)
+        logger = _LoggerStub()
+        manager = _ManagerStub({"connected": True, "autocad_running": True, "drawing_open": True})
+
+        websocket_status_bridge(
+            ws,
+            request_obj=_RequestStub(
+                args={},
+                remote_addr="127.0.0.1",
+                headers={"Sec-WebSocket-Protocol": "api-key.Z29vZA"},
+            ),
+            is_valid_api_key_fn=lambda provided: provided == "good",
             logger=logger,
             get_manager=lambda: manager,
             json_module=json,

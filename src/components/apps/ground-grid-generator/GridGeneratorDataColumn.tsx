@@ -85,6 +85,7 @@ export function GridGeneratorDataColumn({
 			<GridGeneratorDataPreviewTables
 				rods={rods}
 				conductors={conductors}
+				placements={placements}
 				palettePrimary={palettePrimary}
 				paletteText={paletteText}
 				paletteTextMuted={paletteTextMuted}

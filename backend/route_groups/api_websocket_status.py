@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from typing import Any, Dict, Mapping, Optional
 
 
@@ -38,6 +39,37 @@ def websocket_status_payload(
     }
 
 
+def websocket_progress_payload(progress_state: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "type": "progress",
+        "run_id": progress_state.get("run_id"),
+        "stage": str(progress_state.get("stage") or "processing"),
+        "progress": int(progress_state.get("progress") or 0),
+        "current_item": progress_state.get("current_item"),
+        "message": str(progress_state.get("message") or ""),
+    }
+
+
+def websocket_complete_payload(progress_state: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "type": "complete",
+        "run_id": progress_state.get("run_id"),
+        "message": str(progress_state.get("message") or "Completed"),
+        "timestamp": progress_state.get("timestamp"),
+    }
+
+
+def websocket_error_payload(progress_state: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "type": "error",
+        "run_id": progress_state.get("run_id"),
+        "message": str(progress_state.get("message") or "Execution failed"),
+        "error_details": str(progress_state.get("message") or "Execution failed"),
+        "code": "EXECUTION_FAILED",
+        "timestamp": progress_state.get("timestamp"),
+    }
+
+
 def websocket_status_bridge(
     ws: Any,
     *,
@@ -53,6 +85,24 @@ def websocket_status_bridge(
     max_iterations: Optional[int] = None,
 ) -> None:
     provided_key = request_obj.args.get("api_key")
+    if not provided_key:
+        headers = getattr(request_obj, "headers", {}) or {}
+        protocol_header = str(headers.get("Sec-WebSocket-Protocol", "") or "")
+        for token in (part.strip() for part in protocol_header.split(",")):
+            if token.startswith("api-key."):
+                encoded = token[len("api-key.") :]
+                try:
+                    padding = "=" * (-len(encoded) % 4)
+                    provided_key = base64.urlsafe_b64decode((encoded + padding).encode("ascii")).decode(
+                        "utf-8"
+                    )
+                    break
+                except Exception:
+                    continue
+            if token.startswith("api-key-plain."):
+                provided_key = token[len("api-key-plain.") :]
+                break
+
     if not is_valid_api_key_fn(provided_key):
         try:
             ws.send(
@@ -89,6 +139,7 @@ def websocket_status_bridge(
         )
 
         iterations = 0
+        last_progress_event_id = 0
         while True:
             manager = get_manager()
             status = manager.get_status(force_refresh=True)
@@ -103,6 +154,22 @@ def websocket_status_bridge(
                     )
                 )
             )
+
+            try:
+                progress_events = manager.get_progress_events_since(last_progress_event_id)
+            except Exception:
+                progress_events = []
+
+            for progress_event in progress_events:
+                event_id = int(progress_event.get("event_id") or 0)
+                ws.send(json_module.dumps(websocket_progress_payload(progress_event)))
+                stage = str(progress_event.get("stage") or "").strip().lower()
+                if stage == "completed":
+                    ws.send(json_module.dumps(websocket_complete_payload(progress_event)))
+                elif stage == "failed":
+                    ws.send(json_module.dumps(websocket_error_payload(progress_event)))
+                if event_id > last_progress_event_id:
+                    last_progress_event_id = event_id
 
             try:
                 incoming = ws.receive(timeout=0.1)

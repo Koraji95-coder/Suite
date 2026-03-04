@@ -10,20 +10,12 @@ def resolve_api_key(
 ) -> str:
     api_key = (os_module.environ.get("API_KEY") or "").strip()
     if not api_key:
-        fallback_key = (os_module.environ.get("VITE_API_KEY") or "").strip()
-        if fallback_key:
-            api_key = fallback_key
-            logger.warning(
-                "API_KEY not set; using VITE_API_KEY for local development. "
-                "Set API_KEY explicitly for production."
-            )
-        else:
-            raise RuntimeError(
-                "FATAL: API_KEY environment variable is not set.\n"
-                "Please set your API key before starting the server:\n"
-                "  export API_KEY='your-secure-api-key-here'\n"
-                "Then start the server again."
-            )
+        raise RuntimeError(
+            "FATAL: API_KEY environment variable is not set.\n"
+            "Please set your API key before starting the server:\n"
+            "  export API_KEY='your-secure-api-key-here'\n"
+            "Then start the server again."
+        )
     return api_key
 
 

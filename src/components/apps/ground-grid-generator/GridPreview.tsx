@@ -15,7 +15,17 @@ interface GridPreviewProps {
 	rods: GridRod[];
 	conductors: GridConductor[];
 	placements: GridPlacement[];
-	segmentCount: number;
+	layerVisibility: {
+		conductors: boolean;
+		rods: boolean;
+		testWells: boolean;
+		tees: boolean;
+		crosses: boolean;
+	};
+	callouts: {
+		show: boolean;
+		scale: number;
+	};
 }
 
 const ELASTIC_DAMPING = 0.15;
@@ -27,7 +37,8 @@ export function GridPreview({
 	rods,
 	conductors,
 	placements,
-	segmentCount,
+	layerVisibility,
+	callouts,
 }: GridPreviewProps) {
 	const { palette } = useTheme();
 	const svgRef = useRef<SVGSVGElement>(null);
@@ -219,7 +230,15 @@ export function GridPreview({
 	const tees = placements.filter((placement) => placement.type === "TEE");
 	const crosses = placements.filter((placement) => placement.type === "CROSS");
 	const testWells = placements.filter(
-		(placement) => placement.type === "GROUND_ROD_TEST_WELL",
+		(placement) => placement.type === "GROUND_ROD_WITH_TEST_WELL",
+	);
+	const rodsWithoutTestWells = rods.filter(
+		(rod) =>
+			!testWells.some(
+				(testWell) =>
+					Math.abs(testWell.grid_x - rod.grid_x) <= 1e-6 &&
+					Math.abs(testWell.grid_y - rod.grid_y) <= 1e-6,
+			),
 	);
 	const rodScale = computeScaleFromViewBox(effectiveViewBox, 0.012);
 
@@ -237,12 +256,14 @@ export function GridPreview({
 				effectiveViewBox={effectiveViewBox}
 				isPanning={isPanning}
 				backgroundColor={palette.background}
-				rods={rods}
-				conductors={conductors}
-				tees={tees}
-				crosses={crosses}
-				testWells={testWells}
+				rods={layerVisibility.rods ? rodsWithoutTestWells : []}
+				conductors={layerVisibility.conductors ? conductors : []}
+				tees={layerVisibility.tees ? tees : []}
+				crosses={layerVisibility.crosses ? crosses : []}
+				testWells={layerVisibility.testWells ? testWells : []}
 				rodScale={rodScale}
+				showCallouts={callouts.show}
+				calloutScale={callouts.scale}
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
@@ -252,9 +273,9 @@ export function GridPreview({
 				backgroundColor={palette.background}
 				primaryColor={palette.primary}
 				textMutedColor={palette.textMuted}
-				rodCount={rods.length - testWells.length}
+				rodCount={rods.length}
 				testWellCount={testWells.length}
-				segmentCount={segmentCount}
+				conductorCount={conductors.length}
 				teeCount={tees.length}
 				crossCount={crosses.length}
 			/>

@@ -9,6 +9,7 @@ interface CoordinatesGrabberRunPanelProps {
 	state: CoordinatesGrabberState;
 	palette: ColorScheme;
 	progress: number;
+	progressStage: string;
 	backendConnected: boolean;
 	handleLayerSearch: () => Promise<void>;
 	handleSelectionRefresh: () => Promise<void>;
@@ -18,10 +19,38 @@ export function CoordinatesGrabberRunPanel({
 	state,
 	palette,
 	progress,
+	progressStage,
 	backendConnected,
 	handleLayerSearch,
 	handleSelectionRefresh,
 }: CoordinatesGrabberRunPanelProps) {
+	const getStageLabel = (stage: string, pct: number): string => {
+		switch (stage) {
+			case "initializing":
+				return "Initializing AutoCAD connection...";
+			case "preparing":
+				return "Preparing layer search...";
+			case "scanning":
+				return "Scanning entities...";
+			case "inserting_blocks":
+				return "Inserting blocks and labels...";
+			case "exporting_excel":
+				return "Exporting Excel...";
+			case "completed":
+				return "Finalizing...";
+			case "failed":
+				return "Run failed";
+			default:
+				return pct < 30
+					? "Scanning layers..."
+					: pct < 60
+						? "Extracting vertices..."
+						: pct < 90
+							? "Building Excel..."
+							: "Finalizing...";
+		}
+	};
+
 	return (
 		<div style={{ ...configCardStyle(palette), gridColumn: "1 / -1" }}>
 			{state.isRunning && (
@@ -39,13 +68,7 @@ export function CoordinatesGrabberRunPanel({
 								fontWeight: 500,
 							}}
 						>
-							{progress < 30
-								? "Scanning layers..."
-								: progress < 60
-									? "Extracting vertices..."
-									: progress < 90
-										? "Building Excel..."
-										: "Finalizing..."}
+							{getStageLabel(progressStage, progress)}
 						</span>
 					</div>
 					<ProgressBar progress={progress} />
@@ -83,7 +106,7 @@ export function CoordinatesGrabberRunPanel({
 						}
 					}}
 				>
-					{state.isRunning ? "⏳ Running..." : "▶ Run Layer Search"}
+					{state.isRunning ? "Running..." : "Run Layer Search"}
 				</button>
 				{state.mode === "blocks" && (
 					<button
@@ -100,7 +123,7 @@ export function CoordinatesGrabberRunPanel({
 							cursor: backendConnected ? "pointer" : "not-allowed",
 						}}
 					>
-						🔄 Refresh
+						Refresh
 					</button>
 				)}
 			</div>

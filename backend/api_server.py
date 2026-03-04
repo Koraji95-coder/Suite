@@ -150,6 +150,12 @@ from route_groups.api_dependency_bundle import (
     build_passkey_deps as dependency_bundle_build_passkey_deps_helper,
     build_transmittal_render_deps as dependency_bundle_build_transmittal_render_deps_helper,
 )
+
+# Explicit aliases expected by dependency bundle keys.
+requests_module = requests
+json_module = json
+traceback_module = traceback
+
 try:
     from webauthn import (
         generate_registration_options,

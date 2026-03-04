@@ -16,37 +16,50 @@ export function CoordinatesGrabberModePanel({
 	palette,
 	onModeChange,
 }: CoordinatesGrabberModePanelProps) {
+	const modeOptions: Array<{
+		value: CoordinatesGrabberState["mode"];
+		label: string;
+		enabled: boolean;
+	}> = [
+		{ value: "layer_search", label: "Layer Search", enabled: true },
+		{ value: "blocks", label: "Block Centers (coming soon)", enabled: false },
+		{ value: "polylines", label: "Polyline Vertices (coming soon)", enabled: false },
+	];
+
 	return (
 		<div style={configCardStyle(palette)}>
 			<h3 style={configTitleStyle(palette)}>Extraction Mode</h3>
 			<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-				{(["polylines", "blocks", "layer_search"] as const).map((entryMode) => (
+				{modeOptions.map((entryMode) => (
 					<label
-						key={entryMode}
+						key={entryMode.value}
 						style={{
 							display: "flex",
 							alignItems: "center",
 							gap: "8px",
-							cursor: "pointer",
+							cursor: entryMode.enabled ? "pointer" : "not-allowed",
 							fontSize: "13px",
+							opacity: entryMode.enabled ? 1 : 0.65,
 						}}
 					>
 						<input
 							type="radio"
 							name="mode"
-							value={entryMode}
-							checked={mode === entryMode}
-							onChange={() => onModeChange(entryMode)}
+							value={entryMode.value}
+							checked={mode === entryMode.value}
+							onChange={() => onModeChange(entryMode.value)}
+							disabled={!entryMode.enabled}
 							style={{ cursor: "pointer" }}
 						/>
 						<span
 							style={{
-								color: mode === entryMode ? palette.primary : palette.text,
+								color:
+									mode === entryMode.value && entryMode.enabled
+										? palette.primary
+										: palette.text,
 							}}
 						>
-							{entryMode === "polylines" && "Polyline Vertices"}
-							{entryMode === "blocks" && "Block Centers"}
-							{entryMode === "layer_search" && "Layer Search"}
+							{entryMode.label}
 						</span>
 					</label>
 				))}

@@ -290,9 +290,6 @@ export function teeRotationFromDirs(ds: Set<Direction>): number {
 		else branch = "W";
 	}
 
-	if (branch === "N") branch = "S";
-	else if (branch === "S") branch = "N";
-
 	if (branch === "S") return 0;
 	if (branch === "N") return 180;
 	if (branch === "E") return 90;
@@ -376,7 +373,7 @@ export function generatePlacements(
 		const isCorner = cornerKeys.has(key);
 
 		placements.push({
-			type: isCorner ? "GROUND_ROD_TEST_WELL" : "ROD",
+			type: isCorner ? "GROUND_ROD_WITH_TEST_WELL" : "ROD",
 			grid_x: rod.grid_x,
 			grid_y: rod.grid_y,
 			autocad_x: ax,

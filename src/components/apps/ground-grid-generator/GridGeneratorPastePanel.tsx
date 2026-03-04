@@ -117,33 +117,22 @@ export function GridGeneratorPastePanel({
 					overflow: "hidden",
 				}}
 			>
-				{pasteMode === "rods" ? (
-					<div style={{ display: "flex", width: "100%", paddingBottom: 4 }}>
-						{["Label", "Depth", "X", "Y", "Dia", "GridX", "GridY"].map(
-							(header) => (
-								<span
-									key={header}
-									style={{ flex: 1, textAlign: "left", paddingLeft: 2 }}
-								>
-									{header}
-								</span>
-							),
-						)}
-					</div>
-				) : (
-					<div style={{ display: "flex", width: "100%", paddingBottom: 4 }}>
-						{["#", "Label", "Len", "X1", "Y1", "Dia", "X2", "Y2"].map(
-							(header) => (
-								<span
-									key={header}
-									style={{ flex: 1, textAlign: "left", paddingLeft: 2 }}
-								>
-									{header}
-								</span>
-							),
-						)}
-					</div>
-				)}
+				<pre
+					style={{
+						margin: 0,
+						paddingBottom: 4,
+						fontSize: 11,
+						lineHeight: 1.4,
+						fontFamily: "ui-monospace, SFMono-Regular, monospace",
+						whiteSpace: "pre",
+						tabSize: 8,
+						fontVariantNumeric: "tabular-nums",
+					}}
+				>
+					{pasteMode === "rods"
+						? "Label\tDepth\tX\tY\tDia\tGridX\tGridY"
+						: "#\tLabel\tLen\tX1\tY1\tDia\tX2\tY2"}
+				</pre>
 			</div>
 			<textarea
 				value={pasteText}
@@ -158,6 +147,7 @@ export function GridGeneratorPastePanel({
 					minHeight: 80,
 					padding: "6px 10px",
 					fontSize: 11,
+					lineHeight: 1.4,
 					fontFamily: "ui-monospace, SFMono-Regular, monospace",
 					background: "transparent",
 					border: "none",
@@ -168,6 +158,7 @@ export function GridGeneratorPastePanel({
 					textAlign: "left",
 					tabSize: 8,
 					whiteSpace: "pre",
+					fontVariantNumeric: "tabular-nums",
 				}}
 			/>
 			<div style={{ display: "flex", gap: 6, padding: "6px 10px" }}>

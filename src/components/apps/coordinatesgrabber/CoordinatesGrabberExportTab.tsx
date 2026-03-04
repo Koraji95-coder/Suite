@@ -5,12 +5,14 @@ interface CoordinatesGrabberExportTabProps {
 	state: CoordinatesGrabberState;
 	palette: ColorScheme;
 	downloadResult: () => Promise<void>;
+	openResultLocation: () => Promise<void>;
 }
 
 export function CoordinatesGrabberExportTab({
 	state,
 	palette,
 	downloadResult,
+	openResultLocation,
 }: CoordinatesGrabberExportTabProps) {
 	return (
 		<div style={{ flex: 1, overflow: "auto" }}>
@@ -54,9 +56,10 @@ export function CoordinatesGrabberExportTab({
 									fontWeight: "500",
 								}}
 							>
-								✓ {state.excelPath}
+								OK {state.excelPath}
 							</div>
 							<button
+								onClick={openResultLocation}
 								style={{
 									padding: "8px 12px",
 									borderRadius: "4px",
@@ -68,7 +71,7 @@ export function CoordinatesGrabberExportTab({
 									cursor: "pointer",
 								}}
 							>
-								📂 Open Export Location
+								Open Export Location
 							</button>
 							<button
 								onClick={downloadResult}
@@ -83,7 +86,7 @@ export function CoordinatesGrabberExportTab({
 									cursor: "pointer",
 								}}
 							>
-								⬇️ Download Excel
+								Download Excel
 							</button>
 						</div>
 					) : (

@@ -124,7 +124,7 @@ export function createGridPreview3DEngine({
 
 	const testWellSet = new Set(
 		placements
-			.filter((placement) => placement.type === "GROUND_ROD_TEST_WELL")
+			.filter((placement) => placement.type === "GROUND_ROD_WITH_TEST_WELL")
 			.map((placement) => `${placement.grid_x},${placement.grid_y}`),
 	);
 

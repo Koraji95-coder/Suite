@@ -2,6 +2,8 @@ import {
 	Box,
 	FileSpreadsheet,
 	FileText,
+	Lock,
+	LockOpen,
 	Loader,
 	Monitor,
 	PenTool,
@@ -10,9 +12,9 @@ import {
 	Undo2,
 	Zap,
 } from "lucide-react";
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { hexToRgba } from "@/lib/palette";
-import type { PreviewMode } from "./GridGeneratorPanelModels";
+import type { PlotDiffPreview, PreviewMode } from "./GridGeneratorPanelModels";
 import styles from "./GridGeneratorPreviewColumn.module.css";
 import { GridManualEditor } from "./GridManualEditor";
 import { GridPreview } from "./GridPreview";
@@ -28,12 +30,12 @@ interface GridGeneratorPreviewColumnProps {
 	backendConnected: boolean;
 	soilResistivity: number;
 	faultCurrent: number;
-	segmentCount: number;
 	teeCount: number;
 	crossCount: number;
 	rods: GridRod[];
 	conductors: GridConductor[];
 	placements: GridPlacement[];
+	plotDiffPreview: PlotDiffPreview;
 	palettePrimary: string;
 	paletteSurfaceLight: string;
 	paletteText: string;
@@ -45,6 +47,8 @@ interface GridGeneratorPreviewColumnProps {
 	onExportExcel: () => void;
 	onExportPdf: () => void;
 	onPlotToAutoCad: () => void;
+	placementLock: boolean;
+	onTogglePlacementLock: () => void;
 	onPreviewModeChange: (mode: PreviewMode) => void;
 	onSoilResistivityChange: (value: number) => void;
 	onFaultCurrentChange: (value: number) => void;
@@ -61,12 +65,12 @@ export function GridGeneratorPreviewColumn({
 	backendConnected,
 	soilResistivity,
 	faultCurrent,
-	segmentCount,
 	teeCount,
 	crossCount,
 	rods,
 	conductors,
 	placements,
+	plotDiffPreview,
 	palettePrimary,
 	paletteSurfaceLight,
 	paletteText,
@@ -78,6 +82,8 @@ export function GridGeneratorPreviewColumn({
 	onExportExcel,
 	onExportPdf,
 	onPlotToAutoCad,
+	placementLock,
+	onTogglePlacementLock,
 	onPreviewModeChange,
 	onSoilResistivityChange,
 	onFaultCurrentChange,
@@ -86,6 +92,14 @@ export function GridGeneratorPreviewColumn({
 	onManualPlacementsChange,
 }: GridGeneratorPreviewColumnProps) {
 	const hasPlacements = placements.length > 0;
+	const [showConductors, setShowConductors] = useState(true);
+	const [showRods, setShowRods] = useState(true);
+	const [showTestWells, setShowTestWells] = useState(true);
+	const [showTees, setShowTees] = useState(true);
+	const [showCrosses, setShowCrosses] = useState(true);
+	const [showCallouts, setShowCallouts] = useState(true);
+	const [calloutScale, setCalloutScale] = useState(1.2);
+	const [showPlotPreview, setShowPlotPreview] = useState(false);
 
 	return (
 		<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -123,6 +137,23 @@ export function GridGeneratorPreviewColumn({
 				>
 					<Redo2 size={14} />
 				</button>
+				<button
+					onClick={onTogglePlacementLock}
+					style={{
+						...btnStyle(placementLock),
+						borderStyle: "dashed",
+						opacity: hasPlacements ? 1 : 0.6,
+					}}
+					disabled={!hasPlacements}
+					title={
+						placementLock
+							? "Placements are locked: Generate Grid will not overwrite them."
+							: "Placements are unlocked: Generate Grid will replace them."
+					}
+				>
+					{placementLock ? <Lock size={14} /> : <LockOpen size={14} />}
+					{placementLock ? "Placements Locked" : "Placements Unlocked"}
+				</button>
 
 				{hasPlacements && (
 					<>
@@ -133,7 +164,7 @@ export function GridGeneratorPreviewColumn({
 							<FileText size={14} /> PDF
 						</button>
 						<button
-							onClick={onPlotToAutoCad}
+							onClick={() => setShowPlotPreview(true)}
 							style={{
 								...btnStyle(),
 								opacity: backendConnected ? 1 : 0.5,
@@ -232,6 +263,133 @@ export function GridGeneratorPreviewColumn({
 				</div>
 			)}
 
+			{previewMode === "2d" && (
+				<div
+					style={{
+						display: "flex",
+						flexWrap: "wrap",
+						gap: 6,
+						alignItems: "center",
+					}}
+				>
+					{[
+						{
+							id: "all",
+							label: "All",
+							apply: () => {
+								setShowConductors(true);
+								setShowRods(true);
+								setShowTestWells(true);
+								setShowTees(true);
+								setShowCrosses(true);
+								setShowCallouts(true);
+							},
+						},
+						{
+							id: "topology",
+							label: "Focus Topology",
+							apply: () => {
+								setShowConductors(true);
+								setShowRods(false);
+								setShowTestWells(false);
+								setShowTees(true);
+								setShowCrosses(true);
+								setShowCallouts(true);
+							},
+						},
+						{
+							id: "rods",
+							label: "Focus Rods",
+							apply: () => {
+								setShowConductors(false);
+								setShowRods(true);
+								setShowTestWells(true);
+								setShowTees(false);
+								setShowCrosses(false);
+								setShowCallouts(true);
+							},
+						},
+					].map((preset) => (
+						<button
+							key={preset.id}
+							onClick={preset.apply}
+							style={{
+								...btnStyle(),
+								padding: "4px 8px",
+								fontSize: 11,
+								borderStyle: "dashed",
+							}}
+						>
+							{preset.label}
+						</button>
+					))}
+
+					{[
+						{
+							id: "cond",
+							label: "Conductors",
+							on: showConductors,
+							set: setShowConductors,
+						},
+						{ id: "rod", label: "Rods", on: showRods, set: setShowRods },
+						{
+							id: "tw",
+							label: "Test Wells",
+							on: showTestWells,
+							set: setShowTestWells,
+						},
+						{ id: "tee", label: "Tees", on: showTees, set: setShowTees },
+						{
+							id: "cross",
+							label: "Crosses",
+							on: showCrosses,
+							set: setShowCrosses,
+						},
+						{
+							id: "callouts",
+							label: "Callouts",
+							on: showCallouts,
+							set: setShowCallouts,
+						},
+					].map((toggle) => (
+						<button
+							key={toggle.id}
+							onClick={() => toggle.set((prev) => !prev)}
+							style={{
+								...btnStyle(toggle.on),
+								padding: "4px 8px",
+								fontSize: 11,
+							}}
+						>
+							{toggle.label}
+						</button>
+					))}
+
+					<label
+						style={{
+							display: "flex",
+							alignItems: "center",
+							gap: 6,
+							fontSize: 11,
+							color: paletteTextMuted,
+							marginLeft: 4,
+						}}
+					>
+						Callout Size
+						<input
+							type="range"
+							min={0.25}
+							max={4}
+							step={0.1}
+							value={calloutScale}
+							onChange={(event) =>
+								setCalloutScale(Number(event.target.value) || 1.2)
+							}
+						/>
+					</label>
+				</div>
+			)}
+
 			<div
 				style={{
 					borderRadius: 10,
@@ -247,7 +405,17 @@ export function GridGeneratorPreviewColumn({
 						rods={rods}
 						conductors={conductors}
 						placements={placements}
-						segmentCount={segmentCount}
+						layerVisibility={{
+							conductors: showConductors,
+							rods: showRods,
+							testWells: showTestWells,
+							tees: showTees,
+							crosses: showCrosses,
+						}}
+						callouts={{
+							show: showCallouts,
+							scale: calloutScale,
+						}}
 					/>
 				)}
 				{previewMode === "3d" && (
@@ -280,7 +448,7 @@ export function GridGeneratorPreviewColumn({
 			{hasPlacements &&
 				(() => {
 					const testWellCount = placements.filter(
-						(placement) => placement.type === "GROUND_ROD_TEST_WELL",
+						(placement) => placement.type === "GROUND_ROD_WITH_TEST_WELL",
 					).length;
 					const rodOnlyCount = rods.length - testWellCount;
 					return (
@@ -294,7 +462,11 @@ export function GridGeneratorPreviewColumn({
 							{[
 								{ label: "Ground Rods", value: rodOnlyCount, color: "#22c55e" },
 								{ label: "Test Wells", value: testWellCount, color: "#ef4444" },
-								{ label: "Segments", value: segmentCount, color: "#f59e0b" },
+								{
+									label: "Conductors",
+									value: conductors.length,
+									color: "#f59e0b",
+								},
 								{ label: "Tees", value: teeCount, color: "#3b82f6" },
 								{ label: "Crosses", value: crossCount, color: "#06b6d4" },
 							].map((stat) => (
@@ -332,6 +504,167 @@ export function GridGeneratorPreviewColumn({
 						</div>
 					);
 				})()}
+
+			{showPlotPreview && (
+				<div
+					style={{
+						position: "fixed",
+						inset: 0,
+						background: "rgba(0,0,0,0.45)",
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "center",
+						zIndex: 1000,
+						padding: 16,
+					}}
+				>
+					<div
+						style={{
+							width: "min(760px, 96vw)",
+							borderRadius: 10,
+							background: paletteSurfaceLight,
+							border: `1px solid ${hexToRgba(palettePrimary, 0.25)}`,
+							padding: 14,
+							display: "flex",
+							flexDirection: "column",
+							gap: 12,
+						}}
+					>
+						<div style={{ fontSize: 14, fontWeight: 700, color: paletteText }}>
+							Pre-Plot Validation and Diff
+						</div>
+						<div style={{ fontSize: 11, color: paletteTextMuted }}>
+							{plotDiffPreview.hasBaseline
+								? "Comparing current grid against last successful AutoCAD plot."
+								: "No prior plot baseline found. This will be treated as first plot."}
+						</div>
+
+						<div
+							style={{
+								display: "grid",
+								gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+								gap: 8,
+							}}
+						>
+							{[
+								{
+									label: "Conductors Added",
+									value: plotDiffPreview.conductorsAdded,
+									color: "#22c55e",
+								},
+								{
+									label: "Conductors Removed",
+									value: plotDiffPreview.conductorsRemoved,
+									color: "#ef4444",
+								},
+								{
+									label: "Placements Added",
+									value: plotDiffPreview.placementsAdded,
+									color: "#22c55e",
+								},
+								{
+									label: "Placements Removed",
+									value: plotDiffPreview.placementsRemoved,
+									color: "#ef4444",
+								},
+								{
+									label: "Rotation Changes",
+									value: plotDiffPreview.placementsRotationChanged,
+									color: "#f59e0b",
+								},
+								{
+									label: "Type Swaps",
+									value: plotDiffPreview.placementTypeSwaps,
+									color: "#3b82f6",
+								},
+							].map((stat) => (
+								<div
+									key={stat.label}
+									style={{
+										borderRadius: 8,
+										padding: "8px 10px",
+										border: `1px solid ${hexToRgba(stat.color, 0.25)}`,
+										background: hexToRgba(stat.color, 0.08),
+									}}
+								>
+									<div
+										style={{
+											fontSize: 16,
+											fontWeight: 700,
+											color: stat.color,
+											fontVariantNumeric: "tabular-nums",
+										}}
+									>
+										{stat.value}
+									</div>
+									<div style={{ fontSize: 10, color: paletteTextMuted }}>
+										{stat.label}
+									</div>
+								</div>
+							))}
+						</div>
+
+						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+							{plotDiffPreview.issues.length === 0 ? (
+								<div style={{ color: "#22c55e", fontSize: 11 }}>
+									No blocking issues found.
+								</div>
+							) : (
+								plotDiffPreview.issues.map((issue, idx) => (
+									<div
+										key={`${issue.severity}-${idx}`}
+										style={{
+											fontSize: 11,
+											padding: "6px 8px",
+											borderRadius: 6,
+											border: `1px solid ${
+												issue.severity === "error"
+													? hexToRgba("#ef4444", 0.35)
+													: issue.severity === "warning"
+														? hexToRgba("#f59e0b", 0.35)
+														: hexToRgba("#10b981", 0.35)
+											}`,
+											background:
+												issue.severity === "error"
+													? hexToRgba("#ef4444", 0.1)
+													: issue.severity === "warning"
+														? hexToRgba("#f59e0b", 0.1)
+														: hexToRgba("#10b981", 0.1),
+											color:
+												issue.severity === "error"
+													? "#ef4444"
+													: issue.severity === "warning"
+														? "#f59e0b"
+														: "#10b981",
+										}}
+									>
+										[{issue.severity.toUpperCase()}] {issue.message}
+									</div>
+								))
+							)}
+						</div>
+
+						<div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+							<button onClick={() => setShowPlotPreview(false)} style={btnStyle()}>
+								Cancel
+							</button>
+							<button
+								onClick={() => {
+									setShowPlotPreview(false);
+									onPlotToAutoCad();
+								}}
+								disabled={!plotDiffPreview.canPlot}
+								style={{
+									...btnStyle(plotDiffPreview.canPlot),
+									opacity: plotDiffPreview.canPlot ? 1 : 0.45,
+								}}
+							>
+								Confirm Plot
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

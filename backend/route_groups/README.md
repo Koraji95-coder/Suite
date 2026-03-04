@@ -42,6 +42,7 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_autocad_reference_block.py`: shared AutoCAD reference-block helpers (`default_ref_dwg_path`, `ensure_block_exists`, `insert_reference_block`, `add_point_label`)
 - `api_autocad_com_helpers.py`: shared AutoCAD COM utility helpers (`com_call_with_retry`, `wait_for_command_finish`, `ensure_layer`, `pt`)
 - `api_autocad_connection.py`: shared AutoCAD connection/dispatch helpers (`dyn`, `connect_autocad`)
+- `api_autocad_ground_grid_plot.py`: shared ground-grid plotting helpers (grid-to-AutoCAD mapping, block definitions, plotting conductors + placements)
 - `api_autocad_manager.py`: shared AutoCAD manager lifecycle and operations (`AutoCADManager`, `get_manager`, `reset_manager_for_tests`, `create_autocad_manager`)
 - `api_autocad_runtime.py`: shared AutoCAD runtime wiring/composition (`create_autocad_runtime`, `AutoCADRuntime`)
 - `api_auth_runtime.py`: shared auth/session runtime wiring (`create_auth_runtime`, `AuthRuntime`)
@@ -61,7 +62,7 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
 - `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
 - `api_transmittal_render.py`: `/api/transmittal/render`
-- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/trigger-selection`
+- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`
 - `api_health.py`: `/health`
 - `api_registry.py`: central route-group registration for the Flask app
 

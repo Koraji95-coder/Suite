@@ -58,24 +58,19 @@ export function CoordinatesGrabberHistoryTab({
 							}}
 						>
 							<div>
-								Points:{" "}
-								<strong>{state.performanceMetrics.pointsCreated}</strong>
+								Points: <strong>{state.performanceMetrics.pointsCreated}</strong>
 							</div>
 							<div>
-								Duration:{" "}
-								<strong>{state.performanceMetrics.duration.toFixed(2)}s</strong>
+								Duration: <strong>{state.performanceMetrics.duration.toFixed(2)}s</strong>
 							</div>
 							<div>
-								Rate:{" "}
-								<strong>{state.performanceMetrics.pointsPerSecond}</strong>
+								Rate: <strong>{state.performanceMetrics.pointsPerSecond}</strong>
 								/s
 							</div>
 							<div>
 								Time:{" "}
 								<strong>
-									{new Date(
-										state.performanceMetrics.startTime,
-									).toLocaleTimeString()}
+									{new Date(state.performanceMetrics.startTime).toLocaleTimeString()}
 								</strong>
 							</div>
 						</div>
@@ -124,7 +119,7 @@ export function CoordinatesGrabberHistoryTab({
 										color: entry.success ? "#51cf66" : "#ff6b6b",
 									}}
 								>
-									{entry.success ? "✓" : "✗"}
+									{entry.success ? "OK" : "FAIL"}
 								</span>
 								<span
 									style={{

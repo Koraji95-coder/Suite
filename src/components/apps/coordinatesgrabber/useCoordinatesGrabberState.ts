@@ -21,6 +21,7 @@ export function useCoordinatesGrabberState() {
 	const [wsConnected, setWsConnected] = useState(
 		coordinatesGrabberService.isConnected(),
 	);
+	const [lastWsEventAt, setLastWsEventAt] = useState<number | null>(null);
 	const [liveBackendStatus, setLiveBackendStatus] = useState<LiveBackendStatus>(
 		{
 			autocadRunning: false,
@@ -31,10 +32,12 @@ export function useCoordinatesGrabberState() {
 		},
 	);
 	const [progress, setProgress] = useState(0);
+	const [progressStage, setProgressStage] = useState<string>("");
 	const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
 		null,
 	);
 	const hasAttemptedRunRef = useRef(false);
+	const activeRunIdRef = useRef<string | null>(null);
 
 	const addLog = useCallback(
 		(message: string) => {
@@ -45,6 +48,7 @@ export function useCoordinatesGrabberState() {
 
 	const startProgressSimulation = useCallback(() => {
 		setProgress(5);
+		setProgressStage("processing");
 		let current = 5;
 		if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
 		progressIntervalRef.current = setInterval(() => {
@@ -60,7 +64,10 @@ export function useCoordinatesGrabberState() {
 			progressIntervalRef.current = null;
 		}
 		setProgress(100);
-		setTimeout(() => setProgress(0), 600);
+		setTimeout(() => {
+			setProgress(0);
+			setProgressStage("");
+		}, 600);
 	}, []);
 
 	const saveExecutionResult = useCallback((entry: ExecutionHistoryEntry) => {
@@ -132,6 +139,13 @@ export function useCoordinatesGrabberState() {
 	]);
 
 	const handleModeChange = (newMode: CoordinatesGrabberState["mode"]) => {
+		if (newMode !== "layer_search") {
+			addLog(
+				`[INFO] '${newMode}' mode is not yet supported in this API flow. Staying on layer_search.`,
+			);
+			setState((prev) => ({ ...prev, mode: "layer_search" }));
+			return;
+		}
 		setState((prev) => ({ ...prev, mode: newMode }));
 		addLog(`Mode changed to: ${newMode}`);
 	};
@@ -190,6 +204,37 @@ export function useCoordinatesGrabberState() {
 			return;
 		}
 
+		if (state.scanSelection) {
+			try {
+				const selectionCount = await coordinatesGrabberService.getSelectionCount();
+				setState((prev) => ({ ...prev, selectionCount }));
+				if (selectionCount <= 0 && !state.includeModelspace) {
+					addLog(
+						"[ERROR] Selection-only scan is enabled but no objects are selected. Select objects in AutoCAD first.",
+					);
+					return;
+				}
+				if (selectionCount <= 0 && state.includeModelspace) {
+					addLog(
+						"[WARNING] Selection scan enabled but no objects selected; proceeding with modelspace scan.",
+					);
+				} else {
+					addLog(`[INFO] Selection preflight: ${selectionCount} objects selected`);
+				}
+			} catch (err) {
+				const message = err instanceof Error ? err.message : "Unknown error";
+				if (!state.includeModelspace) {
+					addLog(
+						`[ERROR] Could not verify AutoCAD selection (${message}). Disable selection-only or retry.`,
+					);
+					return;
+				}
+				addLog(
+					`[WARNING] Could not verify AutoCAD selection (${message}); proceeding with modelspace scan.`,
+				);
+			}
+		}
+
 		setState((prev) => ({ ...prev, isRunning: true, validationErrors: [] }));
 		const executionStartTime = Date.now();
 
@@ -212,7 +257,14 @@ export function useCoordinatesGrabberState() {
 
 		try {
 			addLog("[PROCESSING] Preparing request...");
-			startProgressSimulation();
+			const runId = `cg_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+			activeRunIdRef.current = runId;
+			if (wsConnected) {
+				setProgress(3);
+				setProgressStage("initializing");
+			} else {
+				startProgressSimulation();
+			}
 
 			const result = await coordinatesGrabberService.execute({
 				mode: state.mode,
@@ -238,7 +290,7 @@ export function useCoordinatesGrabberState() {
 				show_distance_3d: false,
 				show_bearing: false,
 				show_azimuth: false,
-			});
+			}, { runId });
 
 			if (result.success) {
 				const pointsCreated = result.points_created || 0;
@@ -349,7 +401,18 @@ export function useCoordinatesGrabberState() {
 			saveExecutionResult(historyEntry);
 		} finally {
 			setState((prev) => ({ ...prev, isRunning: false }));
-			finishProgress();
+			activeRunIdRef.current = null;
+			if (!wsConnected) {
+				setProgressStage("completed");
+				finishProgress();
+			} else {
+				setProgressStage("completed");
+				setProgress(100);
+				setTimeout(() => {
+					setProgress(0);
+					setProgressStage("");
+				}, 600);
+			}
 		}
 	};
 
@@ -360,24 +423,35 @@ export function useCoordinatesGrabberState() {
 		}
 		try {
 			addLog("[INFO] Initiating download...");
-			const response = await fetch(
-				`/api/download-result?path=${encodeURIComponent(state.excelPath)}`,
-			);
-			if (response.ok) {
-				const blob = await response.blob();
-				const url = window.URL.createObjectURL(blob);
-				const link = document.createElement("a");
-				link.href = url;
-				link.download = `coordinates_${Date.now()}.xlsx`;
-				link.click();
-				window.URL.revokeObjectURL(url);
-				addLog("[SUCCESS] File downloaded successfully");
-			} else {
-				addLog("[ERROR] Failed to download file");
-			}
+			const blob =
+				await coordinatesGrabberService.downloadResultFile(state.excelPath);
+			const url = window.URL.createObjectURL(blob);
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = `coordinates_${Date.now()}.xlsx`;
+			link.click();
+			window.URL.revokeObjectURL(url);
+			addLog("[SUCCESS] File downloaded successfully");
 		} catch (err) {
 			addLog(
 				`[ERROR] Download failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+			);
+		}
+	}, [state.excelPath, addLog]);
+
+	const openResultLocation = useCallback(async () => {
+		if (!state.excelPath) {
+			addLog("[ERROR] No export path available");
+			return;
+		}
+		try {
+			const result = await coordinatesGrabberService.openExportFolder(
+				state.excelPath,
+			);
+			addLog(`[SUCCESS] ${result.message}`);
+		} catch (err) {
+			addLog(
+				`[ERROR] Could not open export folder: ${err instanceof Error ? err.message : "Unknown error"}`,
 			);
 		}
 	}, [state.excelPath, addLog]);
@@ -392,6 +466,20 @@ export function useCoordinatesGrabberState() {
 			addLog(`[WARNING] Could not get selection count: ${message}`);
 		}
 	};
+
+	const reconnectLiveStream = useCallback(async () => {
+		try {
+			coordinatesGrabberService.disconnect();
+			await coordinatesGrabberService.connectWebSocket();
+			setWsConnected(true);
+			setLastWsEventAt(Date.now());
+			addLog("[INFO] Reconnected WebSocket live stream");
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Unknown error";
+			setWsConnected(false);
+			addLog(`[WARNING] WebSocket reconnect failed: ${message}`);
+		}
+	}, [addLog]);
 
 	useEffect(() => {
 		const errors = validateConfiguration();
@@ -415,6 +503,7 @@ export function useCoordinatesGrabberState() {
 			(event) => {
 				if (!mounted || event.type !== "connected") return;
 				setWsConnected(true);
+				setLastWsEventAt(Date.now());
 			},
 		);
 
@@ -431,6 +520,7 @@ export function useCoordinatesGrabberState() {
 					error: typeof event.error === "string" ? event.error : null,
 					lastUpdated: Date.now(),
 				});
+				setLastWsEventAt(Date.now());
 			},
 		);
 
@@ -447,13 +537,53 @@ export function useCoordinatesGrabberState() {
 			setWsConnected(false);
 		});
 
+		const unsubscribeProgress = coordinatesGrabberService.on("progress", (event) => {
+			if (!mounted || event.type !== "progress") return;
+			const activeRunId = activeRunIdRef.current;
+			const eventRunId = event.run_id ? String(event.run_id) : null;
+			if (activeRunId && eventRunId && activeRunId !== eventRunId) return;
+			const next = Math.max(0, Math.min(100, Math.round(event.progress)));
+			setProgress(next);
+			setProgressStage(event.stage);
+			setLastWsEventAt(Date.now());
+		});
+
+		const unsubscribeComplete = coordinatesGrabberService.on("complete", (event) => {
+			if (!mounted || event.type !== "complete") return;
+			const activeRunId = activeRunIdRef.current;
+			const eventRunId = event.run_id ? String(event.run_id) : null;
+			if (activeRunId && eventRunId && activeRunId !== eventRunId) return;
+			finishProgress();
+		});
+
+		const unsubscribeWsError = coordinatesGrabberService.on("error", (event) => {
+			if (!mounted || event.type !== "error") return;
+			const activeRunId = activeRunIdRef.current;
+			const eventRunId = event.run_id ? String(event.run_id) : null;
+			if (activeRunId && eventRunId && activeRunId !== eventRunId) return;
+			finishProgress();
+		});
+
 		return () => {
 			mounted = false;
 			unsubscribeConnected();
 			unsubscribeStatus();
 			unsubscribeDisconnected();
 			unsubscribeError();
+			unsubscribeProgress();
+			unsubscribeComplete();
+			unsubscribeWsError();
 		};
+	}, [finishProgress]);
+
+	useEffect(() => {
+		const interval = setInterval(() => {
+			if (coordinatesGrabberService.isConnected()) return;
+			coordinatesGrabberService.connectWebSocket().catch(() => {
+				// Service handles retry/backoff internally.
+			});
+		}, 10000);
+		return () => clearInterval(interval);
 	}, []);
 
 	useEffect(() => {
@@ -467,12 +597,16 @@ export function useCoordinatesGrabberState() {
 	const liveStatusStamp = liveBackendStatus.lastUpdated
 		? new Date(liveBackendStatus.lastUpdated).toLocaleTimeString()
 		: "--";
+	const wsLastEventStamp = lastWsEventAt
+		? new Date(lastWsEventAt).toLocaleTimeString()
+		: "--";
 
 	return {
 		addLog,
 		availableLayers,
 		backendConnected,
 		downloadResult,
+		openResultLocation,
 		handleAddLayer,
 		handleClearLayers,
 		handleLayerSearch,
@@ -482,10 +616,13 @@ export function useCoordinatesGrabberState() {
 		handleStyleChange,
 		liveBackendStatus,
 		liveStatusStamp,
+		progressStage,
+		reconnectLiveStream,
 		progress,
 		refreshLayers,
 		setState,
 		state,
+		wsLastEventStamp,
 		wsConnected,
 	};
 }

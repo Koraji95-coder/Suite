@@ -45,6 +45,7 @@ export interface ExecutionResultPoint {
 export interface ExecutionResult {
 	success: boolean;
 	message: string;
+	run_id?: string;
 	excel_path?: string;
 	points_created?: number;
 	blocks_inserted?: number;
@@ -52,6 +53,53 @@ export interface ExecutionResult {
 	duration_seconds?: number;
 	error_details?: string;
 	points?: ExecutionResultPoint[];
+}
+
+export interface GroundGridPlotConductor {
+	x1: number;
+	y1: number;
+	x2: number;
+	y2: number;
+}
+
+export interface GroundGridPlotPlacement {
+	type: "ROD" | "TEE" | "CROSS" | "GROUND_ROD_WITH_TEST_WELL";
+	grid_x: number;
+	grid_y: number;
+	autocad_x: number;
+	autocad_y: number;
+	rotation_deg: number;
+}
+
+export interface GroundGridPlotConfig {
+	origin_x_feet: number;
+	origin_x_inches: number;
+	origin_y_feet: number;
+	origin_y_inches: number;
+	block_scale: number;
+	layer_name: string;
+	grid_max_y: number;
+}
+
+export interface GroundGridPlotRequest {
+	conductors: GroundGridPlotConductor[];
+	placements: GroundGridPlotPlacement[];
+	config: GroundGridPlotConfig;
+}
+
+export interface GroundGridPlotResult {
+	success: boolean;
+	message: string;
+	lines_drawn: number;
+	blocks_inserted: number;
+	layer_name: string;
+	test_well_block_name?: string;
+	error_details?: string;
+}
+
+export interface OpenExportFolderResult {
+	success: boolean;
+	message: string;
 }
 
 export interface ProgressUpdate {
@@ -99,6 +147,7 @@ export interface ServiceDisconnectedEvent {
 
 export interface WebSocketProgressEvent {
 	type: "progress";
+	run_id?: string | null;
 	stage: string;
 	progress: number;
 	current_item?: string;
@@ -107,13 +156,19 @@ export interface WebSocketProgressEvent {
 
 export interface WebSocketCompleteEvent {
 	type: "complete";
-	result: ExecutionResult;
+	run_id?: string | null;
+	message?: string;
+	result?: ExecutionResult;
+	timestamp?: number;
 }
 
 export interface WebSocketErrorEvent {
 	type: "error";
+	run_id?: string | null;
 	message: string;
+	code?: string;
 	error_details?: string;
+	timestamp?: number;
 }
 
 export type WebSocketMessage =
@@ -142,6 +197,7 @@ class CoordinatesGrabberService {
 	private listeners: Map<string, Set<(data: WebSocketMessage) => void>> =
 		new Map();
 	private apiKey: string;
+	private shouldReconnect: boolean = true;
 
 	constructor() {
 		// Initialize with localhost for development
@@ -170,9 +226,27 @@ class CoordinatesGrabberService {
 	}
 
 	/**
+	 * Encode API key as websocket subprotocol token to avoid query-string secrets.
+	 */
+	private getWebSocketProtocols(): string[] | undefined {
+		if (!this.apiKey) return undefined;
+		try {
+			const encoded = btoa(this.apiKey)
+				.replace(/\+/g, "-")
+				.replace(/\//g, "_")
+				.replace(/=+$/g, "");
+			return [`api-key.${encoded}`];
+		} catch {
+			// Fallback for edge runtimes that fail base64 encoding.
+			return [`api-key-plain.${this.apiKey}`];
+		}
+	}
+
+	/**
 	 * Connect to the Python backend via WebSocket for real-time updates
 	 */
 	public connectWebSocket(): Promise<void> {
+		this.shouldReconnect = true;
 		if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
 			return Promise.resolve();
 		}
@@ -184,8 +258,10 @@ class CoordinatesGrabberService {
 		this.connectingPromise = new Promise((resolve, reject) => {
 			try {
 				const wsBaseUrl = this.baseUrl.replace(/^http/, "ws") + "/ws";
-				const wsUrl = `${wsBaseUrl}?api_key=${encodeURIComponent(this.apiKey)}`;
-				this.websocket = new WebSocket(wsUrl);
+				const protocols = this.getWebSocketProtocols();
+				this.websocket = protocols
+					? new WebSocket(wsBaseUrl, protocols)
+					: new WebSocket(wsBaseUrl);
 
 				this.websocket.onopen = () => {
 					logger.debug("WebSocket connected", "CoordinatesGrabber");
@@ -221,7 +297,9 @@ class CoordinatesGrabberService {
 					logger.debug("WebSocket disconnected", "CoordinatesGrabber");
 					this.websocket = null;
 					this.connectingPromise = null;
-					this.attemptReconnect();
+					if (this.shouldReconnect) {
+						this.attemptReconnect();
+					}
 				};
 			} catch (err) {
 				this.connectingPromise = null;
@@ -296,11 +374,18 @@ class CoordinatesGrabberService {
 	/**
 	 * Execute coordinates grabber with the provided config
 	 */
-	public async execute(config: CoordinatesConfig): Promise<ExecutionResult> {
+	public async execute(
+		config: CoordinatesConfig,
+		options?: { runId?: string },
+	): Promise<ExecutionResult> {
 		try {
+			const headers = this.getHeaders();
+			if (options?.runId) {
+				(headers as Record<string, string>)["X-Run-Id"] = options.runId;
+			}
 			const response = await fetch(`${this.baseUrl}/api/execute`, {
 				method: "POST",
-				headers: this.getHeaders(),
+				headers,
 				body: JSON.stringify(config),
 			});
 
@@ -399,6 +484,102 @@ class CoordinatesGrabberService {
 	}
 
 	/**
+	 * Download a generated coordinates Excel file from backend.
+	 */
+	public async downloadResultFile(path: string): Promise<Blob> {
+		const response = await fetch(
+			`${this.baseUrl}/api/download-result?path=${encodeURIComponent(path)}`,
+			{
+				method: "GET",
+				headers: {
+					"X-API-Key": this.apiKey,
+				},
+			},
+		);
+		if (!response.ok) {
+			throw new Error(`Download failed (${response.status})`);
+		}
+		return await response.blob();
+	}
+
+	/**
+	 * Open folder containing a generated coordinates Excel file (Windows backend).
+	 */
+	public async openExportFolder(
+		path: string,
+	): Promise<OpenExportFolderResult> {
+		const response = await fetch(`${this.baseUrl}/api/open-export-folder`, {
+			method: "POST",
+			headers: this.getHeaders(),
+			body: JSON.stringify({ path }),
+		});
+
+		const body = (await response
+			.json()
+			.catch(() => null)) as OpenExportFolderResult | null;
+		if (!response.ok) {
+			throw new Error(body?.message || `Open folder failed (${response.status})`);
+		}
+		return (
+			body || {
+				success: true,
+				message: "Opened export folder",
+			}
+		);
+	}
+
+	/**
+	 * Plot generated ground-grid conductors and placements into AutoCAD.
+	 */
+	public async plotGroundGrid(
+		payload: GroundGridPlotRequest,
+	): Promise<GroundGridPlotResult> {
+		try {
+			const response = await fetch(`${this.baseUrl}/api/ground-grid/plot`, {
+				method: "POST",
+				headers: this.getHeaders(),
+				body: JSON.stringify(payload),
+			});
+
+			const data = (await response
+				.json()
+				.catch(() => null)) as GroundGridPlotResult | null;
+			if (!response.ok) {
+				return {
+					success: false,
+					message:
+						data?.message || `Ground-grid plot failed (${response.status})`,
+					lines_drawn: data?.lines_drawn ?? 0,
+					blocks_inserted: data?.blocks_inserted ?? 0,
+					layer_name: data?.layer_name ?? "",
+					error_details: data?.error_details,
+				};
+			}
+
+			return (
+				data || {
+					success: true,
+					message: "Ground grid plotted",
+					lines_drawn: 0,
+					blocks_inserted: 0,
+					layer_name: "",
+				}
+			);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : "Unknown error";
+			logger.error("Ground-grid plot failed", "CoordinatesGrabber", err);
+			return {
+				success: false,
+				message: `Cannot reach backend at ${this.baseUrl}. Is api_server.py running?`,
+				lines_drawn: 0,
+				blocks_inserted: 0,
+				layer_name: "",
+				error_details: message,
+			};
+		}
+	}
+
+	/**
 	 * Subscribe to a specific event type
 	 */
 	public on(
@@ -440,6 +621,7 @@ class CoordinatesGrabberService {
 	 * Close WebSocket connection
 	 */
 	public disconnect(): void {
+		this.shouldReconnect = false;
 		if (this.websocket) {
 			this.websocket.close();
 			this.websocket = null;

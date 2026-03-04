@@ -51,14 +51,14 @@ const ALL_BORDER: Partial<ExcelJS.Borders> = {
 };
 
 const SECTION_COLORS: Record<string, string> = {
-	GROUND_ROD_TEST_WELL: "FFC0392B",
+	GROUND_ROD_WITH_TEST_WELL: "FFC0392B",
 	ROD: "FF27AE60",
 	TEE: "FF2980B9",
 	CROSS: "FF16A085",
 };
 
 const HEADER_FILLS: Record<string, ExcelJS.FillPattern> = {
-	GROUND_ROD_TEST_WELL: {
+	GROUND_ROD_WITH_TEST_WELL: {
 		type: "pattern",
 		pattern: "solid",
 		fgColor: { argb: "FF922B21" },
@@ -95,6 +95,77 @@ const SECTION_FONT: Partial<ExcelJS.Font> = {
 	size: 12,
 	name: "Arial",
 };
+
+type QaSeverity = "ERROR" | "WARNING" | "INFO";
+type QaItem = { severity: QaSeverity; message: string };
+
+function buildQaItems(params: {
+	placements: GridPlacement[];
+	conductors: GridConductor[];
+	rods: GridRod[];
+}): QaItem[] {
+	const { placements, conductors, rods } = params;
+	const testWells = placements.filter(
+		(placement) => placement.type === "GROUND_ROD_WITH_TEST_WELL",
+	).length;
+	const items: QaItem[] = [];
+	const validTypes = new Set(["ROD", "TEE", "CROSS", "GROUND_ROD_WITH_TEST_WELL"]);
+	const unknownTypes = Array.from(
+		new Set(
+			placements
+				.map((placement) => placement.type)
+				.filter((type) => !validTypes.has(type)),
+		),
+	);
+	if (unknownTypes.length > 0) {
+		items.push({
+			severity: "ERROR",
+			message: `Unknown placement type(s): ${unknownTypes.join(", ")}`,
+		});
+	}
+
+	const buckets = new Map<string, Set<string>>();
+	for (const placement of placements) {
+		const key = `${placement.grid_x.toFixed(6)},${placement.grid_y.toFixed(6)}`;
+		const set = buckets.get(key) || new Set<string>();
+		set.add(placement.type);
+		buckets.set(key, set);
+	}
+	const mixedCollisions = Array.from(buckets.values()).filter(
+		(types) =>
+			types.size > 1 &&
+			!(types.size === 2 && types.has("ROD") && types.has("GROUND_ROD_WITH_TEST_WELL")),
+	).length;
+	if (mixedCollisions > 0) {
+		items.push({
+			severity: "ERROR",
+			message: `Detected ${mixedCollisions} mixed-type placement collision(s).`,
+		});
+	}
+
+	if (conductors.length > 0 && placements.length === 0) {
+		items.push({
+			severity: "WARNING",
+			message: "Conductors exist but no placements were generated.",
+		});
+	}
+	if (testWells !== 4) {
+		items.push({
+			severity: "WARNING",
+			message: `Expected 4 corner test wells; found ${testWells}.`,
+		});
+	}
+	if (rods.length < testWells) {
+		items.push({
+			severity: "ERROR",
+			message: "Test well count exceeds rod count.",
+		});
+	}
+	if (items.length === 0) {
+		items.push({ severity: "INFO", message: "No QA issues detected." });
+	}
+	return items;
+}
 
 function applyRowFill(
 	row: ExcelJS.Row,
@@ -183,6 +254,11 @@ export async function exportGridToExcel(
 	conductors: GridConductor[],
 ): Promise<void> {
 	const wb = new ExcelJS.Workbook();
+	const qaItems = buildQaItems({ placements, conductors, rods });
+	const testWellCount = placements.filter(
+		(placement) => placement.type === "GROUND_ROD_WITH_TEST_WELL",
+	).length;
+	const standardRodCount = Math.max(0, rods.length - testWellCount);
 
 	const wsPlace = wb.addWorksheet("Placements");
 	const placeHeaders = [
@@ -209,7 +285,7 @@ export async function exportGridToExcel(
 	for (const p of placements) {
 		(grouped[p.type] ||= []).push(p);
 	}
-	const typeOrder = ["GROUND_ROD_TEST_WELL", "ROD", "TEE", "CROSS"];
+	const typeOrder = ["GROUND_ROD_WITH_TEST_WELL", "ROD", "TEE", "CROSS"];
 	const sortedTypes = typeOrder.filter((t) => grouped[t]?.length);
 
 	let currentRow = 2;
@@ -218,7 +294,7 @@ export async function exportGridToExcel(
 		const typeName = sortedTypes[ti];
 		const items = grouped[typeName];
 		const labelMap: Record<string, string> = {
-			GROUND_ROD_TEST_WELL: "Ground Rod with Test Well",
+			GROUND_ROD_WITH_TEST_WELL: "Ground Rod with Test Well",
 			ROD: "Ground Rods",
 			TEE: "Tee Connections",
 			CROSS: "Cross Connections",
@@ -370,7 +446,19 @@ export async function exportGridToExcel(
 		applyRowFill(rSectionRow, RODS_SECTION_FILL, rodHeaders.length);
 		rSectionRow.height = 24;
 
-		const rHeaderRow = wsRods.getRow(3);
+		const rNoteRow = wsRods.getRow(3);
+		wsRods.mergeCells(3, 1, 3, rodHeaders.length);
+		rNoteRow.getCell(1).value =
+			`${standardRodCount} standard rods + ${testWellCount} test wells included in rod total.`;
+		rNoteRow.getCell(1).font = DATA_FONT;
+		rNoteRow.getCell(1).fill = EVEN_FILL;
+		rNoteRow.getCell(1).alignment = {
+			horizontal: "left",
+			vertical: "middle",
+		};
+		applyRowFill(rNoteRow, EVEN_FILL, rodHeaders.length);
+
+		const rHeaderRow = wsRods.getRow(4);
 		rodHeaders.forEach((h, i) => {
 			const cell = rHeaderRow.getCell(i + 1);
 			cell.value = h;
@@ -385,7 +473,7 @@ export async function exportGridToExcel(
 		rHeaderRow.height = 22;
 
 		rods.forEach((r, idx) => {
-			const row = wsRods.getRow(idx + 4);
+			const row = wsRods.getRow(idx + 5);
 			const values = [r.label, r.grid_x, r.grid_y, r.depth, r.diameter];
 			const fill = idx % 2 === 0 ? EVEN_FILL : ODD_FILL;
 			values.forEach((v, ci) => {
@@ -398,7 +486,7 @@ export async function exportGridToExcel(
 			});
 		});
 
-		const rodsLastRow = rods.length + 3;
+		const rodsLastRow = rods.length + 4;
 		autofitColumns(wsRods, rodHeaders.length, rodsLastRow);
 		hideUnusedCells(wsRods, rodHeaders.length, rodsLastRow);
 	}
@@ -469,6 +557,61 @@ export async function exportGridToExcel(
 		autofitColumns(wsCond, condHeaders.length, condsLastRow);
 		hideUnusedCells(wsCond, condHeaders.length, condsLastRow);
 	}
+
+	const wsQa = wb.addWorksheet("QA Summary");
+	const qaHeaders = ["Severity", "Detail"];
+	const qaTitleRow = wsQa.getRow(1);
+	wsQa.mergeCells(1, 1, 1, qaHeaders.length);
+	const qaTitleCell = qaTitleRow.getCell(1);
+	qaTitleCell.value = `${designName} - QA Summary`;
+	qaTitleCell.font = TITLE_FONT;
+	qaTitleCell.fill = TITLE_FILL;
+	qaTitleCell.alignment = { horizontal: "center", vertical: "middle" };
+	applyRowFill(qaTitleRow, TITLE_FILL, qaHeaders.length);
+	qaTitleRow.height = 28;
+
+	const qaHeaderRow = wsQa.getRow(2);
+	qaHeaders.forEach((h, i) => {
+		const cell = qaHeaderRow.getCell(i + 1);
+		cell.value = h;
+		cell.font = HEADER_FONT;
+		cell.fill = {
+			type: "pattern",
+			pattern: "solid",
+			fgColor: { argb: "FF4B5563" },
+		};
+		cell.alignment = { horizontal: "center", vertical: "middle" };
+		cell.border = {
+			...ALL_BORDER,
+			bottom: { style: "medium", color: { argb: "FF374151" } },
+		};
+	});
+	qaHeaderRow.height = 22;
+
+	qaItems.forEach((item, idx) => {
+		const row = wsQa.getRow(idx + 3);
+		const fill = idx % 2 === 0 ? EVEN_FILL : ODD_FILL;
+		const severityColor =
+			item.severity === "ERROR"
+				? "FFB91C1C"
+				: item.severity === "WARNING"
+					? "FFB45309"
+					: "FF047857";
+		row.getCell(1).value = item.severity;
+		row.getCell(1).fill = fill;
+		row.getCell(1).border = ALL_BORDER;
+		row.getCell(1).font = { ...BOLD_DATA_FONT, color: { argb: severityColor } };
+		row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+
+		row.getCell(2).value = item.message;
+		row.getCell(2).fill = fill;
+		row.getCell(2).border = ALL_BORDER;
+		row.getCell(2).font = DATA_FONT;
+		row.getCell(2).alignment = { horizontal: "left", vertical: "middle" };
+	});
+	const qaLastRow = qaItems.length + 2;
+	autofitColumns(wsQa, qaHeaders.length, qaLastRow);
+	hideUnusedCells(wsQa, qaHeaders.length, qaLastRow);
 
 	const buffer = await wb.xlsx.writeBuffer();
 	const blob = new Blob([buffer], {

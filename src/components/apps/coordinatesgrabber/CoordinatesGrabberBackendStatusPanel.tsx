@@ -11,6 +11,8 @@ interface CoordinatesGrabberBackendStatusPanelProps {
 	wsConnected: boolean;
 	liveBackendStatus: LiveBackendStatus;
 	liveStatusStamp: string;
+	wsLastEventStamp: string;
+	reconnectLiveStream: () => Promise<void>;
 	addLog: (message: string) => void;
 }
 
@@ -20,6 +22,8 @@ export function CoordinatesGrabberBackendStatusPanel({
 	wsConnected,
 	liveBackendStatus,
 	liveStatusStamp,
+	wsLastEventStamp,
+	reconnectLiveStream,
 	addLog,
 }: CoordinatesGrabberBackendStatusPanelProps) {
 	return (
@@ -59,12 +63,40 @@ export function CoordinatesGrabberBackendStatusPanel({
 							fontWeight: 600,
 						}}
 					>
-						{wsConnected ? "● LIVE" : "○ OFFLINE"}
+						{wsConnected ? "LIVE" : "OFFLINE"}
 					</span>
+				</div>
+				<div
+					style={{
+						display: "flex",
+						alignItems: "center",
+						justifyContent: "space-between",
+						gap: "8px",
+						marginBottom: "8px",
+					}}
+				>
+					<span style={{ color: palette.textMuted, fontSize: "10px" }}>
+						Last stream event: {wsLastEventStamp}
+					</span>
+					<button
+						onClick={() => void reconnectLiveStream()}
+						style={{
+							padding: "4px 8px",
+							borderRadius: "4px",
+							border: `1px solid ${hexToRgba(palette.primary, 0.35)}`,
+							background: "transparent",
+							color: palette.primary,
+							fontSize: "10px",
+							fontWeight: 600,
+							cursor: "pointer",
+						}}
+					>
+						Reconnect Stream
+					</button>
 				</div>
 				{backendConnected ? (
 					<div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-						<span style={{ color: "#51cf66" }}>● Connected to AutoCAD</span>
+						<span style={{ color: "#51cf66" }}>Connected to AutoCAD</span>
 						<span style={{ color: palette.textMuted, fontSize: "10px" }}>
 							Drawing:{" "}
 							{liveBackendStatus.drawingOpen
@@ -80,7 +112,7 @@ export function CoordinatesGrabberBackendStatusPanel({
 						style={{ display: "flex", flexDirection: "column", gap: "10px" }}
 					>
 						<div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-							<span style={{ color: "#ffa94d" }}>○ Backend not detected</span>
+							<span style={{ color: "#ffa94d" }}>Backend not detected</span>
 							<span style={{ color: palette.textMuted, fontSize: "10px" }}>
 								(live stream + 10s polling fallback)
 							</span>

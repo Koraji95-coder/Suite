@@ -39,17 +39,7 @@ class TestApiRuntimeConfig(unittest.TestCase):
         )
         self.assertEqual(len(logger.warnings), 0)
 
-    def test_resolve_api_key_fallback_and_missing(self) -> None:
-        logger = _LoggerStub()
-        self.assertEqual(
-            resolve_api_key(
-                os_module=_OSStub({"VITE_API_KEY": "dev-key"}),
-                logger=logger,
-            ),
-            "dev-key",
-        )
-        self.assertEqual(len(logger.warnings), 1)
-
+    def test_resolve_api_key_missing(self) -> None:
         with self.assertRaises(RuntimeError):
             resolve_api_key(
                 os_module=_OSStub({}),

@@ -214,6 +214,9 @@ def create_autocad_runtime(
             insert_reference_block_fn=insert_reference_block,
             add_point_label_fn=add_point_label,
             export_points_to_excel_fn=export_points_to_excel,
+            ensure_layer_fn=ensure_layer,
+            pt_fn=pt,
+            com_call_with_retry_fn=com_call_with_retry,
             foundation_source_type=foundation_source_type,
             print_fn=print_fn,
         )

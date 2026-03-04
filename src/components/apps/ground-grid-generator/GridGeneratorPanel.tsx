@@ -45,19 +45,21 @@ export function GridGeneratorPanel() {
 		pasteMode,
 		pasteText,
 		placements,
+		plotDiffPreview,
+		placementLock,
 		previewMode,
 		projects,
 		rods,
 		runGeneration,
 		saveDesign,
 		saving,
-		segmentCount,
 		setDesignName,
 		setFaultCurrent,
 		setIsDragging,
 		setPasteMode,
 		setPasteText,
 		setPreviewMode,
+		setPlacementLock,
 		setSoilResistivity,
 		soilResistivity,
 		teeCount,
@@ -140,12 +142,12 @@ export function GridGeneratorPanel() {
 					backendConnected={backendConnected}
 					soilResistivity={soilResistivity}
 					faultCurrent={faultCurrent}
-					segmentCount={segmentCount}
 					teeCount={teeCount}
 					crossCount={crossCount}
 					rods={rods}
 					conductors={conductors}
 					placements={placements}
+					plotDiffPreview={plotDiffPreview}
 					palettePrimary={palette.primary}
 					paletteSurfaceLight={palette.surfaceLight}
 					paletteText={palette.text}
@@ -159,6 +161,8 @@ export function GridGeneratorPanel() {
 					}}
 					onExportPdf={handlePdfExport}
 					onPlotToAutoCad={handlePlotToAutoCad}
+					placementLock={placementLock}
+					onTogglePlacementLock={() => setPlacementLock((prev) => !prev)}
 					onPreviewModeChange={setPreviewMode}
 					onSoilResistivityChange={setSoilResistivity}
 					onFaultCurrentChange={setFaultCurrent}

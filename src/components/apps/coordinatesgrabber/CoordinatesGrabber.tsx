@@ -15,6 +15,7 @@ export function CoordinatesGrabber() {
 		availableLayers,
 		backendConnected,
 		downloadResult,
+		openResultLocation,
 		handleAddLayer,
 		handleClearLayers,
 		handleLayerSearch,
@@ -24,10 +25,13 @@ export function CoordinatesGrabber() {
 		handleStyleChange,
 		liveBackendStatus,
 		liveStatusStamp,
+		progressStage,
+		reconnectLiveStream,
 		progress,
 		refreshLayers,
 		setState,
 		state,
+		wsLastEventStamp,
 		wsConnected,
 	} = useCoordinatesGrabberState();
 
@@ -66,7 +70,10 @@ export function CoordinatesGrabber() {
 					wsConnected={wsConnected}
 					liveBackendStatus={liveBackendStatus}
 					liveStatusStamp={liveStatusStamp}
+					wsLastEventStamp={wsLastEventStamp}
+					reconnectLiveStream={reconnectLiveStream}
 					progress={progress}
+					progressStage={progressStage}
 				/>
 			)}
 
@@ -75,6 +82,7 @@ export function CoordinatesGrabber() {
 					state={state}
 					palette={palette}
 					downloadResult={downloadResult}
+					openResultLocation={openResultLocation}
 				/>
 			)}
 

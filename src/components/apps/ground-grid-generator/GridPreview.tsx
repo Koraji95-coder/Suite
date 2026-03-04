@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "@/lib/palette";
 import { GridCanvasEmptyState } from "./GridCanvasEmptyState";
+import styles from "./GridPreview.module.css";
 import { GridPreviewOverlay } from "./GridPreviewOverlay";
 import { GridPreviewSvg } from "./GridPreviewSvg";
 import {
@@ -230,7 +231,7 @@ export function GridPreview({
 	}
 
 	return (
-		<div ref={containerRef} className="relative min-h-[min(400px,60vh)] w-full">
+		<div ref={containerRef} className={styles.root}>
 			<GridPreviewSvg
 				svgRef={svgRef}
 				effectiveViewBox={effectiveViewBox}

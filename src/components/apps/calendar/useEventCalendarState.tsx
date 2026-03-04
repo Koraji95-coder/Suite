@@ -17,6 +17,7 @@ import {
 	type CalendarEvent,
 	type CalendarView,
 } from "./calendarindex";
+import styles from "./useEventCalendarState.module.css";
 
 interface UseEventCalendarStateParams {
 	initialView: CalendarView;
@@ -226,16 +227,13 @@ export function useEventCalendarState({
 		if (view === "day") {
 			return (
 				<>
-					<span className="min-[480px]:hidden leading-none" aria-hidden="true">
+					<span className={styles.dayTitleNarrow} aria-hidden="true">
 						{format(currentDate, "MMM d, yyyy")}
 					</span>
-					<span
-						className="max-[479px]:hidden md:hidden leading-tight"
-						aria-hidden="true"
-					>
+					<span className={styles.dayTitleMedium} aria-hidden="true">
 						{format(currentDate, "MMMM d, yyyy")}
 					</span>
-					<span className="max-md:hidden leading-tight">
+					<span className={styles.dayTitleWide}>
 						{format(currentDate, "EEE MMMM d, yyyy")}
 					</span>
 				</>

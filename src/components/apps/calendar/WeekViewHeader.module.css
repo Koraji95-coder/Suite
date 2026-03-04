@@ -1,0 +1,108 @@
+.root {
+	position: sticky;
+	top: 0;
+	z-index: 30;
+	display: grid;
+	grid-template-columns: repeat(8, minmax(0, 1fr));
+	border-bottom: 1px solid color-mix(in srgb, var(--primary) 12%, transparent);
+	background: color-mix(in srgb, var(--surface) 60%, transparent);
+	backdrop-filter: blur(10px);
+}
+
+.timezoneCell {
+	display: flex;
+	min-height: 2.75rem;
+	align-items: center;
+	justify-content: center;
+	padding: 0 0.25rem;
+	text-align: center;
+	font-size: 0.75rem;
+	line-height: 1;
+	color: var(--text-muted);
+}
+
+.timezoneDesktop {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.dayButton {
+	display: flex;
+	min-height: 2.75rem;
+	align-items: center;
+	justify-content: center;
+	padding: 0 0.25rem;
+	border: none;
+	background: transparent;
+	text-align: center;
+	font-size: 0.75rem;
+	line-height: 1;
+	transition:
+		background-color 160ms ease,
+		color 160ms ease;
+	cursor: pointer;
+}
+
+.dayButtonToday {
+	font-weight: 600;
+	color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.dayButtonSelected {
+	font-weight: 600;
+	color: var(--text);
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.dayButtonDefault {
+	color: var(--text-muted);
+}
+
+.dayLabelMobile {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.25rem;
+	line-height: 1;
+}
+
+.dayLabelDesktop {
+	display: none;
+	line-height: 1;
+}
+
+@media (min-width: 480px) {
+	.timezoneDesktop {
+		position: static;
+		width: auto;
+		height: auto;
+		margin: 0;
+		overflow: visible;
+		clip: auto;
+		white-space: nowrap;
+		border: 0;
+	}
+}
+
+@media (min-width: 640px) {
+	.timezoneCell,
+	.dayButton {
+		font-size: 0.875rem;
+	}
+
+	.dayLabelMobile {
+		display: none;
+	}
+
+	.dayLabelDesktop {
+		display: inline;
+	}
+}

@@ -1,0 +1,120 @@
+.selectTriggerDesign {
+	height: 2rem;
+	min-width: 240px;
+	border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+	background: color-mix(in srgb, var(--surface-2) 75%, transparent);
+	color: var(--text);
+	padding: 0.375rem 0.75rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+.selectTriggerProject {
+	min-width: 220px;
+	height: 2rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+	background: color-mix(in srgb, var(--surface-2) 75%, transparent);
+	color: var(--text);
+	padding: 0.375rem 0.75rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+.selectTriggerContent {
+	display: inline-flex;
+	max-width: 100%;
+	align-items: center;
+	gap: 0.5rem;
+	overflow: hidden;
+}
+
+.selectTriggerIcon {
+	width: 0.875rem;
+	height: 0.875rem;
+	color: var(--primary);
+	flex-shrink: 0;
+}
+
+.selectTriggerText {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.selectContentDesign {
+	max-height: 16rem;
+	min-width: 260px;
+	border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+	background: var(--surface);
+}
+
+.selectContentProject {
+	max-height: 15rem;
+	min-width: 220px;
+	border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+	background: var(--surface);
+}
+
+.emptyState {
+	padding: 0.5rem 0.75rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.selectItemDesign {
+	align-items: flex-start;
+	padding-top: 0.5rem;
+	padding-bottom: 0.5rem;
+	text-align: left;
+}
+
+.selectItemBody {
+	width: 100%;
+}
+
+.selectItemTitle {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.selectItemMeta {
+	font-size: 10px;
+	color: var(--text-muted);
+}
+
+.spinner {
+	animation: spin 1s linear infinite;
+}
+
+.projectNoSelection {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.projectItem {
+	font-size: 0.75rem;
+}
+
+.projectItemBody {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.projectDot {
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 999px;
+	flex-shrink: 0;
+}
+
+.projectName {
+	color: var(--text);
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}

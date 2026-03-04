@@ -7,6 +7,7 @@ import { CalendarDaysIcon } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "./calendarindex";
+import styles from "./UpcomingBanner.module.css";
 import { getUpcomingNext7Days } from "./upcoming";
 
 export function UpcomingBanner({
@@ -23,21 +24,13 @@ export function UpcomingBanner({
 	if (hasUpcoming) return null;
 
 	return (
-		<div
-			className={cn(
-				"flex items-center gap-3 rounded-xl border px-5 py-4 text-center",
-				"[border-color:var(--border)] [background:var(--surface)]",
-				className,
-			)}
-		>
-			<div className="[color:var(--text-muted)]">
+		<div className={cn(styles.root, className)}>
+			<div className={styles.iconWrap}>
 				<CalendarDaysIcon size={16} aria-hidden="true" />
 			</div>
-			<div className="min-w-0 space-y-0.5">
-				<div className="text-sm font-semibold leading-tight [color:var(--text)]">
-					No new events in the next 7 days
-				</div>
-				<div className="text-xs leading-relaxed [color:var(--text-muted)]">
+			<div className={styles.content}>
+				<div className={styles.title}>No new events in the next 7 days</div>
+				<div className={styles.description}>
 					When something is scheduled, it'll show up automatically.
 				</div>
 			</div>

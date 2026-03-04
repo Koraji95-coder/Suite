@@ -1,6 +1,7 @@
 import { hexToRgba } from "@/lib/palette";
 import { GridOverlayCard } from "./GridOverlayCard";
 import type { HoveredPotentialValue } from "./PotentialContourHelpers";
+import styles from "./PotentialContourOverlay.module.css";
 
 interface PotentialContourOverlayProps {
 	hoveredValue: HoveredPotentialValue | null;
@@ -22,9 +23,9 @@ export function PotentialContourOverlay({
 	mutedTextColor,
 }: PotentialContourOverlayProps) {
 	return (
-		<div className="pointer-events-none absolute inset-0 p-2 sm:p-3">
-			<div className="flex h-full flex-col justify-between gap-2">
-				<div className="flex flex-wrap items-start justify-between gap-2">
+		<div className={styles.root}>
+			<div className={styles.stack}>
+				<div className={styles.topRow}>
 					{hoveredValue ? (
 						<GridOverlayCard
 							backgroundColor={backgroundColor}
@@ -53,7 +54,7 @@ export function PotentialContourOverlay({
 				</div>
 
 				<GridOverlayCard
-					className="self-start sm:self-end"
+					className={styles.legendCard}
 					backgroundColor={backgroundColor}
 					borderColor={primaryColor}
 					textColor={mutedTextColor}

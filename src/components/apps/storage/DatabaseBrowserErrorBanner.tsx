@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import styles from "./DatabaseBrowserErrorBanner.module.css";
 
 interface DatabaseBrowserErrorBannerProps {
 	error: string | null;
@@ -12,13 +13,10 @@ export function DatabaseBrowserErrorBanner({
 	if (!error) return null;
 
 	return (
-		<div className="mb-3 flex items-center gap-2 rounded-lg border px-3.5 py-2.5 text-[13px] border-[color-mix(in_srgb,var(--danger)_30%,transparent)] [background:color-mix(in_srgb,var(--danger)_12%,transparent)] [color:var(--danger)]">
-			<AlertTriangle className="h-4 w-4 shrink-0" />
-			<span className="flex-1">{error}</span>
-			<button
-				onClick={onDismiss}
-				className="border-none bg-transparent text-[13px] font-semibold [color:var(--danger)]"
-			>
+		<div className={styles.root}>
+			<AlertTriangle className={styles.icon} />
+			<span className={styles.message}>{error}</span>
+			<button onClick={onDismiss} className={styles.dismissButton}>
 				Dismiss
 			</button>
 		</div>

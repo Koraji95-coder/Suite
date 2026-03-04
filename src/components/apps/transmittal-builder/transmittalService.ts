@@ -27,10 +27,35 @@ const parseFilename = (value: string | null) => {
 	if (!value) return "transmittal_output";
 	const utfMatch = value.match(/filename\*=UTF-8''([^;]+)/i);
 	if (utfMatch?.[1]) {
-		return decodeURIComponent(utfMatch[1]);
+		try {
+			return decodeURIComponent(utfMatch[1]);
+		} catch {
+			return utfMatch[1];
+		}
 	}
 	const match = value.match(/filename="?([^";]+)"?/i);
 	return match?.[1] ?? "transmittal_output";
+};
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 45_000;
+
+const withTimeout = (
+	signal: AbortSignal | null | undefined,
+	timeoutMs: number,
+) => {
+	const controller = new AbortController();
+	const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+	if (signal) {
+		if (signal.aborted) controller.abort();
+		else
+			signal.addEventListener("abort", () => controller.abort(), {
+				once: true,
+			});
+	}
+	return {
+		signal: controller.signal,
+		clear: () => globalThis.clearTimeout(timeout),
+	};
 };
 
 class TransmittalService {
@@ -38,11 +63,15 @@ class TransmittalService {
 	private apiKey: string;
 
 	constructor() {
-		this.baseUrl =
+		const configuredBaseUrl =
 			import.meta.env.VITE_TRANSMITTAL_BACKEND_URL ||
 			import.meta.env.VITE_COORDINATES_BACKEND_URL ||
 			"http://localhost:5000";
-		this.apiKey = import.meta.env.VITE_API_KEY || "";
+		this.baseUrl = configuredBaseUrl.replace(/\/+$/, "");
+		this.apiKey =
+			import.meta.env.VITE_TRANSMITTAL_API_KEY ||
+			import.meta.env.VITE_API_KEY ||
+			"";
 	}
 
 	hasApiKey() {
@@ -55,29 +84,65 @@ class TransmittalService {
 		};
 	}
 
+	private async parseError(response: Response) {
+		const contentType = response.headers.get("content-type") || "";
+		let message = `Request failed (${response.status})`;
+		try {
+			if (contentType.includes("application/json")) {
+				const data = (await response.json()) as
+					| { message?: string; detail?: string; error?: string }
+					| undefined;
+				message = data?.message || data?.detail || data?.error || message;
+			} else {
+				const text = await response.text();
+				if (text.trim()) message = text.trim();
+			}
+		} catch {
+			// ignore parse failures and use default message
+		}
+		return message;
+	}
+
+	private async request(
+		path: string,
+		init: RequestInit = {},
+		timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+	) {
+		const { signal, clear } = withTimeout(init.signal, timeoutMs);
+		const headers = { ...this.getHeaders(), ...(init.headers || {}) };
+		try {
+			const response = await fetch(`${this.baseUrl}${path}`, {
+				...init,
+				headers,
+				signal,
+			});
+			if (!response.ok) {
+				const message = await this.parseError(response);
+				logger.error("Transmittal request failed", "TransmittalService", {
+					path,
+					status: response.status,
+					message,
+				});
+				throw new Error(message);
+			}
+			return response;
+		} catch (error) {
+			if (error instanceof Error && error.name === "AbortError") {
+				throw new Error("Request timed out. Please try again.");
+			}
+			throw error;
+		} finally {
+			clear();
+		}
+	}
+
 	async renderTransmittal(
 		formData: FormData,
 	): Promise<TransmittalRenderResult> {
-		const response = await fetch(`${this.baseUrl}/api/transmittal/render`, {
+		const response = await this.request("/api/transmittal/render", {
 			method: "POST",
-			headers: this.getHeaders(),
 			body: formData,
 		});
-
-		if (!response.ok) {
-			let message = `Request failed (${response.status})`;
-			try {
-				const data = await response.json();
-				message = data?.message || data?.detail || message;
-			} catch {
-				// ignore
-			}
-			logger.error("Transmittal render failed", "TransmittalService", {
-				status: response.status,
-				message,
-			});
-			throw new Error(message);
-		}
 
 		const contentType = response.headers.get("content-type") || "";
 		const filename = parseFilename(response.headers.get("content-disposition"));
@@ -87,21 +152,13 @@ class TransmittalService {
 	}
 
 	async fetchExampleTemplate(): Promise<TransmittalRenderResult> {
-		const response = await fetch(`${this.baseUrl}/api/transmittal/template`, {
-			method: "GET",
-			headers: this.getHeaders(),
-		});
-
-		if (!response.ok) {
-			let message = `Request failed (${response.status})`;
-			try {
-				const data = await response.json();
-				message = data?.message || message;
-			} catch {
-				// ignore
-			}
-			throw new Error(message);
-		}
+		const response = await this.request(
+			"/api/transmittal/template",
+			{
+				method: "GET",
+			},
+			25_000,
+		);
 
 		const contentType = response.headers.get("content-type") || "";
 		const filename = parseFilename(response.headers.get("content-disposition"));
@@ -110,21 +167,13 @@ class TransmittalService {
 	}
 
 	async fetchProfileOptions(): Promise<TransmittalProfileOptionsResult> {
-		const response = await fetch(`${this.baseUrl}/api/transmittal/profiles`, {
-			method: "GET",
-			headers: this.getHeaders(),
-		});
-
-		if (!response.ok) {
-			let message = `Request failed (${response.status})`;
-			try {
-				const data = await response.json();
-				message = data?.message || message;
-			} catch {
-				// ignore
-			}
-			throw new Error(message);
-		}
+		const response = await this.request(
+			"/api/transmittal/profiles",
+			{
+				method: "GET",
+			},
+			20_000,
+		);
 
 		const payload = (await response.json()) as {
 			profiles?: unknown;

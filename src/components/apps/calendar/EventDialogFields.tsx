@@ -20,6 +20,7 @@ import { Label } from "@/components/primitives/Text";
 import { cn } from "@/lib/utils";
 import { Calendar } from "./Calendar";
 import type { EventColor } from "./calendarindex";
+import styles from "./EventDialogFields.module.css";
 import {
 	EVENT_DIALOG_COLOR_OPTIONS,
 	EVENT_DIALOG_TIME_OPTIONS,
@@ -93,9 +94,9 @@ export function EventDialogFields({
 	setError,
 }: EventDialogFieldsProps) {
 	return (
-		<div className="grid gap-4 py-2 sm:py-4">
-			<div className="grid gap-3">
-				<div className="*:not-first:mt-1.5">
+		<div className={styles.root}>
+			<div className={styles.fieldGroup}>
+				<div className={styles.fieldStack}>
 					<Label htmlFor="project">Project</Label>
 					<Select
 						value={projectId ?? ""}
@@ -104,7 +105,7 @@ export function EventDialogFields({
 							setTaskId(null);
 						}}
 					>
-						<SelectTrigger id="project" className="w-full">
+						<SelectTrigger id="project" className={styles.fullWidth}>
 							<SelectValue placeholder="No project" />
 						</SelectTrigger>
 						<SelectContent>
@@ -118,13 +119,13 @@ export function EventDialogFields({
 					</Select>
 				</div>
 
-				<div className="*:not-first:mt-1.5">
+				<div className={styles.fieldStack}>
 					<Label htmlFor="task">Task</Label>
 					<Select
 						value={taskId ?? ""}
 						onValueChange={(value) => setTaskId(value || null)}
 					>
-						<SelectTrigger id="task" className="w-full">
+						<SelectTrigger id="task" className={styles.fullWidth}>
 							<SelectValue placeholder="No task" />
 						</SelectTrigger>
 						<SelectContent>
@@ -139,7 +140,7 @@ export function EventDialogFields({
 				</div>
 			</div>
 
-			<div className="*:not-first:mt-1.5">
+			<div className={styles.fieldStack}>
 				<Label htmlFor="title">Title</Label>
 				<Input
 					id="title"
@@ -148,7 +149,7 @@ export function EventDialogFields({
 				/>
 			</div>
 
-			<div className="*:not-first:mt-1.5">
+			<div className={styles.fieldStack}>
 				<Label htmlFor="description">Description</Label>
 				<TextArea
 					id="description"
@@ -158,8 +159,8 @@ export function EventDialogFields({
 				/>
 			</div>
 
-			<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_130px] sm:gap-4">
-				<div className="flex-1 *:not-first:mt-1.5">
+			<div className={styles.dateTimeRow}>
+				<div className={cn(styles.dateColumn, styles.fieldStack)}>
 					<Label htmlFor="start-date">Start Date</Label>
 					<Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
 						<PopoverTrigger asChild>
@@ -167,25 +168,25 @@ export function EventDialogFields({
 								id="start-date"
 								variant="outline"
 								className={cn(
-									"group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
-									!startDate && "text-muted-foreground",
+									styles.dateTrigger,
+									!startDate && styles.mutedText,
 								)}
 							>
 								<span
 									className={cn(
-										"truncate",
-										!startDate && "text-muted-foreground",
+										styles.dateLabel,
+										!startDate && styles.mutedText,
 									)}
 								>
 									{startDate ? format(startDate, "PPP") : "Pick a date"}
 								</span>
 								<CalendarIcon
-									className="text-muted-foreground/80 h-4 w-4 shrink-0"
+									className={styles.calendarIcon}
 									aria-hidden="true"
 								/>
 							</Button>
 						</PopoverTrigger>
-						<PopoverContent className="w-auto p-2" align="start">
+						<PopoverContent className={styles.popoverContent} align="start">
 							<Calendar
 								mode="single"
 								selected={startDate}
@@ -205,7 +206,7 @@ export function EventDialogFields({
 				</div>
 
 				{!allDay ? (
-					<div className="w-full *:not-first:mt-1.5">
+					<div className={cn(styles.timeColumn, styles.fieldStack)}>
 						<Label htmlFor="start-time">Start Time</Label>
 						<Select value={startTime} onValueChange={setStartTime}>
 							<SelectTrigger id="start-time">
@@ -223,34 +224,28 @@ export function EventDialogFields({
 				) : null}
 			</div>
 
-			<div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_130px] sm:gap-4">
-				<div className="flex-1 *:not-first:mt-1.5">
+			<div className={styles.dateTimeRow}>
+				<div className={cn(styles.dateColumn, styles.fieldStack)}>
 					<Label htmlFor="end-date">End Date</Label>
 					<Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
 						<PopoverTrigger asChild>
 							<Button
 								id="end-date"
 								variant="outline"
-								className={cn(
-									"group bg-background hover:bg-background border-input w-full justify-between px-3 font-normal outline-offset-0 outline-none focus-visible:outline-[3px]",
-									!endDate && "text-muted-foreground",
-								)}
+								className={cn(styles.dateTrigger, !endDate && styles.mutedText)}
 							>
 								<span
-									className={cn(
-										"truncate",
-										!endDate && "text-muted-foreground",
-									)}
+									className={cn(styles.dateLabel, !endDate && styles.mutedText)}
 								>
 									{endDate ? format(endDate, "PPP") : "Pick a date"}
 								</span>
 								<CalendarIcon
-									className="text-muted-foreground/80 h-4 w-4 shrink-0"
+									className={styles.calendarIcon}
 									aria-hidden="true"
 								/>
 							</Button>
 						</PopoverTrigger>
-						<PopoverContent className="w-auto p-2" align="start">
+						<PopoverContent className={styles.popoverContent} align="start">
 							<Calendar
 								mode="single"
 								selected={endDate}
@@ -268,7 +263,7 @@ export function EventDialogFields({
 				</div>
 
 				{!allDay ? (
-					<div className="w-full *:not-first:mt-1.5">
+					<div className={cn(styles.timeColumn, styles.fieldStack)}>
 						<Label htmlFor="end-time">End Time</Label>
 						<Select value={endTime} onValueChange={setEndTime}>
 							<SelectTrigger id="end-time">
@@ -286,7 +281,7 @@ export function EventDialogFields({
 				) : null}
 			</div>
 
-			<div className="flex items-center gap-2">
+			<div className={styles.allDayRow}>
 				<Checkbox
 					id="all-day"
 					checked={allDay}
@@ -295,7 +290,7 @@ export function EventDialogFields({
 				<Label htmlFor="all-day">All day</Label>
 			</div>
 
-			<div className="*:not-first:mt-1.5">
+			<div className={styles.fieldStack}>
 				<Label htmlFor="location">Location</Label>
 				<Input
 					id="location"
@@ -304,12 +299,10 @@ export function EventDialogFields({
 				/>
 			</div>
 
-			<fieldset className="space-y-4">
-				<legend className="text-foreground text-sm leading-none font-medium">
-					Etiquette
-				</legend>
+			<fieldset className={styles.colorFieldset}>
+				<legend className={styles.colorLegend}>Etiquette</legend>
 				<RadioGroup
-					className="flex gap-1.5"
+					className={styles.colorOptions}
 					defaultValue={EVENT_DIALOG_COLOR_OPTIONS[0]?.value}
 					value={color}
 					onValueChange={(value: EventColor) => setColor(value)}
@@ -321,9 +314,8 @@ export function EventDialogFields({
 							value={colorOption.value}
 							aria-label={colorOption.label}
 							className={cn(
-								"size-6 shadow-none",
-								colorOption.bgClass,
-								colorOption.borderClass,
+								styles.colorOption,
+								styles[`colorOption-${colorOption.value}`],
 							)}
 						/>
 					))}

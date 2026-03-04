@@ -1,0 +1,108 @@
+.root {
+	width: 18rem;
+	flex-shrink: 0;
+	overflow-y: auto;
+	border-left: 1px solid var(--border);
+	background: var(--surface);
+	padding: 1rem;
+}
+
+.header {
+	margin-bottom: 0.75rem;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.title {
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.closeButton {
+	border: none;
+	border-radius: 0.375rem;
+	background: transparent;
+	padding: 0.25rem;
+	transition: background-color 160ms ease;
+	cursor: pointer;
+}
+
+.closeButton:hover {
+	background: var(--surface-2);
+}
+
+.closeIcon {
+	color: var(--text-muted);
+}
+
+.metaList {
+	display: grid;
+	gap: 0.5rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.metaLabel {
+	font-weight: 500;
+	color: var(--text);
+}
+
+.metaValue {
+	margin-top: 0.125rem;
+}
+
+.metaCode {
+	margin-top: 0.125rem;
+	word-break: break-word;
+	font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+
+.metadataSection {
+	margin-top: 0.75rem;
+}
+
+.metadataTitle {
+	margin: 0 0 0.25rem;
+	font-size: 0.75rem;
+	font-weight: 500;
+	color: var(--text);
+}
+
+.metadataCode {
+	margin: 0;
+	overflow-x: auto;
+	border: 1px solid var(--border);
+	border-radius: 0.375rem;
+	background: var(--bg-heavy);
+	padding: 0.5rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.deleteButton {
+	margin-top: 1rem;
+	display: inline-flex;
+	width: 100%;
+	align-items: center;
+	justify-content: center;
+	gap: 0.375rem;
+	border: 1px solid var(--danger);
+	border-radius: 0.75rem;
+	background: transparent;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--danger);
+	transition:
+		background-color 160ms ease,
+		opacity 160ms ease;
+	cursor: pointer;
+}
+
+.deleteButton:hover {
+	background: color-mix(in srgb, var(--danger) 10%, transparent);
+}

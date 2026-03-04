@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, format, isSameDay } from "date-fns";
 import type { CSSProperties } from "react";
-import type { CalendarEvent, EventColor } from "./calendartypes";
+import type { CalendarEvent } from "./calendartypes";
 
 /** Date key format used for selection + external integration */
 export function dateKey(d: Date): string {
@@ -12,45 +12,6 @@ export function isMultiDayEvent(event: CalendarEvent): boolean {
 	const start = new Date(event.start);
 	const end = new Date(event.end);
 	return differenceInCalendarDays(end, start) >= 1;
-}
-
-/**
- * Get CSS classes for event colors (Tailwind tokens)
- */
-export function getEventColorClasses(color?: EventColor | string): string {
-	const eventColor = color || "sky";
-
-	// If someone passes a hex color, we handle color via inline styles instead.
-	if (typeof eventColor === "string" && eventColor.trim().startsWith("#")) {
-		return "bg-muted/40 hover:bg-muted/50 text-foreground/90 shadow-black/10";
-	}
-
-	switch (eventColor) {
-		case "sky":
-			return "bg-sky-200/50 hover:bg-sky-200/40 text-sky-950/80 dark:bg-sky-400/25 dark:hover:bg-sky-400/20 dark:text-sky-200 shadow-sky-700/8";
-		case "amber":
-			return "bg-amber-200/50 hover:bg-amber-200/40 text-amber-950/80 dark:bg-amber-400/25 dark:hover:bg-amber-400/20 dark:text-amber-200 shadow-amber-700/8";
-		case "violet":
-			return "bg-violet-200/50 hover:bg-violet-200/40 text-violet-950/80 dark:bg-violet-400/25 dark:hover:bg-violet-400/20 dark:text-violet-200 shadow-violet-700/8";
-		case "rose":
-			return "bg-rose-200/50 hover:bg-rose-200/40 text-rose-950/80 dark:bg-rose-400/25 dark:hover:bg-rose-400/20 dark:text-rose-200 shadow-rose-700/8";
-		case "emerald":
-			return "bg-emerald-200/50 hover:bg-emerald-200/40 text-emerald-950/80 dark:bg-emerald-400/25 dark:hover:bg-emerald-400/20 dark:text-emerald-200 shadow-emerald-700/8";
-		case "orange":
-			return "bg-orange-200/50 hover:bg-orange-200/40 text-orange-950/80 dark:bg-orange-400/25 dark:hover:bg-orange-400/20 dark:text-orange-200 shadow-orange-700/8";
-		default:
-			return "bg-sky-200/50 hover:bg-sky-200/40 text-sky-950/80 dark:bg-sky-400/25 dark:hover:bg-sky-400/20 dark:text-sky-200 shadow-sky-700/8";
-	}
-}
-
-export function getBorderRadiusClasses(
-	isFirstDay: boolean,
-	isLastDay: boolean,
-): string {
-	if (isFirstDay && isLastDay) return "rounded";
-	if (isFirstDay) return "rounded-l rounded-r-none";
-	if (isLastDay) return "rounded-r rounded-l-none";
-	return "rounded-none";
 }
 
 /**

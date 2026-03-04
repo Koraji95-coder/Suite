@@ -1,4 +1,5 @@
 import { type ColorScheme, hexToRgba } from "@/lib/palette";
+import styles from "./CoordinatesGrabberHeader.module.css";
 
 interface CoordinatesGrabberHeaderProps {
 	palette: ColorScheme;
@@ -9,7 +10,7 @@ export function CoordinatesGrabberHeader({
 }: CoordinatesGrabberHeaderProps) {
 	return (
 		<div
-			className="flex flex-col gap-3 border-b pb-3 sm:flex-row sm:items-center sm:justify-between"
+			className={styles.root}
 			style={{ borderBottomColor: hexToRgba(palette.primary, 0.1) }}
 		>
 			<div>
@@ -33,7 +34,7 @@ export function CoordinatesGrabberHeader({
 					Extract coordinate points from CAD drawings
 				</p>
 			</div>
-			<div className="flex flex-wrap items-center gap-1">
+			<div className={styles.actions}>
 				<div
 					title="Coming soon: Presets"
 					style={{

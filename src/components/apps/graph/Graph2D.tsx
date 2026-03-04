@@ -1,5 +1,6 @@
 import * as d3 from "d3";
 import { useCallback, useEffect, useRef } from "react";
+import styles from "./Graph2D.module.css";
 import type { GraphData, GraphNode } from "./types";
 import { getGroupColor } from "./types";
 
@@ -207,10 +208,5 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 			});
 	}, [selectedNodeId]);
 
-	return (
-		<svg
-			ref={svgRef}
-			className="block h-full w-full [background:var(--background)]"
-		/>
-	);
+	return <svg ref={svgRef} className={styles.root} />;
 }

@@ -6,6 +6,7 @@ import {
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
 import { cn } from "@/lib/utils";
+import styles from "./EventDialog.module.css";
 import { EventDialogFields } from "./EventDialogFields";
 import { EventDialogFooter } from "./EventDialogFooter";
 import type { EventDialogProps } from "./eventDialogModels";
@@ -64,25 +65,18 @@ export function EventDialog({
 
 	const dialogCard = (
 		<DialogContent
-			className={cn(
-				"w-[min(96vw,840px)] border-primary/30 bg-card sm:max-w-170",
-				inline && "w-full sm:max-w-none",
-			)}
+			className={cn(styles.dialogContent, inline && styles.dialogContentInline)}
 		>
 			<DialogHeader>
 				<DialogTitle>{event?.id ? "Edit Event" : "Create Event"}</DialogTitle>
-				<DialogDescription className="sr-only">
+				<DialogDescription className={styles.srOnly}>
 					{event?.id
 						? "Edit the details of this event"
 						: "Add a new event to your calendar"}
 				</DialogDescription>
 			</DialogHeader>
 
-			{error ? (
-				<div className="bg-destructive/15 text-destructive rounded-md px-3 py-2 text-sm">
-					{error}
-				</div>
-			) : null}
+			{error ? <div className={styles.errorBanner}>{error}</div> : null}
 
 			<EventDialogFields
 				projectOptions={projectOptions}
@@ -126,7 +120,7 @@ export function EventDialog({
 	);
 
 	if (inline) {
-		return <div className="px-2 pb-2 sm:px-5 sm:pb-5">{dialogCard}</div>;
+		return <div className={styles.inlineWrap}>{dialogCard}</div>;
 	}
 
 	return (

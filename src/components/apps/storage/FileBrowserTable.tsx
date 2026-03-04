@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Trash2 } from "lucide-react";
 import type { DragEvent } from "react";
 import { cn } from "@/lib/utils";
+import styles from "./FileBrowserTable.module.css";
 import { formatSize, getFileIcon, type SortKey } from "./fileBrowserModels";
 import type { StorageFile } from "./storageTypes";
 
@@ -21,8 +22,6 @@ interface FileBrowserTableProps {
 	onRequestDelete: (file: StorageFile) => void;
 }
 
-const gridCols = "grid-cols-[minmax(220px,1fr)_80px_120px_40px]";
-
 export function FileBrowserTable({
 	dragging,
 	onDragStateChange,
@@ -41,11 +40,11 @@ export function FileBrowserTable({
 }: FileBrowserTableProps) {
 	const sortIcon = (column: SortKey) => {
 		if (sortKey !== column)
-			return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+			return <ArrowUpDown className={styles.sortIconMuted} />;
 		return sortAsc ? (
-			<ArrowUp className="h-3 w-3" />
+			<ArrowUp className={styles.sortIcon} />
 		) : (
-			<ArrowDown className="h-3 w-3" />
+			<ArrowDown className={styles.sortIcon} />
 		);
 	};
 
@@ -58,50 +57,42 @@ export function FileBrowserTable({
 			onDragLeave={() => onDragStateChange(false)}
 			onDrop={onDrop}
 			className={cn(
-				"overflow-x-auto rounded-[10px] border-2 border-dashed transition-colors",
-				dragging
-					? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_5%,transparent)]"
-					: "border-[color-mix(in_srgb,var(--primary)_15%,transparent)] bg-transparent",
+				styles.dropZone,
+				dragging ? styles.dropZoneDragging : styles.dropZoneIdle,
 			)}
 		>
-			<div className="min-w-130">
+			<div className={styles.inner}>
 				{/* Header */}
-				<div
-					className={`grid ${gridCols} border-b px-4 py-2 text-xs font-semibold border-[color-mix(in_srgb,var(--primary)_10%,transparent)] [color:var(--text-muted)]`}
-				>
+				<div className={cn(styles.gridRow, styles.headerRow)}>
 					<button
 						onClick={() => onSort("name")}
-						className="flex items-center gap-1 border-none bg-transparent p-0 text-xs font-semibold [color:var(--text-muted)]"
+						className={styles.headerSortButton}
 					>
 						Name {sortIcon("name")}
 					</button>
 					<button
 						onClick={() => onSort("size")}
-						className="flex items-center gap-1 border-none bg-transparent p-0 text-xs font-semibold [color:var(--text-muted)]"
+						className={styles.headerSortButton}
 					>
 						Size {sortIcon("size")}
 					</button>
 					<button
 						onClick={() => onSort("created_at")}
-						className="flex items-center gap-1 border-none bg-transparent p-0 text-xs font-semibold [color:var(--text-muted)]"
+						className={styles.headerSortButton}
 					>
 						Date {sortIcon("created_at")}
 					</button>
 					<span />
 				</div>
 
-				{error && (
-					<div className="p-3 text-[13px] [color:var(--danger)]">{error}</div>
-				)}
+				{error && <div className={styles.errorState}>{error}</div>}
 
 				{loading && !filesLength && (
-					<div className="py-8 text-center [color:var(--text-muted)]">
-						Loading...
-					</div>
+					<div className={styles.emptyState}>Loading...</div>
 				)}
 
 				{!loading && filteredFiles.length === 0 && (
-					<div className="py-8 text-center text-sm [color:var(--text-muted)]">
+					<div className={styles.emptyState}>
 						{search
 							? "No files match your search"
 							: "Drop files here or click Upload"}
@@ -113,23 +104,21 @@ export function FileBrowserTable({
 						key={file.id || file.name}
 						onClick={() => onFileClick(file)}
 						className={cn(
-							`grid ${gridCols} cursor-pointer items-center border-b px-4 py-2.5 transition-colors`,
-							"border-[color-mix(in_srgb,var(--primary)_5%,transparent)]",
-							"hover:[background:color-mix(in_srgb,var(--primary)_6%,transparent)]",
-							selectedName === file.name &&
-								"[background:color-mix(in_srgb,var(--primary)_8%,transparent)]",
+							styles.gridRow,
+							styles.fileRow,
+							selectedName === file.name && styles.fileRowSelected,
 						)}
 					>
-						<div className="flex items-center gap-2.5 overflow-hidden [color:var(--text)]">
-							<span className="shrink-0 [color:var(--primary)]">
+						<div className={styles.nameCell}>
+							<span className={styles.fileIconWrap}>
 								{getFileIcon(file.type)}
 							</span>
-							<span className="truncate text-sm">{file.name}</span>
+							<span className={styles.fileName}>{file.name}</span>
 						</div>
-						<span className="text-[13px] [color:var(--text-muted)]">
+						<span className={styles.metaCell}>
 							{file.size ? formatSize(file.size) : "--"}
 						</span>
-						<span className="text-[13px] [color:var(--text-muted)]">
+						<span className={styles.metaCell}>
 							{file.created_at
 								? new Date(file.created_at).toLocaleDateString()
 								: "--"}
@@ -139,9 +128,10 @@ export function FileBrowserTable({
 								event.stopPropagation();
 								onRequestDelete(file);
 							}}
-							className="border-none bg-transparent p-1 [color:var(--text-muted)]"
+							className={styles.deleteButton}
+							aria-label={`Delete ${file.name}`}
 						>
-							<Trash2 className="h-4 w-4" />
+							<Trash2 className={styles.deleteIcon} />
 						</button>
 					</div>
 				))}

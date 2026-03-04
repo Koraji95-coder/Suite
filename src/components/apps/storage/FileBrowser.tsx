@@ -1,3 +1,4 @@
+import styles from "./FileBrowser.module.css";
 import { FileBrowserBreadcrumbs } from "./FileBrowserBreadcrumbs";
 import { FileBrowserDeleteDialog } from "./FileBrowserDeleteDialog";
 import { FileBrowserDetailsPanel } from "./FileBrowserDetailsPanel";
@@ -37,8 +38,8 @@ export function FileBrowser() {
 
 	return (
 		<>
-			<div className="flex min-h-100 flex-col gap-4 lg:flex-row">
-				<div className="min-w-0 flex-1">
+			<div className={styles.layout}>
+				<div className={styles.mainPane}>
 					<FileBrowserToolbar
 						search={search}
 						onSearchChange={setSearch}

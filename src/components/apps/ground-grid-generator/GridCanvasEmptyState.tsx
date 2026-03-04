@@ -1,11 +1,9 @@
+import styles from "./GridCanvasEmptyState.module.css";
+
 interface GridCanvasEmptyStateProps {
 	message: string;
 }
 
 export function GridCanvasEmptyState({ message }: GridCanvasEmptyStateProps) {
-	return (
-		<div className="flex min-h-[min(300px,50vh)] items-center justify-center text-sm text-text-muted">
-			{message}
-		</div>
-	);
+	return <div className={styles.root}>{message}</div>;
 }

@@ -2,6 +2,7 @@ import { isBefore, isSameDay, isToday } from "date-fns";
 import type { MouseEvent } from "react";
 import { cn } from "@/lib/utils";
 import { type CalendarEvent, EventItem } from "./calendarindex";
+import styles from "./WeekViewAllDaySection.module.css";
 
 interface WeekViewAllDaySectionProps {
 	days: Date[];
@@ -21,13 +22,11 @@ export function WeekViewAllDaySection({
 	if (allDayEvents.length === 0) return null;
 
 	return (
-		<div className="border-b border-[color-mix(in_srgb,var(--primary)_10%,transparent)] [background:color-mix(in_srgb,var(--surface)_30%,transparent)]">
-			<div className="grid grid-cols-8">
+		<div className={styles.root}>
+			<div className={styles.grid}>
 				{/* Label */}
-				<div className="relative flex items-end justify-center border-r border-[color-mix(in_srgb,var(--primary)_8%,transparent)]">
-					<span className="mb-1 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none [color:var(--text-muted)]">
-						All day
-					</span>
+				<div className={styles.labelCell}>
+					<span className={styles.labelText}>All day</span>
 				</div>
 
 				{days.map((day, dayIndex) => {
@@ -46,10 +45,8 @@ export function WeekViewAllDaySection({
 						<div
 							key={day.toString()}
 							className={cn(
-								"relative border-r p-1 last:border-r-0",
-								"border-[color-mix(in_srgb,var(--primary)_8%,transparent)]",
-								isSelected &&
-									"[background:color-mix(in_srgb,var(--primary)_6%,transparent)] [box-shadow:inset_0_0_0_1px_color-mix(in_srgb,var(--primary)_25%,transparent)]",
+								styles.dayCell,
+								isSelected && styles.dayCellSelected,
 							)}
 							data-today={isToday(day) || undefined}
 							data-selected={isSelected || undefined}
@@ -74,8 +71,8 @@ export function WeekViewAllDaySection({
 									>
 										<div
 											className={cn(
-												"w-full truncate text-center",
-												!shouldShowTitle && "invisible",
+												styles.eventTitle,
+												!shouldShowTitle && styles.eventTitleHidden,
 											)}
 											aria-hidden={!shouldShowTitle}
 										>

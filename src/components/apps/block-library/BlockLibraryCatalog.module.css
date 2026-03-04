@@ -1,0 +1,274 @@
+.loadingState {
+	padding: 4rem 0;
+	text-align: center;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.emptyState {
+	padding: 4rem 0;
+	text-align: center;
+}
+
+.emptyIcon {
+	width: 3rem;
+	height: 3rem;
+	margin: 0 auto 0.75rem;
+	color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.emptyText {
+	margin: 0;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.root {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.category {
+	overflow: hidden;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+}
+
+.categoryHeader {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	gap: 0.5rem;
+	border: none;
+	background: var(--surface);
+	padding: 0.75rem 1rem;
+	text-align: left;
+	transition: background-color 160ms ease;
+	cursor: pointer;
+}
+
+.categoryHeader:hover {
+	background: var(--surface-2);
+}
+
+.categoryChevron {
+	width: 1rem;
+	height: 1rem;
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.categoryTitle {
+	font-size: 0.875rem;
+	font-weight: 600;
+	text-transform: capitalize;
+	color: var(--text);
+}
+
+.categoryCount {
+	margin-left: auto;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+	padding: 0.125rem 0.5rem;
+	font-size: 0.75rem;
+	color: var(--primary);
+}
+
+.blocksContainer {
+	border-top: 1px solid var(--border);
+	background: var(--bg-base);
+	padding: 0.75rem;
+}
+
+.blocksContainerGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.blocksContainerList {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.card {
+	overflow: hidden;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	transition: border-color 160ms ease;
+}
+
+.card:hover {
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.cardList {
+	display: flex;
+	align-items: center;
+}
+
+.thumbnail {
+	position: relative;
+}
+
+.thumbnailGrid {
+	aspect-ratio: 1 / 1;
+	width: 100%;
+}
+
+.thumbnailList {
+	width: 5rem;
+	height: 5rem;
+	flex-shrink: 0;
+}
+
+.thumbnailImage {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	background: var(--surface-2);
+}
+
+.thumbnailFallback {
+	display: flex;
+	width: 100%;
+	height: 100%;
+	align-items: center;
+	justify-content: center;
+	background: var(--surface-2);
+}
+
+.thumbnailFallbackIcon {
+	width: 2rem;
+	height: 2rem;
+	color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.overlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.375rem;
+	background: rgba(0, 0, 0, 0.5);
+	opacity: 0;
+	transition: opacity 160ms ease;
+}
+
+.card:hover .overlay {
+	opacity: 1;
+}
+
+.dynamicBadge {
+	position: absolute;
+	top: 0.375rem;
+	right: 0.375rem;
+	border-radius: 999px;
+	background: var(--primary);
+	padding: 0.125rem 0.5rem;
+	font-size: 0.625rem;
+	font-weight: 600;
+	color: var(--primary-contrast);
+}
+
+.info {
+	padding: 0.625rem;
+}
+
+.infoList {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.name {
+	margin: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text);
+}
+
+.meta {
+	margin-top: 0.125rem;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.tagRow {
+	margin-top: 0.375rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.25rem;
+}
+
+.tag {
+	border-radius: 999px;
+	background: var(--surface-2);
+	padding: 0.125rem 0.5rem;
+	font-size: 0.625rem;
+	color: var(--text-muted);
+}
+
+.tagOverflow {
+	padding: 0.125rem 0.25rem;
+	font-size: 0.625rem;
+	color: var(--text-muted);
+}
+
+.overlayButton {
+	border: none;
+	border-radius: 0.375rem;
+	padding: 0.375rem;
+	backdrop-filter: blur(4px);
+	transition:
+		background-color 160ms ease,
+		color 160ms ease;
+	cursor: pointer;
+}
+
+.overlayButtonDefault {
+	background: rgba(255, 255, 255, 0.15);
+	color: white;
+}
+
+.overlayButtonDefault:hover {
+	background: rgba(255, 255, 255, 0.25);
+}
+
+.overlayButtonActive {
+	background: color-mix(in srgb, var(--warning) 35%, transparent);
+	color: var(--warning);
+}
+
+.overlayButtonDanger {
+	background: color-mix(in srgb, var(--danger) 25%, transparent);
+	color: var(--danger);
+}
+
+.overlayButtonDanger:hover {
+	background: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+.overlayIcon {
+	width: 0.875rem;
+	height: 0.875rem;
+}
+
+@media (min-width: 768px) {
+	.blocksContainerGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1024px) {
+	.blocksContainerGrid {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}

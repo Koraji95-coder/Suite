@@ -1,5 +1,6 @@
 import { hexToRgba } from "@/lib/palette";
 import { GridOverlayCard } from "./GridOverlayCard";
+import styles from "./GridPreviewOverlay.module.css";
 
 interface GridPreviewOverlayProps {
 	backgroundColor: string;
@@ -25,7 +26,7 @@ export function GridPreviewOverlay({
 	return (
 		<>
 			<GridOverlayCard
-				className="absolute bottom-2 left-2 flex gap-3 text-[10px]"
+				className={styles.statsCard}
 				backgroundColor={backgroundColor}
 				borderColor={primaryColor}
 				textColor={textMutedColor}
@@ -34,24 +35,24 @@ export function GridPreviewOverlay({
 				padding="8px 12px"
 			>
 				<span>
-					<b className="text-success">Rods:</b> {rodCount}
+					<b className={styles.rods}>Rods:</b> {rodCount}
 				</span>
 				<span>
-					<b className="text-danger">Test Wells:</b> {testWellCount}
+					<b className={styles.testWells}>Test Wells:</b> {testWellCount}
 				</span>
 				<span>
-					<b className="text-[color:#f59e0b]">Segments:</b> {segmentCount}
+					<b className={styles.segments}>Segments:</b> {segmentCount}
 				</span>
 				<span>
-					<b className="text-[color:#3b82f6]">Tees:</b> {teeCount}
+					<b className={styles.tees}>Tees:</b> {teeCount}
 				</span>
 				<span>
-					<b className="text-[color:#06b6d4]">Crosses:</b> {crossCount}
+					<b className={styles.crosses}>Crosses:</b> {crossCount}
 				</span>
 			</GridOverlayCard>
 
 			<GridOverlayCard
-				className="absolute right-2 top-2 text-[9px]"
+				className={styles.hintCard}
 				backgroundColor={backgroundColor}
 				showBorder={false}
 				backgroundAlpha={0.7}

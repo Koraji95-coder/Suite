@@ -1,5 +1,7 @@
 import { RefreshCw, Search, Upload } from "lucide-react";
 import type { ChangeEvent, RefObject } from "react";
+import { cn } from "@/lib/utils";
+import styles from "./FileBrowserToolbar.module.css";
 
 interface FileBrowserToolbarProps {
 	search: string;
@@ -19,35 +21,37 @@ export function FileBrowserToolbar({
 	loading,
 }: FileBrowserToolbarProps) {
 	return (
-		<div className="mb-3 flex flex-wrap items-center gap-2">
-			<div className="relative min-w-55 flex-1 basis-full sm:basis-auto">
-				<Search className="absolute left-2.5 top-2.5 h-4 w-4 [color:var(--primary)]" />
+		<div className={styles.root}>
+			<div className={styles.searchWrap}>
+				<Search className={styles.searchIcon} />
 				<input
 					value={search}
 					onChange={(event) => onSearchChange(event.target.value)}
 					placeholder="Search files..."
-					className="w-full rounded-lg border py-2 pr-3 pl-8.5 text-sm outline-none border-[color-mix(in_srgb,var(--primary)_25%,transparent)] [background:color-mix(in_srgb,var(--background)_60%,transparent)] [color:var(--text)]"
+					className={styles.searchInput}
 				/>
 			</div>
 			<button
 				onClick={() => fileInputRef.current?.click()}
-				className="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm border-[color-mix(in_srgb,var(--primary)_30%,transparent)] [background:color-mix(in_srgb,var(--primary)_15%,transparent)] [color:var(--text)]"
+				className={styles.uploadButton}
 			>
-				<Upload className="h-4 w-4" /> Upload
+				<Upload className={styles.buttonIcon} /> Upload
 			</button>
 			<input
 				ref={fileInputRef}
 				type="file"
 				multiple
-				className="hidden"
+				className={styles.hiddenInput}
 				onChange={onFileInputChange}
 			/>
 			<button
 				onClick={onRefresh}
 				disabled={loading}
-				className="rounded-lg border p-2 border-[color-mix(in_srgb,var(--primary)_20%,transparent)] [background:color-mix(in_srgb,var(--primary)_10%,transparent)] [color:var(--text)]"
+				className={styles.refreshButton}
 			>
-				<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+				<RefreshCw
+					className={cn(styles.buttonIcon, loading && styles.spinning)}
+				/>
 			</button>
 		</div>
 	);

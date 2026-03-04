@@ -1,5 +1,6 @@
 import { format, isSameDay, isToday } from "date-fns";
 import { cn } from "@/lib/utils";
+import styles from "./WeekViewHeader.module.css";
 
 interface WeekViewHeaderProps {
 	days: Date[];
@@ -13,14 +14,12 @@ export function WeekViewHeader({
 	onDateSelect,
 }: WeekViewHeaderProps) {
 	return (
-		<div
-			className="sticky top-0 z-30 grid grid-cols-8 border-b backdrop-blur-md
-				border-[color-mix(in_srgb,var(--primary)_12%,transparent)]
-				[background:color-mix(in_srgb,var(--surface)_60%,transparent)]"
-		>
+		<div className={styles.root}>
 			{/* Timezone label */}
-			<div className="flex min-h-11 items-center justify-center px-1 text-center text-xs leading-none [color:var(--text-muted)] sm:text-sm">
-				<span className="max-[479px]:sr-only">{format(new Date(), "O")}</span>
+			<div className={styles.timezoneCell}>
+				<span className={styles.timezoneDesktop}>
+					{format(new Date(), "O")}
+				</span>
 			</div>
 
 			{days.map((day) => {
@@ -33,23 +32,20 @@ export function WeekViewHeader({
 						type="button"
 						onClick={() => onDateSelect?.(day)}
 						className={cn(
-							"flex min-h-11 items-center justify-center px-1 text-center text-xs leading-none transition-all sm:text-sm",
+							styles.dayButton,
 							today
-								? "font-semibold [color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_8%,transparent)]"
+								? styles.dayButtonToday
 								: isSelected
-									? "font-semibold [color:var(--text)] [background:color-mix(in_srgb,var(--primary)_10%,transparent)]"
-									: "[color:var(--text-muted)]",
+									? styles.dayButtonSelected
+									: styles.dayButtonDefault,
 						)}
 						data-today={today || undefined}
 						data-selected={isSelected || undefined}
 					>
-						<span
-							className="inline-flex items-center justify-center gap-1 leading-none sm:hidden"
-							aria-hidden="true"
-						>
+						<span className={styles.dayLabelMobile} aria-hidden="true">
 							{format(day, "E")[0]} {format(day, "d")}
 						</span>
-						<span className="max-sm:hidden leading-none">
+						<span className={styles.dayLabelDesktop}>
 							{format(day, "EEE dd")}
 						</span>
 					</button>

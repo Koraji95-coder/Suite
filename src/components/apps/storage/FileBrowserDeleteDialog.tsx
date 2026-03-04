@@ -5,6 +5,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
+import styles from "./StorageDialogs.module.css";
 import type { StorageFile } from "./storageTypes";
 
 interface FileBrowserDeleteDialogProps {
@@ -23,24 +24,18 @@ export function FileBrowserDeleteDialog({
 			open={Boolean(pendingDelete)}
 			onOpenChange={(open) => !open && onCancel()}
 		>
-			<DialogContent className="max-w-sm border-(--border) bg-(--surface)">
+			<DialogContent className={styles.dialogContentSm}>
 				<DialogHeader>
 					<DialogTitle>Delete file?</DialogTitle>
 				</DialogHeader>
-				<p className="text-sm text-(--text-muted)">
+				<p className={styles.message}>
 					Delete "{pendingDelete?.name}"? This cannot be undone.
 				</p>
-				<DialogFooter className="mt-4 gap-2 sm:justify-end">
-					<button
-						onClick={onCancel}
-						className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-					>
+				<DialogFooter className={styles.footer}>
+					<button onClick={onCancel} className={styles.cancelButton}>
 						Cancel
 					</button>
-					<button
-						onClick={onConfirm}
-						className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] text-[white]"
-					>
+					<button onClick={onConfirm} className={styles.dangerButton}>
 						Delete
 					</button>
 				</DialogFooter>

@@ -1,5 +1,6 @@
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
 import { Dialog, DialogContent } from "@/components/apps/ui/dialog";
+import styles from "./BlockLibraryUploadDialog.module.css";
 import {
 	type BlockUploadForm,
 	UPLOAD_CATEGORY_OPTIONS,
@@ -24,17 +25,12 @@ export function BlockLibraryUploadDialog({
 	isUploading,
 	onCancel,
 }: BlockLibraryUploadDialogProps) {
-	const inputClass =
-		"w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
-
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-md border-(--border) bg-(--bg-heavy)">
-				<h3 className="text-lg font-semibold [color:var(--text)]">
-					Upload Block
-				</h3>
+			<DialogContent className={styles.dialogContent}>
+				<h3 className={styles.title}>Upload Block</h3>
 
-				<div className="mt-4 space-y-4" role="form" onSubmit={onSubmit}>
+				<div className={styles.form} role="form" onSubmit={onSubmit}>
 					<Field label="Block Name">
 						<input
 							type="text"
@@ -43,7 +39,7 @@ export function BlockLibraryUploadDialog({
 								setUploadForm((p) => ({ ...p, name: e.target.value }))
 							}
 							required
-							className={inputClass}
+							className={styles.input}
 							placeholder="e.g., Transformer-3Phase"
 						/>
 					</Field>
@@ -54,7 +50,7 @@ export function BlockLibraryUploadDialog({
 							onChange={(e) =>
 								setUploadForm((p) => ({ ...p, category: e.target.value }))
 							}
-							className={inputClass}
+							className={styles.input}
 						>
 							{UPLOAD_CATEGORY_OPTIONS.map((opt) => (
 								<option key={opt} value={opt}>
@@ -71,31 +67,29 @@ export function BlockLibraryUploadDialog({
 							onChange={(e) =>
 								setUploadForm((p) => ({ ...p, tags: e.target.value }))
 							}
-							className={inputClass}
+							className={styles.input}
 							placeholder="e.g., transformer, 3phase, 480v"
 						/>
 					</Field>
 
-					<label className="flex items-center gap-2 text-sm [color:var(--text-muted)]">
+					<label className={styles.checkboxLabel}>
 						<input
 							type="checkbox"
 							checked={uploadForm.is_dynamic}
 							onChange={(e) =>
 								setUploadForm((p) => ({ ...p, is_dynamic: e.target.checked }))
 							}
-							className="rounded"
+							className={styles.checkbox}
 						/>
 						Dynamic block (with variations)
 					</label>
 
-					<div className="flex gap-2 pt-2">
+					<div className={styles.actions}>
 						<button
 							type="button"
 							disabled={isUploading}
 							onClick={onSubmit as unknown as () => void}
-							className="flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition
-								[background:var(--primary)] [color:var(--primary-contrast)]
-								hover:opacity-90 disabled:opacity-40"
+							className={styles.submitButton}
 						>
 							{isUploading ? "Uploading…" : "Upload Block"}
 						</button>
@@ -103,9 +97,7 @@ export function BlockLibraryUploadDialog({
 							type="button"
 							disabled={isUploading}
 							onClick={onCancel}
-							className="rounded-lg border px-4 py-2.5 text-sm transition
-								[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-								hover:[background:var(--surface-2)]"
+							className={styles.cancelButton}
 						>
 							Cancel
 						</button>
@@ -116,18 +108,10 @@ export function BlockLibraryUploadDialog({
 	);
 }
 
-function Field({
-	label,
-	children,
-}: {
-	label: string;
-	children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
 	return (
 		<div>
-			<label className="mb-1.5 block text-xs font-medium [color:var(--text-muted)]">
-				{label}
-			</label>
+			<label className={styles.fieldLabel}>{label}</label>
 			{children}
 		</div>
 	);

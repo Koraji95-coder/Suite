@@ -5,6 +5,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
+import styles from "./BlockLibraryDeleteDialog.module.css";
 import type { BlockFile } from "./blockLibraryModels";
 
 interface BlockLibraryDeleteDialogProps {
@@ -23,28 +24,19 @@ export function BlockLibraryDeleteDialog({
 			open={Boolean(pendingDeleteBlock)}
 			onOpenChange={(open) => !open && onCancel()}
 		>
-			<DialogContent className="max-w-sm border-(--border) bg-(--surface)">
+			<DialogContent className={styles.dialogContent}>
 				<DialogHeader>
 					<DialogTitle>Delete block?</DialogTitle>
 				</DialogHeader>
-				<p className="text-sm [color:var(--text-muted)]">
+				<p className={styles.message}>
 					This will permanently remove "
 					{pendingDeleteBlock?.name ?? "this block"}".
 				</p>
-				<DialogFooter className="mt-4 gap-2 sm:justify-end">
-					<button
-						onClick={onCancel}
-						className="rounded-lg border px-4 py-2 text-sm transition
-							[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-							hover:[background:var(--surface-2)]"
-					>
+				<DialogFooter className={styles.footer}>
+					<button onClick={onCancel} className={styles.cancelButton}>
 						Cancel
 					</button>
-					<button
-						onClick={onConfirmDelete}
-						className="rounded-lg px-4 py-2 text-sm font-medium transition
-							[background:var(--danger)] text-[white] hover:opacity-90"
-					>
+					<button onClick={onConfirmDelete} className={styles.deleteButton}>
 						Delete
 					</button>
 				</DialogFooter>

@@ -295,7 +295,8 @@ export function useTransmittalBuilderState() {
 		if (!transmittalService.hasApiKey()) {
 			setGenerationState({
 				state: "error",
-				message: "Missing API key. Set VITE_API_KEY in your env.",
+				message:
+					"Missing API key. Set VITE_TRANSMITTAL_API_KEY (or VITE_API_KEY) in your env.",
 			});
 			return;
 		}

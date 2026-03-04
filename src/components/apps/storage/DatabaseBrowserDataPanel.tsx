@@ -8,6 +8,7 @@ import {
 	Loader2,
 	Search,
 } from "lucide-react";
+import styles from "./DatabaseBrowserDataPanel.module.css";
 
 interface DatabaseBrowserDataPanelProps {
 	selectedTable: string;
@@ -28,15 +29,6 @@ interface DatabaseBrowserDataPanelProps {
 	sortDir: "asc" | "desc";
 	onSort: (column: string) => void;
 }
-
-const cellClass =
-	"max-w-[240px] truncate whitespace-nowrap px-3 py-2 text-[13px] [color:var(--text)]";
-
-const thClass =
-	"max-w-[240px] truncate whitespace-nowrap px-3 py-2 text-[13px] font-semibold select-none [color:var(--text-muted)]";
-
-const pageBtnClass =
-	"inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs disabled:opacity-40 [border-color:color-mix(in_srgb,var(--primary)_20%,transparent)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)] [color:var(--text)]";
 
 export function DatabaseBrowserDataPanel({
 	selectedTable,
@@ -59,28 +51,27 @@ export function DatabaseBrowserDataPanel({
 }: DatabaseBrowserDataPanelProps) {
 	if (!selectedTable) {
 		return (
-			<div className="flex h-full flex-col items-center justify-center [color:var(--text-muted)]">
-				<DatabaseIcon className="mb-3 h-12 w-12 opacity-30" />
-				<span className="text-sm">Select a table to view data</span>
+			<div className={styles.emptyTableState}>
+				<DatabaseIcon className={styles.emptyTableIcon} />
+				<span className={styles.emptyTableText}>
+					Select a table to view data
+				</span>
 			</div>
 		);
 	}
 
 	return (
 		<>
-			{/* Toolbar */}
-			<div className="mb-3 flex flex-wrap items-center gap-2">
-				<span className="text-[15px] font-semibold [color:var(--text)]">
-					{selectedTable}
-				</span>
-				<span className="text-xs [color:var(--text-muted)]">
+			<div className={styles.toolbar}>
+				<span className={styles.tableName}>{selectedTable}</span>
+				<span className={styles.rowCount}>
 					{loadingData ? "Loading..." : `${totalCount} rows`}
 				</span>
-				<div className="hidden sm:block sm:flex-1" />
+				<div className={styles.spacer} />
 				<select
 					value={pageSize}
 					onChange={(event) => onPageSizeChange(Number(event.target.value))}
-					className="rounded-md border px-2 py-1 text-xs border-[color-mix(in_srgb,var(--primary)_20%,transparent)] [background:color-mix(in_srgb,var(--background)_60%,transparent)] [color:var(--text)]"
+					className={styles.pageSizeSelect}
 				>
 					{[25, 50, 100].map((value) => (
 						<option key={value} value={value}>
@@ -90,59 +81,53 @@ export function DatabaseBrowserDataPanel({
 				</select>
 			</div>
 
-			{/* Search */}
 			{rows.length > 0 && (
-				<div className="relative mb-2.5">
-					<Search className="absolute left-2.5 top-2.25 h-4 w-4 [color:var(--primary)]" />
+				<div className={styles.searchWrap}>
+					<Search className={styles.searchIcon} />
 					<input
 						value={search}
 						onChange={(event) => onSearchChange(event.target.value)}
 						placeholder="Filter rows..."
-						className="w-full rounded-lg border py-2 pr-3 pl-8.5 text-[13px] outline-none border-[color-mix(in_srgb,var(--primary)_20%,transparent)] [background:color-mix(in_srgb,var(--background)_60%,transparent)] [color:var(--text)]"
+						className={styles.searchInput}
 					/>
 					{search && (
-						<span className="absolute right-2.5 top-2.5 hidden text-[11px] sm:block [color:var(--text-muted)]">
+						<span className={styles.searchMeta}>
 							{filteredRows.length} of {rows.length}
 						</span>
 					)}
 				</div>
 			)}
 
-			{/* States */}
 			{loadingData ? (
-				<div className="py-10 text-center [color:var(--text-muted)]">
-					<Loader2 className="mx-auto mb-2 h-6 w-6 animate-spin" />
+				<div className={styles.stateMessage}>
+					<Loader2 className={styles.loaderIcon} />
 					Loading...
 				</div>
 			) : rows.length === 0 ? (
-				<div className="py-10 text-center [color:var(--text-muted)]">
-					No data in this table
-				</div>
+				<div className={styles.stateMessage}>No data in this table</div>
 			) : filteredRows.length === 0 ? (
-				<div className="py-10 text-center [color:var(--text-muted)]">
-					No rows match "{search}"
-				</div>
+				<div className={styles.stateMessage}>No rows match "{search}"</div>
 			) : (
-				<div className="overflow-x-auto rounded-lg border border-[color-mix(in_srgb,var(--primary)_10%,transparent)]">
-					<table className="w-full border-collapse">
+				<div className={styles.tableContainer}>
+					<table className={styles.table}>
 						<thead>
-							<tr className="[background:color-mix(in_srgb,var(--primary)_8%,transparent)]">
+							<tr className={styles.headerRow}>
 								{visibleKeys.map((key) => (
 									<th
 										key={key}
 										onClick={() => onSort(key)}
-										className={`${thClass} cursor-pointer`}
+										className={styles.headerCell}
 									>
-										<span className="inline-flex items-center gap-1">
+										<span className={styles.headerCellInner}>
 											{key}
 											{sortCol === key ? (
 												sortDir === "asc" ? (
-													<ArrowUp className="h-3 w-3" />
+													<ArrowUp className={styles.sortIcon} />
 												) : (
-													<ArrowDown className="h-3 w-3" />
+													<ArrowDown className={styles.sortIcon} />
 												)
 											) : (
-												<ArrowUpDown className="h-3 w-3 opacity-30" />
+												<ArrowUpDown className={styles.sortIconMuted} />
 											)}
 										</span>
 									</th>
@@ -151,30 +136,23 @@ export function DatabaseBrowserDataPanel({
 						</thead>
 						<tbody>
 							{filteredRows.map((row, rowIndex) => (
-								<tr
-									key={`row-${rowIndex}`}
-									className="border-b border-[color-mix(in_srgb,var(--primary)_4%,transparent)]"
-								>
+								<tr key={`row-${rowIndex}`} className={styles.dataRow}>
 									{visibleKeys.map((key) => {
 										const value = row[key];
 										return (
-											<td key={key} className={cellClass}>
+											<td key={key} className={styles.dataCell}>
 												{value === null ? (
-													<span className="italic [color:var(--text-muted)]">
-														null
-													</span>
+													<span className={styles.nullValue}>null</span>
 												) : typeof value === "boolean" ? (
 													<span
 														className={
-															value
-																? "[color:var(--success)]"
-																: "[color:var(--danger)]"
+															value ? styles.booleanTrue : styles.booleanFalse
 														}
 													>
 														{String(value)}
 													</span>
 												) : typeof value === "object" ? (
-													<span className="[color:var(--text-muted)]">
+													<span className={styles.objectValue}>
 														{JSON.stringify(value)}
 													</span>
 												) : (
@@ -190,30 +168,29 @@ export function DatabaseBrowserDataPanel({
 				</div>
 			)}
 
-			{/* Pagination */}
 			{totalCount > pageSize && (
-				<div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-					<span className="text-xs [color:var(--text-muted)]">
+				<div className={styles.pagination}>
+					<span className={styles.paginationCount}>
 						{page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalCount)}{" "}
 						of {totalCount}
 					</span>
-					<div className="flex items-center gap-2">
+					<div className={styles.paginationControls}>
 						<button
 							disabled={page === 0}
 							onClick={onPrevPage}
-							className={pageBtnClass}
+							className={styles.pageButton}
 						>
-							<ChevronLeft className="h-3.5 w-3.5" /> Prev
+							<ChevronLeft className={styles.pageButtonIcon} /> Prev
 						</button>
-						<span className="text-xs [color:var(--text-muted)]">
+						<span className={styles.paginationPage}>
 							Page {page + 1} / {totalPages}
 						</span>
 						<button
 							disabled={page >= totalPages - 1}
 							onClick={onNextPage}
-							className={pageBtnClass}
+							className={styles.pageButton}
 						>
-							Next <ChevronRight className="h-3.5 w-3.5" />
+							Next <ChevronRight className={styles.pageButtonIcon} />
 						</button>
 					</div>
 				</div>

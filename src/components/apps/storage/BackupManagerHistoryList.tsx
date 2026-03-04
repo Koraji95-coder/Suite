@@ -1,3 +1,4 @@
+import styles from "./BackupManagerHistoryList.module.css";
 import type { BackupHistoryEntry } from "./storageTypes";
 
 interface BackupManagerHistoryListProps {
@@ -13,15 +14,10 @@ export function BackupManagerHistoryList({
 
 	return (
 		<div>
-			<div className="mb-2.5 text-sm font-semibold [color:var(--text)]">
-				Backup History
-			</div>
-			<div className="grid gap-1">
+			<div className={styles.title}>Backup History</div>
+			<div className={styles.list}>
 				{history.slice(0, 10).map((entry, index) => (
-					<div
-						key={`${entry.timestamp}-${index}`}
-						className="flex gap-4 rounded-md px-3 py-1.5 text-xs [background:color-mix(in_srgb,var(--surface)_30%,transparent)] [color:var(--text-muted)]"
-					>
+					<div key={`${entry.timestamp}-${index}`} className={styles.item}>
 						<span>{new Date(entry.timestamp).toLocaleString()}</span>
 						<span>{entry.tableCount} tables</span>
 						<span>{formatSize(entry.size)}</span>

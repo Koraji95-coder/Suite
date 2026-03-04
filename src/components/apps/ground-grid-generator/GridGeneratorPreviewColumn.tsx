@@ -13,6 +13,7 @@ import {
 import type { CSSProperties } from "react";
 import { hexToRgba } from "@/lib/palette";
 import type { PreviewMode } from "./GridGeneratorPanelModels";
+import styles from "./GridGeneratorPreviewColumn.module.css";
 import { GridManualEditor } from "./GridManualEditor";
 import { GridPreview } from "./GridPreview";
 import { GridPreview3D } from "./GridPreview3D";
@@ -101,7 +102,7 @@ export function GridGeneratorPreviewColumn({
 					}}
 				>
 					{generating ? (
-						<Loader size={14} className="animate-spin" />
+						<Loader size={14} className={styles.spinner} />
 					) : (
 						<Play size={14} />
 					)}

@@ -1,0 +1,16 @@
+.content {
+	max-width: 24rem;
+	border-color: var(--border);
+	background: var(--surface);
+}
+
+.footer {
+	margin-top: 1rem;
+	gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+	.footer {
+		justify-content: flex-end;
+	}
+}

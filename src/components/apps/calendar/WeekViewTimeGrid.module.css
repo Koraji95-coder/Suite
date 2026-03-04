@@ -1,0 +1,127 @@
+.root {
+	display: grid;
+	flex: 1 1 auto;
+	grid-template-columns: repeat(8, minmax(0, 1fr));
+	overflow: hidden;
+}
+
+.hourColumn {
+	display: grid;
+	border-right: 1px solid color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.hourCell {
+	position: relative;
+	display: flex;
+	min-height: var(--week-cells-height);
+	align-items: flex-start;
+	justify-content: center;
+	border-bottom: 1px solid color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.hourLabel {
+	margin-top: 0;
+	transform: translateY(-50%);
+	display: inline-flex;
+	min-height: 1.75rem;
+	width: 3.5rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.375rem;
+	padding: 0 0.625rem;
+	text-align: center;
+	font-size: 0.75rem;
+	line-height: 1;
+	color: var(--text-muted);
+}
+
+.dayColumn {
+	position: relative;
+	display: grid;
+	border-right: 1px solid color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.dayColumn:last-child {
+	border-right: none;
+}
+
+.dayColumnSelected {
+	background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+.dayColumnToday {
+	background: color-mix(in srgb, var(--primary) 2%, transparent);
+}
+
+.positionedEvent {
+	position: absolute;
+	z-index: 10;
+	padding: 0 0.125rem;
+}
+
+.positionedEventInner {
+	height: 100%;
+	width: 100%;
+}
+
+.currentTimeLineWrap {
+	pointer-events: none;
+	position: absolute;
+	right: 0;
+	left: 0;
+	z-index: 20;
+}
+
+.currentTimeLineInner {
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+
+.currentTimeDot {
+	position: absolute;
+	left: -0.25rem;
+	height: 0.5rem;
+	width: 0.5rem;
+	border-radius: 999px;
+	background: var(--primary);
+}
+
+.currentTimeLine {
+	height: 0.125rem;
+	width: 100%;
+	background: var(--primary);
+	opacity: 0.85;
+}
+
+.gridHourCell {
+	position: relative;
+	min-height: var(--week-cells-height);
+	border-bottom: 1px solid color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.gridHourCell:last-child {
+	border-bottom: none;
+}
+
+.quarterCell {
+	position: absolute;
+	height: calc(var(--week-cells-height) / 4);
+	width: 100%;
+}
+
+.quarter0 {
+	top: 0;
+}
+
+.quarter1 {
+	top: calc(var(--week-cells-height) / 4);
+}
+
+.quarter2 {
+	top: calc((var(--week-cells-height) / 4) * 2);
+}
+
+.quarter3 {
+	top: calc((var(--week-cells-height) / 4) * 3);
+}

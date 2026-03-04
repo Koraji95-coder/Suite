@@ -1,0 +1,35 @@
+.statsCard {
+	position: absolute;
+	left: 0.5rem;
+	bottom: 0.5rem;
+	display: flex;
+	gap: 0.75rem;
+	font-size: 10px;
+}
+
+.hintCard {
+	position: absolute;
+	right: 0.5rem;
+	top: 0.5rem;
+	font-size: 9px;
+}
+
+.rods {
+	color: var(--success);
+}
+
+.testWells {
+	color: var(--danger);
+}
+
+.segments {
+	color: #f59e0b;
+}
+
+.tees {
+	color: #3b82f6;
+}
+
+.crosses {
+	color: #06b6d4;
+}

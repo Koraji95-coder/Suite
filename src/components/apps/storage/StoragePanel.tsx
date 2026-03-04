@@ -1,8 +1,10 @@
 import { Database, FileText, HardDrive, Shield } from "lucide-react";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { BackupManager } from "./BackupManager";
 import { DatabaseBrowser } from "./DatabaseBrowser";
 import { FileBrowser } from "./FileBrowser";
+import styles from "./StoragePanel.module.css";
 import type { StorageTab } from "./storageTypes";
 
 const TABS: { key: StorageTab; label: string; icon: typeof FileText }[] = [
@@ -21,36 +23,31 @@ export function StoragePanel() {
 	const [tab, setTab] = useState<StorageTab>("browser");
 
 	return (
-		<div className="p-6">
-			<div className="mb-6 flex items-center justify-between">
-				<div className="flex items-center gap-3">
-					<div className="rounded-[10px] p-2.5 [background:color-mix(in_srgb,var(--primary)_15%,transparent)]">
-						<HardDrive className="h-7 w-7 [color:var(--primary)]" />
+		<div className={styles.root}>
+			<div className={styles.header}>
+				<div className={styles.titleRow}>
+					<div className={styles.iconWrap}>
+						<HardDrive className={styles.icon} />
 					</div>
 					<div>
-						<h2 className="text-[22px] font-bold [color:var(--text)]">
-							Storage
-						</h2>
-						<p className="text-[13px] [color:var(--text-muted)]">
-							{TAB_DESCRIPTIONS[tab]}
-						</p>
+						<h2 className={styles.title}>Storage</h2>
+						<p className={styles.subtitle}>{TAB_DESCRIPTIONS[tab]}</p>
 					</div>
 				</div>
 
-				<div className="flex gap-1.5">
+				<div className={styles.tabs}>
 					{TABS.map(({ key, label, icon: Icon }) => {
 						const active = tab === key;
 						return (
 							<button
 								key={key}
 								onClick={() => setTab(key)}
-								className={`inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition ${
-									active
-										? "[border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)]"
-										: "border-[color-mix(in_srgb,var(--text-muted)_15%,transparent)] [background:color-mix(in_srgb,var(--surface)_40%,transparent)] [color:var(--text-muted)]"
-								}`}
+								className={cn(
+									styles.tabButton,
+									active ? styles.tabButtonActive : styles.tabButtonInactive,
+								)}
 							>
-								<Icon className="h-4 w-4" />
+								<Icon className={styles.tabIcon} />
 								{label}
 							</button>
 						);
@@ -58,7 +55,7 @@ export function StoragePanel() {
 				</div>
 			</div>
 
-			<div className="rounded-xl border p-5 border-[color-mix(in_srgb,var(--primary)_8%,transparent)] [background:color-mix(in_srgb,var(--surface)_35%,transparent)]">
+			<div className={styles.panel}>
 				{tab === "browser" && <FileBrowser />}
 				{tab === "database" && <DatabaseBrowser />}
 				{tab === "backups" && <BackupManager />}

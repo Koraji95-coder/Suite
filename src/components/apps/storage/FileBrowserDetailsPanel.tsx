@@ -1,4 +1,5 @@
 import { Download, Trash2, X } from "lucide-react";
+import styles from "./FileBrowserDetailsPanel.module.css";
 import { formatSize, getFileIcon } from "./fileBrowserModels";
 import type { StorageFile } from "./storageTypes";
 
@@ -34,46 +35,35 @@ export function FileBrowserDetailsPanel({
 	];
 
 	return (
-		<div className="w-full rounded-[10px] border p-4 lg:w-65 lg:shrink-0 border-[color-mix(in_srgb,var(--primary)_12%,transparent)] [background:color-mix(in_srgb,var(--surface)_60%,transparent)]">
-			<div className="mb-4 flex items-center justify-between">
-				<span className="text-sm font-semibold [color:var(--text)]">
-					Details
-				</span>
-				<button
-					onClick={onClose}
-					className="border-none bg-transparent [color:var(--text-muted)]"
-				>
-					<X className="h-4 w-4" />
+		<div className={styles.root}>
+			<div className={styles.header}>
+				<span className={styles.title}>Details</span>
+				<button onClick={onClose} className={styles.closeButton}>
+					<X className={styles.closeIcon} />
 				</button>
 			</div>
 
-			<div className="mb-4 flex justify-center [color:var(--primary)]">
-				{getFileIcon(selected.type)}
-			</div>
+			<div className={styles.preview}>{getFileIcon(selected.type)}</div>
 
 			{details.map(([label, value]) => (
-				<div key={label} className="mb-2.5">
-					<div className="mb-0.5 text-[11px] [color:var(--text-muted)]">
-						{label}
-					</div>
-					<div className="break-all text-[13px] [color:var(--text)]">
-						{value}
-					</div>
+				<div key={label} className={styles.detailRow}>
+					<div className={styles.detailLabel}>{label}</div>
+					<div className={styles.detailValue}>{value}</div>
 				</div>
 			))}
 
-			<div className="mt-4 flex gap-2">
+			<div className={styles.actions}>
 				<button
 					onClick={() => onDownload(selected)}
-					className="flex flex-1 items-center justify-center gap-1 rounded-md border py-2 text-[13px] border-[color-mix(in_srgb,var(--primary)_30%,transparent)] [background:color-mix(in_srgb,var(--primary)_15%,transparent)] [color:var(--text)]"
+					className={styles.downloadButton}
 				>
-					<Download className="h-3.5 w-3.5" /> Download
+					<Download className={styles.actionIcon} /> Download
 				</button>
 				<button
 					onClick={() => onRequestDelete(selected)}
-					className="rounded-md border px-3 py-2 border-[color-mix(in_srgb,var(--danger)_30%,transparent)] [background:color-mix(in_srgb,var(--danger)_15%,transparent)] [color:var(--danger)]"
+					className={styles.deleteButton}
 				>
-					<Trash2 className="h-3.5 w-3.5" />
+					<Trash2 className={styles.actionIcon} />
 				</button>
 			</div>
 		</div>

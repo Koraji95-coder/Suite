@@ -11,20 +11,20 @@ import type { StorageFile } from "./storageTypes";
 export type SortKey = "name" | "size" | "created_at";
 
 export function getFileIcon(type: string) {
-	if (type === "folder") return <Folder className="w-5 h-5" />;
-	if (type.startsWith("image/")) return <Image className="w-5 h-5" />;
-	if (type.startsWith("video/")) return <Film className="w-5 h-5" />;
+	if (type === "folder") return <Folder size={20} />;
+	if (type.startsWith("image/")) return <Image size={20} />;
+	if (type.startsWith("video/")) return <Film size={20} />;
 	if (type.includes("zip") || type.includes("rar") || type.includes("tar")) {
-		return <Archive className="w-5 h-5" />;
+		return <Archive size={20} />;
 	}
 	if (
 		type.includes("spreadsheet") ||
 		type.includes("excel") ||
 		type.includes("csv")
 	) {
-		return <FileSpreadsheet className="w-5 h-5" />;
+		return <FileSpreadsheet size={20} />;
 	}
-	return <FileText className="w-5 h-5" />;
+	return <FileText size={20} />;
 }
 
 export function formatSize(bytes: number): string {

@@ -15,6 +15,7 @@ import {
 } from "@/components/apps/ui/select";
 import { hexToRgba } from "@/lib/palette";
 import type { ProjectOption } from "./GridGeneratorPanelModels";
+import styles from "./GridGeneratorTopBar.module.css";
 import type { GridDesign } from "./types";
 
 interface GridGeneratorTopBarProps {
@@ -71,33 +72,29 @@ export function GridGeneratorTopBar({
 
 			<Select value={currentDesign?.id} onValueChange={onDesignSelect}>
 				<SelectTrigger
-					className="h-8 min-w-[240px] border px-3 py-1.5 text-xs font-semibold [border-color:color-mix(in_srgb,var(--primary)_25%,transparent)] [background:color-mix(in_srgb,var(--surface-2)_75%,transparent)] [color:var(--text)]"
+					className={styles.selectTriggerDesign}
 					id="grid-design-selector"
 				>
-					<span className="inline-flex items-center gap-2 truncate">
-						<Database className="h-3.5 w-3.5 [color:var(--primary)]" />
-						<span className="truncate">
+					<span className={styles.selectTriggerContent}>
+						<Database className={styles.selectTriggerIcon} />
+						<span className={styles.selectTriggerText}>
 							{currentDesign ? currentDesign.name : "Load Design"}
 						</span>
 					</span>
 				</SelectTrigger>
-				<SelectContent className="max-h-64 min-w-[260px] border-[color:color-mix(in_srgb,var(--primary)_25%,transparent)] [background:var(--surface)]">
+				<SelectContent className={styles.selectContentDesign}>
 					{designs.length === 0 ? (
-						<div className="px-3 py-2 text-xs [color:var(--text-muted)]">
-							No saved designs
-						</div>
+						<div className={styles.emptyState}>No saved designs</div>
 					) : (
 						designs.map((design) => (
 							<SelectItem
 								key={design.id}
 								value={design.id}
-								className="items-start py-2 text-left"
+								className={styles.selectItemDesign}
 							>
-								<div className="w-full">
-									<div className="text-xs font-semibold [color:var(--text)]">
-										{design.name}
-									</div>
-									<div className="text-[10px] [color:var(--text-muted)]">
+								<div className={styles.selectItemBody}>
+									<div className={styles.selectItemTitle}>{design.name}</div>
+									<div className={styles.selectItemMeta}>
 										{design.status} --{" "}
 										{new Date(design.updated_at).toLocaleDateString()}
 									</div>
@@ -127,7 +124,7 @@ export function GridGeneratorTopBar({
 
 			<button onClick={onSaveDesign} disabled={saving} style={btnStyle()}>
 				{saving ? (
-					<Loader size={14} className="animate-spin" />
+					<Loader size={14} className={styles.spinner} />
 				) : (
 					<Save size={14} />
 				)}
@@ -152,31 +149,32 @@ export function GridGeneratorTopBar({
 				onValueChange={onProjectSelect}
 			>
 				<SelectTrigger
-					className="h-8 min-w-[220px] border px-3 py-1.5 text-xs font-semibold [border-color:color-mix(in_srgb,var(--primary)_25%,transparent)] [background:color-mix(in_srgb,var(--surface-2)_75%,transparent)] [color:var(--text)]"
+					className={styles.selectTriggerProject}
 					id="grid-project-selector"
 				>
-					<span className="inline-flex items-center gap-2 truncate">
-						<FolderKanban className="h-3.5 w-3.5 [color:var(--primary)]" />
-						<span className="truncate">
+					<span className={styles.selectTriggerContent}>
+						<FolderKanban className={styles.selectTriggerIcon} />
+						<span className={styles.selectTriggerText}>
 							{linkedProject ? linkedProject.name : "Link Project"}
 						</span>
 					</span>
 				</SelectTrigger>
-				<SelectContent className="max-h-60 min-w-[220px] border-[color:color-mix(in_srgb,var(--primary)_25%,transparent)] [background:var(--surface)]">
-					<SelectItem
-						value="__none"
-						className="text-xs [color:var(--text-muted)]"
-					>
+				<SelectContent className={styles.selectContentProject}>
+					<SelectItem value="__none" className={styles.projectNoSelection}>
 						No Project
 					</SelectItem>
 					{projects.map((project) => (
-						<SelectItem key={project.id} value={project.id} className="text-xs">
-							<span className="inline-flex items-center gap-2">
+						<SelectItem
+							key={project.id}
+							value={project.id}
+							className={styles.projectItem}
+						>
+							<span className={styles.projectItemBody}>
 								<span
-									className="h-2 w-2 rounded-full"
+									className={styles.projectDot}
 									style={{ background: project.color }}
 								/>
-								<span className="[color:var(--text)]">{project.name}</span>
+								<span className={styles.projectName}>{project.name}</span>
 							</span>
 						</SelectItem>
 					))}

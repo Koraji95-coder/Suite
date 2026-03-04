@@ -1,6 +1,7 @@
 import { Plus, Search, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import styles from "./BatchFindReplaceApp.module.css";
 
 type ReplaceRule = {
 	id: string;
@@ -150,14 +151,12 @@ export function BatchFindReplaceApp() {
 			description="Bulk text replacement pipeline bridged through the backend service."
 			maxWidth="lg"
 			actions={
-				<div className="flex items-center gap-2">
+				<div className={styles.actions}>
 					<button
 						type="button"
 						onClick={runPreview}
 						disabled={!canRun || runningPreview}
-						className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition
-							[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-							hover:[background:var(--surface-2)] disabled:opacity-40 disabled:pointer-events-none"
+						className={styles.secondaryButton}
 					>
 						<Search size={14} />
 						{runningPreview ? "Previewing…" : "Preview"}
@@ -166,40 +165,25 @@ export function BatchFindReplaceApp() {
 						type="button"
 						onClick={applyChanges}
 						disabled={!canRun || applying}
-						className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition
-							[background:var(--primary)] [color:var(--primary-contrast)]
-							hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
+						className={styles.primaryButton}
 					>
 						{applying ? "Applying…" : "Apply Changes"}
 					</button>
 				</div>
 			}
 		>
-			{message && (
-				<div
-					className="rounded-lg border px-4 py-3 text-sm
-						[border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)]"
-				>
-					{message}
-				</div>
-			)}
+			{message && <div className={styles.message}>{message}</div>}
 
 			{/* File upload */}
-			<section className="space-y-3">
-				<h3 className="text-sm font-medium [color:var(--text-muted)]">
-					Input Files
-				</h3>
-				<label
-					className="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition
-						[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-						hover:[background:var(--surface-2)]"
-				>
-					<Upload size={16} className="[color:var(--primary)]" />
+			<section className={styles.section}>
+				<h3 className={styles.sectionTitle}>Input Files</h3>
+				<label className={styles.uploadLabel}>
+					<Upload size={16} className={styles.uploadIcon} />
 					Choose files
 					<input
 						type="file"
 						multiple
-						className="hidden"
+						className={styles.hiddenInput}
 						onChange={(e) => {
 							setFiles(Array.from(e.target.files || []));
 							setPreview([]);
@@ -207,31 +191,26 @@ export function BatchFindReplaceApp() {
 					/>
 				</label>
 				{files.length > 0 && (
-					<p className="text-xs [color:var(--text-muted)]">
+					<p className={styles.fileCount}>
 						{files.length} file{files.length !== 1 && "s"} selected
 					</p>
 				)}
 			</section>
 
 			{/* Rules */}
-			<section className="space-y-3">
-				<h3 className="text-sm font-medium [color:var(--text-muted)]">Rules</h3>
-				<div className="space-y-2">
+			<section className={styles.section}>
+				<h3 className={styles.sectionTitle}>Rules</h3>
+				<div className={styles.rulesList}>
 					{rules.map((rule) => (
-						<div
-							key={rule.id}
-							className="rounded-lg border p-3 [border-color:var(--border)] [background:var(--surface)]"
-						>
-							<div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+						<div key={rule.id} className={styles.ruleCard}>
+							<div className={styles.ruleGrid}>
 								<input
 									value={rule.find}
 									onChange={(e) =>
 										updateRule(rule.id, { find: e.target.value })
 									}
 									placeholder="Find"
-									className="rounded-md border px-3 py-2 text-sm outline-none transition
-										focus:[border-color:var(--primary)]
-										[border-color:var(--border)] [background:var(--bg-base)] [color:var(--text)]"
+									className={styles.textInput}
 								/>
 								<input
 									value={rule.replace}
@@ -239,40 +218,36 @@ export function BatchFindReplaceApp() {
 										updateRule(rule.id, { replace: e.target.value })
 									}
 									placeholder="Replace"
-									className="rounded-md border px-3 py-2 text-sm outline-none transition
-										focus:[border-color:var(--primary)]
-										[border-color:var(--border)] [background:var(--bg-base)] [color:var(--text)]"
+									className={styles.textInput}
 								/>
 								<button
 									type="button"
 									onClick={() => removeRule(rule.id)}
-									className="rounded-md border px-3 py-2 text-xs transition
-										[border-color:var(--border)] [color:var(--text-muted)]
-										hover:[background:color-mix(in_srgb,var(--danger)_12%,transparent)] hover:[color:var(--danger)]"
+									className={styles.removeRuleButton}
 								>
 									Remove
 								</button>
 							</div>
-							<div className="mt-2 flex items-center gap-4">
-								<label className="flex items-center gap-1.5 text-xs [color:var(--text-muted)]">
+							<div className={styles.ruleOptions}>
+								<label className={styles.checkboxLabel}>
 									<input
 										type="checkbox"
 										checked={rule.useRegex}
 										onChange={(e) =>
 											updateRule(rule.id, { useRegex: e.target.checked })
 										}
-										className="rounded"
+										className={styles.checkbox}
 									/>
 									Regex
 								</label>
-								<label className="flex items-center gap-1.5 text-xs [color:var(--text-muted)]">
+								<label className={styles.checkboxLabel}>
 									<input
 										type="checkbox"
 										checked={rule.matchCase}
 										onChange={(e) =>
 											updateRule(rule.id, { matchCase: e.target.checked })
 										}
-										className="rounded"
+										className={styles.checkbox}
 									/>
 									Case sensitive
 								</label>
@@ -283,9 +258,7 @@ export function BatchFindReplaceApp() {
 				<button
 					type="button"
 					onClick={() => setRules((prev) => [...prev, createRule()])}
-					className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition
-						[border-color:var(--border)] [color:var(--text-muted)]
-						hover:[background:var(--surface-2)] hover:[color:var(--text)]"
+					className={styles.addRuleButton}
 				>
 					<Plus size={14} /> Add rule
 				</button>
@@ -293,30 +266,26 @@ export function BatchFindReplaceApp() {
 
 			{/* Preview */}
 			{preview.length > 0 && (
-				<section className="space-y-3">
-					<h3 className="text-sm font-medium [color:var(--text-muted)]">
+				<section className={styles.section}>
+					<h3 className={styles.sectionTitle}>
 						Preview — {preview.length} match{preview.length !== 1 && "es"}
 					</h3>
-					<div className="max-h-90 space-y-1.5 overflow-auto rounded-lg border p-3 [border-color:var(--border)] [background:var(--surface)]">
+					<div className={styles.previewPanel}>
 						{preview.map((m, i) => (
 							<div
 								key={`${m.file}-${m.line}-${i}`}
-								className="rounded-md border p-2.5 text-xs [border-color:var(--border)] [background:var(--bg-base)]"
+								className={styles.previewItem}
 							>
-								<span className="font-medium [color:var(--text)]">
+								<span className={styles.previewItemTitle}>
 									{m.file}:{m.line}
 								</span>
-								<div className="mt-1 space-y-0.5 [color:var(--text-muted)]">
+								<div className={styles.previewDiff}>
 									<div>
-										<span className="inline-block w-12 font-medium [color:var(--danger)]">
-											−
-										</span>
+										<span className={styles.previewDiffPrefixDanger}>−</span>
 										{m.before}
 									</div>
 									<div>
-										<span className="inline-block w-12 font-medium [color:var(--success)]">
-											+
-										</span>
+										<span className={styles.previewDiffPrefixSuccess}>+</span>
 										{m.after}
 									</div>
 								</div>

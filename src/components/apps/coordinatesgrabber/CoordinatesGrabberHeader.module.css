@@ -1,0 +1,23 @@
+.root {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	padding-bottom: 0.75rem;
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+@media (min-width: 640px) {
+	.root {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+}

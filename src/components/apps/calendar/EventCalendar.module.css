@@ -1,0 +1,31 @@
+.root {
+	display: flex;
+	flex-direction: column;
+	overflow: visible;
+	border: 1px solid var(--border);
+	border-radius: 0.75rem;
+	background: var(--surface);
+}
+
+.root:has([data-slot="month-view"]) {
+	flex: 1 1 auto;
+}
+
+.compact {
+	font-size: 0.875rem;
+}
+
+.content {
+	position: relative;
+	z-index: 10;
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	padding: 0 0.5rem 0.5rem;
+}
+
+@media (min-width: 640px) {
+	.content {
+		padding: 0 1.25rem 1.25rem;
+	}
+}

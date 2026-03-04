@@ -1,6 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { DialogFooter } from "@/components/apps/ui/dialog";
 import { Button } from "@/components/primitives/Button";
+import styles from "./EventDialogFooter.module.css";
 
 interface EventDialogFooterProps {
 	eventId: string | undefined;
@@ -16,19 +17,19 @@ export function EventDialogFooter({
 	onSave,
 }: EventDialogFooterProps) {
 	return (
-		<DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+		<DialogFooter className={styles.root}>
 			{eventId ? (
 				<Button
 					variant="outline"
 					size="sm"
 					iconOnly
-					iconLeft={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+					iconLeft={<Trash2 className={styles.deleteIcon} aria-hidden="true" />}
 					onClick={onDelete}
 					aria-label="Delete event"
-					className="self-start"
+					className={styles.deleteButton}
 				/>
 			) : null}
-			<div className="flex w-full flex-1 justify-end gap-2">
+			<div className={styles.actions}>
 				<Button variant="outline" onClick={onCancel}>
 					Cancel
 				</Button>

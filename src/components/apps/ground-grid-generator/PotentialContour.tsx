@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "@/lib/palette";
 import { GridCanvasEmptyState } from "./GridCanvasEmptyState";
+import styles from "./PotentialContour.module.css";
 import {
 	computeContourBounds,
 	computePotentialField,
@@ -114,10 +115,7 @@ export function PotentialContour({
 	}
 
 	return (
-		<div
-			ref={containerRef}
-			className="relative h-full min-h-[320px] w-full sm:min-h-[400px]"
-		>
+		<div ref={containerRef} className={styles.root}>
 			<canvas
 				ref={canvasRef}
 				style={{ width: "100%", height: "100%", borderRadius: 8 }}

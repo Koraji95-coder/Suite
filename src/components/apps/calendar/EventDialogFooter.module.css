@@ -1,0 +1,28 @@
+.root {
+	flex-direction: column-reverse;
+	gap: 0.5rem;
+}
+
+.deleteIcon {
+	width: 1rem;
+	height: 1rem;
+}
+
+.deleteButton {
+	align-self: flex-start;
+}
+
+.actions {
+	display: flex;
+	width: 100%;
+	flex: 1 1 auto;
+	justify-content: flex-end;
+	gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+	.root {
+		flex-direction: row;
+		justify-content: space-between;
+	}
+}

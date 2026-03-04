@@ -1,0 +1,7 @@
+.hiddenPlaceholder {
+	opacity: 0;
+}
+
+.dragContainer {
+	touch-action: none;
+}

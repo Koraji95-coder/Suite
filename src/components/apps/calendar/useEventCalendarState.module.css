@@ -1,0 +1,34 @@
+.dayTitleNarrow {
+	display: inline;
+	line-height: 1;
+}
+
+.dayTitleMedium {
+	display: none;
+	line-height: 1.25;
+}
+
+.dayTitleWide {
+	display: none;
+	line-height: 1.25;
+}
+
+@media (min-width: 480px) {
+	.dayTitleNarrow {
+		display: none;
+	}
+
+	.dayTitleMedium {
+		display: inline;
+	}
+}
+
+@media (min-width: 768px) {
+	.dayTitleMedium {
+		display: none;
+	}
+
+	.dayTitleWide {
+		display: inline;
+	}
+}

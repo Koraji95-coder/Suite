@@ -2,6 +2,7 @@ import { Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { GridCanvasEmptyState } from "./GridCanvasEmptyState";
+import styles from "./GridPreview3D.module.css";
 import { createGridPreview3DEngine } from "./GridPreview3DEngine";
 import { computeGridBounds2D } from "./gridViewUtils";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
@@ -59,16 +60,13 @@ export function GridPreview3D({
 	}
 
 	return (
-		<div ref={containerRef} className="relative min-h-[min(400px,60vh)] w-full">
-			<canvas
-				ref={canvasRef}
-				className="h-full w-full rounded-md cursor-grab active:cursor-grabbing"
-			/>
+		<div ref={containerRef} className={styles.root}>
+			<canvas ref={canvasRef} className={styles.canvas} />
 
 			<button
 				type="button"
 				onClick={togglePause}
-				className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[10px] font-semibold text-text backdrop-blur"
+				className={styles.pauseButton}
 				style={{
 					background: hexToRgba(palette.background, 0.8),
 					borderColor: hexToRgba(palette.primary, 0.2),
@@ -79,7 +77,7 @@ export function GridPreview3D({
 			</button>
 
 			<div
-				className="absolute right-2 top-2 rounded-md px-2 py-1 text-[9px] pointer-events-none"
+				className={styles.hint}
 				style={{
 					color: hexToRgba(palette.textMuted, 0.6),
 					background: hexToRgba(palette.background, 0.7),

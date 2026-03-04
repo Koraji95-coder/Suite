@@ -1,4 +1,5 @@
 import { useTheme } from "@/lib/palette";
+import styles from "./CoordinatesGrabber.module.css";
 import { CoordinatesGrabberConfigTab } from "./CoordinatesGrabberConfigTab";
 import { CoordinatesGrabberExportTab } from "./CoordinatesGrabberExportTab";
 import { CoordinatesGrabberHeader } from "./CoordinatesGrabberHeader";
@@ -31,10 +32,7 @@ export function CoordinatesGrabber() {
 	} = useCoordinatesGrabberState();
 
 	return (
-		<div
-			className="flex h-full flex-col gap-3 overflow-auto p-4 sm:p-5"
-			style={{ background: palette.background }}
-		>
+		<div className={styles.root} style={{ background: palette.background }}>
 			<CoordinatesGrabberHeader palette={palette} />
 
 			<CoordinatesGrabberTabs
@@ -81,7 +79,7 @@ export function CoordinatesGrabber() {
 			)}
 
 			{state.activeTab === "yaml" && (
-				<div style={{ flex: 1, overflow: "auto", padding: "4px 0" }}>
+				<div className={styles.yamlTab}>
 					<CoordinateYamlViewer data={state.coordinateData} />
 				</div>
 			)}

@@ -31,6 +31,7 @@ import {
 	useEventVisibility,
 } from "./calendarindex";
 import { DefaultStartHour } from "./hooks/calendarconstants";
+import styles from "./MonthView.module.css";
 
 interface MonthViewProps {
 	currentDate: Date;
@@ -91,30 +92,19 @@ export function MonthView({
 	useEffect(() => setIsMounted(true), []);
 
 	return (
-		<div
-			data-slot="month-view"
-			className="flex min-w-0 flex-1 flex-col overflow-x-auto"
-		>
-			{/* Weekday header */}
-			<div className="grid grid-cols-7 border-b border-[color-mix(in_srgb,var(--primary)_12%,transparent)]">
+		<div data-slot="month-view" className={styles.root}>
+			<div className={styles.weekdayHeader}>
 				{weekdays.map((day) => (
-					<div
-						key={day}
-						className="py-2 text-center text-sm font-medium [color:var(--text-muted)]"
-					>
+					<div key={day} className={styles.weekdayCell}>
 						{day}
 					</div>
 				))}
 			</div>
 
-			{/* Week rows */}
-			<div className="grid flex-1 auto-rows-fr">
+			<div className={styles.weeksGrid}>
 				{weeks.map((week, weekIndex) => (
-					<div
-						key={`week-${weekIndex}`}
-						className="grid grid-cols-7 [&:last-child>*]:border-b-0"
-					>
-						{week.map((day, dayIndex) => {
+					<div key={`week-${weekIndex}`} className={styles.weekRow}>
+						{week.map((day) => {
 							const dayEvents = getEventsForDay(events, day);
 							const spanningEvents = getSpanningEventsForDay(events, day);
 							const isCurrentMonth = isSameMonth(day, currentDate);
@@ -125,7 +115,7 @@ export function MonthView({
 							const allDayEvents = [...spanningEvents, ...dayEvents];
 							const allEvents = getAllEventsForDay(events, day);
 
-							const isReferenceCell = weekIndex === 0 && dayIndex === 0;
+							const isReferenceCell = weekIndex === 0 && day.getDay() === 0;
 							const visibleCount = isMounted
 								? getVisibleEventCount(allDayEvents.length)
 								: undefined;
@@ -141,17 +131,13 @@ export function MonthView({
 								<div
 									key={day.toString()}
 									className={cn(
-										"group border-r border-b last:border-r-0",
-										"border-[color-mix(in_srgb,var(--primary)_8%,transparent)]",
-										isSelected &&
-											"[background:color-mix(in_srgb,var(--primary)_6%,transparent)] [box-shadow:inset_0_0_0_1px_color-mix(in_srgb,var(--primary)_25%,transparent)]",
-										!isSelected &&
-											today &&
-											"[background:color-mix(in_srgb,var(--primary)_3%,transparent)]",
+										styles.dayCell,
+										isSelected && styles.dayCellSelected,
+										!isSelected && today && styles.dayCellToday,
 										!isSelected &&
 											!today &&
 											!isCurrentMonth &&
-											"[background:color-mix(in_srgb,var(--surface)_30%,transparent)]",
+											styles.dayCellOutside,
 									)}
 									data-today={today || undefined}
 									data-selected={isSelected || undefined}
@@ -167,24 +153,20 @@ export function MonthView({
 											onEventCreate(startTime);
 										}}
 									>
-										{/* Day number chip */}
 										<button
 											type="button"
 											className={cn(
-												"mt-1.5 inline-flex size-7 items-center justify-center rounded-full text-sm leading-none transition-all",
-												today &&
-													"font-bold [background:var(--primary)] [color:var(--primary-contrast)] [box-shadow:0_0_8px_color-mix(in_srgb,var(--primary)_40%,transparent)]",
-												!today &&
-													isSelected &&
-													"font-semibold [background:color-mix(in_srgb,var(--primary)_15%,transparent)] [color:var(--primary)] [box-shadow:0_0_0_1px_color-mix(in_srgb,var(--primary)_35%,transparent)]",
+												styles.dayChip,
+												today && styles.dayChipToday,
+												!today && isSelected && styles.dayChipSelected,
 												!today &&
 													!isSelected &&
 													!isCurrentMonth &&
-													"[color:var(--text-muted)]",
+													styles.dayChipOutside,
 												!today &&
 													!isSelected &&
 													isCurrentMonth &&
-													"[color:var(--text)]",
+													styles.dayChipCurrentMonth,
 											)}
 											onClick={(e) => {
 												e.stopPropagation();
@@ -195,10 +177,9 @@ export function MonthView({
 											{format(day, "d")}
 										</button>
 
-										{/* Events container */}
 										<div
 											ref={isReferenceCell ? contentRef : null}
-											className="min-h-[calc((var(--event-height)+var(--event-gap))*2)] sm:min-h-[calc((var(--event-height)+var(--event-gap))*3)] lg:min-h-[calc((var(--event-height)+var(--event-gap))*4)]"
+											className={styles.eventsContainer}
 										>
 											{sortEvents(allDayEvents).map((event, index) => {
 												const eventStart = new Date(event.start);
@@ -214,7 +195,7 @@ export function MonthView({
 													return (
 														<div
 															key={`spanning-${event.id}-${day.toISOString().slice(0, 10)}`}
-															className="aria-hidden:hidden"
+															className={styles.eventVisibilityItem}
 															aria-hidden={isHidden ? "true" : undefined}
 														>
 															<EventItem
@@ -224,7 +205,7 @@ export function MonthView({
 																isFirstDay={isFirstDay}
 																isLastDay={isLastDay}
 															>
-																<div className="invisible" aria-hidden={true}>
+																<div className={styles.invisibleContinueText}>
 																	{!event.allDay && (
 																		<span>
 																			{format(
@@ -243,7 +224,7 @@ export function MonthView({
 												return (
 													<div
 														key={event.id}
-														className="aria-hidden:hidden"
+														className={styles.eventVisibilityItem}
 														aria-hidden={isHidden ? "true" : undefined}
 													>
 														<DraggableEvent
@@ -257,34 +238,35 @@ export function MonthView({
 												);
 											})}
 
-											{/* "+N more" popover */}
 											{hasMore && (
 												<Popover modal>
 													<PopoverTrigger asChild>
 														<button
-															className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-(--event-gap) flex h-(--event-height) w-full items-center overflow-hidden px-2 text-left text-[10px] leading-tight backdrop-blur-md transition outline-none select-none focus-visible:ring-[3px] sm:px-2.5 sm:text-xs"
+															className={styles.moreButton}
 															onClick={(e) => e.stopPropagation()}
 														>
-															<span>
+															<span className={styles.moreButtonText}>
 																+ {remainingCount}{" "}
-																<span className="max-sm:sr-only">more</span>
+																<span className={styles.moreWordDesktop}>
+																	more
+																</span>
 															</span>
 														</button>
 													</PopoverTrigger>
 													<PopoverContent
 														align="center"
-														className="max-w-52 p-3"
+														className={styles.popoverContent}
 														style={
 															{
 																"--event-height": `${EventHeight}px`,
 															} as React.CSSProperties
 														}
 													>
-														<div className="space-y-2">
-															<div className="text-sm font-medium">
+														<div className={styles.popoverStack}>
+															<div className={styles.popoverHeading}>
 																{format(day, "EEE d")}
 															</div>
-															<div className="space-y-1">
+															<div className={styles.popoverList}>
 																{sortEvents(allEvents).map((event) => {
 																	const eventStart = new Date(event.start);
 																	const eventEnd = new Date(event.end);

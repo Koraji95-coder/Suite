@@ -1,6 +1,7 @@
 import React from "react";
 import type { CalendarEvent } from "./calendarindex";
 import { useWeekViewData } from "./useWeekViewData";
+import styles from "./WeekView.module.css";
 import { WeekViewAllDaySection } from "./WeekViewAllDaySection";
 import { WeekViewHeader } from "./WeekViewHeader";
 import { WeekViewTimeGrid } from "./WeekViewTimeGrid";
@@ -41,11 +42,7 @@ export function WeekView({
 	};
 
 	return (
-		<div
-			data-slot="week-view"
-			className="flex h-full flex-col overflow-x-auto"
-			style={{ minWidth: 0 }}
-		>
+		<div data-slot="week-view" className={styles.root}>
 			<WeekViewHeader
 				days={days}
 				selectedDate={selectedDate}

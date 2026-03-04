@@ -13,6 +13,7 @@ import {
 	WeekCellsHeight,
 	WeekView,
 } from "./calendarindex";
+import styles from "./EventCalendar.module.css";
 import { EventCalendarToolbar } from "./EventCalendarToolbar";
 import { useEventCalendarState } from "./useEventCalendarState";
 
@@ -73,12 +74,7 @@ export function EventCalendar({
 
 	return (
 		<div
-			className={cn(
-				"flex flex-col overflow-visible rounded-xl border has-data-[slot=month-view]:flex-1",
-				"[border-color:var(--border)] [background:var(--surface)]",
-				compact ? "text-sm" : "",
-				className,
-			)}
+			className={cn(styles.root, compact && styles.compact, className)}
 			style={
 				{
 					"--event-height": `${EventHeight}px`,
@@ -101,7 +97,7 @@ export function EventCalendar({
 					onNewEvent={openNewEventDialog}
 				/>
 
-				<div className="relative z-10 flex flex-1 flex-col px-2 pb-2 sm:px-5 sm:pb-5">
+				<div className={styles.content}>
 					{view === "month" && (
 						<MonthView
 							currentDate={currentDate}

@@ -1,0 +1,8 @@
+.root {
+	display: flex;
+	min-height: min(300px, 50vh);
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	font-size: 0.875rem;
+}

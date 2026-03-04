@@ -1,0 +1,7 @@
+.root {
+	display: flex;
+	height: 100%;
+	min-width: 0;
+	flex-direction: column;
+	overflow-x: auto;
+}

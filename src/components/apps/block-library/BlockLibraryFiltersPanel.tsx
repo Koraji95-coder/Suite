@@ -1,4 +1,5 @@
 import { Search } from "lucide-react";
+import styles from "./BlockLibraryFiltersPanel.module.css";
 
 interface BlockLibraryFiltersPanelProps {
 	searchTerm: string;
@@ -31,22 +32,17 @@ export function BlockLibraryFiltersPanel({
 	hasActiveFilters,
 	onClearFilters,
 }: BlockLibraryFiltersPanelProps) {
-	const panelClass =
-		"rounded-lg border p-6 [border-color:var(--border)] [background:var(--bg-mid)]";
-	const inputClass =
-		"w-full rounded-lg border px-4 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
-
 	return (
-		<div className={panelClass}>
-			<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-				<div className="relative md:col-span-2">
-					<Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform [color:var(--text-muted)]" />
+		<div className={styles.panel}>
+			<div className={styles.filtersGrid}>
+				<div className={styles.searchWrap}>
+					<Search className={styles.searchIcon} />
 					<input
 						type="text"
 						value={searchTerm}
 						onChange={(event) => onSearchTermChange(event.target.value)}
 						placeholder="Search blocks..."
-						className={`${inputClass} pl-10`}
+						className={styles.searchInput}
 					/>
 				</div>
 
@@ -54,7 +50,7 @@ export function BlockLibraryFiltersPanel({
 					<select
 						value={selectedCategory}
 						onChange={(event) => onSelectedCategoryChange(event.target.value)}
-						className={inputClass}
+						className={styles.select}
 					>
 						{categories.map((category) => (
 							<option key={category} value={category}>
@@ -68,7 +64,7 @@ export function BlockLibraryFiltersPanel({
 					<select
 						value={selectedTag}
 						onChange={(event) => onSelectedTagChange(event.target.value)}
-						className={inputClass}
+						className={styles.select}
 					>
 						{allTags.map((tag) => (
 							<option key={tag} value={tag}>
@@ -79,17 +75,14 @@ export function BlockLibraryFiltersPanel({
 				</div>
 			</div>
 
-			<div className="mt-4 flex items-center justify-between text-sm [color:var(--text-muted)]">
-				<div className="flex items-center space-x-4">
+			<div className={styles.summaryRow}>
+				<div className={styles.summaryStats}>
 					<span>Total: {totalBlocks}</span>
 					<span>Filtered: {filteredBlocks}</span>
 					<span>Favorites: {favorites}</span>
 				</div>
 				{hasActiveFilters && (
-					<button
-						onClick={onClearFilters}
-						className="transition hover:opacity-80 [color:var(--primary)]"
-					>
+					<button onClick={onClearFilters} className={styles.clearButton}>
 						Clear Filters
 					</button>
 				)}

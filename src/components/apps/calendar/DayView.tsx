@@ -20,6 +20,7 @@ import {
 	useCurrentTimeIndicator,
 	WeekCellsHeight,
 } from "./calendarindex";
+import styles from "./DayView.module.css";
 import { EndHour, StartHour } from "./hooks/calendarconstants";
 
 interface DayViewProps {
@@ -69,52 +70,40 @@ export function DayView({
 			);
 	}, [currentDate, events]);
 
-	// Filter all-day events
 	const allDayEvents = useMemo(() => {
-		return dayEvents.filter((event) => {
-			// Include explicitly marked all-day events or multi-day events
-			return event.allDay || isMultiDayEvent(event);
-		});
+		return dayEvents.filter((event) => event.allDay || isMultiDayEvent(event));
 	}, [dayEvents]);
 
-	// Get only single-day time-based events
 	const timeEvents = useMemo(() => {
-		return dayEvents.filter((event) => {
-			// Exclude all-day events and multi-day events
-			return !event.allDay && !isMultiDayEvent(event);
-		});
+		return dayEvents.filter(
+			(event) => !event.allDay && !isMultiDayEvent(event),
+		);
 	}, [dayEvents]);
 
-	// Process events to calculate positions
 	const positionedEvents = useMemo(() => {
 		const result: PositionedEvent[] = [];
 		const dayStart = startOfDay(currentDate);
 
-		// Sort events by start time and duration
 		const sortedEvents = [...timeEvents].sort((a, b) => {
 			const aStart = new Date(a.start);
 			const bStart = new Date(b.start);
 			const aEnd = new Date(a.end);
 			const bEnd = new Date(b.end);
 
-			// First sort by start time
 			if (aStart < bStart) return -1;
 			if (aStart > bStart) return 1;
 
-			// If start times are equal, sort by duration (longer events first)
 			const aDuration = differenceInMinutes(aEnd, aStart);
 			const bDuration = differenceInMinutes(bEnd, bStart);
 			return bDuration - aDuration;
 		});
 
-		// Track columns for overlapping events
 		const columns: { event: CalendarEvent; end: Date }[][] = [];
 
 		sortedEvents.forEach((event) => {
 			const eventStart = new Date(event.start);
 			const eventEnd = new Date(event.end);
 
-			// Adjust start and end times if they're outside this day
 			const adjustedStart = isSameDay(currentDate, eventStart)
 				? eventStart
 				: dayStart;
@@ -122,14 +111,12 @@ export function DayView({
 				? eventEnd
 				: addHours(dayStart, 24);
 
-			// Calculate top position and height
 			const startHour =
 				getHours(adjustedStart) + getMinutes(adjustedStart) / 60;
 			const endHour = getHours(adjustedEnd) + getMinutes(adjustedEnd) / 60;
 			const top = (startHour - StartHour) * WeekCellsHeight;
 			const height = (endHour - startHour) * WeekCellsHeight;
 
-			// Find a column for this event
 			let columnIndex = 0;
 			let placed = false;
 
@@ -153,7 +140,6 @@ export function DayView({
 				}
 			}
 
-			// Ensure column is initialized before pushing
 			const currentColumn = columns[columnIndex] || [];
 			columns[columnIndex] = currentColumn;
 			currentColumn.push({ event, end: adjustedEnd });
@@ -164,7 +150,7 @@ export function DayView({
 				height,
 				left: 0,
 				width: 1,
-				zIndex: 10 + columnIndex, // Higher columns get higher z-index
+				zIndex: 10 + columnIndex,
 				columnIndex,
 			});
 		});
@@ -192,16 +178,14 @@ export function DayView({
 	);
 
 	return (
-		<div data-slot="day-view" className="contents">
+		<div data-slot="day-view" className={styles.root}>
 			{showAllDaySection && (
-				<div className="border-border/70 border-t bg-background/35">
-					<div className="grid grid-cols-[3.5rem_1fr] sm:grid-cols-[4.5rem_1fr]">
-						<div className="relative flex items-end justify-center">
-							<span className="text-muted-foreground mb-1 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none">
-								All day
-							</span>
+				<div className={styles.allDaySection}>
+					<div className={styles.allDayGrid}>
+						<div className={styles.allDayLabelCol}>
+							<span className={styles.allDayLabel}>All day</span>
 						</div>
-						<div className="border-border/70 relative border-r p-1 last:border-r-0">
+						<div className={styles.allDayEventsCol}>
 							{allDayEvents.map((event) => {
 								const eventStart = new Date(event.start);
 								const eventEnd = new Date(event.end);
@@ -217,9 +201,7 @@ export function DayView({
 										isFirstDay={isFirstDay}
 										isLastDay={isLastDay}
 									>
-										<div className="w-full text-center truncate">
-											{event.title}
-										</div>
+										<div className={styles.allDayEventTitle}>{event.title}</div>
 									</EventItem>
 								);
 							})}
@@ -228,28 +210,22 @@ export function DayView({
 				</div>
 			)}
 
-			<div className="border-border/70 grid flex-1 grid-cols-[3.5rem_1fr] overflow-hidden border-t bg-background/20 sm:grid-cols-[4.5rem_1fr]">
-				<div>
+			<div className={styles.mainGrid}>
+				<div className={styles.hourRail}>
 					{hours.map((hour, index) => (
-						<div
-							key={hour.toString()}
-							className="border-border/70 relative flex h-(--week-cells-height) items-start justify-center border-b last:border-b-0"
-						>
+						<div key={hour.toString()} className={styles.hourRow}>
 							{index > 0 && (
-								<span className="text-muted-foreground bg-background -translate-y-1/2 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none">
-									{format(hour, "h a")}
-								</span>
+								<span className={styles.hourLabel}>{format(hour, "h a")}</span>
 							)}
 						</div>
 					))}
 				</div>
 
-				<div className="relative">
-					{/* Positioned events */}
+				<div className={styles.timeline}>
 					{positionedEvents.map((positionedEvent) => (
 						<div
 							key={positionedEvent.event.id}
-							className="absolute z-10 px-0.5"
+							className={styles.positionedEvent}
 							style={{
 								top: `${positionedEvent.top}px`,
 								height: `${positionedEvent.height}px`,
@@ -258,7 +234,7 @@ export function DayView({
 								zIndex: positionedEvent.zIndex,
 							}}
 						>
-							<div className="size-full">
+							<div className={styles.positionedEventInner}>
 								<DraggableEvent
 									event={positionedEvent.event}
 									view="day"
@@ -270,28 +246,22 @@ export function DayView({
 						</div>
 					))}
 
-					{/* Current time indicator */}
 					{currentTimeVisible && (
 						<div
-							className="pointer-events-none absolute right-0 left-0 z-20"
+							className={styles.currentTimeLineWrap}
 							style={{ top: `${currentTimePosition}%` }}
 						>
-							<div className="relative flex items-center">
-								<div className="bg-primary absolute -left-1 h-2 w-2 rounded-full opacity-90"></div>
-								<div className="bg-primary h-0.5 w-full opacity-85"></div>
+							<div className={styles.currentTimeLineInner}>
+								<div className={styles.currentTimeDot} />
+								<div className={styles.currentTimeLine} />
 							</div>
 						</div>
 					)}
 
-					{/* Time grid */}
 					{hours.map((hour) => {
 						const hourValue = getHours(hour);
 						return (
-							<div
-								key={hour.toString()}
-								className="border-border/70 relative h-(--week-cells-height) border-b last:border-b-0"
-							>
-								{/* Quarter-hour intervals */}
+							<div key={hour.toString()} className={styles.timeGridRow}>
 								{[0, 1, 2, 3].map((quarter) => {
 									const quarterHourTime = hourValue + quarter * 0.25;
 									return (
@@ -301,14 +271,11 @@ export function DayView({
 											date={currentDate}
 											time={quarterHourTime}
 											className={cn(
-												"absolute h-[calc(var(--week-cells-height)/4)] w-full",
-												quarter === 0 && "top-0",
-												quarter === 1 &&
-													"top-[calc(var(--week-cells-height)/4)]",
-												quarter === 2 &&
-													"top-[calc(var(--week-cells-height)/4*2)]",
-												quarter === 3 &&
-													"top-[calc(var(--week-cells-height)/4*3)]",
+												styles.quarterCell,
+												quarter === 0 && styles.quarter0,
+												quarter === 1 && styles.quarter1,
+												quarter === 2 && styles.quarter2,
+												quarter === 3 && styles.quarter3,
 											)}
 											onClick={() => {
 												const startTime = new Date(currentDate);

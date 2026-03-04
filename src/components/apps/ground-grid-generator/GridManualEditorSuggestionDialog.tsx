@@ -11,6 +11,7 @@ import type {
 	PlacementSuggestion,
 	SuggestionCoords,
 } from "./GridManualEditorModels";
+import styles from "./GridManualEditorSuggestionDialog.module.css";
 
 interface GridManualEditorSuggestionDialogProps {
 	suggestion: PlacementSuggestion | null;
@@ -42,7 +43,7 @@ export function GridManualEditorSuggestionDialog({
 			open={Boolean(suggestion)}
 			onOpenChange={(open) => !open && onCancel()}
 		>
-			<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+			<DialogContent className={styles.content}>
 				<DialogHeader>
 					<DialogTitle>
 						{suggestion?.type === "add-rod"
@@ -113,7 +114,7 @@ export function GridManualEditorSuggestionDialog({
 						</>
 					)}
 				</div>
-				<DialogFooter className="mt-4 gap-2 sm:justify-end">
+				<DialogFooter className={styles.footer}>
 					<button
 						onClick={onCancel}
 						style={{ ...btnStyle(false), justifyContent: "center" }}

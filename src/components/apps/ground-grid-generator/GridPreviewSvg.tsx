@@ -1,5 +1,7 @@
 import type { MouseEventHandler, MutableRefObject } from "react";
 import { hexToRgba } from "@/lib/palette";
+import { cn } from "@/lib/utils";
+import styles from "./GridPreviewSvg.module.css";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
 
 interface GridPreviewSvgProps {
@@ -42,10 +44,10 @@ export function GridPreviewSvg({
 		<svg
 			ref={svgRef}
 			viewBox={`${effectiveViewBox.x} ${effectiveViewBox.y} ${effectiveViewBox.w} ${effectiveViewBox.h}`}
-			className={[
-				"h-full w-full select-none rounded-md",
-				isPanning ? "cursor-grabbing" : "cursor-grab",
-			].join(" ")}
+			className={cn(
+				styles.root,
+				isPanning ? styles.cursorGrabbing : styles.cursorGrab,
+			)}
 			style={{
 				background: hexToRgba(backgroundColor, 0.5),
 				WebkitUserSelect: "none",

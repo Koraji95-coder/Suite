@@ -9,6 +9,7 @@ import { endOfDay, format, isSameDay, startOfDay } from "date-fns";
 import { PlusIcon } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import styles from "./CalendarRightRail.module.css";
 import type { CalendarEvent } from "./calendarindex";
 import { UpcomingBanner } from "./UpcomingBanner";
 import { getUpcomingNext7Days } from "./upcoming";
@@ -57,26 +58,29 @@ export function CalendarRightRail({
 
 	if (!hasUpcoming) {
 		return (
-			<div className={cn("hidden xl:block", className)}>
-				<div className="sticky top-0">
-					<UpcomingBanner events={events} className="w-full justify-center" />
+			<div className={cn(styles.root, className)}>
+				<div className={styles.stickyTop}>
+					<UpcomingBanner
+						events={events}
+						className={styles.upcomingBannerCentered}
+					/>
 				</div>
 			</div>
 		);
 	}
 
 	return (
-		<div className={cn("hidden xl:block", className)}>
-			<div className="sticky top-0 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">
-				<div className="grid gap-4">
+		<div className={cn(styles.root, className)}>
+			<div className={styles.scrollContainer}>
+				<div className={styles.stack}>
 					{/* Selected day */}
-					<div className="rounded-xl border p-5 border-[color-mix(in_srgb,var(--primary)_12%,transparent)] [background:var(--surface)]">
-						<div className="flex items-start justify-between gap-3">
-							<div className="min-w-0">
-								<div className="text-sm font-semibold leading-tight [color:var(--text)]">
+					<div className={styles.selectedDayCard}>
+						<div className={styles.cardHeader}>
+							<div className={styles.cardHeaderText}>
+								<div className={styles.selectedDayTitle}>
 									{format(selectedDate, "EEEE")}
 								</div>
-								<div className="mt-0.5 text-xs [color:var(--text-muted)]">
+								<div className={styles.selectedDaySubtitle}>
 									{format(selectedDate, "MMMM d, yyyy")}
 								</div>
 							</div>
@@ -84,44 +88,37 @@ export function CalendarRightRail({
 							<button
 								type="button"
 								onClick={onNewEvent}
-								className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold leading-none
-									[background:var(--primary)] [color:var(--primary-contrast)]
-									[box-shadow:0_0_12px_color-mix(in_srgb,var(--primary)_22%,transparent)]
-									hover:opacity-90"
+								className={styles.newButton}
 							>
 								<PlusIcon size={14} aria-hidden="true" />
 								New
 							</button>
 						</div>
 
-						<div className="mt-4 h-px [background:linear-gradient(90deg,transparent,color-mix(in_srgb,var(--primary)_14%,transparent),transparent)]" />
+						<div className={styles.divider} />
 
-						<div className="mt-4">
-							<div className="text-xs font-semibold uppercase tracking-wide [color:var(--text-muted)]">
-								Agenda
-							</div>
+						<div className={styles.agendaSection}>
+							<div className={styles.sectionLabel}>Agenda</div>
 
 							{agenda.length === 0 ? (
-								<div className="mt-3 rounded-xl border p-4 text-center [border-color:var(--border)] [background:var(--surface-2)]">
-									<div className="text-sm leading-relaxed [color:var(--text-muted)]">
+								<div className={styles.emptyAgendaCard}>
+									<div className={styles.emptyAgendaText}>
 										No events for this day.
 									</div>
 								</div>
 							) : (
-								<div className="mt-3 grid gap-2">
+								<div className={styles.agendaList}>
 									{agenda.slice(0, 6).map((e) => (
 										<button
 											key={e.id || `${e.title}-${e.start.toISOString()}`}
 											type="button"
 											onClick={() => onSelectEvent(e)}
-											className="w-full rounded-xl border px-3.5 py-3 text-left transition
-												[border-color:var(--border)] [background:var(--surface-2)]
-												hover:[background:color-mix(in_srgb,var(--primary)_6%,var(--surface-2))]"
+											className={styles.listButton}
 										>
-											<div className="truncate text-sm font-semibold leading-tight [color:var(--text)]">
+											<div className={styles.listButtonTitle}>
 												{e.title || "Untitled event"}
 											</div>
-											<div className="mt-1 text-xs [color:var(--text-muted)]">
+											<div className={styles.listButtonSubtitle}>
 												{timeLabel(e)}
 											</div>
 										</button>
@@ -132,17 +129,13 @@ export function CalendarRightRail({
 					</div>
 
 					{/* Upcoming list */}
-					<div className="rounded-xl border p-5 [border-color:var(--border)] [background:var(--surface)]">
-						<div className="flex items-center justify-between gap-3">
-							<div className="text-xs font-semibold uppercase tracking-wide [color:var(--text-muted)]">
-								Upcoming
-							</div>
-							<div className="text-xs [color:var(--text-muted)]">
-								Next 7 days
-							</div>
+					<div className={styles.upcomingCard}>
+						<div className={styles.cardSubHeader}>
+							<div className={styles.sectionLabel}>Upcoming</div>
+							<div className={styles.cardMetaText}>Next 7 days</div>
 						</div>
 
-						<div className="mt-3 grid gap-2">
+						<div className={styles.upcomingList}>
 							{upcomingPreview.map((e) => (
 								<button
 									key={e.id || `${e.title}-${e.start.toISOString()}`}
@@ -151,26 +144,20 @@ export function CalendarRightRail({
 										onSelectDate(e.start);
 										onSelectEvent(e);
 									}}
-									className="w-full rounded-xl border px-3.5 py-3 text-left transition
-										[border-color:var(--border)] [background:var(--surface-2)]
-										hover:[background:color-mix(in_srgb,var(--primary)_6%,var(--surface-2))]"
+									className={styles.listButton}
 								>
-									<div className="flex items-center justify-between gap-3">
-										<div className="min-w-0">
-											<div className="truncate text-sm font-semibold leading-tight [color:var(--text)]">
+									<div className={styles.listButtonRow}>
+										<div className={styles.listButtonRowText}>
+											<div className={styles.listButtonTitle}>
 												{e.title || "Untitled event"}
 											</div>
-											<div className="mt-0.5 text-xs [color:var(--text-muted)]">
+											<div className={styles.listButtonSubtitleCompact}>
 												{format(e.start, "EEE, MMM d")} ·{" "}
 												{e.allDay ? "All day" : format(e.start, "p")}
 											</div>
 										</div>
 
-										<div
-											className="w-10 shrink-0 rounded-xl border px-2.5 py-1.5 text-center text-xs font-semibold leading-none
-												[border-color:var(--border)] [color:var(--text-muted)] [background:var(--surface)]"
-											style={{ minWidth: 40 }}
-										>
+										<div className={styles.dayPill} style={{ minWidth: 40 }}>
 											{isSameDay(e.start, selectedDate)
 												? "Sel"
 												: format(e.start, "d")}
@@ -180,7 +167,7 @@ export function CalendarRightRail({
 							))}
 
 							{upcoming.length > upcomingPreview.length && (
-								<div className="mt-1 text-xs [color:var(--text-muted)]">
+								<div className={styles.moreText}>
 									+{upcoming.length - upcomingPreview.length} more
 								</div>
 							)}

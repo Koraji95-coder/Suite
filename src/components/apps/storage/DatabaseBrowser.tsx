@@ -1,3 +1,4 @@
+import styles from "./DatabaseBrowser.module.css";
 import { DatabaseBrowserDataPanel } from "./DatabaseBrowserDataPanel";
 import { DatabaseBrowserErrorBanner } from "./DatabaseBrowserErrorBanner";
 import { DatabaseBrowserSidebar } from "./DatabaseBrowserSidebar";
@@ -30,13 +31,13 @@ export function DatabaseBrowser() {
 	} = useDatabaseBrowserState();
 
 	return (
-		<div className="flex min-h-100 flex-col">
+		<div className={styles.root}>
 			<DatabaseBrowserErrorBanner
 				error={error}
 				onDismiss={() => setError(null)}
 			/>
 
-			<div className="flex flex-1 flex-col gap-4 xl:flex-row">
+			<div className={styles.layout}>
 				<DatabaseBrowserSidebar
 					tables={tables}
 					selectedTable={selectedTable}
@@ -45,7 +46,7 @@ export function DatabaseBrowser() {
 					onSelectTable={selectTable}
 				/>
 
-				<div className="min-w-0 flex-1">
+				<div className={styles.mainPane}>
 					<DatabaseBrowserDataPanel
 						selectedTable={selectedTable}
 						loadingData={loadingData}

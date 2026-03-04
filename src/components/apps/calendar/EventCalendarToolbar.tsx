@@ -15,6 +15,7 @@ import {
 } from "@/components/apps/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { CalendarView } from "./calendarindex";
+import styles from "./EventCalendarToolbar.module.css";
 
 interface EventCalendarToolbarProps {
 	compact: boolean;
@@ -44,70 +45,58 @@ export function EventCalendarToolbar({
 	onViewChange,
 	onNewEvent,
 }: EventCalendarToolbarProps) {
-	const controlBase =
-		"inline-flex items-center justify-center rounded-lg font-semibold transition-all leading-none text-center whitespace-nowrap";
-	const controlSize = compact
-		? "min-h-9 px-3 py-2 text-sm"
-		: "min-h-[46px] px-5 py-2.5 text-sm sm:text-base";
+	const controlSize = compact ? styles.controlCompact : styles.controlRegular;
 	const primaryControlSize = compact
-		? "min-h-10 px-4 py-2 text-sm"
-		: "min-h-[52px] px-6 py-3 text-sm sm:text-base";
+		? styles.primaryControlCompact
+		: styles.primaryControlRegular;
 
 	return (
 		<div
 			className={cn(
-				"sticky top-0 z-20 rounded-xl border backdrop-blur-md",
-				"[border-color:var(--border)] [background:color-mix(in_srgb,var(--surface)_60%,transparent)]",
-				compact ? "mx-2 mt-2" : "mx-2 mt-2 sm:mx-4 sm:mt-4",
+				styles.root,
+				compact ? styles.rootCompact : styles.rootRegular,
 			)}
 		>
 			<div
 				className={cn(
-					"grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center",
-					compact ? "p-2" : "p-3 sm:p-4",
+					styles.layout,
+					compact ? styles.layoutCompact : styles.layoutRegular,
 				)}
 			>
 				{/* Left: Today + nav + view tabs */}
 				<div
 					className={cn(
-						"flex min-w-0 flex-wrap items-center",
-						compact ? "gap-1.5" : "gap-3",
+						styles.leftGroup,
+						compact ? styles.leftGroupCompact : styles.leftGroupRegular,
 					)}
 				>
 					<button
 						onClick={onToday}
-						className={cn(
-							controlBase,
-							controlSize,
-							"border [border-color:var(--border)] [background:var(--surface)] [color:var(--primary)]",
-							"hover:[background:var(--surface-2)]",
-						)}
+						className={cn(styles.controlBase, controlSize, styles.todayButton)}
 					>
-						<CalendarCheck className="h-4 w-4 sm:me-2" aria-hidden="true" />
-						<span className="max-[479px]:sr-only sm:not-sr-only">Today</span>
+						<CalendarCheck className={styles.todayIcon} aria-hidden="true" />
+						<span className={styles.todayLabel}>Today</span>
 					</button>
 
-					<div className="flex items-center gap-1">
+					<div className={styles.navGroup}>
 						<button
 							onClick={onPrev}
 							aria-label="Previous"
-							className="inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors
-								[color:var(--text-muted)] hover:[background:var(--surface-2)]"
+							className={styles.navButton}
 						>
-							<ChevronLeftIcon size={18} aria-hidden="true" />
+							<ChevronLeftIcon className={styles.navIcon} aria-hidden="true" />
 						</button>
 						<button
 							onClick={onNext}
 							aria-label="Next"
-							className="inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors
-								[color:var(--text-muted)] hover:[background:var(--surface-2)]"
+							className={styles.navButton}
 						>
-							<ChevronRightIcon size={18} aria-hidden="true" />
+							<ChevronRightIcon className={styles.navIcon} aria-hidden="true" />
 						</button>
 					</div>
 
 					{/* Desktop view tabs */}
-					<div className="ms-1 hidden items-center gap-1 md:flex">
+					<div className={styles.desktopTabs}>
 						{(["month", "week", "day", "agenda"] as CalendarView[]).map((v) => {
 							const active = v === view;
 							return (
@@ -116,10 +105,8 @@ export function EventCalendarToolbar({
 									type="button"
 									onClick={() => onViewChange(v)}
 									className={cn(
-										"inline-flex h-10 w-24 items-center justify-center rounded-xl border text-center text-sm leading-none transition-colors",
-										active
-											? "border-[color-mix(in_srgb,var(--primary)_22%,transparent)] [background:var(--surface-2)] [color:var(--text)]"
-											: "[border-color:var(--border)] [color:var(--text-muted)] hover:[background:var(--surface)]",
+										styles.viewTab,
+										active ? styles.viewTabActive : styles.viewTabInactive,
 									)}
 								>
 									{viewLabel[v]}
@@ -130,11 +117,11 @@ export function EventCalendarToolbar({
 				</div>
 
 				{/* Center: Title */}
-				<div className="flex items-center justify-center sm:justify-self-center">
+				<div className={styles.titleWrap}>
 					<h2
 						className={cn(
-							"text-center font-semibold [color:var(--text)]",
-							compact ? "text-sm" : "text-sm sm:text-lg md:text-xl",
+							styles.title,
+							compact ? styles.titleCompact : styles.titleRegular,
 						)}
 					>
 						{viewTitle}
@@ -144,30 +131,33 @@ export function EventCalendarToolbar({
 				{/* Right: Mobile view dropdown + New event */}
 				<div
 					className={cn(
-						"flex min-w-0 items-center justify-between pr-2 sm:justify-end sm:pr-3",
-						compact ? "gap-1.5" : "gap-2",
+						styles.rightGroup,
+						compact ? styles.rightGroupCompact : styles.rightGroupRegular,
 					)}
 				>
 					{/* Mobile view dropdown */}
-					<div className="md:hidden">
+					<div className={styles.mobileOnly}>
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
 								<button
 									className={cn(
-										controlBase,
+										styles.controlBase,
 										controlSize,
-										"gap-1.5 border [border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)]",
+										styles.mobileViewButton,
 									)}
 								>
 									<span>{viewLabel[view]}</span>
 									<ChevronDownIcon
-										className="-me-1 opacity-60"
+										className={styles.dropdownChevron}
 										size={16}
 										aria-hidden="true"
 									/>
 								</button>
 							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="min-w-36">
+							<DropdownMenuContent
+								align="end"
+								className={styles.dropdownContent}
+							>
 								<DropdownMenuItem onClick={() => onViewChange("month")}>
 									Month <DropdownMenuShortcut>M</DropdownMenuShortcut>
 								</DropdownMenuItem>
@@ -187,27 +177,24 @@ export function EventCalendarToolbar({
 					<button
 						type="button"
 						className={cn(
-							controlBase,
+							styles.controlBase,
 							primaryControlSize,
-							"ms-1 me-2 gap-1.5 rounded-xl sm:ms-2 sm:me-3",
-							"[background:var(--primary)] [color:var(--primary-contrast)]",
-							"[box-shadow:0_0_12px_color-mix(in_srgb,var(--primary)_30%,transparent)]",
-							"hover:opacity-90",
+							styles.newEventButton,
 						)}
 						onClick={onNewEvent}
 					>
 						<PlusIcon
-							className="opacity-80 sm:-ms-1"
+							className={styles.newEventIcon}
 							size={16}
 							aria-hidden="true"
 						/>
-						<span className="max-sm:sr-only">New event</span>
+						<span className={styles.newEventLabel}>New event</span>
 					</button>
 				</div>
 			</div>
 
 			{/* Divider */}
-			<div className="h-px [background:linear-gradient(90deg,transparent,color-mix(in_srgb,var(--primary)_14%,transparent),transparent)]" />
+			<div className={styles.divider} />
 		</div>
 	);
 }

@@ -6,6 +6,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
+import styles from "./StorageDialogs.module.css";
 
 interface BackupManagerRestoreDialogProps {
 	confirmRestore: string | null;
@@ -23,33 +24,30 @@ export function BackupManagerRestoreDialog({
 			open={Boolean(confirmRestore)}
 			onOpenChange={(open) => !open && onCancel()}
 		>
-			<DialogContent className="max-w-md border-(--border) bg-(--surface)">
+			<DialogContent className={styles.dialogContentMd}>
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2">
-						<AlertTriangle className="h-5 w-5 [color:var(--warning)]" />
+					<DialogTitle className={styles.titleWithIcon}>
+						<AlertTriangle className={styles.warningIcon} />
 						Confirm Restore
 					</DialogTitle>
 				</DialogHeader>
-				<p className="text-sm text-(--text-muted)">
+				<p className={styles.message}>
 					This will upsert data from{" "}
-					<strong className="text-(--text)">
+					<strong className={styles.strongText}>
 						{confirmRestore ?? "this backup"}
 					</strong>{" "}
 					into your database. Existing rows with matching IDs will be
 					overwritten.
 				</p>
-				<DialogFooter className="mt-4 gap-2 sm:justify-end">
-					<button
-						onClick={onCancel}
-						className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
-					>
+				<DialogFooter className={styles.footer}>
+					<button onClick={onCancel} className={styles.cancelButton}>
 						Cancel
 					</button>
 					<button
 						onClick={() => {
 							if (confirmRestore) onConfirm(confirmRestore);
 						}}
-						className="rounded-lg px-4 py-2 font-semibold [background:var(--primary)] [color:var(--primary-contrast)]"
+						className={styles.primaryButton}
 					>
 						Restore
 					</button>

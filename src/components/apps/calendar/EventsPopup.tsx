@@ -1,8 +1,8 @@
 import { format, isSameDay } from "date-fns";
 import { XIcon } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
-
 import { type CalendarEvent, EventItem } from "./calendarindex";
+import styles from "./EventsPopup.module.css";
 
 interface EventsPopupProps {
 	date: Date;
@@ -84,27 +84,27 @@ export function EventsPopup({
 	return (
 		<div
 			ref={popupRef}
-			className="bg-background absolute max-h-96 w-80 overflow-auto rounded-md border shadow-lg"
+			className={styles.root}
 			style={{
 				top: `${adjustedPosition.top}px`,
 				left: `${adjustedPosition.left}px`,
 				zIndex: "var(--z-dropdown)",
 			}}
 		>
-			<div className="bg-background sticky top-0 flex items-center justify-between border-b p-3">
-				<h3 className="font-medium">{format(date, "d MMMM yyyy")}</h3>
+			<div className={styles.header}>
+				<h3 className={styles.title}>{format(date, "d MMMM yyyy")}</h3>
 				<button
 					onClick={onClose}
-					className="hover:bg-muted rounded-full p-1"
+					className={styles.closeButton}
 					aria-label="Close"
 				>
-					<XIcon className="h-4 w-4" />
+					<XIcon className={styles.closeIcon} />
 				</button>
 			</div>
 
-			<div className="space-y-2 p-3">
+			<div className={styles.body}>
 				{events.length === 0 ? (
-					<div className="text-muted-foreground py-2 text-sm">No events</div>
+					<div className={styles.emptyState}>No events</div>
 				) : (
 					events.map((event) => {
 						const eventStart = new Date(event.start);
@@ -115,7 +115,7 @@ export function EventsPopup({
 						return (
 							<div
 								key={event.id}
-								className="cursor-pointer"
+								className={styles.eventRow}
 								onClick={() => handleEventClick(event)}
 							>
 								<EventItem

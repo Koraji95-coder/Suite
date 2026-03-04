@@ -1,0 +1,20 @@
+.root {
+	display: flex;
+	height: 100%;
+	flex-direction: column;
+	gap: 0.75rem;
+	overflow: auto;
+	padding: 1rem;
+}
+
+.yamlTab {
+	flex: 1 1 auto;
+	overflow: auto;
+	padding-block: 0.25rem;
+}
+
+@media (min-width: 640px) {
+	.root {
+		padding: 1.25rem;
+	}
+}

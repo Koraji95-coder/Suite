@@ -6,6 +6,7 @@ import { adaptMemories } from "./adapters/memoryAdapter";
 import { Graph2D } from "./Graph2D";
 import { GraphInspector } from "./GraphInspector";
 import { GraphToolbar } from "./GraphToolbar";
+import styles from "./GraphVisualization.module.css";
 import type { GraphData, GraphNode, SourceFilter, ViewMode } from "./types";
 
 function mergeGraphData(...sources: GraphData[]): GraphData {
@@ -79,7 +80,7 @@ export function GraphVisualization() {
 	}, []);
 
 	return (
-		<div className="flex h-full flex-col [background:var(--background)]">
+		<div className={styles.root}>
 			<GraphToolbar
 				viewMode={viewMode}
 				onViewModeChange={setViewMode}
@@ -89,12 +90,10 @@ export function GraphVisualization() {
 				onSearchChange={setSearchQuery}
 				onAddMemory={handleAddMemory}
 			/>
-			<div className="flex min-h-0 flex-1">
-				<div className="relative flex-1">
+			<div className={styles.body}>
+				<div className={styles.graphPane}>
 					{!loaded ? (
-						<div className="flex h-full items-center justify-center [color:var(--text-muted)]">
-							Loading graph data...
-						</div>
+						<div className={styles.loadingState}>Loading graph data...</div>
 					) : (
 						<Graph2D
 							data={filtered}

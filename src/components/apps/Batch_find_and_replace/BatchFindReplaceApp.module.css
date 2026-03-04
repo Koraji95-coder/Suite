@@ -1,0 +1,251 @@
+.actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.secondaryButton,
+.primaryButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	border-radius: 0.5rem;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.875rem;
+	transition:
+		background-color 160ms ease,
+		opacity 160ms ease;
+	cursor: pointer;
+}
+
+.secondaryButton {
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+}
+
+.secondaryButton:hover {
+	background: var(--surface-2);
+}
+
+.primaryButton {
+	border: none;
+	padding: 0.5rem 1rem;
+	background: var(--primary);
+	color: var(--primary-contrast);
+	font-weight: 500;
+}
+
+.primaryButton:hover {
+	opacity: 0.9;
+}
+
+.secondaryButton:disabled,
+.primaryButton:disabled {
+	opacity: 0.4;
+	pointer-events: none;
+}
+
+.message {
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 0.75rem 1rem;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.sectionTitle {
+	margin: 0;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text-muted);
+}
+
+.uploadLabel {
+	display: inline-flex;
+	width: fit-content;
+	cursor: pointer;
+	align-items: center;
+	gap: 0.5rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 0.625rem 1rem;
+	font-size: 0.875rem;
+	color: var(--text);
+	transition: background-color 160ms ease;
+}
+
+.uploadLabel:hover {
+	background: var(--surface-2);
+}
+
+.uploadIcon {
+	color: var(--primary);
+}
+
+.hiddenInput {
+	display: none;
+}
+
+.fileCount {
+	margin: 0;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.rulesList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.ruleCard {
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 0.75rem;
+}
+
+.ruleGrid {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.textInput {
+	border: 1px solid var(--border);
+	border-radius: 0.375rem;
+	background: var(--bg-base);
+	padding: 0.5rem 0.75rem;
+	font-size: 0.875rem;
+	color: var(--text);
+	outline: none;
+	transition:
+		border-color 160ms ease,
+		box-shadow 160ms ease;
+}
+
+.textInput:focus {
+	border-color: var(--primary);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.removeRuleButton {
+	border: 1px solid var(--border);
+	border-radius: 0.375rem;
+	background: transparent;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	transition:
+		background-color 160ms ease,
+		color 160ms ease;
+	cursor: pointer;
+}
+
+.removeRuleButton:hover {
+	background: color-mix(in srgb, var(--danger) 12%, transparent);
+	color: var(--danger);
+}
+
+.ruleOptions {
+	margin-top: 0.5rem;
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.checkboxLabel {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.checkbox {
+	border-radius: 0.25rem;
+}
+
+.addRuleButton {
+	display: inline-flex;
+	width: fit-content;
+	align-items: center;
+	gap: 0.375rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: transparent;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	transition:
+		background-color 160ms ease,
+		color 160ms ease;
+	cursor: pointer;
+}
+
+.addRuleButton:hover {
+	background: var(--surface-2);
+	color: var(--text);
+}
+
+.previewPanel {
+	max-height: 22.5rem;
+	overflow: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 0.75rem;
+}
+
+.previewItem {
+	border: 1px solid var(--border);
+	border-radius: 0.375rem;
+	background: var(--bg-base);
+	padding: 0.625rem;
+	font-size: 0.75rem;
+}
+
+.previewItemTitle {
+	font-weight: 500;
+	color: var(--text);
+}
+
+.previewDiff {
+	margin-top: 0.25rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.125rem;
+	color: var(--text-muted);
+}
+
+.previewDiffPrefixDanger,
+.previewDiffPrefixSuccess {
+	display: inline-block;
+	width: 3rem;
+	font-weight: 500;
+}
+
+.previewDiffPrefixDanger {
+	color: var(--danger);
+}
+
+.previewDiffPrefixSuccess {
+	color: var(--success);
+}
+
+@media (min-width: 768px) {
+	.ruleGrid {
+		grid-template-columns: 1fr 1fr auto;
+	}
+}

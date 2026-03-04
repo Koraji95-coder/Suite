@@ -1,0 +1,49 @@
+.dialogContent {
+	max-width: 24rem;
+	border: 1px solid var(--border);
+	background: var(--surface);
+}
+
+.message {
+	margin: 0;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.footer {
+	margin-top: 1rem;
+	display: flex;
+	gap: 0.5rem;
+}
+
+.cancelButton,
+.deleteButton {
+	border-radius: 0.5rem;
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	transition:
+		background-color 160ms ease,
+		opacity 160ms ease;
+	cursor: pointer;
+}
+
+.cancelButton {
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text);
+}
+
+.cancelButton:hover {
+	background: var(--surface-2);
+}
+
+.deleteButton {
+	border: none;
+	background: var(--danger);
+	color: #fff;
+	font-weight: 500;
+}
+
+.deleteButton:hover {
+	opacity: 0.9;
+}

@@ -3,6 +3,7 @@ import { ProgressBar } from "@/data/ProgressBar";
 import type { ColorScheme } from "@/lib/palette";
 import { configCardStyle } from "./CoordinatesGrabberConfigStyles";
 import type { CoordinatesGrabberState } from "./CoordinatesGrabberModels";
+import styles from "./CoordinatesGrabberRunPanel.module.css";
 
 interface CoordinatesGrabberRunPanelProps {
 	state: CoordinatesGrabberState;
@@ -28,7 +29,7 @@ export function CoordinatesGrabberRunPanel({
 					<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
 						<Loader
 							size={14}
-							className="animate-spin"
+							className={styles.spinner}
 							style={{ color: palette.primary }}
 						/>
 						<span

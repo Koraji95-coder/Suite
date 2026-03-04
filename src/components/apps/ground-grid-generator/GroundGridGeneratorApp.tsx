@@ -3,9 +3,11 @@ import { MapPin, ScrollText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
 import { hexToRgba, useTheme } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import { CoordinatesGrabber } from "../coordinatesgrabber/CoordinatesGrabber";
 import { GridGeneratorPanel } from "./GridGeneratorPanel";
 import { GroundGridProvider, useGroundGrid } from "./GroundGridContext";
+import styles from "./GroundGridGeneratorApp.module.css";
 import { UnifiedLog } from "./UnifiedLog";
 
 type TabId = "grabber" | "generator" | "log";
@@ -62,7 +64,7 @@ function ScrollableTabs({
 		<div
 			ref={scrollRef}
 			onMouseDown={handleMiddleDown}
-			className="flex gap-0.5 overflow-x-auto overflow-y-hidden [scrollbar-width:thin]"
+			className={styles.tabsScroller}
 			style={{
 				scrollbarColor: `${hexToRgba(palette.primary, 0.25)} transparent`,
 			}}
@@ -76,20 +78,15 @@ function ScrollableTabs({
 						key={tab.id}
 						type="button"
 						onClick={() => onTabChange(tab.id)}
-						className={[
-							"flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-lg px-5 py-2 text-[13px] font-semibold transition",
-							"border-b-2",
-							isActive
-								? "bg-surface-2 text-text border-[color:#f59e0b]"
-								: "bg-transparent text-text-muted border-transparent hover:bg-surface hover:text-text",
-						].join(" ")}
+						className={cn(
+							styles.tabButton,
+							isActive ? styles.tabButtonActive : styles.tabButtonInactive,
+						)}
 					>
 						{tab.id === "log" ? <ScrollText size={13} /> : null}
 						{tab.label}
 						{hasCount ? (
-							<span className="ml-1 inline-flex items-center rounded-full bg-[color-mix(in_oklab,var(--primary)_15%,transparent)] px-1.5 py-0.5 text-[10px] font-extrabold text-text-muted">
-								{logs.length}
-							</span>
+							<span className={styles.tabBadge}>{logs.length}</span>
 						) : null}
 					</button>
 				);
@@ -109,19 +106,17 @@ function StatusPill({
 }) {
 	return (
 		<div
-			className={[
-				"flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium",
-				isOk
-					? "border-[color:color-mix(in_oklab,var(--success)_30%,var(--border))] bg-[color-mix(in_oklab,var(--success)_10%,transparent)] text-success"
-					: "border-[color:color-mix(in_oklab,var(--accent)_22%,var(--border))] bg-[color-mix(in_oklab,var(--accent)_10%,transparent)] text-accent",
-			].join(" ")}
+			className={cn(
+				styles.statusPill,
+				isOk ? styles.statusPillOk : styles.statusPillMuted,
+			)}
 			title={title}
 		>
 			<span
-				className={[
-					"h-2 w-2 rounded-full",
-					isOk ? "bg-success" : "bg-accent",
-				].join(" ")}
+				className={cn(
+					styles.statusDot,
+					isOk ? styles.statusDotOk : styles.statusDotMuted,
+				)}
 			/>
 			<span>{label}</span>
 		</div>
@@ -186,30 +181,28 @@ function GroundGridGeneratorInner() {
 	);
 
 	return (
-		<div className="relative flex flex-col">
+		<div className={styles.root}>
 			{/* Header */}
 			<div
-				className="relative z-10 shrink-0 border-b px-6 pt-4 backdrop-blur"
+				className={styles.header}
 				style={{
 					borderColor: hexToRgba(palette.primary, 0.12),
 					background: hexToRgba(palette.surface, 0.85),
 				}}
 			>
-				<div className="mb-4 flex items-center gap-3">
-					<div className="rounded-xl p-2.5 bg-[linear-gradient(135deg,color-mix(in_oklab,#f59e0b_20%,transparent),color-mix(in_oklab,#ea580c_20%,transparent))]">
-						<MapPin size={24} className="text-[color:#f59e0b]" />
+				<div className={styles.headerRow}>
+					<div className={styles.iconWrap}>
+						<MapPin size={24} className={styles.icon} />
 					</div>
 
-					<div className="min-w-0 flex-1">
-						<h2 className="m-0 text-[22px] font-bold tracking-tight bg-[linear-gradient(90deg,#f59e0b,#ea580c)] bg-clip-text text-transparent">
-							Ground Grid Generator
-						</h2>
-						<p className="m-0 mt-0.5 text-xs text-text-muted">
+					<div className={styles.titleWrap}>
+						<h2 className={styles.title}>Ground Grid Generator</h2>
+						<p className={styles.subtitle}>
 							Extract coordinates and generate ground grid designs
 						</p>
 					</div>
 
-					<div className="flex items-center gap-2">
+					<div className={styles.statusRow}>
 						<StatusPill
 							isOk={backendConnected}
 							label={backendConnected ? "AutoCAD Connected" : "AutoCAD Offline"}
@@ -231,19 +224,30 @@ function GroundGridGeneratorInner() {
 			</div>
 
 			{/* Body */}
-			<div className="relative z-10 min-h-0 flex-1">
-				<div className={activeTab === "grabber" ? "overflow-auto" : "hidden"}>
+			<div className={styles.body}>
+				<div
+					className={cn(
+						styles.panel,
+						activeTab === "grabber" ? styles.panelScroll : styles.panelHidden,
+					)}
+				>
 					<CoordinatesGrabber />
 				</div>
 
-				<div className={activeTab === "generator" ? "overflow-auto" : "hidden"}>
+				<div
+					className={cn(
+						styles.panel,
+						activeTab === "generator" ? styles.panelScroll : styles.panelHidden,
+					)}
+				>
 					<GridGeneratorPanel />
 				</div>
 
 				<div
-					className={
-						activeTab === "log" ? "flex flex-col overflow-auto" : "hidden"
-					}
+					className={cn(
+						styles.panel,
+						activeTab === "log" ? styles.panelLog : styles.panelHidden,
+					)}
 				>
 					<UnifiedLog />
 				</div>

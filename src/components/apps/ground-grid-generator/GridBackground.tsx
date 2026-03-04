@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import styles from "./GridBackground.module.css";
 import { createGridBackgroundEngine } from "./GridBackgroundEngine";
 
 interface GridBackgroundProps {
@@ -18,7 +19,7 @@ export function GridBackground({ opacity = 0.35 }: GridBackgroundProps) {
 		<div
 			ref={containerRef}
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-0 overflow-hidden"
+			className={styles.root}
 			style={{
 				opacity,
 				zIndex: 0,

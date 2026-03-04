@@ -14,6 +14,7 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import styles from "./Calendar.module.css";
 
 interface CalendarProps {
 	mode?: "single";
@@ -58,34 +59,31 @@ export function Calendar({
 	};
 
 	return (
-		<div className={cn("p-3", className)}>
-			<div className="flex items-center justify-between mb-2">
+		<div className={cn(styles.root, className)}>
+			<div className={styles.header}>
 				<button
 					type="button"
 					onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-					className="p-1 rounded hover:bg-accent text-muted-foreground"
+					className={styles.navButton}
 				>
-					<ChevronLeft className="h-4 w-4" />
+					<ChevronLeft className={styles.navIcon} />
 				</button>
-				<span className="text-sm font-medium text-foreground">
+				<span className={styles.monthLabel}>
 					{format(currentMonth, "MMMM yyyy")}
 				</span>
 				<button
 					type="button"
 					onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-					className="p-1 rounded hover:bg-accent text-muted-foreground"
+					className={styles.navButton}
 				>
-					<ChevronRight className="h-4 w-4" />
+					<ChevronRight className={styles.navIcon} />
 				</button>
 			</div>
-			<table className="w-full border-collapse">
+			<table className={styles.table}>
 				<thead>
 					<tr>
 						{["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-							<th
-								key={d}
-								className="text-muted-foreground text-xs font-normal p-2 text-center"
-							>
+							<th key={d} className={styles.weekdayCell}>
 								{d}
 							</th>
 						))}
@@ -100,18 +98,18 @@ export function Calendar({
 								const dis = isDisabled(d);
 								const today = isSameDay(d, new Date());
 								return (
-									<td key={di} className="p-0 text-center">
+									<td key={di} className={styles.dayCell}>
 										<button
 											type="button"
 											disabled={dis}
 											onClick={() => !dis && onSelect?.(d)}
 											className={cn(
-												"h-8 w-8 rounded-md text-sm mx-auto flex items-center justify-center cursor-pointer",
-												!inMonth && "text-muted-foreground/40",
-												inMonth && !sel && "text-foreground hover:bg-accent",
-												sel && "bg-primary text-primary-foreground",
-												today && !sel && "border border-primary/50",
-												dis && "opacity-30 cursor-not-allowed",
+												styles.dayButton,
+												!inMonth && styles.dayOutsideMonth,
+												inMonth && !sel && styles.dayInMonth,
+												sel && styles.daySelected,
+												today && !sel && styles.dayToday,
+												dis && styles.dayDisabled,
 											)}
 										>
 											{format(d, "d")}

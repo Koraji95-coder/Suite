@@ -1,6 +1,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
 import { useCalendarDnd } from "./calendarindex";
+import styles from "./DroppableCell.module.css";
 
 interface DroppableCellProps {
 	id: string;
@@ -43,10 +44,7 @@ export function DroppableCell({
 			ref={setNodeRef}
 			onClick={onClick}
 			onDoubleClick={onDoubleClick} // ✅ new
-			className={cn(
-				"data-dragging:bg-accent flex h-full flex-col overflow-hidden px-0.5 py-1 sm:px-1",
-				className,
-			)}
+			className={cn(styles.root, className)}
 			title={formattedTime ? `${formattedTime}` : undefined}
 			data-dragging={isOver && activeEvent ? true : undefined}
 		>

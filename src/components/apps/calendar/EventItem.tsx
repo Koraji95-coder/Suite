@@ -5,13 +5,38 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
 	type CalendarEvent,
-	getBorderRadiusClasses,
-	getEventColorClasses,
+	type EventColor,
 	getEventInlineStyle,
 } from "./calendarindex";
+import styles from "./EventItem.module.css";
 
 const formatTimeWithOptionalMinutes = (date: Date) => {
 	return format(date, getMinutes(date) === 0 ? "ha" : "h:mma").toLowerCase();
+};
+
+const getEventColorClass = (color?: EventColor | string): string => {
+	switch (color) {
+		case "amber":
+			return styles.colorAmber;
+		case "violet":
+			return styles.colorViolet;
+		case "rose":
+			return styles.colorRose;
+		case "emerald":
+			return styles.colorEmerald;
+		case "orange":
+			return styles.colorOrange;
+		case "sky":
+		default:
+			return styles.colorSky;
+	}
+};
+
+const getRadiusClass = (isFirstDay: boolean, isLastDay: boolean): string => {
+	if (isFirstDay && isLastDay) return styles.radiusSingle;
+	if (isFirstDay) return styles.radiusStart;
+	if (isLastDay) return styles.radiusEnd;
+	return styles.radiusMiddle;
 };
 
 interface EventWrapperProps {
@@ -56,10 +81,11 @@ function EventWrapper({
 
 	return (
 		<button
+			type="button"
 			className={cn(
-				"focus-visible:border-ring focus-visible:ring-ring/50 flex size-full overflow-hidden px-2 text-left font-medium leading-tight backdrop-blur-md transition outline-none select-none focus-visible:ring-[3px] data-dragging:cursor-grabbing data-dragging:shadow-lg data-past-event:line-through sm:px-2.5",
-				inlineStyle ? "shadow-black/10" : getEventColorClasses(event.color),
-				getBorderRadiusClasses(isFirstDay, isLastDay),
+				styles.eventWrapper,
+				inlineStyle ? styles.customColor : getEventColorClass(event.color),
+				getRadiusClass(isFirstDay, isLastDay),
 				className,
 			)}
 			style={inlineStyle}
@@ -135,10 +161,7 @@ export function EventItem({
 				isLastDay={isLastDay}
 				isDragging={isDragging}
 				onClick={onClick}
-				className={cn(
-					"mt-[var(--event-gap)] h-[var(--event-height)] items-center justify-center text-[11px] leading-none sm:text-xs",
-					className,
-				)}
+				className={cn(styles.monthEvent, className)}
 				currentTime={currentTime}
 				dndListeners={dndListeners}
 				dndAttributes={dndAttributes}
@@ -146,13 +169,13 @@ export function EventItem({
 				onTouchStart={onTouchStart}
 			>
 				{children || (
-					<span className="flex w-full items-center justify-center gap-1 overflow-hidden text-center leading-none">
+					<span className={styles.monthContent}>
 						{!event.allDay && (
-							<span className="truncate font-normal opacity-70 text-[10px] sm:text-[11px]">
+							<span className={styles.timeLabel}>
 								{formatTimeWithOptionalMinutes(displayStart)}{" "}
 							</span>
 						)}
-						<span className="truncate">{event.title}</span>
+						<span className={styles.monthTitle}>{event.title}</span>
 					</span>
 				)}
 			</EventWrapper>
@@ -167,22 +190,17 @@ export function EventItem({
 				isLastDay={isLastDay}
 				isDragging={isDragging}
 				onClick={onClick}
-				className={cn(
-					"items-center justify-center text-[11px] leading-none sm:text-xs",
-					className,
-				)}
+				className={cn(styles.gridEvent, className)}
 				currentTime={currentTime}
 				dndListeners={dndListeners}
 				dndAttributes={dndAttributes}
 				onMouseDown={onMouseDown}
 				onTouchStart={onTouchStart}
 			>
-				<div className="flex w-full items-center justify-center gap-1 overflow-hidden text-center leading-none">
-					<span className="truncate">{event.title}</span>
+				<div className={styles.gridContent}>
+					<span className={styles.gridTitle}>{event.title}</span>
 					{showTime && (
-						<span className="truncate opacity-70 text-[10px] sm:text-[11px]">
-							{shortTimeLabel}
-						</span>
+						<span className={styles.gridTime}>{shortTimeLabel}</span>
 					)}
 				</div>
 			</EventWrapper>
@@ -191,11 +209,12 @@ export function EventItem({
 
 	return (
 		<button
+			type="button"
 			className={cn(
-				"focus-visible:border-ring focus-visible:ring-ring/50 flex w-full flex-col gap-1.5 rounded-lg px-3 py-2.5 text-left transition outline-none focus-visible:ring-[3px] data-past-event:line-through data-past-event:opacity-90",
+				styles.agendaButton,
 				event.colorHex
-					? "bg-muted/40 hover:bg-muted/50 text-foreground/90"
-					: getEventColorClasses(event.color),
+					? styles.agendaCustomColor
+					: getEventColorClass(event.color),
 				className,
 			)}
 			style={getEventInlineStyle(event.colorHex)}
@@ -206,25 +225,25 @@ export function EventItem({
 			{...dndListeners}
 			{...dndAttributes}
 		>
-			<div className="text-sm font-medium leading-tight">{event.title}</div>
-			<div className="text-xs opacity-70">
+			<div className={styles.agendaTitle}>{event.title}</div>
+			<div className={styles.agendaMeta}>
 				{event.allDay ? (
 					<span>All day</span>
 				) : (
-					<span className="uppercase">
+					<span className={styles.timeRange}>
 						{formatTimeWithOptionalMinutes(displayStart)} -{" "}
 						{formatTimeWithOptionalMinutes(displayEnd)}
 					</span>
 				)}
 				{event.location && (
 					<>
-						<span className="px-1 opacity-35"> · </span>
+						<span className={styles.separator}> · </span>
 						<span>{event.location}</span>
 					</>
 				)}
 			</div>
 			{event.description && (
-				<div className="my-1 text-xs opacity-90">{event.description}</div>
+				<div className={styles.agendaDescription}>{event.description}</div>
 			)}
 		</button>
 	);

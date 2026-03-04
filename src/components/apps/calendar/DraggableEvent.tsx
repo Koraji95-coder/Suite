@@ -4,6 +4,7 @@ import { differenceInDays } from "date-fns";
 import { useRef, useState } from "react";
 
 import { CalendarEvent, EventItem, useCalendarDnd } from "./calendarindex";
+import styles from "./DraggableEvent.module.css";
 
 interface DraggableEventProps {
 	event: CalendarEvent;
@@ -74,7 +75,7 @@ export function DraggableEvent({
 		return (
 			<div
 				ref={setNodeRef}
-				className="opacity-0"
+				className={styles.hiddenPlaceholder}
 				style={{ height: height || "auto" }}
 			/>
 		);
@@ -114,7 +115,7 @@ export function DraggableEvent({
 				if (elementRef) elementRef.current = node;
 			}}
 			style={style}
-			className="touch-none"
+			className={styles.dragContainer}
 		>
 			<EventItem
 				event={event}

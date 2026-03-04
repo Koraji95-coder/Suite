@@ -4,7 +4,7 @@ import { useMemo, useRef } from "react";
 import { Button } from "@/components/apps/ui/button";
 import { Input } from "@/components/apps/ui/input";
 import { Surface } from "@/components/apps/ui/Surface";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 
 interface TransmittalBuilderFileRowProps {
 	label: string;
@@ -31,7 +31,6 @@ export function TransmittalBuilderFileRow({
 	invalid,
 	action,
 }: TransmittalBuilderFileRowProps) {
-	const { palette } = useTheme();
 	const inputRef = useRef<HTMLInputElement | null>(null);
 
 	const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -56,33 +55,22 @@ export function TransmittalBuilderFileRow({
 
 	return (
 		<Surface
-			className="p-5 space-y-3"
-			style={{
-				border: `1px solid ${hexToRgba(
-					invalid ? palette.accent : palette.primary,
-					invalid ? 0.45 : 0.14,
-				)}`,
-			}}
+			className={cn(
+				"space-y-3 p-5",
+				invalid && "[border-color:var(--danger)]",
+			)}
 		>
 			<div className="flex items-start justify-between gap-3">
 				<div className="space-y-1">
-					<div
-						className="text-sm font-semibold"
-						style={{ color: hexToRgba(palette.text, 0.82) }}
-					>
+					<div className="text-sm font-semibold [color:var(--text)]">
 						{label}
 					</div>
-					{helpText ? (
-						<div
-							className="text-xs"
-							style={{ color: hexToRgba(palette.textMuted, 0.9) }}
-						>
-							{helpText}
-						</div>
-					) : null}
+					{helpText && (
+						<div className="text-xs [color:var(--text-muted)]">{helpText}</div>
+					)}
 				</div>
 				<div className="flex items-center gap-2">
-					{action ? (
+					{action && (
 						<Button
 							type="button"
 							variant="outline"
@@ -92,8 +80,8 @@ export function TransmittalBuilderFileRow({
 						>
 							{action.label}
 						</Button>
-					) : null}
-					{files.length > 0 ? (
+					)}
+					{files.length > 0 && (
 						<Button
 							type="button"
 							variant="ghost"
@@ -102,7 +90,7 @@ export function TransmittalBuilderFileRow({
 						>
 							Clear
 						</Button>
-					) : null}
+					)}
 				</div>
 			</div>
 			<div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -116,12 +104,7 @@ export function TransmittalBuilderFileRow({
 				multiple={multiple}
 				onChange={handleChange}
 			/>
-			<div
-				className="text-xs"
-				style={{ color: hexToRgba(palette.textMuted, 0.9) }}
-			>
-				{previewLabel}
-			</div>
+			<div className="text-xs [color:var(--text-muted)]">{previewLabel}</div>
 		</Surface>
 	);
 }

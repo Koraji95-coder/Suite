@@ -1,6 +1,4 @@
-import { type CSSProperties, useMemo } from "react";
-import { GlassPanel } from "@/components/apps/ui/GlassPanel";
-import { getContrastText, useTheme } from "@/lib/palette";
+import { type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import {
 	AgendaView,
@@ -45,11 +43,6 @@ export function EventCalendar({
 	selectedDate: controlledSelectedDate,
 	onSelectedDateChange,
 }: EventCalendarProps) {
-	const { palette } = useTheme();
-	const primaryTextColor = useMemo(
-		() => getContrastText(palette.primary),
-		[palette.primary],
-	);
 	const {
 		closeEventDialog,
 		currentDate,
@@ -79,14 +72,10 @@ export function EventCalendar({
 	});
 
 	return (
-		<GlassPanel
-			tint={palette.primary}
-			hoverEffect={false}
-			bevel={false}
-			specular={false}
-			overflow="visible"
+		<div
 			className={cn(
-				"flex flex-col has-data-[slot=month-view]:flex-1",
+				"flex flex-col overflow-visible rounded-xl border has-data-[slot=month-view]:flex-1",
+				"[border-color:var(--border)] [background:var(--surface)]",
 				compact ? "text-sm" : "",
 				className,
 			)}
@@ -105,8 +94,6 @@ export function EventCalendar({
 					compact={compact}
 					view={view}
 					viewTitle={viewTitle}
-					palette={palette}
-					primaryTextColor={primaryTextColor}
 					onToday={handleToday}
 					onPrev={handlePrevious}
 					onNext={handleNext}
@@ -115,7 +102,7 @@ export function EventCalendar({
 				/>
 
 				<div className="relative z-10 flex flex-1 flex-col px-2 pb-2 sm:px-5 sm:pb-5">
-					{view === "month" ? (
+					{view === "month" && (
 						<MonthView
 							currentDate={currentDate}
 							selectedDate={selectedDate}
@@ -124,9 +111,8 @@ export function EventCalendar({
 							onEventSelect={handleEventSelect}
 							onEventCreate={handleEventCreate}
 						/>
-					) : null}
-
-					{view === "week" ? (
+					)}
+					{view === "week" && (
 						<WeekView
 							currentDate={currentDate}
 							selectedDate={selectedDate}
@@ -135,18 +121,16 @@ export function EventCalendar({
 							onEventSelect={handleEventSelect}
 							onEventCreate={handleEventCreate}
 						/>
-					) : null}
-
-					{view === "day" ? (
+					)}
+					{view === "day" && (
 						<DayView
 							currentDate={currentDate}
 							events={events}
 							onEventSelect={handleEventSelect}
 							onEventCreate={handleEventCreate}
 						/>
-					) : null}
-
-					{view === "agenda" ? (
+					)}
+					{view === "agenda" && (
 						<AgendaView
 							currentDate={currentDate}
 							events={events}
@@ -154,7 +138,7 @@ export function EventCalendar({
 							selectedDate={selectedDate}
 							onDateSelect={handleDateSelect}
 						/>
-					) : null}
+					)}
 				</div>
 
 				<EventDialog
@@ -168,6 +152,6 @@ export function EventCalendar({
 					taskOptions={taskOptions}
 				/>
 			</CalendarDndProvider>
-		</GlassPanel>
+		</div>
 	);
 }

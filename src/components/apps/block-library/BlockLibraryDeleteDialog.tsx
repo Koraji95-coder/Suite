@@ -23,23 +23,26 @@ export function BlockLibraryDeleteDialog({
 			open={Boolean(pendingDeleteBlock)}
 			onOpenChange={(open) => !open && onCancel()}
 		>
-			<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+			<DialogContent className="max-w-sm border-(--border) bg-(--surface)">
 				<DialogHeader>
 					<DialogTitle>Delete block?</DialogTitle>
 				</DialogHeader>
-				<p className="text-sm text-[var(--text-muted)]">
-					Delete "{pendingDeleteBlock?.name ?? "this block"}"?
+				<p className="text-sm [color:var(--text-muted)]">
+					This will permanently remove "{pendingDeleteBlock?.name ?? "this block"}".
 				</p>
 				<DialogFooter className="mt-4 gap-2 sm:justify-end">
 					<button
 						onClick={onCancel}
-						className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+						className="rounded-lg border px-4 py-2 text-sm transition
+							[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+							hover:[background:var(--surface-2)]"
 					>
 						Cancel
 					</button>
 					<button
 						onClick={onConfirmDelete}
-						className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+						className="rounded-lg px-4 py-2 text-sm font-medium transition
+							[background:var(--danger)] text-[white] hover:opacity-90"
 					>
 						Delete
 					</button>

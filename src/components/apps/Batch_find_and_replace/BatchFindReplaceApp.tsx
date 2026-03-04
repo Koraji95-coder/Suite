@@ -1,7 +1,6 @@
 import { Plus, Search, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
-import { FrameSection, PageFrame } from "@/components/apps/ui/PageFrame";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { PageFrame } from "@/components/layout/PageFrame";
 
 type ReplaceRule = {
 	id: string;
@@ -28,7 +27,6 @@ const createRule = (): ReplaceRule => ({
 });
 
 export function BatchFindReplaceApp() {
-	const { palette } = useTheme();
 	const [rules, setRules] = useState<ReplaceRule[]>([createRule()]);
 	const [files, setFiles] = useState<File[]>([]);
 	const [preview, setPreview] = useState<PreviewMatch[]>([]);
@@ -38,33 +36,33 @@ export function BatchFindReplaceApp() {
 	const [sessionReady, setSessionReady] = useState(false);
 
 	const canRun = useMemo(
-		() => files.length > 0 && rules.some((rule) => rule.find.trim().length > 0),
+		() => files.length > 0 && rules.some((r) => r.find.trim().length > 0),
 		[files.length, rules],
 	);
 
 	const updateRule = (id: string, patch: Partial<ReplaceRule>) => {
-		setRules((prev) => prev.map((rule) => (rule.id === id ? { ...rule, ...patch } : rule)));
+		setRules((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 	};
 
 	const removeRule = (id: string) => {
-		setRules((prev) => (prev.length > 1 ? prev.filter((rule) => rule.id !== id) : prev));
+		setRules((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
 	};
 
 	const ensureBatchSession = async () => {
 		if (sessionReady) return;
-		const response = await fetch("/api/batch-find-replace/session", {
+		const res = await fetch("/api/batch-find-replace/session", {
 			method: "POST",
 			credentials: "include",
 		});
-		if (!response.ok) {
-			let errorMessage = "Unable to start batch session";
+		if (!res.ok) {
+			let msg = "Unable to start batch session";
 			try {
-				const payload = await response.json();
-				errorMessage = payload?.error || errorMessage;
+				const payload = await res.json();
+				msg = payload?.error || msg;
 			} catch {
-				// keep default error message
+				/* keep default */
 			}
-			throw new Error(errorMessage);
+			throw new Error(msg);
 		}
 		setSessionReady(true);
 	};
@@ -76,24 +74,21 @@ export function BatchFindReplaceApp() {
 		try {
 			await ensureBatchSession();
 			const body = new FormData();
-			files.forEach((file) => body.append("files", file));
+			files.forEach((f) => body.append("files", f));
 			body.append("rules", JSON.stringify(rules));
 
-			const response = await fetch("/api/batch-find-replace/preview", {
+			const res = await fetch("/api/batch-find-replace/preview", {
 				method: "POST",
 				credentials: "include",
 				body,
 			});
-
-			const payload = await response.json();
-			if (!response.ok) {
-				throw new Error(payload?.error || "Preview failed");
-			}
+			const payload = await res.json();
+			if (!res.ok) throw new Error(payload?.error || "Preview failed");
 
 			setPreview(Array.isArray(payload?.matches) ? payload.matches : []);
 			setMessage(payload?.message || "Preview completed.");
-		} catch (error) {
-			setMessage(error instanceof Error ? error.message : "Preview failed.");
+		} catch (err) {
+			setMessage(err instanceof Error ? err.message : "Preview failed.");
 		} finally {
 			setRunningPreview(false);
 		}
@@ -106,42 +101,42 @@ export function BatchFindReplaceApp() {
 		try {
 			await ensureBatchSession();
 			const body = new FormData();
-			files.forEach((file) => body.append("files", file));
+			files.forEach((f) => body.append("files", f));
 			body.append("rules", JSON.stringify(rules));
 
-			const response = await fetch("/api/batch-find-replace/apply", {
+			const res = await fetch("/api/batch-find-replace/apply", {
 				method: "POST",
 				credentials: "include",
 				body,
 			});
-			if (!response.ok) {
-				let errorMessage = "Apply failed";
+			if (!res.ok) {
+				let msg = "Apply failed";
 				try {
-					const payload = await response.json();
-					errorMessage = payload?.error || errorMessage;
+					const payload = await res.json();
+					msg = payload?.error || msg;
 				} catch {
-					// keep default error message
+					/* keep default */
 				}
-				throw new Error(errorMessage);
+				throw new Error(msg);
 			}
 
-			const reportBlob = await response.blob();
-			const contentDisposition = response.headers.get("content-disposition") || "";
-			const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
-			const filename = filenameMatch?.[1] || "batch_find_replace_changes.xlsx";
+			const blob = await res.blob();
+			const cd = res.headers.get("content-disposition") || "";
+			const match = cd.match(/filename="?([^";]+)"?/i);
+			const filename = match?.[1] || "batch_find_replace_changes.xlsx";
 
-			const reportUrl = URL.createObjectURL(reportBlob);
-			const downloadLink = document.createElement("a");
-			downloadLink.href = reportUrl;
-			downloadLink.download = filename;
-			document.body.appendChild(downloadLink);
-			downloadLink.click();
-			document.body.removeChild(downloadLink);
-			URL.revokeObjectURL(reportUrl);
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
 
 			setMessage("Apply completed. Excel change report downloaded.");
-		} catch (error) {
-			setMessage(error instanceof Error ? error.message : "Apply failed.");
+		} catch (err) {
+			setMessage(err instanceof Error ? err.message : "Apply failed.");
 		} finally {
 			setApplying(false);
 		}
@@ -149,72 +144,124 @@ export function BatchFindReplaceApp() {
 
 	return (
 		<PageFrame
-			title="Batch Find and Replace"
-			subtitle="Bulk text replacement pipeline bridged through the backend service."
+			title="Batch Find & Replace"
+			description="Bulk text replacement pipeline bridged through the backend service."
+			maxWidth="lg"
+			actions={
+				<div className="flex items-center gap-2">
+					<button
+						type="button"
+						onClick={runPreview}
+						disabled={!canRun || runningPreview}
+						className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition
+							[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+							hover:[background:var(--surface-2)] disabled:opacity-40 disabled:pointer-events-none"
+					>
+						<Search size={14} />
+						{runningPreview ? "Previewing…" : "Preview"}
+					</button>
+					<button
+						type="button"
+						onClick={applyChanges}
+						disabled={!canRun || applying}
+						className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition
+							[background:var(--primary)] [color:var(--primary-contrast)]
+							hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none"
+					>
+						{applying ? "Applying…" : "Apply Changes"}
+					</button>
+				</div>
+			}
 		>
-			<FrameSection title="Input Files">
-				<label
-					className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm"
-					style={{
-						borderColor: hexToRgba(palette.primary, 0.3),
-						color: palette.text,
-					}}
+			{message && (
+				<div
+					className="rounded-lg border px-4 py-3 text-sm
+						[border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)]"
 				>
-					<Upload size={16} />
-					Upload files
+					{message}
+				</div>
+			)}
+
+			{/* File upload */}
+			<section className="space-y-3">
+				<h3 className="text-sm font-medium [color:var(--text-muted)]">Input Files</h3>
+				<label
+					className="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition
+						[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+						hover:[background:var(--surface-2)]"
+				>
+					<Upload size={16} className="[color:var(--primary)]" />
+					Choose files
 					<input
 						type="file"
 						multiple
 						className="hidden"
-						onChange={(event) => {
-							setFiles(Array.from(event.target.files || []));
+						onChange={(e) => {
+							setFiles(Array.from(e.target.files || []));
 							setPreview([]);
 						}}
 					/>
 				</label>
-				<div className="mt-2 text-xs" style={{ color: palette.textMuted }}>
-					{files.length} file(s) selected
-				</div>
-			</FrameSection>
+				{files.length > 0 && (
+					<p className="text-xs [color:var(--text-muted)]">
+						{files.length} file{files.length !== 1 && "s"} selected
+					</p>
+				)}
+			</section>
 
-			<FrameSection title="Rules">
+			{/* Rules */}
+			<section className="space-y-3">
+				<h3 className="text-sm font-medium [color:var(--text-muted)]">Rules</h3>
 				<div className="space-y-2">
 					{rules.map((rule) => (
-						<div key={rule.id} className="grid gap-2 rounded-xl border p-3 md:grid-cols-[1fr_1fr_auto]" style={{ borderColor: hexToRgba(palette.primary, 0.18) }}>
-							<input
-								value={rule.find}
-								onChange={(event) => updateRule(rule.id, { find: event.target.value })}
-								placeholder="Find"
-								className="rounded-lg border px-3 py-2 text-sm"
-							/>
-							<input
-								value={rule.replace}
-								onChange={(event) => updateRule(rule.id, { replace: event.target.value })}
-								placeholder="Replace"
-								className="rounded-lg border px-3 py-2 text-sm"
-							/>
-							<button
-								type="button"
-								onClick={() => removeRule(rule.id)}
-								className="rounded-lg border px-3 py-2 text-xs"
-							>
-								Remove
-							</button>
-							<div className="flex items-center gap-3 md:col-span-3">
-								<label className="text-xs">
+						<div
+							key={rule.id}
+							className="rounded-lg border p-3 [border-color:var(--border)] [background:var(--surface)]"
+						>
+							<div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+								<input
+									value={rule.find}
+									onChange={(e) => updateRule(rule.id, { find: e.target.value })}
+									placeholder="Find"
+									className="rounded-md border px-3 py-2 text-sm outline-none transition
+										focus:[border-color:var(--primary)]
+										[border-color:var(--border)] [background:var(--bg-base)] [color:var(--text)]"
+								/>
+								<input
+									value={rule.replace}
+									onChange={(e) => updateRule(rule.id, { replace: e.target.value })}
+									placeholder="Replace"
+									className="rounded-md border px-3 py-2 text-sm outline-none transition
+										focus:[border-color:var(--primary)]
+										[border-color:var(--border)] [background:var(--bg-base)] [color:var(--text)]"
+								/>
+								<button
+									type="button"
+									onClick={() => removeRule(rule.id)}
+									className="rounded-md border px-3 py-2 text-xs transition
+										[border-color:var(--border)] [color:var(--text-muted)]
+										hover:[background:color-mix(in_srgb,var(--danger)_12%,transparent)] hover:[color:var(--danger)]"
+								>
+									Remove
+								</button>
+							</div>
+							<div className="mt-2 flex items-center gap-4">
+								<label className="flex items-center gap-1.5 text-xs [color:var(--text-muted)]">
 									<input
 										type="checkbox"
 										checked={rule.useRegex}
-										onChange={(event) => updateRule(rule.id, { useRegex: event.target.checked })}
-									/>{" "}
+										onChange={(e) => updateRule(rule.id, { useRegex: e.target.checked })}
+										className="rounded"
+									/>
 									Regex
 								</label>
-								<label className="text-xs">
+								<label className="flex items-center gap-1.5 text-xs [color:var(--text-muted)]">
 									<input
 										type="checkbox"
 										checked={rule.matchCase}
-										onChange={(event) => updateRule(rule.id, { matchCase: event.target.checked })}
-									/>{" "}
+										onChange={(e) => updateRule(rule.id, { matchCase: e.target.checked })}
+										className="rounded"
+									/>
 									Case sensitive
 								</label>
 							</div>
@@ -224,57 +271,44 @@ export function BatchFindReplaceApp() {
 				<button
 					type="button"
 					onClick={() => setRules((prev) => [...prev, createRule()])}
-					className="mt-3 inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs"
+					className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition
+						[border-color:var(--border)] [color:var(--text-muted)]
+						hover:[background:var(--surface-2)] hover:[color:var(--text)]"
 				>
 					<Plus size={14} /> Add rule
 				</button>
-			</FrameSection>
+			</section>
 
-			<FrameSection title="Actions">
-				<div className="flex flex-wrap items-center gap-2">
-					<button
-						type="button"
-						onClick={runPreview}
-						disabled={!canRun || runningPreview}
-						className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
-					>
-						<Search size={14} /> {runningPreview ? "Previewing..." : "Preview"}
-					</button>
-					<button
-						type="button"
-						onClick={applyChanges}
-						disabled={!canRun || applying}
-						className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
-					>
-						{applying ? "Applying..." : "Apply Changes"}
-					</button>
-				</div>
-				{message && (
-					<p className="mt-2 text-xs" style={{ color: palette.textMuted }}>
-						{message}
-					</p>
-				)}
-			</FrameSection>
-
-			<FrameSection title="Preview Results">
-				{preview.length === 0 ? (
-					<p className="text-sm" style={{ color: palette.textMuted }}>
-						No preview results yet.
-					</p>
-				) : (
-					<div className="max-h-[360px] space-y-2 overflow-auto">
-						{preview.map((match, index) => (
-							<div key={`${match.file}-${match.line}-${index}`} className="rounded-lg border p-2 text-xs">
-								<div className="font-semibold">{match.file} · line {match.line}</div>
-								<div className="mt-1" style={{ color: palette.textMuted }}>
-									Before: {match.before}
+			{/* Preview */}
+			{preview.length > 0 && (
+				<section className="space-y-3">
+					<h3 className="text-sm font-medium [color:var(--text-muted)]">
+						Preview — {preview.length} match{preview.length !== 1 && "es"}
+					</h3>
+					<div className="max-h-90 space-y-1.5 overflow-auto rounded-lg border p-3 [border-color:var(--border)] [background:var(--surface)]">
+						{preview.map((m, i) => (
+							<div
+								key={`${m.file}-${m.line}-${i}`}
+								className="rounded-md border p-2.5 text-xs [border-color:var(--border)] [background:var(--bg-base)]"
+							>
+								<span className="font-medium [color:var(--text)]">
+									{m.file}:{m.line}
+								</span>
+								<div className="mt-1 space-y-0.5 [color:var(--text-muted)]">
+									<div>
+										<span className="inline-block w-12 font-medium [color:var(--danger)]">−</span>
+										{m.before}
+									</div>
+									<div>
+										<span className="inline-block w-12 font-medium [color:var(--success)]">+</span>
+										{m.after}
+									</div>
 								</div>
-								<div>After: {match.after}</div>
 							</div>
 						))}
 					</div>
-				)}
-			</FrameSection>
+				</section>
+			)}
 		</PageFrame>
 	);
 }

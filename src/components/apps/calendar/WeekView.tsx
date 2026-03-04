@@ -1,5 +1,4 @@
 import React from "react";
-import { useTheme } from "@/lib/palette";
 import type { CalendarEvent } from "./calendarindex";
 import { useWeekViewData } from "./useWeekViewData";
 import { WeekViewAllDaySection } from "./WeekViewAllDaySection";
@@ -23,7 +22,6 @@ export function WeekView({
 	onEventSelect,
 	onEventCreate,
 }: WeekViewProps) {
-	const { palette } = useTheme();
 	const {
 		allDayEvents,
 		currentTimePosition,
@@ -52,7 +50,6 @@ export function WeekView({
 				days={days}
 				selectedDate={selectedDate}
 				onDateSelect={onDateSelect}
-				palette={palette}
 			/>
 
 			<WeekViewAllDaySection
@@ -60,7 +57,6 @@ export function WeekView({
 				allDayEvents={allDayEvents}
 				selectedDate={selectedDate}
 				weekStart={weekStart}
-				palette={palette}
 				onEventSelect={handleEventClick}
 			/>
 
@@ -71,7 +67,6 @@ export function WeekView({
 				processedDayEvents={processedDayEvents}
 				currentTimeVisible={currentTimeVisible}
 				currentTimePosition={currentTimePosition}
-				palette={palette}
 				onEventSelect={handleEventClick}
 				onEventCreate={onEventCreate}
 			/>

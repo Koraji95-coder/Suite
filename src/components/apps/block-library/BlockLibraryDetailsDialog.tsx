@@ -1,4 +1,4 @@
-import { Download, Package, Star, Tag } from "lucide-react";
+import { Download, Package, Star, Tag, X } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/apps/ui/dialog";
 import type { BlockFile } from "./blockLibraryModels";
 
@@ -13,101 +13,96 @@ export function BlockLibraryDetailsDialog({
 	onClose,
 	onToggleFavorite,
 }: BlockLibraryDetailsDialogProps) {
+	if (!selectedBlock) return null;
+
 	return (
-		<Dialog
-			open={Boolean(selectedBlock)}
-			onOpenChange={(open) => !open && onClose()}
-		>
-			<DialogContent className="max-h-[92vh] max-w-4xl overflow-auto border-[var(--border)] bg-[var(--bg-heavy)] p-0">
-				<div className="sticky top-0 z-10 flex items-center justify-between border-b p-6 backdrop-blur-sm [border-color:var(--border)] [background:color-mix(in_srgb,var(--bg-base)_95%,transparent)]">
-					<div>
-						<h3 className="text-2xl font-bold [color:var(--text)]">
-							{selectedBlock?.name}
+		<Dialog open onOpenChange={(open) => !open && onClose()}>
+			<DialogContent className="max-h-[90vh] max-w-3xl overflow-auto border-(--border) bg-(--bg-heavy) p-0">
+				{/* Header */}
+				<div className="flex items-start justify-between gap-4 border-b p-5 [border-color:var(--border)]">
+					<div className="min-w-0">
+						<h3 className="text-xl font-semibold [color:var(--text)]">
+							{selectedBlock.name}
 						</h3>
-						<div className="mt-2 flex items-center space-x-4 text-sm [color:var(--text-muted)]">
-							<span className="capitalize">{selectedBlock?.category}</span>
-							<span>•</span>
-							<span>
-								{((selectedBlock?.file_size ?? 0) / 1024).toFixed(1)} KB
-							</span>
-							<span>•</span>
-							<span>Used {selectedBlock?.usage_count ?? 0}x</span>
-						</div>
+						<p className="mt-1 flex items-center gap-2 text-sm [color:var(--text-muted)]">
+							<span className="capitalize">{selectedBlock.category}</span>
+							<span>·</span>
+							<span>{(selectedBlock.file_size / 1024).toFixed(1)} KB</span>
+							<span>·</span>
+							<span>{selectedBlock.usage_count}× used</span>
+						</p>
 					</div>
 					<button
 						onClick={onClose}
-						className="rounded-lg p-2 transition hover:[background:color-mix(in_srgb,var(--danger)_18%,transparent)]"
+						className="shrink-0 rounded-md p-1.5 transition hover:[background:var(--surface-2)]"
 					>
-						<span className="text-2xl [color:var(--danger)]">×</span>
+						<X className="h-4 w-4 [color:var(--text-muted)]" />
 					</button>
 				</div>
 
-				<div className="p-6 space-y-6">
-					<div className="aspect-video flex items-center justify-center rounded-lg border [border-color:var(--border)] [background:var(--surface-2)]">
-						{selectedBlock?.thumbnail_url ? (
+				<div className="space-y-5 p-5">
+					{/* Preview */}
+					<div className="flex aspect-video items-center justify-center rounded-lg border [border-color:var(--border)] [background:var(--surface-2)]">
+						{selectedBlock.thumbnail_url ? (
 							<img
 								src={selectedBlock.thumbnail_url}
 								alt={selectedBlock.name}
-								className="max-w-full max-h-full object-contain"
+								className="max-h-full max-w-full object-contain"
 							/>
 						) : (
 							<div className="text-center">
-								<Package className="mx-auto mb-4 h-24 w-24 [color:color-mix(in_srgb,var(--primary)_35%,transparent)]" />
-								<p className="[color:var(--text-muted)]">
-									Preview not available
-								</p>
+								<Package className="mx-auto mb-2 h-16 w-16 text-[color-mix(in_srgb,var(--primary)_30%,transparent)]" />
+								<p className="text-sm [color:var(--text-muted)]">No preview available</p>
 							</div>
 						)}
 					</div>
 
-					{(selectedBlock?.tags.length ?? 0) > 0 && (
-						<div>
-							<h4 className="mb-3 text-lg font-bold [color:var(--text)]">
-								Tags
-							</h4>
-							<div className="flex flex-wrap gap-2">
-								{selectedBlock?.tags.map((tag, index) => (
-									<span
-										key={`${selectedBlock.id}-${tag}-${index}`}
-										className="flex items-center space-x-1 rounded-full border px-3 py-1 [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text-muted)]"
-									>
-										<Tag className="w-3 h-3" />
-										<span>{tag}</span>
-									</span>
-								))}
-							</div>
+					{/* Tags */}
+					{selectedBlock.tags.length > 0 && (
+						<div className="flex flex-wrap gap-2">
+							{selectedBlock.tags.map((tag, i) => (
+								<span
+									key={`${selectedBlock.id}-${tag}-${i}`}
+									className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs
+										[border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)]"
+								>
+									<Tag className="h-3 w-3" />
+									{tag}
+								</span>
+							))}
 						</div>
 					)}
 
-					{selectedBlock?.is_dynamic && (
-						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]">
-							<h4 className="mb-2 text-lg font-bold [color:var(--text)]">
-								Dynamic Block
-							</h4>
-							<p className="text-sm [color:var(--text-muted)]">
-								This block includes dynamic variations and can be customized
-								with different parameters.
+					{/* Dynamic info */}
+					{selectedBlock.is_dynamic && (
+						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_8%,transparent)]">
+							<p className="text-sm font-medium [color:var(--text)]">Dynamic Block</p>
+							<p className="mt-1 text-xs [color:var(--text-muted)]">
+								Includes dynamic variations and can be customized with different parameters.
 							</p>
 						</div>
 					)}
 
-					<div className="flex gap-3">
-						<button className="flex flex-1 items-center justify-center space-x-2 rounded-lg border px-6 py-3 text-sm font-medium transition hover:[background:var(--surface-2)] [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)]">
-							<Download className="w-5 h-5" />
-							<span>Download</span>
+					{/* Actions */}
+					<div className="flex gap-2">
+						<button
+							className="flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition
+								[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+								hover:[background:var(--surface-2)]"
+						>
+							<Download className="h-4 w-4" />
+							Download
 						</button>
 						<button
-							onClick={() => selectedBlock && onToggleFavorite(selectedBlock)}
-							className={`px-6 py-3 border rounded-lg transition-all flex items-center space-x-2 ${
-								selectedBlock?.is_favorite
-									? "[background:color-mix(in_srgb,var(--warning)_30%,var(--surface))] [border-color:color-mix(in_srgb,var(--warning)_50%,transparent)] [color:var(--warning)]"
-									: "[background:var(--surface-2)] [border-color:var(--border)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--warning)_20%,var(--surface))]"
+							onClick={() => onToggleFavorite(selectedBlock)}
+							className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition ${
+								selectedBlock.is_favorite
+									? "border-[color-mix(in_srgb,var(--warning)_40%,transparent)] [background:color-mix(in_srgb,var(--warning)_15%,transparent)] [color:var(--warning)]"
+									: "[border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:var(--surface-2)]"
 							}`}
 						>
-							<Star className="w-5 h-5" />
-							<span>
-								{selectedBlock?.is_favorite ? "Favorited" : "Favorite"}
-							</span>
+							<Star className="h-4 w-4" />
+							{selectedBlock.is_favorite ? "Favorited" : "Favorite"}
 						</button>
 					</div>
 				</div>

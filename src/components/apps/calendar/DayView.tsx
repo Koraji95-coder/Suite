@@ -233,7 +233,7 @@ export function DayView({
 					{hours.map((hour, index) => (
 						<div
 							key={hour.toString()}
-							className="border-border/70 relative flex h-[var(--week-cells-height)] items-start justify-center border-b last:border-b-0"
+							className="border-border/70 relative flex h-(--week-cells-height) items-start justify-center border-b last:border-b-0"
 						>
 							{index > 0 && (
 								<span className="text-muted-foreground bg-background -translate-y-1/2 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none">
@@ -278,7 +278,7 @@ export function DayView({
 						>
 							<div className="relative flex items-center">
 								<div className="bg-primary absolute -left-1 h-2 w-2 rounded-full opacity-90"></div>
-								<div className="bg-primary h-[2px] w-full opacity-85"></div>
+								<div className="bg-primary h-0.5 w-full opacity-85"></div>
 							</div>
 						</div>
 					)}
@@ -289,7 +289,7 @@ export function DayView({
 						return (
 							<div
 								key={hour.toString()}
-								className="border-border/70 relative h-[var(--week-cells-height)] border-b last:border-b-0"
+								className="border-border/70 relative h-(--week-cells-height) border-b last:border-b-0"
 							>
 								{/* Quarter-hour intervals */}
 								{[0, 1, 2, 3].map((quarter) => {

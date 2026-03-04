@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+import unittest
+
+from backend.route_groups.api_auth_decorators import (
+    decorate_require_agent_session,
+    decorate_require_supabase_user,
+)
+
+
+class TestApiAuthDecorators(unittest.TestCase):
+    @staticmethod
+    def _jsonify(payload):
+        return payload
+
+    def test_require_supabase_user_missing_bearer_token(self) -> None:
+        g_obj = SimpleNamespace()
+
+        def endpoint():
+            return {"ok": True}, 200
+
+        wrapped = decorate_require_supabase_user(
+            endpoint,
+            get_bearer_token_fn=lambda: None,
+            verify_supabase_user_token_fn=lambda _token: {"id": "user-1"},
+            jsonify_fn=self._jsonify,
+            g_obj=g_obj,
+        )
+
+        self.assertEqual(
+            wrapped(),
+            ({"error": "Authorization bearer token required"}, 401),
+        )
+        self.assertFalse(hasattr(g_obj, "supabase_user"))
+
+    def test_require_supabase_user_rejects_invalid_token(self) -> None:
+        g_obj = SimpleNamespace()
+
+        def endpoint():
+            return {"ok": True}, 200
+
+        wrapped = decorate_require_supabase_user(
+            endpoint,
+            get_bearer_token_fn=lambda: "bad-token",
+            verify_supabase_user_token_fn=lambda _token: None,
+            jsonify_fn=self._jsonify,
+            g_obj=g_obj,
+        )
+
+        self.assertEqual(
+            wrapped(),
+            ({"error": "Invalid or expired Supabase token"}, 401),
+        )
+        self.assertFalse(hasattr(g_obj, "supabase_user"))
+
+    def test_require_supabase_user_sets_user_and_calls_endpoint(self) -> None:
+        g_obj = SimpleNamespace()
+        expected_user = {"id": "user-1", "email": "user@example.com"}
+
+        def endpoint(value: str):
+            return {"ok": value}, 200
+
+        wrapped = decorate_require_supabase_user(
+            endpoint,
+            get_bearer_token_fn=lambda: "valid-token",
+            verify_supabase_user_token_fn=lambda _token: expected_user,
+            jsonify_fn=self._jsonify,
+            g_obj=g_obj,
+        )
+
+        self.assertEqual(wrapped("ready"), ({"ok": "ready"}, 200))
+        self.assertEqual(g_obj.supabase_user, expected_user)
+
+    def test_require_agent_session_rejects_missing_or_mismatched_session(self) -> None:
+        g_obj = SimpleNamespace(supabase_user={"id": "user-1"})
+
+        def endpoint():
+            return {"ok": True}, 200
+
+        wrapped_missing = decorate_require_agent_session(
+            endpoint,
+            get_agent_session_fn=lambda: None,
+            get_supabase_user_id_fn=lambda user: str(user.get("id") or ""),
+            jsonify_fn=self._jsonify,
+            g_obj=g_obj,
+        )
+        self.assertEqual(wrapped_missing(), ({"error": "Agent session required"}, 401))
+
+        wrapped_mismatch = decorate_require_agent_session(
+            endpoint,
+            get_agent_session_fn=lambda: {"user_id": "user-2", "token": "t"},
+            get_supabase_user_id_fn=lambda user: str(user.get("id") or ""),
+            jsonify_fn=self._jsonify,
+            g_obj=g_obj,
+        )
+        self.assertEqual(wrapped_mismatch(), ({"error": "Agent session required"}, 401))
+
+    def test_require_agent_session_sets_session_and_calls_endpoint(self) -> None:
+        g_obj = SimpleNamespace(supabase_user={"id": "user-1"})
+        session = {"user_id": "user-1", "token": "token-1"}
+
+        def endpoint():
+            return {"ok": True}, 200
+
+        wrapped = decorate_require_agent_session(
+            endpoint,
+            get_agent_session_fn=lambda: session,
+            get_supabase_user_id_fn=lambda user: str(user.get("id") or ""),
+            jsonify_fn=self._jsonify,
+            g_obj=g_obj,
+        )
+
+        self.assertEqual(wrapped(), ({"ok": True}, 200))
+        self.assertEqual(g_obj.agent_session, session)
+
+
+if __name__ == "__main__":
+    unittest.main()

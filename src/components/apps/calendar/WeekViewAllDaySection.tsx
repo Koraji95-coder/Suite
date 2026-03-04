@@ -1,7 +1,5 @@
 import { isBefore, isSameDay, isToday } from "date-fns";
 import type { MouseEvent } from "react";
-import type { ColorScheme } from "@/lib/palette";
-import { hexToRgba } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { type CalendarEvent, EventItem } from "./calendarindex";
 
@@ -10,7 +8,6 @@ interface WeekViewAllDaySectionProps {
 	allDayEvents: CalendarEvent[];
 	selectedDate?: Date | null;
 	weekStart: Date;
-	palette: ColorScheme;
 	onEventSelect: (event: CalendarEvent, eventClick: MouseEvent) => void;
 }
 
@@ -19,29 +16,16 @@ export function WeekViewAllDaySection({
 	allDayEvents,
 	selectedDate,
 	weekStart,
-	palette,
 	onEventSelect,
 }: WeekViewAllDaySectionProps) {
 	if (allDayEvents.length === 0) return null;
 
 	return (
-		<div
-			style={{
-				borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-				backgroundColor: hexToRgba(palette.surface, 0.3),
-			}}
-		>
+		<div className="border-b border-[color-mix(in_srgb,var(--primary)_10%,transparent)] [background:color-mix(in_srgb,var(--surface)_30%,transparent)]">
 			<div className="grid grid-cols-8">
-				<div
-					className="relative flex items-end justify-center"
-					style={{
-						borderRight: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
-					}}
-				>
-					<span
-						className="mb-1 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none"
-						style={{ color: hexToRgba(palette.text, 0.35) }}
-					>
+				{/* Label */}
+				<div className="relative flex items-end justify-center border-r border-[color-mix(in_srgb,var(--primary)_8%,transparent)]">
+					<span className="mb-1 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none [color:var(--text-muted)]">
 						All day
 					</span>
 				</div>
@@ -61,16 +45,12 @@ export function WeekViewAllDaySection({
 					return (
 						<div
 							key={day.toString()}
-							className="relative p-1 last:border-r-0"
-							style={{
-								borderRight: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
-								...(isSelected
-									? {
-											backgroundColor: hexToRgba(palette.primary, 0.06),
-											boxShadow: `inset 0 0 0 1px ${hexToRgba(palette.primary, 0.25)}`,
-										}
-									: {}),
-							}}
+							className={cn(
+								"relative border-r p-1 last:border-r-0",
+								"border-[color-mix(in_srgb,var(--primary)_8%,transparent)]",
+								isSelected &&
+									"[background:color-mix(in_srgb,var(--primary)_6%,transparent)] [box-shadow:inset_0_0_0_1px_color-mix(in_srgb,var(--primary)_25%,transparent)]",
+							)}
 							data-today={isToday(day) || undefined}
 							data-selected={isSelected || undefined}
 						>

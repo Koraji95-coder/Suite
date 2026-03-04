@@ -1,129 +1,123 @@
-import { Clock, ExternalLink, FileText } from "lucide-react";
+// src/components/apps/dashboard/RecentFilesWidget.tsx
+import { Clock, ExternalLink, FileText, FolderOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { bubbleStyle } from "@/components/apps/dashboard/dashboardStyles";
-import { GlassPanel } from "@/components/apps/ui/GlassPanel";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import { useRecentFiles } from "./useRecentFiles";
 
+// Primitives
+import { Text } from "@/components/primitives/Text";
+import { Panel } from "@/components/primitives/Panel";
+import { Stack, HStack } from "@/components/primitives/Stack";
+import { Badge } from "@/components/primitives/Badge";
+
+function formatTimeAgo(timestamp: string) {
+  const now = new Date();
+  const then = new Date(timestamp);
+  const diffMs = now.getTime() - then.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return then.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export function RecentFilesWidget() {
-	const { palette } = useTheme();
-	const navigate = useNavigate();
-	const { files, loading } = useRecentFiles(8);
+  const navigate = useNavigate();
+  const { files, loading } = useRecentFiles(8);
 
-	const formatTime = (iso: string) => {
-		const d = new Date(iso);
-		const now = new Date();
-		const diff = now.getTime() - d.getTime();
-		const mins = Math.floor(diff / 60000);
-		if (mins < 1) return "Just now";
-		if (mins < 60) return `${mins}m ago`;
-		const hours = Math.floor(mins / 60);
-		if (hours < 24) return `${hours}h ago`;
-		const days = Math.floor(hours / 24);
-		if (days < 7) return `${days}d ago`;
-		return d.toLocaleDateString();
-	};
+  return (
+    <Panel variant="default" padding="lg" className="h-full">
+      <Stack gap={5}>
+        {/* Header */}
+        <HStack justify="between" align="center">
+          <HStack gap={3} align="center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/15 text-warning">
+              <Clock size={20} />
+            </div>
+            <Stack gap={0}>
+              <Text size="lg" weight="bold">
+                Recent Files
+              </Text>
+              <Text size="xs" color="muted">
+                Recently accessed documents
+              </Text>
+            </Stack>
+          </HStack>
+          
+          {files.length > 0 && (
+            <Badge variant="soft" size="sm">
+              {files.length} file{files.length !== 1 ? "s" : ""}
+            </Badge>
+          )}
+        </HStack>
 
-	return (
-		<GlassPanel
-			tint={palette.primary}
-			hoverEffect={false}
-			specular={false}
-			bevel={false}
-			className="p-8 group"
-		>
-			<div className="relative z-10">
-				<div className="flex items-center space-x-2 mb-4">
-					<div
-						className="p-2 rounded-lg"
-						style={{
-							background: `linear-gradient(135deg, ${hexToRgba(
-								palette.primary,
-								0.25,
-							)} 0%, ${hexToRgba(palette.primary, 0.08)} 100%)`,
-							boxShadow: `0 0 16px ${hexToRgba(palette.primary, 0.12)}`,
-						}}
-					>
-						<Clock className="w-5 h-5" style={{ color: palette.primary }} />
-					</div>
-					<h3 className="text-xl font-bold" style={{ color: palette.primary }}>
-						Recent Files
-					</h3>
-				</div>
+        {/* Files list */}
+        {loading ? (
+          <Stack gap={2}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-16 rounded-xl bg-surface-2 animate-pulse" />
+            ))}
+          </Stack>
+        ) : files.length === 0 ? (
+          <Panel variant="inset" padding="lg" className="text-center">
+            <Stack gap={3} align="center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2">
+                <FolderOpen size={24} className="text-text-muted" />
+              </div>
+              <Stack gap={1}>
+                <Text size="sm" weight="medium">
+                  No recent files
+                </Text>
+                <Text size="xs" color="muted">
+                  Open files to see them here
+                </Text>
+              </Stack>
+            </Stack>
+          </Panel>
+        ) : (
+          <Stack gap={2}>
+            {files.map((file) => (
+              <button
+                key={file.id}
+                type="button"
+                onClick={() => navigate(file.file_path)}
+                className="group flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-3 text-left transition-all hover:bg-surface-2 hover:border-primary/30 hover:-translate-y-0.5"
+              >
+                {/* File icon */}
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-text-muted">
+                  <FileText size={18} />
+                </div>
 
-				{loading ? (
-					<div
-						className="text-sm"
-						style={{ color: hexToRgba(palette.text, 0.45) }}
-					>
-						Loading...
-					</div>
-				) : files.length === 0 ? (
-					<div
-						className="text-sm"
-						style={{ color: hexToRgba(palette.text, 0.45) }}
-					>
-						No recent files yet. Open files to see them here.
-					</div>
-				) : (
-					<div className="flex flex-col gap-3">
-						{files.map((f) => (
-							<button
-								key={f.id}
-								onClick={() => navigate(f.file_path)}
-								className="flex w-full items-center gap-3 rounded-2xl px-5 py-4 text-left transition-all duration-300 hover:-translate-y-px"
-								style={bubbleStyle(palette, palette.primary)}
-							>
-								<FileText
-									size={14}
-									color={hexToRgba(palette.text, 0.45)}
-									style={{ flexShrink: 0 }}
-								/>
-								<div style={{ flex: 1, minWidth: 0 }}>
-									<div
-										style={{
-											fontSize: 12,
-											fontWeight: 600,
-											color: hexToRgba(palette.text, 0.9),
-											overflow: "hidden",
-											textOverflow: "ellipsis",
-											whiteSpace: "nowrap",
-										}}
-									>
-										{f.file_name}
-									</div>
-									{f.context && (
-										<div
-											style={{
-												fontSize: 10,
-												color: hexToRgba(palette.text, 0.45),
-												marginTop: 2,
-											}}
-										>
-											{f.context}
-										</div>
-									)}
-								</div>
-								<span
-									style={{
-										fontSize: 10,
-										color: hexToRgba(palette.text, 0.45),
-										flexShrink: 0,
-										whiteSpace: "nowrap",
-									}}
-								>
-									{formatTime(f.accessed_at)}
-								</span>
-								<ExternalLink
-									size={10}
-									color={hexToRgba(palette.text, 0.4)}
-									style={{ flexShrink: 0, opacity: 0.5 }}
-								/>
-							</button>
-						))}
-					</div>
-				)}
-			</div>
-		</GlassPanel>
-	);
+                {/* File info */}
+                <Stack gap={0} className="flex-1 min-w-0">
+                  <Text size="sm" weight="medium" truncate>
+                    {file.file_name}
+                  </Text>
+                  {file.context && (
+                    <Text size="xs" color="muted" truncate>
+                      {file.context}
+                    </Text>
+                  )}
+                </Stack>
+
+                {/* Time */}
+                <Text size="xs" color="muted" className="shrink-0">
+                  {formatTimeAgo(file.accessed_at)}
+                </Text>
+
+                {/* Arrow */}
+                <ExternalLink 
+                  size={12} 
+                  className="shrink-0 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" 
+                />
+              </button>
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    </Panel>
+  );
 }

@@ -14,49 +14,59 @@ export function WhiteboardCard({
 	onDelete,
 }: WhiteboardCardProps) {
 	return (
-		<div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] backdrop-blur-md transition-all hover:border-[var(--accent)]">
-			<div className="relative group">
+		<div className="group overflow-hidden rounded-xl border transition hover:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)]">
+			{/* Thumbnail */}
+			<div className="relative">
 				{whiteboard.thumbnail_url ? (
 					<img
 						src={whiteboard.thumbnail_url}
 						alt={whiteboard.title}
-						className="h-48 w-full bg-[var(--surface-2)] object-cover"
+						className="h-48 w-full object-cover [background:var(--surface-2)]"
 					/>
 				) : (
-					<div className="flex h-48 w-full items-center justify-center bg-[var(--surface-2)]">
-						<span className="text-4xl font-bold text-[var(--accent)]/40">
+					<div className="flex h-48 w-full items-center justify-center [background:var(--surface-2)]">
+						<span className="text-4xl font-bold opacity-25 [color:var(--primary)]">
 							{getInitials(whiteboard.title)}
 						</span>
 					</div>
 				)}
-				<div className="absolute inset-0 flex items-center justify-center space-x-2 bg-[color:rgb(10_10_10_/_0.55)] opacity-0 transition-opacity group-hover:opacity-100">
+
+				{/* Hover overlay */}
+				<div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
 					<button
 						onClick={() => onView(whiteboard)}
-						className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-[var(--text)] transition-all hover:bg-[var(--surface-2)]"
 						title="View"
+						className="rounded-lg border p-2 transition
+							[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+							hover:[background:var(--surface-2)]"
 					>
-						<Eye className="w-5 h-5" />
+						<Eye className="h-5 w-5" />
 					</button>
 					<button
 						onClick={() => onDelete(whiteboard.id)}
-						className="p-2 [background:color-mix(in_srgb,var(--danger)_20%,transparent)] hover:[background:color-mix(in_srgb,var(--danger)_30%,transparent)] border border-[color-mix(in_srgb,var(--danger)_40%,transparent)] rounded-lg [color:var(--danger)] transition-all"
 						title="Delete"
+						className="rounded-lg border p-2 transition
+							border-[color-mix(in_srgb,var(--danger)_40%,transparent)]
+							[background:color-mix(in_srgb,var(--danger)_14%,transparent)]
+							[color:var(--danger)]
+							hover:[background:color-mix(in_srgb,var(--danger)_25%,transparent)]"
 					>
-						<Trash2 className="w-5 h-5" />
+						<Trash2 className="h-5 w-5" />
 					</button>
 				</div>
 			</div>
 
+			{/* Info */}
 			<div className="p-4">
-				<h3 className="mb-2 truncate text-lg font-bold text-[var(--text)]">
+				<h3 className="mb-2 truncate text-sm font-semibold [color:var(--text)]">
 					{whiteboard.title}
 				</h3>
 
-				<div className="mb-3 flex items-center space-x-2 text-xs text-[var(--text-muted)]">
-					<Calendar className="w-3 h-3" />
+				<div className="mb-3 flex items-center gap-2 text-xs [color:var(--text-muted)]">
+					<Calendar className="h-3 w-3" />
 					<span>{formatDate(whiteboard.created_at)}</span>
-					<span>•</span>
-					<span className="rounded bg-[var(--surface-2)] px-2 py-0.5">
+					<span>·</span>
+					<span className="rounded px-1.5 py-0.5 [background:var(--surface-2)]">
 						{whiteboard.panel_context}
 					</span>
 				</div>
@@ -66,10 +76,11 @@ export function WhiteboardCard({
 						{whiteboard.tags.map((tag, idx) => (
 							<span
 								key={idx}
-								className="flex items-center space-x-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs text-[var(--text-muted)]"
+								className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs
+									[border-color:var(--border)] [background:var(--surface-2)] [color:var(--text-muted)]"
 							>
-								<Tag className="w-3 h-3" />
-								<span>{tag}</span>
+								<Tag className="h-3 w-3" />
+								{tag}
 							</span>
 						))}
 					</div>

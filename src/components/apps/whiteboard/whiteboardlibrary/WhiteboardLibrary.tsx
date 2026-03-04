@@ -103,7 +103,7 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 
 	if (loading) {
 		return (
-			<div className="py-8 text-center text-[var(--text-muted)]">
+			<div className="py-8 text-center text-(--text-muted)">
 				Loading whiteboards...
 			</div>
 		);
@@ -145,11 +145,11 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 				open={Boolean(pendingDelete)}
 				onOpenChange={(open) => !open && setPendingDelete(null)}
 			>
-				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+				<DialogContent className="max-w-sm border-(--border) bg-(--surface)">
 					<DialogHeader>
 						<DialogTitle>Delete whiteboard?</DialogTitle>
 					</DialogHeader>
-					<p className="text-sm text-[var(--text-muted)]">
+					<p className="text-sm text-(--text-muted)">
 						This permanently deletes {pendingDelete?.title ?? "this whiteboard"}
 						.
 					</p>
@@ -162,7 +162,7 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 						</button>
 						<button
 							onClick={() => void confirmDeleteWhiteboard()}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] text-[white]"
 						>
 							Delete
 						</button>

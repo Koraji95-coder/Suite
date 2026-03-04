@@ -22,7 +22,8 @@ function mergeGraphData(...sources: GraphData[]): GraphData {
 export function GraphVisualization() {
 	const { palette } = useTheme();
 	const [viewMode, setViewMode] = useState<ViewMode>("2d");
-	const [sourceFilter, setSourceFilter] = useState<SourceFilter>("both");
+	const [sourceFilter, setSourceFilter] =
+		useState<SourceFilter>("architecture");
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 	const [memories, setMemories] = useState<Memory[]>([]);

@@ -1,0 +1,10 @@
+{
+	"name": "suite-repo-mcp",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Repo-native MCP server for Suite coding workflows",
+	"scripts": {
+		"start": "node server.mjs"
+	}
+}

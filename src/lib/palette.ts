@@ -37,137 +37,160 @@ export interface ColorScheme {
 	glow: string;
 }
 
-// --- Schemes ---
 export const COLOR_SCHEMES: Record<string, ColorScheme> = {
-	graphiteCyan: {
-		name: "Graphite Cyan",
-		description: "Cool graphite base with teal-cyan accent",
-		background: "#0E1117",
-		surface: "#161B22",
-		surfaceLight: "#21262D",
-		primary: "#2DD4BF",
-		secondary: "#64748B",
-		tertiary: "#F59E0B",
-		accent: "#60A5FA",
-		text: "#F0F6FC",
-		textMuted: "#8B949E",
+	// ═══════════════════════════════════════════════════════════════════════════
+	// NEUTRAL / PROFESSIONAL
+	// ═══════════════════════════════════════════════════════════════════════════
+	
+	midnight: {
+		name: "Midnight",
+		description: "Deep navy with cyan accents — focused and modern",
+		background: "#0a0f1a",
+		surface: "#111827",
+		surfaceLight: "#1f2937",
+		primary: "#22d3ee",
+		secondary: "#64748b",
+		tertiary: "#f59e0b",
+		accent: "#818cf8",
+		text: "#f1f5f9",
+		textMuted: "#94a3b8",
+		glow: "rgba(34, 211, 238, 0.15)",
+	},
+
+	graphite: {
+		name: "Graphite",
+		description: "Warm neutral gray with teal highlights",
+		background: "#0e1117",
+		surface: "#161b22",
+		surfaceLight: "#21262d",
+		primary: "#2dd4bf",
+		secondary: "#6b7280",
+		tertiary: "#f59e0b",
+		accent: "#60a5fa",
+		text: "#f0f6fc",
+		textMuted: "#8b949e",
 		glow: "rgba(45, 212, 191, 0.15)",
 	},
-	slateCoral: {
-		name: "Slate & Coral",
-		description: "Neutral base + warm accent",
-		background: "#121212",
-		surface: "#1E1E1E",
-		surfaceLight: "#2C2C2C",
-		primary: "#FF6B6B",
-		secondary: "#4ECDC4",
-		tertiary: "#FFD93D",
-		accent: "#2563EB",
-		text: "#F5F5F5",
-		textMuted: "#A0A0A0",
-		glow: "rgba(255, 107, 107, 0.20)",
+
+	slate: {
+		name: "Slate",
+		description: "Cool blue-gray with bright blue accent",
+		background: "#0f172a",
+		surface: "#1e293b",
+		surfaceLight: "#334155",
+		primary: "#3b82f6",
+		secondary: "#64748b",
+		tertiary: "#f59e0b",
+		accent: "#22d3ee",
+		text: "#f8fafc",
+		textMuted: "#94a3b8",
+		glow: "rgba(59, 130, 246, 0.15)",
 	},
-	oceanDepths: {
-		name: "Ocean Depths",
-		description: "Blue-green, calm, trustworthy",
-		background: "#0A1929",
-		surface: "#0F2743",
-		surfaceLight: "#153356",
-		primary: "#00B4D8",
-		secondary: "#48CAE4",
-		tertiary: "#F9C74F",
-		accent: "#22C55E",
-		text: "#EDF2F7",
-		textMuted: "#9CB4D4",
-		glow: "rgba(0, 180, 216, 0.20)",
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// WARM TONES
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	ember: {
+		name: "Ember",
+		description: "Warm charcoal with orange-coral accent",
+		background: "#18120e",
+		surface: "#231a14",
+		surfaceLight: "#2f241c",
+		primary: "#f97316",
+		secondary: "#a8a29e",
+		tertiary: "#22c55e",
+		accent: "#fbbf24",
+		text: "#fafaf9",
+		textMuted: "#a8a29e",
+		glow: "rgba(249, 115, 22, 0.15)",
 	},
-	twilightNebula: {
-		name: "Twilight Nebula",
-		description: "Purple-blue, moody, rich",
-		background: "#0C0717",
-		surface: "#1E1530",
-		surfaceLight: "#2E2347",
-		primary: "#7B2CBF",
-		secondary: "#3A86FF",
-		tertiary: "#FF006E",
-		accent: "#F472B6",
-		text: "#F8F0FC",
-		textMuted: "#B8B0D0",
-		glow: "rgba(123, 44, 191, 0.20)",
-	},
-	desertDusk: {
-		name: "Desert Dusk",
-		description: "Warm terracotta and sand",
-		background: "#1A1410",
-		surface: "#2A2118",
-		surfaceLight: "#3D3024",
-		primary: "#E07A5F",
-		secondary: "#F2CC8F",
-		tertiary: "#81B29A",
-		accent: "#F59E0B",
-		text: "#F4F1DE",
-		textMuted: "#B5A898",
-		glow: "rgba(224, 122, 95, 0.20)",
-	},
-	steelMint: {
-		name: "Steel Mint",
-		description: "Cool steel + mint accent",
-		background: "#0B1320",
-		surface: "#101F33",
-		surfaceLight: "#162A45",
-		primary: "#34D399",
-		secondary: "#93C5FD",
-		tertiary: "#F59E0B",
-		accent: "#93C5FD",
-		text: "#EAF2FF",
-		textMuted: "#9AA9C0",
-		glow: "rgba(52, 211, 153, 0.16)",
-	},
-	indigoFog: {
-		name: "Indigo Fog",
-		description: "Indigo base + soft violet",
-		background: "#0D1024",
-		surface: "#141A36",
-		surfaceLight: "#1B2450",
-		primary: "#A78BFA",
-		secondary: "#60A5FA",
-		tertiary: "#F472B6",
-		accent: "#60A5FA",
-		text: "#EFF2FF",
-		textMuted: "#A8ACD8",
-		glow: "rgba(167, 139, 250, 0.16)",
-	},
-	forestSignal: {
-		name: "Forest Signal",
-		description: "Deep green + signal lime",
-		background: "#071613",
-		surface: "#0B221D",
-		surfaceLight: "#103129",
-		primary: "#A3E635",
-		secondary: "#22C55E",
-		tertiary: "#60A5FA",
-		accent: "#22C55E",
-		text: "#EAFBF5",
-		textMuted: "#98B8AE",
-		glow: "rgba(163, 230, 53, 0.16)",
-	},
-	copperSlate: {
-		name: "Copper Slate",
-		description: "Warm slate + copper metallic",
-		background: "#0F1116",
-		surface: "#171A22",
+
+	copper: {
+		name: "Copper",
+		description: "Dark bronze with warm metallic highlights",
+		background: "#0f1116",
+		surface: "#171a22",
 		surfaceLight: "#222633",
-		primary: "#FB923C",
-		secondary: "#FBBF24",
-		tertiary: "#60A5FA",
-		accent: "#FBBF24",
-		text: "#F4F7FF",
-		textMuted: "#A5AEC2",
+		primary: "#fb923c",
+		secondary: "#78716c",
+		tertiary: "#60a5fa",
+		accent: "#fbbf24",
+		text: "#f4f7ff",
+		textMuted: "#a5aec2",
 		glow: "rgba(251, 146, 60, 0.16)",
+	},
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// COOL / NATURE TONES
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	forest: {
+		name: "Forest",
+		description: "Deep green with lime accent — fresh and focused",
+		background: "#071310",
+		surface: "#0c1f1a",
+		surfaceLight: "#132e26",
+		primary: "#4ade80",
+		secondary: "#6b7280",
+		tertiary: "#60a5fa",
+		accent: "#22d3ee",
+		text: "#ecfdf5",
+		textMuted: "#86efac",
+		glow: "rgba(74, 222, 128, 0.12)",
+	},
+
+	ocean: {
+		name: "Ocean",
+		description: "Deep sea blue with bright cyan — calm and clear",
+		background: "#0a1628",
+		surface: "#0f2744",
+		surfaceLight: "#163556",
+		primary: "#06b6d4",
+		secondary: "#64748b",
+		tertiary: "#fbbf24",
+		accent: "#22c55e",
+		text: "#e0f2fe",
+		textMuted: "#7dd3fc",
+		glow: "rgba(6, 182, 212, 0.15)",
+	},
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// ACCENT / CREATIVE
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	violet: {
+		name: "Violet",
+		description: "Deep purple with soft lavender — creative and rich",
+		background: "#0d0a1a",
+		surface: "#1a1528",
+		surfaceLight: "#271f3d",
+		primary: "#a78bfa",
+		secondary: "#64748b",
+		tertiary: "#f472b6",
+		accent: "#818cf8",
+		text: "#f5f3ff",
+		textMuted: "#a5b4fc",
+		glow: "rgba(167, 139, 250, 0.15)",
+	},
+
+	rose: {
+		name: "Rose",
+		description: "Deep gray with pink-coral accent — warm and inviting",
+		background: "#12080a",
+		surface: "#1c1012",
+		surfaceLight: "#2a181c",
+		primary: "#fb7185",
+		secondary: "#78716c",
+		tertiary: "#60a5fa",
+		accent: "#f472b6",
+		text: "#fff1f2",
+		textMuted: "#fda4af",
+		glow: "rgba(251, 113, 133, 0.15)",
 	},
 };
 
-export const DEFAULT_SCHEME_KEY = "graphiteCyan";
+export const DEFAULT_SCHEME_KEY = "midnight";
 
 // --- Helpers (pure functions) ---
 export function hexToRgba(hex: string, alpha: number): string {
@@ -198,6 +221,18 @@ export function getContrastText(
 		0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
 
 	return lum > 0.6 ? dark : light;
+}
+
+/** Lighten a hex color by a percentage */
+function lightenHex(hex: string, percent: number): string {
+	const normalized = hex.replace("#", "");
+	if (normalized.length !== 6) return hex;
+	
+	const r = Math.min(255, Math.floor(Number.parseInt(normalized.slice(0, 2), 16) * (1 + percent)));
+	const g = Math.min(255, Math.floor(Number.parseInt(normalized.slice(2, 4), 16) * (1 + percent)));
+	const b = Math.min(255, Math.floor(Number.parseInt(normalized.slice(4, 6), 16) * (1 + percent)));
+	
+	return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
 /**
@@ -290,26 +325,61 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 
 	document.documentElement.dataset.theme = schemeKey;
 
+	// ═══════════════════════════════════════════════════════════════════════════
+	// BACKGROUNDS
+	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--bg", palette.background);
-	rootStyle.setProperty("--bg-base", palette.background);
-	rootStyle.setProperty("--bg-mid", hexToRgba(palette.background, 0.72));
-	rootStyle.setProperty("--bg-heavy", hexToRgba(palette.background, 0.86));
+	rootStyle.setProperty("--bg-subtle", palette.background);
 
+	// ═══════════════════════════════════════════════════════════════════════════
+	// SURFACES
+	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--surface", palette.surface);
 	rootStyle.setProperty("--surface-2", palette.surfaceLight);
 
-	rootStyle.setProperty("--border", hexToRgba(palette.text, 0.1));
+	// ═══════════════════════════════════════════════════════════════════════════
+	// BORDERS
+	// ═══════════════════════════════════════════════════════════════════════════
+	rootStyle.setProperty("--border", hexToRgba(palette.text, 0.08));
+	rootStyle.setProperty("--border-subtle", hexToRgba(palette.text, 0.04));
+	rootStyle.setProperty("--border-strong", hexToRgba(palette.text, 0.14));
 
+	// ═══════════════════════════════════════════════════════════════════════════
+	// TEXT
+	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--text", palette.text);
 	rootStyle.setProperty("--text-muted", palette.textMuted);
 
+	// ═══════════════════════════════════════════════════════════════════════════
+	// BRAND COLORS
+	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--primary", palette.primary);
+	rootStyle.setProperty("--primary-hover", lightenHex(palette.primary, 0.15));
 	rootStyle.setProperty("--primary-contrast", getContrastText(palette.primary));
-
+	
 	rootStyle.setProperty("--accent", palette.accent);
+	rootStyle.setProperty("--secondary", palette.secondary);
 
+	// ═══════════════════════════════════════════════════════════════════════════
+	// STATUS COLORS
+	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--success", "#22c55e");
+	rootStyle.setProperty("--warning", "#f59e0b");
 	rootStyle.setProperty("--danger", "#ef4444");
+	rootStyle.setProperty("--info", "#3b82f6");
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// EFFECTS
+	// ═══════════════════════════════════════════════════════════════════════════
+	rootStyle.setProperty("--glow", palette.glow);
+	rootStyle.setProperty("--focus-ring", hexToRgba(palette.primary, 0.25));
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// SHADOWS
+	// ═══════════════════════════════════════════════════════════════════════════
+	rootStyle.setProperty("--shadow-sm", "0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2)");
+	rootStyle.setProperty("--shadow-md", "0 4px 12px rgba(0,0,0,0.35)");
+	rootStyle.setProperty("--shadow-lg", "0 8px 30px rgba(0,0,0,0.4)");
 }
 
 function startThemeAnimation(durationMs = 220) {

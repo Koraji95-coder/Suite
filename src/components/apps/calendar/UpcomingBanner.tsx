@@ -5,7 +5,6 @@
 
 import { CalendarDaysIcon } from "lucide-react";
 import { useMemo } from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "./calendarindex";
 import { getUpcomingNext7Days } from "./upcoming";
@@ -17,8 +16,6 @@ export function UpcomingBanner({
 	events: CalendarEvent[];
 	className?: string;
 }) {
-	const { palette } = useTheme();
-
 	const hasUpcoming = useMemo(() => {
 		return getUpcomingNext7Days(events).length > 0;
 	}, [events]);
@@ -28,29 +25,20 @@ export function UpcomingBanner({
 	return (
 		<div
 			className={cn(
-				"rounded-2xl px-5 py-4 flex items-center gap-3 text-center",
+				"flex items-center gap-3 rounded-xl border px-5 py-4 text-center",
+				"[border-color:var(--border)] [background:var(--surface)]",
 				className,
 			)}
-			style={{
-				border: `1px solid ${hexToRgba(palette.text, 0.08)}`,
-				background: hexToRgba(palette.surface, 0.14),
-			}}
 		>
-			<div style={{ color: hexToRgba(palette.text, 0.55) }}>
+			<div className="[color:var(--text-muted)]">
 				<CalendarDaysIcon size={16} aria-hidden="true" />
 			</div>
 			<div className="min-w-0 space-y-0.5">
-				<div
-					className="text-sm font-semibold leading-tight"
-					style={{ color: hexToRgba(palette.text, 0.82) }}
-				>
+				<div className="text-sm font-semibold leading-tight [color:var(--text)]">
 					No new events in the next 7 days
 				</div>
-				<div
-					className="text-xs leading-relaxed"
-					style={{ color: hexToRgba(palette.text, 0.55) }}
-				>
-					When something is scheduled, it’ll show up automatically.
+				<div className="text-xs leading-relaxed [color:var(--text-muted)]">
+					When something is scheduled, it'll show up automatically.
 				</div>
 			</div>
 		</div>

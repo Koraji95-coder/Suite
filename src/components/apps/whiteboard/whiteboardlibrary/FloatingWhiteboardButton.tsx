@@ -43,7 +43,8 @@ export function FloatingWhiteboardButton({
 								setShowWhiteboard(true);
 								setShowMenu(false);
 							}}
-							className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] [color:var(--text)] hover:opacity-90"
+							className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition
+								[background:var(--primary)] [color:var(--primary-contrast)] hover:opacity-90"
 						>
 							<Pen className="h-4 w-4 shrink-0" />
 							<span className="truncate">New Whiteboard</span>
@@ -54,7 +55,9 @@ export function FloatingWhiteboardButton({
 								setShowLibrary(true);
 								setShowMenu(false);
 							}}
-							className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-all [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] [color:var(--text)] hover:opacity-90"
+							className="flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition
+								[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+								hover:[background:var(--surface-2)]"
 						>
 							<BookOpen className="h-4 w-4 shrink-0" />
 							<span className="truncate">Whiteboard Library</span>
@@ -64,9 +67,11 @@ export function FloatingWhiteboardButton({
 
 				<button
 					onClick={() => setShowMenu(!showMenu)}
-					className={`flex h-12 w-12 items-center justify-center rounded-full shadow-2xl transition-all [background:linear-gradient(to_bottom_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] [color:var(--text)] hover:opacity-90 sm:h-14 sm:w-14 ${
-						showMenu ? "rotate-45" : ""
-					}`}
+					className={`flex h-12 w-12 items-center justify-center rounded-full shadow-xl transition-all
+						[background:var(--primary)] [color:var(--primary-contrast)]
+						[box-shadow:0_0_16px_color-mix(in_srgb,var(--primary)_35%,transparent)]
+						hover:opacity-90 sm:h-14 sm:w-14
+						${showMenu ? "rotate-45" : ""}`}
 					title="Whiteboard"
 					aria-label="Toggle whiteboard actions"
 					aria-expanded={showMenu}
@@ -81,21 +86,20 @@ export function FloatingWhiteboardButton({
 				panelContext={panelContext}
 				onSaved={() => {
 					setShowWhiteboard(false);
-					// Optionally refresh library
 				}}
 			/>
 
 			<Dialog open={showLibrary} onOpenChange={setShowLibrary}>
-				<DialogContent className="max-h-[90vh] max-w-7xl border-[var(--border)] bg-[var(--surface)] p-0">
-					<DialogHeader className="border-b border-[var(--border)] p-6">
+				<DialogContent className="max-h-[90vh] max-w-7xl border-(--border) bg-(--surface) p-0">
+					<DialogHeader className="border-b p-6 [border-color:var(--border)]">
 						<div className="flex items-center justify-between">
-							<DialogTitle className="flex items-center space-x-3 text-[var(--text)]">
-								<BookOpen className="h-6 w-6 text-[var(--accent)]" />
+							<DialogTitle className="flex items-center gap-3 [color:var(--text)]">
+								<BookOpen className="h-5 w-5 [color:var(--primary)]" />
 								<span>Whiteboard Library</span>
 							</DialogTitle>
 							<button
 								onClick={() => setShowLibrary(false)}
-								className="text-2xl text-[var(--text-muted)] transition-all hover:text-[var(--text)]"
+								className="text-2xl transition [color:var(--text-muted)] hover:[color:var(--text)]"
 							>
 								×
 							</button>

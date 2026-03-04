@@ -9,7 +9,6 @@ import { Button } from "@/components/apps/ui/button";
 import { FrameSection } from "@/components/apps/ui/PageFrame";
 import { RadioGroup, RadioGroupItem } from "@/components/apps/ui/RadioGroup";
 import { Surface } from "@/components/apps/ui/Surface";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import {
 	bytesToSize,
@@ -60,17 +59,12 @@ export function TransmittalBuilderRightRail({
 	submitAttempted,
 	validationErrors,
 }: TransmittalBuilderRightRailProps) {
-	const { palette } = useTheme();
-
 	return (
 		<div className="space-y-4">
 			<TransmittalSection title="Generate">
 				<div className="grid gap-3 px-2 sm:px-3">
 					<div className="grid gap-2">
-						<div
-							className="text-xs font-semibold"
-							style={{ color: hexToRgba(palette.text, 0.75) }}
-						>
+						<div className="text-xs font-semibold [color:var(--text)]">
 							Output format
 						</div>
 						<RadioGroup<OutputFormat>
@@ -85,7 +79,7 @@ export function TransmittalBuilderRightRail({
 									<label
 										key={format.value}
 										className={cn(
-											"flex items-center gap-3 rounded-xl border p-3 cursor-pointer",
+											"flex cursor-pointer items-center gap-3 rounded-xl border p-3",
 											active ? "border-primary" : "border-border",
 										)}
 									>
@@ -95,10 +89,7 @@ export function TransmittalBuilderRightRail({
 										/>
 										<Icon size={18} />
 										<div>
-											<div
-												className="text-sm font-semibold"
-												style={{ color: hexToRgba(palette.text, 0.82) }}
-											>
+											<div className="text-sm font-semibold [color:var(--text)]">
 												{format.label}
 											</div>
 											<div className="text-xs text-muted-foreground">
@@ -131,7 +122,7 @@ export function TransmittalBuilderRightRail({
 			</TransmittalSection>
 
 			<TransmittalSection title="Output">
-				<div className="grid gap-3 px-2 sm:px-3 text-xs text-muted-foreground">
+				<div className="grid gap-3 px-2 text-xs text-muted-foreground sm:px-3">
 					<div className="flex items-center gap-2">
 						{generationState.state === "success" ? (
 							<CheckCircle2 size={14} />
@@ -151,12 +142,7 @@ export function TransmittalBuilderRightRail({
 							{outputs.map((output) => (
 								<Surface key={output.id} className="p-4">
 									<div className="grid gap-1 text-xs">
-										<div
-											className="font-semibold"
-											style={{
-												color: hexToRgba(palette.text, 0.82),
-											}}
-										>
+										<div className="font-semibold [color:var(--text)]">
 											{output.label}
 										</div>
 										<div>{output.filename}</div>
@@ -185,13 +171,10 @@ export function TransmittalBuilderRightRail({
 			</TransmittalSection>
 
 			<TransmittalSection title="Summary">
-				<Surface className="p-5 text-xs space-y-3">
+				<Surface className="space-y-3 p-5 text-xs">
 					<div>
 						<div className="text-muted-foreground">Project</div>
-						<div
-							className="text-sm font-semibold"
-							style={{ color: hexToRgba(palette.text, 0.82) }}
-						>
+						<div className="text-sm font-semibold [color:var(--text)]">
 							{draft.projectName || "Untitled project"}
 						</div>
 						<div className="text-muted-foreground">
@@ -202,7 +185,7 @@ export function TransmittalBuilderRightRail({
 
 					<div>
 						<div className="text-muted-foreground">From</div>
-						<div style={{ color: hexToRgba(palette.text, 0.78) }}>
+						<div className="[color:var(--text)]">
 							{draft.fromName || "—"}
 						</div>
 						<div className="text-muted-foreground">
@@ -212,14 +195,14 @@ export function TransmittalBuilderRightRail({
 
 					<div>
 						<div className="text-muted-foreground">Contacts</div>
-						<div style={{ color: hexToRgba(palette.text, 0.78) }}>
+						<div className="[color:var(--text)]">
 							{completeContactsCount} complete
 						</div>
 					</div>
 
 					<div>
 						<div className="text-muted-foreground">Files</div>
-						<div style={{ color: hexToRgba(palette.text, 0.78) }}>
+						<div className="[color:var(--text)]">
 							Template: {fileSummary.template}
 						</div>
 						<div className="text-muted-foreground">
@@ -232,7 +215,7 @@ export function TransmittalBuilderRightRail({
 						<div className="grid gap-1">
 							{optionSummary.map((group) => (
 								<div key={group.label}>
-									<span style={{ color: hexToRgba(palette.text, 0.78) }}>
+									<span className="[color:var(--text)]">
 										{group.label}:
 									</span>{" "}
 									<span className="text-muted-foreground">{group.value}</span>
@@ -244,7 +227,7 @@ export function TransmittalBuilderRightRail({
 			</TransmittalSection>
 
 			<TransmittalSection title="Validation">
-				<div className="grid gap-2 px-2 sm:px-3 text-xs text-muted-foreground">
+				<div className="grid gap-2 px-2 text-xs text-muted-foreground sm:px-3">
 					<div>Draft saved: {lastSavedAt?.toLocaleTimeString() || "-"}</div>
 					{submitAttempted && validationErrors.length > 0 ? (
 						<div className="grid gap-1 [color:var(--danger)]">

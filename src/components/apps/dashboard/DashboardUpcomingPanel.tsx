@@ -1,154 +1,144 @@
+// src/components/apps/dashboard/DashboardUpcomingPanel.tsx
 import { format } from "date-fns";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Clock, ChevronRight, Sparkles } from "lucide-react";
 import { useMemo } from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import { useCalendarEvents } from "../calendar/hooks/useCalendarEvents";
-import { UpcomingBanner } from "../calendar/UpcomingBanner";
 import { getUpcomingNext7Days } from "../calendar/upcoming";
-import { getUrgencyLevel, URGENCY_COLORS } from "../calendar/urgencyUtils";
-import { GlassPanel } from "../ui/GlassPanel";
-import { bubbleStyle } from "./dashboardStyles";
+import { getUrgencyLevel } from "../calendar/urgencyUtils";
+
+// Primitives
+import { Text } from "@/components/primitives/Text";
+import { Panel } from "@/components/primitives/Panel";
+import { Stack, HStack } from "@/components/primitives/Stack";
+import { Badge } from "@/components/primitives/Badge";
+
+const URGENCY_CONFIG = {
+  OVERDUE: { color: "danger", label: "Overdue", bg: "bg-danger/10", border: "border-danger/20" },
+  CRITICAL: { color: "warning", label: "Due soon", bg: "bg-warning/10", border: "border-warning/20" },
+  WARNING: { color: "info", label: "Upcoming", bg: "bg-info/10", border: "border-info/20" },
+  NORMAL: { color: "success", label: "Scheduled", bg: "bg-success/10", border: "border-success/20" },
+} as const;
 
 export function DashboardUpcomingPanel() {
-	const { palette } = useTheme();
-	const { events, isLoading } = useCalendarEvents();
+  const { events, isLoading } = useCalendarEvents();
+  const upcoming = useMemo(() => getUpcomingNext7Days(events), [events]);
+  const upcomingPreview = upcoming.slice(0, 5);
 
-	const upcoming = useMemo(() => getUpcomingNext7Days(events), [events]);
-	const upcomingPreview = upcoming.slice(0, 4);
+  return (
+    <Panel variant="default" padding="lg" className="h-full">
+      <Stack gap={5}>
+        {/* Header */}
+        <HStack justify="between" align="center">
+          <HStack gap={3} align="center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <CalendarDays size={20} />
+            </div>
+            <Stack gap={0}>
+              <Text size="lg" weight="bold">
+                Upcoming
+              </Text>
+              <Text size="xs" color="muted" className="uppercase tracking-widest">
+                Next 7 days
+              </Text>
+            </Stack>
+          </HStack>
+          
+          {upcoming.length > 0 && (
+            <Badge color="primary" variant="soft">
+              {upcoming.length} event{upcoming.length !== 1 ? "s" : ""}
+            </Badge>
+          )}
+        </HStack>
 
-	return (
-		<GlassPanel
-			tint={palette.primary}
-			hoverEffect={false}
-			specular={false}
-			bevel={false}
-			className="p-8 xl:p-9 group"
-		>
-			<div className="relative z-10">
-				<div className="flex items-center justify-between mb-5">
-					<div className="flex items-center gap-2">
-						<div
-							className="p-2 rounded-lg"
-							style={{
-								background: `linear-gradient(135deg, ${hexToRgba(
-									palette.primary,
-									0.25,
-								)} 0%, ${hexToRgba(palette.primary, 0.08)} 100%)`,
-								boxShadow: `0 0 16px ${hexToRgba(palette.primary, 0.12)}`,
-							}}
-						>
-							<CalendarDays
-								className="w-5 h-5"
-								style={{ color: palette.primary }}
-							/>
-						</div>
-						<h3
-							className="text-xl font-bold"
-							style={{ color: palette.primary }}
-						>
-							Upcoming
-						</h3>
-					</div>
-					<span
-						className="text-xs uppercase tracking-[0.2em]"
-						style={{ color: hexToRgba(palette.text, 0.45) }}
-					>
-						Next 7 days
-					</span>
-				</div>
+        {/* Content */}
+        {isLoading ? (
+          <Stack gap={3}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 rounded-xl bg-surface-2 animate-pulse" />
+            ))}
+          </Stack>
+        ) : upcoming.length === 0 ? (
+          <Panel variant="inset" padding="lg" className="text-center">
+            <Stack gap={3} align="center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2">
+                <Sparkles size={24} className="text-text-muted" />
+              </div>
+              <Stack gap={1}>
+                <Text size="sm" weight="medium">
+                  All clear!
+                </Text>
+                <Text size="xs" color="muted">
+                  No upcoming events in the next 7 days
+                </Text>
+              </Stack>
+            </Stack>
+          </Panel>
+        ) : (
+          <Stack gap={3}>
+            {upcomingPreview.map((event) => {
+              const urgency = getUrgencyLevel(event.start.toISOString());
+              const config = URGENCY_CONFIG[urgency];
+              const dayNum = format(event.start, "d");
+              const dayName = format(event.start, "EEE");
 
-				{isLoading ? (
-					<div className="space-y-3">
-						<div className="h-14 rounded-2xl bg-white/5 animate-pulse" />
-						<div className="h-14 rounded-2xl bg-white/5 animate-pulse" />
-						<div className="h-14 rounded-2xl bg-white/5 animate-pulse" />
-					</div>
-				) : upcoming.length === 0 ? (
-					<UpcomingBanner events={events} className="justify-center" />
-				) : (
-					<div className="space-y-4">
-						{upcomingPreview.map((event) =>
-							(() => {
-								const urgency = getUrgencyLevel(event.start.toISOString());
-								const urgencyLabel =
-									urgency === "OVERDUE"
-										? "Overdue"
-										: urgency === "CRITICAL"
-											? "Due soon"
-											: urgency === "WARNING"
-												? "Upcoming"
-												: "Scheduled";
-								const urgencyTone = URGENCY_COLORS[urgency];
-								return (
-									<div
-										key={
-											event.id || `${event.title}-${event.start.toISOString()}`
-										}
-										className="flex items-center justify-between gap-4 rounded-2xl px-5 py-4 transition-all duration-300 hover:-translate-y-0.5"
-										style={bubbleStyle(palette, palette.secondary)}
-									>
-										<div className="min-w-0">
-											<div
-												className="text-sm font-semibold truncate"
-												style={{ color: hexToRgba(palette.text, 0.9) }}
-											>
-												{event.title || "Untitled event"}
-											</div>
-											<div
-												className="text-xs mt-1"
-												style={{ color: hexToRgba(palette.text, 0.55) }}
-											>
-												{format(event.start, "EEE, MMM d")} •{" "}
-												{event.allDay ? "All day" : format(event.start, "p")}
-											</div>
-											<div
-												className="mt-2 inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-[10px] uppercase tracking-[0.2em]"
-												style={{
-													color: urgencyTone.text,
-													border: `1px solid ${hexToRgba(urgencyTone.border, 0.4)}`,
-													background: hexToRgba(urgencyTone.bg, 0.15),
-												}}
-											>
-												<span
-													className="h-1.5 w-1.5 rounded-full"
-													style={{
-														background: urgencyTone.text,
-														boxShadow: `0 0 6px ${hexToRgba(
-															urgencyTone.text,
-															0.6,
-														)}`,
-													}}
-												/>
-												{urgencyLabel}
-											</div>
-										</div>
-										<div
-											className="w-10 shrink-0 rounded-lg px-2.5 py-1.5 text-center text-xs font-semibold"
-											style={{
-												border: `1px solid ${hexToRgba(palette.text, 0.1)}`,
-												color: hexToRgba(palette.text, 0.7),
-												background: "rgba(255,255,255,0.02)",
-												minWidth: 40,
-											}}
-										>
-											{format(event.start, "d")}
-										</div>
-									</div>
-								);
-							})(),
-						)}
+              return (
+                <div
+                  key={event.id || `${event.title}-${event.start.toISOString()}`}
+                  className={`
+                    group flex items-center gap-4 rounded-xl border p-4
+                    transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md
+                    ${config.bg} ${config.border}
+                  `}
+                >
+                  {/* Date badge */}
+                  <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-surface text-center">
+                    <Text size="xs" color="muted" className="uppercase">
+                      {dayName}
+                    </Text>
+                    <Text size="xl" weight="bold">
+                      {dayNum}
+                    </Text>
+                  </div>
 
-						{upcoming.length > upcomingPreview.length ? (
-							<div
-								className="text-xs mt-1"
-								style={{ color: hexToRgba(palette.text, 0.55) }}
-							>
-								+{upcoming.length - upcomingPreview.length} more
-							</div>
-						) : null}
-					</div>
-				)}
-			</div>
-		</GlassPanel>
-	);
+                  {/* Event details */}
+                  <Stack gap={1} className="flex-1 min-w-0">
+                    <Text size="sm" weight="semibold" truncate>
+                      {event.title || "Untitled event"}
+                    </Text>
+                    <HStack gap={2} align="center">
+                      <Clock size={12} className="text-text-muted" />
+                      <Text size="xs" color="muted">
+                        {event.allDay ? "All day" : format(event.start, "h:mm a")}
+                      </Text>
+                    </HStack>
+                    <Badge 
+                      color={config.color as "danger" | "warning" | "info" | "success"} 
+                      variant="soft" 
+                      size="sm"
+                      dot
+                    >
+                      {config.label}
+                    </Badge>
+                  </Stack>
+
+                  {/* Arrow */}
+                  <ChevronRight 
+                    size={16} 
+                    className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" 
+                  />
+                </div>
+              );
+            })}
+
+            {/* More indicator */}
+            {upcoming.length > upcomingPreview.length && (
+              <Text size="xs" color="muted" align="center">
+                +{upcoming.length - upcomingPreview.length} more events
+              </Text>
+            )}
+          </Stack>
+        )}
+      </Stack>
+    </Panel>
+  );
 }

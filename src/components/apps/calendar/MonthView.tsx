@@ -16,7 +16,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "@/components/apps/ui/Popover";
-import { getContrastText, hexToRgba, useTheme } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import {
 	type CalendarEvent,
 	DraggableEvent,
@@ -34,8 +34,8 @@ import { DefaultStartHour } from "./hooks/calendarconstants";
 
 interface MonthViewProps {
 	currentDate: Date;
-	selectedDate?: Date | null; // ✅ new
-	onDateSelect?: (date: Date) => void; // ✅ new
+	selectedDate?: Date | null;
+	onDateSelect?: (date: Date) => void;
 	events: CalendarEvent[];
 	onEventSelect: (event: CalendarEvent) => void;
 	onEventCreate: (startTime: Date) => void;
@@ -49,8 +49,6 @@ export function MonthView({
 	onEventSelect,
 	onEventCreate,
 }: MonthViewProps) {
-	const { palette } = useTheme();
-	const dayChipTextColor = getContrastText(palette.primary);
 	const days = useMemo(() => {
 		const monthStart = startOfMonth(currentDate);
 		const monthEnd = endOfMonth(monthStart);
@@ -69,7 +67,6 @@ export function MonthView({
 	const weeks = useMemo(() => {
 		const result: Date[][] = [];
 		let week: Date[] = [];
-
 		for (let i = 0; i < days.length; i++) {
 			week.push(days[i]);
 			if (week.length === 7 || i === days.length - 1) {
@@ -96,25 +93,21 @@ export function MonthView({
 	return (
 		<div
 			data-slot="month-view"
-			className="flex flex-1 flex-col min-w-0 overflow-x-auto"
+			className="flex min-w-0 flex-1 flex-col overflow-x-auto"
 		>
-			<div
-				className="grid grid-cols-7"
-				style={{
-					borderBottom: `1px solid ${hexToRgba(palette.primary, 0.12)}`,
-				}}
-			>
+			{/* Weekday header */}
+			<div className="grid grid-cols-7 border-b border-[color-mix(in_srgb,var(--primary)_12%,transparent)]">
 				{weekdays.map((day) => (
 					<div
 						key={day}
-						className="py-2 text-center text-sm font-medium"
-						style={{ color: hexToRgba(palette.text, 0.4) }}
+						className="py-2 text-center text-sm font-medium [color:var(--text-muted)]"
 					>
 						{day}
 					</div>
 				))}
 			</div>
 
+			{/* Week rows */}
 			<div className="grid flex-1 auto-rows-fr">
 				{weeks.map((week, weekIndex) => (
 					<div
@@ -124,9 +117,9 @@ export function MonthView({
 						{week.map((day, dayIndex) => {
 							const dayEvents = getEventsForDay(events, day);
 							const spanningEvents = getSpanningEventsForDay(events, day);
-
 							const isCurrentMonth = isSameMonth(day, currentDate);
 							const isSelected = !!selectedDate && isSameDay(day, selectedDate);
+							const today = isToday(day);
 
 							const cellId = `month-cell-${day.toISOString()}`;
 							const allDayEvents = [...spanningEvents, ...dayEvents];
@@ -136,11 +129,9 @@ export function MonthView({
 							const visibleCount = isMounted
 								? getVisibleEventCount(allDayEvents.length)
 								: undefined;
-
 							const hasMore =
 								visibleCount !== undefined &&
 								allDayEvents.length > visibleCount;
-
 							const remainingCount =
 								visibleCount !== undefined && hasMore
 									? allDayEvents.length - visibleCount
@@ -149,66 +140,37 @@ export function MonthView({
 							return (
 								<div
 									key={day.toString()}
-									className="group border-r border-b last:border-r-0"
-									style={{
-										borderColor: hexToRgba(palette.primary, 0.08),
-										backgroundColor: isSelected
-											? hexToRgba(palette.primary, 0.06)
-											: isToday(day)
-												? hexToRgba(palette.primary, 0.03)
-												: !isCurrentMonth
-													? hexToRgba(palette.surface, 0.3)
-													: undefined,
-										...(isSelected
-											? {
-													boxShadow: `inset 0 0 0 1px ${hexToRgba(palette.primary, 0.25)}`,
-												}
-											: {}),
-									}}
-									data-today={isToday(day) || undefined}
+									className={cn(
+										"group border-r border-b last:border-r-0",
+										"border-[color-mix(in_srgb,var(--primary)_8%,transparent)]",
+										isSelected && "[background:color-mix(in_srgb,var(--primary)_6%,transparent)] [box-shadow:inset_0_0_0_1px_color-mix(in_srgb,var(--primary)_25%,transparent)]",
+										!isSelected && today && "[background:color-mix(in_srgb,var(--primary)_3%,transparent)]",
+										!isSelected && !today && !isCurrentMonth && "[background:color-mix(in_srgb,var(--surface)_30%,transparent)]",
+									)}
+									data-today={today || undefined}
 									data-selected={isSelected || undefined}
 									data-outside-cell={!isCurrentMonth || undefined}
 								>
 									<DroppableCell
 										id={cellId}
 										date={day}
-										onClick={() => {
-											onDateSelect?.(day); // ✅ single-click selects date
-										}}
+										onClick={() => onDateSelect?.(day)}
 										onDoubleClick={() => {
-											// ✅ double-click creates event (keeps your “click to create” feel without breaking selection)
 											const startTime = new Date(day);
 											startTime.setHours(DefaultStartHour, 0, 0, 0);
 											onEventCreate(startTime);
 										}}
 									>
+										{/* Day number chip */}
 										<button
 											type="button"
-											className="mt-1.5 inline-flex size-7 items-center justify-center rounded-full text-sm leading-none transition-all"
-											style={{
-												...(isToday(day)
-													? {
-															backgroundColor: palette.primary,
-															color: dayChipTextColor,
-															fontWeight: "bold",
-															boxShadow: `0 0 8px ${hexToRgba(palette.primary, 0.4)}`,
-														}
-													: isSelected
-														? {
-																backgroundColor: hexToRgba(
-																	palette.primary,
-																	0.15,
-																),
-																color: palette.primary,
-																fontWeight: 600,
-																boxShadow: `0 0 0 1px ${hexToRgba(palette.primary, 0.35)}`,
-															}
-														: {
-																color: !isCurrentMonth
-																	? hexToRgba(palette.text, 0.3)
-																	: hexToRgba(palette.text, 0.7),
-															}),
-											}}
+											className={cn(
+												"mt-1.5 inline-flex size-7 items-center justify-center rounded-full text-sm leading-none transition-all",
+												today && "font-bold [background:var(--primary)] [color:var(--primary-contrast)] [box-shadow:0_0_8px_color-mix(in_srgb,var(--primary)_40%,transparent)]",
+												!today && isSelected && "font-semibold [background:color-mix(in_srgb,var(--primary)_15%,transparent)] [color:var(--primary)] [box-shadow:0_0_0_1px_color-mix(in_srgb,var(--primary)_35%,transparent)]",
+												!today && !isSelected && !isCurrentMonth && "[color:var(--text-muted)]",
+												!today && !isSelected && isCurrentMonth && "[color:var(--text)]",
+											)}
 											onClick={(e) => {
 												e.stopPropagation();
 												onDateSelect?.(day);
@@ -218,6 +180,7 @@ export function MonthView({
 											{format(day, "d")}
 										</button>
 
+										{/* Events container */}
 										<div
 											ref={isReferenceCell ? contentRef : null}
 											className="min-h-[calc((var(--event-height)+var(--event-gap))*2)] sm:min-h-[calc((var(--event-height)+var(--event-gap))*3)] lg:min-h-[calc((var(--event-height)+var(--event-gap))*4)]"
@@ -227,11 +190,9 @@ export function MonthView({
 												const eventEnd = new Date(event.end);
 												const isFirstDay = isSameDay(day, eventStart);
 												const isLastDay = isSameDay(day, eventEnd);
-
 												const isHidden =
 													visibleCount !== undefined && index >= visibleCount;
 
-												// ✅ only block rendering when we truly don’t know visibleCount yet
 												if (visibleCount === undefined) return null;
 
 												if (!isFirstDay) {
@@ -251,10 +212,7 @@ export function MonthView({
 																<div className="invisible" aria-hidden={true}>
 																	{!event.allDay && (
 																		<span>
-																			{format(
-																				new Date(event.start),
-																				"h:mm",
-																			)}{" "}
+																			{format(new Date(event.start), "h:mm")}{" "}
 																		</span>
 																	)}
 																	{event.title}
@@ -281,11 +239,12 @@ export function MonthView({
 												);
 											})}
 
+											{/* "+N more" popover */}
 											{hasMore && (
 												<Popover modal>
 													<PopoverTrigger asChild>
 														<button
-															className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-[var(--event-gap)] flex h-[var(--event-height)] w-full items-center overflow-hidden px-2 text-left text-[10px] leading-tight backdrop-blur-md transition outline-none select-none focus-visible:ring-[3px] sm:px-2.5 sm:text-xs"
+															className="focus-visible:border-ring focus-visible:ring-ring/50 text-muted-foreground hover:text-foreground hover:bg-muted/50 mt-(--event-gap) flex h-(--event-height) w-full items-center overflow-hidden px-2 text-left text-[10px] leading-tight backdrop-blur-md transition outline-none select-none focus-visible:ring-[3px] sm:px-2.5 sm:text-xs"
 															onClick={(e) => e.stopPropagation()}
 														>
 															<span>
@@ -311,7 +270,10 @@ export function MonthView({
 																{sortEvents(allEvents).map((event) => {
 																	const eventStart = new Date(event.start);
 																	const eventEnd = new Date(event.end);
-																	const isFirstDay = isSameDay(day, eventStart);
+																	const isFirstDay = isSameDay(
+																		day,
+																		eventStart,
+																	);
 																	const isLastDay = isSameDay(day, eventEnd);
 
 																	return (

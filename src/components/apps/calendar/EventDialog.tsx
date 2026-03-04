@@ -65,7 +65,7 @@ export function EventDialog({
 	const dialogCard = (
 		<DialogContent
 			className={cn(
-				"w-[min(96vw,840px)] border-primary/30 bg-card sm:max-w-[680px]",
+				"w-[min(96vw,840px)] border-primary/30 bg-card sm:max-w-170",
 				inline && "w-full sm:max-w-none",
 			)}
 		>

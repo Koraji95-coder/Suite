@@ -28,6 +28,16 @@ export type SourceFilter = "architecture" | "memory" | "both";
 
 export const getGroupColor = (group: string, palette: ColorScheme): string => {
 	switch (group) {
+		case "frontend":
+			return palette.primary;
+		case "backend":
+			return palette.tertiary;
+		case "data":
+			return palette.accent;
+		case "agent":
+			return palette.secondary;
+		case "docs":
+			return palette.textMuted;
 		case "dash":
 			return palette.primary;
 		case "know":

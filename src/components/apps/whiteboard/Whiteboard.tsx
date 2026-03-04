@@ -185,39 +185,46 @@ export function Whiteboard({
 	return (
 		<>
 			<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-				<DialogContent className="max-h-[90vh] max-w-7xl border-[var(--border)] bg-[var(--surface)] p-0">
-					<div className="flex h-full w-full flex-col overflow-hidden rounded-lg backdrop-blur-xl">
-						<div className="flex items-center justify-between border-b border-[var(--border)] p-4">
-							<div className="flex items-center space-x-3">
-								<Pen className="h-6 w-6 text-[var(--accent)]" />
-								<h3 className="text-2xl font-bold text-[var(--text)]">
-									Whiteboard - {panelContext}
+				<DialogContent className="max-h-[90vh] max-w-7xl border-(--border) bg-(--surface) p-0">
+					<div className="flex h-full w-full flex-col overflow-hidden rounded-lg">
+						{/* Header */}
+						<div className="flex items-center justify-between border-b p-4 [border-color:var(--border)]">
+							<div className="flex items-center gap-3">
+								<Pen className="h-5 w-5 [color:var(--primary)]" />
+								<h3 className="text-lg font-semibold [color:var(--text)]">
+									Whiteboard — {panelContext}
 								</h3>
 							</div>
-							<div className="flex items-center space-x-2">
+							<div className="flex items-center gap-2">
 								<button
 									onClick={() => setShowSaveDialog(true)}
-									className="flex items-center space-x-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] transition-all hover:bg-[var(--surface)]"
+									className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition
+										[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+										hover:[background:var(--surface-2)]"
 								>
-									<Save className="w-4 h-4" />
-									<span>{isSaving ? "Saving..." : "Save"}</span>
+									<Save className="h-4 w-4" />
+									{isSaving ? "Saving…" : "Save"}
 								</button>
 								<button
 									onClick={exportAsImage}
-									className="flex items-center space-x-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] transition-all hover:bg-[var(--surface)]"
+									className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition
+										[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+										hover:[background:var(--surface-2)]"
 								>
-									<Download className="w-4 h-4" />
-									<span>Export</span>
+									<Download className="h-4 w-4" />
+									Export
 								</button>
 								<button
 									onClick={onClose}
-									className="rounded-lg p-2 transition-all hover:[background:color-mix(in_srgb,var(--danger)_20%,transparent)]"
+									className="rounded-lg p-2 transition
+										hover:[background:color-mix(in_srgb,var(--danger)_14%,transparent)]"
 								>
-									<X className="w-5 h-5 [color:var(--danger)]" />
+									<X className="h-4 w-4 [color:var(--text-muted)]" />
 								</button>
 							</div>
 						</div>
 
+						{/* Canvas area */}
 						<div className="flex flex-1 overflow-hidden">
 							<WhiteboardToolbar
 								tool={tool}
@@ -233,7 +240,7 @@ export function Whiteboard({
 								canRedo={redoStack.length > 0}
 							/>
 
-							<div className="flex flex-1 items-center justify-center overflow-auto p-4">
+							<div className="flex flex-1 items-center justify-center overflow-auto p-4 [background:var(--bg-base)]">
 								<WhiteboardCanvas
 									actions={actions}
 									onActionAdd={handleActionAdd}
@@ -255,27 +262,31 @@ export function Whiteboard({
 				</DialogContent>
 			</Dialog>
 
+			{/* Clear confirmation */}
 			<Dialog
 				open={showClearDialog}
 				onOpenChange={(open) => !open && setShowClearDialog(false)}
 			>
-				<DialogContent className="max-w-sm border-[var(--border)] bg-[var(--surface)]">
+				<DialogContent className="max-w-sm border-(--border) bg-(--surface)">
 					<DialogHeader>
 						<DialogTitle>Clear whiteboard?</DialogTitle>
 					</DialogHeader>
-					<p className="text-sm text-[var(--text-muted)]">
+					<p className="text-sm [color:var(--text-muted)]">
 						This will remove all strokes and cannot be undone.
 					</p>
 					<DialogFooter className="mt-4 gap-2 sm:justify-end">
 						<button
 							onClick={() => setShowClearDialog(false)}
-							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							className="rounded-lg border px-4 py-2 text-sm transition
+								[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+								hover:[background:var(--surface-2)]"
 						>
 							Cancel
 						</button>
 						<button
 							onClick={confirmClearCanvas}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] [color:white]"
+							className="rounded-lg px-4 py-2 text-sm font-medium transition
+								[background:var(--danger)] text-[white] hover:opacity-90"
 						>
 							Clear
 						</button>
@@ -283,6 +294,7 @@ export function Whiteboard({
 				</DialogContent>
 			</Dialog>
 
+			{/* Text input */}
 			<Dialog
 				open={showTextDialog}
 				onOpenChange={(open) => {
@@ -292,7 +304,7 @@ export function Whiteboard({
 					}
 				}}
 			>
-				<DialogContent className="max-w-md border-[var(--border)] bg-[var(--surface)]">
+				<DialogContent className="max-w-md border-(--border) bg-(--surface)">
 					<DialogHeader>
 						<DialogTitle>Add Text</DialogTitle>
 					</DialogHeader>
@@ -300,7 +312,9 @@ export function Whiteboard({
 						type="text"
 						value={textValue}
 						onChange={(e) => setTextValue(e.target.value)}
-						className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+						className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition
+							focus:[border-color:var(--primary)]
+							[border-color:var(--border)] [background:var(--surface-2)] [color:var(--text)]"
 						placeholder="Enter text"
 						autoFocus
 					/>
@@ -311,13 +325,16 @@ export function Whiteboard({
 								setTextPosition(null);
 								setTextValue("");
 							}}
-							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							className="rounded-lg border px-4 py-2 text-sm transition
+								[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+								hover:[background:var(--surface-2)]"
 						>
 							Cancel
 						</button>
 						<button
 							onClick={confirmAddText}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--primary)] [color:var(--primary-contrast)]"
+							className="rounded-lg px-4 py-2 text-sm font-medium transition
+								[background:var(--primary)] [color:var(--primary-contrast)] hover:opacity-90"
 						>
 							Add Text
 						</button>

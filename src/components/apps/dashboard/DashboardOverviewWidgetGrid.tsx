@@ -1,57 +1,61 @@
+// src/components/apps/dashboard/DashboardOverviewWidgetGrid.tsx
 import type { ReactNode } from "react";
 
 interface DashboardWidget {
-	id: string;
-	visible: boolean;
+  id: string;
+  visible: boolean;
 }
 
 interface DashboardOverviewWidgetGridProps {
-	visibleWidgets: DashboardWidget[];
-	widgetMap: Record<string, ReactNode>;
+  visibleWidgets: DashboardWidget[];
+  widgetMap: Record<string, ReactNode>;
 }
 
-const gridWidgetIds = new Set(["calendar", "activity", "recent-files"]);
-
 export function DashboardOverviewWidgetGrid({
-	visibleWidgets,
-	widgetMap,
+  visibleWidgets,
+  widgetMap,
 }: DashboardOverviewWidgetGridProps) {
-	const elements: ReactNode[] = [];
-	let index = 0;
+  // Separate widgets by type for smart layout
+  const statsWidget = visibleWidgets.find((w) => w.id === "stats");
+  const projectsWidget = visibleWidgets.find((w) => w.id === "projects");
+  const otherWidgets = visibleWidgets.filter(
+    (w) => w.id !== "stats" && w.id !== "projects"
+  );
 
-	while (index < visibleWidgets.length) {
-		const currentWidget = visibleWidgets[index];
-		const currentElement = widgetMap[currentWidget.id];
+  return (
+    <div className="space-y-6">
+      {/* Stats row - full width */}
+      {statsWidget && widgetMap[statsWidget.id] && (
+        <div>{widgetMap[statsWidget.id]}</div>
+      )}
 
-		if (!currentElement) {
-			index += 1;
-			continue;
-		}
+      {/* Main content grid */}
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Left column - Projects (wider) */}
+        {projectsWidget && widgetMap[projectsWidget.id] && (
+          <div className="lg:col-span-5">
+            {widgetMap[projectsWidget.id]}
+          </div>
+        )}
 
-		if (gridWidgetIds.has(currentWidget.id)) {
-			const gridChildren: ReactNode[] = [currentElement];
-			const nextWidget = visibleWidgets[index + 1];
-			if (nextWidget && gridWidgetIds.has(nextWidget.id)) {
-				const nextElement = widgetMap[nextWidget.id];
-				if (nextElement) gridChildren.push(nextElement);
-				index += 2;
-			} else {
-				index += 1;
-			}
-
-			elements.push(
-				<div
-					key={`grid-${currentWidget.id}`}
-					className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]"
-				>
-					{gridChildren}
-				</div>,
-			);
-		} else {
-			elements.push(currentElement);
-			index += 1;
-		}
-	}
-
-	return <>{elements}</>;
+        {/* Right column - Other widgets stacked */}
+        {otherWidgets.length > 0 && (
+          <div className={`space-y-6 ${projectsWidget ? "lg:col-span-7" : "lg:col-span-12"}`}>
+            {/* Two-column grid for smaller widgets */}
+            <div className="grid gap-6 md:grid-cols-2">
+              {otherWidgets.map((widget) => {
+                const element = widgetMap[widget.id];
+                if (!element) return null;
+                return (
+                  <div key={widget.id} className="min-h-75">
+                    {element}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

@@ -10,7 +10,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/apps/ui/select";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { TransmittalBuilderFileRow as FileRow } from "./TransmittalBuilderFileRow";
 import {
@@ -62,8 +61,6 @@ export function TransmittalBuilderTypeAndFilesSection({
 	updateCidDocument,
 	removeCidDocument,
 }: TransmittalBuilderTypeAndFilesSectionProps) {
-	const { palette } = useTheme();
-
 	return (
 		<>
 			<TransmittalSection title="Transmittal Type">
@@ -76,10 +73,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 						<label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-4">
 							<RadioGroupItem value="standard" aria-label="Standard" />
 							<div>
-								<div
-									className="text-sm font-semibold"
-									style={{ color: hexToRgba(palette.text, 0.82) }}
-								>
+								<div className="text-sm font-semibold [color:var(--text)]">
 									Standard
 								</div>
 								<div className="text-xs text-muted-foreground">
@@ -90,10 +84,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 						<label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-4">
 							<RadioGroupItem value="cid" aria-label="CID" />
 							<div>
-								<div
-									className="text-sm font-semibold"
-									style={{ color: hexToRgba(palette.text, 0.82) }}
-								>
+								<div className="text-sm font-semibold [color:var(--text)]">
 									CID
 								</div>
 								<div className="text-xs text-muted-foreground">
@@ -115,14 +106,14 @@ export function TransmittalBuilderTypeAndFilesSection({
 						helpText="DOCX template used for transmittal layout."
 						invalid={isInvalid("template")}
 						action={{
-							label: templateLoading ? "Loading..." : "Use example",
+							label: templateLoading ? "Loading…" : "Use example",
 							onClick: handleUseExampleTemplate,
 							disabled: templateLoading,
 						}}
 					/>
-					{templateError ? (
+					{templateError && (
 						<div className="text-xs [color:var(--danger)]">{templateError}</div>
-					) : null}
+					)}
 
 					{draft.transmittalType === "standard" ? (
 						<div className="grid gap-4">
@@ -169,7 +160,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 				</div>
 			</TransmittalSection>
 
-			{draft.transmittalType === "cid" ? (
+			{draft.transmittalType === "cid" && (
 				<TransmittalSection title="CID Document Index">
 					<div className="grid gap-3 px-2 sm:px-3">
 						{draft.cidDocuments.length === 0 ? (
@@ -190,7 +181,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 										className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[2fr_4fr_1fr_auto]"
 									>
 										<div
-											className="truncate rounded-lg border border-border bg-background px-2 py-2 text-xs font-mono"
+											className="truncate rounded-lg border border-border bg-background px-2 py-2 font-mono text-xs"
 											title={doc.fileName}
 										>
 											{doc.fileName}
@@ -240,7 +231,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 						)}
 					</div>
 				</TransmittalSection>
-			) : null}
+			)}
 		</>
 	);
 }

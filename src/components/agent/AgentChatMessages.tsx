@@ -1,108 +1,222 @@
-import { useEffect, useRef } from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
+// src/components/agent/AgentChatMessages.tsx
+import { useEffect, useRef, useState } from "react";
+import { Copy, Check } from "lucide-react";
 import type { AgentConversationMessage } from "@/services/agentTaskManager";
 import type { AgentProfileId } from "./agentProfiles";
 import { AgentPixelMark } from "./AgentPixelMark";
 
+// Primitives
+import { Text } from "@/components/primitives/Text";
+import { Panel } from "@/components/primitives/Panel";
+import { Stack, HStack } from "@/components/primitives/Stack";
+import { IconButton } from "@/components/primitives/Button";
+
 interface AgentChatMessagesProps {
-	messages: AgentConversationMessage[];
-	profileId: AgentProfileId;
-	isThinking?: boolean;
+  messages: AgentConversationMessage[];
+  profileId: AgentProfileId;
+  isThinking?: boolean;
 }
 
 export function AgentChatMessages({
-	messages,
-	profileId,
-	isThinking = false,
+  messages,
+  profileId,
+  isThinking = false,
 }: AgentChatMessagesProps) {
-	const { palette } = useTheme();
-	const bottomRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-	useEffect(() => {
-		bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [messages.length, isThinking]);
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  });
 
-	return (
-		<div className="flex-1 overflow-y-auto px-6 py-6">
-			<div className="mx-auto max-w-[720px] space-y-6">
-				{messages.map((msg) =>
-					msg.role === "user" ? (
-						<UserBubble key={msg.id} content={msg.content} palette={palette} />
-					) : (
-						<AssistantRow
-							key={msg.id}
-							content={msg.content}
-							profileId={profileId}
-							palette={palette}
-						/>
-					),
-				)}
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6">
+      <div className="mx-auto max-w-190">
+        <Stack gap={4}>
+          {messages.map((msg, index) =>
+            msg.role === "user" ? (
+              <UserBubble key={msg.id} content={msg.content} />
+            ) : (
+              <AssistantRow
+                key={msg.id}
+                content={msg.content}
+                profileId={profileId}
+                isLatest={index === messages.length - 1 && !isThinking}
+              />
+            ),
+          )}
 
-				{isThinking && (
-					<div className="flex items-start gap-3">
-						<div className="suite-mark-pulse shrink-0 pt-0.5">
-							<AgentPixelMark
-								profileId={profileId}
-								size={32}
-								expression="active"
-							/>
-						</div>
-						<div className="flex items-center gap-1.5 pt-2.5">
-							<span className="suite-thinking-dot" />
-							<span className="suite-thinking-dot" />
-							<span className="suite-thinking-dot" />
-						</div>
-					</div>
-				)}
+          {/* Thinking indicator */}
+          {isThinking && <ThinkingIndicator profileId={profileId} />}
+        </Stack>
 
-				<div ref={bottomRef} />
-			</div>
-		</div>
-	);
+        <div ref={bottomRef} />
+      </div>
+    </div>
+  );
 }
 
-function UserBubble({
-	content,
-	palette,
-}: {
-	content: string;
-	palette: ReturnType<typeof useTheme>["palette"];
-}) {
-	return (
-		<div className="flex justify-end">
-			<div
-				className="max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed"
-				style={{
-					background: hexToRgba(palette.primary, 0.12),
-					color: palette.text,
-				}}
-			>
-				{content}
-			</div>
-		</div>
-	);
+// ═══════════════════════════════════════════════════════════════════════════
+// USER BUBBLE
+// ═══════════════════════════════════════════════════════════════════════════
+function UserBubble({ content }: { content: string }) {
+  return (
+    <div className="flex justify-end pl-12">
+      <div 
+        className="
+          relative max-w-[85%] rounded-2xl rounded-br-sm 
+          bg-linear-to-br from-primary/20 to-primary/10
+          border border-primary/20
+          px-4 py-3
+        "
+      >
+        {/* Subtle shine effect */}
+        <div className="absolute inset-0 rounded-2xl rounded-br-sm bg-linear-to-br from-white/5 to-transparent pointer-events-none" />
+        
+        <Text size="sm" className="relative leading-relaxed whitespace-pre-wrap">
+          {content}
+        </Text>
+      </div>
+    </div>
+  );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ASSISTANT ROW
+// ═══════════════════════════════════════════════════════════════════════════
 function AssistantRow({
-	content,
-	profileId,
-	palette,
+  content,
+  profileId,
+  isLatest,
 }: {
-	content: string;
-	profileId: AgentProfileId;
-	palette: ReturnType<typeof useTheme>["palette"];
+  content: string;
+  profileId: AgentProfileId;
+  isLatest: boolean;
 }) {
-	return (
-		<div className="flex items-start gap-3">
-			<div className="shrink-0 pt-0.5">
-				<AgentPixelMark profileId={profileId} size={32} expression="neutral" />
-			</div>
-			<div
-				className="min-w-0 flex-1 text-sm leading-relaxed whitespace-pre-wrap"
-				style={{ color: hexToRgba(palette.text, 0.88) }}
-			>
-				{content}
-			</div>
-		</div>
-	);
+  const [copied, setCopied] = useState(false);
+  
+  // Check if content looks like JSON/code
+  const isCodeBlock = content.trim().startsWith("{") || content.trim().startsWith("[");
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <HStack gap={3} align="start" className="group pr-12">
+      {/* Avatar */}
+      <div className="shrink-0 pt-1">
+        <div className="relative">
+          <AgentPixelMark 
+            profileId={profileId} 
+            size={32} 
+            expression={isLatest ? "active" : "neutral"} 
+          />
+          {/* Online indicator */}
+          <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-success" />
+        </div>
+      </div>
+      
+      {/* Content */}
+      <Stack gap={1} className="min-w-0 flex-1">
+        {isCodeBlock ? (
+          <Panel 
+            variant="inset" 
+            padding="md" 
+            className="overflow-x-auto relative group/code"
+          >
+            {/* Copy button */}
+            <IconButton
+              icon={copied ? <Check size={14} /> : <Copy size={14} />}
+              aria-label="Copy code"
+              variant="ghost"
+              size="sm"
+              onClick={handleCopy}
+              className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity"
+            />
+            
+            <pre className="text-xs leading-relaxed text-text/90 font-mono whitespace-pre-wrap pr-8">
+              {content}
+            </pre>
+          </Panel>
+        ) : (
+          <div className="rounded-2xl rounded-tl-sm bg-surface-2/50 border border-border/50 px-4 py-3">
+            <Text 
+              size="sm" 
+              className="leading-relaxed whitespace-pre-wrap"
+            >
+              {content}
+            </Text>
+          </div>
+        )}
+
+        {/* Message actions (visible on hover) */}
+        <HStack gap={1} className="opacity-0 group-hover:opacity-100 transition-opacity">
+          <IconButton
+            icon={copied ? <Check size={12} /> : <Copy size={12} />}
+            aria-label="Copy message"
+            variant="ghost"
+            size="sm"
+            onClick={handleCopy}
+          />
+        </HStack>
+      </Stack>
+    </HStack>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THINKING INDICATOR
+// ═══════════════════════════════════════════════════════════════════════════
+function ThinkingIndicator({ profileId }: { profileId: AgentProfileId }) {
+  return (
+    <HStack gap={3} align="start" className="pr-12">
+      <div className="shrink-0 pt-1">
+        <AgentPixelMark
+          profileId={profileId}
+          size={32}
+          expression="active"
+          pulse
+        />
+      </div>
+      
+      <HStack gap={2} align="center" className="rounded-2xl rounded-tl-sm bg-surface-2/50 border border-border/50 px-4 py-3">
+        <ThinkingDots />
+        <Text size="xs" color="muted">
+          Thinking...
+        </Text>
+      </HStack>
+    </HStack>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THINKING DOTS
+// ═══════════════════════════════════════════════════════════════════════════
+function ThinkingDots() {
+  return (
+    <>
+      <div className="flex items-center gap-1">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="h-1.5 w-1.5 rounded-full bg-primary thinking-dot"
+            style={{ animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </div>
+      
+      <style>{`
+        @keyframes thinking-bounce {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-4px); }
+        }
+        .thinking-dot {
+          animation: thinking-bounce 1s ease-in-out infinite;
+        }
+      `}</style>
+    </>
+  );
 }

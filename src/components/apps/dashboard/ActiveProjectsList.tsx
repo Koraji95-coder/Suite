@@ -1,203 +1,172 @@
-import { AlertCircle, AlertTriangle, ChevronRight } from "lucide-react";
+// src/components/apps/dashboard/ActiveProjectsList.tsx
+import { AlertCircle, AlertTriangle, ChevronRight, FolderKanban } from "lucide-react";
 import { useState } from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
-import { GlassPanel } from "../ui/GlassPanel";
-import { bubbleStyle, softButtonStyle } from "./dashboardStyles";
+
+// Primitives
+import { Text } from "@/components/primitives/Text";
+import { Panel } from "@/components/primitives/Panel";
+import { Stack, HStack } from "@/components/primitives/Stack";
+import { Badge } from "@/components/primitives/Badge";
+import { Button } from "@/components/primitives/Button";
+
 import {
-	formatDateOnly,
-	formatDeadline,
-	getCategoryColor,
-	getTaskUrgencyColor,
-	getUrgencyColor,
+  formatDateOnly,
+  formatDeadline,
+  getCategoryColor,
+  getTaskUrgencyColor,
+  getUrgencyColor,
 } from "./dashboardUtils";
 
 interface Project {
-	id: string;
-	name: string;
-	deadline: string | null;
-	status: string;
-	priority: string;
-	color: string;
-	category: string | null;
+  id: string;
+  name: string;
+  deadline: string | null;
+  status: string;
+  priority: string;
+  color: string;
+  category: string | null;
 }
 
 interface TaskCount {
-	total: number;
-	completed: number;
-	nextDue: { name: string; date: string } | null;
-	hasOverdue: boolean;
+  total: number;
+  completed: number;
+  nextDue: { name: string; date: string } | null;
+  hasOverdue: boolean;
 }
 
 interface ActiveProjectsListProps {
-	projects: Project[];
-	projectTaskCounts: Map<string, TaskCount>;
-	onNavigateToProject?: (projectId: string) => void;
-	onNavigateToProjectsHub?: () => void;
+  projects: Project[];
+  projectTaskCounts: Map<string, TaskCount>;
+  onNavigateToProject?: (projectId: string) => void;
+  onNavigateToProjectsHub?: () => void;
 }
 
 export function ActiveProjectsList({
-	projects,
-	projectTaskCounts,
-	onNavigateToProject,
-	onNavigateToProjectsHub,
+  projects,
+  projectTaskCounts,
+  onNavigateToProject,
+  onNavigateToProjectsHub,
 }: ActiveProjectsListProps) {
-	const { palette } = useTheme();
-	const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
-	return (
-		<GlassPanel
-			tint={palette.secondary}
-			hoverEffect={false}
-			specular={false}
-			bevel={false}
-			className="p-8 xl:p-9 group"
-		>
-			<div className="relative z-10">
-				<div className="flex items-center justify-between mb-6">
-					<div className="flex items-center gap-3">
-						<h3
-							className="text-xl font-bold"
-							style={{ color: palette.primary }}
-						>
-							Active Projects
-						</h3>
-						<span
-							className="text-xs px-2.5 py-1 rounded-full border"
-							style={{
-								color: hexToRgba(palette.text, 0.65),
-								borderColor: hexToRgba(palette.text, 0.1),
-								background: hexToRgba(palette.surface, 0.4),
-							}}
-						>
-							{projects.length} active
-						</span>
-					</div>
-					<button
-						onClick={() => onNavigateToProjectsHub?.()}
-						className="text-sm flex items-center space-x-1 px-3 py-1 rounded-lg transition-all hover:opacity-90"
-						style={{
-							...softButtonStyle(palette, palette.primary),
-							color: palette.primary,
-						}}
-					>
-						<span>View All</span>
-						<ChevronRight className="w-4 h-4" />
-					</button>
-				</div>
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
 
-				<div className="space-y-4">
-					{projects.length === 0 ? (
-						<p
-							className="text-sm"
-							style={{ color: hexToRgba(palette.text, 0.3) }}
-						>
-							No active projects
-						</p>
-					) : (
-						projects.map((project) => {
-							const taskCount = projectTaskCounts.get(project.id);
-							const catColor = getCategoryColor(project.category);
-							const isHovered = hoveredProjectId === project.id;
+  return (
+    <Panel variant="default" padding="lg">
+      <Stack gap={5}>
+        {/* Header */}
+        <HStack justify="between" align="center">
+          <HStack gap={3} align="center">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary/15 text-secondary">
+              <FolderKanban size={18} />
+            </div>
+            <Text size="lg" weight="bold" color="primary">
+              Active Projects
+            </Text>
+            <Badge variant="soft" size="sm">
+              {projects.length} active
+            </Badge>
+          </HStack>
+          
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onNavigateToProjectsHub?.()}
+            iconRight={<ChevronRight size={14} />}
+          >
+            View All
+          </Button>
+        </HStack>
 
-							const baseStyle = bubbleStyle(palette, catColor);
-							return (
-								<div
-									key={project.id}
-									className="px-5 py-4 cursor-pointer transition-all duration-300 hover:-translate-y-1.5"
-									style={{
-										...baseStyle,
-										border: `1px solid ${
-											isHovered
-												? hexToRgba(catColor, 0.3)
-												: hexToRgba(palette.text, 0.08)
-										}`,
-										boxShadow: isHovered
-											? `0 16px 34px ${hexToRgba(catColor, 0.22)}`
-											: `0 10px 26px ${hexToRgba("#000000", 0.18)}`,
-									}}
-									onClick={() => onNavigateToProject?.(project.id)}
-									onMouseEnter={() => setHoveredProjectId(project.id)}
-									onMouseLeave={() => setHoveredProjectId(null)}
-								>
-									<div className="flex items-start justify-between">
-										<div className="flex items-start space-x-3 flex-1">
-											<div
-												className="w-3 h-3 rounded-full mt-1"
-												style={{
-													backgroundColor: catColor,
-													boxShadow: `0 0 8px ${hexToRgba(catColor, 0.5)}`,
-												}}
-											/>
-											<div className="flex-1">
-												<h4
-													className="font-semibold"
-													style={{ color: hexToRgba(palette.text, 0.9) }}
-												>
-													{project.name}
-												</h4>
-												<div className="flex items-center space-x-3 mt-2.5">
-													<span
-														className="text-sm"
-														style={{ color: getUrgencyColor(project.deadline) }}
-													>
-														{formatDeadline(project.deadline)}
-													</span>
-													{taskCount && (
-														<span
-															className="text-xs"
-															style={{ color: hexToRgba(palette.text, 0.4) }}
-														>
-															{taskCount.completed}/{taskCount.total} tasks
-														</span>
-													)}
-												</div>
-												{taskCount?.hasOverdue && (
-													<div className="flex items-center space-x-2 mt-1.5">
-														<AlertCircle
-															className="w-3 h-3"
-															style={{ color: palette.tertiary }}
-														/>
-														<span
-															className="text-xs"
-															style={{
-																color: hexToRgba(palette.tertiary, 0.9),
-															}}
-														>
-															Overdue tasks
-														</span>
-													</div>
-												)}
-												{taskCount?.nextDue && (
-													<div className="flex items-center space-x-2 mt-1.5">
-														<AlertTriangle
-															className="w-3 h-3"
-															style={{ color: palette.secondary }}
-														/>
-														<span
-															className="text-xs leading-relaxed"
-															style={{
-																color: getTaskUrgencyColor(
-																	taskCount.nextDue.date,
-																),
-															}}
-														>
-															Task: &quot;{taskCount.nextDue.name}&quot; Due{" "}
-															{formatDateOnly(taskCount.nextDue.date)}
-														</span>
-													</div>
-												)}
-											</div>
-										</div>
-										<ChevronRight
-											className="w-5 h-5"
-											style={{ color: hexToRgba(palette.primary, 0.6) }}
-										/>
-									</div>
-								</div>
-							);
-						})
-					)}
-				</div>
-			</div>
-		</GlassPanel>
-	);
+        {/* Project list */}
+        <Stack gap={3}>
+          {projects.length === 0 ? (
+            <Text size="sm" color="muted">
+              No active projects
+            </Text>
+          ) : (
+            projects.map((project) => {
+              const taskCount = projectTaskCounts.get(project.id);
+              const catColor = getCategoryColor(project.category);
+              const isHovered = hoveredProjectId === project.id;
+
+              return (
+                <button
+                  key={project.id}
+                  type="button"
+                  onClick={() => onNavigateToProject?.(project.id)}
+                  onMouseEnter={() => setHoveredProjectId(project.id)}
+                  onMouseLeave={() => setHoveredProjectId(null)}
+                  className={`
+                    w-full rounded-xl border p-4 text-left transition-all duration-200
+                    ${isHovered 
+                      ? "border-primary/30 bg-surface-2 -translate-y-1 shadow-lg" 
+                      : "border-border bg-surface hover:bg-surface-2"
+                    }
+                  `}
+                >
+                  <HStack justify="between" align="start">
+                    <HStack gap={3} align="start" className="flex-1">
+                      {/* Category dot */}
+                      <div
+                        className="mt-1.5 h-3 w-3 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: catColor,
+                          boxShadow: `0 0 8px ${catColor}50`,
+                        }}
+                      />
+                      
+                      {/* Project info */}
+                      <Stack gap={2} className="flex-1">
+                        <Text size="sm" weight="semibold">
+                          {project.name}
+                        </Text>
+                        
+                        <HStack gap={3} align="center">
+                          <Text 
+                            size="sm" 
+                            style={{ color: getUrgencyColor(project.deadline) }}
+                          >
+                            {formatDeadline(project.deadline)}
+                          </Text>
+                          {taskCount && (
+                            <Text size="xs" color="muted">
+                              {taskCount.completed}/{taskCount.total} tasks
+                            </Text>
+                          )}
+                        </HStack>
+
+                        {/* Overdue warning */}
+                        {taskCount?.hasOverdue && (
+                          <HStack gap={2} align="center">
+                            <AlertCircle size={12} className="text-danger" />
+                            <Text size="xs" color="danger">
+                              Overdue tasks
+                            </Text>
+                          </HStack>
+                        )}
+
+                        {/* Next due task */}
+                        {taskCount?.nextDue && (
+                          <HStack gap={2} align="center">
+                            <AlertTriangle size={12} className="text-warning" />
+                            <Text 
+                              size="xs"
+                              style={{ color: getTaskUrgencyColor(taskCount.nextDue.date) }}
+                            >
+                              Task: "{taskCount.nextDue.name}" Due {formatDateOnly(taskCount.nextDue.date)}
+                            </Text>
+                          </HStack>
+                        )}
+                      </Stack>
+                    </HStack>
+
+                    <ChevronRight size={18} className="text-primary/60 shrink-0" />
+                  </HStack>
+                </button>
+              );
+            })
+          )}
+        </Stack>
+      </Stack>
+    </Panel>
+  );
 }

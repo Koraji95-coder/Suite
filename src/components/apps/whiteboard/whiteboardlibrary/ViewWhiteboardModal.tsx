@@ -19,32 +19,35 @@ export function ViewWhiteboardModal({
 			open={Boolean(whiteboard)}
 			onOpenChange={(open) => !open && onClose()}
 		>
-			<DialogContent className="max-h-[90vh] max-w-6xl overflow-auto border-[var(--border)] bg-[var(--surface)] p-0">
-				<div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] p-6 backdrop-blur-sm">
+			<DialogContent className="max-h-[90vh] max-w-6xl overflow-auto border-(--border) bg-(--surface) p-0">
+				{/* Sticky header */}
+				<div className="sticky top-0 z-10 flex items-center justify-between border-b p-5 backdrop-blur-sm [border-color:var(--border)] [background:var(--surface)]">
 					<div>
-						<h3 className="text-2xl font-bold text-[var(--text)]">
+						<h3 className="text-lg font-semibold [color:var(--text)]">
 							{whiteboard.title}
 						</h3>
-						<div className="mt-2 flex items-center space-x-4 text-sm text-[var(--text-muted)]">
+						<div className="mt-1 flex items-center gap-3 text-xs [color:var(--text-muted)]">
 							<span>{whiteboard.panel_context}</span>
-							<span>•</span>
+							<span>·</span>
 							<span>{formatDate(whiteboard.created_at)}</span>
 						</div>
 					</div>
 					<button
 						onClick={onClose}
-						className="p-2 hover:[background:color-mix(in_srgb,var(--danger)_20%,transparent)] rounded-lg transition-all"
+						className="rounded-lg p-2 transition
+							hover:[background:color-mix(in_srgb,var(--danger)_14%,transparent)]"
 					>
-						<X className="w-6 h-6 [color:var(--danger)]" />
+						<X className="h-4 w-4 [color:var(--text-muted)]" />
 					</button>
 				</div>
 
-				<div className="p-6">
+				{/* Content */}
+				<div className="p-5">
 					{whiteboard.thumbnail_url && (
 						<img
 							src={whiteboard.thumbnail_url}
 							alt={whiteboard.title}
-							className="w-full rounded-lg border border-[var(--border)]"
+							className="w-full rounded-lg border [border-color:var(--border)]"
 						/>
 					)}
 
@@ -53,10 +56,11 @@ export function ViewWhiteboardModal({
 							{whiteboard.tags.map((tag, idx) => (
 								<span
 									key={idx}
-									className="flex items-center space-x-1 rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1 text-[var(--text-muted)]"
+									className="flex items-center gap-1 rounded-full border px-3 py-1 text-xs
+										[border-color:var(--border)] [background:var(--surface-2)] [color:var(--text-muted)]"
 								>
-									<Tag className="w-3 h-3" />
-									<span>{tag}</span>
+									<Tag className="h-3 w-3" />
+									{tag}
 								</span>
 							))}
 						</div>

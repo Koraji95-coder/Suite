@@ -1,688 +1,248 @@
 /* src/theme.css */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
-/* =========================================================
-   FALLBACK TOKENS
-   (palette.ts overwrites these at runtime)
-   ========================================================= */
+/* ═══════════════════════════════════════════════════════════════════════════
+   CSS CUSTOM PROPERTIES
+   These are set dynamically by ThemeProvider based on selected color scheme.
+   Values below are fallbacks (graphiteCyan theme).
+   ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-	--bg: #0b1220;
-	--bg-base: var(--bg);
-	--bg-mid: rgba(11, 18, 32, 0.72);
-	--bg-heavy: rgba(11, 18, 32, 0.86);
+  /* Backgrounds */
+  --bg: #0e1117;
+  --bg-subtle: #0e1117;
+  --surface: #161b22;
+  --surface-2: #21262d;
 
-	--surface: #0f1a2e;
-	--surface-2: #16243d;
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-strong: rgba(255, 255, 255, 0.14);
 
-	--border: rgba(255, 255, 255, 0.08);
-	--text: rgba(255, 255, 255, 0.92);
-	--text-muted: rgba(255, 255, 255, 0.62);
+  /* Text */
+  --text: #f0f6fc;
+  --text-muted: #8b949e;
 
-	--primary: #2dd4bf;
-	--primary-contrast: #062a27;
-	--accent: #60a5fa;
+  /* Brand Colors */
+  --primary: #2dd4bf;
+  --primary-hover: #5eead4;
+  --primary-contrast: #042f2e;
+  --accent: #60a5fa;
+  --secondary: #64748b;
 
-	--success: #22c55e;
-	--warning: #f59e0b;
-	--danger: #ef4444;
+  /* Status Colors */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
 
-	--focus-ring: color-mix(in oklab, var(--primary) 35%, transparent);
+  /* Effects */
+  --glow: rgba(45, 212, 191, 0.15);
+  --focus-ring: color-mix(in oklab, var(--primary) 25%, transparent);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.4);
 
-	--shadow-command: 0 -1px 0 rgba(255, 255, 255, 0.04), 0 -4px 16px rgba(0, 0, 0, 0.2);
-	--shadow-neon: 0 0 40px color-mix(in oklab, var(--primary) 12%, transparent);
+  /* Transitions */
+  --transition-fast: 100ms;
+  --transition-base: 150ms;
+  --transition-slow: 250ms;
 
-	--radius-lg: 16px;
-	--radius-md: 12px;
-	--radius-sm: 10px;
+  /* Z-Index Scale */
+  --z-dropdown: 45;
+  --z-sheet: 50;
+  --z-toast: 60;
+  --z-dialog: 70;
+  --z-command: 80;
 
-	--shadow-panel:
-		0 10px 30px rgba(0, 0, 0, 0.28),
-		0 1px 0 rgba(255, 255, 255, 0.04) inset;
-
-	--theme-transition-duration: 180ms;
-
-	/*  Z-INDEX SCALE  ──────────────────────────────────────────
-	    When adding a new overlay, pick the variable whose description
-	    matches your use-case.  NEVER hardcode a raw number for any
-	    fixed/absolute overlay that competes with the global stack.
-	    Local stacking (sticky headers inside a scroll container,
-	    drag layers, overlapping siblings) can use Tailwind z-10/z-20
-	    as long as the parent is NOT position:fixed.
-
-	    Layer                     Var                        Value
-	    ─────────────────────────────────────────────────────────────
-	    Desktop sidebar           --z-sidebar                  30
-	    Top header bar, FABs      --z-topbar                   40
-	    Popovers / dropdowns      --z-dropdown                 45
-	    Side panels, drawers      --z-sheet                    50
-	    Toast notifications       --z-toast                    60
-	    Modal dialogs             --z-dialog                   70
-	    Command palette           --z-command-palette          80
-	    System-blocking modals    --z-critical-modal          100
-	    Custom cursor             (hardcoded in CSS below)   9999
-	    ───────────────────────────────────────────────────────── */
-	--z-sidebar: 30;
-	--z-topbar: 40;
-	--z-dropdown: 45;
-	--z-sheet: 50;
-	--z-toast: 60;
-	--z-dialog: 70;
-	--z-command-palette: 80;
-	--z-critical-modal: 100;
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
 }
 
-/* =========================================================
-   BASE / RESET
-   ========================================================= */
+/* ═══════════════════════════════════════════════════════════════════════════
+   TAILWIND THEME EXTENSION
+   Map CSS variables to Tailwind utilities via @theme
+   ═══════════════════════════════════════════════════════════════════════════ */
+@theme {
+  --color-bg: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-contrast: var(--primary-contrast);
+  --color-accent: var(--accent);
+  --color-secondary: var(--secondary);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  --color-focus-ring: var(--focus-ring);
+  --color-glow: var(--glow);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE RESET & DEFAULTS
+   ═══════════════════════════════════════════════════════════════════════════ */
 *,
 *::before,
 *::after {
-	box-sizing: border-box;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html,
 body,
 #root {
-	min-height: 100%;
-}
-
-html {
-	scroll-behavior: smooth;
-	overflow-x: hidden;
+  min-height: 100%;
 }
 
 body {
-	margin: 0;
-	font-family: "Inter", system-ui, -apple-system, sans-serif;
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
-	background: var(--bg);
-	color: var(--text);
-	overflow-wrap: break-word;
-	word-break: break-word;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: var(--bg);
+  color: var(--text);
 }
 
-img,
-video,
-svg:not(:root) {
-	max-width: 100%;
-	height: auto;
+/* ═══════════════════════════════════════════════════════════════════════════
+   GLOBAL FOCUS STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+:focus {
+  outline: none;
 }
 
-/* Selection */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--primary);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SELECTION
+   ═══════════════════════════════════════════════════════════════════════════ */
 ::selection {
-	background: color-mix(in oklab, var(--primary) 28%, transparent);
-	color: var(--text);
+  background-color: var(--focus-ring);
+  color: var(--text);
 }
 
-/* =========================================================
-   CUSTOM CURSOR
-   ========================================================= */
-body.cursor-enabled,
-body.cursor-enabled * {
-	cursor: none !important;
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-#cursor,
-#cursor-ring {
-	position: fixed;
-	top: 0;
-	left: 0;
-	pointer-events: none;
-	z-index: 9999;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-#cursor {
-	width: 12px;
-	height: 12px;
-	border: 2px solid var(--accent);
-	background: color-mix(in oklab, var(--accent) 22%, transparent);
-	transform: translate(-50%, -50%) rotate(45deg);
-	box-shadow: 0 0 10px color-mix(in oklab, var(--accent) 45%, transparent);
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
 }
 
-#cursor::after {
-	content: "";
-	position: absolute;
-	inset: 3px;
-	background: color-mix(in oklab, var(--primary) 70%, transparent);
-	opacity: 0.9;
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 
-#cursor-ring {
-	width: 34px;
-	height: 34px;
-	border-radius: 999px;
-	border: 1px solid rgba(232, 201, 126, 0.32);
-	transform: translate(-50%, -50%);
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
-/* =========================================================
-   THEME ANIMATION (ONLY WHEN TOGGLING)
-   Add/remove `html.theme-animating` in ThemeProvider on theme switch.
-   ========================================================= */
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME TRANSITION (during theme switch only)
+   ═══════════════════════════════════════════════════════════════════════════ */
 html.theme-animating,
 html.theme-animating * {
-	transition:
-		background-color var(--theme-transition-duration) ease,
-		border-color var(--theme-transition-duration) ease,
-		color var(--theme-transition-duration) ease,
-		box-shadow var(--theme-transition-duration) ease,
-		fill var(--theme-transition-duration) ease,
-		stroke var(--theme-transition-duration) ease;
+  transition:
+    background-color var(--transition-base) ease,
+    border-color var(--transition-base) ease,
+    color var(--transition-base) ease !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	html {
-		scroll-behavior: auto;
-	}
-
-	html.theme-animating,
-	html.theme-animating * {
-		transition: none !important;
-	}
+  html {
+    scroll-behavior: auto;
+  }
+  html.theme-animating,
+  html.theme-animating * {
+    transition: none !important;
+  }
 }
 
-/* =========================================================
-   FOCUS RING (ACCESSIBLE)
-   ========================================================= */
-:where(
-	.ui-btn-primary,
-	.ui-btn-secondary,
-	.btn-ghost,
-	.btn-primary,
-	.btn-hero-primary,
-	.btn-hero-secondary,
-	.ui-input,
-	.auth-input,
-	button,
-	a,
-	[role="button"],
-	[tabindex]
-):focus-visible {
-	outline: none;
-	box-shadow: 0 0 0 3px var(--focus-ring);
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILITY CLASSES
+   ═══════════════════════════════════════════════════════════════════════════ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-/* =========================================================
-   SHARED SHELL / PANELS
-   ========================================================= */
-.ui-panel,
-.glass,
-.settings-card {
-	background: var(--surface);
-	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-panel);
+/* ═══════════════════════════════════════════════════════════════════════════
+   AGENT ANIMATIONS (for your pixel avatars)
+   ═══════════════════════════════════════════════════════════════════════════ */
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
-.ui-panel-subtle {
-	background: var(--surface-2);
-	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
-/* =========================================================
-   BUTTONS
-   ========================================================= */
-.ui-btn-primary,
-.btn-primary,
-.btn-hero-primary {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	padding: 10px 16px;
-	border-radius: var(--radius-md);
-	font-size: 14px;
-	font-weight: 600;
-	border: 1px solid transparent;
-	background: var(--primary);
-	color: var(--primary-contrast);
-	text-decoration: none;
-	cursor: pointer;
-	transition: filter 160ms ease;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-.ui-btn-primary:hover,
-.btn-primary:hover,
-.btn-hero-primary:hover {
-	filter: brightness(1.06);
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
 }
 
-.ui-btn-secondary,
-.btn-ghost,
-.btn-hero-secondary {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	padding: 10px 16px;
-	border-radius: var(--radius-md);
-	font-size: 14px;
-	font-weight: 600;
-	border: 1px solid var(--border);
-	background: var(--surface);
-	color: var(--text);
-	text-decoration: none;
-	cursor: pointer;
+.animate-float {
+  animation: float 3s ease-in-out infinite;
 }
 
-.ui-btn-secondary:hover,
-.btn-ghost:hover,
-.btn-hero-secondary:hover {
-	background: var(--surface-2);
-}
-
-/* =========================================================
-   INPUTS
-   ========================================================= */
-.ui-input,
-.auth-input {
-	width: 100%;
-	padding: 10px 12px;
-	border-radius: var(--radius-md);
-	border: 1px solid var(--border);
-	background: var(--surface);
-	color: var(--text);
-	font-size: 14px;
-}
-
-.ui-input:focus,
-.auth-input:focus {
-	outline: 0;
-	border-color: var(--primary);
-	box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 20%, transparent);
-}
-
-/* =========================================================
-   AUTH (layout styles only)
-   ========================================================= */
-.auth-page {
-	min-height: 100vh;
-	background: var(--bg);
-	color: var(--text);
-}
-
-.auth-nav {
-	max-width: 1152px;
-	margin: 0 auto;
-	padding: 16px;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-}
-
-.nav-right {
-	display: inline-flex;
-	align-items: center;
-}
-
-.nav-logo {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 14px;
-	font-weight: 600;
-	text-decoration: none;
-	color: var(--text);
-}
-
-.nav-logo-mark {
-	display: grid;
-	grid-template-columns: repeat(2, 1fr);
-	gap: 2px;
-	padding: 4px;
-	border-radius: 8px;
-	background: var(--surface-2);
-	border: 1px solid var(--border);
-}
-
-.nav-logo-mark span {
-	display: block;
-	width: 6px;
-	height: 6px;
-	border-radius: 2px;
-	background: var(--primary);
-}
-
-.auth-main {
-	max-width: 1152px;
-	margin: 0 auto;
-	padding: 0 16px 32px;
-}
-
-.auth-shell-grid {
-	display: grid;
-	gap: 16px;
-}
-
-.auth-panel {
-	display: none;
-	padding: 24px;
-}
-
-.auth-panel-badge,
-.hero-badge {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	padding: 4px 12px;
-	border-radius: 999px;
-	font-size: 12px;
-	font-weight: 500;
-	background: var(--surface-2);
-	color: var(--text-muted);
-}
-
-.badge-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 999px;
-	background: var(--primary);
-}
-
-.auth-panel-title {
-	font-size: 28px;
-	font-weight: 600;
-	margin-top: 12px;
-}
-
-.auth-panel-sub,
-.auth-panel-item-sub,
-.auth-panel-foot,
-.auth-sub,
-.muted,
-.auth-copy {
-	color: var(--text-muted);
-}
-
-.auth-panel-grid {
-	display: grid;
-	gap: 12px;
-	margin-top: 16px;
-}
-
-.auth-panel-item {
-	padding: 12px;
-	border-radius: var(--radius-md);
-	background: var(--surface-2);
-	border: 1px solid var(--border);
-}
-
-.auth-panel-item-title {
-	font-size: 14px;
-	font-weight: 600;
-	color: var(--text);
-}
-
-.auth-panel-item-sub {
-	font-size: 12px;
-	margin-top: 4px;
-}
-
-.auth-panel-foot {
-	margin-top: 16px;
-	font-size: 12px;
-}
-
-.auth-card {
-	padding: 24px;
-}
-
-.auth-head {
-	margin-bottom: 20px;
-}
-
-.auth-title {
-	font-size: 28px;
-	font-weight: 600;
-	line-height: 1.15;
-	margin: 12px 0 0;
-}
-
-.auth-sub {
-	font-size: 14px;
-	margin-top: 8px;
-}
-
-.auth-form {
-	display: grid;
-	gap: 12px;
-}
-
-.auth-label {
-	font-size: 14px;
-	font-weight: 600;
-}
-
-.auth-error {
-	padding: 8px 10px;
-	border-radius: var(--radius-sm);
-	border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--border));
-	background: color-mix(in oklab, var(--danger) 8%, var(--surface));
-	color: var(--danger);
-	font-size: 14px;
-}
-
-.auth-message {
-	padding: 10px 12px;
-	border-radius: var(--radius-sm);
-	border: 1px solid var(--border);
-	background: var(--surface-2);
-	color: var(--text);
-	font-size: 14px;
-}
-
-.auth-message.is-success {
-	border-color: color-mix(in oklab, var(--success) 45%, var(--border));
-	color: var(--success);
-}
-
-.auth-submit {
-	margin-top: 6px;
-}
-
-.auth-foot {
-	margin-top: 8px;
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: space-between;
-	gap: 10px;
-	font-size: 14px;
-}
-
-.auth-link {
-	font-size: 14px;
-	font-weight: 600;
-	text-decoration: none;
-	color: var(--text);
-}
-
-.auth-link:hover {
-	text-decoration: underline;
-}
-
-.auth-progress-track {
-	height: 8px;
-	width: 100%;
-	overflow: hidden;
-	border-radius: 999px;
-	background: var(--surface-2);
-}
-
-.auth-progress-fill {
-	height: 100%;
-	border-radius: 999px;
-	background: var(--primary);
-	transition: width 160ms ease;
-}
-
-.auth-progress-fill.is-indeterminate {
-	width: 35%;
-	animation: loading-slide 1.2s ease-in-out infinite;
-}
-
-@keyframes loading-slide {
-	0% {
-		transform: translateX(-100%);
-	}
-	100% {
-		transform: translateX(300%);
-	}
-}
-
-@media (min-width: 768px) {
-	.auth-nav,
-	.auth-main {
-		padding-left: 32px;
-		padding-right: 32px;
-	}
-
-	.auth-shell-grid {
-		grid-template-columns: repeat(12, minmax(0, 1fr));
-	}
-
-	.auth-panel {
-		display: block;
-		grid-column: span 5;
-	}
-
-	.auth-card {
-		grid-column: span 7;
-	}
-
-	.auth-card-wide {
-		grid-column: span 12;
-	}
-}
-
-/* =========================================================
-   AUTH INPUT / BUTTON / SPINNER (shared across auth pages)
-   ========================================================= */
-.auth-input-field {
-	width: 100%;
-	padding: 10px 14px;
-	border-radius: var(--radius-md);
-	border: 1px solid var(--border);
-	background: var(--bg);
-	color: var(--text);
-	font-size: 14px;
-	outline: none;
-	transition:
-		border-color 200ms ease,
-		box-shadow 200ms ease;
-}
-
-.auth-input-field::placeholder {
-	color: var(--text-muted);
-	opacity: 0.6;
-}
-
-.auth-input-field:focus {
-	border-color: var(--primary);
-	box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 15%, transparent);
-}
-
-.auth-submit-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	padding: 11px 20px;
-	border-radius: var(--radius-md);
-	font-size: 14px;
-	font-weight: 600;
-	border: none;
-	background: var(--primary);
-	color: var(--primary-contrast);
-	cursor: pointer;
-	transition:
-		filter 160ms ease,
-		opacity 160ms ease;
-}
-
-.auth-submit-btn:hover:not(:disabled) {
-	filter: brightness(1.08);
-}
-
-.auth-submit-btn:disabled {
-	opacity: 0.45;
-	cursor: not-allowed;
-}
-
-@keyframes auth-spin {
-	to {
-		transform: rotate(360deg);
-	}
-}
-
-.auth-spinner {
-	display: inline-block;
-	width: 14px;
-	height: 14px;
-	border-radius: 50%;
-	border: 2px solid color-mix(in oklab, var(--primary-contrast) 30%, transparent);
-	border-top-color: var(--primary-contrast);
-	animation: auth-spin 0.6s linear infinite;
-}
-
-@keyframes auth-float {
-	0%,
-	100% {
-		transform: translate(-50%, -50%) translateY(0);
-	}
-	50% {
-		transform: translate(-50%, -50%) translateY(-8px);
-	}
-}
-
-.auth-float-mark {
-	animation: auth-float 4s ease-in-out infinite;
-}
-
-/* =========================================================
-   AGENT CHAT PANEL
-   ========================================================= */
-@keyframes suite-thinking-dot {
-	0%,
-	80%,
-	100% {
-		opacity: 0.25;
-		transform: scale(0.8);
-	}
-	40% {
-		opacity: 1;
-		transform: scale(1);
-	}
-}
-
-.suite-thinking-dot {
-	display: inline-block;
-	width: 6px;
-	height: 6px;
-	border-radius: 50%;
-	background: var(--primary);
-	animation: suite-thinking-dot 1.4s ease-in-out infinite;
-}
-
-.suite-thinking-dot:nth-child(2) {
-	animation-delay: 0.16s;
-}
-
-.suite-thinking-dot:nth-child(3) {
-	animation-delay: 0.32s;
-}
-
-@keyframes suite-mark-pulse {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.7;
-	}
-}
-
-.suite-mark-pulse {
-	animation: suite-mark-pulse 2.4s ease-in-out infinite;
+.animate-spin {
+  animation: spin 1s linear infinite;
 }

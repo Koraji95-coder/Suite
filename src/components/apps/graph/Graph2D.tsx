@@ -113,7 +113,10 @@ export function Graph2D({ data, selectedNodeId, onSelectNode }: Graph2DProps) {
 			.selectAll("text")
 			.data(
 				simNodes.filter(
-					(n) => n.gNode.data?.type === "major" || n.source === "memory",
+					(n) =>
+						n.gNode.data?.type === "major" ||
+						n.source === "memory" ||
+						n.gNode.data?.showLabel === true,
 				),
 			)
 			.join("text")

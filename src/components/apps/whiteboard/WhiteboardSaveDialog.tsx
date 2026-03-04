@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
 	Dialog,
 	DialogContent,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
@@ -37,66 +38,73 @@ export function WhiteboardSaveDialog({
 		void onSave(title.trim(), tags);
 	};
 
+	const inputClass =
+		"w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text)]";
+
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="max-w-md border-[var(--border)] bg-[var(--surface)] p-6">
-				<DialogHeader className="mb-4">
-					<DialogTitle className="text-xl font-bold text-[var(--text)]">
-						Save Whiteboard
-					</DialogTitle>
+			<DialogContent className="max-w-md border-(--border) bg-(--surface)">
+				<DialogHeader>
+					<DialogTitle>Save Whiteboard</DialogTitle>
 				</DialogHeader>
+
 				<div className="space-y-4">
 					<div>
-						<label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">
+						<label className="mb-1.5 block text-xs font-medium [color:var(--text-muted)]">
 							Title *
 						</label>
 						<input
 							type="text"
 							value={title}
 							onChange={(e) => setTitle(e.target.value)}
-							className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+							className={inputClass}
 							placeholder="Enter whiteboard title"
 							autoFocus
 						/>
 					</div>
+
 					<div>
-						<label className="mb-2 block text-sm font-medium text-[var(--text-muted)]">
+						<label className="mb-1.5 block text-xs font-medium [color:var(--text-muted)]">
 							Tags (comma separated)
 						</label>
 						<input
 							type="text"
 							value={tags}
 							onChange={(e) => setTags(e.target.value)}
-							className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+							className={inputClass}
 							placeholder="e.g., calculations, circuit, notes"
 						/>
 					</div>
-					{error ? (
-						<div className="rounded-lg border border-[var(--danger)] bg-[color:color-mix(in_srgb,var(--danger)_18%,transparent)] px-3 py-2 text-sm text-[var(--danger)]">
+
+					{error && (
+						<div className="rounded-lg border px-3 py-2 text-sm
+							[border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_10%,transparent)] [color:var(--danger)]">
 							{error}
 						</div>
-					) : null}
-					<p className="text-sm text-[var(--text-muted)]">
-						Panel Context:{" "}
-						<span className="font-semibold text-[var(--text)]">
-							{panelContext}
-						</span>
+					)}
+
+					<p className="text-xs [color:var(--text-muted)]">
+						Panel: <span className="font-medium [color:var(--text)]">{panelContext}</span>
 					</p>
 				</div>
-				<div className="mt-6 flex gap-3">
-					<button
-						onClick={handleSubmit}
-						className="flex-1 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-2 rounded-lg transition-all"
-					>
-						Save Whiteboard
-					</button>
+
+				<DialogFooter className="mt-4 gap-2 sm:justify-end">
 					<button
 						onClick={onClose}
-						className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-6 py-2 text-[var(--text-muted)] transition-all hover:bg-[var(--surface)]"
+						className="rounded-lg border px-4 py-2 text-sm transition
+							[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
+							hover:[background:var(--surface-2)]"
 					>
 						Cancel
 					</button>
-				</div>
+					<button
+						onClick={handleSubmit}
+						className="rounded-lg px-4 py-2 text-sm font-medium transition
+							[background:var(--primary)] [color:var(--primary-contrast)] hover:opacity-90"
+					>
+						Save Whiteboard
+					</button>
+				</DialogFooter>
 			</DialogContent>
 		</Dialog>
 	);

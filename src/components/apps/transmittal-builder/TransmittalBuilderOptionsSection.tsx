@@ -1,7 +1,6 @@
 import { Checkbox } from "@/components/apps/ui/checkbox";
 import { FrameSection } from "@/components/apps/ui/PageFrame";
 import { Surface } from "@/components/apps/ui/Surface";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import {
 	type DraftState,
 	OPTION_GROUPS,
@@ -19,19 +18,11 @@ export function TransmittalBuilderOptionsSection({
 	draft,
 	handleOptionToggle,
 }: TransmittalBuilderOptionsSectionProps) {
-	const { palette } = useTheme();
-
 	return (
 		<TransmittalSection title="Transmittal Options">
-			<div className="grid gap-4 px-2 sm:px-3 sm:grid-cols-2 lg:grid-cols-4">
+			<div className="grid gap-4 px-2 sm:grid-cols-2 sm:px-3 lg:grid-cols-4">
 				{OPTION_GROUPS.map((group) => (
-					<Surface
-						key={group.id}
-						className="space-y-3 p-4"
-						style={{
-							border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-						}}
-					>
+					<Surface key={group.id} className="space-y-3 p-4">
 						<div className="text-xs font-semibold text-muted-foreground">
 							{group.label}
 						</div>

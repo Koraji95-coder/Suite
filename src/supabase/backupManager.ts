@@ -4,6 +4,7 @@ import { supabase } from "./client";
 
 const BACKUP_STORAGE_KEY = "suite_yaml_backup";
 const BACKUP_TIMESTAMP_KEY = "suite_yaml_backup_timestamp";
+const BACKUP_API_KEY = import.meta.env.VITE_API_KEY ?? "";
 
 // All tables to back up
 const BACKUP_TABLES = [
@@ -35,6 +36,12 @@ export interface BackupData {
 		total_rows: number;
 	};
 	tables: Record<string, Record<string, unknown>[]>;
+}
+
+function withBackupHeaders(base?: HeadersInit): HeadersInit {
+	const headers = new Headers(base);
+	if (BACKUP_API_KEY) headers.set("X-API-Key", BACKUP_API_KEY);
+	return headers;
 }
 
 /**
@@ -142,7 +149,7 @@ export async function saveToDisk(
 	try {
 		const res = await fetch("/api/backup/save", {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: withBackupHeaders({ "Content-Type": "application/json" }),
 			body: JSON.stringify({ filename: name, content: yamlStr }),
 		});
 		if (res.ok) {
@@ -167,7 +174,9 @@ export interface BackupFileInfo {
 
 export async function listBackupFiles(): Promise<BackupFileInfo[]> {
 	try {
-		const res = await fetch("/api/backup/list");
+		const res = await fetch("/api/backup/list", {
+			headers: withBackupHeaders(),
+		});
 		if (res.ok) return await res.json();
 		return [];
 	} catch {
@@ -182,6 +191,9 @@ export async function readBackupFile(filename: string): Promise<string | null> {
 	try {
 		const res = await fetch(
 			`/api/backup/read?file=${encodeURIComponent(filename)}`,
+			{
+				headers: withBackupHeaders(),
+			},
 		);
 		if (res.ok) return await res.text();
 		return null;
@@ -197,7 +209,10 @@ export async function deleteBackupFile(filename: string): Promise<boolean> {
 	try {
 		const res = await fetch(
 			`/api/backup/delete?file=${encodeURIComponent(filename)}`,
-			{ method: "DELETE" },
+			{
+				method: "DELETE",
+				headers: withBackupHeaders(),
+			},
 		);
 		return res.ok;
 	} catch {

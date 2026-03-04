@@ -1,0 +1,75 @@
+# Backend Route Groups
+
+This folder is the domain split for `backend/api_server.py`.
+
+## Current extracted groups
+
+- `api_backup.py`: `/api/backup/*`
+- `api_batch_find_replace.py`: `/api/batch-find-replace/*`
+- `api_auth_email.py`: `/api/auth/email-link`
+- `api_auth_passkey.py`: `/api/auth/passkey*`
+- `api_passkey_helpers.py`: shared passkey utility + state-store helpers
+- `api_passkey_signature.py`: shared passkey callback signature/timestamp helpers
+- `api_passkey_store.py`: shared passkey Supabase CRUD helpers
+- `api_supabase_rest.py`: shared Supabase REST transport/helpers
+- `api_supabase_auth.py`: shared Supabase auth helpers (email-link, magic-link, token verify)
+- `api_auth_decorators.py`: shared auth decorators (`require_supabase_user`, `require_agent_session`)
+- `api_auth_identity.py`: shared auth identity/header helpers (`_get_bearer_token`, `_get_supabase_user_id`, `_get_supabase_user_email`)
+- `api_agent_session.py`: shared agent session lifecycle helpers (`_create_agent_session`, `_get_agent_session`, `_clear_agent_session_for_request`)
+- `api_agent_pairing_challenge.py`: shared pairing challenge state helpers (`_purge_expired_agent_pairing_challenges`, `_create_agent_pairing_challenge`, `_consume_agent_pairing_challenge`)
+- `api_agent_abuse_controls.py`: shared agent pairing abuse/rate-control helpers (`_is_agent_pairing_action_allowed`, `_is_agent_pairing_confirm_blocked`, `_register_agent_pairing_confirm_failure`, `_clear_agent_pairing_confirm_failures`)
+- `api_agent_config.py`: shared static agent config validation (`_agent_broker_config_status`)
+- `api_supabase_jwks.py`: shared Supabase JWT/JWKS support helpers (`_looks_like_uuid`, `_get_supabase_jwks_client`)
+- `api_passkey_capability.py`: shared passkey rollout/config status helper (`_auth_passkey_capability`)
+- `api_auth_email_abuse.py`: shared auth-email abuse/rate-control helpers (`_auth_email_key`, `_auth_email_ip_key`, `_compact_auth_email_state`, `_is_auth_email_request_allowed`)
+- `api_auth_email_support.py`: shared auth-email support helpers (`_auth_email_generic_response`, `_apply_auth_email_response_floor`, `_verify_turnstile_token`)
+- `api_email_validation.py`: shared email validation helper (`_is_valid_email`)
+- `api_passkey_origin.py`: shared passkey origin/RP helpers (`_normalize_origin`, `_normalize_absolute_http_url`, `_normalized_auth_passkey_allowed_origins`, `_is_valid_webauthn_rp_id_for_origin`)
+- `api_auth_redirect.py`: shared auth redirect URL helpers (`_build_auth_redirect_url`, `_build_external_passkey_redirect`)
+- `api_passkey_request_context.py`: shared passkey request-context helpers (`_resolve_passkey_webauthn_expected_origin`, `_options_to_json_dict`)
+- `api_auth_redirect_signature.py`: shared passkey callback signature helpers (`_build_passkey_callback_signature_payload`, `_normalize_passkey_callback_timestamp`, `_verify_passkey_callback_signature`)
+- `api_passkey_state.py`: shared passkey state helpers (`_create_passkey_callback_state`, `_consume_passkey_callback_state`, `_get_passkey_callback_state`, `_create_passkey_webauthn_state`, `_consume_passkey_webauthn_state`)
+- `api_passkey_formatting.py`: shared passkey value/credential normalization helpers (`_normalize_passkey_transports`, `_normalize_passkey_friendly_name`, `_extract_passkey_credential_id`, `_coerce_webauthn_enum_value`)
+- `api_passkey_store_access.py`: shared passkey store-access wrappers (`_fetch_active_passkeys_for_user_id`, `_fetch_active_passkey_by_credential_id`, `_insert_user_passkey_row`, `_update_user_passkey_row`)
+- `api_supabase_service_request.py`: shared Supabase service request wrappers (`_supabase_rest_base_url`, `_supabase_service_rest_headers`, `_extract_supabase_error_message`, `_supabase_service_rest_request`)
+- `api_supabase_auth_access.py`: shared Supabase auth-access wrappers (`_send_supabase_email_link`, `_generate_supabase_magic_link_url`, `_verify_supabase_user_token`)
+- `api_websocket_status.py`: shared websocket status bridge + payload helpers (`websocket_status_bridge`, `websocket_connected_payload`, `websocket_status_payload`)
+- `api_bootstrap_banner.py`: shared startup/banner printing helpers for server bootstrap (`startup_banner_lines`, `initial_manager_status_lines`, `print_startup_banner`, `print_initial_manager_status`)
+- `api_server_entrypoint.py`: shared server launch orchestration helpers (`resolve_api_host`, `resolve_api_port`, `run_server_entrypoint`)
+- `api_autocad_export_excel.py`: shared AutoCAD coordinate Excel export helper (`export_points_to_excel`)
+- `api_autocad_entity_geometry.py`: shared AutoCAD entity geometry helpers (`_entity_bbox`, `_poly_centroid`, `_entity_center`)
+- `api_autocad_reference_block.py`: shared AutoCAD reference-block helpers (`default_ref_dwg_path`, `ensure_block_exists`, `insert_reference_block`, `add_point_label`)
+- `api_autocad_com_helpers.py`: shared AutoCAD COM utility helpers (`com_call_with_retry`, `wait_for_command_finish`, `ensure_layer`, `pt`)
+- `api_autocad_connection.py`: shared AutoCAD connection/dispatch helpers (`dyn`, `connect_autocad`)
+- `api_autocad_manager.py`: shared AutoCAD manager lifecycle and operations (`AutoCADManager`, `get_manager`, `reset_manager_for_tests`, `create_autocad_manager`)
+- `api_autocad_runtime.py`: shared AutoCAD runtime wiring/composition (`create_autocad_runtime`, `AutoCADRuntime`)
+- `api_auth_runtime.py`: shared auth/session runtime wiring (`create_auth_runtime`, `AuthRuntime`)
+- `api_passkey_runtime.py`: shared passkey runtime wiring/orchestration (`create_passkey_runtime`, `PasskeyRuntime`)
+- `api_email_runtime.py`: shared auth-email runtime wiring/orchestration (`create_email_runtime`, `EmailRuntime`)
+- `api_agent_runtime.py`: shared agent runtime wiring/orchestration (`create_agent_runtime`, `AgentRuntime`)
+- `api_security_runtime.py`: shared API-key guard + layer-config validation runtime (`create_security_runtime`, `SecurityRuntime`)
+- `api_transmittal_runtime.py`: shared transmittal helper runtime (`create_transmittal_runtime`, `TransmittalRuntime`)
+- `api_transmittal_profiles_runtime.py`: shared transmittal profile/cache runtime (`create_transmittal_profiles_runtime`, `TransmittalProfilesRuntime`)
+- `api_env_parsing.py`: shared env parsing runtime (`create_env_parsing_runtime`, `EnvParsingRuntime`)
+- `api_runtime_config.py`: shared runtime config normalization helpers (API key, Supabase URL/API key, agent webhook secret, passkey provider/RP defaults, turnstile requirement)
+- `api_http_hardening.py`: shared HTTP hardening helpers (default allowed origins, CORS setup, limiter defaults, security headers)
+- `api_server_state.py`: shared in-memory server state initialization (stores + locks for transmittal profiles, agent sessions/challenges, passkey/auth-email abuse windows)
+- `api_bootstrap_runtime.py`: shared startup/bootstrap helpers (logging config, gen_py read-only setup, env file loading)
+- `api_dependency_bundle.py`: shared dependency-bundle builders for route-group registration (`passkey_deps`, `agent_deps`, `transmittal_render_deps`)
+- `api_agent.py`: `/api/agent/*`
+- `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
+- `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
+- `api_transmittal_render.py`: `/api/transmittal/render`
+- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/trigger-selection`
+- `api_health.py`: `/health`
+- `api_registry.py`: central route-group registration for the Flask app
+
+## Why this exists
+
+- Keep API surface organized by domain.
+- Reduce monolithic `api_server.py` blast radius.
+- Make incremental refactors safer by moving one domain at a time.
+
+## Next recommended groups
+
+- `api_server_constants.py`: optional extraction for remaining top-level constant/env declarations to reduce `api_server.py` scan length

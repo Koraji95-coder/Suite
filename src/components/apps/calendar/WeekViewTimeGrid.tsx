@@ -1,7 +1,5 @@
 import { format, getHours, isSameDay, isToday } from "date-fns";
 import type { MouseEvent } from "react";
-import type { ColorScheme } from "@/lib/palette";
-import { hexToRgba } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import type { CalendarEvent } from "./calendarindex";
 import { DraggableEvent, DroppableCell } from "./calendarindex";
@@ -14,7 +12,6 @@ interface WeekViewTimeGridProps {
 	processedDayEvents: PositionedWeekEvent[][];
 	currentTimeVisible: boolean;
 	currentTimePosition: number;
-	palette: ColorScheme;
 	onEventSelect: (event: CalendarEvent, eventClick: MouseEvent) => void;
 	onEventCreate: (startTime: Date) => void;
 }
@@ -26,55 +23,46 @@ export function WeekViewTimeGrid({
 	processedDayEvents,
 	currentTimeVisible,
 	currentTimePosition,
-	palette,
 	onEventSelect,
 	onEventCreate,
 }: WeekViewTimeGridProps) {
 	return (
 		<div className="grid flex-1 grid-cols-8 overflow-hidden">
-			<div
-				className="grid auto-cols-fr"
-				style={{
-					borderRight: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
-				}}
-			>
+			{/* Hour labels column */}
+			<div className="grid auto-cols-fr border-r border-[color-mix(in_srgb,var(--primary)_8%,transparent)]">
 				{hours.map((hour, index) => (
 					<div
 						key={hour.toString()}
-						className="relative flex min-h-[var(--week-cells-height)] items-start justify-center"
-						style={{
-							borderBottom: `1px solid ${hexToRgba(palette.primary, 0.06)}`,
-						}}
+						className="relative flex min-h-(--week-cells-height) items-start justify-center border-b
+							border-[color-mix(in_srgb,var(--primary)_6%,transparent)]"
 					>
-						{index > 0 ? (
-							<span
-								className="-translate-y-1/2 mt-0 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none"
-								style={{ color: hexToRgba(palette.text, 0.35) }}
-							>
+						{index > 0 && (
+							<span className="-translate-y-1/2 mt-0 inline-flex min-h-7 w-14 items-center justify-center rounded-md px-2.5 text-center text-xs leading-none [color:var(--text-muted)]">
 								{format(hour, "h a")}
 							</span>
-						) : null}
+						)}
 					</div>
 				))}
 			</div>
 
+			{/* Day columns */}
 			{days.map((day, dayIndex) => {
 				const isSelected = !!selectedDate && isSameDay(day, selectedDate);
+				const today = isToday(day);
+
 				return (
 					<div
 						key={day.toString()}
-						className="relative grid auto-cols-fr last:border-r-0"
-						style={{
-							borderRight: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
-							...(isSelected
-								? { backgroundColor: hexToRgba(palette.primary, 0.05) }
-								: isToday(day)
-									? { backgroundColor: hexToRgba(palette.primary, 0.02) }
-									: {}),
-						}}
-						data-today={isToday(day) || undefined}
+						className={cn(
+							"relative grid auto-cols-fr border-r last:border-r-0",
+							"border-[color-mix(in_srgb,var(--primary)_8%,transparent)]",
+							isSelected && "[background:color-mix(in_srgb,var(--primary)_5%,transparent)]",
+							today && !isSelected && "[background:color-mix(in_srgb,var(--primary)_2%,transparent)]",
+						)}
+						data-today={today || undefined}
 						data-selected={isSelected || undefined}
 					>
+						{/* Positioned events */}
 						{(processedDayEvents[dayIndex] ?? []).map((positionedEvent) => (
 							<div
 								key={positionedEvent.event.id}
@@ -86,7 +74,7 @@ export function WeekViewTimeGrid({
 									width: `${positionedEvent.width * 100}%`,
 									zIndex: positionedEvent.zIndex,
 								}}
-								onClick={(event) => event.stopPropagation()}
+								onClick={(e) => e.stopPropagation()}
 							>
 								<div className="size-full">
 									<DraggableEvent
@@ -102,33 +90,27 @@ export function WeekViewTimeGrid({
 							</div>
 						))}
 
-						{currentTimeVisible && isToday(day) ? (
+						{/* Current time indicator */}
+						{currentTimeVisible && today && (
 							<div
 								className="pointer-events-none absolute right-0 left-0 z-20"
 								style={{ top: `${currentTimePosition}%` }}
 							>
 								<div className="relative flex items-center">
-									<div
-										className="absolute -left-1 h-2 w-2 rounded-full"
-										style={{ backgroundColor: palette.primary }}
-									></div>
-									<div
-										className="h-[2px] w-full"
-										style={{ backgroundColor: palette.primary }}
-									></div>
+									<div className="absolute -left-1 h-2 w-2 rounded-full [background:var(--primary)]" />
+									<div className="h-0.5 w-full [background:var(--primary)] opacity-85" />
 								</div>
 							</div>
-						) : null}
+						)}
 
+						{/* Hour grid cells */}
 						{hours.map((hour) => {
 							const hourValue = getHours(hour);
 							return (
 								<div
 									key={hour.toString()}
-									className="relative min-h-[var(--week-cells-height)] last:border-b-0"
-									style={{
-										borderBottom: `1px solid ${hexToRgba(palette.primary, 0.06)}`,
-									}}
+									className="relative min-h-(--week-cells-height) border-b last:border-b-0
+										border-[color-mix(in_srgb,var(--primary)_6%,transparent)]"
 								>
 									{[0, 1, 2, 3].map((quarter) => {
 										const quarterHourTime = hourValue + quarter * 0.25;
@@ -141,12 +123,9 @@ export function WeekViewTimeGrid({
 												className={cn(
 													"absolute h-[calc(var(--week-cells-height)/4)] w-full",
 													quarter === 0 && "top-0",
-													quarter === 1 &&
-														"top-[calc(var(--week-cells-height)/4)]",
-													quarter === 2 &&
-														"top-[calc(var(--week-cells-height)/4*2)]",
-													quarter === 3 &&
-														"top-[calc(var(--week-cells-height)/4*3)]",
+													quarter === 1 && "top-[calc(var(--week-cells-height)/4)]",
+													quarter === 2 && "top-[calc(var(--week-cells-height)/4*2)]",
+													quarter === 3 && "top-[calc(var(--week-cells-height)/4*3)]",
 												)}
 												onClick={() => {
 													const startTime = new Date(day);

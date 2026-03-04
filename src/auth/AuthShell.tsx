@@ -8,6 +8,8 @@ import { Button } from "@/components/primitives/Button";
 import { HStack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
+import styles from "./AuthShell.module.css";
 
 type AuthShellProps = {
 	children: ReactNode;
@@ -45,18 +47,18 @@ export default function AuthShell({
 	}, []);
 
 	return (
-		<div className="min-h-screen bg-bg text-text">
+		<div className={styles.root}>
 			{/* ═══════════════════════════════════════════════════════════════════
           NAV
       ═══════════════════════════════════════════════════════════════════ */}
-			<nav className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-4 md:px-8">
+			<nav className={styles.nav}>
 				<Link
 					to="/"
-					className="inline-flex items-center gap-2.5 text-sm font-semibold text-text no-underline"
+					className={styles.brandLink}
 					aria-label={`${APP_NAME} home`}
 				>
 					<AgentPixelMark profileId="koro" size={28} expression="neutral" />
-					<span className="tracking-tight">{APP_NAME}</span>
+					<span className={styles.brandName}>{APP_NAME}</span>
 				</Link>
 
 				{navLink && (
@@ -71,9 +73,12 @@ export default function AuthShell({
 			{/* ═══════════════════════════════════════════════════════════════════
           MAIN CONTENT
       ═══════════════════════════════════════════════════════════════════ */}
-			<main className="mx-auto w-full max-w-6xl px-4 pb-16 pt-2 md:px-8">
+			<main className={styles.main}>
 				<div
-					className={`grid gap-6 ${hidePanel ? "" : "md:grid-cols-12"}`}
+					className={cn(
+						styles.contentGrid,
+						!hidePanel && styles.contentGridWithPanel,
+					)}
 					style={{
 						opacity: mounted ? 1 : 0,
 						transform: mounted ? "translateY(0)" : "translateY(12px)",
@@ -84,10 +89,10 @@ export default function AuthShell({
               LEFT PANEL (Agent showcase)
           ───────────────────────────────────────────────────────────────── */}
 					{!hidePanel && (
-						<section className="relative hidden overflow-hidden rounded-2xl border border-border md:col-span-5 md:flex md:flex-col md:items-center md:justify-center">
+						<section className={styles.leftPanel}>
 							{/* Background gradient */}
 							<div
-								className="absolute inset-0"
+								className={styles.leftPanelGradient}
 								style={{
 									background: `
                     radial-gradient(ellipse 80% 60% at 50% 40%, color-mix(in oklab, var(--primary) 12%, transparent), transparent),
@@ -99,7 +104,7 @@ export default function AuthShell({
 
 							{/* Dot pattern */}
 							<div
-								className="absolute inset-0 opacity-[0.04]"
+								className={styles.leftPanelPattern}
 								style={{
 									backgroundImage:
 										"radial-gradient(circle, var(--text-muted) 1px, transparent 1px)",
@@ -108,13 +113,13 @@ export default function AuthShell({
 							/>
 
 							{/* Content */}
-							<div className="relative flex h-full min-h-105 w-full flex-col items-center justify-center px-8 py-12">
+							<div className={styles.leftPanelContent}>
 								{/* Floating agent marks */}
-								<div className="relative mb-10">
+								<div className={styles.floatArea}>
 									{FLOATING_MARKS.map((m) => (
 										<div
 											key={m.id}
-											className="absolute animate-float"
+											className={styles.floatMark}
 											style={{
 												top: m.top,
 												left: m.left,
@@ -131,28 +136,39 @@ export default function AuthShell({
 											/>
 										</div>
 									))}
-									<div className="h-48 w-48" aria-hidden="true" />
+									<div className={styles.floatSpacer} aria-hidden="true" />
 								</div>
 
 								{/* Branding */}
-								<div className="text-center">
+								<div className={styles.brandBlock}>
 									<Text size="xl" weight="semibold" block>
 										{APP_NAME}
 									</Text>
-									<Text size="sm" color="muted" className="mt-1.5" block>
+									<Text
+										size="sm"
+										color="muted"
+										className={styles.tagline}
+										block
+									>
 										{APP_TAGLINE}
 									</Text>
 								</div>
 
 								{/* Agent badges */}
-								<HStack gap={3} className="mt-8" wrap justify="center">
+								<HStack
+									gap={3}
+									className={styles.agentBadgeRow}
+									wrap
+									justify="center"
+								>
 									{FLOATING_MARKS.map((m) => (
-										<div
-											key={m.id}
-											className="flex items-center gap-1.5 rounded-full border border-border bg-surface/80 px-2.5 py-1"
-										>
+										<div key={m.id} className={styles.agentBadge}>
 											<AgentPixelMark profileId={m.id} size={14} />
-											<Text size="xs" color="muted" className="capitalize">
+											<Text
+												size="xs"
+												color="muted"
+												className={styles.agentName}
+											>
 												{m.id}
 											</Text>
 										</div>
@@ -166,16 +182,16 @@ export default function AuthShell({
               RIGHT PANEL (Form content)
           ───────────────────────────────────────────────────────────────── */}
 					<section
-						className={`
-              relative overflow-hidden rounded-2xl border border-border bg-surface shadow-sm
-              ${hidePanel ? "" : "md:col-span-7"}
-              ${cardClassName ?? ""}
-            `}
+						className={cn(
+							styles.rightPanel,
+							!hidePanel && styles.rightPanelWithLeft,
+							cardClassName,
+						)}
 						style={cardStyle}
 					>
 						{/* Top accent line */}
 						<div
-							className="h-0.5 w-full opacity-70"
+							className={styles.topAccent}
 							style={{
 								background:
 									"linear-gradient(90deg, var(--primary), var(--accent), var(--primary))",
@@ -183,7 +199,7 @@ export default function AuthShell({
 						/>
 
 						{/* Content */}
-						<div className="p-6">{children}</div>
+						<div className={styles.rightPanelBody}>{children}</div>
 					</section>
 				</div>
 			</main>

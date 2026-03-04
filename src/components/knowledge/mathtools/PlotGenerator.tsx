@@ -1,6 +1,7 @@
 import { TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
+import styles from "./PlotGenerator.module.css";
 
 type PlotType =
 	| "sine"
@@ -16,8 +17,6 @@ export function PlotGenerator() {
 	const [frequency, setFrequency] = useState(1);
 	const [amplitude, setAmplitude] = useState(1);
 	const [timeConstant, setTimeConstant] = useState(1);
-	const inputClass =
-		"w-full rounded-lg border px-4 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
 
 	const drawPlot = useCallback(() => {
 		const canvas = canvasRef.current;
@@ -115,32 +114,30 @@ export function PlotGenerator() {
 	}, [drawPlot]);
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center space-x-3">
-				<TrendingUp className="h-8 w-8 [color:var(--primary)]" />
-				<h2 className="text-3xl font-bold [color:var(--text)]">
-					Plot Diagrams
-				</h2>
+		<div className={styles.root}>
+			<div className={styles.header}>
+				<TrendingUp className={styles.headerIcon} />
+				<h2 className={styles.title}>Plot Diagrams</h2>
 			</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-				<div className="lg:col-span-2">
+			<div className={styles.layout}>
+				<div className={styles.canvasSection}>
 					<Section>
 						<canvas
 							ref={canvasRef}
 							width={800}
 							height={400}
-							className="w-full rounded-lg border [border-color:var(--border)]"
+							className={styles.canvas}
 						/>
 					</Section>
 				</div>
 
-				<div className="space-y-4">
+				<div className={styles.controls}>
 					<Section title="Plot Type">
 						<select
 							value={plotType}
 							onChange={(e) => setPlotType(e.target.value as PlotType)}
-							className={inputClass}
+							className={styles.select}
 						>
 							<option value="sine">Sine Wave</option>
 							<option value="square">Square Wave</option>
@@ -162,7 +159,7 @@ export function PlotGenerator() {
 								step="0.1"
 								value={frequency}
 								onChange={(e) => setFrequency(parseFloat(e.target.value))}
-								className="w-full"
+								className={styles.slider}
 							/>
 						</Section>
 					)}
@@ -176,7 +173,7 @@ export function PlotGenerator() {
 								step="0.1"
 								value={timeConstant}
 								onChange={(e) => setTimeConstant(parseFloat(e.target.value))}
-								className="w-full"
+								className={styles.slider}
 							/>
 						</Section>
 					)}
@@ -189,14 +186,14 @@ export function PlotGenerator() {
 							step="0.1"
 							value={amplitude}
 							onChange={(e) => setAmplitude(parseFloat(e.target.value))}
-							className="w-full"
+							className={styles.slider}
 						/>
 					</Section>
 				</div>
 			</div>
 
 			<Section title="Plot Information">
-				<div className="space-y-2 text-sm [color:var(--text-muted)]">
+				<div className={styles.info}>
 					{plotType === "sine" && (
 						<p>
 							Sinusoidal waveform commonly found in AC circuits and signal

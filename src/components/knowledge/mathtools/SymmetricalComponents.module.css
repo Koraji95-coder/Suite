@@ -1,0 +1,349 @@
+.root {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 0.25rem;
+}
+
+.headerIcon {
+	width: 2rem;
+	height: 2rem;
+	color: var(--accent);
+}
+
+.title {
+	margin: 0;
+	font-size: 1.875rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.theoryBlock {
+	display: grid;
+	gap: 0.75rem;
+	color: var(--text-muted);
+}
+
+.theoryBlock p {
+	margin: 0;
+}
+
+.strongText {
+	color: var(--text);
+}
+
+.theoryList {
+	margin: 0;
+	padding-left: 1rem;
+	display: grid;
+	gap: 0.5rem;
+	list-style: disc;
+	list-style-position: inside;
+}
+
+.inputGrid {
+	margin-bottom: 1.5rem;
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1.5rem;
+}
+
+.phaseColumn {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.subheading {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.fieldLabel {
+	display: block;
+	margin-bottom: 0.25rem;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.inputControl {
+	width: 100%;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	color: var(--text);
+	outline: none;
+}
+
+.inputControl:focus {
+	border-color: var(--primary);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.phaseCardDanger,
+.phaseCardWarning,
+.phaseCardAccent {
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	padding: 0.75rem;
+}
+
+.phaseCardDanger {
+	border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+	background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.phaseCardWarning {
+	border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+	background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.phaseCardAccent {
+	border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+	background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.phaseCardValue {
+	margin: 0;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875rem;
+	color: var(--text);
+}
+
+.sequenceBlock {
+	display: grid;
+	gap: 1rem;
+}
+
+.sequenceGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1rem;
+}
+
+.sequenceCardNeutral,
+.sequenceCardSuccess,
+.sequenceCardDanger {
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	padding: 1rem;
+}
+
+.sequenceCardNeutral {
+	border-color: color-mix(in srgb, var(--text-muted) 30%, transparent);
+	background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+}
+
+.sequenceCardSuccess {
+	border-color: color-mix(in srgb, var(--success) 30%, transparent);
+	background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.sequenceCardDanger {
+	border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+	background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.sequenceLabelNeutral,
+.sequenceLabelSuccess,
+.sequenceLabelDanger {
+	margin: 0 0 0.5rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.sequenceLabelNeutral {
+	color: var(--text-muted);
+}
+
+.sequenceLabelSuccess {
+	color: var(--success);
+}
+
+.sequenceLabelDanger {
+	color: var(--danger);
+}
+
+.sequenceValue {
+	margin: 0 0 0.25rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 1.25rem;
+	color: var(--text);
+}
+
+.sequenceSubtext {
+	margin: 0;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.topSection {
+	margin-top: 1.5rem;
+}
+
+.toggleButton {
+	border: 1px solid var(--primary);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--primary) 18%, transparent);
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text);
+	transition: background-color 160ms ease;
+	cursor: pointer;
+}
+
+.toggleButton:hover {
+	background: color-mix(in srgb, var(--primary) 26%, transparent);
+}
+
+.workPanel {
+	margin-top: 1rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 1.25rem;
+}
+
+.panelTitle {
+	margin: 0 0 0.75rem;
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.monoListMuted {
+	display: grid;
+	gap: 0.25rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.monoListMuted p {
+	margin: 0;
+}
+
+.spacer {
+	height: 0.5rem;
+}
+
+.stack {
+	display: grid;
+	gap: 1rem;
+}
+
+.inlinePanel {
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 1rem;
+}
+
+.overflowX {
+	overflow-x: auto;
+}
+
+.monoListSpaced,
+.monoList {
+	display: grid;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875rem;
+	color: var(--text);
+}
+
+.monoListSpaced {
+	gap: 0.5rem;
+}
+
+.monoList {
+	gap: 0.25rem;
+}
+
+.monoListSpaced p,
+.monoList p {
+	margin: 0;
+}
+
+.noteText {
+	margin: 0.75rem 0 0;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.operatorGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.75rem;
+}
+
+.representationGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1rem;
+}
+
+.surfaceNotePanel {
+	margin-top: 1rem;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface-2);
+	padding: 1rem;
+}
+
+.noteBody {
+	margin: 0;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.exampleBlock {
+	display: grid;
+	gap: 0.5rem;
+	color: var(--text-muted);
+}
+
+.exampleBlock p {
+	margin: 0;
+}
+
+.exampleHeading {
+	margin-top: 0.75rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.exampleIndented {
+	padding-left: 1rem;
+}
+
+.exampleFootnote {
+	margin-top: 0.75rem;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+@media (min-width: 768px) {
+	.sequenceGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.operatorGrid,
+	.representationGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1024px) {
+	.inputGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}

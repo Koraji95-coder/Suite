@@ -1,5 +1,6 @@
 import { Shuffle } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
+import styles from "./DrawingListManagerConfigPanels.module.css";
 import {
 	buildProjectCode,
 	type ProjectConfig,
@@ -16,12 +17,6 @@ interface DrawingListManagerConfigPanelsProps {
 	onApplySwap: () => void;
 }
 
-const panelClass =
-	"rounded-xl border p-4 [border-color:var(--border)] [background:var(--surface)]";
-const inputClass =
-	"w-full rounded-lg border px-2.5 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text)]";
-const labelClass = "grid gap-1.5 text-xs [color:var(--text-muted)]";
-
 export function DrawingListManagerConfigPanels({
 	projectConfig,
 	setProjectConfig,
@@ -32,14 +27,12 @@ export function DrawingListManagerConfigPanels({
 	onApplySwap,
 }: DrawingListManagerConfigPanelsProps) {
 	return (
-		<div className="grid gap-4 xl:grid-cols-3" style={{ alignItems: "start" }}>
+		<div className={styles.layout}>
 			{/* Project Standard */}
-			<div className={panelClass}>
-				<h3 className="text-sm font-semibold [color:var(--text)]">
-					Project Standard
-				</h3>
-				<div className="mt-3 grid gap-3">
-					<label className={labelClass}>
+			<div className={styles.panel}>
+				<h3 className={styles.title}>Project Standard</h3>
+				<div className={styles.sectionGrid}>
+					<label className={styles.labelGroup}>
 						Project number (XXX)
 						<input
 							value={projectConfig.projectNumber}
@@ -51,10 +44,10 @@ export function DrawingListManagerConfigPanels({
 								}));
 							}}
 							placeholder="25074"
-							className={inputClass}
+							className={styles.input}
 						/>
 					</label>
-					<label className={labelClass}>
+					<label className={styles.labelGroup}>
 						Default revision
 						<input
 							value={projectConfig.revisionDefault}
@@ -64,10 +57,10 @@ export function DrawingListManagerConfigPanels({
 									revisionDefault: e.target.value.toUpperCase(),
 								}))
 							}
-							className={inputClass}
+							className={styles.input}
 						/>
 					</label>
-					<label className="flex items-center gap-2.5 text-xs [color:var(--text-muted)]">
+					<label className={styles.checkboxRow}>
 						<input
 							type="checkbox"
 							checked={projectConfig.enforceProjectCode}
@@ -80,9 +73,9 @@ export function DrawingListManagerConfigPanels({
 						/>
 						Enforce project code in naming convention
 					</label>
-					<div className="grid gap-1.5 text-xs [color:var(--text-muted)]">
+					<div className={styles.labelGroup}>
 						Naming pattern
-						<div className="rounded-lg border border-dashed px-2.5 py-2 font-mono text-xs border-[color-mix(in_srgb,var(--primary)_30%,transparent)] [background:color-mix(in_srgb,var(--primary)_8%,transparent)] [color:var(--text)]">
+						<div className={styles.patternPreview}>
 							{buildProjectCode(projectConfig.projectNumber)}-DISC-TYPE-### REV
 						</div>
 					</div>
@@ -90,26 +83,19 @@ export function DrawingListManagerConfigPanels({
 			</div>
 
 			{/* Drawing Types & Counts */}
-			<div className={panelClass}>
-				<h3 className="text-sm font-semibold [color:var(--text)]">
-					Drawing Types & Counts
-				</h3>
-				<p className="mt-1 text-xs [color:var(--text-muted)]">
+			<div className={styles.panel}>
+				<h3 className={styles.title}>Drawing Types & Counts</h3>
+				<p className={styles.copy}>
 					Set how many drawings of each type to generate.
 				</p>
-				<div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-3">
+				<div className={styles.typesGrid}>
 					{projectConfig.allowedDisciplines.flatMap((discipline) =>
 						projectConfig.allowedSheetTypes.map((sheetType) => {
 							const typeKey = `${discipline}-${sheetType}`;
 							const count = templateCounts[typeKey] || 0;
 							return (
-								<div
-									key={typeKey}
-									className="rounded-lg border p-2.5 [border-color:var(--border)] [background:var(--surface-2)]"
-								>
-									<label className="mb-1.5 block text-xs font-medium [color:var(--text)]">
-										{typeKey}
-									</label>
+								<div key={typeKey} className={styles.typeCard}>
+									<label className={styles.typeLabel}>{typeKey}</label>
 									<input
 										type="number"
 										min={0}
@@ -121,7 +107,7 @@ export function DrawingListManagerConfigPanels({
 												[typeKey]: Math.max(0, Number(e.target.value)),
 											}))
 										}
-										className={inputClass}
+										className={styles.input}
 									/>
 								</div>
 							);
@@ -131,17 +117,15 @@ export function DrawingListManagerConfigPanels({
 			</div>
 
 			{/* Hot Swap Names */}
-			<div className={panelClass}>
-				<h3 className="text-sm font-semibold [color:var(--text)]">
-					Hot Swap Names
-				</h3>
-				<p className="mt-1 text-xs [color:var(--text-muted)]">
+			<div className={styles.panel}>
+				<h3 className={styles.title}>Hot Swap Names</h3>
+				<p className={styles.copy}>
 					Replace naming fragments across titles and regenerate naming
 					consistency.
 				</p>
-				<div className="mt-3 grid max-h-60 gap-2 overflow-y-auto pr-2">
+				<div className={styles.swapList}>
 					{swapRules.map((rule) => (
-						<div key={rule.id} className="grid grid-cols-2 gap-2">
+						<div key={rule.id} className={styles.swapRow}>
 							<input
 								value={rule.from}
 								onChange={(e) =>
@@ -154,7 +138,7 @@ export function DrawingListManagerConfigPanels({
 									)
 								}
 								placeholder="From"
-								className={inputClass}
+								className={styles.input}
 							/>
 							<input
 								value={rule.to}
@@ -168,7 +152,7 @@ export function DrawingListManagerConfigPanels({
 									)
 								}
 								placeholder="To"
-								className={inputClass}
+								className={styles.input}
 							/>
 						</div>
 					))}
@@ -176,10 +160,7 @@ export function DrawingListManagerConfigPanels({
 				<button
 					type="button"
 					onClick={onApplySwap}
-					className="mt-3 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition
-						border-[color-mix(in_srgb,var(--primary)_20%,transparent)]
-						[background:color-mix(in_srgb,var(--primary)_12%,transparent)]
-						[color:var(--primary)] hover:opacity-80"
+					className={styles.swapButton}
 				>
 					<Shuffle size={14} />
 					Apply Swap Rules

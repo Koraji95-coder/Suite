@@ -4,6 +4,7 @@ import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { cn } from "@/lib/utils";
+import styles from "./TransmittalBuilderContactsSection.module.css";
 import type { Contact, DraftState } from "./transmittalBuilderModels";
 
 const TransmittalSection = Section;
@@ -29,18 +30,18 @@ export function TransmittalBuilderContactsSection({
 }: TransmittalBuilderContactsSectionProps) {
 	return (
 		<TransmittalSection title="To - Contacts">
-			<div className="grid gap-3 px-2 sm:px-3">
+			<div className={styles.root}>
 				{draft.contacts.map((contact) => (
 					<Panel
 						key={contact.id}
 						variant="inset"
 						padding="md"
 						className={cn(
-							"space-y-3",
-							isInvalid("contacts") && "[border-color:var(--danger)]",
+							styles.contactPanel,
+							isInvalid("contacts") && styles.contactPanelInvalid,
 						)}
 					>
-						<div className="grid gap-2 sm:grid-cols-4">
+						<div className={styles.fields}>
 							<Input
 								value={contact.name}
 								onChange={(event) =>
@@ -70,7 +71,7 @@ export function TransmittalBuilderContactsSection({
 								placeholder="Phone"
 							/>
 						</div>
-						<div className="flex justify-end">
+						<div className={styles.actionsRow}>
 							<Button
 								type="button"
 								variant="ghost"
@@ -87,6 +88,7 @@ export function TransmittalBuilderContactsSection({
 				<Button
 					type="button"
 					variant="outline"
+					className={styles.addButton}
 					onClick={addContact}
 					iconLeft={<Plus size={16} />}
 				>

@@ -6,6 +6,7 @@ import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
+import styles from "./CalculatorPanel.module.css";
 
 type CalculationType =
 	| "ohms-law"
@@ -276,19 +277,17 @@ export function CalculatorPanel() {
 	};
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center space-x-3">
-				<div className="rounded-lg border border-(--border) bg-(--surface-2) p-3">
+		<div className={styles.root}>
+			<div className={styles.header}>
+				<div className={styles.headerBadge}>
 					<Zap
-						className="h-8 w-8 animate-pulse text-(--accent)"
+						className={styles.headerIcon}
 						style={{ animationDuration: "1.5s" }}
 					/>
 				</div>
-				<div>
-					<h2 className="text-3xl font-bold text-(--text)">
-						Electrical Calculations
-					</h2>
-					<p className="text-sm text-(--text-muted)">
+				<div className={styles.headerCopy}>
+					<h2 className={styles.title}>Electrical Calculations</h2>
+					<p className={styles.subtitle}>
 						Power, impedance, and circuit analysis
 					</p>
 				</div>
@@ -302,7 +301,7 @@ export function CalculatorPanel() {
 						setInputs({});
 						setResults([]);
 					}}
-					className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+					className={styles.inputControl}
 				>
 					{Object.entries(calculations).map(([key, calc]) => (
 						<option key={key} value={key}>
@@ -313,12 +312,10 @@ export function CalculatorPanel() {
 			</Section>
 
 			<Section title="Input Values">
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+				<div className={styles.inputGrid}>
 					{calculations[calcType].fields.map((field) => (
 						<div key={field.id}>
-							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
-								{field.label}
-							</label>
+							<label className={styles.fieldLabel}>{field.label}</label>
 							<input
 								type="number"
 								step="any"
@@ -326,47 +323,37 @@ export function CalculatorPanel() {
 								onChange={(e) =>
 									setInputs({ ...inputs, [field.id]: e.target.value })
 								}
-								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+								className={styles.inputControl}
 								placeholder={`Enter ${field.label.toLowerCase()}`}
 							/>
 						</div>
 					))}
 				</div>
 
-				<button
-					onClick={calculate}
-					className="mt-6 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30"
-				>
+				<button onClick={calculate} className={styles.primaryButton}>
 					Calculate
 				</button>
 			</Section>
 
 			{results.length > 0 && (
 				<Section title="Results">
-					<div className="space-y-3">
+					<div className={styles.resultList}>
 						{results.map((result, index) => (
-							<div
-								key={index}
-								className="flex items-center justify-between rounded-lg border border-(--border) bg-(--surface) px-4 py-3"
-							>
-								<span className="font-medium text-(--text-muted)">
-									{result.label}:
-								</span>
-								<span className="font-bold text-(--text)">
+							<div key={index} className={styles.resultRow}>
+								<span className={styles.resultLabel}>{result.label}:</span>
+								<span className={styles.resultValue}>
 									{result.value} {result.unit}
 								</span>
 							</div>
 						))}
 					</div>
 
-					<div className="mt-6">
-						<label className="mb-2 block text-sm font-medium text-(--text-muted)">
-							Notes (Optional)
-						</label>
+					<div className={styles.notesBlock}>
+						<label className={styles.fieldLabel}>Notes (Optional)</label>
 						<textarea
 							value={notes}
 							onChange={(e) => setNotes(e.target.value)}
-							className="min-h-20 w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+							className={styles.notesInput}
 							placeholder="Add notes about this calculation..."
 						/>
 					</div>
@@ -374,9 +361,9 @@ export function CalculatorPanel() {
 					<button
 						onClick={saveCalculation}
 						disabled={isSavingCalculation}
-						className="mt-4 [background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30 flex items-center space-x-2"
+						className={styles.primaryButtonWithIcon}
 					>
-						<Save className="w-5 h-5" />
+						<Save className={styles.buttonIcon} />
 						<span>
 							{isSavingCalculation ? "Saving..." : "Save Calculation"}
 						</span>

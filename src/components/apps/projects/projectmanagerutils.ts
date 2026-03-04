@@ -2,7 +2,8 @@ import type { CSSProperties } from "react";
 import { PROJECT_CATEGORIES } from "./projectmanagertypes";
 
 export const categoryColor = (cat: string | null | undefined): string =>
-	PROJECT_CATEGORIES.find((c) => c.key === cat)?.color ?? "#a855f7";
+	PROJECT_CATEGORIES.find((c) => c.key === (cat === "QAQC" ? "Standards" : cat))
+		?.color ?? "#a855f7";
 
 export const categoryBadgeStyle = (cat: string | null | undefined) => {
 	const color = categoryColor(cat);

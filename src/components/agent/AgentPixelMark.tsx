@@ -1,5 +1,7 @@
 // src/components/agent/AgentPixelMark.tsx
 import { useId, useMemo } from "react";
+import { cn } from "@/lib/utils";
+import styles from "./AgentPixelMark.module.css";
 import { AGENT_MARKS, type MarkExpression } from "./agentMarkPatterns";
 import type { AgentProfileId } from "./agentProfiles";
 
@@ -70,25 +72,16 @@ export function AgentPixelMark({
 
 	return (
 		<div
-			className={`relative inline-flex ${className}`}
+			className={cn(styles.root, className)}
 			style={{ width: size, height: size }}
 		>
 			{/* Pulse ring */}
 			{pulse && (
-				<div
-					className="absolute inset-0 rounded-full animate-ping opacity-20"
-					style={{
-						background: glowColor,
-						animationDuration: "2s",
-					}}
-				/>
+				<div className={styles.pulseRing} style={{ background: glowColor }} />
 			)}
 
 			{/* Breathing wrapper */}
-			<div
-				className={breathe ? "animate-pulse" : ""}
-				style={{ animationDuration: "3s" }}
-			>
+			<div className={breathe ? styles.breathe : undefined}>
 				<svg
 					width={size}
 					height={size}

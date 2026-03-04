@@ -1,3 +1,4 @@
+import styles from "./DrawingListManagerArchitectureMap.module.css";
 import type { DrawingListManagerArchitectureMap as ArchMap } from "./useDrawingListManagerState";
 
 interface DrawingListManagerArchitectureMapProps {
@@ -8,23 +9,16 @@ export function DrawingListManagerArchitectureMap({
 	architectureMap,
 }: DrawingListManagerArchitectureMapProps) {
 	return (
-		<div className="rounded-xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
-			<h3 className="text-sm font-semibold [color:var(--text)]">
-				Architecture Map
-			</h3>
-			<p className="mt-1 text-xs [color:var(--text-muted)]">
+		<div className={styles.root}>
+			<h3 className={styles.title}>Architecture Map</h3>
+			<p className={styles.copy}>
 				Summarized by sheet type for quick reporting.
 			</p>
-			<div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
+			<div className={styles.grid}>
 				{architectureMap.map(([type, count]) => (
-					<div
-						key={type}
-						className="flex items-center justify-between rounded-xl border p-3 [border-color:var(--border)] [background:var(--surface-2)]"
-					>
-						<div className="text-xs [color:var(--text-muted)]">{type}</div>
-						<div className="text-base font-bold [color:var(--text)]">
-							{count}
-						</div>
+					<div key={type} className={styles.card}>
+						<div className={styles.cardLabel}>{type}</div>
+						<div className={styles.cardValue}>{count}</div>
 					</div>
 				))}
 			</div>

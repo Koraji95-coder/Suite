@@ -5,6 +5,7 @@ import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { cn } from "@/lib/utils";
+import styles from "./TransmittalBuilderFileRow.module.css";
 
 interface TransmittalBuilderFileRowProps {
 	label: string;
@@ -57,18 +58,14 @@ export function TransmittalBuilderFileRow({
 		<Panel
 			variant="inset"
 			padding="lg"
-			className={cn("space-y-3", invalid && "[border-color:var(--danger)]")}
+			className={cn(styles.panel, invalid && styles.panelInvalid)}
 		>
-			<div className="flex items-start justify-between gap-3">
-				<div className="space-y-1">
-					<div className="text-sm font-semibold [color:var(--text)]">
-						{label}
-					</div>
-					{helpText && (
-						<div className="text-xs [color:var(--text-muted)]">{helpText}</div>
-					)}
+			<div className={styles.headerRow}>
+				<div className={styles.headerInfo}>
+					<div className={styles.label}>{label}</div>
+					{helpText && <div className={styles.helpText}>{helpText}</div>}
 				</div>
-				<div className="flex items-center gap-2">
+				<div className={styles.actions}>
 					{action && (
 						<Button
 							type="button"
@@ -92,7 +89,7 @@ export function TransmittalBuilderFileRow({
 					)}
 				</div>
 			</div>
-			<div className="flex items-center gap-2 text-xs text-text-muted">
+			<div className={styles.uploadHint}>
 				<Upload size={14} />
 				<span>Choose files or drag into the picker.</span>
 			</div>
@@ -103,7 +100,7 @@ export function TransmittalBuilderFileRow({
 				multiple={multiple}
 				onChange={handleChange}
 			/>
-			<div className="text-xs [color:var(--text-muted)]">{previewLabel}</div>
+			<div className={styles.preview}>{previewLabel}</div>
 		</Panel>
 	);
 }

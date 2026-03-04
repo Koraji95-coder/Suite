@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import styles from "./WhiteboardCanvas.module.css";
 import { DrawAction } from "./whiteboardtypes";
 
 interface WhiteboardCanvasProps {
@@ -240,7 +241,7 @@ export function WhiteboardCanvas({
 			onMouseMove={draw}
 			onMouseUp={stopDrawing}
 			onMouseLeave={stopDrawing}
-			className="cursor-crosshair rounded-lg border border-(--border) shadow-2xl"
+			className={styles.canvas}
 		/>
 	);
 }

@@ -1,0 +1,112 @@
+.header {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.75rem;
+}
+
+.headerIcon {
+	display: flex;
+	width: 2.5rem;
+	height: 2.5rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: var(--radius-3);
+	color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.activeRowIcon {
+	color: var(--primary);
+}
+
+.grid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.themeButton {
+	position: relative;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 1rem;
+	text-align: left;
+	transition:
+		border-color 200ms ease,
+		background 200ms ease,
+		box-shadow 200ms ease;
+}
+
+.themeButtonActive {
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	background: color-mix(in srgb, var(--primary) 5%, transparent);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.themeButtonInactive {
+	background: var(--surface);
+}
+
+.themeButtonInactive:hover {
+	border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+	background: var(--surface-2);
+}
+
+.activeCheck {
+	position: absolute;
+	top: -0.4rem;
+	right: -0.4rem;
+	display: flex;
+	width: 1.5rem;
+	height: 1.5rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	color: var(--primary-contrast);
+	background: var(--primary);
+	box-shadow: 0 6px 10px rgb(0 0 0 / 25%);
+}
+
+.themeDescription {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+
+.swatchRow {
+	display: flex;
+	gap: 0.5rem;
+}
+
+.swatch {
+	position: relative;
+	width: 1.5rem;
+	height: 1.5rem;
+	border-radius: 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+	box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+	transition: transform 200ms ease;
+}
+
+.themeButton:hover .swatch {
+	transform: scale(1.05);
+}
+
+.swatchShine {
+	position: absolute;
+	inset: 0;
+	border-radius: 0.5rem;
+	background: linear-gradient(135deg, rgb(255 255 255 / 20%), transparent);
+}
+
+@media (min-width: 40rem) {
+	.grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 64rem) {
+	.grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}

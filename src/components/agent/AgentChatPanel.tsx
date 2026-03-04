@@ -16,6 +16,7 @@ import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 import { agentService } from "@/services/agentService";
 import {
 	type AgentConversation,
@@ -23,6 +24,7 @@ import {
 } from "@/services/agentTaskManager";
 import { AgentChatComposer } from "./AgentChatComposer";
 import { AgentChatMessages } from "./AgentChatMessages";
+import styles from "./AgentChatPanel.module.css";
 import { AgentChatSidebar } from "./AgentChatSidebar";
 import { AgentPixelMark } from "./AgentPixelMark";
 import { AgentProfileSwitcher } from "./AgentProfileSwitcher";
@@ -141,20 +143,15 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const isReady = healthy && paired;
 
 	return (
-		<Panel
-			variant="default"
-			padding="none"
-			className="flex h-full overflow-hidden relative"
-		>
+		<Panel variant="default" padding="none" className={styles.panelRoot}>
 			{/* ═══════════════════════════════════════════════════════════════════
           SIDEBAR
       ═══════════════════════════════════════════════════════════════════ */}
 			<div
-				className={`
-          hidden md:flex flex-col shrink-0 border-r border-border bg-bg
-          transition-all duration-300 ease-in-out
-          ${sidebarCollapsed ? "w-0 opacity-0 overflow-hidden" : "w-64"}
-        `}
+				className={cn(
+					styles.sidebar,
+					sidebarCollapsed ? styles.sidebarCollapsed : styles.sidebarExpanded,
+				)}
 			>
 				<AgentChatSidebar
 					conversations={conversations}
@@ -169,13 +166,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			<button
 				type="button"
 				onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-				className="
-          hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10
-          h-6 w-3 items-center justify-center
-          bg-surface-2 border border-border border-l-0
-          rounded-r-md text-text-muted hover:text-text
-          transition-all hover:w-4
-        "
+				className={styles.sidebarToggle}
 				style={{ left: sidebarCollapsed ? 0 : 256 }}
 			>
 				{sidebarCollapsed ? (
@@ -188,17 +179,17 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			{/* ═══════════════════════════════════════════════════════════════════
           MAIN CHAT AREA
       ═══════════════════════════════════════════════════════════════════ */}
-			<div className="flex min-w-0 flex-1 flex-col">
+			<div className={styles.mainArea}>
 				{/* Header */}
-				<div className="flex items-center justify-between border-b border-border px-4 py-3 bg-surface/50 backdrop-blur-sm">
+				<div className={styles.header}>
 					<HStack gap={3} align="center">
 						{/* Agent avatar with status ring */}
-						<div className="relative">
+						<div className={styles.avatarCluster}>
 							<div
-								className={`
-                absolute -inset-1 rounded-full opacity-50
-                ${isThinking ? "bg-primary/20 animate-pulse" : ""}
-              `}
+								className={cn(
+									styles.avatarThinkingHalo,
+									isThinking && styles.avatarThinkingHaloVisible,
+								)}
 							/>
 							<AgentPixelMark
 								profileId={profileId}
@@ -208,11 +199,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 							/>
 							{/* Status dot */}
 							<div
-								className={`
-                absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full 
-                border-2 border-surface
-                ${isReady ? "bg-success" : "bg-warning animate-pulse"}
-              `}
+								className={cn(
+									styles.statusDot,
+									isReady ? styles.statusDotReady : styles.statusDotPending,
+								)}
 							/>
 						</div>
 
@@ -224,7 +214,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 								/>
 								{isThinking && (
 									<Badge color="primary" variant="soft" size="sm">
-										<Loader2 size={10} className="animate-spin" />
+										<Loader2 size={10} className={styles.spin} />
 										Working...
 									</Badge>
 								)}
@@ -238,7 +228,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					{/* Right side actions */}
 					<HStack gap={2}>
 						{/* Status badges */}
-						<div className="hidden sm:flex items-center gap-2">
+						<div className={styles.statusBadges}>
 							<Badge
 								color={healthy ? "success" : "danger"}
 								variant="soft"
@@ -322,56 +312,30 @@ function EmptyState({
 	onTemplateClick: (prompt: string) => void;
 }) {
 	return (
-		<div className="flex flex-1 flex-col items-center justify-center px-6 py-12 relative overflow-hidden">
+		<div className={styles.emptyRoot}>
 			{/* Background decorations */}
-			<div className="absolute inset-0 pointer-events-none">
+			<div className={styles.emptyBackdrop}>
 				{/* Radial gradient */}
-				<div
-					className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 opacity-30"
-					style={{
-						background: `radial-gradient(circle, var(--primary) 0%, transparent 70%)`,
-						filter: "blur(80px)",
-					}}
-				/>
+				<div className={styles.emptyRadial} />
 
 				{/* Grid pattern */}
-				<div
-					className="absolute inset-0 opacity-[0.015]"
-					style={{
-						backgroundImage: `
-              linear-gradient(var(--text) 1px, transparent 1px),
-              linear-gradient(90deg, var(--text) 1px, transparent 1px)
-            `,
-						backgroundSize: "60px 60px",
-					}}
-				/>
+				<div className={styles.emptyGrid} />
 			</div>
 
 			{/* Content */}
-			<div className="relative z-10 flex flex-col items-center">
+			<div className={styles.emptyContent}>
 				{/* Agent avatar with effects */}
-				<div className="relative mb-8">
+				<div className={styles.emptyAvatarWrap}>
 					{/* Outer glow ring */}
-					<div
-						className="absolute -inset-4 rounded-3xl opacity-20 blur-xl"
-						style={{ background: `var(--primary)` }}
-					/>
+					<div className={styles.emptyAvatarGlow} />
 
 					{/* Inner container */}
-					<div className="relative">
+					<div className={styles.emptyAvatarInner}>
 						{/* Rotating border when not ready */}
-						{!isReady && (
-							<div
-								className="absolute -inset-1 rounded-2xl opacity-50 animate-spin"
-								style={{
-									background: `linear-gradient(135deg, var(--primary), var(--accent), var(--primary))`,
-									animationDuration: "3s",
-								}}
-							/>
-						)}
+						{!isReady && <div className={styles.emptyAvatarSpinBorder} />}
 
 						{/* Avatar box */}
-						<div className="relative rounded-2xl border border-border bg-surface p-6">
+						<div className={styles.emptyAvatarBox}>
 							<AgentPixelMark
 								profileId={profileId}
 								size={96}
@@ -383,18 +347,13 @@ function EmptyState({
 				</div>
 
 				{/* Agent name with gradient */}
-				<h2
-					className="text-3xl font-bold bg-linear-to-r from-text via-primary to-text bg-clip-text text-transparent"
-					style={{ backgroundSize: "200% 100%" }}
-				>
-					{profile.name}
-				</h2>
+				<h2 className={styles.emptyTitle}>{profile.name}</h2>
 
 				<Text
 					size="md"
 					color="muted"
 					align="center"
-					className="mt-2 max-w-sm"
+					className={styles.emptyTagline}
 					block
 				>
 					{profile.tagline}
@@ -405,9 +364,9 @@ function EmptyState({
 					<HStack
 						gap={2}
 						align="center"
-						className="mt-6 rounded-full bg-warning/10 border border-warning/20 px-4 py-2"
+						className={cn(styles.statusPill, styles.statusPillWarning)}
 					>
-						<WifiOff size={14} className="text-warning" />
+						<WifiOff size={14} className={styles.warningIcon} />
 						<Text size="sm" color="warning">
 							Waiting for connection...
 						</Text>
@@ -416,9 +375,9 @@ function EmptyState({
 					<HStack
 						gap={2}
 						align="center"
-						className="mt-6 rounded-full bg-success/10 border border-success/20 px-4 py-2"
+						className={cn(styles.statusPill, styles.statusPillSuccess)}
 					>
-						<div className="h-2 w-2 rounded-full bg-success animate-pulse" />
+						<div className={styles.readyDot} />
 						<Text size="sm" color="success">
 							Ready to assist
 						</Text>
@@ -427,26 +386,26 @@ function EmptyState({
 
 				{/* Quick action templates */}
 				{templates.length > 0 && isReady && (
-					<div className="mt-10 w-full max-w-lg">
+					<div className={styles.templateWrap}>
 						<Text
 							size="xs"
 							color="muted"
 							weight="semibold"
 							align="center"
-							className="mb-4 uppercase tracking-wider"
+							className={styles.templateLabel}
 							block
 						>
 							Get started with
 						</Text>
 
-						<div className="grid grid-cols-2 gap-3">
+						<div className={styles.templateGrid}>
 							{templates.slice(0, 4).map((t) => (
 								<Button
 									key={t.label}
 									variant="outline"
 									onClick={() => onTemplateClick(t.prompt)}
 									iconLeft={<Zap size={14} />}
-									className="justify-start text-left h-auto py-3"
+									className={styles.templateButton}
 								>
 									<Text size="sm" weight="medium" truncate>
 										{t.label}

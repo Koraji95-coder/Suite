@@ -1,3 +1,4 @@
+import styles from "./DrawingListManagerTable.module.css";
 import type { DrawingListManagerFilteredDrawing } from "./useDrawingListManagerState";
 
 interface DrawingListManagerTableProps {
@@ -10,52 +11,39 @@ export function DrawingListManagerTable({
 	onTitleChange,
 }: DrawingListManagerTableProps) {
 	return (
-		<div className="rounded-xl border p-4 [border-color:var(--border)] [background:var(--surface)]">
-			<div className="flex items-center justify-between">
-				<h3 className="text-sm font-semibold [color:var(--text)]">
-					Drawing List
-				</h3>
-				<div className="text-xs [color:var(--text-muted)]">
-					{drawings.length} entries
-				</div>
+		<div className={styles.root}>
+			<div className={styles.header}>
+				<h3 className={styles.title}>Drawing List</h3>
+				<div className={styles.count}>{drawings.length} entries</div>
 			</div>
 
-			<div className="mt-3 overflow-x-auto">
-				<table className="w-full border-collapse text-xs">
+			<div className={styles.tableWrap}>
+				<table className={styles.table}>
 					<thead>
-						<tr className="text-left [color:var(--text-muted)]">
-							<th className="px-1.5 py-2">Drawing Number</th>
-							<th className="px-1.5 py-2">Title</th>
-							<th className="px-1.5 py-2">File</th>
-							<th className="px-1.5 py-2">Status</th>
+						<tr className={styles.headerRow}>
+							<th className={styles.cellHead}>Drawing Number</th>
+							<th className={styles.cellHead}>Title</th>
+							<th className={styles.cellHead}>File</th>
+							<th className={styles.cellHead}>Status</th>
 						</tr>
 					</thead>
 					<tbody>
 						{drawings.map((drawing) => (
-							<tr
-								key={drawing.id}
-								className="border-t [border-color:var(--border)]"
-							>
-								<td className="px-1.5 py-2 font-semibold [color:var(--text)]">
-									{drawing.drawingNumber}
-								</td>
-								<td className="px-1.5 py-2">
+							<tr key={drawing.id} className={styles.bodyRow}>
+								<td className={styles.numberCell}>{drawing.drawingNumber}</td>
+								<td className={styles.cell}>
 									<input
 										value={drawing.title}
 										onChange={(e) => onTitleChange(drawing.id, e.target.value)}
-										className="w-full rounded-md border bg-transparent px-1.5 py-1 text-xs outline-none transition focus:[border-color:var(--primary)] border-[color-mix(in_srgb,var(--primary)_15%,transparent)] [color:var(--text)]"
+										className={styles.titleInput}
 									/>
 								</td>
-								<td className="px-1.5 py-2 [color:var(--text-muted)]">
-									{drawing.fileName || "–"}
-								</td>
-								<td className="px-1.5 py-2">
+								<td className={styles.fileCell}>{drawing.fileName || "–"}</td>
+								<td className={styles.cell}>
 									{drawing.issues.length === 0 ? (
-										<span className="font-semibold [color:var(--success)]">
-											Ready
-										</span>
+										<span className={styles.statusReady}>Ready</span>
 									) : (
-										<span className="font-semibold [color:var(--warning)]">
+										<span className={styles.statusWarn}>
 											{drawing.issues.join(", ")}
 										</span>
 									)}

@@ -1,0 +1,8 @@
+.canvas {
+	cursor: crosshair;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	box-shadow:
+		0 24px 48px color-mix(in srgb, black 28%, transparent),
+		0 8px 16px color-mix(in srgb, black 22%, transparent);
+}

@@ -1,0 +1,118 @@
+.sectionBody {
+	padding-inline: 0.5rem;
+}
+
+.typeGrid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.typeOption {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	border: 1px solid var(--border);
+	border-radius: 0.75rem;
+	padding: 1rem;
+	cursor: pointer;
+}
+
+.typeTitle {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.typeDescription {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.fileSelectionGrid {
+	display: grid;
+	gap: 1rem;
+	padding-inline: 0.5rem;
+}
+
+.errorText {
+	font-size: 0.75rem;
+	color: var(--danger);
+}
+
+.standardFiles {
+	display: grid;
+	gap: 1rem;
+}
+
+.cidFiles {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.emptyState {
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.cidTable {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.cidHeader {
+	display: none;
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.cidRow {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.cidFileName {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 0.5rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.75rem;
+}
+
+.revisionTrigger {
+	font-size: 0.75rem;
+}
+
+.invalidField {
+	border-color: var(--danger);
+}
+
+.invalidField:focus-visible {
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+@media (min-width: 640px) {
+	.sectionBody,
+	.fileSelectionGrid {
+		padding-inline: 0.75rem;
+	}
+
+	.typeGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.cidHeader {
+		display: grid;
+		grid-template-columns: 2fr 4fr 1fr auto;
+		gap: 0.5rem;
+	}
+
+	.cidRow {
+		grid-template-columns: 2fr 4fr 1fr auto;
+		align-items: center;
+	}
+}

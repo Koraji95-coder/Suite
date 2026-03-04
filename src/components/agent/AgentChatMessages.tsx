@@ -8,7 +8,9 @@ import { HStack, Stack } from "@/components/primitives/Stack";
 
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 import type { AgentConversationMessage } from "@/services/agentTaskManager";
+import styles from "./AgentChatMessages.module.css";
 import { AgentPixelMark } from "./AgentPixelMark";
 import type { AgentProfileId } from "./agentProfiles";
 
@@ -31,8 +33,8 @@ export function AgentChatMessages({
 	});
 
 	return (
-		<div className="flex-1 overflow-y-auto px-4 py-6 md:px-6">
-			<div className="mx-auto max-w-190">
+		<div className={styles.root}>
+			<div className={styles.inner}>
 				<Stack gap={4}>
 					{messages.map((msg, index) =>
 						msg.role === "user" ? (
@@ -62,22 +64,12 @@ export function AgentChatMessages({
 // ═══════════════════════════════════════════════════════════════════════════
 function UserBubble({ content }: { content: string }) {
 	return (
-		<div className="flex justify-end pl-12">
-			<div
-				className="
-          relative max-w-[85%] rounded-2xl rounded-br-sm 
-          bg-linear-to-br from-primary/20 to-primary/10
-          border border-primary/20
-          px-4 py-3
-        "
-			>
+		<div className={styles.userRow}>
+			<div className={styles.userBubble}>
 				{/* Subtle shine effect */}
-				<div className="absolute inset-0 rounded-2xl rounded-br-sm bg-linear-to-br from-white/5 to-transparent pointer-events-none" />
+				<div className={styles.userShine} />
 
-				<Text
-					size="sm"
-					className="relative leading-relaxed whitespace-pre-wrap"
-				>
+				<Text size="sm" className={styles.userText}>
 					{content}
 				</Text>
 			</div>
@@ -110,28 +102,24 @@ function AssistantRow({
 	};
 
 	return (
-		<HStack gap={3} align="start" className="group pr-12">
+		<HStack gap={3} align="start" className={styles.assistantRow}>
 			{/* Avatar */}
-			<div className="shrink-0 pt-1">
-				<div className="relative">
+			<div className={styles.assistantAvatarShell}>
+				<div className={styles.assistantAvatarWrap}>
 					<AgentPixelMark
 						profileId={profileId}
 						size={32}
 						expression={isLatest ? "active" : "neutral"}
 					/>
 					{/* Online indicator */}
-					<div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-success" />
+					<div className={styles.onlineDot} />
 				</div>
 			</div>
 
 			{/* Content */}
-			<Stack gap={1} className="min-w-0 flex-1">
+			<Stack gap={1} className={styles.assistantContent}>
 				{isCodeBlock ? (
-					<Panel
-						variant="inset"
-						padding="md"
-						className="overflow-x-auto relative group/code"
-					>
+					<Panel variant="inset" padding="md" className={styles.codePanel}>
 						{/* Copy button */}
 						<IconButton
 							icon={copied ? <Check size={14} /> : <Copy size={14} />}
@@ -139,26 +127,21 @@ function AssistantRow({
 							variant="ghost"
 							size="sm"
 							onClick={handleCopy}
-							className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity"
+							className={styles.codeCopyButton}
 						/>
 
-						<pre className="text-xs leading-relaxed text-text/90 font-mono whitespace-pre-wrap pr-8">
-							{content}
-						</pre>
+						<pre className={styles.codeContent}>{content}</pre>
 					</Panel>
 				) : (
-					<div className="rounded-2xl rounded-tl-sm bg-surface-2/50 border border-border/50 px-4 py-3">
-						<Text size="sm" className="leading-relaxed whitespace-pre-wrap">
+					<div className={styles.assistantBubble}>
+						<Text size="sm" className={styles.assistantText}>
 							{content}
 						</Text>
 					</div>
 				)}
 
 				{/* Message actions (visible on hover) */}
-				<HStack
-					gap={1}
-					className="opacity-0 group-hover:opacity-100 transition-opacity"
-				>
+				<HStack gap={1} className={styles.messageActions}>
 					<IconButton
 						icon={copied ? <Check size={12} /> : <Copy size={12} />}
 						aria-label="Copy message"
@@ -177,8 +160,8 @@ function AssistantRow({
 // ═══════════════════════════════════════════════════════════════════════════
 function ThinkingIndicator({ profileId }: { profileId: AgentProfileId }) {
 	return (
-		<HStack gap={3} align="start" className="pr-12">
-			<div className="shrink-0 pt-1">
+		<HStack gap={3} align="start" className={styles.thinkingRow}>
+			<div className={styles.assistantAvatarShell}>
 				<AgentPixelMark
 					profileId={profileId}
 					size={32}
@@ -187,11 +170,7 @@ function ThinkingIndicator({ profileId }: { profileId: AgentProfileId }) {
 				/>
 			</div>
 
-			<HStack
-				gap={2}
-				align="center"
-				className="rounded-2xl rounded-tl-sm bg-surface-2/50 border border-border/50 px-4 py-3"
-			>
+			<HStack gap={2} align="center" className={styles.thinkingBubble}>
 				<ThinkingDots />
 				<Text size="xs" color="muted">
 					Thinking...
@@ -206,26 +185,14 @@ function ThinkingIndicator({ profileId }: { profileId: AgentProfileId }) {
 // ═══════════════════════════════════════════════════════════════════════════
 function ThinkingDots() {
 	return (
-		<>
-			<div className="flex items-center gap-1">
-				{[0, 1, 2].map((i) => (
-					<span
-						key={i}
-						className="h-1.5 w-1.5 rounded-full bg-primary thinking-dot"
-						style={{ animationDelay: `${i * 0.15}s` }}
-					/>
-				))}
-			</div>
-
-			<style>{`
-        @keyframes thinking-bounce {
-          0%, 60%, 100% { transform: translateY(0); }
-          30% { transform: translateY(-4px); }
-        }
-        .thinking-dot {
-          animation: thinking-bounce 1s ease-in-out infinite;
-        }
-      `}</style>
-		</>
+		<div className={styles.thinkingDots}>
+			{[0, 1, 2].map((i) => (
+				<span
+					key={i}
+					className={cn(styles.thinkingDot)}
+					style={{ animationDelay: `${i * 0.15}s` }}
+				/>
+			))}
+		</div>
 	);
 }

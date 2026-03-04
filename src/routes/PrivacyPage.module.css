@@ -1,0 +1,160 @@
+.headerTop {
+	margin-bottom: 1rem;
+}
+
+.heading {
+	margin-bottom: 0.75rem;
+}
+
+.shieldIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 0.6rem;
+	color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.introCopy {
+	max-width: 34rem;
+	line-height: 1.65;
+}
+
+.updatedNote {
+	margin-top: 0.75rem;
+}
+
+.sectionsGrid {
+	display: grid;
+	gap: 1rem;
+}
+
+.sectionHead {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.75rem;
+}
+
+.sectionIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	flex-shrink: 0;
+	border-radius: 0.65rem;
+}
+
+.sectionIconPrimary {
+	color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.sectionIconSuccess {
+	color: var(--success);
+	background: color-mix(in srgb, var(--success) 15%, transparent);
+}
+
+.sectionIconAccent {
+	color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.sectionIconWarning {
+	color: var(--warning);
+	background: color-mix(in srgb, var(--warning) 15%, transparent);
+}
+
+.sectionTitle {
+	padding-top: 0.45rem;
+}
+
+.sectionItems {
+	padding-left: 3rem;
+}
+
+.bulletDot {
+	margin-top: 0.55rem;
+	width: 0.25rem;
+	height: 0.25rem;
+	flex-shrink: 0;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text-muted) 50%, transparent);
+}
+
+.contactWrap {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 1rem;
+}
+
+.contactIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	flex-shrink: 0;
+	border-radius: var(--radius-3);
+	color: var(--text-muted);
+	background: var(--surface-2);
+}
+
+.contactBody {
+	flex: 1;
+	min-width: 13rem;
+}
+
+.contactEmail {
+	margin-top: 0.5rem;
+}
+
+.ctaPanel {
+	position: relative;
+	overflow: hidden;
+}
+
+.ctaAccent {
+	position: absolute;
+	inset: 0;
+	opacity: 0.3;
+	background: radial-gradient(
+		ellipse 80% 80% at 50% 0%,
+		var(--primary),
+		transparent
+	);
+}
+
+.ctaContent {
+	position: relative;
+}
+
+.footerLinks {
+	padding-top: 0.5rem;
+}
+
+.footerLink {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	transition: color 160ms ease;
+}
+
+.footerLink:hover {
+	color: var(--text);
+}
+
+.footerDivider {
+	color: color-mix(in srgb, var(--text-muted) 35%, transparent);
+}
+
+@media (min-width: 40rem) {
+	.sectionsGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}

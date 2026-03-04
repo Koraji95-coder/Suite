@@ -1,4 +1,5 @@
 import { SavedWhiteboard } from "../whiteboardtypes";
+import styles from "./LibraryGrid.module.css";
 import { WhiteboardCard } from "./WhiteboardCard";
 
 interface LibraryGridProps {
@@ -15,15 +16,11 @@ export function LibraryGrid({
 	emptyMessage,
 }: LibraryGridProps) {
 	if (whiteboards.length === 0) {
-		return (
-			<div className="py-12 text-center text-(--text-muted)">
-				{emptyMessage}
-			</div>
-		);
+		return <div className={styles.emptyState}>{emptyMessage}</div>;
 	}
 
 	return (
-		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+		<div className={styles.grid}>
 			{whiteboards.map((wb) => (
 				<WhiteboardCard
 					key={wb.id}

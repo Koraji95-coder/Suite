@@ -1,6 +1,7 @@
 import { Calendar, Eye, Tag, Trash2 } from "lucide-react";
 import { SavedWhiteboard } from "../whiteboardtypes";
 import { formatDate, getInitials } from "../whiteboardutils";
+import styles from "./WhiteboardCard.module.css";
 
 interface WhiteboardCardProps {
 	whiteboard: SavedWhiteboard;
@@ -14,72 +15,60 @@ export function WhiteboardCard({
 	onDelete,
 }: WhiteboardCardProps) {
 	return (
-		<div className="group overflow-hidden rounded-xl border transition hover:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)]">
+		<div className={styles.card}>
 			{/* Thumbnail */}
-			<div className="relative">
+			<div className={styles.thumbnailWrap}>
 				{whiteboard.thumbnail_url ? (
 					<img
 						src={whiteboard.thumbnail_url}
 						alt={whiteboard.title}
-						className="h-48 w-full object-cover [background:var(--surface-2)]"
+						className={styles.thumbnailImage}
 					/>
 				) : (
-					<div className="flex h-48 w-full items-center justify-center [background:var(--surface-2)]">
-						<span className="text-4xl font-bold opacity-25 [color:var(--primary)]">
+					<div className={styles.thumbnailEmpty}>
+						<span className={styles.thumbnailInitials}>
 							{getInitials(whiteboard.title)}
 						</span>
 					</div>
 				)}
 
 				{/* Hover overlay */}
-				<div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+				<div className={styles.overlay}>
 					<button
 						onClick={() => onView(whiteboard)}
 						title="View"
-						className="rounded-lg border p-2 transition
-							[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-							hover:[background:var(--surface-2)]"
+						className={styles.viewButton}
 					>
-						<Eye className="h-5 w-5" />
+						<Eye className={styles.overlayIcon} />
 					</button>
 					<button
 						onClick={() => onDelete(whiteboard.id)}
 						title="Delete"
-						className="rounded-lg border p-2 transition
-							border-[color-mix(in_srgb,var(--danger)_40%,transparent)]
-							[background:color-mix(in_srgb,var(--danger)_14%,transparent)]
-							[color:var(--danger)]
-							hover:[background:color-mix(in_srgb,var(--danger)_25%,transparent)]"
+						className={styles.deleteButton}
 					>
-						<Trash2 className="h-5 w-5" />
+						<Trash2 className={styles.overlayIcon} />
 					</button>
 				</div>
 			</div>
 
 			{/* Info */}
-			<div className="p-4">
-				<h3 className="mb-2 truncate text-sm font-semibold [color:var(--text)]">
-					{whiteboard.title}
-				</h3>
+			<div className={styles.body}>
+				<h3 className={styles.title}>{whiteboard.title}</h3>
 
-				<div className="mb-3 flex items-center gap-2 text-xs [color:var(--text-muted)]">
-					<Calendar className="h-3 w-3" />
+				<div className={styles.metaRow}>
+					<Calendar className={styles.metaIcon} />
 					<span>{formatDate(whiteboard.created_at)}</span>
 					<span>·</span>
-					<span className="rounded px-1.5 py-0.5 [background:var(--surface-2)]">
+					<span className={styles.contextBadge}>
 						{whiteboard.panel_context}
 					</span>
 				</div>
 
 				{whiteboard.tags.length > 0 && (
-					<div className="flex flex-wrap gap-1">
+					<div className={styles.tagsWrap}>
 						{whiteboard.tags.map((tag, idx) => (
-							<span
-								key={idx}
-								className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs
-									[border-color:var(--border)] [background:var(--surface-2)] [color:var(--text-muted)]"
-							>
-								<Tag className="h-3 w-3" />
+							<span key={idx} className={styles.tagChip}>
+								<Tag className={styles.tagIcon} />
 								{tag}
 							</span>
 						))}

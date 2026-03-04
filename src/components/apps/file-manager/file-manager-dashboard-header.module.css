@@ -1,0 +1,124 @@
+.root {
+	display: flex;
+	height: 4rem;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: 1px solid var(--border);
+	padding: 0 1rem;
+}
+
+.start {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	gap: 1rem;
+}
+
+.mobileMenuButton {
+	display: inline-flex;
+}
+
+.searchWrap {
+	position: relative;
+	flex: 1 1 auto;
+	max-width: 32rem;
+}
+
+.searchIcon {
+	position: absolute;
+	top: 50%;
+	left: 0.75rem;
+	width: 1rem;
+	height: 1rem;
+	transform: translateY(-50%);
+	color: var(--text-muted);
+	pointer-events: none;
+}
+
+.searchInput {
+	padding-left: 2.5rem;
+}
+
+.actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.mobileStorageButton {
+	display: inline-flex;
+}
+
+.uploadLabel {
+	display: none;
+}
+
+.createButton {
+	display: none;
+	background: transparent;
+}
+
+.buttonIcon {
+	margin-right: 0.5rem;
+}
+
+.profileTrigger {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.avatar {
+	width: 2rem;
+	height: 2rem;
+}
+
+.profileName {
+	display: none;
+}
+
+.profileChevron {
+	display: none;
+	width: 1rem;
+	height: 1rem;
+}
+
+@media (min-width: 640px) {
+	.uploadLabel {
+		display: inline;
+	}
+
+	.createButton {
+		display: inline-flex;
+	}
+}
+
+@media (min-width: 768px) {
+	.profileName {
+		display: inline;
+	}
+
+	.profileChevron {
+		display: inline-flex;
+	}
+}
+
+@media (min-width: 1024px) {
+	.root {
+		padding: 0 1.5rem;
+	}
+
+	.actions {
+		gap: 1rem;
+	}
+
+	.mobileMenuButton {
+		display: none;
+	}
+}
+
+@media (min-width: 1280px) {
+	.mobileStorageButton {
+		display: none;
+	}
+}

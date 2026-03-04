@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { logger } from "../lib/logger";
+import styles from "./CaptchaChallenge.module.css";
 
 type CaptchaChallengeProps = {
 	token: string;
@@ -144,7 +146,7 @@ export default function CaptchaChallenge({
 			}
 			widgetIdRef.current = null;
 		};
-	}, [siteKey]);
+	}, []);
 
 	useEffect(() => {
 		if (!siteKey) return;
@@ -152,22 +154,20 @@ export default function CaptchaChallenge({
 		if (!disabled) return;
 		window.turnstile.reset(widgetIdRef.current);
 		onTokenChangeRef.current("");
-	}, [disabled, siteKey]);
+	}, [disabled]);
 
 	if (!siteKey) return null;
 
 	return (
-		<div className="grid gap-2">
+		<div className={styles.root}>
 			<div
 				ref={containerRef}
-				className={disabled ? "pointer-events-none opacity-75" : ""}
+				className={cn(disabled && styles.disabledWidget)}
 			/>
 			{loadError ? (
-				<div className="rounded-lg border px-3 py-2 text-xs [border-color:color-mix(in_oklab,var(--danger)_45%,var(--border))] [background:color-mix(in_oklab,var(--danger)_8%,var(--surface))] [color:var(--danger)]">
-					{loadError}
-				</div>
+				<div className={styles.error}>{loadError}</div>
 			) : token.trim().length === 0 ? (
-				<p className="m-0 text-xs [color:var(--text-muted)]">
+				<p className={styles.hint}>
 					Complete the CAPTCHA challenge before continuing.
 				</p>
 			) : null}

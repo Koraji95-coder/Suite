@@ -1,0 +1,13 @@
+.track {
+	width: 100%;
+	height: 0.5rem;
+	border-radius: 0.25rem;
+	background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.fill {
+	height: 0.5rem;
+	border-radius: 0.25rem;
+	background: var(--primary);
+	transition: width 200ms ease;
+}

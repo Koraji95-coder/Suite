@@ -1,6 +1,8 @@
 import { Zap } from "lucide-react";
 import { useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
+import { cn } from "@/lib/utils";
+import styles from "./ThreePhaseCalculator.module.css";
 
 export function ThreePhaseCalculator() {
 	const [lineVoltage, setLineVoltage] = useState(415);
@@ -81,32 +83,24 @@ export function ThreePhaseCalculator() {
 		];
 	};
 
-	const inputClass =
-		"w-full rounded-lg border px-4 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
-	const labelClass = "mb-1 block text-sm [color:var(--text-muted)]";
-	const cardClass =
-		"rounded-lg border p-4 [border-color:var(--border)] [background:var(--surface)]";
-
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center space-x-3 mb-6">
-				<Zap className="h-8 w-8 [color:var(--primary)]" />
-				<h2 className="text-3xl font-bold [color:var(--text)]">
-					Three-Phase Systems
-				</h2>
+		<div className={styles.root}>
+			<div className={styles.header}>
+				<Zap className={styles.headerIcon} />
+				<h2 className={styles.title}>Three-Phase Systems</h2>
 			</div>
 
 			<Section title="Voltage Relationships in 3-Phase System">
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<div className="space-y-4">
+				<div className={styles.twoColumnLayout}>
+					<div className={styles.stack}>
 						<div>
-							<label className={labelClass}>Configuration</label>
+							<label className={styles.label}>Configuration</label>
 							<select
 								value={configuration}
 								onChange={(e) =>
 									setConfiguration(e.target.value as "wye" | "delta")
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							>
 								<option value="wye">Wye (Y)</option>
 								<option value="delta">Delta (Δ)</option>
@@ -114,7 +108,7 @@ export function ThreePhaseCalculator() {
 						</div>
 
 						<div>
-							<label className={labelClass}>
+							<label className={styles.label}>
 								Line Voltage (V<sub>L</sub>)
 							</label>
 							<input
@@ -123,12 +117,12 @@ export function ThreePhaseCalculator() {
 								onChange={(e) =>
 									setLineVoltage(parseFloat(e.target.value) || 0)
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
 						<div>
-							<label className={labelClass}>
+							<label className={styles.label}>
 								Line Current (I<sub>L</sub>)
 							</label>
 							<input
@@ -137,12 +131,12 @@ export function ThreePhaseCalculator() {
 								onChange={(e) =>
 									setLineCurrent(parseFloat(e.target.value) || 0)
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
 						<div>
-							<label className={labelClass}>Power Factor (cos φ)</label>
+							<label className={styles.label}>Power Factor (cos φ)</label>
 							<input
 								type="number"
 								step="0.01"
@@ -152,55 +146,43 @@ export function ThreePhaseCalculator() {
 								onChange={(e) =>
 									setPowerFactor(parseFloat(e.target.value) || 0)
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 					</div>
 
-					<div className="space-y-4">
-						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
+					<div className={styles.stack}>
+						<div className={cn(styles.metricCard, styles.metricCardPrimary)}>
+							<p className={styles.metricLabelPrimary}>
 								Phase Voltage (V<sub>φ</sub>)
 							</p>
-							<p className="font-mono text-xl [color:var(--text)]">
-								{phaseVoltage.toFixed(2)} V
-							</p>
-							<p className="mt-1 text-xs [color:var(--text-muted)]">
+							<p className={styles.metricValue}>{phaseVoltage.toFixed(2)} V</p>
+							<p className={styles.metricHelp}>
 								{configuration === "wye" ? "V_φ = V_L / √3" : "V_φ = V_L"}
 							</p>
 						</div>
 
-						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
+						<div className={cn(styles.metricCard, styles.metricCardPrimary)}>
+							<p className={styles.metricLabelPrimary}>
 								Phase Current (I<sub>φ</sub>)
 							</p>
-							<p className="font-mono text-xl [color:var(--text)]">
-								{phaseCurrent.toFixed(2)} A
-							</p>
-							<p className="mt-1 text-xs [color:var(--text-muted)]">
+							<p className={styles.metricValue}>{phaseCurrent.toFixed(2)} A</p>
+							<p className={styles.metricHelp}>
 								{configuration === "wye" ? "I_φ = I_L" : "I_φ = I_L / √3"}
 							</p>
 						</div>
 
-						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Phase Angle (φ)
-							</p>
-							<p className="font-mono text-xl [color:var(--text)]">
-								{angle.toFixed(2)}°
-							</p>
-							<p className="mt-1 text-xs [color:var(--text-muted)]">
-								φ = cos⁻¹(PF)
-							</p>
+						<div className={cn(styles.metricCard, styles.metricCardPrimary)}>
+							<p className={styles.metricLabelPrimary}>Phase Angle (φ)</p>
+							<p className={styles.metricValue}>{angle.toFixed(2)}°</p>
+							<p className={styles.metricHelp}>φ = cos⁻¹(PF)</p>
 						</div>
 					</div>
 				</div>
 
-				<div className="mt-6">
-					<h4 className="mb-3 text-lg font-semibold [color:var(--text-muted)]">
-						Phase Voltage Relationships
-					</h4>
-					<div className="space-y-2 rounded-lg border p-4 font-mono [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]">
+				<div className={styles.topSection}>
+					<h4 className={styles.subheading}>Phase Voltage Relationships</h4>
+					<div className={styles.formulaPanel}>
 						<p>
 							V<sub>an</sub> = V<sub>φ</sub>∠0°
 						</p>
@@ -210,7 +192,7 @@ export function ThreePhaseCalculator() {
 						<p>
 							V<sub>cn</sub> = V<sub>φ</sub>∠-240° (or +120°)
 						</p>
-						<p className="mt-2 text-sm [color:var(--text-muted)]">
+						<p className={styles.formulaNote}>
 							Balanced system: V<sub>an</sub> + V<sub>bn</sub> + V<sub>cn</sub>{" "}
 							= 0
 						</p>
@@ -219,71 +201,67 @@ export function ThreePhaseCalculator() {
 			</Section>
 
 			<Section title="Power Calculations">
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-					<div className="rounded-lg border p-4 [border-color:var(--accent)] [background:color-mix(in_srgb,var(--accent)_14%,transparent)]">
-						<p className="mb-1 text-sm font-semibold [color:var(--accent)]">
-							Active Power (P)
-						</p>
-						<p className="font-mono text-2xl [color:var(--text)]">
+				<div className={styles.powerGrid}>
+					<div className={cn(styles.metricCard, styles.metricCardAccent)}>
+						<p className={styles.metricLabelAccent}>Active Power (P)</p>
+						<p className={styles.metricValueLarge}>
 							{activePower.toFixed(2)} kW
 						</p>
-						<p className="mt-2 text-xs [color:var(--text-muted)]">
+						<p className={styles.metricHelpTop}>
 							P = √3 × V<sub>L</sub> × I<sub>L</sub> × cos(φ)
 						</p>
 					</div>
 
-					<div className="rounded-lg border p-4 [border-color:var(--warning)] [background:color-mix(in_srgb,var(--warning)_14%,transparent)]">
-						<p className="mb-1 text-sm font-semibold [color:var(--warning)]">
-							Reactive Power (Q)
-						</p>
-						<p className="font-mono text-2xl [color:var(--text)]">
+					<div className={cn(styles.metricCard, styles.metricCardWarning)}>
+						<p className={styles.metricLabelWarning}>Reactive Power (Q)</p>
+						<p className={styles.metricValueLarge}>
 							{reactivePower.toFixed(2)} kVAR
 						</p>
-						<p className="mt-2 text-xs [color:var(--text-muted)]">
+						<p className={styles.metricHelpTop}>
 							Q = √3 × V<sub>L</sub> × I<sub>L</sub> × sin(φ)
 						</p>
 					</div>
 
-					<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_14%,transparent)]">
-						<p className="mb-1 text-sm font-semibold [color:var(--primary)]">
-							Apparent Power (S)
-						</p>
-						<p className="font-mono text-2xl [color:var(--text)]">
+					<div
+						className={cn(styles.metricCard, styles.metricCardPrimaryStrong)}
+					>
+						<p className={styles.metricLabelPrimary}>Apparent Power (S)</p>
+						<p className={styles.metricValueLarge}>
 							{apparentPower.toFixed(2)} kVA
 						</p>
-						<p className="mt-2 text-xs [color:var(--text-muted)]">
+						<p className={styles.metricHelpTop}>
 							S = √3 × V<sub>L</sub> × I<sub>L</sub>
 						</p>
 					</div>
 				</div>
 
-				<div className="mt-4 rounded-lg border p-4 [border-color:var(--border)] [background:var(--surface)]">
-					<h4 className="mb-2 font-semibold [color:var(--text-muted)]">
+				<div className={styles.inlinePanel}>
+					<h4 className={styles.inlinePanelTitle}>
 						Power Triangle Relationships
 					</h4>
-					<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+					<div className={styles.monoList}>
 						<p>S² = P² + Q²</p>
 						<p>Power Factor (PF) = P / S = cos(φ)</p>
 						<p>Q = P × tan(φ)</p>
 					</div>
 				</div>
 
-				<div className="mt-6">
+				<div className={styles.topSection}>
 					<button
 						onClick={() => setShowWork(!showWork)}
-						className="rounded-lg border px-4 py-2 text-sm font-medium transition [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)] hover:[background:color-mix(in_srgb,var(--primary)_26%,transparent)]"
+						className={styles.toggleButton}
 					>
 						{showWork ? "Hide" : "Show"} Step-by-Step Work
 					</button>
 
 					{showWork && (
-						<div className="mt-4 rounded-lg border p-5 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,var(--surface))]">
-							<h4 className="mb-3 font-semibold [color:var(--text-muted)]">
+						<div className={styles.workPanel}>
+							<h4 className={styles.inlinePanelTitle}>
 								Step-by-Step Power Calculation
 							</h4>
-							<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+							<div className={styles.monoList}>
 								{getPowerSteps().map((step, i) => (
-									<p key={i} className={step === "" ? "h-2" : ""}>
+									<p key={i} className={step === "" ? styles.spacer : ""}>
 										{step}
 									</p>
 								))}
@@ -294,22 +272,22 @@ export function ThreePhaseCalculator() {
 			</Section>
 
 			<Section title="Fault Analysis">
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<div className="space-y-4">
+				<div className={styles.twoColumnLayout}>
+					<div className={styles.stack}>
 						<div>
-							<label className={labelClass}>Base Voltage (kV)</label>
+							<label className={styles.label}>Base Voltage (kV)</label>
 							<input
 								type="number"
 								value={baseVoltage}
 								onChange={(e) =>
 									setBaseVoltage(parseFloat(e.target.value) || 0)
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
 						<div>
-							<label className={labelClass}>Source Impedance (Ω)</label>
+							<label className={styles.label}>Source Impedance (Ω)</label>
 							<input
 								type="number"
 								step="0.01"
@@ -317,12 +295,12 @@ export function ThreePhaseCalculator() {
 								onChange={(e) =>
 									setSourceImpedance(parseFloat(e.target.value) || 0)
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
 						<div>
-							<label className={labelClass}>Fault Type</label>
+							<label className={styles.label}>Fault Type</label>
 							<select
 								value={faultType}
 								onChange={(e) =>
@@ -330,7 +308,7 @@ export function ThreePhaseCalculator() {
 										e.target.value as "3phase" | "line-line" | "line-ground",
 									)
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							>
 								<option value="3phase">Three-Phase (3φ)</option>
 								<option value="line-line">Line-to-Line (L-L)</option>
@@ -339,21 +317,19 @@ export function ThreePhaseCalculator() {
 						</div>
 					</div>
 
-					<div className="space-y-4">
-						<div className="rounded-lg border p-4 [border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_14%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--danger)]">
+					<div className={styles.stack}>
+						<div className={cn(styles.metricCard, styles.metricCardDanger)}>
+							<p className={styles.metricLabelDanger}>
 								Fault Current (I<sub>f</sub>)
 							</p>
-							<p className="font-mono text-2xl [color:var(--text)]">
+							<p className={styles.metricValueLarge}>
 								{(faultCurrent / 1000).toFixed(2)} kA
 							</p>
 						</div>
 
-						<div className={cardClass}>
-							<h4 className="mb-2 font-semibold [color:var(--text-muted)]">
-								Fault Formulas
-							</h4>
-							<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+						<div className={styles.inlinePanel}>
+							<h4 className={styles.inlinePanelTitle}>Fault Formulas</h4>
+							<div className={styles.monoList}>
 								<p>
 									3φ Fault: I<sub>f</sub> = V<sub>φ</sub> / Z<sub>s</sub>
 								</p>
@@ -372,12 +348,10 @@ export function ThreePhaseCalculator() {
 			</Section>
 
 			<Section title="Δ-Y Transformation">
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div className={cardClass}>
-						<h4 className="mb-3 font-semibold [color:var(--text-muted)]">
-							Delta to Wye
-						</h4>
-						<div className="space-y-2 font-mono text-sm [color:var(--text)]">
+				<div className={styles.deltaGrid}>
+					<div className={styles.inlinePanel}>
+						<h4 className={styles.inlinePanelTitleLarge}>Delta to Wye</h4>
+						<div className={styles.monoListSpaced}>
 							<p>
 								R<sub>1</sub> = (R<sub>a</sub> × R<sub>c</sub>) / (R<sub>a</sub>{" "}
 								+ R<sub>b</sub> + R<sub>c</sub>)
@@ -393,11 +367,9 @@ export function ThreePhaseCalculator() {
 						</div>
 					</div>
 
-					<div className={cardClass}>
-						<h4 className="mb-3 font-semibold [color:var(--text-muted)]">
-							Wye to Delta
-						</h4>
-						<div className="space-y-2 font-mono text-sm [color:var(--text)]">
+					<div className={styles.inlinePanel}>
+						<h4 className={styles.inlinePanelTitleLarge}>Wye to Delta</h4>
+						<div className={styles.monoListSpaced}>
 							<p>
 								R<sub>a</sub> = (R<sub>1</sub>R<sub>2</sub> + R<sub>2</sub>R
 								<sub>3</sub> + R<sub>3</sub>R<sub>1</sub>) / R<sub>2</sub>
@@ -413,11 +385,9 @@ export function ThreePhaseCalculator() {
 						</div>
 					</div>
 
-					<div className={`${cardClass} md:col-span-2`}>
-						<h4 className="mb-2 font-semibold [color:var(--text-muted)]">
-							Balanced Systems
-						</h4>
-						<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+					<div className={cn(styles.inlinePanel, styles.balancedPanel)}>
+						<h4 className={styles.inlinePanelTitle}>Balanced Systems</h4>
+						<div className={styles.monoList}>
 							<p>
 								If R<sub>Δ</sub> = R in all branches: R<sub>Y</sub> = R
 								<sub>Δ</sub> / 3

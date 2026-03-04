@@ -1,0 +1,147 @@
+.root {
+	display: grid;
+	gap: 1rem;
+}
+
+.sectionBody {
+	display: grid;
+	gap: 0.75rem;
+	padding-inline: 0.5rem;
+}
+
+.block {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.blockTitle {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.formatGrid {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.formatOption {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	border: 1px solid var(--border);
+	border-radius: 0.75rem;
+	padding: 0.75rem;
+	cursor: pointer;
+}
+
+.formatOptionActive {
+	border-color: var(--primary);
+}
+
+.formatMeta {
+	display: grid;
+	gap: 0.125rem;
+}
+
+.formatTitle {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.formatDescription {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.spin {
+	animation: spin 1s linear infinite;
+}
+
+.outputBody {
+	display: grid;
+	gap: 0.75rem;
+	padding-inline: 0.5rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.outputStatus {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.outputList {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.outputItem {
+	display: grid;
+	gap: 0.25rem;
+	font-size: 0.75rem;
+}
+
+.outputLabel {
+	font-weight: 600;
+	color: var(--text);
+}
+
+.summaryPanel {
+	display: grid;
+	gap: 0.75rem;
+	font-size: 0.75rem;
+}
+
+.summaryHeading {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.text {
+	color: var(--text);
+}
+
+.muted {
+	color: var(--text-muted);
+}
+
+.optionSummaryList {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.validationBody {
+	display: grid;
+	gap: 0.5rem;
+	padding-inline: 0.5rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.validationErrors {
+	display: grid;
+	gap: 0.25rem;
+	color: var(--danger);
+}
+
+@media (min-width: 640px) {
+	.sectionBody,
+	.outputBody,
+	.validationBody {
+		padding-inline: 0.75rem;
+	}
+}
+
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+
+	to {
+		transform: rotate(360deg);
+	}
+}

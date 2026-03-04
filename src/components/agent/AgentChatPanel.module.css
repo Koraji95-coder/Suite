@@ -1,0 +1,307 @@
+.panelRoot {
+	position: relative;
+	display: flex;
+	height: 100%;
+	overflow: hidden;
+}
+
+.sidebar {
+	display: none;
+	flex-shrink: 0;
+	flex-direction: column;
+	background: var(--bg);
+	border-right: 1px solid var(--border);
+	transition:
+		width 300ms ease-in-out,
+		opacity 300ms ease-in-out;
+}
+
+.sidebarExpanded {
+	width: 16rem;
+	opacity: 1;
+	overflow: hidden;
+}
+
+.sidebarCollapsed {
+	width: 0;
+	opacity: 0;
+	overflow: hidden;
+}
+
+.sidebarToggle {
+	position: absolute;
+	top: 50%;
+	z-index: 10;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	width: 0.75rem;
+	height: 1.5rem;
+	color: var(--text-muted);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-left: 0;
+	border-radius: 0 0.375rem 0.375rem 0;
+	transform: translateY(-50%);
+	transition:
+		width 150ms ease,
+		color 150ms ease;
+}
+
+.sidebarToggle:hover {
+	width: 1rem;
+	color: var(--text);
+}
+
+.mainArea {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.75rem 1rem;
+	border-bottom: 1px solid var(--border);
+	background: color-mix(in srgb, var(--surface) 50%, transparent);
+	backdrop-filter: blur(8px);
+}
+
+.avatarCluster {
+	position: relative;
+}
+
+.avatarThinkingHalo {
+	position: absolute;
+	inset: -0.25rem;
+	opacity: 0;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--primary) 20%, transparent);
+	transition: opacity 150ms ease;
+}
+
+.avatarThinkingHaloVisible {
+	opacity: 0.5;
+	animation: pulse 2s ease-in-out infinite;
+}
+
+.statusDot {
+	position: absolute;
+	right: -0.125rem;
+	bottom: -0.125rem;
+	width: 0.75rem;
+	height: 0.75rem;
+	border: 2px solid var(--surface);
+	border-radius: 999px;
+}
+
+.statusDotReady {
+	background: var(--success);
+}
+
+.statusDotPending {
+	background: var(--warning);
+	animation: pulse 2s ease-in-out infinite;
+}
+
+.statusBadges {
+	display: none;
+}
+
+.spin {
+	animation: spin 1s linear infinite;
+}
+
+.emptyRoot {
+	position: relative;
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 3rem 1.5rem;
+	overflow: hidden;
+}
+
+.emptyBackdrop {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.emptyRadial {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 37.5rem;
+	height: 37.5rem;
+	opacity: 0.3;
+	background: radial-gradient(circle, var(--primary) 0%, transparent 70%);
+	filter: blur(80px);
+	transform: translate(-50%, -50%);
+}
+
+.emptyGrid {
+	position: absolute;
+	inset: 0;
+	opacity: 0.015;
+	background-image:
+		linear-gradient(var(--text) 1px, transparent 1px),
+		linear-gradient(90deg, var(--text) 1px, transparent 1px);
+	background-size: 60px 60px;
+}
+
+.emptyContent {
+	position: relative;
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.emptyAvatarWrap {
+	position: relative;
+	margin-bottom: 2rem;
+}
+
+.emptyAvatarGlow {
+	position: absolute;
+	inset: -1rem;
+	opacity: 0.2;
+	border-radius: 1.5rem;
+	background: var(--primary);
+	filter: blur(20px);
+}
+
+.emptyAvatarInner {
+	position: relative;
+}
+
+.emptyAvatarSpinBorder {
+	position: absolute;
+	inset: -0.25rem;
+	opacity: 0.5;
+	border-radius: 1rem;
+	background: linear-gradient(
+		135deg,
+		var(--primary),
+		var(--accent),
+		var(--primary)
+	);
+	animation: spin 3s linear infinite;
+}
+
+.emptyAvatarBox {
+	position: relative;
+	padding: 1.5rem;
+	border: 1px solid var(--border);
+	border-radius: 1rem;
+	background: var(--surface);
+}
+
+.emptyTitle {
+	margin: 0;
+	font-size: 1.875rem;
+	font-weight: 700;
+	background: linear-gradient(90deg, var(--text), var(--primary), var(--text));
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+}
+
+.emptyTagline {
+	margin-top: 0.5rem;
+	max-width: 24rem;
+}
+
+.statusPill {
+	margin-top: 1.5rem;
+	padding: 0.5rem 1rem;
+	border-radius: 999px;
+}
+
+.statusPillWarning {
+	border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent);
+	background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.statusPillSuccess {
+	border: 1px solid color-mix(in srgb, var(--success) 20%, transparent);
+	background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.warningIcon {
+	color: var(--warning);
+}
+
+.readyDot {
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 999px;
+	background: var(--success);
+	animation: pulse 2s ease-in-out infinite;
+}
+
+.templateWrap {
+	width: 100%;
+	max-width: 32rem;
+	margin-top: 2.5rem;
+}
+
+.templateLabel {
+	margin-bottom: 1rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.templateGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.templateButton {
+	height: auto;
+	padding-top: 0.75rem;
+	padding-bottom: 0.75rem;
+	text-align: left;
+	justify-content: flex-start;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.65;
+	}
+}
+
+@media (min-width: 40rem) {
+	.statusBadges {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+}
+
+@media (min-width: 48rem) {
+	.sidebar {
+		display: flex;
+	}
+
+	.sidebarToggle {
+		display: inline-flex;
+	}
+}

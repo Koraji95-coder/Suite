@@ -6,6 +6,7 @@
 import { AlertCircle, AlertTriangle, CheckCircle, Info, X } from "lucide-react";
 import { Notification, useNotification } from "../../auth/NotificationContext";
 import { cn } from "../../lib/utils";
+import styles from "./ToastContainer.module.css";
 
 const iconMap = {
 	success: CheckCircle,
@@ -15,20 +16,17 @@ const iconMap = {
 };
 
 const colorMap = {
-	success:
-		"[background:color-mix(in_srgb,var(--success)_10%,var(--surface))] [border-color:var(--success)] [color:var(--success)]",
-	error:
-		"[background:color-mix(in_srgb,var(--danger)_10%,var(--surface))] [border-color:var(--danger)] [color:var(--danger)]",
-	warning:
-		"[background:color-mix(in_srgb,var(--warning)_10%,var(--surface))] [border-color:var(--warning)] [color:var(--warning)]",
-	info: "[background:color-mix(in_srgb,var(--accent)_10%,var(--surface))] [border-color:var(--accent)] [color:var(--accent)]",
+	success: styles.toastSuccess,
+	error: styles.toastError,
+	warning: styles.toastWarning,
+	info: styles.toastInfo,
 };
 
 const iconColorMap = {
-	success: "[color:var(--success)]",
-	error: "[color:var(--danger)]",
-	warning: "[color:var(--warning)]",
-	info: "[color:var(--accent)]",
+	success: styles.iconSuccess,
+	error: styles.iconError,
+	warning: styles.iconWarning,
+	info: styles.iconInfo,
 };
 
 function ToastItem({ notification }: { notification: Notification }) {
@@ -38,27 +36,22 @@ function ToastItem({ notification }: { notification: Notification }) {
 	return (
 		<div
 			className={cn(
-				"flex items-start gap-3 p-4 rounded-lg border shadow-lg max-w-md w-full",
-				"animate-in slide-in-from-right-full duration-300",
+				styles.toast,
+				styles.animateIn,
 				colorMap[notification.type],
 			)}
 		>
-			<Icon
-				className={cn(
-					"w-5 h-5 mt-0.5 shrink-0",
-					iconColorMap[notification.type],
-				)}
-			/>
+			<Icon className={cn(styles.icon, iconColorMap[notification.type])} />
 
-			<div className="flex-1 min-w-0">
-				<div className="font-semibold text-sm">{notification.title}</div>
+			<div className={styles.content}>
+				<div className={styles.title}>{notification.title}</div>
 				{notification.message && (
-					<div className="text-sm mt-1 opacity-90">{notification.message}</div>
+					<div className={styles.message}>{notification.message}</div>
 				)}
 				{notification.action && (
 					<button
 						onClick={notification.action.onClick}
-						className="text-sm font-medium mt-2 hover:underline"
+						className={styles.actionButton}
 					>
 						{notification.action.label}
 					</button>
@@ -67,10 +60,10 @@ function ToastItem({ notification }: { notification: Notification }) {
 
 			<button
 				onClick={() => dismissNotification(notification.id)}
-				className="shrink-0 hover:opacity-70 transition-opacity"
+				className={styles.dismissButton}
 				aria-label="Dismiss notification"
 			>
-				<X className="w-4 h-4" />
+				<X className={styles.dismissIcon} />
 			</button>
 		</div>
 	);
@@ -82,11 +75,8 @@ export function ToastContainer() {
 	if (notifications.length === 0) return null;
 
 	return (
-		<div
-			className="fixed top-4 right-4 flex flex-col gap-2 pointer-events-none"
-			style={{ zIndex: "var(--z-toast)" }}
-		>
-			<div className="flex flex-col gap-2 pointer-events-auto">
+		<div className={styles.container} style={{ zIndex: "var(--z-toast)" }}>
+			<div className={styles.stack}>
 				{notifications.map((notification) => (
 					<ToastItem key={notification.id} notification={notification} />
 				))}

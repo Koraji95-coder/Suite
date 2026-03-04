@@ -1,6 +1,8 @@
 import { Compass, Divide, Minus, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
+import { cn } from "@/lib/utils";
+import styles from "./VectorCalculator.module.css";
 
 export function VectorCalculator() {
 	const [rectangular, setRectangular] = useState({ x: 3, y: 4 });
@@ -76,12 +78,6 @@ export function VectorCalculator() {
 	const { r, theta } = polar;
 	const { x, y } = rectangular;
 	const thetaRad = ((theta * Math.PI) / 180).toFixed(4);
-
-	const cardClass =
-		"rounded-lg border p-4 [border-color:var(--border)] [background:var(--surface)]";
-	const inputClass =
-		"w-full rounded-lg border px-4 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
-	const labelClass = "mb-1 block text-sm [color:var(--text-muted)]";
 
 	const getSteps = () => {
 		const { x: x1, y: y1 } = vector1;
@@ -161,76 +157,70 @@ export function VectorCalculator() {
 	};
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center space-x-3 mb-6">
-				<Compass className="h-8 w-8 [color:var(--primary)]" />
-				<h2 className="text-3xl font-bold [color:var(--text)]">
-					Vector Representation & Operations
-				</h2>
+		<div className={styles.root}>
+			<div className={styles.header}>
+				<Compass className={styles.headerIcon} />
+				<h2 className={styles.title}>Vector Representation & Operations</h2>
 			</div>
 
 			<Section title="Vector Converter">
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<div className="space-y-4">
-						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-							Rectangular Form (x + jy)
-						</h4>
-						<div className="space-y-3">
+				<div className={styles.twoColumnLayout}>
+					<div className={styles.stack}>
+						<h4 className={styles.subheading}>Rectangular Form (x + jy)</h4>
+						<div className={styles.stackTight}>
 							<div>
-								<label className={labelClass}>Real Part (x)</label>
+								<label className={styles.label}>Real Part (x)</label>
 								<input
 									type="number"
 									step="0.01"
 									value={x}
 									onChange={(e) => handleRectangularChange("x", e.target.value)}
-									className={inputClass}
+									className={styles.inputControl}
 								/>
 							</div>
 							<div>
-								<label className={labelClass}>Imaginary Part (y)</label>
+								<label className={styles.label}>Imaginary Part (y)</label>
 								<input
 									type="number"
 									step="0.01"
 									value={y}
 									onChange={(e) => handleRectangularChange("y", e.target.value)}
-									className={inputClass}
+									className={styles.inputControl}
 								/>
 							</div>
-							<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_15%,transparent)]">
-								<p className="font-mono text-lg [color:var(--text)]">
+							<div className={styles.valueCardPrimary}>
+								<p className={styles.valueTextLarge}>
 									Z = {x} {y >= 0 ? "+" : ""} j{y}
 								</p>
 							</div>
 						</div>
 					</div>
 
-					<div className="space-y-4">
-						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-							Polar Form (r∠θ)
-						</h4>
-						<div className="space-y-3">
+					<div className={styles.stack}>
+						<h4 className={styles.subheading}>Polar Form (r∠θ)</h4>
+						<div className={styles.stackTight}>
 							<div>
-								<label className={labelClass}>Magnitude (r)</label>
+								<label className={styles.label}>Magnitude (r)</label>
 								<input
 									type="number"
 									step="0.01"
 									value={r}
 									onChange={(e) => handlePolarChange("r", e.target.value)}
-									className={inputClass}
+									className={styles.inputControl}
 								/>
 							</div>
 							<div>
-								<label className={labelClass}>Angle θ (degrees)</label>
+								<label className={styles.label}>Angle θ (degrees)</label>
 								<input
 									type="number"
 									step="0.01"
 									value={theta}
 									onChange={(e) => handlePolarChange("theta", e.target.value)}
-									className={inputClass}
+									className={styles.inputControl}
 								/>
 							</div>
-							<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_15%,transparent)]">
-								<p className="font-mono text-lg [color:var(--text)]">
+							<div className={styles.valueCardPrimary}>
+								<p className={styles.valueTextLarge}>
 									Z = {r}∠{theta}°
 								</p>
 							</div>
@@ -238,66 +228,54 @@ export function VectorCalculator() {
 					</div>
 				</div>
 
-				<div className="mt-6 space-y-4">
-					<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-						All Representations
-					</h4>
+				<div className={styles.topSection}>
+					<h4 className={styles.subheading}>All Representations</h4>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<div className={cardClass}>
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Rectangular
-							</p>
-							<p className="font-mono [color:var(--text)]">
+					<div className={styles.representationGrid}>
+						<div className={styles.inlinePanel}>
+							<p className={styles.primaryLabel}>Rectangular</p>
+							<p className={styles.valueText}>
 								Z = {x} {y >= 0 ? "+" : ""} j{y}
 							</p>
 						</div>
 
-						<div className={cardClass}>
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Polar
-							</p>
-							<p className="font-mono [color:var(--text)]">
+						<div className={styles.inlinePanel}>
+							<p className={styles.primaryLabel}>Polar</p>
+							<p className={styles.valueText}>
 								Z = {r}∠{theta}°
 							</p>
 						</div>
 
-						<div className={cardClass}>
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Trigonometric
-							</p>
-							<p className="font-mono text-sm [color:var(--text)]">
+						<div className={styles.inlinePanel}>
+							<p className={styles.primaryLabel}>Trigonometric</p>
+							<p className={styles.valueTextSm}>
 								Z = {r}(cos({theta}°) + j·sin({theta}°))
 							</p>
 						</div>
 
-						<div className={cardClass}>
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Exponential
-							</p>
-							<p className="font-mono text-sm [color:var(--text)]">
+						<div className={styles.inlinePanel}>
+							<p className={styles.primaryLabel}>Exponential</p>
+							<p className={styles.valueTextSm}>
 								Z = {r} · e^(j·{thetaRad} rad)
 							</p>
 						</div>
 					</div>
 				</div>
 
-				<div className="mt-6">
+				<div className={styles.topSection}>
 					<button
 						onClick={() => setShowWork(!showWork)}
-						className="rounded-lg border px-4 py-2 text-sm font-medium transition [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)] hover:[background:color-mix(in_srgb,var(--primary)_26%,transparent)]"
+						className={styles.toggleButton}
 					>
 						{showWork ? "Hide" : "Show"} Step-by-Step Work
 					</button>
 
 					{showWork && (
-						<div className="mt-4 rounded-lg border p-5 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,var(--surface))]">
-							<h4 className="mb-3 font-semibold [color:var(--text-muted)]">
-								Step-by-Step Conversion
-							</h4>
-							<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+						<div className={styles.workPanel}>
+							<h4 className={styles.panelTitle}>Step-by-Step Conversion</h4>
+							<div className={styles.monoList}>
 								{getConversionSteps().map((step, i) => (
-									<p key={i} className={step === "" ? "h-2" : ""}>
+									<p key={i} className={step === "" ? styles.spacer : ""}>
 										{step}
 									</p>
 								))}
@@ -308,13 +286,11 @@ export function VectorCalculator() {
 			</Section>
 
 			<Section title="Vector Operations">
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-					<div className="space-y-4">
-						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-							Vector 1 (Z₁)
-						</h4>
+				<div className={styles.operationLayout}>
+					<div className={styles.stack}>
+						<h4 className={styles.subheading}>Vector 1 (Z₁)</h4>
 						<div>
-							<label className={labelClass}>Real (x₁)</label>
+							<label className={styles.label}>Real (x₁)</label>
 							<input
 								type="number"
 								step="0.01"
@@ -322,11 +298,11 @@ export function VectorCalculator() {
 								onChange={(e) =>
 									setVector1({ ...vector1, x: parseFloat(e.target.value) || 0 })
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 						<div>
-							<label className={labelClass}>Imaginary (y₁)</label>
+							<label className={styles.label}>Imaginary (y₁)</label>
 							<input
 								type="number"
 								step="0.01"
@@ -334,74 +310,74 @@ export function VectorCalculator() {
 								onChange={(e) =>
 									setVector1({ ...vector1, y: parseFloat(e.target.value) || 0 })
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
-						<div className="rounded-lg border p-3 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_15%,transparent)]">
-							<p className="font-mono text-sm [color:var(--text)]">
+						<div className={styles.valueCardPrimaryCompact}>
+							<p className={styles.valueTextSm}>
 								Z₁ = {vector1.x} {vector1.y >= 0 ? "+" : ""} j{vector1.y}
 							</p>
 						</div>
 					</div>
 
-					<div className="space-y-4">
-						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-							Operation
-						</h4>
-						<div className="grid grid-cols-2 gap-2">
+					<div className={styles.stack}>
+						<h4 className={styles.subheading}>Operation</h4>
+						<div className={styles.operationGrid}>
 							<button
 								onClick={() => setOperation("add")}
-								className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg transition-all ${
+								className={cn(
+									styles.operationButton,
 									operation === "add"
-										? "border-2 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_28%,transparent)] [color:var(--text)]"
-										: "border [border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--primary)_10%,var(--surface))]"
-								}`}
+										? styles.operationButtonActive
+										: styles.operationButtonInactive,
+								)}
 							>
-								<Plus className="w-4 h-4" />
+								<Plus className={styles.operationIcon} />
 								<span>Add</span>
 							</button>
 							<button
 								onClick={() => setOperation("subtract")}
-								className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg transition-all ${
+								className={cn(
+									styles.operationButton,
 									operation === "subtract"
-										? "border-2 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_28%,transparent)] [color:var(--text)]"
-										: "border [border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--primary)_10%,var(--surface))]"
-								}`}
+										? styles.operationButtonActive
+										: styles.operationButtonInactive,
+								)}
 							>
-								<Minus className="w-4 h-4" />
+								<Minus className={styles.operationIcon} />
 								<span>Subtract</span>
 							</button>
 							<button
 								onClick={() => setOperation("multiply")}
-								className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg transition-all ${
+								className={cn(
+									styles.operationButton,
 									operation === "multiply"
-										? "border-2 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_28%,transparent)] [color:var(--text)]"
-										: "border [border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--primary)_10%,var(--surface))]"
-								}`}
+										? styles.operationButtonActive
+										: styles.operationButtonInactive,
+								)}
 							>
-								<X className="w-4 h-4" />
+								<X className={styles.operationIcon} />
 								<span>Multiply</span>
 							</button>
 							<button
 								onClick={() => setOperation("divide")}
-								className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg transition-all ${
+								className={cn(
+									styles.operationButton,
 									operation === "divide"
-										? "border-2 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_28%,transparent)] [color:var(--text)]"
-										: "border [border-color:var(--border)] [background:var(--surface)] [color:var(--text-muted)] hover:[background:color-mix(in_srgb,var(--primary)_10%,var(--surface))]"
-								}`}
+										? styles.operationButtonActive
+										: styles.operationButtonInactive,
+								)}
 							>
-								<Divide className="w-4 h-4" />
+								<Divide className={styles.operationIcon} />
 								<span>Divide</span>
 							</button>
 						</div>
 					</div>
 
-					<div className="space-y-4">
-						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-							Vector 2 (Z₂)
-						</h4>
+					<div className={styles.stack}>
+						<h4 className={styles.subheading}>Vector 2 (Z₂)</h4>
 						<div>
-							<label className={labelClass}>Real (x₂)</label>
+							<label className={styles.label}>Real (x₂)</label>
 							<input
 								type="number"
 								step="0.01"
@@ -409,11 +385,11 @@ export function VectorCalculator() {
 								onChange={(e) =>
 									setVector2({ ...vector2, x: parseFloat(e.target.value) || 0 })
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 						<div>
-							<label className={labelClass}>Imaginary (y₂)</label>
+							<label className={styles.label}>Imaginary (y₂)</label>
 							<input
 								type="number"
 								step="0.01"
@@ -421,50 +397,42 @@ export function VectorCalculator() {
 								onChange={(e) =>
 									setVector2({ ...vector2, y: parseFloat(e.target.value) || 0 })
 								}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
-						<div className="rounded-lg border p-3 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_15%,transparent)]">
-							<p className="font-mono text-sm [color:var(--text)]">
+						<div className={styles.valueCardPrimaryCompact}>
+							<p className={styles.valueTextSm}>
 								Z₂ = {vector2.x} {vector2.y >= 0 ? "+" : ""} j{vector2.y}
 							</p>
 						</div>
 					</div>
 				</div>
 
-				<div className="mt-6 space-y-4">
-					<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-						Result
-					</h4>
+				<div className={styles.topSection}>
+					<h4 className={styles.subheading}>Result</h4>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<div className="rounded-lg border p-4 [border-color:var(--accent)] [background:color-mix(in_srgb,var(--accent)_14%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--accent)]">
-								Rectangular Form
-							</p>
-							<p className="font-mono text-lg [color:var(--text)]">
+					<div className={styles.representationGrid}>
+						<div className={styles.accentPanel}>
+							<p className={styles.accentLabel}>Rectangular Form</p>
+							<p className={styles.valueTextLarge}>
 								Z = {result.x.toFixed(4)} {result.y >= 0 ? "+" : ""} j
 								{result.y.toFixed(4)}
 							</p>
 						</div>
 
-						<div className="rounded-lg border p-4 [border-color:var(--accent)] [background:color-mix(in_srgb,var(--accent)_14%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--accent)]">
-								Polar Form
-							</p>
-							<p className="font-mono text-lg [color:var(--text)]">
+						<div className={styles.accentPanel}>
+							<p className={styles.accentLabel}>Polar Form</p>
+							<p className={styles.valueTextLarge}>
 								Z = {resultPolar.r.toFixed(4)}∠{resultPolar.theta.toFixed(2)}°
 							</p>
 						</div>
 					</div>
 
-					<div className="rounded-lg border p-5 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,var(--surface))]">
-						<h4 className="mb-3 font-semibold [color:var(--text-muted)]">
-							Step-by-Step Solution
-						</h4>
-						<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+					<div className={styles.workPanel}>
+						<h4 className={styles.panelTitle}>Step-by-Step Solution</h4>
+						<div className={styles.monoList}>
 							{getSteps().map((step, i) => (
-								<p key={i} className={step === "" ? "h-2" : ""}>
+								<p key={i} className={step === "" ? styles.spacer : ""}>
 									{step}
 								</p>
 							))}
@@ -477,43 +445,33 @@ export function VectorCalculator() {
 				title="Formulas"
 				description="Key formulas for vector operations in rectangular and polar forms."
 			>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div className={cardClass}>
-						<h4 className="mb-2 font-semibold [color:var(--text-muted)]">
-							Addition & Subtraction
-						</h4>
-						<div className="space-y-2 font-mono text-sm [color:var(--text)]">
+				<div className={styles.representationGrid}>
+					<div className={styles.inlinePanel}>
+						<h4 className={styles.panelTitle}>Addition & Subtraction</h4>
+						<div className={styles.monoListSpaced}>
 							<p>Z₁ ± Z₂ = (x₁ ± x₂) + j(y₁ ± y₂)</p>
 						</div>
 					</div>
 
-					<div className={cardClass}>
-						<h4 className="mb-2 font-semibold [color:var(--text-muted)]">
-							Multiplication
-						</h4>
-						<div className="space-y-2 font-mono text-sm [color:var(--text)]">
+					<div className={styles.inlinePanel}>
+						<h4 className={styles.panelTitle}>Multiplication</h4>
+						<div className={styles.monoListSpaced}>
 							<p>Z₁ × Z₂ = (x₁x₂ - y₁y₂) + j(x₁y₂ + y₁x₂)</p>
-							<p className="[color:var(--text-muted)]">Polar: r₁r₂∠(θ₁ + θ₂)</p>
+							<p className={styles.mutedText}>Polar: r₁r₂∠(θ₁ + θ₂)</p>
 						</div>
 					</div>
 
-					<div className={cardClass}>
-						<h4 className="mb-2 font-semibold [color:var(--text-muted)]">
-							Division
-						</h4>
-						<div className="space-y-2 font-mono text-xs [color:var(--text)]">
+					<div className={styles.inlinePanel}>
+						<h4 className={styles.panelTitle}>Division</h4>
+						<div className={styles.monoListXs}>
 							<p>Z₁ / Z₂ = [(x₁x₂ + y₁y₂) + j(y₁x₂ - x₁y₂)] / (x₂² + y₂²)</p>
-							<p className="[color:var(--text-muted)]">
-								Polar: (r₁/r₂)∠(θ₁ - θ₂)
-							</p>
+							<p className={styles.mutedText}>Polar: (r₁/r₂)∠(θ₁ - θ₂)</p>
 						</div>
 					</div>
 
-					<div className={cardClass}>
-						<h4 className="mb-2 font-semibold [color:var(--text-muted)]">
-							Conversion
-						</h4>
-						<div className="space-y-2 font-mono text-sm [color:var(--text)]">
+					<div className={styles.inlinePanel}>
+						<h4 className={styles.panelTitle}>Conversion</h4>
+						<div className={styles.monoListSpaced}>
 							<p>r = √(x² + y²)</p>
 							<p>θ = tan⁻¹(y/x)</p>
 						</div>
@@ -522,18 +480,24 @@ export function VectorCalculator() {
 			</Section>
 
 			<Section title="Example: Vector Multiplication">
-				<div className="space-y-2 [color:var(--text)]">
+				<div className={styles.exampleBlock}>
 					<p>Given: Z₁ = 3 + j4, Z₂ = 2 - j1</p>
-					<p className="pl-4">
+					<p className={styles.exampleIndented}>
 						• Method 1 (Rectangular): (3)(2) - (4)(-1) + j[(3)(-1) + (4)(2)] =
 						10 + j5
 					</p>
-					<p className="pl-4">
+					<p className={styles.exampleIndented}>
 						• Method 2 (Polar): Z₁ = 5∠53.13°, Z₂ = 2.236∠-26.57°
 					</p>
-					<p className="pl-4">• Multiply magnitudes: 5 × 2.236 = 11.18</p>
-					<p className="pl-4">• Add angles: 53.13° + (-26.57°) = 26.56°</p>
-					<p className="pl-4">• Result: Z = 11.18∠26.56° = 10 + j5</p>
+					<p className={styles.exampleIndented}>
+						• Multiply magnitudes: 5 × 2.236 = 11.18
+					</p>
+					<p className={styles.exampleIndented}>
+						• Add angles: 53.13° + (-26.57°) = 26.56°
+					</p>
+					<p className={styles.exampleIndented}>
+						• Result: Z = 11.18∠26.56° = 10 + j5
+					</p>
 				</div>
 			</Section>
 		</div>

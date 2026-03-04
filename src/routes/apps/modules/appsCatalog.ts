@@ -65,7 +65,7 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		id: "standards-checker",
 		title: "Standards Checker",
 		description:
-			"Unified QA/QC and standards validation workflow for engineering deliverables.",
+			"Unified standards validation workflow for engineering deliverables.",
 		to: "/app/apps/standards-checker",
 		status: "active",
 	},

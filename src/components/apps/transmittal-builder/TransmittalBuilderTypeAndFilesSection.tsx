@@ -12,6 +12,7 @@ import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { cn } from "@/lib/utils";
 import { TransmittalBuilderFileRow as FileRow } from "./TransmittalBuilderFileRow";
+import styles from "./TransmittalBuilderTypeAndFilesSection.module.css";
 import {
 	type DraftState,
 	type FileState,
@@ -64,32 +65,28 @@ export function TransmittalBuilderTypeAndFilesSection({
 	return (
 		<>
 			<TransmittalSection title="Transmittal Type">
-				<div className="px-2 sm:px-3">
+				<div className={styles.sectionBody}>
 					<RadioGroup
 						value={draft.transmittalType}
 						onValueChange={(value) =>
 							updateDraft("transmittalType", value as TransmittalType)
 						}
-						className="grid gap-3 sm:grid-cols-2"
+						className={styles.typeGrid}
 					>
-						<label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-4">
+						<label className={styles.typeOption}>
 							<RadioGroupItem value="standard" aria-label="Standard" />
 							<div>
-								<div className="text-sm font-semibold [color:var(--text)]">
-									Standard
-								</div>
-								<div className="text-xs text-text-muted">
+								<div className={styles.typeTitle}>Standard</div>
+								<div className={styles.typeDescription}>
 									PDF documents with an Excel index.
 								</div>
 							</div>
 						</label>
-						<label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-4">
+						<label className={styles.typeOption}>
 							<RadioGroupItem value="cid" aria-label="CID" />
 							<div>
-								<div className="text-sm font-semibold [color:var(--text)]">
-									CID
-								</div>
-								<div className="text-xs text-text-muted">
+								<div className={styles.typeTitle}>CID</div>
+								<div className={styles.typeDescription}>
 									CID files with document index entries.
 								</div>
 							</div>
@@ -99,7 +96,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 			</TransmittalSection>
 
 			<TransmittalSection title="File Selection">
-				<div className="grid gap-4 px-2 sm:px-3">
+				<div className={styles.fileSelectionGrid}>
 					<FileRow
 						label="Template File"
 						accept=".docx"
@@ -114,11 +111,11 @@ export function TransmittalBuilderTypeAndFilesSection({
 						}}
 					/>
 					{templateError && (
-						<div className="text-xs [color:var(--danger)]">{templateError}</div>
+						<div className={styles.errorText}>{templateError}</div>
 					)}
 
 					{draft.transmittalType === "standard" ? (
-						<div className="grid gap-4">
+						<div className={styles.standardFiles}>
 							<FileRow
 								label="Drawing Index"
 								accept=".xlsx,.xls"
@@ -138,7 +135,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 							/>
 						</div>
 					) : (
-						<div className="grid gap-3">
+						<div className={styles.cidFiles}>
 							<FileRow
 								label="CID Files"
 								accept=".cid"
@@ -164,28 +161,22 @@ export function TransmittalBuilderTypeAndFilesSection({
 
 			{draft.transmittalType === "cid" && (
 				<TransmittalSection title="CID Document Index">
-					<div className="grid gap-3 px-2 sm:px-3">
+					<div className={styles.sectionBody}>
 						{draft.cidDocuments.length === 0 ? (
-							<div className="text-sm text-text-muted">
+							<div className={styles.emptyState}>
 								Select CID files to populate the list.
 							</div>
 						) : (
-							<div className="grid gap-2">
-								<div className="grid grid-cols-1 gap-2 text-xs font-semibold text-text-muted sm:grid-cols-[2fr_4fr_1fr_auto]">
+							<div className={styles.cidTable}>
+								<div className={styles.cidHeader}>
 									<span>File</span>
 									<span>Description</span>
 									<span>Revision</span>
 									<span></span>
 								</div>
 								{draft.cidDocuments.map((doc) => (
-									<div
-										key={doc.id}
-										className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[2fr_4fr_1fr_auto]"
-									>
-										<div
-											className="truncate rounded-lg border border-border bg-surface px-2 py-2 font-mono text-xs"
-											title={doc.fileName}
-										>
+									<div key={doc.id} className={styles.cidRow}>
+										<div className={styles.cidFileName} title={doc.fileName}>
 											{doc.fileName}
 										</div>
 										<Input
@@ -198,8 +189,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 												)
 											}
 											className={cn(
-												isInvalid("cidDocs") &&
-													"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
+												isInvalid("cidDocs") && styles.invalidField,
 											)}
 										/>
 										<Select
@@ -208,7 +198,12 @@ export function TransmittalBuilderTypeAndFilesSection({
 												updateCidDocument(doc.id, "revision", value)
 											}
 										>
-											<SelectTrigger className="text-xs">
+											<SelectTrigger
+												className={cn(
+													styles.revisionTrigger,
+													isInvalid("cidDocs") && styles.invalidField,
+												)}
+											>
 												<SelectValue placeholder="-" />
 											</SelectTrigger>
 											<SelectContent>

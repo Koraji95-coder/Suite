@@ -13,6 +13,8 @@ import {
 } from "@/components/apps/ui/dialog";
 import { Button } from "@/components/primitives/Button";
 import { Label } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
+import styles from "./file-upload-dialog.module.css";
 
 export function FileUploadDialog() {
 	const [open, setOpen] = React.useState(false);
@@ -63,7 +65,7 @@ export function FileUploadDialog() {
 			<Button onClick={() => setOpen(true)} iconLeft={<UploadIcon />}>
 				Upload
 			</Button>
-			<DialogContent className="sm:max-w-xl">
+			<DialogContent className={styles.dialogContent}>
 				<DialogHeader>
 					<DialogTitle>Upload Files</DialogTitle>
 					<DialogDescription>
@@ -71,53 +73,46 @@ export function FileUploadDialog() {
 					</DialogDescription>
 				</DialogHeader>
 				<div
-					className={`mt-2 flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10 ${
-						dragActive ? "bg-muted" : ""
-					}`}
+					className={cn(styles.dropZone, dragActive && styles.dropZoneActive)}
 					onDragEnter={handleDrag}
 					onDragLeave={handleDrag}
 					onDragOver={handleDrag}
 					onDrop={handleDrop}
 				>
-					<div className="text-center">
-						<Upload className="mx-auto size-10 opacity-25" aria-hidden="true" />
-						<div className="mt-4 flex text-sm leading-none">
-							<Label htmlFor="file-upload" className="relative cursor-pointer">
+					<div className={styles.dropContent}>
+						<Upload className={styles.uploadIcon} aria-hidden="true" />
+						<div className={styles.uploadRow}>
+							<Label htmlFor="file-upload" className={styles.uploadLabel}>
 								<span>Upload a file</span>
 								<input
 									id="file-upload"
 									name="file-upload"
 									type="file"
-									className="sr-only"
+									className={styles.fileInput}
 									onChange={handleChange}
 									multiple
 								/>
 							</Label>
-							<p className="pl-1">or drag and drop</p>
+							<p className={styles.uploadRowText}>or drag and drop</p>
 						</div>
-						<p className="text-muted-foreground text-xs leading-5">
-							PNG, JPG, GIF up to 10MB
-						</p>
+						<p className={styles.uploadHint}>PNG, JPG, GIF up to 10MB</p>
 					</div>
 				</div>
 				{files.length > 0 && (
-					<div>
-						<h4 className="text-sm">Selected Files</h4>
-						<ul className="divide mt-2 divide-y rounded-md border">
+					<div className={styles.selectedBlock}>
+						<h4 className={styles.selectedTitle}>Selected Files</h4>
+						<ul className={styles.fileList}>
 							{files.map((file, index) => (
-								<li
-									key={index}
-									className="flex items-center justify-between py-2 pr-2 pl-4 text-sm leading-6"
-								>
-									<div className="flex w-0 flex-1 items-center">
-										<div className="flex min-w-0 flex-1 gap-2">
-											<span className="truncate font-medium">{file.name}</span>
-											<span className="text-muted-foreground shrink-0">
+								<li key={index} className={styles.fileListItem}>
+									<div className={styles.fileMetaWrap}>
+										<div className={styles.fileNameRow}>
+											<span className={styles.fileName}>{file.name}</span>
+											<span className={styles.fileSize}>
 												{(file.size / 1024).toFixed(2)} kb
 											</span>
 										</div>
 									</div>
-									<div className="shrink-0">
+									<div className={styles.fileAction}>
 										<Button
 											variant="ghost"
 											size="sm"

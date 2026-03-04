@@ -12,6 +12,7 @@ import {
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Json } from "@/supabase/database";
+import styles from "./Whiteboard.module.css";
 import { WhiteboardCanvas } from "./WhiteboardCanvas";
 import { WhiteboardSaveDialog } from "./WhiteboardSaveDialog";
 import { WhiteboardToolbar } from "./WhiteboardToolbar";
@@ -185,47 +186,36 @@ export function Whiteboard({
 	return (
 		<>
 			<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-				<DialogContent className="max-h-[90vh] max-w-7xl border-(--border) bg-(--surface) p-0">
-					<div className="flex h-full w-full flex-col overflow-hidden rounded-lg">
+				<DialogContent className={styles.dialogContent}>
+					<div className={styles.root}>
 						{/* Header */}
-						<div className="flex items-center justify-between border-b p-4 [border-color:var(--border)]">
-							<div className="flex items-center gap-3">
-								<Pen className="h-5 w-5 [color:var(--primary)]" />
-								<h3 className="text-lg font-semibold [color:var(--text)]">
+						<div className={styles.header}>
+							<div className={styles.headerTitle}>
+								<Pen className={styles.headerIcon} />
+								<h3 className={styles.headerHeading}>
 									Whiteboard — {panelContext}
 								</h3>
 							</div>
-							<div className="flex items-center gap-2">
+							<div className={styles.headerActions}>
 								<button
 									onClick={() => setShowSaveDialog(true)}
-									className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition
-										[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-										hover:[background:var(--surface-2)]"
+									className={styles.actionButton}
 								>
-									<Save className="h-4 w-4" />
+									<Save className={styles.actionIcon} />
 									{isSaving ? "Saving…" : "Save"}
 								</button>
-								<button
-									onClick={exportAsImage}
-									className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition
-										[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-										hover:[background:var(--surface-2)]"
-								>
-									<Download className="h-4 w-4" />
+								<button onClick={exportAsImage} className={styles.actionButton}>
+									<Download className={styles.actionIcon} />
 									Export
 								</button>
-								<button
-									onClick={onClose}
-									className="rounded-lg p-2 transition
-										hover:[background:color-mix(in_srgb,var(--danger)_14%,transparent)]"
-								>
-									<X className="h-4 w-4 [color:var(--text-muted)]" />
+								<button onClick={onClose} className={styles.closeButton}>
+									<X className={styles.closeIcon} />
 								</button>
 							</div>
 						</div>
 
 						{/* Canvas area */}
-						<div className="flex flex-1 overflow-hidden">
+						<div className={styles.canvasArea}>
 							<WhiteboardToolbar
 								tool={tool}
 								onToolChange={setTool}
@@ -240,7 +230,7 @@ export function Whiteboard({
 								canRedo={redoStack.length > 0}
 							/>
 
-							<div className="flex flex-1 items-center justify-center overflow-auto p-4 [background:var(--bg-base)]">
+							<div className={styles.canvasViewport}>
 								<WhiteboardCanvas
 									actions={actions}
 									onActionAdd={handleActionAdd}
@@ -267,26 +257,23 @@ export function Whiteboard({
 				open={showClearDialog}
 				onOpenChange={(open) => !open && setShowClearDialog(false)}
 			>
-				<DialogContent className="max-w-sm border-(--border) bg-(--surface)">
+				<DialogContent className={styles.confirmDialogContent}>
 					<DialogHeader>
 						<DialogTitle>Clear whiteboard?</DialogTitle>
 					</DialogHeader>
-					<p className="text-sm [color:var(--text-muted)]">
+					<p className={styles.dialogText}>
 						This will remove all strokes and cannot be undone.
 					</p>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+					<DialogFooter className={styles.dialogFooter}>
 						<button
 							onClick={() => setShowClearDialog(false)}
-							className="rounded-lg border px-4 py-2 text-sm transition
-								[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-								hover:[background:var(--surface-2)]"
+							className={styles.cancelButton}
 						>
 							Cancel
 						</button>
 						<button
 							onClick={confirmClearCanvas}
-							className="rounded-lg px-4 py-2 text-sm font-medium transition
-								[background:var(--danger)] text-[white] hover:opacity-90"
+							className={styles.dangerButton}
 						>
 							Clear
 						</button>
@@ -304,7 +291,7 @@ export function Whiteboard({
 					}
 				}}
 			>
-				<DialogContent className="max-w-md border-(--border) bg-(--surface)">
+				<DialogContent className={styles.textDialogContent}>
 					<DialogHeader>
 						<DialogTitle>Add Text</DialogTitle>
 					</DialogHeader>
@@ -312,30 +299,22 @@ export function Whiteboard({
 						type="text"
 						value={textValue}
 						onChange={(e) => setTextValue(e.target.value)}
-						className="w-full rounded-lg border px-3 py-2 text-sm outline-none transition
-							focus:[border-color:var(--primary)]
-							[border-color:var(--border)] [background:var(--surface-2)] [color:var(--text)]"
+						className={styles.textInput}
 						placeholder="Enter text"
 						autoFocus
 					/>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+					<DialogFooter className={styles.dialogFooter}>
 						<button
 							onClick={() => {
 								setShowTextDialog(false);
 								setTextPosition(null);
 								setTextValue("");
 							}}
-							className="rounded-lg border px-4 py-2 text-sm transition
-								[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-								hover:[background:var(--surface-2)]"
+							className={styles.cancelButton}
 						>
 							Cancel
 						</button>
-						<button
-							onClick={confirmAddText}
-							className="rounded-lg px-4 py-2 text-sm font-medium transition
-								[background:var(--primary)] [color:var(--primary-contrast)] hover:opacity-90"
-						>
+						<button onClick={confirmAddText} className={styles.primaryButton}>
 							Add Text
 						</button>
 					</DialogFooter>

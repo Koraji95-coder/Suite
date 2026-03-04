@@ -148,7 +148,7 @@ export const appsInfo = {
 				"This hub provides specialized tools and automation features designed for electrical engineering workflows. Each app integrates seamlessly with your projects, files, and database, creating a unified engineering workspace.",
 		},
 		{
-			title: "QA/QC Standards Checker",
+			title: "Standards Checker",
 			content: [
 				"Automated drawing compliance verification",
 				"Verifies title block completeness and accuracy",
@@ -159,7 +159,7 @@ export const appsInfo = {
 				"Generates detailed compliance reports",
 			],
 			tips: [
-				"Run QA/QC checks before submitting drawings",
+				"Run standards checks before submitting drawings",
 				"Configure custom rules based on your standards",
 				"Export reports for quality documentation",
 				"Use to train team on drafting standards",
@@ -231,7 +231,7 @@ export const appsInfo = {
 		{
 			title: "App Configuration",
 			content: [
-				"QA/QC: Configure standards rules in drawing_annotations table",
+				"Standards checker: Configure standards rules in drawing_annotations table",
 				"Block Library: Set default categories and tags in user preferences",
 				"Transmittal: Create company templates in project settings",
 				"Ground Grid: Set default safety factors and calculation methods",
@@ -384,7 +384,7 @@ export const standardsInfo = {
 			],
 		},
 		{
-			title: "QA/QC Standards Checker",
+			title: "Standards Checker",
 			content: [
 				"Automated checking of drawing compliance",
 				"Verifies title block information completeness",
@@ -400,7 +400,7 @@ export const standardsInfo = {
 			title: "Files to Edit",
 			content: [
 				"Standards documents: Upload via Standards panel",
-				"QA/QC rules: Configure in Drawing Annotations settings (coming soon)",
+				"Standards checker rules: Configure in Drawing Annotations settings (coming soon)",
 				"Compliance templates: Created in Project Manager",
 				"Standard layer definitions: Set in drawing_annotations table",
 			],
@@ -408,7 +408,7 @@ export const standardsInfo = {
 				"Keep standards up-to-date with latest versions",
 				"Use descriptive names including year and version number",
 				"Create project-specific standards folders",
-				"Regularly run QA/QC checks before final delivery",
+				"Regularly run standards checks before final delivery",
 				"Maintain a standards update log",
 			],
 		},

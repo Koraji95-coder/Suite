@@ -6,6 +6,7 @@ import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
+import styles from "./CircuitGenerator.module.css";
 
 interface Component {
 	type: string;
@@ -179,10 +180,10 @@ export function CircuitGenerator() {
 	};
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center space-x-3">
-				<CircuitBoard className="h-8 w-8 text-(--accent)" />
-				<h2 className="text-3xl font-bold text-(--text)">Circuit Generator</h2>
+		<div className={styles.root}>
+			<div className={styles.header}>
+				<CircuitBoard className={styles.headerIcon} />
+				<h2 className={styles.title}>Circuit Generator</h2>
 			</div>
 
 			<Section
@@ -190,9 +191,9 @@ export function CircuitGenerator() {
 				actions={
 					<button
 						onClick={generateRandomCircuit}
-						className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30 flex items-center space-x-2"
+						className={styles.primaryAction}
 					>
-						<Shuffle className="w-5 h-5" />
+						<Shuffle className={styles.actionIcon} />
 						<span>Generate Random Circuit</span>
 					</button>
 				}
@@ -201,42 +202,37 @@ export function CircuitGenerator() {
 					ref={canvasRef}
 					width={800}
 					height={400}
-					className="w-full rounded-lg border border-(--border)"
+					className={styles.canvas}
 				/>
 
 				{components.length > 0 && (
-					<div className="mt-6 space-y-4">
-						<div className="rounded-lg border border-(--border) bg-(--surface) p-4">
-							<h4 className="mb-3 font-semibold text-(--text)">Components:</h4>
-							<div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+					<div className={styles.generatedContent}>
+						<div className={styles.componentsPanel}>
+							<h4 className={styles.componentsTitle}>Components:</h4>
+							<div className={styles.componentGrid}>
 								{components.map((comp, index) => (
-									<div
-										key={index}
-										className="rounded border border-(--border) bg-(--surface-2) px-3 py-2"
-									>
-										<div className="font-medium text-(--text)">
-											{comp.label}
-										</div>
-										<div className="text-sm text-(--accent)">{comp.value}</div>
+									<div key={index} className={styles.componentItem}>
+										<div className={styles.componentLabel}>{comp.label}</div>
+										<div className={styles.componentValue}>{comp.value}</div>
 									</div>
 								))}
 							</div>
 						</div>
 
-						<div className="flex gap-4">
+						<div className={styles.saveRow}>
 							<input
 								type="text"
 								value={circuitName}
 								onChange={(e) => setCircuitName(e.target.value)}
 								placeholder="Enter circuit name..."
-								className="flex-1 rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+								className={styles.circuitNameInput}
 							/>
 							<button
 								onClick={saveCircuit}
 								disabled={isSavingCircuit}
-								className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30 flex items-center space-x-2"
+								className={styles.primaryAction}
 							>
-								<Save className="w-5 h-5" />
+								<Save className={styles.actionIcon} />
 								<span>{isSavingCircuit ? "Saving..." : "Save Circuit"}</span>
 							</button>
 						</div>
@@ -245,7 +241,7 @@ export function CircuitGenerator() {
 			</Section>
 
 			<Section title="About Circuit Generator">
-				<p className="text-sm text-(--text-muted)">
+				<p className={styles.aboutText}>
 					Click "Generate Random Circuit" to create a random circuit with
 					various components. Each circuit includes a voltage source and random
 					combinations of resistors, capacitors, and inductors. Save your

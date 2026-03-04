@@ -181,7 +181,7 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 				category: "ai",
 			},
 			{
-				title: "QA/QC annotation pipeline",
+				title: "Standards annotation pipeline",
 				description:
 					"Drawing annotations with issue tracking, status workflow (pending, reviewed, approved, rejected), and per-project QA dashboards.",
 				status: "planned",

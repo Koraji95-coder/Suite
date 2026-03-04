@@ -1,6 +1,7 @@
 import { Checkbox } from "@/components/apps/ui/checkbox";
 import { Section } from "@/components/apps/ui/PageFrame";
 import { Panel } from "@/components/primitives/Panel";
+import styles from "./TransmittalBuilderOptionsSection.module.css";
 import {
 	type DraftState,
 	OPTION_GROUPS,
@@ -20,23 +21,18 @@ export function TransmittalBuilderOptionsSection({
 }: TransmittalBuilderOptionsSectionProps) {
 	return (
 		<TransmittalSection title="Transmittal Options">
-			<div className="grid gap-4 px-2 sm:grid-cols-2 sm:px-3 lg:grid-cols-4">
+			<div className={styles.grid}>
 				{OPTION_GROUPS.map((group) => (
 					<Panel
 						key={group.id}
 						variant="inset"
 						padding="md"
-						className="space-y-3"
+						className={styles.optionPanel}
 					>
-						<div className="text-xs font-semibold text-text-muted">
-							{group.label}
-						</div>
-						<div className="grid gap-2">
+						<div className={styles.groupTitle}>{group.label}</div>
+						<div className={styles.optionsList}>
 							{group.options.map((option) => (
-								<label
-									key={option.key}
-									className="flex items-center gap-2 text-sm"
-								>
+								<label key={option.key} className={styles.optionLabel}>
 									<Checkbox
 										checked={draft.options[option.key]}
 										onCheckedChange={(checked) =>

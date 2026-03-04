@@ -12,6 +12,7 @@ import { SavedWhiteboard } from "../whiteboardtypes";
 import { LibraryFilters } from "./LibraryFilters";
 import { LibraryGrid } from "./LibraryGrid";
 import { ViewWhiteboardModal } from "./ViewWhiteboardModal";
+import styles from "./WhiteboardLibrary.module.css";
 
 interface WhiteboardLibraryProps {
 	filterByPanel?: string;
@@ -102,15 +103,11 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 	});
 
 	if (loading) {
-		return (
-			<div className="py-8 text-center text-(--text-muted)">
-				Loading whiteboards...
-			</div>
-		);
+		return <div className={styles.loadingState}>Loading whiteboards...</div>;
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className={styles.root}>
 			<LibraryFilters
 				searchTerm={searchTerm}
 				onSearchChange={setSearchTerm}
@@ -145,24 +142,24 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 				open={Boolean(pendingDelete)}
 				onOpenChange={(open) => !open && setPendingDelete(null)}
 			>
-				<DialogContent className="max-w-sm border-(--border) bg-(--surface)">
+				<DialogContent className={styles.dialogContent}>
 					<DialogHeader>
 						<DialogTitle>Delete whiteboard?</DialogTitle>
 					</DialogHeader>
-					<p className="text-sm text-(--text-muted)">
+					<p className={styles.dialogText}>
 						This permanently deletes {pendingDelete?.title ?? "this whiteboard"}
 						.
 					</p>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+					<DialogFooter className={styles.dialogFooter}>
 						<button
 							onClick={() => setPendingDelete(null)}
-							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							className={styles.cancelButton}
 						>
 							Cancel
 						</button>
 						<button
 							onClick={() => void confirmDeleteWhiteboard()}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] text-[white]"
+							className={styles.deleteButton}
 						>
 							Delete
 						</button>

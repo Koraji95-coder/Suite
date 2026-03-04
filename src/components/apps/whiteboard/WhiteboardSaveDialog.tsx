@@ -6,6 +6,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
+import styles from "./WhiteboardSaveDialog.module.css";
 
 interface WhiteboardSaveDialogProps {
 	isOpen: boolean;
@@ -38,75 +39,49 @@ export function WhiteboardSaveDialog({
 		void onSave(title.trim(), tags);
 	};
 
-	const inputClass =
-		"w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface-2)] [color:var(--text)]";
-
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="max-w-md border-(--border) bg-(--surface)">
+			<DialogContent className={styles.dialogContent}>
 				<DialogHeader>
 					<DialogTitle>Save Whiteboard</DialogTitle>
 				</DialogHeader>
 
-				<div className="space-y-4">
+				<div className={styles.body}>
 					<div>
-						<label className="mb-1.5 block text-xs font-medium [color:var(--text-muted)]">
-							Title *
-						</label>
+						<label className={styles.label}>Title *</label>
 						<input
 							type="text"
 							value={title}
 							onChange={(e) => setTitle(e.target.value)}
-							className={inputClass}
+							className={styles.input}
 							placeholder="Enter whiteboard title"
 							autoFocus
 						/>
 					</div>
 
 					<div>
-						<label className="mb-1.5 block text-xs font-medium [color:var(--text-muted)]">
-							Tags (comma separated)
-						</label>
+						<label className={styles.label}>Tags (comma separated)</label>
 						<input
 							type="text"
 							value={tags}
 							onChange={(e) => setTags(e.target.value)}
-							className={inputClass}
+							className={styles.input}
 							placeholder="e.g., calculations, circuit, notes"
 						/>
 					</div>
 
-					{error && (
-						<div
-							className="rounded-lg border px-3 py-2 text-sm
-							[border-color:var(--danger)] [background:color-mix(in_srgb,var(--danger)_10%,transparent)] [color:var(--danger)]"
-						>
-							{error}
-						</div>
-					)}
+					{error && <div className={styles.error}>{error}</div>}
 
-					<p className="text-xs [color:var(--text-muted)]">
-						Panel:{" "}
-						<span className="font-medium [color:var(--text)]">
-							{panelContext}
-						</span>
+					<p className={styles.meta}>
+						Panel: <span className={styles.metaValue}>{panelContext}</span>
 					</p>
 				</div>
 
-				<DialogFooter className="mt-4 gap-2 sm:justify-end">
-					<button
-						onClick={onClose}
-						className="rounded-lg border px-4 py-2 text-sm transition
-							[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-							hover:[background:var(--surface-2)]"
-					>
+				<DialogFooter className={styles.footer}>
+					<button onClick={onClose} className={styles.cancelButton}>
 						Cancel
 					</button>
-					<button
-						onClick={handleSubmit}
-						className="rounded-lg px-4 py-2 text-sm font-medium transition
-							[background:var(--primary)] [color:var(--primary-contrast)] hover:opacity-90"
-					>
+					<button onClick={handleSubmit} className={styles.primaryButton}>
 						Save Whiteboard
 					</button>
 				</DialogFooter>

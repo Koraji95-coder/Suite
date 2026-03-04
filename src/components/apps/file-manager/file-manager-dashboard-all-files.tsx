@@ -1,52 +1,53 @@
 import { ChevronDown, Filter, List, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
+import styles from "./file-manager-dashboard-all-files.module.css";
 import { allFiles, fileTypeLegendItems } from "./file-manager-dashboard-models";
 
 export function FileManagerDashboardAllFiles() {
 	return (
-		<div>
-			<div className="mb-4 flex items-center justify-between">
-				<h2 className="text-base font-medium lg:text-lg">All files</h2>
-				<div className="flex items-center gap-2">
+		<section className={styles.root}>
+			<div className={styles.headerRow}>
+				<h2 className={styles.title}>All files</h2>
+				<div className={styles.headerActions}>
 					<Button variant="outline" size="sm">
-						<Filter className="h-4 w-4 sm:mr-2" />
-						<span className="hidden sm:inline">Filter</span>
+						<Filter size={16} className={styles.leadingIcon} />
+						<span className={styles.buttonLabel}>Filter</span>
 					</Button>
 					<Button variant="outline" size="sm">
-						<List className="h-4 w-4 sm:mr-2" />
-						<span className="hidden sm:inline">List</span>
-						<ChevronDown className="ml-1 hidden h-4 w-4 sm:inline" />
+						<List size={16} className={styles.leadingIcon} />
+						<span className={styles.buttonLabel}>List</span>
+						<ChevronDown className={styles.trailingIcon} />
 					</Button>
 				</div>
 			</div>
 
-			<div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2">
+			<div className={styles.legendRow}>
 				{fileTypeLegendItems.map((item) => (
-					<div
-						key={item.label}
-						className="flex items-center gap-1 whitespace-nowrap"
-					>
-						<div className={item.colorClassName} />
-						<span className="text-muted-foreground text-sm">{item.label}</span>
+					<div key={item.label} className={styles.legendItem}>
+						<div
+							className={styles.legendSwatch}
+							style={{ background: item.color }}
+						/>
+						<span className={styles.legendLabel}>{item.label}</span>
 					</div>
 				))}
 			</div>
 
-			<div className="space-y-3 lg:hidden">
+			<div className={styles.mobileList}>
 				{allFiles.map((file) => (
-					<Panel key={file.name} padding="none" className="p-4">
-						<div className="flex items-center gap-3">
-							<div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
-								<file.icon className="text-muted-foreground h-5 w-5" />
+					<Panel key={file.name} padding="none" className={styles.mobileCard}>
+						<div className={styles.mobileFileRow}>
+							<div className={styles.mobileFileIconWrap}>
+								<file.icon className={styles.mobileFileIcon} />
 							</div>
-							<div className="min-w-0 flex-1">
-								<p className="mb-1 truncate text-sm font-medium">{file.name}</p>
-								<div className="text-muted-foreground flex items-center gap-2 text-xs">
+							<div className={styles.fileInfo}>
+								<p className={styles.fileName}>{file.name}</p>
+								<div className={styles.fileMeta}>
 									<span>{file.owner}</span>
-									<span>•</span>
+									<span className={styles.separator}>•</span>
 									<span>{file.size}</span>
-									<span>•</span>
+									<span className={styles.separator}>•</span>
 									<span>{file.date}</span>
 								</div>
 							</div>
@@ -54,7 +55,7 @@ export function FileManagerDashboardAllFiles() {
 								variant="ghost"
 								size="sm"
 								iconOnly
-								iconLeft={<MoreHorizontal className="h-4 w-4" />}
+								iconLeft={<MoreHorizontal size={16} />}
 								aria-label={`More actions for ${file.name}`}
 							/>
 						</div>
@@ -62,45 +63,37 @@ export function FileManagerDashboardAllFiles() {
 				))}
 			</div>
 
-			<div className="border-border hidden overflow-x-auto rounded-lg border lg:block">
-				<div className="bg-muted/50 border-border text-muted-foreground grid grid-cols-12 gap-4 border-b p-4 text-sm font-medium">
-					<div className="col-span-5">Name</div>
-					<div className="col-span-3">Owner</div>
-					<div className="col-span-2">File Size</div>
-					<div className="col-span-2">Date modified</div>
+			<div className={styles.desktopTable}>
+				<div className={styles.tableHeader}>
+					<div className={styles.tableHeaderName}>Name</div>
+					<div>Owner</div>
+					<div>File Size</div>
+					<div>Date modified</div>
+					<div />
 				</div>
 				{allFiles.map((file) => (
-					<div
-						key={file.name}
-						className="border-border hover:bg-muted/50 grid grid-cols-12 gap-4 border-b p-4 transition-colors last:border-b-0"
-					>
-						<div className="col-span-5 flex items-center gap-3">
-							<div className="bg-muted flex h-8 w-8 items-center justify-center rounded-lg">
-								<file.icon className="text-muted-foreground h-4 w-4" />
+					<div key={file.name} className={styles.tableRow}>
+						<div className={styles.tableNameCell}>
+							<div className={styles.tableFileIconWrap}>
+								<file.icon className={styles.tableFileIcon} />
 							</div>
-							<span className="truncate text-sm font-medium">{file.name}</span>
+							<span className={styles.tableFileName}>{file.name}</span>
 						</div>
-						<div className="text-muted-foreground col-span-3 text-sm">
-							{file.owner}
-						</div>
-						<div className="text-muted-foreground col-span-2 text-sm">
-							{file.size}
-						</div>
-						<div className="text-muted-foreground col-span-1 text-sm">
-							{file.date}
-						</div>
-						<div className="col-span-1 flex justify-end">
+						<div className={styles.tableMetaCell}>{file.owner}</div>
+						<div className={styles.tableMetaCell}>{file.size}</div>
+						<div className={styles.tableMetaCell}>{file.date}</div>
+						<div className={styles.tableActions}>
 							<Button
 								variant="ghost"
 								size="sm"
 								iconOnly
-								iconLeft={<MoreHorizontal className="h-4 w-4" />}
+								iconLeft={<MoreHorizontal size={16} />}
 								aria-label={`More actions for ${file.name}`}
 							/>
 						</div>
 					</div>
 				))}
 			</div>
-		</div>
+		</section>
 	);
 }

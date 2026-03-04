@@ -6,8 +6,10 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
+import { cn } from "@/lib/utils";
 import { Whiteboard } from "../Whiteboard";
 import { WhiteboardLibrary } from "../whiteboardlibrary/WhiteboardLibrary";
+import styles from "./FloatingWhiteboardButton.module.css";
 
 interface FloatingWhiteboardButtonProps {
 	panelContext: string;
@@ -29,7 +31,7 @@ export function FloatingWhiteboardButton({
 	return (
 		<>
 			<div
-				className="fixed bottom-4 right-4 flex flex-col items-end gap-2 sm:bottom-6 sm:right-6"
+				className={styles.container}
 				style={{
 					zIndex: "var(--z-topbar)",
 					paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -37,17 +39,16 @@ export function FloatingWhiteboardButton({
 				}}
 			>
 				{showMenu && (
-					<div className="mb-2 flex w-[min(86vw,18rem)] flex-col gap-2 rounded-xl border p-2 shadow-xl backdrop-blur-sm [border-color:var(--border)] [background:color-mix(in_srgb,var(--bg-base)_92%,transparent)] sm:w-64">
+					<div className={styles.menuPanel}>
 						<button
 							onClick={() => {
 								setShowWhiteboard(true);
 								setShowMenu(false);
 							}}
-							className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition
-								[background:var(--primary)] [color:var(--primary-contrast)] hover:opacity-90"
+							className={styles.primaryAction}
 						>
-							<Pen className="h-4 w-4 shrink-0" />
-							<span className="truncate">New Whiteboard</span>
+							<Pen className={styles.actionIcon} />
+							<span className={styles.actionLabel}>New Whiteboard</span>
 						</button>
 
 						<button
@@ -55,28 +56,22 @@ export function FloatingWhiteboardButton({
 								setShowLibrary(true);
 								setShowMenu(false);
 							}}
-							className="flex w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition
-								[border-color:var(--border)] [background:var(--surface)] [color:var(--text)]
-								hover:[background:var(--surface-2)]"
+							className={styles.secondaryAction}
 						>
-							<BookOpen className="h-4 w-4 shrink-0" />
-							<span className="truncate">Whiteboard Library</span>
+							<BookOpen className={styles.actionIcon} />
+							<span className={styles.actionLabel}>Whiteboard Library</span>
 						</button>
 					</div>
 				)}
 
 				<button
 					onClick={() => setShowMenu(!showMenu)}
-					className={`flex h-12 w-12 items-center justify-center rounded-full shadow-xl transition-all
-						[background:var(--primary)] [color:var(--primary-contrast)]
-						[box-shadow:0_0_16px_color-mix(in_srgb,var(--primary)_35%,transparent)]
-						hover:opacity-90 sm:h-14 sm:w-14
-						${showMenu ? "rotate-45" : ""}`}
+					className={cn(styles.fabButton, showMenu && styles.fabButtonOpen)}
 					title="Whiteboard"
 					aria-label="Toggle whiteboard actions"
 					aria-expanded={showMenu}
 				>
-					<Pen className="h-5 w-5 sm:h-6 sm:w-6" />
+					<Pen className={styles.fabIcon} />
 				</button>
 			</div>
 
@@ -90,22 +85,22 @@ export function FloatingWhiteboardButton({
 			/>
 
 			<Dialog open={showLibrary} onOpenChange={setShowLibrary}>
-				<DialogContent className="max-h-[90vh] max-w-7xl border-(--border) bg-(--surface) p-0">
-					<DialogHeader className="border-b p-6 [border-color:var(--border)]">
-						<div className="flex items-center justify-between">
-							<DialogTitle className="flex items-center gap-3 [color:var(--text)]">
-								<BookOpen className="h-5 w-5 [color:var(--primary)]" />
+				<DialogContent className={styles.dialogContent}>
+					<DialogHeader className={styles.dialogHeader}>
+						<div className={styles.dialogHeaderRow}>
+							<DialogTitle className={styles.dialogTitle}>
+								<BookOpen className={styles.dialogTitleIcon} />
 								<span>Whiteboard Library</span>
 							</DialogTitle>
 							<button
 								onClick={() => setShowLibrary(false)}
-								className="text-2xl transition [color:var(--text-muted)] hover:[color:var(--text)]"
+								className={styles.dialogClose}
 							>
 								×
 							</button>
 						</div>
 					</DialogHeader>
-					<div className="max-h-[calc(90vh-96px)] overflow-auto p-6">
+					<div className={styles.dialogBody}>
 						<WhiteboardLibrary
 							filterByPanel={
 								panelContext !== "Dashboard" ? panelContext : undefined

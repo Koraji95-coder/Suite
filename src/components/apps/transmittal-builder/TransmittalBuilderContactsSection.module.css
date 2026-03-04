@@ -1,0 +1,38 @@
+.root {
+	display: grid;
+	gap: 0.75rem;
+	padding-inline: 0.5rem;
+}
+
+.contactPanel {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.contactPanelInvalid {
+	border-color: var(--danger);
+}
+
+.fields {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.actionsRow {
+	display: flex;
+	justify-content: flex-end;
+}
+
+.addButton {
+	width: fit-content;
+}
+
+@media (min-width: 640px) {
+	.root {
+		padding-inline: 0.75rem;
+	}
+
+	.fields {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}

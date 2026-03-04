@@ -1,4 +1,5 @@
 import { TransmittalBuilderContactsSection } from "./TransmittalBuilderContactsSection";
+import styles from "./TransmittalBuilderMainForm.module.css";
 import { TransmittalBuilderOptionsSection } from "./TransmittalBuilderOptionsSection";
 import { TransmittalBuilderProjectAndSenderSection } from "./TransmittalBuilderProjectAndSenderSection";
 import { TransmittalBuilderTypeAndFilesSection } from "./TransmittalBuilderTypeAndFilesSection";
@@ -71,7 +72,7 @@ export function TransmittalBuilderMainForm({
 	handleOptionToggle,
 }: TransmittalBuilderMainFormProps) {
 	return (
-		<div className="space-y-4">
+		<div className={styles.stack}>
 			<TransmittalBuilderTypeAndFilesSection
 				draft={draft}
 				files={files}

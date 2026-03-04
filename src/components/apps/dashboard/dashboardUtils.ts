@@ -41,11 +41,12 @@ export const getTaskUrgencyColor = (dateStr: string) =>
 export const PROJECT_CATEGORIES = [
 	{ key: "Coding", color: "#22c55e" },
 	{ key: "Substation", color: "#38bdf8" },
-	{ key: "QAQC", color: "#ec4899" },
+	{ key: "Standards", color: "#ec4899" },
 	{ key: "School", color: "#f59e0b" },
 ] as const;
 
 export const getCategoryColor = (category: string | null): string => {
-	const cat = PROJECT_CATEGORIES.find((c) => c.key === category);
+	const normalizedCategory = category === "QAQC" ? "Standards" : category;
+	const cat = PROJECT_CATEGORIES.find((c) => c.key === normalizedCategory);
 	return cat ? cat.color : "#f8c67e";
 };

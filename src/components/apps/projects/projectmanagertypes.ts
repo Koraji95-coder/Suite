@@ -60,7 +60,7 @@ export interface TaskFormData {
 export const PROJECT_CATEGORIES = [
 	{ key: "Coding", color: "#22c55e" },
 	{ key: "Substation", color: "#38bdf8" },
-	{ key: "QAQC", color: "#ec4899" },
+	{ key: "Standards", color: "#ec4899" },
 	{ key: "School", color: "#f59e0b" },
 ] as const;
 

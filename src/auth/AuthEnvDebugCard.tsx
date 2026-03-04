@@ -1,4 +1,5 @@
-import { type CSSProperties, useMemo } from "react";
+import { type CSSProperties } from "react";
+import styles from "./AuthEnvDebugCard.module.css";
 
 export default function AuthEnvDebugCard() {
 	if (!import.meta.env.DEV) return null;
@@ -8,32 +9,18 @@ export default function AuthEnvDebugCard() {
 	const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "";
 	const origin = typeof window !== "undefined" ? window.location.origin : "";
 
-	const projectHost = useMemo(() => {
-		if (!projectUrl) return "(missing)";
+	const parseHost = (value: string, fallback: string): string => {
+		if (!value) return fallback;
 		try {
-			return new URL(projectUrl).host;
+			return new URL(value).host;
 		} catch (_error) {
-			return projectUrl;
+			return value;
 		}
-	}, [projectUrl]);
+	};
 
-	const redirectHost = useMemo(() => {
-		if (!redirectEnv) return "(using current origin)";
-		try {
-			return new URL(redirectEnv).host;
-		} catch (_error) {
-			return redirectEnv;
-		}
-	}, [redirectEnv]);
-
-	const originHost = useMemo(() => {
-		if (!origin) return "(unavailable)";
-		try {
-			return new URL(origin).host;
-		} catch (_error) {
-			return origin;
-		}
-	}, [origin]);
+	const projectHost = parseHost(projectUrl, "(missing)");
+	const redirectHost = parseHost(redirectEnv, "(using current origin)");
+	const originHost = parseHost(origin, "(unavailable)");
 
 	const redirectMismatch =
 		Boolean(redirectEnv) &&
@@ -65,7 +52,7 @@ export default function AuthEnvDebugCard() {
 
 	return (
 		<div
-			className="auth-message"
+			className={styles.root}
 			style={{
 				background: "rgba(255,255,255,0.03)",
 				border: "1px solid rgba(255,255,255,0.12)",
@@ -73,10 +60,8 @@ export default function AuthEnvDebugCard() {
 				marginTop: 10,
 			}}
 		>
-			<div style={{ fontSize: 11, marginBottom: 8, opacity: 0.8 }}>
-				Dev Auth Environment
-			</div>
-			<div style={{ display: "grid", gap: 4 }}>
+			<div className={styles.title}>Dev Auth Environment</div>
+			<div className={styles.rows}>
 				<div style={rowStyle}>
 					<span style={labelStyle}>Supabase</span>
 					<span style={valueStyle}>{projectHost}</span>
@@ -97,7 +82,7 @@ export default function AuthEnvDebugCard() {
 				</div>
 			</div>
 			{redirectMismatch ? (
-				<div className="auth-error" style={{ marginTop: 8, marginBottom: 0 }}>
+				<div className={styles.errorNote}>
 					Redirect host does not match current host. Email auth links may fail.
 				</div>
 			) : null}

@@ -33,12 +33,14 @@ import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 import { type AgentPairingAction, agentService } from "@/services/agentService";
 import {
 	logAuthMethodTelemetry,
 	logSecurityEvent,
 } from "@/services/securityEventService";
 import { supabase } from "@/supabase/client";
+import styles from "./AccountSettings.module.css";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -61,16 +63,14 @@ function SectionHeader({
 	tone?: "primary" | "accent" | "neutral";
 }) {
 	const toneClasses = {
-		primary: "bg-primary/15 text-primary",
-		accent: "bg-accent/15 text-accent",
-		neutral: "bg-surface-2 text-text-muted",
+		primary: styles.sectionIconPrimary,
+		accent: styles.sectionIconAccent,
+		neutral: styles.sectionIconNeutral,
 	};
 
 	return (
 		<HStack gap={3} align="start">
-			<div
-				className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneClasses[tone]}`}
-			>
+			<div className={cn(styles.sectionIconBase, toneClasses[tone])}>
 				<Icon size={18} />
 			</div>
 			<Stack gap={0}>
@@ -98,71 +98,65 @@ function StatusTile({
 }) {
 	const toneConfig = {
 		success: {
-			bg: "bg-success/10",
-			border: "border-success/20",
-			dot: "bg-success",
+			tile: styles.statusToneSuccess,
+			glow: styles.statusDotSuccess,
+			icon: styles.statusIconSuccess,
+			dot: styles.statusDotSuccess,
 		},
 		danger: {
-			bg: "bg-danger/10",
-			border: "border-danger/20",
-			dot: "bg-danger",
+			tile: styles.statusToneDanger,
+			glow: styles.statusDotDanger,
+			icon: styles.statusIconDanger,
+			dot: styles.statusDotDanger,
 		},
 		warning: {
-			bg: "bg-warning/10",
-			border: "border-warning/20",
-			dot: "bg-warning",
+			tile: styles.statusToneWarning,
+			glow: styles.statusDotWarning,
+			icon: styles.statusIconWarning,
+			dot: styles.statusDotWarning,
 		},
 		muted: {
-			bg: "bg-surface-2",
-			border: "border-border",
-			dot: "bg-text-muted",
+			tile: styles.statusToneMuted,
+			glow: styles.statusDotMuted,
+			icon: styles.statusIconMuted,
+			dot: styles.statusDotMuted,
 		},
 	};
 
 	const config = toneConfig[tone];
 
 	return (
-		<div
-			className={`relative overflow-hidden rounded-xl border ${config.border} ${config.bg} p-3`}
-		>
+		<div className={cn(styles.statusTile, config.tile)}>
 			{/* Glow effect */}
 			{tone !== "muted" && (
-				<div
-					className={`absolute -right-4 -top-4 h-12 w-12 rounded-full blur-xl opacity-30 ${config.dot}`}
-				/>
+				<div className={cn(styles.statusGlow, config.glow)} />
 			)}
 
-			<HStack justify="between" align="start" className="relative">
+			<HStack justify="between" align="start" className={styles.statusHeader}>
 				<HStack gap={2} align="center">
-					<div
-						className={`flex h-6 w-6 items-center justify-center rounded-md ${config.bg} border ${config.border}`}
-					>
-						<Icon size={12} className="text-text" />
+					<div className={cn(styles.statusIconWrap, config.icon)}>
+						<Icon size={12} className={styles.statusIconGlyph} />
 					</div>
 					<Text
 						size="xs"
 						color="muted"
 						weight="medium"
-						className="uppercase tracking-wide"
+						className={styles.statusLabel}
 					>
 						{title}
 					</Text>
 				</HStack>
 
 				{/* Status dot with pulse */}
-				<span className="relative flex h-2.5 w-2.5">
+				<span className={styles.statusDotWrap}>
 					{tone === "success" && (
-						<span
-							className={`absolute inline-flex h-full w-full animate-ping rounded-full ${config.dot} opacity-40`}
-						/>
+						<span className={cn(styles.statusDotPulse, config.dot)} />
 					)}
-					<span
-						className={`relative inline-flex h-2.5 w-2.5 rounded-full ${config.dot}`}
-					/>
+					<span className={cn(styles.statusDot, config.dot)} />
 				</span>
 			</HStack>
 
-			<div className="relative mt-2">
+			<div className={styles.statusValue}>
 				<Badge
 					color={tone === "muted" ? "default" : tone}
 					variant="soft"
@@ -784,7 +778,7 @@ export default function AccountSettings() {
 						tone="primary"
 					/>
 
-					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+					<div className={styles.securityGrid}>
 						<StatusTile
 							title="Passkey auth"
 							value={passkeyAuthStatus.value}
@@ -849,7 +843,7 @@ export default function AccountSettings() {
 						tone="accent"
 					/>
 
-					<div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+					<div className={styles.profileGrid}>
 						<Input
 							label="Display Name"
 							value={displayName}
@@ -884,10 +878,10 @@ export default function AccountSettings() {
 						<Panel
 							variant="outline"
 							padding="sm"
-							className="border-danger/40 bg-danger/5"
+							className={styles.profileErrorPanel}
 						>
 							<HStack gap={2} align="center">
-								<AlertCircle size={14} className="text-danger" />
+								<AlertCircle size={14} className={styles.dangerIcon} />
 								<Text size="sm" color="danger">
 									{profileError}
 								</Text>
@@ -910,7 +904,7 @@ export default function AccountSettings() {
 					/>
 
 					<HStack gap={2} wrap align="end">
-						<div className="w-40">
+						<div className={styles.agentCodeWrap}>
 							<Input
 								value={agentPairingCode}
 								onChange={(e) => {
@@ -919,7 +913,7 @@ export default function AccountSettings() {
 								}}
 								placeholder="000000"
 								maxLength={6}
-								className="text-center font-mono tracking-widest"
+								className={styles.agentCodeInput}
 							/>
 						</div>
 
@@ -961,7 +955,7 @@ export default function AccountSettings() {
 						<IconButton
 							icon={
 								agentLoading ? (
-									<Loader2 size={14} className="animate-spin" />
+									<Loader2 size={14} className={styles.spin} />
 								) : (
 									<RefreshCw size={14} />
 								)

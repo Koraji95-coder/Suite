@@ -1,0 +1,66 @@
+.root {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.rowsPerPage {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.rowsLabel {
+	display: none;
+}
+
+.selectTrigger {
+	width: fit-content;
+	white-space: nowrap;
+}
+
+.selectContent :global([role="option"]) {
+	padding-inline-start: 0.5rem;
+	padding-inline-end: 2rem;
+}
+
+.selectContent :global([role="option"] > span) {
+	inset-inline-start: auto;
+	inset-inline-end: 0.5rem;
+}
+
+.resultsInfo {
+	display: flex;
+	flex-grow: 1;
+	justify-content: flex-end;
+	color: var(--text-muted);
+	font-size: 0.875rem;
+	white-space: nowrap;
+}
+
+.resultsText {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 0.875rem;
+	white-space: nowrap;
+}
+
+.resultsStrong {
+	color: var(--text);
+}
+
+.pageLink[aria-disabled="true"] {
+	pointer-events: none;
+	opacity: 0.5;
+}
+
+@media (min-width: 1024px) {
+	.root {
+		gap: 2rem;
+	}
+
+	.rowsLabel {
+		display: block;
+	}
+}

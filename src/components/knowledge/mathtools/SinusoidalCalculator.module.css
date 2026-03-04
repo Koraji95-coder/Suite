@@ -1,0 +1,277 @@
+.root {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 0.25rem;
+}
+
+.headerIcon {
+	width: 2rem;
+	height: 2rem;
+	color: var(--primary);
+}
+
+.title {
+	margin: 0;
+	font-size: 1.875rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.twoColumnLayout {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1.5rem;
+}
+
+.stack {
+	display: grid;
+	gap: 1rem;
+}
+
+.label {
+	display: block;
+	margin-bottom: 0.25rem;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.inputControl {
+	width: 100%;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	color: var(--text);
+	outline: none;
+	transition:
+		border-color 160ms ease,
+		box-shadow 160ms ease;
+}
+
+.inputControl:focus {
+	border-color: var(--primary);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.metricCard,
+.inlinePanel {
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	padding: 1rem;
+}
+
+.metricCardPrimary {
+	border-color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.metricCardPrimaryStrong {
+	border-color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.metricCardAccent {
+	border-color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.metricLabelPrimary,
+.metricLabelAccent {
+	margin: 0 0 0.5rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.metricLabelPrimary {
+	color: var(--primary);
+}
+
+.metricLabelAccent {
+	color: var(--accent);
+}
+
+.metricValue {
+	margin: 0;
+	font-family: var(--font-mono, monospace);
+	font-size: 1.25rem;
+	color: var(--text);
+}
+
+.metricHelp {
+	margin: 0.25rem 0 0;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.metricHelpTop {
+	margin: 0.5rem 0 0;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.topSection {
+	margin-top: 1.5rem;
+	display: grid;
+	gap: 1rem;
+}
+
+.subheading {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.representationGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1rem;
+}
+
+.inlinePanel {
+	background: var(--surface);
+}
+
+.inlinePanelTitle {
+	margin: 0 0 0.5rem;
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.monoTextSm {
+	margin: 0;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875rem;
+	color: var(--text);
+}
+
+.highlightPanel {
+	border: 1px solid var(--primary);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+	padding: 1.25rem;
+}
+
+.keyGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.75rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875rem;
+	color: var(--text);
+}
+
+.keyList {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.keyList p {
+	margin: 0;
+}
+
+.toggleButton {
+	width: fit-content;
+	border: 1px solid var(--primary);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--primary) 18%, transparent);
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text);
+	transition: background-color 160ms ease;
+	cursor: pointer;
+}
+
+.toggleButton:hover {
+	background: color-mix(in srgb, var(--primary) 26%, transparent);
+}
+
+.workPanel {
+	border: 1px solid var(--primary);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+	padding: 1.25rem;
+}
+
+.monoList {
+	display: grid;
+	gap: 0.25rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875rem;
+	color: var(--text);
+}
+
+.monoList p {
+	margin: 0;
+}
+
+.spacer {
+	height: 0.5rem;
+}
+
+.perUnitResultGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.monoListXs {
+	display: grid;
+	gap: 0.25rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.75rem;
+	color: var(--text);
+}
+
+.monoListXs p {
+	margin: 0;
+}
+
+.mutedListXs {
+	display: grid;
+	gap: 0.25rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.mutedListXs p {
+	margin: 0;
+}
+
+.exampleBlock {
+	display: grid;
+	gap: 0.5rem;
+	color: var(--text);
+}
+
+.exampleHeading {
+	margin: 0;
+	font-weight: 600;
+}
+
+.exampleIndented {
+	margin: 0;
+	padding-left: 1rem;
+}
+
+@media (min-width: 768px) {
+	.representationGrid,
+	.keyGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1024px) {
+	.twoColumnLayout {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}

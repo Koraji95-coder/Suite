@@ -1,29 +1,27 @@
 import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
 import { recentFiles } from "./file-manager-dashboard-models";
+import styles from "./file-manager-dashboard-recent-files.module.css";
 
 export function FileManagerDashboardRecentFiles() {
 	return (
-		<div className="mb-8">
-			<div className="mb-4 flex items-center justify-between">
-				<h2 className="text-base font-medium lg:text-lg">Recently modified</h2>
-				<Button
-					variant="ghost"
-					className="text-sm [color:var(--primary)] hover:[color:var(--primary)]"
-				>
+		<section className={styles.root}>
+			<div className={styles.headerRow}>
+				<h2 className={styles.title}>Recently modified</h2>
+				<Button variant="ghost" className={styles.viewAllButton}>
 					View all →
 				</Button>
 			</div>
-			<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			<div className={styles.grid}>
 				{recentFiles.map((file) => (
-					<Panel key={file.name} padding="none" className="p-4">
-						<div className="flex items-center gap-3">
-							<div className="bg-muted flex h-10 w-10 items-center justify-center rounded-lg">
-								<file.icon className="text-muted-foreground h-5 w-5" />
+					<Panel key={file.name} padding="none" className={styles.card}>
+						<div className={styles.fileRow}>
+							<div className={styles.fileIconWrap}>
+								<file.icon className={styles.fileIcon} />
 							</div>
-							<div className="min-w-0 flex-1">
-								<p className="truncate text-sm font-medium">{file.name}</p>
-								<p className="text-muted-foreground text-xs">
+							<div className={styles.fileInfo}>
+								<p className={styles.fileName}>{file.name}</p>
+								<p className={styles.fileMeta}>
 									{file.size} • {file.type}
 								</p>
 							</div>
@@ -31,6 +29,6 @@ export function FileManagerDashboardRecentFiles() {
 					</Panel>
 				))}
 			</div>
-		</div>
+		</section>
 	);
 }

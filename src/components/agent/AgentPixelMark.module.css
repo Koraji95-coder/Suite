@@ -1,0 +1,36 @@
+.root {
+	position: relative;
+	display: inline-flex;
+}
+
+.pulseRing {
+	position: absolute;
+	inset: 0;
+	opacity: 0.2;
+	border-radius: 999px;
+	animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.breathe {
+	animation: breathe 3s ease-in-out infinite;
+}
+
+@keyframes ping {
+	75%,
+	100% {
+		transform: scale(2);
+		opacity: 0;
+	}
+}
+
+@keyframes breathe {
+	0%,
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.85;
+		transform: scale(0.99);
+	}
+}

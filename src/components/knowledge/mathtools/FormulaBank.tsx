@@ -6,6 +6,7 @@ import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
 import { useAuth } from "../../../auth/useAuth";
+import styles from "./FormulaBank.module.css";
 
 type Formula = Database["public"]["Tables"]["formulas"]["Row"];
 
@@ -122,93 +123,85 @@ export function FormulaBank() {
 	};
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center space-x-3">
-					<BookOpen className="h-8 w-8 text-(--accent)" />
-					<h2 className="text-3xl font-bold text-(--text)">Formula Bank</h2>
+		<div className={styles.root}>
+			<div className={styles.headerRow}>
+				<div className={styles.headerTitleWrap}>
+					<BookOpen className={styles.headerIcon} />
+					<h2 className={styles.title}>Formula Bank</h2>
 				</div>
 				<button
 					onClick={() => setShowAddForm(!showAddForm)}
-					className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 [color:var(--text)] font-semibold px-6 py-3 rounded-lg transition-all shadow-lg shadow-(--primary)/30 flex items-center space-x-2"
+					className={styles.primaryButtonWithIcon}
 				>
-					<Plus className="w-5 h-5" />
+					<Plus className={styles.buttonIcon} />
 					<span>Add Formula</span>
 				</button>
 			</div>
 
 			{showAddForm && (
 				<Section title="Add New Formula">
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div className={styles.formGrid}>
 						<div>
-							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
-								Name
-							</label>
+							<label className={styles.fieldLabel}>Name</label>
 							<input
 								type="text"
 								value={newFormula.name}
 								onChange={(e) =>
 									setNewFormula({ ...newFormula, name: e.target.value })
 								}
-								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+								className={styles.inputControl}
 								placeholder="e.g., Ohm's Law"
 							/>
 						</div>
 						<div>
-							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
-								Category
-							</label>
+							<label className={styles.fieldLabel}>Category</label>
 							<input
 								type="text"
 								value={newFormula.category}
 								onChange={(e) =>
 									setNewFormula({ ...newFormula, category: e.target.value })
 								}
-								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+								className={styles.inputControl}
 								placeholder="e.g., Basic Laws"
 							/>
 						</div>
 						<div>
-							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
-								Formula
-							</label>
+							<label className={styles.fieldLabel}>Formula</label>
 							<input
 								type="text"
 								value={newFormula.formula}
 								onChange={(e) =>
 									setNewFormula({ ...newFormula, formula: e.target.value })
 								}
-								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+								className={styles.inputControl}
 								placeholder="e.g., V = I × R"
 							/>
 						</div>
 						<div>
-							<label className="mb-2 block text-sm font-medium text-(--text-muted)">
-								Description
-							</label>
+							<label className={styles.fieldLabel}>Description</label>
 							<input
 								type="text"
 								value={newFormula.description}
 								onChange={(e) =>
 									setNewFormula({ ...newFormula, description: e.target.value })
 								}
-								className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+								className={styles.inputControl}
 								placeholder="Brief description"
 							/>
 						</div>
 					</div>
-					<div className="mt-4 flex gap-3">
+					<div className={styles.formActions}>
 						<button
 							onClick={addFormula}
 							disabled={isAddingFormula}
-							className="[background:linear-gradient(to_right,var(--primary),color-mix(in_srgb,var(--primary)_70%,var(--warning)))] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed [color:var(--text)] font-semibold px-6 py-2 rounded-lg transition-all"
+							className={styles.primaryButton}
 						>
 							{isAddingFormula ? "Adding..." : "Add Formula"}
 						</button>
 						<button
 							onClick={() => setShowAddForm(false)}
 							disabled={isAddingFormula}
-							className="rounded-lg border border-(--border) bg-(--surface) px-6 py-2 text-(--text-muted) transition-all hover:bg-(--surface-2) disabled:cursor-not-allowed disabled:opacity-50"
+							className={styles.secondaryButton}
 						>
 							Cancel
 						</button>
@@ -217,25 +210,25 @@ export function FormulaBank() {
 			)}
 
 			<Section>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div className="relative">
-						<Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 transform text-(--accent)" />
+				<div className={styles.filterGrid}>
+					<div className={styles.searchWrap}>
+						<Search className={styles.searchIcon} />
 						<input
 							type="text"
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
 							placeholder="Search formulas..."
-							className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 pl-10 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+							className={styles.searchInput}
 						/>
 					</div>
 					<div>
 						<select
 							value={selectedCategory}
 							onChange={(e) => setSelectedCategory(e.target.value)}
-							className="w-full rounded-lg border border-(--border) bg-(--surface) px-4 py-2 text-(--text) focus:outline-none focus:ring-2 focus:ring-(--accent) [&>option]:bg-(--surface-2) [&>option]:text-(--text)"
+							className={styles.inputControl}
 						>
 							{categories.map((cat) => (
-								<option key={cat} value={cat} className="text-(--text)">
+								<option key={cat} value={cat} className={styles.optionItem}>
 									{cat}
 								</option>
 							))}
@@ -245,7 +238,7 @@ export function FormulaBank() {
 			</Section>
 
 			<Section>
-				<div className="text-sm text-(--text-muted)">
+				<div className={styles.stats}>
 					<p>Total Formulas: {formulas.length}</p>
 					<p>Filtered Formulas: {filteredFormulas.length}</p>
 					<p>Selected Category: {selectedCategory}</p>
@@ -253,39 +246,26 @@ export function FormulaBank() {
 			</Section>
 
 			{loading ? (
-				<div className="py-8 text-center text-(--text-muted)">
-					Loading formulas...
-				</div>
+				<div className={styles.emptyState}>Loading formulas...</div>
 			) : (
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+				<div className={styles.formulaGrid}>
 					{filteredFormulas.map((formula) => (
-						<div
-							key={formula.id}
-							className="rounded-lg border border-(--border) bg-(--surface) p-5 transition-all hover:border-(--accent)"
-						>
-							<div className="flex items-start justify-between mb-2">
-								<h3 className="text-lg font-bold text-(--text)">
-									{formula.name}
-								</h3>
-								<span className="rounded border border-(--border) bg-(--surface-2) px-2 py-1 text-xs text-(--text-muted)">
-									{formula.category}
-								</span>
+						<div key={formula.id} className={styles.formulaCard}>
+							<div className={styles.formulaHeader}>
+								<h3 className={styles.formulaName}>{formula.name}</h3>
+								<span className={styles.categoryBadge}>{formula.category}</span>
 							</div>
-							<div className="mb-3 rounded-lg border border-(--border) bg-(--surface-2) px-4 py-3">
-								<code className="font-mono text-lg text-(--accent)">
-									{formula.formula}
-								</code>
+							<div className={styles.formulaBlock}>
+								<code className={styles.formulaCode}>{formula.formula}</code>
 							</div>
-							<p className="text-sm text-(--text-muted)">
-								{formula.description}
-							</p>
+							<p className={styles.description}>{formula.description}</p>
 						</div>
 					))}
 				</div>
 			)}
 
 			{!loading && filteredFormulas.length === 0 && (
-				<div className="py-8 text-center text-(--text-muted)">
+				<div className={styles.emptyState}>
 					No formulas found matching your search.
 				</div>
 			)}

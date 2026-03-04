@@ -1,0 +1,173 @@
+.root {
+	min-height: 100vh;
+	color: var(--text);
+	background: var(--bg);
+}
+
+.nav {
+	display: flex;
+	width: 100%;
+	max-width: 72rem;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 1rem 1rem;
+	margin: 0 auto;
+}
+
+.brandLink {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.625rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--text);
+	text-decoration: none;
+}
+
+.brandName {
+	letter-spacing: -0.02em;
+}
+
+.main {
+	width: 100%;
+	max-width: 72rem;
+	padding: 0.5rem 1rem 4rem;
+	margin: 0 auto;
+}
+
+.contentGrid {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.leftPanel {
+	position: relative;
+	display: none;
+	overflow: hidden;
+	border: 1px solid var(--border);
+	border-radius: 1rem;
+}
+
+.leftPanelGradient {
+	position: absolute;
+	inset: 0;
+}
+
+.leftPanelPattern {
+	position: absolute;
+	inset: 0;
+	opacity: 0.04;
+}
+
+.leftPanelContent {
+	position: relative;
+	display: flex;
+	width: 100%;
+	height: 100%;
+	min-height: 26.25rem;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 3rem 2rem;
+}
+
+.floatArea {
+	position: relative;
+	margin-bottom: 2.5rem;
+}
+
+.floatMark {
+	position: absolute;
+	animation: float 6s ease-in-out infinite;
+}
+
+.floatSpacer {
+	width: 12rem;
+	height: 12rem;
+}
+
+.brandBlock {
+	text-align: center;
+}
+
+.tagline {
+	margin-top: 0.375rem;
+}
+
+.agentBadgeRow {
+	margin-top: 2rem;
+}
+
+.agentBadge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	padding: 0.25rem 0.625rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+
+.agentName {
+	text-transform: capitalize;
+}
+
+.rightPanel {
+	position: relative;
+	overflow: hidden;
+	border: 1px solid var(--border);
+	border-radius: 1rem;
+	background: var(--surface);
+	box-shadow: 0 1px 2px color-mix(in srgb, black 14%, transparent);
+}
+
+.topAccent {
+	width: 100%;
+	height: 0.125rem;
+	opacity: 0.7;
+}
+
+.rightPanelBody {
+	padding: 1.5rem;
+}
+
+@keyframes float {
+	0%,
+	100% {
+		transform: translate(-50%, -50%) translateY(0);
+	}
+	50% {
+		transform: translate(-50%, -50%) translateY(-6px);
+	}
+}
+
+@media (min-width: 48rem) {
+	.nav {
+		padding-right: 2rem;
+		padding-left: 2rem;
+	}
+
+	.main {
+		padding-right: 2rem;
+		padding-left: 2rem;
+	}
+}
+
+@media (min-width: 48rem) {
+	.contentGridWithPanel {
+		grid-template-columns: repeat(12, minmax(0, 1fr));
+	}
+
+	.leftPanel {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		grid-column: span 5 / span 5;
+	}
+
+	.rightPanelWithLeft {
+		grid-column: span 7 / span 7;
+	}
+}

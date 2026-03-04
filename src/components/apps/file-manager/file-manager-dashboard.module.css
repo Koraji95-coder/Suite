@@ -1,0 +1,98 @@
+.root {
+	display: flex;
+	min-height: 0;
+	background: var(--background);
+}
+
+.desktopSidebar {
+	display: none;
+	width: 16rem;
+	flex-direction: column;
+	border-right: 1px solid var(--border);
+	background: var(--surface);
+}
+
+.mobileSheetContent {
+	width: 16rem;
+	padding: 0;
+}
+
+.mobileSidebarShell {
+	display: flex;
+	height: 100%;
+	flex-direction: column;
+	background: var(--surface);
+}
+
+.storageSheetContent {
+	width: 20rem;
+	padding: 1.5rem;
+}
+
+.main {
+	display: flex;
+	min-width: 0;
+	flex: 1 1 auto;
+	flex-direction: column;
+}
+
+.contentRow {
+	display: flex;
+	min-height: 0;
+	flex: 1 1 auto;
+}
+
+.scrollArea {
+	flex: 1 1 auto;
+	overflow: auto;
+	padding: 1rem;
+}
+
+.headingBlock {
+	margin-bottom: 1.5rem;
+}
+
+.title {
+	margin: 0 0 0.25rem;
+	font-size: 1.25rem;
+	font-weight: 600;
+	line-height: 1.25;
+}
+
+.subtitle {
+	margin: 0;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.desktopStoragePanel {
+	display: none;
+	width: 20rem;
+	border-left: 1px solid var(--border);
+	background: var(--surface);
+	padding: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+	.desktopSidebar {
+		display: flex;
+	}
+
+	.scrollArea {
+		padding: 1.5rem;
+	}
+
+	.title {
+		font-size: 1.5rem;
+	}
+
+	.subtitle {
+		font-size: 1rem;
+	}
+}
+
+@media (min-width: 1280px) {
+	.desktopStoragePanel {
+		display: block;
+	}
+}

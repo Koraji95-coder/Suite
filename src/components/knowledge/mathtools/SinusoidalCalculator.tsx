@@ -1,6 +1,8 @@
 import { Activity } from "lucide-react";
 import { useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
+import { cn } from "@/lib/utils";
+import styles from "./SinusoidalCalculator.module.css";
 
 export function SinusoidalCalculator() {
 	const [amplitude, setAmplitude] = useState(220);
@@ -24,12 +26,6 @@ export function SinusoidalCalculator() {
 	const perUnitVoltage = actualKV / baseKV;
 	const percentPower = perUnitPower * 100;
 	const percentVoltage = perUnitVoltage * 100;
-
-	const inputClass =
-		"w-full rounded-lg border px-4 py-2 text-sm outline-none transition focus:[border-color:var(--primary)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]";
-	const labelClass = "mb-1 block text-sm [color:var(--text-muted)]";
-	const cardClass =
-		"rounded-lg border p-4 [border-color:var(--border)] [background:var(--surface)]";
 
 	const getSinusoidalSteps = () => {
 		return [
@@ -96,152 +92,126 @@ export function SinusoidalCalculator() {
 	};
 
 	return (
-		<div className="space-y-6">
-			<div className="flex items-center space-x-3 mb-6">
-				<Activity className="h-8 w-8 [color:var(--primary)]" />
-				<h2 className="text-3xl font-bold [color:var(--text)]">
-					Sinusoidal Analysis & Per-Unit System
-				</h2>
+		<div className={styles.root}>
+			<div className={styles.header}>
+				<Activity className={styles.headerIcon} />
+				<h2 className={styles.title}>Sinusoidal Analysis & Per-Unit System</h2>
 			</div>
 
 			<Section title="Sinusoidal Waveform Calculator">
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<div className="space-y-4">
+				<div className={styles.twoColumnLayout}>
+					<div className={styles.stack}>
 						<div>
-							<label className={labelClass}>
+							<label className={styles.label}>
 								Peak Amplitude (V<sub>m</sub> or I<sub>m</sub>)
 							</label>
 							<input
 								type="number"
 								value={amplitude}
 								onChange={(e) => setAmplitude(parseFloat(e.target.value) || 0)}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
 						<div>
-							<label className={labelClass}>Frequency (Hz)</label>
+							<label className={styles.label}>Frequency (Hz)</label>
 							<input
 								type="number"
 								value={frequency}
 								onChange={(e) => setFrequency(parseFloat(e.target.value) || 0)}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
 						<div>
-							<label className={labelClass}>Phase Angle (degrees)</label>
+							<label className={styles.label}>Phase Angle (degrees)</label>
 							<input
 								type="number"
 								value={phase}
 								onChange={(e) => setPhase(parseFloat(e.target.value) || 0)}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 					</div>
 
-					<div className="space-y-4">
-						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								RMS Value
-							</p>
-							<p className="font-mono text-xl [color:var(--text)]">
-								{rms.toFixed(2)}
-							</p>
-							<p className="mt-1 text-xs [color:var(--text-muted)]">
+					<div className={styles.stack}>
+						<div className={cn(styles.metricCard, styles.metricCardPrimary)}>
+							<p className={styles.metricLabelPrimary}>RMS Value</p>
+							<p className={styles.metricValue}>{rms.toFixed(2)}</p>
+							<p className={styles.metricHelp}>
 								RMS = V<sub>m</sub> / √2
 							</p>
 						</div>
 
-						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Angular Frequency (ω)
-							</p>
-							<p className="font-mono text-xl [color:var(--text)]">
-								{omega.toFixed(2)} rad/s
-							</p>
-							<p className="mt-1 text-xs [color:var(--text-muted)]">ω = 2πf</p>
+						<div className={cn(styles.metricCard, styles.metricCardPrimary)}>
+							<p className={styles.metricLabelPrimary}>Angular Frequency (ω)</p>
+							<p className={styles.metricValue}>{omega.toFixed(2)} rad/s</p>
+							<p className={styles.metricHelp}>ω = 2πf</p>
 						</div>
 
-						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Period (T)
-							</p>
-							<p className="font-mono text-xl [color:var(--text)]">
+						<div className={cn(styles.metricCard, styles.metricCardPrimary)}>
+							<p className={styles.metricLabelPrimary}>Period (T)</p>
+							<p className={styles.metricValue}>
 								{(period * 1000).toFixed(2)} ms
 							</p>
-							<p className="mt-1 text-xs [color:var(--text-muted)]">
-								T = 1 / f
-							</p>
+							<p className={styles.metricHelp}>T = 1 / f</p>
 						</div>
 					</div>
 				</div>
 
-				<div className="mt-6 space-y-4">
-					<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-						Sinusoidal Representations
-					</h4>
+				<div className={styles.topSection}>
+					<h4 className={styles.subheading}>Sinusoidal Representations</h4>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<div className={cardClass}>
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Time Domain
-							</p>
-							<p className="font-mono text-sm [color:var(--text)]">
+					<div className={styles.representationGrid}>
+						<div className={styles.inlinePanel}>
+							<p className={styles.metricLabelPrimary}>Time Domain</p>
+							<p className={styles.monoTextSm}>
 								v(t) = {amplitude} × sin({omega.toFixed(2)}t{" "}
 								{phase !== 0 ? `+ ${angularPhase.toFixed(4)}` : ""})
 							</p>
-							<p className="mt-2 text-xs [color:var(--text-muted)]">
+							<p className={styles.metricHelpTop}>
 								General form: v(t) = V<sub>m</sub> × sin(ωt + φ)
 							</p>
 						</div>
 
-						<div className={cardClass}>
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Phasor Form
-							</p>
-							<p className="font-mono text-sm [color:var(--text)]">
+						<div className={styles.inlinePanel}>
+							<p className={styles.metricLabelPrimary}>Phasor Form</p>
+							<p className={styles.monoTextSm}>
 								V = {rms.toFixed(2)}∠{phase}°
 							</p>
-							<p className="mt-2 text-xs [color:var(--text-muted)]">
+							<p className={styles.metricHelpTop}>
 								Phasor: V = V<sub>RMS</sub>∠φ
 							</p>
 						</div>
 
-						<div className={cardClass}>
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Complex Form
-							</p>
-							<p className="font-mono text-sm [color:var(--text)]">
+						<div className={styles.inlinePanel}>
+							<p className={styles.metricLabelPrimary}>Complex Form</p>
+							<p className={styles.monoTextSm}>
 								V = {(rms * Math.cos(angularPhase)).toFixed(2)}{" "}
 								{rms * Math.sin(angularPhase) >= 0 ? "+" : ""} j
 								{(rms * Math.sin(angularPhase)).toFixed(2)}
 							</p>
-							<p className="mt-2 text-xs [color:var(--text-muted)]">
+							<p className={styles.metricHelpTop}>
 								V = V<sub>RMS</sub> × (cos(φ) + j·sin(φ))
 							</p>
 						</div>
 
-						<div className={cardClass}>
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-								Exponential Form
-							</p>
-							<p className="font-mono text-sm [color:var(--text)]">
+						<div className={styles.inlinePanel}>
+							<p className={styles.metricLabelPrimary}>Exponential Form</p>
+							<p className={styles.monoTextSm}>
 								V = {rms.toFixed(2)} × e^(j·{angularPhase.toFixed(4)})
 							</p>
-							<p className="mt-2 text-xs [color:var(--text-muted)]">
+							<p className={styles.metricHelpTop}>
 								V = V<sub>RMS</sub> × e^(jφ)
 							</p>
 						</div>
 					</div>
 				</div>
 
-				<div className="mt-6 rounded-lg border p-5 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,var(--surface))]">
-					<h4 className="mb-3 font-semibold [color:var(--text-muted)]">
-						Key Relationships
-					</h4>
-					<div className="grid grid-cols-1 gap-3 font-mono text-sm [color:var(--text)] md:grid-cols-2">
-						<div className="space-y-1">
+				<div className={styles.highlightPanel}>
+					<h4 className={styles.inlinePanelTitle}>Key Relationships</h4>
+					<div className={styles.keyGrid}>
+						<div className={styles.keyList}>
 							<p>• Average Value = 0 (symmetric)</p>
 							<p>
 								• RMS = V<sub>m</sub> / √2 = 0.707 × V<sub>m</sub>
@@ -250,7 +220,7 @@ export function SinusoidalCalculator() {
 								• V<sub>m</sub> = √2 × RMS = 1.414 × RMS
 							</p>
 						</div>
-						<div className="space-y-1">
+						<div className={styles.keyList}>
 							<p>• Period T = 1/f</p>
 							<p>• Frequency f = 1/T</p>
 							<p>• Angular frequency ω = 2πf</p>
@@ -258,22 +228,22 @@ export function SinusoidalCalculator() {
 					</div>
 				</div>
 
-				<div className="mt-6">
+				<div className={styles.topSection}>
 					<button
 						onClick={() => setShowSinusoidalWork(!showSinusoidalWork)}
-						className="rounded-lg border px-4 py-2 text-sm font-medium transition [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)] hover:[background:color-mix(in_srgb,var(--primary)_26%,transparent)]"
+						className={styles.toggleButton}
 					>
 						{showSinusoidalWork ? "Hide" : "Show"} Step-by-Step Work
 					</button>
 
 					{showSinusoidalWork && (
-						<div className="mt-4 rounded-lg border p-5 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,var(--surface))]">
-							<h4 className="mb-3 font-semibold [color:var(--text-muted)]">
+						<div className={styles.workPanel}>
+							<h4 className={styles.inlinePanelTitle}>
 								Step-by-Step Sinusoidal Analysis
 							</h4>
-							<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+							<div className={styles.monoList}>
 								{getSinusoidalSteps().map((step, i) => (
-									<p key={i} className={step === "" ? "h-2" : ""}>
+									<p key={i} className={step === "" ? styles.spacer : ""}>
 										{step}
 									</p>
 								))}
@@ -284,107 +254,101 @@ export function SinusoidalCalculator() {
 			</Section>
 
 			<Section title="Per-Unit System Calculator">
-				<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-					<div className="space-y-4">
-						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-							Base Values
-						</h4>
+				<div className={styles.twoColumnLayout}>
+					<div className={styles.stack}>
+						<h4 className={styles.subheading}>Base Values</h4>
 
 						<div>
-							<label className={labelClass}>
+							<label className={styles.label}>
 								Base MVA (S<sub>base</sub>)
 							</label>
 							<input
 								type="number"
 								value={baseMVA}
 								onChange={(e) => setBaseMVA(parseFloat(e.target.value) || 0)}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
 						<div>
-							<label className={labelClass}>
+							<label className={styles.label}>
 								Base kV (V<sub>base</sub>)
 							</label>
 							<input
 								type="number"
 								value={baseKV}
 								onChange={(e) => setBaseKV(parseFloat(e.target.value) || 0)}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
-						<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]">
-							<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
+						<div className={cn(styles.metricCard, styles.metricCardPrimary)}>
+							<p className={styles.metricLabelPrimary}>
 								Base Impedance (Z<sub>base</sub>)
 							</p>
-							<p className="font-mono text-xl [color:var(--text)]">
-								{baseImpedance.toFixed(2)} Ω
-							</p>
-							<p className="mt-1 text-xs [color:var(--text-muted)]">
+							<p className={styles.metricValue}>{baseImpedance.toFixed(2)} Ω</p>
+							<p className={styles.metricHelp}>
 								Z<sub>base</sub> = V<sub>base</sub>² / S<sub>base</sub>
 							</p>
 						</div>
 					</div>
 
-					<div className="space-y-4">
-						<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-							Actual Values
-						</h4>
+					<div className={styles.stack}>
+						<h4 className={styles.subheading}>Actual Values</h4>
 
 						<div>
-							<label className={labelClass}>Actual Power (MW)</label>
+							<label className={styles.label}>Actual Power (MW)</label>
 							<input
 								type="number"
 								value={actualMW}
 								onChange={(e) => setActualMW(parseFloat(e.target.value) || 0)}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
 						<div>
-							<label className={labelClass}>Actual Voltage (kV)</label>
+							<label className={styles.label}>Actual Voltage (kV)</label>
 							<input
 								type="number"
 								value={actualKV}
 								onChange={(e) => setActualKV(parseFloat(e.target.value) || 0)}
-								className={inputClass}
+								className={styles.inputControl}
 							/>
 						</div>
 
-						<div className="grid grid-cols-2 gap-3">
-							<div className="rounded-lg border p-4 [border-color:var(--accent)] [background:color-mix(in_srgb,var(--accent)_14%,transparent)]">
-								<p className="mb-2 text-sm font-semibold [color:var(--accent)]">
-									Per-Unit Power
-								</p>
-								<p className="font-mono text-xl [color:var(--text)]">
+						<div className={styles.perUnitResultGrid}>
+							<div className={cn(styles.metricCard, styles.metricCardAccent)}>
+								<p className={styles.metricLabelAccent}>Per-Unit Power</p>
+								<p className={styles.metricValue}>
 									{perUnitPower.toFixed(4)} p.u.
 								</p>
 							</div>
 
-							<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_14%,transparent)]">
-								<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-									Percent Power
-								</p>
-								<p className="font-mono text-xl [color:var(--text)]">
-									{percentPower.toFixed(2)}%
-								</p>
+							<div
+								className={cn(
+									styles.metricCard,
+									styles.metricCardPrimaryStrong,
+								)}
+							>
+								<p className={styles.metricLabelPrimary}>Percent Power</p>
+								<p className={styles.metricValue}>{percentPower.toFixed(2)}%</p>
 							</div>
 
-							<div className="rounded-lg border p-4 [border-color:var(--accent)] [background:color-mix(in_srgb,var(--accent)_14%,transparent)]">
-								<p className="mb-2 text-sm font-semibold [color:var(--accent)]">
-									Per-Unit Voltage
-								</p>
-								<p className="font-mono text-xl [color:var(--text)]">
+							<div className={cn(styles.metricCard, styles.metricCardAccent)}>
+								<p className={styles.metricLabelAccent}>Per-Unit Voltage</p>
+								<p className={styles.metricValue}>
 									{perUnitVoltage.toFixed(4)} p.u.
 								</p>
 							</div>
 
-							<div className="rounded-lg border p-4 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_14%,transparent)]">
-								<p className="mb-2 text-sm font-semibold [color:var(--primary)]">
-									Percent Voltage
-								</p>
-								<p className="font-mono text-xl [color:var(--text)]">
+							<div
+								className={cn(
+									styles.metricCard,
+									styles.metricCardPrimaryStrong,
+								)}
+							>
+								<p className={styles.metricLabelPrimary}>Percent Voltage</p>
+								<p className={styles.metricValue}>
 									{percentVoltage.toFixed(2)}%
 								</p>
 							</div>
@@ -392,17 +356,13 @@ export function SinusoidalCalculator() {
 					</div>
 				</div>
 
-				<div className="mt-6 space-y-4">
-					<h4 className="text-lg font-semibold [color:var(--text-muted)]">
-						Per-Unit System Formulas
-					</h4>
+				<div className={styles.topSection}>
+					<h4 className={styles.subheading}>Per-Unit System Formulas</h4>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<div className={cardClass}>
-							<h5 className="mb-2 font-semibold [color:var(--text-muted)]">
-								Base Quantities
-							</h5>
-							<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+					<div className={styles.representationGrid}>
+						<div className={styles.inlinePanel}>
+							<h5 className={styles.inlinePanelTitle}>Base Quantities</h5>
+							<div className={styles.monoList}>
 								<p>
 									Z<sub>base</sub> = V<sub>base</sub>² / S<sub>base</sub>
 								</p>
@@ -415,11 +375,9 @@ export function SinusoidalCalculator() {
 							</div>
 						</div>
 
-						<div className={cardClass}>
-							<h5 className="mb-2 font-semibold [color:var(--text-muted)]">
-								Per-Unit Conversion
-							</h5>
-							<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+						<div className={styles.inlinePanel}>
+							<h5 className={styles.inlinePanelTitle}>Per-Unit Conversion</h5>
+							<div className={styles.monoList}>
 								<p>
 									X<sub>p.u.</sub> = X<sub>actual</sub> / X<sub>base</sub>
 								</p>
@@ -432,11 +390,9 @@ export function SinusoidalCalculator() {
 							</div>
 						</div>
 
-						<div className={cardClass}>
-							<h5 className="mb-2 font-semibold [color:var(--text-muted)]">
-								Change of Base
-							</h5>
-							<div className="space-y-1 font-mono text-xs [color:var(--text)]">
+						<div className={styles.inlinePanel}>
+							<h5 className={styles.inlinePanelTitle}>Change of Base</h5>
+							<div className={styles.monoListXs}>
 								<p>
 									Z<sub>p.u.,new</sub> = Z<sub>p.u.,old</sub> × (S
 									<sub>base,new</sub> / S<sub>base,old</sub>) × (V
@@ -445,11 +401,9 @@ export function SinusoidalCalculator() {
 							</div>
 						</div>
 
-						<div className={cardClass}>
-							<h5 className="mb-2 font-semibold [color:var(--text-muted)]">
-								Advantages
-							</h5>
-							<div className="space-y-1 text-xs [color:var(--text-muted)]">
+						<div className={styles.inlinePanel}>
+							<h5 className={styles.inlinePanelTitle}>Advantages</h5>
+							<div className={styles.mutedListXs}>
 								<p>• Simplifies calculations</p>
 								<p>• Values typically 0.8-1.2 p.u.</p>
 								<p>• Easier comparison of systems</p>
@@ -458,22 +412,22 @@ export function SinusoidalCalculator() {
 					</div>
 				</div>
 
-				<div className="mt-6">
+				<div className={styles.topSection}>
 					<button
 						onClick={() => setShowPerUnitWork(!showPerUnitWork)}
-						className="rounded-lg border px-4 py-2 text-sm font-medium transition [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_18%,transparent)] [color:var(--text)] hover:[background:color-mix(in_srgb,var(--primary)_26%,transparent)]"
+						className={styles.toggleButton}
 					>
 						{showPerUnitWork ? "Hide" : "Show"} Step-by-Step Work
 					</button>
 
 					{showPerUnitWork && (
-						<div className="mt-4 rounded-lg border p-5 [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,var(--surface))]">
-							<h4 className="mb-3 font-semibold [color:var(--text-muted)]">
+						<div className={styles.workPanel}>
+							<h4 className={styles.inlinePanelTitle}>
 								Step-by-Step Per-Unit Calculation
 							</h4>
-							<div className="space-y-1 font-mono text-sm [color:var(--text)]">
+							<div className={styles.monoList}>
 								{getPerUnitSteps().map((step, i) => (
-									<p key={i} className={step === "" ? "h-2" : ""}>
+									<p key={i} className={step === "" ? styles.spacer : ""}>
 										{step}
 									</p>
 								))}
@@ -484,21 +438,23 @@ export function SinusoidalCalculator() {
 			</Section>
 
 			<Section title="Example: Sinusoidal Voltage">
-				<div className="space-y-2 [color:var(--text)]">
-					<p className="font-semibold">
+				<div className={styles.exampleBlock}>
+					<p className={styles.exampleHeading}>
 						Given: v(t) = 220√2 × sin(2π × 50t + 30°)
 					</p>
-					<p className="pl-4">
+					<p className={styles.exampleIndented}>
 						• Peak Amplitude (V<sub>m</sub>) = 220√2 = 311.13 V
 					</p>
-					<p className="pl-4">• RMS Value = 220 V</p>
-					<p className="pl-4">• Frequency (f) = 50 Hz</p>
-					<p className="pl-4">• Period (T) = 1/50 = 20 ms</p>
-					<p className="pl-4">
+					<p className={styles.exampleIndented}>• RMS Value = 220 V</p>
+					<p className={styles.exampleIndented}>• Frequency (f) = 50 Hz</p>
+					<p className={styles.exampleIndented}>• Period (T) = 1/50 = 20 ms</p>
+					<p className={styles.exampleIndented}>
 						• Angular Frequency (ω) = 2π × 50 = 314.16 rad/s
 					</p>
-					<p className="pl-4">• Phase Angle (φ) = 30° = 0.524 rad</p>
-					<p className="pl-4">• Phasor Form: V = 220∠30° V</p>
+					<p className={styles.exampleIndented}>
+						• Phase Angle (φ) = 30° = 0.524 rad
+					</p>
+					<p className={styles.exampleIndented}>• Phasor Form: V = 220∠30° V</p>
 				</div>
 			</Section>
 		</div>

@@ -7,6 +7,8 @@ import { HStack, Stack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
 import { COLOR_SCHEMES, useTheme } from "@/lib/palette";
+import { cn } from "@/lib/utils";
+import styles from "./ThemePicker.module.css";
 
 // New theme keys matching palette.ts
 const THEME_KEYS = [
@@ -60,8 +62,8 @@ export default function ThemePicker() {
 		<Panel variant="default" padding="lg">
 			<Stack gap={6}>
 				{/* Header */}
-				<HStack gap={3} align="start">
-					<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+				<HStack gap={3} align="start" className={styles.header}>
+					<div className={styles.headerIcon}>
 						<Palette size={20} />
 					</div>
 					<Stack gap={1}>
@@ -77,7 +79,7 @@ export default function ThemePicker() {
 				{/* Current theme indicator */}
 				<Panel variant="inset" padding="md">
 					<HStack gap={3} align="center">
-						<Sparkles size={16} className="text-primary" />
+						<Sparkles size={16} className={styles.activeRowIcon} />
 						<Text size="sm" color="muted">
 							Currently using{" "}
 							<Text weight="semibold" color="default">
@@ -88,7 +90,7 @@ export default function ThemePicker() {
 				</Panel>
 
 				{/* Theme grid */}
-				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				<div className={styles.grid}>
 					{items.map((t) => {
 						const isActive = t.key === active;
 
@@ -97,18 +99,16 @@ export default function ThemePicker() {
 								key={t.key}
 								type="button"
 								onClick={() => setScheme(t.key)}
-								className={`
-                  group relative rounded-xl border p-4 text-left transition-all duration-200
-                  ${
-										isActive
-											? "border-primary bg-primary/5 ring-2 ring-primary/20"
-											: "border-border bg-surface hover:border-primary/50 hover:bg-surface-2"
-									}
-                `}
+								className={cn(
+									styles.themeButton,
+									isActive
+										? styles.themeButtonActive
+										: styles.themeButtonInactive,
+								)}
 							>
 								{/* Active checkmark */}
 								{isActive && (
-									<div className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-contrast shadow-md">
+									<div className={styles.activeCheck}>
 										<Check size={12} strokeWidth={3} />
 									</div>
 								)}
@@ -126,22 +126,26 @@ export default function ThemePicker() {
 												</Badge>
 											)}
 										</HStack>
-										<Text size="xs" color="muted" className="line-clamp-2">
+										<Text
+											size="xs"
+											color="muted"
+											className={styles.themeDescription}
+										>
 											{t.description}
 										</Text>
 									</Stack>
 
 									{/* Color swatches */}
-									<HStack gap={2}>
+									<HStack gap={2} className={styles.swatchRow}>
 										{t.swatches.map((s) => (
 											<div
 												key={`${t.key}-${s.label}`}
-												className="relative h-6 w-6 rounded-lg border border-border/50 shadow-sm transition-transform group-hover:scale-105"
+												className={styles.swatch}
 												style={{ background: s.value }}
 												title={`${s.label}: ${s.value}`}
 											>
 												{/* Subtle shine */}
-												<div className="absolute inset-0 rounded-lg bg-linear-to-br from-white/20 to-transparent" />
+												<div className={styles.swatchShine} />
 											</div>
 										))}
 									</HStack>

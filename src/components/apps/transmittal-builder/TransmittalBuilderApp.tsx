@@ -1,4 +1,5 @@
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import styles from "./TransmittalBuilderApp.module.css";
 import { TransmittalBuilderMainForm } from "./TransmittalBuilderMainForm";
 import { TransmittalBuilderRightRail } from "./TransmittalBuilderRightRail";
 import { useTransmittalBuilderState } from "./useTransmittalBuilderState";
@@ -11,7 +12,7 @@ export function TransmittalBuilderApp() {
 			title="Transmittal Builder"
 			description="Generate transmittal packages in DOCX and PDF formats."
 		>
-			<div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+			<div className={styles.layout}>
 				<TransmittalBuilderMainForm
 					draft={state.draft}
 					files={state.files}
@@ -37,7 +38,7 @@ export function TransmittalBuilderApp() {
 					handleOptionToggle={state.handleOptionToggle}
 				/>
 
-				<aside>
+				<aside className={styles.sideRail}>
 					<TransmittalBuilderRightRail
 						outputFormat={state.outputFormat}
 						onOutputFormatChange={state.setOutputFormat}

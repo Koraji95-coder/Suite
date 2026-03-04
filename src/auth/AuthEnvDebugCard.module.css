@@ -1,0 +1,23 @@
+.root {
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.03);
+	margin-top: 0.625rem;
+	padding: 0.625rem 0.75rem;
+}
+
+.title {
+	margin-bottom: 0.5rem;
+	font-size: 0.6875rem;
+	opacity: 0.8;
+}
+
+.rows {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.errorNote {
+	margin: 0.5rem 0 0;
+	color: var(--danger);
+	font-size: 0.75rem;
+}

@@ -1,0 +1,94 @@
+.root {
+	margin-bottom: 2rem;
+}
+
+.headerRow {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: 1rem;
+}
+
+.title {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 500;
+}
+
+.viewAllButton {
+	font-size: 0.875rem;
+	color: var(--primary);
+}
+
+.viewAllButton:hover {
+	color: var(--primary);
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1rem;
+}
+
+.card {
+	padding: 1rem;
+}
+
+.fileRow {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.fileIconWrap {
+	display: flex;
+	width: 2.5rem;
+	height: 2.5rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.625rem;
+	background: var(--surface-2);
+}
+
+.fileIcon {
+	width: 1.25rem;
+	height: 1.25rem;
+	color: var(--text-muted);
+}
+
+.fileInfo {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.fileName {
+	margin: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 0.875rem;
+	font-weight: 500;
+}
+
+.fileMeta {
+	margin: 0;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+@media (min-width: 640px) {
+	.grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1024px) {
+	.title {
+		font-size: 1.125rem;
+	}
+
+	.grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}

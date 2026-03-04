@@ -7,7 +7,9 @@ import { HStack, Stack } from "@/components/primitives/Stack";
 
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 import { AgentPixelMark } from "./AgentPixelMark";
+import styles from "./AgentProfileSwitcher.module.css";
 import {
 	AGENT_PROFILE_IDS,
 	AGENT_PROFILES,
@@ -82,20 +84,15 @@ function DropdownSwitcher({
 	};
 
 	return (
-		<div ref={containerRef} className="relative">
+		<div ref={containerRef} className={styles.dropdownRoot}>
 			{/* Trigger button */}
 			<button
 				type="button"
 				onClick={() => setOpen(!open)}
-				className={`
-          flex items-center gap-2 rounded-xl px-3 py-1.5
-          border transition-all duration-150
-          ${
-						open
-							? "border-primary bg-primary/10"
-							: "border-transparent hover:bg-surface-2"
-					}
-        `}
+				className={cn(
+					styles.triggerButton,
+					open ? styles.triggerButtonOpen : styles.triggerButtonClosed,
+				)}
 			>
 				<AgentPixelMark
 					profileId={activeProfileId}
@@ -107,35 +104,30 @@ function DropdownSwitcher({
 				</Text>
 				<ChevronDown
 					size={14}
-					className={`text-text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+					className={cn(
+						styles.triggerChevron,
+						open && styles.triggerChevronOpen,
+					)}
 				/>
 			</button>
 
 			{/* Dropdown menu */}
 			{open && (
-				<div
-					className="
-            absolute top-full left-0 mt-2 z-50
-            w-72 rounded-xl border border-border bg-surface
-            shadow-lg shadow-black/20
-            overflow-hidden
-            animate-in fade-in slide-in-from-top-2 duration-150
-          "
-				>
+				<div className={styles.menu}>
 					{/* Header */}
-					<div className="px-4 py-3 border-b border-border bg-surface-2/50">
+					<div className={styles.menuHeader}>
 						<Text
 							size="xs"
 							color="muted"
 							weight="semibold"
-							className="uppercase tracking-wider"
+							className={styles.menuHeaderLabel}
 						>
 							Switch Agent
 						</Text>
 					</div>
 
 					{/* Agent list */}
-					<div className="p-2">
+					<div className={styles.menuList}>
 						{AGENT_PROFILE_IDS.map((id) => {
 							const profile = AGENT_PROFILES[id];
 							const isActive = id === activeProfileId;
@@ -145,32 +137,29 @@ function DropdownSwitcher({
 									key={id}
 									type="button"
 									onClick={() => handleSelect(id)}
-									className={`
-                    w-full flex items-center gap-3 rounded-lg px-3 py-2.5
-                    text-left transition-all duration-150
-                    ${
-											isActive
-												? "bg-primary/10 border border-primary/20"
-												: "hover:bg-surface-2 border border-transparent"
-										}
-                  `}
+									className={cn(
+										styles.optionButton,
+										isActive
+											? styles.optionButtonActive
+											: styles.optionButtonInactive,
+									)}
 								>
 									{/* Avatar */}
-									<div className="relative shrink-0">
+									<div className={styles.optionAvatar}>
 										<AgentPixelMark
 											profileId={id}
 											size={32}
 											expression={isActive ? "active" : "neutral"}
 										/>
 										{isActive && (
-											<div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-primary flex items-center justify-center">
-												<Check size={8} className="text-primary-contrast" />
+											<div className={styles.activeCheckBubble}>
+												<Check size={8} className={styles.activeCheckIcon} />
 											</div>
 										)}
 									</div>
 
 									{/* Info */}
-									<Stack gap={0} className="flex-1 min-w-0">
+									<Stack gap={0} className={styles.optionContent}>
 										<HStack gap={2} align="center">
 											<Text
 												size="sm"
@@ -195,7 +184,7 @@ function DropdownSwitcher({
 					</div>
 
 					{/* Footer hint */}
-					<div className="px-4 py-2 border-t border-border bg-surface-2/30">
+					<div className={styles.menuFooter}>
 						<Text size="xs" color="muted">
 							Each agent has specialized capabilities
 						</Text>
@@ -217,7 +206,7 @@ function TabsSwitcher({
 	onSelect: (id: AgentProfileId) => void;
 }) {
 	return (
-		<div className="flex items-center gap-1 p-1 rounded-xl bg-surface-2/50 border border-border">
+		<div className={styles.tabsRoot}>
 			{AGENT_PROFILE_IDS.map((id) => {
 				const profile = AGENT_PROFILES[id];
 				const isActive = id === activeProfileId;
@@ -227,15 +216,10 @@ function TabsSwitcher({
 						key={id}
 						type="button"
 						onClick={() => onSelect(id)}
-						className={`
-              relative flex items-center gap-2 rounded-lg px-3 py-2
-              text-xs font-medium transition-all duration-200
-              ${
-								isActive
-									? "bg-surface text-text shadow-sm"
-									: "text-text-muted hover:text-text hover:bg-surface/50"
-							}
-            `}
+						className={cn(
+							styles.tabButton,
+							isActive ? styles.tabButtonActive : styles.tabButtonInactive,
+						)}
 						title={profile.tagline}
 					>
 						<AgentPixelMark
@@ -243,12 +227,10 @@ function TabsSwitcher({
 							size={20}
 							expression={isActive ? "active" : "neutral"}
 						/>
-						<span className="hidden sm:inline">{profile.name}</span>
+						<span className={styles.tabName}>{profile.name}</span>
 
 						{/* Active indicator dot */}
-						{isActive && (
-							<span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />
-						)}
+						{isActive && <span className={styles.tabActiveDot} />}
 					</button>
 				);
 			})}

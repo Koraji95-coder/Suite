@@ -2,21 +2,22 @@ import { Folder } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
 import { storageData } from "./file-manager-dashboard-models";
+import styles from "./file-manager-dashboard-storage-panel.module.css";
 
 export function FileManagerDashboardStoragePanel() {
 	return (
 		<>
-			<Panel className="mb-6" padding="lg">
-				<h3 className="mb-6 text-lg font-semibold">Storage usage</h3>
-				<div className="mb-6 flex flex-col items-center">
-					<div className="relative mb-4 h-32 w-32">
-						<svg className="h-32 w-32 -rotate-90 transform" viewBox="0 0 36 36">
+			<Panel className={styles.usagePanel} padding="lg">
+				<h3 className={styles.title}>Storage usage</h3>
+				<div className={styles.chartBlock}>
+					<div className={styles.chartWrap}>
+						<svg className={styles.chartSvg} viewBox="0 0 36 36">
 							<path
 								d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
 								fill="none"
 								stroke="currentColor"
 								strokeWidth="2"
-								className="text-muted"
+								className={styles.chartTrack}
 							/>
 							<path
 								d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -24,28 +25,28 @@ export function FileManagerDashboardStoragePanel() {
 								stroke="currentColor"
 								strokeWidth="2"
 								strokeDasharray="65, 100"
-								className="[color:var(--primary)]"
+								className={styles.chartProgress}
 							/>
 						</svg>
-						<div className="absolute inset-0 flex flex-col items-center justify-center">
-							<Folder className="text-muted-foreground mb-1 h-6 w-6" />
-							<div className="text-2xl font-bold">104.6 GB</div>
-							<div className="text-muted-foreground text-xs">of 256 GB</div>
+						<div className={styles.chartCenter}>
+							<Folder className={styles.chartIcon} />
+							<div className={styles.chartUsed}>104.6 GB</div>
+							<div className={styles.chartTotal}>of 256 GB</div>
 						</div>
 					</div>
 				</div>
 
-				<div className="space-y-4">
+				<div className={styles.list}>
 					{storageData.map((item) => (
-						<div key={item.type} className="flex items-center gap-3">
-							<div className="bg-muted flex h-8 w-8 items-center justify-center rounded-lg">
-								<item.icon className="text-muted-foreground h-4 w-4" />
+						<div key={item.type} className={styles.listItem}>
+							<div className={styles.itemIconWrap}>
+								<item.icon className={styles.itemIcon} />
 							</div>
-							<div className="flex-1">
-								<div className="mb-1 flex items-center justify-between">
-									<span className="text-sm font-medium">{item.type}</span>
+							<div className={styles.itemInfo}>
+								<div className={styles.itemHeader}>
+									<span className={styles.itemType}>{item.type}</span>
 								</div>
-								<div className="text-muted-foreground text-xs">
+								<div className={styles.itemMeta}>
 									{item.files} Files | {item.size}
 								</div>
 							</div>
@@ -55,14 +56,14 @@ export function FileManagerDashboardStoragePanel() {
 			</Panel>
 
 			<Panel padding="lg">
-				<div className="text-center">
-					<div className="bg-muted mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
-						<div className="border-muted-foreground flex h-6 w-6 items-center justify-center rounded-full border-2">
-							<span className="text-xs font-bold">$</span>
+				<div className={styles.upgradeContent}>
+					<div className={styles.upgradeBadgeOuter}>
+						<div className={styles.upgradeBadgeInner}>
+							<span className={styles.upgradeBadgeText}>$</span>
 						</div>
 					</div>
-					<h3 className="mb-2 font-semibold">Get more space for your files</h3>
-					<p className="text-muted-foreground mb-4 text-sm">
+					<h3 className={styles.upgradeTitle}>Get more space for your files</h3>
+					<p className={styles.upgradeDescription}>
 						Upgrade your account to pro to get more storage
 					</p>
 					<Button variant="secondary" fluid>

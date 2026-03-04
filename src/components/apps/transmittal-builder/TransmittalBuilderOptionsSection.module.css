@@ -1,0 +1,41 @@
+.grid {
+	display: grid;
+	gap: 1rem;
+	padding-inline: 0.5rem;
+}
+
+.optionPanel {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.groupTitle {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.optionsList {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.optionLabel {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.875rem;
+}
+
+@media (min-width: 640px) {
+	.grid {
+		padding-inline: 0.75rem;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1024px) {
+	.grid {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}

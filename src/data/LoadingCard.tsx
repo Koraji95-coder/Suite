@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
+import styles from "./LoadingCard.module.css";
 
 export interface LoadingCardProps {
 	title?: string;
@@ -21,20 +23,18 @@ export function LoadingCard({
 }: LoadingCardProps) {
 	const displayTitle = label ?? title;
 	const statusClass = isActive
-		? "[border-color:color-mix(in_srgb,var(--warning)_60%,var(--border))]"
+		? styles.statusActive
 		: isComplete
-			? "[border-color:color-mix(in_srgb,var(--accent)_60%,var(--border))]"
-			: "[border-color:var(--border)]";
+			? styles.statusComplete
+			: styles.statusIdle;
 
 	return (
-		<div
-			className={`rounded-xl border p-4 [background:var(--bg-mid)] ${statusClass}`}
-		>
-			<div className="flex items-center justify-between gap-2">
-				<div className="text-sm font-medium">{displayTitle}</div>
+		<div className={cn(styles.root, statusClass)}>
+			<div className={styles.header}>
+				<div className={styles.title}>{displayTitle}</div>
 				{icon ? <div>{icon}</div> : null}
 			</div>
-			<div className="mt-2 text-xs [color:var(--text-muted)]">
+			<div className={styles.body}>
 				{children ||
 					`Step ${typeof index === "number" ? index + 1 : ""}`.trim() ||
 					"Please wait…"}

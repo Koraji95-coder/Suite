@@ -7,7 +7,7 @@ import {
 	SelectValue,
 } from "@/components/apps/ui/select";
 import { Input, TextArea } from "@/components/primitives/Input";
-import { cn } from "@/lib/utils";
+import styles from "./TransmittalBuilderProjectAndSenderSection.module.css";
 import type { DraftState } from "./transmittalBuilderModels";
 import type { PeProfile } from "./transmittalConfig";
 
@@ -38,67 +38,59 @@ export function TransmittalBuilderProjectAndSenderSection({
 	return (
 		<>
 			<TransmittalSection title="Project Information">
-				<div className="grid gap-4 px-2 sm:px-3">
-					<div className="grid gap-3 sm:grid-cols-2">
-						<div className="grid gap-1">
-							<label className="text-xs text-text-muted">Project Name</label>
+				<div className={styles.sectionGrid}>
+					<div className={styles.twoColumns}>
+						<div className={styles.field}>
+							<label className={styles.label}>Project Name</label>
 							<Input
 								value={draft.projectName}
 								onChange={(event) =>
 									updateDraft("projectName", event.target.value)
 								}
-								className={cn(
-									isInvalid("projectName") &&
-										"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
-								)}
+								className={isInvalid("projectName") ? styles.invalidField : ""}
 								placeholder="Client - Site Name"
 							/>
 						</div>
-						<div className="grid gap-1">
-							<label className="text-xs text-text-muted">Project Number</label>
+						<div className={styles.field}>
+							<label className={styles.label}>Project Number</label>
 							<Input
 								value={draft.projectNumber}
 								onChange={(event) =>
 									updateDraft("projectNumber", event.target.value)
 								}
-								className={cn(
-									isInvalid("projectNumber") &&
-										"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
-								)}
+								className={
+									isInvalid("projectNumber") ? styles.invalidField : ""
+								}
 								placeholder="R3P-XXXX"
 							/>
 						</div>
 					</div>
-					<div className="grid gap-3 sm:grid-cols-2">
-						<div className="grid gap-1">
-							<label className="text-xs text-text-muted">Date</label>
+					<div className={styles.twoColumns}>
+						<div className={styles.field}>
+							<label className={styles.label}>Date</label>
 							<Input
 								value={draft.date}
 								onChange={(event) => updateDraft("date", event.target.value)}
-								className={cn(
-									isInvalid("date") &&
-										"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
-								)}
+								className={isInvalid("date") ? styles.invalidField : ""}
 								placeholder="MM/DD/YYYY"
 							/>
 						</div>
-						<div className="grid gap-1">
-							<label className="text-xs text-text-muted">Transmittal</label>
+						<div className={styles.field}>
+							<label className={styles.label}>Transmittal</label>
 							<Input
 								value={draft.transmittalNumber}
 								onChange={(event) =>
 									updateDraft("transmittalNumber", event.target.value)
 								}
-								className={cn(
-									isInvalid("transmittalNumber") &&
-										"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
-								)}
+								className={
+									isInvalid("transmittalNumber") ? styles.invalidField : ""
+								}
 								placeholder="XMTL-###"
 							/>
 						</div>
 					</div>
-					<div className="grid gap-1">
-						<label className="text-xs text-text-muted">Description</label>
+					<div className={styles.field}>
+						<label className={styles.label}>Description</label>
 						<TextArea
 							value={draft.description}
 							onChange={(event) =>
@@ -112,16 +104,13 @@ export function TransmittalBuilderProjectAndSenderSection({
 			</TransmittalSection>
 
 			<TransmittalSection title="From Information">
-				<div className="grid gap-4 px-2 sm:px-3">
-					<div className="grid gap-3 sm:grid-cols-2">
-						<div className="grid gap-1">
-							<label className="text-xs text-text-muted">PE</label>
+				<div className={styles.sectionGrid}>
+					<div className={styles.twoColumns}>
+						<div className={styles.field}>
+							<label className={styles.label}>PE</label>
 							<Select value={draft.peName} onValueChange={handlePeChange}>
 								<SelectTrigger
-									className={cn(
-										isInvalid("peName") &&
-											"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
-									)}
+									className={isInvalid("peName") ? styles.invalidField : ""}
 								>
 									<SelectValue placeholder="Select PE" />
 								</SelectTrigger>
@@ -134,44 +123,36 @@ export function TransmittalBuilderProjectAndSenderSection({
 								</SelectContent>
 							</Select>
 							{profileOptionsError ? (
-								<div className="text-xs [color:var(--danger)]">
-									{profileOptionsError}
-								</div>
+								<div className={styles.errorText}>{profileOptionsError}</div>
 							) : (
-								<div className="text-xs text-text-muted">
+								<div className={styles.helperText}>
 									Sender values are managed by the selected profile.
 								</div>
 							)}
 						</div>
-						<div className="grid gap-1">
-							<label className="text-xs text-text-muted">Title</label>
+						<div className={styles.field}>
+							<label className={styles.label}>Title</label>
 							<Input
 								value={draft.fromTitle}
 								readOnly
-								className={cn(
-									isInvalid("fromTitle") &&
-										"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
-								)}
+								className={isInvalid("fromTitle") ? styles.invalidField : ""}
 								placeholder="Managed from profile"
 							/>
 						</div>
 					</div>
 
-					<div className="grid gap-3 sm:grid-cols-2">
-						<div className="grid gap-1">
-							<label className="text-xs text-text-muted">Email</label>
+					<div className={styles.twoColumns}>
+						<div className={styles.field}>
+							<label className={styles.label}>Email</label>
 							<Input
 								value={draft.fromEmail}
 								readOnly
-								className={cn(
-									isInvalid("fromEmail") &&
-										"[border-color:var(--danger)] focus-visible:[ring-color:var(--danger)]",
-								)}
+								className={isInvalid("fromEmail") ? styles.invalidField : ""}
 								placeholder="Managed from profile"
 							/>
 						</div>
-						<div className="grid gap-1">
-							<label className="text-xs text-text-muted">Phone</label>
+						<div className={styles.field}>
+							<label className={styles.label}>Phone</label>
 							<Input
 								value={draft.fromPhone}
 								readOnly
@@ -180,8 +161,8 @@ export function TransmittalBuilderProjectAndSenderSection({
 						</div>
 					</div>
 
-					<div className="grid gap-1">
-						<label className="text-xs text-text-muted">Firm Number</label>
+					<div className={styles.field}>
+						<label className={styles.label}>Firm Number</label>
 						<Select
 							value={draft.firmNumber}
 							onValueChange={(value) => updateDraft("firmNumber", value)}

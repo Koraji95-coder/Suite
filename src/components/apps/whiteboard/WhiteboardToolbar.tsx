@@ -9,6 +9,7 @@ import {
 	Undo,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import styles from "./WhiteboardToolbar.module.css";
 
 interface WhiteboardToolbarProps {
 	tool: "pen" | "eraser" | "rectangle" | "circle" | "text";
@@ -48,7 +49,7 @@ export function WhiteboardToolbar({
 	canRedo,
 }: WhiteboardToolbarProps) {
 	return (
-		<div className="flex w-16 flex-col items-center gap-1.5 border-r py-3 [border-color:var(--border)] [background:var(--surface)]">
+		<div className={styles.root}>
 			{/* Drawing tools */}
 			{tools.map(({ id, icon: Icon, label }) => (
 				<button
@@ -56,53 +57,50 @@ export function WhiteboardToolbar({
 					onClick={() => onToolChange(id)}
 					title={label}
 					className={cn(
-						"rounded-lg p-2.5 transition",
-						tool === id
-							? "border [border-color:var(--primary)] [background:color-mix(in_srgb,var(--primary)_12%,transparent)]"
-							: "hover:[background:var(--surface-2)]",
+						styles.toolButton,
+						tool === id ? styles.toolButtonActive : styles.toolButtonInactive,
 					)}
 				>
-					<Icon className="h-4 w-4 [color:var(--primary)]" />
+					<Icon className={styles.toolIcon} />
 				</button>
 			))}
 
-			<div className="mx-2 my-1 h-px w-8 [background:var(--border)]" />
+			<div className={styles.divider} />
 
 			{/* Undo / Redo / Clear */}
 			<button
 				onClick={onUndo}
 				disabled={!canUndo}
 				title="Undo"
-				className="rounded-lg p-2.5 transition hover:[background:var(--surface-2)] disabled:opacity-30"
+				className={styles.actionButton}
 			>
-				<Undo className="h-4 w-4 [color:var(--text-muted)]" />
+				<Undo className={styles.actionIcon} />
 			</button>
 			<button
 				onClick={onRedo}
 				disabled={!canRedo}
 				title="Redo"
-				className="rounded-lg p-2.5 transition hover:[background:var(--surface-2)] disabled:opacity-30"
+				className={styles.actionButton}
 			>
-				<Redo className="h-4 w-4 [color:var(--text-muted)]" />
+				<Redo className={styles.actionIcon} />
 			</button>
 			<button
 				onClick={onClear}
 				title="Clear All"
-				className="rounded-lg p-2.5 transition
-					hover:[background:color-mix(in_srgb,var(--danger)_14%,transparent)]"
+				className={cn(styles.actionButton, styles.clearButton)}
 			>
-				<Trash2 className="h-4 w-4 [color:var(--danger)]" />
+				<Trash2 className={styles.clearIcon} />
 			</button>
 
-			<div className="mx-2 my-1 h-px w-8 [background:var(--border)]" />
+			<div className={styles.divider} />
 
 			{/* Color + line width */}
-			<div className="flex flex-col items-center gap-3">
+			<div className={styles.controls}>
 				<input
 					type="color"
 					value={color}
 					onChange={(e) => onColorChange(e.target.value)}
-					className="h-8 w-8 cursor-pointer rounded border-none"
+					className={styles.colorInput}
 					title="Color"
 				/>
 				<input
@@ -111,7 +109,7 @@ export function WhiteboardToolbar({
 					max="20"
 					value={lineWidth}
 					onChange={(e) => onLineWidthChange(parseInt(e.target.value))}
-					className="w-10 origin-center rotate-90"
+					className={styles.lineWidthInput}
 					title="Line Width"
 				/>
 			</div>

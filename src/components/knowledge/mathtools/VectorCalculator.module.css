@@ -1,0 +1,296 @@
+.root {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-bottom: 0.25rem;
+}
+
+.headerIcon {
+	width: 2rem;
+	height: 2rem;
+	color: var(--primary);
+}
+
+.title {
+	margin: 0;
+	font-size: 1.875rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.twoColumnLayout {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1.5rem;
+}
+
+.operationLayout {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1.5rem;
+}
+
+.stack {
+	display: grid;
+	gap: 1rem;
+}
+
+.stackTight {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.subheading {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.label {
+	display: block;
+	margin-bottom: 0.25rem;
+	font-size: 0.875rem;
+	color: var(--text-muted);
+}
+
+.inputControl {
+	width: 100%;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	color: var(--text);
+	outline: none;
+}
+
+.inputControl:focus {
+	border-color: var(--primary);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.valueCardPrimary {
+	border: 1px solid var(--primary);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--primary) 15%, transparent);
+	padding: 1rem;
+}
+
+.valueCardPrimaryCompact {
+	border: 1px solid var(--primary);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--primary) 15%, transparent);
+	padding: 0.75rem;
+}
+
+.valueTextLarge {
+	margin: 0;
+	font-family: var(--font-mono, monospace);
+	font-size: 1.125rem;
+	color: var(--text);
+}
+
+.valueText {
+	margin: 0;
+	font-family: var(--font-mono, monospace);
+	color: var(--text);
+}
+
+.valueTextSm {
+	margin: 0;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875rem;
+	color: var(--text);
+}
+
+.topSection {
+	margin-top: 1.5rem;
+	display: grid;
+	gap: 1rem;
+}
+
+.representationGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1rem;
+}
+
+.inlinePanel {
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+	background: var(--surface);
+	padding: 1rem;
+}
+
+.primaryLabel {
+	margin: 0 0 0.5rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--primary);
+}
+
+.toggleButton {
+	width: fit-content;
+	border: 1px solid var(--primary);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--primary) 18%, transparent);
+	padding: 0.5rem 1rem;
+	font-size: 0.875rem;
+	font-weight: 500;
+	color: var(--text);
+	transition: background-color 160ms ease;
+	cursor: pointer;
+}
+
+.toggleButton:hover {
+	background: color-mix(in srgb, var(--primary) 26%, transparent);
+}
+
+.workPanel {
+	border: 1px solid var(--primary);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+	padding: 1.25rem;
+}
+
+.panelTitle {
+	margin: 0 0 0.75rem;
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.monoList {
+	display: grid;
+	gap: 0.25rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875rem;
+	color: var(--text);
+}
+
+.monoList p {
+	margin: 0;
+}
+
+.spacer {
+	height: 0.5rem;
+}
+
+.operationGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.5rem;
+}
+
+.operationButton {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	border-radius: 0.5rem;
+	padding: 0.75rem 1rem;
+	transition:
+		background-color 160ms ease,
+		border-color 160ms ease,
+		color 160ms ease;
+	cursor: pointer;
+}
+
+.operationButtonActive {
+	border: 2px solid var(--primary);
+	background: color-mix(in srgb, var(--primary) 28%, transparent);
+	color: var(--text);
+}
+
+.operationButtonInactive {
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text-muted);
+}
+
+.operationButtonInactive:hover {
+	background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.operationIcon {
+	width: 1rem;
+	height: 1rem;
+}
+
+.accentPanel {
+	border: 1px solid var(--accent);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
+	padding: 1rem;
+}
+
+.accentLabel {
+	margin: 0 0 0.5rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--accent);
+}
+
+.monoListSpaced {
+	display: grid;
+	gap: 0.5rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875rem;
+	color: var(--text);
+}
+
+.monoListSpaced p {
+	margin: 0;
+}
+
+.monoListXs {
+	display: grid;
+	gap: 0.5rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.75rem;
+	color: var(--text);
+}
+
+.monoListXs p {
+	margin: 0;
+}
+
+.mutedText {
+	color: var(--text-muted);
+}
+
+.exampleBlock {
+	display: grid;
+	gap: 0.5rem;
+	color: var(--text);
+}
+
+.exampleBlock p {
+	margin: 0;
+}
+
+.exampleIndented {
+	padding-left: 1rem;
+}
+
+@media (min-width: 768px) {
+	.representationGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1024px) {
+	.twoColumnLayout {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.operationLayout {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}

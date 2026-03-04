@@ -1,0 +1,81 @@
+.header {
+	border-bottom: 1px solid var(--border);
+	padding: 1.5rem;
+}
+
+.brandRow {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.brandBadge {
+	display: flex;
+	width: 2rem;
+	height: 2rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.5rem;
+	background: var(--primary);
+	color: var(--text);
+}
+
+.brandTitle {
+	font-size: 1.125rem;
+	font-weight: 600;
+}
+
+.body {
+	flex: 1 1 auto;
+	padding: 1rem;
+}
+
+.label {
+	margin-bottom: 1rem;
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.nav {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.menuItem {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	gap: 0.75rem;
+	border: none;
+	border-radius: 0.625rem;
+	background: transparent;
+	padding: 0.5rem 0.75rem;
+	font-size: 0.875rem;
+	text-align: left;
+	transition:
+		background-color 160ms ease,
+		color 160ms ease;
+	cursor: pointer;
+}
+
+.menuItemActive {
+	background: var(--primary);
+	color: var(--text);
+}
+
+.menuItemInactive {
+	color: var(--text-muted);
+}
+
+.menuItemInactive:hover {
+	background: color-mix(in srgb, var(--accent) 16%, transparent);
+	color: var(--text);
+}
+
+.footer {
+	border-top: 1px solid var(--border);
+	padding: 1rem;
+}

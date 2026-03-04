@@ -1,0 +1,66 @@
+.root {
+	display: flex;
+	height: 100%;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 1rem;
+	padding: 2rem;
+	color: var(--text);
+}
+
+.card {
+	width: min(100%, 37.5rem);
+	border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+	border-radius: 0.75rem;
+	background: color-mix(in srgb, var(--surface) 80%, transparent);
+	padding: 1.5rem;
+	text-align: center;
+}
+
+.title {
+	margin: 0 0 0.5rem;
+	font-size: 1.125rem;
+	font-weight: 600;
+}
+
+.message {
+	margin: 0 0 1rem;
+	font-size: 0.8125rem;
+	color: var(--text-muted);
+}
+
+.details {
+	max-height: 12.5rem;
+	overflow: auto;
+	margin-bottom: 1rem;
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--background) 50%, transparent);
+	padding: 0.75rem;
+	text-align: left;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.6875rem;
+}
+
+.summary {
+	margin-bottom: 0.5rem;
+	cursor: pointer;
+	font-size: 0.75rem;
+}
+
+.pre {
+	margin: 0;
+	word-break: break-word;
+	white-space: pre-wrap;
+}
+
+.reloadButton {
+	border: none;
+	border-radius: 0.5rem;
+	background: var(--primary);
+	padding: 0.5rem 1.25rem;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	color: var(--primary-contrast);
+	cursor: pointer;
+}

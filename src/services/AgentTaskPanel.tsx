@@ -15,6 +15,7 @@ import {
 	PREDEFINED_TASKS,
 	type PredefinedTask,
 } from "@/services/agentTaskManager";
+import styles from "./AgentTaskPanel.module.css";
 
 interface AgentTaskPanelProps {
 	onExecuteTask: (prompt: string, taskName: string) => void;
@@ -447,23 +448,23 @@ export function AgentTaskPanel({
 				</div>
 			</div>
 			<Dialog open={confirmClearHistory} onOpenChange={setConfirmClearHistory}>
-				<DialogContent className="max-w-sm border-(--border) bg-(--surface)">
+				<DialogContent className={styles.confirmDialogContent}>
 					<DialogHeader>
 						<DialogTitle>Clear task history?</DialogTitle>
 					</DialogHeader>
-					<p className="text-sm text-(--text-muted)">
+					<p className={styles.confirmText}>
 						This permanently removes all saved task runs.
 					</p>
-					<DialogFooter className="mt-4 gap-2 sm:justify-end">
+					<DialogFooter className={styles.confirmFooter}>
 						<button
 							onClick={() => setConfirmClearHistory(false)}
-							className="rounded-lg border px-4 py-2 transition hover:[background:var(--surface-2)] [border-color:var(--border)] [background:var(--surface)] [color:var(--text)]"
+							className={styles.cancelButton}
 						>
 							Cancel
 						</button>
 						<button
 							onClick={confirmClearTaskHistory}
-							className="rounded-lg px-4 py-2 font-semibold [background:var(--danger)] text-[white]"
+							className={styles.clearButton}
 						>
 							Clear
 						</button>

@@ -20,6 +20,7 @@ import {
 	SelectValue,
 } from "@/components/apps/ui/select";
 import { Label } from "@/components/primitives/Text";
+import styles from "./file-manager-app-pagination.module.css";
 
 type PaginationProps = {
 	currentPage?: number;
@@ -32,17 +33,17 @@ export default function FileManagerPagination({
 }: PaginationProps) {
 	const id = useId();
 	return (
-		<div className="flex items-center justify-between gap-4 lg:gap-8">
+		<div className={styles.root}>
 			{/* Results per page */}
-			<div className="flex items-center gap-3">
-				<Label className="hidden lg:block" htmlFor={id}>
+			<div className={styles.rowsPerPage}>
+				<Label className={styles.rowsLabel} htmlFor={id}>
 					Rows per page
 				</Label>
 				<Select value="25">
-					<SelectTrigger id={id} className="w-fit whitespace-nowrap">
+					<SelectTrigger id={id} className={styles.selectTrigger}>
 						<SelectValue placeholder="Select number of results" />
 					</SelectTrigger>
-					<SelectContent className="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:start-auto [&_*[role=option]>span]:end-2">
+					<SelectContent className={styles.selectContent}>
 						<SelectItem value="10">10</SelectItem>
 						<SelectItem value="25">25</SelectItem>
 						<SelectItem value="50">50</SelectItem>
@@ -52,13 +53,10 @@ export default function FileManagerPagination({
 			</div>
 
 			{/* Page number information */}
-			<div className="text-muted-foreground flex grow justify-end text-sm whitespace-nowrap">
-				<p
-					className="text-muted-foreground text-sm whitespace-nowrap"
-					aria-live="polite"
-				>
-					<span className="text-foreground">1-25</span> of{" "}
-					<span className="text-foreground">100</span>
+			<div className={styles.resultsInfo}>
+				<p className={styles.resultsText} aria-live="polite">
+					<span className={styles.resultsStrong}>1-25</span> of{" "}
+					<span className={styles.resultsStrong}>100</span>
 				</p>
 			</div>
 
@@ -69,7 +67,7 @@ export default function FileManagerPagination({
 						{/* First page button */}
 						<PaginationItem>
 							<PaginationLink
-								className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+								className={styles.pageLink}
 								href={
 									currentPage === 1 ? undefined : `#/page/${currentPage - 1}`
 								}
@@ -84,7 +82,7 @@ export default function FileManagerPagination({
 						{/* Previous page button */}
 						<PaginationItem>
 							<PaginationLink
-								className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+								className={styles.pageLink}
 								href={
 									currentPage === 1 ? undefined : `#/page/${currentPage - 1}`
 								}
@@ -99,7 +97,7 @@ export default function FileManagerPagination({
 						{/* Next page button */}
 						<PaginationItem>
 							<PaginationLink
-								className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+								className={styles.pageLink}
 								href={
 									currentPage === totalPages
 										? undefined
@@ -116,7 +114,7 @@ export default function FileManagerPagination({
 						{/* Last page button */}
 						<PaginationItem>
 							<PaginationLink
-								className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+								className={styles.pageLink}
 								href={
 									currentPage === totalPages
 										? undefined

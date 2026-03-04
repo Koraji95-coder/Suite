@@ -1,0 +1,50 @@
+.panel {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.panelInvalid {
+	border-color: var(--danger);
+}
+
+.headerRow {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.headerInfo {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.label {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.helpText {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.uploadHint {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.preview {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}

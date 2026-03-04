@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/apps/ui/RadioGroup";
 import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
 import { cn } from "@/lib/utils";
+import styles from "./TransmittalBuilderRightRail.module.css";
 import {
 	bytesToSize,
 	type DraftState,
@@ -60,19 +61,17 @@ export function TransmittalBuilderRightRail({
 	validationErrors,
 }: TransmittalBuilderRightRailProps) {
 	return (
-		<div className="space-y-4">
+		<div className={styles.root}>
 			<TransmittalSection title="Generate">
-				<div className="grid gap-3 px-2 sm:px-3">
-					<div className="grid gap-2">
-						<div className="text-xs font-semibold [color:var(--text)]">
-							Output format
-						</div>
+				<div className={styles.sectionBody}>
+					<div className={styles.block}>
+						<div className={styles.blockTitle}>Output format</div>
 						<RadioGroup
 							value={outputFormat}
 							onValueChange={(value) =>
 								onOutputFormatChange(value as OutputFormat)
 							}
-							className="grid gap-2"
+							className={styles.formatGrid}
 						>
 							{OUTPUT_FORMATS.map((format) => {
 								const Icon = format.icon;
@@ -81,8 +80,8 @@ export function TransmittalBuilderRightRail({
 									<label
 										key={format.value}
 										className={cn(
-											"flex cursor-pointer items-center gap-3 rounded-xl border p-3",
-											active ? "border-primary" : "border-border",
+											styles.formatOption,
+											active && styles.formatOptionActive,
 										)}
 									>
 										<RadioGroupItem
@@ -90,11 +89,9 @@ export function TransmittalBuilderRightRail({
 											aria-label={format.label}
 										/>
 										<Icon size={18} />
-										<div>
-											<div className="text-sm font-semibold [color:var(--text)]">
-												{format.label}
-											</div>
-											<div className="text-xs text-text-muted">
+										<div className={styles.formatMeta}>
+											<div className={styles.formatTitle}>{format.label}</div>
+											<div className={styles.formatDescription}>
 												{format.description}
 											</div>
 										</div>
@@ -110,7 +107,7 @@ export function TransmittalBuilderRightRail({
 						disabled={generationState.state === "loading"}
 						iconLeft={
 							generationState.state === "loading" ? (
-								<Loader2 size={16} className="animate-spin" />
+								<Loader2 size={16} className={styles.spin} />
 							) : (
 								<Download size={16} />
 							)
@@ -126,8 +123,8 @@ export function TransmittalBuilderRightRail({
 			</TransmittalSection>
 
 			<TransmittalSection title="Output">
-				<div className="grid gap-3 px-2 text-xs text-text-muted sm:px-3">
-					<div className="flex items-center gap-2">
+				<div className={styles.outputBody}>
+					<div className={styles.outputStatus}>
 						{generationState.state === "success" ? (
 							<CheckCircle2 size={14} />
 						) : generationState.state === "error" ? (
@@ -142,13 +139,11 @@ export function TransmittalBuilderRightRail({
 					{outputs.length === 0 ? (
 						<div>No output yet.</div>
 					) : (
-						<div className="grid gap-2">
+						<div className={styles.outputList}>
 							{outputs.map((output) => (
 								<Panel key={output.id} variant="inset" padding="md">
-									<div className="grid gap-1 text-xs">
-										<div className="font-semibold [color:var(--text)]">
-											{output.label}
-										</div>
+									<div className={styles.outputItem}>
+										<div className={styles.outputLabel}>{output.label}</div>
 										<div>{output.filename}</div>
 										<div>
 											{bytesToSize(output.size)} | {output.createdAt}
@@ -175,48 +170,44 @@ export function TransmittalBuilderRightRail({
 			</TransmittalSection>
 
 			<TransmittalSection title="Summary">
-				<Panel variant="inset" padding="lg" className="space-y-3 text-xs">
+				<Panel variant="inset" padding="lg" className={styles.summaryPanel}>
 					<div>
-						<div className="text-text-muted">Project</div>
-						<div className="text-sm font-semibold [color:var(--text)]">
+						<div className={styles.muted}>Project</div>
+						<div className={styles.summaryHeading}>
 							{draft.projectName || "Untitled project"}
 						</div>
-						<div className="text-text-muted">
+						<div className={styles.muted}>
 							{draft.projectNumber || "R3P-"} ·{" "}
 							{draft.transmittalNumber || "XMTL-"} · {draft.date || "--"}
 						</div>
 					</div>
 
 					<div>
-						<div className="text-text-muted">From</div>
-						<div className="[color:var(--text)]">{draft.fromName || "—"}</div>
-						<div className="text-text-muted">{draft.fromTitle || "—"}</div>
+						<div className={styles.muted}>From</div>
+						<div className={styles.text}>{draft.fromName || "—"}</div>
+						<div className={styles.muted}>{draft.fromTitle || "—"}</div>
 					</div>
 
 					<div>
-						<div className="text-text-muted">Contacts</div>
-						<div className="[color:var(--text)]">
-							{completeContactsCount} complete
-						</div>
+						<div className={styles.muted}>Contacts</div>
+						<div className={styles.text}>{completeContactsCount} complete</div>
 					</div>
 
 					<div>
-						<div className="text-text-muted">Files</div>
-						<div className="[color:var(--text)]">
-							Template: {fileSummary.template}
-						</div>
-						<div className="text-text-muted">
+						<div className={styles.muted}>Files</div>
+						<div className={styles.text}>Template: {fileSummary.template}</div>
+						<div className={styles.muted}>
 							Index: {fileSummary.index} · {fileSummary.documents}
 						</div>
 					</div>
 
 					<div>
-						<div className="text-text-muted">Options</div>
-						<div className="grid gap-1">
+						<div className={styles.muted}>Options</div>
+						<div className={styles.optionSummaryList}>
 							{optionSummary.map((group) => (
 								<div key={group.label}>
-									<span className="[color:var(--text)]">{group.label}:</span>{" "}
-									<span className="text-text-muted">{group.value}</span>
+									<span className={styles.text}>{group.label}:</span>{" "}
+									<span className={styles.muted}>{group.value}</span>
 								</div>
 							))}
 						</div>
@@ -225,10 +216,10 @@ export function TransmittalBuilderRightRail({
 			</TransmittalSection>
 
 			<TransmittalSection title="Validation">
-				<div className="grid gap-2 px-2 text-xs text-text-muted sm:px-3">
+				<div className={styles.validationBody}>
 					<div>Draft saved: {lastSavedAt?.toLocaleTimeString() || "-"}</div>
 					{submitAttempted && validationErrors.length > 0 ? (
-						<div className="grid gap-1 [color:var(--danger)]">
+						<div className={styles.validationErrors}>
 							{validationErrors.map((error) => (
 								<div key={error}>{error}</div>
 							))}

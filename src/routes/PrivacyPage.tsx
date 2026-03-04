@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { APP_NAME } from "@/appMeta";
+import { cn } from "@/lib/utils";
 import AuthShell from "../auth/AuthShell";
 import { Badge } from "../components/primitives/Badge";
 import { Button } from "../components/primitives/Button";
@@ -19,6 +20,7 @@ import { Panel } from "../components/primitives/Panel";
 import { HStack, Stack } from "../components/primitives/Stack";
 // Primitives
 import { Heading, Text } from "../components/primitives/Text";
+import styles from "./PrivacyPage.module.css";
 
 const APP_SLUG = APP_NAME.toLowerCase().replace(/\s+/g, "");
 
@@ -72,6 +74,13 @@ const sections = [
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 export default function PrivacyPage() {
+	const sectionToneClass = {
+		primary: styles.sectionIconPrimary,
+		success: styles.sectionIconSuccess,
+		accent: styles.sectionIconAccent,
+		warning: styles.sectionIconWarning,
+	} as const;
+
 	return (
 		<AuthShell navLink={{ to: "/", label: "Back to landing" }} hidePanel>
 			<Stack gap={8}>
@@ -79,8 +88,8 @@ export default function PrivacyPage() {
             HEADER
         ───────────────────────────────────────────────────────────────── */}
 				<div>
-					<HStack gap={2} align="center" className="mb-4">
-						<div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
+					<HStack gap={2} align="center" className={styles.headerTop}>
+						<div className={styles.shieldIcon}>
 							<Shield size={16} />
 						</div>
 						<Badge color="primary" variant="soft">
@@ -88,21 +97,16 @@ export default function PrivacyPage() {
 						</Badge>
 					</HStack>
 
-					<Heading level={1} className="mb-3">
+					<Heading level={1} className={styles.heading}>
 						Your data, your control
 					</Heading>
 
-					<Text
-						color="muted"
-						size="md"
-						className="max-w-lg leading-relaxed"
-						block
-					>
+					<Text color="muted" size="md" className={styles.introCopy} block>
 						We believe in transparency. Here's exactly what we collect, why we
 						collect it, and how we protect it.
 					</Text>
 
-					<Text size="xs" color="muted" className="mt-3" block>
+					<Text size="xs" color="muted" className={styles.updatedNote} block>
 						Last updated: March 2025 · This is a living document.
 					</Text>
 				</div>
@@ -110,35 +114,36 @@ export default function PrivacyPage() {
 				{/* ─────────────────────────────────────────────────────────────────
             SECTIONS GRID
         ───────────────────────────────────────────────────────────────── */}
-				<div className="grid gap-4 sm:grid-cols-2">
+				<div className={styles.sectionsGrid}>
 					{sections.map((section) => {
 						const Icon = section.icon;
 						return (
 							<Panel key={section.title} variant="default" padding="md" hover>
 								<Stack gap={3}>
 									{/* Section header */}
-									<HStack gap={3} align="start">
+									<HStack gap={3} align="start" className={styles.sectionHead}>
 										<div
-											className={`
-                        inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg
-                        ${section.color === "primary" ? "bg-primary/15 text-primary" : ""}
-                        ${section.color === "success" ? "bg-success/15 text-success" : ""}
-                        ${section.color === "accent" ? "bg-accent/15 text-accent" : ""}
-                        ${section.color === "warning" ? "bg-warning/15 text-warning" : ""}
-                      `}
+											className={cn(
+												styles.sectionIcon,
+												sectionToneClass[section.color],
+											)}
 										>
 											<Icon size={18} />
 										</div>
-										<Text size="sm" weight="semibold" className="pt-2">
+										<Text
+											size="sm"
+											weight="semibold"
+											className={styles.sectionTitle}
+										>
 											{section.title}
 										</Text>
 									</HStack>
 
 									{/* Items */}
-									<Stack gap={2} className="pl-12">
+									<Stack gap={2} className={styles.sectionItems}>
 										{section.items.map((item, i) => (
 											<HStack key={i} gap={2} align="start">
-												<span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-text-muted/50" />
+												<span className={styles.bulletDot} />
 												<Text size="sm" color="muted">
 													{item}
 												</Text>
@@ -155,17 +160,22 @@ export default function PrivacyPage() {
             CONTACT SECTION
         ───────────────────────────────────────────────────────────────── */}
 				<Panel variant="outline" padding="lg">
-					<HStack gap={4} align="start" wrap>
-						<div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-text-muted">
+					<HStack gap={4} align="start" wrap className={styles.contactWrap}>
+						<div className={styles.contactIcon}>
 							<Mail size={20} />
 						</div>
-						<Stack gap={1} className="flex-1 min-w-50">
+						<Stack gap={1} className={styles.contactBody}>
 							<Text weight="semibold">Questions or concerns?</Text>
 							<Text size="sm" color="muted">
 								We're happy to help. Reach out and we'll respond within 48
 								hours.
 							</Text>
-							<Text size="sm" weight="medium" color="primary" className="mt-2">
+							<Text
+								size="sm"
+								weight="medium"
+								color="primary"
+								className={styles.contactEmail}
+							>
 								{`privacy@${APP_SLUG}.app`}
 							</Text>
 						</Stack>
@@ -175,20 +185,11 @@ export default function PrivacyPage() {
 				{/* ─────────────────────────────────────────────────────────────────
             CTA SECTION
         ───────────────────────────────────────────────────────────────── */}
-				<Panel
-					variant="glass"
-					padding="lg"
-					className="relative overflow-hidden"
-				>
+				<Panel variant="default" padding="lg" className={styles.ctaPanel}>
 					{/* Background accent */}
-					<div
-						className="absolute inset-0 opacity-30"
-						style={{
-							background: `radial-gradient(ellipse 80% 80% at 50% 0%, var(--primary), transparent)`,
-						}}
-					/>
+					<div className={styles.ctaAccent} />
 
-					<Stack gap={4} className="relative">
+					<Stack gap={4} className={styles.ctaContent}>
 						<div>
 							<Text size="lg" weight="semibold" block>
 								Ready to get started?
@@ -214,19 +215,13 @@ export default function PrivacyPage() {
 				{/* ─────────────────────────────────────────────────────────────────
             FOOTER LINKS
         ───────────────────────────────────────────────────────────────── */}
-				<HStack gap={4} justify="center" className="pt-2">
-					<Link
-						to="/roadmap"
-						className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text transition"
-					>
+				<HStack gap={4} justify="center" className={styles.footerLinks}>
+					<Link to="/roadmap" className={styles.footerLink}>
 						Roadmap
 						<ExternalLink size={10} />
 					</Link>
-					<span className="text-text-muted/30">·</span>
-					<Link
-						to="/"
-						className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-text transition"
-					>
+					<span className={styles.footerDivider}>·</span>
+					<Link to="/" className={styles.footerLink}>
 						Home
 						<ExternalLink size={10} />
 					</Link>

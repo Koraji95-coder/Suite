@@ -60,7 +60,7 @@ Large UI hotspots were split into smaller components/hooks/models for maintainab
 Major areas already modularized:
 
 - Block Library
-- QAQC + Standards Checker
+- Standards Checker
 - Drawing List Manager
 - Coordinates Grabber
 - Ground Grid Generator

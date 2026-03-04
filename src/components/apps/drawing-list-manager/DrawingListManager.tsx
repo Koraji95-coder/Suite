@@ -1,4 +1,5 @@
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import styles from "./DrawingListManager.module.css";
 import { DrawingListManagerArchitectureMap } from "./DrawingListManagerArchitectureMap";
 import { DrawingListManagerConfigPanels } from "./DrawingListManagerConfigPanels";
 import { DrawingListManagerOverview } from "./DrawingListManagerOverview";
@@ -39,7 +40,7 @@ export function DrawingListManager() {
 				/>
 			}
 		>
-			<div className="space-y-6">
+			<div className={styles.stack}>
 				<DrawingListManagerConfigPanels
 					projectConfig={projectConfig}
 					setProjectConfig={setProjectConfig}

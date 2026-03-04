@@ -1,0 +1,90 @@
+.dialogContent {
+	max-width: 72rem;
+	max-height: 90vh;
+	padding: 0;
+	overflow: auto;
+	border: 1px solid var(--border);
+	background: var(--surface);
+}
+
+.header {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 1.25rem;
+	border-bottom: 1px solid var(--border);
+	background: var(--surface);
+	backdrop-filter: blur(8px);
+}
+
+.title {
+	margin: 0;
+	font-size: 1.125rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.meta {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-top: 0.25rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.closeButton {
+	padding: 0.5rem;
+	border: 0;
+	border-radius: 0.5rem;
+	background: transparent;
+	transition: background 160ms ease;
+}
+
+.closeButton:hover {
+	background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.closeIcon {
+	width: 1rem;
+	height: 1rem;
+	color: var(--text-muted);
+}
+
+.body {
+	padding: 1.25rem;
+}
+
+.image {
+	display: block;
+	width: 100%;
+	border: 1px solid var(--border);
+	border-radius: 0.5rem;
+}
+
+.tagsWrap {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-top: 1rem;
+}
+
+.tagChip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0.25rem 0.75rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+}
+
+.tagIcon {
+	width: 0.75rem;
+	height: 0.75rem;
+}

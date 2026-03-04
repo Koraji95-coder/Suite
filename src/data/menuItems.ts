@@ -120,9 +120,9 @@ export const menuSections: MenuSection[] = [
 				color: "blue",
 			},
 			{
-				id: "qaqc",
+				id: "standards-checker",
 				icon: CheckCircle,
-				label: "QA/QC Standards Checker",
+				label: "Standards Checker",
 				color: "blue",
 			},
 			{

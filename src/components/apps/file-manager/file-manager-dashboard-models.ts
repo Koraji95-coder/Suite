@@ -39,7 +39,7 @@ export interface FileManagerStorageItem {
 
 export interface FileManagerLegendItem {
 	label: string;
-	colorClassName: string;
+	color: string;
 }
 
 export const sidebarItems: FileManagerSidebarItem[] = [
@@ -152,27 +152,22 @@ export const storageData: FileManagerStorageItem[] = [
 export const fileTypeLegendItems: FileManagerLegendItem[] = [
 	{
 		label: "Documents",
-		colorClassName:
-			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_70%,var(--surface))]",
+		color: "color-mix(in srgb, var(--primary) 70%, var(--surface))",
 	},
 	{
 		label: "Image",
-		colorClassName:
-			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_50%,var(--surface))]",
+		color: "color-mix(in srgb, var(--primary) 50%, var(--surface))",
 	},
 	{
 		label: "Video",
-		colorClassName:
-			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--primary)_30%,var(--surface))]",
+		color: "color-mix(in srgb, var(--primary) 30%, var(--surface))",
 	},
 	{
 		label: "Audio",
-		colorClassName:
-			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--warning)_70%,var(--surface))]",
+		color: "color-mix(in srgb, var(--warning) 70%, var(--surface))",
 	},
 	{
 		label: "ZIP",
-		colorClassName:
-			"h-4 w-4 rounded-sm [background:color-mix(in_srgb,var(--danger)_70%,var(--surface))]",
+		color: "color-mix(in srgb, var(--danger) 70%, var(--surface))",
 	},
 ];

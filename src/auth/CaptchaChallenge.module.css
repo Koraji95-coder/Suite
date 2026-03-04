@@ -1,0 +1,24 @@
+.root {
+	display: grid;
+	gap: 0.5rem;
+}
+
+.disabledWidget {
+	pointer-events: none;
+	opacity: 0.75;
+}
+
+.error {
+	padding: 0.5rem 0.75rem;
+	font-size: 0.75rem;
+	color: var(--danger);
+	border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--border));
+	border-radius: 0.5rem;
+	background: color-mix(in oklab, var(--danger) 8%, var(--surface));
+}
+
+.hint {
+	margin: 0;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}

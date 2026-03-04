@@ -96,7 +96,7 @@ function DropdownSwitcher({
 			>
 				<AgentPixelMark
 					profileId={activeProfileId}
-					size={24}
+					size={26}
 					expression="active"
 				/>
 				<Text size="sm" weight="semibold">
@@ -148,7 +148,7 @@ function DropdownSwitcher({
 									<div className={styles.optionAvatar}>
 										<AgentPixelMark
 											profileId={id}
-											size={32}
+											size={34}
 											expression={isActive ? "active" : "neutral"}
 										/>
 										{isActive && (
@@ -224,7 +224,7 @@ function TabsSwitcher({
 					>
 						<AgentPixelMark
 							profileId={id}
-							size={20}
+							size={22}
 							expression={isActive ? "active" : "neutral"}
 						/>
 						<span className={styles.tabName}>{profile.name}</span>

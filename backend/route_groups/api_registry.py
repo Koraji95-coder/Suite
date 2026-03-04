@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional
 from flask import Flask
 from flask_limiter import Limiter
 
+from .api_autodraft import create_autodraft_blueprint
 from .api_agent import create_agent_blueprint
 from .api_auth_passkey import create_auth_passkey_blueprint
 from .api_autocad import create_autocad_blueprint
@@ -44,6 +45,7 @@ def register_route_groups(
     backup_storage_dir: Path,
     backup_max_bytes: int,
     backup_max_files: int,
+    autodraft_dotnet_api_url: str,
     batch_session_cookie: str,
     batch_session_ttl_seconds: int,
     require_supabase_user: Callable,
@@ -67,6 +69,14 @@ def register_route_groups(
             backup_storage_dir=backup_storage_dir,
             backup_max_bytes=backup_max_bytes,
             backup_max_files=backup_max_files,
+        )
+    )
+    app.register_blueprint(
+        create_autodraft_blueprint(
+            require_api_key=require_api_key,
+            limiter=limiter,
+            logger=logger,
+            autodraft_dotnet_api_url=autodraft_dotnet_api_url,
         )
     )
     app.register_blueprint(

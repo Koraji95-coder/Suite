@@ -193,7 +193,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 							/>
 							<AgentPixelMark
 								profileId={profileId}
-								size={40}
+								size={44}
 								expression={isThinking ? "active" : "neutral"}
 								pulse={isThinking}
 							/>
@@ -331,18 +331,13 @@ function EmptyState({
 
 					{/* Inner container */}
 					<div className={styles.emptyAvatarInner}>
-						{/* Rotating border when not ready */}
-						{!isReady && <div className={styles.emptyAvatarSpinBorder} />}
-
-						{/* Avatar box */}
-						<div className={styles.emptyAvatarBox}>
-							<AgentPixelMark
-								profileId={profileId}
-								size={96}
-								expression={isReady ? "focus" : "neutral"}
-								breathe={isReady}
-							/>
-						</div>
+						<AgentPixelMark
+							profileId={profileId}
+							size={108}
+							expression={isReady ? "focus" : "neutral"}
+							breathe={isReady}
+							className={styles.emptyAvatarMark}
+						/>
 					</div>
 				</div>
 

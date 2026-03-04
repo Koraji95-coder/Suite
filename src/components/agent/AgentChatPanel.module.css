@@ -61,6 +61,9 @@
 }
 
 .header {
+	position: relative;
+	z-index: 20;
+	overflow: visible;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -169,37 +172,28 @@
 
 .emptyAvatarGlow {
 	position: absolute;
-	inset: -1rem;
-	opacity: 0.2;
-	border-radius: 1.5rem;
-	background: var(--primary);
-	filter: blur(20px);
+	inset: -1.25rem;
+	opacity: 0.24;
+	border-radius: 999px;
+	background: radial-gradient(
+		circle,
+		color-mix(in srgb, var(--primary) 56%, transparent),
+		transparent 70%
+	);
+	filter: blur(16px);
 }
 
 .emptyAvatarInner {
 	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
-.emptyAvatarSpinBorder {
-	position: absolute;
-	inset: -0.25rem;
-	opacity: 0.5;
-	border-radius: 1rem;
-	background: linear-gradient(
-		135deg,
-		var(--primary),
-		var(--accent),
-		var(--primary)
+.emptyAvatarMark {
+	filter: drop-shadow(
+		0 8px 22px color-mix(in srgb, var(--primary) 28%, transparent)
 	);
-	animation: spin 3s linear infinite;
-}
-
-.emptyAvatarBox {
-	position: relative;
-	padding: 1.5rem;
-	border: 1px solid var(--border);
-	border-radius: 1rem;
-	background: var(--surface);
 }
 
 .emptyTitle {

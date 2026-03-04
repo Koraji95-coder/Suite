@@ -34,6 +34,9 @@ const GroundGridRoutePage = lazy(
 			"./routes/apps/ground-grid-generation/GroundGridGenerationRoutePage"
 		),
 );
+const AutoDraftStudioRoutePage = lazy(
+	() => import("./routes/apps/autodraft-studio/AutoDraftStudioRoutePage"),
+);
 const TransmittalBuilderRoutePage = lazy(
 	() => import("./routes/apps/transmittal-builder/TransmittalBuilderRoutePage"),
 );
@@ -127,6 +130,10 @@ export default function App() {
 									<Route
 										path="apps/ground-grid-generation"
 										element={withRouteSuspense(<GroundGridRoutePage />)}
+									/>
+									<Route
+										path="apps/autodraft-studio"
+										element={withRouteSuspense(<AutoDraftStudioRoutePage />)}
 									/>
 									<Route
 										path="apps/transmittal-builder"

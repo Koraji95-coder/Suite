@@ -1,5 +1,5 @@
 // src/components/agent/AgentPixelMark.tsx
-import { useId, useMemo } from "react";
+import { type CSSProperties, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import styles from "./AgentPixelMark.module.css";
 import { AGENT_MARKS, type MarkExpression } from "./agentMarkPatterns";
@@ -24,13 +24,11 @@ export function AgentPixelMark({
 	pulse = false,
 	breathe = false,
 }: AgentPixelMarkProps) {
-	const filterId = useId();
-	const glowId = useId();
 	const mark = AGENT_MARKS[profileId];
 
 	const rows = mark.grid.length;
 	const cols = mark.grid[0].length;
-	const cellSize = size / Math.max(rows, cols);
+	const cellSize = Math.max(1, Math.floor(size / Math.max(rows, cols)));
 	const svgW = cols * cellSize;
 	const svgH = rows * cellSize;
 
@@ -77,64 +75,39 @@ export function AgentPixelMark({
 		>
 			{/* Pulse ring */}
 			{pulse && (
-				<div className={styles.pulseRing} style={{ background: glowColor }} />
+				<div
+					className={styles.pulseRing}
+					style={
+						{
+							"--agent-glow": glowColor,
+						} as CSSProperties
+					}
+				/>
+			)}
+
+			{/* Circular halo; no square backing tile */}
+			{showGlow && (
+				<div
+					className={styles.halo}
+					style={
+						{
+							"--agent-glow": glowColor,
+						} as CSSProperties
+					}
+				/>
 			)}
 
 			{/* Breathing wrapper */}
-			<div className={breathe ? styles.breathe : undefined}>
+			<div className={cn(styles.spriteWrap, breathe && styles.breathe)}>
 				<svg
-					width={size}
-					height={size}
+					width={svgW}
+					height={svgH}
 					viewBox={`0 0 ${svgW} ${svgH}`}
-					style={{ imageRendering: "pixelated" }}
+					className={styles.spriteSvg}
+					shapeRendering="crispEdges"
 					aria-hidden="true"
 				>
-					<defs>
-						{/* Glow filter */}
-						<filter
-							id={`glow-${filterId}`}
-							x="-50%"
-							y="-50%"
-							width="200%"
-							height="200%"
-						>
-							<feGaussianBlur stdDeviation={cellSize * 0.8} result="blur" />
-							<feComposite in="SourceGraphic" in2="blur" operator="over" />
-						</filter>
-
-						{/* Drop shadow */}
-						<filter
-							id={`shadow-${glowId}`}
-							x="-20%"
-							y="-20%"
-							width="140%"
-							height="140%"
-						>
-							<feDropShadow
-								dx="0"
-								dy={cellSize * 0.2}
-								stdDeviation={cellSize * 0.3}
-								floodOpacity="0.3"
-							/>
-						</filter>
-					</defs>
-
-					{/* Background glow */}
-					{showGlow && (
-						<rect
-							x={svgW * 0.15}
-							y={svgH * 0.15}
-							width={svgW * 0.7}
-							height={svgH * 0.7}
-							rx={cellSize * 2}
-							fill={glowColor}
-							opacity={0.2}
-							filter={`url(#glow-${filterId})`}
-						/>
-					)}
-
-					{/* Pixel grid with shadow */}
-					<g filter={showGlow ? `url(#shadow-${glowId})` : undefined}>
+					<g className={styles.spritePixels}>
 						{rects.map((rect) => (
 							<rect
 								key={`${rect.x}-${rect.y}`}
@@ -144,7 +117,7 @@ export function AgentPixelMark({
 								height={cellSize}
 								fill={rect.color}
 								opacity={rect.opacity}
-								rx={cellSize * 0.12}
+								rx={0}
 							/>
 						))}
 					</g>

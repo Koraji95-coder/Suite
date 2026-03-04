@@ -30,6 +30,14 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		status: "active",
 	},
 	{
+		id: "autodraft-studio",
+		title: "AutoDraft Studio",
+		description:
+			"Recognize Bluebeam markups and generate deterministic CAD action plans.",
+		to: "/app/apps/autodraft-studio",
+		status: "active",
+	},
+	{
 		id: "transmittal-builder",
 		title: "Transmittal Builder",
 		description:

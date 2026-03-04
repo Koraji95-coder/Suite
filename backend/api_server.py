@@ -344,6 +344,9 @@ else:
     BACKUP_STORAGE_DIR = (Path(__file__).resolve().parents[1] / "backups").resolve()
 BACKUP_MAX_BYTES = _parse_int_env("BACKUP_MAX_BYTES", 5 * 1024 * 1024, minimum=1024)
 BACKUP_MAX_FILES = _parse_int_env("BACKUP_MAX_FILES", 500, minimum=10)
+AUTODRAFT_DOTNET_API_URL = (
+    (os.environ.get("AUTODRAFT_DOTNET_API_URL") or "").strip()
+)
 
 # ── Agent Broker + Supabase Auth ────────────────────────────────
 SUPABASE_URL = runtime_config_resolve_supabase_url_helper(
@@ -1314,6 +1317,7 @@ register_route_groups(
     backup_storage_dir=BACKUP_STORAGE_DIR,
     backup_max_bytes=BACKUP_MAX_BYTES,
     backup_max_files=BACKUP_MAX_FILES,
+    autodraft_dotnet_api_url=AUTODRAFT_DOTNET_API_URL,
     batch_session_cookie=BATCH_SESSION_COOKIE,
     batch_session_ttl_seconds=BATCH_SESSION_TTL_SECONDS,
     require_supabase_user=require_supabase_user,

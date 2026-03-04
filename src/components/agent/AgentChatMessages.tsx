@@ -108,7 +108,7 @@ function AssistantRow({
 				<div className={styles.assistantAvatarWrap}>
 					<AgentPixelMark
 						profileId={profileId}
-						size={32}
+						size={34}
 						expression={isLatest ? "active" : "neutral"}
 					/>
 					{/* Online indicator */}
@@ -164,7 +164,7 @@ function ThinkingIndicator({ profileId }: { profileId: AgentProfileId }) {
 			<div className={styles.assistantAvatarShell}>
 				<AgentPixelMark
 					profileId={profileId}
-					size={32}
+					size={34}
 					expression="active"
 					pulse
 				/>

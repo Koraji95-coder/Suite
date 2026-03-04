@@ -12,11 +12,11 @@ export interface AgentMarkDefinition {
 const KORO_MARK: AgentMarkDefinition = {
 	colors: [
 		"transparent",
-		"#1a1a2e",
-		"#e63946",
-		"#f4845f",
-		"#f7b267",
-		"#f7d26b",
+		"#20102f",
+		"#ff4d63",
+		"#ff8c5d",
+		"#ffbf4a",
+		"#ffe28a",
 	],
 	grid: [
 		[0, 1, 0, 0, 0, 0, 0, 1, 0],
@@ -43,11 +43,11 @@ const KORO_MARK: AgentMarkDefinition = {
 const DEVSTRAL_MARK: AgentMarkDefinition = {
 	colors: [
 		"transparent",
-		"#0d3b4e",
-		"#0f766e",
-		"#14b8a6",
-		"#5eead4",
-		"#a7f3d0",
+		"#0f3347",
+		"#0ea5a5",
+		"#2dd4bf",
+		"#67e8f9",
+		"#bbf7d0",
 	],
 	grid: [
 		[0, 0, 1, 0, 0, 0, 1, 0, 0],
@@ -74,11 +74,11 @@ const DEVSTRAL_MARK: AgentMarkDefinition = {
 const SENTINEL_MARK: AgentMarkDefinition = {
 	colors: [
 		"transparent",
-		"#1e293b",
-		"#334155",
-		"#60a5fa",
-		"#93c5fd",
-		"#dbeafe",
+		"#10243d",
+		"#2a4a6d",
+		"#4ea8ff",
+		"#91ccff",
+		"#e5f3ff",
 	],
 	grid: [
 		[0, 0, 0, 1, 5, 1, 0, 0, 0],
@@ -105,11 +105,11 @@ const SENTINEL_MARK: AgentMarkDefinition = {
 const FORGE_MARK: AgentMarkDefinition = {
 	colors: [
 		"transparent",
-		"#451a03",
-		"#92400e",
-		"#d97706",
+		"#4a1f02",
+		"#b45309",
+		"#fb923c",
 		"#fbbf24",
-		"#fde68a",
+		"#ffef9a",
 	],
 	grid: [
 		[0, 0, 1, 0, 5, 0, 1, 0, 0],

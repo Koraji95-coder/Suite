@@ -6,6 +6,7 @@ This folder is the domain split for `backend/api_server.py`.
 
 - `api_backup.py`: `/api/backup/*`
 - `api_batch_find_replace.py`: `/api/batch-find-replace/*`
+- `api_autodraft.py`: `/api/autodraft/*`
 - `api_auth_email.py`: `/api/auth/email-link`
 - `api_auth_passkey.py`: `/api/auth/passkey*`
 - `api_passkey_helpers.py`: shared passkey utility + state-store helpers

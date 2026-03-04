@@ -1,6 +1,7 @@
 // src/components/primitives/Button.tsx
 import { type ButtonHTMLAttributes, forwardRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import styles from "./Button.module.css";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -29,54 +30,27 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// STYLE CLASSES
+// STYLE LOOKUPS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const baseClasses = `
-  inline-flex items-center justify-center gap-2
-  font-semibold whitespace-nowrap
-  transition-all duration-150 ease-out
-  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg
-  disabled:opacity-50 disabled:cursor-not-allowed
-  cursor-pointer select-none
-`;
-
 const variantClasses: Record<ButtonVariant, string> = {
-	primary: `
-    bg-primary text-primary-contrast
-    hover:brightness-110 active:brightness-95
-  `,
-	secondary: `
-    bg-surface-2 text-text border border-border
-    hover:bg-surface-2/80 hover:border-border-strong
-    active:bg-surface
-  `,
-	outline: `
-    bg-transparent text-primary border border-primary/40
-    hover:bg-primary/10 hover:border-primary
-    active:bg-primary/15
-  `,
-	ghost: `
-    bg-transparent text-text-muted
-    hover:bg-surface hover:text-text
-    active:bg-surface-2
-  `,
-	danger: `
-    bg-danger text-white
-    hover:brightness-110 active:brightness-95
-  `,
+	primary: styles.variantPrimary,
+	secondary: styles.variantSecondary,
+	outline: styles.variantOutline,
+	ghost: styles.variantGhost,
+	danger: styles.variantDanger,
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
-	sm: "h-8 px-3 text-[13px] rounded-lg",
-	md: "h-10 px-4 text-sm rounded-lg",
-	lg: "h-12 px-5 text-[15px] rounded-xl",
+	sm: styles.sizeSm,
+	md: styles.sizeMd,
+	lg: styles.sizeLg,
 };
 
 const iconOnlySizeClasses: Record<ButtonSize, string> = {
-	sm: "h-8 w-8 p-0 rounded-lg",
-	md: "h-10 w-10 p-0 rounded-lg",
-	lg: "h-12 w-12 p-0 rounded-xl",
+	sm: styles.iconOnlySm,
+	md: styles.iconOnlyMd,
+	lg: styles.iconOnlyLg,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -86,7 +60,7 @@ const iconOnlySizeClasses: Record<ButtonSize, string> = {
 function Spinner({ className }: { className?: string }) {
 	return (
 		<svg
-			className={cn("animate-spin", className)}
+			className={cn(styles.spinner, className)}
 			width="16"
 			height="16"
 			viewBox="0 0 24 24"
@@ -99,7 +73,7 @@ function Spinner({ className }: { className?: string }) {
 				stroke="currentColor"
 				strokeWidth="3"
 				strokeLinecap="round"
-				className="opacity-25"
+				className={styles.spinnerTrack}
 			/>
 			<path
 				d="M12 2a10 10 0 0 1 10 10"
@@ -149,24 +123,28 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 				ref={ref}
 				disabled={isDisabled}
 				className={cn(
-					baseClasses,
+					styles.button,
 					variantClasses[variant],
 					iconOnly ? iconOnlySizeClasses[size] : sizeClasses[size],
-					fluid && "w-full",
-					active && "ring-2 ring-primary ring-offset-2 ring-offset-bg",
+					fluid && styles.fluid,
+					active && styles.active,
 					className,
 				)}
 				{...props}
 			>
 				{loading ? (
-					<Spinner className={size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4"} />
+					<Spinner
+						className={size === "sm" ? styles.spinnerSm : styles.spinnerMd}
+					/>
 				) : iconLeft ? (
-					<span className="shrink-0">{iconLeft}</span>
+					<span className={styles.iconSlot}>{iconLeft}</span>
 				) : null}
 
 				{!iconOnly && children && <span>{children}</span>}
 
-				{iconRight && !loading && <span className="shrink-0">{iconRight}</span>}
+				{iconRight && !loading && (
+					<span className={styles.iconSlot}>{iconRight}</span>
+				)}
 			</button>
 		);
 	},
@@ -230,10 +208,8 @@ export function ButtonGroup({
 		<div
 			role="group"
 			className={cn(
-				"inline-flex",
-				attached
-					? "[&>button]:rounded-none [&>button:first-child]:rounded-l-lg [&>button:last-child]:rounded-r-lg [&>button:not(:last-child)]:border-r-0"
-					: "gap-2",
+				styles.groupRoot,
+				attached ? styles.groupAttached : styles.groupGap,
 				className,
 			)}
 		>

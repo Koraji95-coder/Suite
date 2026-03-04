@@ -130,6 +130,38 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 			"Domain apps (ground grid, transmittal, drawing list, graph, standards, calendar).",
 	},
 	{
+		id: "ui-primitives",
+		domainId: "frontend",
+		label: "UI Primitives",
+		path: "src/components/primitives",
+		summary:
+			"Shared primitives (Button/Input/Text/Panel/Stack/Container) used across app modules.",
+	},
+	{
+		id: "pageframe-system",
+		domainId: "frontend",
+		label: "PageFrame + Section",
+		path: "src/components/apps/ui/PageFrame.tsx",
+		summary:
+			"Canonical page-level layout system: PageFrame for route wrapper, Section for in-page blocks.",
+	},
+	{
+		id: "frontend-style-tokens",
+		domainId: "frontend",
+		label: "Frontend Style Tokens",
+		path: "src/styles/tokens.css + src/styles/globals.css",
+		summary:
+			"CSS variable tokens, global foundations, and spacing/radius system for long-term visual consistency.",
+	},
+	{
+		id: "tailwind-bridge",
+		domainId: "frontend",
+		label: "Tailwind Compatibility Bridge",
+		path: "src/theme.css",
+		summary:
+			"Legacy utility compatibility layer still active while components are migrated to CSS Modules.",
+	},
+	{
 		id: "frontend-services",
 		domainId: "frontend",
 		label: "Service Layer",
@@ -278,6 +310,36 @@ export const ARCHITECTURE_DEPENDENCIES: ArchitectureDependency[] = [
 		targetId: "feature-components",
 		kind: "powers",
 		weight: 0.9,
+	},
+	{
+		sourceId: "feature-components",
+		targetId: "ui-primitives",
+		kind: "powers",
+		weight: 0.93,
+	},
+	{
+		sourceId: "feature-routes",
+		targetId: "pageframe-system",
+		kind: "powers",
+		weight: 0.88,
+	},
+	{
+		sourceId: "pageframe-system",
+		targetId: "ui-primitives",
+		kind: "powers",
+		weight: 0.86,
+	},
+	{
+		sourceId: "ui-primitives",
+		targetId: "frontend-style-tokens",
+		kind: "powers",
+		weight: 0.9,
+	},
+	{
+		sourceId: "tailwind-bridge",
+		targetId: "feature-components",
+		kind: "powers",
+		weight: 0.7,
 	},
 	{
 		sourceId: "feature-components",
@@ -430,6 +492,16 @@ export const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
 			"per-user storage and table access controls",
 		],
 	},
+	{
+		id: "ui-modernization",
+		title: "UI Modernization Path",
+		steps: [
+			"src/styles/tokens.css + src/styles/globals.css",
+			"src/components/primitives/*",
+			"src/components/apps/ui/PageFrame.tsx + Section",
+			"feature apps migrated from utility classes to CSS Modules",
+		],
+	},
 ];
 
 export const ARCHITECTURE_FIX_CANDIDATES: ArchitectureFixCandidate[] = [
@@ -471,6 +543,19 @@ export const ARCHITECTURE_FIX_CANDIDATES: ArchitectureFixCandidate[] = [
 		detail:
 			"Keep this model updated whenever major modules move so the graph and route page stay trustworthy.",
 		paths: ["src/data/architectureModel.ts"],
+	},
+	{
+		id: "ui-migration-tail",
+		priority: "high",
+		title: "Shared primitives are mid-migration away from utility classes",
+		detail:
+			"Core app modules are now largely CSS-module based, but shared primitives and remaining route shells still need full convergence to the tokenized style system.",
+		paths: [
+			"src/components/primitives",
+			"src/components/apps/ui/PageFrame.tsx",
+			"src/routes",
+			"src/theme.css",
+		],
 	},
 ];
 

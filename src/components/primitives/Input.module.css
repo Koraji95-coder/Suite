@@ -1,0 +1,165 @@
+.fluid {
+	width: 100%;
+}
+
+.inputWrap {
+	position: relative;
+}
+
+.iconSlot {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--text-muted);
+	pointer-events: none;
+}
+
+.iconLeft {
+	left: 0.75rem;
+}
+
+.iconRight {
+	right: 0.75rem;
+}
+
+.inputBase {
+	width: 100%;
+	border-radius: 0.5rem;
+	font-weight: 400;
+	transition: all 150ms ease;
+}
+
+.inputBase::placeholder {
+	color: color-mix(in srgb, var(--text-muted) 60%, transparent);
+}
+
+.inputBase:focus {
+	outline: none;
+}
+
+.inputBase:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.inputBase:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.inputSm {
+	height: 2rem;
+	padding-inline: 0.75rem;
+	font-size: 13px;
+}
+
+.inputMd {
+	height: 2.5rem;
+	padding-inline: 0.75rem;
+	font-size: 0.875rem;
+}
+
+.inputLg {
+	height: 3rem;
+	padding-inline: 1rem;
+	font-size: 15px;
+}
+
+.inputPadLeftSm {
+	padding-left: 2rem;
+}
+
+.inputPadLeftMd {
+	padding-left: 2.5rem;
+}
+
+.inputPadLeftLg {
+	padding-left: 2.75rem;
+}
+
+.inputPadRightSm {
+	padding-right: 2rem;
+}
+
+.inputPadRightMd {
+	padding-right: 2.5rem;
+}
+
+.inputPadRightLg {
+	padding-right: 2.75rem;
+}
+
+.variantDefault {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	color: var(--text);
+}
+
+.variantDefaultError {
+	background: var(--bg);
+	border: 1px solid var(--danger);
+	color: var(--text);
+}
+
+.variantDefaultError:focus-visible {
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+.variantFilled {
+	background: var(--surface);
+	border: 1px solid transparent;
+	color: var(--text);
+}
+
+.variantFilledError {
+	background: var(--surface);
+	border: 1px solid var(--danger);
+	color: var(--text);
+}
+
+.variantFilledError:focus-visible {
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+.variantGhost {
+	background: transparent;
+	border: 1px solid transparent;
+	color: var(--text);
+}
+
+.variantGhost:hover,
+.variantGhost:focus-visible {
+	background: var(--surface);
+}
+
+.variantGhostError {
+	background: transparent;
+	border: 1px solid var(--danger);
+	color: var(--text);
+}
+
+.variantGhostError:focus-visible {
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 20%, transparent);
+}
+
+.textareaBase {
+	min-height: 5rem;
+	padding-block: 0.625rem;
+	resize: vertical;
+}
+
+.textareaSm {
+	font-size: 13px;
+}
+
+.textareaMd {
+	font-size: 0.875rem;
+}
+
+.textareaLg {
+	font-size: 15px;
+}
+
+.requiredAsterisk {
+	margin-left: 0.25rem;
+}

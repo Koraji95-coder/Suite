@@ -7,6 +7,7 @@ export default function AppsRoutePage() {
 		<PageFrame
 			title="Apps Hub"
 			description="Launch workspace tools from a consistent page frame."
+			maxWidth="xl"
 		>
 			<Section title="Workspace Apps">
 				<AppsCatalogGrid items={APPS_CATALOG} />

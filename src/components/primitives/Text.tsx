@@ -1,11 +1,13 @@
 // src/components/primitives/Text.tsx
 import {
+	type CSSProperties,
 	type ElementType,
 	forwardRef,
 	type HTMLAttributes,
 	type LabelHTMLAttributes,
 } from "react";
 import { cn } from "@/lib/utils";
+import styles from "./Text.module.css";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -47,42 +49,42 @@ export interface TextProps extends HTMLAttributes<HTMLElement> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CLASS MAPS
+// CLASS LOOKUPS
 // ═══════════════════════════════════════════════════════════════════════════
 
 const sizeClasses: Record<TextSize, string> = {
-	xs: "text-[11px] leading-4",
-	sm: "text-[13px] leading-5",
-	base: "text-sm leading-5",
-	md: "text-[15px] leading-6",
-	lg: "text-lg leading-7",
-	xl: "text-xl leading-7 tracking-tight",
-	"2xl": "text-2xl leading-8 tracking-tight",
-	"3xl": "text-[32px] leading-10 tracking-tight",
+	xs: styles.sizeXs,
+	sm: styles.sizeSm,
+	base: styles.sizeBase,
+	md: styles.sizeMd,
+	lg: styles.sizeLg,
+	xl: styles.sizeXl,
+	"2xl": styles.size2xl,
+	"3xl": styles.size3xl,
 };
 
 const weightClasses: Record<TextWeight, string> = {
-	normal: "font-normal",
-	medium: "font-medium",
-	semibold: "font-semibold",
-	bold: "font-bold",
+	normal: styles.weightNormal,
+	medium: styles.weightMedium,
+	semibold: styles.weightSemibold,
+	bold: styles.weightBold,
 };
 
 const colorClasses: Record<TextColor, string> = {
-	default: "text-text",
-	muted: "text-text-muted",
-	primary: "text-primary",
-	accent: "text-accent",
-	success: "text-success",
-	warning: "text-warning",
-	danger: "text-danger",
-	inherit: "text-inherit",
+	default: styles.colorDefault,
+	muted: styles.colorMuted,
+	primary: styles.colorPrimary,
+	accent: styles.colorAccent,
+	success: styles.colorSuccess,
+	warning: styles.colorWarning,
+	danger: styles.colorDanger,
+	inherit: styles.colorInherit,
 };
 
 const alignClasses = {
-	left: "text-left",
-	center: "text-center",
-	right: "text-right",
+	left: styles.alignLeft,
+	center: styles.alignCenter,
+	right: styles.alignRight,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -117,6 +119,14 @@ export const Text = forwardRef<HTMLElement, TextProps>(
 		},
 		ref,
 	) => {
+		const computedStyle: CSSProperties | undefined =
+			truncate && maxLines
+				? {
+						...style,
+						WebkitLineClamp: maxLines,
+					}
+				: style;
+
 		return (
 			<Component
 				ref={ref}
@@ -125,14 +135,14 @@ export const Text = forwardRef<HTMLElement, TextProps>(
 					weight && weightClasses[weight],
 					colorClasses[color],
 					align && alignClasses[align],
-					mono && "font-mono",
-					block && "block",
-					uppercase && "uppercase tracking-wider",
-					truncate && !maxLines && "truncate",
-					truncate && maxLines && "line-clamp-" + maxLines,
+					mono && styles.mono,
+					block && styles.block,
+					uppercase && styles.uppercase,
+					truncate && !maxLines && styles.truncateSingle,
+					truncate && maxLines && styles.truncateClamp,
 					className,
 				)}
-				style={style}
+				style={computedStyle}
 				{...props}
 			>
 				{children}
@@ -204,7 +214,7 @@ export const Code = forwardRef<HTMLElement, Omit<TextProps, "as" | "mono">>(
 			as="code"
 			size="sm"
 			mono
-			className={cn("px-1.5 py-0.5 rounded-md bg-surface-2", className)}
+			className={cn(styles.codeInline, className)}
 			{...props}
 		/>
 	),

@@ -21,6 +21,7 @@ export default function ArchitectureMapRoutePage() {
 		<PageFrame
 			title="Architecture Map"
 			description={`Repo model: ${ARCHITECTURE_DOMAINS.length} domains, ${totalModules} modules, ${ARCHITECTURE_DEPENDENCIES.length} dependency links.`}
+			maxWidth="full"
 		>
 			<div className={styles.root}>
 				<Section

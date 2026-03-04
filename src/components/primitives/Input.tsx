@@ -6,6 +6,7 @@ import {
 	type TextareaHTMLAttributes,
 } from "react";
 import { cn } from "@/lib/utils";
+import styles from "./Input.module.css";
 import { Stack } from "./Stack";
 import { Text } from "./Text";
 
@@ -51,45 +52,34 @@ export interface TextAreaProps
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// STYLE CLASSES
+// STYLE LOOKUPS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const baseInputClasses = `
-  w-full rounded-lg font-normal transition-all duration-150
-  placeholder:text-text-muted/60
-  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
-  disabled:opacity-50 disabled:cursor-not-allowed
-`;
-
 const sizeClasses: Record<InputSize, string> = {
-	sm: "h-8 px-3 text-[13px]",
-	md: "h-10 px-3 text-sm",
-	lg: "h-12 px-4 text-[15px]",
+	sm: styles.inputSm,
+	md: styles.inputMd,
+	lg: styles.inputLg,
 };
 
 const iconPaddingClasses: Record<InputSize, { left: string; right: string }> = {
-	sm: { left: "pl-8", right: "pr-8" },
-	md: { left: "pl-10", right: "pr-10" },
-	lg: { left: "pl-11", right: "pr-11" },
+	sm: { left: styles.inputPadLeftSm, right: styles.inputPadRightSm },
+	md: { left: styles.inputPadLeftMd, right: styles.inputPadRightMd },
+	lg: { left: styles.inputPadLeftLg, right: styles.inputPadRightLg },
 };
 
 const variantClasses: Record<InputVariant, { normal: string; error: string }> =
 	{
 		default: {
-			normal: "bg-bg border border-border text-text",
-			error:
-				"bg-bg border border-danger text-text focus:ring-danger/20 focus:border-danger",
+			normal: styles.variantDefault,
+			error: styles.variantDefaultError,
 		},
 		filled: {
-			normal: "bg-surface border border-transparent text-text",
-			error:
-				"bg-surface border border-danger text-text focus:ring-danger/20 focus:border-danger",
+			normal: styles.variantFilled,
+			error: styles.variantFilledError,
 		},
 		ghost: {
-			normal:
-				"bg-transparent border border-transparent text-text hover:bg-surface focus:bg-surface",
-			error:
-				"bg-transparent border border-danger text-text focus:ring-danger/20",
+			normal: styles.variantGhost,
+			error: styles.variantGhostError,
 		},
 	};
 
@@ -127,17 +117,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 		const variantStyle = variantClasses[variant];
 
 		const inputElement = (
-			<div className={cn("relative", fluid && "w-full")}>
+			<div className={cn(styles.inputWrap, fluid && styles.fluid)}>
 				{iconLeft && (
-					<div className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none">
-						{iconLeft}
-					</div>
+					<div className={cn(styles.iconSlot, styles.iconLeft)}>{iconLeft}</div>
 				)}
 
 				<input
 					ref={ref}
 					className={cn(
-						baseInputClasses,
+						styles.inputBase,
 						sizeClasses[inputSize],
 						hasError ? variantStyle.error : variantStyle.normal,
 						iconLeft && iconPaddingClasses[inputSize].left,
@@ -148,7 +136,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 				/>
 
 				{iconRight && (
-					<div className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none">
+					<div className={cn(styles.iconSlot, styles.iconRight)}>
 						{iconRight}
 					</div>
 				)}
@@ -162,12 +150,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
 		// With label/helper - wrap in stack
 		return (
-			<Stack gap={1} className={cn(fluid && "w-full")}>
+			<Stack gap={1} className={cn(fluid && styles.fluid)}>
 				{label && (
 					<Text as="label" size="sm" weight="medium">
 						{label}
 						{required && (
-							<Text color="danger" className="ml-1">
+							<Text color="danger" className={styles.requiredAsterisk}>
 								*
 							</Text>
 						)}
@@ -213,21 +201,21 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 		const hasError = error || !!errorMessage;
 		const variantStyle = variantClasses[variant];
 
-		const fontSizeClass =
+		const textareaSizeClass =
 			inputSize === "sm"
-				? "text-[13px]"
+				? styles.textareaSm
 				: inputSize === "lg"
-					? "text-[15px]"
-					: "text-sm";
+					? styles.textareaLg
+					: styles.textareaMd;
 
 		const textareaElement = (
 			<textarea
 				ref={ref}
 				rows={minRows}
 				className={cn(
-					baseInputClasses,
-					"py-2.5 min-h-20 resize-y",
-					fontSizeClass,
+					styles.inputBase,
+					styles.textareaBase,
+					textareaSizeClass,
 					hasError ? variantStyle.error : variantStyle.normal,
 					className,
 				)}
@@ -240,12 +228,12 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 		}
 
 		return (
-			<Stack gap={1} className={cn(fluid && "w-full")}>
+			<Stack gap={1} className={cn(fluid && styles.fluid)}>
 				{label && (
 					<Text as="label" size="sm" weight="medium">
 						{label}
 						{required && (
-							<Text color="danger" className="ml-1">
+							<Text color="danger" className={styles.requiredAsterisk}>
 								*
 							</Text>
 						)}

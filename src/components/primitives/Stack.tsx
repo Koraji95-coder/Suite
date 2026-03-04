@@ -1,6 +1,7 @@
 // src/components/primitives/Stack.tsx
 import { forwardRef, type HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
+import styles from "./Stack.module.css";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -26,37 +27,37 @@ export interface StackProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GAP CLASSES
+// CLASS LOOKUPS
 // ═══════════════════════════════════════════════════════════════════════════
 
 const gapClasses: Record<Gap, string> = {
-	0: "gap-0",
-	1: "gap-1",
-	2: "gap-2",
-	3: "gap-3",
-	4: "gap-4",
-	5: "gap-5",
-	6: "gap-6",
-	8: "gap-8",
-	10: "gap-10",
-	12: "gap-12",
+	0: styles.gap0,
+	1: styles.gap1,
+	2: styles.gap2,
+	3: styles.gap3,
+	4: styles.gap4,
+	5: styles.gap5,
+	6: styles.gap6,
+	8: styles.gap8,
+	10: styles.gap10,
+	12: styles.gap12,
 };
 
 const alignClasses = {
-	start: "items-start",
-	center: "items-center",
-	end: "items-end",
-	stretch: "items-stretch",
-	baseline: "items-baseline",
+	start: styles.alignStart,
+	center: styles.alignCenter,
+	end: styles.alignEnd,
+	stretch: styles.alignStretch,
+	baseline: styles.alignBaseline,
 };
 
 const justifyClasses = {
-	start: "justify-start",
-	center: "justify-center",
-	end: "justify-end",
-	between: "justify-between",
-	around: "justify-around",
-	evenly: "justify-evenly",
+	start: styles.justifyStart,
+	center: styles.justifyCenter,
+	end: styles.justifyEnd,
+	between: styles.justifyBetween,
+	around: styles.justifyAround,
+	evenly: styles.justifyEvenly,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -98,13 +99,13 @@ export const Stack = forwardRef<HTMLDivElement, StackProps>(
 			<div
 				ref={ref}
 				className={cn(
-					inline ? "inline-flex" : "flex",
-					direction === "row" ? "flex-row" : "flex-col",
+					inline ? styles.inlineFlex : styles.flex,
+					direction === "row" ? styles.row : styles.column,
 					gapClasses[gap],
 					align && alignClasses[align],
 					justify && justifyClasses[justify],
-					wrap && "flex-wrap",
-					fluid && "w-full",
+					wrap && styles.wrap,
+					fluid && styles.fluid,
 					className,
 				)}
 				{...props}
@@ -150,18 +151,18 @@ VStack.displayName = "VStack";
 export function Spacer({ size }: { size?: Gap }) {
 	if (size !== undefined) {
 		const sizeClasses: Record<Gap, string> = {
-			0: "w-0 h-0",
-			1: "w-1 h-1",
-			2: "w-2 h-2",
-			3: "w-3 h-3",
-			4: "w-4 h-4",
-			5: "w-5 h-5",
-			6: "w-6 h-6",
-			8: "w-8 h-8",
-			10: "w-10 h-10",
-			12: "w-12 h-12",
+			0: styles.spacer0,
+			1: styles.spacer1,
+			2: styles.spacer2,
+			3: styles.spacer3,
+			4: styles.spacer4,
+			5: styles.spacer5,
+			6: styles.spacer6,
+			8: styles.spacer8,
+			10: styles.spacer10,
+			12: styles.spacer12,
 		};
-		return <div className={cn("shrink-0", sizeClasses[size])} aria-hidden />;
+		return <div className={cn(styles.spacer, sizeClasses[size])} aria-hidden />;
 	}
-	return <div className="flex-1" aria-hidden />;
+	return <div className={styles.spacerFlex} aria-hidden />;
 }

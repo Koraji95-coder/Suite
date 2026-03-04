@@ -1,0 +1,200 @@
+.button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	border: 1px solid transparent;
+	font-weight: 600;
+	white-space: nowrap;
+	transition: all 150ms ease-out;
+	cursor: pointer;
+	user-select: none;
+}
+
+.button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.button:focus-visible {
+	outline: none;
+	box-shadow:
+		0 0 0 2px var(--primary),
+		0 0 0 4px var(--bg);
+}
+
+.variantPrimary {
+	background: var(--primary);
+	color: var(--primary-contrast);
+}
+
+.variantPrimary:hover {
+	filter: brightness(1.1);
+}
+
+.variantPrimary:active {
+	filter: brightness(0.95);
+}
+
+.variantSecondary {
+	background: var(--surface-2);
+	color: var(--text);
+	border-color: var(--border);
+}
+
+.variantSecondary:hover {
+	background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+	border-color: var(--border-strong);
+}
+
+.variantSecondary:active {
+	background: var(--surface);
+}
+
+.variantOutline {
+	background: transparent;
+	color: var(--primary);
+	border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.variantOutline:hover {
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+	border-color: var(--primary);
+}
+
+.variantOutline:active {
+	background: color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.variantGhost {
+	background: transparent;
+	color: var(--text-muted);
+}
+
+.variantGhost:hover {
+	background: var(--surface);
+	color: var(--text);
+}
+
+.variantGhost:active {
+	background: var(--surface-2);
+}
+
+.variantDanger {
+	background: var(--danger);
+	color: #fff;
+}
+
+.variantDanger:hover {
+	filter: brightness(1.1);
+}
+
+.variantDanger:active {
+	filter: brightness(0.95);
+}
+
+.sizeSm {
+	height: 2rem;
+	padding-inline: 0.75rem;
+	font-size: 13px;
+	border-radius: 0.5rem;
+}
+
+.sizeMd {
+	height: 2.5rem;
+	padding-inline: 1rem;
+	font-size: 0.875rem;
+	border-radius: 0.5rem;
+}
+
+.sizeLg {
+	height: 3rem;
+	padding-inline: 1.25rem;
+	font-size: 15px;
+	border-radius: 0.75rem;
+}
+
+.iconOnlySm {
+	height: 2rem;
+	width: 2rem;
+	padding: 0;
+	border-radius: 0.5rem;
+}
+
+.iconOnlyMd {
+	height: 2.5rem;
+	width: 2.5rem;
+	padding: 0;
+	border-radius: 0.5rem;
+}
+
+.iconOnlyLg {
+	height: 3rem;
+	width: 3rem;
+	padding: 0;
+	border-radius: 0.75rem;
+}
+
+.fluid {
+	width: 100%;
+}
+
+.active {
+	box-shadow:
+		0 0 0 2px var(--primary),
+		0 0 0 4px var(--bg);
+}
+
+.spinner {
+	animation: spin 1s linear infinite;
+}
+
+.spinnerTrack {
+	opacity: 0.25;
+}
+
+.spinnerSm {
+	width: 0.875rem;
+	height: 0.875rem;
+}
+
+.spinnerMd {
+	width: 1rem;
+	height: 1rem;
+}
+
+.iconSlot {
+	flex-shrink: 0;
+}
+
+.groupRoot {
+	display: inline-flex;
+}
+
+.groupGap {
+	gap: 0.5rem;
+}
+
+.groupAttached > button {
+	border-radius: 0;
+}
+
+.groupAttached > button:first-child {
+	border-top-left-radius: 0.5rem;
+	border-bottom-left-radius: 0.5rem;
+}
+
+.groupAttached > button:last-child {
+	border-top-right-radius: 0.5rem;
+	border-bottom-right-radius: 0.5rem;
+}
+
+.groupAttached > button:not(:last-child) {
+	border-right-width: 0;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}

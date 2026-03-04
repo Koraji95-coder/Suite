@@ -102,7 +102,9 @@ export function DashboardOverviewPanel({
 					</div>
 					<div>
 						<div className={styles.titleRow}>
-							<Heading level={1}>Dashboard</Heading>
+							<Heading level={1} className={styles.title}>
+								Dashboard
+							</Heading>
 							{editMode && (
 								<Badge color="warning" variant="soft">
 									Editing

@@ -11,6 +11,7 @@ export function TransmittalBuilderApp() {
 		<PageFrame
 			title="Transmittal Builder"
 			description="Generate transmittal packages in DOCX and PDF formats."
+			maxWidth="full"
 		>
 			<div className={styles.layout}>
 				<TransmittalBuilderMainForm

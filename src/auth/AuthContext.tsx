@@ -57,6 +57,29 @@ export const AuthContext = createContext<AuthContextValue | undefined>(
 	undefined,
 );
 
+function isUserAdmin(authUser: User | null): boolean {
+	if (!authUser) return false;
+
+	const rawRole = (authUser.app_metadata as Record<string, unknown> | undefined)
+		?.role;
+
+	if (typeof rawRole === "string") {
+		return rawRole.trim().toLowerCase() === "admin";
+	}
+
+	const rawRoles = (
+		authUser.app_metadata as Record<string, unknown> | undefined
+	)?.roles;
+	if (Array.isArray(rawRoles)) {
+		return rawRoles.some(
+			(entry) =>
+				typeof entry === "string" && entry.trim().toLowerCase() === "admin",
+		);
+	}
+
+	return false;
+}
+
 async function fetchProfile(userId: string): Promise<Profile | null> {
 	const { data, error } = await supabase
 		.from("profiles")
@@ -115,30 +138,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		useState<SessionAuthMethod>("email_link");
 	const [loading, setLoading] = useState(true);
 	const lastSignedInTelemetryKeyRef = useRef<string>("");
-
-	const isUserAdmin = (authUser: User | null): boolean => {
-		if (!authUser) return false;
-
-		const rawRole = (
-			authUser.app_metadata as Record<string, unknown> | undefined
-		)?.role;
-
-		if (typeof rawRole === "string") {
-			return rawRole.trim().toLowerCase() === "admin";
-		}
-
-		const rawRoles = (
-			authUser.app_metadata as Record<string, unknown> | undefined
-		)?.roles;
-		if (Array.isArray(rawRoles)) {
-			return rawRoles.some(
-				(entry) =>
-					typeof entry === "string" && entry.trim().toLowerCase() === "admin",
-			);
-		}
-
-		return false;
-	};
 
 	useEffect(() => {
 		// Rehydrate session from storage on mount

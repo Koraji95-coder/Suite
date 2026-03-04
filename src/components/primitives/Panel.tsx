@@ -1,6 +1,7 @@
 // src/components/primitives/Panel.tsx
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import styles from "./Panel.module.css";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -32,33 +33,32 @@ export interface PanelProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// STYLE CLASSES
+// STYLE LOOKUPS
 // ═══════════════════════════════════════════════════════════════════════════
 
 const variantClasses: Record<PanelVariant, string> = {
-	default: "bg-surface border border-border shadow-sm",
-	elevated: "bg-surface border border-border-subtle shadow-md",
-	outline: "bg-transparent border border-border",
-	ghost: "bg-transparent border border-transparent",
-	glass: "bg-surface/60 backdrop-blur-xl border border-border shadow-lg",
-	inset:
-		"bg-bg shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] border border-border-subtle",
+	default: styles.variantDefault,
+	elevated: styles.variantElevated,
+	outline: styles.variantOutline,
+	ghost: styles.variantGhost,
+	glass: styles.variantGlass,
+	inset: styles.variantInset,
 };
 
 const paddingClasses: Record<PanelPadding, string> = {
-	none: "p-0",
-	sm: "p-3",
-	md: "p-4",
-	lg: "p-5",
-	xl: "p-6",
+	none: styles.paddingNone,
+	sm: styles.paddingSm,
+	md: styles.paddingMd,
+	lg: styles.paddingLg,
+	xl: styles.paddingXl,
 };
 
 const radiusClasses: Record<PanelRadius, string> = {
-	none: "rounded-none",
-	sm: "rounded-lg",
-	md: "rounded-xl",
-	lg: "rounded-2xl",
-	xl: "rounded-3xl",
+	none: styles.radiusNone,
+	sm: styles.radiusSm,
+	md: styles.radiusMd,
+	lg: styles.radiusLg,
+	xl: styles.radiusXl,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -95,21 +95,20 @@ export const Panel = forwardRef<HTMLDivElement, PanelProps>(
 				ref={ref}
 				className={cn(
 					// Base
-					"relative transition-all duration-150",
+					styles.panel,
 					// Variant
 					variantClasses[variant],
 					// Padding & Radius
 					paddingClasses[padding],
 					radiusClasses[radius],
 					// Borderless override
-					borderless && "border-transparent",
+					borderless && styles.borderless,
 					// Hover effects
-					hover &&
-						"hover:-translate-y-0.5 hover:shadow-md hover:border-border-strong",
+					hover && styles.hover,
 					// Interactive
-					isClickable && "cursor-pointer active:scale-[0.99]",
+					isClickable && styles.interactive,
 					// Ghost hover (only shows bg on hover)
-					variant === "ghost" && hover && "hover:bg-surface",
+					variant === "ghost" && hover && styles.ghostHover,
 					className,
 				)}
 				{...props}
@@ -137,10 +136,7 @@ export function PanelHeader({
 	...props
 }: PanelSectionProps) {
 	return (
-		<div
-			className={cn("pb-4 mb-4 border-b border-border", className)}
-			{...props}
-		>
+		<div className={cn(styles.sectionHeader, className)} {...props}>
 			{children}
 		</div>
 	);
@@ -166,10 +162,7 @@ export function PanelFooter({
 	...props
 }: PanelSectionProps) {
 	return (
-		<div
-			className={cn("pt-4 mt-4 border-t border-border", className)}
-			{...props}
-		>
+		<div className={cn(styles.sectionFooter, className)} {...props}>
 			{children}
 		</div>
 	);
@@ -190,11 +183,11 @@ export interface PanelGroupProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 const gapClasses: Record<Gap, string> = {
-	2: "gap-2",
-	3: "gap-3",
-	4: "gap-4",
-	5: "gap-5",
-	6: "gap-6",
+	2: styles.gap2,
+	3: styles.gap3,
+	4: styles.gap4,
+	5: styles.gap5,
+	6: styles.gap6,
 };
 
 /** PanelGroup — Arrange panels with consistent spacing */
@@ -208,8 +201,8 @@ export function PanelGroup({
 	return (
 		<div
 			className={cn(
-				"flex",
-				direction === "row" ? "flex-row" : "flex-col",
+				styles.group,
+				direction === "row" ? styles.groupRow : styles.groupColumn,
 				gapClasses[gap],
 				className,
 			)}

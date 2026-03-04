@@ -6,6 +6,7 @@ export default function RouteLoadingFallback() {
 		<PageFrame
 			title={"Loading\u2026"}
 			description="Preparing workspace module."
+			maxWidth="xl"
 		>
 			<Text size="sm" color="muted">
 				One moment while we assemble the workspace view.

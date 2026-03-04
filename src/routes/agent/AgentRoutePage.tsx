@@ -57,7 +57,11 @@ export default function AgentRoutePage() {
 	const isReady = healthy === true && paired;
 
 	return (
-		<PageFrame title="Agent" description="AI-powered task orchestration">
+		<PageFrame
+			title="Agent"
+			description="AI-powered task orchestration"
+			maxWidth="full"
+		>
 			<div className={styles.statusPanel}>
 				<div className={styles.statusRow}>
 					<div className={styles.statusInfo}>

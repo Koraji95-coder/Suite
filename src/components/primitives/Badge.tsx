@@ -1,6 +1,7 @@
 // src/components/primitives/Badge.tsx
 import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import styles from "./Badge.module.css";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -34,56 +35,53 @@ export interface BadgeProps
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// STYLE CLASSES
+// STYLE LOOKUPS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const baseClasses =
-	"inline-flex items-center justify-center gap-1.5 font-medium whitespace-nowrap rounded-full";
-
 const sizeClasses: Record<BadgeSize, string> = {
-	sm: "h-5 px-2 text-[11px]",
-	md: "h-6 px-2.5 text-xs",
+	sm: styles.sizeSm,
+	md: styles.sizeMd,
 };
 
 // Variant + Color combinations
 const colorVariantClasses: Record<BadgeVariant, Record<BadgeColor, string>> = {
 	solid: {
-		default: "bg-surface-2 text-text",
-		primary: "bg-primary text-primary-contrast",
-		accent: "bg-accent text-bg",
-		success: "bg-success text-white",
-		warning: "bg-warning text-black",
-		danger: "bg-danger text-white",
-		info: "bg-info text-white",
+		default: styles.solidDefault,
+		primary: styles.solidPrimary,
+		accent: styles.solidAccent,
+		success: styles.solidSuccess,
+		warning: styles.solidWarning,
+		danger: styles.solidDanger,
+		info: styles.solidInfo,
 	},
 	soft: {
-		default: "bg-text/10 text-text-muted",
-		primary: "bg-primary/15 text-primary",
-		accent: "bg-accent/15 text-accent",
-		success: "bg-success/15 text-success",
-		warning: "bg-warning/15 text-warning",
-		danger: "bg-danger/15 text-danger",
-		info: "bg-info/15 text-info",
+		default: styles.softDefault,
+		primary: styles.softPrimary,
+		accent: styles.softAccent,
+		success: styles.softSuccess,
+		warning: styles.softWarning,
+		danger: styles.softDanger,
+		info: styles.softInfo,
 	},
 	outline: {
-		default: "border border-border text-text-muted",
-		primary: "border border-primary/50 text-primary",
-		accent: "border border-accent/50 text-accent",
-		success: "border border-success/50 text-success",
-		warning: "border border-warning/50 text-warning",
-		danger: "border border-danger/50 text-danger",
-		info: "border border-info/50 text-info",
+		default: styles.outlineDefault,
+		primary: styles.outlinePrimary,
+		accent: styles.outlineAccent,
+		success: styles.outlineSuccess,
+		warning: styles.outlineWarning,
+		danger: styles.outlineDanger,
+		info: styles.outlineInfo,
 	},
 };
 
 const dotColorClasses: Record<BadgeColor, string> = {
-	default: "bg-text-muted",
-	primary: "bg-primary",
-	accent: "bg-accent",
-	success: "bg-success",
-	warning: "bg-warning",
-	danger: "bg-danger",
-	info: "bg-info",
+	default: styles.dotDefault,
+	primary: styles.dotPrimary,
+	accent: styles.dotAccent,
+	success: styles.dotSuccess,
+	warning: styles.dotWarning,
+	danger: styles.dotDanger,
+	info: styles.dotInfo,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -117,7 +115,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
 			<span
 				ref={ref}
 				className={cn(
-					baseClasses,
+					styles.badge,
 					sizeClasses[size],
 					colorVariantClasses[variant][color],
 					className,
@@ -127,13 +125,13 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
 				{dot && (
 					<span
 						className={cn(
-							"w-1.5 h-1.5 rounded-full shrink-0",
+							styles.dot,
 							dotColorClasses[color],
-							pulse && "animate-pulse-soft",
+							pulse && styles.dotPulse,
 						)}
 					/>
 				)}
-				{icon && <span className="shrink-0">{icon}</span>}
+				{icon && <span className={styles.icon}>{icon}</span>}
 				{children}
 			</span>
 		);

@@ -7,6 +7,7 @@ export default function WhiteboardKnowledgePage() {
 		<PageFrame
 			title="Whiteboard"
 			description="Sketch, save, and review whiteboard snapshots."
+			maxWidth="xl"
 		>
 			<Section title="Whiteboard Library">
 				<WhiteboardLibrary filterByPanel="Whiteboard" />

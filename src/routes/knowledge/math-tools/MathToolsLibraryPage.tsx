@@ -65,6 +65,7 @@ export default function MathToolsLibraryPage() {
 		<PageFrame
 			title="Math Tools Library"
 			description="Legacy calculators and engineering utilities collected in one place."
+			maxWidth="full"
 		>
 			<Section title="Tools">
 				<div className={styles.toolsRow}>

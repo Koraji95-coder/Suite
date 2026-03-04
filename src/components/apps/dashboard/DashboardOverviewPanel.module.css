@@ -35,14 +35,20 @@
 }
 
 .titleRow {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
 	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.title {
+	margin: 0;
 }
 
 .subtitle {
 	color: var(--text-muted);
-	margin-top: 0.18rem;
+	display: block;
+	margin-top: 0.35rem;
 }
 
 .customizerPanel {

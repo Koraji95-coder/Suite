@@ -2,6 +2,7 @@
 import { Check, Copy, Lock, ShieldAlert, Terminal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/useAuth";
+import { PageFrame } from "@/components/apps/ui/PageFrame";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
@@ -142,114 +143,124 @@ export default function CommandCenterPage() {
 	// Not in dev mode
 	if (!import.meta.env.DEV) {
 		return (
-			<div className={styles.rootNarrow}>
-				<PageHeader />
-				<Panel variant="default" padding="lg" className={styles.topMargin}>
-					<HStack gap={3} align="center">
-						<div className={cn(styles.stateIcon, styles.stateIconWarning)}>
-							<Lock size={20} />
-						</div>
-						<Stack gap={1}>
-							<Text size="sm" weight="semibold">
-								Development Mode Required
-							</Text>
-							<Text size="sm" color="muted">
-								Command Center is disabled outside development mode.
-							</Text>
-						</Stack>
-					</HStack>
-				</Panel>
-			</div>
+			<PageFrame maxWidth="full">
+				<div className={styles.rootNarrow}>
+					<PageHeader />
+					<Panel variant="default" padding="lg" className={styles.topMargin}>
+						<HStack gap={3} align="center">
+							<div className={cn(styles.stateIcon, styles.stateIconWarning)}>
+								<Lock size={20} />
+							</div>
+							<Stack gap={1}>
+								<Text size="sm" weight="semibold">
+									Development Mode Required
+								</Text>
+								<Text size="sm" color="muted">
+									Command Center is disabled outside development mode.
+								</Text>
+							</Stack>
+						</HStack>
+					</Panel>
+				</div>
+			</PageFrame>
 		);
 	}
 
 	// Not authorized
 	if (!isAllowed) {
 		return (
-			<div className={styles.rootNarrow}>
-				<PageHeader />
-				<Panel variant="default" padding="lg" className={styles.topMargin}>
-					<Stack gap={4}>
-						<HStack gap={3} align="start">
-							<div className={cn(styles.stateIcon, styles.stateIconDanger)}>
-								<ShieldAlert size={20} />
-							</div>
-							<Stack gap={1}>
-								<Text size="sm" weight="semibold">
-									Admin Access Required
-								</Text>
-								<Text size="sm" color="muted">
-									Set{" "}
-									<code className={styles.monoCode}>VITE_DEV_ADMIN_EMAIL</code>{" "}
-									or{" "}
-									<code className={styles.monoCode}>VITE_DEV_ADMIN_EMAILS</code>{" "}
-									in your <code className={styles.monoCode}>.env</code> to your
-									account email.
-								</Text>
-							</Stack>
-						</HStack>
-
-						<Panel variant="inset" padding="md">
-							<Stack gap={2}>
-								<HStack gap={2} align="center">
-									<Text size="xs" color="muted">
-										Current account:
+			<PageFrame maxWidth="full">
+				<div className={styles.rootNarrow}>
+					<PageHeader />
+					<Panel variant="default" padding="lg" className={styles.topMargin}>
+						<Stack gap={4}>
+							<HStack gap={3} align="start">
+								<div className={cn(styles.stateIcon, styles.stateIconDanger)}>
+									<ShieldAlert size={20} />
+								</div>
+								<Stack gap={1}>
+									<Text size="sm" weight="semibold">
+										Admin Access Required
 									</Text>
-									<Badge variant="soft" size="sm">
-										{userEmail || "(unknown)"}
-									</Badge>
-								</HStack>
-								{allowlist.length > 0 && (
+									<Text size="sm" color="muted">
+										Set{" "}
+										<code className={styles.monoCode}>
+											VITE_DEV_ADMIN_EMAIL
+										</code>{" "}
+										or{" "}
+										<code className={styles.monoCode}>
+											VITE_DEV_ADMIN_EMAILS
+										</code>{" "}
+										in your <code className={styles.monoCode}>.env</code> to
+										your account email.
+									</Text>
+								</Stack>
+							</HStack>
+
+							<Panel variant="inset" padding="md">
+								<Stack gap={2}>
 									<HStack gap={2} align="center">
 										<Text size="xs" color="muted">
-											Allowlist:
+											Current account:
 										</Text>
-										<Text size="xs" color="muted">
-											{allowlist.join(", ")}
-										</Text>
+										<Badge variant="soft" size="sm">
+											{userEmail || "(unknown)"}
+										</Badge>
 									</HStack>
-								)}
-							</Stack>
-						</Panel>
-					</Stack>
-				</Panel>
-			</div>
+									{allowlist.length > 0 && (
+										<HStack gap={2} align="center">
+											<Text size="xs" color="muted">
+												Allowlist:
+											</Text>
+											<Text size="xs" color="muted">
+												{allowlist.join(", ")}
+											</Text>
+										</HStack>
+									)}
+								</Stack>
+							</Panel>
+						</Stack>
+					</Panel>
+				</div>
+			</PageFrame>
 		);
 	}
 
 	// Authorized - show commands
 	return (
-		<div className={styles.rootWide}>
-			<PageHeader />
+		<PageFrame maxWidth="full">
+			<div className={styles.rootWide}>
+				<PageHeader />
 
-			<div className={styles.groupsGrid}>
-				{COMMAND_GROUPS.map((group) => (
-					<Panel key={group.title} variant="default" padding="md">
-						<Stack gap={4}>
-							<HStack gap={2} align="center" className={styles.groupHead}>
-								<div className={styles.groupIcon}>
-									<Terminal size={14} />
-								</div>
-								<Text size="sm" weight="semibold">
-									{group.title}
-								</Text>
-							</HStack>
+				<div className={styles.groupsGrid}>
+					{COMMAND_GROUPS.map((group) => (
+						<Panel key={group.title} variant="default" padding="md">
+							<Stack gap={4}>
+								<HStack gap={2} align="center" className={styles.groupHead}>
+									<div className={styles.groupIcon}>
+										<Terminal size={14} />
+									</div>
+									<Text size="sm" weight="semibold">
+										{group.title}
+									</Text>
+								</HStack>
 
-							<Stack gap={3}>
-								{group.presets.map((preset) => (
-									<CommandCard
-										key={preset.id}
-										preset={preset}
-										copied={copiedId === preset.id}
-										onCopy={() => void copyCommand(preset)}
-									/>
-								))}
+								<Stack gap={3}>
+									{group.presets.map((preset) => (
+										<CommandCard
+											key={preset.id}
+											preset={preset}
+											copied={copiedId === preset.id}
+											onCopy={() => void copyCommand(preset)}
+										/>
+									))}
+								</Stack>
 							</Stack>
-						</Stack>
-					</Panel>
-				))}
+						</Panel>
+					))}
+				</div>
 			</div>
-		</div>
+		</PageFrame>
 	);
 }
 

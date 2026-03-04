@@ -1,0 +1,93 @@
+.sizeSm {
+	height: 0.25rem;
+}
+
+.sizeMd {
+	height: 0.5rem;
+}
+
+.sizeLg {
+	height: 0.75rem;
+}
+
+.colorPrimary {
+	background: var(--primary);
+}
+
+.colorAccent {
+	background: var(--accent);
+}
+
+.colorSuccess {
+	background: var(--success);
+}
+
+.colorWarning {
+	background: var(--warning);
+}
+
+.colorDanger {
+	background: var(--danger);
+}
+
+.track {
+	width: 100%;
+	overflow: hidden;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.fill {
+	height: 100%;
+	border-radius: 999px;
+}
+
+.animated {
+	transition: width 300ms ease-out;
+}
+
+.indeterminate {
+	width: 33.3333%;
+	animation: progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+.withValueWrap {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.withValueTrack {
+	flex: 1 1 auto;
+}
+
+.valueText {
+	min-width: 2.25rem;
+	text-align: right;
+}
+
+.segmentedWrap {
+	display: flex;
+	width: 100%;
+	gap: 0.25rem;
+}
+
+.segment {
+	flex: 1 1 0%;
+	border-radius: 999px;
+	transition: background-color 150ms ease;
+}
+
+.segmentInactive {
+	background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+@keyframes progress-indeterminate {
+	0% {
+		transform: translateX(-100%);
+	}
+
+	100% {
+		transform: translateX(400%);
+	}
+}

@@ -1,6 +1,7 @@
 // src/components/primitives/Progress.tsx
 import { forwardRef, type HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
+import styles from "./Progress.module.css";
 import { Text } from "./Text";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -29,21 +30,21 @@ export interface ProgressProps
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// STYLE CLASSES
+// STYLE LOOKUPS
 // ═══════════════════════════════════════════════════════════════════════════
 
 const sizeClasses: Record<ProgressSize, string> = {
-	sm: "h-1",
-	md: "h-2",
-	lg: "h-3",
+	sm: styles.sizeSm,
+	md: styles.sizeMd,
+	lg: styles.sizeLg,
 };
 
 const colorClasses: Record<ProgressColor, string> = {
-	primary: "bg-primary",
-	accent: "bg-accent",
-	success: "bg-success",
-	warning: "bg-warning",
-	danger: "bg-danger",
+	primary: styles.colorPrimary,
+	accent: styles.colorAccent,
+	success: styles.colorSuccess,
+	warning: styles.colorWarning,
+	danger: styles.colorDanger,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -76,21 +77,13 @@ export const Progress = forwardRef<HTMLDivElement, ProgressProps>(
 		const percentage = Math.min(100, Math.max(0, (value / max) * 100));
 
 		const progressBar = (
-			<div
-				className={cn(
-					"w-full rounded-full bg-text/10 overflow-hidden",
-					sizeClasses[size],
-				)}
-			>
+			<div className={cn(styles.track, sizeClasses[size])}>
 				<div
 					className={cn(
-						"h-full rounded-full",
+						styles.fill,
 						colorClasses[color],
-						animated &&
-							!indeterminate &&
-							"transition-all duration-300 ease-out",
-						indeterminate &&
-							"w-1/3 animate-[progress-indeterminate_1.5s_ease-in-out_infinite]",
+						animated && !indeterminate && styles.animated,
+						indeterminate && styles.indeterminate,
 					)}
 					style={{ width: indeterminate ? undefined : `${percentage}%` }}
 				/>
@@ -101,32 +94,16 @@ export const Progress = forwardRef<HTMLDivElement, ProgressProps>(
 			return (
 				<div ref={ref} className={className} {...props}>
 					{progressBar}
-					<style>{`
-            @keyframes progress-indeterminate {
-              0% { transform: translateX(-100%); }
-              100% { transform: translateX(400%); }
-            }
-          `}</style>
 				</div>
 			);
 		}
 
 		return (
-			<div
-				ref={ref}
-				className={cn("flex items-center gap-3", className)}
-				{...props}
-			>
-				<div className="flex-1">{progressBar}</div>
-				<Text size="xs" color="muted" mono className="min-w-9 text-right">
+			<div ref={ref} className={cn(styles.withValueWrap, className)} {...props}>
+				<div className={styles.withValueTrack}>{progressBar}</div>
+				<Text size="xs" color="muted" mono className={styles.valueText}>
 					{Math.round(percentage)}%
 				</Text>
-				<style>{`
-          @keyframes progress-indeterminate {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(400%); }
-          }
-        `}</style>
 			</div>
 		);
 	},
@@ -159,14 +136,14 @@ export function SegmentedProgress({
 	className,
 }: SegmentedProgressProps) {
 	return (
-		<div className={cn("flex gap-1 w-full", className)}>
+		<div className={cn(styles.segmentedWrap, className)}>
 			{Array.from({ length: segments }).map((_, i) => (
 				<div
 					key={i}
 					className={cn(
-						"flex-1 rounded-full transition-colors duration-150",
+						styles.segment,
 						sizeClasses[size],
-						i <= current ? colorClasses[color] : "bg-text/10",
+						i <= current ? colorClasses[color] : styles.segmentInactive,
 					)}
 				/>
 			))}

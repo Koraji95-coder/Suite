@@ -8,6 +8,7 @@ export default function KnowledgeRoutePage() {
 		<PageFrame
 			title="Knowledge"
 			description="References, docs, and standards aligned to current workflows."
+			maxWidth="xl"
 		>
 			<Section
 				title="Libraries"

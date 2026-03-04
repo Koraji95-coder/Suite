@@ -32,6 +32,7 @@ export function DrawingListManager() {
 		<PageFrame
 			title="Drawing List Manager"
 			description="Validate naming, generate lists, and audit drawing folders in seconds."
+			maxWidth="full"
 			actions={
 				<DrawingListManagerOverview
 					summary={summary}

@@ -14,8 +14,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, Panel, Stack, Text } from "@/components/primitives";
 import { cn } from "@/lib/utils";
 import styles from "./ConduitTerminalWorkflow.module.css";
-import { DEFAULT_WIRE_FUNCTIONS, WIRE_COLORS } from "./conduitRouteData";
-import type { CableSystemType, Point2D } from "./conduitRouteTypes";
+import { DEFAULT_WIRE_FUNCTIONS, OBSTACLE_STYLE, WIRE_COLORS } from "./conduitRouteData";
+import type {
+	CableSystemType,
+	ConduitObstacleScanMeta,
+	Obstacle,
+	Point2D,
+} from "./conduitRouteTypes";
 import {
 	buildTerminalLayout,
 	routeTerminalPath,
@@ -24,6 +29,7 @@ import {
 	terminalPathLength,
 	toTerminalRouteSvg,
 } from "./conduitTerminalEngine";
+import { conduitRouteService } from "./conduitRouteService";
 import { conduitTerminalService } from "./conduitTerminalService";
 import type {
 	TerminalLayoutResult,
@@ -31,6 +37,7 @@ import type {
 	TerminalRouteRecord,
 	TerminalScanData,
 	TerminalScanMeta,
+	TerminalScanProfile,
 } from "./conduitTerminalTypes";
 
 const EMPTY_LAYOUT: TerminalLayoutResult = {
@@ -38,6 +45,52 @@ const EMPTY_LAYOUT: TerminalLayoutResult = {
 	canvasHeight: 620,
 	strips: [],
 	terminals: [],
+};
+
+function parseEnvBoolean(raw: unknown, fallback: boolean): boolean {
+	if (typeof raw !== "string") return fallback;
+	const normalized = raw.trim().toLowerCase();
+	if (normalized === "true" || normalized === "1" || normalized === "yes") {
+		return true;
+	}
+	if (normalized === "false" || normalized === "0" || normalized === "no") {
+		return false;
+	}
+	return fallback;
+}
+
+function parseCsvEnv(raw: unknown): string[] {
+	if (typeof raw !== "string") return [];
+	return raw
+		.split(",")
+		.map((entry) => entry.trim().toUpperCase())
+		.filter((entry, index, all) => entry.length > 0 && all.indexOf(entry) === index);
+}
+
+const AUTO_CONNECT_ON_MOUNT = parseEnvBoolean(
+	import.meta.env.VITE_TERMINAL_AUTO_CONNECT,
+	true,
+);
+
+const TERMINAL_BLOCK_ALLOW_LIST = parseCsvEnv(
+	import.meta.env.VITE_TERMINAL_BLOCK_ALLOW_LIST ?? "TB_STRIP_META_SIDE",
+);
+
+const DEFAULT_TERMINAL_SCAN_PROFILE: TerminalScanProfile = {
+	panelIdKeys: ["PANEL_ID"],
+	panelNameKeys: ["PANEL_NAME"],
+	sideKeys: ["SIDE"],
+	stripIdKeys: ["STRIP_ID"],
+	stripNumberKeys: ["STRIP_NO", "STRIP_NUM", "STRIP_NUMBER", "NUMBER", "NO"],
+	terminalCountKeys: ["TERMINAL_COUNT"],
+	terminalTagKeys: ["PANEL_ID", "PANEL_NAME", "SIDE", "STRIP_ID", "TERMINAL_COUNT"],
+	terminalNameTokens: ["TERMINAL", "TB", "TS"],
+	blockNameAllowList: TERMINAL_BLOCK_ALLOW_LIST,
+	requireStripId: true,
+	requireTerminalCount: true,
+	requireSide: true,
+	defaultPanelPrefix: "PANEL",
+	defaultTerminalCount: 12,
 };
 
 function makeRouteId(): string {
@@ -75,6 +128,13 @@ export function ConduitTerminalWorkflow() {
 	const [scanning, setScanning] = useState(false);
 	const [scanData, setScanData] = useState<TerminalScanData | null>(null);
 	const [scanMeta, setScanMeta] = useState<TerminalScanMeta | null>(null);
+	const [overlayEnabled, setOverlayEnabled] = useState(true);
+	const [overlaySyncing, setOverlaySyncing] = useState(false);
+	const [overlayObstacles, setOverlayObstacles] = useState<Obstacle[]>([]);
+	const [overlayMeta, setOverlayMeta] = useState<ConduitObstacleScanMeta | null>(
+		null,
+	);
+	const [overlayMessage, setOverlayMessage] = useState("");
 	const [statusMessage, setStatusMessage] = useState(
 		"Offline. Run Connect & Scan to load terminal strips.",
 	);
@@ -156,6 +216,55 @@ export function ConduitTerminalWorkflow() {
 			length: Math.round(route.length),
 		}));
 
+	const syncObstacleOverlay = async (
+		targetLayout: TerminalLayoutResult,
+	): Promise<{ success: boolean; count: number; message: string }> => {
+		setOverlaySyncing(true);
+		try {
+			const response = await conduitRouteService.scanObstacles({
+				selectionOnly: false,
+				includeModelspace: true,
+				maxEntities: 50000,
+				canvasWidth: targetLayout.canvasWidth,
+				canvasHeight: targetLayout.canvasHeight,
+			});
+
+			if (response.success && response.data) {
+				const obstacles = response.data.obstacles ?? [];
+				setOverlayObstacles(obstacles);
+				setOverlayMeta(response.meta ?? null);
+				setOverlayMessage("");
+				return {
+					success: true,
+					count: obstacles.length,
+					message:
+						response.message ||
+						`Obstacle overlay synced (${obstacles.length} obstacle(s)).`,
+				};
+			}
+
+			setOverlayObstacles([]);
+			setOverlayMeta(response.meta ?? null);
+			setOverlayMessage(response.message || "Obstacle overlay unavailable.");
+			return {
+				success: false,
+				count: 0,
+				message: response.message || "Obstacle overlay unavailable.",
+			};
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Obstacle overlay sync request failed.";
+			setOverlayObstacles([]);
+			setOverlayMeta(null);
+			setOverlayMessage(message);
+			return { success: false, count: 0, message };
+		} finally {
+			setOverlaySyncing(false);
+		}
+	};
+
 	const runScan = async (messagePrefix: string) => {
 		if (scanning) return;
 		setScanning(true);
@@ -164,6 +273,7 @@ export function ConduitTerminalWorkflow() {
 			selectionOnly: false,
 			includeModelspace: true,
 			maxEntities: 50000,
+			terminalProfile: DEFAULT_TERMINAL_SCAN_PROFILE,
 		});
 		setScanning(false);
 
@@ -175,10 +285,15 @@ export function ConduitTerminalWorkflow() {
 			setHoverTerminalId(null);
 			const panelCount = Object.keys(response.data.panels).length;
 			const terminalCount = response.meta?.totalTerminals ?? 0;
-			setStatusMessage(
+			const nextLayout = buildTerminalLayout(response.data);
+			const obstacleResult = await syncObstacleOverlay(nextLayout);
+			const baseMessage =
 				response.message ||
-					`Scan loaded ${panelCount} panel(s) and ${terminalCount} terminal(s).`,
-			);
+				`Scan loaded ${panelCount} panel(s) and ${terminalCount} terminal(s).`;
+			const overlaySuffix = obstacleResult.success
+				? ` Obstacle overlay: ${obstacleResult.count}.`
+				: " Obstacle overlay unavailable.";
+			setStatusMessage(`${baseMessage}${overlaySuffix}`);
 			return;
 		}
 
@@ -187,6 +302,9 @@ export function ConduitTerminalWorkflow() {
 			setConnected(true);
 			setScanData(response.data);
 			setScanMeta(response.meta ?? null);
+			setOverlayObstacles([]);
+			setOverlayMeta(null);
+			setOverlayMessage("");
 			setStatusMessage(
 				response.message ||
 					"No terminal strips detected. Check block naming and attributes.",
@@ -197,10 +315,22 @@ export function ConduitTerminalWorkflow() {
 		setConnected(false);
 		setScanData(null);
 		setScanMeta(null);
+		setOverlayObstacles([]);
+		setOverlayMeta(null);
+		setOverlayMessage("");
 		setFromTerminalId(null);
 		setHoverTerminalId(null);
 		setStatusMessage(response.message || "Terminal scan failed.");
 	};
+
+	useEffect(() => {
+		if (!AUTO_CONNECT_ON_MOUNT) {
+			return;
+		}
+		void runScan("Auto-connecting bridge and scanning terminal strips...");
+		// Intentionally run once on mount to avoid repeated auto-scans.
+		// biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount
+	}, []);
 
 	const connectAndScan = () => {
 		void runScan("Connecting bridge and scanning terminal strips...");
@@ -210,11 +340,29 @@ export function ConduitTerminalWorkflow() {
 		void runScan("Rescanning terminal strips...");
 	};
 
+	const rescanOverlay = () => {
+		if (!connected || !scanData || overlaySyncing) {
+			return;
+		}
+		const nextLayout = buildTerminalLayout(scanData);
+		void (async () => {
+			const result = await syncObstacleOverlay(nextLayout);
+			setStatusMessage(
+				result.success
+					? `Obstacle overlay synced (${result.count} obstacle(s)).`
+					: result.message || "Obstacle overlay sync failed.",
+			);
+		})();
+	};
+
 	const disconnect = () => {
 		setConnected(false);
 		setScanning(false);
 		setScanData(null);
 		setScanMeta(null);
+		setOverlayObstacles([]);
+		setOverlayMeta(null);
+		setOverlayMessage("");
 		setFromTerminalId(null);
 		setHoverTerminalId(null);
 		setStatusMessage("Bridge disconnected.");
@@ -491,10 +639,38 @@ export function ConduitTerminalWorkflow() {
 								conductors.
 							</Text>
 						</div>
-						<Badge color="default" variant="outline" size="sm">
-							<Route size={12} />
-							{routeStats.total} routes
-						</Badge>
+						<div className={styles.canvasTools}>
+							<Badge color="default" variant="outline" size="sm">
+								<Route size={12} />
+								{routeStats.total} routes
+							</Badge>
+							<Badge color="default" variant="outline" size="sm">
+								{overlayObstacles.length} obstacles
+							</Badge>
+							<Button
+								variant={overlayEnabled ? "secondary" : "outline"}
+								size="sm"
+								onClick={() => setOverlayEnabled((current) => !current)}
+							>
+								{overlayEnabled ? "Overlay On" : "Overlay Off"}
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={rescanOverlay}
+								disabled={!connected || scanning || overlaySyncing || !scanData}
+								loading={overlaySyncing}
+								iconLeft={
+									overlaySyncing ? (
+										<LoaderCircle size={12} />
+									) : (
+										<RefreshCw size={12} />
+									)
+								}
+							>
+								Resync Obstacles
+							</Button>
+						</div>
 					</div>
 
 					<div className={styles.canvasWrap}>
@@ -527,6 +703,46 @@ export function ConduitTerminalWorkflow() {
 								fill="url(#terminal-grid)"
 							/>
 
+							{overlayEnabled
+								? overlayObstacles.map((obstacle) => {
+										const style = OBSTACLE_STYLE[obstacle.type];
+										return (
+											<g
+												key={`overlay-${obstacle.id}`}
+												className={styles.obstacleGroup}
+											>
+												<rect
+													x={obstacle.x}
+													y={obstacle.y}
+													width={obstacle.w}
+													height={obstacle.h}
+													rx={obstacle.type === "fence" ? 8 : 4}
+													fill={style.fill}
+													stroke={style.stroke}
+													strokeWidth={obstacle.type === "fence" ? 1.4 : 1.1}
+													strokeDasharray={
+														obstacle.type === "fence" ? "6,4" : undefined
+													}
+													className={styles.obstacleRect}
+												/>
+												{obstacle.label &&
+												obstacle.w >= 34 &&
+												obstacle.h >= 16 ? (
+													<text
+														x={obstacle.x + obstacle.w / 2}
+														y={obstacle.y + obstacle.h / 2}
+														textAnchor="middle"
+														className={styles.obstacleLabel}
+														fill={style.label}
+													>
+														{obstacle.label}
+													</text>
+												) : null}
+											</g>
+										);
+									})
+								: null}
+
 							{routes.map((route) => {
 								const selected = selectedRouteId === route.id;
 								const tagPoint = midPoint(route.path);
@@ -556,14 +772,61 @@ export function ConduitTerminalWorkflow() {
 
 							{layout.strips.map((strip) => (
 								<g key={strip.stripId}>
-									<rect
-										x={strip.px}
-										y={strip.py}
-										width={strip.width}
-										height={strip.height}
-										className={styles.stripRail}
-										style={{ stroke: strip.panelColor }}
-									/>
+									{strip.geometryPx && strip.geometryPx.length > 0 ? (
+										<g className={styles.stripGeometryGroup}>
+											{strip.geometryPx.map((primitive, index) => {
+												if (!primitive.points || primitive.points.length < 2) {
+													return null;
+												}
+
+												if (
+													primitive.kind === "line" ||
+													primitive.points.length === 2
+												) {
+													const [startPoint, endPoint] = primitive.points;
+													if (!startPoint || !endPoint) {
+														return null;
+													}
+													return (
+														<line
+															key={`${strip.stripId}-geom-${index}`}
+															x1={startPoint.x}
+															y1={startPoint.y}
+															x2={endPoint.x}
+															y2={endPoint.y}
+															className={styles.stripGeometry}
+															style={{ stroke: strip.panelColor }}
+														/>
+													);
+												}
+
+												const pathPoints = [...primitive.points];
+												if (primitive.closed && primitive.points.length > 2) {
+													pathPoints.push(primitive.points[0]);
+												}
+												const pointsValue = pathPoints
+													.map((point) => `${point.x},${point.y}`)
+													.join(" ");
+												return (
+													<polyline
+														key={`${strip.stripId}-geom-${index}`}
+														points={pointsValue}
+														className={styles.stripGeometry}
+														style={{ stroke: strip.panelColor }}
+													/>
+												);
+											})}
+										</g>
+									) : (
+										<rect
+											x={strip.px}
+											y={strip.py}
+											width={strip.width}
+											height={strip.height}
+											className={styles.stripRail}
+											style={{ stroke: strip.panelColor }}
+										/>
+									)}
 									<text
 										x={strip.xLabel}
 										y={strip.yLabel}
@@ -608,6 +871,18 @@ export function ConduitTerminalWorkflow() {
 							<Link2 size={12} />
 							{statusMessage}
 						</span>
+						{overlayMeta?.scanMs ? (
+							<span>
+								<RefreshCw size={12} />
+								Overlay {overlayMeta.scanMs} ms
+							</span>
+						) : null}
+						{overlayMessage ? (
+							<span>
+								<X size={12} />
+								{overlayMessage}
+							</span>
+						) : null}
 						{activeHoverTerminal ? (
 							<span>
 								<Cable size={12} />

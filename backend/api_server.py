@@ -411,7 +411,38 @@ BACKUP_MAX_FILES = _parse_int_env("BACKUP_MAX_FILES", 500, minimum=10)
 AUTODRAFT_DOTNET_API_URL = (
     (os.environ.get("AUTODRAFT_DOTNET_API_URL") or "").strip()
 )
-CONDUIT_ROUTE_AUTOCAD_PROVIDER = (
+
+
+def _normalize_conduit_provider_env(raw_value: str) -> str:
+    normalized = str(raw_value or "").strip().lower().replace("-", "_")
+    aliases = {
+        "": "com",
+        "com": "com",
+        "dotnet": "dotnet",
+        "net": "dotnet",
+        ".net": "dotnet",
+        "dotnet_fallback_com": "dotnet_fallback_com",
+        "dotnet_with_com_fallback": "dotnet_fallback_com",
+        "dotnet_fallback": "dotnet_fallback_com",
+        "dotnet_com_fallback": "dotnet_fallback_com",
+    }
+    resolved = aliases.get(normalized)
+    if resolved is None:
+        logger.warning(
+            "Unknown CONDUIT_ROUTE_AUTOCAD_PROVIDER=%s; defaulting to 'com'.",
+            raw_value,
+        )
+        return "com"
+    if normalized and resolved != normalized:
+        logger.info(
+            "Normalized CONDUIT_ROUTE_AUTOCAD_PROVIDER alias %s -> %s.",
+            raw_value,
+            resolved,
+        )
+    return resolved
+
+
+CONDUIT_ROUTE_AUTOCAD_PROVIDER = _normalize_conduit_provider_env(
     (os.environ.get("CONDUIT_ROUTE_AUTOCAD_PROVIDER") or "com").strip() or "com"
 )
 AUTOCAD_DOTNET_PIPE_NAME = (
@@ -431,6 +462,34 @@ AUTOCAD_DOTNET_TOKEN = (
 def _is_dotnet_provider(value: str) -> bool:
     normalized = str(value or "").strip().lower().replace("-", "_")
     return normalized in {"dotnet", "dotnet_fallback_com", "dotnet_with_com_fallback"}
+
+
+def _validate_conduit_provider_startup_settings() -> None:
+    pipe_has_whitespace = any(char.isspace() for char in AUTOCAD_DOTNET_PIPE_NAME)
+    if pipe_has_whitespace:
+        logger.error(
+            "AUTOCAD_DOTNET_PIPE_NAME=%s contains whitespace. Use a simple token-like pipe name.",
+            AUTOCAD_DOTNET_PIPE_NAME,
+        )
+
+    if _is_dotnet_provider(CONDUIT_ROUTE_AUTOCAD_PROVIDER):
+        logger.info(
+            "Validated conduit provider settings (provider=%s, pipe=%s, timeout_ms=%s, token_configured=%s).",
+            CONDUIT_ROUTE_AUTOCAD_PROVIDER,
+            AUTOCAD_DOTNET_PIPE_NAME,
+            AUTOCAD_DOTNET_TIMEOUT_MS,
+            bool(AUTOCAD_DOTNET_TOKEN),
+        )
+        return
+
+    if AUTOCAD_DOTNET_TOKEN:
+        logger.info(
+            "AUTOCAD_DOTNET_TOKEN is set but provider=%s; token will remain unused until a dotnet provider is enabled.",
+            CONDUIT_ROUTE_AUTOCAD_PROVIDER,
+        )
+
+
+_validate_conduit_provider_startup_settings()
 
 
 if _is_dotnet_provider(CONDUIT_ROUTE_AUTOCAD_PROVIDER):

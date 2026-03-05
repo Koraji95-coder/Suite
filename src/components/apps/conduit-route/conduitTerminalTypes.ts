@@ -4,6 +4,17 @@ import type {
 	WireColorProfile,
 } from "./conduitRouteTypes";
 
+export interface TerminalGeometryPoint {
+	x: number;
+	y: number;
+}
+
+export interface TerminalGeometryPrimitive {
+	kind: "line" | "polyline";
+	points: TerminalGeometryPoint[];
+	closed?: boolean;
+}
+
 export interface TerminalDrawingMeta {
 	name: string;
 	units: string;
@@ -13,6 +24,8 @@ export interface TerminalStripDefinition {
 	stripId: string;
 	stripNumber: number;
 	terminalCount: number;
+	terminalLabels?: string[];
+	geometry?: TerminalGeometryPrimitive[];
 	x: number;
 	y: number;
 }
@@ -47,6 +60,7 @@ export interface TerminalStripLayout extends TerminalStripDefinition {
 	panelFullName: string;
 	panelColor: string;
 	side: string;
+	geometryPx?: TerminalGeometryPrimitive[];
 	xLabel: number;
 	yLabel: number;
 	px: number;
@@ -92,10 +106,28 @@ export interface TerminalRouteRecord {
 	createdAt: number;
 }
 
+export interface TerminalScanProfile {
+	panelIdKeys?: string[];
+	panelNameKeys?: string[];
+	sideKeys?: string[];
+	stripIdKeys?: string[];
+	stripNumberKeys?: string[];
+	terminalCountKeys?: string[];
+	terminalTagKeys?: string[];
+	terminalNameTokens?: string[];
+	blockNameAllowList?: string[];
+	requireStripId?: boolean;
+	requireTerminalCount?: boolean;
+	requireSide?: boolean;
+	defaultPanelPrefix?: string;
+	defaultTerminalCount?: number;
+}
+
 export interface TerminalScanRequest {
 	selectionOnly?: boolean;
 	includeModelspace?: boolean;
 	maxEntities?: number;
+	terminalProfile?: TerminalScanProfile;
 }
 
 export interface TerminalScanMeta {
@@ -109,6 +141,8 @@ export interface TerminalScanMeta {
 	totalPanels?: number;
 	totalStrips?: number;
 	totalTerminals?: number;
+	totalLabeledTerminals?: number;
+	totalGeometryPrimitives?: number;
 }
 
 export interface TerminalScanResponse {

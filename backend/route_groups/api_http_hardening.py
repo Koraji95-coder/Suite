@@ -23,7 +23,12 @@ def configure_cors(
         origins=list(allowed_origins),
         supports_credentials=True,
         methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-API-Key"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-API-Key",
+            "X-Request-ID",
+        ],
     )
 
 

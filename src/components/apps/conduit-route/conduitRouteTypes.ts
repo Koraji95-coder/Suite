@@ -66,6 +66,7 @@ export interface ConduitObstacleScanOptions {
 	maxEntities?: number;
 	layerNames?: string[];
 	layerTypeOverrides?: Record<string, ObstacleType>;
+	layerPreset?: string;
 }
 
 export interface ConduitObstacleViewport {
@@ -139,6 +140,7 @@ export interface ConduitObstacleScanRequest {
 	canvasHeight?: number;
 	layerNames?: string[];
 	layerTypeOverrides?: Record<string, ObstacleType>;
+	layerPreset?: string;
 }
 
 export interface ConduitObstacleScanMeta {

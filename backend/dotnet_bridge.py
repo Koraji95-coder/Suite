@@ -2,7 +2,7 @@
 Named pipe client stub for communicating with a .NET AutoCAD automation service.
 
 This is a local IPC client intended for Windows + pywin32.
-It is not wired into any endpoints yet.
+It is wired into conduit-route endpoints via backend/api_server.py.
 """
 
 from __future__ import annotations

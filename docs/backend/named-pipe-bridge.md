@@ -39,7 +39,7 @@ Each request/response is a single JSON object on its own line (newline-delimited
 Example request:
 
 ```json
-{"id":"job-123","action":"batch_find_replace","payload":{"files":["C:\\path\\a.dwg"],"rules":[{"find":"A","replace":"B"}]},"token":"<hmac>"}
+{"id":"job-123","action":"batch_find_replace","payload":{"files":["C:\\path\\a.dwg"],"rules":[{"find":"A","replace":"B"}],"requestId":"req-abc-123","layerPreset":"substation_default","layerNames":["S-FNDN-PRIMARY"],"layerTypeOverrides":{"S-FNDN-PRIMARY":"foundation"}},"token":"<hmac>"}
 ```
 
 Example response:
@@ -83,10 +83,32 @@ Named-pipe bridge settings:
 - `AUTOCAD_DOTNET_PIPE_NAME=SUITE_AUTOCAD_PIPE`
 - `AUTOCAD_DOTNET_TIMEOUT_MS=30000`
 - `AUTOCAD_DOTNET_TOKEN=` (optional)
+  - if set, .NET bridge rejects mismatched/missing tokens with `AUTH_INVALID_TOKEN`
+- `AUTOCAD_DOTNET_COM_READ_RETRY_ATTEMPTS=3` (optional)
+- `AUTOCAD_DOTNET_COM_READ_RETRY_DELAY_MS=35` (optional)
 
 When `dotnet` is selected, `/api/conduit-route/terminal-scan` and
 `/api/conduit-route/obstacles/scan` call the pipe bridge directly. With
 `dotnet_fallback_com`, backend falls back to COM if the bridge call fails.
+
+Obstacle scan requests can include optional preset-driven layer mapping:
+
+- `layerPreset` (for example: `substation_default`, `industrial_plant`, `utility_yard`)
+- `layerNames` (merged with preset layers)
+- `layerTypeOverrides` (manual overrides take precedence over preset defaults)
+
+Terminal scan requests can include optional terminal profile overrides:
+
+- `terminalProfile.panelIdKeys`, `terminalProfile.panelNameKeys`, `terminalProfile.sideKeys`
+- `terminalProfile.stripIdKeys`, `terminalProfile.stripNumberKeys`
+- `terminalProfile.terminalCountKeys`, `terminalProfile.terminalTagKeys`
+- `terminalProfile.terminalNameTokens`
+- `terminalProfile.defaultPanelPrefix`, `terminalProfile.defaultTerminalCount`
+
+Terminal strip metadata can include optional per-terminal label attributes:
+
+- `TERM01_LABEL`, `TERM02_LABEL`, ... (1-based index)
+- Returned in scan response as `strips[].terminalLabels[]`
 
 Expected bridge actions for current Conduit Route integration:
 

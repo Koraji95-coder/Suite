@@ -16,6 +16,17 @@ class ConduitTerminalService {
 		this.apiKey = import.meta.env.VITE_API_KEY ?? "";
 	}
 
+	private createRequestId(): string {
+		try {
+			if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+				return `terminal-${crypto.randomUUID()}`;
+			}
+		} catch {
+			// Ignore and use timestamp fallback.
+		}
+		return `terminal-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+	}
+
 	private async getAccessToken(): Promise<string | null> {
 		try {
 			const {
@@ -41,9 +52,10 @@ class ConduitTerminalService {
 		}
 	}
 
-	private async getHeaders(): Promise<Record<string, string>> {
+	private async getHeaders(requestId: string): Promise<Record<string, string>> {
 		const headers: Record<string, string> = {
 			"Content-Type": "application/json",
+			"X-Request-ID": requestId,
 		};
 
 		const accessToken = await this.getAccessToken();
@@ -91,7 +103,8 @@ class ConduitTerminalService {
 		request: TerminalScanRequest = {},
 	): Promise<TerminalScanResponse> {
 		try {
-			const headers = await this.getHeaders();
+			const requestId = this.createRequestId();
+			const headers = await this.getHeaders(requestId);
 			const response = await fetch(
 				`${this.baseUrl}/api/conduit-route/terminal-scan`,
 				{
@@ -101,6 +114,7 @@ class ConduitTerminalService {
 						selectionOnly: request.selectionOnly ?? false,
 						includeModelspace: request.includeModelspace ?? true,
 						maxEntities: request.maxEntities ?? 50000,
+						terminalProfile: request.terminalProfile ?? undefined,
 					}),
 				},
 			);

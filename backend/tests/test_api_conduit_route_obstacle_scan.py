@@ -151,6 +151,45 @@ class TestApiConduitRouteObstacleScan(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertEqual(result["code"], "NO_OBSTACLES_FOUND")
         self.assertEqual(result["meta"]["totalObstacles"], 0)
+        self.assertGreaterEqual(result["meta"]["scannedLayerCount"], 1)
+        self.assertGreaterEqual(result["meta"]["skippedUnclassifiedLayerEntities"], 1)
+        top_scanned = result["meta"]["topScannedLayers"]
+        self.assertTrue(any(item["layer"] == "MISC" for item in top_scanned))
+
+    def test_obstacle_scan_reports_layer_filter_diagnostics(self) -> None:
+        entities = [
+            _BBoxEntity(
+                handle="L1",
+                layer="ROAD",
+                object_name="AcDbPolyline",
+                bbox=(0.0, 0.0, 0.0, 20.0, 20.0, 0.0),
+            ),
+        ]
+        doc = _Doc(name="filter.dwg", units=0)
+        modelspace = _Collection(entities)
+
+        result = scan_conduit_obstacles(
+            doc=doc,
+            modelspace=modelspace,
+            dyn_fn=lambda value: value,
+            entity_bbox_fn=lambda ent: ent._bbox,
+            include_modelspace=True,
+            selection_only=False,
+            max_entities=1000,
+            canvas_width=980,
+            canvas_height=560,
+            layer_names=["S-FNDN-PRIMARY"],
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["code"], "NO_OBSTACLES_FOUND")
+        self.assertEqual(result["meta"]["allowedLayerFilterCount"], 1)
+        self.assertEqual(result["meta"]["filteredOutByLayerFilterEntities"], 1)
+        filtered = result["meta"]["topFilteredOutLayers"]
+        self.assertTrue(any(item["layer"] == "ROAD" for item in filtered))
+        self.assertTrue(
+            any("Layer filter excluded" in warning for warning in result.get("warnings", []))
+        )
 
     def test_obstacle_scan_applies_layer_type_override(self) -> None:
         entities = [

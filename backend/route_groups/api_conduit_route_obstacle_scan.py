@@ -136,6 +136,18 @@ def _normalize_layer_type_overrides(raw: Any) -> Dict[str, str]:
     return overrides
 
 
+def _top_layer_counts(layer_counts: Dict[str, int], *, limit: int = 20) -> List[Dict[str, Any]]:
+    ranked = sorted(
+        (
+            {"layer": layer_name, "count": count}
+            for layer_name, count in layer_counts.items()
+            if layer_name
+        ),
+        key=lambda item: (-int(item["count"]), str(item["layer"])),
+    )
+    return ranked[: max(1, int(limit))]
+
+
 def _normalize_to_canvas(
     *,
     raw_obstacles: Sequence[Dict[str, Any]],
@@ -242,13 +254,34 @@ def scan_conduit_obstacles(
     matched_layer_entities = 0
     override_layer_entities = 0
     deduped_entities = 0
+    skipped_non_geometric_entities = 0
+    skipped_empty_layer_entities = 0
+    filtered_out_by_layer_filter_entities = 0
+    skipped_unclassified_layer_entities = 0
+    skipped_missing_bbox_entities = 0
+    skipped_degenerate_bbox_entities = 0
+
+    scanned_layer_counts: Dict[str, int] = {}
+    matched_layer_counts: Dict[str, int] = {}
+    filtered_layer_counts: Dict[str, int] = {}
+    unclassified_layer_counts: Dict[str, int] = {}
 
     seen_handles: set[str] = set()
     seen_bbox_keys: set[Tuple[str, str, float, float, float, float]] = set()
     raw_obstacles: List[Dict[str, Any]] = []
 
     def _consume_entity(entity: Any) -> None:
-        nonlocal scanned_entities, scanned_geometry_entities, matched_layer_entities, deduped_entities, override_layer_entities
+        nonlocal scanned_entities
+        nonlocal scanned_geometry_entities
+        nonlocal matched_layer_entities
+        nonlocal deduped_entities
+        nonlocal override_layer_entities
+        nonlocal skipped_non_geometric_entities
+        nonlocal skipped_empty_layer_entities
+        nonlocal filtered_out_by_layer_filter_entities
+        nonlocal skipped_unclassified_layer_entities
+        nonlocal skipped_missing_bbox_entities
+        nonlocal skipped_degenerate_bbox_entities
         scanned_entities += 1
 
         handle = _handle_for_entity(entity)
@@ -259,13 +292,19 @@ def scan_conduit_obstacles(
 
         object_name = _safe_str(getattr(entity, "ObjectName", ""))
         if _is_non_geometric_object(object_name):
+            skipped_non_geometric_entities += 1
             return
 
         layer_name = _safe_upper(getattr(entity, "Layer", ""))
         if not layer_name:
+            skipped_empty_layer_entities += 1
             return
 
+        scanned_layer_counts[layer_name] = scanned_layer_counts.get(layer_name, 0) + 1
+
         if allowed_layers and layer_name not in allowed_layers:
+            filtered_out_by_layer_filter_entities += 1
+            filtered_layer_counts[layer_name] = filtered_layer_counts.get(layer_name, 0) + 1
             return
 
         obstacle_type = normalized_type_overrides.get(layer_name)
@@ -277,17 +316,24 @@ def scan_conduit_obstacles(
                 force_unknown_to_foundation=force_unknown_to_foundation,
             )
         if not obstacle_type:
+            skipped_unclassified_layer_entities += 1
+            unclassified_layer_counts[layer_name] = (
+                unclassified_layer_counts.get(layer_name, 0) + 1
+            )
             return
         matched_layer_entities += 1
+        matched_layer_counts[layer_name] = matched_layer_counts.get(layer_name, 0) + 1
 
         bbox = entity_bbox_fn(entity)
         if not bbox:
+            skipped_missing_bbox_entities += 1
             return
         scanned_geometry_entities += 1
         minx, miny, _, maxx, maxy, _ = bbox
         width = maxx - minx
         height = maxy - miny
         if width <= 0.0001 and height <= 0.0001:
+            skipped_degenerate_bbox_entities += 1
             return
 
         dedupe_key = (
@@ -344,11 +390,40 @@ def scan_conduit_obstacles(
     )
 
     total_obstacles = len(normalized["obstacles"])
-    if total_obstacles == 0:
-        message = (
-            "No route obstacles found from AutoCAD layers. "
-            "Expected layers like FOUNDATION, PAD, TRENCH, ROAD, or FENCE."
+    scanned_layers_preview = ", ".join(
+        item["layer"] for item in _top_layer_counts(scanned_layer_counts, limit=6)
+    )
+    if allowed_layers and filtered_out_by_layer_filter_entities > 0:
+        warnings.append(
+            "Layer filter excluded "
+            f"{filtered_out_by_layer_filter_entities} entities across "
+            f"{len(filtered_layer_counts)} layers."
         )
+    if skipped_unclassified_layer_entities > 0:
+        warnings.append(
+            "Skipped "
+            f"{skipped_unclassified_layer_entities} entities from non-route layers."
+        )
+    if skipped_missing_bbox_entities > 0 or skipped_degenerate_bbox_entities > 0:
+        warnings.append(
+            "Skipped entities with unusable geometry "
+            f"(missing_bbox={skipped_missing_bbox_entities}, "
+            f"degenerate_bbox={skipped_degenerate_bbox_entities})."
+        )
+
+    if total_obstacles == 0:
+        if allowed_layers:
+            message = (
+                "No route obstacles found from AutoCAD layers after applying layer filter. "
+                "Check obstacleScan.layerNames/layerTypeOverrides and drawing layer content."
+            )
+        else:
+            message = (
+                "No route obstacles found from AutoCAD layers. "
+                "Expected layers like FOUNDATION, PAD, TRENCH, ROAD, or FENCE."
+            )
+        if scanned_layers_preview:
+            message = f"{message} Scanned layers sample: {scanned_layers_preview}."
     else:
         message = (
             f"Scanned {scanned_entities} entities and mapped {total_obstacles} obstacles."
@@ -372,6 +447,20 @@ def scan_conduit_obstacles(
             "includeModelspace": bool(include_modelspace),
             "totalObstacles": total_obstacles,
             "overrideLayerEntities": override_layer_entities,
+            "allowedLayerFilterCount": len(allowed_layers),
+            "allowedLayerFilter": sorted(allowed_layers),
+            "scannedLayerCount": len(scanned_layer_counts),
+            "matchedLayerCount": len(matched_layer_counts),
+            "filteredOutByLayerFilterEntities": filtered_out_by_layer_filter_entities,
+            "skippedUnclassifiedLayerEntities": skipped_unclassified_layer_entities,
+            "skippedNonGeometricEntities": skipped_non_geometric_entities,
+            "skippedEmptyLayerEntities": skipped_empty_layer_entities,
+            "skippedMissingBboxEntities": skipped_missing_bbox_entities,
+            "skippedDegenerateBboxEntities": skipped_degenerate_bbox_entities,
+            "topScannedLayers": _top_layer_counts(scanned_layer_counts, limit=20),
+            "topMatchedLayers": _top_layer_counts(matched_layer_counts, limit=20),
+            "topFilteredOutLayers": _top_layer_counts(filtered_layer_counts, limit=20),
+            "topUnclassifiedLayers": _top_layer_counts(unclassified_layer_counts, limit=20),
         },
         "warnings": warnings,
     }

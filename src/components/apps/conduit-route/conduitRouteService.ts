@@ -18,6 +18,17 @@ class ConduitRouteService {
 		this.apiKey = import.meta.env.VITE_API_KEY ?? "";
 	}
 
+	private createRequestId(): string {
+		try {
+			if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+				return `conduit-${crypto.randomUUID()}`;
+			}
+		} catch {
+			// Ignore and use timestamp fallback.
+		}
+		return `conduit-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+	}
+
 	private async getAccessToken(): Promise<string | null> {
 		try {
 			const {
@@ -43,9 +54,10 @@ class ConduitRouteService {
 		}
 	}
 
-	private async getHeaders(): Promise<Record<string, string>> {
+	private async getHeaders(requestId: string): Promise<Record<string, string>> {
 		const headers: Record<string, string> = {
 			"Content-Type": "application/json",
+			"X-Request-ID": requestId,
 		};
 
 		const accessToken = await this.getAccessToken();
@@ -93,7 +105,8 @@ class ConduitRouteService {
 		request: ConduitRouteComputeRequest,
 	): Promise<ConduitRouteComputeResponse> {
 		try {
-			const headers = await this.getHeaders();
+			const requestId = this.createRequestId();
+			const headers = await this.getHeaders(requestId);
 			const response = await fetch(
 				`${this.baseUrl}/api/conduit-route/route/compute`,
 				{
@@ -156,7 +169,8 @@ class ConduitRouteService {
 
 	async listLayers(): Promise<string[]> {
 		try {
-			const headers = await this.getHeaders();
+			const requestId = this.createRequestId();
+			const headers = await this.getHeaders(requestId);
 			const response = await fetch(`${this.baseUrl}/api/layers`, {
 				method: "GET",
 				headers,
@@ -189,7 +203,8 @@ class ConduitRouteService {
 		request: ConduitObstacleScanRequest = {},
 	): Promise<ConduitObstacleScanResponse> {
 		try {
-			const headers = await this.getHeaders();
+			const requestId = this.createRequestId();
+			const headers = await this.getHeaders(requestId);
 			const response = await fetch(
 				`${this.baseUrl}/api/conduit-route/obstacles/scan`,
 				{
@@ -203,6 +218,7 @@ class ConduitRouteService {
 						canvasHeight: request.canvasHeight,
 						layerNames: request.layerNames ?? [],
 						layerTypeOverrides: request.layerTypeOverrides ?? {},
+						layerPreset: request.layerPreset ?? "",
 					}),
 				},
 			);

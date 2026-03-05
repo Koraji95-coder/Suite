@@ -13,9 +13,16 @@ const SERVER_INFO = {
 	name: "suite-repo-mcp",
 	version: "0.1.0",
 };
+const LATEST_PROTOCOL_VERSION = "2026-01-26";
+const SUPPORTED_PROTOCOL_VERSIONS = new Set([
+	LATEST_PROTOCOL_VERSION,
+	"2025-06-18",
+	"2024-11-05",
+]);
 
 const MAX_OUTPUT_CHARS = 200_000;
 const DEFAULT_TIMEOUT_MS = 120_000;
+let cachedHasRipgrep = null;
 const SOURCE_EXTENSIONS = [
 	".ts",
 	".tsx",
@@ -194,8 +201,10 @@ function runProcess(command, args = [], options = {}) {
 }
 
 async function commandExists(command) {
-	const result = await runProcess("which", [command], { timeoutMs: 4000 });
-	return result.ok;
+	// Cross-platform existence check: if spawn resolves to a process at all,
+	// runProcess returns a numeric exit code instead of null.
+	const result = await runProcess(command, ["--version"], { timeoutMs: 4000 });
+	return result.code !== null;
 }
 
 async function walkFiles(rootAbsPath, maxDepth = 20) {
@@ -404,38 +413,96 @@ async function runSearch({
 		resolveRepoPath(pathValue);
 	}
 
-	const hasRipgrep = await commandExists("rg");
-	let result;
+	if (cachedHasRipgrep === null) {
+		cachedHasRipgrep = await commandExists("rg");
+	}
+	const hasRipgrep = cachedHasRipgrep;
 	if (hasRipgrep) {
 		const args = ["-n", "--no-heading", "--color", "never"];
 		if (!caseSensitive) args.push("-i");
-		args.push(pattern, ...paths);
-		result = await runProcess("rg", args, { timeoutMs: 90_000 });
-	} else {
-		const args = ["-R", "-n", "--color=never"];
-		if (!caseSensitive) args.push("-i");
-		args.push(pattern, ...paths);
-		result = await runProcess("grep", args, { timeoutMs: 90_000 });
+		args.push("--", pattern, ...paths);
+		const result = await runProcess("rg", args, { timeoutMs: 90_000 });
+
+		const noMatch =
+			result.code === 1 && !result.stdout.trim() && !result.stderr.trim();
+		if (noMatch) {
+			return createTextResult(`No matches found for pattern: ${pattern}`);
+		}
+
+		const lines = result.stdout.split(/\r?\n/).filter(Boolean).slice(0, max);
+		const truncated = lines.length >= max;
+		const text = [
+			`Pattern: ${pattern}`,
+			`Paths: ${paths.join(", ")}`,
+			`Matches: ${lines.length}${truncated ? "+" : ""}`,
+			"",
+			...lines,
+		].join("\n");
+
+		const isError = !(result.ok || noMatch || result.code === 1);
+		return createTextResult(text, isError);
 	}
 
-	const noMatch =
-		result.code === 1 && !result.stdout.trim() && !result.stderr.trim();
-	if (noMatch) {
+	let regex;
+	try {
+		regex = new RegExp(pattern, caseSensitive ? "" : "i");
+	} catch (error) {
+		throw new Error(`Invalid regex pattern: ${String(error?.message || error)}`);
+	}
+
+	const matchingLines = [];
+	const seenFiles = new Set();
+	for (const pathValue of paths) {
+		const rootAbsPath = resolveRepoPath(pathValue);
+		const rootStat = await statSafe(rootAbsPath);
+		if (!rootStat) continue;
+
+		const filesToSearch = rootStat.isDirectory()
+			? await walkFiles(rootAbsPath, 20)
+			: [rootAbsPath];
+
+		for (const fileAbsPath of filesToSearch) {
+			if (matchingLines.length >= max) break;
+			if (seenFiles.has(fileAbsPath)) continue;
+			seenFiles.add(fileAbsPath);
+
+			const fileStat = await statSafe(fileAbsPath);
+			if (!fileStat?.isFile()) continue;
+
+			let sourceText = "";
+			try {
+				sourceText = await fs.readFile(fileAbsPath, "utf8");
+			} catch {
+				continue;
+			}
+
+			const sourceLines = sourceText.split(/\r?\n/);
+			for (let index = 0; index < sourceLines.length; index += 1) {
+				regex.lastIndex = 0;
+				if (!regex.test(sourceLines[index])) continue;
+				matchingLines.push(
+					`${repoRelative(fileAbsPath)}:${index + 1}:${sourceLines[index]}`,
+				);
+				if (matchingLines.length >= max) break;
+			}
+		}
+
+		if (matchingLines.length >= max) break;
+	}
+
+	if (matchingLines.length === 0) {
 		return createTextResult(`No matches found for pattern: ${pattern}`);
 	}
 
-	const lines = result.stdout.split(/\r?\n/).filter(Boolean).slice(0, max);
-	const truncated = lines.length >= max;
+	const truncated = matchingLines.length >= max;
 	const text = [
 		`Pattern: ${pattern}`,
 		`Paths: ${paths.join(", ")}`,
-		`Matches: ${lines.length}${truncated ? "+" : ""}`,
+		`Matches: ${matchingLines.length}${truncated ? "+" : ""}`,
 		"",
-		...lines,
+		...matchingLines,
 	].join("\n");
-
-	const isError = !(result.ok || noMatch || result.code === 1);
-	return createTextResult(text, isError);
+	return createTextResult(text);
 }
 
 async function toolSearch(args = {}) {
@@ -770,6 +837,7 @@ async function toolGenerateRoute(args = {}) {
 	if (!rawName) throw new Error("name is required");
 
 	const name = pascalCase(rawName);
+	const routeSlug = slugify(rawName) || slugify(name);
 	const authPolicy = String(args.auth_policy || "protected").toLowerCase();
 	if (!["protected", "public"].includes(authPolicy)) {
 		throw new Error("auth_policy must be either 'protected' or 'public'");
@@ -780,9 +848,8 @@ async function toolGenerateRoute(args = {}) {
 	const created = [];
 
 	if (authPolicy === "protected") {
-		const slug = slugify(rawName) || slugify(name);
-		const componentDirAbs = resolveRepoPath(`src/components/apps/${slug}`);
-		const routeDirAbs = resolveRepoPath(`src/routes/apps/${slug}`);
+		const componentDirAbs = resolveRepoPath(`src/components/apps/${routeSlug}`);
+		const routeDirAbs = resolveRepoPath(`src/routes/apps/${routeSlug}`);
 		await fs.mkdir(componentDirAbs, { recursive: true });
 		await fs.mkdir(routeDirAbs, { recursive: true });
 
@@ -800,12 +867,12 @@ async function toolGenerateRoute(args = {}) {
 
 		await fs.writeFile(
 			appFileAbs,
-			routeAppTemplate(name, slug, schema),
+			routeAppTemplate(name, routeSlug, schema),
 			"utf8",
 		);
 		await fs.writeFile(
 			routeFileAbs,
-			protectedRouteTemplate(name, slug),
+			protectedRouteTemplate(name, routeSlug),
 			"utf8",
 		);
 		created.push(repoRelative(appFileAbs), repoRelative(routeFileAbs));
@@ -822,8 +889,8 @@ async function toolGenerateRoute(args = {}) {
 
 	const registrationHint =
 		authPolicy === "protected"
-			? `Add route registration in src/App.tsx under /app, for example: path="apps/${slugify(rawName)}" -> <${name}RoutePage />`
-			: `Add public route registration in src/App.tsx, for example: path="/${slugify(rawName)}" -> <${name}Page />`;
+			? `Add route registration in src/App.tsx under /app, for example: path="apps/${routeSlug}" -> <${name}RoutePage />`
+			: `Add public route registration in src/App.tsx, for example: path="/${routeSlug}" -> <${name}Page />`;
 
 	return createTextResult(
 		`Generated route scaffold (${authPolicy}):\n- ${created.join("\n- ")}\n\nNext step: ${registrationHint}`,
@@ -1404,15 +1471,16 @@ let initialized = false;
 function sendMessage(message) {
 	const body = Buffer.from(JSON.stringify(message), "utf8");
 	const header = Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, "utf8");
-	process.stdout.write(header);
-	process.stdout.write(body);
+	process.stdout.write(Buffer.concat([header, body]));
 }
 
 function sendResponse(id, result) {
+	if (id === undefined) return;
 	sendMessage({ jsonrpc: "2.0", id, result });
 }
 
 function sendError(id, code, message, data) {
+	if (id === undefined) return;
 	sendMessage({
 		jsonrpc: "2.0",
 		id,
@@ -1432,11 +1500,22 @@ async function handleRequest(message) {
 	try {
 		if (method === "initialize") {
 			initialized = true;
+			const requestedProtocolVersion =
+				typeof params?.protocolVersion === "string"
+					? params.protocolVersion
+					: "";
+			const protocolVersion = SUPPORTED_PROTOCOL_VERSIONS.has(
+				requestedProtocolVersion,
+			)
+				? requestedProtocolVersion
+				: LATEST_PROTOCOL_VERSION;
 			return sendResponse(id, {
-				protocolVersion: "2024-11-05",
+				protocolVersion,
 				capabilities: {
 					tools: {},
 					prompts: {},
+					resources: {},
+					logging: {},
 				},
 				serverInfo: SERVER_INFO,
 			});
@@ -1459,16 +1538,37 @@ async function handleRequest(message) {
 			});
 		}
 
+		if (method === "resources/list") {
+			return sendResponse(id, {
+				resources: [],
+			});
+		}
+
+		if (method === "resources/templates/list") {
+			return sendResponse(id, {
+				resourceTemplates: [],
+			});
+		}
+
 		if (method === "tools/call") {
 			const name = params?.name;
-			const args = params?.arguments || {};
+			const rawArgs = params?.arguments;
 			if (typeof name !== "string") {
 				return sendError(id, -32602, "tools/call requires a string name");
+			}
+			if (
+				rawArgs !== undefined &&
+				(rawArgs === null ||
+					typeof rawArgs !== "object" ||
+					Array.isArray(rawArgs))
+			) {
+				return sendError(id, -32602, "tools/call arguments must be an object");
 			}
 			const tool = TOOL_MAP.get(name);
 			if (!tool) {
 				return sendError(id, -32601, `Unknown tool: ${name}`);
 			}
+			const args = rawArgs || {};
 
 			try {
 				const result = await tool.handler(args);
@@ -1492,10 +1592,19 @@ async function handleRequest(message) {
 
 		if (method === "prompts/get") {
 			const name = params?.name;
-			const args = params?.arguments || {};
+			const rawArgs = params?.arguments;
 			if (typeof name !== "string") {
 				return sendError(id, -32602, "prompts/get requires a string name");
 			}
+			if (
+				rawArgs !== undefined &&
+				(rawArgs === null ||
+					typeof rawArgs !== "object" ||
+					Array.isArray(rawArgs))
+			) {
+				return sendError(id, -32602, "prompts/get arguments must be an object");
+			}
+			const args = rawArgs || {};
 			const result = promptGet(name, args);
 			return sendResponse(id, result);
 		}
@@ -1517,20 +1626,32 @@ async function handleRequest(message) {
 
 let buffer = Buffer.alloc(0);
 
+function findHeaderTerminator(buf) {
+	const crlfIndex = buf.indexOf("\r\n\r\n");
+	const lfIndex = buf.indexOf("\n\n");
+
+	if (crlfIndex === -1 && lfIndex === -1) return null;
+	if (crlfIndex === -1) return { index: lfIndex, length: 2 };
+	if (lfIndex === -1) return { index: crlfIndex, length: 4 };
+	return crlfIndex < lfIndex
+		? { index: crlfIndex, length: 4 }
+		: { index: lfIndex, length: 2 };
+}
+
 function processInputBuffer() {
 	while (true) {
-		const headerEnd = buffer.indexOf("\r\n\r\n");
-		if (headerEnd === -1) return;
+		const terminator = findHeaderTerminator(buffer);
+		if (!terminator) return;
 
-		const header = buffer.slice(0, headerEnd).toString("utf8");
+		const header = buffer.slice(0, terminator.index).toString("utf8");
 		const lengthMatch = header.match(/Content-Length:\s*(\d+)/i);
 		if (!lengthMatch) {
-			buffer = buffer.slice(headerEnd + 4);
+			buffer = buffer.slice(terminator.index + terminator.length);
 			continue;
 		}
 
 		const contentLength = Number.parseInt(lengthMatch[1], 10);
-		const messageStart = headerEnd + 4;
+		const messageStart = terminator.index + terminator.length;
 		const messageEnd = messageStart + contentLength;
 		if (buffer.length < messageEnd) return;
 

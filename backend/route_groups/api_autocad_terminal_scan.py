@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -66,6 +67,16 @@ TERMINAL_COUNT_KEYS = (
     "POINT_COUNT",
 )
 
+TERMINAL_NAME_TOKENS = (
+    "TERMINAL",
+    "TERMS",
+    "TB",
+    "TS",
+    "MARSHALLING",
+)
+
+TERMINAL_LABEL_TAG_PATTERN = re.compile(r"^TERM[_-]?0*(\d+)[_-]?LABEL$")
+
 PANEL_COLOR_PALETTE = (
     "#f59e0b",
     "#3b82f6",
@@ -87,6 +98,10 @@ INSUNITS_MAP = {
     6: "Meters",
     7: "Kilometers",
 }
+
+DEFAULT_PANEL_PREFIX = "PANEL"
+DEFAULT_TERMINAL_COUNT = 12
+AFFINE2D_IDENTITY = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
 
 
 def _safe_str(value: Any) -> str:
@@ -115,6 +130,131 @@ def _safe_int(value: Any) -> Optional[int]:
         return int(str(value).strip())
     except Exception:
         return None
+
+
+def _safe_bool(value: Any, *, fallback: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = _safe_upper(value)
+    if text in {"1", "TRUE", "YES", "Y", "ON"}:
+        return True
+    if text in {"0", "FALSE", "NO", "N", "OFF"}:
+        return False
+    return fallback
+
+
+def _normalize_tag_keys(raw_value: Any, *, fallback: Sequence[str]) -> tuple[str, ...]:
+    if not isinstance(raw_value, list):
+        return tuple(str(item).strip().upper() for item in fallback if str(item).strip())
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw_value:
+        key = _safe_upper(item)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        normalized.append(key)
+    if normalized:
+        return tuple(normalized)
+    return tuple(str(item).strip().upper() for item in fallback if str(item).strip())
+
+
+def _normalize_name_tokens(raw_value: Any, *, fallback: Sequence[str]) -> tuple[str, ...]:
+    if not isinstance(raw_value, list):
+        return tuple(str(item).strip().upper() for item in fallback if str(item).strip())
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw_value:
+        token = _safe_upper(item)
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        normalized.append(token)
+    if normalized:
+        return tuple(normalized)
+    return tuple(str(item).strip().upper() for item in fallback if str(item).strip())
+
+
+def _resolve_terminal_profile(raw_profile: Any) -> Dict[str, Any]:
+    profile = raw_profile if isinstance(raw_profile, dict) else {}
+
+    default_panel_prefix = _safe_upper(
+        profile.get("defaultPanelPrefix", profile.get("default_panel_prefix", DEFAULT_PANEL_PREFIX))
+    )
+    if not default_panel_prefix:
+        default_panel_prefix = DEFAULT_PANEL_PREFIX
+
+    default_terminal_count = _safe_int(
+        profile.get(
+            "defaultTerminalCount",
+            profile.get("default_terminal_count", DEFAULT_TERMINAL_COUNT),
+        )
+    )
+    if default_terminal_count is None or default_terminal_count <= 0:
+        default_terminal_count = DEFAULT_TERMINAL_COUNT
+    default_terminal_count = max(1, min(2000, default_terminal_count))
+
+    return {
+        "panelIdKeys": _normalize_tag_keys(profile.get("panelIdKeys"), fallback=PANEL_ID_KEYS),
+        "panelNameKeys": _normalize_tag_keys(profile.get("panelNameKeys"), fallback=PANEL_NAME_KEYS),
+        "sideKeys": _normalize_tag_keys(profile.get("sideKeys"), fallback=SIDE_KEYS),
+        "stripIdKeys": _normalize_tag_keys(profile.get("stripIdKeys"), fallback=STRIP_ID_KEYS),
+        "stripNumberKeys": _normalize_tag_keys(
+            profile.get("stripNumberKeys"),
+            fallback=STRIP_NUMBER_KEYS,
+        ),
+        "terminalCountKeys": _normalize_tag_keys(
+            profile.get("terminalCountKeys"),
+            fallback=TERMINAL_COUNT_KEYS,
+        ),
+        "terminalTagKeys": _normalize_tag_keys(
+            profile.get("terminalTagKeys"),
+            fallback=TERMINAL_TAG_KEYS,
+        ),
+        "terminalNameTokens": _normalize_name_tokens(
+            profile.get("terminalNameTokens"),
+            fallback=TERMINAL_NAME_TOKENS,
+        ),
+        "blockNameAllowList": _normalize_name_tokens(
+            profile.get("blockNameAllowList", profile.get("block_name_allow_list")),
+            fallback=(),
+        ),
+        "requireStripId": _safe_bool(
+            profile.get("requireStripId", profile.get("require_strip_id")),
+            fallback=False,
+        ),
+        "requireTerminalCount": _safe_bool(
+            profile.get("requireTerminalCount", profile.get("require_terminal_count")),
+            fallback=False,
+        ),
+        "requireSide": _safe_bool(
+            profile.get("requireSide", profile.get("require_side")),
+            fallback=False,
+        ),
+        "defaultPanelPrefix": default_panel_prefix,
+        "defaultTerminalCount": default_terminal_count,
+    }
+
+
+def _terminal_profile_summary(profile: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "defaultPanelPrefix": str(profile.get("defaultPanelPrefix") or DEFAULT_PANEL_PREFIX),
+        "defaultTerminalCount": int(profile.get("defaultTerminalCount") or DEFAULT_TERMINAL_COUNT),
+        "panelIdKeys": list(profile.get("panelIdKeys") or []),
+        "panelNameKeys": list(profile.get("panelNameKeys") or []),
+        "sideKeys": list(profile.get("sideKeys") or []),
+        "stripIdKeys": list(profile.get("stripIdKeys") or []),
+        "stripNumberKeys": list(profile.get("stripNumberKeys") or []),
+        "terminalCountKeys": list(profile.get("terminalCountKeys") or []),
+        "terminalTagKeys": list(profile.get("terminalTagKeys") or []),
+        "terminalNameTokens": list(profile.get("terminalNameTokens") or []),
+        "blockNameAllowList": list(profile.get("blockNameAllowList") or []),
+        "requireStripId": bool(profile.get("requireStripId")),
+        "requireTerminalCount": bool(profile.get("requireTerminalCount")),
+        "requireSide": bool(profile.get("requireSide")),
+    }
 
 
 def _first_attr(attrs: Dict[str, str], keys: Sequence[str]) -> str:
@@ -182,6 +322,352 @@ def _extract_insertion_point(entity: Any) -> Optional[Tuple[float, float]]:
     return None
 
 
+def _to_point2(raw: Any) -> Optional[Tuple[float, float]]:
+    if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+        return None
+    x = _safe_float(raw[0])
+    y = _safe_float(raw[1])
+    if x is None or y is None:
+        return None
+    if not math.isfinite(x) or not math.isfinite(y):
+        return None
+    return (x, y)
+
+
+def _block_insert_transform(
+    entity: Any,
+    *,
+    fallback_insertion: Optional[Tuple[float, float]] = None,
+) -> Tuple[float, float, float, float, float, float]:
+    insertion = _extract_insertion_point(entity)
+    if insertion is None:
+        insertion = fallback_insertion or (0.0, 0.0)
+
+    try:
+        sx = _safe_float(getattr(entity, "XScaleFactor", 1.0))
+    except Exception:
+        sx = 1.0
+    try:
+        sy = _safe_float(getattr(entity, "YScaleFactor", 1.0))
+    except Exception:
+        sy = 1.0
+    try:
+        rotation = _safe_float(getattr(entity, "Rotation", 0.0))
+    except Exception:
+        rotation = 0.0
+
+    sx = 1.0 if sx is None or abs(sx) <= 1e-9 else sx
+    sy = 1.0 if sy is None or abs(sy) <= 1e-9 else sy
+    rotation = 0.0 if rotation is None else rotation
+
+    cos_r = math.cos(rotation)
+    sin_r = math.sin(rotation)
+    return (
+        cos_r * sx,
+        -sin_r * sy,
+        insertion[0],
+        sin_r * sx,
+        cos_r * sy,
+        insertion[1],
+    )
+
+
+def _compose_affine2d(
+    parent: Tuple[float, float, float, float, float, float],
+    child: Tuple[float, float, float, float, float, float],
+) -> Tuple[float, float, float, float, float, float]:
+    a00, a01, a02, a10, a11, a12 = parent
+    b00, b01, b02, b10, b11, b12 = child
+    return (
+        a00 * b00 + a01 * b10,
+        a00 * b01 + a01 * b11,
+        a00 * b02 + a01 * b12 + a02,
+        a10 * b00 + a11 * b10,
+        a10 * b01 + a11 * b11,
+        a10 * b02 + a11 * b12 + a12,
+    )
+
+
+def _apply_affine2d(
+    transform: Tuple[float, float, float, float, float, float],
+    point: Tuple[float, float],
+) -> Tuple[float, float]:
+    m00, m01, m02, m10, m11, m12 = transform
+    x, y = point
+    return (m00 * x + m01 * y + m02, m10 * x + m11 * y + m12)
+
+
+def _iter_collection_items(collection: Any, dyn_fn: Any) -> Iterable[Any]:
+    if collection is None:
+        return []
+    try:
+        count = int(collection.Count)
+    except Exception:
+        return []
+
+    for index in range(count):
+        try:
+            yield dyn_fn(collection.Item(index))
+        except Exception:
+            continue
+
+
+def _extract_polyline_points(entity: Any, object_name: str) -> List[Tuple[float, float]]:
+    points: List[Tuple[float, float]] = []
+
+    try:
+        raw_coords = list(getattr(entity, "Coordinates"))
+    except Exception:
+        raw_coords = []
+
+    if raw_coords:
+        stride = 3 if "3DPOLYLINE" in object_name else 2
+        if stride == 2 and len(raw_coords) % 2 != 0 and len(raw_coords) % 3 == 0:
+            stride = 3
+
+        for index in range(0, len(raw_coords), stride):
+            if index + 1 >= len(raw_coords):
+                break
+            x = _safe_float(raw_coords[index])
+            y = _safe_float(raw_coords[index + 1])
+            if x is None or y is None:
+                continue
+            if not math.isfinite(x) or not math.isfinite(y):
+                continue
+            points.append((x, y))
+
+        if len(points) >= 2:
+            return points
+
+    try:
+        vertex_count = int(getattr(entity, "NumberOfVertices"))
+    except Exception:
+        return points
+
+    for index in range(vertex_count):
+        try:
+            vertex = getattr(entity, "Coordinate")(index)
+        except Exception:
+            continue
+        parsed = _to_point2(vertex)
+        if parsed is None:
+            continue
+        points.append(parsed)
+
+    return points
+
+
+def _polyline_closed(entity: Any) -> bool:
+    try:
+        raw_closed = getattr(entity, "Closed")
+    except Exception:
+        return False
+
+    if isinstance(raw_closed, bool):
+        return raw_closed
+    if isinstance(raw_closed, (int, float)):
+        return bool(raw_closed)
+    return _safe_upper(raw_closed) in {"1", "TRUE", "YES", "Y", "ON"}
+
+
+def _transform_geometry_primitives(
+    primitives: Sequence[Dict[str, Any]],
+    transform: Tuple[float, float, float, float, float, float],
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for primitive in primitives:
+        raw_points = primitive.get("points")
+        if not isinstance(raw_points, list):
+            continue
+
+        transformed_points: List[Tuple[float, float]] = []
+        for raw_point in raw_points:
+            if not isinstance(raw_point, tuple) or len(raw_point) < 2:
+                continue
+            x = _safe_float(raw_point[0])
+            y = _safe_float(raw_point[1])
+            if x is None or y is None:
+                continue
+            world_x, world_y = _apply_affine2d(transform, (x, y))
+            if not math.isfinite(world_x) or not math.isfinite(world_y):
+                continue
+            transformed_points.append((world_x, world_y))
+
+        if len(transformed_points) < 2:
+            continue
+
+        payload: Dict[str, Any] = {
+            "kind": "polyline"
+            if _safe_upper(primitive.get("kind")) == "POLYLINE"
+            else "line",
+            "points": transformed_points,
+        }
+        if payload["kind"] == "polyline" and bool(primitive.get("closed")):
+            payload["closed"] = True
+        out.append(payload)
+    return out
+
+
+def _serialize_geometry_primitives(primitives: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    serialized: List[Dict[str, Any]] = []
+    for primitive in primitives:
+        raw_points = primitive.get("points")
+        if not isinstance(raw_points, list):
+            continue
+
+        points_payload: List[Dict[str, float]] = []
+        for raw_point in raw_points:
+            if not isinstance(raw_point, tuple) or len(raw_point) < 2:
+                continue
+            x = _safe_float(raw_point[0])
+            y = _safe_float(raw_point[1])
+            if x is None or y is None:
+                continue
+            if not math.isfinite(x) or not math.isfinite(y):
+                continue
+            points_payload.append({"x": round(float(x), 6), "y": round(float(y), 6)})
+
+        if len(points_payload) < 2:
+            continue
+
+        kind = (
+            "polyline"
+            if _safe_upper(primitive.get("kind")) == "POLYLINE"
+            else "line"
+        )
+        payload: Dict[str, Any] = {"kind": kind, "points": points_payload}
+        if kind == "polyline" and bool(primitive.get("closed")):
+            payload["closed"] = True
+        serialized.append(payload)
+
+    return serialized
+
+
+def _collect_block_definition_geometry(
+    *,
+    doc: Any,
+    block_name: str,
+    dyn_fn: Any,
+    cache: Dict[str, List[Dict[str, Any]]],
+    active_stack: set[str],
+) -> List[Dict[str, Any]]:
+    key = _safe_upper(block_name)
+    if not key:
+        return []
+    if key in cache:
+        return cache[key]
+    if key in active_stack:
+        return []
+
+    active_stack.add(key)
+    primitives: List[Dict[str, Any]] = []
+    try:
+        try:
+            blocks = dyn_fn(getattr(doc, "Blocks"))
+        except Exception:
+            cache[key] = []
+            return []
+
+        block_def = None
+        for candidate_name in (block_name, key):
+            if not candidate_name:
+                continue
+            try:
+                block_def = dyn_fn(blocks.Item(candidate_name))
+                break
+            except Exception:
+                continue
+
+        if block_def is None:
+            cache[key] = []
+            return []
+
+        for child_entity in _iter_collection_items(block_def, dyn_fn):
+            object_name = _safe_upper(getattr(child_entity, "ObjectName", ""))
+            if not object_name:
+                continue
+
+            if "BLOCKREFERENCE" in object_name:
+                nested_name = _block_name_for_entity(child_entity, dyn_fn)
+                if not nested_name:
+                    continue
+                nested_primitives = _collect_block_definition_geometry(
+                    doc=doc,
+                    block_name=nested_name,
+                    dyn_fn=dyn_fn,
+                    cache=cache,
+                    active_stack=active_stack,
+                )
+                if not nested_primitives:
+                    continue
+                nested_transform = _block_insert_transform(child_entity)
+                primitives.extend(
+                    _transform_geometry_primitives(nested_primitives, nested_transform)
+                )
+                continue
+
+            if "POLYLINE" in object_name:
+                points = _extract_polyline_points(child_entity, object_name)
+                if len(points) < 2:
+                    continue
+                primitive: Dict[str, Any] = {
+                    "kind": "polyline",
+                    "points": points,
+                }
+                if _polyline_closed(child_entity):
+                    primitive["closed"] = True
+                primitives.append(primitive)
+                continue
+
+            if object_name == "ACDBLINE":
+                start_point = _to_point2(getattr(child_entity, "StartPoint", None))
+                end_point = _to_point2(getattr(child_entity, "EndPoint", None))
+                if start_point is None or end_point is None:
+                    continue
+                primitives.append(
+                    {
+                        "kind": "line",
+                        "points": [start_point, end_point],
+                    }
+                )
+                continue
+
+        cache[key] = primitives
+        return primitives
+    finally:
+        active_stack.discard(key)
+
+
+def _extract_terminal_geometry(
+    *,
+    entity: Any,
+    doc: Any,
+    block_name: str,
+    dyn_fn: Any,
+    cache: Dict[str, List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    if not block_name:
+        return []
+
+    insertion = _extract_insertion_point(entity) or (0.0, 0.0)
+    transform = _compose_affine2d(
+        AFFINE2D_IDENTITY,
+        _block_insert_transform(entity, fallback_insertion=insertion),
+    )
+    local_primitives = _collect_block_definition_geometry(
+        doc=doc,
+        block_name=block_name,
+        dyn_fn=dyn_fn,
+        cache=cache,
+        active_stack=set(),
+    )
+    if not local_primitives:
+        return []
+
+    world_primitives = _transform_geometry_primitives(local_primitives, transform)
+    return _serialize_geometry_primitives(world_primitives)
+
+
 def _normalize_side(raw_side: str) -> str:
     text = _safe_upper(raw_side)
     if not text:
@@ -236,18 +722,40 @@ def _extract_int_from_text(text: str) -> Optional[int]:
         return None
 
 
-def _strip_number(strip_id: str, attrs: Dict[str, str]) -> int:
-    for key in STRIP_NUMBER_KEYS:
+def _strip_number(strip_id: str, attrs: Dict[str, str], strip_number_keys: Sequence[str]) -> int:
+    for key in strip_number_keys:
         value = attrs.get(key, "")
         parsed = _extract_int_from_text(value)
         if parsed is not None:
             return parsed
-    parsed = _extract_int_from_text(strip_id)
+
+    # Common strip-id shape is PANEL+SIDE+NUMBER (e.g., RP1L6, JB2R12).
+    # Prefer the terminal-side suffix number over earlier panel digits.
+    text = _safe_upper(strip_id)
+    suffix_match = re.search(r"[LRC](\d+)$", text)
+    if suffix_match:
+        try:
+            return int(suffix_match.group(1))
+        except Exception:
+            pass
+
+    trailing_match = re.search(r"(\d+)$", text)
+    if trailing_match:
+        try:
+            return int(trailing_match.group(1))
+        except Exception:
+            pass
+
+    parsed = _extract_int_from_text(text)
     return parsed if parsed is not None else 1
 
 
-def _terminal_count(attrs: Dict[str, str]) -> int:
-    for key in TERMINAL_COUNT_KEYS:
+def _terminal_count(
+    attrs: Dict[str, str],
+    terminal_count_keys: Sequence[str],
+    default_terminal_count: int,
+) -> int:
+    for key in terminal_count_keys:
         value = attrs.get(key, "")
         parsed = _extract_int_from_text(value)
         if parsed is not None and parsed > 0:
@@ -260,18 +768,65 @@ def _terminal_count(attrs: Dict[str, str]) -> int:
     if inferred > 0:
         return min(inferred, 2000)
 
-    return 12
+    return max(1, min(2000, int(default_terminal_count)))
 
 
-def _is_terminal_block(block_name: str, attrs: Dict[str, str]) -> bool:
+def _terminal_labels(attrs: Dict[str, str], terminal_count: int) -> List[str]:
+    labels_by_index: Dict[int, str] = {}
+    for key, raw_value in attrs.items():
+        match = TERMINAL_LABEL_TAG_PATTERN.fullmatch(_safe_upper(key))
+        if not match:
+            continue
+        try:
+            index = int(match.group(1))
+        except Exception:
+            continue
+        if index <= 0:
+            continue
+        label_text = _safe_str(raw_value)
+        if not label_text:
+            continue
+        labels_by_index[index] = label_text
+
+    count = max(1, int(terminal_count))
+    return [labels_by_index.get(index, "") for index in range(1, count + 1)]
+
+
+def _is_terminal_block(
+    block_name: str,
+    attrs: Dict[str, str],
+    *,
+    terminal_tag_keys: Sequence[str],
+    terminal_name_tokens: Sequence[str],
+    block_name_allow_list: Sequence[str],
+    strip_id_keys: Sequence[str],
+    terminal_count_keys: Sequence[str],
+    side_keys: Sequence[str],
+    require_strip_id: bool,
+    require_terminal_count: bool,
+    require_side: bool,
+) -> bool:
     name = _safe_upper(block_name)
     if not name and not attrs:
         return False
 
+    if block_name_allow_list:
+        normalized_allow = {_safe_upper(entry) for entry in block_name_allow_list if _safe_upper(entry)}
+        if normalized_allow and name not in normalized_allow:
+            return False
+
+    if require_strip_id and not _first_attr(attrs, strip_id_keys):
+        return False
+    if require_terminal_count and not _first_attr(attrs, terminal_count_keys):
+        return False
+    if require_side and not _first_attr(attrs, side_keys):
+        return False
+
     tokens = [token for token in re.split(r"[^A-Z0-9]+", name) if token]
     token_set = set(tokens)
+    token_hints = {_safe_upper(token) for token in terminal_name_tokens if _safe_upper(token)}
     has_terminal_name = any(
-        token in {"TERMINAL", "TERMS", "TB", "TS", "MARSHALLING"}
+        token in token_hints
         or token.startswith("TB")
         or token.startswith("TS")
         for token in token_set
@@ -279,7 +834,7 @@ def _is_terminal_block(block_name: str, attrs: Dict[str, str]) -> bool:
     if has_terminal_name:
         return True
 
-    return any(key in attrs for key in TERMINAL_TAG_KEYS)
+    return any(key in attrs for key in terminal_tag_keys)
 
 
 def _handle_for_entity(entity: Any) -> str:
@@ -348,6 +903,18 @@ def _collect_selection_entities(doc: Any, dyn_fn: Any) -> List[Any]:
     return entities
 
 
+def _top_block_counts(block_counts: Dict[str, int], *, limit: int = 20) -> List[Dict[str, Any]]:
+    ranked = sorted(
+        (
+            {"blockName": block_name, "count": count}
+            for block_name, count in block_counts.items()
+            if block_name
+        ),
+        key=lambda item: (-int(item["count"]), str(item["blockName"])),
+    )
+    return ranked[: max(1, int(limit))]
+
+
 def scan_terminal_strips(
     *,
     doc: Any,
@@ -356,23 +923,39 @@ def scan_terminal_strips(
     include_modelspace: bool = True,
     selection_only: bool = False,
     max_entities: int = 50000,
+    terminal_profile: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     drawing_name = _safe_str(getattr(doc, "Name", "")) or "Unknown.dwg"
     units = _resolve_units(doc)
+    profile = _resolve_terminal_profile(terminal_profile)
 
     records: List[Dict[str, Any]] = []
+    geometry_cache: Dict[str, List[Dict[str, Any]]] = {}
     seen_strip_ids: set[str] = set()
     seen_entity_handles: set[str] = set()
     warnings: List[str] = []
 
     scanned_entities = 0
     scanned_block_refs = 0
+    skipped_non_block_entities = 0
     skipped_non_terminal_blocks = 0
+    skipped_missing_insertion_point_blocks = 0
+    terminal_candidate_blocks = 0
+    total_labeled_terminals = 0
+    total_geometry_primitives = 0
+    scanned_block_name_counts: Dict[str, int] = {}
 
     selection_entities = _collect_selection_entities(doc, dyn_fn) if selection_only else []
 
     def _try_record_entity(entity: Any) -> None:
-        nonlocal scanned_entities, scanned_block_refs, skipped_non_terminal_blocks
+        nonlocal scanned_entities
+        nonlocal scanned_block_refs
+        nonlocal skipped_non_block_entities
+        nonlocal skipped_non_terminal_blocks
+        nonlocal skipped_missing_insertion_point_blocks
+        nonlocal terminal_candidate_blocks
+        nonlocal total_labeled_terminals
+        nonlocal total_geometry_primitives
         scanned_entities += 1
         handle = _handle_for_entity(entity)
         if handle and handle in seen_entity_handles:
@@ -382,23 +965,42 @@ def scan_terminal_strips(
 
         object_name = _safe_upper(getattr(entity, "ObjectName", ""))
         if "BLOCKREFERENCE" not in object_name:
+            skipped_non_block_entities += 1
             return
         scanned_block_refs += 1
 
         attrs = _attributes_for_entity(entity, dyn_fn)
         block_name = _block_name_for_entity(entity, dyn_fn)
-        if not _is_terminal_block(block_name, attrs):
+        block_name_key = _safe_upper(block_name) or "<UNKNOWN>"
+        scanned_block_name_counts[block_name_key] = (
+            scanned_block_name_counts.get(block_name_key, 0) + 1
+        )
+        if not _is_terminal_block(
+            block_name,
+            attrs,
+            terminal_tag_keys=profile["terminalTagKeys"],
+            terminal_name_tokens=profile["terminalNameTokens"],
+            block_name_allow_list=profile["blockNameAllowList"],
+            strip_id_keys=profile["stripIdKeys"],
+            terminal_count_keys=profile["terminalCountKeys"],
+            side_keys=profile["sideKeys"],
+            require_strip_id=bool(profile.get("requireStripId")),
+            require_terminal_count=bool(profile.get("requireTerminalCount")),
+            require_side=bool(profile.get("requireSide")),
+        ):
             skipped_non_terminal_blocks += 1
             return
+        terminal_candidate_blocks += 1
 
         insertion = _extract_insertion_point(entity)
         if insertion is None:
+            skipped_missing_insertion_point_blocks += 1
             warnings.append(
                 f"Skipping block {block_name or '<unknown>'} (missing insertion point)."
             )
             return
 
-        strip_id_raw = _first_attr(attrs, STRIP_ID_KEYS)
+        strip_id_raw = _first_attr(attrs, profile["stripIdKeys"])
         strip_id = _safe_upper(strip_id_raw) or _safe_upper(block_name) or f"STRIP_{handle or scanned_block_refs}"
 
         if strip_id in seen_strip_ids:
@@ -410,19 +1012,41 @@ def scan_terminal_strips(
             strip_id = candidate
         seen_strip_ids.add(strip_id)
 
-        panel_id_raw = _first_attr(attrs, PANEL_ID_KEYS)
-        panel_id = _safe_upper(panel_id_raw) or _derive_panel_from_strip_id(strip_id) or "PANEL"
-        panel_name = _first_attr(attrs, PANEL_NAME_KEYS) or panel_id
-        side_raw = _first_attr(attrs, SIDE_KEYS) or _derive_side_from_strip_id(strip_id)
+        panel_id_raw = _first_attr(attrs, profile["panelIdKeys"])
+        panel_id = (
+            _safe_upper(panel_id_raw)
+            or _derive_panel_from_strip_id(strip_id)
+            or str(profile["defaultPanelPrefix"])
+        )
+        panel_name = _first_attr(attrs, profile["panelNameKeys"]) or panel_id
+        side_raw = _first_attr(attrs, profile["sideKeys"]) or _derive_side_from_strip_id(strip_id)
         side = _normalize_side(side_raw)
+
+        terminal_count = _terminal_count(
+            attrs,
+            profile["terminalCountKeys"],
+            int(profile["defaultTerminalCount"]),
+        )
+        terminal_labels = _terminal_labels(attrs, terminal_count)
+        total_labeled_terminals += sum(1 for label in terminal_labels if label)
+        geometry = _extract_terminal_geometry(
+            entity=entity,
+            doc=doc,
+            block_name=block_name,
+            dyn_fn=dyn_fn,
+            cache=geometry_cache,
+        )
+        total_geometry_primitives += len(geometry)
 
         record = {
             "panel_id": panel_id,
             "panel_name": panel_name,
             "side": side,
             "strip_id": strip_id,
-            "strip_number": _strip_number(strip_id, attrs),
-            "terminal_count": _terminal_count(attrs),
+            "strip_number": _strip_number(strip_id, attrs, profile["stripNumberKeys"]),
+            "terminal_count": terminal_count,
+            "terminal_labels": terminal_labels,
+            "geometry": geometry,
             "x": insertion[0],
             "y": insertion[1],
         }
@@ -476,6 +1100,8 @@ def scan_terminal_strips(
                 "stripId": _safe_str(record.get("strip_id")),
                 "stripNumber": int(record.get("strip_number") or 1),
                 "terminalCount": int(record.get("terminal_count") or 12),
+                "terminalLabels": list(record.get("terminal_labels") or []),
+                "geometry": list(record.get("geometry") or []),
                 "x": float(record.get("x") or 0.0),
                 "y": float(record.get("y") or 0.0),
             }
@@ -497,6 +1123,13 @@ def scan_terminal_strips(
         "No terminal-strip block references were detected. "
         "Check block naming/attributes (e.g., STRIP_ID, TERMINAL_COUNT, PANEL_ID)."
     )
+    top_scanned_block_names = _top_block_counts(scanned_block_name_counts, limit=12)
+    if total_strips == 0 and top_scanned_block_names:
+        sample_names = ", ".join(
+            item.get("blockName", "") for item in top_scanned_block_names[:6] if item.get("blockName")
+        )
+        if sample_names:
+            no_data_message = f"{no_data_message} Scanned block names sample: {sample_names}."
 
     return {
         "success": total_strips > 0,
@@ -513,12 +1146,19 @@ def scan_terminal_strips(
         "meta": {
             "scannedEntities": scanned_entities,
             "scannedBlockReferences": scanned_block_refs,
+            "skippedNonBlockEntities": skipped_non_block_entities,
             "skippedNonTerminalBlocks": skipped_non_terminal_blocks,
+            "skippedMissingInsertionPointBlocks": skipped_missing_insertion_point_blocks,
+            "terminalCandidateBlocks": terminal_candidate_blocks,
             "selectionOnly": bool(selection_only),
             "includeModelspace": bool(include_modelspace),
             "totalPanels": len(panels),
             "totalStrips": total_strips,
             "totalTerminals": total_terminals,
+            "totalLabeledTerminals": total_labeled_terminals,
+            "totalGeometryPrimitives": total_geometry_primitives,
+            "topScannedBlockNames": top_scanned_block_names,
+            "terminalProfile": _terminal_profile_summary(profile),
         },
         "warnings": warnings,
     }

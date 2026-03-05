@@ -87,6 +87,14 @@ function makeRouteId(): string {
 	return `route_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function toCsvValue(value: string | number): string {
+	const text = String(value ?? "");
+	if (/[",\r\n]/.test(text)) {
+		return `"${text.replace(/"/g, '""')}"`;
+	}
+	return text;
+}
+
 function colorVariantByPercent(
 	percent: number,
 ): "success" | "warning" | "danger" {
@@ -129,6 +137,13 @@ function inferObstacleTypeFromLayer(layerName: string): ObstacleType | null {
 	if (layer.startsWith("E-CONDUIT") || layer === "E-CONDUIT") return "road";
 	return null;
 }
+
+const OBSTACLE_LAYER_PRESET_OPTIONS = [
+	{ id: "", label: "Manual Rules" },
+	{ id: "substation_default", label: "Substation Default" },
+	{ id: "industrial_plant", label: "Industrial Plant" },
+	{ id: "utility_yard", label: "Utility Yard" },
+] as const;
 
 function SectionSketch({ preset }: { preset: SectionPreset["id"] }) {
 	if (preset === "stub_up") {
@@ -335,6 +350,7 @@ export function ConduitRouteApp() {
 	const [obstacleLayerRules, setObstacleLayerRules] = useState<
 		ObstacleLayerRule[]
 	>([]);
+	const [obstacleLayerPreset, setObstacleLayerPreset] = useState<string>("");
 
 	const [necConductors, setNecConductors] =
 		useState<NecConductorInput[]>(DEFAULT_CONDUCTORS);
@@ -524,6 +540,7 @@ export function ConduitRouteApp() {
 			canvasHeight: CANVAS_HEIGHT,
 			layerNames: obstacleLayerNames,
 			layerTypeOverrides: obstacleLayerTypeOverrides,
+			layerPreset: obstacleLayerPreset,
 		});
 		setObstacleSyncing(false);
 
@@ -605,6 +622,7 @@ export function ConduitRouteApp() {
 				canvasHeight: CANVAS_HEIGHT,
 				layerNames: obstacleLayerNames,
 				layerTypeOverrides: obstacleLayerTypeOverrides,
+				layerPreset: obstacleLayerPreset,
 			})
 			.then((response) => {
 				if (cancelled || !response.success || !response.data) {
@@ -632,6 +650,7 @@ export function ConduitRouteApp() {
 		obstacleSource,
 		obstacleLayerNames,
 		obstacleLayerTypeOverrides,
+		obstacleLayerPreset,
 	]);
 
 	const handleCanvasPoint = (
@@ -688,6 +707,7 @@ export function ConduitRouteApp() {
 									maxEntities: 50000,
 									layerNames: obstacleLayerNames,
 									layerTypeOverrides: obstacleLayerTypeOverrides,
+									layerPreset: obstacleLayerPreset,
 								}
 							: undefined,
 					canvasWidth: CANVAS_WIDTH,
@@ -810,6 +830,61 @@ export function ConduitRouteApp() {
 			to: `${Math.round(route.end.x)},${Math.round(route.end.y)}`,
 			length: Math.round(route.length),
 		}));
+	const bridgeBadgeLabel = isTerminalWorkspace
+		? "Terminal Scan Workflow"
+		: obstacleSyncing
+			? "AutoCAD Bridge Syncing"
+			: obstacleSource === "autocad"
+				? "AutoCAD Bridge Active"
+				: "AutoCAD Bridge Ready";
+
+	const exportScheduleCsv = () => {
+		if (scheduleRows.length === 0) {
+			setStatusMessage("No schedule rows available to export.");
+			return;
+		}
+
+		const header = ["Ref", "Type", "Fn", "Color", "From", "To", "LengthPx"];
+		const lines = [header.join(",")];
+		for (const row of scheduleRows) {
+			lines.push(
+				[
+					toCsvValue(row.ref),
+					toCsvValue(row.type),
+					toCsvValue(row.fn),
+					toCsvValue(row.color),
+					toCsvValue(row.from),
+					toCsvValue(row.to),
+					toCsvValue(row.length),
+				].join(","),
+			);
+		}
+
+		const csvText = lines.join("\r\n");
+		const blob = new Blob([csvText], { type: "text/csv;charset=utf-8" });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement("a");
+		const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+		anchor.href = url;
+		anchor.download = `conduit-route-schedule-${stamp}.csv`;
+		document.body.append(anchor);
+		anchor.click();
+		anchor.remove();
+		URL.revokeObjectURL(url);
+		setStatusMessage(`Exported ${scheduleRows.length} schedule row(s) to CSV.`);
+	};
+
+	const handleLayerPresetChange = (presetId: string) => {
+		setObstacleLayerPreset(presetId);
+		const selected = OBSTACLE_LAYER_PRESET_OPTIONS.find(
+			(entry) => entry.id === presetId,
+		);
+		setStatusMessage(
+			presetId
+				? `Obstacle layer preset set to '${selected?.label ?? presetId}'.`
+				: "Obstacle layer preset set to manual rules.",
+		);
+	};
 
 	return (
 		<div className={styles.root}>
@@ -824,9 +899,7 @@ export function ConduitRouteApp() {
 					<div className={styles.heroBadges}>
 						<Badge color="success" variant="outline" size="sm">
 							<ScanLine size={12} />
-							{isTerminalWorkspace
-								? "Terminal Scan Workflow"
-								: "AutoCAD Bridge Planned"}
+							{bridgeBadgeLabel}
 						</Badge>
 						<Badge color="primary" variant="outline" size="sm">
 							<Sparkles size={12} />
@@ -1025,10 +1098,10 @@ export function ConduitRouteApp() {
 										) : null}
 									</div>
 									<div className={styles.layerEditorPanel}>
-										<div className={styles.layerEditorHeader}>
-											<Text size="xs" color="muted">
-												Layer Identification
-											</Text>
+									<div className={styles.layerEditorHeader}>
+										<Text size="xs" color="muted">
+											Layer Identification
+										</Text>
 											<Button
 												size="sm"
 												variant="ghost"
@@ -1047,6 +1120,22 @@ export function ConduitRouteApp() {
 											>
 												Refresh
 											</Button>
+										</div>
+										<div className={styles.layerEditorInputRow}>
+											<select
+												value={obstacleLayerPreset}
+												onChange={(event) =>
+													handleLayerPresetChange(event.target.value)
+												}
+												className={styles.layerEditorSelect}
+												disabled={routeComputing || obstacleSyncing}
+											>
+												{OBSTACLE_LAYER_PRESET_OPTIONS.map((preset) => (
+													<option key={preset.id || "manual"} value={preset.id}>
+														{preset.label}
+													</option>
+												))}
+											</select>
 										</div>
 										<div className={styles.layerEditorInputRow}>
 											{availableCadLayers.length > 0 ? (
@@ -1601,8 +1690,10 @@ export function ConduitRouteApp() {
 											variant="outline"
 											size="sm"
 											iconLeft={<HardDriveDownload size={14} />}
+											onClick={exportScheduleCsv}
+											disabled={scheduleRows.length === 0}
 										>
-											Export CSV (next)
+											Export CSV
 										</Button>
 									</div>
 								</div>

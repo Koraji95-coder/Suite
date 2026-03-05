@@ -1,0 +1,124 @@
+{
+  "entries": [
+    {
+      "name": "compute-sample",
+      "kind": "compute",
+      "payload": {
+        "start": {
+          "x": 52,
+          "y": 82
+        },
+        "end": {
+          "x": 900,
+          "y": 480
+        },
+        "mode": "plan_view",
+        "clearance": 18,
+        "canvasWidth": 980,
+        "canvasHeight": 560,
+        "gridStep": 8,
+        "obstacles": [
+          {
+            "id": "FNDN-1",
+            "type": "foundation",
+            "x": 320,
+            "y": 180,
+            "w": 180,
+            "h": 120,
+            "label": "Transformer Foundation"
+          }
+        ]
+      }
+    },
+    {
+      "name": "obstacle-scan-sample",
+      "kind": "obstacle_scan",
+      "document": {
+        "name": "sample.dwg",
+        "units": 2
+      },
+      "scanRequest": {
+        "selectionOnly": false,
+        "includeModelspace": true,
+        "maxEntities": 50000,
+        "canvasWidth": 980,
+        "canvasHeight": 560,
+        "layerNames": [
+          "S-FNDN-PRIMARY"
+        ],
+        "layerTypeOverrides": {
+          "S-FNDN-PRIMARY": "foundation"
+        }
+      },
+      "entities": [
+        {
+          "handle": "1A2B",
+          "layer": "S-FNDN-PRIMARY",
+          "objectName": "AcDbPolyline",
+          "bbox": [
+            100.0,
+            120.0,
+            0.0,
+            200.0,
+            180.0,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "terminal-scan-sample",
+      "kind": "terminal_scan",
+      "document": {
+        "name": "sample.dwg",
+        "units": 2
+      },
+      "scanRequest": {
+        "selectionOnly": false,
+        "includeModelspace": true,
+        "maxEntities": 50000,
+        "terminalProfile": {
+          "panelIdKeys": [
+            "PANEL_ID"
+          ],
+          "sideKeys": [
+            "SIDE"
+          ],
+          "stripIdKeys": [
+            "STRIP_ID"
+          ],
+          "terminalCountKeys": [
+            "TERMINAL_COUNT"
+          ],
+          "defaultPanelPrefix": "RP",
+          "defaultTerminalCount": 12
+        }
+      },
+      "entities": [
+        {
+          "kind": "block",
+          "handle": "T1",
+          "name": "TERMINAL_STRIP_BLOCK",
+          "insertionPoint": [
+            120.0,
+            220.0,
+            0.0
+          ],
+          "attrs": {
+            "PANEL_ID": "RP1",
+            "PANEL_NAME": "Relay Panel 1",
+            "SIDE": "L",
+            "STRIP_ID": "RP1L1",
+            "TERMINAL_COUNT": "16",
+            "TERM01_LABEL": "IN105 (+)",
+            "TERM02_LABEL": "IN105 (-)"
+          }
+        },
+        {
+          "kind": "line",
+          "handle": "L1"
+        }
+      ]
+    }
+  ]
+}

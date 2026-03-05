@@ -76,6 +76,88 @@ def create_autocad_blueprint(
     conduit_provider = _normalize_conduit_provider(conduit_route_autocad_provider)
     conduit_dotnet_enabled = conduit_provider in {"dotnet", "dotnet_fallback_com"}
     conduit_allow_com_fallback = conduit_provider == "dotnet_fallback_com"
+    valid_obstacle_types = {
+        "foundation",
+        "building",
+        "equipment_pad",
+        "trench",
+        "fence",
+        "road",
+    }
+    conduit_layer_presets: Dict[str, Dict[str, Any]] = {
+        "substation_default": {
+            "label": "Substation Default",
+            "description": "Typical substation yard foundation/pad/trench/road/fence layers.",
+            "layerNames": [
+                "S-FNDN-PRIMARY",
+                "S-FNDN-SECONDARY",
+                "S-CONC-PAD",
+                "E-TRENCH",
+                "C-ROAD",
+                "S-FENCE",
+                "A-BLDG",
+                "A-WALL",
+            ],
+            "layerTypeOverrides": {
+                "S-FNDN-PRIMARY": "foundation",
+                "S-FNDN-SECONDARY": "foundation",
+                "S-CONC-PAD": "equipment_pad",
+                "E-TRENCH": "trench",
+                "C-ROAD": "road",
+                "S-FENCE": "fence",
+                "A-BLDG": "building",
+                "A-WALL": "building",
+            },
+        },
+        "industrial_plant": {
+            "label": "Industrial Plant",
+            "description": "Plant area layers for slabs, trenches, roadways, and process structures.",
+            "layerNames": [
+                "P-FOUND",
+                "P-PAD",
+                "P-TRENCH",
+                "P-ROAD",
+                "P-FENCE",
+                "P-BLDG",
+            ],
+            "layerTypeOverrides": {
+                "P-FOUND": "foundation",
+                "P-PAD": "equipment_pad",
+                "P-TRENCH": "trench",
+                "P-ROAD": "road",
+                "P-FENCE": "fence",
+                "P-BLDG": "building",
+            },
+        },
+        "utility_yard": {
+            "label": "Utility Yard",
+            "description": "Utility yard layers for equipment pads, trenches, roads, and perimeter zones.",
+            "layerNames": [
+                "U-FOUND",
+                "U-PAD",
+                "U-TRENCH",
+                "U-ROAD",
+                "U-FENCE",
+                "U-BLDG",
+            ],
+            "layerTypeOverrides": {
+                "U-FOUND": "foundation",
+                "U-PAD": "equipment_pad",
+                "U-TRENCH": "trench",
+                "U-ROAD": "road",
+                "U-FENCE": "fence",
+                "U-BLDG": "building",
+            },
+        },
+    }
+    conduit_layer_preset_aliases = {
+        "substation": "substation_default",
+        "default": "substation_default",
+        "plant": "industrial_plant",
+        "industrial": "industrial_plant",
+        "yard": "utility_yard",
+        "utility": "utility_yard",
+    }
 
     logger.info(
         "Conduit route AutoCAD provider initialized (provider=%s, dotnet_enabled=%s, com_fallback=%s, dotnet_sender_ready=%s)",
@@ -85,12 +167,193 @@ def create_autocad_blueprint(
         bool(send_autocad_dotnet_command),
     )
 
+    def _normalize_layer_names(raw_value: Any) -> list[str]:
+        if not isinstance(raw_value, list):
+            return []
+        seen: set[str] = set()
+        out: list[str] = []
+        for item in raw_value:
+            text = str(item).strip()
+            if not text:
+                continue
+            key = text.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(text)
+        return out
+
+    def _normalize_layer_type_overrides(raw_value: Any) -> Dict[str, str]:
+        if not isinstance(raw_value, dict):
+            return {}
+        out: Dict[str, str] = {}
+        for raw_layer_name, raw_obstacle_type in raw_value.items():
+            layer_name = str(raw_layer_name).strip()
+            obstacle_type = str(raw_obstacle_type).strip().lower()
+            if not layer_name or obstacle_type not in valid_obstacle_types:
+                continue
+            out[layer_name] = obstacle_type
+        return out
+
+    def _normalize_terminal_profile_tag_list(raw_value: Any) -> list[str]:
+        if not isinstance(raw_value, list):
+            return []
+        out: list[str] = []
+        seen: set[str] = set()
+        for item in raw_value:
+            key = str(item).strip().upper()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            out.append(key)
+        return out
+
+    def _normalize_terminal_profile_bool(raw_value: Any, *, fallback: bool = False) -> bool:
+        if isinstance(raw_value, bool):
+            return raw_value
+        if isinstance(raw_value, (int, float)):
+            return bool(raw_value)
+        text = str(raw_value or "").strip().lower()
+        if text in {"1", "true", "yes", "y", "on"}:
+            return True
+        if text in {"0", "false", "no", "n", "off"}:
+            return False
+        return fallback
+
+    def _normalize_terminal_profile(raw_value: Any) -> Dict[str, Any]:
+        if not isinstance(raw_value, dict):
+            return {}
+
+        profile: Dict[str, Any] = {}
+        list_fields = (
+            "panelIdKeys",
+            "panelNameKeys",
+            "sideKeys",
+            "stripIdKeys",
+            "stripNumberKeys",
+            "terminalCountKeys",
+            "terminalTagKeys",
+            "terminalNameTokens",
+            "blockNameAllowList",
+        )
+        for field_name in list_fields:
+            normalized = _normalize_terminal_profile_tag_list(raw_value.get(field_name))
+            if normalized:
+                profile[field_name] = normalized
+
+        default_panel_prefix = str(
+            raw_value.get("defaultPanelPrefix", raw_value.get("default_panel_prefix", ""))
+        ).strip()
+        if default_panel_prefix:
+            profile["defaultPanelPrefix"] = default_panel_prefix.upper()
+
+        default_terminal_count_raw = raw_value.get(
+            "defaultTerminalCount",
+            raw_value.get("default_terminal_count"),
+        )
+        if default_terminal_count_raw is not None:
+            try:
+                default_terminal_count = int(default_terminal_count_raw)
+            except Exception:
+                default_terminal_count = 0
+            if default_terminal_count > 0:
+                profile["defaultTerminalCount"] = max(1, min(2000, default_terminal_count))
+
+        profile["requireStripId"] = _normalize_terminal_profile_bool(
+            raw_value.get("requireStripId", raw_value.get("require_strip_id", False)),
+            fallback=False,
+        )
+        profile["requireTerminalCount"] = _normalize_terminal_profile_bool(
+            raw_value.get("requireTerminalCount", raw_value.get("require_terminal_count", False)),
+            fallback=False,
+        )
+        profile["requireSide"] = _normalize_terminal_profile_bool(
+            raw_value.get("requireSide", raw_value.get("require_side", False)),
+            fallback=False,
+        )
+
+        return profile
+
+    def _normalize_layer_preset_name(raw_value: Any) -> str:
+        normalized = str(raw_value or "").strip().lower().replace("-", "_")
+        if normalized in {"", "none", "manual", "off"}:
+            return ""
+        return conduit_layer_preset_aliases.get(normalized, normalized)
+
+    def _resolve_obstacle_layer_rules(
+        *,
+        raw_layer_names: Any,
+        raw_layer_type_overrides: Any,
+        raw_layer_preset: Any,
+    ) -> tuple[list[str], Dict[str, str], Dict[str, Any]]:
+        explicit_layer_names = _normalize_layer_names(raw_layer_names)
+        explicit_layer_type_overrides = _normalize_layer_type_overrides(raw_layer_type_overrides)
+        requested_preset = str(raw_layer_preset or "").strip()
+        normalized_preset = _normalize_layer_preset_name(raw_layer_preset)
+        preset_config = conduit_layer_presets.get(normalized_preset) if normalized_preset else None
+        if normalized_preset and preset_config is None:
+            logger.warning(
+                "Unknown conduit layer preset requested: %s",
+                raw_layer_preset,
+            )
+
+        merged_layer_names: list[str] = []
+        seen_layers: set[str] = set()
+
+        def _append_layer(layer_name: str) -> None:
+            text = str(layer_name).strip()
+            if not text:
+                return
+            key = text.lower()
+            if key in seen_layers:
+                return
+            seen_layers.add(key)
+            merged_layer_names.append(text)
+
+        if preset_config:
+            for layer_name in preset_config.get("layerNames", []):
+                _append_layer(layer_name)
+        for layer_name in explicit_layer_names:
+            _append_layer(layer_name)
+
+        merged_layer_type_overrides: Dict[str, str] = {}
+        if preset_config:
+            merged_layer_type_overrides.update(
+                _normalize_layer_type_overrides(preset_config.get("layerTypeOverrides", {}))
+            )
+        merged_layer_type_overrides.update(explicit_layer_type_overrides)
+        for layer_name in merged_layer_type_overrides.keys():
+            _append_layer(layer_name)
+
+        preset_meta: Dict[str, Any] = {
+            "requestedPreset": requested_preset,
+            "appliedPreset": normalized_preset if preset_config else "",
+            "availablePresets": sorted(conduit_layer_presets.keys()),
+            "explicitLayerCount": len(explicit_layer_names),
+            "explicitOverrideCount": len(explicit_layer_type_overrides),
+            "layerCount": len(merged_layer_names),
+            "overrideCount": len(merged_layer_type_overrides),
+            "presetApplied": bool(preset_config),
+        }
+        if preset_config:
+            preset_meta["presetLabel"] = str(preset_config.get("label") or normalized_preset)
+            preset_meta["presetDescription"] = str(preset_config.get("description") or "")
+
+        return merged_layer_names, merged_layer_type_overrides, preset_meta
+
+    def _request_correlation_id() -> str:
+        raw_value = str(request.headers.get("X-Request-ID") or "").strip()
+        if raw_value:
+            return raw_value[:128]
+        return f"req-{int(time.time() * 1000)}"
+
     def _call_dotnet_conduit_action(
         *,
         action: str,
         payload: Dict[str, Any],
         remote_addr: str,
         auth_mode: str,
+        request_id: str,
     ) -> Dict[str, Any]:
         if send_autocad_dotnet_command is None:
             raise RuntimeError(
@@ -99,7 +362,13 @@ def create_autocad_blueprint(
             )
 
         started_at = time.time()
-        response = send_autocad_dotnet_command(action, payload)
+        response = send_autocad_dotnet_command(
+            action,
+            {
+                **payload,
+                "requestId": request_id,
+            },
+        )
         elapsed_ms = int((time.time() - started_at) * 1000)
 
         if not isinstance(response, dict):
@@ -124,9 +393,12 @@ def create_autocad_blueprint(
             **(result_payload.get("meta", {}) or {}),
             "bridgeMs": elapsed_ms,
             "source": "dotnet",
+            "requestId": request_id,
+            "bridgeRequestId": str(response.get("id") or ""),
         }
         logger.info(
-            ".NET conduit action succeeded (action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s)",
+            ".NET conduit action succeeded (request_id=%s, action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s)",
+            request_id,
             action,
             remote_addr,
             auth_mode,
@@ -167,6 +439,35 @@ def create_autocad_blueprint(
             "error": error,
         }
         return jsonify(response), 200 if success else 503
+
+    @bp.route("/conduit-route/obstacles/presets", methods=["GET"])
+    @require_autocad_auth
+    @limiter.limit("600 per hour")
+    def api_conduit_route_obstacle_presets():
+        """Return built-in obstacle layer presets for project templates."""
+        presets = []
+        for preset_id in sorted(conduit_layer_presets.keys()):
+            preset = conduit_layer_presets.get(preset_id, {})
+            layer_names = _normalize_layer_names(preset.get("layerNames"))
+            overrides = _normalize_layer_type_overrides(preset.get("layerTypeOverrides"))
+            presets.append(
+                {
+                    "id": preset_id,
+                    "label": str(preset.get("label") or preset_id),
+                    "description": str(preset.get("description") or ""),
+                    "layerNames": layer_names,
+                    "layerTypeOverrides": overrides,
+                }
+            )
+
+        return jsonify(
+            {
+                "success": True,
+                "count": len(presets),
+                "presets": presets,
+                "aliases": dict(sorted(conduit_layer_preset_aliases.items())),
+            }
+        )
 
     @bp.route("/selection-count", methods=["GET"])
     @require_autocad_auth
@@ -552,6 +853,7 @@ def create_autocad_blueprint(
         """
         remote_addr = str(request.remote_addr or "unknown")
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+        request_id = _request_correlation_id()
 
         payload = request.get_json(silent=True) or {}
         selection_only = bool(
@@ -579,15 +881,20 @@ def create_autocad_blueprint(
                 400,
             )
         max_entities = max(500, min(200000, max_entities))
+        terminal_profile = _normalize_terminal_profile(
+            payload.get("terminalProfile", payload.get("terminal_profile"))
+        )
 
         logger.info(
-            "Terminal scan request received (remote=%s, auth_mode=%s, provider=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
+            "Terminal scan request received (request_id=%s, remote=%s, auth_mode=%s, provider=%s, selection_only=%s, include_modelspace=%s, max_entities=%s, terminal_profile_fields=%s)",
+            request_id,
             remote_addr,
             auth_mode,
             conduit_provider,
             selection_only,
             include_modelspace,
             max_entities,
+            sorted(terminal_profile.keys()),
         )
 
         if conduit_dotnet_enabled:
@@ -595,6 +902,7 @@ def create_autocad_blueprint(
                 "selectionOnly": selection_only,
                 "includeModelspace": include_modelspace,
                 "maxEntities": max_entities,
+                "terminalProfile": terminal_profile,
             }
             try:
                 result = _call_dotnet_conduit_action(
@@ -602,11 +910,13 @@ def create_autocad_blueprint(
                     payload=dotnet_payload,
                     remote_addr=remote_addr,
                     auth_mode=auth_mode,
+                    request_id=request_id,
                 )
                 return jsonify(result), 200
             except Exception as exc:
                 logger.warning(
-                    "Terminal scan .NET provider failed (remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    "Terminal scan .NET provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    request_id,
                     remote_addr,
                     auth_mode,
                     conduit_provider,
@@ -698,12 +1008,15 @@ def create_autocad_blueprint(
                 include_modelspace=include_modelspace,
                 selection_only=selection_only,
                 max_entities=max_entities,
+                terminal_profile=terminal_profile,
             )
             elapsed_ms = int((time.time() - started_at) * 1000)
             result["meta"] = {
                 **(result.get("meta", {}) or {}),
                 "scanMs": elapsed_ms,
                 "source": "autocad",
+                "requestId": request_id,
+                "terminalProfileRequest": terminal_profile,
             }
 
             if result.get("success"):
@@ -755,6 +1068,7 @@ def create_autocad_blueprint(
         """Compute a conduit route path for yard-routing workflow requests."""
         remote_addr = str(request.remote_addr or "unknown")
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+        request_id = _request_correlation_id()
 
         if not request.is_json:
             return (
@@ -797,6 +1111,7 @@ def create_autocad_blueprint(
         resolved_payload = dict(payload)
         obstacle_scan_result: Dict[str, Any] | None = None
         obstacle_scan_elapsed_ms: int | None = None
+        layer_rules_meta: Dict[str, Any] = {}
 
         if obstacle_source == "autocad":
             scan_config = payload.get("obstacleScan")
@@ -849,13 +1164,10 @@ def create_autocad_blueprint(
                     400,
                 )
 
-            layer_names_raw = scan_config.get("layerNames")
-            layer_names: list[str] = []
-            if isinstance(layer_names_raw, list):
-                layer_names = [str(layer).strip() for layer in layer_names_raw if str(layer).strip()]
-            layer_type_overrides_raw = scan_config.get("layerTypeOverrides")
-            layer_type_overrides: Dict[str, Any] = (
-                layer_type_overrides_raw if isinstance(layer_type_overrides_raw, dict) else {}
+            layer_names, layer_type_overrides, layer_rules_meta = _resolve_obstacle_layer_rules(
+                raw_layer_names=scan_config.get("layerNames"),
+                raw_layer_type_overrides=scan_config.get("layerTypeOverrides"),
+                raw_layer_preset=scan_config.get("layerPreset", scan_config.get("layer_preset", "")),
             )
 
             if conduit_dotnet_enabled:
@@ -867,6 +1179,7 @@ def create_autocad_blueprint(
                     "canvasHeight": canvas_height,
                     "layerNames": layer_names,
                     "layerTypeOverrides": layer_type_overrides,
+                    "layerPreset": layer_rules_meta.get("appliedPreset") or "",
                 }
                 try:
                     obstacle_scan_result = _call_dotnet_conduit_action(
@@ -874,6 +1187,7 @@ def create_autocad_blueprint(
                         payload=dotnet_payload,
                         remote_addr=remote_addr,
                         auth_mode=auth_mode,
+                        request_id=request_id,
                     )
                     dotnet_meta = obstacle_scan_result.get("meta", {}) if obstacle_scan_result else {}
                     scan_ms_candidate = (
@@ -887,6 +1201,11 @@ def create_autocad_blueprint(
                         obstacle_scan_elapsed_ms = int(scan_ms_candidate) if scan_ms_candidate is not None else None
                     except Exception:
                         obstacle_scan_elapsed_ms = None
+                    obstacle_scan_result["meta"] = {
+                        **(obstacle_scan_result.get("meta", {}) or {}),
+                        "layerPreset": layer_rules_meta.get("appliedPreset") or "",
+                        "layerRuleSummary": layer_rules_meta,
+                    }
                     resolved_payload["obstacles"] = (
                         obstacle_scan_result.get("data", {}).get("obstacles", [])
                         if obstacle_scan_result
@@ -894,7 +1213,8 @@ def create_autocad_blueprint(
                     )
                 except Exception as exc:
                     logger.warning(
-                        "Conduit route compute .NET obstacle scan failed (remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                        "Conduit route compute .NET obstacle scan failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                        request_id,
                         remote_addr,
                         auth_mode,
                         conduit_provider,
@@ -1026,7 +1346,11 @@ def create_autocad_blueprint(
                 "obstacleSource": obstacle_source,
                 "obstacleScanMs": obstacle_scan_elapsed_ms,
                 "resolvedObstacleCount": len((resolved_payload.get("obstacles") or [])),
+                "requestId": request_id,
             }
+            if obstacle_source == "autocad":
+                result["meta"]["obstacleLayerPreset"] = layer_rules_meta.get("appliedPreset") or ""
+                result["meta"]["obstacleLayerRuleSummary"] = layer_rules_meta
 
             if obstacle_scan_result:
                 result["meta"]["obstacleScan"] = obstacle_scan_result.get("meta", {})
@@ -1087,6 +1411,7 @@ def create_autocad_blueprint(
         """Scan and normalize route obstacles from AutoCAD drawing layers."""
         remote_addr = str(request.remote_addr or "unknown")
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+        request_id = _request_correlation_id()
 
         payload = request.get_json(silent=True) or {}
 
@@ -1134,23 +1459,23 @@ def create_autocad_blueprint(
                 400,
             )
 
-        layer_names_raw = payload.get("layerNames")
-        layer_names: list[str] = []
-        if isinstance(layer_names_raw, list):
-            layer_names = [str(layer).strip() for layer in layer_names_raw if str(layer).strip()]
-        layer_type_overrides_raw = payload.get("layerTypeOverrides")
-        layer_type_overrides: Dict[str, Any] = (
-            layer_type_overrides_raw if isinstance(layer_type_overrides_raw, dict) else {}
+        layer_names, layer_type_overrides, layer_rules_meta = _resolve_obstacle_layer_rules(
+            raw_layer_names=payload.get("layerNames"),
+            raw_layer_type_overrides=payload.get("layerTypeOverrides"),
+            raw_layer_preset=payload.get("layerPreset", payload.get("layer_preset", "")),
         )
 
         logger.info(
-            "Conduit obstacle scan request (remote=%s, auth_mode=%s, provider=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
+            "Conduit obstacle scan request (request_id=%s, remote=%s, auth_mode=%s, provider=%s, selection_only=%s, include_modelspace=%s, max_entities=%s, layer_preset=%s, layer_count=%s)",
+            request_id,
             remote_addr,
             auth_mode,
             conduit_provider,
             selection_only,
             include_modelspace,
             max_entities,
+            layer_rules_meta.get("appliedPreset") or "",
+            len(layer_names),
         )
 
         if conduit_dotnet_enabled:
@@ -1162,6 +1487,7 @@ def create_autocad_blueprint(
                 "canvasHeight": canvas_height,
                 "layerNames": layer_names,
                 "layerTypeOverrides": layer_type_overrides,
+                "layerPreset": layer_rules_meta.get("appliedPreset") or "",
             }
             try:
                 result = _call_dotnet_conduit_action(
@@ -1169,11 +1495,18 @@ def create_autocad_blueprint(
                     payload=dotnet_payload,
                     remote_addr=remote_addr,
                     auth_mode=auth_mode,
+                    request_id=request_id,
                 )
+                result["meta"] = {
+                    **(result.get("meta", {}) or {}),
+                    "layerPreset": layer_rules_meta.get("appliedPreset") or "",
+                    "layerRuleSummary": layer_rules_meta,
+                }
                 return jsonify(result), 200
             except Exception as exc:
                 logger.warning(
-                    "Conduit obstacle scan .NET provider failed (remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    "Conduit obstacle scan .NET provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    request_id,
                     remote_addr,
                     auth_mode,
                     conduit_provider,
@@ -1275,6 +1608,9 @@ def create_autocad_blueprint(
                 **(result.get("meta", {}) or {}),
                 "scanMs": elapsed_ms,
                 "source": "autocad",
+                "requestId": request_id,
+                "layerPreset": layer_rules_meta.get("appliedPreset") or "",
+                "layerRuleSummary": layer_rules_meta,
             }
 
             if result.get("success"):

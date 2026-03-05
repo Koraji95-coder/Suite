@@ -1,6 +1,7 @@
 import type { Point2D } from "./conduitRouteTypes";
 import { TERMINAL_LAYOUT_CONFIG } from "./conduitTerminalData";
 import type {
+	TerminalGeometryPrimitive,
 	TerminalLayoutConfig,
 	TerminalLayoutResult,
 	TerminalNode,
@@ -20,6 +21,13 @@ interface Rect {
 	h: number;
 }
 
+interface Bounds2D {
+	minX: number;
+	minY: number;
+	maxX: number;
+	maxY: number;
+}
+
 interface PathNode {
 	x: number;
 	y: number;
@@ -31,6 +39,17 @@ interface PathNode {
 
 function clamp(value: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, value));
+}
+
+function normalizeRange(value: number, min: number, max: number): number {
+	if (!Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max)) {
+		return 0.5;
+	}
+	const span = max - min;
+	if (Math.abs(span) <= 1e-6) {
+		return 0.5;
+	}
+	return clamp((value - min) / span, 0, 1);
 }
 
 function pointInRect(point: Point2D, rect: Rect): boolean {
@@ -60,6 +79,115 @@ function toGrid(
 
 function fromGrid(point: GridPoint, step: number): Point2D {
 	return { x: point.x * step, y: point.y * step };
+}
+
+function geometryBounds(
+	geometry: TerminalGeometryPrimitive[] | undefined,
+): Bounds2D | null {
+	if (!Array.isArray(geometry) || geometry.length === 0) {
+		return null;
+	}
+
+	let minX = Number.POSITIVE_INFINITY;
+	let minY = Number.POSITIVE_INFINITY;
+	let maxX = Number.NEGATIVE_INFINITY;
+	let maxY = Number.NEGATIVE_INFINITY;
+	let hasPoint = false;
+
+	for (const primitive of geometry) {
+		if (!Array.isArray(primitive.points)) continue;
+		for (const point of primitive.points) {
+			if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+			hasPoint = true;
+			minX = Math.min(minX, point.x);
+			minY = Math.min(minY, point.y);
+			maxX = Math.max(maxX, point.x);
+			maxY = Math.max(maxY, point.y);
+		}
+	}
+
+	if (!hasPoint) {
+		return null;
+	}
+	return { minX, minY, maxX, maxY };
+}
+
+function mapWorldToCanvas(
+	point: Point2D,
+	params: {
+		worldMinX: number;
+		worldMaxX: number;
+		worldMinY: number;
+		worldMaxY: number;
+		padding: number;
+		usableWidth: number;
+		usableHeight: number;
+	},
+): Point2D {
+	const { worldMinX, worldMaxX, worldMinY, worldMaxY, padding, usableWidth, usableHeight } =
+		params;
+	return {
+		x:
+			padding +
+			normalizeRange(point.x, worldMinX, worldMaxX) * Math.max(1, usableWidth),
+		y:
+			padding +
+			normalizeRange(point.y, worldMinY, worldMaxY) * Math.max(1, usableHeight),
+	};
+}
+
+function mapGeometryToCanvas(
+	geometry: TerminalGeometryPrimitive[] | undefined,
+	params: {
+		worldMinX: number;
+		worldMaxX: number;
+		worldMinY: number;
+		worldMaxY: number;
+		padding: number;
+		usableWidth: number;
+		usableHeight: number;
+	},
+): TerminalGeometryPrimitive[] {
+	if (!Array.isArray(geometry) || geometry.length === 0) {
+		return [];
+	}
+
+	const out: TerminalGeometryPrimitive[] = [];
+	for (const primitive of geometry) {
+		if (!Array.isArray(primitive.points) || primitive.points.length < 2) continue;
+
+		const mappedPoints = primitive.points
+			.filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+			.map((point) =>
+				mapWorldToCanvas(point, {
+					worldMinX: params.worldMinX,
+					worldMaxX: params.worldMaxX,
+					worldMinY: params.worldMinY,
+					worldMaxY: params.worldMaxY,
+					padding: params.padding,
+					usableWidth: params.usableWidth,
+					usableHeight: params.usableHeight,
+				}),
+			);
+		if (mappedPoints.length < 2) continue;
+
+		out.push({
+			kind: primitive.kind,
+			points: mappedPoints,
+			closed: Boolean(primitive.closed),
+		});
+	}
+	return out;
+}
+
+function sideTerminalX(strip: TerminalStripLayout): number {
+	if (strip.side === "L") {
+		return strip.px + strip.width * 0.2;
+	}
+	if (strip.side === "R") {
+		return strip.px + strip.width * 0.8;
+	}
+	return strip.px + strip.width * 0.5;
 }
 
 function stripBlockRect(strip: TerminalStripLayout, inflateBy = 7): Rect {
@@ -100,53 +228,165 @@ export function buildTerminalLayout(
 	const canvasWidth = config.gridWidth * config.scale + config.padding * 2;
 	const canvasHeight = config.gridHeight * config.scale + config.padding * 2;
 
+	const stripDrafts: Array<{
+		base: Omit<TerminalStripLayout, "px" | "py" | "xLabel" | "yLabel">;
+		rawX: number;
+		rawY: number;
+		syntheticWidth: number;
+		syntheticHeight: number;
+		geometryWorld?: TerminalGeometryPrimitive[];
+		geometryWorldBounds: Bounds2D | null;
+	}> = [];
+
 	for (const [panelId, panel] of Object.entries(scanData.panels)) {
 		for (const [side, sideData] of Object.entries(panel.sides)) {
 			for (const strip of sideData.strips) {
-				const px = config.padding + strip.x * config.scale;
-				const py = config.padding + strip.y * config.scale;
-				const height = Math.max(
+				const syntheticHeight = Math.max(
 					config.terminalSpacing * (strip.terminalCount - 1),
 					config.terminalRadius * 2 + 6,
 				);
-				const width = config.stripWidth;
-
-				strips.push({
-					...strip,
-					panelId,
-					panelFullName: panel.fullName,
-					panelColor: panel.color,
-					side,
-					xLabel: px + width / 2,
-					yLabel: py - 9,
-					px,
-					py,
-					width,
-					height,
-				});
-
-				for (
-					let terminalIndex = 0;
-					terminalIndex < strip.terminalCount;
-					terminalIndex += 1
-				) {
-					const termId = `T${String(terminalIndex + 1).padStart(2, "0")}`;
-					const y = py + terminalIndex * config.terminalSpacing;
-					const x = px + width / 2;
-					terminals.push({
-						id: `${strip.stripId}:${termId}`,
-						stripId: strip.stripId,
+				const geometryWorld = Array.isArray(strip.geometry)
+					? strip.geometry
+					: undefined;
+				stripDrafts.push({
+					base: {
+						...strip,
 						panelId,
+						panelFullName: panel.fullName,
 						panelColor: panel.color,
 						side,
-						termId,
-						index: terminalIndex,
-						label: `${strip.stripId}:${termId}`,
-						x,
-						y,
-					});
-				}
+						width: config.stripWidth,
+						height: syntheticHeight,
+					},
+					rawX: strip.x,
+					rawY: strip.y,
+					syntheticWidth: config.stripWidth,
+					syntheticHeight,
+					geometryWorld,
+					geometryWorldBounds: geometryBounds(geometryWorld),
+				});
 			}
+		}
+	}
+
+	const worldBounds = stripDrafts.flatMap((draft) => {
+		const bounds: Bounds2D[] = [
+			{
+				minX: draft.rawX,
+				minY: draft.rawY,
+				maxX: draft.rawX,
+				maxY: draft.rawY,
+			},
+		];
+		if (draft.geometryWorldBounds) {
+			bounds.push(draft.geometryWorldBounds);
+		}
+		return bounds;
+	});
+
+	const minX =
+		worldBounds.length > 0
+			? Math.min(...worldBounds.map((bounds) => bounds.minX))
+			: 0;
+	const maxX =
+		worldBounds.length > 0
+			? Math.max(...worldBounds.map((bounds) => bounds.maxX))
+			: 1;
+	const minY =
+		worldBounds.length > 0
+			? Math.min(...worldBounds.map((bounds) => bounds.minY))
+			: 0;
+	const maxY =
+		worldBounds.length > 0
+			? Math.max(...worldBounds.map((bounds) => bounds.maxY))
+			: 1;
+	const maxStripHeight =
+		stripDrafts.length > 0
+			? Math.max(...stripDrafts.map((draft) => draft.syntheticHeight))
+			: config.terminalRadius * 2 + 6;
+	const usableWidth = Math.max(
+		1,
+		canvasWidth - config.padding * 2 - config.stripWidth,
+	);
+	const usableHeight = Math.max(
+		1,
+		canvasHeight - config.padding * 2 - maxStripHeight,
+	);
+
+	for (const draft of stripDrafts) {
+		const insertionPx = mapWorldToCanvas(
+			{ x: draft.rawX, y: draft.rawY },
+			{
+				worldMinX: minX,
+				worldMaxX: maxX,
+				worldMinY: minY,
+				worldMaxY: maxY,
+				padding: config.padding,
+				usableWidth,
+				usableHeight,
+			},
+		);
+		const geometryPx = mapGeometryToCanvas(draft.geometryWorld, {
+			worldMinX: minX,
+			worldMaxX: maxX,
+			worldMinY: minY,
+			worldMaxY: maxY,
+			padding: config.padding,
+			usableWidth,
+			usableHeight,
+		});
+		const geometryPxBounds = geometryBounds(geometryPx);
+
+		const px = geometryPxBounds ? geometryPxBounds.minX : insertionPx.x;
+		const py = geometryPxBounds ? geometryPxBounds.minY : insertionPx.y;
+		const width = geometryPxBounds
+			? Math.max(8, geometryPxBounds.maxX - geometryPxBounds.minX)
+			: draft.syntheticWidth;
+		const height = geometryPxBounds
+			? Math.max(config.terminalRadius * 2 + 6, geometryPxBounds.maxY - geometryPxBounds.minY)
+			: draft.syntheticHeight;
+
+		const strip: TerminalStripLayout = {
+			...draft.base,
+			width,
+			height,
+			geometryPx: geometryPx.length > 0 ? geometryPx : undefined,
+			xLabel: px + width / 2,
+			yLabel: py - 9,
+			px,
+			py,
+		};
+		strips.push(strip);
+
+		const terminalX = sideTerminalX(strip);
+		const rowSpacing = geometryPxBounds
+			? height / Math.max(1, strip.terminalCount)
+			: config.terminalSpacing;
+
+		for (
+			let terminalIndex = 0;
+			terminalIndex < strip.terminalCount;
+			terminalIndex += 1
+		) {
+			const termId = `T${String(terminalIndex + 1).padStart(2, "0")}`;
+			const customLabelRaw = strip.terminalLabels?.[terminalIndex];
+			const customLabel =
+				typeof customLabelRaw === "string" ? customLabelRaw.trim() : "";
+			const y = geometryPxBounds
+				? py + rowSpacing * (terminalIndex + 0.5)
+				: py + terminalIndex * rowSpacing;
+			terminals.push({
+				id: `${strip.stripId}:${termId}`,
+				stripId: strip.stripId,
+				panelId: strip.panelId,
+				panelColor: strip.panelColor,
+				side: strip.side,
+				termId,
+				index: terminalIndex,
+				label: customLabel || `${strip.stripId}:${termId}`,
+				x: terminalX,
+				y,
+			});
 		}
 	}
 

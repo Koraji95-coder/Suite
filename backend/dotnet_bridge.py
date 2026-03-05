@@ -85,6 +85,7 @@ def send_dotnet_command(
     payload: Dict[str, Any],
     token: Optional[str] = None,
     pipe_name: str = "SUITE_AUTOCAD_PIPE",
+    timeout_ms: int = 30_000,
 ) -> Dict[str, Any]:
     request = {
         "id": f"job-{int(time.time() * 1000)}",
@@ -92,5 +93,5 @@ def send_dotnet_command(
         "payload": payload,
         "token": token,
     }
-    client = DotNetPipeClient(pipe_name=pipe_name)
+    client = DotNetPipeClient(pipe_name=pipe_name, timeout_ms=timeout_ms)
     return client.send_request(request)

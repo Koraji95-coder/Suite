@@ -49,6 +49,7 @@ def register_route_groups(
     backup_max_bytes: int,
     backup_max_files: int,
     autodraft_dotnet_api_url: str,
+    conduit_route_autocad_provider: str,
     batch_session_cookie: str,
     batch_session_ttl_seconds: int,
     require_supabase_user: Callable,
@@ -60,6 +61,7 @@ def register_route_groups(
     connect_autocad: Callable[[], Any],
     dyn: Callable[[Any], Any],
     pythoncom: Any,
+    send_autocad_dotnet_command: Optional[Callable[[str, dict[str, Any]], dict[str, Any]]],
     validate_layer_config: Callable[[Any], dict[str, Any]],
     traceback_module: Any,
 ) -> None:
@@ -163,6 +165,8 @@ def register_route_groups(
             connect_autocad=connect_autocad,
             dyn=dyn,
             pythoncom=pythoncom,
+            conduit_route_autocad_provider=conduit_route_autocad_provider,
+            send_autocad_dotnet_command=send_autocad_dotnet_command,
             validate_layer_config=validate_layer_config,
             traceback_module=traceback_module,
         )

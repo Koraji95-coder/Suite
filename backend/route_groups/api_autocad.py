@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 import os
 
 from flask import Blueprint, g, jsonify, request, send_file
@@ -23,6 +23,8 @@ def create_autocad_blueprint(
     connect_autocad: Callable[[], Any],
     dyn: Callable[[Any], Any],
     pythoncom: Any,
+    conduit_route_autocad_provider: str,
+    send_autocad_dotnet_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]],
     validate_layer_config: Callable[[Any], Dict[str, Any]],
     traceback_module: Any,
 ) -> Blueprint:
@@ -49,6 +51,89 @@ def create_autocad_blueprint(
                 pass
         return _is_under_dir(path_value, backend_exports_dir)
 
+    def _normalize_conduit_provider(raw_value: str) -> str:
+        normalized = str(raw_value or "").strip().lower().replace("-", "_")
+        provider_aliases = {
+            "": "com",
+            "com": "com",
+            "dotnet": "dotnet",
+            "net": "dotnet",
+            ".net": "dotnet",
+            "dotnet_fallback_com": "dotnet_fallback_com",
+            "dotnet_with_com_fallback": "dotnet_fallback_com",
+            "dotnet_fallback": "dotnet_fallback_com",
+            "dotnet_com_fallback": "dotnet_fallback_com",
+        }
+        resolved = provider_aliases.get(normalized)
+        if resolved is not None:
+            return resolved
+        logger.warning(
+            "Unknown CONDUIT_ROUTE_AUTOCAD_PROVIDER=%s; defaulting to COM provider.",
+            raw_value,
+        )
+        return "com"
+
+    conduit_provider = _normalize_conduit_provider(conduit_route_autocad_provider)
+    conduit_dotnet_enabled = conduit_provider in {"dotnet", "dotnet_fallback_com"}
+    conduit_allow_com_fallback = conduit_provider == "dotnet_fallback_com"
+
+    logger.info(
+        "Conduit route AutoCAD provider initialized (provider=%s, dotnet_enabled=%s, com_fallback=%s, dotnet_sender_ready=%s)",
+        conduit_provider,
+        conduit_dotnet_enabled,
+        conduit_allow_com_fallback,
+        bool(send_autocad_dotnet_command),
+    )
+
+    def _call_dotnet_conduit_action(
+        *,
+        action: str,
+        payload: Dict[str, Any],
+        remote_addr: str,
+        auth_mode: str,
+    ) -> Dict[str, Any]:
+        if send_autocad_dotnet_command is None:
+            raise RuntimeError(
+                "AutoCAD .NET command sender is not configured. "
+                "Set CONDUIT_ROUTE_AUTOCAD_PROVIDER=com or configure AUTOCAD_DOTNET_* backend settings."
+            )
+
+        started_at = time.time()
+        response = send_autocad_dotnet_command(action, payload)
+        elapsed_ms = int((time.time() - started_at) * 1000)
+
+        if not isinstance(response, dict):
+            raise RuntimeError("Malformed response from .NET bridge (expected JSON object).")
+
+        if not response.get("ok"):
+            error_message = str(
+                response.get("error")
+                or response.get("message")
+                or "Unknown .NET bridge error."
+            )
+            raise RuntimeError(error_message)
+
+        result_payload = response.get("result")
+        if not isinstance(result_payload, dict):
+            raise RuntimeError(".NET bridge returned invalid 'result' payload.")
+
+        if not isinstance(result_payload.get("success"), bool):
+            raise RuntimeError(".NET bridge result missing boolean 'success' field.")
+
+        result_payload["meta"] = {
+            **(result_payload.get("meta", {}) or {}),
+            "bridgeMs": elapsed_ms,
+            "source": "dotnet",
+        }
+        logger.info(
+            ".NET conduit action succeeded (action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s)",
+            action,
+            remote_addr,
+            auth_mode,
+            elapsed_ms,
+        )
+        return result_payload
+
     @bp.route("/status", methods=["GET"])
     @require_autocad_auth
     @limiter.limit("3600 per hour")
@@ -58,6 +143,12 @@ def create_autocad_blueprint(
         status = manager.get_status()
         status["backend_id"] = "coordinates-grabber-api"
         status["backend_version"] = "1.0.0"
+        status["conduit_route_provider"] = {
+            "configured": conduit_provider,
+            "dotnet_enabled": conduit_dotnet_enabled,
+            "com_fallback": conduit_allow_com_fallback,
+            "dotnet_sender_ready": bool(send_autocad_dotnet_command),
+        }
 
         http_code = 200 if status.get("autocad_running") else 503
         return jsonify(status), http_code
@@ -459,11 +550,83 @@ def create_autocad_blueprint(
         Scan terminal-strip blocks from AutoCAD and return normalized layout data
         for the Conduit Route terminal workflow UI.
         """
-        manager = get_manager()
-        status = manager.get_status()
         remote_addr = str(request.remote_addr or "unknown")
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
 
+        payload = request.get_json(silent=True) or {}
+        selection_only = bool(
+            payload.get("selectionOnly")
+            if "selectionOnly" in payload
+            else payload.get("selection_only", False)
+        )
+        include_modelspace = bool(
+            payload.get("includeModelspace")
+            if "includeModelspace" in payload
+            else payload.get("include_modelspace", True)
+        )
+        max_entities_raw = payload.get("maxEntities", payload.get("max_entities", 50000))
+        try:
+            max_entities = int(max_entities_raw)
+        except Exception:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "maxEntities must be an integer.",
+                    }
+                ),
+                400,
+            )
+        max_entities = max(500, min(200000, max_entities))
+
+        logger.info(
+            "Terminal scan request received (remote=%s, auth_mode=%s, provider=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
+            remote_addr,
+            auth_mode,
+            conduit_provider,
+            selection_only,
+            include_modelspace,
+            max_entities,
+        )
+
+        if conduit_dotnet_enabled:
+            dotnet_payload = {
+                "selectionOnly": selection_only,
+                "includeModelspace": include_modelspace,
+                "maxEntities": max_entities,
+            }
+            try:
+                result = _call_dotnet_conduit_action(
+                    action="conduit_route_terminal_scan",
+                    payload=dotnet_payload,
+                    remote_addr=remote_addr,
+                    auth_mode=auth_mode,
+                )
+                return jsonify(result), 200
+            except Exception as exc:
+                logger.warning(
+                    "Terminal scan .NET provider failed (remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    remote_addr,
+                    auth_mode,
+                    conduit_provider,
+                    conduit_allow_com_fallback,
+                    str(exc),
+                )
+                if not conduit_allow_com_fallback:
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "code": "DOTNET_BRIDGE_FAILED",
+                                "message": f".NET terminal scan failed: {str(exc)}",
+                            }
+                        ),
+                        503,
+                    )
+
+        manager = get_manager()
+        status = manager.get_status()
         if not status.get("drawing_open"):
             logger.warning(
                 "Terminal scan blocked: no drawing open (remote=%s, auth_mode=%s)",
@@ -497,42 +660,6 @@ def create_autocad_blueprint(
                 ),
                 503,
             )
-
-        payload = request.get_json(silent=True) or {}
-        selection_only = bool(
-            payload.get("selectionOnly")
-            if "selectionOnly" in payload
-            else payload.get("selection_only", False)
-        )
-        include_modelspace = bool(
-            payload.get("includeModelspace")
-            if "includeModelspace" in payload
-            else payload.get("include_modelspace", True)
-        )
-        max_entities_raw = payload.get("maxEntities", payload.get("max_entities", 50000))
-        try:
-            max_entities = int(max_entities_raw)
-        except Exception:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "maxEntities must be an integer.",
-                    }
-                ),
-                400,
-            )
-        max_entities = max(500, min(200000, max_entities))
-
-        logger.info(
-            "Terminal scan request received (remote=%s, auth_mode=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
-            remote_addr,
-            auth_mode,
-            selection_only,
-            include_modelspace,
-            max_entities,
-        )
 
         started_at = time.time()
         try:
@@ -672,41 +799,6 @@ def create_autocad_blueprint(
         obstacle_scan_elapsed_ms: int | None = None
 
         if obstacle_source == "autocad":
-            manager = get_manager()
-            status = manager.get_status()
-            if not status.get("drawing_open"):
-                logger.warning(
-                    "Conduit route compute blocked: no drawing open (remote=%s, auth_mode=%s)",
-                    remote_addr,
-                    auth_mode,
-                )
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "AUTOCAD_DRAWING_NOT_OPEN",
-                            "message": "No drawing open in AutoCAD.",
-                        }
-                    ),
-                    503,
-                )
-            if pythoncom is None:
-                logger.warning(
-                    "Conduit route compute blocked: COM unavailable (remote=%s, auth_mode=%s)",
-                    remote_addr,
-                    auth_mode,
-                )
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "COM_UNAVAILABLE",
-                            "message": "AutoCAD COM bridge unavailable on this platform.",
-                        }
-                    ),
-                    503,
-                )
-
             scan_config = payload.get("obstacleScan")
             if not isinstance(scan_config, dict):
                 scan_config = {}
@@ -766,60 +858,151 @@ def create_autocad_blueprint(
                 layer_type_overrides_raw if isinstance(layer_type_overrides_raw, dict) else {}
             )
 
-            try:
-                scan_started_at = time.time()
-                pythoncom.CoInitialize()
-                acad = connect_autocad()
-                if acad is None:
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "code": "AUTOCAD_CONNECT_FAILED",
-                                "message": "Cannot connect to AutoCAD.",
-                            }
-                        ),
-                        503,
-                    )
-
-                doc = dyn(acad.ActiveDocument)
-                modelspace = dyn(doc.ModelSpace)
-                if doc is None or modelspace is None:
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "code": "AUTOCAD_DOCUMENT_UNAVAILABLE",
-                                "message": "Cannot access ActiveDocument or ModelSpace.",
-                            }
-                        ),
-                        503,
-                    )
-
-                obstacle_scan_result = scan_conduit_obstacles(
-                    doc=doc,
-                    modelspace=modelspace,
-                    dyn_fn=dyn,
-                    entity_bbox_fn=lambda ent: entity_bbox(ent, dyn_fn=dyn),
-                    include_modelspace=include_modelspace,
-                    selection_only=selection_only,
-                    max_entities=max_entities,
-                    canvas_width=canvas_width,
-                    canvas_height=canvas_height,
-                    layer_names=layer_names,
-                    layer_type_overrides=layer_type_overrides,
-                )
-                obstacle_scan_elapsed_ms = int((time.time() - scan_started_at) * 1000)
-                resolved_payload["obstacles"] = (
-                    obstacle_scan_result.get("data", {}).get("obstacles", [])
-                    if obstacle_scan_result
-                    else []
-                )
-            finally:
+            if conduit_dotnet_enabled:
+                dotnet_payload = {
+                    "selectionOnly": selection_only,
+                    "includeModelspace": include_modelspace,
+                    "maxEntities": max_entities,
+                    "canvasWidth": canvas_width,
+                    "canvasHeight": canvas_height,
+                    "layerNames": layer_names,
+                    "layerTypeOverrides": layer_type_overrides,
+                }
                 try:
-                    pythoncom.CoUninitialize()
-                except Exception:
-                    pass
+                    obstacle_scan_result = _call_dotnet_conduit_action(
+                        action="conduit_route_obstacle_scan",
+                        payload=dotnet_payload,
+                        remote_addr=remote_addr,
+                        auth_mode=auth_mode,
+                    )
+                    dotnet_meta = obstacle_scan_result.get("meta", {}) if obstacle_scan_result else {}
+                    scan_ms_candidate = (
+                        dotnet_meta.get("scanMs")
+                        if isinstance(dotnet_meta, dict)
+                        else None
+                    )
+                    if scan_ms_candidate is None and isinstance(dotnet_meta, dict):
+                        scan_ms_candidate = dotnet_meta.get("bridgeMs")
+                    try:
+                        obstacle_scan_elapsed_ms = int(scan_ms_candidate) if scan_ms_candidate is not None else None
+                    except Exception:
+                        obstacle_scan_elapsed_ms = None
+                    resolved_payload["obstacles"] = (
+                        obstacle_scan_result.get("data", {}).get("obstacles", [])
+                        if obstacle_scan_result
+                        else []
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Conduit route compute .NET obstacle scan failed (remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                        remote_addr,
+                        auth_mode,
+                        conduit_provider,
+                        conduit_allow_com_fallback,
+                        str(exc),
+                    )
+                    if not conduit_allow_com_fallback:
+                        return (
+                            jsonify(
+                                {
+                                    "success": False,
+                                    "code": "DOTNET_BRIDGE_FAILED",
+                                    "message": f".NET obstacle scan failed: {str(exc)}",
+                                }
+                            ),
+                            503,
+                        )
+
+            if obstacle_scan_result is None:
+                manager = get_manager()
+                status = manager.get_status()
+                if not status.get("drawing_open"):
+                    logger.warning(
+                        "Conduit route compute blocked: no drawing open (remote=%s, auth_mode=%s)",
+                        remote_addr,
+                        auth_mode,
+                    )
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "code": "AUTOCAD_DRAWING_NOT_OPEN",
+                                "message": "No drawing open in AutoCAD.",
+                            }
+                        ),
+                        503,
+                    )
+                if pythoncom is None:
+                    logger.warning(
+                        "Conduit route compute blocked: COM unavailable (remote=%s, auth_mode=%s)",
+                        remote_addr,
+                        auth_mode,
+                    )
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "code": "COM_UNAVAILABLE",
+                                "message": "AutoCAD COM bridge unavailable on this platform.",
+                            }
+                        ),
+                        503,
+                    )
+
+                try:
+                    scan_started_at = time.time()
+                    pythoncom.CoInitialize()
+                    acad = connect_autocad()
+                    if acad is None:
+                        return (
+                            jsonify(
+                                {
+                                    "success": False,
+                                    "code": "AUTOCAD_CONNECT_FAILED",
+                                    "message": "Cannot connect to AutoCAD.",
+                                }
+                            ),
+                            503,
+                        )
+
+                    doc = dyn(acad.ActiveDocument)
+                    modelspace = dyn(doc.ModelSpace)
+                    if doc is None or modelspace is None:
+                        return (
+                            jsonify(
+                                {
+                                    "success": False,
+                                    "code": "AUTOCAD_DOCUMENT_UNAVAILABLE",
+                                    "message": "Cannot access ActiveDocument or ModelSpace.",
+                                }
+                            ),
+                            503,
+                        )
+
+                    obstacle_scan_result = scan_conduit_obstacles(
+                        doc=doc,
+                        modelspace=modelspace,
+                        dyn_fn=dyn,
+                        entity_bbox_fn=lambda ent: entity_bbox(ent, dyn_fn=dyn),
+                        include_modelspace=include_modelspace,
+                        selection_only=selection_only,
+                        max_entities=max_entities,
+                        canvas_width=canvas_width,
+                        canvas_height=canvas_height,
+                        layer_names=layer_names,
+                        layer_type_overrides=layer_type_overrides,
+                    )
+                    obstacle_scan_elapsed_ms = int((time.time() - scan_started_at) * 1000)
+                    resolved_payload["obstacles"] = (
+                        obstacle_scan_result.get("data", {}).get("obstacles", [])
+                        if obstacle_scan_result
+                        else []
+                    )
+                finally:
+                    try:
+                        pythoncom.CoUninitialize()
+                    except Exception:
+                        pass
 
         started_at = time.time()
         try:
@@ -902,43 +1085,8 @@ def create_autocad_blueprint(
     @limiter.limit("240 per hour")
     def api_conduit_route_obstacles_scan():
         """Scan and normalize route obstacles from AutoCAD drawing layers."""
-        manager = get_manager()
-        status = manager.get_status()
         remote_addr = str(request.remote_addr or "unknown")
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
-
-        if not status.get("drawing_open"):
-            logger.warning(
-                "Conduit obstacle scan blocked: no drawing open (remote=%s, auth_mode=%s)",
-                remote_addr,
-                auth_mode,
-            )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
-                        "message": "No drawing open in AutoCAD.",
-                    }
-                ),
-                503,
-            )
-        if pythoncom is None:
-            logger.warning(
-                "Conduit obstacle scan blocked: COM unavailable (remote=%s, auth_mode=%s)",
-                remote_addr,
-                auth_mode,
-            )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "COM_UNAVAILABLE",
-                        "message": "AutoCAD COM bridge unavailable on this platform.",
-                    }
-                ),
-                503,
-            )
 
         payload = request.get_json(silent=True) or {}
 
@@ -996,13 +1144,88 @@ def create_autocad_blueprint(
         )
 
         logger.info(
-            "Conduit obstacle scan request (remote=%s, auth_mode=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
+            "Conduit obstacle scan request (remote=%s, auth_mode=%s, provider=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
             remote_addr,
             auth_mode,
+            conduit_provider,
             selection_only,
             include_modelspace,
             max_entities,
         )
+
+        if conduit_dotnet_enabled:
+            dotnet_payload = {
+                "selectionOnly": selection_only,
+                "includeModelspace": include_modelspace,
+                "maxEntities": max_entities,
+                "canvasWidth": canvas_width,
+                "canvasHeight": canvas_height,
+                "layerNames": layer_names,
+                "layerTypeOverrides": layer_type_overrides,
+            }
+            try:
+                result = _call_dotnet_conduit_action(
+                    action="conduit_route_obstacle_scan",
+                    payload=dotnet_payload,
+                    remote_addr=remote_addr,
+                    auth_mode=auth_mode,
+                )
+                return jsonify(result), 200
+            except Exception as exc:
+                logger.warning(
+                    "Conduit obstacle scan .NET provider failed (remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    remote_addr,
+                    auth_mode,
+                    conduit_provider,
+                    conduit_allow_com_fallback,
+                    str(exc),
+                )
+                if not conduit_allow_com_fallback:
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "code": "DOTNET_BRIDGE_FAILED",
+                                "message": f".NET obstacle scan failed: {str(exc)}",
+                            }
+                        ),
+                        503,
+                    )
+
+        manager = get_manager()
+        status = manager.get_status()
+        if not status.get("drawing_open"):
+            logger.warning(
+                "Conduit obstacle scan blocked: no drawing open (remote=%s, auth_mode=%s)",
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
+                        "message": "No drawing open in AutoCAD.",
+                    }
+                ),
+                503,
+            )
+        if pythoncom is None:
+            logger.warning(
+                "Conduit obstacle scan blocked: COM unavailable (remote=%s, auth_mode=%s)",
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "COM_UNAVAILABLE",
+                        "message": "AutoCAD COM bridge unavailable on this platform.",
+                    }
+                ),
+                503,
+            )
 
         started_at = time.time()
         try:

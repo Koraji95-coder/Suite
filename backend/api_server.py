@@ -150,6 +150,13 @@ from route_groups.api_dependency_bundle import (
     build_passkey_deps as dependency_bundle_build_passkey_deps_helper,
     build_transmittal_render_deps as dependency_bundle_build_transmittal_render_deps_helper,
 )
+try:
+    from dotnet_bridge import send_dotnet_command as dotnet_send_command_helper
+except Exception as _dotnet_bridge_import_error:
+    dotnet_send_command_helper = None  # type: ignore[assignment]
+    DOTNET_BRIDGE_IMPORT_ERROR = str(_dotnet_bridge_import_error)
+else:
+    DOTNET_BRIDGE_IMPORT_ERROR = ""
 
 # Explicit aliases expected by dependency bundle keys.
 requests_module = requests
@@ -403,6 +410,61 @@ BACKUP_MAX_BYTES = _parse_int_env("BACKUP_MAX_BYTES", 5 * 1024 * 1024, minimum=1
 BACKUP_MAX_FILES = _parse_int_env("BACKUP_MAX_FILES", 500, minimum=10)
 AUTODRAFT_DOTNET_API_URL = (
     (os.environ.get("AUTODRAFT_DOTNET_API_URL") or "").strip()
+)
+CONDUIT_ROUTE_AUTOCAD_PROVIDER = (
+    (os.environ.get("CONDUIT_ROUTE_AUTOCAD_PROVIDER") or "com").strip() or "com"
+)
+AUTOCAD_DOTNET_PIPE_NAME = (
+    (os.environ.get("AUTOCAD_DOTNET_PIPE_NAME") or "SUITE_AUTOCAD_PIPE").strip()
+    or "SUITE_AUTOCAD_PIPE"
+)
+AUTOCAD_DOTNET_TIMEOUT_MS = _parse_int_env(
+    "AUTOCAD_DOTNET_TIMEOUT_MS",
+    30000,
+    minimum=1000,
+)
+AUTOCAD_DOTNET_TOKEN = (
+    (os.environ.get("AUTOCAD_DOTNET_TOKEN") or "").strip()
+)
+
+
+def _is_dotnet_provider(value: str) -> bool:
+    normalized = str(value or "").strip().lower().replace("-", "_")
+    return normalized in {"dotnet", "dotnet_fallback_com", "dotnet_with_com_fallback"}
+
+
+if _is_dotnet_provider(CONDUIT_ROUTE_AUTOCAD_PROVIDER):
+    if dotnet_send_command_helper is None:
+        logger.error(
+            "CONDUIT_ROUTE_AUTOCAD_PROVIDER=%s but dotnet_bridge import failed: %s",
+            CONDUIT_ROUTE_AUTOCAD_PROVIDER,
+            DOTNET_BRIDGE_IMPORT_ERROR or "unknown import error",
+        )
+    else:
+        logger.info(
+            "Conduit route AutoCAD provider set to %s (pipe=%s, timeout_ms=%s).",
+            CONDUIT_ROUTE_AUTOCAD_PROVIDER,
+            AUTOCAD_DOTNET_PIPE_NAME,
+            AUTOCAD_DOTNET_TIMEOUT_MS,
+        )
+
+
+def _send_autocad_dotnet_command(action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    if dotnet_send_command_helper is None:
+        raise RuntimeError(
+            "dotnet_bridge is unavailable. Install pywin32 and ensure backend/dotnet_bridge.py loads."
+        )
+    return dotnet_send_command_helper(
+        action=action,
+        payload=payload,
+        token=AUTOCAD_DOTNET_TOKEN or None,
+        pipe_name=AUTOCAD_DOTNET_PIPE_NAME,
+        timeout_ms=AUTOCAD_DOTNET_TIMEOUT_MS,
+    )
+
+
+AUTOCAD_DOTNET_COMMAND_SENDER = (
+    _send_autocad_dotnet_command if dotnet_send_command_helper is not None else None
 )
 
 # ── Agent Broker + Supabase Auth ────────────────────────────────
@@ -1567,6 +1629,7 @@ register_route_groups(
     backup_max_bytes=BACKUP_MAX_BYTES,
     backup_max_files=BACKUP_MAX_FILES,
     autodraft_dotnet_api_url=AUTODRAFT_DOTNET_API_URL,
+    conduit_route_autocad_provider=CONDUIT_ROUTE_AUTOCAD_PROVIDER,
     batch_session_cookie=BATCH_SESSION_COOKIE,
     batch_session_ttl_seconds=BATCH_SESSION_TTL_SECONDS,
     require_supabase_user=require_supabase_user,
@@ -1580,6 +1643,7 @@ register_route_groups(
     connect_autocad=connect_autocad,
     dyn=dyn,
     pythoncom=pythoncom,
+    send_autocad_dotnet_command=AUTOCAD_DOTNET_COMMAND_SENDER,
     validate_layer_config=validate_layer_config,
     traceback_module=traceback,
 )

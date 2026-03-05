@@ -197,6 +197,7 @@ class TestApiRouteGroups(unittest.TestCase):
             backup_max_bytes=1024 * 1024,
             backup_max_files=100,
             autodraft_dotnet_api_url="",
+            conduit_route_autocad_provider="com",
             batch_session_cookie="bfr_session",
             batch_session_ttl_seconds=3600,
             require_supabase_user=require_supabase_user,
@@ -217,6 +218,7 @@ class TestApiRouteGroups(unittest.TestCase):
             connect_autocad=connect_autocad,
             dyn=dyn,
             pythoncom=_PythonComStub(),
+            send_autocad_dotnet_command=None,
             validate_layer_config=validate_layer_config,
             traceback_module=_TracebackStub(),
         )

@@ -70,6 +70,38 @@ Starter code is in: `backend/dotnet_bridge.py`.
 - Map existing `/api/*` endpoints to the .NET actions.
 - Keep input validation in the backend.
 
+### Current env wiring (Conduit Route)
+
+The backend now supports provider selection for Conduit Route endpoints:
+
+- `CONDUIT_ROUTE_AUTOCAD_PROVIDER=com` (default)
+- `CONDUIT_ROUTE_AUTOCAD_PROVIDER=dotnet`
+- `CONDUIT_ROUTE_AUTOCAD_PROVIDER=dotnet_fallback_com`
+
+Named-pipe bridge settings:
+
+- `AUTOCAD_DOTNET_PIPE_NAME=SUITE_AUTOCAD_PIPE`
+- `AUTOCAD_DOTNET_TIMEOUT_MS=30000`
+- `AUTOCAD_DOTNET_TOKEN=` (optional)
+
+When `dotnet` is selected, `/api/conduit-route/terminal-scan` and
+`/api/conduit-route/obstacles/scan` call the pipe bridge directly. With
+`dotnet_fallback_com`, backend falls back to COM if the bridge call fails.
+
+Expected bridge actions for current Conduit Route integration:
+
+- `conduit_route_terminal_scan`
+- `conduit_route_obstacle_scan`
+
+Each action response should follow:
+
+```json
+{"id":"job-123","ok":true,"result":{"success":true,"data":{},"meta":{},"warnings":[]}}
+```
+
+Current implementation status: these two actions are wired and execute live
+AutoCAD scans through the .NET bridge process (COM-backed today).
+
 ## Step 4: Long-running jobs (optional)
 
 For long tasks:

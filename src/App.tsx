@@ -51,6 +51,9 @@ const DrawingListManagerRoutePage = lazy(
 	() =>
 		import("./routes/apps/drawing-list-manager/DrawingListManagerRoutePage"),
 );
+const ConduitRouteRoutePage = lazy(
+	() => import("./routes/apps/conduit-route/ConduitRouteRoutePage"),
+);
 const KnowledgeRoutePage = lazy(
 	() => import("./routes/knowledge/KnowledgeRoutePage"),
 );
@@ -142,6 +145,10 @@ export default function App() {
 									<Route
 										path="apps/drawing-list-manager"
 										element={withRouteSuspense(<DrawingListManagerRoutePage />)}
+									/>
+									<Route
+										path="apps/conduit-route"
+										element={withRouteSuspense(<ConduitRouteRoutePage />)}
 									/>
 									<Route
 										path="apps/graph"

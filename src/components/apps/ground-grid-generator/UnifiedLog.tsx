@@ -58,12 +58,6 @@ export function UnifiedLog() {
 	}, []);
 
 	useEffect(() => {
-		let mounted = true;
-
-		coordinatesGrabberService.connectWebSocket().catch(() => {
-			if (mounted) setWsLive(false);
-		});
-
 		const unsubscribeConnected = coordinatesGrabberService.on(
 			"connected",
 			(event) => {
@@ -92,7 +86,6 @@ export function UnifiedLog() {
 		});
 
 		return () => {
-			mounted = false;
 			unsubscribeConnected();
 			unsubscribeStatus();
 			unsubscribeDisconnected();

@@ -248,7 +248,6 @@
 	border-radius: 999px;
 	background: color-mix(in srgb, var(--surface) 60%, transparent);
 	transition:
-		transform 300ms ease,
 		border-color 300ms ease,
 		background 300ms ease;
 	animation: fadeInScale 400ms ease-out forwards;
@@ -256,7 +255,6 @@
 }
 
 .heroSecondaryAgent:hover {
-	transform: scale(1.1);
 	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
 	background: var(--surface);
 }
@@ -276,14 +274,11 @@
 	background: var(--surface);
 	transition:
 		border-color 300ms ease,
-		transform 300ms ease,
 		box-shadow 300ms ease,
-		opacity 400ms ease,
-		transform 400ms ease;
+		opacity 400ms ease;
 }
 
 .featureCard:hover {
-	transform: translateY(-0.25rem);
 	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
 	box-shadow: 0 14px 24px color-mix(in srgb, var(--primary) 8%, transparent);
 }
@@ -337,7 +332,6 @@
 
 .featureCard:hover .featureArrow {
 	opacity: 0.6;
-	transform: translateX(0.25rem);
 }
 
 .agentsSection {
@@ -416,11 +410,7 @@
 }
 
 .agentMark {
-	transition: transform 240ms ease;
-}
-
-.agentCard:hover .agentMark {
-	transform: scale(1.1);
+	transition: none;
 }
 
 .agentTagline {
@@ -463,14 +453,12 @@
 	font-size: 0.875rem;
 	transition:
 		border-color 200ms ease,
-		background 200ms ease,
-		transform 200ms ease;
+		background 200ms ease;
 }
 
 .themeButtonActive {
 	border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
 	background: var(--surface-2);
-	transform: scale(1.02);
 }
 
 .themeButtonInactive {

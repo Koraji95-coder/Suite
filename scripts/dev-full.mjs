@@ -1,13 +1,25 @@
 import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
 
 const children = [];
 let shuttingDown = false;
 
+function forwardOutput(stream, label, write) {
+	if (!stream) return;
+	const rl = createInterface({ input: stream });
+	rl.on("line", (line) => {
+		write(`[${label}] ${line}`);
+	});
+}
+
 function run(name, command) {
 	const child = spawn(command, {
-		stdio: "inherit",
+		stdio: ["inherit", "pipe", "pipe"],
 		shell: true,
 	});
+
+	forwardOutput(child.stdout, name, console.log);
+	forwardOutput(child.stderr, name, console.error);
 
 	children.push(child);
 

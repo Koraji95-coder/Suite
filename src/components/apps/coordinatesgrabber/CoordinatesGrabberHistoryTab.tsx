@@ -58,19 +58,24 @@ export function CoordinatesGrabberHistoryTab({
 							}}
 						>
 							<div>
-								Points: <strong>{state.performanceMetrics.pointsCreated}</strong>
+								Points:{" "}
+								<strong>{state.performanceMetrics.pointsCreated}</strong>
 							</div>
 							<div>
-								Duration: <strong>{state.performanceMetrics.duration.toFixed(2)}s</strong>
+								Duration:{" "}
+								<strong>{state.performanceMetrics.duration.toFixed(2)}s</strong>
 							</div>
 							<div>
-								Rate: <strong>{state.performanceMetrics.pointsPerSecond}</strong>
+								Rate:{" "}
+								<strong>{state.performanceMetrics.pointsPerSecond}</strong>
 								/s
 							</div>
 							<div>
 								Time:{" "}
 								<strong>
-									{new Date(state.performanceMetrics.startTime).toLocaleTimeString()}
+									{new Date(
+										state.performanceMetrics.startTime,
+									).toLocaleTimeString()}
 								</strong>
 							</div>
 						</div>
@@ -86,7 +91,7 @@ export function CoordinatesGrabberHistoryTab({
 							margin: "20px 0",
 						}}
 					>
-						No execution history yet. Run a search to see results here.
+						No execution history yet. Start extraction to see results here.
 					</p>
 				) : (
 					state.executionHistory.map((entry, idx) => (

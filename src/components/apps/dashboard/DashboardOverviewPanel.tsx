@@ -67,6 +67,7 @@ export function DashboardOverviewPanel({
 				key="activity"
 				activities={activities}
 				allProjectsMap={allProjectsMap}
+				isLoading={isLoading}
 			/>
 		),
 		calendar: <DashboardUpcomingPanel key="calendar" />,
@@ -75,6 +76,7 @@ export function DashboardOverviewPanel({
 				key="projects"
 				projects={projects}
 				projectTaskCounts={projectTaskCounts}
+				isLoading={isLoading}
 				onNavigateToProject={handleNavigateToProject}
 				onNavigateToProjectsHub={handleNavigateToProjectsHub}
 			/>

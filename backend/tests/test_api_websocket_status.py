@@ -219,6 +219,65 @@ class TestApiWebsocketStatus(unittest.TestCase):
         self.assertEqual(len(ws.sent), 2)
         self.assertEqual(manager.calls, [True])
 
+    def test_websocket_status_bridge_accepts_ticket_auth_without_api_key(self) -> None:
+        ws = _WsStub(receive_result=None)
+        logger = _LoggerStub()
+        manager = _ManagerStub({"connected": True, "autocad_running": True, "drawing_open": True})
+        consumed = []
+
+        def consume_ticket(ticket: str, remote_addr: str) -> tuple[bool, str]:
+            consumed.append((ticket, remote_addr))
+            return ticket == "ticket-good", "ok"
+
+        websocket_status_bridge(
+            ws,
+            request_obj=_RequestStub(
+                args={"ticket": "ticket-good"},
+                remote_addr="127.0.0.1",
+            ),
+            is_valid_api_key_fn=lambda _provided: False,
+            consume_ws_ticket_fn=consume_ticket,
+            allow_api_key_fallback=False,
+            logger=logger,
+            get_manager=lambda: manager,
+            json_module=json,
+            time_module=_TimeStub([1.0, 2.0]),
+            backend_id="coordinates-grabber-api",
+            backend_version="1.0.0",
+            max_iterations=1,
+        )
+
+        self.assertEqual(consumed, [("ticket-good", "127.0.0.1")])
+        self.assertEqual(len(ws.sent), 2)
+        self.assertEqual(manager.calls, [True])
+
+    def test_websocket_status_bridge_rejects_invalid_ticket_when_fallback_disabled(self) -> None:
+        ws = _WsStub(receive_result=None)
+        logger = _LoggerStub()
+
+        websocket_status_bridge(
+            ws,
+            request_obj=_RequestStub(
+                args={"ticket": "ticket-bad"},
+                remote_addr="127.0.0.1",
+            ),
+            is_valid_api_key_fn=lambda _provided: False,
+            consume_ws_ticket_fn=lambda _ticket, _remote: (False, "missing_or_used"),
+            allow_api_key_fallback=False,
+            logger=logger,
+            get_manager=lambda: _ManagerStub({}),
+            json_module=json,
+            time_module=_TimeStub([1.0]),
+            backend_id="coordinates-grabber-api",
+            backend_version="1.0.0",
+        )
+
+        self.assertTrue(ws.closed)
+        self.assertEqual(len(ws.sent), 1)
+        payload = json.loads(ws.sent[0])
+        self.assertEqual(payload["code"], "AUTH_INVALID")
+        self.assertTrue(logger.warning_calls)
+
 
 if __name__ == "__main__":
     unittest.main()

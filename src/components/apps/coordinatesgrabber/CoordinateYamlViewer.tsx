@@ -143,7 +143,7 @@ export function CoordinateYamlViewer({ data }: CoordinateYamlViewerProps) {
 					fontSize: "12px",
 				}}
 			>
-				No coordinate data. Run a search to generate YAML output.
+				No coordinate data. Start extraction to generate YAML output.
 			</div>
 		);
 	}

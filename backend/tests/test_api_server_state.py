@@ -31,6 +31,7 @@ class TestApiServerState(unittest.TestCase):
         self.assertEqual(state.agent_pairing_action_blocked_until, {})
         self.assertEqual(state.agent_pairing_confirm_failure_window, {})
         self.assertEqual(state.agent_pairing_confirm_blocked_until, {})
+        self.assertEqual(state.websocket_tickets, {})
 
     def test_stores_are_independent_and_locks_exist(self) -> None:
         state = create_server_state(threading_module=threading)
@@ -53,6 +54,7 @@ class TestApiServerState(unittest.TestCase):
             state.passkey_webauthn_states_lock,
             state.agent_pairing_action_abuse_lock,
             state.agent_pairing_confirm_abuse_lock,
+            state.websocket_tickets_lock,
         ):
             self.assertTrue(hasattr(lock, "acquire"))
             self.assertTrue(hasattr(lock, "release"))

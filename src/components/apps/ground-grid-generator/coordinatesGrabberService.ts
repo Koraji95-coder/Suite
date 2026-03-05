@@ -6,6 +6,7 @@
  */
 
 import { logger } from "@/lib/logger";
+import { supabase } from "@/supabase/client";
 
 export interface CoordinatesConfig {
 	mode: "polylines" | "blocks" | "layer_search";
@@ -179,6 +180,16 @@ export type WebSocketMessage =
 	| WebSocketCompleteEvent
 	| WebSocketErrorEvent;
 
+interface WebSocketTicketResponse {
+	ok?: boolean;
+	ticket?: string;
+	expires_at?: number;
+	ttl_seconds?: number;
+	error?: string;
+	message?: string;
+	code?: string;
+}
+
 /**
  * Singleton service for coordinating with the Python AutoCAD backend.
  *
@@ -193,11 +204,21 @@ class CoordinatesGrabberService {
 	private reconnectAttempts: number = 0;
 	private maxReconnectAttempts: number = 5;
 	private reconnectDelay: number = 2000; // ms
+	private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 	private connectingPromise: Promise<void> | null = null;
 	private listeners: Map<string, Set<(data: WebSocketMessage) => void>> =
 		new Map();
 	private apiKey: string;
 	private shouldReconnect: boolean = true;
+	private wsConnectStartedAt: number | null = null;
+	private wsOpenedAt: number | null = null;
+	private authInvalid: boolean = false;
+	private wsConnectionSequence: number = 0;
+	private missingAuthWarningShown: boolean = false;
+
+	private isStaleConnection(connectionId: number): boolean {
+		return connectionId !== this.wsConnectionSequence;
+	}
 
 	constructor() {
 		// Initialize with localhost for development
@@ -208,7 +229,7 @@ class CoordinatesGrabberService {
 		if (!key) {
 			logger.warn(
 				"[CoordinatesGrabberService] VITE_API_KEY is not set. " +
-					"Backend requests will fail until you add it to .env",
+					"Bearer auth will be required for backend requests.",
 				"CoordinatesGrabber",
 			);
 		}
@@ -216,29 +237,165 @@ class CoordinatesGrabberService {
 	}
 
 	/**
-	 * Get default headers with API key authentication
+	 * Parse error payloads without throwing on invalid JSON.
 	 */
-	private getHeaders(): HeadersInit {
-		return {
-			"Content-Type": "application/json",
-			"X-API-Key": this.apiKey,
-		};
+	private async parseErrorMessage(
+		response: Response,
+		fallback: string,
+	): Promise<string> {
+		try {
+			const payload = (await response.json()) as {
+				error?: string;
+				message?: string;
+				code?: string;
+			} | null;
+			const candidate = payload?.error || payload?.message;
+			if (typeof candidate === "string" && candidate.trim().length > 0) {
+				return candidate.trim();
+			}
+		} catch {
+			// Ignore parse failure and use fallback.
+		}
+		return fallback;
 	}
 
 	/**
-	 * Encode API key as websocket subprotocol token to avoid query-string secrets.
+	 * Read Supabase access token for authenticated backend requests.
 	 */
-	private getWebSocketProtocols(): string[] | undefined {
-		if (!this.apiKey) return undefined;
+	private async getAccessToken(): Promise<string | null> {
 		try {
-			const encoded = btoa(this.apiKey)
-				.replace(/\+/g, "-")
-				.replace(/\//g, "_")
-				.replace(/=+$/g, "");
-			return [`api-key.${encoded}`];
+			const {
+				data: { session },
+				error,
+			} = await supabase.auth.getSession();
+			if (error) {
+				logger.warn(
+					"Unable to read Supabase session for backend auth",
+					"CoordinatesGrabber",
+					{ message: error.message || "Unknown auth error" },
+				);
+				return null;
+			}
+			return session?.access_token || null;
+		} catch (err) {
+			logger.error(
+				"Unexpected error while reading Supabase session",
+				"CoordinatesGrabber",
+				err,
+			);
+			return null;
+		}
+	}
+
+	/**
+	 * Build auth headers: bearer token preferred, API-key fallback for local/dev.
+	 */
+	private async getHeaders(options?: {
+		includeContentType?: boolean;
+		context?: string;
+	}): Promise<Record<string, string>> {
+		const includeContentType = options?.includeContentType ?? true;
+		const context = options?.context || "request";
+		const headers: Record<string, string> = {};
+		if (includeContentType) {
+			headers["Content-Type"] = "application/json";
+		}
+
+		const accessToken = await this.getAccessToken();
+		if (accessToken) {
+			headers.Authorization = `Bearer ${accessToken}`;
+			return headers;
+		}
+
+		if (this.apiKey) {
+			headers["X-API-Key"] = this.apiKey;
+			logger.debug(
+				`Using API-key fallback auth for ${context}`,
+				"CoordinatesGrabber",
+			);
+			return headers;
+		}
+
+		if (!this.missingAuthWarningShown) {
+			this.missingAuthWarningShown = true;
+			logger.warn(
+				"No bearer token or API key available for backend auth. AutoCAD features will remain offline until auth is available.",
+				"CoordinatesGrabber",
+			);
+		}
+
+		return headers;
+	}
+
+	private getWebSocketUrl(ticket: string): string {
+		const wsBaseUrl = this.baseUrl.replace(/^http/, "ws") + "/ws";
+		const separator = wsBaseUrl.includes("?") ? "&" : "?";
+		return `${wsBaseUrl}${separator}ticket=${encodeURIComponent(ticket)}`;
+	}
+
+	private async requestWebSocketTicket(): Promise<string> {
+		const endpoint = `${this.baseUrl}/api/autocad/ws-ticket`;
+		const headers = await this.getHeaders({ context: "websocket-ticket" });
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers,
+		});
+
+		if (!response.ok) {
+			const message = await this.parseErrorMessage(
+				response,
+				`WebSocket ticket request failed (${response.status})`,
+			);
+			throw new Error(message);
+		}
+
+		const payload = (await response.json()) as WebSocketTicketResponse;
+		const ticket = (payload.ticket || "").trim();
+		if (!ticket) {
+			throw new Error("WebSocket ticket response did not include a ticket");
+		}
+
+		logger.debug("Received websocket ticket", "CoordinatesGrabber", {
+			ttlSeconds: payload.ttl_seconds ?? null,
+			expiresAt: payload.expires_at ?? null,
+		});
+		return ticket;
+	}
+
+	private handleAuthInvalid(message?: string): void {
+		if (this.authInvalid) return;
+
+		this.authInvalid = true;
+		this.shouldReconnect = false;
+		if (this.reconnectTimeout) {
+			clearTimeout(this.reconnectTimeout);
+			this.reconnectTimeout = null;
+		}
+
+		const errorMessage =
+			typeof message === "string" && message.trim()
+				? message
+				: "WebSocket authentication failed: invalid credentials.";
+
+		this.emit("error", {
+			type: "error",
+			message: errorMessage,
+			code: "AUTH_INVALID",
+			error_details: errorMessage,
+			timestamp: Date.now(),
+		});
+
+		this.emit("service-disconnected", {
+			type: "service-disconnected",
+			message:
+				"WebSocket authentication failed (AUTH_INVALID). Re-authenticate and retry connection.",
+			timestamp: new Date().toISOString(),
+		});
+
+		try {
+			this.websocket?.close();
 		} catch {
-			// Fallback for edge runtimes that fail base64 encoding.
-			return [`api-key-plain.${this.apiKey}`];
+			// Ignore close errors while transitioning to auth-invalid terminal state.
 		}
 	}
 
@@ -246,6 +403,18 @@ class CoordinatesGrabberService {
 	 * Connect to the Python backend via WebSocket for real-time updates
 	 */
 	public connectWebSocket(): Promise<void> {
+		if (this.authInvalid) {
+			return Promise.reject(
+				new Error(
+					"WebSocket authentication is blocked after AUTH_INVALID. Call disconnect() after correcting keys, then reconnect.",
+				),
+			);
+		}
+
+		if (this.reconnectTimeout) {
+			clearTimeout(this.reconnectTimeout);
+			this.reconnectTimeout = null;
+		}
 		this.shouldReconnect = true;
 		if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
 			return Promise.resolve();
@@ -256,55 +425,122 @@ class CoordinatesGrabberService {
 		}
 
 		this.connectingPromise = new Promise((resolve, reject) => {
-			try {
-				const wsBaseUrl = this.baseUrl.replace(/^http/, "ws") + "/ws";
-				const protocols = this.getWebSocketProtocols();
-				this.websocket = protocols
-					? new WebSocket(wsBaseUrl, protocols)
-					: new WebSocket(wsBaseUrl);
+			const connectionId = ++this.wsConnectionSequence;
+			this.wsConnectStartedAt = Date.now();
 
-				this.websocket.onopen = () => {
-					logger.debug("WebSocket connected", "CoordinatesGrabber");
-					this.reconnectAttempts = 0;
-					this.connectingPromise = null;
-					resolve();
-				};
-
-				this.websocket.onmessage = (event) => {
-					try {
-						const data = JSON.parse(event.data);
-						this.emit(data.type, data);
-					} catch (err) {
-						logger.error(
-							"Failed to parse WebSocket message",
-							"CoordinatesGrabber",
-							err,
-						);
+			this.requestWebSocketTicket()
+				.then((ticket) => {
+					if (this.isStaleConnection(connectionId) || !this.shouldReconnect) {
+						this.connectingPromise = null;
+						reject(new Error("WebSocket connection canceled"));
+						return;
 					}
-				};
 
-				this.websocket.onerror = (error) => {
+					const wsUrl = this.getWebSocketUrl(ticket);
+					this.websocket = new WebSocket(wsUrl);
+
+					this.websocket.onopen = () => {
+						if (this.isStaleConnection(connectionId)) {
+							try {
+								this.websocket?.close();
+							} catch {
+								// Ignore close errors while canceling stale connection.
+							}
+							return;
+						}
+						this.wsOpenedAt = Date.now();
+						this.reconnectAttempts = 0;
+						this.connectingPromise = null;
+						logger.debug("WebSocket connected", "CoordinatesGrabber", {
+							connectionId,
+							connectMs:
+								this.wsConnectStartedAt !== null
+									? Date.now() - this.wsConnectStartedAt
+									: null,
+						});
+						resolve();
+					};
+
+					this.websocket.onmessage = (event) => {
+						if (this.isStaleConnection(connectionId)) return;
+						try {
+							const data = JSON.parse(event.data) as
+								| WebSocketMessage
+								| { type?: string; code?: string; message?: string };
+							if (
+								data &&
+								data.type === "error" &&
+								data.code === "AUTH_INVALID"
+							) {
+								logger.error(
+									"WebSocket authentication failed (AUTH_INVALID). Disabling reconnect until reset.",
+									"CoordinatesGrabber",
+									{
+										connectionId,
+										message: data.message || "",
+									},
+								);
+								this.handleAuthInvalid(data.message);
+								return;
+							}
+							if (typeof data.type === "string" && data.type.length > 0) {
+								this.emit(data.type, data as WebSocketMessage);
+							}
+						} catch (err) {
+							logger.error(
+								"Failed to parse WebSocket message",
+								"CoordinatesGrabber",
+								err,
+							);
+						}
+					};
+
+					this.websocket.onerror = (error) => {
+						if (this.isStaleConnection(connectionId)) return;
+						logger.error("WebSocket connection error", "CoordinatesGrabber", {
+							connectionId,
+							error,
+						});
+						this.connectingPromise = null;
+						reject(error);
+					};
+
+					this.websocket.onclose = (event) => {
+						if (this.isStaleConnection(connectionId)) return;
+						const openForMs = this.wsOpenedAt
+							? Date.now() - this.wsOpenedAt
+							: 0;
+						const connectForMs = this.wsConnectStartedAt
+							? Date.now() - this.wsConnectStartedAt
+							: 0;
+						logger.debug("WebSocket disconnected", "CoordinatesGrabber", {
+							connectionId,
+							code: event.code,
+							reason: event.reason || "",
+							wasClean: event.wasClean,
+							openForMs,
+							connectForMs,
+						});
+						this.wsConnectStartedAt = null;
+						this.wsOpenedAt = null;
+						this.websocket = null;
+						this.connectingPromise = null;
+						if (this.shouldReconnect) {
+							this.attemptReconnect();
+						}
+					};
+				})
+				.catch((err) => {
+					if (this.isStaleConnection(connectionId)) return;
+					this.connectingPromise = null;
+					this.wsConnectStartedAt = null;
 					logger.error(
-						"WebSocket connection error",
+						"WebSocket ticket acquisition failed",
 						"CoordinatesGrabber",
-						error,
+						err,
 					);
-					this.connectingPromise = null;
-					reject(error);
-				};
-
-				this.websocket.onclose = () => {
-					logger.debug("WebSocket disconnected", "CoordinatesGrabber");
-					this.websocket = null;
-					this.connectingPromise = null;
-					if (this.shouldReconnect) {
-						this.attemptReconnect();
-					}
-				};
-			} catch (err) {
-				this.connectingPromise = null;
-				reject(err);
-			}
+					reject(err);
+				});
 		});
 
 		return this.connectingPromise;
@@ -322,17 +558,26 @@ class CoordinatesGrabberService {
 				`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
 				"CoordinatesGrabber",
 			);
-			setTimeout(
-				() =>
-					this.connectWebSocket().catch((err) => {
-						logger.error("Reconnection failed", "CoordinatesGrabber", err);
-					}),
-				delay,
-			);
+			if (this.reconnectTimeout) {
+				clearTimeout(this.reconnectTimeout);
+			}
+			this.reconnectTimeout = setTimeout(() => {
+				this.reconnectTimeout = null;
+				if (!this.shouldReconnect) {
+					return;
+				}
+				this.connectWebSocket().catch((err) => {
+					logger.error("Reconnection failed", "CoordinatesGrabber", err);
+				});
+			}, delay);
 		} else {
 			const errorMsg =
 				"Max WebSocket reconnection attempts reached. Service is offline. Please restart the server.";
 			logger.error(errorMsg, "CoordinatesGrabber");
+			if (this.reconnectTimeout) {
+				clearTimeout(this.reconnectTimeout);
+				this.reconnectTimeout = null;
+			}
 			// Notify UI that service is permanently disconnected
 			this.emit("service-disconnected", {
 				type: "service-disconnected",
@@ -347,11 +592,18 @@ class CoordinatesGrabberService {
 	 */
 	public async checkStatus(): Promise<BackendStatus> {
 		try {
+			const headers = await this.getHeaders({ context: "status" });
 			const response = await fetch(`${this.baseUrl}/api/status`, {
 				method: "GET",
-				headers: this.getHeaders(),
+				headers,
 			});
-			if (!response.ok) throw new Error(`Status ${response.status}`);
+			if (!response.ok) {
+				const message = await this.parseErrorMessage(
+					response,
+					`Status check failed (${response.status})`,
+				);
+				throw new Error(message);
+			}
 			const data = await response.json();
 
 			if (data.backend_id !== "coordinates-grabber-api") {
@@ -363,7 +615,10 @@ class CoordinatesGrabberService {
 
 			return data;
 		} catch (err) {
-			logger.error("Status check failed", "CoordinatesGrabber", err);
+			logger.error("Status check failed", "CoordinatesGrabber", {
+				baseUrl: this.baseUrl,
+				error: err,
+			});
 			return {
 				connected: false,
 				autocad_running: false,
@@ -379,10 +634,8 @@ class CoordinatesGrabberService {
 		options?: { runId?: string },
 	): Promise<ExecutionResult> {
 		try {
-			const headers = this.getHeaders();
-			if (options?.runId) {
-				(headers as Record<string, string>)["X-Run-Id"] = options.runId;
-			}
+			const headers = await this.getHeaders({ context: "execute" });
+			if (options?.runId) headers["X-Run-Id"] = options.runId;
 			const response = await fetch(`${this.baseUrl}/api/execute`, {
 				method: "POST",
 				headers,
@@ -399,7 +652,10 @@ class CoordinatesGrabberService {
 						error_details: `Another service may be running on ${this.baseUrl} instead of the Coordinates Grabber API`,
 					};
 				}
-				const body = await response.json().catch(() => null);
+				const body = (await response.json().catch(() => null)) as {
+					message?: string;
+					error_details?: string;
+				} | null;
 				if (body && typeof body.message === "string") {
 					return {
 						success: false,
@@ -434,12 +690,19 @@ class CoordinatesGrabberService {
 	 */
 	public async listLayers(): Promise<string[]> {
 		try {
+			const headers = await this.getHeaders({ context: "layers" });
 			const response = await fetch(`${this.baseUrl}/api/layers`, {
 				method: "GET",
-				headers: this.getHeaders(),
+				headers,
 			});
 
-			if (!response.ok) throw new Error(`Status ${response.status}`);
+			if (!response.ok) {
+				const message = await this.parseErrorMessage(
+					response,
+					`Layer request failed (${response.status})`,
+				);
+				throw new Error(message);
+			}
 			const data = await response.json();
 			return data.layers || [];
 		} catch (err) {
@@ -453,12 +716,19 @@ class CoordinatesGrabberService {
 	 */
 	public async getSelectionCount(): Promise<number> {
 		try {
+			const headers = await this.getHeaders({ context: "selection-count" });
 			const response = await fetch(`${this.baseUrl}/api/selection-count`, {
 				method: "GET",
-				headers: this.getHeaders(),
+				headers,
 			});
 
-			if (!response.ok) throw new Error(`Status ${response.status}`);
+			if (!response.ok) {
+				const message = await this.parseErrorMessage(
+					response,
+					`Selection count failed (${response.status})`,
+				);
+				throw new Error(message);
+			}
 			const data = await response.json();
 			return data.count || 0;
 		} catch (err) {
@@ -472,12 +742,19 @@ class CoordinatesGrabberService {
 	 */
 	public async triggerSelection(): Promise<void> {
 		try {
+			const headers = await this.getHeaders({ context: "trigger-selection" });
 			const response = await fetch(`${this.baseUrl}/api/trigger-selection`, {
 				method: "POST",
-				headers: this.getHeaders(),
+				headers,
 			});
 
-			if (!response.ok) throw new Error(`Status ${response.status}`);
+			if (!response.ok) {
+				const message = await this.parseErrorMessage(
+					response,
+					`Trigger selection failed (${response.status})`,
+				);
+				throw new Error(message);
+			}
 		} catch (err) {
 			logger.error("Failed to trigger selection", "CoordinatesGrabber", err);
 		}
@@ -487,17 +764,23 @@ class CoordinatesGrabberService {
 	 * Download a generated coordinates Excel file from backend.
 	 */
 	public async downloadResultFile(path: string): Promise<Blob> {
+		const headers = await this.getHeaders({
+			includeContentType: false,
+			context: "download-result",
+		});
 		const response = await fetch(
 			`${this.baseUrl}/api/download-result?path=${encodeURIComponent(path)}`,
 			{
 				method: "GET",
-				headers: {
-					"X-API-Key": this.apiKey,
-				},
+				headers,
 			},
 		);
 		if (!response.ok) {
-			throw new Error(`Download failed (${response.status})`);
+			const message = await this.parseErrorMessage(
+				response,
+				`Download failed (${response.status})`,
+			);
+			throw new Error(message);
 		}
 		return await response.blob();
 	}
@@ -505,12 +788,11 @@ class CoordinatesGrabberService {
 	/**
 	 * Open folder containing a generated coordinates Excel file (Windows backend).
 	 */
-	public async openExportFolder(
-		path: string,
-	): Promise<OpenExportFolderResult> {
+	public async openExportFolder(path: string): Promise<OpenExportFolderResult> {
+		const headers = await this.getHeaders({ context: "open-export-folder" });
 		const response = await fetch(`${this.baseUrl}/api/open-export-folder`, {
 			method: "POST",
-			headers: this.getHeaders(),
+			headers,
 			body: JSON.stringify({ path }),
 		});
 
@@ -518,7 +800,9 @@ class CoordinatesGrabberService {
 			.json()
 			.catch(() => null)) as OpenExportFolderResult | null;
 		if (!response.ok) {
-			throw new Error(body?.message || `Open folder failed (${response.status})`);
+			throw new Error(
+				body?.message || `Open folder failed (${response.status})`,
+			);
 		}
 		return (
 			body || {
@@ -535,9 +819,10 @@ class CoordinatesGrabberService {
 		payload: GroundGridPlotRequest,
 	): Promise<GroundGridPlotResult> {
 		try {
+			const headers = await this.getHeaders({ context: "ground-grid-plot" });
 			const response = await fetch(`${this.baseUrl}/api/ground-grid/plot`, {
 				method: "POST",
-				headers: this.getHeaders(),
+				headers,
 				body: JSON.stringify(payload),
 			});
 
@@ -621,7 +906,16 @@ class CoordinatesGrabberService {
 	 * Close WebSocket connection
 	 */
 	public disconnect(): void {
+		this.wsConnectionSequence += 1;
 		this.shouldReconnect = false;
+		this.authInvalid = false;
+		this.wsConnectStartedAt = null;
+		this.wsOpenedAt = null;
+		this.reconnectAttempts = 0;
+		if (this.reconnectTimeout) {
+			clearTimeout(this.reconnectTimeout);
+			this.reconnectTimeout = null;
+		}
 		if (this.websocket) {
 			this.websocket.close();
 			this.websocket = null;

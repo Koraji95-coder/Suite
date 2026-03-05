@@ -97,7 +97,7 @@ export function CoordinatesGrabberExportTab({
 								fontSize: "12px",
 							}}
 						>
-							No export yet. Run layer search to generate Excel file.
+							No export yet. Start extraction to generate Excel file.
 						</p>
 					)}
 				</div>

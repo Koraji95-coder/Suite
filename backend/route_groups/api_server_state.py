@@ -28,6 +28,8 @@ class ServerState:
     agent_pairing_confirm_failure_window: Dict[str, List[float]]
     agent_pairing_confirm_blocked_until: Dict[str, float]
     agent_pairing_confirm_abuse_lock: Any
+    websocket_tickets: Dict[str, Dict[str, Any]]
+    websocket_tickets_lock: Any
 
 
 def create_server_state(
@@ -57,4 +59,6 @@ def create_server_state(
         agent_pairing_confirm_failure_window={},
         agent_pairing_confirm_blocked_until={},
         agent_pairing_confirm_abuse_lock=threading_module.Lock(),
+        websocket_tickets={},
+        websocket_tickets_lock=threading_module.Lock(),
     )

@@ -340,6 +340,57 @@ API_KEY = runtime_config_resolve_api_key_helper(
 if len(API_KEY) < 16:
     logger.warning("API_KEY length is under 16 characters; use a longer key for production.")
 
+VITE_API_KEY = (os.environ.get("VITE_API_KEY") or "").strip()
+if not VITE_API_KEY:
+    logger.warning(
+        "VITE_API_KEY is not set. Frontend API/WebSocket auth may fail. "
+        "Set VITE_API_KEY to match API_KEY and restart both servers."
+    )
+elif not hmac.compare_digest(VITE_API_KEY, API_KEY):
+    logger.error(
+        "API key mismatch detected: VITE_API_KEY does not match API_KEY. "
+        "Set both keys equal in .env, then restart frontend and backend."
+    )
+AUTOCAD_ALLOW_API_KEY_FALLBACK = _parse_bool_env(
+    "AUTOCAD_ALLOW_API_KEY_FALLBACK",
+    False,
+)
+WS_ALLOW_API_KEY_FALLBACK = _parse_bool_env(
+    "WS_ALLOW_API_KEY_FALLBACK",
+    AUTOCAD_ALLOW_API_KEY_FALLBACK,
+)
+WS_TICKET_TTL_SECONDS = _parse_int_env(
+    "WS_TICKET_TTL_SECONDS",
+    45,
+    minimum=5,
+)
+WS_TICKET_MAX_ENTRIES = _parse_int_env(
+    "WS_TICKET_MAX_ENTRIES",
+    20000,
+    minimum=100,
+)
+WS_TICKET_BIND_REMOTE_ADDR = _parse_bool_env(
+    "WS_TICKET_BIND_REMOTE_ADDR",
+    False,
+)
+if AUTOCAD_ALLOW_API_KEY_FALLBACK:
+    logger.warning(
+        "AUTOCAD_ALLOW_API_KEY_FALLBACK is enabled. "
+        "Prefer bearer token auth in production and disable this fallback."
+    )
+if WS_ALLOW_API_KEY_FALLBACK:
+    logger.warning(
+        "WS_ALLOW_API_KEY_FALLBACK is enabled. "
+        "WebSocket API-key auth should be disabled in production."
+    )
+logger.info(
+    "AutoCAD auth config loaded (api_key_fallback=%s, ws_api_key_fallback=%s, ws_ticket_ttl_seconds=%s, ws_ticket_bind_remote_addr=%s)",
+    AUTOCAD_ALLOW_API_KEY_FALLBACK,
+    WS_ALLOW_API_KEY_FALLBACK,
+    WS_TICKET_TTL_SECONDS,
+    WS_TICKET_BIND_REMOTE_ADDR,
+)
+
 BATCH_SESSION_COOKIE = "bfr_session"
 BATCH_SESSION_TTL_SECONDS = _parse_int_env("BATCH_SESSION_TTL_SECONDS", 6 * 60 * 60, minimum=300)
 
@@ -598,6 +649,8 @@ AGENT_PAIRING_ACTION_ABUSE_LOCK = server_state.agent_pairing_action_abuse_lock
 AGENT_PAIRING_CONFIRM_FAILURE_WINDOW = server_state.agent_pairing_confirm_failure_window
 AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL = server_state.agent_pairing_confirm_blocked_until
 AGENT_PAIRING_CONFIRM_ABUSE_LOCK = server_state.agent_pairing_confirm_abuse_lock
+WEBSOCKET_TICKETS = server_state.websocket_tickets
+WEBSOCKET_TICKETS_LOCK = server_state.websocket_tickets_lock
 
 
 # Agent runtime wiring
@@ -913,6 +966,112 @@ def _get_request_ip() -> str:
     return (request.remote_addr or "").strip() or "unknown"
 
 
+def _prune_expired_ws_tickets_locked(now_ts: float) -> int:
+    expired_tokens: List[str] = []
+    for token, payload in WEBSOCKET_TICKETS.items():
+        expires_at = float(payload.get("expires_at") or 0.0)
+        if expires_at <= now_ts:
+            expired_tokens.append(token)
+    for token in expired_tokens:
+        WEBSOCKET_TICKETS.pop(token, None)
+    return len(expired_tokens)
+
+
+def _issue_ws_ticket(
+    *,
+    user_id: str,
+    auth_mode: str,
+    remote_addr: str,
+) -> Dict[str, Any]:
+    now_ts = time.time()
+    expires_at = now_ts + WS_TICKET_TTL_SECONDS
+    ticket_token = secrets.token_urlsafe(40)
+    auth_mode_value = str(auth_mode or "unknown").strip() or "unknown"
+    user_id_value = str(user_id or "").strip()
+    remote_addr_value = str(remote_addr or "unknown").strip() or "unknown"
+
+    with WEBSOCKET_TICKETS_LOCK:
+        _prune_expired_ws_tickets_locked(now_ts)
+
+        if len(WEBSOCKET_TICKETS) >= WS_TICKET_MAX_ENTRIES:
+            overflow = len(WEBSOCKET_TICKETS) - WS_TICKET_MAX_ENTRIES + 1
+            oldest_tokens = sorted(
+                WEBSOCKET_TICKETS.keys(),
+                key=lambda token: float(WEBSOCKET_TICKETS[token].get("issued_at") or 0.0),
+            )[:overflow]
+            for token in oldest_tokens:
+                WEBSOCKET_TICKETS.pop(token, None)
+            if oldest_tokens:
+                logger.warning(
+                    "Pruned %s websocket tickets due to capacity pressure (max=%s)",
+                    len(oldest_tokens),
+                    WS_TICKET_MAX_ENTRIES,
+                )
+
+        WEBSOCKET_TICKETS[ticket_token] = {
+            "user_id": user_id_value,
+            "auth_mode": auth_mode_value,
+            "remote_addr": remote_addr_value,
+            "issued_at": now_ts,
+            "expires_at": expires_at,
+        }
+
+    logger.info(
+        "Issued websocket ticket (user_id=%s, auth_mode=%s, remote=%s, ttl_seconds=%s)",
+        user_id_value or "unknown",
+        auth_mode_value,
+        remote_addr_value,
+        WS_TICKET_TTL_SECONDS,
+    )
+    return {
+        "ticket": ticket_token,
+        "expires_at": expires_at,
+        "ttl_seconds": WS_TICKET_TTL_SECONDS,
+    }
+
+
+def _consume_ws_ticket(ticket_token: str, remote_addr: str) -> Tuple[bool, str]:
+    token_value = str(ticket_token or "").strip()
+    remote_addr_value = str(remote_addr or "unknown").strip() or "unknown"
+    if not token_value:
+        return False, "missing"
+
+    now_ts = time.time()
+    with WEBSOCKET_TICKETS_LOCK:
+        _prune_expired_ws_tickets_locked(now_ts)
+        ticket_payload = WEBSOCKET_TICKETS.pop(token_value, None)
+
+    if not ticket_payload:
+        logger.warning("Rejected websocket ticket (remote=%s, reason=missing_or_used)", remote_addr_value)
+        return False, "missing_or_used"
+
+    expires_at = float(ticket_payload.get("expires_at") or 0.0)
+    if expires_at <= now_ts:
+        logger.warning("Rejected websocket ticket (remote=%s, reason=expired)", remote_addr_value)
+        return False, "expired"
+
+    issued_remote_addr = str(ticket_payload.get("remote_addr") or "").strip()
+    if (
+        WS_TICKET_BIND_REMOTE_ADDR
+        and issued_remote_addr
+        and issued_remote_addr != remote_addr_value
+    ):
+        logger.warning(
+            "Rejected websocket ticket (remote=%s, reason=ip_mismatch, issued_remote=%s)",
+            remote_addr_value,
+            issued_remote_addr,
+        )
+        return False, "ip_mismatch"
+
+    logger.info(
+        "Accepted websocket ticket (remote=%s, user_id=%s, auth_mode=%s)",
+        remote_addr_value,
+        str(ticket_payload.get("user_id") or "unknown"),
+        str(ticket_payload.get("auth_mode") or "unknown"),
+    )
+    return True, "ok"
+
+
 # Auth-email runtime wiring
 email_runtime = email_create_runtime_helper(
     now_fn=time.time,
@@ -1220,6 +1379,88 @@ def is_valid_api_key(provided_key: Optional[str]) -> bool:
 
 def require_api_key(f):
     return security_runtime.require_api_key(f)
+
+
+def require_autocad_auth(f):
+    """Decorator for AutoCAD routes: bearer-token auth first, optional API-key fallback."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        remote_addr = _get_request_ip()
+        path = str(request.path or "")
+        method = str(request.method or "GET")
+        auth_header = str(request.headers.get("Authorization") or "").strip()
+
+        if auth_header and not auth_header.lower().startswith("bearer "):
+            logger.warning(
+                "AutoCAD auth rejected (invalid authorization scheme) %s %s from %s",
+                method,
+                path,
+                remote_addr,
+            )
+            return jsonify({"error": "Invalid Authorization header", "code": "AUTH_INVALID"}), 401
+
+        bearer_token = _get_bearer_token()
+        if bearer_token:
+            user = _verify_supabase_user_token(bearer_token)
+            if user is not None:
+                g.supabase_user = user
+                g.autocad_auth_mode = "bearer"
+                user_id = str(_get_supabase_user_id(user) or "unknown")
+                logger.info(
+                    "AutoCAD auth success via bearer %s %s from %s (user_id=%s)",
+                    method,
+                    path,
+                    remote_addr,
+                    user_id,
+                )
+                return f(*args, **kwargs)
+
+            logger.warning(
+                "AutoCAD bearer token rejected %s %s from %s",
+                method,
+                path,
+                remote_addr,
+            )
+            if not AUTOCAD_ALLOW_API_KEY_FALLBACK:
+                return jsonify({"error": "Invalid bearer token", "code": "AUTH_INVALID"}), 401
+
+        provided_key = str(request.headers.get("X-API-Key") or "").strip()
+        if AUTOCAD_ALLOW_API_KEY_FALLBACK and provided_key:
+            if is_valid_api_key(provided_key):
+                g.autocad_auth_mode = "api_key"
+                logger.info(
+                    "AutoCAD auth success via API key fallback %s %s from %s",
+                    method,
+                    path,
+                    remote_addr,
+                )
+                return f(*args, **kwargs)
+            logger.warning(
+                "AutoCAD API-key fallback rejected %s %s from %s",
+                method,
+                path,
+                remote_addr,
+            )
+            return jsonify({"error": "Invalid API key", "code": "AUTH_INVALID"}), 401
+
+        auth_required_message = (
+            "Authorization bearer token required"
+            if not AUTOCAD_ALLOW_API_KEY_FALLBACK
+            else "Authorization bearer token or API key required"
+        )
+        logger.warning(
+            "AutoCAD auth missing credentials %s %s from %s (api_key_fallback=%s)",
+            method,
+            path,
+            remote_addr,
+            AUTOCAD_ALLOW_API_KEY_FALLBACK,
+        )
+        return jsonify({"error": auth_required_message, "code": "AUTH_REQUIRED"}), 401
+
+    return decorated_function
+
+
 # ── Input Validation ─────────────────────────────────────────────
 def validate_layer_config(config: Any) -> Dict[str, Any]:
     return security_runtime.validate_layer_config(config)
@@ -1300,9 +1541,11 @@ def _revoke_gateway_agent_token(token: str):
 register_route_groups(
     app,
     require_api_key=require_api_key,
+    require_autocad_auth=require_autocad_auth,
     is_valid_api_key=is_valid_api_key,
     limiter=limiter,
     logger=logger,
+    issue_ws_ticket=_issue_ws_ticket,
     api_key=API_KEY,
     schedule_cleanup=_schedule_cleanup,
     supabase_url=SUPABASE_URL,
@@ -1349,6 +1592,8 @@ def websocket_status_bridge(ws):
         ws,
         request_obj=request,
         is_valid_api_key_fn=is_valid_api_key,
+        consume_ws_ticket_fn=_consume_ws_ticket,
+        allow_api_key_fallback=WS_ALLOW_API_KEY_FALLBACK,
         logger=logger,
         get_manager=get_manager,
         json_module=json,

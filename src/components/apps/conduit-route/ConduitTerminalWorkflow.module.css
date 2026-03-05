@@ -1,0 +1,444 @@
+.root {
+	display: grid;
+	gap: var(--space-3);
+}
+
+.header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--space-3);
+}
+
+.headerBadges {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+}
+
+.actions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+}
+
+.layout {
+	display: grid;
+	grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(
+			310px,
+			360px
+		);
+	gap: var(--space-3);
+}
+
+.controlsCard,
+.canvasCard,
+.routesCard {
+	min-height: 100%;
+	border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, #0c1526 82%, transparent),
+		color-mix(in srgb, #070d18 92%, transparent)
+	);
+}
+
+.controlGroup {
+	display: grid;
+	gap: var(--space-2);
+}
+
+.toggleRow {
+	display: flex;
+	gap: var(--space-2);
+}
+
+.functionGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-2);
+}
+
+.functionButton {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.5rem 0.55rem;
+	border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, #101b2d 62%, transparent);
+	color: var(--text);
+	font-size: 0.72rem;
+	cursor: pointer;
+}
+
+.functionButton small {
+	color: var(--text-muted);
+	font-size: 0.66rem;
+}
+
+.functionButtonActive {
+	border-color: color-mix(in srgb, var(--warning) 52%, var(--border));
+	background: linear-gradient(
+		145deg,
+		color-mix(in srgb, #2e1f0f 62%, transparent),
+		color-mix(in srgb, #141a2a 82%, transparent)
+	);
+}
+
+.swatch {
+	width: 0.72rem;
+	height: 0.72rem;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, #ffffff 20%, transparent);
+}
+
+.startSelection {
+	padding: 0.55rem 0.6rem;
+	border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+	border-radius: var(--radius-1);
+	background: color-mix(in srgb, #101b2d 62%, transparent);
+	color: color-mix(in srgb, var(--text) 94%, transparent);
+	font-size: 0.72rem;
+	font-weight: 600;
+}
+
+.panelList {
+	display: grid;
+	gap: var(--space-2);
+}
+
+.panelItem {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	gap: var(--space-2);
+	padding: 0.45rem 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+	border-radius: var(--radius-1);
+	background: color-mix(in srgb, #0f192a 60%, transparent);
+}
+
+.panelItem strong {
+	font-size: 0.75rem;
+}
+
+.panelItem small {
+	display: block;
+	color: var(--text-muted);
+	font-size: 0.66rem;
+}
+
+.panelDot {
+	width: 0.68rem;
+	height: 0.68rem;
+	border-radius: 999px;
+}
+
+.actionRow {
+	display: flex;
+	gap: var(--space-2);
+}
+
+.canvasCard {
+	display: grid;
+	gap: var(--space-2);
+}
+
+.canvasHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+.canvasWrap {
+	overflow: auto;
+	border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+	border-radius: var(--radius-3);
+	background:
+		radial-gradient(
+			100% 120% at 100% 0%,
+			color-mix(in srgb, #122844 30%, transparent),
+			transparent
+		),
+		linear-gradient(
+			160deg,
+			color-mix(in srgb, #020814 90%, transparent),
+			color-mix(in srgb, #081225 87%, transparent)
+		);
+}
+
+.canvas {
+	display: block;
+	width: 100%;
+	min-width: 760px;
+	height: auto;
+	aspect-ratio: 940 / 620;
+}
+
+.canvasBg {
+	fill: color-mix(in srgb, #020712 92%, transparent);
+}
+
+.grid {
+	stroke: color-mix(in srgb, var(--border) 72%, transparent);
+	stroke-width: 1;
+}
+
+.stripRail {
+	fill: color-mix(in srgb, #101827 78%, transparent);
+	stroke-width: 1.5;
+	rx: 4px;
+}
+
+.stripLabel {
+	fill: color-mix(in srgb, var(--text-muted) 95%, transparent);
+	font-size: 0.63rem;
+	text-anchor: middle;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+}
+
+.terminalDot {
+	stroke: color-mix(in srgb, #ffffff 26%, transparent);
+	stroke-width: 1;
+	cursor: pointer;
+}
+
+.terminalRing {
+	fill: none;
+	stroke: color-mix(in srgb, #f8fafc 75%, transparent);
+	stroke-width: 1.2;
+	stroke-dasharray: 4 3;
+	pointer-events: none;
+}
+
+.routeShadow {
+	fill: none;
+	stroke: color-mix(in srgb, #000000 84%, transparent);
+	stroke-width: 6;
+	opacity: 0.38;
+}
+
+.routeStroke {
+	fill: none;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	cursor: pointer;
+	filter: drop-shadow(
+		0 0 6px color-mix(in srgb, var(--primary) 30%, transparent)
+	);
+}
+
+.routeTag {
+	fill: color-mix(in srgb, #f7d8a1 90%, #ffffff 10%);
+	font-size: 0.62rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+}
+
+.canvasFooter {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+	padding: 0.5rem 0.6rem;
+	border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, #0d1828 66%, transparent);
+	color: color-mix(in srgb, var(--text) 92%, transparent);
+	font-size: 0.72rem;
+}
+
+.canvasFooter span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.32rem;
+}
+
+.routesCard {
+	display: grid;
+	grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+	gap: var(--space-2);
+}
+
+.routesHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+.routeFeed {
+	display: grid;
+	gap: var(--space-2);
+	max-height: 280px;
+	overflow: auto;
+	padding-right: 0.12rem;
+}
+
+.routeCard {
+	display: grid;
+	gap: 0.2rem;
+	padding: 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, #101a2c 60%, transparent);
+	color: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.routeCardActive {
+	border-color: color-mix(in srgb, var(--warning) 50%, var(--border));
+	background: linear-gradient(
+		145deg,
+		color-mix(in srgb, #2d1f0f 62%, transparent),
+		color-mix(in srgb, #141a2a 84%, transparent)
+	);
+}
+
+.routeTop {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 0.73rem;
+}
+
+.routeTop span {
+	color: var(--text-muted);
+	font-size: 0.66rem;
+}
+
+.routeMeta {
+	color: var(--text-muted);
+	font-size: 0.68rem;
+}
+
+.selectedRoute {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-2);
+	padding: 0.55rem;
+	border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, #0f1b2d 66%, transparent);
+}
+
+.selectedRoute div {
+	display: grid;
+	gap: 0.08rem;
+}
+
+.selectedRoute span {
+	color: var(--text-muted);
+	font-size: 0.66rem;
+	text-transform: uppercase;
+}
+
+.selectedRoute strong {
+	font-size: 0.72rem;
+}
+
+.tableWrap {
+	overflow: auto;
+	border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+	border-radius: var(--radius-2);
+}
+
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.69rem;
+}
+
+.table th,
+.table td {
+	padding: 0.4rem 0.46rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+	white-space: nowrap;
+	text-align: left;
+}
+
+.table thead th {
+	color: var(--text-muted);
+	background: color-mix(in srgb, #111c2f 76%, transparent);
+	font-size: 0.64rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.table tbody tr:nth-child(even) {
+	background: color-mix(in srgb, #0b1323 58%, transparent);
+}
+
+.summaryStrip {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+	padding: 0.46rem 0.56rem;
+	border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+	border-radius: var(--radius-1);
+	background: color-mix(in srgb, #0c1525 66%, transparent);
+	color: var(--text-muted);
+	font-size: 0.69rem;
+}
+
+.summaryStrip span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.28rem;
+}
+
+.emptyState {
+	padding: 0.7rem;
+	border: 1px dashed color-mix(in srgb, var(--border) 86%, transparent);
+	border-radius: var(--radius-2);
+	color: var(--text-muted);
+	font-size: 0.72rem;
+}
+
+@media (max-width: 1360px) {
+	.layout {
+		grid-template-columns: minmax(240px, 290px) minmax(0, 1fr);
+	}
+
+	.routesCard {
+		grid-column: 1 / -1;
+	}
+}
+
+@media (max-width: 1024px) {
+	.header {
+		flex-direction: column;
+	}
+
+	.layout {
+		grid-template-columns: 1fr;
+	}
+
+	.canvas {
+		min-width: 640px;
+	}
+
+	.selectedRoute {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 720px) {
+	.functionGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.canvas {
+		min-width: 560px;
+	}
+}

@@ -41,6 +41,7 @@ interface TaskCount {
 interface ActiveProjectsListProps {
 	projects: Project[];
 	projectTaskCounts: Map<string, TaskCount>;
+	isLoading?: boolean;
 	onNavigateToProject?: (projectId: string) => void;
 	onNavigateToProjectsHub?: () => void;
 }
@@ -48,6 +49,7 @@ interface ActiveProjectsListProps {
 export function ActiveProjectsList({
 	projects,
 	projectTaskCounts,
+	isLoading = false,
 	onNavigateToProject,
 	onNavigateToProjectsHub,
 }: ActiveProjectsListProps) {
@@ -82,7 +84,16 @@ export function ActiveProjectsList({
 
 				{/* Project list */}
 				<Stack gap={3}>
-					{projects.length === 0 ? (
+					{isLoading ? (
+						<>
+							{[1, 2, 3].map((item) => (
+								<div
+									key={item}
+									className="h-[104px] rounded-xl border border-border bg-surface-2 animate-pulse"
+								/>
+							))}
+						</>
+					) : projects.length === 0 ? (
 						<Text size="sm" color="muted">
 							No active projects
 						</Text>

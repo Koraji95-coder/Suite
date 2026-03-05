@@ -29,7 +29,7 @@ export function CoordinatesGrabberRunPanel({
 			case "initializing":
 				return "Initializing AutoCAD connection...";
 			case "preparing":
-				return "Preparing layer search...";
+				return "Preparing extraction...";
 			case "scanning":
 				return "Scanning entities...";
 			case "inserting_blocks":
@@ -106,7 +106,7 @@ export function CoordinatesGrabberRunPanel({
 						}
 					}}
 				>
-					{state.isRunning ? "Running..." : "Run Layer Search"}
+					{state.isRunning ? "Extracting..." : "Start Extraction"}
 				</button>
 				{state.mode === "blocks" && (
 					<button

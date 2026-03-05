@@ -4,6 +4,12 @@ import { logger } from "@/lib/errorLogger";
 import type { ActivityLogRow } from "@/services/activityService";
 import { supabase } from "@/supabase/client";
 import { safeSupabaseQuery } from "@/supabase/utils";
+import {
+	type DashboardLoadProgress,
+	type DashboardOverviewPayload,
+	getCachedDashboardOverviewPayload,
+	loadDashboardOverviewFromBackend,
+} from "./dashboardOverviewService";
 
 export interface DashboardProject {
 	id: string;
@@ -34,6 +40,8 @@ interface FileSize {
 	size: number | null;
 }
 
+const FALLBACK_START_PROGRESS = 12;
+
 export function useDashboardOverviewData() {
 	const [projects, setProjects] = useState<DashboardProject[]>([]);
 	const [activities, setActivities] = useState<ActivityLogRow[]>([]);
@@ -45,6 +53,43 @@ export function useDashboardOverviewData() {
 	const [allProjectsMap, setAllProjectsMap] = useState<
 		Map<string, DashboardProject>
 	>(new Map());
+	const [loadStage, setLoadStage] = useState("queued");
+	const [loadMessage, setLoadMessage] = useState("Preparing dashboard...");
+	const [loadProgress, setLoadProgress] = useState(0);
+	const [usingBackendProgress, setUsingBackendProgress] = useState(false);
+
+	const applyBackendPayload = useCallback(
+		(backendPayload: DashboardOverviewPayload) => {
+			const backendProjects = Array.isArray(backendPayload.projects)
+				? backendPayload.projects
+				: [];
+			const backendActivities = Array.isArray(backendPayload.activities)
+				? (backendPayload.activities as ActivityLogRow[])
+				: [];
+			const taskCountEntries = Object.entries(
+				backendPayload.projectTaskCounts ?? {},
+			) as Array<[string, DashboardTaskCount]>;
+
+			const mergedProjects =
+				Array.isArray(backendPayload.allProjects) &&
+				backendPayload.allProjects.length > 0
+					? backendPayload.allProjects
+					: backendProjects;
+
+			setProjects(backendProjects);
+			setActivities(backendActivities);
+			setStorageUsed(
+				Number.isFinite(backendPayload.storageUsed)
+					? Number(backendPayload.storageUsed)
+					: 0,
+			);
+			setProjectTaskCounts(new Map(taskCountEntries));
+			setAllProjectsMap(
+				new Map(mergedProjects.map((project) => [project.id, project])),
+			);
+		},
+		[],
+	);
 
 	const getCurrentUserId = useCallback(async (): Promise<string | null> => {
 		const {
@@ -142,6 +187,49 @@ export function useDashboardOverviewData() {
 		[toLocalDay],
 	);
 
+	const loadProjectMapForActivities = useCallback(
+		async (
+			projectList: DashboardProject[],
+			activityList: ActivityLogRow[],
+			userId: string | null,
+		): Promise<Map<string, DashboardProject>> => {
+			const merged = new Map(
+				projectList.map((project) => [project.id, project]),
+			);
+			if (!userId) return merged;
+
+			const activityProjectIds = activityList
+				.filter(
+					(activity) => activity.project_id && !merged.has(activity.project_id),
+				)
+				.map((activity) => activity.project_id as string);
+
+			if (activityProjectIds.length === 0) return merged;
+
+			const result = await safeSupabaseQuery(
+				async () =>
+					(await supabase
+						.from("projects")
+						.select("id, name, deadline, status, priority, color, category")
+						.eq("user_id", userId)
+						.in("id", activityProjectIds)) as {
+						data: DashboardProject[] | null;
+						error: PostgrestError | null;
+					},
+				"MainDashboard",
+			);
+
+			if (result.data) {
+				result.data.forEach((project) => {
+					merged.set(project.id, project);
+				});
+			}
+
+			return merged;
+		},
+		[],
+	);
+
 	const loadDashboardData = useCallback(async () => {
 		const userId = await getCurrentUserId();
 		if (!userId) {
@@ -215,9 +303,57 @@ export function useDashboardOverviewData() {
 	useEffect(() => {
 		let cancelled = false;
 
+		const updateProgress = (progress: DashboardLoadProgress) => {
+			if (cancelled) return;
+			setUsingBackendProgress(true);
+			setLoadProgress(Math.max(0, Math.min(100, progress.progress)));
+			setLoadStage(progress.stage || "loading");
+			setLoadMessage(progress.message || "Loading dashboard...");
+		};
+
 		const run = async () => {
 			setIsLoading(true);
+			setLoadProgress(0);
+			setLoadStage("queued");
+			setLoadMessage("Preparing dashboard...");
+			setUsingBackendProgress(false);
+
+			const cachedPayload = getCachedDashboardOverviewPayload();
+			if (cachedPayload) {
+				applyBackendPayload(cachedPayload);
+				setLoadStage("complete");
+				setLoadMessage("Dashboard ready.");
+				setLoadProgress(100);
+				setIsLoading(false);
+				return;
+			}
+
 			try {
+				const backendPayload =
+					await loadDashboardOverviewFromBackend(updateProgress);
+				if (cancelled) return;
+				applyBackendPayload(backendPayload);
+				setLoadStage("complete");
+				setLoadMessage("Dashboard ready.");
+				setLoadProgress(100);
+				return;
+			} catch (backendError) {
+				logger.warn(
+					"MainDashboard",
+					"Backend dashboard progress unavailable. Falling back to direct Supabase queries.",
+					{
+						error: backendError,
+					},
+				);
+				if (cancelled) return;
+				setUsingBackendProgress(false);
+			}
+
+			try {
+				setLoadStage("fallback");
+				setLoadMessage("Loading dashboard data...");
+				setLoadProgress(FALLBACK_START_PROGRESS);
+
 				const { projectsData, activitiesData, filesData, userId } =
 					await loadDashboardData();
 				if (cancelled) return;
@@ -228,11 +364,30 @@ export function useDashboardOverviewData() {
 					filesData.reduce((sum, file) => sum + (file.size || 0), 0),
 				);
 
-				if (userId && projectsData.length > 0) {
-					const counts = await loadAllProjectTaskCounts(projectsData, userId);
-					if (!cancelled) setProjectTaskCounts(counts);
-				} else {
-					setProjectTaskCounts(new Map());
+				setLoadStage("tasks");
+				setLoadMessage("Loading project task progress...");
+				setLoadProgress(58);
+
+				const counts =
+					userId && projectsData.length > 0
+						? await loadAllProjectTaskCounts(projectsData, userId)
+						: new Map();
+				if (!cancelled) setProjectTaskCounts(counts);
+
+				setLoadStage("activity-projects");
+				setLoadMessage("Resolving activity references...");
+				setLoadProgress(84);
+				const projectMap = await loadProjectMapForActivities(
+					projectsData,
+					activitiesData,
+					userId,
+				);
+				if (!cancelled) setAllProjectsMap(projectMap);
+
+				if (!cancelled) {
+					setLoadStage("complete");
+					setLoadMessage("Dashboard ready.");
+					setLoadProgress(100);
 				}
 			} catch (error) {
 				logger.critical(
@@ -247,6 +402,10 @@ export function useDashboardOverviewData() {
 					setActivities([]);
 					setStorageUsed(0);
 					setProjectTaskCounts(new Map());
+					setAllProjectsMap(new Map());
+					setLoadStage("error");
+					setLoadMessage("Failed to load dashboard.");
+					setLoadProgress(100);
 				}
 			} finally {
 				if (!cancelled) setIsLoading(false);
@@ -257,62 +416,23 @@ export function useDashboardOverviewData() {
 		return () => {
 			cancelled = true;
 		};
-	}, [loadDashboardData, loadAllProjectTaskCounts]);
-
-	useEffect(() => {
-		let cancelled = false;
-
-		const loadProjectsForActivities = async () => {
-			const userId = await getCurrentUserId();
-			if (!userId) {
-				if (!cancelled) setAllProjectsMap(new Map());
-				return;
-			}
-
-			const activityProjectIds = activities
-				.filter(
-					(activity) =>
-						activity.project_id &&
-						!projects.some((project) => project.id === activity.project_id),
-				)
-				.map((activity) => activity.project_id as string);
-
-			if (activityProjectIds.length === 0) {
-				if (!cancelled) {
-					setAllProjectsMap(
-						new Map(projects.map((project) => [project.id, project])),
-					);
-				}
-				return;
-			}
-
-			const { data } = (await supabase
-				.from("projects")
-				.select("id, name, deadline, status, priority, color, category")
-				.eq("user_id", userId)
-				.in("id", activityProjectIds)) as { data: DashboardProject[] | null };
-
-			const merged = new Map(projects.map((project) => [project.id, project]));
-			if (data) {
-				data.forEach((project) => {
-					merged.set(project.id, project);
-				});
-			}
-			if (!cancelled) setAllProjectsMap(merged);
-		};
-
-		void loadProjectsForActivities();
-		return () => {
-			cancelled = true;
-		};
-	}, [activities, projects, getCurrentUserId]);
+	}, [
+		applyBackendPayload,
+		loadDashboardData,
+		loadAllProjectTaskCounts,
+		loadProjectMapForActivities,
+	]);
 
 	return {
 		activities,
 		allProjectsMap,
 		isLoading,
+		loadMessage,
+		loadProgress,
+		loadStage,
 		projectTaskCounts,
 		projects,
 		storageUsed,
+		usingBackendProgress,
 	};
 }

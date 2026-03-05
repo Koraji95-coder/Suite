@@ -1,27 +1,58 @@
+.topBar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.designSelectWrap {
+	flex: 1 1 19rem;
+	min-width: 19rem;
+}
+
+.projectSelectWrap {
+	flex: 1 1 18rem;
+	min-width: 18rem;
+}
+
 .selectTriggerDesign {
-	height: 2rem;
-	min-width: 240px;
+	height: 2.2rem;
+	width: 100%;
+	min-width: 0;
 	border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
 	background: color-mix(in srgb, var(--surface-2) 75%, transparent);
 	color: var(--text);
-	padding: 0.375rem 0.75rem;
-	font-size: 0.75rem;
+	padding: 0.45rem 0.75rem;
+	font-size: 0.8rem;
 	font-weight: 600;
 }
 
 .selectTriggerProject {
-	min-width: 220px;
-	height: 2rem;
+	width: 100%;
+	min-width: 0;
+	height: 2.2rem;
 	border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
 	background: color-mix(in srgb, var(--surface-2) 75%, transparent);
 	color: var(--text);
-	padding: 0.375rem 0.75rem;
-	font-size: 0.75rem;
+	padding: 0.45rem 0.75rem;
+	font-size: 0.8rem;
 	font-weight: 600;
+}
+
+.designNameInput {
+	flex: 1 1 16rem;
+	min-width: 16rem;
+	padding: 0.48rem 0.65rem;
+	font-size: 0.81rem;
+	font-weight: 600;
+	border-radius: 0.375rem;
+	outline: none;
 }
 
 .selectTriggerContent {
 	display: inline-flex;
+	flex: 1 1 auto;
+	min-width: 0;
 	max-width: 100%;
 	align-items: center;
 	gap: 0.5rem;
@@ -36,6 +67,9 @@
 }
 
 .selectTriggerText {
+	display: block;
+	flex: 1 1 auto;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -43,14 +77,14 @@
 
 .selectContentDesign {
 	max-height: 16rem;
-	min-width: 260px;
+	min-width: 21rem;
 	border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
 	background: var(--surface);
 }
 
 .selectContentProject {
 	max-height: 15rem;
-	min-width: 220px;
+	min-width: 18rem;
 	border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
 	background: var(--surface);
 }
@@ -111,6 +145,15 @@
 
 .projectName {
 	color: var(--text);
+}
+
+@media (max-width: 60rem) {
+	.designSelectWrap,
+	.projectSelectWrap,
+	.designNameInput {
+		flex-basis: 100%;
+		min-width: 100%;
+	}
 }
 
 @keyframes spin {

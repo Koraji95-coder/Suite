@@ -24,6 +24,7 @@ import { markPasskeySignInPending } from "../auth/passkeySessionState";
 import { useAuth } from "../auth/useAuth";
 // Components
 import { AgentPixelMark } from "../components/agent/AgentPixelMark";
+import { loadDashboardOverviewFromBackend } from "../components/apps/dashboard/dashboardOverviewService";
 import { Badge } from "../components/primitives/Badge";
 // Primitives
 import { Button } from "../components/primitives/Button";
@@ -41,6 +42,11 @@ const AGENT_IDS = ["koro", "devstral", "sentinel", "forge"] as const;
 
 type LocationState = { from?: string };
 
+function isDashboardDestination(path: string): boolean {
+	const normalized = path.split("?")[0].replace(/\/+$/, "");
+	return normalized === "/app/home" || normalized === "/app/dashboard";
+}
+
 export default function LoginPage() {
 	const { user, loading, signIn } = useAuth();
 	const navigate = useNavigate();
@@ -56,8 +62,15 @@ export default function LoginPage() {
 	const [sent, setSent] = useState(false);
 	const [error, setError] = useState("");
 	const [redirectProgress, setRedirectProgress] = useState(0);
+	const [redirectMessage, setRedirectMessage] = useState(
+		"Preparing your session...",
+	);
 	const [mounted, setMounted] = useState(false);
 	const passkeyCallbackHandledRef = useRef("");
+	const shouldPreloadDashboard = useMemo(
+		() => isDashboardDestination(from),
+		[from],
+	);
 
 	const requiresCaptcha = Boolean(
 		(import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim(),
@@ -89,32 +102,71 @@ export default function LoginPage() {
 	useEffect(() => {
 		if (!(user && !loading)) {
 			setRedirectProgress(0);
+			setRedirectMessage("Preparing your session...");
 			return;
 		}
 
-		const durationMs = 1100;
-		const start = performance.now();
+		let timeoutId: number | null = null;
 		let rafId: number | null = null;
+		let cancelled = false;
 
-		const tick = (now: number) => {
-			const elapsed = now - start;
-			const pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
-			setRedirectProgress(pct);
-			if (elapsed >= durationMs) {
-				navigate(from, { replace: true });
-				return;
-			}
-			rafId = window.requestAnimationFrame(tick);
+		const navigateToDestination = () => {
+			if (cancelled) return;
+			navigate(from, { replace: true });
 		};
 
-		rafId = window.requestAnimationFrame(tick);
+		if (shouldPreloadDashboard) {
+			setRedirectMessage("Preparing dashboard...");
+			setRedirectProgress(4);
+			void loadDashboardOverviewFromBackend((progress) => {
+				if (cancelled) return;
+				setRedirectProgress(Math.max(4, Math.round(progress.progress)));
+				setRedirectMessage(progress.message || "Loading dashboard...");
+			})
+				.then(() => {
+					if (cancelled) return;
+					setRedirectProgress(100);
+					setRedirectMessage("Dashboard ready.");
+					timeoutId = window.setTimeout(navigateToDestination, 120);
+				})
+				.catch((preloadError) => {
+					logger.warn(
+						"LoginPage",
+						"Dashboard preload failed during sign-in redirect. Continuing navigation.",
+						{ error: preloadError },
+					);
+					if (cancelled) return;
+					setRedirectProgress(100);
+					setRedirectMessage("Opening dashboard...");
+					timeoutId = window.setTimeout(navigateToDestination, 120);
+				});
+		} else {
+			const durationMs = 1100;
+			const start = performance.now();
+			const tick = (now: number) => {
+				const elapsed = now - start;
+				const pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
+				setRedirectProgress(pct);
+				if (elapsed >= durationMs) {
+					navigateToDestination();
+					return;
+				}
+				rafId = window.requestAnimationFrame(tick);
+			};
+
+			rafId = window.requestAnimationFrame(tick);
+		}
 
 		return () => {
+			cancelled = true;
+			if (timeoutId !== null) {
+				window.clearTimeout(timeoutId);
+			}
 			if (rafId !== null) {
 				window.cancelAnimationFrame(rafId);
 			}
 		};
-	}, [from, loading, navigate, user]);
+	}, [from, loading, navigate, shouldPreloadDashboard, user]);
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// PASSKEY CALLBACK EFFECT
@@ -479,7 +531,7 @@ export default function LoginPage() {
 
 							<Text color="muted" size="sm" className={styles.headerCopy} block>
 								{redirecting
-									? "Email confirmed. We're signing you in now."
+									? redirectMessage
 									: "Validating your sign-in status…"}
 							</Text>
 						</div>

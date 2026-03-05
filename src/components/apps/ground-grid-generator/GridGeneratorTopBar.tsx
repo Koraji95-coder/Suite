@@ -58,67 +58,56 @@ export function GridGeneratorTopBar({
 	onProjectSelect,
 }: GridGeneratorTopBarProps) {
 	return (
-		<div
-			style={{
-				display: "flex",
-				flexWrap: "wrap",
-				gap: 8,
-				alignItems: "center",
-			}}
-		>
+		<div className={styles.topBar}>
 			<button onClick={onNewDesign} style={btnStyle()}>
 				<Plus size={14} /> New
 			</button>
 
-			<Select value={currentDesign?.id} onValueChange={onDesignSelect}>
-				<SelectTrigger
-					className={styles.selectTriggerDesign}
-					id="grid-design-selector"
-				>
-					<span className={styles.selectTriggerContent}>
-						<Database className={styles.selectTriggerIcon} />
-						<span className={styles.selectTriggerText}>
-							{currentDesign ? currentDesign.name : "Load Design"}
-						</span>
-					</span>
-				</SelectTrigger>
-				<SelectContent className={styles.selectContentDesign}>
-					{designs.length === 0 ? (
-						<div className={styles.emptyState}>No saved designs</div>
-					) : (
-						designs.map((design) => (
-							<SelectItem
-								key={design.id}
-								value={design.id}
-								className={styles.selectItemDesign}
-							>
-								<div className={styles.selectItemBody}>
-									<div className={styles.selectItemTitle}>{design.name}</div>
-									<div className={styles.selectItemMeta}>
-										{design.status} --{" "}
-										{new Date(design.updated_at).toLocaleDateString()}
+			<div className={styles.designSelectWrap}>
+				<Select value={currentDesign?.id} onValueChange={onDesignSelect}>
+					<SelectTrigger
+						className={styles.selectTriggerDesign}
+						id="grid-design-selector"
+					>
+						<div className={styles.selectTriggerContent}>
+							<Database className={styles.selectTriggerIcon} />
+							<span className={styles.selectTriggerText}>
+								{currentDesign ? currentDesign.name : "Load Design"}
+							</span>
+						</div>
+					</SelectTrigger>
+					<SelectContent className={styles.selectContentDesign}>
+						{designs.length === 0 ? (
+							<div className={styles.emptyState}>No saved designs</div>
+						) : (
+							designs.map((design) => (
+								<SelectItem
+									key={design.id}
+									value={design.id}
+									className={styles.selectItemDesign}
+								>
+									<div className={styles.selectItemBody}>
+										<div className={styles.selectItemTitle}>{design.name}</div>
+										<div className={styles.selectItemMeta}>
+											{design.status} --{" "}
+											{new Date(design.updated_at).toLocaleDateString()}
+										</div>
 									</div>
-								</div>
-							</SelectItem>
-						))
-					)}
-				</SelectContent>
-			</Select>
+								</SelectItem>
+							))
+						)}
+					</SelectContent>
+				</Select>
+			</div>
 
 			<input
 				value={designName}
 				onChange={(e) => onDesignNameChange(e.target.value)}
+				className={styles.designNameInput}
 				style={{
-					flex: 1,
-					minWidth: 180,
-					padding: "6px 10px",
-					fontSize: 13,
-					fontWeight: 600,
 					background: hexToRgba(paletteSurfaceLight, 0.3),
 					border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-					borderRadius: 6,
 					color: paletteText,
-					outline: "none",
 				}}
 			/>
 
@@ -144,42 +133,44 @@ export function GridGeneratorTopBar({
 				</button>
 			)}
 
-			<Select
-				value={linkedProjectId ?? "__none"}
-				onValueChange={onProjectSelect}
-			>
-				<SelectTrigger
-					className={styles.selectTriggerProject}
-					id="grid-project-selector"
+			<div className={styles.projectSelectWrap}>
+				<Select
+					value={linkedProjectId ?? "__none"}
+					onValueChange={onProjectSelect}
 				>
-					<span className={styles.selectTriggerContent}>
-						<FolderKanban className={styles.selectTriggerIcon} />
-						<span className={styles.selectTriggerText}>
-							{linkedProject ? linkedProject.name : "Link Project"}
-						</span>
-					</span>
-				</SelectTrigger>
-				<SelectContent className={styles.selectContentProject}>
-					<SelectItem value="__none" className={styles.projectNoSelection}>
-						No Project
-					</SelectItem>
-					{projects.map((project) => (
-						<SelectItem
-							key={project.id}
-							value={project.id}
-							className={styles.projectItem}
-						>
-							<span className={styles.projectItemBody}>
-								<span
-									className={styles.projectDot}
-									style={{ background: project.color }}
-								/>
-								<span className={styles.projectName}>{project.name}</span>
+					<SelectTrigger
+						className={styles.selectTriggerProject}
+						id="grid-project-selector"
+					>
+						<div className={styles.selectTriggerContent}>
+							<FolderKanban className={styles.selectTriggerIcon} />
+							<span className={styles.selectTriggerText}>
+								{linkedProject ? linkedProject.name : "Link Project"}
 							</span>
+						</div>
+					</SelectTrigger>
+					<SelectContent className={styles.selectContentProject}>
+						<SelectItem value="__none" className={styles.projectNoSelection}>
+							No Project
 						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
+						{projects.map((project) => (
+							<SelectItem
+								key={project.id}
+								value={project.id}
+								className={styles.projectItem}
+							>
+								<span className={styles.projectItemBody}>
+									<span
+										className={styles.projectDot}
+										style={{ background: project.color }}
+									/>
+									<span className={styles.projectName}>{project.name}</span>
+								</span>
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</div>
 		</div>
 	);
 }

@@ -46,6 +46,7 @@ export function GroundGridProvider({
 	const [availableLayers, setAvailableLayers] = useState<string[]>([]);
 	const hasInitRef = useRef(false);
 	const shownDisconnectToastRef = useRef(false);
+	const lastWsStatusAtRef = useRef(0);
 
 	const addLog = useCallback((source: LogEntry["source"], message: string) => {
 		setLogs((prev) => [
@@ -87,6 +88,7 @@ export function GroundGridProvider({
 			"status",
 			async (event) => {
 				if (event.type !== "status") return;
+				lastWsStatusAtRef.current = Date.now();
 
 				const isNowConnected = event.connected && event.autocad_running;
 
@@ -131,6 +133,10 @@ export function GroundGridProvider({
 		);
 
 		const checkBackendStatus = async () => {
+			// If WS status has been seen recently, skip HTTP fallback polling.
+			if (Date.now() - lastWsStatusAtRef.current < 15_000) {
+				return;
+			}
 			try {
 				const status = await coordinatesGrabberService.checkStatus();
 				const isNowConnected = status.connected && status.autocad_running;

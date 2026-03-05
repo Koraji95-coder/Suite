@@ -43,6 +43,8 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_autocad_com_helpers.py`: shared AutoCAD COM utility helpers (`com_call_with_retry`, `wait_for_command_finish`, `ensure_layer`, `pt`)
 - `api_autocad_connection.py`: shared AutoCAD connection/dispatch helpers (`dyn`, `connect_autocad`)
 - `api_autocad_ground_grid_plot.py`: shared ground-grid plotting helpers (grid-to-AutoCAD mapping, block definitions, plotting conductors + placements)
+- `api_conduit_route_compute.py`: shared conduit-route A* compute helpers (`compute_conduit_route`)
+- `api_conduit_route_obstacle_scan.py`: shared AutoCAD obstacle extraction + canvas normalization helpers (`scan_conduit_obstacles`)
 - `api_autocad_manager.py`: shared AutoCAD manager lifecycle and operations (`AutoCADManager`, `get_manager`, `reset_manager_for_tests`, `create_autocad_manager`)
 - `api_autocad_runtime.py`: shared AutoCAD runtime wiring/composition (`create_autocad_runtime`, `AutoCADRuntime`)
 - `api_auth_runtime.py`: shared auth/session runtime wiring (`create_auth_runtime`, `AuthRuntime`)
@@ -59,10 +61,11 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_bootstrap_runtime.py`: shared startup/bootstrap helpers (logging config, gen_py read-only setup, env file loading)
 - `api_dependency_bundle.py`: shared dependency-bundle builders for route-group registration (`passkey_deps`, `agent_deps`, `transmittal_render_deps`)
 - `api_agent.py`: `/api/agent/*`
+- `api_dashboard.py`: `/api/dashboard/load`, `/api/dashboard/load/<job_id>`
 - `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
 - `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
 - `api_transmittal_render.py`: `/api/transmittal/render`
-- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`
+- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`
 - `api_health.py`: `/health`
 - `api_registry.py`: central route-group registration for the Flask app
 

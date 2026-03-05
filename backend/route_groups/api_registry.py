@@ -14,6 +14,7 @@ from .api_backup import create_backup_blueprint
 from .api_auth_email import create_auth_email_blueprint
 from .api_batch_find_replace import create_batch_find_replace_blueprint
 from .api_health import create_health_blueprint
+from .api_dashboard import create_dashboard_blueprint
 from .api_transmittal import create_transmittal_blueprint
 from .api_transmittal_render import create_transmittal_render_blueprint
 
@@ -22,9 +23,11 @@ def register_route_groups(
     app: Flask,
     *,
     require_api_key: Callable,
+    require_autocad_auth: Callable,
     is_valid_api_key: Callable[[Optional[str]], bool],
     limiter: Limiter,
     logger: Any,
+    issue_ws_ticket: Callable[..., dict[str, Any]],
     api_key: str,
     schedule_cleanup: Callable[[str], None],
     supabase_url: str,
@@ -127,6 +130,15 @@ def register_route_groups(
         )
     )
     app.register_blueprint(
+        create_dashboard_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
+            supabase_url=supabase_url,
+            supabase_api_key=supabase_api_key,
+        )
+    )
+    app.register_blueprint(
         create_transmittal_blueprint(
             require_api_key=require_api_key,
             limiter=limiter,
@@ -143,8 +155,10 @@ def register_route_groups(
     )
     app.register_blueprint(
         create_autocad_blueprint(
-            require_api_key=require_api_key,
+            require_autocad_auth=require_autocad_auth,
             limiter=limiter,
+            issue_ws_ticket=issue_ws_ticket,
+            logger=logger,
             get_manager=get_manager,
             connect_autocad=connect_autocad,
             dyn=dyn,

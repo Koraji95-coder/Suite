@@ -38,6 +38,15 @@ class TestApiRouteGroups(unittest.TestCase):
             wrapped.__name__ = getattr(f, "__name__", "wrapped")
             return wrapped
 
+        def require_autocad_auth(f):
+            def wrapped(*args, **kwargs):
+                if request.headers.get("X-API-Key") != "valid-key":
+                    return jsonify({"error": "Invalid API key", "code": "AUTH_INVALID"}), 401
+                return f(*args, **kwargs)
+
+            wrapped.__name__ = getattr(f, "__name__", "wrapped")
+            return wrapped
+
         def is_valid_api_key(provided_key: str | None) -> bool:
             return provided_key == "valid-key"
 
@@ -143,6 +152,13 @@ class TestApiRouteGroups(unittest.TestCase):
         def validate_layer_config(config):
             return config
 
+        def issue_ws_ticket(**_kwargs):
+            return {
+                "ticket": "test-ticket",
+                "expires_at": 4102444800.0,
+                "ttl_seconds": 45,
+            }
+
         def auth_passkey_capability() -> dict:
             return {
                 "enabled": False,
@@ -155,9 +171,11 @@ class TestApiRouteGroups(unittest.TestCase):
         register_route_groups(
             self.app,
             require_api_key=require_api_key,
+            require_autocad_auth=require_autocad_auth,
             is_valid_api_key=is_valid_api_key,
             limiter=self.limiter,
             logger=logging.getLogger("test"),
+            issue_ws_ticket=issue_ws_ticket,
             api_key="very-secure-test-key-value",
             schedule_cleanup=schedule_cleanup,
             supabase_url="https://example.supabase.co",
@@ -178,6 +196,7 @@ class TestApiRouteGroups(unittest.TestCase):
             backup_storage_dir=self.backup_dir,
             backup_max_bytes=1024 * 1024,
             backup_max_files=100,
+            autodraft_dotnet_api_url="",
             batch_session_cookie="bfr_session",
             batch_session_ttl_seconds=3600,
             require_supabase_user=require_supabase_user,
@@ -238,6 +257,8 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/agent/unpair": ["POST"],
             "/api/agent/session/clear": ["POST"],
             "/api/agent/webhook": ["POST"],
+            "/api/dashboard/load": ["POST"],
+            "/api/dashboard/load/<job_id>": ["GET"],
             "/api/transmittal/profiles": ["GET"],
             "/api/transmittal/template": ["GET"],
             "/api/transmittal/render": ["POST"],
@@ -246,6 +267,10 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/selection-count": ["GET"],
             "/api/execute": ["POST"],
             "/api/trigger-selection": ["POST"],
+            "/api/conduit-route/terminal-scan": ["POST"],
+            "/api/conduit-route/obstacles/scan": ["POST"],
+            "/api/conduit-route/route/compute": ["POST"],
+            "/api/autocad/ws-ticket": ["POST"],
             "/health": ["GET"],
         }
 
@@ -345,6 +370,25 @@ class TestApiRouteGroups(unittest.TestCase):
         payload = response.get_json()
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload.get("backend_id"), "coordinates-grabber-api")
+
+    def test_terminal_scan_endpoint_requires_auth(self) -> None:
+        response = self.client.post("/api/conduit-route/terminal-scan")
+        self.assertEqual(response.status_code, 401)
+
+    def test_conduit_route_compute_endpoint_requires_auth(self) -> None:
+        response = self.client.post(
+            "/api/conduit-route/route/compute",
+            json={
+                "start": {"x": 10, "y": 10},
+                "end": {"x": 100, "y": 100},
+                "mode": "plan_view",
+            },
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_conduit_obstacle_scan_endpoint_requires_auth(self) -> None:
+        response = self.client.post("/api/conduit-route/obstacles/scan")
+        self.assertEqual(response.status_code, 401)
 
 
 if __name__ == "__main__":

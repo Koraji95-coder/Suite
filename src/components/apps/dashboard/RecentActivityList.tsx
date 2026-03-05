@@ -24,6 +24,7 @@ interface ProjectSummary {
 interface RecentActivityListProps {
 	activities: ActivityLogRow[];
 	allProjectsMap: Map<string, ProjectSummary>;
+	isLoading?: boolean;
 }
 
 // Map action types to icons
@@ -70,6 +71,7 @@ function formatTimeAgo(timestamp: string) {
 export function RecentActivityList({
 	activities,
 	allProjectsMap,
+	isLoading = false,
 }: RecentActivityListProps) {
 	return (
 		<Panel variant="default" padding="lg" className="h-full">
@@ -90,7 +92,16 @@ export function RecentActivityList({
 				</HStack>
 
 				{/* Activity timeline */}
-				{activities.length === 0 ? (
+				{isLoading ? (
+					<Stack gap={2}>
+						{[1, 2, 3, 4].map((item) => (
+							<div
+								key={item}
+								className="h-[68px] rounded-xl bg-surface-2 animate-pulse"
+							/>
+						))}
+					</Stack>
+				) : activities.length === 0 ? (
 					<Panel variant="inset" padding="lg" className="text-center">
 						<Stack gap={3} align="center">
 							<div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2">

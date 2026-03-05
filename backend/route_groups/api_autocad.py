@@ -5,14 +5,20 @@ from pathlib import Path
 from typing import Any, Callable, Dict
 import os
 
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, g, jsonify, request, send_file
 from flask_limiter import Limiter
+from .api_autocad_terminal_scan import scan_terminal_strips
+from .api_conduit_route_compute import compute_conduit_route
+from .api_conduit_route_obstacle_scan import scan_conduit_obstacles
+from .api_autocad_entity_geometry import entity_bbox
 
 
 def create_autocad_blueprint(
     *,
-    require_api_key: Callable,
+    require_autocad_auth: Callable,
     limiter: Limiter,
+    issue_ws_ticket: Callable[..., Dict[str, Any]],
+    logger: Any,
     get_manager: Callable[[], Any],
     connect_autocad: Callable[[], Any],
     dyn: Callable[[Any], Any],
@@ -44,7 +50,8 @@ def create_autocad_blueprint(
         return _is_under_dir(path_value, backend_exports_dir)
 
     @bp.route("/status", methods=["GET"])
-    @require_api_key
+    @require_autocad_auth
+    @limiter.limit("3600 per hour")
     def api_status():
         """Health check endpoint with AutoCAD connection details."""
         manager = get_manager()
@@ -56,7 +63,7 @@ def create_autocad_blueprint(
         return jsonify(status), http_code
 
     @bp.route("/layers", methods=["GET"])
-    @require_api_key
+    @require_autocad_auth
     def api_layers():
         """List available layers in the active AutoCAD drawing."""
         manager = get_manager()
@@ -71,7 +78,7 @@ def create_autocad_blueprint(
         return jsonify(response), 200 if success else 503
 
     @bp.route("/selection-count", methods=["GET"])
-    @require_api_key
+    @require_autocad_auth
     @limiter.limit("120 per hour")
     def api_selection_count():
         """Get count of currently selected objects in AutoCAD (fresh COM)."""
@@ -127,7 +134,7 @@ def create_autocad_blueprint(
                 pass
 
     @bp.route("/execute", methods=["POST"])
-    @require_api_key
+    @require_autocad_auth
     @limiter.limit("30 per hour")
     def api_execute():
         """
@@ -230,7 +237,7 @@ def create_autocad_blueprint(
             )
 
     @bp.route("/ground-grid/plot", methods=["POST"])
-    @require_api_key
+    @require_autocad_auth
     @limiter.limit("30 per hour")
     def api_plot_ground_grid():
         """Plot generated ground-grid data into the active AutoCAD drawing."""
@@ -288,7 +295,7 @@ def create_autocad_blueprint(
             )
 
     @bp.route("/trigger-selection", methods=["POST"])
-    @require_api_key
+    @require_autocad_auth
     @limiter.limit("120 per hour")
     def api_trigger_selection():
         """Bring AutoCAD to foreground (fresh COM)."""
@@ -324,7 +331,7 @@ def create_autocad_blueprint(
                 pass
 
     @bp.route("/download-result", methods=["GET"])
-    @require_api_key
+    @require_autocad_auth
     @limiter.limit("60 per hour")
     def api_download_result():
         """Download a generated Excel file from an absolute path returned by /api/execute."""
@@ -377,7 +384,7 @@ def create_autocad_blueprint(
             return jsonify({"success": False, "message": f"Download failed: {exc}"}), 500
 
     @bp.route("/open-export-folder", methods=["POST"])
-    @require_api_key
+    @require_autocad_auth
     @limiter.limit("60 per hour")
     def api_open_export_folder():
         """Open the folder containing a generated export file (Windows only)."""
@@ -441,6 +448,677 @@ def create_autocad_blueprint(
         except Exception as exc:
             return (
                 jsonify({"success": False, "message": f"Could not open folder: {exc}"}),
+                500,
+            )
+
+    @bp.route("/conduit-route/terminal-scan", methods=["POST"])
+    @require_autocad_auth
+    @limiter.limit("240 per hour")
+    def api_conduit_route_terminal_scan():
+        """
+        Scan terminal-strip blocks from AutoCAD and return normalized layout data
+        for the Conduit Route terminal workflow UI.
+        """
+        manager = get_manager()
+        status = manager.get_status()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+
+        if not status.get("drawing_open"):
+            logger.warning(
+                "Terminal scan blocked: no drawing open (remote=%s, auth_mode=%s)",
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
+                        "message": "No drawing open in AutoCAD.",
+                    }
+                ),
+                503,
+            )
+
+        if pythoncom is None:
+            logger.warning(
+                "Terminal scan blocked: COM unavailable (remote=%s, auth_mode=%s)",
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "COM_UNAVAILABLE",
+                        "message": "AutoCAD COM bridge unavailable on this platform.",
+                    }
+                ),
+                503,
+            )
+
+        payload = request.get_json(silent=True) or {}
+        selection_only = bool(
+            payload.get("selectionOnly")
+            if "selectionOnly" in payload
+            else payload.get("selection_only", False)
+        )
+        include_modelspace = bool(
+            payload.get("includeModelspace")
+            if "includeModelspace" in payload
+            else payload.get("include_modelspace", True)
+        )
+        max_entities_raw = payload.get("maxEntities", payload.get("max_entities", 50000))
+        try:
+            max_entities = int(max_entities_raw)
+        except Exception:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "maxEntities must be an integer.",
+                    }
+                ),
+                400,
+            )
+        max_entities = max(500, min(200000, max_entities))
+
+        logger.info(
+            "Terminal scan request received (remote=%s, auth_mode=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
+            remote_addr,
+            auth_mode,
+            selection_only,
+            include_modelspace,
+            max_entities,
+        )
+
+        started_at = time.time()
+        try:
+            pythoncom.CoInitialize()
+            acad = connect_autocad()
+            if acad is None:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "AUTOCAD_CONNECT_FAILED",
+                            "message": "Cannot connect to AutoCAD.",
+                        }
+                    ),
+                    503,
+                )
+
+            doc = dyn(acad.ActiveDocument)
+            modelspace = dyn(doc.ModelSpace)
+            if doc is None or modelspace is None:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "AUTOCAD_DOCUMENT_UNAVAILABLE",
+                            "message": "Cannot access ActiveDocument or ModelSpace.",
+                        }
+                    ),
+                    503,
+                )
+
+            result = scan_terminal_strips(
+                doc=doc,
+                modelspace=modelspace,
+                dyn_fn=dyn,
+                include_modelspace=include_modelspace,
+                selection_only=selection_only,
+                max_entities=max_entities,
+            )
+            elapsed_ms = int((time.time() - started_at) * 1000)
+            result["meta"] = {
+                **(result.get("meta", {}) or {}),
+                "scanMs": elapsed_ms,
+                "source": "autocad",
+            }
+
+            if result.get("success"):
+                logger.info(
+                    "Terminal scan success (remote=%s, panels=%s, strips=%s, terminals=%s, elapsed_ms=%s)",
+                    remote_addr,
+                    result["meta"].get("totalPanels"),
+                    result["meta"].get("totalStrips"),
+                    result["meta"].get("totalTerminals"),
+                    elapsed_ms,
+                )
+                return jsonify(result), 200
+
+            logger.warning(
+                "Terminal scan found no strips (remote=%s, scanned_entities=%s, block_refs=%s, elapsed_ms=%s)",
+                remote_addr,
+                result["meta"].get("scannedEntities"),
+                result["meta"].get("scannedBlockReferences"),
+                elapsed_ms,
+            )
+            # Return 200 for empty scans so UI can render diagnostics cleanly.
+            return jsonify(result), 200
+        except Exception as exc:
+            logger.exception(
+                "Terminal scan failed (remote=%s, auth_mode=%s)",
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "TERMINAL_SCAN_FAILED",
+                        "message": f"Terminal scan failed: {str(exc)}",
+                    }
+                ),
+                500,
+            )
+        finally:
+            try:
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
+
+    @bp.route("/conduit-route/route/compute", methods=["POST"])
+    @require_autocad_auth
+    @limiter.limit("1800 per hour")
+    def api_conduit_route_route_compute():
+        """Compute a conduit route path for yard-routing workflow requests."""
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+
+        if not request.is_json:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "Expected application/json payload.",
+                    }
+                ),
+                400,
+            )
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "Request payload must be a JSON object.",
+                    }
+                ),
+                400,
+            )
+
+        obstacle_source = str(payload.get("obstacleSource", "client") or "client").strip().lower()
+        if obstacle_source not in {"client", "autocad"}:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "obstacleSource must be 'client' or 'autocad'.",
+                    }
+                ),
+                400,
+            )
+
+        resolved_payload = dict(payload)
+        obstacle_scan_result: Dict[str, Any] | None = None
+        obstacle_scan_elapsed_ms: int | None = None
+
+        if obstacle_source == "autocad":
+            manager = get_manager()
+            status = manager.get_status()
+            if not status.get("drawing_open"):
+                logger.warning(
+                    "Conduit route compute blocked: no drawing open (remote=%s, auth_mode=%s)",
+                    remote_addr,
+                    auth_mode,
+                )
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "AUTOCAD_DRAWING_NOT_OPEN",
+                            "message": "No drawing open in AutoCAD.",
+                        }
+                    ),
+                    503,
+                )
+            if pythoncom is None:
+                logger.warning(
+                    "Conduit route compute blocked: COM unavailable (remote=%s, auth_mode=%s)",
+                    remote_addr,
+                    auth_mode,
+                )
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "COM_UNAVAILABLE",
+                            "message": "AutoCAD COM bridge unavailable on this platform.",
+                        }
+                    ),
+                    503,
+                )
+
+            scan_config = payload.get("obstacleScan")
+            if not isinstance(scan_config, dict):
+                scan_config = {}
+
+            selection_only = bool(
+                scan_config.get("selectionOnly")
+                if "selectionOnly" in scan_config
+                else scan_config.get("selection_only", False)
+            )
+            include_modelspace = bool(
+                scan_config.get("includeModelspace")
+                if "includeModelspace" in scan_config
+                else scan_config.get("include_modelspace", True)
+            )
+            max_entities_raw = scan_config.get(
+                "maxEntities",
+                scan_config.get("max_entities", 50000),
+            )
+            try:
+                max_entities = int(max_entities_raw)
+            except Exception:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "INVALID_REQUEST",
+                            "message": "obstacleScan.maxEntities must be an integer.",
+                        }
+                    ),
+                    400,
+                )
+            max_entities = max(500, min(200000, max_entities))
+
+            canvas_width_raw = payload.get("canvasWidth", 980)
+            canvas_height_raw = payload.get("canvasHeight", 560)
+            try:
+                canvas_width = max(120.0, float(canvas_width_raw))
+                canvas_height = max(120.0, float(canvas_height_raw))
+            except Exception:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "INVALID_REQUEST",
+                            "message": "canvasWidth/canvasHeight must be numbers.",
+                        }
+                    ),
+                    400,
+                )
+
+            layer_names_raw = scan_config.get("layerNames")
+            layer_names: list[str] = []
+            if isinstance(layer_names_raw, list):
+                layer_names = [str(layer).strip() for layer in layer_names_raw if str(layer).strip()]
+            layer_type_overrides_raw = scan_config.get("layerTypeOverrides")
+            layer_type_overrides: Dict[str, Any] = (
+                layer_type_overrides_raw if isinstance(layer_type_overrides_raw, dict) else {}
+            )
+
+            try:
+                scan_started_at = time.time()
+                pythoncom.CoInitialize()
+                acad = connect_autocad()
+                if acad is None:
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "code": "AUTOCAD_CONNECT_FAILED",
+                                "message": "Cannot connect to AutoCAD.",
+                            }
+                        ),
+                        503,
+                    )
+
+                doc = dyn(acad.ActiveDocument)
+                modelspace = dyn(doc.ModelSpace)
+                if doc is None or modelspace is None:
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "code": "AUTOCAD_DOCUMENT_UNAVAILABLE",
+                                "message": "Cannot access ActiveDocument or ModelSpace.",
+                            }
+                        ),
+                        503,
+                    )
+
+                obstacle_scan_result = scan_conduit_obstacles(
+                    doc=doc,
+                    modelspace=modelspace,
+                    dyn_fn=dyn,
+                    entity_bbox_fn=lambda ent: entity_bbox(ent, dyn_fn=dyn),
+                    include_modelspace=include_modelspace,
+                    selection_only=selection_only,
+                    max_entities=max_entities,
+                    canvas_width=canvas_width,
+                    canvas_height=canvas_height,
+                    layer_names=layer_names,
+                    layer_type_overrides=layer_type_overrides,
+                )
+                obstacle_scan_elapsed_ms = int((time.time() - scan_started_at) * 1000)
+                resolved_payload["obstacles"] = (
+                    obstacle_scan_result.get("data", {}).get("obstacles", [])
+                    if obstacle_scan_result
+                    else []
+                )
+            finally:
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
+
+        started_at = time.time()
+        try:
+            result = compute_conduit_route(resolved_payload)
+            elapsed_ms = int((time.time() - started_at) * 1000)
+
+            merged_warnings: list[str] = []
+            if obstacle_scan_result:
+                merged_warnings.extend(obstacle_scan_result.get("warnings", []) or [])
+                if not obstacle_scan_result.get("success"):
+                    merged_warnings.append(obstacle_scan_result.get("message", "No AutoCAD obstacles found."))
+            merged_warnings.extend(result.get("warnings", []) or [])
+            if merged_warnings:
+                # Keep warning order but drop duplicates.
+                result["warnings"] = list(dict.fromkeys(str(entry) for entry in merged_warnings if str(entry).strip()))
+
+            result["meta"] = {
+                **(result.get("meta", {}) or {}),
+                "requestMs": elapsed_ms,
+                "source": "backend",
+                "obstacleSource": obstacle_source,
+                "obstacleScanMs": obstacle_scan_elapsed_ms,
+                "resolvedObstacleCount": len((resolved_payload.get("obstacles") or [])),
+            }
+
+            if obstacle_scan_result:
+                result["meta"]["obstacleScan"] = obstacle_scan_result.get("meta", {})
+                if isinstance(result.get("data"), dict):
+                    result["data"]["resolvedObstacles"] = obstacle_scan_result.get("data", {}).get(
+                        "obstacles",
+                        [],
+                    )
+                    result["data"]["obstacleViewport"] = obstacle_scan_result.get("data", {}).get(
+                        "viewport",
+                        {},
+                    )
+
+            if result.get("success"):
+                logger.info(
+                    "Conduit route compute success (remote=%s, auth_mode=%s, obstacle_source=%s, obstacle_count=%s, path_points=%s, bends=%s, fallback=%s, elapsed_ms=%s)",
+                    remote_addr,
+                    auth_mode,
+                    obstacle_source,
+                    result["meta"].get("resolvedObstacleCount"),
+                    len((result.get("data") or {}).get("path", [])),
+                    (result.get("data") or {}).get("bendCount"),
+                    (result.get("meta") or {}).get("fallbackUsed"),
+                    elapsed_ms,
+                )
+                return jsonify(result), 200
+
+            logger.warning(
+                "Conduit route compute rejected (remote=%s, auth_mode=%s, code=%s, message=%s)",
+                remote_addr,
+                auth_mode,
+                result.get("code"),
+                result.get("message"),
+            )
+            status_code = 400 if result.get("code") == "INVALID_REQUEST" else 422
+            return jsonify(result), status_code
+        except Exception:
+            logger.exception(
+                "Conduit route compute failed (remote=%s, auth_mode=%s)",
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "ROUTE_COMPUTE_FAILED",
+                        "message": "Conduit route computation failed unexpectedly.",
+                    }
+                ),
+                500,
+            )
+
+    @bp.route("/conduit-route/obstacles/scan", methods=["POST"])
+    @require_autocad_auth
+    @limiter.limit("240 per hour")
+    def api_conduit_route_obstacles_scan():
+        """Scan and normalize route obstacles from AutoCAD drawing layers."""
+        manager = get_manager()
+        status = manager.get_status()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+
+        if not status.get("drawing_open"):
+            logger.warning(
+                "Conduit obstacle scan blocked: no drawing open (remote=%s, auth_mode=%s)",
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
+                        "message": "No drawing open in AutoCAD.",
+                    }
+                ),
+                503,
+            )
+        if pythoncom is None:
+            logger.warning(
+                "Conduit obstacle scan blocked: COM unavailable (remote=%s, auth_mode=%s)",
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "COM_UNAVAILABLE",
+                        "message": "AutoCAD COM bridge unavailable on this platform.",
+                    }
+                ),
+                503,
+            )
+
+        payload = request.get_json(silent=True) or {}
+
+        selection_only = bool(
+            payload.get("selectionOnly")
+            if "selectionOnly" in payload
+            else payload.get("selection_only", False)
+        )
+        include_modelspace = bool(
+            payload.get("includeModelspace")
+            if "includeModelspace" in payload
+            else payload.get("include_modelspace", True)
+        )
+
+        max_entities_raw = payload.get("maxEntities", payload.get("max_entities", 50000))
+        try:
+            max_entities = int(max_entities_raw)
+        except Exception:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "maxEntities must be an integer.",
+                    }
+                ),
+                400,
+            )
+        max_entities = max(500, min(200000, max_entities))
+
+        canvas_width_raw = payload.get("canvasWidth", 980)
+        canvas_height_raw = payload.get("canvasHeight", 560)
+        try:
+            canvas_width = max(120.0, float(canvas_width_raw))
+            canvas_height = max(120.0, float(canvas_height_raw))
+        except Exception:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "canvasWidth/canvasHeight must be numbers.",
+                    }
+                ),
+                400,
+            )
+
+        layer_names_raw = payload.get("layerNames")
+        layer_names: list[str] = []
+        if isinstance(layer_names_raw, list):
+            layer_names = [str(layer).strip() for layer in layer_names_raw if str(layer).strip()]
+        layer_type_overrides_raw = payload.get("layerTypeOverrides")
+        layer_type_overrides: Dict[str, Any] = (
+            layer_type_overrides_raw if isinstance(layer_type_overrides_raw, dict) else {}
+        )
+
+        logger.info(
+            "Conduit obstacle scan request (remote=%s, auth_mode=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
+            remote_addr,
+            auth_mode,
+            selection_only,
+            include_modelspace,
+            max_entities,
+        )
+
+        started_at = time.time()
+        try:
+            pythoncom.CoInitialize()
+            acad = connect_autocad()
+            if acad is None:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "AUTOCAD_CONNECT_FAILED",
+                            "message": "Cannot connect to AutoCAD.",
+                        }
+                    ),
+                    503,
+                )
+
+            doc = dyn(acad.ActiveDocument)
+            modelspace = dyn(doc.ModelSpace)
+            if doc is None or modelspace is None:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "AUTOCAD_DOCUMENT_UNAVAILABLE",
+                            "message": "Cannot access ActiveDocument or ModelSpace.",
+                        }
+                    ),
+                    503,
+                )
+
+            result = scan_conduit_obstacles(
+                doc=doc,
+                modelspace=modelspace,
+                dyn_fn=dyn,
+                entity_bbox_fn=lambda ent: entity_bbox(ent, dyn_fn=dyn),
+                include_modelspace=include_modelspace,
+                selection_only=selection_only,
+                max_entities=max_entities,
+                canvas_width=canvas_width,
+                canvas_height=canvas_height,
+                layer_names=layer_names,
+                layer_type_overrides=layer_type_overrides,
+            )
+            elapsed_ms = int((time.time() - started_at) * 1000)
+            result["meta"] = {
+                **(result.get("meta", {}) or {}),
+                "scanMs": elapsed_ms,
+                "source": "autocad",
+            }
+
+            if result.get("success"):
+                logger.info(
+                    "Conduit obstacle scan success (remote=%s, total_obstacles=%s, elapsed_ms=%s)",
+                    remote_addr,
+                    result["meta"].get("totalObstacles"),
+                    elapsed_ms,
+                )
+            else:
+                logger.warning(
+                    "Conduit obstacle scan no data (remote=%s, scanned_entities=%s, elapsed_ms=%s)",
+                    remote_addr,
+                    result["meta"].get("scannedEntities"),
+                    elapsed_ms,
+                )
+            return jsonify(result), 200
+        except Exception as exc:
+            logger.exception(
+                "Conduit obstacle scan failed (remote=%s, auth_mode=%s)",
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "OBSTACLE_SCAN_FAILED",
+                        "message": f"Conduit obstacle scan failed: {str(exc)}",
+                    }
+                ),
+                500,
+            )
+        finally:
+            try:
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
+
+    @bp.route("/autocad/ws-ticket", methods=["POST"])
+    @require_autocad_auth
+    @limiter.limit("1200 per hour")
+    def api_autocad_ws_ticket():
+        """Issue a short-lived one-time websocket ticket for /ws authentication."""
+        user = getattr(g, "supabase_user", {}) or {}
+        user_id = str(user.get("id") or user.get("sub") or "").strip()
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+        remote_addr = str(request.remote_addr or "unknown")
+
+        try:
+            ticket_payload = issue_ws_ticket(
+                user_id=user_id,
+                auth_mode=auth_mode,
+                remote_addr=remote_addr,
+            )
+            return jsonify({"ok": True, **ticket_payload}), 200
+        except Exception as exc:
+            logger.exception("Failed to issue websocket ticket (remote=%s)", remote_addr)
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Failed to issue websocket ticket",
+                        "code": "WS_TICKET_ISSUE_FAILED",
+                        "message": str(exc),
+                    }
+                ),
                 500,
             )
 

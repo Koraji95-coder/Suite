@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { GridGeneratorDataColumn } from "./GridGeneratorDataColumn";
+import styles from "./GridGeneratorPanel.module.css";
 import { GridGeneratorPreviewColumn } from "./GridGeneratorPreviewColumn";
 import { GridGeneratorTopBar } from "./GridGeneratorTopBar";
 import { useGridGeneratorState } from "./useGridGeneratorState";
@@ -83,9 +84,7 @@ export function GridGeneratorPanel() {
 	});
 
 	return (
-		<div
-			style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}
-		>
+		<div className={styles.root}>
 			<GridGeneratorTopBar
 				designs={designs}
 				currentDesign={currentDesign}
@@ -110,66 +109,70 @@ export function GridGeneratorPanel() {
 				onProjectSelect={handleProjectSelect}
 			/>
 
-			<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-				<GridGeneratorDataColumn
-					isDragging={isDragging}
-					fileInputRef={fileInputRef}
-					pasteMode={pasteMode}
-					pasteText={pasteText}
-					rods={rods}
-					conductors={conductors}
-					placements={placements}
-					palettePrimary={palette.primary}
-					paletteSurfaceLight={palette.surfaceLight}
-					paletteText={palette.text}
-					paletteTextMuted={palette.textMuted}
-					btnStyle={btnStyle}
-					onDragStateChange={setIsDragging}
-					onFileDrop={handleFileDrop}
-					onFileSelect={handleFileSelect}
-					onPasteModeChange={setPasteMode}
-					onPasteTextChange={setPasteText}
-					onApplyPaste={applyPaste}
-					onLoadSampleData={loadSampleData}
-					onClearAll={clearAll}
-				/>
+			<div className={styles.columns}>
+				<div className={styles.dataColumn}>
+					<GridGeneratorDataColumn
+						isDragging={isDragging}
+						fileInputRef={fileInputRef}
+						pasteMode={pasteMode}
+						pasteText={pasteText}
+						rods={rods}
+						conductors={conductors}
+						placements={placements}
+						palettePrimary={palette.primary}
+						paletteSurfaceLight={palette.surfaceLight}
+						paletteText={palette.text}
+						paletteTextMuted={palette.textMuted}
+						btnStyle={btnStyle}
+						onDragStateChange={setIsDragging}
+						onFileDrop={handleFileDrop}
+						onFileSelect={handleFileSelect}
+						onPasteModeChange={setPasteMode}
+						onPasteTextChange={setPasteText}
+						onApplyPaste={applyPaste}
+						onLoadSampleData={loadSampleData}
+						onClearAll={clearAll}
+					/>
+				</div>
 
-				<GridGeneratorPreviewColumn
-					previewMode={previewMode}
-					generating={generating}
-					canUndo={canUndo}
-					canRedo={canRedo}
-					backendConnected={backendConnected}
-					soilResistivity={soilResistivity}
-					faultCurrent={faultCurrent}
-					teeCount={teeCount}
-					crossCount={crossCount}
-					rods={rods}
-					conductors={conductors}
-					placements={placements}
-					plotDiffPreview={plotDiffPreview}
-					palettePrimary={palette.primary}
-					paletteSurfaceLight={palette.surfaceLight}
-					paletteText={palette.text}
-					paletteTextMuted={palette.textMuted}
-					btnStyle={btnStyle}
-					onRunGeneration={runGeneration}
-					onUndo={handleUndo}
-					onRedo={handleRedo}
-					onExportExcel={() => {
-						void handleExcelExport();
-					}}
-					onExportPdf={handlePdfExport}
-					onPlotToAutoCad={handlePlotToAutoCad}
-					placementLock={placementLock}
-					onTogglePlacementLock={() => setPlacementLock((prev) => !prev)}
-					onPreviewModeChange={setPreviewMode}
-					onSoilResistivityChange={setSoilResistivity}
-					onFaultCurrentChange={setFaultCurrent}
-					onManualRodsChange={handleManualRodsChange}
-					onManualConductorsChange={handleManualConductorsChange}
-					onManualPlacementsChange={handleManualPlacementsChange}
-				/>
+				<div className={styles.previewColumn}>
+					<GridGeneratorPreviewColumn
+						previewMode={previewMode}
+						generating={generating}
+						canUndo={canUndo}
+						canRedo={canRedo}
+						backendConnected={backendConnected}
+						soilResistivity={soilResistivity}
+						faultCurrent={faultCurrent}
+						teeCount={teeCount}
+						crossCount={crossCount}
+						rods={rods}
+						conductors={conductors}
+						placements={placements}
+						plotDiffPreview={plotDiffPreview}
+						palettePrimary={palette.primary}
+						paletteSurfaceLight={palette.surfaceLight}
+						paletteText={palette.text}
+						paletteTextMuted={palette.textMuted}
+						btnStyle={btnStyle}
+						onRunGeneration={runGeneration}
+						onUndo={handleUndo}
+						onRedo={handleRedo}
+						onExportExcel={() => {
+							void handleExcelExport();
+						}}
+						onExportPdf={handlePdfExport}
+						onPlotToAutoCad={handlePlotToAutoCad}
+						placementLock={placementLock}
+						onTogglePlacementLock={() => setPlacementLock((prev) => !prev)}
+						onPreviewModeChange={setPreviewMode}
+						onSoilResistivityChange={setSoilResistivity}
+						onFaultCurrentChange={setFaultCurrent}
+						onManualRodsChange={handleManualRodsChange}
+						onManualConductorsChange={handleManualConductorsChange}
+						onManualPlacementsChange={handleManualPlacementsChange}
+					/>
+				</div>
 			</div>
 		</div>
 	);

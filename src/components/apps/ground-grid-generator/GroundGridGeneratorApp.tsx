@@ -1,6 +1,13 @@
 // src/components/apps/ground-grid/GroundGridGeneratorApp.tsx
-import { MapPin, ScrollText } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MapPin, ScrollText, Server, Signal } from "lucide-react";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
 import { hexToRgba, useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
@@ -96,12 +103,16 @@ function ScrollableTabs({
 }
 
 function StatusPill({
+	name,
 	label,
 	isOk,
+	icon,
 	title,
 }: {
+	name: string;
 	label: string;
 	isOk: boolean;
+	icon: ReactNode;
 	title?: string;
 }) {
 	return (
@@ -114,11 +125,16 @@ function StatusPill({
 		>
 			<span
 				className={cn(
-					styles.statusDot,
-					isOk ? styles.statusDotOk : styles.statusDotMuted,
+					styles.statusIconWrap,
+					isOk ? styles.statusIconWrapOk : styles.statusIconWrapMuted,
 				)}
-			/>
-			<span>{label}</span>
+			>
+				{icon}
+			</span>
+			<span className={styles.statusText}>
+				<span className={styles.statusName}>{name}</span>
+				<span className={styles.statusValue}>{label}</span>
+			</span>
 		</div>
 	);
 }
@@ -134,10 +150,6 @@ function GroundGridGeneratorInner() {
 	const [activeTab, setActiveTab] = useState<TabId>("generator");
 
 	useEffect(() => {
-		coordinatesGrabberService.connectWebSocket().catch(() => {
-			setWsLive(false);
-		});
-
 		const unsubscribeConnected = coordinatesGrabberService.on(
 			"connected",
 			(event) => {
@@ -196,20 +208,24 @@ function GroundGridGeneratorInner() {
 					</div>
 
 					<div className={styles.titleWrap}>
-						<h2 className={styles.title}>Ground Grid Generator</h2>
+						<h2 className={styles.title}>Grid Workspace</h2>
 						<p className={styles.subtitle}>
-							Extract coordinates and generate ground grid designs
+							Coordinate capture, grid design, and live logs in one workspace
 						</p>
 					</div>
 
 					<div className={styles.statusRow}>
 						<StatusPill
 							isOk={backendConnected}
-							label={backendConnected ? "AutoCAD Connected" : "AutoCAD Offline"}
+							name="AutoCAD"
+							label={backendConnected ? "Connected" : "Offline"}
+							icon={<Server size={14} />}
 						/>
 						<StatusPill
 							isOk={wsLive}
-							label={wsLive ? "WS Live" : "WS Offline"}
+							name="WebSocket"
+							label={wsLive ? "Live" : "Offline"}
+							icon={<Signal size={14} />}
 							title={`Last WebSocket update: ${wsLiveStamp}`}
 						/>
 					</div>

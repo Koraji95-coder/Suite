@@ -40,9 +40,20 @@ export interface TerminalPanelDefinition {
 	sides: Record<string, TerminalPanelSide>;
 }
 
+export interface TerminalJumperDefinition {
+	jumperId: string;
+	panelId: string;
+	fromStripId: string;
+	fromTerminal: number;
+	toStripId: string;
+	toTerminal: number;
+	sourceBlockName?: string;
+}
+
 export interface TerminalScanData {
 	drawing: TerminalDrawingMeta;
 	panels: Record<string, TerminalPanelDefinition>;
+	jumpers?: TerminalJumperDefinition[];
 }
 
 export interface TerminalLayoutConfig {
@@ -92,6 +103,7 @@ export interface TerminalLayoutResult {
 export interface TerminalRouteRecord {
 	id: string;
 	ref: string;
+	routeType: "conductor" | "jumper";
 	cableType: CableSystemType;
 	wireFunction: string;
 	color: WireColorProfile;
@@ -141,8 +153,11 @@ export interface TerminalScanMeta {
 	totalPanels?: number;
 	totalStrips?: number;
 	totalTerminals?: number;
+	totalJumpers?: number;
 	totalLabeledTerminals?: number;
 	totalGeometryPrimitives?: number;
+	jumperCandidateBlocks?: number;
+	skippedInvalidJumperBlocks?: number;
 }
 
 export interface TerminalScanResponse {

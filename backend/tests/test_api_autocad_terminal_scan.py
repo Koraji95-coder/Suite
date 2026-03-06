@@ -459,6 +459,74 @@ class TestApiAutocadTerminalScan(unittest.TestCase):
         self.assertAlmostEqual(geometry[0]["points"][1]["y"], 232.0, places=4)
         self.assertGreaterEqual(result["meta"]["totalGeometryPrimitives"], 2)
 
+    def test_scan_terminal_strips_extracts_tb_jumper_meta_records(self) -> None:
+        doc = _Doc(name="jumpers.dwg", units=2)
+        modelspace = _Collection(
+            [
+                _BlockRef(
+                    name="TB_STRIP_META_SIDE",
+                    handle="J1",
+                    insertion_point=(10.0, 40.0, 0.0),
+                    attrs=[
+                        ("PANEL_ID", "RP1"),
+                        ("SIDE", "L"),
+                        ("STRIP_ID", "RP1L1"),
+                        ("TERMINAL_COUNT", "12"),
+                    ],
+                ),
+                _BlockRef(
+                    name="TB_STRIP_META_SIDE",
+                    handle="J2",
+                    insertion_point=(40.0, 40.0, 0.0),
+                    attrs=[
+                        ("PANEL_ID", "RP1"),
+                        ("SIDE", "R"),
+                        ("STRIP_ID", "RP1R1"),
+                        ("TERMINAL_COUNT", "12"),
+                    ],
+                ),
+                _BlockRef(
+                    name="TB_JUMPER_META",
+                    handle="J3",
+                    insertion_point=(20.0, 20.0, 0.0),
+                    attrs=[
+                        ("JUMPER_ID", "JMP-A"),
+                        ("PANEL_ID", "RP1"),
+                        ("FROM_STRIP_ID", "RP1L1"),
+                        ("FROM_TERM", "5"),
+                        ("TO_STRIP_ID", "RP1R1"),
+                        ("TO_TERM", "5"),
+                    ],
+                ),
+            ]
+        )
+
+        result = scan_terminal_strips(
+            doc=doc,
+            modelspace=modelspace,
+            dyn_fn=lambda value: value,
+            include_modelspace=True,
+            selection_only=False,
+            max_entities=1000,
+            terminal_profile={
+                "blockNameAllowList": ["TB_STRIP_META_SIDE"],
+                "requireStripId": True,
+                "requireTerminalCount": True,
+                "requireSide": True,
+            },
+        )
+
+        self.assertTrue(result["success"])
+        jumpers = result["data"]["jumpers"]
+        self.assertEqual(len(jumpers), 1)
+        self.assertEqual(jumpers[0]["jumperId"], "JMP-A")
+        self.assertEqual(jumpers[0]["panelId"], "RP1")
+        self.assertEqual(jumpers[0]["fromStripId"], "RP1L1")
+        self.assertEqual(jumpers[0]["fromTerminal"], 5)
+        self.assertEqual(jumpers[0]["toStripId"], "RP1R1")
+        self.assertEqual(jumpers[0]["toTerminal"], 5)
+        self.assertEqual(result["meta"]["totalJumpers"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,8 +24,8 @@ import type {
 import {
 	buildTerminalLayout,
 	routeTerminalPath,
-	terminalAnchorPoint,
 	terminalBendCount,
+	terminalLeadPoint,
 	terminalPathLength,
 	toTerminalRouteSvg,
 } from "./conduitTerminalEngine";
@@ -93,6 +93,13 @@ const DEFAULT_TERMINAL_SCAN_PROFILE: TerminalScanProfile = {
 	defaultTerminalCount: 12,
 };
 
+const JUMPER_COLOR = {
+	code: "JMP",
+	hex: "#f97316",
+	stroke: "#fb923c",
+	aci: 30,
+} as const;
+
 function makeRouteId(): string {
 	return `troute_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -123,6 +130,134 @@ function midPoint(path: Point2D[]): Point2D {
 	return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
+function terminalIdFor(stripId: string, terminalIndex: number): string {
+	const normalizedIndex = Math.max(1, Math.trunc(terminalIndex));
+	return `${stripId}:T${String(normalizedIndex).padStart(2, "0")}`;
+}
+
+function firstPathSegment(path: Point2D[]): { start: Point2D; end: Point2D } | null {
+	for (let index = 1; index < path.length; index += 1) {
+		const start = path[index - 1];
+		const end = path[index];
+		if (Math.hypot(end.x - start.x, end.y - start.y) >= 0.5) {
+			return { start, end };
+		}
+	}
+	return null;
+}
+
+function routeInlineAnchor(path: Point2D[]): {
+	x: number;
+	y: number;
+	angleDeg: number;
+} | null {
+	const segment = firstPathSegment(path);
+	if (!segment) return null;
+
+	const dx = segment.end.x - segment.start.x;
+	const dy = segment.end.y - segment.start.y;
+	const length = Math.hypot(dx, dy);
+	if (length < 0.5) return null;
+
+	const ux = dx / length;
+	const uy = dy / length;
+	const distance = clamp(length * 0.58, 18, Math.max(18, length - 6));
+	let angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+	if (angleDeg > 90 || angleDeg < -90) {
+		angleDeg += 180;
+	}
+
+	return {
+		x: segment.start.x + ux * distance,
+		y: segment.start.y + uy * distance,
+		angleDeg,
+	};
+}
+
+function clamp(value: number, min: number, max: number): number {
+	return Math.max(min, Math.min(max, value));
+}
+
+function parseTrailingNumber(value: string): number {
+	const match = String(value || "").match(/(\d+)\s*$/);
+	if (!match) return 0;
+	const parsed = Number.parseInt(match[1], 10);
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildJumperRoutes(
+	scanData: TerminalScanData,
+	layout: TerminalLayoutResult,
+): { routes: TerminalRouteRecord[]; unresolved: number; nextRef: number } {
+	const jumpers = Array.isArray(scanData.jumpers) ? scanData.jumpers : [];
+	if (jumpers.length === 0) {
+		return { routes: [], unresolved: 0, nextRef: 1 };
+	}
+
+	const terminalById = new Map(layout.terminals.map((terminal) => [terminal.id, terminal]));
+	const dedupe = new Set<string>();
+	const routes: TerminalRouteRecord[] = [];
+	let unresolved = 0;
+	let maxNumericRef = 0;
+	let autoIndex = 1;
+
+	for (const jumper of jumpers) {
+		const fromTerm = Math.max(1, Math.trunc(Number(jumper.fromTerminal) || 0));
+		const toTerm = Math.max(1, Math.trunc(Number(jumper.toTerminal) || 0));
+		const fromId = terminalIdFor(jumper.fromStripId, fromTerm);
+		const toId = terminalIdFor(jumper.toStripId, toTerm);
+		const from = terminalById.get(fromId);
+		const to = terminalById.get(toId);
+		if (!from || !to) {
+			unresolved += 1;
+			continue;
+		}
+
+		const signature = `${from.id}|${to.id}`;
+		if (dedupe.has(signature)) {
+			continue;
+		}
+		dedupe.add(signature);
+
+		const fromLead = terminalLeadPoint(from, to, 36);
+		const toLead = terminalLeadPoint(to, from, 36);
+		const trunkPath = routeTerminalPath(
+			fromLead,
+			toLead,
+			layout.strips,
+			layout.canvasWidth,
+			layout.canvasHeight,
+		);
+		const path = dedupePath([from, fromLead, ...trunkPath, toLead, to]);
+		const bends = terminalBendCount(path);
+		const rawRef = String(jumper.jumperId || "").trim();
+		const ref = rawRef.length > 0 ? rawRef : `JMP-${String(autoIndex).padStart(3, "0")}`;
+		autoIndex += 1;
+		maxNumericRef = Math.max(maxNumericRef, parseTrailingNumber(ref));
+
+		routes.push({
+			id: makeRouteId(),
+			ref,
+			routeType: "jumper",
+			cableType: "DC",
+			wireFunction: "Jumper",
+			color: JUMPER_COLOR,
+			fromTerminalId: from.id,
+			toTerminalId: to.id,
+			fromLabel: from.label,
+			toLabel: to.label,
+			path,
+			length: terminalPathLength(path),
+			bendCount: bends,
+			bendDegrees: bends * 90,
+			createdAt: Date.now(),
+		});
+	}
+
+	const nextRef = Math.max(1, maxNumericRef + 1, routes.length + 1);
+	return { routes, unresolved, nextRef };
+}
+
 export function ConduitTerminalWorkflow() {
 	const [connected, setConnected] = useState(false);
 	const [scanning, setScanning] = useState(false);
@@ -142,6 +277,7 @@ export function ConduitTerminalWorkflow() {
 	const [hoverTerminalId, setHoverTerminalId] = useState<string | null>(null);
 	const [routes, setRoutes] = useState<TerminalRouteRecord[]>([]);
 	const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+	const [routeType, setRouteType] = useState<"conductor" | "jumper">("conductor");
 	const [cableType, setCableType] = useState<CableSystemType>("DC");
 	const [wireFunction, setWireFunction] = useState<string>(
 		DEFAULT_WIRE_FUNCTIONS.DC,
@@ -150,6 +286,7 @@ export function ConduitTerminalWorkflow() {
 		AC: 1,
 		DC: 1,
 	});
+	const [nextJumperRef, setNextJumperRef] = useState(1);
 
 	useEffect(() => {
 		const palette = WIRE_COLORS[cableType];
@@ -163,8 +300,10 @@ export function ConduitTerminalWorkflow() {
 		[cableType],
 	);
 	const activeColor =
-		WIRE_COLORS[cableType][wireFunction] ??
-		WIRE_COLORS[cableType][DEFAULT_WIRE_FUNCTIONS[cableType]];
+		routeType === "jumper"
+			? JUMPER_COLOR
+			: (WIRE_COLORS[cableType][wireFunction] ??
+				WIRE_COLORS[cableType][DEFAULT_WIRE_FUNCTIONS[cableType]]);
 
 	const layout = useMemo(
 		() => (scanData ? buildTerminalLayout(scanData) : EMPTY_LAYOUT),
@@ -283,17 +422,32 @@ export function ConduitTerminalWorkflow() {
 			setScanMeta(response.meta ?? null);
 			setFromTerminalId(null);
 			setHoverTerminalId(null);
+			setSelectedRouteId(null);
 			const panelCount = Object.keys(response.data.panels).length;
 			const terminalCount = response.meta?.totalTerminals ?? 0;
 			const nextLayout = buildTerminalLayout(response.data);
+			const jumperSeed = buildJumperRoutes(response.data, nextLayout);
+			setRoutes(jumperSeed.routes);
+			setNextJumperRef(jumperSeed.nextRef);
+			setNextRef({ AC: 1, DC: 1 });
 			const obstacleResult = await syncObstacleOverlay(nextLayout);
 			const baseMessage =
 				response.message ||
 				`Scan loaded ${panelCount} panel(s) and ${terminalCount} terminal(s).`;
+			const jumperSuffix =
+				jumperSeed.routes.length > 0
+					? ` Loaded ${jumperSeed.routes.length} jumper route(s).`
+					: "";
+			const unresolvedSuffix =
+				jumperSeed.unresolved > 0
+					? ` ${jumperSeed.unresolved} jumper definition(s) could not map to scanned terminals.`
+					: "";
 			const overlaySuffix = obstacleResult.success
 				? ` Obstacle overlay: ${obstacleResult.count}.`
 				: " Obstacle overlay unavailable.";
-			setStatusMessage(`${baseMessage}${overlaySuffix}`);
+			setStatusMessage(
+				`${baseMessage}${jumperSuffix}${unresolvedSuffix}${overlaySuffix}`,
+			);
 			return;
 		}
 
@@ -302,6 +456,8 @@ export function ConduitTerminalWorkflow() {
 			setConnected(true);
 			setScanData(response.data);
 			setScanMeta(response.meta ?? null);
+			setRoutes([]);
+			setSelectedRouteId(null);
 			setOverlayObstacles([]);
 			setOverlayMeta(null);
 			setOverlayMessage("");
@@ -410,21 +566,27 @@ export function ConduitTerminalWorkflow() {
 			return;
 		}
 
-		const anchors = terminalAnchorPoint(from, terminal, 12);
+		const fromLead = terminalLeadPoint(from, terminal, 36);
+		const toLead = terminalLeadPoint(terminal, from, 36);
 		const trunkPath = routeTerminalPath(
-			anchors.start,
-			anchors.end,
+			fromLead,
+			toLead,
 			layout.strips,
 			layout.canvasWidth,
 			layout.canvasHeight,
 		);
-		const path = dedupePath([from, ...trunkPath, terminal]);
+		const path = dedupePath([from, fromLead, ...trunkPath, toLead, terminal]);
 		const bends = terminalBendCount(path);
+		const isJumper = routeType === "jumper";
+		const routeRef = isJumper
+			? `JMP-${String(nextJumperRef).padStart(3, "0")}`
+			: `${cableType}-${String(nextRef[cableType]).padStart(3, "0")}`;
 		const route: TerminalRouteRecord = {
 			id: makeRouteId(),
-			ref: `${cableType}-${String(nextRef[cableType]).padStart(3, "0")}`,
+			ref: routeRef,
+			routeType,
 			cableType,
-			wireFunction,
+			wireFunction: isJumper ? "Jumper" : wireFunction,
 			color: activeColor,
 			fromTerminalId: from.id,
 			toTerminalId: terminal.id,
@@ -440,25 +602,29 @@ export function ConduitTerminalWorkflow() {
 		setRoutes((current) => [route, ...current]);
 		setSelectedRouteId(route.id);
 		setFromTerminalId(null);
-		setNextRef((current) => ({
-			...current,
-			[cableType]: current[cableType] + 1,
-		}));
+		if (isJumper) {
+			setNextJumperRef((current) => current + 1);
+		} else {
+			setNextRef((current) => ({
+				...current,
+				[cableType]: current[cableType] + 1,
+			}));
+		}
 		if (route.bendDegrees > 360) {
 			setStatusMessage(
-				`${route.ref} routed with ${route.bendDegrees}° total bends. Add pull point in panel field install.`,
+				`${route.ref} routed with ${route.bendDegrees} deg total bends. Add pull point in panel field install.`,
 			);
 			return;
 		}
 		setStatusMessage(
-			`${route.ref} routed ${route.fromLabel} → ${route.toLabel} (${formatLength(route.length)}).`,
+			`${route.ref} routed ${route.fromLabel} -> ${route.toLabel} (${formatLength(route.length)}).`,
 		);
 	};
 
 	return (
 		<div className={styles.root}>
 			<div className={styles.header}>
-				<div>
+				<div className={styles.titleStack}>
 					<Text size="sm" weight="semibold">
 						Terminal Strip Routing Workflow
 					</Text>
@@ -526,6 +692,28 @@ export function ConduitTerminalWorkflow() {
 					<Stack gap={3}>
 						<div className={styles.controlGroup}>
 							<Text size="xs" color="muted">
+								Route Type
+							</Text>
+							<div className={styles.toggleRow}>
+								<Button
+									variant={routeType === "conductor" ? "primary" : "outline"}
+									size="sm"
+									onClick={() => setRouteType("conductor")}
+								>
+									Conductor
+								</Button>
+								<Button
+									variant={routeType === "jumper" ? "primary" : "outline"}
+									size="sm"
+									onClick={() => setRouteType("jumper")}
+								>
+									Jumper
+								</Button>
+							</div>
+						</div>
+
+						<div className={styles.controlGroup}>
+							<Text size="xs" color="muted">
 								Cable System
 							</Text>
 							<div className={styles.toggleRow}>
@@ -535,6 +723,7 @@ export function ConduitTerminalWorkflow() {
 										variant={cableType === entry ? "primary" : "outline"}
 										size="sm"
 										onClick={() => setCableType(entry)}
+										disabled={routeType === "jumper"}
 									>
 										{entry}
 									</Button>
@@ -552,9 +741,11 @@ export function ConduitTerminalWorkflow() {
 										key={entry}
 										type="button"
 										onClick={() => setWireFunction(entry)}
+										disabled={routeType === "jumper"}
 										className={cn(
 											styles.functionButton,
 											wireFunction === entry && styles.functionButtonActive,
+											routeType === "jumper" && styles.functionButtonDisabled,
 										)}
 									>
 										<span
@@ -630,7 +821,7 @@ export function ConduitTerminalWorkflow() {
 
 				<Panel variant="elevated" padding="md" className={styles.canvasCard}>
 					<div className={styles.canvasHeader}>
-						<div>
+						<div className={styles.titleStack}>
 							<Text size="sm" weight="semibold">
 								Terminal Map
 							</Text>
@@ -743,33 +934,6 @@ export function ConduitTerminalWorkflow() {
 									})
 								: null}
 
-							{routes.map((route) => {
-								const selected = selectedRouteId === route.id;
-								const tagPoint = midPoint(route.path);
-								return (
-									<g key={route.id}>
-										<path
-											d={toTerminalRouteSvg(route.path)}
-											className={styles.routeShadow}
-										/>
-										<path
-											d={toTerminalRouteSvg(route.path)}
-											className={styles.routeStroke}
-											stroke={route.color.stroke}
-											strokeWidth={selected ? 3.8 : 3}
-											onClick={() => setSelectedRouteId(route.id)}
-										/>
-										<text
-											x={tagPoint.x + 6}
-											y={tagPoint.y - 6}
-											className={styles.routeTag}
-										>
-											{route.ref}
-										</text>
-									</g>
-								);
-							})}
-
 							{layout.strips.map((strip) => (
 								<g key={strip.stripId}>
 									{strip.geometryPx && strip.geometryPx.length > 0 ? (
@@ -837,6 +1001,64 @@ export function ConduitTerminalWorkflow() {
 								</g>
 							))}
 
+							{routes.map((route) => {
+								const selected = selectedRouteId === route.id;
+								const routeSvg = toTerminalRouteSvg(route.path);
+								const segment = firstPathSegment(route.path);
+								const inlineTag = routeInlineAnchor(route.path);
+								const fallbackTagPoint = midPoint(route.path);
+
+								return (
+									<g key={route.id}>
+										<path d={routeSvg} className={styles.routeShadow} />
+										<path
+											d={routeSvg}
+											className={styles.routeStroke}
+											stroke={route.color.stroke}
+											strokeWidth={selected ? 4.2 : 3.2}
+											strokeDasharray={
+												route.routeType === "jumper" ? "11 7" : undefined
+											}
+											onClick={() => setSelectedRouteId(route.id)}
+										/>
+										{segment ? (
+											<path
+												d={`M ${segment.start.x} ${segment.start.y} L ${segment.end.x} ${segment.end.y}`}
+												className={styles.routeLead}
+												stroke={route.color.stroke}
+											/>
+										) : null}
+										{inlineTag ? (
+											<g
+												transform={`translate(${inlineTag.x} ${inlineTag.y}) rotate(${inlineTag.angleDeg})`}
+											>
+												{route.routeType === "jumper" ? (
+													<path
+														d="M -24 2 Q -19 -7 -14 2 M -14 2 L -9 2"
+														className={styles.jumperGlyph}
+													/>
+												) : null}
+												<text
+													x={route.routeType === "jumper" ? -4 : 0}
+													y={-2}
+													className={styles.routeTagInline}
+												>
+													{route.ref}
+												</text>
+											</g>
+										) : (
+											<text
+												x={fallbackTagPoint.x + 6}
+												y={fallbackTagPoint.y - 6}
+												className={styles.routeTagInline}
+											>
+												{route.ref}
+											</text>
+										)}
+									</g>
+								);
+							})}
+
 							{layout.terminals.map((terminal) => {
 								const isFrom = fromTerminalId === terminal.id;
 								const isHover = hoverTerminalId === terminal.id;
@@ -845,7 +1067,7 @@ export function ConduitTerminalWorkflow() {
 										<circle
 											cx={terminal.x}
 											cy={terminal.y}
-											r={isFrom ? 6 : 4}
+											r={isFrom ? 8.6 : 6.1}
 											className={styles.terminalDot}
 											fill={terminal.panelColor}
 											onMouseEnter={() => setHoverTerminalId(terminal.id)}
@@ -856,7 +1078,7 @@ export function ConduitTerminalWorkflow() {
 											<circle
 												cx={terminal.x}
 												cy={terminal.y}
-												r={isFrom ? 11 : 8}
+												r={isFrom ? 15.4 : 11.1}
 												className={styles.terminalRing}
 											/>
 										) : null}
@@ -927,10 +1149,15 @@ export function ConduitTerminalWorkflow() {
 										<span>{route.color.code}</span>
 									</div>
 									<div className={styles.routeMeta}>
-										{route.fromLabel} → {route.toLabel}
+										{route.fromLabel}
+										{" -> "}
+										{route.toLabel}
 									</div>
 									<div className={styles.routeMeta}>
-										{formatLength(route.length)} · {route.bendDegrees}°
+										{route.routeType === "jumper" ? "Jumper" : "Conductor"}
+									</div>
+									<div className={styles.routeMeta}>
+										{formatLength(route.length)} | {route.bendDegrees} deg
 									</div>
 								</button>
 							))
@@ -942,6 +1169,14 @@ export function ConduitTerminalWorkflow() {
 							<div>
 								<span>Selected</span>
 								<strong>{selectedRoute.ref}</strong>
+							</div>
+							<div>
+								<span>Type</span>
+								<strong>
+									{selectedRoute.routeType === "jumper"
+										? "Jumper"
+										: "Conductor"}
+								</strong>
 							</div>
 							<div>
 								<span>From</span>

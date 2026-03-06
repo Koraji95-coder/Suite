@@ -6,9 +6,9 @@ import type {
 export const TERMINAL_LAYOUT_CONFIG: TerminalLayoutConfig = {
 	scale: 38,
 	padding: 42,
-	stripWidth: 20,
-	terminalSpacing: 7.6,
-	terminalRadius: 4,
+	stripWidth: 58,
+	terminalSpacing: 22,
+	terminalRadius: 8.2,
 	gridWidth: 22,
 	gridHeight: 14,
 };

@@ -10,6 +10,19 @@
 	gap: var(--space-3);
 }
 
+.titleStack {
+	display: grid;
+	gap: 0.28rem;
+}
+
+.titleStack :global(span) {
+	display: block;
+}
+
+.titleStack :global(span:last-child) {
+	padding-left: 0.24rem;
+}
+
 .headerBadges {
 	display: flex;
 	align-items: center;
@@ -73,6 +86,11 @@
 	color: var(--text);
 	font-size: 0.72rem;
 	cursor: pointer;
+}
+
+.functionButtonDisabled {
+	opacity: 0.58;
+	cursor: not-allowed;
 }
 
 .functionButton small {
@@ -183,7 +201,7 @@
 .canvas {
 	display: block;
 	width: 100%;
-	min-width: 760px;
+	min-width: 860px;
 	height: auto;
 	aspect-ratio: 940 / 620;
 }
@@ -209,7 +227,7 @@
 
 .stripGeometry {
 	fill: none;
-	stroke-width: 1.4;
+	stroke-width: 2.25;
 	stroke-linecap: round;
 	stroke-linejoin: round;
 	opacity: 0.92;
@@ -233,7 +251,7 @@
 
 .stripLabel {
 	fill: color-mix(in srgb, var(--text-muted) 95%, transparent);
-	font-size: 0.63rem;
+	font-size: 0.98rem;
 	text-anchor: middle;
 	font-weight: 700;
 	letter-spacing: 0.04em;
@@ -241,14 +259,14 @@
 
 .terminalDot {
 	stroke: color-mix(in srgb, #ffffff 26%, transparent);
-	stroke-width: 1;
+	stroke-width: 1.4;
 	cursor: pointer;
 }
 
 .terminalRing {
 	fill: none;
 	stroke: color-mix(in srgb, #f8fafc 75%, transparent);
-	stroke-width: 1.2;
+	stroke-width: 1.55;
 	stroke-dasharray: 4 3;
 	pointer-events: none;
 }
@@ -256,7 +274,7 @@
 .routeShadow {
 	fill: none;
 	stroke: color-mix(in srgb, #000000 84%, transparent);
-	stroke-width: 6;
+	stroke-width: 7;
 	opacity: 0.38;
 }
 
@@ -270,11 +288,30 @@
 	);
 }
 
-.routeTag {
+.routeLead {
+	fill: none;
+	stroke-width: 4.4;
+	stroke-linecap: round;
+	opacity: 0.95;
+}
+
+.routeTagInline {
 	fill: color-mix(in srgb, #f7d8a1 90%, #ffffff 10%);
-	font-size: 0.62rem;
+	font-size: 0.78rem;
 	font-weight: 700;
 	letter-spacing: 0.06em;
+	dominant-baseline: central;
+	paint-order: stroke fill;
+	stroke: color-mix(in srgb, #050912 90%, transparent);
+	stroke-width: 2.1;
+}
+
+.jumperGlyph {
+	fill: none;
+	stroke: color-mix(in srgb, #fb923c 94%, #fff 6%);
+	stroke-width: 1.9;
+	stroke-linecap: round;
+	stroke-linejoin: round;
 }
 
 .canvasFooter {
@@ -461,7 +498,7 @@
 	}
 
 	.canvas {
-		min-width: 640px;
+		min-width: 700px;
 	}
 
 	.selectedRoute {
@@ -475,6 +512,6 @@
 	}
 
 	.canvas {
-		min-width: 560px;
+		min-width: 620px;
 	}
 }

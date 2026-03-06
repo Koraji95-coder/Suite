@@ -77,6 +77,58 @@ TERMINAL_NAME_TOKENS = (
 
 TERMINAL_LABEL_TAG_PATTERN = re.compile(r"^TERM[_-]?0*(\d+)[_-]?LABEL$")
 
+JUMPER_NAME_TOKENS = (
+    "JUMPER",
+    "JMP",
+)
+
+JUMPER_ID_KEYS = (
+    "JUMPER_ID",
+    "JUMPER",
+    "JMP_ID",
+    "JMP_REF",
+    "JMP",
+)
+
+JUMPER_PANEL_ID_KEYS = (
+    "PANEL_ID",
+    "PANEL",
+)
+
+JUMPER_FROM_STRIP_KEYS = (
+    "FROM_STRIP_ID",
+    "FROM_STRIP",
+    "FROM_TB",
+    "FROM_TB_ID",
+    "STRIP_ID_FROM",
+)
+
+JUMPER_TO_STRIP_KEYS = (
+    "TO_STRIP_ID",
+    "TO_STRIP",
+    "TO_TB",
+    "TO_TB_ID",
+    "STRIP_ID_TO",
+)
+
+JUMPER_FROM_TERM_KEYS = (
+    "FROM_TERM",
+    "FROM_TERMINAL",
+    "FROM_POS",
+    "FROM_POSITION",
+    "TERM_FROM",
+    "FROM",
+)
+
+JUMPER_TO_TERM_KEYS = (
+    "TO_TERM",
+    "TO_TERMINAL",
+    "TO_POS",
+    "TO_POSITION",
+    "TERM_TO",
+    "TO",
+)
+
 PANEL_COLOR_PALETTE = (
     "#f59e0b",
     "#3b82f6",
@@ -792,6 +844,61 @@ def _terminal_labels(attrs: Dict[str, str], terminal_count: int) -> List[str]:
     return [labels_by_index.get(index, "") for index in range(1, count + 1)]
 
 
+def _terminal_index_from_text(raw_value: str) -> Optional[int]:
+    parsed = _extract_int_from_text(_safe_str(raw_value))
+    if parsed is None or parsed <= 0:
+        return None
+    return min(parsed, 2000)
+
+
+def _looks_like_jumper_block(block_name: str, attrs: Dict[str, str]) -> bool:
+    name = _safe_upper(block_name)
+    if any(token in name for token in JUMPER_NAME_TOKENS):
+        return True
+
+    has_from_strip = bool(_first_attr(attrs, JUMPER_FROM_STRIP_KEYS))
+    has_to_strip = bool(_first_attr(attrs, JUMPER_TO_STRIP_KEYS))
+    has_from_term = bool(_first_attr(attrs, JUMPER_FROM_TERM_KEYS))
+    has_to_term = bool(_first_attr(attrs, JUMPER_TO_TERM_KEYS))
+    return has_from_strip and has_to_strip and has_from_term and has_to_term
+
+
+def _extract_jumper_record(
+    *,
+    attrs: Dict[str, str],
+    block_name: str,
+    handle: str,
+    default_panel_prefix: str,
+) -> Optional[Dict[str, Any]]:
+    from_strip = _safe_upper(_first_attr(attrs, JUMPER_FROM_STRIP_KEYS))
+    to_strip = _safe_upper(_first_attr(attrs, JUMPER_TO_STRIP_KEYS))
+    from_terminal = _terminal_index_from_text(_first_attr(attrs, JUMPER_FROM_TERM_KEYS))
+    to_terminal = _terminal_index_from_text(_first_attr(attrs, JUMPER_TO_TERM_KEYS))
+
+    if not from_strip or not to_strip or from_terminal is None or to_terminal is None:
+        return None
+
+    panel_id = (
+        _safe_upper(_first_attr(attrs, JUMPER_PANEL_ID_KEYS))
+        or _derive_panel_from_strip_id(from_strip)
+        or _derive_panel_from_strip_id(to_strip)
+        or default_panel_prefix
+    )
+    jumper_id = _safe_str(_first_attr(attrs, JUMPER_ID_KEYS))
+    if not jumper_id:
+        jumper_id = f"JMP_{handle or from_strip + '_' + str(from_terminal)}"
+
+    return {
+        "jumper_id": jumper_id,
+        "panel_id": panel_id,
+        "from_strip_id": from_strip,
+        "from_terminal": from_terminal,
+        "to_strip_id": to_strip,
+        "to_terminal": to_terminal,
+        "source_block_name": _safe_str(block_name),
+    }
+
+
 def _is_terminal_block(
     block_name: str,
     attrs: Dict[str, str],
@@ -930,8 +1037,10 @@ def scan_terminal_strips(
     profile = _resolve_terminal_profile(terminal_profile)
 
     records: List[Dict[str, Any]] = []
+    jumpers: List[Dict[str, Any]] = []
     geometry_cache: Dict[str, List[Dict[str, Any]]] = {}
     seen_strip_ids: set[str] = set()
+    seen_jumper_signatures: set[str] = set()
     seen_entity_handles: set[str] = set()
     warnings: List[str] = []
 
@@ -941,6 +1050,8 @@ def scan_terminal_strips(
     skipped_non_terminal_blocks = 0
     skipped_missing_insertion_point_blocks = 0
     terminal_candidate_blocks = 0
+    jumper_candidate_blocks = 0
+    skipped_invalid_jumper_blocks = 0
     total_labeled_terminals = 0
     total_geometry_primitives = 0
     scanned_block_name_counts: Dict[str, int] = {}
@@ -954,6 +1065,8 @@ def scan_terminal_strips(
         nonlocal skipped_non_terminal_blocks
         nonlocal skipped_missing_insertion_point_blocks
         nonlocal terminal_candidate_blocks
+        nonlocal jumper_candidate_blocks
+        nonlocal skipped_invalid_jumper_blocks
         nonlocal total_labeled_terminals
         nonlocal total_geometry_primitives
         scanned_entities += 1
@@ -975,6 +1088,34 @@ def scan_terminal_strips(
         scanned_block_name_counts[block_name_key] = (
             scanned_block_name_counts.get(block_name_key, 0) + 1
         )
+
+        if _looks_like_jumper_block(block_name, attrs):
+            jumper_candidate_blocks += 1
+            jumper_record = _extract_jumper_record(
+                attrs=attrs,
+                block_name=block_name,
+                handle=handle,
+                default_panel_prefix=str(profile["defaultPanelPrefix"]),
+            )
+            if jumper_record is None:
+                skipped_invalid_jumper_blocks += 1
+                warnings.append(
+                    "Skipping jumper block "
+                    f"{block_name or '<unknown>'} (missing FROM/TO strip or terminal attributes)."
+                )
+                return
+
+            signature = (
+                f"{jumper_record['panel_id']}|{jumper_record['from_strip_id']}|"
+                f"{jumper_record['from_terminal']}|{jumper_record['to_strip_id']}|"
+                f"{jumper_record['to_terminal']}"
+            )
+            if signature in seen_jumper_signatures:
+                return
+            seen_jumper_signatures.add(signature)
+            jumpers.append(jumper_record)
+            return
+
         if not _is_terminal_block(
             block_name,
             attrs,
@@ -1118,6 +1259,28 @@ def scan_terminal_strips(
         for side in panel.get("sides", {}).values()
         for strip in side.get("strips", [])
     )
+    jumpers_payload = [
+        {
+            "jumperId": _safe_str(jumper.get("jumper_id")),
+            "panelId": _safe_str(jumper.get("panel_id")),
+            "fromStripId": _safe_str(jumper.get("from_strip_id")),
+            "fromTerminal": int(jumper.get("from_terminal") or 0),
+            "toStripId": _safe_str(jumper.get("to_strip_id")),
+            "toTerminal": int(jumper.get("to_terminal") or 0),
+            "sourceBlockName": _safe_str(jumper.get("source_block_name")),
+        }
+        for jumper in sorted(
+            jumpers,
+            key=lambda item: (
+                _safe_upper(item.get("panel_id")),
+                _safe_upper(item.get("from_strip_id")),
+                int(item.get("from_terminal") or 0),
+                _safe_upper(item.get("to_strip_id")),
+                int(item.get("to_terminal") or 0),
+            ),
+        )
+    ]
+    total_jumpers = len(jumpers_payload)
 
     no_data_message = (
         "No terminal-strip block references were detected. "
@@ -1142,6 +1305,7 @@ def scan_terminal_strips(
         "data": {
             "drawing": {"name": drawing_name, "units": units},
             "panels": panels,
+            "jumpers": jumpers_payload,
         },
         "meta": {
             "scannedEntities": scanned_entities,
@@ -1150,11 +1314,14 @@ def scan_terminal_strips(
             "skippedNonTerminalBlocks": skipped_non_terminal_blocks,
             "skippedMissingInsertionPointBlocks": skipped_missing_insertion_point_blocks,
             "terminalCandidateBlocks": terminal_candidate_blocks,
+            "jumperCandidateBlocks": jumper_candidate_blocks,
+            "skippedInvalidJumperBlocks": skipped_invalid_jumper_blocks,
             "selectionOnly": bool(selection_only),
             "includeModelspace": bool(include_modelspace),
             "totalPanels": len(panels),
             "totalStrips": total_strips,
             "totalTerminals": total_terminals,
+            "totalJumpers": total_jumpers,
             "totalLabeledTerminals": total_labeled_terminals,
             "totalGeometryPrimitives": total_geometry_primitives,
             "topScannedBlockNames": top_scanned_block_names,

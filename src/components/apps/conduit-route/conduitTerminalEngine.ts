@@ -37,6 +37,12 @@ interface PathNode {
 	py: number;
 }
 
+interface LabelBucket {
+	L?: string[];
+	R?: string[];
+	C?: string[];
+}
+
 function clamp(value: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, value));
 }
@@ -182,12 +188,31 @@ function mapGeometryToCanvas(
 
 function sideTerminalX(strip: TerminalStripLayout): number {
 	if (strip.side === "L") {
-		return strip.px + strip.width * 0.2;
+		return strip.px + strip.width * 0.16;
 	}
 	if (strip.side === "R") {
-		return strip.px + strip.width * 0.8;
+		return strip.px + strip.width * 0.84;
 	}
 	return strip.px + strip.width * 0.5;
+}
+
+function hasAnyLabel(labels: string[] | undefined): boolean {
+	if (!Array.isArray(labels) || labels.length === 0) {
+		return false;
+	}
+	return labels.some((label) => typeof label === "string" && label.trim().length > 0);
+}
+
+function normalizeLabelArray(
+	labels: string[] | undefined,
+	terminalCount: number,
+): string[] {
+	const count = Math.max(1, terminalCount);
+	const out = Array.from({ length: count }, (_, index) => {
+		const raw = labels?.[index];
+		return typeof raw === "string" ? raw : "";
+	});
+	return out;
 }
 
 function stripBlockRect(strip: TerminalStripLayout, inflateBy = 7): Rect {
@@ -224,6 +249,7 @@ export function buildTerminalLayout(
 ): TerminalLayoutResult {
 	const strips: TerminalStripLayout[] = [];
 	const terminals: TerminalNode[] = [];
+	const sharedLabelsByStrip = new Map<string, LabelBucket>();
 
 	const canvasWidth = config.gridWidth * config.scale + config.padding * 2;
 	const canvasHeight = config.gridHeight * config.scale + config.padding * 2;
@@ -240,17 +266,35 @@ export function buildTerminalLayout(
 
 	for (const [panelId, panel] of Object.entries(scanData.panels)) {
 		for (const [side, sideData] of Object.entries(panel.sides)) {
+			const sideKey = side.toUpperCase();
 			for (const strip of sideData.strips) {
 				const syntheticHeight = Math.max(
 					config.terminalSpacing * (strip.terminalCount - 1),
 					config.terminalRadius * 2 + 6,
 				);
+				const normalizedLabels = normalizeLabelArray(
+					strip.terminalLabels,
+					strip.terminalCount,
+				);
+				if (hasAnyLabel(normalizedLabels)) {
+					const bucketKey = `${panelId}|${strip.stripNumber}|${strip.terminalCount}`;
+					const bucket = sharedLabelsByStrip.get(bucketKey) ?? {};
+					if (sideKey === "L") {
+						bucket.L = normalizedLabels;
+					} else if (sideKey === "R") {
+						bucket.R = normalizedLabels;
+					} else {
+						bucket.C = normalizedLabels;
+					}
+					sharedLabelsByStrip.set(bucketKey, bucket);
+				}
 				const geometryWorld = Array.isArray(strip.geometry)
 					? strip.geometry
 					: undefined;
 				stripDrafts.push({
 					base: {
 						...strip,
+						terminalLabels: normalizedLabels,
 						panelId,
 						panelFullName: panel.fullName,
 						panelColor: panel.color,
@@ -266,6 +310,35 @@ export function buildTerminalLayout(
 					geometryWorldBounds: geometryBounds(geometryWorld),
 				});
 			}
+		}
+	}
+
+	for (const draft of stripDrafts) {
+		if (hasAnyLabel(draft.base.terminalLabels)) {
+			continue;
+		}
+
+		const sideKey = draft.base.side.toUpperCase();
+		const bucketKey = `${draft.base.panelId}|${draft.base.stripNumber}|${draft.base.terminalCount}`;
+		const bucket = sharedLabelsByStrip.get(bucketKey);
+		if (!bucket) {
+			continue;
+		}
+
+		let mirrorLabels: string[] | undefined;
+		if (sideKey === "L") {
+			mirrorLabels = bucket.R ?? bucket.C;
+		} else if (sideKey === "R") {
+			mirrorLabels = bucket.L ?? bucket.C;
+		} else {
+			mirrorLabels = bucket.L ?? bucket.R;
+		}
+
+		if (hasAnyLabel(mirrorLabels)) {
+			draft.base.terminalLabels = normalizeLabelArray(
+				mirrorLabels,
+				draft.base.terminalCount,
+			);
 		}
 	}
 
@@ -360,7 +433,7 @@ export function buildTerminalLayout(
 
 		const terminalX = sideTerminalX(strip);
 		const rowSpacing = geometryPxBounds
-			? height / Math.max(1, strip.terminalCount)
+			? Math.max(height / Math.max(1, strip.terminalCount), config.terminalSpacing)
 			: config.terminalSpacing;
 
 		for (
@@ -408,6 +481,25 @@ export function terminalAnchorPoint(
 		y: to.y,
 	};
 	return { start, end };
+}
+
+export function terminalLeadPoint(
+	terminal: TerminalNode,
+	target: Point2D,
+	leadLength = 24,
+): Point2D {
+	if (terminal.side === "L") {
+		return { x: terminal.x - leadLength, y: terminal.y };
+	}
+	if (terminal.side === "R") {
+		return { x: terminal.x + leadLength, y: terminal.y };
+	}
+
+	const towardRight = target.x >= terminal.x;
+	return {
+		x: terminal.x + (towardRight ? leadLength : -leadLength),
+		y: terminal.y,
+	};
 }
 
 export function routeTerminalPath(
@@ -578,27 +670,61 @@ export function terminalBendCount(path: Point2D[]): number {
 
 export function toTerminalRouteSvg(path: Point2D[]): string {
 	if (path.length < 2) return "";
-	let svgPath = `M ${path[0].x} ${path[0].y}`;
-	for (let index = 1; index < path.length - 1; index += 1) {
-		const prev = path[index - 1];
-		const current = path[index];
-		const next = path[index + 1];
-		const dx1 = Math.sign(current.x - prev.x);
-		const dy1 = Math.sign(current.y - prev.y);
-		const dx2 = Math.sign(next.x - current.x);
-		const dy2 = Math.sign(next.y - current.y);
-		if (dx1 === dx2 && dy1 === dy2) {
+	const points = simplifyPath(path);
+	if (points.length < 2) return "";
+
+	let svgPath = `M ${points[0].x} ${points[0].y}`;
+	const preferredRadius = 11;
+
+	for (let index = 1; index < points.length - 1; index += 1) {
+		const prev = points[index - 1];
+		const current = points[index];
+		const next = points[index + 1];
+
+		const inX = current.x - prev.x;
+		const inY = current.y - prev.y;
+		const outX = next.x - current.x;
+		const outY = next.y - current.y;
+		const inLen = Math.hypot(inX, inY);
+		const outLen = Math.hypot(outX, outY);
+		if (inLen < 0.5 || outLen < 0.5) {
 			svgPath += ` L ${current.x} ${current.y}`;
 			continue;
 		}
-		const radius = 6;
-		const ax = current.x - dx1 * radius;
-		const ay = current.y - dy1 * radius;
-		const bx = current.x + dx2 * radius;
-		const by = current.y + dy2 * radius;
-		const sweep = dx1 * dy2 - dy1 * dx2 > 0 ? 1 : 0;
-		svgPath += ` L ${ax} ${ay} A ${radius} ${radius} 0 0 ${sweep} ${bx} ${by}`;
+
+		const inUx = inX / inLen;
+		const inUy = inY / inLen;
+		const outUx = outX / outLen;
+		const outUy = outY / outLen;
+		const dot = inUx * outUx + inUy * outUy;
+		const cross = inUx * outUy - inUy * outUx;
+
+		if (Math.abs(cross) <= 0.001 || dot <= -0.999) {
+			svgPath += ` L ${current.x} ${current.y}`;
+			continue;
+		}
+
+		const cornerRadius = Math.min(
+			preferredRadius,
+			inLen * 0.45,
+			outLen * 0.45,
+		);
+		if (cornerRadius < 1.1) {
+			svgPath += ` L ${current.x} ${current.y}`;
+			continue;
+		}
+
+		const entryX = current.x - inUx * cornerRadius;
+		const entryY = current.y - inUy * cornerRadius;
+		const exitX = current.x + outUx * cornerRadius;
+		const exitY = current.y + outUy * cornerRadius;
+		const sweep = cross > 0 ? 1 : 0;
+		svgPath +=
+			` L ${entryX} ${entryY}` +
+			` A ${cornerRadius} ${cornerRadius} 0 0 ${sweep} ${exitX} ${exitY}`;
 	}
-	svgPath += ` L ${path[path.length - 1].x} ${path[path.length - 1].y}`;
+
+	const last = points[points.length - 1];
+	svgPath += ` L ${last.x} ${last.y}`;
 	return svgPath;
 }

@@ -338,6 +338,13 @@ static class ConduitRouteStubHandlers
     private static readonly string[] TerminalCountKeys = { "TERMINAL_COUNT", "TERMINALS", "TERM_COUNT", "WAYS", "POINT_COUNT" };
     private static readonly string[] StripNumberKeys = { "STRIP_NO", "STRIP_NUM", "STRIP_NUMBER", "NUMBER", "NO" };
     private static readonly string[] TerminalNameTokens = { "TERMINAL", "TERMS", "TB", "TS", "MARSHALLING" };
+    private static readonly string[] JumperNameTokens = { "JUMPER", "JMP" };
+    private static readonly string[] JumperIdKeys = { "JUMPER_ID", "JUMPER", "JMP_ID", "JMP_REF", "JMP" };
+    private static readonly string[] JumperPanelIdKeys = { "PANEL_ID", "PANEL" };
+    private static readonly string[] JumperFromStripKeys = { "FROM_STRIP_ID", "FROM_STRIP", "FROM_TB", "FROM_TB_ID", "STRIP_ID_FROM" };
+    private static readonly string[] JumperToStripKeys = { "TO_STRIP_ID", "TO_STRIP", "TO_TB", "TO_TB_ID", "STRIP_ID_TO" };
+    private static readonly string[] JumperFromTermKeys = { "FROM_TERM", "FROM_TERMINAL", "FROM_POS", "FROM_POSITION", "TERM_FROM", "FROM" };
+    private static readonly string[] JumperToTermKeys = { "TO_TERM", "TO_TERMINAL", "TO_POS", "TO_POSITION", "TERM_TO", "TO" };
     private static readonly Regex TerminalLabelTagRegex = new(
         "^TERM[_-]?0*(\\d+)[_-]?LABEL$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled
@@ -421,6 +428,17 @@ static class ConduitRouteStubHandlers
         public int DefaultTerminalCount { get; }
     }
 
+    private sealed class JumperRecord
+    {
+        public string JumperId { get; init; } = "";
+        public string PanelId { get; init; } = "";
+        public string FromStripId { get; init; } = "";
+        public int FromTerminal { get; init; }
+        public string ToStripId { get; init; } = "";
+        public int ToTerminal { get; init; }
+        public string SourceBlockName { get; init; } = "";
+    }
+
     public static JsonObject HandleTerminalScan(JsonObject payload)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -438,13 +456,18 @@ static class ConduitRouteStubHandlers
         var warnings = new List<string>();
         var seenEntityHandles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var seenStripIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenJumperSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var blockGeometryCache = new Dictionary<string, List<TerminalGeometryPrimitive>>(StringComparer.OrdinalIgnoreCase);
+        var jumpers = new List<JumperRecord>();
 
         var scannedEntities = 0;
         var scannedBlockReferences = 0;
         var skippedNonTerminalBlocks = 0;
+        var jumperCandidateBlocks = 0;
+        var skippedInvalidJumperBlocks = 0;
         var totalStrips = 0;
         var totalTerminals = 0;
+        var totalJumpers = 0;
         var totalLabeledTerminals = 0;
         var totalGeometryPrimitives = 0;
 
@@ -471,6 +494,37 @@ static class ConduitRouteStubHandlers
             {
                 blockName = StringOrDefault(ReadProperty(entity, "Name"), "");
             }
+
+            if (LooksLikeJumperBlock(blockName, attrs))
+            {
+                jumperCandidateBlocks += 1;
+                var jumper = TryParseJumperRecord(
+                    attrs,
+                    blockName,
+                    handle,
+                    terminalProfile.DefaultPanelPrefix
+                );
+                if (jumper is null)
+                {
+                    skippedInvalidJumperBlocks += 1;
+                    warnings.Add(
+                        $"Skipping jumper block {(string.IsNullOrWhiteSpace(blockName) ? "<unknown>" : blockName)} (missing FROM/TO strip or terminal attributes)."
+                    );
+                    return;
+                }
+
+                var jumperSignature =
+                    $"{jumper.PanelId}|{jumper.FromStripId}|{jumper.FromTerminal}|{jumper.ToStripId}|{jumper.ToTerminal}";
+                if (!seenJumperSignatures.Add(jumperSignature))
+                {
+                    return;
+                }
+
+                jumpers.Add(jumper);
+                totalJumpers += 1;
+                return;
+            }
+
             if (!LooksLikeTerminalBlock(blockName, attrs, terminalProfile))
             {
                 skippedNonTerminalBlocks += 1;
@@ -624,6 +678,7 @@ static class ConduitRouteStubHandlers
                     ["units"] = units,
                 },
                 ["panels"] = panels,
+                ["jumpers"] = JumpersToJsonArray(jumpers),
             },
             ["meta"] = new JsonObject
             {
@@ -632,11 +687,14 @@ static class ConduitRouteStubHandlers
                 ["scannedEntities"] = scannedEntities,
                 ["scannedBlockReferences"] = scannedBlockReferences,
                 ["skippedNonTerminalBlocks"] = skippedNonTerminalBlocks,
+                ["jumperCandidateBlocks"] = jumperCandidateBlocks,
+                ["skippedInvalidJumperBlocks"] = skippedInvalidJumperBlocks,
                 ["selectionOnly"] = selectionOnly,
                 ["includeModelspace"] = includeModelspace,
                 ["totalPanels"] = panels.Count,
                 ["totalStrips"] = totalStrips,
                 ["totalTerminals"] = totalTerminals,
+                ["totalJumpers"] = totalJumpers,
                 ["totalLabeledTerminals"] = totalLabeledTerminals,
                 ["totalGeometryPrimitives"] = totalGeometryPrimitives,
                 ["terminalProfile"] = TerminalScanProfileToJson(terminalProfile),
@@ -1286,6 +1344,115 @@ static class ConduitRouteStubHandlers
             labels.Add(labelsByIndex.TryGetValue(index, out var label) ? label : "");
         }
         return labels;
+    }
+
+    private static bool LooksLikeJumperBlock(string blockName, Dictionary<string, string> attrs)
+    {
+        var name = (blockName ?? "").Trim().ToUpperInvariant();
+        if (JumperNameTokens.Any(token => name.Contains(token, StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        var hasFromStrip = !string.IsNullOrWhiteSpace(FirstAttr(attrs, JumperFromStripKeys));
+        var hasToStrip = !string.IsNullOrWhiteSpace(FirstAttr(attrs, JumperToStripKeys));
+        var hasFromTerm = !string.IsNullOrWhiteSpace(FirstAttr(attrs, JumperFromTermKeys));
+        var hasToTerm = !string.IsNullOrWhiteSpace(FirstAttr(attrs, JumperToTermKeys));
+        return hasFromStrip && hasToStrip && hasFromTerm && hasToTerm;
+    }
+
+    private static int? ParseTerminalIndex(string rawValue)
+    {
+        var parsed = ExtractFirstInt(rawValue ?? "");
+        if (!parsed.HasValue || parsed.Value <= 0)
+        {
+            return null;
+        }
+        return ClampInt(parsed.Value, 1, 2000);
+    }
+
+    private static JumperRecord? TryParseJumperRecord(
+        Dictionary<string, string> attrs,
+        string blockName,
+        string handle,
+        string defaultPanelPrefix
+    )
+    {
+        var fromStripId = FirstAttr(attrs, JumperFromStripKeys).Trim().ToUpperInvariant();
+        var toStripId = FirstAttr(attrs, JumperToStripKeys).Trim().ToUpperInvariant();
+        var fromTerminal = ParseTerminalIndex(FirstAttr(attrs, JumperFromTermKeys));
+        var toTerminal = ParseTerminalIndex(FirstAttr(attrs, JumperToTermKeys));
+        if (string.IsNullOrWhiteSpace(fromStripId)
+            || string.IsNullOrWhiteSpace(toStripId)
+            || !fromTerminal.HasValue
+            || !toTerminal.HasValue)
+        {
+            return null;
+        }
+
+        var panelId = FirstAttr(attrs, JumperPanelIdKeys).Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(panelId))
+        {
+            panelId = DerivePanelFromStripId(fromStripId);
+        }
+        if (string.IsNullOrWhiteSpace(panelId))
+        {
+            panelId = DerivePanelFromStripId(toStripId);
+        }
+        if (string.IsNullOrWhiteSpace(panelId))
+        {
+            panelId = string.IsNullOrWhiteSpace(defaultPanelPrefix)
+                ? "PANEL"
+                : defaultPanelPrefix.Trim().ToUpperInvariant();
+        }
+
+        var jumperId = FirstAttr(attrs, JumperIdKeys).Trim();
+        if (string.IsNullOrWhiteSpace(jumperId))
+        {
+            jumperId = string.IsNullOrWhiteSpace(handle)
+                ? $"JMP_{fromStripId}_{fromTerminal.Value}"
+                : $"JMP_{handle}";
+        }
+
+        return new JumperRecord
+        {
+            JumperId = jumperId,
+            PanelId = panelId,
+            FromStripId = fromStripId,
+            FromTerminal = fromTerminal.Value,
+            ToStripId = toStripId,
+            ToTerminal = toTerminal.Value,
+            SourceBlockName = (blockName ?? "").Trim(),
+        };
+    }
+
+    private static JsonArray JumpersToJsonArray(List<JumperRecord> jumpers)
+    {
+        var sorted = jumpers
+            .OrderBy(item => item.PanelId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.FromStripId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.FromTerminal)
+            .ThenBy(item => item.ToStripId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.ToTerminal)
+            .ToList();
+
+        var outNode = new JsonArray();
+        foreach (var jumper in sorted)
+        {
+            outNode.Add(
+                new JsonObject
+                {
+                    ["jumperId"] = jumper.JumperId,
+                    ["panelId"] = jumper.PanelId,
+                    ["fromStripId"] = jumper.FromStripId,
+                    ["fromTerminal"] = jumper.FromTerminal,
+                    ["toStripId"] = jumper.ToStripId,
+                    ["toTerminal"] = jumper.ToTerminal,
+                    ["sourceBlockName"] = jumper.SourceBlockName,
+                }
+            );
+        }
+        return outNode;
     }
 
     private static List<TerminalGeometryPrimitive> ReadTerminalGeometryForInsert(

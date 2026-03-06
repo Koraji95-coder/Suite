@@ -22,9 +22,6 @@ import RouteLoadingFallback from "./routes/RouteLoadingFallback";
 import SignupPage from "./routes/SignupPage";
 
 const AppsRoutePage = lazy(() => import("./routes/apps/AppsRoutePage"));
-const ArchitectureMapRoutePage = lazy(
-	() => import("./routes/architecture/ArchitectureMapRoutePage"),
-);
 const AgentRoutePage = lazy(() => import("./routes/agent/AgentRoutePage"));
 const CalendarRoutePage = lazy(() => import("./routes/CalendarRoutePage"));
 const CommandCenterPage = lazy(() => import("./routes/CommandCenterPage"));
@@ -177,10 +174,6 @@ export default function App() {
 									<Route
 										path="agent"
 										element={withRouteSuspense(<AgentRoutePage />)}
-									/>
-									<Route
-										path="architecture-map"
-										element={withRouteSuspense(<ArchitectureMapRoutePage />)}
 									/>
 									<Route
 										path="settings"

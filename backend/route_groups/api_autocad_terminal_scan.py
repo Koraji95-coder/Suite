@@ -802,6 +802,36 @@ def _strip_number(strip_id: str, attrs: Dict[str, str], strip_number_keys: Seque
     return parsed if parsed is not None else 1
 
 
+def _next_unique_strip_id(strip_id: str, seen_strip_ids: set[str]) -> str:
+    """Prefer side-index increment (RP1L1 -> RP1L2) before suffix fallback."""
+    normalized = _safe_upper(strip_id)
+    if not normalized:
+        normalized = "STRIP"
+
+    side_suffix_match = re.match(r"^(.*?)([LRC])(\d+)$", normalized)
+    if side_suffix_match:
+        prefix = _safe_upper(side_suffix_match.group(1))
+        side = _safe_upper(side_suffix_match.group(2))
+        try:
+            number = int(side_suffix_match.group(3))
+        except Exception:
+            number = 1
+
+        candidate = normalized
+        next_number = max(1, number)
+        while candidate in seen_strip_ids:
+            next_number += 1
+            candidate = f"{prefix}{side}{next_number}"
+        return candidate
+
+    suffix = 2
+    candidate = f"{normalized}_{suffix}"
+    while candidate in seen_strip_ids:
+        suffix += 1
+        candidate = f"{normalized}_{suffix}"
+    return candidate
+
+
 def _terminal_count(
     attrs: Dict[str, str],
     terminal_count_keys: Sequence[str],
@@ -896,6 +926,150 @@ def _extract_jumper_record(
         "to_strip_id": to_strip,
         "to_terminal": to_terminal,
         "source_block_name": _safe_str(block_name),
+    }
+
+
+def _geometry_vertical_bounds(geometry: Any) -> Optional[Tuple[float, float]]:
+    if not isinstance(geometry, list) or not geometry:
+        return None
+    min_y = float("inf")
+    max_y = float("-inf")
+    found = False
+    for primitive in geometry:
+        if not isinstance(primitive, dict):
+            continue
+        points = primitive.get("points")
+        if not isinstance(points, list):
+            continue
+        for point in points:
+            if not isinstance(point, dict):
+                continue
+            y = _safe_float(point.get("y"))
+            if y is None or not math.isfinite(y):
+                continue
+            found = True
+            min_y = min(min_y, y)
+            max_y = max(max_y, y)
+    if not found:
+        return None
+    return (min_y, max_y)
+
+
+def _strip_center(record: Dict[str, Any]) -> Tuple[float, float]:
+    x = _safe_float(record.get("x"))
+    y = _safe_float(record.get("y"))
+    if x is None:
+        x = 0.0
+    if y is None:
+        y = 0.0
+
+    geometry_bounds = _geometry_vertical_bounds(record.get("geometry"))
+    if geometry_bounds is None:
+        return (x, y)
+
+    min_y, max_y = geometry_bounds
+    if not math.isfinite(min_y) or not math.isfinite(max_y):
+        return (x, y)
+    return (x, (min_y + max_y) / 2.0)
+
+
+def _infer_terminal_index_from_y(record: Dict[str, Any], y_value: float) -> int:
+    terminal_count = max(1, min(2000, int(record.get("terminal_count") or 1)))
+    geometry_bounds = _geometry_vertical_bounds(record.get("geometry"))
+    if geometry_bounds is not None:
+        min_y, max_y = geometry_bounds
+        span = max_y - min_y
+        if span > 1e-6 and math.isfinite(span):
+            normalized = (y_value - min_y) / span
+            normalized = max(0.0, min(1.0, normalized))
+            return max(1, min(terminal_count, int(round(normalized * (terminal_count - 1))) + 1))
+
+    strip_y = _safe_float(record.get("y"))
+    if strip_y is None or not math.isfinite(strip_y):
+        return max(1, min(terminal_count, int(round(terminal_count / 2.0))))
+
+    guessed = int(round(((y_value - strip_y) / 12.0) + 1.0))
+    return max(1, min(terminal_count, guessed))
+
+
+def _resolve_positional_jumper_record(
+    *,
+    candidate: Dict[str, Any],
+    records: Sequence[Dict[str, Any]],
+    default_panel_prefix: str,
+) -> Optional[Dict[str, Any]]:
+    x = _safe_float(candidate.get("x"))
+    y = _safe_float(candidate.get("y"))
+    if x is None or y is None or not math.isfinite(x) or not math.isfinite(y):
+        return None
+    if len(records) < 2:
+        return None
+
+    panel_hint = _safe_upper(candidate.get("panel_hint"))
+    eligible_records = list(records)
+    if panel_hint:
+        filtered = [
+            record
+            for record in records
+            if _safe_upper(record.get("panel_id")) == panel_hint
+        ]
+        if len(filtered) >= 2:
+            eligible_records = filtered
+    if len(eligible_records) < 2:
+        return None
+
+    def _distance_to_candidate(record: Dict[str, Any]) -> float:
+        center_x, center_y = _strip_center(record)
+        return math.hypot(center_x - x, center_y - y)
+
+    first_strip = min(eligible_records, key=_distance_to_candidate)
+    first_side = _normalize_side(_safe_str(first_strip.get("side")))
+    first_panel = _safe_upper(first_strip.get("panel_id"))
+
+    second_candidates = [
+        record
+        for record in eligible_records
+        if _safe_upper(record.get("strip_id")) != _safe_upper(first_strip.get("strip_id"))
+    ]
+    if not second_candidates:
+        return None
+
+    def _second_score(record: Dict[str, Any]) -> float:
+        score = _distance_to_candidate(record)
+        panel_penalty = 0.0 if _safe_upper(record.get("panel_id")) == first_panel else 250.0
+        side_penalty = 0.0 if _normalize_side(_safe_str(record.get("side"))) != first_side else 35.0
+        return score + panel_penalty + side_penalty
+
+    second_strip = min(second_candidates, key=_second_score)
+
+    from_strip_id = _safe_upper(first_strip.get("strip_id"))
+    to_strip_id = _safe_upper(second_strip.get("strip_id"))
+    if not from_strip_id or not to_strip_id or from_strip_id == to_strip_id:
+        return None
+
+    panel_id = (
+        panel_hint
+        or _safe_upper(first_strip.get("panel_id"))
+        or _safe_upper(second_strip.get("panel_id"))
+        or _safe_upper(default_panel_prefix)
+        or "PANEL"
+    )
+    jumper_id = _safe_str(candidate.get("jumper_id"))
+    handle = _safe_str(candidate.get("handle"))
+    if not jumper_id:
+        jumper_id = f"JMP_{handle or from_strip_id + '_' + str(_infer_terminal_index_from_y(first_strip, y))}"
+
+    return {
+        "jumper_id": jumper_id,
+        "panel_id": panel_id,
+        "from_strip_id": from_strip_id,
+        "from_terminal": _infer_terminal_index_from_y(first_strip, y),
+        "to_strip_id": to_strip_id,
+        "to_terminal": _infer_terminal_index_from_y(second_strip, y),
+        "source_block_name": _safe_str(candidate.get("block_name")),
+        "resolution": "position",
+        "x": x,
+        "y": y,
     }
 
 
@@ -1038,6 +1212,7 @@ def scan_terminal_strips(
 
     records: List[Dict[str, Any]] = []
     jumpers: List[Dict[str, Any]] = []
+    pending_positional_jumpers: List[Dict[str, Any]] = []
     geometry_cache: Dict[str, List[Dict[str, Any]]] = {}
     seen_strip_ids: set[str] = set()
     seen_jumper_signatures: set[str] = set()
@@ -1052,6 +1227,8 @@ def scan_terminal_strips(
     terminal_candidate_blocks = 0
     jumper_candidate_blocks = 0
     skipped_invalid_jumper_blocks = 0
+    positional_jumper_candidates = 0
+    resolved_positional_jumpers = 0
     total_labeled_terminals = 0
     total_geometry_primitives = 0
     scanned_block_name_counts: Dict[str, int] = {}
@@ -1067,6 +1244,8 @@ def scan_terminal_strips(
         nonlocal terminal_candidate_blocks
         nonlocal jumper_candidate_blocks
         nonlocal skipped_invalid_jumper_blocks
+        nonlocal positional_jumper_candidates
+        nonlocal resolved_positional_jumpers
         nonlocal total_labeled_terminals
         nonlocal total_geometry_primitives
         scanned_entities += 1
@@ -1098,10 +1277,24 @@ def scan_terminal_strips(
                 default_panel_prefix=str(profile["defaultPanelPrefix"]),
             )
             if jumper_record is None:
+                insertion = _extract_insertion_point(entity)
+                if insertion is not None:
+                    positional_jumper_candidates += 1
+                    pending_positional_jumpers.append(
+                        {
+                            "x": insertion[0],
+                            "y": insertion[1],
+                            "panel_hint": _safe_upper(_first_attr(attrs, JUMPER_PANEL_ID_KEYS)),
+                            "jumper_id": _safe_str(_first_attr(attrs, JUMPER_ID_KEYS)),
+                            "handle": handle,
+                            "block_name": _safe_str(block_name),
+                        }
+                    )
+                    return
                 skipped_invalid_jumper_blocks += 1
                 warnings.append(
                     "Skipping jumper block "
-                    f"{block_name or '<unknown>'} (missing FROM/TO strip or terminal attributes)."
+                    f"{block_name or '<unknown>'} (missing FROM/TO attributes and insertion point)."
                 )
                 return
 
@@ -1145,12 +1338,7 @@ def scan_terminal_strips(
         strip_id = _safe_upper(strip_id_raw) or _safe_upper(block_name) or f"STRIP_{handle or scanned_block_refs}"
 
         if strip_id in seen_strip_ids:
-            suffix = 2
-            candidate = f"{strip_id}_{suffix}"
-            while candidate in seen_strip_ids:
-                suffix += 1
-                candidate = f"{strip_id}_{suffix}"
-            strip_id = candidate
+            strip_id = _next_unique_strip_id(strip_id, seen_strip_ids)
         seen_strip_ids.add(strip_id)
 
         panel_id_raw = _first_attr(attrs, profile["panelIdKeys"])
@@ -1214,6 +1402,31 @@ def scan_terminal_strips(
                 continue
             _try_record_entity(entity)
 
+    for candidate in pending_positional_jumpers:
+        resolved = _resolve_positional_jumper_record(
+            candidate=candidate,
+            records=records,
+            default_panel_prefix=str(profile["defaultPanelPrefix"]),
+        )
+        if resolved is None:
+            skipped_invalid_jumper_blocks += 1
+            warnings.append(
+                "Skipping jumper block "
+                f"{candidate.get('block_name') or '<unknown>'} "
+                "(could not resolve nearest strip pair from insertion point)."
+            )
+            continue
+        signature = (
+            f"{resolved['panel_id']}|{resolved['from_strip_id']}|"
+            f"{resolved['from_terminal']}|{resolved['to_strip_id']}|"
+            f"{resolved['to_terminal']}"
+        )
+        if signature in seen_jumper_signatures:
+            continue
+        seen_jumper_signatures.add(signature)
+        jumpers.append(resolved)
+        resolved_positional_jumpers += 1
+
     panels: Dict[str, Dict[str, Any]] = {}
     for record in sorted(
         records,
@@ -1259,8 +1472,18 @@ def scan_terminal_strips(
         for side in panel.get("sides", {}).values()
         for strip in side.get("strips", [])
     )
-    jumpers_payload = [
-        {
+    jumpers_payload: List[Dict[str, Any]] = []
+    for jumper in sorted(
+        jumpers,
+        key=lambda item: (
+            _safe_upper(item.get("panel_id")),
+            _safe_upper(item.get("from_strip_id")),
+            int(item.get("from_terminal") or 0),
+            _safe_upper(item.get("to_strip_id")),
+            int(item.get("to_terminal") or 0),
+        ),
+    ):
+        payload: Dict[str, Any] = {
             "jumperId": _safe_str(jumper.get("jumper_id")),
             "panelId": _safe_str(jumper.get("panel_id")),
             "fromStripId": _safe_str(jumper.get("from_strip_id")),
@@ -1268,18 +1491,14 @@ def scan_terminal_strips(
             "toStripId": _safe_str(jumper.get("to_strip_id")),
             "toTerminal": int(jumper.get("to_terminal") or 0),
             "sourceBlockName": _safe_str(jumper.get("source_block_name")),
+            "resolution": _safe_str(jumper.get("resolution")) or "attribute",
         }
-        for jumper in sorted(
-            jumpers,
-            key=lambda item: (
-                _safe_upper(item.get("panel_id")),
-                _safe_upper(item.get("from_strip_id")),
-                int(item.get("from_terminal") or 0),
-                _safe_upper(item.get("to_strip_id")),
-                int(item.get("to_terminal") or 0),
-            ),
-        )
-    ]
+        x = _safe_float(jumper.get("x"))
+        y = _safe_float(jumper.get("y"))
+        if x is not None and y is not None and math.isfinite(x) and math.isfinite(y):
+            payload["x"] = float(x)
+            payload["y"] = float(y)
+        jumpers_payload.append(payload)
     total_jumpers = len(jumpers_payload)
 
     no_data_message = (
@@ -1316,6 +1535,8 @@ def scan_terminal_strips(
             "terminalCandidateBlocks": terminal_candidate_blocks,
             "jumperCandidateBlocks": jumper_candidate_blocks,
             "skippedInvalidJumperBlocks": skipped_invalid_jumper_blocks,
+            "positionalJumperCandidates": positional_jumper_candidates,
+            "resolvedPositionalJumpers": resolved_positional_jumpers,
             "selectionOnly": bool(selection_only),
             "includeModelspace": bool(include_modelspace),
             "totalPanels": len(panels),
@@ -1325,6 +1546,310 @@ def scan_terminal_strips(
             "totalLabeledTerminals": total_labeled_terminals,
             "totalGeometryPrimitives": total_geometry_primitives,
             "topScannedBlockNames": top_scanned_block_names,
+            "terminalProfile": _terminal_profile_summary(profile),
+        },
+        "warnings": warnings,
+    }
+
+
+def _normalize_terminal_label_values(raw_labels: Any, terminal_count: int) -> List[str]:
+    count = max(1, min(2000, int(terminal_count or 1)))
+    labels: List[str] = []
+    for index in range(count):
+        value = ""
+        if isinstance(raw_labels, list) and index < len(raw_labels):
+            value = _safe_str(raw_labels[index])
+        labels.append(value if value else str(index + 1))
+    return labels
+
+
+def _build_target_strip_label_map(strips_payload: Any) -> Dict[str, List[str]]:
+    if not isinstance(strips_payload, list):
+        return {}
+
+    target: Dict[str, List[str]] = {}
+    for strip in strips_payload:
+        if not isinstance(strip, dict):
+            continue
+        strip_id = _safe_upper(strip.get("stripId") or strip.get("strip_id"))
+        if not strip_id:
+            continue
+        terminal_count = _safe_int(
+            strip.get("terminalCount", strip.get("terminal_count"))
+        )
+        labels_raw = strip.get("labels")
+        if terminal_count is None or terminal_count <= 0:
+            if isinstance(labels_raw, list) and len(labels_raw) > 0:
+                terminal_count = len(labels_raw)
+            else:
+                terminal_count = DEFAULT_TERMINAL_COUNT
+        target[strip_id] = _normalize_terminal_label_values(labels_raw, terminal_count)
+    return target
+
+
+def _write_terminal_labels_to_entity(
+    *,
+    entity: Any,
+    dyn_fn: Any,
+    desired_labels: Sequence[str],
+) -> Dict[str, int]:
+    updated = 0
+    unchanged = 0
+    missing = 0
+    failed = 0
+
+    try:
+        raw_attrs = entity.GetAttributes()
+    except Exception:
+        return {
+            "updated": 0,
+            "unchanged": 0,
+            "missing": len(desired_labels),
+            "failed": 0,
+        }
+
+    attrs_by_index: Dict[int, Any] = {}
+    for attr in _iter_attribute_objects(raw_attrs, dyn_fn):
+        tag = _safe_upper(getattr(attr, "TagString", ""))
+        match = TERMINAL_LABEL_TAG_PATTERN.fullmatch(tag)
+        if not match:
+            continue
+        try:
+            index = int(match.group(1))
+        except Exception:
+            continue
+        if index <= 0:
+            continue
+        attrs_by_index[index] = attr
+
+    for index, next_value in enumerate(desired_labels, start=1):
+        attr = attrs_by_index.get(index)
+        if attr is None:
+            missing += 1
+            continue
+
+        try:
+            current_value = _safe_str(getattr(attr, "TextString", ""))
+        except Exception:
+            current_value = ""
+
+        if current_value == next_value:
+            unchanged += 1
+            continue
+
+        try:
+            attr.TextString = next_value
+            try:
+                attr.Update()
+            except Exception:
+                pass
+            updated += 1
+        except Exception:
+            failed += 1
+
+    if updated > 0:
+        try:
+            entity.Update()
+        except Exception:
+            pass
+
+    return {
+        "updated": updated,
+        "unchanged": unchanged,
+        "missing": missing,
+        "failed": failed,
+    }
+
+
+def sync_terminal_strip_labels(
+    *,
+    doc: Any,
+    modelspace: Any,
+    dyn_fn: Any,
+    strips_payload: Any = None,
+    include_modelspace: bool = True,
+    selection_only: bool = False,
+    max_entities: int = 50000,
+    terminal_profile: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    profile = _resolve_terminal_profile(terminal_profile)
+    target_strip_labels = _build_target_strip_label_map(strips_payload)
+    target_strip_ids = set(target_strip_labels.keys())
+    unresolved_target_ids = set(target_strip_ids)
+
+    warnings: List[str] = []
+    seen_entity_handles: set[str] = set()
+    matched_strips: set[str] = set()
+    updated_strips: set[str] = set()
+
+    scanned_entities = 0
+    scanned_block_references = 0
+    skipped_non_block_entities = 0
+    skipped_non_terminal_blocks = 0
+    terminal_candidate_blocks = 0
+    matched_terminal_blocks = 0
+    updated_blocks = 0
+    updated_attributes = 0
+    unchanged_attributes = 0
+    missing_attributes = 0
+    failed_attributes = 0
+
+    selection_entities = _collect_selection_entities(doc, dyn_fn) if selection_only else []
+
+    def _desired_labels_for_strip(strip_id: str, terminal_count: int) -> Optional[List[str]]:
+        if target_strip_labels:
+            labels = target_strip_labels.get(strip_id)
+            if labels is None:
+                return None
+            return _normalize_terminal_label_values(labels, terminal_count)
+        return _normalize_terminal_label_values([], terminal_count)
+
+    def _try_sync_entity(entity: Any) -> None:
+        nonlocal scanned_entities
+        nonlocal scanned_block_references
+        nonlocal skipped_non_block_entities
+        nonlocal skipped_non_terminal_blocks
+        nonlocal terminal_candidate_blocks
+        nonlocal matched_terminal_blocks
+        nonlocal updated_blocks
+        nonlocal updated_attributes
+        nonlocal unchanged_attributes
+        nonlocal missing_attributes
+        nonlocal failed_attributes
+
+        scanned_entities += 1
+        handle = _handle_for_entity(entity)
+        if handle and handle in seen_entity_handles:
+            return
+        if handle:
+            seen_entity_handles.add(handle)
+
+        object_name = _safe_upper(getattr(entity, "ObjectName", ""))
+        if "BLOCKREFERENCE" not in object_name:
+            skipped_non_block_entities += 1
+            return
+        scanned_block_references += 1
+
+        attrs = _attributes_for_entity(entity, dyn_fn)
+        block_name = _block_name_for_entity(entity, dyn_fn)
+        if _looks_like_jumper_block(block_name, attrs):
+            skipped_non_terminal_blocks += 1
+            return
+
+        is_terminal = _is_terminal_block(
+            block_name,
+            attrs,
+            terminal_tag_keys=profile["terminalTagKeys"],
+            terminal_name_tokens=profile["terminalNameTokens"],
+            block_name_allow_list=profile["blockNameAllowList"],
+            strip_id_keys=profile["stripIdKeys"],
+            terminal_count_keys=profile["terminalCountKeys"],
+            side_keys=profile["sideKeys"],
+            require_strip_id=bool(profile["requireStripId"]),
+            require_terminal_count=bool(profile["requireTerminalCount"]),
+            require_side=bool(profile["requireSide"]),
+        )
+        if not is_terminal:
+            skipped_non_terminal_blocks += 1
+            return
+        terminal_candidate_blocks += 1
+
+        strip_id = _safe_upper(_first_attr(attrs, profile["stripIdKeys"]))
+        if not strip_id:
+            skipped_non_terminal_blocks += 1
+            return
+
+        terminal_count = _terminal_count(
+            attrs,
+            profile["terminalCountKeys"],
+            int(profile["defaultTerminalCount"]),
+        )
+        desired_labels = _desired_labels_for_strip(strip_id, terminal_count)
+        if desired_labels is None:
+            return
+
+        unresolved_target_ids.discard(strip_id)
+        matched_terminal_blocks += 1
+        matched_strips.add(strip_id)
+
+        write_result = _write_terminal_labels_to_entity(
+            entity=entity,
+            dyn_fn=dyn_fn,
+            desired_labels=desired_labels,
+        )
+        updated_attributes += int(write_result.get("updated") or 0)
+        unchanged_attributes += int(write_result.get("unchanged") or 0)
+        missing_attributes += int(write_result.get("missing") or 0)
+        failed_attributes += int(write_result.get("failed") or 0)
+        if int(write_result.get("updated") or 0) > 0:
+            updated_blocks += 1
+            updated_strips.add(strip_id)
+
+    for entity in selection_entities:
+        _try_sync_entity(entity)
+
+    if include_modelspace:
+        try:
+            modelspace_count = int(modelspace.Count)
+        except Exception:
+            modelspace_count = 0
+        capped_count = min(modelspace_count, max_entities)
+        if modelspace_count > max_entities:
+            warnings.append(
+                f"ModelSpace scan capped at {max_entities} entities (of {modelspace_count})."
+            )
+        for index in range(capped_count):
+            try:
+                entity = dyn_fn(modelspace.Item(index))
+            except Exception:
+                continue
+            _try_sync_entity(entity)
+
+    if unresolved_target_ids:
+        unresolved_sample = ", ".join(sorted(unresolved_target_ids)[:8])
+        warnings.append(
+            f"{len(unresolved_target_ids)} target strip(s) were not matched in drawing: {unresolved_sample}"
+        )
+
+    if target_strip_ids and matched_terminal_blocks == 0:
+        success = False
+        code = "NO_TARGET_STRIPS_MATCHED"
+        message = "No terminal strips matched requested label-sync targets."
+    elif terminal_candidate_blocks == 0:
+        success = False
+        code = "NO_TERMINAL_STRIPS_FOUND"
+        message = "No terminal-strip block references were found for label sync."
+    else:
+        success = True
+        code = ""
+        message = (
+            f"Processed {matched_terminal_blocks} terminal block(s): "
+            f"{updated_blocks} block(s) updated, {unchanged_attributes} attribute value(s) unchanged."
+        )
+
+    return {
+        "success": success,
+        "code": code,
+        "message": message,
+        "data": {
+            "updatedStrips": len(updated_strips),
+            "matchedStrips": len(matched_strips),
+            "targetStrips": len(target_strip_ids),
+            "matchedBlocks": matched_terminal_blocks,
+            "updatedBlocks": updated_blocks,
+            "updatedAttributes": updated_attributes,
+            "unchangedAttributes": unchanged_attributes,
+            "missingAttributes": missing_attributes,
+            "failedAttributes": failed_attributes,
+        },
+        "meta": {
+            "scannedEntities": scanned_entities,
+            "scannedBlockReferences": scanned_block_references,
+            "skippedNonBlockEntities": skipped_non_block_entities,
+            "skippedNonTerminalBlocks": skipped_non_terminal_blocks,
+            "terminalCandidateBlocks": terminal_candidate_blocks,
+            "selectionOnly": bool(selection_only),
+            "includeModelspace": bool(include_modelspace),
             "terminalProfile": _terminal_profile_summary(profile),
         },
         "warnings": warnings,

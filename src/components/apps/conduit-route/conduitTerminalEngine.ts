@@ -1,6 +1,7 @@
-import type { Point2D } from "./conduitRouteTypes";
+import type { Obstacle, Point2D } from "./conduitRouteTypes";
 import { TERMINAL_LAYOUT_CONFIG } from "./conduitTerminalData";
 import type {
+	TerminalCanvasTransform,
 	TerminalGeometryPrimitive,
 	TerminalLayoutConfig,
 	TerminalLayoutResult,
@@ -41,6 +42,16 @@ interface LabelBucket {
 	L?: string[];
 	R?: string[];
 	C?: string[];
+}
+
+interface WorldOrientation {
+	mode: "native" | "rotated_cw_90";
+	sourceMinX: number;
+	sourceMaxX: number;
+	sourceMinY: number;
+	sourceMaxY: number;
+	centerX: number;
+	centerY: number;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -187,6 +198,16 @@ function mapGeometryToCanvas(
 }
 
 function sideTerminalX(strip: TerminalStripLayout): number {
+	const geometryColumns = strip.terminalSideColumnsX;
+	if (strip.side === "L" && Number.isFinite(geometryColumns?.L)) {
+		return Number(geometryColumns?.L);
+	}
+	if (strip.side === "R" && Number.isFinite(geometryColumns?.R)) {
+		return Number(geometryColumns?.R);
+	}
+	if (Number.isFinite(geometryColumns?.C)) {
+		return Number(geometryColumns?.C);
+	}
 	if (strip.side === "L") {
 		return strip.px + strip.width * 0.16;
 	}
@@ -194,6 +215,182 @@ function sideTerminalX(strip: TerminalStripLayout): number {
 		return strip.px + strip.width * 0.84;
 	}
 	return strip.px + strip.width * 0.5;
+}
+
+function stripVisualBounds(strip: TerminalStripLayout): Bounds2D {
+	const geometry = geometryBounds(strip.geometryPx);
+	if (geometry) {
+		return geometry;
+	}
+	return {
+		minX: strip.px,
+		minY: strip.py,
+		maxX: strip.px + strip.width,
+		maxY: strip.py + strip.height,
+	};
+}
+
+function sortAndDedupe(values: number[], tolerance: number): number[] {
+	if (values.length === 0) {
+		return [];
+	}
+	const sorted = [...values].sort((a, b) => a - b);
+	const output: number[] = [sorted[0]];
+	for (let index = 1; index < sorted.length; index += 1) {
+		const candidate = sorted[index];
+		if (Math.abs(candidate - output[output.length - 1]) > tolerance) {
+			output.push(candidate);
+		}
+	}
+	return output;
+}
+
+function defaultRowCenters(
+	bounds: Bounds2D,
+	terminalCount: number,
+): number[] {
+	const centers: number[] = [];
+	const count = Math.max(1, terminalCount);
+	const span = Math.max(1, bounds.maxY - bounds.minY);
+	for (let index = 0; index < count; index += 1) {
+		centers.push(bounds.minY + ((index + 0.5) / count) * span);
+	}
+	return centers;
+}
+
+function bestWindowByReference(
+	values: number[],
+	targetCount: number,
+	reference: number[],
+): number[] {
+	if (values.length <= targetCount) {
+		return values;
+	}
+	let bestStart = 0;
+	let bestScore = Number.POSITIVE_INFINITY;
+	for (let start = 0; start <= values.length - targetCount; start += 1) {
+		let score = 0;
+		for (let index = 0; index < targetCount; index += 1) {
+			score += Math.abs(values[start + index] - reference[index]);
+		}
+		if (score < bestScore) {
+			bestScore = score;
+			bestStart = start;
+		}
+	}
+	return values.slice(bestStart, bestStart + targetCount);
+}
+
+function deriveStripTerminalAnchors(
+	strip: TerminalStripLayout,
+): {
+	rowCentersY: number[];
+	sideColumnsX: { L?: number; R?: number; C?: number };
+} {
+	const bounds = stripVisualBounds(strip);
+	const terminalCount = Math.max(1, strip.terminalCount);
+	const defaultRows = defaultRowCenters(bounds, terminalCount);
+	const defaultColumns = {
+		L: strip.px + strip.width * 0.16,
+		R: strip.px + strip.width * 0.84,
+		C: strip.px + strip.width * 0.5,
+	};
+
+	if (!Array.isArray(strip.geometryPx) || strip.geometryPx.length === 0) {
+		return { rowCentersY: defaultRows, sideColumnsX: defaultColumns };
+	}
+
+	const axisTolerance = clamp(Math.min(strip.width, strip.height) * 0.02, 0.8, 2.5);
+	const minHorizontalLength = Math.max(8, strip.width * 0.3);
+	const minVerticalLength = Math.max(8, strip.height * 0.3);
+	const horizontalRailsY: number[] = [];
+	const verticalRailsX: number[] = [];
+
+	const pushSegment = (a: Point2D, b: Point2D) => {
+		const dx = b.x - a.x;
+		const dy = b.y - a.y;
+		const length = Math.hypot(dx, dy);
+		if (length <= 1e-3) {
+			return;
+		}
+		if (Math.abs(dy) <= axisTolerance && length >= minHorizontalLength) {
+			horizontalRailsY.push((a.y + b.y) * 0.5);
+		}
+		if (Math.abs(dx) <= axisTolerance && length >= minVerticalLength) {
+			verticalRailsX.push((a.x + b.x) * 0.5);
+		}
+	};
+
+	for (const primitive of strip.geometryPx) {
+		if (!Array.isArray(primitive.points) || primitive.points.length < 2) {
+			continue;
+		}
+		for (let index = 1; index < primitive.points.length; index += 1) {
+			pushSegment(primitive.points[index - 1], primitive.points[index]);
+		}
+		if (primitive.closed && primitive.points.length > 2) {
+			pushSegment(
+				primitive.points[primitive.points.length - 1],
+				primitive.points[0],
+			);
+		}
+	}
+
+	const dedupeToleranceY = clamp((bounds.maxY - bounds.minY) / 160, 0.8, 3);
+	const dedupeToleranceX = clamp((bounds.maxX - bounds.minX) / 120, 0.8, 3);
+	const railY = sortAndDedupe(horizontalRailsY, dedupeToleranceY);
+	const railX = sortAndDedupe(verticalRailsX, dedupeToleranceX);
+
+	let rowCenters = defaultRows;
+	if (railY.length >= terminalCount + 1) {
+		let bestStart = 0;
+		let bestSpan = Number.NEGATIVE_INFINITY;
+		const window = terminalCount + 1;
+		for (let start = 0; start <= railY.length - window; start += 1) {
+			const span = railY[start + window - 1] - railY[start];
+			if (span > bestSpan) {
+				bestSpan = span;
+				bestStart = start;
+			}
+		}
+		const selectedRails = railY.slice(bestStart, bestStart + window);
+		rowCenters = selectedRails
+			.slice(0, terminalCount)
+			.map((value, index) => (value + selectedRails[index + 1]) * 0.5);
+	} else if (railY.length >= 2) {
+		const intervalCenters = railY
+			.slice(0, railY.length - 1)
+			.map((value, index) => (value + railY[index + 1]) * 0.5);
+		if (intervalCenters.length >= terminalCount) {
+			rowCenters = bestWindowByReference(
+				intervalCenters,
+				terminalCount,
+				defaultRows,
+			);
+		}
+	}
+
+	const sideColumns = { ...defaultColumns };
+	if (railX.length >= 2) {
+		sideColumns.L = (railX[0] + railX[1]) * 0.5;
+		sideColumns.R = (railX[railX.length - 2] + railX[railX.length - 1]) * 0.5;
+	}
+	if (railX.length >= 4) {
+		const midRight = Math.floor(railX.length / 2);
+		const midLeft = Math.max(0, midRight - 1);
+		sideColumns.C = (railX[midLeft] + railX[midRight]) * 0.5;
+	}
+
+	const clampX = (value: number) => clamp(value, bounds.minX, bounds.maxX);
+	const clampY = (value: number) => clamp(value, bounds.minY, bounds.maxY);
+	return {
+		rowCentersY: rowCenters.map(clampY),
+		sideColumnsX: {
+			L: clampX(sideColumns.L),
+			R: clampX(sideColumns.R),
+			C: clampX(sideColumns.C),
+		},
+	};
 }
 
 function hasAnyLabel(labels: string[] | undefined): boolean {
@@ -204,14 +401,11 @@ function hasAnyLabel(labels: string[] | undefined): boolean {
 }
 
 function normalizeLabelArray(
-	labels: string[] | undefined,
+	_labels: string[] | undefined,
 	terminalCount: number,
 ): string[] {
 	const count = Math.max(1, terminalCount);
-	const out = Array.from({ length: count }, (_, index) => {
-		const raw = labels?.[index];
-		return typeof raw === "string" ? raw : "";
-	});
+	const out = Array.from({ length: count }, (_, index) => String(index + 1));
 	return out;
 }
 
@@ -243,6 +437,38 @@ function simplifyPath(path: Point2D[]): Point2D[] {
 	return simplified;
 }
 
+function rotateWorldPointClockwise(
+	point: Point2D,
+	params: { centerX: number; centerY: number },
+): Point2D {
+	const { centerX, centerY } = params;
+	return {
+		x: centerX + (point.y - centerY),
+		y: centerY - (point.x - centerX),
+	};
+}
+
+function rotateWorldPointCounterClockwise(
+	point: Point2D,
+	params: { centerX: number; centerY: number },
+): Point2D {
+	const { centerX, centerY } = params;
+	return {
+		x: centerX - (point.y - centerY),
+		y: centerY + (point.x - centerX),
+	};
+}
+
+function orientWorldPoint(point: Point2D, orientation: WorldOrientation): Point2D {
+	if (orientation.mode === "rotated_cw_90") {
+		return rotateWorldPointClockwise(point, {
+			centerX: orientation.centerX,
+			centerY: orientation.centerY,
+		});
+	}
+	return point;
+}
+
 export function buildTerminalLayout(
 	scanData: TerminalScanData,
 	config: TerminalLayoutConfig = TERMINAL_LAYOUT_CONFIG,
@@ -250,9 +476,8 @@ export function buildTerminalLayout(
 	const strips: TerminalStripLayout[] = [];
 	const terminals: TerminalNode[] = [];
 	const sharedLabelsByStrip = new Map<string, LabelBucket>();
-
-	const canvasWidth = config.gridWidth * config.scale + config.padding * 2;
-	const canvasHeight = config.gridHeight * config.scale + config.padding * 2;
+	const baseCanvasWidth = config.gridWidth * config.scale + config.padding * 2;
+	const baseCanvasHeight = config.gridHeight * config.scale + config.padding * 2;
 
 	const stripDrafts: Array<{
 		base: Omit<TerminalStripLayout, "px" | "py" | "xLabel" | "yLabel">;
@@ -342,7 +567,7 @@ export function buildTerminalLayout(
 		}
 	}
 
-	const worldBounds = stripDrafts.flatMap((draft) => {
+	const sourceWorldBounds = stripDrafts.flatMap((draft) => {
 		const bounds: Bounds2D[] = [
 			{
 				minX: draft.rawX,
@@ -357,53 +582,156 @@ export function buildTerminalLayout(
 		return bounds;
 	});
 
-	const minX =
-		worldBounds.length > 0
-			? Math.min(...worldBounds.map((bounds) => bounds.minX))
+	const sourceMinX =
+		sourceWorldBounds.length > 0
+			? Math.min(...sourceWorldBounds.map((bounds) => bounds.minX))
 			: 0;
-	const maxX =
-		worldBounds.length > 0
-			? Math.max(...worldBounds.map((bounds) => bounds.maxX))
+	const sourceMaxX =
+		sourceWorldBounds.length > 0
+			? Math.max(...sourceWorldBounds.map((bounds) => bounds.maxX))
 			: 1;
-	const minY =
-		worldBounds.length > 0
-			? Math.min(...worldBounds.map((bounds) => bounds.minY))
+	const sourceMinY =
+		sourceWorldBounds.length > 0
+			? Math.min(...sourceWorldBounds.map((bounds) => bounds.minY))
 			: 0;
-	const maxY =
-		worldBounds.length > 0
-			? Math.max(...worldBounds.map((bounds) => bounds.maxY))
+	const sourceMaxY =
+		sourceWorldBounds.length > 0
+			? Math.max(...sourceWorldBounds.map((bounds) => bounds.maxY))
 			: 1;
-	const maxStripHeight =
-		stripDrafts.length > 0
-			? Math.max(...stripDrafts.map((draft) => draft.syntheticHeight))
-			: config.terminalRadius * 2 + 6;
-	const usableWidth = Math.max(
-		1,
-		canvasWidth - config.padding * 2 - config.stripWidth,
+	const sourceSpanX = Math.max(1e-6, sourceMaxX - sourceMinX);
+	const sourceSpanY = Math.max(1e-6, sourceMaxY - sourceMinY);
+	let rotateVotes = 0;
+	let nativeVotes = 0;
+	for (const draft of stripDrafts) {
+		const bounds = draft.geometryWorldBounds;
+		if (!bounds) {
+			nativeVotes += 1;
+			continue;
+		}
+		const spanX = Math.max(1e-6, bounds.maxX - bounds.minX);
+		const spanY = Math.max(1e-6, bounds.maxY - bounds.minY);
+		if (spanX > spanY) {
+			rotateVotes += 1;
+		} else {
+			nativeVotes += 1;
+		}
+	}
+	const orientationMode: WorldOrientation["mode"] =
+		rotateVotes === nativeVotes
+			? sourceSpanX > sourceSpanY
+				? "rotated_cw_90"
+				: "native"
+			: rotateVotes > nativeVotes
+				? "rotated_cw_90"
+				: "native";
+	const orientation: WorldOrientation = {
+		mode: orientationMode,
+		sourceMinX,
+		sourceMaxX,
+		sourceMinY,
+		sourceMaxY,
+		centerX: (sourceMinX + sourceMaxX) * 0.5,
+		centerY: (sourceMinY + sourceMaxY) * 0.5,
+	};
+
+	const orientedPoints: Point2D[] = [];
+	for (const draft of stripDrafts) {
+		orientedPoints.push(
+			orientWorldPoint({ x: draft.rawX, y: draft.rawY }, orientation),
+		);
+		if (!draft.geometryWorld) {
+			continue;
+		}
+		for (const primitive of draft.geometryWorld) {
+			for (const point of primitive.points) {
+				if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+					continue;
+				}
+				orientedPoints.push(orientWorldPoint(point, orientation));
+			}
+		}
+	}
+
+	const orientedMinX =
+		orientedPoints.length > 0
+			? Math.min(...orientedPoints.map((point) => point.x))
+			: sourceMinX;
+	const orientedMaxX =
+		orientedPoints.length > 0
+			? Math.max(...orientedPoints.map((point) => point.x))
+			: sourceMaxX;
+	const orientedMinY =
+		orientedPoints.length > 0
+			? Math.min(...orientedPoints.map((point) => point.y))
+			: sourceMinY;
+	const orientedMaxY =
+		orientedPoints.length > 0
+			? Math.max(...orientedPoints.map((point) => point.y))
+			: sourceMaxY;
+	const orientedSpanX = Math.max(1e-6, orientedMaxX - orientedMinX);
+	const orientedSpanY = Math.max(1e-6, orientedMaxY - orientedMinY);
+	const orientedAspect = orientedSpanX / orientedSpanY;
+	const targetArea = baseCanvasWidth * baseCanvasHeight;
+	let canvasWidth = clamp(
+		Math.sqrt(targetArea * orientedAspect) + config.padding * 0.75,
+		560,
+		980,
 	);
-	const usableHeight = Math.max(
-		1,
-		canvasHeight - config.padding * 2 - maxStripHeight,
+	let canvasHeight = clamp(
+		Math.sqrt(targetArea / orientedAspect) + config.padding * 0.75,
+		520,
+		980,
 	);
+	if (orientation.mode === "rotated_cw_90" && canvasHeight <= canvasWidth) {
+		canvasHeight = Math.min(980, canvasWidth + 140);
+	}
+
+	const usableWidth = Math.max(1, canvasWidth - config.padding * 2);
+	const usableHeight = Math.max(1, canvasHeight - config.padding * 2);
+	const transform: TerminalCanvasTransform = {
+		worldMinX: orientedMinX,
+		worldMaxX: orientedMaxX,
+		worldMinY: orientedMinY,
+		worldMaxY: orientedMaxY,
+		padding: config.padding,
+		usableWidth,
+		usableHeight,
+		orientation: orientation.mode,
+		sourceWorldMinX: sourceMinX,
+		sourceWorldMaxX: sourceMaxX,
+		sourceWorldMinY: sourceMinY,
+		sourceWorldMaxY: sourceMaxY,
+		rotationCenterX: orientation.centerX,
+		rotationCenterY: orientation.centerY,
+	};
 
 	for (const draft of stripDrafts) {
-		const insertionPx = mapWorldToCanvas(
+		const orientedInsertion = orientWorldPoint(
 			{ x: draft.rawX, y: draft.rawY },
-			{
-				worldMinX: minX,
-				worldMaxX: maxX,
-				worldMinY: minY,
-				worldMaxY: maxY,
-				padding: config.padding,
-				usableWidth,
-				usableHeight,
-			},
+			orientation,
 		);
-		const geometryPx = mapGeometryToCanvas(draft.geometryWorld, {
-			worldMinX: minX,
-			worldMaxX: maxX,
-			worldMinY: minY,
-			worldMaxY: maxY,
+		const orientedGeometryWorld =
+			draft.geometryWorld?.map((primitive) => ({
+				...primitive,
+				points: primitive.points.map((point) =>
+					orientWorldPoint(point, orientation),
+				),
+			})) ?? [];
+
+		const insertionPx = mapWorldToCanvas(orientedInsertion, {
+			worldMinX: orientedMinX,
+			worldMaxX: orientedMaxX,
+			worldMinY: orientedMinY,
+			worldMaxY: orientedMaxY,
+			padding: config.padding,
+			usableWidth,
+			usableHeight,
+		});
+		const geometryPx = mapGeometryToCanvas(orientedGeometryWorld, {
+			worldMinX: orientedMinX,
+			worldMaxX: orientedMaxX,
+			worldMinY: orientedMinY,
+			worldMaxY: orientedMaxY,
 			padding: config.padding,
 			usableWidth,
 			usableHeight,
@@ -416,25 +744,39 @@ export function buildTerminalLayout(
 			? Math.max(8, geometryPxBounds.maxX - geometryPxBounds.minX)
 			: draft.syntheticWidth;
 		const height = geometryPxBounds
-			? Math.max(config.terminalRadius * 2 + 6, geometryPxBounds.maxY - geometryPxBounds.minY)
+			? Math.max(
+					config.terminalRadius * 2 + 6,
+					geometryPxBounds.maxY - geometryPxBounds.minY,
+				)
 			: draft.syntheticHeight;
 
-		const strip: TerminalStripLayout = {
+		const baseStrip: TerminalStripLayout = {
 			...draft.base,
 			width,
 			height,
 			geometryPx: geometryPx.length > 0 ? geometryPx : undefined,
-			xLabel: px + width / 2,
+			xLabel: px + width * 0.5,
 			yLabel: py - 9,
 			px,
 			py,
 		};
+		const anchors = deriveStripTerminalAnchors(baseStrip);
+		const strip: TerminalStripLayout = {
+			...baseStrip,
+			terminalRowCentersY: anchors.rowCentersY,
+			terminalSideColumnsX: anchors.sideColumnsX,
+		};
 		strips.push(strip);
 
 		const terminalX = sideTerminalX(strip);
-		const rowSpacing = geometryPxBounds
-			? Math.max(height / Math.max(1, strip.terminalCount), config.terminalSpacing)
-			: config.terminalSpacing;
+		const stripBounds = stripVisualBounds(strip);
+		const fallbackRows = defaultRowCenters(stripBounds, strip.terminalCount);
+		const terminalInset = clamp(
+			Math.max(config.terminalRadius + 1.5, height * 0.08),
+			config.terminalRadius + 1.5,
+			12,
+		);
+		const usableTerminalHeight = Math.max(1, height - terminalInset * 2);
 
 		for (
 			let terminalIndex = 0;
@@ -445,9 +787,18 @@ export function buildTerminalLayout(
 			const customLabelRaw = strip.terminalLabels?.[terminalIndex];
 			const customLabel =
 				typeof customLabelRaw === "string" ? customLabelRaw.trim() : "";
-			const y = geometryPxBounds
-				? py + rowSpacing * (terminalIndex + 0.5)
-				: py + terminalIndex * rowSpacing;
+			const heuristicY =
+				py +
+				terminalInset +
+				((terminalIndex + 0.5) / Math.max(1, strip.terminalCount)) *
+					usableTerminalHeight;
+			const y = clamp(
+				strip.terminalRowCentersY?.[terminalIndex] ??
+					fallbackRows[terminalIndex] ??
+					heuristicY,
+				stripBounds.minY,
+				stripBounds.maxY,
+			);
 			terminals.push({
 				id: `${strip.stripId}:${termId}`,
 				stripId: strip.stripId,
@@ -456,14 +807,70 @@ export function buildTerminalLayout(
 				side: strip.side,
 				termId,
 				index: terminalIndex,
-				label: customLabel || `${strip.stripId}:${termId}`,
+				label: customLabel || String(terminalIndex + 1),
 				x: terminalX,
 				y,
 			});
 		}
 	}
 
-	return { canvasWidth, canvasHeight, strips, terminals };
+	return {
+		canvasWidth,
+		canvasHeight,
+		transform,
+		orientation: orientation.mode,
+		strips,
+		terminals,
+	};
+}
+
+export function canvasPointToWorld(
+	point: Point2D,
+	transform: TerminalCanvasTransform,
+): Point2D {
+	const width = Math.max(1, transform.usableWidth);
+	const height = Math.max(1, transform.usableHeight);
+	const nxRaw = (point.x - transform.padding) / width;
+	const nyRaw = (point.y - transform.padding) / height;
+	const nx = Number.isFinite(nxRaw) ? nxRaw : 0.5;
+	const ny = Number.isFinite(nyRaw) ? nyRaw : 0.5;
+	const worldSpanX = transform.worldMaxX - transform.worldMinX;
+	const worldSpanY = transform.worldMaxY - transform.worldMinY;
+	const orientedPoint = {
+		x: transform.worldMinX + nx * worldSpanX,
+		y: transform.worldMinY + ny * worldSpanY,
+	};
+	if (transform.orientation === "rotated_cw_90") {
+		return rotateWorldPointCounterClockwise(orientedPoint, {
+			centerX: transform.rotationCenterX,
+			centerY: transform.rotationCenterY,
+		});
+	}
+	return orientedPoint;
+}
+
+export function worldPointToCanvas(
+	point: Point2D,
+	transform: TerminalCanvasTransform,
+): Point2D {
+	const orientedPoint =
+		transform.orientation === "rotated_cw_90"
+			? rotateWorldPointClockwise(point, {
+					centerX: transform.rotationCenterX,
+					centerY: transform.rotationCenterY,
+				})
+			: point;
+
+	return {
+		x:
+			transform.padding +
+			normalizeRange(orientedPoint.x, transform.worldMinX, transform.worldMaxX) *
+				Math.max(1, transform.usableWidth),
+		y:
+			transform.padding +
+			normalizeRange(orientedPoint.y, transform.worldMinY, transform.worldMaxY) *
+				Math.max(1, transform.usableHeight),
+	};
 }
 
 export function terminalAnchorPoint(
@@ -502,42 +909,241 @@ export function terminalLeadPoint(
 	};
 }
 
+export function terminalStripEdgePoint(
+	terminal: TerminalNode,
+	strips: TerminalStripLayout[],
+	target: Point2D,
+): Point2D {
+	const strip = strips.find((entry) => entry.stripId === terminal.stripId);
+	if (!strip) {
+		return { x: terminal.x, y: terminal.y };
+	}
+
+	const bounds = stripVisualBounds(strip);
+	const y = clamp(terminal.y, bounds.minY, bounds.maxY);
+	if (terminal.side === "L") {
+		return { x: bounds.minX, y };
+	}
+	if (terminal.side === "R") {
+		return { x: bounds.maxX, y };
+	}
+	const towardRight = target.x >= terminal.x;
+	return {
+		x: towardRight ? bounds.maxX : bounds.minX,
+		y,
+	};
+}
+
+export function terminalLeadFromEdge(
+	edge: Point2D,
+	side: string,
+	target: Point2D,
+	leadLength = 24,
+): Point2D {
+	if (side === "L") {
+		return { x: edge.x - leadLength, y: edge.y };
+	}
+	if (side === "R") {
+		return { x: edge.x + leadLength, y: edge.y };
+	}
+	const towardRight = target.x >= edge.x;
+	return {
+		x: edge.x + (towardRight ? leadLength : -leadLength),
+		y: edge.y,
+	};
+}
+
+function dedupeClosePoints(path: Point2D[], minDistance = 0.1): Point2D[] {
+	if (path.length <= 1) return path;
+	const output: Point2D[] = [path[0]];
+	for (let index = 1; index < path.length; index += 1) {
+		const prev = output[output.length - 1];
+		const point = path[index];
+		if (Math.hypot(point.x - prev.x, point.y - prev.y) >= minDistance) {
+			output.push(point);
+		}
+	}
+	return output;
+}
+
+export function smoothTerminalPath(
+	path: Point2D[],
+	cornerRadius = 11,
+	segmentsPerCorner = 5,
+): Point2D[] {
+	const points = dedupeClosePoints(path, 0.05);
+	if (points.length < 3) {
+		return points;
+	}
+
+	const radius = Math.max(1, cornerRadius);
+	const segments = clamp(Math.trunc(segmentsPerCorner), 2, 12);
+	const smoothed: Point2D[] = [points[0]];
+
+	for (let index = 1; index < points.length - 1; index += 1) {
+		const prev = points[index - 1];
+		const current = points[index];
+		const next = points[index + 1];
+
+		const inX = current.x - prev.x;
+		const inY = current.y - prev.y;
+		const outX = next.x - current.x;
+		const outY = next.y - current.y;
+		const inLen = Math.hypot(inX, inY);
+		const outLen = Math.hypot(outX, outY);
+
+		if (inLen < 0.5 || outLen < 0.5) {
+			smoothed.push(current);
+			continue;
+		}
+
+		const inUx = inX / inLen;
+		const inUy = inY / inLen;
+		const outUx = outX / outLen;
+		const outUy = outY / outLen;
+		const cross = inUx * outUy - inUy * outUx;
+		const dot = inUx * outUx + inUy * outUy;
+
+		if (Math.abs(cross) <= 0.001 || dot <= -0.999) {
+			smoothed.push(current);
+			continue;
+		}
+
+		const fillet = Math.min(radius, inLen * 0.45, outLen * 0.45);
+		if (fillet < 0.75) {
+			smoothed.push(current);
+			continue;
+		}
+
+		const entry = {
+			x: current.x - inUx * fillet,
+			y: current.y - inUy * fillet,
+		};
+		const exit = {
+			x: current.x + outUx * fillet,
+			y: current.y + outUy * fillet,
+		};
+		if (Math.hypot(entry.x - smoothed[smoothed.length - 1].x, entry.y - smoothed[smoothed.length - 1].y) >= 0.05) {
+			smoothed.push(entry);
+		}
+
+		for (let step = 1; step < segments; step += 1) {
+			const t = step / segments;
+			const inv = 1 - t;
+			const qx = inv * inv * entry.x + 2 * inv * t * current.x + t * t * exit.x;
+			const qy = inv * inv * entry.y + 2 * inv * t * current.y + t * t * exit.y;
+			const last = smoothed[smoothed.length - 1];
+			if (Math.hypot(qx - last.x, qy - last.y) >= 0.05) {
+				smoothed.push({ x: qx, y: qy });
+			}
+		}
+
+		const last = smoothed[smoothed.length - 1];
+		if (Math.hypot(exit.x - last.x, exit.y - last.y) >= 0.05) {
+			smoothed.push(exit);
+		}
+	}
+
+	const tail = points[points.length - 1];
+	const last = smoothed[smoothed.length - 1];
+	if (Math.hypot(tail.x - last.x, tail.y - last.y) >= 0.05) {
+		smoothed.push(tail);
+	}
+	return smoothed;
+}
+
 export function routeTerminalPath(
 	start: Point2D,
 	end: Point2D,
 	strips: TerminalStripLayout[],
 	canvasWidth: number,
 	canvasHeight: number,
+	obstacles: Obstacle[] = [],
 ): Point2D[] {
 	const step = 8;
 	const cols = Math.max(2, Math.ceil(canvasWidth / step));
 	const rows = Math.max(2, Math.ceil(canvasHeight / step));
 	const grid = Array.from({ length: rows }, () => Array<number>(cols).fill(0));
 
-	for (const strip of strips) {
-		const blockedRect = stripBlockRect(strip, 8);
-		const x0 = clamp(Math.floor(blockedRect.x / step), 0, cols - 1);
-		const y0 = clamp(Math.floor(blockedRect.y / step), 0, rows - 1);
-		const x1 = clamp(
-			Math.ceil((blockedRect.x + blockedRect.w) / step),
-			0,
-			cols - 1,
-		);
-		const y1 = clamp(
-			Math.ceil((blockedRect.y + blockedRect.h) / step),
-			0,
-			rows - 1,
-		);
+	const applyCellCost = (col: number, row: number, value: number) => {
+		if (row < 0 || row >= rows || col < 0 || col >= cols) return;
+		if (grid[row][col] >= 999) return;
+		if (value >= 999) {
+			grid[row][col] = 999;
+			return;
+		}
+		if (value < 0) {
+			grid[row][col] = grid[row][col] < 0 ? Math.min(grid[row][col], value) : value;
+			return;
+		}
+		grid[row][col] = Math.max(grid[row][col], value);
+	};
+
+	const markRectCost = (rect: Rect, value: number, preserveEndpoints = false) => {
+		const x0 = clamp(Math.floor(rect.x / step), 0, cols - 1);
+		const y0 = clamp(Math.floor(rect.y / step), 0, rows - 1);
+		const x1 = clamp(Math.ceil((rect.x + rect.w) / step), 0, cols - 1);
+		const y1 = clamp(Math.ceil((rect.y + rect.h) / step), 0, rows - 1);
 		for (let row = y0; row <= y1; row += 1) {
 			for (let col = x0; col <= x1; col += 1) {
 				const world = fromGrid({ x: col, y: row }, step);
-				const closeToStart =
-					Math.hypot(world.x - start.x, world.y - start.y) <= 12;
-				const closeToEnd = Math.hypot(world.x - end.x, world.y - end.y) <= 12;
-				if (closeToStart || closeToEnd) continue;
-				if (pointInRect(world, blockedRect)) {
-					grid[row][col] = 999;
+				if (!pointInRect(world, rect)) continue;
+				if (preserveEndpoints) {
+					const closeToStart = Math.hypot(world.x - start.x, world.y - start.y) <= 12;
+					const closeToEnd = Math.hypot(world.x - end.x, world.y - end.y) <= 12;
+					if (closeToStart || closeToEnd) continue;
 				}
+				applyCellCost(col, row, value);
+			}
+		}
+	};
+
+	for (const strip of strips) {
+		const blockedRect = stripBlockRect(strip, 8);
+		markRectCost(blockedRect, 999, true);
+	}
+
+	for (const obstacle of obstacles) {
+		if (!Number.isFinite(obstacle.x) || !Number.isFinite(obstacle.y)) continue;
+		if (!Number.isFinite(obstacle.w) || !Number.isFinite(obstacle.h)) continue;
+		if (obstacle.w <= 0 || obstacle.h <= 0) continue;
+
+		const baseRect: Rect = {
+			x: obstacle.x,
+			y: obstacle.y,
+			w: obstacle.w,
+			h: obstacle.h,
+		};
+		if (obstacle.type === "fence") {
+			continue;
+		}
+		if (obstacle.type === "trench") {
+			markRectCost(baseRect, -0.55);
+			continue;
+		}
+
+		const hardRect: Rect = {
+			x: baseRect.x - 4,
+			y: baseRect.y - 4,
+			w: baseRect.w + 8,
+			h: baseRect.h + 8,
+		};
+		const softRect: Rect = {
+			x: baseRect.x - 10,
+			y: baseRect.y - 10,
+			w: baseRect.w + 20,
+			h: baseRect.h + 20,
+		};
+		markRectCost(hardRect, 999, true);
+		const x0 = clamp(Math.floor(softRect.x / step), 0, cols - 1);
+		const y0 = clamp(Math.floor(softRect.y / step), 0, rows - 1);
+		const x1 = clamp(Math.ceil((softRect.x + softRect.w) / step), 0, cols - 1);
+		const y1 = clamp(Math.ceil((softRect.y + softRect.h) / step), 0, rows - 1);
+		for (let row = y0; row <= y1; row += 1) {
+			for (let col = x0; col <= x1; col += 1) {
+				const world = fromGrid({ x: col, y: row }, step);
+				if (!pointInRect(world, softRect) || pointInRect(world, hardRect)) continue;
+				applyCellCost(col, row, 1.8);
 			}
 		}
 	}
@@ -603,11 +1209,15 @@ export function routeTerminalPath(
 			const nx = current.x + dx;
 			const ny = current.y + dy;
 			if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) continue;
-			if (grid[ny][nx] >= 999) continue;
+			const cellCost = grid[ny][nx];
+			if (cellCost >= 999) continue;
 			const nextKey = gridKey(nx, ny);
 			if (closed.has(nextKey)) continue;
 
-			let movementCost = 1;
+			let movementCost = 1 + Math.max(0, cellCost * 2.2);
+			if (cellCost < 0) {
+				movementCost = Math.max(0.1, movementCost - Math.abs(cellCost));
+			}
 			if (current.px >= 0) {
 				const prevDx = current.x - current.px;
 				const prevDy = current.y - current.py;
@@ -670,61 +1280,11 @@ export function terminalBendCount(path: Point2D[]): number {
 
 export function toTerminalRouteSvg(path: Point2D[]): string {
 	if (path.length < 2) return "";
-	const points = simplifyPath(path);
+	const points = dedupeClosePoints(path, 0.05);
 	if (points.length < 2) return "";
-
 	let svgPath = `M ${points[0].x} ${points[0].y}`;
-	const preferredRadius = 11;
-
-	for (let index = 1; index < points.length - 1; index += 1) {
-		const prev = points[index - 1];
-		const current = points[index];
-		const next = points[index + 1];
-
-		const inX = current.x - prev.x;
-		const inY = current.y - prev.y;
-		const outX = next.x - current.x;
-		const outY = next.y - current.y;
-		const inLen = Math.hypot(inX, inY);
-		const outLen = Math.hypot(outX, outY);
-		if (inLen < 0.5 || outLen < 0.5) {
-			svgPath += ` L ${current.x} ${current.y}`;
-			continue;
-		}
-
-		const inUx = inX / inLen;
-		const inUy = inY / inLen;
-		const outUx = outX / outLen;
-		const outUy = outY / outLen;
-		const dot = inUx * outUx + inUy * outUy;
-		const cross = inUx * outUy - inUy * outUx;
-
-		if (Math.abs(cross) <= 0.001 || dot <= -0.999) {
-			svgPath += ` L ${current.x} ${current.y}`;
-			continue;
-		}
-
-		const cornerRadius = Math.min(
-			preferredRadius,
-			inLen * 0.45,
-			outLen * 0.45,
-		);
-		if (cornerRadius < 1.1) {
-			svgPath += ` L ${current.x} ${current.y}`;
-			continue;
-		}
-
-		const entryX = current.x - inUx * cornerRadius;
-		const entryY = current.y - inUy * cornerRadius;
-		const exitX = current.x + outUx * cornerRadius;
-		const exitY = current.y + outUy * cornerRadius;
-		const sweep = cross > 0 ? 1 : 0;
-		svgPath +=
-			` L ${entryX} ${entryY}` +
-			` A ${cornerRadius} ${cornerRadius} 0 0 ${sweep} ${exitX} ${exitY}`;
+	for (let index = 1; index < points.length; index += 1) {
+		svgPath += ` L ${points[index].x} ${points[index].y}`;
 	}
-
-	const last = points[points.length - 1];
-	svgPath += ` L ${last.x} ${last.y}`;
 	return svgPath;
 }

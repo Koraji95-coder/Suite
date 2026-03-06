@@ -92,12 +92,57 @@
 
 .userBadge {
 	display: none;
+	align-items: center;
+	gap: 0.35rem;
 	border-radius: 0.6rem;
 	border: 1px solid var(--line-soft);
-	background: var(--surface);
-	padding: 0.32rem 0.55rem;
+	background:
+		linear-gradient(
+			130deg,
+			color-mix(in srgb, var(--surface) 86%, transparent),
+			color-mix(in srgb, var(--surface-2) 65%, transparent)
+		),
+		var(--surface);
+	padding: 0.32rem 0.48rem;
 	font-size: 0.72rem;
 	color: var(--text);
+}
+
+.userCrown {
+	flex: 0 0 auto;
+	filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 35%, transparent));
+}
+
+.userName {
+	max-width: 11.5rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.roleBadge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	padding: 0.06rem 0.45rem;
+	font-size: 0.62rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	font-weight: 700;
+	border: 1px solid transparent;
+}
+
+.roleBadgeAdmin {
+	border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+	background: color-mix(in srgb, var(--accent) 18%, transparent);
+	color: color-mix(in srgb, white 86%, var(--accent));
+}
+
+.roleBadgeUser {
+	border-color: color-mix(in srgb, var(--secondary) 35%, transparent);
+	background: color-mix(in srgb, var(--secondary) 15%, transparent);
+	color: color-mix(in srgb, white 72%, var(--secondary));
 }
 
 .promptOverlay {

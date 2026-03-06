@@ -40,7 +40,7 @@ class AutoCADRuntime:
     connect_autocad: Callable[[], Any]
     com_call_with_retry: Callable[..., Any]
     pt: Callable[..., Any]
-    ensure_layer: Callable[[Any, str], None]
+    ensure_layer: Callable[[Any, str, int | None], None]
     wait_for_command_finish: Callable[[Any, float], bool]
     ensure_block_exists: Callable[[Any, str, str], str]
     insert_reference_block: Callable[..., Any]
@@ -105,10 +105,11 @@ def create_autocad_runtime(
             win32com_client_module=win32_client_module,
         )
 
-    def ensure_layer(doc: Any, layer_name: str) -> None:
+    def ensure_layer(doc: Any, layer_name: str, color_aci: int | None = None) -> None:
         return autocad_ensure_layer_helper(
             doc,
             layer_name,
+            color_aci=color_aci,
             dyn_fn=dyn,
         )
 

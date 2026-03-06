@@ -6,6 +6,7 @@ This folder is the domain split for `backend/api_server.py`.
 
 - `api_backup.py`: `/api/backup/*`
 - `api_batch_find_replace.py`: `/api/batch-find-replace/*`
+- `api_watchdog.py`: `/api/watchdog/*`
 - `api_autodraft.py`: `/api/autodraft/*`
 - `api_auth_email.py`: `/api/auth/email-link`
 - `api_auth_passkey.py`: `/api/auth/passkey*`
@@ -60,12 +61,14 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_server_state.py`: shared in-memory server state initialization (stores + locks for transmittal profiles, agent sessions/challenges, passkey/auth-email abuse windows)
 - `api_bootstrap_runtime.py`: shared startup/bootstrap helpers (logging config, gen_py read-only setup, env file loading)
 - `api_dependency_bundle.py`: shared dependency-bundle builders for route-group registration (`passkey_deps`, `agent_deps`, `transmittal_render_deps`)
+- `api_watchdog_service.py`: shared in-memory heartbeat monitor service for recursive folder snapshots/diff events (`WatchdogMonitorService`)
 - `api_agent.py`: `/api/agent/*`
 - `api_dashboard.py`: `/api/dashboard/load`, `/api/dashboard/load/<job_id>`
 - `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
 - `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
 - `api_transmittal_render.py`: `/api/transmittal/render`
 - `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`
+- `api_watchdog.py`: `/api/watchdog/config`, `/api/watchdog/status`, `/api/watchdog/heartbeat`
 - `api_health.py`: `/health`
 - `api_registry.py`: central route-group registration for the Flask app
 

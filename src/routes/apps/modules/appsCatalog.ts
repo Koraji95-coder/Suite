@@ -93,13 +93,6 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		status: "active",
 	},
 	{
-		id: "architecture",
-		title: "Architecture Map",
-		description: "System structure, service boundaries, and module map.",
-		to: "/app/architecture-map",
-		status: "active",
-	},
-	{
 		id: "knowledge",
 		title: "Knowledge",
 		description: "Standards, security notes, and implementation docs.",

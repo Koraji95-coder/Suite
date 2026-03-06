@@ -24,6 +24,8 @@ class _ManagerStub:
         if isinstance(status, dict):
             default_status.update(status)
         self._status = default_status
+        self.draw_payloads: list[dict[str, Any]] = []
+        self.label_sync_payloads: list[dict[str, Any]] = []
 
     def get_status(self) -> Dict[str, Any]:
         return dict(self._status)
@@ -41,6 +43,57 @@ class _ManagerStub:
             "blocks_inserted": 0,
             "block_errors": None,
             "run_id": run_id,
+        }
+
+    def plot_terminal_routes(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        self.draw_payloads.append(payload)
+        operation = str(payload.get("operation") or "")
+        client_route_id = str(payload.get("clientRouteId") or "")
+        sync_status = "synced" if operation == "upsert" else ("deleted" if operation == "delete" else "reset")
+        return {
+            "success": True,
+            "code": "",
+            "message": "ok",
+            "data": {
+                "drawing": {"name": "stub.dwg", "units": "Feet"},
+                "operation": operation,
+                "sessionId": payload.get("sessionId"),
+                "clientRouteId": client_route_id,
+                "syncStatus": sync_status,
+                "drawnRoutes": 1 if operation == "upsert" else 0,
+                "drawnSegments": 2 if operation == "upsert" else 0,
+                "labelsDrawn": 1 if operation == "upsert" else 0,
+                "deletedEntities": 1 if operation == "delete" else 0,
+                "resetRoutes": 1 if operation == "reset" else 0,
+                "layersUsed": ["SUITE_WIRE_AUTO"],
+                "bindings": {client_route_id: {"entityHandles": ["A1", "A2"]}}
+                if client_route_id
+                else {},
+            },
+            "warnings": [],
+        }
+
+    def sync_terminal_labels(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        self.label_sync_payloads.append(payload)
+        strips = payload.get("strips") or []
+        return {
+            "success": True,
+            "code": "",
+            "message": "labels synced",
+            "data": {
+                "drawing": {"name": "stub.dwg", "units": "Feet"},
+                "updatedStrips": len(strips),
+                "matchedStrips": len(strips),
+                "targetStrips": len(strips),
+                "matchedBlocks": len(strips),
+                "updatedBlocks": len(strips),
+                "updatedAttributes": len(strips) * 12,
+                "unchangedAttributes": 0,
+                "missingAttributes": 0,
+                "failedAttributes": 0,
+            },
+            "meta": {},
+            "warnings": [],
         }
 
 
@@ -96,6 +149,7 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
             }
 
         manager = _ManagerStub(status=manager_status)
+        self._manager = manager
 
         def get_manager():
             return manager
@@ -230,6 +284,238 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         self.assertEqual(calls[0][1]["canvasWidth"], 980.0)
         self.assertEqual(calls[0][1]["canvasHeight"], 560.0)
         self.assertEqual(calls[0][1]["layerNames"], ["S-FNDN-PRIMARY"])
+
+    def test_terminal_route_draw_uses_dotnet_action(self) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            calls.append((action, payload))
+            return {
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "stub route draw ok",
+                    "data": {
+                        "drawing": {"name": "stub.dwg", "units": "Feet"},
+                        "drawnRoutes": 1,
+                        "drawnSegments": 2,
+                        "labelsDrawn": 1,
+                        "layersUsed": ["SUITE_WIRE_AUTO"],
+                    },
+                    "meta": {},
+                    "warnings": [],
+                },
+                "error": None,
+            }
+
+        client = self._build_client(provider="dotnet", sender=sender)
+        response = client.post(
+            "/api/conduit-route/terminal-routes/draw",
+            json={
+                "operation": "upsert",
+                "sessionId": "cad-session-1",
+                "clientRouteId": "route-1",
+                "defaultLayerName": "SUITE_WIRE_AUTO",
+                "annotateRefs": True,
+                "route": {
+                    "ref": "DC-001",
+                    "routeType": "conductor",
+                    "wireFunction": "DC (+)",
+                    "cableType": "DC",
+                    "colorCode": "RD",
+                    "colorAci": 1,
+                    "path": [
+                        {"x": 10, "y": 20},
+                        {"x": 30, "y": 20},
+                        {"x": 30, "y": 50},
+                    ],
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(payload.get("meta", {}).get("source"), "dotnet")
+        self.assertEqual(payload.get("meta", {}).get("providerPath"), "dotnet")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "conduit_route_terminal_routes_draw")
+        dotnet_payload = calls[0][1]
+        self.assertEqual(dotnet_payload.get("operation"), "upsert")
+        self.assertEqual(dotnet_payload.get("sessionId"), "cad-session-1")
+        self.assertEqual(dotnet_payload.get("clientRouteId"), "route-1")
+        self.assertEqual(dotnet_payload.get("defaultLayerName"), "SUITE_WIRE_AUTO")
+        self.assertEqual(dotnet_payload.get("annotateRefs"), True)
+        self.assertEqual(dotnet_payload.get("textHeight"), 0.125)
+        self.assertIsInstance(dotnet_payload.get("route"), dict)
+        route_payload = dotnet_payload.get("route") or {}
+        self.assertEqual(route_payload.get("geometryVersion"), "v1.2")
+        self.assertIsInstance(route_payload.get("primitives"), list)
+        self.assertGreaterEqual(len(route_payload.get("primitives")), 2)
+
+    def test_terminal_route_draw_dotnet_fallback_uses_com_when_bridge_unavailable(self) -> None:
+        def sender(_action: str, _payload: dict[str, Any]) -> dict[str, Any]:
+            raise RuntimeError("named pipe unavailable")
+
+        client = self._build_client(provider="dotnet_fallback_com", sender=sender)
+        response = client.post(
+            "/api/conduit-route/terminal-routes/draw",
+            json={
+                "operation": "upsert",
+                "sessionId": "cad-session-2",
+                "clientRouteId": "route-fallback-1",
+                "route": {
+                    "ref": "JMP-001",
+                    "routeType": "jumper",
+                    "path": [{"x": 8, "y": 10}, {"x": 18, "y": 10}],
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(payload.get("meta", {}).get("source"), "autocad")
+        self.assertEqual(payload.get("meta", {}).get("providerPath"), "com_fallback")
+
+    def test_terminal_label_sync_uses_manager_com_path(self) -> None:
+        client = self._build_client(provider="dotnet", sender=lambda *_args, **_kwargs: {})
+        response = client.post(
+            "/api/conduit-route/terminal-labels/sync",
+            json={
+                "selectionOnly": False,
+                "includeModelspace": True,
+                "maxEntities": 50000,
+                "strips": [
+                    {
+                        "stripId": "RP1L1",
+                        "terminalCount": 12,
+                        "labels": [str(index) for index in range(1, 13)],
+                    }
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(payload.get("meta", {}).get("providerPath"), "com")
+        manager = self._manager
+        self.assertEqual(len(manager.label_sync_payloads), 1)
+        self.assertEqual(
+            manager.label_sync_payloads[0]["strips"][0]["stripId"],
+            "RP1L1",
+        )
+
+    def test_terminal_route_draw_rejects_missing_session_id(self) -> None:
+        client = self._build_client(provider="dotnet", sender=lambda *_args, **_kwargs: {})
+        response = client.post(
+            "/api/conduit-route/terminal-routes/draw",
+            json={
+                "operation": "upsert",
+                "clientRouteId": "route-1",
+                "route": {
+                    "ref": "R1",
+                    "routeType": "conductor",
+                    "path": [{"x": 1, "y": 1}, {"x": 2, "y": 2}],
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+        self.assertEqual(payload.get("code"), "INVALID_REQUEST")
+
+    def test_terminal_route_draw_delete_uses_dotnet_action(self) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            calls.append((action, payload))
+            return {
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "deleted",
+                    "data": {
+                        "operation": "delete",
+                        "sessionId": "cad-session-del",
+                        "clientRouteId": "route-del-1",
+                        "syncStatus": "deleted",
+                        "drawnRoutes": 0,
+                        "drawnSegments": 0,
+                        "labelsDrawn": 0,
+                        "deletedEntities": 2,
+                        "resetRoutes": 0,
+                        "layersUsed": [],
+                        "bindings": {"route-del-1": {"entityHandles": ["A1", "A2"]}},
+                    },
+                    "meta": {},
+                    "warnings": [],
+                },
+                "error": None,
+            }
+
+        client = self._build_client(provider="dotnet", sender=sender)
+        response = client.post(
+            "/api/conduit-route/terminal-routes/draw",
+            json={
+                "operation": "delete",
+                "sessionId": "cad-session-del",
+                "clientRouteId": "route-del-1",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "conduit_route_terminal_routes_draw")
+        self.assertEqual(calls[0][1].get("operation"), "delete")
+
+    def test_terminal_route_draw_reset_uses_dotnet_action(self) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            calls.append((action, payload))
+            return {
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "reset",
+                    "data": {
+                        "operation": "reset",
+                        "sessionId": "cad-session-rst",
+                        "clientRouteId": "",
+                        "syncStatus": "reset",
+                        "drawnRoutes": 0,
+                        "drawnSegments": 0,
+                        "labelsDrawn": 0,
+                        "deletedEntities": 4,
+                        "resetRoutes": 2,
+                        "layersUsed": [],
+                        "bindings": {},
+                    },
+                    "meta": {},
+                    "warnings": [],
+                },
+                "error": None,
+            }
+
+        client = self._build_client(provider="dotnet", sender=sender)
+        response = client.post(
+            "/api/conduit-route/terminal-routes/draw",
+            json={
+                "operation": "reset",
+                "sessionId": "cad-session-rst",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "conduit_route_terminal_routes_draw")
+        self.assertEqual(calls[0][1].get("operation"), "reset")
 
     def test_obstacle_scan_layer_preset_expands_rules_for_dotnet_payload(self) -> None:
         calls: list[tuple[str, dict[str, Any]]] = []

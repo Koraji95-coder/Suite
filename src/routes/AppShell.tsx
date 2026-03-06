@@ -7,7 +7,6 @@ import {
 	KeyRound,
 	LayoutDashboard,
 	Menu,
-	Network,
 	Settings,
 	Sparkles,
 	TerminalSquare,
@@ -22,6 +21,7 @@ import {
 	usePageHeader,
 } from "../components/apps/ui/PageHeaderContext";
 import { Badge } from "../components/primitives/Badge";
+import AdminCrownPixel from "../components/roles/AdminCrownPixel";
 
 // Primitives
 import { Button } from "../components/primitives/Button";
@@ -30,7 +30,8 @@ import { Input } from "../components/primitives/Input";
 import { Panel } from "../components/primitives/Panel";
 import { HStack, Stack } from "../components/primitives/Stack";
 import { Text } from "../components/primitives/Text";
-import { isDevAdminEmail } from "../lib/devAccess";
+import { isCommandCenterAuthorized } from "../lib/devAccess";
+import { getAppRole } from "../lib/roles";
 import { cn } from "../lib/utils";
 import styles from "./AppShell.module.css";
 
@@ -44,7 +45,6 @@ const primaryNavItems = [
 	{ to: "/app/apps", label: "Apps", icon: AppWindow },
 	{ to: "/app/knowledge", label: "Knowledge", icon: BookOpen },
 	{ to: "/app/agent", label: "Koro Agent", icon: Sparkles },
-	{ to: "/app/architecture-map", label: "Architecture", icon: Network },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -86,6 +86,8 @@ function AppTopbar({ onMenuToggle }: { onMenuToggle: () => void }) {
 	);
 
 	const passkeySessionActive = sessionAuthMethod === "passkey";
+	const appRole = useMemo(() => getAppRole(user), [user]);
+	const isAdmin = appRole === "Admin";
 
 	return (
 		<header className={styles.topbar}>
@@ -143,7 +145,18 @@ function AppTopbar({ onMenuToggle }: { onMenuToggle: () => void }) {
 						</Badge>
 					)}
 
-					<span className={styles.userBadge}>{displayLabel}</span>
+					<span className={styles.userBadge}>
+						{isAdmin && <AdminCrownPixel size={15} className={styles.userCrown} />}
+						<span className={styles.userName}>{displayLabel}</span>
+						<span
+							className={cn(
+								styles.roleBadge,
+								isAdmin ? styles.roleBadgeAdmin : styles.roleBadgeUser,
+							)}
+						>
+							{appRole}
+						</span>
+					</span>
 
 					<Button variant="secondary" size="sm" onClick={() => void signOut()}>
 						Sign out
@@ -257,7 +270,7 @@ const navItemClass = (isActive: boolean) =>
 // ═══════════════════════════════════════════════════════════════════════════
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 	const { user } = useAuth();
-	const canAccessCommandCenter = isDevAdminEmail(user?.email);
+	const canAccessCommandCenter = isCommandCenterAuthorized(user);
 	const navRef = useRef<HTMLElement | null>(null);
 
 	const safeNavItems = primaryNavItems.filter(

@@ -1,6 +1,12 @@
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import type {
+	TerminalCadRuntimeStatus,
+	TerminalCadStatusResponse,
+	TerminalCadDrawRequest,
+	TerminalCadDrawResponse,
+	TerminalLabelSyncRequest,
+	TerminalLabelSyncResponse,
 	TerminalScanRequest,
 	TerminalScanResponse,
 } from "./conduitTerminalTypes";
@@ -99,6 +105,76 @@ class ConduitTerminalService {
 		return fallback;
 	}
 
+	private normalizeCadRuntimeStatus(payload: unknown): TerminalCadRuntimeStatus | null {
+		if (!payload || typeof payload !== "object") {
+			return null;
+		}
+		const raw = payload as Record<string, unknown>;
+		return {
+			connected: Boolean(raw.connected),
+			autocad_running: Boolean(raw.autocad_running),
+			drawing_open: Boolean(raw.drawing_open),
+			drawing_name:
+				typeof raw.drawing_name === "string" ? raw.drawing_name : undefined,
+			error:
+				typeof raw.error === "string" || raw.error === null
+					? (raw.error as string | null)
+					: null,
+			backend_id: typeof raw.backend_id === "string" ? raw.backend_id : undefined,
+			backend_version:
+				typeof raw.backend_version === "string"
+					? raw.backend_version
+					: undefined,
+			conduit_route_provider:
+				raw.conduit_route_provider &&
+				typeof raw.conduit_route_provider === "object"
+					? (raw.conduit_route_provider as TerminalCadRuntimeStatus["conduit_route_provider"])
+					: undefined,
+		};
+	}
+
+	async getAutoCadStatus(): Promise<TerminalCadStatusResponse> {
+		try {
+			const requestId = this.createRequestId();
+			const headers = await this.getHeaders(requestId);
+			const response = await fetch(`${this.baseUrl}/api/status`, {
+				method: "GET",
+				headers,
+			});
+
+			const payload = await response.json().catch(() => null);
+			const status = this.normalizeCadRuntimeStatus(payload);
+			if (!status) {
+				return {
+					success: false,
+					httpStatus: response.status,
+					message: "AutoCAD status returned an unexpected payload.",
+				};
+			}
+
+			const healthy = Boolean(status.autocad_running && status.drawing_open);
+			return {
+				success: healthy,
+				status,
+				httpStatus: response.status,
+				message:
+					typeof status.error === "string" && status.error.trim().length > 0
+						? status.error
+						: healthy
+							? "AutoCAD drawing is ready."
+							: `AutoCAD status check reported ${response.status}.`,
+			};
+		} catch (err) {
+			const message =
+				err instanceof Error ? err.message : "AutoCAD status request failed";
+			logger.error("AutoCAD status request failed", "ConduitTerminalService", err);
+			return {
+				success: false,
+				message,
+			};
+		}
+	}
+
 	async scanTerminalStrips(
 		request: TerminalScanRequest = {},
 	): Promise<TerminalScanResponse> {
@@ -150,6 +226,144 @@ class ConduitTerminalService {
 				err instanceof Error ? err.message : "Terminal scan request failed";
 			logger.error(
 				"Terminal scan request failed",
+				"ConduitTerminalService",
+				err,
+			);
+			return {
+				success: false,
+				code: "NETWORK_ERROR",
+				message,
+			};
+		}
+	}
+
+	async drawTerminalRoutes(
+		request: TerminalCadDrawRequest,
+	): Promise<TerminalCadDrawResponse> {
+		try {
+			const requestId = this.createRequestId();
+			const headers = await this.getHeaders(requestId);
+			const response = await fetch(
+				`${this.baseUrl}/api/conduit-route/terminal-routes/draw`,
+				{
+					method: "POST",
+					headers,
+					body: JSON.stringify({
+						operation: request.operation,
+						sessionId: request.sessionId,
+						clientRouteId: request.clientRouteId,
+						route: request.route,
+						defaultLayerName: request.defaultLayerName ?? "SUITE_WIRE_AUTO",
+						annotateRefs: request.annotateRefs ?? true,
+						textHeight: request.textHeight ?? 0.125,
+					}),
+				},
+			);
+
+			const payload = (await response
+				.json()
+				.catch(() => null)) as TerminalCadDrawResponse | null;
+
+			if (!response.ok) {
+				return {
+					success: false,
+					code: payload?.code || "REQUEST_FAILED",
+					message:
+						payload?.message ||
+						(await this.parseErrorMessage(
+							response,
+							`Terminal route draw failed (${response.status})`,
+						)),
+					meta: payload?.meta,
+					warnings: payload?.warnings,
+					data: payload?.data,
+				};
+			}
+
+			if (payload && typeof payload.success === "boolean") {
+				return payload;
+			}
+
+			return {
+				success: false,
+				code: "INVALID_RESPONSE",
+				message: "Terminal route draw returned an unexpected payload.",
+			};
+		} catch (err) {
+			const message =
+				err instanceof Error
+					? err.message
+					: "Terminal route draw request failed";
+			logger.error(
+				"Terminal route draw request failed",
+				"ConduitTerminalService",
+				err,
+			);
+			return {
+				success: false,
+				code: "NETWORK_ERROR",
+				message,
+			};
+		}
+	}
+
+	async syncTerminalLabels(
+		request: TerminalLabelSyncRequest,
+	): Promise<TerminalLabelSyncResponse> {
+		try {
+			const requestId = this.createRequestId();
+			const headers = await this.getHeaders(requestId);
+			const response = await fetch(
+				`${this.baseUrl}/api/conduit-route/terminal-labels/sync`,
+				{
+					method: "POST",
+					headers,
+					body: JSON.stringify({
+						selectionOnly: request.selectionOnly ?? false,
+						includeModelspace: request.includeModelspace ?? true,
+						maxEntities: request.maxEntities ?? 50000,
+						terminalProfile: request.terminalProfile ?? undefined,
+						strips: request.strips ?? [],
+					}),
+				},
+			);
+
+			const payload = (await response
+				.json()
+				.catch(() => null)) as TerminalLabelSyncResponse | null;
+
+			if (!response.ok) {
+				return {
+					success: false,
+					code: payload?.code || "REQUEST_FAILED",
+					message:
+						payload?.message ||
+						(await this.parseErrorMessage(
+							response,
+							`Terminal label sync failed (${response.status})`,
+						)),
+					meta: payload?.meta,
+					warnings: payload?.warnings,
+					data: payload?.data,
+				};
+			}
+
+			if (payload && typeof payload.success === "boolean") {
+				return payload;
+			}
+
+			return {
+				success: false,
+				code: "INVALID_RESPONSE",
+				message: "Terminal label sync returned an unexpected payload.",
+			};
+		} catch (err) {
+			const message =
+				err instanceof Error
+					? err.message
+					: "Terminal label sync request failed";
+			logger.error(
+				"Terminal label sync request failed",
 				"ConduitTerminalService",
 				err,
 			);

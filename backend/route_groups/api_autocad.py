@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -11,6 +12,7 @@ from .api_autocad_terminal_scan import scan_terminal_strips
 from .api_conduit_route_compute import compute_conduit_route
 from .api_conduit_route_obstacle_scan import scan_conduit_obstacles
 from .api_autocad_entity_geometry import entity_bbox
+from .api_autocad_terminal_route_plot import canonicalize_route_for_sync
 
 
 def create_autocad_blueprint(
@@ -1399,6 +1401,526 @@ def create_autocad_blueprint(
                         "success": False,
                         "code": "ROUTE_COMPUTE_FAILED",
                         "message": "Conduit route computation failed unexpectedly.",
+                    }
+                ),
+                500,
+            )
+
+    @bp.route("/conduit-route/terminal-routes/draw", methods=["POST"])
+    @require_autocad_auth
+    @limiter.limit("600 per hour")
+    def api_conduit_route_terminal_routes_draw():
+        """Apply terminal route CAD sync operation (upsert/delete/reset)."""
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+        request_id = _request_correlation_id()
+
+        if not request.is_json:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "Expected application/json payload.",
+                    }
+                ),
+                400,
+            )
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "Request payload must be a JSON object.",
+                    }
+                ),
+                400,
+            )
+
+        operation = str(payload.get("operation") or "").strip().lower()
+        if operation not in {"upsert", "delete", "reset"}:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "operation must be one of: upsert, delete, reset.",
+                    }
+                ),
+                400,
+            )
+
+        session_id = str(payload.get("sessionId") or payload.get("session_id") or "").strip()[:128]
+        if not session_id:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "sessionId is required.",
+                    }
+                ),
+                400,
+            )
+
+        client_route_id = str(
+            payload.get("clientRouteId") or payload.get("client_route_id") or ""
+        ).strip()[:128]
+
+        default_layer_name = str(payload.get("defaultLayerName") or "SUITE_WIRE_AUTO").strip()
+        if not default_layer_name:
+            default_layer_name = "SUITE_WIRE_AUTO"
+        default_layer_name = default_layer_name[:80]
+
+        annotate_refs = bool(payload.get("annotateRefs", True))
+        text_height_raw = payload.get("textHeight", 0.125)
+        try:
+            text_height = max(0.01, float(text_height_raw))
+        except Exception:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "textHeight must be a numeric value.",
+                    }
+                ),
+                400,
+            )
+
+        warnings: list[str] = []
+        normalized_payload: dict[str, Any] = {
+            "operation": operation,
+            "sessionId": session_id,
+            "defaultLayerName": default_layer_name,
+            "annotateRefs": annotate_refs,
+            "textHeight": text_height,
+        }
+        route_candidates = 0
+
+        if operation in {"upsert", "delete"}:
+            if not client_route_id:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "INVALID_REQUEST",
+                            "message": "clientRouteId is required for upsert/delete operations.",
+                        }
+                    ),
+                    400,
+                )
+            normalized_payload["clientRouteId"] = client_route_id
+            route_candidates = 1
+
+        if operation == "upsert":
+            route_payload = payload.get("route")
+            if route_payload is None:
+                routes_fallback = payload.get("routes")
+                if isinstance(routes_fallback, list) and routes_fallback:
+                    route_payload = routes_fallback[0]
+            if not isinstance(route_payload, dict):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "INVALID_REQUEST",
+                            "message": "route object is required for upsert operation.",
+                        }
+                    ),
+                    400,
+                )
+
+            path_raw = route_payload.get("path")
+            if not isinstance(path_raw, list):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "INVALID_REQUEST",
+                            "message": "route.path must be an array.",
+                        }
+                    ),
+                    400,
+                )
+
+            color_aci: int | None = None
+            raw_color_aci = route_payload.get("colorAci")
+            if raw_color_aci is not None:
+                try:
+                    candidate = int(raw_color_aci)
+                    if 1 <= candidate <= 255:
+                        color_aci = candidate
+                except Exception:
+                    color_aci = None
+
+            raw_route_for_cad = {
+                "ref": str(route_payload.get("ref") or "AUTO-001").strip(),
+                "routeType": str(route_payload.get("routeType") or "conductor").strip().lower(),
+                "wireFunction": str(route_payload.get("wireFunction") or "").strip(),
+                "cableType": str(route_payload.get("cableType") or "").strip().upper(),
+                "colorCode": str(route_payload.get("colorCode") or "").strip().upper(),
+                "colorAci": color_aci,
+                "layerName": str(route_payload.get("layerName") or "").strip()[:80],
+                "filletRadius": route_payload.get("filletRadius", route_payload.get("fillet_radius", 0.1)),
+                "path": path_raw,
+            }
+            try:
+                normalized_route, canonical_warnings = canonicalize_route_for_sync(
+                    raw_route_for_cad,
+                    route_index=0,
+                )
+            except ValueError as exc:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "INVALID_REQUEST",
+                            "message": str(exc),
+                        }
+                    ),
+                    400,
+                )
+            warnings.extend(canonical_warnings)
+            normalized_payload["route"] = normalized_route
+
+        logger.info(
+            "Terminal route sync request received (request_id=%s, remote=%s, auth_mode=%s, provider=%s, operation=%s, session_id=%s, client_route_id=%s, route_candidates=%s, annotate_refs=%s, default_layer=%s)",
+            request_id,
+            remote_addr,
+            auth_mode,
+            conduit_provider,
+            operation,
+            session_id,
+            client_route_id,
+            route_candidates,
+            annotate_refs,
+            default_layer_name,
+        )
+
+        provider_path = "com"
+        if conduit_dotnet_enabled:
+            try:
+                result = _call_dotnet_conduit_action(
+                    action="conduit_route_terminal_routes_draw",
+                    payload=normalized_payload,
+                    remote_addr=remote_addr,
+                    auth_mode=auth_mode,
+                    request_id=request_id,
+                )
+                merged_warnings: list[str] = []
+                merged_warnings.extend(result.get("warnings", []) or [])
+                merged_warnings.extend(warnings)
+                if merged_warnings:
+                    result["warnings"] = list(
+                        dict.fromkeys(str(entry) for entry in merged_warnings if str(entry).strip())
+                    )
+                result["meta"] = {
+                    **(result.get("meta", {}) or {}),
+                    "operation": operation,
+                    "sessionId": session_id,
+                    "clientRouteId": client_route_id,
+                    "routeCandidates": route_candidates,
+                    "providerPath": "dotnet",
+                    "providerConfigured": conduit_provider,
+                }
+                if result.get("success"):
+                    return jsonify(result), 200
+                status_code = 400 if result.get("code") == "INVALID_REQUEST" else 422
+                return jsonify(result), status_code
+            except Exception as exc:
+                logger.warning(
+                    "Terminal route draw .NET provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    request_id,
+                    remote_addr,
+                    auth_mode,
+                    conduit_provider,
+                    conduit_allow_com_fallback,
+                    str(exc),
+                )
+                if not conduit_allow_com_fallback:
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "code": "DOTNET_BRIDGE_FAILED",
+                                "message": f".NET terminal route draw failed: {str(exc)}",
+                                "meta": {
+                                    "source": "dotnet",
+                                    "requestId": request_id,
+                                    "operation": operation,
+                                    "sessionId": session_id,
+                                    "clientRouteId": client_route_id,
+                                    "providerPath": "dotnet",
+                                    "providerConfigured": conduit_provider,
+                                },
+                            }
+                        ),
+                        503,
+                    )
+                provider_path = "com_fallback"
+
+        manager = get_manager()
+        status = manager.get_status()
+        if not status.get("drawing_open"):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
+                        "message": "No drawing open in AutoCAD.",
+                    }
+                ),
+                503,
+            )
+
+        if pythoncom is None:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "COM_UNAVAILABLE",
+                        "message": "AutoCAD COM bridge unavailable on this platform.",
+                    }
+                ),
+                503,
+            )
+
+        started_at = time.time()
+        try:
+            result = manager.plot_terminal_routes(normalized_payload)
+            elapsed_ms = int((time.time() - started_at) * 1000)
+            merged_warnings: list[str] = []
+            merged_warnings.extend(result.get("warnings", []) or [])
+            merged_warnings.extend(warnings)
+            if merged_warnings:
+                result["warnings"] = list(
+                    dict.fromkeys(str(entry) for entry in merged_warnings if str(entry).strip())
+                )
+            result["meta"] = {
+                **(result.get("meta", {}) or {}),
+                "source": "autocad",
+                "drawMs": elapsed_ms,
+                "requestId": request_id,
+                "operation": operation,
+                "sessionId": session_id,
+                "clientRouteId": client_route_id,
+                "routeCandidates": route_candidates,
+                "providerPath": provider_path,
+                "providerConfigured": conduit_provider,
+            }
+            if result.get("success"):
+                return jsonify(result), 200
+            status_code = 400 if result.get("code") == "INVALID_REQUEST" else 422
+            return jsonify(result), status_code
+        except Exception as exc:
+            logger.exception(
+                "Terminal route draw failed (request_id=%s, remote=%s, auth_mode=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "TERMINAL_ROUTE_DRAW_FAILED",
+                        "message": f"Terminal route draw failed: {str(exc)}",
+                    }
+                ),
+                500,
+            )
+
+    @bp.route("/conduit-route/terminal-labels/sync", methods=["POST"])
+    @require_autocad_auth
+    @limiter.limit("300 per hour")
+    def api_conduit_route_terminal_labels_sync():
+        """Sync terminal label attribute values onto scanned strip blocks."""
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+        request_id = _request_correlation_id()
+
+        if not request.is_json:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "Expected application/json payload.",
+                    }
+                ),
+                400,
+            )
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "Request payload must be a JSON object.",
+                    }
+                ),
+                400,
+            )
+
+        selection_only = bool(
+            payload.get("selectionOnly")
+            if "selectionOnly" in payload
+            else payload.get("selection_only", False)
+        )
+        include_modelspace = bool(
+            payload.get("includeModelspace")
+            if "includeModelspace" in payload
+            else payload.get("include_modelspace", True)
+        )
+        max_entities_raw = payload.get("maxEntities", payload.get("max_entities", 50000))
+        try:
+            max_entities = int(max_entities_raw)
+        except Exception:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "maxEntities must be an integer.",
+                    }
+                ),
+                400,
+            )
+        max_entities = max(100, min(250000, max_entities))
+
+        raw_strips = payload.get("strips")
+        normalized_strips: list[dict[str, Any]] = []
+        if raw_strips is not None:
+            if not isinstance(raw_strips, list):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "INVALID_REQUEST",
+                            "message": "strips must be an array when provided.",
+                        }
+                    ),
+                    400,
+                )
+            for entry in raw_strips:
+                if not isinstance(entry, dict):
+                    continue
+                strip_id = str(entry.get("stripId") or entry.get("strip_id") or "").strip()
+                if not strip_id:
+                    continue
+                terminal_count_raw = entry.get("terminalCount", entry.get("terminal_count", 12))
+                try:
+                    terminal_count = int(terminal_count_raw)
+                except Exception:
+                    terminal_count = 12
+                terminal_count = max(1, min(2000, terminal_count))
+                labels_raw = entry.get("labels")
+                labels = []
+                if isinstance(labels_raw, list):
+                    labels = [str(value).strip() for value in labels_raw]
+                normalized_strips.append(
+                    {
+                        "stripId": strip_id,
+                        "terminalCount": terminal_count,
+                        "labels": labels,
+                    }
+                )
+            if raw_strips and not normalized_strips:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "code": "INVALID_REQUEST",
+                            "message": "No valid strip entries were provided.",
+                        }
+                    ),
+                    400,
+                )
+
+        terminal_profile = payload.get("terminalProfile", payload.get("terminal_profile"))
+        normalized_payload: dict[str, Any] = {
+            "selectionOnly": selection_only,
+            "includeModelspace": include_modelspace,
+            "maxEntities": max_entities,
+            "terminalProfile": terminal_profile,
+            "strips": normalized_strips,
+        }
+
+        logger.info(
+            "Terminal label sync request received (request_id=%s, remote=%s, auth_mode=%s, strips=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
+            request_id,
+            remote_addr,
+            auth_mode,
+            len(normalized_strips),
+            selection_only,
+            include_modelspace,
+            max_entities,
+        )
+
+        manager = get_manager()
+        status = manager.get_status()
+        if not status.get("drawing_open"):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
+                        "message": "No drawing open in AutoCAD.",
+                    }
+                ),
+                503,
+            )
+
+        if pythoncom is None:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "COM_UNAVAILABLE",
+                        "message": "AutoCAD COM bridge unavailable on this platform.",
+                    }
+                ),
+                503,
+            )
+
+        started_at = time.time()
+        try:
+            result = manager.sync_terminal_labels(normalized_payload)
+            elapsed_ms = int((time.time() - started_at) * 1000)
+            result["meta"] = {
+                **(result.get("meta", {}) or {}),
+                "source": "autocad",
+                "requestId": request_id,
+                "requestMs": elapsed_ms,
+                "providerPath": "com",
+                "providerConfigured": conduit_provider,
+                "selectionOnly": selection_only,
+                "includeModelspace": include_modelspace,
+                "targetStrips": len(normalized_strips),
+            }
+            if result.get("success"):
+                return jsonify(result), 200
+            status_code = 400 if result.get("code") == "INVALID_REQUEST" else 422
+            return jsonify(result), status_code
+        except Exception as exc:
+            logger.exception(
+                "Terminal label sync failed (request_id=%s, remote=%s, auth_mode=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "TERMINAL_LABEL_SYNC_FAILED",
+                        "message": f"Terminal label sync failed: {str(exc)}",
                     }
                 ),
                 500,

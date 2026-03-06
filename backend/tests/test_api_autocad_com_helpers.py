@@ -46,17 +46,24 @@ class _TimeStub:
 
 class _LayersStub:
     def __init__(self, existing):
-        self.existing = set(existing)
+        self.existing = {}
+        for name in existing:
+            layer = type("LayerStub", (), {})()
+            layer.Color = 7
+            self.existing[name] = layer
         self.add_calls = []
 
     def Item(self, name):
         if name not in self.existing:
             raise RuntimeError("missing")
-        return object()
+        return self.existing[name]
 
     def Add(self, name):
         self.add_calls.append(name)
-        self.existing.add(name)
+        layer = type("LayerStub", (), {})()
+        layer.Color = 7
+        self.existing[name] = layer
+        return layer
 
 
 class _DocWithLayers:
@@ -141,13 +148,15 @@ class TestApiAutocadComHelpers(unittest.TestCase):
 
     def test_ensure_layer_adds_missing_layer(self) -> None:
         doc = _DocWithLayers(existing=[])
-        ensure_layer(doc, "COORD", dyn_fn=lambda value: value)
+        ensure_layer(doc, "COORD", dyn_fn=lambda value: value, color_aci=30)
         self.assertEqual(doc.Layers.add_calls, ["COORD"])
+        self.assertEqual(doc.Layers.Item("COORD").Color, 30)
 
     def test_ensure_layer_keeps_existing_layer(self) -> None:
         doc = _DocWithLayers(existing=["COORD"])
-        ensure_layer(doc, "COORD", dyn_fn=lambda value: value)
+        ensure_layer(doc, "COORD", dyn_fn=lambda value: value, color_aci=10)
         self.assertEqual(doc.Layers.add_calls, [])
+        self.assertEqual(doc.Layers.Item("COORD").Color, 10)
 
     def test_wait_for_command_finish_returns_true_when_idle(self) -> None:
         result = wait_for_command_finish(

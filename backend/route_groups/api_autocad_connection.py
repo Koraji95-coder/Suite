@@ -49,7 +49,24 @@ def connect_autocad(
         raise RuntimeError(
             "AutoCAD COM bridge unavailable on this platform. Run backend on Windows with pywin32 installed."
         )
-    acad = win32com_module.client.dynamic.Dispatch("AutoCAD.Application")
+    client = getattr(win32com_module, "client", None)
+    if client is None:
+        raise RuntimeError("AutoCAD COM bridge unavailable: win32com.client is missing.")
+
+    acad = None
+    get_active_object = getattr(client, "GetActiveObject", None)
+    if callable(get_active_object):
+        try:
+            acad = get_active_object("AutoCAD.Application")
+        except Exception:
+            acad = None
+
+    if acad is None:
+        dynamic_client = getattr(client, "dynamic", None)
+        if dynamic_client is None:
+            raise RuntimeError("AutoCAD COM bridge unavailable: dynamic dispatch is missing.")
+        acad = dynamic_client.Dispatch("AutoCAD.Application")
+
     if acad is None:
         raise RuntimeError("Could not connect to AutoCAD.Application")
     return dyn_fn(acad)

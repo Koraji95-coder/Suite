@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -270,9 +271,15 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/execute": ["POST"],
             "/api/trigger-selection": ["POST"],
             "/api/conduit-route/terminal-scan": ["POST"],
+            "/api/conduit-route/terminal-routes/draw": ["POST"],
+            "/api/conduit-route/terminal-labels/sync": ["POST"],
             "/api/conduit-route/obstacles/scan": ["POST"],
             "/api/conduit-route/route/compute": ["POST"],
             "/api/autocad/ws-ticket": ["POST"],
+            "/api/watchdog/config": ["PUT"],
+            "/api/watchdog/heartbeat": ["POST"],
+            "/api/watchdog/pick-root": ["POST"],
+            "/api/watchdog/status": ["GET"],
             "/health": ["GET"],
         }
 
@@ -388,9 +395,136 @@ class TestApiRouteGroups(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 401)
 
+    def test_terminal_route_draw_endpoint_requires_auth(self) -> None:
+        response = self.client.post(
+            "/api/conduit-route/terminal-routes/draw",
+            json={"routes": []},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_terminal_label_sync_endpoint_requires_auth(self) -> None:
+        response = self.client.post(
+            "/api/conduit-route/terminal-labels/sync",
+            json={"strips": []},
+        )
+        self.assertEqual(response.status_code, 401)
+
     def test_conduit_obstacle_scan_endpoint_requires_auth(self) -> None:
         response = self.client.post("/api/conduit-route/obstacles/scan")
         self.assertEqual(response.status_code, 401)
+
+    def test_watchdog_endpoints_require_auth(self) -> None:
+        response = self.client.get("/api/watchdog/status")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.put(
+            "/api/watchdog/config",
+            json={
+                "roots": [self.temp_dir.name],
+                "includeGlobs": [],
+                "excludeGlobs": [],
+                "heartbeatMs": 5000,
+                "enabled": True,
+            },
+        )
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.post("/api/watchdog/heartbeat")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.post("/api/watchdog/pick-root")
+        self.assertEqual(response.status_code, 401)
+
+    def test_watchdog_config_validation_and_heartbeat_events(self) -> None:
+        bad_response = self.client.put(
+            "/api/watchdog/config",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "roots": ["relative/path"],
+                "heartbeatMs": 5000,
+                "enabled": True,
+            },
+        )
+        self.assertEqual(bad_response.status_code, 400)
+        bad_payload = bad_response.get_json()
+        self.assertIsInstance(bad_payload, dict)
+        self.assertFalse(bad_payload.get("ok", True))
+
+        config_response = self.client.put(
+            "/api/watchdog/config",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "roots": [self.temp_dir.name],
+                "includeGlobs": [],
+                "excludeGlobs": [],
+                "heartbeatMs": 5000,
+                "enabled": True,
+            },
+        )
+        self.assertEqual(config_response.status_code, 200)
+        config_payload = config_response.get_json()
+        self.assertIsInstance(config_payload, dict)
+        self.assertTrue(config_payload.get("ok"))
+        self.assertIn("config", config_payload)
+        self.assertIn("initialScan", config_payload)
+
+        first_heartbeat = self.client.post(
+            "/api/watchdog/heartbeat",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(first_heartbeat.status_code, 200)
+        first_payload = first_heartbeat.get_json()
+        self.assertIsInstance(first_payload, dict)
+        self.assertTrue(first_payload.get("ok"))
+        self.assertIn("events", first_payload)
+        self.assertIn("scanMs", first_payload)
+        self.assertIn("filesScanned", first_payload)
+        self.assertIn("foldersScanned", first_payload)
+        self.assertIn("truncated", first_payload)
+        self.assertIn("warnings", first_payload)
+        self.assertIn("lastHeartbeatAt", first_payload)
+
+        added_file = os.path.join(self.temp_dir.name, "watchdog_added.txt")
+        with open(added_file, "w", encoding="utf-8") as handle:
+            handle.write("new file")
+
+        second_heartbeat = self.client.post(
+            "/api/watchdog/heartbeat",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(second_heartbeat.status_code, 200)
+        second_payload = second_heartbeat.get_json()
+        self.assertIsInstance(second_payload, dict)
+
+        events = second_payload.get("events") or []
+        self.assertTrue(any(event.get("type") == "added" for event in events))
+        added_event_ids = [
+            int(event.get("eventId") or 0)
+            for event in events
+            if event.get("type") == "added"
+        ]
+        self.assertTrue(all(event_id > 0 for event_id in added_event_ids))
+
+        modified_file = os.path.join(self.temp_dir.name, "watchdog_added.txt")
+        with open(modified_file, "a", encoding="utf-8") as handle:
+            handle.write("\nupdated")
+
+        third_heartbeat = self.client.post(
+            "/api/watchdog/heartbeat",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(third_heartbeat.status_code, 200)
+        third_payload = third_heartbeat.get_json()
+        self.assertIsInstance(third_payload, dict)
+        third_events = third_payload.get("events") or []
+        modified_event_ids = [
+            int(event.get("eventId") or 0)
+            for event in third_events
+            if event.get("type") == "modified"
+        ]
+        self.assertTrue(modified_event_ids)
+        if added_event_ids:
+            self.assertGreater(min(modified_event_ids), max(added_event_ids))
 
 
 if __name__ == "__main__":

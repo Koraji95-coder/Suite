@@ -13,6 +13,7 @@ from .api_autocad import create_autocad_blueprint
 from .api_backup import create_backup_blueprint
 from .api_auth_email import create_auth_email_blueprint
 from .api_batch_find_replace import create_batch_find_replace_blueprint
+from .api_watchdog import create_watchdog_blueprint
 from .api_health import create_health_blueprint
 from .api_dashboard import create_dashboard_blueprint
 from .api_transmittal import create_transmittal_blueprint
@@ -169,6 +170,13 @@ def register_route_groups(
             send_autocad_dotnet_command=send_autocad_dotnet_command,
             validate_layer_config=validate_layer_config,
             traceback_module=traceback_module,
+        )
+    )
+    app.register_blueprint(
+        create_watchdog_blueprint(
+            require_autocad_auth=require_autocad_auth,
+            limiter=limiter,
+            logger=logger,
         )
     )
     app.register_blueprint(create_health_blueprint())

@@ -38,14 +38,22 @@ class _DynamicDispatchStub:
 
 
 class _Win32ClientStub:
-    def __init__(self, dynamic_dispatch_stub):
+    def __init__(self, dynamic_dispatch_stub, get_active_fn=None):
         self.dynamic = dynamic_dispatch_stub
+        self._get_active_fn = get_active_fn
+        self.get_active_calls = []
+
+    def GetActiveObject(self, prog_id):
+        self.get_active_calls.append(prog_id)
+        if self._get_active_fn is None:
+            raise RuntimeError("GetActiveObject unavailable")
+        return self._get_active_fn(prog_id)
 
 
 class _Win32ComStub:
-    def __init__(self, dispatch_fn):
+    def __init__(self, dispatch_fn, get_active_fn=None):
         self._dynamic = _DynamicDispatchStub(dispatch_fn)
-        self.client = _Win32ClientStub(self._dynamic)
+        self.client = _Win32ClientStub(self._dynamic, get_active_fn=get_active_fn)
 
 
 class CDispatch:
@@ -117,17 +125,21 @@ class TestApiAutocadConnection(unittest.TestCase):
             )
 
     def test_connect_autocad_raises_when_dispatch_returns_none(self) -> None:
-        win32_stub = _Win32ComStub(lambda _value: None)
+        win32_stub = _Win32ComStub(lambda _value: None, get_active_fn=lambda _value: None)
         with self.assertRaises(RuntimeError):
             connect_autocad(
                 autocad_com_available=True,
                 win32com_module=win32_stub,
                 dyn_fn=lambda value: value,
             )
+        self.assertEqual(win32_stub.client.get_active_calls, ["AutoCAD.Application"])
         self.assertEqual(win32_stub.client.dynamic.calls, ["AutoCAD.Application"])
 
-    def test_connect_autocad_dispatches_and_wraps_with_dyn(self) -> None:
-        win32_stub = _Win32ComStub(lambda value: {"app": value})
+    def test_connect_autocad_prefers_get_active_object(self) -> None:
+        win32_stub = _Win32ComStub(
+            lambda value: {"dispatch_app": value},
+            get_active_fn=lambda value: {"active_app": value},
+        )
 
         result = connect_autocad(
             autocad_com_available=True,
@@ -135,7 +147,24 @@ class TestApiAutocadConnection(unittest.TestCase):
             dyn_fn=lambda value: {"wrapped": value},
         )
 
-        self.assertEqual(result, {"wrapped": {"app": "AutoCAD.Application"}})
+        self.assertEqual(result, {"wrapped": {"active_app": "AutoCAD.Application"}})
+        self.assertEqual(win32_stub.client.get_active_calls, ["AutoCAD.Application"])
+        self.assertEqual(win32_stub.client.dynamic.calls, [])
+
+    def test_connect_autocad_dispatches_when_get_active_fails(self) -> None:
+        win32_stub = _Win32ComStub(
+            lambda value: {"dispatch_app": value},
+            get_active_fn=lambda _value: (_ for _ in ()).throw(RuntimeError("no instance")),
+        )
+
+        result = connect_autocad(
+            autocad_com_available=True,
+            win32com_module=win32_stub,
+            dyn_fn=lambda value: {"wrapped": value},
+        )
+
+        self.assertEqual(result, {"wrapped": {"dispatch_app": "AutoCAD.Application"}})
+        self.assertEqual(win32_stub.client.get_active_calls, ["AutoCAD.Application"])
         self.assertEqual(win32_stub.client.dynamic.calls, ["AutoCAD.Application"])
 
 

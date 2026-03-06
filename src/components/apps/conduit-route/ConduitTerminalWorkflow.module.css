@@ -124,6 +124,25 @@
 	font-weight: 600;
 }
 
+.preflightCard {
+	display: grid;
+	gap: 0.24rem;
+	padding: 0.52rem 0.6rem;
+	border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+	border-radius: var(--radius-1);
+	background: color-mix(in srgb, #0f1c31 64%, transparent);
+}
+
+.preflightCard strong {
+	font-size: 0.72rem;
+}
+
+.preflightCard small {
+	color: var(--text-muted);
+	font-size: 0.65rem;
+	line-height: 1.35;
+}
+
 .panelList {
 	display: grid;
 	gap: var(--space-2);
@@ -157,8 +176,15 @@
 }
 
 .actionRow {
-	display: flex;
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: var(--space-2);
+}
+
+.actionRow :global(button) {
+	min-width: 0;
+	width: 100%;
+	justify-content: center;
 }
 
 .canvasCard {
@@ -187,32 +213,31 @@
 	border-radius: var(--radius-3);
 	background:
 		radial-gradient(
-			100% 120% at 100% 0%,
-			color-mix(in srgb, #122844 30%, transparent),
+			120% 140% at 100% 0%,
+			color-mix(in srgb, #15365b 22%, transparent),
 			transparent
 		),
 		linear-gradient(
-			160deg,
-			color-mix(in srgb, #020814 90%, transparent),
-			color-mix(in srgb, #081225 87%, transparent)
+			165deg,
+			color-mix(in srgb, #031022 90%, transparent),
+			color-mix(in srgb, #09182e 87%, transparent)
 		);
 }
 
 .canvas {
 	display: block;
 	width: 100%;
-	min-width: 860px;
+	min-width: 640px;
 	height: auto;
-	aspect-ratio: 940 / 620;
 }
 
 .canvasBg {
-	fill: color-mix(in srgb, #020712 92%, transparent);
+	fill: color-mix(in srgb, #031126 92%, transparent);
 }
 
 .grid {
-	stroke: color-mix(in srgb, var(--border) 72%, transparent);
-	stroke-width: 1;
+	stroke: color-mix(in srgb, #6d7f99 26%, transparent);
+	stroke-width: 0.8;
 }
 
 .stripRail {
@@ -263,12 +288,28 @@
 	cursor: pointer;
 }
 
+.terminalHit {
+	fill: transparent;
+	cursor: pointer;
+}
+
 .terminalRing {
 	fill: none;
 	stroke: color-mix(in srgb, #f8fafc 75%, transparent);
 	stroke-width: 1.55;
 	stroke-dasharray: 4 3;
 	pointer-events: none;
+}
+
+.terminalValue {
+	fill: color-mix(in srgb, #f8dcae 92%, #ffffff 8%);
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	pointer-events: none;
+	paint-order: stroke fill;
+	stroke: color-mix(in srgb, #050912 88%, transparent);
+	stroke-width: 1.55;
 }
 
 .routeShadow {
@@ -301,17 +342,16 @@
 	font-weight: 700;
 	letter-spacing: 0.06em;
 	dominant-baseline: central;
-	paint-order: stroke fill;
-	stroke: color-mix(in srgb, #050912 90%, transparent);
-	stroke-width: 2.1;
+	pointer-events: none;
 }
 
-.jumperGlyph {
+.routeTagMask {
 	fill: none;
-	stroke: color-mix(in srgb, #fb923c 94%, #fff 6%);
-	stroke-width: 1.9;
-	stroke-linecap: round;
+	stroke: color-mix(in srgb, #031126 96%, transparent);
+	stroke-width: 5.6;
 	stroke-linejoin: round;
+	paint-order: stroke;
+	pointer-events: none;
 }
 
 .canvasFooter {
@@ -388,9 +428,41 @@
 	font-size: 0.66rem;
 }
 
+.syncBadge {
+	padding: 0.12rem 0.38rem;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+	background: color-mix(in srgb, #0f1a2b 72%, transparent);
+	color: var(--text-muted);
+	font-size: 0.61rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.syncBadgeSynced {
+	border-color: color-mix(in srgb, var(--success) 60%, var(--border));
+	color: color-mix(in srgb, var(--success) 84%, #ffffff 16%);
+}
+
+.syncBadgePending {
+	border-color: color-mix(in srgb, var(--warning) 62%, var(--border));
+	color: color-mix(in srgb, var(--warning) 84%, #ffffff 16%);
+}
+
+.syncBadgeFailed {
+	border-color: color-mix(in srgb, var(--danger) 62%, var(--border));
+	color: color-mix(in srgb, var(--danger) 84%, #ffffff 16%);
+}
+
 .routeMeta {
 	color: var(--text-muted);
 	font-size: 0.68rem;
+}
+
+.routeErrorMeta {
+	color: color-mix(in srgb, var(--danger) 82%, #ffffff 18%);
+	font-size: 0.64rem;
+	line-height: 1.3;
 }
 
 .selectedRoute {
@@ -416,6 +488,10 @@
 
 .selectedRoute strong {
 	font-size: 0.72rem;
+}
+
+.selectedRouteWide {
+	grid-column: 1 / -1;
 }
 
 .tableWrap {
@@ -470,6 +546,66 @@
 	gap: 0.28rem;
 }
 
+.diagnosticsPanel {
+	display: grid;
+	gap: var(--space-2);
+	border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+	border-radius: var(--radius-2);
+	padding: 0.5rem;
+	background: color-mix(in srgb, #0d1628 72%, transparent);
+}
+
+.diagnosticsList {
+	display: grid;
+	gap: var(--space-2);
+	max-height: 190px;
+	overflow: auto;
+	padding-right: 0.12rem;
+}
+
+.diagnosticItem {
+	display: grid;
+	gap: 0.16rem;
+	padding: 0.45rem 0.5rem;
+	border-radius: var(--radius-1);
+	border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+	background: color-mix(in srgb, #0f1b30 62%, transparent);
+}
+
+.diagnosticHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+.diagnosticHead strong {
+	font-size: 0.66rem;
+	letter-spacing: 0.03em;
+}
+
+.diagnosticHead span {
+	color: var(--text-muted);
+	font-size: 0.61rem;
+}
+
+.diagnosticMeta {
+	color: color-mix(in srgb, var(--text-muted) 90%, #9fb4d4 10%);
+	font-size: 0.61rem;
+}
+
+.diagnosticMessage {
+	color: color-mix(in srgb, var(--text) 92%, transparent);
+	font-size: 0.65rem;
+	line-height: 1.3;
+}
+
+.diagnosticWarnings {
+	color: color-mix(in srgb, var(--warning) 82%, #ffffff 18%);
+	font-size: 0.62rem;
+	line-height: 1.3;
+}
+
 .emptyState {
 	padding: 0.7rem;
 	border: 1px dashed color-mix(in srgb, var(--border) 86%, transparent);
@@ -511,7 +647,11 @@
 		grid-template-columns: 1fr;
 	}
 
+	.actionRow {
+		grid-template-columns: 1fr;
+	}
+
 	.canvas {
-		min-width: 620px;
+		min-width: 520px;
 	}
 }

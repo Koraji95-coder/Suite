@@ -13,6 +13,7 @@ import {
 } from "react";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
+import { hasAdminClaim } from "../lib/roles";
 import { logger } from "../lib/logger";
 import { agentService } from "../services/agentService";
 import { agentTaskManager } from "../services/agentTaskManager";
@@ -58,26 +59,7 @@ export const AuthContext = createContext<AuthContextValue | undefined>(
 );
 
 function isUserAdmin(authUser: User | null): boolean {
-	if (!authUser) return false;
-
-	const rawRole = (authUser.app_metadata as Record<string, unknown> | undefined)
-		?.role;
-
-	if (typeof rawRole === "string") {
-		return rawRole.trim().toLowerCase() === "admin";
-	}
-
-	const rawRoles = (
-		authUser.app_metadata as Record<string, unknown> | undefined
-	)?.roles;
-	if (Array.isArray(rawRoles)) {
-		return rawRoles.some(
-			(entry) =>
-				typeof entry === "string" && entry.trim().toLowerCase() === "admin",
-		);
-	}
-
-	return false;
+	return hasAdminClaim(authUser);
 }
 
 async function fetchProfile(userId: string): Promise<Profile | null> {

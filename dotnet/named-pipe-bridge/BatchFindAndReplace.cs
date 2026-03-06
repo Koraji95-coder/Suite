@@ -174,6 +174,7 @@ static class PipeRouter
             {
                 "conduit_route_terminal_scan" => ConduitRouteStubHandlers.HandleTerminalScan(payload),
                 "conduit_route_obstacle_scan" => ConduitRouteStubHandlers.HandleObstacleScan(payload),
+                "conduit_route_terminal_routes_draw" => ConduitRouteStubHandlers.HandleTerminalRoutesDraw(payload),
                 _ => BuildActionNotImplementedResult(normalizedAction),
             };
 
@@ -319,8 +320,15 @@ static class ConduitRouteStubHandlers
     private const double DefaultCanvasHeight = 560.0;
     private const double MinCanvasSize = 120.0;
     private const double ViewportPadding = 20.0;
+    private const double ArcQuarterTurnTolerance = 1e-6;
     private const int DefaultComReadRetryAttempts = 3;
     private const int DefaultComReadRetryDelayMs = 35;
+    private const string RouteGeometryVersion = "v1.2";
+
+    static ConduitRouteStubHandlers()
+    {
+        ValidateArcAngleNormalization();
+    }
 
     private static readonly string[] AutoCadProgIds =
     {
@@ -374,6 +382,10 @@ static class ConduitRouteStubHandlers
         "AUTOCAD_DOTNET_COM_READ_RETRY_DELAY_MS",
         DefaultComReadRetryDelayMs
     );
+    private static readonly object TerminalRouteBindingLock = new();
+    private static readonly Dictionary<string, Dictionary<string, List<string>>> TerminalRouteBindings =
+        new(StringComparer.OrdinalIgnoreCase);
+    private const int MaxTerminalRouteSessions = 96;
 
     private sealed class TerminalScanProfile
     {
@@ -437,6 +449,39 @@ static class ConduitRouteStubHandlers
         public string ToStripId { get; init; } = "";
         public int ToTerminal { get; init; }
         public string SourceBlockName { get; init; } = "";
+        public string Resolution { get; init; } = "attribute";
+        public double? X { get; init; }
+        public double? Y { get; init; }
+    }
+
+    private sealed class StripScanRecord
+    {
+        public string PanelId { get; init; } = "";
+        public string Side { get; init; } = "";
+        public string StripId { get; init; } = "";
+        public int TerminalCount { get; init; }
+        public double X { get; init; }
+        public double Y { get; init; }
+        public List<TerminalGeometryPrimitive> Geometry { get; init; } = new();
+    }
+
+    private sealed class PendingPositionalJumperCandidate
+    {
+        public string JumperId { get; init; } = "";
+        public string PanelHint { get; init; } = "";
+        public string Handle { get; init; } = "";
+        public string BlockName { get; init; } = "";
+        public double X { get; init; }
+        public double Y { get; init; }
+    }
+
+    private sealed class TerminalRouteDrawRecord
+    {
+        public string Ref { get; init; } = "";
+        public string RouteType { get; init; } = "conductor";
+        public string LayerName { get; init; } = "";
+        public int? ColorAci { get; init; }
+        public List<GeometryPoint> Points { get; init; } = new();
     }
 
     public static JsonObject HandleTerminalScan(JsonObject payload)
@@ -459,12 +504,16 @@ static class ConduitRouteStubHandlers
         var seenJumperSignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var blockGeometryCache = new Dictionary<string, List<TerminalGeometryPrimitive>>(StringComparer.OrdinalIgnoreCase);
         var jumpers = new List<JumperRecord>();
+        var stripRecords = new List<StripScanRecord>();
+        var pendingPositionalJumpers = new List<PendingPositionalJumperCandidate>();
 
         var scannedEntities = 0;
         var scannedBlockReferences = 0;
         var skippedNonTerminalBlocks = 0;
         var jumperCandidateBlocks = 0;
         var skippedInvalidJumperBlocks = 0;
+        var positionalJumperCandidates = 0;
+        var resolvedPositionalJumpers = 0;
         var totalStrips = 0;
         var totalTerminals = 0;
         var totalJumpers = 0;
@@ -506,9 +555,26 @@ static class ConduitRouteStubHandlers
                 );
                 if (jumper is null)
                 {
+                    if (TryReadPoint(ReadProperty(entity, "InsertionPoint"), out var jumperX, out var jumperY))
+                    {
+                        positionalJumperCandidates += 1;
+                        pendingPositionalJumpers.Add(
+                            new PendingPositionalJumperCandidate
+                            {
+                                JumperId = FirstAttr(attrs, JumperIdKeys).Trim(),
+                                PanelHint = FirstAttr(attrs, JumperPanelIdKeys).Trim().ToUpperInvariant(),
+                                Handle = handle,
+                                BlockName = (blockName ?? "").Trim(),
+                                X = jumperX,
+                                Y = jumperY,
+                            }
+                        );
+                        return;
+                    }
+
                     skippedInvalidJumperBlocks += 1;
                     warnings.Add(
-                        $"Skipping jumper block {(string.IsNullOrWhiteSpace(blockName) ? "<unknown>" : blockName)} (missing FROM/TO strip or terminal attributes)."
+                        $"Skipping jumper block {(string.IsNullOrWhiteSpace(blockName) ? "<unknown>" : blockName)} (missing FROM/TO attributes and insertion point)."
                     );
                     return;
                 }
@@ -625,6 +691,19 @@ static class ConduitRouteStubHandlers
                 }
             );
 
+            stripRecords.Add(
+                new StripScanRecord
+                {
+                    PanelId = panelId,
+                    Side = side,
+                    StripId = stripId,
+                    TerminalCount = terminalCount,
+                    X = pointX,
+                    Y = pointY,
+                    Geometry = CloneGeometry(geometry),
+                }
+            );
+
             totalStrips += 1;
             totalTerminals += terminalCount;
         }
@@ -635,6 +714,34 @@ static class ConduitRouteStubHandlers
             {
                 ConsumeEntity(entity);
             }
+        }
+
+        foreach (var pending in pendingPositionalJumpers)
+        {
+            var resolved = ResolvePositionalJumperRecord(
+                pending,
+                stripRecords,
+                terminalProfile.DefaultPanelPrefix
+            );
+            if (resolved is null)
+            {
+                skippedInvalidJumperBlocks += 1;
+                warnings.Add(
+                    $"Skipping jumper block {(string.IsNullOrWhiteSpace(pending.BlockName) ? "<unknown>" : pending.BlockName)} (could not resolve nearest strip pair from insertion point)."
+                );
+                continue;
+            }
+
+            var jumperSignature =
+                $"{resolved.PanelId}|{resolved.FromStripId}|{resolved.FromTerminal}|{resolved.ToStripId}|{resolved.ToTerminal}";
+            if (!seenJumperSignatures.Add(jumperSignature))
+            {
+                continue;
+            }
+
+            jumpers.Add(resolved);
+            totalJumpers += 1;
+            resolvedPositionalJumpers += 1;
         }
 
         if (includeModelspace)
@@ -689,6 +796,8 @@ static class ConduitRouteStubHandlers
                 ["skippedNonTerminalBlocks"] = skippedNonTerminalBlocks,
                 ["jumperCandidateBlocks"] = jumperCandidateBlocks,
                 ["skippedInvalidJumperBlocks"] = skippedInvalidJumperBlocks,
+                ["positionalJumperCandidates"] = positionalJumperCandidates,
+                ["resolvedPositionalJumpers"] = resolvedPositionalJumpers,
                 ["selectionOnly"] = selectionOnly,
                 ["includeModelspace"] = includeModelspace,
                 ["totalPanels"] = panels.Count,
@@ -878,6 +987,560 @@ static class ConduitRouteStubHandlers
                 ["includeModelspace"] = includeModelspace,
                 ["totalObstacles"] = totalObstacles,
                 ["overrideLayerEntities"] = overrideLayerEntities,
+            },
+            ["warnings"] = ToJsonArray(warnings),
+        };
+    }
+
+    public static JsonObject HandleTerminalRoutesDraw(JsonObject payload)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var operation = ReadStringValue(payload, "operation", "").Trim().ToLowerInvariant();
+        if (operation is not ("upsert" or "delete" or "reset"))
+        {
+            return new JsonObject
+            {
+                ["success"] = false,
+                ["code"] = "INVALID_REQUEST",
+                ["message"] = "operation must be one of: upsert, delete, reset.",
+                ["meta"] = new JsonObject
+                {
+                    ["source"] = "dotnet",
+                },
+                ["warnings"] = new JsonArray(),
+            };
+        }
+
+        var sessionId = ReadStringValue(payload, "sessionId", "").Trim();
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return new JsonObject
+            {
+                ["success"] = false,
+                ["code"] = "INVALID_REQUEST",
+                ["message"] = "sessionId is required for terminal route sync operations.",
+                ["meta"] = new JsonObject
+                {
+                    ["source"] = "dotnet",
+                    ["operation"] = operation,
+                },
+                ["warnings"] = new JsonArray(),
+            };
+        }
+        sessionId = sessionId.Length <= 128 ? sessionId : sessionId[..128];
+
+        var clientRouteId = ReadStringValue(payload, "clientRouteId", "").Trim();
+        if (clientRouteId.Length > 128)
+        {
+            clientRouteId = clientRouteId[..128];
+        }
+
+        var defaultLayerName = NormalizeLayerName(
+            ReadStringValue(payload, "defaultLayerName", "SUITE_WIRE_AUTO"),
+            "SUITE_WIRE_AUTO"
+        );
+        var annotateRefs = ReadBool(payload, "annotateRefs", fallback: true);
+        var textHeight = Math.Max(0.01, ReadDouble(payload, "textHeight", 0.125));
+
+        var warnings = new List<string>();
+        var routeCandidates = operation == "reset" ? 0 : 1;
+        using var session = ConnectAutoCad();
+        var drawingName = StringOrDefault(ReadProperty(session.Document, "Name"), "Unknown.dwg");
+        var units = ResolveUnits(session.Document);
+
+        var bindingsNode = new JsonObject();
+        var layersUsed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var routesDrawn = 0;
+        var segmentsDrawn = 0;
+        var drawnLines = 0;
+        var drawnArcs = 0;
+        var labelsDrawn = 0;
+        var filletAppliedCorners = 0;
+        var filletSkippedCorners = 0;
+        var geometryVersion = RouteGeometryVersion;
+        var deletedEntities = 0;
+        var resetRoutes = 0;
+        var syncStatus = "failed";
+        var success = false;
+        var code = "";
+        var message = "";
+
+        if (operation == "reset")
+        {
+            var resetResult = DeleteSessionBindings(sessionId, session.Document, warnings);
+            deletedEntities = resetResult.DeletedEntities;
+            resetRoutes = resetResult.ResetRoutes;
+            syncStatus = "reset";
+            success = true;
+            message = $"Reset CAD sync session '{sessionId}' ({resetRoutes} route binding(s) cleared).";
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(clientRouteId))
+            {
+                return new JsonObject
+                {
+                    ["success"] = false,
+                    ["code"] = "INVALID_REQUEST",
+                    ["message"] = "clientRouteId is required for upsert/delete operations.",
+                    ["meta"] = new JsonObject
+                    {
+                        ["source"] = "dotnet",
+                        ["operation"] = operation,
+                        ["sessionId"] = sessionId,
+                    },
+                    ["warnings"] = new JsonArray(),
+                };
+            }
+
+            if (operation == "delete")
+            {
+                var deleteResult = DeleteRouteBindings(sessionId, clientRouteId, session.Document, warnings);
+                deletedEntities = deleteResult.DeletedCount;
+                syncStatus = "deleted";
+                success = true;
+                message = $"Deleted CAD bindings for route '{clientRouteId}' ({deletedEntities} entity(ies)).";
+                bindingsNode[clientRouteId] = new JsonObject
+                {
+                    ["entityHandles"] = ToJsonArray(deleteResult.DeletedHandles),
+                };
+            }
+            else
+            {
+                JsonObject? routeNode = null;
+                if (payload.TryGetPropertyValue("route", out var routeObjNode)
+                    && routeObjNode is JsonObject directRoute)
+                {
+                    routeNode = directRoute;
+                }
+                else if (payload.TryGetPropertyValue("routes", out var routesNode)
+                    && routesNode is JsonArray routesArray
+                    && routesArray.Count > 0
+                    && routesArray[0] is JsonObject firstRoute)
+                {
+                    routeNode = firstRoute;
+                }
+
+                if (routeNode is null)
+                {
+                    return new JsonObject
+                    {
+                        ["success"] = false,
+                        ["code"] = "INVALID_REQUEST",
+                        ["message"] = "route object is required for upsert operation.",
+                        ["meta"] = new JsonObject
+                        {
+                            ["source"] = "dotnet",
+                            ["operation"] = operation,
+                            ["sessionId"] = sessionId,
+                            ["clientRouteId"] = clientRouteId,
+                        },
+                        ["warnings"] = new JsonArray(),
+                    };
+                }
+
+                if (!routeNode.TryGetPropertyValue("path", out var pathNode) || pathNode is not JsonArray pathArray)
+                {
+                    return new JsonObject
+                    {
+                        ["success"] = false,
+                        ["code"] = "INVALID_REQUEST",
+                        ["message"] = "route.path must be an array.",
+                        ["meta"] = new JsonObject
+                        {
+                            ["source"] = "dotnet",
+                            ["operation"] = operation,
+                            ["sessionId"] = sessionId,
+                            ["clientRouteId"] = clientRouteId,
+                        },
+                        ["warnings"] = new JsonArray(),
+                    };
+                }
+
+                var points = new List<GeometryPoint>();
+                for (var pointIndex = 0; pointIndex < pathArray.Count; pointIndex++)
+                {
+                    if (pathArray[pointIndex] is not JsonObject pointObj)
+                    {
+                        continue;
+                    }
+                    var x = ReadDouble(pointObj, "x", double.NaN);
+                    var y = ReadDouble(pointObj, "y", double.NaN);
+                    if (double.IsNaN(x) || double.IsInfinity(x) || double.IsNaN(y) || double.IsInfinity(y))
+                    {
+                        continue;
+                    }
+                    if (points.Count > 0)
+                    {
+                        var prev = points[points.Count - 1];
+                        if (Math.Abs(prev.X - x) <= 1e-6 && Math.Abs(prev.Y - y) <= 1e-6)
+                        {
+                            continue;
+                        }
+                    }
+                    points.Add(new GeometryPoint(x, y));
+                }
+
+                if (points.Count < 2)
+                {
+                    return new JsonObject
+                    {
+                        ["success"] = false,
+                        ["code"] = "INVALID_REQUEST",
+                        ["message"] = "route.path requires at least two valid points.",
+                        ["meta"] = new JsonObject
+                        {
+                            ["source"] = "dotnet",
+                            ["operation"] = operation,
+                            ["sessionId"] = sessionId,
+                            ["clientRouteId"] = clientRouteId,
+                        },
+                        ["warnings"] = new JsonArray(),
+                    };
+                }
+
+                var routeType = ReadStringValue(routeNode, "routeType", "conductor").Trim().ToLowerInvariant();
+                routeType = routeType == "jumper" ? "jumper" : "conductor";
+                var routeLayer = NormalizeLayerName(
+                    ReadStringValue(routeNode, "layerName", ""),
+                    routeType == "jumper" ? "SUITE_WIRE_JUMPER" : defaultLayerName
+                );
+                int? colorAci = null;
+                var colorCandidate = ReadInt(routeNode, "colorAci", 0);
+                if (colorCandidate >= 1 && colorCandidate <= 255)
+                {
+                    colorAci = colorCandidate;
+                }
+                var routeRef = ReadStringValue(routeNode, "ref", "AUTO-001");
+                var routeGeometryVersion = ReadStringValue(routeNode, "geometryVersion", RouteGeometryVersion);
+                if (!string.IsNullOrWhiteSpace(routeGeometryVersion))
+                {
+                    geometryVersion = routeGeometryVersion;
+                }
+
+                var staleDeleteResult = DeleteRouteBindings(sessionId, clientRouteId, session.Document, warnings);
+                deletedEntities += staleDeleteResult.DeletedCount;
+
+                EnsureLayerExists(session.Document, routeLayer, colorAci);
+                layersUsed.Add(routeLayer);
+                var createdHandles = new List<string>();
+                var routePrimitives = ParseCadRoutePrimitives(routeNode, warnings);
+                if (routePrimitives.Count == 0)
+                {
+                    for (var pointIndex = 1; pointIndex < points.Count; pointIndex++)
+                    {
+                        var startPoint = points[pointIndex - 1];
+                        var endPoint = points[pointIndex];
+                        if (Math.Abs(endPoint.X - startPoint.X) <= 1e-6 && Math.Abs(endPoint.Y - startPoint.Y) <= 1e-6)
+                        {
+                            continue;
+                        }
+                        routePrimitives.Add(
+                            new CadRoutePrimitive
+                            {
+                                Kind = "line",
+                                Start = startPoint,
+                                End = endPoint,
+                                Center = default,
+                                Radius = 0.0,
+                                Turn = 1.0,
+                            }
+                        );
+                    }
+                }
+
+                filletAppliedCorners = ClampInt(
+                    ReadInt(
+                        routeNode,
+                        "filletAppliedCorners",
+                        routePrimitives.Count(entry => string.Equals(entry.Kind, "arc", StringComparison.OrdinalIgnoreCase))
+                    ),
+                    0,
+                    100000
+                );
+                filletSkippedCorners = ClampInt(
+                    ReadInt(routeNode, "filletSkippedCorners", 0),
+                    0,
+                    100000
+                );
+
+                for (var primitiveIndex = 0; primitiveIndex < routePrimitives.Count; primitiveIndex++)
+                {
+                    var primitive = routePrimitives[primitiveIndex];
+                    if (string.Equals(primitive.Kind, "line", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (Math.Abs(primitive.End.X - primitive.Start.X) <= 1e-6
+                            && Math.Abs(primitive.End.Y - primitive.Start.Y) <= 1e-6)
+                        {
+                            continue;
+                        }
+                        try
+                        {
+                            var entity = ((dynamic)session.Modelspace).AddLine(
+                                CadPoint(primitive.Start.X, primitive.Start.Y, 0.0),
+                                CadPoint(primitive.End.X, primitive.End.Y, 0.0)
+                            );
+                            SetEntityLayerAndColor(entity, routeLayer, colorAci);
+                            var handle = GetEntityHandle(entity);
+                            if (!string.IsNullOrWhiteSpace(handle))
+                            {
+                                createdHandles.Add(handle);
+                            }
+                            drawnLines += 1;
+                            segmentsDrawn += 1;
+                        }
+                        catch (Exception ex)
+                        {
+                            warnings.Add(
+                                $"Route '{routeRef}': failed to draw line primitive {primitiveIndex} ({DescribeException(ex)})."
+                            );
+                        }
+                        continue;
+                    }
+
+                    if (string.Equals(primitive.Kind, "arc", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var startAngle = Math.Atan2(
+                            primitive.Start.Y - primitive.Center.Y,
+                            primitive.Start.X - primitive.Center.X
+                        );
+                        var endAngle = Math.Atan2(
+                            primitive.End.Y - primitive.Center.Y,
+                            primitive.End.X - primitive.Center.X
+                        );
+                        (startAngle, endAngle) = NormalizeAddArcAngles(startAngle, endAngle, primitive.Turn);
+
+                        object? arcEntity = null;
+                        try
+                        {
+                            arcEntity = ((dynamic)session.Modelspace).AddArc(
+                                CadPoint(primitive.Center.X, primitive.Center.Y, 0.0),
+                                primitive.Radius,
+                                startAngle,
+                                endAngle
+                            );
+                            SetEntityLayerAndColor(arcEntity, routeLayer, colorAci);
+                            var handle = GetEntityHandle(arcEntity);
+                            if (!string.IsNullOrWhiteSpace(handle))
+                            {
+                                createdHandles.Add(handle);
+                            }
+                            drawnArcs += 1;
+                            segmentsDrawn += 1;
+                        }
+                        catch (Exception ex)
+                        {
+                            warnings.Add(
+                                $"Route '{routeRef}': failed to draw arc primitive {primitiveIndex} ({DescribeException(ex)}). Falling back to line."
+                            );
+                            try
+                            {
+                                var fallbackEntity = ((dynamic)session.Modelspace).AddLine(
+                                    CadPoint(primitive.Start.X, primitive.Start.Y, 0.0),
+                                    CadPoint(primitive.End.X, primitive.End.Y, 0.0)
+                                );
+                                SetEntityLayerAndColor(fallbackEntity, routeLayer, colorAci);
+                                var handle = GetEntityHandle(fallbackEntity);
+                                if (!string.IsNullOrWhiteSpace(handle))
+                                {
+                                    createdHandles.Add(handle);
+                                }
+                                drawnLines += 1;
+                                segmentsDrawn += 1;
+                            }
+                            catch (Exception fallbackEx)
+                            {
+                                warnings.Add(
+                                    $"Route '{routeRef}': failed arc fallback line {primitiveIndex} ({DescribeException(fallbackEx)})."
+                                );
+                            }
+                        }
+                        continue;
+                    }
+
+                    warnings.Add($"Route '{routeRef}': unsupported primitive kind '{primitive.Kind}'.");
+                }
+
+                if (annotateRefs && !string.IsNullOrWhiteSpace(routeRef))
+                {
+                    var (labelX, labelY, labelRotation) = ComputeRouteLabelAnchor(points);
+                    try
+                    {
+                        var labelWidth = Math.Max(1.0, textHeight * Math.Max(6.0, routeRef.Length * 0.9));
+                        var labelEntity = ((dynamic)session.Modelspace).AddMText(
+                            CadPoint(labelX, labelY, 0.0),
+                            labelWidth,
+                            routeRef
+                        );
+                        SetEntityLayerAndColor(labelEntity, routeLayer, colorAci);
+                        try
+                        {
+                            ((dynamic)labelEntity).AttachmentPoint = 5; // Middle Center
+                        }
+                        catch
+                        {
+                            // Ignore AttachmentPoint failures.
+                        }
+                        try
+                        {
+                            ((dynamic)labelEntity).Rotation = labelRotation;
+                        }
+                        catch
+                        {
+                            // Ignore rotation assignment failures.
+                        }
+                        try
+                        {
+                            ((dynamic)labelEntity).BackgroundFill = true;
+                        }
+                        catch
+                        {
+                            // Ignore mask assignment failures.
+                        }
+                        try
+                        {
+                            ((dynamic)labelEntity).UseBackgroundColor = true;
+                        }
+                        catch
+                        {
+                            // Ignore mask color assignment failures.
+                        }
+                        var handle = GetEntityHandle(labelEntity);
+                        if (!string.IsNullOrWhiteSpace(handle))
+                        {
+                            createdHandles.Add(handle);
+                        }
+                        labelsDrawn += 1;
+                    }
+                    catch (Exception ex)
+                    {
+                        warnings.Add(
+                            $"Route '{routeRef}': MText label failed ({DescribeException(ex)}). Falling back to Text."
+                        );
+                        try
+                        {
+                            var fallbackLabel = ((dynamic)session.Modelspace).AddText(
+                                routeRef,
+                                CadPoint(labelX, labelY, 0.0),
+                                textHeight
+                            );
+                            SetEntityLayerAndColor(fallbackLabel, routeLayer, colorAci);
+                            try
+                            {
+                                ((dynamic)fallbackLabel).Alignment = 10; // Middle Center
+                            }
+                            catch
+                            {
+                                // Ignore alignment failures.
+                            }
+                            try
+                            {
+                                ((dynamic)fallbackLabel).TextAlignmentPoint = CadPoint(labelX, labelY, 0.0);
+                            }
+                            catch
+                            {
+                                // Ignore alignment point failures.
+                            }
+                            try
+                            {
+                                ((dynamic)fallbackLabel).Rotation = labelRotation;
+                            }
+                            catch
+                            {
+                                // Ignore rotation failures.
+                            }
+                            var handle = GetEntityHandle(fallbackLabel);
+                            if (!string.IsNullOrWhiteSpace(handle))
+                            {
+                                createdHandles.Add(handle);
+                            }
+                            labelsDrawn += 1;
+                        }
+                        catch (Exception fallbackEx)
+                        {
+                            warnings.Add(
+                                $"Route '{routeRef}': failed to place route label ({DescribeException(fallbackEx)})."
+                            );
+                        }
+                    }
+                }
+
+                routesDrawn = segmentsDrawn > 0 ? 1 : 0;
+                if (routesDrawn > 0)
+                {
+                    StoreRouteBindings(sessionId, clientRouteId, createdHandles);
+                    success = true;
+                    syncStatus = "synced";
+                    message = $"Synced route '{clientRouteId}' to CAD ({segmentsDrawn} segment(s)).";
+                    bindingsNode[clientRouteId] = new JsonObject
+                    {
+                        ["entityHandles"] = ToJsonArray(createdHandles),
+                    };
+                }
+                else
+                {
+                    RemoveRouteBinding(sessionId, clientRouteId);
+                    success = false;
+                    code = "NO_VALID_ROUTES";
+                    syncStatus = "failed";
+                    message = $"Failed to sync route '{clientRouteId}' to CAD.";
+                }
+            }
+        }
+
+        try
+        {
+            ((dynamic)session.Document).Regen(1);
+        }
+        catch
+        {
+            // Ignore regen failures.
+        }
+
+        stopwatch.Stop();
+        return new JsonObject
+        {
+            ["success"] = success,
+            ["code"] = code,
+            ["message"] = message,
+            ["data"] = new JsonObject
+            {
+                ["drawing"] = new JsonObject
+                {
+                    ["name"] = drawingName,
+                    ["units"] = units,
+                },
+                ["operation"] = operation,
+                ["sessionId"] = sessionId,
+                ["clientRouteId"] = clientRouteId,
+                ["syncStatus"] = syncStatus,
+                ["drawnRoutes"] = routesDrawn,
+                ["drawnSegments"] = segmentsDrawn,
+                ["drawnLines"] = drawnLines,
+                ["drawnArcs"] = drawnArcs,
+                ["labelsDrawn"] = labelsDrawn,
+                ["filletAppliedCorners"] = filletAppliedCorners,
+                ["filletSkippedCorners"] = filletSkippedCorners,
+                ["geometryVersion"] = geometryVersion,
+                ["deletedEntities"] = deletedEntities,
+                ["resetRoutes"] = resetRoutes,
+                ["layersUsed"] = ToJsonArray(layersUsed),
+                ["bindings"] = bindingsNode,
+            },
+            ["meta"] = new JsonObject
+            {
+                ["source"] = "dotnet",
+                ["providerPath"] = "dotnet",
+                ["drawMs"] = stopwatch.ElapsedMilliseconds,
+                ["operation"] = operation,
+                ["sessionId"] = sessionId,
+                ["clientRouteId"] = clientRouteId,
+                ["routeCandidates"] = routeCandidates,
+                ["routesDrawn"] = routesDrawn,
+                ["segmentsDrawn"] = segmentsDrawn,
+                ["linesDrawn"] = drawnLines,
+                ["arcsDrawn"] = drawnArcs,
+                ["labelsDrawn"] = labelsDrawn,
             },
             ["warnings"] = ToJsonArray(warnings),
         };
@@ -1423,7 +2086,187 @@ static class ConduitRouteStubHandlers
             ToStripId = toStripId,
             ToTerminal = toTerminal.Value,
             SourceBlockName = (blockName ?? "").Trim(),
+            Resolution = "attribute",
         };
+    }
+
+    private static JumperRecord? ResolvePositionalJumperRecord(
+        PendingPositionalJumperCandidate candidate,
+        List<StripScanRecord> stripRecords,
+        string defaultPanelPrefix
+    )
+    {
+        if (stripRecords.Count < 2)
+        {
+            return null;
+        }
+
+        List<StripScanRecord> eligible = stripRecords;
+        if (!string.IsNullOrWhiteSpace(candidate.PanelHint))
+        {
+            var filtered = stripRecords
+                .Where(
+                    item => string.Equals(
+                        item.PanelId,
+                        candidate.PanelHint,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                .ToList();
+            if (filtered.Count >= 2)
+            {
+                eligible = filtered;
+            }
+        }
+        if (eligible.Count < 2)
+        {
+            return null;
+        }
+
+        double DistanceToCandidate(StripScanRecord item)
+        {
+            var center = StripCenter(item);
+            var dx = center.X - candidate.X;
+            var dy = center.Y - candidate.Y;
+            return Math.Sqrt((dx * dx) + (dy * dy));
+        }
+
+        var firstStrip = eligible.OrderBy(DistanceToCandidate).FirstOrDefault();
+        if (firstStrip is null)
+        {
+            return null;
+        }
+
+        var firstSide = NormalizeSide(firstStrip.Side);
+        var firstPanel = firstStrip.PanelId ?? "";
+        var secondStrip = eligible
+            .Where(item => !string.Equals(item.StripId, firstStrip.StripId, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(
+                item =>
+                {
+                    var panelPenalty = string.Equals(item.PanelId, firstPanel, StringComparison.OrdinalIgnoreCase)
+                        ? 0.0
+                        : 250.0;
+                    var sidePenalty = string.Equals(NormalizeSide(item.Side), firstSide, StringComparison.OrdinalIgnoreCase)
+                        ? 35.0
+                        : 0.0;
+                    return DistanceToCandidate(item) + panelPenalty + sidePenalty;
+                }
+            )
+            .FirstOrDefault();
+        if (secondStrip is null)
+        {
+            return null;
+        }
+
+        var fromStripId = (firstStrip.StripId ?? "").Trim().ToUpperInvariant();
+        var toStripId = (secondStrip.StripId ?? "").Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(fromStripId)
+            || string.IsNullOrWhiteSpace(toStripId)
+            || string.Equals(fromStripId, toStripId, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var panelId = !string.IsNullOrWhiteSpace(candidate.PanelHint)
+            ? candidate.PanelHint
+            : !string.IsNullOrWhiteSpace(firstStrip.PanelId)
+                ? firstStrip.PanelId
+                : !string.IsNullOrWhiteSpace(secondStrip.PanelId)
+                    ? secondStrip.PanelId
+                    : defaultPanelPrefix;
+        panelId = string.IsNullOrWhiteSpace(panelId)
+            ? "PANEL"
+            : panelId.Trim().ToUpperInvariant();
+
+        var fromTerminal = InferTerminalIndexFromY(firstStrip, candidate.Y);
+        var toTerminal = InferTerminalIndexFromY(secondStrip, candidate.Y);
+        var jumperId = (candidate.JumperId ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(jumperId))
+        {
+            var fallbackHandle = (candidate.Handle ?? "").Trim();
+            jumperId = string.IsNullOrWhiteSpace(fallbackHandle)
+                ? $"JMP_{fromStripId}_{fromTerminal}"
+                : $"JMP_{fallbackHandle}";
+        }
+
+        return new JumperRecord
+        {
+            JumperId = jumperId,
+            PanelId = panelId,
+            FromStripId = fromStripId,
+            FromTerminal = fromTerminal,
+            ToStripId = toStripId,
+            ToTerminal = toTerminal,
+            SourceBlockName = (candidate.BlockName ?? "").Trim(),
+            Resolution = "position",
+            X = candidate.X,
+            Y = candidate.Y,
+        };
+    }
+
+    private static (double X, double Y) StripCenter(StripScanRecord strip)
+    {
+        var bounds = GeometryVerticalBounds(strip.Geometry);
+        if (!bounds.HasValue)
+        {
+            return (strip.X, strip.Y);
+        }
+        return (strip.X, (bounds.Value.MinY + bounds.Value.MaxY) / 2.0);
+    }
+
+    private static (double MinY, double MaxY)? GeometryVerticalBounds(List<TerminalGeometryPrimitive> geometry)
+    {
+        if (geometry is null || geometry.Count == 0)
+        {
+            return null;
+        }
+
+        var minY = double.PositiveInfinity;
+        var maxY = double.NegativeInfinity;
+        var found = false;
+        foreach (var primitive in geometry)
+        {
+            if (primitive?.Points is null || primitive.Points.Count == 0)
+            {
+                continue;
+            }
+            foreach (var point in primitive.Points)
+            {
+                if (double.IsNaN(point.Y) || double.IsInfinity(point.Y))
+                {
+                    continue;
+                }
+                found = true;
+                minY = Math.Min(minY, point.Y);
+                maxY = Math.Max(maxY, point.Y);
+            }
+        }
+
+        if (!found)
+        {
+            return null;
+        }
+        return (minY, maxY);
+    }
+
+    private static int InferTerminalIndexFromY(StripScanRecord strip, double yValue)
+    {
+        var terminalCount = ClampInt(strip.TerminalCount, 1, 2000);
+        var bounds = GeometryVerticalBounds(strip.Geometry);
+        if (bounds.HasValue)
+        {
+            var span = bounds.Value.MaxY - bounds.Value.MinY;
+            if (span > 1e-6 && !double.IsNaN(span) && !double.IsInfinity(span))
+            {
+                var normalized = (yValue - bounds.Value.MinY) / span;
+                normalized = Math.Max(0.0, Math.Min(1.0, normalized));
+                return ClampInt((int)Math.Round(normalized * (terminalCount - 1)) + 1, 1, terminalCount);
+            }
+        }
+
+        var guessed = (int)Math.Round(((yValue - strip.Y) / 12.0) + 1.0);
+        return ClampInt(guessed, 1, terminalCount);
     }
 
     private static JsonArray JumpersToJsonArray(List<JumperRecord> jumpers)
@@ -1439,18 +2282,25 @@ static class ConduitRouteStubHandlers
         var outNode = new JsonArray();
         foreach (var jumper in sorted)
         {
-            outNode.Add(
-                new JsonObject
-                {
-                    ["jumperId"] = jumper.JumperId,
-                    ["panelId"] = jumper.PanelId,
-                    ["fromStripId"] = jumper.FromStripId,
-                    ["fromTerminal"] = jumper.FromTerminal,
-                    ["toStripId"] = jumper.ToStripId,
-                    ["toTerminal"] = jumper.ToTerminal,
-                    ["sourceBlockName"] = jumper.SourceBlockName,
-                }
-            );
+            var payload = new JsonObject
+            {
+                ["jumperId"] = jumper.JumperId,
+                ["panelId"] = jumper.PanelId,
+                ["fromStripId"] = jumper.FromStripId,
+                ["fromTerminal"] = jumper.FromTerminal,
+                ["toStripId"] = jumper.ToStripId,
+                ["toTerminal"] = jumper.ToTerminal,
+                ["sourceBlockName"] = jumper.SourceBlockName,
+                ["resolution"] = string.IsNullOrWhiteSpace(jumper.Resolution)
+                    ? "attribute"
+                    : jumper.Resolution,
+            };
+            if (jumper.X.HasValue && jumper.Y.HasValue)
+            {
+                payload["x"] = jumper.X.Value;
+                payload["y"] = jumper.Y.Value;
+            }
+            outNode.Add(payload);
         }
         return outNode;
     }
@@ -2110,6 +2960,565 @@ static class ConduitRouteStubHandlers
         );
     }
 
+    private static string ReadStringValue(JsonObject payload, string key, string fallback = "")
+    {
+        if (!payload.TryGetPropertyValue(key, out var node) || node is not JsonValue valueNode)
+        {
+            return fallback;
+        }
+        if (!valueNode.TryGetValue<string>(out var text))
+        {
+            return fallback;
+        }
+        var trimmed = text.Trim();
+        return trimmed.Length > 0 ? trimmed : fallback;
+    }
+
+    private static string NormalizeLayerName(string rawValue, string fallback)
+    {
+        var candidate = (rawValue ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            candidate = fallback;
+        }
+        candidate = candidate.Replace("\t", "_").Replace("\r", "_").Replace("\n", "_");
+        return candidate.Length <= 80 ? candidate : candidate.Substring(0, 80);
+    }
+
+    private static double[] CadPoint(double x, double y, double z)
+    {
+        return new[] { x, y, z };
+    }
+
+    private static double SnapCoord(double value)
+    {
+        return Math.Round(value, 3, MidpointRounding.AwayFromZero);
+    }
+
+    private static (double StartAngle, double EndAngle) NormalizeAddArcAngles(
+        double startAngle,
+        double endAngle,
+        double turn
+    )
+    {
+        var normalizedStart = startAngle;
+        var normalizedEnd = endAngle;
+        // AutoCAD AddArc always sweeps CCW from start->end. For clockwise
+        // corner intent, swap first so the same physical arc stays minor.
+        if (turn < 0.0)
+        {
+            (normalizedStart, normalizedEnd) = (normalizedEnd, normalizedStart);
+        }
+        while (normalizedEnd < normalizedStart)
+        {
+            normalizedEnd += Math.PI * 2.0;
+        }
+        return (normalizedStart, normalizedEnd);
+    }
+
+    private static double CcwSweep(double startAngle, double endAngle)
+    {
+        var sweep = endAngle - startAngle;
+        while (sweep < 0.0)
+        {
+            sweep += Math.PI * 2.0;
+        }
+        while (sweep >= Math.PI * 2.0)
+        {
+            sweep -= Math.PI * 2.0;
+        }
+        return sweep;
+    }
+
+    private static double NormalizeReadableTextAngle(double angleRadians)
+    {
+        var angle = angleRadians;
+        while (angle <= -Math.PI)
+        {
+            angle += Math.PI * 2.0;
+        }
+        while (angle > Math.PI)
+        {
+            angle -= Math.PI * 2.0;
+        }
+        if (angle > (Math.PI * 0.5))
+        {
+            angle -= Math.PI;
+        }
+        else if (angle <= -(Math.PI * 0.5))
+        {
+            angle += Math.PI;
+        }
+        return angle;
+    }
+
+    private static (double X, double Y, double Rotation) ComputeRouteLabelAnchor(IReadOnlyList<GeometryPoint> points)
+    {
+        if (points.Count == 0)
+        {
+            return (0.0, 0.0, 0.0);
+        }
+        if (points.Count == 1)
+        {
+            return (points[0].X, points[0].Y, 0.0);
+        }
+
+        var segmentLengths = new List<double>();
+        var segmentStarts = new List<GeometryPoint>();
+        var segmentEnds = new List<GeometryPoint>();
+        var totalLength = 0.0;
+        for (var i = 1; i < points.Count; i++)
+        {
+            var start = points[i - 1];
+            var end = points[i];
+            var length = Math.Sqrt(
+                ((end.X - start.X) * (end.X - start.X))
+                + ((end.Y - start.Y) * (end.Y - start.Y))
+            );
+            if (length <= 1e-9)
+            {
+                continue;
+            }
+            segmentStarts.Add(start);
+            segmentEnds.Add(end);
+            segmentLengths.Add(length);
+            totalLength += length;
+        }
+
+        if (segmentLengths.Count == 0 || totalLength <= 1e-9)
+        {
+            var first = points[0];
+            return (first.X, first.Y, 0.0);
+        }
+
+        var targetDistance = totalLength * 0.5;
+        var walked = 0.0;
+        for (var i = 0; i < segmentLengths.Count; i++)
+        {
+            var segLength = segmentLengths[i];
+            var start = segmentStarts[i];
+            var end = segmentEnds[i];
+            if (walked + segLength < targetDistance)
+            {
+                walked += segLength;
+                continue;
+            }
+
+            var ratio = (targetDistance - walked) / segLength;
+            ratio = Math.Max(0.0, Math.Min(1.0, ratio));
+            var dx = end.X - start.X;
+            var dy = end.Y - start.Y;
+            var angle = NormalizeReadableTextAngle(Math.Atan2(dy, dx));
+            return (
+                start.X + (dx * ratio),
+                start.Y + (dy * ratio),
+                angle
+            );
+        }
+
+        var tailStart = segmentStarts[segmentStarts.Count - 1];
+        var tailEnd = segmentEnds[segmentEnds.Count - 1];
+        var tailAngle = NormalizeReadableTextAngle(
+            Math.Atan2(tailEnd.Y - tailStart.Y, tailEnd.X - tailStart.X)
+        );
+        return (
+            (tailStart.X + tailEnd.X) * 0.5,
+            (tailStart.Y + tailEnd.Y) * 0.5,
+            tailAngle
+        );
+    }
+
+    private static void ValidateArcAngleNormalization()
+    {
+        var quarterTurn = Math.PI * 0.5;
+        var cases = new[]
+        {
+            (Start: 0.0, End: quarterTurn, Turn: 1.0),
+            (Start: 0.0, End: -quarterTurn, Turn: -1.0),
+            (Start: quarterTurn, End: 0.0, Turn: -1.0),
+            (Start: -quarterTurn, End: 0.0, Turn: 1.0),
+            (Start: Math.PI, End: quarterTurn, Turn: -1.0),
+            (Start: quarterTurn, End: Math.PI, Turn: 1.0),
+        };
+
+        foreach (var testCase in cases)
+        {
+            var (normalizedStart, normalizedEnd) = NormalizeAddArcAngles(
+                testCase.Start,
+                testCase.End,
+                testCase.Turn
+            );
+            var sweep = CcwSweep(normalizedStart, normalizedEnd);
+            if (Math.Abs(sweep - quarterTurn) > ArcQuarterTurnTolerance)
+            {
+                throw new InvalidOperationException(
+                    $"Arc angle normalization failed for turn={testCase.Turn}. "
+                    + $"Expected ~{quarterTurn}, got {sweep}."
+                );
+            }
+        }
+    }
+
+    private static bool TryReadPointNode(JsonObject payload, string key, out GeometryPoint point)
+    {
+        point = default;
+        if (!payload.TryGetPropertyValue(key, out var node) || node is not JsonObject pointNode)
+        {
+            return false;
+        }
+        var x = ReadDouble(pointNode, "x", double.NaN);
+        var y = ReadDouble(pointNode, "y", double.NaN);
+        if (double.IsNaN(x) || double.IsInfinity(x) || double.IsNaN(y) || double.IsInfinity(y))
+        {
+            return false;
+        }
+        point = new GeometryPoint(SnapCoord(x), SnapCoord(y));
+        return true;
+    }
+
+    private static List<CadRoutePrimitive> ParseCadRoutePrimitives(JsonObject routeNode, List<string> warnings)
+    {
+        var output = new List<CadRoutePrimitive>();
+        if (!routeNode.TryGetPropertyValue("primitives", out var primitivesNode) || primitivesNode is not JsonArray primitiveArray)
+        {
+            return output;
+        }
+
+        for (var primitiveIndex = 0; primitiveIndex < primitiveArray.Count; primitiveIndex++)
+        {
+            if (primitiveArray[primitiveIndex] is not JsonObject primitiveObj)
+            {
+                warnings.Add($"Ignoring invalid primitive at index {primitiveIndex} (not an object).");
+                continue;
+            }
+
+            var kind = ReadStringValue(primitiveObj, "kind", "").Trim().ToLowerInvariant();
+            if (kind == "line")
+            {
+                if (!TryReadPointNode(primitiveObj, "start", out var startPoint)
+                    || !TryReadPointNode(primitiveObj, "end", out var endPoint))
+                {
+                    warnings.Add($"Ignoring line primitive {primitiveIndex}: missing/invalid start or end point.");
+                    continue;
+                }
+                if (Math.Abs(startPoint.X - endPoint.X) <= 1e-6 && Math.Abs(startPoint.Y - endPoint.Y) <= 1e-6)
+                {
+                    continue;
+                }
+                output.Add(
+                    new CadRoutePrimitive
+                    {
+                        Kind = "line",
+                        Start = startPoint,
+                        End = endPoint,
+                        Center = default,
+                        Radius = 0.0,
+                        Turn = 1.0,
+                    }
+                );
+                continue;
+            }
+
+            if (kind == "arc")
+            {
+                if (!TryReadPointNode(primitiveObj, "start", out var startPoint)
+                    || !TryReadPointNode(primitiveObj, "end", out var endPoint)
+                    || !TryReadPointNode(primitiveObj, "center", out var centerPoint))
+                {
+                    warnings.Add($"Ignoring arc primitive {primitiveIndex}: missing/invalid start/end/center point.");
+                    continue;
+                }
+                var radius = ReadDouble(primitiveObj, "radius", double.NaN);
+                var turn = ReadDouble(primitiveObj, "turn", 1.0);
+                if (double.IsNaN(radius) || double.IsInfinity(radius) || radius <= 1e-9)
+                {
+                    warnings.Add($"Ignoring arc primitive {primitiveIndex}: invalid radius.");
+                    continue;
+                }
+                if (double.IsNaN(turn) || double.IsInfinity(turn) || Math.Abs(turn) <= 1e-9)
+                {
+                    turn = 1.0;
+                }
+                output.Add(
+                    new CadRoutePrimitive
+                    {
+                        Kind = "arc",
+                        Start = startPoint,
+                        End = endPoint,
+                        Center = centerPoint,
+                        Radius = radius,
+                        Turn = turn,
+                    }
+                );
+                continue;
+            }
+
+            warnings.Add($"Ignoring unsupported primitive kind at index {primitiveIndex}: '{kind}'.");
+        }
+
+        return output;
+    }
+
+    private static void EnsureLayerExists(object document, string layerName, int? colorAci = null)
+    {
+        if (string.IsNullOrWhiteSpace(layerName))
+        {
+            return;
+        }
+
+        var layers = ReadProperty(document, "Layers");
+        if (layers is null)
+        {
+            return;
+        }
+
+        dynamic? layer = null;
+        try
+        {
+            layer = ((dynamic)layers).Item(layerName);
+        }
+        catch
+        {
+            // Ignore lookup failures and try Add below.
+        }
+
+        if (layer is null)
+        {
+            try
+            {
+                layer = ((dynamic)layers).Add(layerName);
+            }
+            catch
+            {
+                // Ignore layer creation failures. Drawing can continue on current layer.
+            }
+        }
+
+        if (layer is not null && colorAci.HasValue && colorAci.Value >= 1 && colorAci.Value <= 255)
+        {
+            try
+            {
+                layer.Color = colorAci.Value;
+            }
+            catch
+            {
+                // Ignore layer color assignment failures.
+            }
+        }
+    }
+
+    private static void SetEntityLayerAndColor(object? entity, string layerName, int? _colorAci)
+    {
+        if (entity is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(layerName))
+        {
+            try
+            {
+                ((dynamic)entity).Layer = layerName;
+            }
+            catch
+            {
+                // Ignore layer assignment failures.
+            }
+        }
+
+        try
+        {
+            ((dynamic)entity).Color = 256; // BYLAYER
+        }
+        catch
+        {
+            // Ignore color assignment failures.
+        }
+    }
+
+    private static string GetEntityHandle(object? entity)
+    {
+        if (entity is null)
+        {
+            return "";
+        }
+        var fromProperty = SafeUpper(ReadProperty(entity, "Handle"));
+        if (!string.IsNullOrWhiteSpace(fromProperty))
+        {
+            return fromProperty;
+        }
+        try
+        {
+            var raw = ((dynamic)entity).Handle;
+            return SafeUpper(raw);
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private static bool TryDeleteEntityByHandle(object document, string handle)
+    {
+        var normalized = (handle ?? "").Trim().ToUpperInvariant();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return false;
+        }
+        try
+        {
+            var entity = ((dynamic)document).HandleToObject(normalized);
+            if (entity is null)
+            {
+                return false;
+            }
+            ((dynamic)entity).Delete();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static (int DeletedCount, List<string> DeletedHandles) DeleteRouteBindings(
+        string sessionId,
+        string clientRouteId,
+        object document,
+        List<string> warnings
+    )
+    {
+        List<string> handles = new();
+        lock (TerminalRouteBindingLock)
+        {
+            if (!TerminalRouteBindings.TryGetValue(sessionId, out var sessionMap))
+            {
+                return (0, new List<string>());
+            }
+            if (!sessionMap.TryGetValue(clientRouteId, out var storedHandles) || storedHandles is null)
+            {
+                return (0, new List<string>());
+            }
+            handles = new List<string>(storedHandles);
+            sessionMap.Remove(clientRouteId);
+            if (sessionMap.Count == 0)
+            {
+                TerminalRouteBindings.Remove(sessionId);
+            }
+        }
+
+        var deleted = 0;
+        var deletedHandles = new List<string>();
+        foreach (var handle in handles)
+        {
+            if (TryDeleteEntityByHandle(document, handle))
+            {
+                deleted += 1;
+                deletedHandles.Add((handle ?? "").Trim().ToUpperInvariant());
+            }
+            else
+            {
+                warnings.Add($"Route {clientRouteId}: could not delete CAD entity handle '{handle}'.");
+            }
+        }
+
+        return (deleted, deletedHandles);
+    }
+
+    private static (int DeletedEntities, int ResetRoutes) DeleteSessionBindings(
+        string sessionId,
+        object document,
+        List<string> warnings
+    )
+    {
+        Dictionary<string, List<string>> snapshot;
+        lock (TerminalRouteBindingLock)
+        {
+            if (!TerminalRouteBindings.TryGetValue(sessionId, out var sessionMap))
+            {
+                return (0, 0);
+            }
+            snapshot = sessionMap.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new List<string>(kvp.Value),
+                StringComparer.OrdinalIgnoreCase
+            );
+            TerminalRouteBindings.Remove(sessionId);
+        }
+
+        var deletedEntities = 0;
+        foreach (var kvp in snapshot)
+        {
+            foreach (var handle in kvp.Value)
+            {
+                if (TryDeleteEntityByHandle(document, handle))
+                {
+                    deletedEntities += 1;
+                }
+                else
+                {
+                    warnings.Add($"Route {kvp.Key}: could not delete CAD entity handle '{handle}'.");
+                }
+            }
+        }
+        return (deletedEntities, snapshot.Count);
+    }
+
+    private static void StoreRouteBindings(string sessionId, string clientRouteId, List<string> handles)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(clientRouteId))
+        {
+            return;
+        }
+
+        var normalizedHandles = handles
+            .Select(item => (item ?? "").Trim().ToUpperInvariant())
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        lock (TerminalRouteBindingLock)
+        {
+            if (!TerminalRouteBindings.TryGetValue(sessionId, out var sessionMap))
+            {
+                sessionMap = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                TerminalRouteBindings[sessionId] = sessionMap;
+            }
+            sessionMap[clientRouteId] = normalizedHandles;
+
+            if (TerminalRouteBindings.Count > MaxTerminalRouteSessions)
+            {
+                var staleSessionId = TerminalRouteBindings.Keys.FirstOrDefault(key =>
+                    !string.Equals(key, sessionId, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrWhiteSpace(staleSessionId))
+                {
+                    TerminalRouteBindings.Remove(staleSessionId);
+                }
+            }
+        }
+    }
+
+    private static void RemoveRouteBinding(string sessionId, string clientRouteId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId) || string.IsNullOrWhiteSpace(clientRouteId))
+        {
+            return;
+        }
+
+        lock (TerminalRouteBindingLock)
+        {
+            if (!TerminalRouteBindings.TryGetValue(sessionId, out var sessionMap))
+            {
+                return;
+            }
+            sessionMap.Remove(clientRouteId);
+            if (sessionMap.Count == 0)
+            {
+                TerminalRouteBindings.Remove(sessionId);
+            }
+        }
+    }
+
     private static bool ReadBool(JsonObject payload, string key, bool fallback)
     {
         if (!payload.TryGetPropertyValue(key, out var node) || node is null)
@@ -2432,6 +3841,16 @@ static class ConduitRouteStubHandlers
                 }
             }
         }
+    }
+
+    private sealed class CadRoutePrimitive
+    {
+        public string Kind { get; init; } = "line";
+        public GeometryPoint Start { get; init; }
+        public GeometryPoint End { get; init; }
+        public GeometryPoint Center { get; init; }
+        public double Radius { get; init; }
+        public double Turn { get; init; }
     }
 
     private readonly struct GeometryPoint

@@ -5,6 +5,12 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from .api_autocad_ground_grid_plot import (
     plot_ground_grid_entities as autocad_plot_ground_grid_entities_helper,
 )
+from .api_autocad_terminal_route_plot import (
+    sync_terminal_route_operation as autocad_sync_terminal_route_operation_helper,
+)
+from .api_autocad_terminal_scan import (
+    sync_terminal_strip_labels as autocad_sync_terminal_strip_labels_helper,
+)
 
 
 class AutoCADManager:
@@ -32,9 +38,9 @@ class AutoCADManager:
         insert_reference_block_fn: Any,
         add_point_label_fn: Any,
         export_points_to_excel_fn: Any,
-        ensure_layer_fn: Any,
-        pt_fn: Any,
-        com_call_with_retry_fn: Any,
+        ensure_layer_fn: Any | None = None,
+        pt_fn: Any | None = None,
+        com_call_with_retry_fn: Any | None = None,
         foundation_source_type: str,
         print_fn: Any = print,
     ) -> None:
@@ -54,9 +60,9 @@ class AutoCADManager:
         self.insert_reference_block = insert_reference_block_fn
         self.add_point_label = add_point_label_fn
         self.export_points_to_excel = export_points_to_excel_fn
-        self.ensure_layer = ensure_layer_fn
-        self.pt = pt_fn
-        self.com_call_with_retry = com_call_with_retry_fn
+        self.ensure_layer = ensure_layer_fn or (lambda _doc, _layer_name: None)
+        self.pt = pt_fn or (lambda x, y, z=0: [x, y, z])
+        self.com_call_with_retry = com_call_with_retry_fn or (lambda fn: fn())
         self.foundation_source_type = foundation_source_type
         self.print_fn = print_fn
 
@@ -71,6 +77,7 @@ class AutoCADManager:
         self._progress_event_max = 500
         self._allowed_export_paths: List[str] = []
         self._allowed_export_paths_max = 200
+        self._terminal_route_bindings: Dict[str, Dict[str, List[str]]] = {}
         self._progress_state: Dict[str, Any] = {
             "event_id": 0,
             "run_id": None,
@@ -831,6 +838,196 @@ class AutoCADManager:
                 "blocks_inserted": 0,
                 "layer_name": "",
                 "test_well_block_name": "",
+                "error": str(exc),
+            }
+        finally:
+            try:
+                self.pythoncom.CoUninitialize()
+            except Exception:
+                pass
+
+    def plot_terminal_routes(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply terminal route CAD sync operation (upsert/delete/reset)."""
+        try:
+            self.pythoncom.CoInitialize()
+
+            acad = self.connect_autocad()
+            doc = self.dyn(acad.ActiveDocument)
+            ms = self.dyn(doc.ModelSpace)
+            if doc is None or ms is None:
+                raise RuntimeError("Cannot access AutoCAD document or modelspace")
+
+            result = autocad_sync_terminal_route_operation_helper(
+                doc=doc,
+                modelspace=ms,
+                payload=payload,
+                binding_store=self._terminal_route_bindings,
+                ensure_layer_fn=self.ensure_layer,
+                pt_fn=self.pt,
+                dyn_fn=self.dyn,
+                com_call_with_retry_fn=self.com_call_with_retry,
+            )
+
+            try:
+                doc.Regen(1)
+            except Exception:
+                pass
+
+            units_value = "Unknown"
+            try:
+                units_code = int(doc.GetVariable("INSUNITS"))
+            except Exception:
+                units_code = -1
+            units_lookup = {
+                1: "Inches",
+                2: "Feet",
+                3: "Miles",
+                4: "Millimeters",
+                5: "Centimeters",
+                6: "Meters",
+                7: "Kilometers",
+            }
+            units_value = units_lookup.get(units_code, "Unitless" if units_code >= 0 else "Unknown")
+
+            drawing_name = "Unknown.dwg"
+            try:
+                drawing_name = str(doc.Name)
+            except Exception:
+                pass
+
+            return {
+                "success": bool(result.get("success")),
+                "code": str(result.get("code") or ""),
+                "message": str(result.get("message") or "Terminal route CAD sync operation completed."),
+                "data": {
+                    "drawing": {
+                        "name": drawing_name,
+                        "units": units_value,
+                    },
+                    **(result.get("data") or {}),
+                },
+                "warnings": result.get("warnings", []),
+            }
+
+        except Exception as exc:
+            self.traceback.print_exc()
+            return {
+                "success": False,
+                "code": "TERMINAL_ROUTE_DRAW_FAILED",
+                "message": f"Terminal route draw failed: {str(exc)}",
+                "data": {
+                    "drawnRoutes": 0,
+                    "drawnSegments": 0,
+                    "labelsDrawn": 0,
+                    "layersUsed": [],
+                },
+                "warnings": [],
+                "error": str(exc),
+            }
+        finally:
+            try:
+                self.pythoncom.CoUninitialize()
+            except Exception:
+                pass
+
+    def sync_terminal_labels(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply terminal strip label updates to block attributes."""
+        try:
+            self.pythoncom.CoInitialize()
+
+            include_modelspace = bool(
+                payload.get("includeModelspace", payload.get("include_modelspace", True))
+            )
+            selection_only = bool(
+                payload.get("selectionOnly", payload.get("selection_only", False))
+            )
+            max_entities_raw = payload.get("maxEntities", payload.get("max_entities", 50000))
+            try:
+                max_entities = int(max_entities_raw)
+            except Exception:
+                max_entities = 50000
+            max_entities = max(100, min(max_entities, 250000))
+
+            strips_payload = payload.get("strips")
+            terminal_profile = payload.get("terminalProfile", payload.get("terminal_profile"))
+
+            acad = self.connect_autocad()
+            doc = self.dyn(acad.ActiveDocument)
+            ms = self.dyn(doc.ModelSpace)
+            if doc is None or ms is None:
+                raise RuntimeError("Cannot access AutoCAD document or modelspace")
+
+            result = autocad_sync_terminal_strip_labels_helper(
+                doc=doc,
+                modelspace=ms,
+                dyn_fn=self.dyn,
+                strips_payload=strips_payload,
+                include_modelspace=include_modelspace,
+                selection_only=selection_only,
+                max_entities=max_entities,
+                terminal_profile=terminal_profile,
+            )
+
+            try:
+                doc.Regen(1)
+            except Exception:
+                pass
+
+            units_value = "Unknown"
+            try:
+                units_code = int(doc.GetVariable("INSUNITS"))
+            except Exception:
+                units_code = -1
+            units_lookup = {
+                1: "Inches",
+                2: "Feet",
+                3: "Miles",
+                4: "Millimeters",
+                5: "Centimeters",
+                6: "Meters",
+                7: "Kilometers",
+            }
+            units_value = units_lookup.get(units_code, "Unitless" if units_code >= 0 else "Unknown")
+
+            drawing_name = "Unknown.dwg"
+            try:
+                drawing_name = str(doc.Name)
+            except Exception:
+                pass
+
+            return {
+                "success": bool(result.get("success")),
+                "code": str(result.get("code") or ""),
+                "message": str(result.get("message") or "Terminal label sync completed."),
+                "data": {
+                    "drawing": {
+                        "name": drawing_name,
+                        "units": units_value,
+                    },
+                    **(result.get("data") or {}),
+                },
+                "meta": result.get("meta", {}),
+                "warnings": result.get("warnings", []),
+            }
+        except Exception as exc:
+            self.traceback.print_exc()
+            return {
+                "success": False,
+                "code": "TERMINAL_LABEL_SYNC_FAILED",
+                "message": f"Terminal label sync failed: {str(exc)}",
+                "data": {
+                    "updatedStrips": 0,
+                    "matchedStrips": 0,
+                    "targetStrips": 0,
+                    "matchedBlocks": 0,
+                    "updatedBlocks": 0,
+                    "updatedAttributes": 0,
+                    "unchangedAttributes": 0,
+                    "missingAttributes": 0,
+                    "failedAttributes": 0,
+                },
+                "meta": {},
+                "warnings": [],
                 "error": str(exc),
             }
         finally:

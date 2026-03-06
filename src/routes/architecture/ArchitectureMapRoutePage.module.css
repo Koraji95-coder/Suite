@@ -3,6 +3,63 @@
 	gap: 2rem;
 }
 
+.archToolbar {
+	display: grid;
+	gap: 0.6rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 0.7rem;
+	background:
+		linear-gradient(
+			160deg,
+			color-mix(in srgb, var(--surface) 90%, transparent),
+			color-mix(in srgb, var(--surface-2) 62%, transparent)
+		),
+		var(--surface);
+}
+
+.archSearchWrap {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	border: 1px solid var(--border);
+	border-radius: 0.55rem;
+	padding: 0.42rem 0.55rem;
+	background: var(--bg-base);
+	color: var(--text-muted);
+}
+
+.archSearchInput {
+	width: 100%;
+	border: 0;
+	outline: 0;
+	background: transparent;
+	color: var(--text);
+	font-size: 0.78rem;
+}
+
+.archDomainFilters {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+
+.archDomainChip {
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	padding: 0.24rem 0.65rem;
+	font-size: 0.72rem;
+	background: var(--surface);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.archDomainChipActive {
+	background: color-mix(in srgb, var(--accent) 17%, var(--surface));
+	border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+	color: var(--text);
+}
+
 .domainsGrid {
 	display: grid;
 	gap: 0.75rem;
@@ -51,6 +108,30 @@
 	background: color-mix(in srgb, var(--surface) 62%, transparent);
 }
 
+.copyChip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.38rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
+	border-radius: 0.48rem;
+	padding: 0.18rem 0.42rem;
+	font-family: var(--font-mono, monospace);
+	font-size: 11px;
+	color: var(--text-muted);
+	background: color-mix(in srgb, var(--surface) 62%, transparent);
+	cursor: pointer;
+}
+
+.copyChipValue {
+	color: inherit;
+}
+
+.copyChipState {
+	font-size: 10px;
+	font-family: var(--font-body, sans-serif);
+	color: color-mix(in srgb, var(--accent) 75%, var(--text-muted));
+}
+
 .modulesStack {
 	display: grid;
 	gap: 1rem;
@@ -87,6 +168,27 @@
 	font-family: var(--font-mono, monospace);
 	font-size: 11px;
 	color: var(--text-muted);
+}
+
+.modulePathRow {
+	margin-top: 0.25rem;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.45rem;
+	align-items: start;
+}
+
+.pathCopyButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.35rem;
+	height: 1.35rem;
+	border-radius: 0.38rem;
+	border: 1px solid var(--border);
+	background: color-mix(in srgb, var(--surface) 75%, transparent);
+	color: var(--text-muted);
+	cursor: pointer;
 }
 
 .moduleSummary {
@@ -235,7 +337,21 @@
 	gap: 0.45rem;
 }
 
+.emptyState {
+	border: 1px dashed var(--line-soft);
+	border-radius: 0.6rem;
+	padding: 0.58rem 0.65rem;
+	font-size: 0.76rem;
+	color: var(--text-muted);
+	background: color-mix(in srgb, var(--surface-2) 38%, transparent);
+}
+
 @media (min-width: 40rem) {
+	.archToolbar {
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+	}
+
 	.domainsGrid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}

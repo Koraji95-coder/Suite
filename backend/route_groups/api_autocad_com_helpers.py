@@ -51,15 +51,22 @@ def ensure_layer(
     doc: Any,
     layer_name: str,
     *,
+    color_aci: int | None = None,
     dyn_fn: Any,
 ) -> None:
     doc = dyn_fn(doc)
     try:
         layers = dyn_fn(doc.Layers)
+        layer = None
         try:
-            layers.Item(layer_name)
+            layer = layers.Item(layer_name)
         except Exception:
-            layers.Add(layer_name)
+            layer = layers.Add(layer_name)
+        if layer is not None and color_aci is not None and 1 <= int(color_aci) <= 255:
+            try:
+                layer.Color = int(color_aci)
+            except Exception:
+                pass
     except Exception:
         pass
 

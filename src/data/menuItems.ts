@@ -17,7 +17,6 @@ import {
 	GitBranch,
 	HardDrive,
 	LayoutDashboard,
-	Network,
 	Settings,
 	Waves,
 	Zap,
@@ -159,7 +158,6 @@ export const sidebarNavItems: SidebarNavItem[] = [
 	},
 	{ divider: true },
 	{ id: "agent", icon: Bot, label: "Koro Agent", color: "purple" },
-	{ id: "architecture-map", icon: Network, label: "Arch Map", color: "purple" },
 	{ divider: true },
 	{
 		id: "test-preview",

@@ -4,8 +4,31 @@
 }
 
 .rootWide {
+	position: relative;
 	margin-inline: auto;
-	max-width: 84rem;
+	max-width: 94rem;
+	padding-bottom: 1.25rem;
+}
+
+.rootWide::before {
+	content: "";
+	position: absolute;
+	inset: -0.75rem -0.4rem auto;
+	height: 14rem;
+	border-radius: 1.2rem;
+	background:
+		radial-gradient(
+			65% 85% at 4% 0%,
+			color-mix(in srgb, var(--accent) 18%, transparent),
+			transparent 62%
+		),
+		radial-gradient(
+			75% 95% at 100% 10%,
+			color-mix(in srgb, var(--primary) 14%, transparent),
+			transparent 64%
+		);
+	pointer-events: none;
+	z-index: -1;
 }
 
 .pageHeader {
@@ -21,12 +44,28 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: var(--radius-3);
-	color: var(--accent);
-	background: color-mix(in srgb, var(--accent) 15%, transparent);
+	color: color-mix(in srgb, var(--accent) 88%, white 12%);
+	border: 1px solid color-mix(in srgb, var(--accent) 36%, transparent);
+	background:
+		linear-gradient(
+			140deg,
+			color-mix(in srgb, var(--accent) 24%, transparent),
+			color-mix(in srgb, var(--primary) 12%, transparent)
+		),
+		var(--surface);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .topMargin {
-	margin-top: 1.5rem;
+	margin-top: 1.25rem;
+	border-color: color-mix(in srgb, var(--border) 72%, transparent);
+	background:
+		linear-gradient(
+			150deg,
+			color-mix(in srgb, var(--surface) 84%, transparent),
+			color-mix(in srgb, var(--surface-2) 66%, transparent)
+		),
+		var(--surface);
 }
 
 .stateIcon {
@@ -56,8 +95,110 @@
 	background: var(--surface-2);
 }
 
+.tabRow {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.6rem;
+}
+
+.tabButton {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0.6rem;
+	border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+	background:
+		linear-gradient(
+			145deg,
+			color-mix(in srgb, var(--surface) 90%, transparent),
+			color-mix(in srgb, var(--surface-2) 62%, transparent)
+		),
+		var(--surface);
+	color: var(--text-muted);
+	border-radius: 0.9rem;
+	padding: 0.52rem 0.72rem;
+	font-size: 0.8rem;
+	cursor: pointer;
+	text-align: left;
+	transition:
+		background-color 150ms ease,
+		color 150ms ease,
+		border-color 150ms ease,
+		transform 150ms ease;
+}
+
+.tabButton:hover {
+	border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+	color: var(--text);
+	transform: translateY(-1px);
+}
+
+.tabButtonActive {
+	border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+	background:
+		linear-gradient(
+			145deg,
+			color-mix(in srgb, var(--primary) 15%, transparent),
+			color-mix(in srgb, var(--accent) 16%, transparent)
+		),
+		var(--surface);
+	color: var(--text);
+	box-shadow:
+		0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent),
+		0 12px 24px -22px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.tabIconWrap {
+	display: inline-flex;
+	width: 1.75rem;
+	height: 1.75rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.62rem;
+	border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+	background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+	color: var(--accent);
+}
+
+.tabText {
+	display: flex;
+	flex-direction: column;
+	gap: 0.08rem;
+	min-width: 0;
+}
+
+.tabLabel {
+	font-size: 0.79rem;
+	font-weight: 650;
+	color: var(--text);
+}
+
+.tabHint {
+	font-size: 0.67rem;
+	color: var(--text-muted);
+}
+
+.tabCounter {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.4rem;
+	height: 1.2rem;
+	padding-inline: 0.35rem;
+	border-radius: 999px;
+	font-size: 0.66rem;
+	font-weight: 700;
+	color: var(--primary-contrast);
+	background: color-mix(in srgb, var(--primary) 90%, white 10%);
+}
+
 .groupsGrid {
-	margin-top: 1.5rem;
+	margin-top: 1.25rem;
+	display: grid;
+	gap: 1rem;
+}
+
+.commandsStack {
 	display: grid;
 	gap: 1rem;
 }
@@ -76,7 +217,8 @@
 	justify-content: center;
 	border-radius: 0.65rem;
 	color: var(--primary);
-	background: color-mix(in srgb, var(--primary) 15%, transparent);
+	border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+	background: color-mix(in srgb, var(--primary) 13%, transparent);
 }
 
 .commandPre {
@@ -87,11 +229,516 @@
 	font-size: 0.74rem;
 	font-family: var(--font-mono, monospace);
 	color: var(--accent);
-	background: var(--bg);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--bg) 94%, transparent),
+			color-mix(in srgb, var(--surface) 50%, transparent)
+		),
+		var(--bg);
+}
+
+.watchdogGrid {
+	margin-top: 1.25rem;
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 1rem;
+}
+
+.watchdogConfigPanel,
+.watchdogFeedPanel,
+.architecturePanel {
+	min-height: 30rem;
+	border-color: color-mix(in srgb, var(--border) 74%, transparent);
+	background:
+		linear-gradient(
+			165deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 58%, transparent)
+		),
+		var(--surface);
+}
+
+.watchdogRootEditor {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0.5rem;
+}
+
+.watchdogRootEditorActions {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.watchdogPresetSection {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.watchdogPresetRow {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 0.45rem;
+}
+
+.watchdogPresetSelect {
+	width: 100%;
+	min-height: 2.2rem;
+	border: 1px solid var(--border);
+	border-radius: 0.55rem;
+	background: var(--bg-base);
+	color: var(--text);
+	padding: 0.48rem 0.62rem;
+	font-size: 0.78rem;
+}
+
+.watchdogPresetActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+}
+
+.watchdogRootList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	border: 1px solid var(--border);
+	border-radius: 0.7rem;
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 86%, transparent),
+			color-mix(in srgb, var(--bg) 82%, transparent)
+		),
+		var(--surface-2);
+	padding: 0.6rem;
+	max-height: 14rem;
+	overflow: auto;
+}
+
+.watchdogRootItem {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.5rem;
+	align-items: center;
+	border: 1px solid var(--line-soft);
+	border-radius: 0.55rem;
+	padding: 0.42rem 0.55rem;
+	background: var(--bg-base);
+}
+
+.watchdogRootPath {
+	font-family: var(--font-mono, monospace);
+	font-size: 0.72rem;
+	color: var(--text);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.toggleRow {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	font-size: 0.8rem;
+	color: var(--text);
+}
+
+.fieldLabel {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.watchdogTextarea {
+	width: 100%;
+	min-height: 6rem;
+	border: 1px solid var(--border);
+	border-radius: 0.55rem;
+	background: var(--bg-base);
+	color: var(--text);
+	padding: 0.55rem 0.7rem;
+	font-size: 0.78rem;
+	font-family: var(--font-mono, monospace);
+}
+
+.watchdogActions {
+	display: flex;
+	flex-wrap: wrap;
+}
+
+.warningList {
+	border: 1px solid color-mix(in srgb, var(--warning) 25%, var(--border));
+	background: color-mix(in srgb, var(--warning) 12%, transparent);
+	border-radius: 0.55rem;
+	padding: 0.5rem 0.65rem;
+	font-size: 0.75rem;
+	color: color-mix(in srgb, var(--warning) 75%, var(--text));
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.watchdogStatsRow {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.4rem;
+}
+
+.statChip {
+	border: 1px solid var(--border);
+	background:
+		linear-gradient(
+			145deg,
+			color-mix(in srgb, var(--surface-2) 86%, transparent),
+			color-mix(in srgb, var(--surface) 52%, transparent)
+		),
+		var(--surface-2);
+	border-radius: 0.55rem;
+	padding: 0.45rem 0.55rem;
+}
+
+.statChipValue {
+	font-size: 1.02rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.statChipLabel {
+	font-size: 0.66rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-muted);
+}
+
+.watchdogToolbar {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 0.5rem;
+}
+
+.watchdogToolbarTop {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.watchdogToolbarBottom {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: 0.55rem;
+}
+
+.watchdogFilterTabs {
+	display: inline-flex;
+	gap: 0.35rem;
+}
+
+.watchdogFilterTab {
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text-muted);
+	border-radius: 999px;
+	padding: 0.25rem 0.65rem;
+	font-size: 0.72rem;
+	cursor: pointer;
+	text-transform: capitalize;
+}
+
+.watchdogFilterTabActive {
+	background: color-mix(in srgb, var(--primary) 15%, var(--surface));
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	color: var(--text);
+}
+
+.watchdogToggleChip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	padding: 0.34rem 0.62rem;
+	font-size: 0.72rem;
+	color: var(--text);
+	background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.watchdogWindowInput {
+	width: 9rem;
+}
+
+.watchdogScanMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.8rem;
+}
+
+.watchdogFeedList {
+	border: 1px solid var(--border);
+	border-radius: 0.7rem;
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 90%, transparent),
+			color-mix(in srgb, var(--bg) 84%, transparent)
+		),
+		var(--surface-2);
+	padding: 0.45rem;
+	max-height: 42rem;
+	overflow: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.watchdogEmpty {
+	font-size: 0.8rem;
+	color: var(--text-muted);
+	padding: 0.65rem;
+}
+
+.watchdogFeedItem {
+	border: 1px solid var(--line-soft);
+	background: var(--bg-base);
+	border-radius: 0.55rem;
+	padding: 0.55rem 0.65rem;
+}
+
+.watchdogFeedItemUnread {
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--line-soft));
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.watchdogFeedHeader {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.watchdogEventTypeWrap {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.38rem;
+}
+
+.watchdogEventType {
+	font-size: 0.72rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-family: var(--font-mono, monospace);
+	color: var(--primary);
+}
+
+.watchdogEventTime {
+	font-size: 0.68rem;
+	color: var(--text-muted);
+}
+
+.watchdogRepeatBadge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.2rem;
+	height: 1.1rem;
+	padding-inline: 0.34rem;
+	border-radius: 999px;
+	font-size: 0.62rem;
+	font-weight: 700;
+	color: var(--primary);
+	border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--border));
+	background: color-mix(in srgb, var(--primary) 15%, var(--surface));
+}
+
+.watchdogEventPath {
+	font-size: 0.75rem;
+	font-family: var(--font-mono, monospace);
+	margin-top: 0.2rem;
+	color: var(--text);
+	word-break: break-all;
+}
+
+.watchdogEventMeta {
+	margin-top: 0.25rem;
+	font-size: 0.66rem;
+	color: var(--text-muted);
+	word-break: break-all;
+}
+
+.historyPanel {
+	border-color: color-mix(in srgb, var(--border) 74%, transparent);
+	background:
+		linear-gradient(
+			165deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 58%, transparent)
+		),
+		var(--surface);
+}
+
+.historyToolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.historyFilterTabs {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+
+.historyFilterTab {
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text-muted);
+	border-radius: 999px;
+	padding: 0.25rem 0.62rem;
+	font-size: 0.72rem;
+	cursor: pointer;
+}
+
+.historyFilterTabActive {
+	background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+	border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+	color: var(--text);
+}
+
+.historyList {
+	border: 1px solid var(--border);
+	border-radius: 0.7rem;
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 90%, transparent),
+			color-mix(in srgb, var(--bg) 84%, transparent)
+		),
+		var(--surface-2);
+	padding: 0.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	max-height: 32rem;
+	overflow: auto;
+}
+
+.historyEmpty {
+	font-size: 0.8rem;
+	color: var(--text-muted);
+	padding: 0.7rem;
+}
+
+.historyItem {
+	border: 1px solid var(--line-soft);
+	border-radius: 0.62rem;
+	background: var(--bg-base);
+	padding: 0.6rem 0.68rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.historyItemHeader {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.45rem;
+}
+
+.historyHeaderMain {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.historyCategoryBadge {
+	display: inline-flex;
+	align-items: center;
+	border-radius: 999px;
+	padding: 0.16rem 0.45rem;
+	font-size: 0.62rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--accent);
+	border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+	background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+}
+
+.historyTitle {
+	font-size: 0.78rem;
+	color: var(--text);
+	font-weight: 600;
+}
+
+.historyActions {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	flex-wrap: wrap;
+}
+
+.historyTime {
+	font-size: 0.67rem;
+	color: var(--text-muted);
+}
+
+.historyMeta {
+	font-size: 0.66rem;
+	font-family: var(--font-mono, monospace);
+	color: var(--text-muted);
+}
+
+.historyDetails {
+	margin: 0;
+	max-height: 10rem;
+	overflow: auto;
+	border: 1px solid var(--line-soft);
+	border-radius: 0.5rem;
+	padding: 0.45rem 0.52rem;
+	font-size: 0.68rem;
+	line-height: 1.35;
+	font-family: var(--font-mono, monospace);
+	color: var(--text);
+	background: color-mix(in srgb, var(--surface) 75%, transparent);
 }
 
 @media (min-width: 48rem) {
+	.tabRow {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
 	.groupsGrid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.watchdogStatsRow {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+
+	.watchdogPresetRow {
+		grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+	}
+
+	.watchdogRootEditor {
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: end;
+	}
+}
+
+@media (min-width: 78rem) {
+	.watchdogGrid {
+		grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+		align-items: start;
 	}
 }

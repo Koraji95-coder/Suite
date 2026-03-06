@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from backend.route_groups.api_autocad_terminal_scan import scan_terminal_strips
+from backend.route_groups.api_autocad_terminal_scan import (
+    scan_terminal_strips,
+    sync_terminal_strip_labels,
+)
 
 
 class _Attr:
@@ -264,6 +267,51 @@ class TestApiAutocadTerminalScan(unittest.TestCase):
         self.assertEqual(len(strips), 1)
         self.assertEqual(strips[0]["stripNumber"], 6)
 
+    def test_scan_terminal_strips_duplicate_strip_ids_increment_terminal_side_number(self) -> None:
+        doc = _Doc(name="duplicate-strip-id.dwg", units=2)
+        modelspace = _Collection(
+            [
+                _BlockRef(
+                    name="TERMINAL_STRIP_BLOCK",
+                    handle="DUP1",
+                    insertion_point=(20.0, 40.0, 0.0),
+                    attrs=[
+                        ("PANEL_ID", "RP1"),
+                        ("SIDE", "L"),
+                        ("STRIP_ID", "RP1L1"),
+                        ("TERMINAL_COUNT", "12"),
+                    ],
+                ),
+                _BlockRef(
+                    name="TERMINAL_STRIP_BLOCK",
+                    handle="DUP2",
+                    insertion_point=(20.0, 80.0, 0.0),
+                    attrs=[
+                        ("PANEL_ID", "RP1"),
+                        ("SIDE", "L"),
+                        ("STRIP_ID", "RP1L1"),
+                        ("TERMINAL_COUNT", "12"),
+                    ],
+                ),
+            ]
+        )
+
+        result = scan_terminal_strips(
+            doc=doc,
+            modelspace=modelspace,
+            dyn_fn=lambda value: value,
+            include_modelspace=True,
+            selection_only=False,
+            max_entities=1000,
+        )
+
+        self.assertTrue(result["success"])
+        strips = result["data"]["panels"]["RP1"]["sides"]["L"]["strips"]
+        self.assertEqual(len(strips), 2)
+        strip_ids = [strip["stripId"] for strip in strips]
+        self.assertIn("RP1L1", strip_ids)
+        self.assertIn("RP1L2", strip_ids)
+
     def test_scan_terminal_strips_applies_custom_terminal_profile(self) -> None:
         doc = _Doc(name="custom-profile.dwg", units=2)
         modelspace = _Collection(
@@ -459,6 +507,55 @@ class TestApiAutocadTerminalScan(unittest.TestCase):
         self.assertAlmostEqual(geometry[0]["points"][1]["y"], 232.0, places=4)
         self.assertGreaterEqual(result["meta"]["totalGeometryPrimitives"], 2)
 
+    def test_sync_terminal_strip_labels_updates_termxx_attributes(self) -> None:
+        block = _BlockRef(
+            name="TERMINAL_STRIP_BLOCK",
+            handle="Z1",
+            insertion_point=(100.0, 220.0, 0.0),
+            attrs=[
+                ("PANEL_ID", "RP1"),
+                ("SIDE", "L"),
+                ("STRIP_ID", "RP1L1"),
+                ("TERMINAL_COUNT", "4"),
+                ("TERM01_LABEL", "OLD1"),
+                ("TERM02_LABEL", "OLD2"),
+                ("TERM03_LABEL", "OLD3"),
+                ("TERM04_LABEL", "OLD4"),
+            ],
+        )
+        doc = _Doc(name="labelsync.dwg", units=2)
+        modelspace = _Collection([block])
+
+        result = sync_terminal_strip_labels(
+            doc=doc,
+            modelspace=modelspace,
+            dyn_fn=lambda value: value,
+            strips_payload=[
+                {
+                    "stripId": "RP1L1",
+                    "terminalCount": 4,
+                    "labels": ["1", "2", "3", "4"],
+                }
+            ],
+            include_modelspace=True,
+            selection_only=False,
+            max_entities=1000,
+            terminal_profile=None,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["data"]["updatedStrips"], 1)
+        self.assertEqual(result["data"]["updatedAttributes"], 4)
+        values = {
+            attr.TagString: attr.TextString
+            for attr in block.GetAttributes()
+            if str(attr.TagString).startswith("TERM")
+        }
+        self.assertEqual(values["TERM01_LABEL"], "1")
+        self.assertEqual(values["TERM02_LABEL"], "2")
+        self.assertEqual(values["TERM03_LABEL"], "3")
+        self.assertEqual(values["TERM04_LABEL"], "4")
+
     def test_scan_terminal_strips_extracts_tb_jumper_meta_records(self) -> None:
         doc = _Doc(name="jumpers.dwg", units=2)
         modelspace = _Collection(
@@ -526,6 +623,69 @@ class TestApiAutocadTerminalScan(unittest.TestCase):
         self.assertEqual(jumpers[0]["toStripId"], "RP1R1")
         self.assertEqual(jumpers[0]["toTerminal"], 5)
         self.assertEqual(result["meta"]["totalJumpers"], 1)
+
+    def test_scan_terminal_strips_resolves_positional_jumper_without_from_to_attributes(self) -> None:
+        doc = _Doc(name="jumpers-positional.dwg", units=2)
+        modelspace = _Collection(
+            [
+                _BlockRef(
+                    name="TB_STRIP_META_SIDE",
+                    handle="K1",
+                    insertion_point=(10.0, 40.0, 0.0),
+                    attrs=[
+                        ("PANEL_ID", "RP1"),
+                        ("SIDE", "L"),
+                        ("STRIP_ID", "RP1L1"),
+                        ("TERMINAL_COUNT", "12"),
+                    ],
+                ),
+                _BlockRef(
+                    name="TB_STRIP_META_SIDE",
+                    handle="K2",
+                    insertion_point=(50.0, 40.0, 0.0),
+                    attrs=[
+                        ("PANEL_ID", "RP1"),
+                        ("SIDE", "R"),
+                        ("STRIP_ID", "RP1R1"),
+                        ("TERMINAL_COUNT", "12"),
+                    ],
+                ),
+                _BlockRef(
+                    name="TB_JUMPER_META",
+                    handle="K3",
+                    insertion_point=(18.0, 52.0, 0.0),
+                    attrs=[("JUMPER_ID", "JMP-POS-1")],
+                ),
+            ]
+        )
+
+        result = scan_terminal_strips(
+            doc=doc,
+            modelspace=modelspace,
+            dyn_fn=lambda value: value,
+            include_modelspace=True,
+            selection_only=False,
+            max_entities=1000,
+            terminal_profile={
+                "blockNameAllowList": ["TB_STRIP_META_SIDE"],
+                "requireStripId": True,
+                "requireTerminalCount": True,
+                "requireSide": True,
+            },
+        )
+
+        self.assertTrue(result["success"])
+        jumpers = result["data"]["jumpers"]
+        self.assertEqual(len(jumpers), 1)
+        jumper = jumpers[0]
+        self.assertEqual(jumper["jumperId"], "JMP-POS-1")
+        self.assertEqual(jumper["resolution"], "position")
+        self.assertEqual(jumper["fromStripId"], "RP1L1")
+        self.assertEqual(jumper["toStripId"], "RP1R1")
+        self.assertGreaterEqual(jumper["fromTerminal"], 1)
+        self.assertGreaterEqual(jumper["toTerminal"], 1)
+        self.assertEqual(result["meta"]["positionalJumperCandidates"], 1)
+        self.assertEqual(result["meta"]["resolvedPositionalJumpers"], 1)
 
 
 if __name__ == "__main__":

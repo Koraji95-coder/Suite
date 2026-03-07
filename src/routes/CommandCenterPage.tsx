@@ -124,6 +124,12 @@ const COMMAND_GROUPS: CommandGroup[] = [
 				command: "npm run dev",
 			},
 			{
+				id: "dev-full",
+				name: "Start Full Stack Dev",
+				description: "Run frontend + backend + local gateway.",
+				command: "npm run dev:full",
+			},
+			{
 				id: "build",
 				name: "Production Build",
 				description: "Create production bundle.",
@@ -167,7 +173,7 @@ const COMMAND_GROUPS: CommandGroup[] = [
 				id: "zeroclaw",
 				name: "ZeroClaw Gateway (Local)",
 				description: "Start local ZeroClaw gateway service.",
-				command: "./zeroclaw gateway --host 127.0.0.1 --port 3000",
+				command: "npm run gateway:dev",
 			},
 			{
 				id: "flask",
@@ -1051,19 +1057,30 @@ export default function CommandCenterPage() {
 	};
 
 	const resetWatchdogConfig = async () => {
-		setWatchdogConfig(DEFAULT_WATCHDOG_CONFIG);
-		setIncludeDraft("");
-		setExcludeDraft("");
+		const pausedConfig: WatchdogConfig = {
+			roots: [],
+			includeGlobs: [],
+			excludeGlobs: [],
+			heartbeatMs: Math.max(1000, Number(watchdogConfig.heartbeatMs) || 5000),
+			enabled: false,
+		};
+		const applied = await applyConfig(pausedConfig, {
+			persist: true,
+			silent: true,
+			refreshNow: false,
+		});
+		if (!applied) return;
+
 		setWatchdogEvents([]);
 		setWatchdogWarnings([]);
 		setWatchdogLastScan(null);
-		await deleteSetting(WATCHDOG_SETTING_KEY, null);
-		setWatchdogMessage("Watchdog configuration cleared.");
+		setWatchdogMessage("Watchdog configuration reset and paused.");
 		appendHistory({
 			category: "Watchdog",
 			action: "watchdog_config_reset",
 			title: "Reset Watchdog configuration",
-			detailsText: "Watchdog config and in-memory feed were reset.",
+			detailsText:
+				"Watchdog config was reset to paused state on backend and local feed was cleared.",
 		});
 	};
 

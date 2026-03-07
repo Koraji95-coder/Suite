@@ -1,6 +1,8 @@
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import type {
+	EtapCleanupRunRequest,
+	EtapCleanupRunResponse,
 	TerminalCadRuntimeStatus,
 	TerminalCadStatusResponse,
 	TerminalCadDrawRequest,
@@ -229,6 +231,69 @@ class ConduitTerminalService {
 				"ConduitTerminalService",
 				err,
 			);
+			return {
+				success: false,
+				code: "NETWORK_ERROR",
+				message,
+			};
+		}
+	}
+
+	async runEtapCleanup(
+		request: EtapCleanupRunRequest = {},
+	): Promise<EtapCleanupRunResponse> {
+		try {
+			const requestId = this.createRequestId();
+			const headers = await this.getHeaders(requestId);
+			const timeoutMs = Math.max(
+				1000,
+				Math.min(600000, Math.trunc(request.timeoutMs ?? 90000)),
+			);
+			const response = await fetch(`${this.baseUrl}/api/etap/cleanup/run`, {
+				method: "POST",
+				headers,
+				body: JSON.stringify({
+					command: request.command ?? "ETAPFIX",
+					pluginDllPath: request.pluginDllPath || undefined,
+					waitForCompletion: request.waitForCompletion ?? true,
+					timeoutMs,
+					saveDrawing: request.saveDrawing ?? false,
+				}),
+			});
+
+			const payload = (await response
+				.json()
+				.catch(() => null)) as EtapCleanupRunResponse | null;
+
+			if (!response.ok) {
+				return {
+					success: false,
+					code: payload?.code || "REQUEST_FAILED",
+					message:
+						payload?.message ||
+						(await this.parseErrorMessage(
+							response,
+							`ETAP cleanup failed (${response.status})`,
+						)),
+					data: payload?.data,
+					meta: payload?.meta,
+					warnings: payload?.warnings,
+				};
+			}
+
+			if (payload && typeof payload.success === "boolean") {
+				return payload;
+			}
+
+			return {
+				success: false,
+				code: "INVALID_RESPONSE",
+				message: "ETAP cleanup returned an unexpected payload.",
+			};
+		} catch (err) {
+			const message =
+				err instanceof Error ? err.message : "ETAP cleanup request failed";
+			logger.error("ETAP cleanup request failed", "ConduitTerminalService", err);
 			return {
 				success: false,
 				code: "NETWORK_ERROR",

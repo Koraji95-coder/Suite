@@ -67,8 +67,8 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
 - `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
 - `api_transmittal_render.py`: `/api/transmittal/render`
-- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`
-- `api_watchdog.py`: `/api/watchdog/config`, `/api/watchdog/status`, `/api/watchdog/heartbeat`
+- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`, `/api/etap/cleanup/run`
+- `api_watchdog.py`: `/api/watchdog/config`, `/api/watchdog/status`, `/api/watchdog/heartbeat`, `/api/watchdog/pick-root`
 - `api_health.py`: `/health`
 - `api_registry.py`: central route-group registration for the Flask app
 

@@ -1,0 +1,44 @@
+{
+  "rules": [
+    {
+      "id": "delete-green-cloud",
+      "category": "DELETE",
+      "trigger": {
+        "type": "cloud",
+        "color": "green"
+      }
+    },
+    {
+      "id": "add-red-cloud",
+      "category": "ADD",
+      "trigger": {
+        "type": "cloud",
+        "color": "red"
+      }
+    },
+    {
+      "id": "note-blue-text",
+      "category": "NOTE",
+      "trigger": {
+        "type": "text",
+        "color": "blue"
+      }
+    },
+    {
+      "id": "swap-blue-arrows",
+      "category": "SWAP",
+      "trigger": {
+        "type": "arrow",
+        "color": "blue"
+      }
+    },
+    {
+      "id": "title-block-rect",
+      "category": "TITLE_BLOCK",
+      "trigger": {
+        "type": "rectangle",
+        "color": null
+      }
+    }
+  ]
+}

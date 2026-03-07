@@ -1,5 +1,5 @@
 import { logger } from "@/lib/logger";
-import type { AutoDraftRule } from "./autodraftData";
+import { RULE_LIBRARY, type AutoDraftRule } from "./autodraftData";
 
 export type AutoDraftHealth = {
 	ok: boolean;
@@ -45,6 +45,196 @@ export type AutoDraftPlanResponse = {
 };
 
 const DEFAULT_TIMEOUT_MS = 20_000;
+
+const FALLBACK_HEALTH: AutoDraftHealth = {
+	ok: false,
+	mode: "offline",
+	dotnet: {
+		configured: false,
+		reachable: false,
+		error: "Backend unavailable.",
+	},
+};
+
+const FALLBACK_RULE_BY_CATEGORY: Record<AutoDraftRule["category"], AutoDraftRule> = {
+	DELETE: RULE_LIBRARY.find((rule) => rule.category === "DELETE") ?? RULE_LIBRARY[0],
+	ADD: RULE_LIBRARY.find((rule) => rule.category === "ADD") ?? RULE_LIBRARY[0],
+	NOTE: RULE_LIBRARY.find((rule) => rule.category === "NOTE") ?? RULE_LIBRARY[0],
+	SWAP: RULE_LIBRARY.find((rule) => rule.category === "SWAP") ?? RULE_LIBRARY[0],
+	TITLE_BLOCK:
+		RULE_LIBRARY.find((rule) => rule.category === "TITLE_BLOCK") ?? RULE_LIBRARY[0],
+	BLOCK_REF:
+		RULE_LIBRARY.find((rule) => rule.category === "BLOCK_REF") ?? RULE_LIBRARY[0],
+	REVISION_CLOUD:
+		RULE_LIBRARY.find((rule) => rule.category === "REVISION_CLOUD") ?? RULE_LIBRARY[0],
+	DIMENSION:
+		RULE_LIBRARY.find((rule) => rule.category === "DIMENSION") ?? RULE_LIBRARY[0],
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isRuleCategory = (value: unknown): value is AutoDraftRule["category"] => {
+	if (typeof value !== "string") return false;
+	return value.toUpperCase() in FALLBACK_RULE_BY_CATEGORY;
+};
+
+const toNonEmptyString = (value: unknown, fallback = ""): string => {
+	if (typeof value !== "string") return fallback;
+	const trimmed = value.trim();
+	return trimmed.length > 0 ? trimmed : fallback;
+};
+
+const toConfidence = (value: unknown, fallback: number): number => {
+	const parsed =
+		typeof value === "number"
+			? value
+			: typeof value === "string"
+				? Number(value)
+				: NaN;
+	if (!Number.isFinite(parsed)) return fallback;
+	return Math.max(0, Math.min(1, parsed));
+};
+
+const toInt = (value: unknown, fallback: number): number => {
+	const parsed =
+		typeof value === "number"
+			? value
+			: typeof value === "string"
+				? Number(value)
+				: NaN;
+	if (!Number.isFinite(parsed)) return fallback;
+	return Math.max(0, Math.round(parsed));
+};
+
+const normalizeTrigger = (
+	value: unknown,
+	fallback: AutoDraftRule["trigger"],
+): AutoDraftRule["trigger"] => {
+	if (!isRecord(value)) return fallback;
+	const entries = Object.entries(value).filter((entry) => {
+		const [key, entryValue] = entry;
+		if (typeof key !== "string" || key.trim().length === 0) return false;
+		return (
+			typeof entryValue === "string" ||
+			typeof entryValue === "number" ||
+			typeof entryValue === "boolean"
+		);
+	});
+	if (entries.length === 0) return fallback;
+	return Object.fromEntries(entries) as AutoDraftRule["trigger"];
+};
+
+const normalizeExamples = (value: unknown, fallback: string[]): string[] => {
+	if (!Array.isArray(value)) return fallback;
+	const normalized = value
+		.filter((item): item is string => typeof item === "string")
+		.map((item) => item.trim())
+		.filter((item) => item.length > 0);
+	return normalized.length > 0 ? normalized : fallback;
+};
+
+const normalizeHealthPayload = (payload: unknown): AutoDraftHealth => {
+	if (!isRecord(payload)) return FALLBACK_HEALTH;
+
+	const dotnet = isRecord(payload.dotnet)
+		? {
+				configured: Boolean(payload.dotnet.configured),
+				reachable: Boolean(payload.dotnet.reachable),
+				base_url:
+					typeof payload.dotnet.base_url === "string" ? payload.dotnet.base_url : null,
+				error: typeof payload.dotnet.error === "string" ? payload.dotnet.error : null,
+			}
+		: FALLBACK_HEALTH.dotnet;
+
+	return {
+		ok: Boolean(payload.ok),
+		app: toNonEmptyString(payload.app),
+		mode: toNonEmptyString(payload.mode, "unknown"),
+		dotnet,
+		elapsed_ms:
+			typeof payload.elapsed_ms === "number" && Number.isFinite(payload.elapsed_ms)
+				? payload.elapsed_ms
+				: undefined,
+	};
+};
+
+const normalizeRule = (payload: unknown, index: number): AutoDraftRule | null => {
+	if (!isRecord(payload)) return null;
+
+	const defaultRule = RULE_LIBRARY[index % RULE_LIBRARY.length] ?? RULE_LIBRARY[0];
+	const rawCategory = toNonEmptyString(payload.category, defaultRule.category).toUpperCase();
+	const category = isRuleCategory(rawCategory)
+		? (rawCategory as AutoDraftRule["category"])
+		: defaultRule.category;
+	const categoryDefaults = FALLBACK_RULE_BY_CATEGORY[category] ?? defaultRule;
+
+	return {
+		id: toNonEmptyString(payload.id, `${category.toLowerCase()}-${index + 1}`),
+		category,
+		trigger: normalizeTrigger(payload.trigger, categoryDefaults.trigger),
+		action: toNonEmptyString(payload.action, categoryDefaults.action),
+		icon: toNonEmptyString(payload.icon, categoryDefaults.icon),
+		examples: normalizeExamples(payload.examples, categoryDefaults.examples),
+		confidence: toConfidence(payload.confidence, categoryDefaults.confidence),
+	};
+};
+
+const normalizeAction = (payload: unknown, index: number): AutoDraftAction | null => {
+	if (!isRecord(payload)) return null;
+	return {
+		id: toNonEmptyString(payload.id, `action-${index + 1}`),
+		rule_id: typeof payload.rule_id === "string" ? payload.rule_id : null,
+		category: toNonEmptyString(payload.category, "UNCLASSIFIED"),
+		action: toNonEmptyString(payload.action, "Manual review required."),
+		confidence: toConfidence(payload.confidence, 0),
+		status: toNonEmptyString(payload.status, "review"),
+		markup: isRecord(payload.markup) ? payload.markup : {},
+	};
+};
+
+const summarizeActions = (
+	actions: AutoDraftAction[],
+): AutoDraftPlanResponse["summary"] => ({
+	total_markups: actions.length,
+	actions_proposed: actions.length,
+	classified: actions.filter((item) => Boolean(item.rule_id)).length,
+	needs_review: actions.filter((item) => !item.rule_id).length,
+});
+
+const normalizePlanPayload = (payload: unknown): AutoDraftPlanResponse => {
+	if (!isRecord(payload)) {
+		return {
+			ok: false,
+			source: "invalid-payload",
+			actions: [],
+			summary: summarizeActions([]),
+		};
+	}
+
+	const actionsRaw = Array.isArray(payload.actions) ? payload.actions : [];
+	const actions = actionsRaw
+		.map((item, index) => normalizeAction(item, index))
+		.filter((item): item is AutoDraftAction => item !== null);
+
+	const fallbackSummary = summarizeActions(actions);
+	const summaryRaw = isRecord(payload.summary) ? payload.summary : null;
+
+	return {
+		ok: Boolean(payload.ok),
+		source: toNonEmptyString(payload.source, "unknown"),
+		actions,
+		summary: {
+			total_markups: toInt(summaryRaw?.total_markups, fallbackSummary.total_markups),
+			actions_proposed: toInt(
+				summaryRaw?.actions_proposed,
+				fallbackSummary.actions_proposed,
+			),
+			classified: toInt(summaryRaw?.classified, fallbackSummary.classified),
+			needs_review: toInt(summaryRaw?.needs_review, fallbackSummary.needs_review),
+		},
+	};
+};
 
 const withTimeout = (
 	timeoutMs: number,
@@ -123,30 +313,35 @@ class AutoDraftService {
 
 	async health(): Promise<AutoDraftHealth> {
 		try {
-			return await this.requestJson<AutoDraftHealth>("/api/autodraft/health", {
+			const payload = await this.requestJson<unknown>("/api/autodraft/health", {
 				method: "GET",
 			});
+			return normalizeHealthPayload(payload);
 		} catch (error) {
 			logger.warn("AutoDraft health failed", "AutoDraftService", { error });
-			return {
-				ok: false,
-				mode: "offline",
-				dotnet: {
-					configured: false,
-					reachable: false,
-					error: "Backend unavailable.",
-				},
-			};
+			return FALLBACK_HEALTH;
 		}
 	}
 
 	async listRules(): Promise<AutoDraftRule[]> {
 		try {
-			const result = await this.requestJson<{
-				ok: boolean;
-				rules?: AutoDraftRule[];
-			}>("/api/autodraft/rules", { method: "GET" });
-			return Array.isArray(result.rules) ? result.rules : [];
+			const payload = await this.requestJson<unknown>("/api/autodraft/rules", {
+				method: "GET",
+			});
+			const rulesRaw =
+				isRecord(payload) && Array.isArray(payload.rules) ? payload.rules : [];
+			const rules = rulesRaw
+				.map((item, index) => normalizeRule(item, index))
+				.filter((item): item is AutoDraftRule => item !== null);
+
+			if (rulesRaw.length > 0 && rules.length !== rulesRaw.length) {
+				logger.warn("AutoDraft rules payload contained invalid entries", "AutoDraftService", {
+					expected: rulesRaw.length,
+					normalized: rules.length,
+				});
+			}
+
+			return rules;
 		} catch (error) {
 			logger.warn("AutoDraft rules fetch failed", "AutoDraftService", {
 				error,
@@ -156,10 +351,11 @@ class AutoDraftService {
 	}
 
 	async plan(markups: MarkupInput[]): Promise<AutoDraftPlanResponse> {
-		return this.requestJson<AutoDraftPlanResponse>("/api/autodraft/plan", {
+		const payload = await this.requestJson<unknown>("/api/autodraft/plan", {
 			method: "POST",
 			body: JSON.stringify({ markups }),
 		});
+		return normalizePlanPayload(payload);
 	}
 }
 

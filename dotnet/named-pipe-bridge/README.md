@@ -54,6 +54,20 @@ If routing fails internally:
 
 - `conduit_route_terminal_scan`
 - `conduit_route_obstacle_scan`
+- `conduit_route_terminal_routes_draw`
+- `etap_dxf_cleanup_run` (queues ETAP plugin cleanup commands such as `ETAPFIX`)
+
+For `etap_dxf_cleanup_run`, when `pluginDllPath` is omitted the bridge tries to
+auto-discover `EtapDxfCleanup.dll` from common repo build locations:
+
+- `src/components/apps/dxfer/bin/Debug/net8.0-windows/EtapDxfCleanup.dll`
+- `src/components/apps/dxfer/bin/Release/net8.0-windows/EtapDxfCleanup.dll`
+- `src/components/apps/dxfer/bin/Debug/net48/EtapDxfCleanup.dll`
+- `src/components/apps/dxfer/bin/Release/net48/EtapDxfCleanup.dll`
+
+You can override discovery with:
+
+- `AUTOCAD_ETAP_PLUGIN_DLL_PATH=C:\absolute\path\EtapDxfCleanup.dll`
 
 These actions now perform live AutoCAD scans through COM from the .NET bridge
 process and return the same normalized payload shape expected by the backend/UI.

@@ -3,6 +3,9 @@ import { createInterface } from "node:readline";
 
 const children = [];
 let shuttingDown = false;
+const autocadPipeName =
+	(process.env.AUTOCAD_DOTNET_PIPE_NAME || "").trim() || "SUITE_AUTOCAD_PIPE";
+const namedPipeServerProject = "dotnet/named-pipe-bridge/NamedPipeServer.csproj";
 
 function forwardOutput(stream, label, write) {
 	if (!stream) return;
@@ -68,5 +71,10 @@ process.on("SIGTERM", () => {
 	}
 });
 
+run(
+	"pipe-bridge",
+	`dotnet run --project ${namedPipeServerProject} -- ${JSON.stringify(autocadPipeName)}`,
+);
 run("frontend", "npm run dev");
 run("backend", "npm run backend:coords:dev");
+run("gateway", "npm run gateway:dev");

@@ -33,6 +33,13 @@ def create_autocad_blueprint(
     """Create AutoCAD backend route group blueprint under /api."""
     bp = Blueprint("autocad_api", __name__, url_prefix="/api")
     backend_exports_dir = Path(__file__).resolve().parents[1] / "exports"
+    repo_root_dir = Path(__file__).resolve().parents[2]
+    etap_plugin_relative_candidates = (
+        Path("src/components/apps/dxfer/bin/Debug/net8.0-windows/EtapDxfCleanup.dll"),
+        Path("src/components/apps/dxfer/bin/Release/net8.0-windows/EtapDxfCleanup.dll"),
+        Path("src/components/apps/dxfer/bin/Debug/net48/EtapDxfCleanup.dll"),
+        Path("src/components/apps/dxfer/bin/Release/net48/EtapDxfCleanup.dll"),
+    )
 
     def _is_under_dir(path_value: Path, root_dir: Path) -> bool:
         try:
@@ -40,6 +47,23 @@ def create_autocad_blueprint(
             return True
         except Exception:
             return False
+
+    def _resolve_default_etap_plugin_dll_path() -> str:
+        env_path_raw = str(os.getenv("AUTOCAD_ETAP_PLUGIN_DLL_PATH", "") or "").strip().strip('"')
+        if env_path_raw:
+            try:
+                env_path = Path(env_path_raw).expanduser().resolve()
+            except Exception:
+                env_path = Path(env_path_raw)
+            if env_path.is_file():
+                return str(env_path)
+
+        for relative_candidate in etap_plugin_relative_candidates:
+            candidate_path = (repo_root_dir / relative_candidate).resolve()
+            if candidate_path.is_file():
+                return str(candidate_path)
+
+        return ""
 
     def _is_safe_export_path(path_value: Path, manager: Any) -> bool:
         name_lower = path_value.name.lower()
@@ -349,7 +373,7 @@ def create_autocad_blueprint(
             return raw_value[:128]
         return f"req-{int(time.time() * 1000)}"
 
-    def _call_dotnet_conduit_action(
+    def _call_dotnet_bridge_action(
         *,
         action: str,
         payload: Dict[str, Any],
@@ -399,7 +423,7 @@ def create_autocad_blueprint(
             "bridgeRequestId": str(response.get("id") or ""),
         }
         logger.info(
-            ".NET conduit action succeeded (request_id=%s, action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s)",
+            ".NET bridge action succeeded (request_id=%s, action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s)",
             request_id,
             action,
             remote_addr,
@@ -907,7 +931,7 @@ def create_autocad_blueprint(
                 "terminalProfile": terminal_profile,
             }
             try:
-                result = _call_dotnet_conduit_action(
+                result = _call_dotnet_bridge_action(
                     action="conduit_route_terminal_scan",
                     payload=dotnet_payload,
                     remote_addr=remote_addr,
@@ -1184,7 +1208,7 @@ def create_autocad_blueprint(
                     "layerPreset": layer_rules_meta.get("appliedPreset") or "",
                 }
                 try:
-                    obstacle_scan_result = _call_dotnet_conduit_action(
+                    obstacle_scan_result = _call_dotnet_bridge_action(
                         action="conduit_route_obstacle_scan",
                         payload=dotnet_payload,
                         remote_addr=remote_addr,
@@ -1604,7 +1628,7 @@ def create_autocad_blueprint(
         provider_path = "com"
         if conduit_dotnet_enabled:
             try:
-                result = _call_dotnet_conduit_action(
+                result = _call_dotnet_bridge_action(
                     action="conduit_route_terminal_routes_draw",
                     payload=normalized_payload,
                     remote_addr=remote_addr,
@@ -1732,6 +1756,163 @@ def create_autocad_blueprint(
                     }
                 ),
                 500,
+            )
+
+    @bp.route("/etap/cleanup/run", methods=["POST"])
+    @require_autocad_auth
+    @limiter.limit("300 per hour")
+    def api_etap_cleanup_run():
+        """
+        Queue ETAP DXF cleanup command execution through the local .NET bridge.
+
+        This endpoint is intended for in-app orchestration of AutoCAD-hosted ETAP cleanup commands
+        (for example ETAPFIX) with optional plugin NETLOAD and completion wait.
+        """
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+        request_id = _request_correlation_id()
+
+        if send_autocad_dotnet_command is None:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "DOTNET_BRIDGE_UNAVAILABLE",
+                        "message": "AutoCAD .NET bridge command sender is not configured.",
+                    }
+                ),
+                503,
+            )
+
+        payload = request.get_json(silent=True) if request.is_json else {}
+        if payload is None:
+            payload = {}
+        if not isinstance(payload, dict):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "Request payload must be a JSON object.",
+                    }
+                ),
+                400,
+            )
+
+        command = str(payload.get("command") or "ETAPFIX").strip().upper()
+        if not command:
+            command = "ETAPFIX"
+
+        plugin_dll_path_raw = payload.get("pluginDllPath", payload.get("plugin_dll_path"))
+        plugin_dll_path = (
+            str(plugin_dll_path_raw).strip()
+            if plugin_dll_path_raw is not None
+            else ""
+        )
+
+        wait_for_completion = _normalize_terminal_profile_bool(
+            payload.get("waitForCompletion", payload.get("wait_for_completion", True)),
+            fallback=True,
+        )
+        save_drawing = _normalize_terminal_profile_bool(
+            payload.get("saveDrawing", payload.get("save_drawing", False)),
+            fallback=False,
+        )
+
+        timeout_ms_raw = payload.get("timeoutMs", payload.get("timeout_ms", 90000))
+        try:
+            timeout_ms = int(timeout_ms_raw)
+        except Exception:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "INVALID_REQUEST",
+                        "message": "timeoutMs must be an integer.",
+                    }
+                ),
+                400,
+            )
+        timeout_ms = max(1000, min(600000, timeout_ms))
+
+        dotnet_payload: Dict[str, Any] = {
+            "command": command,
+            "waitForCompletion": wait_for_completion,
+            "timeoutMs": timeout_ms,
+            "saveDrawing": save_drawing,
+        }
+        resolved_plugin_dll_path = plugin_dll_path or _resolve_default_etap_plugin_dll_path()
+        plugin_dll_auto_discovered = bool(resolved_plugin_dll_path and not plugin_dll_path)
+
+        if resolved_plugin_dll_path:
+            dotnet_payload["pluginDllPath"] = resolved_plugin_dll_path
+
+        logger.info(
+            "ETAP cleanup run request received (request_id=%s, remote=%s, auth_mode=%s, command=%s, wait_for_completion=%s, timeout_ms=%s, plugin_dll_provided=%s, plugin_dll_auto_discovered=%s)",
+            request_id,
+            remote_addr,
+            auth_mode,
+            command,
+            wait_for_completion,
+            timeout_ms,
+            bool(plugin_dll_path),
+            plugin_dll_auto_discovered,
+        )
+
+        try:
+            result = _call_dotnet_bridge_action(
+                action="etap_dxf_cleanup_run",
+                payload=dotnet_payload,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                request_id=request_id,
+            )
+            result["meta"] = {
+                **(result.get("meta", {}) or {}),
+                "providerPath": "dotnet",
+                "providerConfigured": conduit_provider,
+                "command": command,
+                "waitForCompletion": wait_for_completion,
+                "timeoutMs": timeout_ms,
+                "pluginDllPath": resolved_plugin_dll_path or "",
+                "pluginDllAutoDiscovered": plugin_dll_auto_discovered,
+            }
+            if result.get("success"):
+                return jsonify(result), 200
+
+            code = str(result.get("code") or "").strip().upper()
+            if code == "INVALID_REQUEST":
+                status_code = 400
+            elif code == "PLUGIN_DLL_NOT_FOUND":
+                status_code = 404
+            elif code == "AUTOCAD_COMMAND_TIMEOUT":
+                status_code = 504
+            else:
+                status_code = 422
+            return jsonify(result), status_code
+        except Exception as exc:
+            logger.warning(
+                "ETAP cleanup .NET bridge failed (request_id=%s, remote=%s, auth_mode=%s, error=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+                str(exc),
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "code": "DOTNET_BRIDGE_FAILED",
+                        "message": f".NET ETAP cleanup action failed: {str(exc)}",
+                        "meta": {
+                            "source": "dotnet",
+                            "requestId": request_id,
+                            "providerPath": "dotnet",
+                            "providerConfigured": conduit_provider,
+                        },
+                    }
+                ),
+                503,
             )
 
     @bp.route("/conduit-route/terminal-labels/sync", methods=["POST"])
@@ -2012,7 +2193,7 @@ def create_autocad_blueprint(
                 "layerPreset": layer_rules_meta.get("appliedPreset") or "",
             }
             try:
-                result = _call_dotnet_conduit_action(
+                result = _call_dotnet_bridge_action(
                     action="conduit_route_obstacle_scan",
                     payload=dotnet_payload,
                     remote_addr=remote_addr,

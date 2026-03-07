@@ -150,6 +150,27 @@ class TestWatchdogMonitorService(unittest.TestCase):
                 },
             )
 
+    def test_disabled_configuration_allows_empty_roots(self) -> None:
+        service = WatchdogMonitorService()
+        configured = service.configure(
+            "user:demo",
+            {
+                "roots": [],
+                "includeGlobs": [],
+                "excludeGlobs": [],
+                "heartbeatMs": 5000,
+                "enabled": False,
+            },
+        )
+
+        self.assertIn("config", configured)
+        self.assertEqual(configured["config"]["roots"], [])
+        self.assertFalse(configured["config"]["enabled"])
+
+        heartbeat = service.heartbeat("user:demo")
+        self.assertEqual(heartbeat["events"], [])
+        self.assertIn("paused", " ".join(heartbeat.get("warnings") or []).lower())
+
 
 if __name__ == "__main__":
     unittest.main()

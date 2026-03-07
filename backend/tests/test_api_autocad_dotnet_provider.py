@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 from typing import Any, Dict, List, Tuple
 
@@ -602,6 +604,145 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         payload = response.get_json()
         self.assertFalse(payload.get("success", True))
         self.assertEqual(payload.get("code"), "DOTNET_BRIDGE_FAILED")
+
+    def test_etap_cleanup_run_uses_dotnet_action(self) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            calls.append((action, payload))
+            return {
+                "id": "bridge-etap-123",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "queued",
+                    "data": {
+                        "drawing": {"name": "stub.dwg"},
+                        "command": "ETAPFIX",
+                    },
+                    "meta": {},
+                    "warnings": [],
+                },
+                "error": None,
+            }
+
+        client = self._build_client(provider="dotnet", sender=sender)
+        response = client.post(
+            "/api/etap/cleanup/run",
+            headers={"X-Request-ID": "req-etap-123"},
+            json={
+                "command": "ETAPFIX",
+                "pluginDllPath": "C:\\AutoCAD\\Plugins\\EtapDxfCleanup.dll",
+                "waitForCompletion": False,
+                "timeoutMs": 120000,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "etap_dxf_cleanup_run")
+        self.assertEqual(calls[0][1].get("requestId"), "req-etap-123")
+        self.assertEqual(calls[0][1].get("command"), "ETAPFIX")
+        self.assertEqual(
+            calls[0][1].get("pluginDllPath"),
+            "C:\\AutoCAD\\Plugins\\EtapDxfCleanup.dll",
+        )
+        self.assertEqual(calls[0][1].get("waitForCompletion"), False)
+        self.assertEqual(calls[0][1].get("timeoutMs"), 120000)
+        self.assertEqual((payload.get("meta") or {}).get("requestId"), "req-etap-123")
+        self.assertEqual((payload.get("meta") or {}).get("bridgeRequestId"), "bridge-etap-123")
+
+    def test_etap_cleanup_run_returns_503_when_sender_missing(self) -> None:
+        client = self._build_client(provider="dotnet", sender=None)
+        response = client.post("/api/etap/cleanup/run", json={})
+        self.assertEqual(response.status_code, 503)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+        self.assertEqual(payload.get("code"), "DOTNET_BRIDGE_UNAVAILABLE")
+
+    def test_etap_cleanup_run_maps_plugin_not_found_to_404(self) -> None:
+        def sender(_action: str, _payload: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "ok": True,
+                "result": {
+                    "success": False,
+                    "code": "PLUGIN_DLL_NOT_FOUND",
+                    "message": "missing plugin",
+                    "data": {},
+                    "meta": {},
+                    "warnings": [],
+                },
+                "error": None,
+            }
+
+        client = self._build_client(provider="dotnet", sender=sender)
+        response = client.post(
+            "/api/etap/cleanup/run",
+            json={"pluginDllPath": "C:\\missing\\EtapDxfCleanup.dll"},
+        )
+        self.assertEqual(response.status_code, 404)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+        self.assertEqual(payload.get("code"), "PLUGIN_DLL_NOT_FOUND")
+
+    def test_etap_cleanup_run_uses_env_default_plugin_path_when_not_provided(self) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            calls.append((action, payload))
+            return {
+                "id": "bridge-etap-auto-path",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "queued",
+                    "data": {
+                        "drawing": {"name": "stub.dwg"},
+                        "command": "ETAPFIX",
+                    },
+                    "meta": {},
+                    "warnings": [],
+                },
+                "error": None,
+            }
+
+        fd, dll_path = tempfile.mkstemp(suffix=".dll")
+        os.close(fd)
+        previous_env = os.environ.get("AUTOCAD_ETAP_PLUGIN_DLL_PATH")
+        os.environ["AUTOCAD_ETAP_PLUGIN_DLL_PATH"] = dll_path
+        try:
+            client = self._build_client(provider="dotnet", sender=sender)
+            response = client.post(
+                "/api/etap/cleanup/run",
+                json={"command": "ETAPFIX"},
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(calls[0][0], "etap_dxf_cleanup_run")
+            payload_plugin_path = str(calls[0][1].get("pluginDllPath") or "")
+            self.assertTrue(payload_plugin_path)
+            self.assertTrue(os.path.exists(payload_plugin_path))
+            self.assertTrue(os.path.samefile(payload_plugin_path, dll_path))
+
+            payload = response.get_json() or {}
+            meta = payload.get("meta") or {}
+            meta_plugin_path = str(meta.get("pluginDllPath") or "")
+            self.assertTrue(meta_plugin_path)
+            self.assertTrue(os.path.exists(meta_plugin_path))
+            self.assertTrue(os.path.samefile(meta_plugin_path, dll_path))
+            self.assertTrue(meta.get("pluginDllAutoDiscovered"))
+        finally:
+            if previous_env is None:
+                os.environ.pop("AUTOCAD_ETAP_PLUGIN_DLL_PATH", None)
+            else:
+                os.environ["AUTOCAD_ETAP_PLUGIN_DLL_PATH"] = previous_env
+            try:
+                os.remove(dll_path)
+            except OSError:
+                pass
 
     def test_terminal_scan_propagates_request_id_to_dotnet_and_response_meta(self) -> None:
         calls: list[tuple[str, dict[str, Any]]] = []

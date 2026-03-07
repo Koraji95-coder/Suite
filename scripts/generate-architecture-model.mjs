@@ -12,7 +12,13 @@ const outputPath = path.join(
 const DOMAIN_ROOTS = [
 	{
 		domainId: "frontend",
-		roots: ["src/routes", "src/components/apps", "src/auth", "src/services"],
+		roots: [
+			"src/routes",
+			"src/components/apps",
+			"src/components/apps/dxfer",
+			"src/auth",
+			"src/services",
+		],
 		maxChildrenPerRoot: 10,
 	},
 	{
@@ -49,6 +55,8 @@ const SKIP_DIRS = new Set([
 	"node_modules",
 	"dist",
 	"build",
+	"bin",
+	"obj",
 	"target",
 	"coverage",
 	".next",
@@ -56,6 +64,9 @@ const SKIP_DIRS = new Set([
 	".venv",
 	"venv",
 	"__pycache__",
+	".pytest_cache",
+	".idea",
+	".vscode",
 ]);
 
 const TEXT_EXTENSIONS = new Set([
@@ -72,13 +83,48 @@ const TEXT_EXTENSIONS = new Set([
 	".md",
 	".txt",
 	".py",
+	".cs",
+	".csproj",
+	".sln",
+	".props",
+	".targets",
 	".sql",
 	".rs",
 	".toml",
 	".yaml",
 	".yml",
 	".sh",
+	".ps1",
+	".cmd",
+	".bat",
 ]);
+
+function runBiomeWrite(relativeOutput) {
+	const isWindows = process.platform === "win32";
+	const attempts = [
+		{
+			command: "npx",
+			args: ["biome", "check", "--write", relativeOutput],
+		},
+		{
+			command: "npm",
+			args: ["exec", "--", "biome", "check", "--write", relativeOutput],
+		},
+	];
+
+	for (const attempt of attempts) {
+		const result = spawnSync(attempt.command, attempt.args, {
+			cwd: repoRoot,
+			stdio: "ignore",
+			shell: isWindows,
+		});
+		if (!result.error && result.status === 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
 
 function toPosix(relPath) {
 	return relPath.split(path.sep).join("/");
@@ -160,6 +206,24 @@ async function readTextLineCount(absPath) {
 	} catch {
 		return 0;
 	}
+}
+
+async function readTextSafe(absPath, options = {}) {
+	const maxBytes = Number(options.maxBytes) || 4_000_000;
+	const ext = path.extname(absPath).toLowerCase();
+	if (!TEXT_EXTENSIONS.has(ext)) return "";
+	const stat = await statSafe(absPath);
+	if (!stat?.isFile() || stat.size > maxBytes) return "";
+	try {
+		return await fs.readFile(absPath, "utf8");
+	} catch {
+		return "";
+	}
+}
+
+function countRegexMatches(text, regex) {
+	if (!text) return 0;
+	return (text.match(regex) ?? []).length;
 }
 
 async function walkFiles(absRoot) {
@@ -311,6 +375,11 @@ async function buildBatchFindReplaceDetails() {
 		repoRoot,
 		"src/routes/apps/batch-find-replace/BatchFindReplaceRoutePage.tsx",
 	);
+	const routeGroupFile = path.join(
+		repoRoot,
+		"backend/route_groups/api_batch_find_replace.py",
+	);
+	const registryFile = path.join(repoRoot, "backend/route_groups/api_registry.py");
 	const backendFile = path.join(repoRoot, "backend/api_server.py");
 
 	let moduleFiles = [];
@@ -330,14 +399,27 @@ async function buildBatchFindReplaceDetails() {
 	}
 
 	let backendRouteCount = 0;
-	try {
-		const backendText = await fs.readFile(backendFile, "utf8");
-		backendRouteCount = (
-			backendText.match(/\/api\/batch-find-replace\//g) ?? []
-		).length;
-	} catch {
-		backendRouteCount = 0;
+	const routeGroupText = await readTextSafe(routeGroupFile);
+	if (routeGroupText) {
+		backendRouteCount += countRegexMatches(
+			routeGroupText,
+			/@bp\.route\(\s*["'][^"']+["']/g,
+		);
+		if (
+			routeGroupText.includes('url_prefix="/api/batch-find-replace"') ||
+			routeGroupText.includes("url_prefix='/api/batch-find-replace'")
+		) {
+			backendRouteCount += 1;
+		}
 	}
+	backendRouteCount += countRegexMatches(
+		await readTextSafe(registryFile),
+		/create_batch_find_replace_blueprint/g,
+	);
+	backendRouteCount += countRegexMatches(
+		await readTextSafe(backendFile),
+		/\/api\/batch-find-replace(?:\/|["'])/g,
+	);
 
 	return {
 		moduleDir: relFromRoot(moduleDir),
@@ -351,17 +433,36 @@ async function buildBatchFindReplaceDetails() {
 }
 
 async function buildBackupRouteStatus() {
+	const backupRouteGroupFile = path.join(
+		repoRoot,
+		"backend/route_groups/api_backup.py",
+	);
+	const registryFile = path.join(repoRoot, "backend/route_groups/api_registry.py");
 	const backendFile = path.join(repoRoot, "backend/api_server.py");
-	try {
-		const backendText = await fs.readFile(backendFile, "utf8");
-		return {
-			routeImplemented: /\/api\/backup\/(save|list|read|delete)/.test(
-				backendText,
-			),
-		};
-	} catch {
-		return { routeImplemented: false };
+
+	const routeGroupText = await readTextSafe(backupRouteGroupFile);
+	const hasBackupPrefix =
+		routeGroupText.includes('url_prefix="/api/backup"') ||
+		routeGroupText.includes("url_prefix='/api/backup'");
+	const backupHandlers = ["/save", "/list", "/read", "/delete"];
+	const hasBackupHandlers = backupHandlers.every(
+		(routePath) =>
+			routeGroupText.includes(`@bp.route("${routePath}"`) ||
+			routeGroupText.includes(`@bp.route('${routePath}'`),
+	);
+	if (hasBackupPrefix && hasBackupHandlers) {
+		return { routeImplemented: true };
 	}
+
+	const legacyImplemented = /\/api\/backup\/(save|list|read|delete)/.test(
+		await readTextSafe(backendFile),
+	);
+	const registryImplemented = /create_backup_blueprint/.test(
+		await readTextSafe(registryFile),
+	);
+	return {
+		routeImplemented: hasBackupPrefix || legacyImplemented || registryImplemented,
+	};
 }
 
 async function main() {
@@ -392,15 +493,7 @@ export const ARCHITECTURE_SNAPSHOT = ${toTsLiteral(payload)} as const;
 	await fs.writeFile(outputPath, content, "utf8");
 
 	const relativeOutput = relFromRoot(outputPath);
-	const biomeResult = spawnSync(
-		"npx",
-		["biome", "check", "--write", relativeOutput],
-		{
-			cwd: repoRoot,
-			stdio: "ignore",
-		},
-	);
-	if (biomeResult.status !== 0) {
+	if (!runBiomeWrite(relativeOutput)) {
 		console.warn(
 			`Warning: unable to auto-format ${relativeOutput}. Run \`npx biome check --write ${relativeOutput}\` manually.`,
 		);

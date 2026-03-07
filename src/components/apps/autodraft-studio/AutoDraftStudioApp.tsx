@@ -33,15 +33,15 @@ import {
 type TabId = "architecture" | "rules" | "pipeline" | "training";
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
-	{ id: "architecture", label: "Architecture", icon: "◆" },
-	{ id: "rules", label: "Rule Library", icon: "⚙" },
-	{ id: "pipeline", label: "Pipeline", icon: "▸" },
-	{ id: "training", label: "Training Path", icon: "◎" },
+	{ id: "architecture", label: "Architecture", icon: "\u{25C6}" },
+	{ id: "rules", label: "Rule Library", icon: "\u{2699}" },
+	{ id: "pipeline", label: "Pipeline", icon: "\u{25B8}" },
+	{ id: "training", label: "Training Path", icon: "\u{25CE}" },
 ];
 
 const DEMO_MARKUPS = [
-	{ type: "cloud", color: "red", text: "DELETE BUS DUCT A3" },
-	{ type: "cloud", color: "green", text: "Add grounding strap" },
+	{ type: "cloud", color: "green", text: "DELETE BUS DUCT A3" },
+	{ type: "cloud", color: "red", text: "Add grounding strap" },
 	{ type: "text", color: "blue", text: "Coordinate with field install notes" },
 	{ type: "arrow", color: "blue", text: "swap this with RP1L5-4" },
 ];
@@ -307,6 +307,8 @@ export function AutoDraftStudioApp() {
 				<Stack gap={3}>
 					{rules.map((rule) => {
 						const open = expandedRule === rule.id;
+						const examples = Array.isArray(rule.examples) ? rule.examples : [];
+						const badgeColor = STATUS_BADGE_BY_CATEGORY[rule.category] ?? "default";
 						return (
 							<Panel
 								key={rule.id}
@@ -321,10 +323,7 @@ export function AutoDraftStudioApp() {
 								>
 									<HStack gap={2} align="center">
 										<Text>{rule.icon}</Text>
-										<Badge
-											color={STATUS_BADGE_BY_CATEGORY[rule.category]}
-											variant="soft"
-										>
+										<Badge color={badgeColor} variant="soft">
 											{rule.category}
 										</Badge>
 										<Text size="sm" weight="semibold">
@@ -345,7 +344,7 @@ export function AutoDraftStudioApp() {
 											<Text size="xs" color="muted">
 												Examples
 											</Text>
-											{rule.examples.map((example) => (
+											{examples.map((example) => (
 												<Text key={example} size="sm">
 													• {example}
 												</Text>

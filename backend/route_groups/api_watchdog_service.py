@@ -82,8 +82,18 @@ class WatchdogMonitorService:
         raise ValueError("enabled must be a boolean")
 
     @staticmethod
-    def _parse_roots(raw_value: Any) -> list[str]:
-        if not isinstance(raw_value, list) or len(raw_value) == 0:
+    def _parse_roots(raw_value: Any, *, allow_empty: bool = False) -> list[str]:
+        if raw_value is None:
+            if allow_empty:
+                return []
+            raise ValueError("roots must contain at least one absolute directory path")
+
+        if not isinstance(raw_value, list):
+            raise ValueError("roots must contain at least one absolute directory path")
+
+        if len(raw_value) == 0 and allow_empty:
+            return []
+        if len(raw_value) == 0:
             raise ValueError("roots must contain at least one absolute directory path")
 
         out: list[str] = []
@@ -106,6 +116,8 @@ class WatchdogMonitorService:
             seen.add(dedupe_key)
             out.append(normalized)
 
+        if len(out) == 0 and allow_empty:
+            return []
         if len(out) == 0:
             raise ValueError("roots must contain at least one valid absolute directory path")
 
@@ -115,8 +127,12 @@ class WatchdogMonitorService:
         if not isinstance(raw_config, Mapping):
             raise ValueError("Request body must be a JSON object")
 
+        enabled = self._parse_enabled(raw_config.get("enabled"))
         return {
-            "roots": self._parse_roots(raw_config.get("roots")),
+            "roots": self._parse_roots(
+                raw_config.get("roots"),
+                allow_empty=not enabled,
+            ),
             "includeGlobs": self._parse_globs(
                 raw_config.get("includeGlobs"),
                 field_name="includeGlobs",
@@ -126,7 +142,7 @@ class WatchdogMonitorService:
                 field_name="excludeGlobs",
             ),
             "heartbeatMs": self._parse_heartbeat_ms(raw_config.get("heartbeatMs")),
-            "enabled": self._parse_enabled(raw_config.get("enabled")),
+            "enabled": enabled,
         }
 
     @staticmethod

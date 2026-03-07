@@ -30,3 +30,6 @@ __pycache__/
 # .NET build artifacts
 **/bin/
 **/obj/
+
+# Rust/local build artifacts
+zeroclaw-main/target-local/

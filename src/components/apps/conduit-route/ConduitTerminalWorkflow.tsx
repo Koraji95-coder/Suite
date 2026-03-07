@@ -40,7 +40,7 @@ import {
 } from "./conduitTerminalEngine";
 import { conduitTerminalService } from "./conduitTerminalService";
 import type {
-	TerminalCadDrawMeta,
+	EtapCleanupCommand,
 	TerminalCadRouteRecord,
 	TerminalCadRuntimeStatus,
 	TerminalCadSyncDiagnostic,
@@ -138,6 +138,15 @@ const JUMPER_COLOR = {
 	stroke: "#fb923c",
 	aci: 30,
 } as const;
+
+const ETAP_CLEANUP_COMMANDS: readonly EtapCleanupCommand[] = [
+	"ETAPFIX",
+	"ETAPTEXT",
+	"ETAPBLOCKS",
+	"ETAPLAYERFIX",
+	"ETAPOVERLAP",
+	"ETAPIMPORT",
+];
 
 const CAD_SYNC_MAX_RETRIES = 2;
 const CAD_SYNC_RETRY_BASE_DELAY_MS = 250;
@@ -476,8 +485,12 @@ function makeDiagnosticId(): string {
 	return `cad-diag-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
-function resolveCadProviderPath(meta?: TerminalCadDrawMeta): string {
-	const explicit = String(meta?.providerPath || "").trim();
+function resolveCadProviderPath(meta?: {
+	providerPath?: unknown;
+	source?: unknown;
+} | null): string {
+	const explicit =
+		typeof meta?.providerPath === "string" ? meta.providerPath.trim() : "";
 	if (explicit.length > 0) {
 		return explicit;
 	}
@@ -745,6 +758,14 @@ export function ConduitTerminalWorkflow() {
 	const [nextRef, setNextRef] = useState<Record<string, number>>({});
 	const [nextJumperRef, setNextJumperRef] = useState(1);
 	const [syncingTerminalLabels, setSyncingTerminalLabels] = useState(false);
+	const [etapCleanupRunning, setEtapCleanupRunning] = useState(false);
+	const [etapCleanupCommand, setEtapCleanupCommand] =
+		useState<EtapCleanupCommand>("ETAPFIX");
+	const [etapCleanupPluginDllPath, setEtapCleanupPluginDllPath] = useState("");
+	const [etapCleanupWaitForCompletion, setEtapCleanupWaitForCompletion] =
+		useState(true);
+	const [etapCleanupSaveDrawing, setEtapCleanupSaveDrawing] = useState(false);
+	const [etapCleanupTimeoutMs, setEtapCleanupTimeoutMs] = useState(90000);
 	const [resyncingFailed, setResyncingFailed] = useState(false);
 	const [preflightChecking, setPreflightChecking] = useState(false);
 	const [cadStatus, setCadStatus] = useState<TerminalCadRuntimeStatus | null>(
@@ -1180,6 +1201,80 @@ export function ConduitTerminalWorkflow() {
 		})();
 	};
 
+	const runEtapCleanupNow = () => {
+		if (!connected) {
+			setStatusMessage("Connect and scan before running ETAP cleanup.");
+			return;
+		}
+		if (etapCleanupRunning) {
+			return;
+		}
+
+		const timeoutMs = Math.max(
+			1000,
+			Math.min(600000, Math.trunc(etapCleanupTimeoutMs || 90000)),
+		);
+		const pluginDllPath = etapCleanupPluginDllPath.trim();
+		setEtapCleanupRunning(true);
+		setStatusMessage(`Running ${etapCleanupCommand} through AutoCAD bridge...`);
+
+		void (async () => {
+			try {
+				const response = await conduitTerminalService.runEtapCleanup({
+					command: etapCleanupCommand,
+					pluginDllPath: pluginDllPath.length > 0 ? pluginDllPath : undefined,
+					waitForCompletion: etapCleanupWaitForCompletion,
+					timeoutMs,
+					saveDrawing: etapCleanupSaveDrawing,
+				});
+				const providerPath = resolveCadProviderPath(response.meta);
+				const requestId =
+					typeof response.meta?.requestId === "string"
+						? response.meta.requestId
+						: "";
+				const bridgeRequestId =
+					typeof response.meta?.bridgeRequestId === "string"
+						? response.meta.bridgeRequestId
+						: "";
+
+				appendCadDiagnostic({
+					operation: "etap_cleanup",
+					success: Boolean(response.success),
+					code: response.code || "",
+					message:
+						response.message ||
+						(response.success
+							? `${etapCleanupCommand} completed.`
+							: `${etapCleanupCommand} failed.`),
+					warnings: response.warnings ?? [],
+					requestId,
+					bridgeRequestId,
+					providerPath,
+					providerConfigured:
+						typeof response.meta?.providerConfigured === "string"
+							? response.meta.providerConfigured
+							: providerPath,
+				});
+
+				if (response.success) {
+					const drawingName = response.data?.drawing?.name || "";
+					setStatusMessage(
+						drawingName
+							? `${etapCleanupCommand} completed for ${drawingName}.`
+							: (response.message || `${etapCleanupCommand} completed.`),
+					);
+					return;
+				}
+
+				setStatusMessage(
+					`${etapCleanupCommand} failed (${response.code || "unknown"}): ${response.message || "Request failed."}`,
+				);
+			} finally {
+				setEtapCleanupRunning(false);
+			}
+		})();
+	};
+
 	const buildCadRoutePayload = (
 		route: TerminalRouteRecord,
 	): TerminalCadRouteRecord => {
@@ -1554,6 +1649,7 @@ export function ConduitTerminalWorkflow() {
 		if (routesRef.current.length > 0) {
 			void resetCadSessionRoutes();
 		}
+		setEtapCleanupRunning(false);
 		setConnected(false);
 		setCadStatus(null);
 		setScanning(false);
@@ -1877,6 +1973,101 @@ export function ConduitTerminalWorkflow() {
 									</small>
 								</div>
 								{cadStatus?.error ? <small>{cadStatus.error}</small> : null}
+							</div>
+						</div>
+
+						<div className={styles.controlGroup}>
+							<Text size="xs" color="muted">
+								ETAP DXF Cleanup
+							</Text>
+							<div className={styles.etapCard}>
+								<label className={styles.etapField}>
+									<span>Command</span>
+									<select
+										className={styles.etapSelect}
+										value={etapCleanupCommand}
+										onChange={(event) =>
+											setEtapCleanupCommand(
+												event.target.value as EtapCleanupCommand,
+											)
+										}
+										disabled={etapCleanupRunning || scanning}
+									>
+										{ETAP_CLEANUP_COMMANDS.map((command) => (
+											<option key={command} value={command}>
+												{command}
+											</option>
+										))}
+									</select>
+								</label>
+								<label className={styles.etapField}>
+									<span>Plugin DLL (optional)</span>
+									<input
+										type="text"
+										className={styles.etapInput}
+										placeholder="C:\\AutoCAD\\Plugins\\EtapDxfCleanup.dll"
+										value={etapCleanupPluginDllPath}
+										onChange={(event) =>
+											setEtapCleanupPluginDllPath(event.target.value)
+										}
+										disabled={etapCleanupRunning || scanning}
+									/>
+								</label>
+								<label className={styles.etapField}>
+									<span>Timeout (ms)</span>
+									<input
+										type="number"
+										min={1000}
+										max={600000}
+										step={1000}
+										className={styles.etapInput}
+										value={etapCleanupTimeoutMs}
+										onChange={(event) =>
+											setEtapCleanupTimeoutMs(Number(event.target.value) || 90000)
+										}
+										disabled={etapCleanupRunning || scanning}
+									/>
+								</label>
+								<div className={styles.etapToggleRow}>
+									<label className={styles.etapToggle}>
+										<input
+											type="checkbox"
+											checked={etapCleanupWaitForCompletion}
+											onChange={(event) =>
+												setEtapCleanupWaitForCompletion(event.target.checked)
+											}
+											disabled={etapCleanupRunning || scanning}
+										/>
+										<span>Wait for completion</span>
+									</label>
+									<label className={styles.etapToggle}>
+										<input
+											type="checkbox"
+											checked={etapCleanupSaveDrawing}
+											onChange={(event) =>
+												setEtapCleanupSaveDrawing(event.target.checked)
+											}
+											disabled={etapCleanupRunning || scanning}
+										/>
+										<span>Save drawing after run</span>
+									</label>
+								</div>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={runEtapCleanupNow}
+									disabled={!connected || scanning || etapCleanupRunning}
+									loading={etapCleanupRunning}
+									iconLeft={
+										etapCleanupRunning ? (
+											<LoaderCircle size={14} />
+										) : (
+											<PlugZap size={14} />
+										)
+									}
+								>
+									Run ETAP Cleanup
+								</Button>
 							</div>
 						</div>
 

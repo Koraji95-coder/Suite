@@ -44,6 +44,9 @@ const StandardsCheckerRoutePage = lazy(
 const BatchFindReplaceRoutePage = lazy(
 	() => import("./routes/apps/batch-find-replace/BatchFindReplaceRoutePage"),
 );
+const EtapDxfCleanupRoutePage = lazy(
+	() => import("./routes/apps/etap-dxf-cleanup/EtapDxfCleanupRoutePage"),
+);
 const DrawingListManagerRoutePage = lazy(
 	() =>
 		import("./routes/apps/drawing-list-manager/DrawingListManagerRoutePage"),
@@ -158,6 +161,10 @@ export default function App() {
 									<Route
 										path="apps/batch-find-replace"
 										element={withRouteSuspense(<BatchFindReplaceRoutePage />)}
+									/>
+									<Route
+										path="apps/etap-dxf-cleanup"
+										element={withRouteSuspense(<EtapDxfCleanupRoutePage />)}
 									/>
 									<Route
 										path="knowledge"

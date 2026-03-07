@@ -8,36 +8,46 @@ public sealed class RuleBasedAutoDraftPlanner : IAutoDraftPlanner
 {
     private readonly AutoDraftOptions _options;
 
+    private const string DeleteIntentToken = "delete";
+    private const string AddIntentToken = "add";
+
+    private static readonly IReadOnlyDictionary<string, string> CloudColorToCategory =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["green"] = "DELETE",
+            ["red"] = "ADD",
+        };
+
     private static readonly List<AutoDraftRule> SeedRules =
     [
         new()
         {
-            Id = "delete-red-cloud",
+            Id = "delete-green-cloud",
             Category = "DELETE",
-            Trigger = new Dictionary<string, object?>
-            {
-                ["type"] = "cloud",
-                ["color"] = "red",
-                ["text_contains"] = "delete",
-            },
-            Action = "Remove all geometry inside the cloud boundary",
-            Icon = "🔴",
-            Examples = ["Red cloud around area", "Red X through element"],
-            Confidence = 0.92,
-        },
-        new()
-        {
-            Id = "add-green-cloud",
-            Category = "ADD",
             Trigger = new Dictionary<string, object?>
             {
                 ["type"] = "cloud",
                 ["color"] = "green",
                 ["text_contains"] = string.Empty,
             },
-            Action = "Add geometry drawn inside green cloud to model",
-            Icon = "🟢",
-            Examples = ["Green cloud with new linework", "Green arrow to insertion"],
+            Action = "Remove all geometry inside the cloud boundary",
+            Icon = "\U0001F7E2",
+            Examples = ["Green cloud around area", "Green X through element"],
+            Confidence = 0.92,
+        },
+        new()
+        {
+            Id = "add-red-cloud",
+            Category = "ADD",
+            Trigger = new Dictionary<string, object?>
+            {
+                ["type"] = "cloud",
+                ["color"] = "red",
+                ["text_contains"] = string.Empty,
+            },
+            Action = "Add geometry drawn inside red cloud to model",
+            Icon = "\U0001F534",
+            Examples = ["Red cloud with new linework", "Red arrow to insertion"],
             Confidence = 0.88,
         },
         new()
@@ -51,7 +61,7 @@ public sealed class RuleBasedAutoDraftPlanner : IAutoDraftPlanner
                 ["text_contains"] = string.Empty,
             },
             Action = "Log as note only; do not modify geometry",
-            Icon = "🔵",
+            Icon = "\U0001F535",
             Examples = ["Blue text annotation", "Blue callout box"],
             Confidence = 0.95,
         },
@@ -66,7 +76,7 @@ public sealed class RuleBasedAutoDraftPlanner : IAutoDraftPlanner
                 ["count"] = 2,
             },
             Action = "Swap the two elements connected by arrows",
-            Icon = "🔀",
+            Icon = "\U0001F500",
             Examples = ["Two blue arrows between components"],
             Confidence = 0.75,
         },
@@ -80,8 +90,8 @@ public sealed class RuleBasedAutoDraftPlanner : IAutoDraftPlanner
                 ["position"] = "bottom-right",
                 ["aspect"] = "wide",
             },
-            Action = "Identify title block and extract metadata only",
-            Icon = "📋",
+            Action = "Extract metadata only; skip geometry conversion",
+            Icon = "\U0001F4CB",
             Examples = ["Standard ANSI title block", "Company header and rev table"],
             Confidence = 0.97,
         },
@@ -102,28 +112,46 @@ public sealed class RuleBasedAutoDraftPlanner : IAutoDraftPlanner
         for (var i = 0; i < markups.Count; i++)
         {
             var markup = markups[i];
-            var selectedRule = SeedRules.FirstOrDefault(rule => RuleMatches(rule, markup));
-            var action = selectedRule is null
-                ? new AutoDraftActionItem
+            AutoDraftActionItem action;
+
+            if (CloudIntentConflicts(markup))
+            {
+                action = new AutoDraftActionItem
                 {
                     Id = $"action-{i + 1}",
                     RuleId = null,
                     Category = "UNCLASSIFIED",
-                    Action = "Manual review required.",
+                    Action = "Conflicting cloud color/text intent. Manual review required.",
                     Confidence = 0.0,
                     Status = "review",
                     Markup = markup,
-                }
-                : new AutoDraftActionItem
-                {
-                    Id = $"action-{i + 1}",
-                    RuleId = selectedRule.Id,
-                    Category = selectedRule.Category,
-                    Action = selectedRule.Action,
-                    Confidence = selectedRule.Confidence,
-                    Status = "proposed",
-                    Markup = markup,
                 };
+            }
+            else
+            {
+                var selectedRule = SeedRules.FirstOrDefault(rule => RuleMatches(rule, markup));
+                action = selectedRule is null
+                    ? new AutoDraftActionItem
+                    {
+                        Id = $"action-{i + 1}",
+                        RuleId = null,
+                        Category = "UNCLASSIFIED",
+                        Action = "Manual review required.",
+                        Confidence = 0.0,
+                        Status = "review",
+                        Markup = markup,
+                    }
+                    : new AutoDraftActionItem
+                    {
+                        Id = $"action-{i + 1}",
+                        RuleId = selectedRule.Id,
+                        Category = selectedRule.Category,
+                        Action = selectedRule.Action,
+                        Confidence = selectedRule.Confidence,
+                        Status = "proposed",
+                        Markup = markup,
+                    };
+            }
 
             actions.Add(action);
         }
@@ -144,6 +172,32 @@ public sealed class RuleBasedAutoDraftPlanner : IAutoDraftPlanner
                 NeedsReview = needsReview,
             },
             Message = "Contract planner output. Replace with CAD-resolved planning later.",
+        };
+    }
+
+    private static bool CloudIntentConflicts(MarkupInput markup)
+    {
+        var markupType = Normalize(markup.Type);
+        if (markupType != "cloud")
+        {
+            return false;
+        }
+
+        var markupColor = Normalize(markup.Color);
+        if (!CloudColorToCategory.TryGetValue(markupColor, out var impliedCategory))
+        {
+            return false;
+        }
+
+        var markupText = Normalize(markup.Text);
+        var hasDeleteIntent = markupText.Contains(DeleteIntentToken, StringComparison.Ordinal);
+        var hasAddIntent = markupText.Contains(AddIntentToken, StringComparison.Ordinal);
+
+        return impliedCategory switch
+        {
+            "DELETE" => hasAddIntent,
+            "ADD" => hasDeleteIntent,
+            _ => false,
         };
     }
 
@@ -172,7 +226,7 @@ public sealed class RuleBasedAutoDraftPlanner : IAutoDraftPlanner
             return false;
         }
 
-        if (!string.IsNullOrEmpty(triggerContains) && !markupText.Contains(triggerContains))
+        if (!string.IsNullOrEmpty(triggerContains) && !markupText.Contains(triggerContains, StringComparison.Ordinal))
         {
             return false;
         }

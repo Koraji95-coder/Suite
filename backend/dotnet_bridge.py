@@ -30,6 +30,35 @@ class DotNetPipeClient:
     def _pipe_path(self) -> str:
         return rf"\\.\pipe\{self.pipe_name}"
 
+    def _format_pipe_open_error(self, exc: Exception) -> str:
+        error_code = None
+        try:
+            if getattr(exc, "args", None):
+                first = exc.args[0]
+                if isinstance(first, int):
+                    error_code = first
+        except Exception:
+            error_code = None
+
+        pipe_path = self._pipe_path()
+        if error_code == 2:
+            return (
+                f"Named pipe '{pipe_path}' not found. "
+                "Start the .NET named pipe bridge server and verify "
+                "AUTOCAD_DOTNET_PIPE_NAME matches the server pipe name."
+            )
+        if error_code == 231:
+            return (
+                f"Named pipe '{pipe_path}' is busy. "
+                "Wait for the current bridge request to finish and retry."
+            )
+        if error_code == 5:
+            return (
+                f"Access denied opening named pipe '{pipe_path}'. "
+                "Verify process permissions and bridge token configuration."
+            )
+        return f"Failed to open named pipe '{pipe_path}': {exc}"
+
     def send_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Send a single JSON request and return the JSON response."""
         if win32file is None or win32pipe is None:
@@ -38,15 +67,18 @@ class DotNetPipeClient:
         request = json.dumps(payload, separators=(",", ":")) + "\n"
         start = time.time()
 
-        handle = win32file.CreateFile(
-            self._pipe_path(),
-            win32file.GENERIC_READ | win32file.GENERIC_WRITE,
-            0,
-            None,
-            win32file.OPEN_EXISTING,
-            0,
-            None,
-        )
+        try:
+            handle = win32file.CreateFile(
+                self._pipe_path(),
+                win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+                0,
+                None,
+                win32file.OPEN_EXISTING,
+                0,
+                None,
+            )
+        except Exception as exc:
+            raise RuntimeError(self._format_pipe_open_error(exc)) from exc
 
         try:
             win32pipe.SetNamedPipeHandleState(

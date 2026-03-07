@@ -275,6 +275,7 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/conduit-route/terminal-labels/sync": ["POST"],
             "/api/conduit-route/obstacles/scan": ["POST"],
             "/api/conduit-route/route/compute": ["POST"],
+            "/api/etap/cleanup/run": ["POST"],
             "/api/autocad/ws-ticket": ["POST"],
             "/api/watchdog/config": ["PUT"],
             "/api/watchdog/heartbeat": ["POST"],
@@ -380,6 +381,93 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload.get("backend_id"), "coordinates-grabber-api")
 
+    def test_autodraft_rules_payload_shape(self) -> None:
+        unauthorized = self.client.get("/api/autodraft/rules")
+        self.assertEqual(unauthorized.status_code, 401)
+
+        response = self.client.get(
+            "/api/autodraft/rules",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        self.assertTrue(payload.get("ok"))
+
+        rules = payload.get("rules") or []
+        self.assertIsInstance(rules, list)
+        self.assertGreater(len(rules), 0)
+
+        first_rule = rules[0]
+        self.assertIsInstance(first_rule, dict)
+        self.assertTrue(first_rule.get("id"))
+        self.assertTrue(first_rule.get("category"))
+        self.assertTrue(first_rule.get("action"))
+        self.assertIsInstance(first_rule.get("trigger"), dict)
+        self.assertIsInstance(first_rule.get("icon"), str)
+        self.assertIsInstance(first_rule.get("examples"), list)
+        self.assertEqual(first_rule.get("id"), "delete-green-cloud")
+        self.assertEqual(first_rule.get("category"), "DELETE")
+        self.assertEqual((first_rule.get("trigger") or {}).get("color"), "green")
+
+        second_rule = rules[1]
+        self.assertIsInstance(second_rule, dict)
+        self.assertEqual(second_rule.get("id"), "add-red-cloud")
+        self.assertEqual(second_rule.get("category"), "ADD")
+        self.assertEqual((second_rule.get("trigger") or {}).get("color"), "red")
+
+    def test_autodraft_plan_payload_shape(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/plan",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "markups": [
+                    {"type": "cloud", "color": "green", "text": "Remove this"},
+                    {"type": "cloud", "color": "red", "text": "Install this"},
+                    {"type": "cloud", "color": "green", "text": "add support"},
+                    {"type": "cloud", "color": "red", "text": "delete feeder"},
+                    {"type": "text", "color": "blue", "text": "note this"},
+                ]
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        self.assertTrue(payload.get("ok"))
+
+        actions = payload.get("actions") or []
+        self.assertIsInstance(actions, list)
+        self.assertEqual(len(actions), 5)
+
+        green_delete_action = actions[0] or {}
+        self.assertEqual(green_delete_action.get("rule_id"), "delete-green-cloud")
+        self.assertEqual(green_delete_action.get("category"), "DELETE")
+        self.assertEqual(green_delete_action.get("status"), "proposed")
+
+        red_add_action = actions[1] or {}
+        self.assertEqual(red_add_action.get("rule_id"), "add-red-cloud")
+        self.assertEqual(red_add_action.get("category"), "ADD")
+        self.assertEqual(red_add_action.get("status"), "proposed")
+
+        green_add_conflict = actions[2] or {}
+        self.assertIsNone(green_add_conflict.get("rule_id"))
+        self.assertEqual(green_add_conflict.get("category"), "UNCLASSIFIED")
+        self.assertEqual(green_add_conflict.get("status"), "review")
+
+        red_delete_conflict = actions[3] or {}
+        self.assertIsNone(red_delete_conflict.get("rule_id"))
+        self.assertEqual(red_delete_conflict.get("category"), "UNCLASSIFIED")
+        self.assertEqual(red_delete_conflict.get("status"), "review")
+
+        summary = payload.get("summary") or {}
+        self.assertIsInstance(summary, dict)
+        self.assertEqual(summary.get("total_markups"), 5)
+        self.assertEqual(summary.get("actions_proposed"), 5)
+        self.assertIsInstance(summary.get("classified"), int)
+        self.assertIsInstance(summary.get("needs_review"), int)
+
     def test_terminal_scan_endpoint_requires_auth(self) -> None:
         response = self.client.post("/api/conduit-route/terminal-scan")
         self.assertEqual(response.status_code, 401)
@@ -411,6 +499,10 @@ class TestApiRouteGroups(unittest.TestCase):
 
     def test_conduit_obstacle_scan_endpoint_requires_auth(self) -> None:
         response = self.client.post("/api/conduit-route/obstacles/scan")
+        self.assertEqual(response.status_code, 401)
+
+    def test_etap_cleanup_run_endpoint_requires_auth(self) -> None:
+        response = self.client.post("/api/etap/cleanup/run")
         self.assertEqual(response.status_code, 401)
 
     def test_watchdog_endpoints_require_auth(self) -> None:
@@ -525,6 +617,37 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertTrue(modified_event_ids)
         if added_event_ids:
             self.assertGreater(min(modified_event_ids), max(added_event_ids))
+
+    def test_watchdog_allows_disabled_config_without_roots(self) -> None:
+        config_response = self.client.put(
+            "/api/watchdog/config",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "roots": [],
+                "includeGlobs": [],
+                "excludeGlobs": [],
+                "heartbeatMs": 5000,
+                "enabled": False,
+            },
+        )
+        self.assertEqual(config_response.status_code, 200)
+        config_payload = config_response.get_json() or {}
+        self.assertTrue(config_payload.get("ok"))
+        self.assertFalse((config_payload.get("config") or {}).get("enabled", True))
+        self.assertEqual((config_payload.get("config") or {}).get("roots"), [])
+
+        heartbeat_response = self.client.post(
+            "/api/watchdog/heartbeat",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(heartbeat_response.status_code, 200)
+        heartbeat_payload = heartbeat_response.get_json() or {}
+        self.assertTrue(heartbeat_payload.get("ok"))
+        self.assertEqual(heartbeat_payload.get("events"), [])
+        warnings = heartbeat_payload.get("warnings") or []
+        self.assertTrue(
+            any("paused" in str(warning).lower() for warning in warnings),
+        )
 
 
 if __name__ == "__main__":

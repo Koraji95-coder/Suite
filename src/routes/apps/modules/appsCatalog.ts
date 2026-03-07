@@ -46,6 +46,14 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		status: "active",
 	},
 	{
+		id: "etap-dxf-cleanup",
+		title: "ETAP DXF Cleanup",
+		description:
+			"Trigger ETAPFIX and related AutoCAD cleanup commands through the local bridge.",
+		to: "/app/apps/etap-dxf-cleanup",
+		status: "active",
+	},
+	{
 		id: "transmittal-builder",
 		title: "Transmittal Builder",
 		description:

@@ -9,17 +9,21 @@ from flask_limiter import Limiter
 
 DEFAULT_RULES: List[Dict[str, Any]] = [
     {
-        "id": "delete-red-cloud",
+        "id": "delete-green-cloud",
         "category": "DELETE",
-        "trigger": {"type": "cloud", "color": "red", "text_contains": "delete"},
+        "trigger": {"type": "cloud", "color": "green", "text_contains": ""},
         "action": "Remove all geometry inside the cloud boundary",
+        "icon": "\U0001F7E2",
+        "examples": ["Green cloud around area", "Green X through element"],
         "confidence": 0.92,
     },
     {
-        "id": "add-green-cloud",
+        "id": "add-red-cloud",
         "category": "ADD",
-        "trigger": {"type": "cloud", "color": "green", "text_contains": ""},
-        "action": "Add geometry drawn inside green cloud to model",
+        "trigger": {"type": "cloud", "color": "red", "text_contains": ""},
+        "action": "Add geometry drawn inside red cloud to model",
+        "icon": "\U0001F534",
+        "examples": ["Red cloud with new linework", "Red arrow to insertion"],
         "confidence": 0.88,
     },
     {
@@ -27,6 +31,8 @@ DEFAULT_RULES: List[Dict[str, Any]] = [
         "category": "NOTE",
         "trigger": {"type": "text", "color": "blue", "text_contains": ""},
         "action": "Log as note only; do not modify geometry",
+        "icon": "\U0001F535",
+        "examples": ["Blue text annotation", "Blue callout box"],
         "confidence": 0.95,
     },
     {
@@ -34,6 +40,8 @@ DEFAULT_RULES: List[Dict[str, Any]] = [
         "category": "SWAP",
         "trigger": {"type": "arrow", "color": "blue", "count": 2},
         "action": "Swap the two elements connected by arrows",
+        "icon": "\U0001F500",
+        "examples": ["Two blue arrows between components"],
         "confidence": 0.75,
     },
     {
@@ -45,10 +53,18 @@ DEFAULT_RULES: List[Dict[str, Any]] = [
             "aspect": "wide",
         },
         "action": "Extract metadata only; skip geometry conversion",
+        "icon": "\U0001F4CB",
+        "examples": ["Standard ANSI title block", "Company header and rev table"],
         "confidence": 0.97,
     },
 ]
 
+_DELETE_INTENT_TOKEN = "delete"
+_ADD_INTENT_TOKEN = "add"
+_CLOUD_COLOR_TO_CATEGORY: Dict[str, str] = {
+    "green": "DELETE",
+    "red": "ADD",
+}
 
 def _read_json_error(response: requests.Response) -> str:
     try:
@@ -126,34 +142,68 @@ def _rule_matches(rule: Dict[str, Any], markup: Dict[str, Any]) -> bool:
     return True
 
 
+def _cloud_intent_conflicts(markup: Dict[str, Any]) -> bool:
+    markup_type = _normalize_text(markup.get("type"))
+    if markup_type != "cloud":
+        return False
+
+    markup_color = _normalize_text(markup.get("color"))
+    implied_category = _CLOUD_COLOR_TO_CATEGORY.get(markup_color)
+    if not implied_category:
+        return False
+
+    markup_text = _normalize_text(markup.get("text"))
+    has_delete_intent = _DELETE_INTENT_TOKEN in markup_text
+    has_add_intent = _ADD_INTENT_TOKEN in markup_text
+
+    if implied_category == "DELETE":
+        return has_add_intent
+
+    if implied_category == "ADD":
+        return has_delete_intent
+
+    return False
+
+
 def _build_local_plan(markups: List[Dict[str, Any]]) -> Dict[str, Any]:
     actions: List[Dict[str, Any]] = []
     for idx, markup in enumerate(markups, start=1):
-        selected_rule = next(
-            (rule for rule in DEFAULT_RULES if _rule_matches(rule, markup)),
-            None,
-        )
-
-        if selected_rule:
-            action_item = {
-                "id": f"action-{idx}",
-                "rule_id": selected_rule["id"],
-                "category": selected_rule["category"],
-                "action": selected_rule["action"],
-                "confidence": selected_rule["confidence"],
-                "markup": markup,
-                "status": "proposed",
-            }
-        else:
+        if _cloud_intent_conflicts(markup):
             action_item = {
                 "id": f"action-{idx}",
                 "rule_id": None,
                 "category": "UNCLASSIFIED",
-                "action": "Manual review required.",
+                "action": "Conflicting cloud color/text intent. Manual review required.",
                 "confidence": 0.0,
                 "markup": markup,
                 "status": "review",
             }
+        else:
+            selected_rule = next(
+                (rule for rule in DEFAULT_RULES if _rule_matches(rule, markup)),
+                None,
+            )
+
+            if selected_rule:
+                action_item = {
+                    "id": f"action-{idx}",
+                    "rule_id": selected_rule["id"],
+                    "category": selected_rule["category"],
+                    "action": selected_rule["action"],
+                    "confidence": selected_rule["confidence"],
+                    "markup": markup,
+                    "status": "proposed",
+                }
+            else:
+                action_item = {
+                    "id": f"action-{idx}",
+                    "rule_id": None,
+                    "category": "UNCLASSIFIED",
+                    "action": "Manual review required.",
+                    "confidence": 0.0,
+                    "markup": markup,
+                    "status": "review",
+                }
 
         actions.append(action_item)
 

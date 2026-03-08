@@ -27,12 +27,25 @@ class _McpServerProcess:
         self._read_stop = threading.Event()
         self._send_lock = threading.Lock()
         self._next_id = 1
+        self._closed = False
 
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
 
+    def _close_pipe(self, pipe: Any) -> None:
+        if pipe is None:
+            return
+        try:
+            pipe.close()
+        except Exception:
+            return
+
     def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
         self._read_stop.set()
+        self._close_pipe(self._proc.stdin)
         if self._proc.poll() is None:
             self._proc.terminate()
             try:
@@ -41,6 +54,8 @@ class _McpServerProcess:
                 self._proc.kill()
                 self._proc.wait(timeout=3)
         self._reader.join(timeout=1)
+        self._close_pipe(self._proc.stdout)
+        self._close_pipe(self._proc.stderr)
 
     def __enter__(self) -> "_McpServerProcess":
         return self
@@ -180,6 +195,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("repo.run_tests", tool_names)
         self.assertIn("repo.search", tool_names)
         self.assertIn("repo.generate_route", tool_names)
+        self.assertIn("repo.verify_agent_routing_guardrails", tool_names)
 
     def test_tool_call_repo_search_returns_text(self) -> None:
         with _McpServerProcess() as server:
@@ -224,6 +240,83 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         content = messages[0].get("content", {}) if isinstance(messages[0], dict) else {}
         text = str(content.get("text") or "")
         self.assertIn("fix(mcp): stabilize protocol framing", text)
+
+    def test_prompt_get_returns_suite_guardrails(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "prompts/get",
+                {
+                    "name": "repo.suite_guardrails",
+                    "arguments": {},
+                },
+            )
+
+        messages = response.get("result", {}).get("messages", [])
+        self.assertTrue(messages)
+        content = messages[0].get("content", {}) if isinstance(messages[0], dict) else {}
+        text = str(content.get("text") or "")
+        self.assertIn("Do not add or use Tailwind", text)
+        self.assertIn("Do not make major auth-flow changes", text)
+        self.assertIn("AutoCAD reliability contract", text)
+        self.assertIn("npm run gateway:dev", text)
+        self.assertIn("SUITE_GATEWAY_USE_FULL_CLI=1", text)
+
+    def test_prompt_get_returns_agent_handoff_gateway_block(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "prompts/get",
+                {
+                    "name": "repo.agent_handoff_packet",
+                    "arguments": {},
+                },
+            )
+
+        messages = response.get("result", {}).get("messages", [])
+        self.assertTrue(messages)
+        content = messages[0].get("content", {}) if isinstance(messages[0], dict) else {}
+        text = str(content.get("text") or "")
+        self.assertIn("Gateway Build State (Required)", text)
+        self.assertIn("npm run gateway:dev", text)
+        self.assertIn("SUITE_GATEWAY_USE_FULL_CLI=1", text)
+
+    def test_prompt_get_returns_agent_profile_playbook(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "prompts/get",
+                {
+                    "name": "repo.agent_profile_playbook",
+                    "arguments": {},
+                },
+            )
+
+        messages = response.get("result", {}).get("messages", [])
+        self.assertTrue(messages)
+        content = messages[0].get("content", {}) if isinstance(messages[0], dict) else {}
+        text = str(content.get("text") or "")
+        self.assertIn("Agent Profile Playbook", text)
+        self.assertIn("draftsmith", text)
+
+    def test_tool_verify_agent_routing_guardrails(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "tools/call",
+                {
+                    "name": "repo.verify_agent_routing_guardrails",
+                    "arguments": {},
+                },
+                timeout=10.0,
+            )
+
+        result = response.get("result", {})
+        content = result.get("content", [])
+        self.assertTrue(content)
+        text = str(content[0].get("text") if isinstance(content[0], dict) else "")
+        self.assertIn("Profile count checked", text)
+        self.assertIn("Result:", text)
 
     def test_unknown_tool_returns_jsonrpc_error(self) -> None:
         with _McpServerProcess() as server:

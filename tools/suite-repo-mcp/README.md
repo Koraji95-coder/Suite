@@ -30,6 +30,13 @@ Server name (to avoid conflicts): `suite_repo_mcp`
 - `repo.pr_description`
 - `repo.commit_message`
 - `repo.test_plan`
+- `repo.suite_guardrails`
+- `repo.agent_profile_playbook`
+- `repo.agent_orchestration_runbook`
+- `repo.agent_handoff_packet`
+
+### Verification
+- `repo.verify_agent_routing_guardrails`
 
 ## Location
 
@@ -89,3 +96,47 @@ Then restart Codex.
 - Uses unique MCP server id: `suite_repo_mcp`.
 - Lives under `tools/suite-repo-mcp` and does not replace existing tooling.
 - Does not register itself automatically into any shared config in this repo.
+
+## Suite handoff defaults
+
+Future Codex sessions should preserve the repository guardrails in `AGENTS.md`, especially:
+
+- no Tailwind usage in Suite app paths,
+- no major auth-flow changes without explicit approval,
+- AutoCAD error envelope + `requestId` observability contract,
+- profile-based agent model routing with configured fallback models.
+
+Gateway policy is locked for handoffs and MCP usage:
+
+- default path: `zeroclaw-gateway` via `npm run gateway:dev`,
+- full CLI path (`zeroclaw gateway`) is incident-only diagnostics,
+- diagnostics command: `SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev`,
+- if full CLI rustc compile fails with stack overflow, `0xc0000005`, or ICE:
+  - capture toolchain versions + failure signature once,
+  - classify as compiler/toolchain instability,
+  - stop workaround iteration and continue on default gateway path.
+- upstream bug report only after collecting a minimal reproducible diagnostic capture.
+
+Runbooks:
+
+- gateway decision tree and incident protocol: `docs/development/gateway-stability-policy.md`
+- Supabase callback warning noise handling: `docs/security/supabase-clock-skew-runbook.md`
+
+## Parallel agent run operator flow
+
+Use backend orchestration endpoints to run agents while coding continues in parallel:
+
+1. `POST /api/agent/runs`
+- body: `objective`, `profiles[]`, optional `synthesisProfile`, `context`, `timeoutMs`
+2. `GET /api/agent/runs/:runId`
+- poll for current step/status snapshot
+3. `GET /api/agent/runs/:runId/events`
+- SSE stream for live progress
+4. `POST /api/agent/runs/:runId/cancel`
+- cancel in-flight background run
+
+Recommended startup checks before orchestration:
+
+1. `repo.verify_agent_routing_guardrails`
+2. `repo.run_typecheck` with `{ \"scope\": \"all\" }`
+3. `repo.run_tests` with a focused target for changed modules

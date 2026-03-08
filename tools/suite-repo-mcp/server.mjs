@@ -447,7 +447,9 @@ async function runSearch({
 	try {
 		regex = new RegExp(pattern, caseSensitive ? "" : "i");
 	} catch (error) {
-		throw new Error(`Invalid regex pattern: ${String(error?.message || error)}`);
+		throw new Error(
+			`Invalid regex pattern: ${String(error?.message || error)}`,
+		);
 	}
 
 	const matchingLines = [];
@@ -1156,6 +1158,165 @@ async function toolAddApiErrorWrapper(args = {}) {
 	);
 }
 
+function parseBackendAgentProfileModelMap(sourceText) {
+	const map = new Map();
+	const entryRegex =
+		/\{\s*"id":\s*"([^"]+)"[\s\S]*?"model_primary":\s*"([^"]+)"[\s\S]*?"model_fallbacks":\s*\[([\s\S]*?)\][\s\S]*?\},?/g;
+	let match;
+	while ((match = entryRegex.exec(sourceText)) !== null) {
+		const id = String(match[1] || "")
+			.trim()
+			.toLowerCase();
+		if (!id) continue;
+		const primary = String(match[2] || "").trim();
+		const fallbackMatches = [...String(match[3] || "").matchAll(/"([^"]+)"/g)];
+		const fallbacks = fallbackMatches
+			.map((item) => String(item[1] || "").trim())
+			.filter(Boolean);
+		map.set(id, { primary, fallbacks });
+	}
+	return map;
+}
+
+function sliceObjectBlock(sourceText, marker) {
+	const start = sourceText.indexOf(`${marker}: {`);
+	if (start < 0) return "";
+	const firstBrace = sourceText.indexOf("{", start);
+	if (firstBrace < 0) return "";
+
+	let depth = 0;
+	for (let index = firstBrace; index < sourceText.length; index += 1) {
+		const ch = sourceText[index];
+		if (ch === "{") depth += 1;
+		if (ch === "}") {
+			depth -= 1;
+			if (depth === 0) {
+				return sourceText.slice(start, index + 1);
+			}
+		}
+	}
+	return "";
+}
+
+function parseFrontendAgentProfileModelMap(sourceText, profileIds) {
+	const map = new Map();
+	for (const profileId of profileIds) {
+		const block = sliceObjectBlock(sourceText, profileId);
+		if (!block) continue;
+
+		const primaryMatch = block.match(
+			/modelPrimary:\s*resolvePrimary\([^,]+,\s*"([^"]+)"\)/,
+		);
+		const fallbackMatch = block.match(
+			/modelFallbacks:\s*resolveFallbacks\([^,]+,\s*\[([\s\S]*?)\]\)/,
+		);
+		const fallbackValues = fallbackMatch
+			? [...fallbackMatch[1].matchAll(/"([^"]+)"/g)]
+					.map((item) => String(item[1] || "").trim())
+					.filter(Boolean)
+			: [];
+
+		map.set(profileId, {
+			primary: String(primaryMatch?.[1] || "").trim(),
+			fallbacks: fallbackValues,
+		});
+	}
+	return map;
+}
+
+async function toolVerifyAgentRoutingGuardrails() {
+	const guardrailsAbs = resolveRepoPath("AGENTS.md");
+	const frontendAbs = resolveRepoPath("src/components/agent/agentProfiles.ts");
+	const backendAbs = resolveRepoPath(
+		"backend/route_groups/api_agent_profiles.py",
+	);
+
+	const guardrailsText = (await fs.readFile(guardrailsAbs, "utf8")).toString();
+	const frontendText = (await fs.readFile(frontendAbs, "utf8")).toString();
+	const backendText = (await fs.readFile(backendAbs, "utf8")).toString();
+
+	const requiredGuardrails = [
+		"Do not add or use Tailwind",
+		"Do not make major auth flow changes",
+		"AutoCAD Reliability Guardrail",
+		"Agent Model Routing Guardrail",
+		"MCP/Handoff Guardrail",
+		"Gateway Build/Runtime Guardrail",
+		"`zeroclaw-gateway` is the default gateway path for Suite workflows.",
+		"Use `npm run gateway:dev` as the canonical command",
+		"`SUITE_GATEWAY_USE_FULL_CLI=1` is allowed only for explicit diagnostics",
+	];
+	const missingGuardrails = requiredGuardrails.filter(
+		(item) => !guardrailsText.includes(item),
+	);
+
+	const backendMap = parseBackendAgentProfileModelMap(backendText);
+	const profileIds = [...backendMap.keys()].sort();
+	const frontendMap = parseFrontendAgentProfileModelMap(
+		frontendText,
+		profileIds,
+	);
+
+	const mismatches = [];
+	for (const profileId of profileIds) {
+		const backendModel = backendMap.get(profileId);
+		const frontendModel = frontendMap.get(profileId);
+		if (!backendModel || !frontendModel) {
+			mismatches.push(`missing profile mapping for ${profileId}`);
+			continue;
+		}
+
+		if (backendModel.primary !== frontendModel.primary) {
+			mismatches.push(
+				`${profileId} primary mismatch (backend=${backendModel.primary}, frontend=${frontendModel.primary})`,
+			);
+		}
+		const backendFallback = JSON.stringify(backendModel.fallbacks);
+		const frontendFallback = JSON.stringify(frontendModel.fallbacks);
+		if (backendFallback !== frontendFallback) {
+			mismatches.push(
+				`${profileId} fallback mismatch (backend=${backendFallback}, frontend=${frontendFallback})`,
+			);
+		}
+	}
+
+	const draftsmithBackend = backendMap.get("draftsmith");
+	const draftsmithFallbacks = draftsmithBackend?.fallbacks || [];
+	const hasElectricalFallback = draftsmithFallbacks.some((item) =>
+		item.toLowerCase().includes("electricalengineerv2"),
+	);
+	if (!hasElectricalFallback) {
+		mismatches.push(
+			"draftsmith fallback does not include electricalengineerv2 in backend profile catalog",
+		);
+	}
+
+	const ok = missingGuardrails.length === 0 && mismatches.length === 0;
+	const lines = [];
+	lines.push(`Guardrail file: ${repoRelative(guardrailsAbs)}`);
+	lines.push(`Frontend profile file: ${repoRelative(frontendAbs)}`);
+	lines.push(`Backend profile file: ${repoRelative(backendAbs)}`);
+	lines.push(`Profile count checked: ${profileIds.length}`);
+	lines.push(`Result: ${ok ? "PASS" : "FAIL"}`);
+
+	if (missingGuardrails.length > 0) {
+		lines.push("");
+		lines.push("Missing guardrail markers:");
+		for (const item of missingGuardrails) lines.push(`- ${item}`);
+	}
+	if (mismatches.length > 0) {
+		lines.push("");
+		lines.push("Mapping mismatches:");
+		for (const item of mismatches) lines.push(`- ${item}`);
+	}
+	if (ok) {
+		lines.push("");
+		lines.push("All guardrails and profile-model mappings are aligned.");
+	}
+
+	return createTextResult(lines.join("\n"), !ok);
+}
+
 const PROMPTS = {
 	"repo.pr_description": {
 		description: "Generate a structured PR description for this repo.",
@@ -1203,6 +1364,137 @@ ${risk || "- Identify likely regressions and edge cases."}
 2. Run feature-specific unit/integration tests.
 3. Exercise changed UI/API path manually.
 4. Validate error states and invalid inputs.
+`,
+	},
+	"repo.suite_guardrails": {
+		description:
+			"Return the Suite guardrails that must be preserved across handoffs.",
+		template: () => `## Suite Guardrails
+
+1. Do not add or use Tailwind in Suite app paths; use global CSS + CSS Modules.
+2. Do not make major auth-flow changes without explicit user approval.
+3. Preserve AutoCAD reliability contract:
+   - stable error envelope with success/code/message/requestId/meta
+   - structured logger.exception with stage context
+   - no silent broad exception swallow patterns
+4. Preserve agent profile routing contract:
+   - profile-driven primary model + fallback behavior
+   - keep frontend/backend mappings consistent
+   - keep Draftsmith fallback to ALIENTELLIGENCE/electricalengineerv2 unless explicitly changed
+5. Preserve orchestration contract:
+   - keep /api/agent/runs* run-ledger flow additive
+   - do not alter single-chat or pairing behavior as part of orchestration changes
+6. Gateway build/runtime policy (locked default):
+   - use \`npm run gateway:dev\` as the canonical command (zeroclaw-gateway default path)
+   - use \`SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev\` only for explicit diagnostics
+   - if full CLI compile fails with rustc stack overflow / 0xc0000005 / ICE, capture versions + failure signature once, classify as compiler/toolchain instability, stop workaround iteration, and continue on the default gateway path
+   - escalate upstream only after a minimal reproducible diagnostic capture is available
+7. Adjacent auth-noise guidance:
+   - Supabase "issued in the future" warning spam is handled by docs/security/supabase-clock-skew-runbook.md
+   - do not treat clock-skew warning noise as a reason to reopen gateway workaround loops
+`,
+	},
+	"repo.agent_profile_playbook": {
+		description:
+			"Return profile-specific operating instructions for Suite's 5-agent model pack.",
+		template: () => `## Agent Profile Playbook
+
+1. koro
+- Mission: orchestration + final synthesis.
+- Use for: sequencing, dependency mapping, execution plans, final decision packets.
+- Avoid: style-only summaries without implementation actions.
+
+2. devstral
+- Mission: implementation and debugging.
+- Use for: code changes, refactors, diagnostics, typed failure handling.
+- Avoid: product-policy changes outside explicit request.
+
+3. sentinel
+- Mission: risk/compliance review.
+- Use for: regression analysis, standards checks, failure-mode audits.
+- Avoid: approving behavior changes without evidence.
+
+4. forge
+- Mission: documentation/output packaging.
+- Use for: operator runbooks, release notes, rollout instructions.
+- Avoid: ambiguous run steps.
+
+5. draftsmith
+- Mission: CAD/electrical drafting strategy.
+- Use for: route/label sequencing, AutoCAD-safe drafting guidance.
+- Avoid: geometry behavior changes without explicit approval.
+- Fallback: ALIENTELLIGENCE/electricalengineerv2.
+`,
+	},
+	"repo.agent_orchestration_runbook": {
+		description:
+			"Return a concise runbook for backend-led parallel agent orchestration endpoints.",
+		template: () => `## Orchestration Runbook
+
+1. Create run
+- POST /api/agent/runs
+- body: objective, profiles[], synthesisProfile?, context?, timeoutMs?
+- returns: success, runId, status, requestId
+
+2. Track run
+- GET /api/agent/runs/:runId
+- returns stage progress, per-profile outputs, synthesis output, requestId
+
+3. Stream events
+- GET /api/agent/runs/:runId/events
+- SSE events: run_started, step_started, step_completed, step_failed, run_completed, run_cancelled
+
+4. Cancel run
+- POST /api/agent/runs/:runId/cancel
+- returns success, status, requestId
+
+Operational notes:
+- create endpoint requires paired broker session.
+- use run-ledger events for traceability, not ad-hoc in-memory state.
+- keep auth flow unchanged and respect AGENTS.md guardrails.
+`,
+	},
+	"repo.agent_handoff_packet": {
+		description:
+			"Generate a handoff packet template for passing orchestration state to another Codex instance.",
+		template: ({
+			run_id = "<run-id>",
+			objective = "<objective>",
+			status = "<status>",
+		}) => `## Agent Handoff Packet
+
+- Run ID: ${run_id}
+- Objective: ${objective}
+- Current Status: ${status}
+
+### Required Context
+1. Active profiles and model routes used.
+2. Completed stages + failed/cancelled steps.
+3. Final synthesis output or current blocker.
+4. Request IDs for backend/gateway correlation.
+
+### Gateway Build State (Required)
+1. Launch path selected: <default zeroclaw-gateway | diagnostic full CLI>
+2. Command used:
+   - canonical: \`npm run gateway:dev\`
+   - diagnostic-only: \`SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev\`
+3. Rust/toolchain evidence:
+   - \`rustc --version\`:
+   - \`cargo --version\`:
+   - \`rustup show active-toolchain\`:
+4. Result summary:
+   - status:
+   - failure signature (if any):
+   - classification: <normal | compiler/toolchain instability>
+5. Incident protocol:
+   - if diagnostic full CLI compile fails with rustc stack overflow / 0xc0000005 / ICE, record the signature once, stop workaround iteration, and continue on default gateway path.
+
+### Guardrails
+1. No Tailwind in Suite app.
+2. No major auth flow changes without approval.
+3. Preserve AutoCAD requestId/error-envelope contract.
+4. Preserve profile-model fallback mapping parity.
+5. Preserve gateway policy parity with docs/development/gateway-stability-policy.md.
 `,
 	},
 };
@@ -1433,6 +1725,16 @@ const TOOLS = [
 			},
 		},
 		handler: toolAddApiErrorWrapper,
+	},
+	{
+		name: "repo.verify_agent_routing_guardrails",
+		description:
+			"Verify Suite guardrail markers and frontend/backend agent profile model-route parity.",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		handler: toolVerifyAgentRoutingGuardrails,
 	},
 ];
 

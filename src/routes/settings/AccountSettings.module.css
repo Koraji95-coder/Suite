@@ -181,6 +181,57 @@
 		ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
 }
 
+.agentPairingPanel {
+	border-color: color-mix(in srgb, var(--agent-surface-border-strong) 80%, transparent);
+	background:
+		radial-gradient(
+			circle at 88% 4%,
+			color-mix(in srgb, var(--agent-accent-warm) 18%, transparent),
+			transparent 45%
+		),
+		color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.agentPairingSummary {
+	display: grid;
+	gap: 0.5rem;
+	padding: 0.8rem;
+	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 90%, transparent);
+	border-radius: 0.8rem;
+	background: color-mix(in srgb, var(--agent-surface-elevated) 72%, transparent);
+}
+
+.agentActionRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: 0.5rem;
+}
+
+.agentActionButton {
+	border-color: color-mix(in srgb, var(--agent-surface-border-strong) 82%, transparent);
+}
+
+.agentNotice {
+	padding: 0.45rem 0.58rem;
+	border-radius: 0.65rem;
+	background: color-mix(in srgb, var(--agent-surface-elevated) 66%, transparent);
+}
+
+.agentNoticeError {
+	padding: 0.45rem 0.58rem;
+	border: 1px solid color-mix(in srgb, var(--danger) 38%, transparent);
+	border-radius: 0.65rem;
+	background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.agentCooldown {
+	padding: 0.45rem 0.58rem;
+	border: 1px dashed color-mix(in srgb, var(--warning) 42%, transparent);
+	border-radius: 0.65rem;
+	background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+
 .spin {
 	animation: spin 1s linear infinite;
 }
@@ -221,5 +272,15 @@
 	.profileGrid {
 		align-items: end;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+	}
+}
+
+@media (max-width: 47.99rem) {
+	.agentCodeWrap {
+		width: 100%;
+	}
+
+	.agentActionRow {
+		align-items: stretch;
 	}
 }

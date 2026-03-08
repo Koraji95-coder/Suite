@@ -25,8 +25,12 @@ if errorlevel 1 (
 echo [1/3] Checking dependencies...
 pip show flask >nul 2>&1
 if errorlevel 1 (
+    set REQ_FILE=requirements-api.txt
+    if exist requirements-api.lock.txt (
+        set REQ_FILE=requirements-api.lock.txt
+    )
     echo Installing dependencies...
-    pip install -r requirements-api.txt
+    pip install -r %REQ_FILE%
     if errorlevel 1 (
         echo ERROR: Failed to install dependencies
         pause

@@ -12,18 +12,24 @@ import { cn } from "@/lib/utils";
 import type { AgentConversationMessage } from "@/services/agentTaskManager";
 import styles from "./AgentChatMessages.module.css";
 import { AgentPixelMark } from "./AgentPixelMark";
+import {
+	type AgentMarkState,
+	resolveAgentMarkState,
+} from "./agentMarkState";
 import type { AgentProfileId } from "./agentProfiles";
 
 interface AgentChatMessagesProps {
 	messages: AgentConversationMessage[];
 	profileId: AgentProfileId;
 	isThinking?: boolean;
+	baseAvatarState?: AgentMarkState;
 }
 
 export function AgentChatMessages({
 	messages,
 	profileId,
 	isThinking = false,
+	baseAvatarState = "idle",
 }: AgentChatMessagesProps) {
 	const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -45,12 +51,18 @@ export function AgentChatMessages({
 								content={msg.content}
 								profileId={profileId}
 								isLatest={index === messages.length - 1 && !isThinking}
+								baseAvatarState={baseAvatarState}
 							/>
 						),
 					)}
 
 					{/* Thinking indicator */}
-					{isThinking && <ThinkingIndicator profileId={profileId} />}
+					{isThinking && (
+						<ThinkingIndicator
+							profileId={profileId}
+							baseAvatarState={baseAvatarState}
+						/>
+					)}
 				</Stack>
 
 				<div ref={bottomRef} />
@@ -84,12 +96,21 @@ function AssistantRow({
 	content,
 	profileId,
 	isLatest,
+	baseAvatarState,
 }: {
 	content: string;
 	profileId: AgentProfileId;
 	isLatest: boolean;
+	baseAvatarState: AgentMarkState;
 }) {
 	const [copied, setCopied] = useState(false);
+	const avatarState = resolveAgentMarkState({
+		error: baseAvatarState === "error",
+		waiting: baseAvatarState === "waiting",
+		running: baseAvatarState === "running",
+		speaking: isLatest,
+		focus: baseAvatarState === "focus",
+	});
 
 	// Check if content looks like JSON/code
 	const isCodeBlock =
@@ -108,8 +129,9 @@ function AssistantRow({
 				<div className={styles.assistantAvatarWrap}>
 					<AgentPixelMark
 						profileId={profileId}
-						size={34}
-						expression={isLatest ? "active" : "neutral"}
+						size={42}
+						detailLevel="auto"
+						state={avatarState}
 					/>
 					{/* Online indicator */}
 					<div className={styles.onlineDot} />
@@ -158,15 +180,27 @@ function AssistantRow({
 // ═══════════════════════════════════════════════════════════════════════════
 // THINKING INDICATOR
 // ═══════════════════════════════════════════════════════════════════════════
-function ThinkingIndicator({ profileId }: { profileId: AgentProfileId }) {
+function ThinkingIndicator({
+	profileId,
+	baseAvatarState,
+}: {
+	profileId: AgentProfileId;
+	baseAvatarState: AgentMarkState;
+}) {
+	const avatarState = resolveAgentMarkState({
+		error: baseAvatarState === "error",
+		waiting: baseAvatarState === "waiting",
+		running: baseAvatarState === "running",
+		thinking: true,
+	});
 	return (
 		<HStack gap={3} align="start" className={styles.thinkingRow}>
 			<div className={styles.assistantAvatarShell}>
 				<AgentPixelMark
 					profileId={profileId}
-					size={34}
-					expression="active"
-					pulse
+					size={42}
+					detailLevel="auto"
+					state={avatarState}
 				/>
 			</div>
 

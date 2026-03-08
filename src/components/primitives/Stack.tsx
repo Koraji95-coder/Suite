@@ -12,7 +12,7 @@ type Gap = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 8 | 10 | 12;
 export interface StackProps extends HTMLAttributes<HTMLDivElement> {
 	/** Stack direction */
 	direction?: "row" | "column";
-	/** Gap between items (Tailwind spacing scale) */
+	/** Gap between items (shared spacing scale) */
 	gap?: Gap;
 	/** Align items (cross-axis) */
 	align?: "start" | "center" | "end" | "stretch" | "baseline";

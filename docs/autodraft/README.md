@@ -14,6 +14,19 @@ The original source artifacts are preserved here:
 - `reference/pdf_to_autocad_v5.py`
 - `reference/markup_recognition_architecture.jsx`
 
+Important: files in `reference/` are historical source snapshots and may contain
+legacy rule semantics. Current active color semantics for cloud markups are:
+
+- `green => DELETE`
+- `red => ADD`
+
+Canonical sources for current rule mapping are:
+
+- `docs/autodraft/rule_seed_spec.json`
+- `backend/route_groups/api_autodraft.py`
+- `dotnet/autodraft-api-contract/Services/RuleBasedAutoDraftPlanner.cs`
+- `src/components/apps/autodraft-studio/autodraftData.ts`
+
 ## Goal (Current Understanding)
 
 Build an AutoDraft pipeline that:
@@ -36,7 +49,9 @@ Build an AutoDraft pipeline that:
 
 - Endpoint contracts for AutoDraft features.
 - Input validation, auth/API key handling, throttling.
-- Optional proxy to .NET AutoDraft API (`AUTODRAFT_DOTNET_API_URL`).
+- .NET-first proxy path for AutoDraft API (`AUTODRAFT_DOTNET_API_URL`).
+  - Default target when unset: `http://127.0.0.1:5275`.
+  - Falls back to local Python rules for `/api/autodraft/plan` if .NET is unavailable.
 
 ### .NET API (Planned)
 
@@ -58,5 +73,12 @@ execution when the external API is available.
 
 - Path: `dotnet/autodraft-api-contract`
 - Local run: `dotnet run` (inside that directory)
-- Set backend env to enable proxying:
-  - `AUTODRAFT_DOTNET_API_URL=http://localhost:5275`
+- Runtime target: `.NET 8` (`net8.0`)
+- Backend default proxy target:
+  - `AUTODRAFT_DOTNET_API_URL=http://127.0.0.1:5275`
+- Override only if your .NET service uses a different address.
+
+## Cutover Documentation
+
+- Execute-path swap-over guide:
+  - `docs/autodraft/execute-cutover.md`

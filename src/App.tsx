@@ -11,7 +11,6 @@ import {
 import { ErrorBoundary } from "./components/notification-system/ErrorBoundary";
 import { ToastContainer } from "./components/notification-system/ToastContainer";
 import { logger } from "./lib/logger";
-import AppDashboardPage from "./routes/AppDashboardPage";
 import Shell from "./routes/AppShell";
 import LandingPage from "./routes/LandingPage";
 import LoginPage from "./routes/LoginPage";
@@ -23,6 +22,10 @@ import SignupPage from "./routes/SignupPage";
 
 const AppsRoutePage = lazy(() => import("./routes/apps/AppsRoutePage"));
 const AgentRoutePage = lazy(() => import("./routes/agent/AgentRoutePage"));
+const AgentPairingCallbackPage = lazy(
+	() => import("./routes/agent/AgentPairingCallbackPage"),
+);
+const AppDashboardPage = lazy(() => import("./routes/AppDashboardPage"));
 const CalendarRoutePage = lazy(() => import("./routes/CalendarRoutePage"));
 const CommandCenterPage = lazy(() => import("./routes/CommandCenterPage"));
 const GroundGridRoutePage = lazy(
@@ -99,6 +102,10 @@ export default function App() {
 							<Route path="/signup" element={<SignupPage />} />
 							<Route path="/privacy" element={<PrivacyPage />} />
 							<Route path="/roadmap" element={<RoadmapPage />} />
+							<Route
+								path="/agent/pairing-callback"
+								element={withRouteSuspense(<AgentPairingCallbackPage />)}
+							/>
 
 							<Route element={<ProtectedRoute />}>
 								<Route path="/app" element={<Shell />}>
@@ -181,6 +188,10 @@ export default function App() {
 									<Route
 										path="agent"
 										element={withRouteSuspense(<AgentRoutePage />)}
+									/>
+									<Route
+										path="agent/pairing-callback"
+										element={withRouteSuspense(<AgentPairingCallbackPage />)}
 									/>
 									<Route
 										path="settings"

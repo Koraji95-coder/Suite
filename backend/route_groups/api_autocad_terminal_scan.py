@@ -156,12 +156,16 @@ DEFAULT_TERMINAL_COUNT = 12
 AFFINE2D_IDENTITY = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
 
 
+class TerminalScanValidationError(ValueError):
+    """Typed terminal-scan input validation failure."""
+
+
 def _safe_str(value: Any) -> str:
     if value is None:
         return ""
     try:
         text = str(value).strip()
-    except Exception:
+    except (TypeError, ValueError):
         return ""
     return text
 
@@ -173,14 +177,14 @@ def _safe_upper(value: Any) -> str:
 def _safe_float(value: Any) -> Optional[float]:
     try:
         return float(value)
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 
 def _safe_int(value: Any) -> Optional[int]:
     try:
         return int(str(value).strip())
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 
@@ -770,7 +774,7 @@ def _extract_int_from_text(text: str) -> Optional[int]:
         return None
     try:
         return int(match.group(1))
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 
@@ -788,14 +792,14 @@ def _strip_number(strip_id: str, attrs: Dict[str, str], strip_number_keys: Seque
     if suffix_match:
         try:
             return int(suffix_match.group(1))
-        except Exception:
+        except (TypeError, ValueError):
             pass
 
     trailing_match = re.search(r"(\d+)$", text)
     if trailing_match:
         try:
             return int(trailing_match.group(1))
-        except Exception:
+        except (TypeError, ValueError):
             pass
 
     parsed = _extract_int_from_text(text)
@@ -814,7 +818,7 @@ def _next_unique_strip_id(strip_id: str, seen_strip_ids: set[str]) -> str:
         side = _safe_upper(side_suffix_match.group(2))
         try:
             number = int(side_suffix_match.group(3))
-        except Exception:
+        except (TypeError, ValueError):
             number = 1
 
         candidate = normalized
@@ -861,7 +865,7 @@ def _terminal_labels(attrs: Dict[str, str], terminal_count: int) -> List[str]:
             continue
         try:
             index = int(match.group(1))
-        except Exception:
+        except (TypeError, ValueError):
             continue
         if index <= 0:
             continue
@@ -1564,8 +1568,10 @@ def _normalize_terminal_label_values(raw_labels: Any, terminal_count: int) -> Li
 
 
 def _build_target_strip_label_map(strips_payload: Any) -> Dict[str, List[str]]:
-    if not isinstance(strips_payload, list):
+    if strips_payload is None:
         return {}
+    if not isinstance(strips_payload, list):
+        raise TerminalScanValidationError("strips payload must be an array when provided.")
 
     target: Dict[str, List[str]] = {}
     for strip in strips_payload:
@@ -1616,7 +1622,7 @@ def _write_terminal_labels_to_entity(
             continue
         try:
             index = int(match.group(1))
-        except Exception:
+        except (TypeError, ValueError):
             continue
         if index <= 0:
             continue
@@ -1673,7 +1679,36 @@ def sync_terminal_strip_labels(
     terminal_profile: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     profile = _resolve_terminal_profile(terminal_profile)
-    target_strip_labels = _build_target_strip_label_map(strips_payload)
+    try:
+        target_strip_labels = _build_target_strip_label_map(strips_payload)
+    except TerminalScanValidationError as exc:
+        return {
+            "success": False,
+            "code": "INVALID_REQUEST",
+            "message": str(exc),
+            "data": {
+                "updatedStrips": 0,
+                "matchedStrips": 0,
+                "targetStrips": 0,
+                "matchedBlocks": 0,
+                "updatedBlocks": 0,
+                "updatedAttributes": 0,
+                "unchangedAttributes": 0,
+                "missingAttributes": 0,
+                "failedAttributes": 0,
+            },
+            "meta": {
+                "scannedEntities": 0,
+                "scannedBlockReferences": 0,
+                "skippedNonBlockEntities": 0,
+                "skippedNonTerminalBlocks": 0,
+                "terminalCandidateBlocks": 0,
+                "selectionOnly": bool(selection_only),
+                "includeModelspace": bool(include_modelspace),
+                "terminalProfile": _terminal_profile_summary(profile),
+            },
+            "warnings": [],
+        }
     target_strip_ids = set(target_strip_labels.keys())
     unresolved_target_ids = set(target_strip_ids)
 

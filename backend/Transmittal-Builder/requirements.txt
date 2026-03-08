@@ -1,4 +1,8 @@
 # Root3Power Transmittal Builder Dependencies
+# Deterministic install (recommended): pip install -r requirements.lock.txt
+# Flexible install (unpinned): pip install -r requirements.txt
+# Refresh lock: python -m piptools compile requirements.in --output-file requirements.lock.txt
+
 # PyQt6 for GUI
 PyQt6>=6.0.0
 PyQt6-Qt6>=6.0.0

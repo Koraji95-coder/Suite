@@ -38,7 +38,7 @@ The repository ignore rules include:
 - Set `VITE_AGENT_WEBHOOK_SECRET` in app env and configure the same shared secret on the gateway
 - Use localhost agent gateway by default in development
 - For production, prefer the backend broker flow:
-  - Set `VITE_AGENT_TRANSPORT=backend` and `VITE_AGENT_BROKER_URL=/api/agent`
+  - Set `VITE_AGENT_TRANSPORT=backend` and `VITE_AGENT_BROKER_URL=/api/agent` (this is the default transport policy)
   - Configure backend-only env vars: `AGENT_GATEWAY_URL`, `AGENT_WEBHOOK_SECRET`
   - Configure pair/unpair email verification env vars:
     - `AGENT_PAIRING_CHALLENGE_TTL_SECONDS`
@@ -64,8 +64,12 @@ The repository ignore rules include:
 ## Passwordless Auth Deployment Note
 
 - This app runs passwordless email-link auth only (`/login` entrypoint).
-- Ensure Supabase redirect URLs include your app origin + `/login`.
+- Ensure Supabase redirect URLs include exact callback URLs for each allowed origin:
+  - `/login`
+  - `/agent/pairing-callback`
+  - `/app/settings`
 - Keep `AUTH_ALLOWED_REDIRECT_ORIGINS` and `VITE_AUTH_ALLOWED_ORIGINS` aligned with real origins.
+- Canonical auth architecture/runbook: `docs/security/auth-architecture-canonical.md`.
 - Passkey rollout is currently probe-gated (not fully active):
   - Frontend gate: `VITE_AUTH_PASSKEY_ENABLED`
   - Backend gate: `AUTH_PASSKEY_ENABLED`

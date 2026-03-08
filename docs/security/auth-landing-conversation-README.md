@@ -31,6 +31,7 @@ Repo: `Suite`
 - Pairing/unpairing is email-verified in broker mode.
 - Pair/unpair flow:
   1. `POST /api/agent/pairing-challenge`
+     - `pair` challenge fetches gateway pairing code server-side (no client code entry required).
   2. User opens email link
   3. `POST /api/agent/pairing-confirm`
 - Legacy direct broker endpoints are blocked:

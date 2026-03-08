@@ -20,7 +20,8 @@ Browsers cannot directly access Windows processes or AutoCAD due to security san
 Canonical implementation files live in:
 
 - `backend/api_server.py`
-- `backend/requirements-api.txt`
+- `backend/requirements-api.txt` (unpinned input)
+- `backend/requirements-api.lock.txt` (pinned lockfile)
 - `backend/start_api_server.bat`
 
 The backend will read a repo-root `.env` file if present (recommended for `API_KEY`).
@@ -36,8 +37,15 @@ start_api_server.bat
 
 ```bash
 cd backend
-pip install -r requirements-api.txt
+pip install -r requirements-api.lock.txt
 python api_server.py
+```
+
+To refresh locked pins after dependency changes:
+
+```bash
+cd backend
+python -m piptools compile requirements-api.in --output-file requirements-api.lock.txt
 ```
 
 ### Option 3: Workspace npm helper
@@ -164,11 +172,13 @@ Endpoints (all require Supabase auth `Authorization: Bearer <access_token>`):
 
 - `GET /api/agent/health` → proxy gateway health
 - `GET /api/agent/session` → `{ paired: boolean, expires_at?: string }`
-- `POST /api/agent/pairing-challenge` → `{ action: "pair" | "unpair", pairing_code?: "123456" }`
+- `POST /api/agent/pairing-challenge` → `{ action: "pair" | "unpair" }`
+  - For `action: "pair"`, backend requests a fresh gateway pairing code server-side and stores it in the one-time challenge record.
 - `POST /api/agent/pairing-confirm` → `{ challenge_id: "<from-email-link>" }`
 - Pairing endpoints may return `429` with `retry_after_seconds` and `Retry-After` when abuse controls are triggered
 - `POST /api/agent/session/clear` → clear broker cookie/session during sign-out cleanup
 - `POST /api/agent/pair` and `POST /api/agent/unpair` return `428` (direct pair/unpair is intentionally disabled)
+- `POST /api/agent/pairing-code/request` remains available as a legacy/admin fallback endpoint (not the primary UX)
 - `POST /api/agent/webhook` → same payload as gateway `/webhook`
 
 Broker env vars (backend-only):

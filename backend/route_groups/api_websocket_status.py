@@ -70,6 +70,64 @@ def websocket_error_payload(progress_state: Mapping[str, Any]) -> Dict[str, Any]
     }
 
 
+def _normalize_status_signature(status: Mapping[str, Any]) -> Tuple[Any, ...]:
+    checks = status.get("checks", {})
+    if isinstance(checks, Mapping):
+        checks_signature: Any = tuple(
+            sorted((str(key), str(value)) for key, value in checks.items())
+        )
+    else:
+        checks_signature = str(checks)
+
+    return (
+        bool(status.get("connected")),
+        bool(status.get("autocad_running")),
+        bool(status.get("drawing_open")),
+        str(status.get("drawing_name") or ""),
+        str(status.get("error") or ""),
+        checks_signature,
+    )
+
+
+def _resolve_next_poll_interval_seconds(
+    *,
+    base_poll_interval_seconds: float,
+    max_poll_interval_seconds: float,
+    idle_iterations: int,
+    had_status_change: bool,
+    had_progress_events: bool,
+) -> float:
+    if had_status_change or had_progress_events:
+        return max(0.25, base_poll_interval_seconds * 0.5)
+
+    # Idle periods back off gradually to reduce server wakeups.
+    backoff_step_seconds = 0.5
+    next_interval = base_poll_interval_seconds + (backoff_step_seconds * idle_iterations)
+    return min(max_poll_interval_seconds, max(base_poll_interval_seconds, next_interval))
+
+
+def _derive_request_id(request_obj: Any, *, fallback_timestamp_ms: int) -> str:
+    args = getattr(request_obj, "args", {}) or {}
+    headers = getattr(request_obj, "headers", {}) or {}
+    candidate = (
+        str(args.get("requestId") or args.get("request_id") or "").strip()
+        or str(headers.get("X-Request-ID") or headers.get("X-Request-Id") or "").strip()
+    )
+    if candidate:
+        return candidate[:128]
+    return f"req-{fallback_timestamp_ms}"
+
+
+def _derive_connection_id(
+    *,
+    request_id: str,
+    remote_addr: str,
+    timestamp_ms: int,
+) -> str:
+    suffix = abs(hash((request_id, remote_addr, timestamp_ms))) % 100000
+    return f"ws-{timestamp_ms}-{suffix:05d}"
+
+
 def websocket_status_bridge(
     ws: Any,
     *,
@@ -84,9 +142,21 @@ def websocket_status_bridge(
     consume_ws_ticket_fn: Optional[Callable[[str, str], Tuple[bool, str]]] = None,
     allow_api_key_fallback: bool = True,
     poll_interval_seconds: float = 2.0,
+    max_poll_interval_seconds: float = 5.0,
+    status_keepalive_seconds: float = 12.0,
     max_iterations: Optional[int] = None,
 ) -> None:
     remote_addr = str(getattr(request_obj, "remote_addr", "") or "unknown")
+    bootstrap_timestamp_ms = int(time_module.time() * 1000)
+    request_id = _derive_request_id(
+        request_obj,
+        fallback_timestamp_ms=bootstrap_timestamp_ms,
+    )
+    connection_id = _derive_connection_id(
+        request_id=request_id,
+        remote_addr=remote_addr,
+        timestamp_ms=bootstrap_timestamp_ms,
+    )
     auth_mode = ""
     auth_failure_reason = "auth_missing"
 
@@ -145,10 +215,22 @@ def websocket_status_bridge(
                 ws.close()
             except Exception:
                 pass
-        logger.warning("Unauthorized websocket from %s (reason=%s)", remote_addr, auth_failure_reason)
+        logger.warning(
+            "Unauthorized websocket from %s (reason=%s, request_id=%s, connection_id=%s)",
+            remote_addr,
+            auth_failure_reason,
+            request_id,
+            connection_id,
+        )
         return
 
-    logger.info("WebSocket connected from %s (auth_mode=%s)", remote_addr, auth_mode)
+    logger.info(
+        "WebSocket connected from %s (auth_mode=%s, request_id=%s, connection_id=%s)",
+        remote_addr,
+        auth_mode,
+        request_id,
+        connection_id,
+    )
 
     try:
         ws.send(
@@ -163,20 +245,38 @@ def websocket_status_bridge(
 
         iterations = 0
         last_progress_event_id = 0
+        last_status_signature: Optional[Tuple[Any, ...]] = None
+        last_status_sent_at = 0.0
+        base_poll_interval = max(0.25, float(poll_interval_seconds))
+        max_poll_interval = max(base_poll_interval, float(max_poll_interval_seconds))
+        status_keepalive_interval = max(base_poll_interval, float(status_keepalive_seconds))
+        idle_iterations = 0
+
         while True:
             manager = get_manager()
             status = manager.get_status(force_refresh=True)
+            status_signature = _normalize_status_signature(status)
+            now = time_module.time()
+            status_changed = status_signature != last_status_signature
+            should_emit_status = (
+                status_changed
+                or last_status_sent_at <= 0.0
+                or (now - last_status_sent_at) >= status_keepalive_interval
+            )
 
-            ws.send(
-                json_module.dumps(
-                    websocket_status_payload(
-                        status,
-                        backend_id=backend_id,
-                        backend_version=backend_version,
-                        timestamp=time_module.time(),
+            if should_emit_status:
+                ws.send(
+                    json_module.dumps(
+                        websocket_status_payload(
+                            status,
+                            backend_id=backend_id,
+                            backend_version=backend_version,
+                            timestamp=now,
+                        )
                     )
                 )
-            )
+                last_status_signature = status_signature
+                last_status_sent_at = now
 
             try:
                 progress_events = manager.get_progress_events_since(last_progress_event_id)
@@ -207,7 +307,27 @@ def websocket_status_bridge(
             if max_iterations is not None and iterations >= max_iterations:
                 break
 
-            time_module.sleep(poll_interval_seconds)
+            had_progress_events = len(progress_events) > 0
+            if status_changed or had_progress_events:
+                idle_iterations = 0
+            else:
+                idle_iterations += 1
+
+            time_module.sleep(
+                _resolve_next_poll_interval_seconds(
+                    base_poll_interval_seconds=base_poll_interval,
+                    max_poll_interval_seconds=max_poll_interval,
+                    idle_iterations=idle_iterations,
+                    had_status_change=status_changed,
+                    had_progress_events=had_progress_events,
+                )
+            )
 
     except Exception as exc:
-        logger.info("WebSocket disconnected from %s (%s)", remote_addr, exc)
+        logger.info(
+            "WebSocket disconnected from %s (%s) (request_id=%s, connection_id=%s)",
+            remote_addr,
+            exc,
+            request_id,
+            connection_id,
+        )

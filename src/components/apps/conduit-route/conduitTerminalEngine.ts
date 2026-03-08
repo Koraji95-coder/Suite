@@ -672,7 +672,7 @@ export function buildTerminalLayout(
 	const orientedSpanY = Math.max(1e-6, orientedMaxY - orientedMinY);
 	const orientedAspect = orientedSpanX / orientedSpanY;
 	const targetArea = baseCanvasWidth * baseCanvasHeight;
-	let canvasWidth = clamp(
+	const canvasWidth = clamp(
 		Math.sqrt(targetArea * orientedAspect) + config.padding * 0.75,
 		560,
 		980,

@@ -85,6 +85,22 @@ class TestApiServerEntrypoint(unittest.TestCase):
             [{"host": "127.0.0.1", "port": 5050, "debug": False, "threaded": True}],
         )
 
+    def test_run_server_entrypoint_can_block_dev_server(self) -> None:
+        app = _AppStub()
+        manager = _ManagerStub({"connected": True})
+
+        with self.assertRaises(RuntimeError):
+            run_server_entrypoint(
+                app=app,
+                environ={},
+                parse_int_env_fn=lambda *_args, **_kwargs: 5000,
+                print_startup_banner_fn=lambda *_args, **_kwargs: None,
+                get_manager_fn=lambda: manager,
+                print_initial_manager_status_fn=lambda *_args, **_kwargs: None,
+                allow_dev_server=False,
+            )
+        self.assertEqual(app.run_calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

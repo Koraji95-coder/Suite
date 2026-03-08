@@ -1,6 +1,5 @@
 /* src/theme.css */
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-@import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CSS CUSTOM PROPERTIES
@@ -68,53 +67,6 @@
 	--radius-lg: 14px;
 	--radius-xl: 20px;
 	--radius-full: 9999px;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   TAILWIND THEME EXTENSION
-   Map CSS variables to Tailwind utilities via @theme
-   ═══════════════════════════════════════════════════════════════════════════ */
-@theme {
-  --color-bg: var(--bg);
-  --color-background: var(--background);
-  --color-bg-subtle: var(--bg-subtle);
-  --color-bg-base: var(--bg-base);
-  --color-bg-mid: var(--bg-mid);
-  --color-bg-heavy: var(--bg-heavy);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-
-  --color-border: var(--border);
-  --color-border-subtle: var(--border-subtle);
-  --color-border-strong: var(--border-strong);
-
-  --color-text: var(--text);
-  --color-text-muted: var(--text-muted);
-
-  --color-primary: var(--primary);
-  --color-primary-hover: var(--primary-hover);
-  --color-primary-contrast: var(--primary-contrast);
-  --color-accent: var(--accent);
-  --color-secondary: var(--secondary);
-  --color-tertiary: var(--tertiary);
-
-  --color-success: var(--success);
-  --color-warning: var(--warning);
-  --color-danger: var(--danger);
-  --color-info: var(--info);
-
-  --color-focus-ring: var(--focus-ring);
-  --color-glow: var(--glow);
-
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-  --radius-full: var(--radius-full);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

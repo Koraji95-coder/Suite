@@ -1,5 +1,5 @@
 // src/lib/tokens.ts
-// Design system utilities — works with Tailwind + CSS variables
+// Design system utilities backed by CSS variables
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPE DEFINITIONS

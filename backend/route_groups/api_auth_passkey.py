@@ -23,7 +23,16 @@ def create_auth_passkey_blueprint(
 
     _logger = logger or logging.getLogger(__name__)
 
-    AGENT_PAIRING_REDIRECT_PATH = deps.get("AGENT_PAIRING_REDIRECT_PATH", "/app/agent")
+    AGENT_PAIRING_REDIRECT_PATH = deps.get(
+        "AGENT_PAIRING_REDIRECT_PATH",
+        "/agent/pairing-callback",
+    )
+    ALLOWED_PAIRING_REDIRECT_PATHS = {
+        "/agent/pairing-callback",
+        "/app/agent/pairing-callback",
+        "/app/agent",
+        "/app/settings",
+    }
     AUTH_PASSKEY_RP_ID = deps.get("AUTH_PASSKEY_RP_ID", "")
     AUTH_PASSKEY_RP_NAME = deps.get("AUTH_PASSKEY_RP_NAME", "")
     AUTH_PASSKEY_REQUIRE_USER_VERIFICATION = bool(
@@ -177,7 +186,7 @@ def create_auth_passkey_blueprint(
             payload.get("redirectPath") or payload.get("redirect_path") or ""
         ).strip()
         redirect_path = AGENT_PAIRING_REDIRECT_PATH
-        if requested_redirect_path in {"/app/agent", "/app/settings"}:
+        if requested_redirect_path in ALLOWED_PAIRING_REDIRECT_PATHS:
             redirect_path = requested_redirect_path
         client_ip = _get_request_ip()
 

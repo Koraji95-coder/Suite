@@ -145,6 +145,41 @@ class TestApiAutocadManager(unittest.TestCase):
         self.assertEqual(pythoncom.initialize_calls, 1)
         self.assertEqual(pythoncom.uninitialize_calls, 1)
 
+    def test_execute_layer_search_failure_has_code_and_request_id(self) -> None:
+        manager = _build_manager(
+            connect_autocad_fn=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+
+        result = manager.execute_layer_search(
+            {
+                "layer_search_names": ["S-FNDN-PRIMARY"],
+                "requestId": "req-manager-1",
+            }
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["code"], "EXECUTE_LAYER_SEARCH_FAILED")
+        self.assertEqual(result["requestId"], "req-manager-1")
+        self.assertIn("meta", result)
+        self.assertEqual(result["meta"]["stage"], "execute_layer_search")
+
+    def test_plot_ground_grid_failure_has_code_and_request_id(self) -> None:
+        manager = _build_manager()
+
+        result = manager.plot_ground_grid(
+            {
+                "requestId": "req-grid-1",
+                "conductors": "bad-shape",
+                "placements": [],
+            }
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["code"], "GROUND_GRID_PLOT_FAILED")
+        self.assertEqual(result["requestId"], "req-grid-1")
+        self.assertIn("meta", result)
+        self.assertEqual(result["meta"]["stage"], "ground_grid_plot")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -57,11 +57,14 @@ PASSKEY_DEP_KEYS = (
 
 AGENT_DEP_KEYS = (
     "_agent_broker_config_status",
+    "_list_agent_profiles",
+    "_resolve_agent_profile_route",
     "_get_supabase_user_id",
     "_get_supabase_user_email",
     "_get_request_ip",
     "_is_agent_pairing_action_allowed",
     "_create_agent_pairing_challenge",
+    "_build_auth_redirect_url",
     "_send_supabase_email_link",
     "_email_fingerprint",
     "_request_gateway_pairing_code",

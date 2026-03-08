@@ -44,9 +44,17 @@ interface DashboardLoadStatusResponse extends DashboardLoadProgress {
 	data?: DashboardOverviewPayload;
 }
 
-const POLL_INTERVAL_MS = 220;
 const LOAD_TIMEOUT_MS = 35_000;
 const CACHED_PAYLOAD_MAX_AGE_MS = 45_000;
+const POLL_SCHEDULE: ReadonlyArray<{
+	untilElapsedMs: number;
+	intervalMs: number;
+}> = [
+	{ untilElapsedMs: 2_500, intervalMs: 280 },
+	{ untilElapsedMs: 9_000, intervalMs: 650 },
+	{ untilElapsedMs: 20_000, intervalMs: 1_200 },
+	{ untilElapsedMs: Number.POSITIVE_INFINITY, intervalMs: 2_000 },
+];
 
 type ProgressCallback = (progress: DashboardLoadProgress) => void;
 
@@ -121,6 +129,30 @@ async function getDashboardLoadStatus(
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function clampProgress(raw: number): number {
+	if (!Number.isFinite(raw)) return 0;
+	return Math.max(0, Math.min(100, Math.trunc(raw)));
+}
+
+function resolvePollIntervalMs(
+	elapsedMs: number,
+	status: DashboardLoadStatusResponse,
+): number {
+	const progress = clampProgress(status.progress);
+	if (status.status === "running" && progress >= 96) {
+		return 280;
+	}
+	if (status.status === "running" && progress >= 85) {
+		return 450;
+	}
+	for (const step of POLL_SCHEDULE) {
+		if (elapsedMs <= step.untilElapsedMs) {
+			return step.intervalMs;
+		}
+	}
+	return 2_000;
+}
+
 function cachePayload(payload: DashboardOverviewPayload) {
 	cachedPayload = payload;
 	cachedPayloadAt = Date.now();
@@ -174,7 +206,8 @@ async function runDashboardLoad(
 			throw new Error("Dashboard load timed out.");
 		}
 
-		await wait(POLL_INTERVAL_MS);
+		const elapsedMs = Date.now() - startedAt;
+		await wait(resolvePollIntervalMs(elapsedMs, status));
 	}
 }
 

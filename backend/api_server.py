@@ -102,6 +102,14 @@ from route_groups.api_agent_runtime import (
 from route_groups.api_agent_config import (
     agent_broker_config_status as agent_config_status_helper,
 )
+from route_groups.api_agent_profiles import (
+    build_agent_profile_catalog as agent_profile_build_catalog_helper,
+    list_agent_profiles as agent_profile_list_helper,
+    resolve_agent_profile_route as agent_profile_resolve_route_helper,
+)
+from route_groups.api_agent_orchestration_runtime import (
+    AgentRunOrchestrator,
+)
 from route_groups.api_supabase_jwks import (
     get_supabase_jwks_client as supabase_jwks_get_client_helper,
     looks_like_uuid as supabase_jwks_looks_like_uuid_helper,
@@ -129,6 +137,7 @@ from route_groups.api_runtime_config import (
     normalize_auth_passkey_provider as runtime_config_normalize_auth_passkey_provider_helper,
     resolve_agent_webhook_secret as runtime_config_resolve_agent_webhook_secret_helper,
     resolve_api_key as runtime_config_resolve_api_key_helper,
+    resolve_autodraft_dotnet_api_url as runtime_config_resolve_autodraft_dotnet_api_url_helper,
     resolve_auth_email_require_turnstile as runtime_config_resolve_auth_email_require_turnstile_helper,
     resolve_supabase_api_key as runtime_config_resolve_supabase_api_key_helper,
     resolve_supabase_url as runtime_config_resolve_supabase_url_helper,
@@ -138,6 +147,7 @@ from route_groups.api_http_hardening import (
     configure_cors as http_hardening_configure_cors_helper,
     default_allowed_origins as http_hardening_default_allowed_origins_helper,
     resolve_limiter_default_limits as http_hardening_resolve_limiter_default_limits_helper,
+    resolve_limiter_storage_uri as http_hardening_resolve_limiter_storage_uri_helper,
 )
 from route_groups.api_server_state import (
     create_server_state as server_state_create_helper,
@@ -146,6 +156,7 @@ from route_groups.api_bootstrap_runtime import (
     create_bootstrap_runtime as bootstrap_create_runtime_helper,
 )
 from route_groups.api_dependency_bundle import (
+    AGENT_DEP_KEYS,
     build_agent_deps as dependency_bundle_build_agent_deps_helper,
     build_passkey_deps as dependency_bundle_build_passkey_deps_helper,
     build_transmittal_render_deps as dependency_bundle_build_transmittal_render_deps_helper,
@@ -324,11 +335,15 @@ http_hardening_configure_cors_helper(
 )
 
 # ── Rate Limiting ────────────────────────────────────────────────
+LIMITER_STORAGE_URI = http_hardening_resolve_limiter_storage_uri_helper(
+    os_module=os,
+    logger=logger,
+)
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
     default_limits=http_hardening_resolve_limiter_default_limits_helper(os_module=os),
-    storage_uri="memory://",
+    storage_uri=LIMITER_STORAGE_URI,
     strategy="fixed-window"
 )
 
@@ -408,8 +423,8 @@ else:
     BACKUP_STORAGE_DIR = (Path(__file__).resolve().parents[1] / "backups").resolve()
 BACKUP_MAX_BYTES = _parse_int_env("BACKUP_MAX_BYTES", 5 * 1024 * 1024, minimum=1024)
 BACKUP_MAX_FILES = _parse_int_env("BACKUP_MAX_FILES", 500, minimum=10)
-AUTODRAFT_DOTNET_API_URL = (
-    (os.environ.get("AUTODRAFT_DOTNET_API_URL") or "").strip()
+AUTODRAFT_DOTNET_API_URL = runtime_config_resolve_autodraft_dotnet_api_url_helper(
+    os_module=os,
 )
 
 
@@ -561,6 +576,18 @@ AGENT_REQUIRE_WEBHOOK_SECRET = (
     (os.environ.get("AGENT_REQUIRE_WEBHOOK_SECRET") or "true").strip().lower()
     != "false"
 )
+AGENT_PROFILE_CATALOG = agent_profile_build_catalog_helper(
+    environ=os.environ,
+    logger=logger,
+)
+
+
+def _list_agent_profiles() -> List[Dict[str, Any]]:
+    return agent_profile_list_helper(AGENT_PROFILE_CATALOG)
+
+
+def _resolve_agent_profile_route(profile_id: str) -> Optional[Dict[str, Any]]:
+    return agent_profile_resolve_route_helper(AGENT_PROFILE_CATALOG, profile_id)
 
 AGENT_SESSION_COOKIE = (os.environ.get("AGENT_SESSION_COOKIE") or "suite_agent_session").strip()
 AGENT_SESSION_SAMESITE = (os.environ.get("AGENT_SESSION_SAMESITE") or "Strict").strip()
@@ -587,8 +614,24 @@ AGENT_PAIRING_CHALLENGE_MAX_ENTRIES = _parse_int_env(
     minimum=100,
 )
 AGENT_PAIRING_REDIRECT_PATH = (
-    (os.environ.get("AGENT_PAIRING_REDIRECT_PATH") or "/app/agent").strip()
-    or "/app/agent"
+    (os.environ.get("AGENT_PAIRING_REDIRECT_PATH") or "/login").strip()
+    or "/login"
+)
+AGENT_RUN_LEDGER_PATH = Path(
+    (os.environ.get("AGENT_RUN_LEDGER_PATH") or "").strip()
+    or str(Path(__file__).resolve().parent / "agent-runs.sqlite3")
+).expanduser().resolve()
+AGENT_RUN_ORCHESTRATOR = AgentRunOrchestrator(
+    ledger_path=AGENT_RUN_LEDGER_PATH,
+    requests_module=requests,
+    logger=logger,
+    agent_gateway_url=AGENT_GATEWAY_URL,
+    agent_webhook_secret=AGENT_WEBHOOK_SECRET,
+    agent_require_webhook_secret=AGENT_REQUIRE_WEBHOOK_SECRET,
+    list_agent_profiles_fn=_list_agent_profiles,
+    resolve_agent_profile_route_fn=_resolve_agent_profile_route,
+    default_timeout_ms=AGENT_DEFAULT_TIMEOUT_SECONDS * 1000,
+    max_timeout_ms=AGENT_MAX_TIMEOUT_SECONDS * 1000,
 )
 AUTH_PASSKEY_ENABLED = _parse_bool_env("AUTH_PASSKEY_ENABLED", False)
 AUTH_PASSKEY_PROVIDER = runtime_config_normalize_auth_passkey_provider_helper(
@@ -1384,6 +1427,7 @@ def _send_supabase_email_link(
     client_redirect_to: str = "",
     redirect_path: str = "/login",
     redirect_query: Optional[Dict[str, str]] = None,
+    require_redirect: bool = False,
 ) -> None:
     return supabase_send_email_link_helper(
         email,
@@ -1391,6 +1435,7 @@ def _send_supabase_email_link(
         client_redirect_to=client_redirect_to,
         redirect_path=redirect_path,
         redirect_query=redirect_query,
+        require_redirect=require_redirect,
         supabase_url=SUPABASE_URL,
         supabase_api_key=SUPABASE_API_KEY,
         build_auth_redirect_url_fn=_build_auth_redirect_url,
@@ -1658,6 +1703,16 @@ def _revoke_gateway_agent_token(token: str):
     return agent_runtime.revoke_gateway_agent_token(token)
 
 
+AGENT_DEP_KEYS_MISSING_BEFORE_REGISTRATION = [
+    key for key in AGENT_DEP_KEYS if key not in globals()
+]
+if AGENT_DEP_KEYS_MISSING_BEFORE_REGISTRATION:
+    raise RuntimeError(
+        "Agent dependency bundle keys missing before route registration: "
+        + ", ".join(AGENT_DEP_KEYS_MISSING_BEFORE_REGISTRATION)
+    )
+
+
 # ── Split Route Groups ──────────────────────────────────────────
 register_route_groups(
     app,
@@ -1693,8 +1748,12 @@ register_route_groups(
     batch_session_ttl_seconds=BATCH_SESSION_TTL_SECONDS,
     require_supabase_user=require_supabase_user,
     require_agent_session=require_agent_session,
+    get_supabase_user_id=_get_supabase_user_id,
+    get_supabase_user_email=_get_supabase_user_email,
+    is_admin_user=_is_admin_user,
     passkey_deps=dependency_bundle_build_passkey_deps_helper(globals()),
     agent_deps=dependency_bundle_build_agent_deps_helper(globals()),
+    agent_run_orchestrator=AGENT_RUN_ORCHESTRATOR,
     transmittal_render_deps=dependency_bundle_build_transmittal_render_deps_helper(
         globals()
     ),
@@ -1729,6 +1788,16 @@ def websocket_status_bridge(ws):
 # ========== MAIN ==========
 
 if __name__ == '__main__':
+    dev_server_allowed_default = (
+        (os.environ.get("API_ENV") or "").strip().lower() not in {"production", "prod"}
+        and (os.environ.get("FLASK_ENV") or "").strip().lower() not in {"production", "prod"}
+    )
+    allow_dev_server = _parse_bool_env(
+        "API_ALLOW_FLASK_DEV_SERVER",
+        dev_server_allowed_default,
+    )
+    dev_server_threaded = _parse_bool_env("API_DEV_SERVER_THREADED", False)
+
     server_entrypoint_run_helper(
         app=app,
         environ=os.environ,
@@ -1737,5 +1806,6 @@ if __name__ == '__main__':
         get_manager_fn=get_manager,
         print_initial_manager_status_fn=bootstrap_print_initial_manager_status_helper,
         debug=False,
-        threaded=True,
+        threaded=dev_server_threaded,
+        allow_dev_server=allow_dev_server,
     )

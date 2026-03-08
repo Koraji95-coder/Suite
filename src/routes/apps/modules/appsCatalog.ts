@@ -95,8 +95,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 	},
 	{
 		id: "agent",
-		title: "Koro Agent",
-		description: "Pair and run automation workflows through the gateway.",
+		title: "Agent Studio",
+		description:
+			"Pair and run profile-based AI workflows with deterministic model routing.",
 		to: "/app/agent",
 		status: "active",
 	},

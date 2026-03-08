@@ -220,6 +220,7 @@ def create_autocad_runtime(
             com_call_with_retry_fn=com_call_with_retry,
             foundation_source_type=foundation_source_type,
             print_fn=print_fn,
+            logger_fn=logger,
         )
 
     def get_manager() -> Any:

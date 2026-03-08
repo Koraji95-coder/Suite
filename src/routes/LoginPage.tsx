@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthEnvDebugCard from "../auth/AuthEnvDebugCard";
 import AuthShell from "../auth/AuthShell";
+import { buildAgentPairingSearchFromLocation } from "../auth/agentPairingParams";
 import { resolveAuthRedirect } from "../auth/authRedirect";
 import CaptchaChallenge from "../auth/CaptchaChallenge";
 import { useNotification } from "../auth/NotificationContext";
@@ -24,6 +25,7 @@ import { markPasskeySignInPending } from "../auth/passkeySessionState";
 import { useAuth } from "../auth/useAuth";
 // Components
 import { AgentPixelMark } from "../components/agent/AgentPixelMark";
+import { AGENT_PROFILE_IDS } from "../components/agent/agentProfiles";
 import { loadDashboardOverviewFromBackend } from "../components/apps/dashboard/dashboardOverviewService";
 import { Badge } from "../components/primitives/Badge";
 // Primitives
@@ -38,7 +40,7 @@ import { cn } from "../lib/utils";
 import { logAuthMethodTelemetry } from "../services/securityEventService";
 import styles from "./LoginPage.module.css";
 
-const AGENT_IDS = ["koro", "devstral", "sentinel", "forge"] as const;
+const AGENT_IDS = AGENT_PROFILE_IDS;
 
 type LocationState = { from?: string };
 
@@ -51,7 +53,16 @@ export default function LoginPage() {
 	const { user, loading, signIn } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const from = (location.state as LocationState | null)?.from ?? "/app/home";
+	const agentPairingSearch = useMemo(() => {
+		return buildAgentPairingSearchFromLocation(location.search, location.hash);
+	}, [location.hash, location.search]);
+	const hasAgentPairingParams = agentPairingSearch.length > 0;
+	const from = useMemo(() => {
+		if (hasAgentPairingParams) {
+			return `/agent/pairing-callback${agentPairingSearch}`;
+		}
+		return (location.state as LocationState | null)?.from ?? "/app/home";
+	}, [agentPairingSearch, hasAgentPairingParams, location.state]);
 
 	const notification = useNotification();
 	const [email, setEmail] = useState("");
@@ -467,7 +478,12 @@ export default function LoginPage() {
 			<div className={styles.mainAgentWrap}>
 				<div className={styles.agentGlow} />
 				<div className={styles.mainAgentInner}>
-					<AgentPixelMark profileId="koro" size={80} expression="active" />
+					<AgentPixelMark
+						profileId="koro"
+						size={80}
+						detailLevel="hero"
+						expression="active"
+					/>
 				</div>
 			</div>
 
@@ -479,7 +495,7 @@ export default function LoginPage() {
 						className={styles.secondaryAgent}
 						style={{ animationDelay: `${400 + i * 100}ms` }}
 					>
-						<AgentPixelMark profileId={id} size={20} />
+						<AgentPixelMark profileId={id} size={20} detailLevel="hero" />
 					</div>
 				))}
 			</HStack>

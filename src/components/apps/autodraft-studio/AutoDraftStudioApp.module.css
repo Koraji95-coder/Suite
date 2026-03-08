@@ -207,9 +207,22 @@
 	gap: var(--space-2);
 }
 
+.demoActions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
 .planSummary {
 	display: grid;
 	gap: 0.2rem;
+}
+
+.executeSummary {
+	display: grid;
+	gap: 0.2rem;
+	padding-top: var(--space-2);
+	border-top: 1px solid var(--border);
 }
 
 @media (max-width: 1120px) {
@@ -227,6 +240,11 @@
 @media (max-width: 760px) {
 	.headerRow {
 		flex-direction: column;
+	}
+
+	.demoActions {
+		width: 100%;
+		flex-wrap: wrap;
 	}
 
 	.statusGrid,

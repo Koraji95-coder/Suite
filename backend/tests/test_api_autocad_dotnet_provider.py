@@ -363,6 +363,7 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         client = self._build_client(provider="dotnet_fallback_com", sender=sender)
         response = client.post(
             "/api/conduit-route/terminal-routes/draw",
+            headers={"X-Request-ID": "req-route-fallback-1"},
             json={
                 "operation": "upsert",
                 "sessionId": "cad-session-2",
@@ -380,11 +381,15 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         self.assertTrue(payload.get("success"))
         self.assertEqual(payload.get("meta", {}).get("source"), "autocad")
         self.assertEqual(payload.get("meta", {}).get("providerPath"), "com_fallback")
+        manager = self._manager
+        self.assertEqual(len(manager.draw_payloads), 1)
+        self.assertEqual(manager.draw_payloads[0].get("requestId"), "req-route-fallback-1")
 
     def test_terminal_label_sync_uses_manager_com_path(self) -> None:
         client = self._build_client(provider="dotnet", sender=lambda *_args, **_kwargs: {})
         response = client.post(
             "/api/conduit-route/terminal-labels/sync",
+            headers={"X-Request-ID": "req-label-sync-1"},
             json={
                 "selectionOnly": False,
                 "includeModelspace": True,
@@ -408,6 +413,95 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
             manager.label_sync_payloads[0]["strips"][0]["stripId"],
             "RP1L1",
         )
+        self.assertEqual(
+            manager.label_sync_payloads[0].get("requestId"),
+            "req-label-sync-1",
+        )
+
+    def test_bridge_terminal_label_sync_uses_dotnet_action(self) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            calls.append((action, payload))
+            return {
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "labels synced",
+                    "data": {
+                        "drawing": {"name": "stub.dwg", "units": "Feet"},
+                        "updatedStrips": 1,
+                        "matchedStrips": 1,
+                        "targetStrips": 1,
+                        "matchedBlocks": 1,
+                        "updatedBlocks": 1,
+                        "updatedAttributes": 12,
+                        "unchangedAttributes": 0,
+                        "missingAttributes": 0,
+                        "failedAttributes": 0,
+                    },
+                    "meta": {},
+                    "warnings": [],
+                },
+                "error": None,
+            }
+
+        client = self._build_client(provider="dotnet", sender=sender)
+        response = client.post(
+            "/api/conduit-route/bridge/terminal-labels/sync",
+            json={
+                "selectionOnly": False,
+                "includeModelspace": True,
+                "maxEntities": 50000,
+                "strips": [
+                    {
+                        "stripId": "RP1L1",
+                        "terminalCount": 12,
+                        "labels": [str(index) for index in range(1, 13)],
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(payload.get("meta", {}).get("source"), "dotnet")
+        self.assertEqual(payload.get("meta", {}).get("providerPath"), "dotnet")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][0], "conduit_route_terminal_labels_sync")
+        self.assertEqual(calls[0][1].get("selectionOnly"), False)
+        self.assertEqual(calls[0][1].get("includeModelspace"), True)
+        self.assertEqual(calls[0][1].get("maxEntities"), 50000)
+        self.assertEqual(
+            ((calls[0][1].get("strips") or [{}])[0] or {}).get("stripId"),
+            "RP1L1",
+        )
+        manager = self._manager
+        self.assertEqual(len(manager.label_sync_payloads), 0)
+
+    def test_bridge_terminal_label_sync_rejects_invalid_payload(self) -> None:
+        client = self._build_client(provider="dotnet", sender=lambda *_args, **_kwargs: {})
+        response = client.post(
+            "/api/conduit-route/bridge/terminal-labels/sync",
+            json={"maxEntities": "not-an-int"},
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+        self.assertEqual(payload.get("code"), "INVALID_REQUEST")
+
+    def test_bridge_terminal_label_sync_requires_sender_configuration(self) -> None:
+        client = self._build_client(provider="dotnet", sender=None)
+        response = client.post(
+            "/api/conduit-route/bridge/terminal-labels/sync",
+            json={},
+        )
+        self.assertEqual(response.status_code, 503)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+        self.assertEqual(payload.get("code"), "DOTNET_BRIDGE_UNAVAILABLE")
 
     def test_terminal_route_draw_rejects_missing_session_id(self) -> None:
         client = self._build_client(provider="dotnet", sender=lambda *_args, **_kwargs: {})

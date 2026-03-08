@@ -2,19 +2,25 @@
 	display: flex;
 	flex-direction: column;
 	height: 100%;
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--agent-surface-base) 92%, transparent),
+			color-mix(in srgb, var(--agent-surface-muted) 76%, transparent)
+		);
 }
 
 .header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 0.75rem 1rem;
-	border-bottom: 1px solid var(--border);
+	padding: 0.8rem 0.9rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--agent-surface-border) 80%, transparent);
 }
 
 .headerLabel {
 	text-transform: uppercase;
-	letter-spacing: 0.08em;
+	letter-spacing: 0.1em;
 }
 
 .listWrap {
@@ -28,21 +34,24 @@
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	padding: 3rem 1rem;
+	padding: 2.8rem 0.8rem;
+	text-align: center;
 }
 
 .emptyIconWrap {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	padding: 0.75rem;
+	width: 2.5rem;
+	height: 2.5rem;
 	margin-bottom: 0.75rem;
+	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 90%, transparent);
 	border-radius: 999px;
-	background: var(--surface-2);
+	background: color-mix(in srgb, var(--agent-surface-elevated) 74%, transparent);
 }
 
 .emptyIcon {
-	color: var(--text-muted);
+	color: color-mix(in srgb, var(--agent-accent-warm) 54%, var(--text-muted) 46%);
 }
 
 .emptyHint {
@@ -55,7 +64,7 @@
 
 .footer {
 	padding: 0.75rem;
-	border-top: 1px solid var(--border);
+	border-top: 1px solid color-mix(in srgb, var(--agent-surface-border) 80%, transparent);
 }
 
 .conversationRoot {
@@ -64,40 +73,51 @@
 
 .conversationButton {
 	width: 100%;
-	padding: 0.625rem 0.75rem;
+	padding: 0.62rem 0.72rem;
 	border: 1px solid transparent;
-	border-radius: 0.75rem;
+	border-radius: 0.72rem;
 	text-align: left;
 	transition:
-		background 150ms ease,
-		border-color 150ms ease;
+		background-color var(--agent-motion-fast) ease,
+		border-color var(--agent-motion-fast) ease,
+		transform var(--agent-motion-fast) ease;
 }
 
 .conversationButtonActive {
-	border-color: color-mix(in srgb, var(--primary) 20%, transparent);
-	background: color-mix(in srgb, var(--primary) 10%, transparent);
+	border-color: color-mix(in srgb, var(--agent-accent-warm) 34%, transparent);
+	background:
+		linear-gradient(
+			130deg,
+			color-mix(in srgb, var(--agent-accent-warm) 15%, transparent),
+			color-mix(in srgb, var(--agent-surface-elevated) 85%, transparent)
+		);
 }
 
 .conversationButtonInactive:hover {
-	border-color: transparent;
-	background: var(--surface-2);
+	border-color: color-mix(in srgb, var(--agent-surface-border) 90%, transparent);
+	background: color-mix(in srgb, var(--agent-surface-elevated) 76%, transparent);
+	transform: translateY(-1px);
 }
 
 .conversationIconWrap {
 	flex-shrink: 0;
-	padding: 0.375rem;
-	margin-top: 0.125rem;
-	border-radius: 0.5rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.45rem;
+	height: 1.45rem;
+	margin-top: 0.1rem;
+	border-radius: 0.45rem;
 }
 
 .conversationIconWrapActive {
-	color: var(--primary);
-	background: color-mix(in srgb, var(--primary) 15%, transparent);
+	color: color-mix(in srgb, var(--agent-accent-warm) 72%, var(--text) 28%);
+	background: color-mix(in srgb, var(--agent-accent-warm) 18%, transparent);
 }
 
 .conversationIconWrapInactive {
 	color: var(--text-muted);
-	background: var(--surface-2);
+	background: color-mix(in srgb, var(--agent-surface-elevated) 80%, transparent);
 }
 
 .conversationContent {
@@ -108,21 +128,21 @@
 .deleteButton {
 	position: absolute;
 	top: 50%;
-	right: 0.5rem;
+	right: 0.45rem;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	padding: 0.375rem;
+	padding: 0.34rem;
 	border: 0;
-	border-radius: 0.5rem;
+	border-radius: 0.45rem;
 	color: var(--text-muted);
 	background: transparent;
 	opacity: 0;
 	transform: translateY(-50%);
 	transition:
-		opacity 160ms ease,
-		color 160ms ease,
-		background 160ms ease;
+		opacity var(--agent-motion-fast) ease,
+		color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease;
 }
 
 .conversationRoot:hover .deleteButton,
@@ -133,4 +153,11 @@
 .deleteButton:hover {
 	color: var(--danger);
 	background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.conversationButton,
+	.deleteButton {
+		transition: none;
+	}
 }

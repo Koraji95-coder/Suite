@@ -1665,6 +1665,7 @@ async fn persist_pairing_tokens(config: Arc<Mutex<Config>>, pairing: &PairingGua
 async fn prepare_gateway_messages_for_provider(
     state: &AppState,
     message: &str,
+    model_for_call: &str,
 ) -> anyhow::Result<Vec<ChatMessage>> {
     let user_messages = vec![ChatMessage::user(message)];
 
@@ -1674,7 +1675,7 @@ async fn prepare_gateway_messages_for_provider(
         let config_guard = state.config.lock();
         crate::channels::build_system_prompt(
             &config_guard.workspace_dir,
-            &state.model,
+            model_for_call,
             &[], // tools - empty for simple chat
             &[], // skills
             Some(&config_guard.identity),
@@ -1694,12 +1695,21 @@ async fn prepare_gateway_messages_for_provider(
 }
 
 /// Simple chat for webhook endpoint (no tools, for backward compatibility and testing).
-async fn run_gateway_chat_simple(state: &AppState, message: &str) -> anyhow::Result<String> {
-    let prepared_messages = prepare_gateway_messages_for_provider(state, message).await?;
+async fn run_gateway_chat_simple(
+    state: &AppState,
+    message: &str,
+    model_override: Option<&str>,
+) -> anyhow::Result<String> {
+    let model_for_call = model_override
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(state.model.as_str());
+    let prepared_messages =
+        prepare_gateway_messages_for_provider(state, message, model_for_call).await?;
 
     state
         .provider
-        .chat_with_history(&prepared_messages, &state.model, state.temperature)
+        .chat_with_history(&prepared_messages, model_for_call, state.temperature)
         .await
 }
 
@@ -1728,6 +1738,8 @@ pub struct WebhookBody {
     pub message: String,
     #[serde(default)]
     pub stream: Option<bool>,
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -1922,7 +1934,8 @@ async fn handle_webhook_usage() -> impl IntoResponse {
             "method": "POST",
             "path": "/webhook",
             "example": {
-                "message": "Hello from webhook"
+                "message": "Hello from webhook",
+                "model": "qwen3:14b"
             }
         })),
     )
@@ -1933,21 +1946,22 @@ fn handle_webhook_streaming(
     prepared_messages: Vec<ChatMessage>,
     provider_label: String,
     model_label: String,
+    model_for_call: String,
     started_at: Instant,
 ) -> Response {
     if !state.provider.supports_streaming() {
-        let model_for_call = state.model.clone();
         let provider_label_for_call = provider_label.clone();
         let model_label_for_call = model_label.clone();
         let state_for_call = state.clone();
         let messages_for_call = prepared_messages.clone();
+        let model_for_call_sync = model_for_call.clone();
 
         let stream = futures_util::stream::once(async move {
             match state_for_call
                 .provider
                 .chat_with_history(
                     &messages_for_call,
-                    &model_for_call,
+                    &model_for_call_sync,
                     state_for_call.temperature,
                 )
                 .await
@@ -1982,7 +1996,7 @@ fn handle_webhook_streaming(
                         },
                     );
 
-                    let payload = serde_json::json!({"response": safe_response, "model": state_for_call.model});
+                    let payload = serde_json::json!({"response": safe_response, "model": model_for_call_sync});
                     let mut output = format!("data: {payload}\n\n");
                     output.push_str("data: [DONE]\n\n");
                     Ok::<_, std::io::Error>(Bytes::from(output))
@@ -2043,7 +2057,7 @@ fn handle_webhook_streaming(
 
     let provider_stream = state.provider.stream_chat_with_history(
         &prepared_messages,
-        &state.model,
+        &model_for_call,
         state.temperature,
         crate::providers::traits::StreamOptions::new(true),
     );
@@ -2249,6 +2263,13 @@ async fn handle_webhook(
         });
         return (StatusCode::BAD_REQUEST, Json(err)).into_response();
     }
+    let model_for_request = webhook_body
+        .model
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(state.model.as_str())
+        .to_string();
 
     if state.auto_save {
         let key = webhook_memory_key();
@@ -2264,7 +2285,7 @@ async fn handle_webhook(
         .default_provider
         .clone()
         .unwrap_or_else(|| "unknown".to_string());
-    let model_label = state.model.clone();
+    let model_label = model_for_request.clone();
     let started_at = Instant::now();
 
     state
@@ -2282,7 +2303,13 @@ async fn handle_webhook(
         });
 
     if webhook_body.stream.unwrap_or(false) {
-        let prepared_messages = match prepare_gateway_messages_for_provider(&state, message).await {
+        let prepared_messages = match prepare_gateway_messages_for_provider(
+            &state,
+            message,
+            &model_for_request,
+        )
+        .await
+        {
             Ok(messages) => messages,
             Err(e) => {
                 let duration = started_at.elapsed();
@@ -2328,11 +2355,12 @@ async fn handle_webhook(
             prepared_messages,
             provider_label,
             model_label,
+            model_for_request,
             started_at,
         );
     }
 
-    match run_gateway_chat_simple(&state, message).await {
+    match run_gateway_chat_simple(&state, message, Some(&model_for_request)).await {
         Ok(response) => {
             let safe_response =
                 sanitize_gateway_response(&response, state.tools_registry_exec.as_ref());
@@ -2361,7 +2389,7 @@ async fn handle_webhook(
                     cost_usd: None,
                 });
 
-            let body = serde_json::json!({"response": safe_response, "model": state.model});
+            let body = serde_json::json!({"response": safe_response, "model": model_for_request});
             (StatusCode::OK, Json(body)).into_response()
         }
         Err(e) => {
@@ -3017,11 +3045,17 @@ mod tests {
         let parsed = parsed.unwrap();
         assert_eq!(parsed.message, "hello");
         assert_eq!(parsed.stream, None);
+        assert_eq!(parsed.model, None);
 
         let stream_enabled = r#"{"message": "hello", "stream": true}"#;
         let parsed: Result<WebhookBody, _> = serde_json::from_str(stream_enabled);
         assert!(parsed.is_ok());
         assert_eq!(parsed.unwrap().stream, Some(true));
+
+        let model_override = r#"{"message": "hello", "model": "qwen3:14b"}"#;
+        let parsed: Result<WebhookBody, _> = serde_json::from_str(model_override);
+        assert!(parsed.is_ok());
+        assert_eq!(parsed.unwrap().model.as_deref(), Some("qwen3:14b"));
 
         let missing = r#"{"other": "field"}"#;
         let parsed: Result<WebhookBody, _> = serde_json::from_str(missing);
@@ -3858,6 +3892,7 @@ Reminder set successfully."#;
         let body = Ok(Json(WebhookBody {
             message: "hello".into(),
             stream: None,
+            model: None,
         }));
         let first = handle_webhook(
             State(state.clone()),
@@ -3872,6 +3907,7 @@ Reminder set successfully."#;
         let body = Ok(Json(WebhookBody {
             message: "hello".into(),
             stream: None,
+            model: None,
         }));
         let second = handle_webhook(State(state), test_connect_info(), headers, body)
             .await
@@ -3928,6 +3964,7 @@ Reminder set successfully."#;
             Ok(Json(WebhookBody {
                 message: "hello".into(),
                 stream: None,
+                model: None,
             })),
         )
         .await
@@ -3979,6 +4016,7 @@ Reminder set successfully."#;
             Ok(Json(WebhookBody {
                 message: "   ".into(),
                 stream: None,
+                model: None,
             })),
         )
         .await
@@ -4031,6 +4069,7 @@ Reminder set successfully."#;
             Ok(Json(WebhookBody {
                 message: "stream me".into(),
                 stream: Some(true),
+                model: None,
             })),
         )
         .await
@@ -4203,6 +4242,7 @@ Reminder set successfully."#;
         let body1 = Ok(Json(WebhookBody {
             message: "hello one".into(),
             stream: None,
+            model: None,
         }));
         let first = handle_webhook(
             State(state.clone()),
@@ -4217,6 +4257,7 @@ Reminder set successfully."#;
         let body2 = Ok(Json(WebhookBody {
             message: "hello two".into(),
             stream: None,
+            model: None,
         }));
         let second = handle_webhook(State(state), test_connect_info(), headers, body2)
             .await
@@ -4288,6 +4329,7 @@ Reminder set successfully."#;
             Ok(Json(WebhookBody {
                 message: "hello".into(),
                 stream: None,
+                model: None,
             })),
         )
         .await
@@ -4348,6 +4390,7 @@ Reminder set successfully."#;
             Ok(Json(WebhookBody {
                 message: "hello".into(),
                 stream: None,
+                model: None,
             })),
         )
         .await
@@ -4404,6 +4447,7 @@ Reminder set successfully."#;
             Ok(Json(WebhookBody {
                 message: "hello".into(),
                 stream: None,
+                model: None,
             })),
         )
         .await

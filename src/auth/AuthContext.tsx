@@ -33,6 +33,7 @@ import {
 	type SessionAuthMethod,
 	storeSessionAuthMethod,
 } from "./passkeySessionState";
+import { sanitizeSupabaseCallbackUrlInPlace } from "./supabaseCallback";
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -157,6 +158,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					setSessionAuthMethod("email_link");
 					setProfile(null);
 				}
+
+				sanitizeSupabaseCallbackUrlInPlace();
 			} catch (err) {
 				logger.error("AuthContext", "Rehydration error", { err });
 			} finally {
@@ -207,6 +210,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 								: "Signed in with passwordless email-link authentication.",
 						);
 					}
+
+					sanitizeSupabaseCallbackUrlInPlace();
 				} else {
 					const restoredMethod = readSessionAuthMethod(sessionKey);
 					setSessionAuthMethod(restoredMethod ?? "email_link");

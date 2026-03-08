@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Agent Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════
+   GLOBAL CSS — NEXUS AGENT COMMAND CENTER
+   ═══════════════════════════════════════════════════════ */
+
+:root {
+  /* Core Palette */
+  --bg-void: #06060a;
+  --bg-primary: #0a0a10;
+  --bg-secondary: #0e0e18;
+  --bg-tertiary: #121220;
+  --bg-elevated: #16162a;
+  --bg-panel: rgba(14, 14, 26, 0.85);
+  --bg-glass: rgba(18, 18, 36, 0.6);
+
+  /* Borders */
+  --border-dim: rgba(255, 255, 255, 0.04);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-bright: rgba(255, 255, 255, 0.2);
+
+  /* Text */
+  --text-primary: #e8e8f0;
+  --text-secondary: #9898b0;
+  --text-tertiary: #606078;
+  --text-ghost: #3a3a50;
+
+  /* Agent Colors */
+  --agent-coder: #00e5a0;
+  --agent-coder-bg: rgba(0, 229, 160, 0.08);
+  --agent-coder-border: rgba(0, 229, 160, 0.2);
+
+  --agent-manager: #7b61ff;
+  --agent-manager-bg: rgba(123, 97, 255, 0.08);
+  --agent-manager-border: rgba(123, 97, 255, 0.2);
+
+  --agent-qa: #ff6b6b;
+  --agent-qa-bg: rgba(255, 107, 107, 0.08);
+  --agent-qa-border: rgba(255, 107, 107, 0.2);
+
+  --agent-devops: #ffa94d;
+  --agent-devops-bg: rgba(255, 169, 77, 0.08);
+  --agent-devops-border: rgba(255, 169, 77, 0.2);
+
+  --agent-architect: #4dc9f6;
+  --agent-architect-bg: rgba(77, 201, 246, 0.08);
+  --agent-architect-border: rgba(77, 201, 246, 0.2);
+
+  /* Status */
+  --status-active: #00e5a0;
+  --status-idle: #ffa94d;
+  --status-busy: #ff6b6b;
+  --status-thinking: #7b61ff;
+
+  /* Glow Effects */
+  --glow-green: 0 0 20px rgba(0, 229, 160, 0.15), 0 0 40px rgba(0, 229, 160, 0.05);
+  --glow-purple: 0 0 20px rgba(123, 97, 255, 0.15), 0 0 40px rgba(123, 97, 255, 0.05);
+  --glow-red: 0 0 20px rgba(255, 107, 107, 0.15);
+  --glow-orange: 0 0 20px rgba(255, 169, 77, 0.15);
+  --glow-blue: 0 0 20px rgba(77, 201, 246, 0.15);
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+
+  /* Spacing */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ═══ RESET & BASE ═══ */
+*, *::before, *::after {
+  margin: 0; padding: 0; box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══ SCROLLBAR ═══ */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-medium); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+
+/* ═══ KEYFRAMES ═══ */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes typing {
+  0%, 60% { opacity: 1; }
+  61%, 100% { opacity: 0; }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes ripple {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes orbit {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes dataStream {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 0% 100%; }
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes progressFill {
+  from { width: 0; }
+}
+
+@keyframes nodeFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ═══ APP SHELL ═══ */
+#app {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  grid-template-columns: 260px 1fr 320px;
+  grid-template-areas:
+    "header header header"
+    "sidebar main aside";
+  gap: 1px;
+  background: var(--border-dim);
+  position: relative;
+}
+
+/* Scanline overlay */
+#app::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    transparent, transparent 2px,
+    rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ═══ HEADER / TOP BAR ═══ */
+.header {
+  grid-area: header;
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  z-index: 100;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-logo {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, var(--agent-coder), var(--agent-architect));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--bg-void);
+  position: relative;
+}
+
+.header-logo::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--agent-coder), var(--agent-architect));
+  opacity: 0.3;
+  filter: blur(8px);
+  z-index: -1;
+}
+
+.header-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.header-subtitle {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  letter-spacing: 1px;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.header-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.header-stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+.header-stat-dot.green { background: var(--agent-coder); box-shadow: var(--glow-green); }
+.header-stat-dot.purple { background: var(--agent-manager); box-shadow: var(--glow-purple); }
+.header-stat-dot.orange { background: var(--agent-devops); box-shadow: var(--glow-orange); }
+
+.header-stat-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-clock {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  letter-spacing: 1px;
+}
+
+.header-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-out);
+  font-size: 14px;
+}
+
+.header-btn:hover {
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+/* ═══ SIDEBAR ═══ */
+.sidebar {
+  grid-area: sidebar;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-section {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.sidebar-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+  margin-bottom: 12px;
+}
+
+/* Agent Cards */
+.agent-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.25s var(--ease-out);
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  position: relative;
+}
+
+.agent-card:hover {
+  background: var(--bg-glass);
+}
+
+.agent-card.active {
+  border-color: var(--border-medium);
+  background: var(--bg-glass);
+}
+
+.agent-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.agent-avatar.coder { background: var(--agent-coder-bg); color: var(--agent-coder); border: 1px solid var(--agent-coder-border); }
+.agent-avatar.manager { background: var(--agent-manager-bg); color: var(--agent-manager); border: 1px solid var(--agent-manager-border); }
+.agent-avatar.qa { background: var(--agent-qa-bg); color: var(--agent-qa); border: 1px solid var(--agent-qa-border); }
+.agent-avatar.devops { background: var(--agent-devops-bg); color: var(--agent-devops); border: 1px solid var(--agent-devops-border); }
+.agent-avatar.architect { background: var(--agent-architect-bg); color: var(--agent-architect); border: 1px solid var(--agent-architect-border); }
+
+.agent-status-ring {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+}
+
+.agent-status-ring.active { background: var(--status-active); box-shadow: 0 0 6px var(--status-active); }
+.agent-status-ring.busy { background: var(--status-busy); box-shadow: 0 0 6px var(--status-busy); }
+.agent-status-ring.thinking { background: var(--status-thinking); box-shadow: 0 0 6px var(--status-thinking); animation: pulseGlow 1.5s ease-in-out infinite; }
+.agent-status-ring.idle { background: var(--status-idle); }
+
+.agent-info { flex: 1; min-width: 0; }
+
+.agent-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.agent-role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.5px;
+}
+
+.agent-task {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Task Queue */
+.task-queue {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.task-item {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-dim);
+  margin-bottom: 6px;
+  transition: all 0.2s var(--ease-out);
+  cursor: pointer;
+  animation: fadeInUp 0.4s var(--ease-out) backwards;
+}
+
+.task-item:hover {
+  border-color: var(--border-subtle);
+  background: var(--bg-glass);
+}
+
+.task-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.task-priority {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.task-priority.critical { background: rgba(255,107,107,0.15); color: var(--agent-qa); }
+.task-priority.high { background: rgba(255,169,77,0.15); color: var(--agent-devops); }
+.task-priority.medium { background: rgba(123,97,255,0.15); color: var(--agent-manager); }
+.task-priority.low { background: rgba(77,201,246,0.15); color: var(--agent-architect); }
+
+.task-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-ghost);
+}
+
+.task-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-assignee {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.task-assignee.coder { background: var(--agent-coder-bg); color: var(--agent-coder); }
+.task-assignee.manager { background: var(--agent-manager-bg); color: var(--agent-manager); }
+.task-assignee.qa { background: var(--agent-qa-bg); color: var(--agent-qa); }
+.task-assignee.devops { background: var(--agent-devops-bg); color: var(--agent-devops); }
+.task-assignee.architect { background: var(--agent-architect-bg); color: var(--agent-architect); }
+
+.task-progress-bar {
+  flex: 1;
+  height: 3px;
+  background: var(--border-dim);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.task-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  animation: progressFill 1.5s var(--ease-out) backwards;
+}
+
+/* ═══ MAIN AREA ═══ */
+.main {
+  grid-area: main;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Main Tabs */
+.main-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-dim);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.main-tab {
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s var(--ease-out);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.main-tab:hover { color: var(--text-secondary); }
+
+.main-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--agent-coder);
+}
+
+.main-tab-icon {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.tab-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--agent-qa-bg);
+  color: var(--agent-qa);
+  font-weight: 600;
+}
+
+/* Chat Area */
+.chat-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chat-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0 8px;
+}
+
+.chat-divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-dim);
+}
+
+.chat-divider-text {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-ghost);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Chat Messages */
+.chat-message {
+  display: flex;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  animation: fadeInUp 0.35s var(--ease-out) backwards;
+  transition: background 0.2s;
+}
+
+.chat-message:hover {
+  background: var(--bg-glass);
+}
+
+.chat-msg-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.chat-msg-body { flex: 1; min-width: 0; }
+
+.chat-msg-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.chat-msg-name {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.chat-msg-name.coder { color: var(--agent-coder); }
+.chat-msg-name.manager { color: var(--agent-manager); }
+.chat-msg-name.qa { color: var(--agent-qa); }
+.chat-msg-name.devops { color: var(--agent-devops); }
+.chat-msg-name.architect { color: var(--agent-architect); }
+
+.chat-msg-time {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-ghost);
+}
+
+.chat-msg-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.chat-msg-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.chat-msg-text strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Code blocks in chat */
+.chat-code {
+  margin-top: 8px;
+  background: var(--bg-void);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.chat-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.3);
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.chat-code-lang {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-ghost);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.chat-code-body {
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.chat-code-body .keyword { color: var(--agent-manager); }
+.chat-code-body .string { color: var(--agent-coder); }
+.chat-code-body .comment { color: var(--text-ghost); font-style: italic; }
+.chat-code-body .func { color: var(--agent-architect); }
+.chat-code-body .number { color: var(--agent-devops); }
+
+/* System message */
+.chat-system {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-ghost);
+  animation: fadeIn 0.5s var(--ease-out);
+}
+
+.chat-system-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  flex-shrink: 0;
+}
+
+.chat-system-icon.success { background: var(--agent-coder-bg); color: var(--agent-coder); }
+.chat-system-icon.warning { background: var(--agent-devops-bg); color: var(--agent-devops); }
+.chat-system-icon.error { background: var(--agent-qa-bg); color: var(--agent-qa); }
+.chat-system-icon.info { background: var(--agent-architect-bg); color: var(--agent-architect); }
+
+/* Typing indicator */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  animation: fadeIn 0.3s var(--ease-out);
+}
+
+.typing-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.typing-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  animation: pulseGlow 1.2s ease-in-out infinite;
+}
+
+.typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+.typing-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-ghost);
+}
+
+/* Input Bar */
+.chat-input-area {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border-dim);
+  background: var(--bg-primary);
+}
+
+.chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.chat-input {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+  resize: none;
+  min-height: 40px;
+  max-height: 120px;
+  transition: border-color 0.2s;
+}
+
+.chat-input::placeholder { color: var(--text-ghost); }
+.chat-input:focus { border-color: var(--border-medium); }
+
+.chat-send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--agent-coder), #00b880);
+  border: none;
+  color: var(--bg-void);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s var(--ease-out);
+  flex-shrink: 0;
+}
+
+.chat-send-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--glow-green);
+}
+
+.chat-input-hints {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.chat-hint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-ghost);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-hint kbd {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-dim);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+/* ═══ RIGHT ASIDE ═══ */
+.aside {
+  grid-area: aside;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.aside-section {
+  border-bottom: 1px solid var(--border-dim);
+  padding: 14px;
+}
+
+.aside-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.aside-section-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+
+/* Codebase Health */
+.codebase-health {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.health-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  transition: border-color 0.2s;
+}
+
+.health-card:hover { border-color: var(--border-subtle); }
+
+.health-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  margin-bottom: 2px;
+}
+
+.health-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-ghost);
+  letter-spacing: 0.5px;
+}
+
+.health-change {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  margin-top: 4px;
+}
+
+.health-change.up { color: var(--agent-coder); }
+.health-change.down { color: var(--agent-qa); }
+
+/* Git Activity */
+.git-activity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.git-commit {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  animation: fadeInUp 0.4s var(--ease-out) backwards;
+}
+
+.git-commit-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.git-commit-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid;
+  flex-shrink: 0;
+}
+
+.git-commit-trail {
+  width: 1px;
+  flex: 1;
+  min-height: 16px;
+  background: var(--border-dim);
+}
+
+.git-commit-info { flex: 1; min-width: 0; }
+
+.git-commit-msg {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.git-commit-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-ghost);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.git-commit-hash {
+  color: var(--text-tertiary);
+}
+
+/* Agent Network Viz */
+.network-viz {
+  position: relative;
+  height: 140px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.network-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.network-node {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.3s var(--ease-spring);
+  animation: nodeFloat 3s ease-in-out infinite;
+  z-index: 2;
+}
+
+.network-node:hover {
+  transform: scale(1.2);
+  z-index: 3;
+}
+
+.network-node::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  opacity: 0.2;
+  filter: blur(6px);
+  z-index: -1;
+}
+
+/* Activity Log */
+.activity-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
+  animation: fadeInUp 0.35s var(--ease-out) backwards;
+  transition: background 0.15s;
+}
+
+.activity-item:hover { background: var(--bg-glass); }
+
+.activity-time {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-ghost);
+  flex-shrink: 0;
+  min-width: 42px;
+  padding-top: 1px;
+}
+
+.activity-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.activity-text { line-height: 1.4; }
+.activity-text .highlight { font-weight: 600; }
+.activity-text .highlight.coder { color: var(--agent-coder); }
+.activity-text .highlight.manager { color: var(--agent-manager); }
+.activity-text .highlight.qa { color: var(--agent-qa); }
+.activity-text .highlight.devops { color: var(--agent-devops); }
+.activity-text .highlight.architect { color: var(--agent-architect); }
+
+/* SVG connections in network */
+.network-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.network-line {
+  stroke-dasharray: 4 4;
+  animation: dataStream 2s linear infinite;
+}
+
+/* Pipeline Status Bar */
+.pipeline-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.pipeline-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.pipeline-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  border: 2px solid;
+}
+
+.pipeline-dot.complete { border-color: var(--agent-coder); color: var(--agent-coder); background: var(--agent-coder-bg); }
+.pipeline-dot.running { border-color: var(--agent-devops); color: var(--agent-devops); background: var(--agent-devops-bg); animation: pulseGlow 1.5s ease-in-out infinite; }
+.pipeline-dot.pending { border-color: var(--border-subtle); color: var(--text-ghost); }
+.pipeline-dot.failed { border-color: var(--agent-qa); color: var(--agent-qa); background: var(--agent-qa-bg); }
+
+.pipeline-connector {
+  width: 100%;
+  height: 2px;
+  background: var(--border-dim);
+}
+
+.pipeline-connector.active {
+  background: linear-gradient(90deg, var(--agent-coder), var(--agent-devops));
+}
+
+.pipeline-stage-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-ghost);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive tweaks for smaller height */
+@media (max-height: 720px) {
+  .network-viz { height: 100px; }
+  .codebase-health { gap: 4px; }
+  .health-card { padding: 8px; }
+  .health-value { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══ HEADER ═══ -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="header-logo">N</div>
+      <div>
+        <div class="header-title">NEXUS</div>
+        <div class="header-subtitle">Agent Command Center v2.4</div>
+      </div>
+    </div>
+    <div class="header-center">
+      <div class="header-stat">
+        <span class="header-stat-dot green"></span>
+        <span>Agents Online</span>
+        <span class="header-stat-value">5/5</span>
+      </div>
+      <div class="header-stat">
+        <span class="header-stat-dot purple"></span>
+        <span>Active Tasks</span>
+        <span class="header-stat-value">12</span>
+      </div>
+      <div class="header-stat">
+        <span class="header-stat-dot orange"></span>
+        <span>Build</span>
+        <span class="header-stat-value" style="color:var(--agent-coder)">passing</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-clock" id="clock"></div>
+      <button class="header-btn" title="Settings">⚙</button>
+      <button class="header-btn" title="Notifications">🔔</button>
+    </div>
+  </header>
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Agents</div>
+
+      <div class="agent-card active" data-agent="coder">
+        <div class="agent-avatar coder">
+          λ
+          <div class="agent-status-ring active"></div>
+        </div>
+        <div class="agent-info">
+          <div class="agent-name">ATLAS</div>
+          <div class="agent-role">Senior Engineer</div>
+          <div class="agent-task">Refactoring auth middleware...</div>
+        </div>
+      </div>
+
+      <div class="agent-card" data-agent="manager">
+        <div class="agent-avatar manager">
+          Ω
+          <div class="agent-status-ring thinking"></div>
+        </div>
+        <div class="agent-info">
+          <div class="agent-name">NOVA</div>
+          <div class="agent-role">Project Lead</div>
+          <div class="agent-task">Reviewing sprint priorities</div>
+        </div>
+      </div>
+
+      <div class="agent-card" data-agent="qa">
+        <div class="agent-avatar qa">
+          Δ
+          <div class="agent-status-ring busy"></div>
+        </div>
+        <div class="agent-info">
+          <div class="agent-name">SENTINEL</div>
+          <div class="agent-role">QA &amp; Testing</div>
+          <div class="agent-task">Running integration tests...</div>
+        </div>
+      </div>
+
+      <div class="agent-card" data-agent="devops">
+        <div class="agent-avatar devops">
+          Σ
+          <div class="agent-status-ring active"></div>
+        </div>
+        <div class="agent-info">
+          <div class="agent-name">FORGE</div>
+          <div class="agent-role">DevOps / CI-CD</div>
+          <div class="agent-task">Deploying to staging env</div>
+        </div>
+      </div>
+
+      <div class="agent-card" data-agent="architect">
+        <div class="agent-avatar architect">
+          Φ
+          <div class="agent-status-ring thinking"></div>
+        </div>
+        <div class="agent-info">
+          <div class="agent-name">CIPHER</div>
+          <div class="agent-role">System Architect</div>
+          <div class="agent-task">Designing event bus schema</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task Queue -->
+    <div class="sidebar-section" style="padding-bottom:8px">
+      <div class="sidebar-label">Task Queue</div>
+    </div>
+    <div class="task-queue" id="taskQueue">
+      <div class="task-item" style="animation-delay:0s">
+        <div class="task-item-header">
+          <span class="task-priority critical">CRITICAL</span>
+          <span class="task-id">#NX-1042</span>
+        </div>
+        <div class="task-title">Fix memory leak in WebSocket handler</div>
+        <div class="task-meta">
+          <span class="task-assignee coder">ATLAS</span>
+          <div class="task-progress-bar"><div class="task-progress-fill" style="width:72%; background:var(--agent-coder);"></div></div>
+        </div>
+      </div>
+      <div class="task-item" style="animation-delay:0.05s">
+        <div class="task-item-header">
+          <span class="task-priority high">HIGH</span>
+          <span class="task-id">#NX-1039</span>
+        </div>
+        <div class="task-title">Write E2E tests for payment flow</div>
+        <div class="task-meta">
+          <span class="task-assignee qa">SENTINEL</span>
+          <div class="task-progress-bar"><div class="task-progress-fill" style="width:45%; background:var(--agent-qa);"></div></div>
+        </div>
+      </div>
+      <div class="task-item" style="animation-delay:0.1s">
+        <div class="task-item-header">
+          <span class="task-priority medium">MEDIUM</span>
+          <span class="task-id">#NX-1037</span>
+        </div>
+        <div class="task-title">Migrate Redis cache to cluster mode</div>
+        <div class="task-meta">
+          <span class="task-assignee devops">FORGE</span>
+          <div class="task-progress-bar"><div class="task-progress-fill" style="width:88%; background:var(--agent-devops);"></div></div>
+        </div>
+      </div>
+      <div class="task-item" style="animation-delay:0.15s">
+        <div class="task-item-header">
+          <span class="task-priority medium">MEDIUM</span>
+          <span class="task-id">#NX-1035</span>
+        </div>
+        <div class="task-title">Design async event bus schema</div>
+        <div class="task-meta">
+          <span class="task-assignee architect">CIPHER</span>
+          <div class="task-progress-bar"><div class="task-progress-fill" style="width:60%; background:var(--agent-architect);"></div></div>
+        </div>
+      </div>
+      <div class="task-item" style="animation-delay:0.2s">
+        <div class="task-item-header">
+          <span class="task-priority low">LOW</span>
+          <span class="task-id">#NX-1031</span>
+        </div>
+        <div class="task-title">Update sprint burndown metrics</div>
+        <div class="task-meta">
+          <span class="task-assignee manager">NOVA</span>
+          <div class="task-progress-bar"><div class="task-progress-fill" style="width:33%; background:var(--agent-manager);"></div></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN CHAT ═══ -->
+  <main class="main">
+    <div class="main-tabs">
+      <div class="main-tab active">
+        <span class="main-tab-icon">💬</span> Team Chat
+      </div>
+      <div class="main-tab">
+        <span class="main-tab-icon">📋</span> Code Review <span class="tab-badge">3</span>
+      </div>
+      <div class="main-tab">
+        <span class="main-tab-icon">🔀</span> Merge Queue
+      </div>
+      <div class="main-tab">
+        <span class="main-tab-icon">📊</span> Metrics
+      </div>
+    </div>
+
+    <div class="chat-area" id="chatArea">
+      <!-- Divider -->
+      <div class="chat-divider">
+        <div class="chat-divider-line"></div>
+        <div class="chat-divider-text">Today — Sprint 14 · Day 3</div>
+        <div class="chat-divider-line"></div>
+      </div>
+
+      <!-- System -->
+      <div class="chat-system">
+        <div class="chat-system-icon info">ℹ</div>
+        <span>NEXUS initialized · All 5 agents connected · Codebase synced at <strong>main@a7f2e1d</strong></span>
+      </div>
+
+      <!-- Messages populated by JS -->
+    </div>
+
+    <!-- Input -->
+    <div class="chat-input-area">
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chatInput" placeholder="Send a directive to the team..." rows="1"></textarea>
+        <button class="chat-send-btn" id="sendBtn">▶</button>
+      </div>
+      <div class="chat-input-hints">
+        <span class="chat-hint"><kbd>@</kbd> mention agent</span>
+        <span class="chat-hint"><kbd>/</kbd> command</span>
+        <span class="chat-hint"><kbd>Enter</kbd> send</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- ═══ RIGHT ASIDE ═══ -->
+  <aside class="aside">
+    <!-- Codebase Health -->
+    <div class="aside-section">
+      <div class="aside-section-header">
+        <span class="aside-section-title">Codebase Health</span>
+      </div>
+      <div class="codebase-health">
+        <div class="health-card">
+          <div class="health-value" style="color:var(--agent-coder)">94.2%</div>
+          <div class="health-label">Test Coverage</div>
+          <div class="health-change up">↑ 2.1%</div>
+        </div>
+        <div class="health-card">
+          <div class="health-value" style="color:var(--agent-architect)">A</div>
+          <div class="health-label">Code Quality</div>
+          <div class="health-change up">↑ from B+</div>
+        </div>
+        <div class="health-card">
+          <div class="health-value" style="color:var(--agent-devops)">147</div>
+          <div class="health-label">Open Issues</div>
+          <div class="health-change down">↑ 12 today</div>
+        </div>
+        <div class="health-card">
+          <div class="health-value" style="color:var(--agent-manager)">3.2h</div>
+          <div class="health-label">Avg PR Time</div>
+          <div class="health-change up">↓ 0.8h</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline -->
+    <div class="aside-section">
+      <div class="aside-section-header">
+        <span class="aside-section-title">CI/CD Pipeline</span>
+      </div>
+      <div class="pipeline-bar">
+        <div class="pipeline-stage">
+          <div class="pipeline-dot complete">✓</div>
+          <div class="pipeline-stage-label">Build</div>
+        </div>
+        <div class="pipeline-connector active"></div>
+        <div class="pipeline-stage">
+          <div class="pipeline-dot complete">✓</div>
+          <div class="pipeline-stage-label">Test</div>
+        </div>
+        <div class="pipeline-connector active"></div>
+        <div class="pipeline-stage">
+          <div class="pipeline-dot running">⟳</div>
+          <div class="pipeline-stage-label">Stage</div>
+        </div>
+        <div class="pipeline-connector"></div>
+        <div class="pipeline-stage">
+          <div class="pipeline-dot pending">○</div>
+          <div class="pipeline-stage-label">Prod</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Agent Network -->
+    <div class="aside-section">
+      <div class="aside-section-header">
+        <span class="aside-section-title">Agent Network</span>
+      </div>
+      <div class="network-viz" id="networkViz">
+        <svg class="network-svg" id="networkSvg"></svg>
+        <div class="network-node" style="top:10px;left:120px;background:var(--agent-manager-bg);color:var(--agent-manager);border:1.5px solid var(--agent-manager-border);animation-delay:0s">Ω</div>
+        <div class="network-node" style="top:55px;left:30px;background:var(--agent-coder-bg);color:var(--agent-coder);border:1.5px solid var(--agent-coder-border);animation-delay:0.5s">λ</div>
+        <div class="network-node" style="top:95px;left:100px;background:var(--agent-qa-bg);color:var(--agent-qa);border:1.5px solid var(--agent-qa-border);animation-delay:1s">Δ</div>
+        <div class="network-node" style="top:55px;left:200px;background:var(--agent-devops-bg);color:var(--agent-devops);border:1.5px solid var(--agent-devops-border);animation-delay:1.5s">Σ</div>
+        <div class="network-node" style="top:95px;left:230px;background:var(--agent-architect-bg);color:var(--agent-architect);border:1.5px solid var(--agent-architect-border);animation-delay:2s">Φ</div>
+      </div>
+    </div>
+
+    <!-- Git Activity -->
+    <div class="aside-section" style="border-bottom:none;">
+      <div class="aside-section-header">
+        <span class="aside-section-title">Recent Commits</span>
+      </div>
+      <div class="git-activity" id="gitActivity">
+        <div class="git-commit">
+          <div class="git-commit-line">
+            <div class="git-commit-dot" style="border-color:var(--agent-coder)"></div>
+            <div class="git-commit-trail"></div>
+          </div>
+          <div class="git-commit-info">
+            <div class="git-commit-msg">fix: resolve WebSocket memory leak</div>
+            <div class="git-commit-meta">
+              <span style="color:var(--agent-coder)">ATLAS</span>
+              <span class="git-commit-hash">a7f2e1d</span>
+              <span>2m ago</span>
+            </div>
+          </div>
+        </div>
+        <div class="git-commit">
+          <div class="git-commit-line">
+            <div class="git-commit-dot" style="border-color:var(--agent-qa)"></div>
+            <div class="git-commit-trail"></div>
+          </div>
+          <div class="git-commit-info">
+            <div class="git-commit-msg">test: add payment E2E coverage</div>
+            <div class="git-commit-meta">
+              <span style="color:var(--agent-qa)">SENTINEL</span>
+              <span class="git-commit-hash">b3c8f4a</span>
+              <span>8m ago</span>
+            </div>
+          </div>
+        </div>
+        <div class="git-commit">
+          <div class="git-commit-line">
+            <div class="git-commit-dot" style="border-color:var(--agent-architect)"></div>
+            <div class="git-commit-trail"></div>
+          </div>
+          <div class="git-commit-info">
+            <div class="git-commit-msg">feat: event bus schema v2 RFC</div>
+            <div class="git-commit-meta">
+              <span style="color:var(--agent-architect)">CIPHER</span>
+              <span class="git-commit-hash">d9e1c2b</span>
+              <span>14m ago</span>
+            </div>
+          </div>
+        </div>
+        <div class="git-commit">
+          <div class="git-commit-line">
+            <div class="git-commit-dot" style="border-color:var(--agent-devops)"></div>
+            <div class="git-commit-trail"></div>
+          </div>
+          <div class="git-commit-info">
+            <div class="git-commit-msg">infra: Redis cluster config</div>
+            <div class="git-commit-meta">
+              <span style="color:var(--agent-devops)">FORGE</span>
+              <span class="git-commit-hash">e5a9d3f</span>
+              <span>21m ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;border-top:1px solid var(--border-dim);">
+      <div class="aside-section" style="padding-bottom:8px;border-bottom:none;">
+        <div class="aside-section-header" style="margin-bottom:0">
+          <span class="aside-section-title">Live Activity</span>
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-ghost)">streaming...</span>
+        </div>
+      </div>
+      <div class="activity-log" id="activityLog"></div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// NEXUS — Agent Simulation Engine
+// ═══════════════════════════════════════════
+
+const agents = {
+  coder:     { name: 'ATLAS',    symbol: 'λ', role: 'coder',     color: '#00e5a0' },
+  manager:   { name: 'NOVA',     symbol: 'Ω', role: 'manager',   color: '#7b61ff' },
+  qa:        { name: 'SENTINEL', symbol: 'Δ', role: 'qa',        color: '#ff6b6b' },
+  devops:    { name: 'FORGE',    symbol: 'Σ', role: 'devops',    color: '#ffa94d' },
+  architect: { name: 'CIPHER',   symbol: 'Φ', role: 'architect', color: '#4dc9f6' },
+};
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Draw network lines
+function drawNetwork() {
+  const svg = document.getElementById('networkSvg');
+  const nodes = document.querySelectorAll('.network-node');
+  const positions = Array.from(nodes).map(n => ({
+    x: n.offsetLeft + 16, y: n.offsetTop + 16
+  }));
+  const connections = [[0,1],[0,2],[0,3],[1,2],[2,4],[3,4],[1,3]];
+  svg.innerHTML = connections.map(([a,b]) =>
+    `<line x1="${positions[a].x}" y1="${positions[a].y}" x2="${positions[b].x}" y2="${positions[b].y}"
+     stroke="rgba(255,255,255,0.06)" stroke-width="1" stroke-dasharray="3 5" class="network-line"/>`
+  ).join('');
+}
+setTimeout(drawNetwork, 100);
+
+// Chat messages simulation
+const chatConversation = [
+  { agent: 'manager', text: "Good morning team. Sprint 14 Day 3 — we need to close out the WebSocket fix and get payment tests to 90% before EOD.", delay: 2000 },
+  { agent: 'coder', text: "Already on it. I found the leak — it's in the <strong>connectionPool.cleanup()</strong> handler. The event listeners aren't being properly detached on disconnect. Pushing a fix now.", delay: 4500,
+    code: { lang: 'typescript', content:
+`<span class="comment">// Before (leaking)</span>
+socket.<span class="func">on</span>(<span class="string">'disconnect'</span>, handler);
+
+<span class="comment">// After (fixed)</span>
+socket.<span class="func">on</span>(<span class="string">'disconnect'</span>, () <span class="keyword">=></span> {
+  pool.<span class="func">release</span>(socket.id);
+  socket.<span class="func">removeAllListeners</span>();
+});`
+    }
+  },
+  { agent: 'qa', text: "I'll write regression tests for that. @ATLAS can you confirm the cleanup also handles the edge case where the socket reconnects within the grace period?", delay: 3000 },
+  { agent: 'coder', text: "Good catch. The grace window is 5s — I'll add a pending state check. Let me update the PR.", delay: 2500 },
+  { system: true, type: 'success', text: 'ATLAS pushed commit <strong>a7f2e1d</strong> to branch <strong>fix/ws-memory-leak</strong>', delay: 1500 },
+  { agent: 'architect', text: "While we're touching the connection layer — I've drafted the event bus schema v2. It decouples the WebSocket transport from the message routing. Here's the proposed interface:", delay: 4000,
+    code: { lang: 'typescript', content:
+`<span class="keyword">interface</span> <span class="func">EventBus</span> {
+  <span class="func">subscribe</span>(channel: <span class="string">string</span>, handler: Handler): Subscription;
+  <span class="func">publish</span>(channel: <span class="string">string</span>, payload: <span class="keyword">unknown</span>): <span class="keyword">void</span>;
+  <span class="func">replay</span>(channel: <span class="string">string</span>, from: <span class="number">Timestamp</span>): AsyncIterator;
+}`
+    }
+  },
+  { agent: 'manager', text: "That's clean. @CIPHER schedule an RFC review for tomorrow at 10. @FORGE — what's the status on the Redis cluster migration?", delay: 3500 },
+  { agent: 'devops', text: "Staging cluster is up and running. Latency looks <strong>40% better</strong> than the single-node setup. I'm running a load test now — will have results in ~15 minutes.", delay: 3000 },
+  { system: true, type: 'warning', text: 'CI Pipeline: Stage deployment in progress — ETA 4 minutes', delay: 2000 },
+  { agent: 'qa', text: "Payment flow E2E coverage is at <strong>78%</strong>. I've added the Stripe webhook retry scenarios and the 3D Secure edge cases. Targeting 92% by end of sprint.", delay: 4000 },
+  { agent: 'manager', text: "Great progress everyone. I'm updating the burndown — we're tracking <strong>ahead of schedule</strong> for the first time this quarter. Keep it up.", delay: 3500 },
+  { system: true, type: 'success', text: 'SENTINEL: All 247 integration tests passing ✓', delay: 2000 },
+  { agent: 'coder', text: "PR is updated with the grace period handling. @SENTINEL the new test fixtures are in <strong>/tests/ws/</strong> — feel free to extend them.", delay: 3000 },
+  { agent: 'architect', text: "@FORGE — for the event bus, we'll need a pub/sub layer on top of Redis. Can you provision a Redis Streams instance in the staging cluster?", delay: 3500 },
+  { agent: 'devops', text: "Already provisioned. I anticipated this from the RFC draft. Streams are configured with a 7-day retention and consumer group support.", delay: 2500 },
+  { agent: 'manager', text: "Love the proactive coordination. Let's sync again in 2 hours. @ATLAS focus on the PR review feedback, @SENTINEL keep pushing on coverage, @CIPHER finalize the RFC doc.", delay: 4000 },
+];
+
+const chatArea = document.getElementById('chatArea');
+let msgIndex = 0;
+
+function createMessage(msg) {
+  if (msg.system) {
+    const el = document.createElement('div');
+    el.className = 'chat-system';
+    el.innerHTML = `<div class="chat-system-icon ${msg.type}">${msg.type === 'success' ? '✓' : msg.type === 'warning' ? '⚠' : 'ℹ'}</div><span>${msg.text}</span>`;
+    return el;
+  }
+
+  const a = agents[msg.agent];
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+  const el = document.createElement('div');
+  el.className = 'chat-message';
+  let codeBlock = '';
+  if (msg.code) {
+    codeBlock = `
+      <div class="chat-code">
+        <div class="chat-code-header">
+          <span class="chat-code-lang">${msg.code.lang}</span>
+          <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-ghost);cursor:pointer;">copy</span>
+        </div>
+        <div class="chat-code-body">${msg.code.content}</div>
+      </div>`;
+  }
+
+  el.innerHTML = `
+    <div class="chat-msg-avatar ${a.role}" style="background:var(--agent-${a.role}-bg);color:var(--agent-${a.role});border:1px solid var(--agent-${a.role}-border);">${a.symbol}</div>
+    <div class="chat-msg-body">
+      <div class="chat-msg-header">
+        <span class="chat-msg-name ${a.role}">${a.name}</span>
+        <span class="chat-msg-time">${time}</span>
+      </div>
+      <div class="chat-msg-text">${msg.text}</div>
+      ${codeBlock}
+    </div>`;
+  return el;
+}
+
+function showTyping(agent) {
+  const a = agents[agent];
+  const el = document.createElement('div');
+  el.className = 'typing-indicator';
+  el.id = 'typingIndicator';
+  el.innerHTML = `
+    <div class="chat-msg-avatar ${a.role}" style="background:var(--agent-${a.role}-bg);color:var(--agent-${a.role});border:1px solid var(--agent-${a.role}-border);width:24px;height:24px;font-size:9px;">${a.symbol}</div>
+    <div class="typing-dots">
+      <span style="background:var(--agent-${a.role})"></span>
+      <span style="background:var(--agent-${a.role})"></span>
+      <span style="background:var(--agent-${a.role})"></span>
+    </div>
+    <span class="typing-label">${a.name} is typing...</span>`;
+  chatArea.appendChild(el);
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
+function postNextMessage() {
+  if (msgIndex >= chatConversation.length) {
+    msgIndex = 0; // Loop
+    setTimeout(postNextMessage, 8000);
+    return;
+  }
+
+  const msg = chatConversation[msgIndex];
+
+  if (!msg.system && msg.agent) {
+    showTyping(msg.agent);
+    setTimeout(() => {
+      removeTyping();
+      chatArea.appendChild(createMessage(msg));
+      chatArea.scrollTop = chatArea.scrollHeight;
+      msgIndex++;
+      setTimeout(postNextMessage, msg.delay || 3000);
+    }, 1200 + Math.random() * 1000);
+  } else {
+    chatArea.appendChild(createMessage(msg));
+    chatArea.scrollTop = chatArea.scrollHeight;
+    msgIndex++;
+    setTimeout(postNextMessage, msg.delay || 2000);
+  }
+}
+
+setTimeout(postNextMessage, 1500);
+
+// Activity log
+const activityLog = document.getElementById('activityLog');
+const activities = [
+  { icon: '🔧', bg: 'var(--agent-coder-bg)', text: '<span class="highlight coder">ATLAS</span> pushed to <strong>fix/ws-memory-leak</strong>' },
+  { icon: '🧪', bg: 'var(--agent-qa-bg)', text: '<span class="highlight qa">SENTINEL</span> ran 247 tests — all passing' },
+  { icon: '📦', bg: 'var(--agent-devops-bg)', text: '<span class="highlight devops">FORGE</span> deployed to staging' },
+  { icon: '📐', bg: 'var(--agent-architect-bg)', text: '<span class="highlight architect">CIPHER</span> updated RFC-0042' },
+  { icon: '📊', bg: 'var(--agent-manager-bg)', text: '<span class="highlight manager">NOVA</span> updated burndown chart' },
+  { icon: '✅', bg: 'var(--agent-coder-bg)', text: '<span class="highlight coder">ATLAS</span> resolved #NX-1042' },
+  { icon: '🔀', bg: 'var(--agent-qa-bg)', text: '<span class="highlight qa">SENTINEL</span> approved PR #389' },
+  { icon: '⚡', bg: 'var(--agent-devops-bg)', text: '<span class="highlight devops">FORGE</span> load test started' },
+  { icon: '💬', bg: 'var(--agent-architect-bg)', text: '<span class="highlight architect">CIPHER</span> commented on event bus RFC' },
+  { icon: '📋', bg: 'var(--agent-manager-bg)', text: '<span class="highlight manager">NOVA</span> re-prioritized backlog' },
+  { icon: '🛡️', bg: 'var(--agent-qa-bg)', text: '<span class="highlight qa">SENTINEL</span> opened bug #NX-1045' },
+  { icon: '🚀', bg: 'var(--agent-devops-bg)', text: '<span class="highlight devops">FORGE</span> staging build <strong>v2.4.1</strong> live' },
+];
+
+let actIdx = 0;
+function addActivity() {
+  const a = activities[actIdx % activities.length];
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+  const el = document.createElement('div');
+  el.className = 'activity-item';
+  el.style.animationDelay = '0s';
+  el.innerHTML = `
+    <span class="activity-time">${time}</span>
+    <div class="activity-icon" style="background:${a.bg}">${a.icon}</div>
+    <div class="activity-text">${a.text}</div>`;
+
+  activityLog.insertBefore(el, activityLog.firstChild);
+  if (activityLog.children.length > 20) activityLog.removeChild(activityLog.lastChild);
+  actIdx++;
+}
+
+// Seed some initial activities
+for (let i = 0; i < 5; i++) addActivity();
+setInterval(addActivity, 6000 + Math.random() * 4000);
+
+// User input
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function sendUserMessage() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  const el = document.createElement('div');
+  el.className = 'chat-message';
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  el.innerHTML = `
+    <div class="chat-msg-avatar" style="background:rgba(255,255,255,0.05);color:var(--text-secondary);border:1px solid var(--border-subtle);width:28px;height:28px;border-radius:6px;font-size:11px;">You</div>
+    <div class="chat-msg-body">
+      <div class="chat-msg-header">
+        <span class="chat-msg-name" style="color:var(--text-primary)">OPERATOR</span>
+        <span class="chat-msg-time">${time}</span>
+      </div>
+      <div class="chat-msg-text">${text}</div>
+    </div>`;
+  chatArea.appendChild(el);
+  chatArea.scrollTop = chatArea.scrollHeight;
+  chatInput.value = '';
+
+  // Agent responds
+  const responders = Object.keys(agents);
+  const responder = responders[Math.floor(Math.random() * responders.length)];
+  setTimeout(() => {
+    showTyping(responder);
+    setTimeout(() => {
+      removeTyping();
+      const a = agents[responder];
+      const responses = [
+        `Understood, OPERATOR. I'll incorporate that into the current sprint. Updating my task queue now.`,
+        `Roger that. I'll coordinate with the team and get back to you with an ETA.`,
+        `Good input. Let me analyze how this affects the current architecture and I'll propose a plan.`,
+        `On it. I'll run the relevant diagnostics and report back within the hour.`,
+        `Acknowledged. I'll prioritize this and loop in the relevant agents.`,
+      ];
+      const resp = { agent: responder, text: responses[Math.floor(Math.random() * responses.length)] };
+      chatArea.appendChild(createMessage(resp));
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }, 1500 + Math.random() * 1000);
+  }, 500);
+}
+
+sendBtn.addEventListener('click', sendUserMessage);
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendUserMessage();
+  }
+});
+
+// Auto-resize textarea
+chatInput.addEventListener('input', () => {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+});
+
+// Agent card selection
+document.querySelectorAll('.agent-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.agent-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+  });
+});
+
+// Pulse network lines periodically
+setInterval(() => {
+  const lines = document.querySelectorAll('.network-line');
+  const idx = Math.floor(Math.random() * lines.length);
+  const colors = ['rgba(0,229,160,0.3)', 'rgba(123,97,255,0.3)', 'rgba(255,107,107,0.3)', 'rgba(255,169,77,0.3)', 'rgba(77,201,246,0.3)'];
+  lines[idx].setAttribute('stroke', colors[Math.floor(Math.random() * colors.length)]);
+  lines[idx].setAttribute('stroke-width', '2');
+  setTimeout(() => {
+    lines[idx].setAttribute('stroke', 'rgba(255,255,255,0.06)');
+    lines[idx].setAttribute('stroke-width', '1');
+  }, 800);
+}, 2000);
+</script>
+
+</body>
+</html>

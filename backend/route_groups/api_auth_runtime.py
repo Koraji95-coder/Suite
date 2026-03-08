@@ -91,6 +91,11 @@ def create_auth_runtime(
             verify_supabase_user_token_fn=verify_supabase_user_token,
             jsonify_fn=jsonify_fn,
             g_obj=g_obj,
+            logger=logger,
+            get_request_id_fn=lambda: str(
+                getattr(g_obj, "agent_request_id", "") or ""
+            ).strip(),
+            get_request_path_fn=lambda: str(getattr(request_obj, "path", "") or "").strip(),
         )
 
     def create_agent_session(token: str, user_id: str) -> Tuple[str, int]:

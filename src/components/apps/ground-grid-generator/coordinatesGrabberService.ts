@@ -5,6 +5,12 @@
  * Supports configuration management, execution, and progress tracking.
  */
 
+import {
+	fetchWithTimeout,
+	mapFetchErrorCode,
+	mapFetchErrorMessage,
+	parseResponseErrorMessage,
+} from "@/lib/fetchWithTimeout";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 
@@ -243,20 +249,7 @@ class CoordinatesGrabberService {
 		response: Response,
 		fallback: string,
 	): Promise<string> {
-		try {
-			const payload = (await response.json()) as {
-				error?: string;
-				message?: string;
-				code?: string;
-			} | null;
-			const candidate = payload?.error || payload?.message;
-			if (typeof candidate === "string" && candidate.trim().length > 0) {
-				return candidate.trim();
-			}
-		} catch {
-			// Ignore parse failure and use fallback.
-		}
-		return fallback;
+		return parseResponseErrorMessage(response, fallback);
 	}
 
 	/**
@@ -336,9 +329,11 @@ class CoordinatesGrabberService {
 	private async requestWebSocketTicket(): Promise<string> {
 		const endpoint = `${this.baseUrl}/api/autocad/ws-ticket`;
 		const headers = await this.getHeaders({ context: "websocket-ticket" });
-		const response = await fetch(endpoint, {
+		const response = await fetchWithTimeout(endpoint, {
 			method: "POST",
 			headers,
+			timeoutMs: 15_000,
+			requestName: "WebSocket ticket request",
 		});
 
 		if (!response.ok) {
@@ -593,9 +588,11 @@ class CoordinatesGrabberService {
 	public async checkStatus(): Promise<BackendStatus> {
 		try {
 			const headers = await this.getHeaders({ context: "status" });
-			const response = await fetch(`${this.baseUrl}/api/status`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}/api/status`, {
 				method: "GET",
 				headers,
+				timeoutMs: 15_000,
+				requestName: "AutoCAD status request",
 			});
 			if (!response.ok) {
 				const message = await this.parseErrorMessage(
@@ -636,10 +633,12 @@ class CoordinatesGrabberService {
 		try {
 			const headers = await this.getHeaders({ context: "execute" });
 			if (options?.runId) headers["X-Run-Id"] = options.runId;
-			const response = await fetch(`${this.baseUrl}/api/execute`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}/api/execute`, {
 				method: "POST",
 				headers,
 				body: JSON.stringify(config),
+				timeoutMs: 120_000,
+				requestName: "Coordinates execute request",
 			});
 
 			if (!response.ok) {
@@ -668,9 +667,10 @@ class CoordinatesGrabberService {
 
 			return await response.json();
 		} catch (err) {
-			const message = err instanceof Error ? err.message : "Unknown error";
+			const message = mapFetchErrorMessage(err, "Unknown error");
+			const errorCode = mapFetchErrorCode(err, "UNKNOWN_ERROR");
 			logger.error("Execution failed", "CoordinatesGrabber", err);
-			if (message === "Failed to fetch" || message.includes("NetworkError")) {
+			if (errorCode === "NETWORK_ERROR") {
 				return {
 					success: false,
 					message: `Cannot reach backend at ${this.baseUrl}. Is api_server.py running?`,
@@ -691,9 +691,11 @@ class CoordinatesGrabberService {
 	public async listLayers(): Promise<string[]> {
 		try {
 			const headers = await this.getHeaders({ context: "layers" });
-			const response = await fetch(`${this.baseUrl}/api/layers`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}/api/layers`, {
 				method: "GET",
 				headers,
+				timeoutMs: 20_000,
+				requestName: "Layer request",
 			});
 
 			if (!response.ok) {
@@ -717,9 +719,11 @@ class CoordinatesGrabberService {
 	public async getSelectionCount(): Promise<number> {
 		try {
 			const headers = await this.getHeaders({ context: "selection-count" });
-			const response = await fetch(`${this.baseUrl}/api/selection-count`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}/api/selection-count`, {
 				method: "GET",
 				headers,
+				timeoutMs: 20_000,
+				requestName: "Selection count request",
 			});
 
 			if (!response.ok) {
@@ -743,9 +747,11 @@ class CoordinatesGrabberService {
 	public async triggerSelection(): Promise<void> {
 		try {
 			const headers = await this.getHeaders({ context: "trigger-selection" });
-			const response = await fetch(`${this.baseUrl}/api/trigger-selection`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}/api/trigger-selection`, {
 				method: "POST",
 				headers,
+				timeoutMs: 20_000,
+				requestName: "Trigger selection request",
 			});
 
 			if (!response.ok) {
@@ -768,11 +774,13 @@ class CoordinatesGrabberService {
 			includeContentType: false,
 			context: "download-result",
 		});
-		const response = await fetch(
+		const response = await fetchWithTimeout(
 			`${this.baseUrl}/api/download-result?path=${encodeURIComponent(path)}`,
 			{
 				method: "GET",
 				headers,
+				timeoutMs: 60_000,
+				requestName: "Download result request",
 			},
 		);
 		if (!response.ok) {
@@ -790,10 +798,12 @@ class CoordinatesGrabberService {
 	 */
 	public async openExportFolder(path: string): Promise<OpenExportFolderResult> {
 		const headers = await this.getHeaders({ context: "open-export-folder" });
-		const response = await fetch(`${this.baseUrl}/api/open-export-folder`, {
+		const response = await fetchWithTimeout(`${this.baseUrl}/api/open-export-folder`, {
 			method: "POST",
 			headers,
 			body: JSON.stringify({ path }),
+			timeoutMs: 20_000,
+			requestName: "Open export folder request",
 		});
 
 		const body = (await response
@@ -820,10 +830,12 @@ class CoordinatesGrabberService {
 	): Promise<GroundGridPlotResult> {
 		try {
 			const headers = await this.getHeaders({ context: "ground-grid-plot" });
-			const response = await fetch(`${this.baseUrl}/api/ground-grid/plot`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}/api/ground-grid/plot`, {
 				method: "POST",
 				headers,
 				body: JSON.stringify(payload),
+				timeoutMs: 120_000,
+				requestName: "Ground-grid plot request",
 			});
 
 			const data = (await response

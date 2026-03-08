@@ -7,6 +7,7 @@ from backend.route_groups.api_http_hardening import (
     configure_cors,
     default_allowed_origins,
     resolve_limiter_default_limits,
+    resolve_limiter_storage_uri,
 )
 
 
@@ -26,6 +27,14 @@ class _CorsRecorder:
 
     def __call__(self, *args, **kwargs) -> None:
         self.calls.append((args, kwargs))
+
+
+class _LoggerStub:
+    def __init__(self) -> None:
+        self.warnings = []
+
+    def warning(self, message: str, *args) -> None:
+        self.warnings.append((message, args))
 
 
 class TestApiHttpHardening(unittest.TestCase):
@@ -76,6 +85,45 @@ class TestApiHttpHardening(unittest.TestCase):
             response.headers["Referrer-Policy"],
             "strict-origin-when-cross-origin",
         )
+
+    def test_resolve_limiter_storage_uri(self) -> None:
+        logger = _LoggerStub()
+        self.assertEqual(
+            resolve_limiter_storage_uri(
+                os_module=_OSStub({"API_LIMITER_STORAGE_URI": "redis://cache:6379/1"}),
+                logger=logger,
+            ),
+            "redis://cache:6379/1",
+        )
+        self.assertEqual(
+            resolve_limiter_storage_uri(
+                os_module=_OSStub({"REDIS_URL": "redis://cache:6379/2"}),
+                logger=logger,
+            ),
+            "redis://cache:6379/2",
+        )
+        self.assertEqual(
+            resolve_limiter_storage_uri(
+                os_module=_OSStub({}),
+                logger=logger,
+            ),
+            "memory://",
+        )
+        self.assertGreaterEqual(len(logger.warnings), 1)
+
+    def test_resolve_limiter_storage_uri_requires_shared_in_production(self) -> None:
+        with self.assertRaises(RuntimeError):
+            resolve_limiter_storage_uri(
+                os_module=_OSStub({"API_ENV": "production"}),
+                logger=_LoggerStub(),
+            )
+
+    def test_resolve_limiter_storage_uri_requires_shared_when_flag_enabled(self) -> None:
+        with self.assertRaises(RuntimeError):
+            resolve_limiter_storage_uri(
+                os_module=_OSStub({"API_REQUIRE_SHARED_LIMITER_STORAGE": "true"}),
+                logger=_LoggerStub(),
+            )
 
 
 if __name__ == "__main__":

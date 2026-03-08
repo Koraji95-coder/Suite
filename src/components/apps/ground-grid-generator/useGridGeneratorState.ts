@@ -11,7 +11,6 @@ import { useToast } from "@/components/notification-system/ToastProvider";
 import { supabase } from "@/supabase/client";
 import type { Json } from "@/supabase/database";
 import { coordinatesGrabberService } from "./coordinatesGrabberService";
-import { exportGridToExcel } from "./excelExport";
 import type {
 	PasteMode,
 	PlotDiffPreview,
@@ -798,6 +797,7 @@ export function useGridGeneratorState(designIdParam: string | null) {
 	const handleExcelExport = useCallback(async () => {
 		addLog("generator", "[PROCESSING] Exporting to Excel...");
 		try {
+			const { exportGridToExcel } = await import("./excelExport");
 			await exportGridToExcel(designName, placements, rods, conductors);
 			addLog("generator", "[SUCCESS] Excel file exported");
 			showToast("success", "Excel file exported");

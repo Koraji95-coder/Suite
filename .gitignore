@@ -29,7 +29,20 @@ __pycache__/
 
 # .NET build artifacts
 **/bin/
+!zeroclaw-main/src/bin/
+!zeroclaw-main/src/bin/*.rs
 **/obj/
 
 # Rust/local build artifacts
 zeroclaw-main/target-local/
+
+# Local browser automation/session artifacts
+.playwright-cli/
+output/playwright/
+playwright-report/
+test-results/
+.runlogs/autodraft_temp_session.json
+.runlogs/autodraft_storage_state.json
+
+# Local SQLite runtime ledgers
+backend/*.sqlite3

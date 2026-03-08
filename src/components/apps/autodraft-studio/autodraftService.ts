@@ -1,3 +1,7 @@
+import {
+	fetchWithTimeout,
+	parseResponseErrorMessage,
+} from "@/lib/fetchWithTimeout";
 import { logger } from "@/lib/logger";
 import { RULE_LIBRARY, type AutoDraftRule } from "./autodraftData";
 
@@ -42,6 +46,17 @@ export type AutoDraftPlanResponse = {
 		classified: number;
 		needs_review: number;
 	};
+};
+
+export type AutoDraftExecuteResponse = {
+	ok: boolean;
+	source: string;
+	job_id: string;
+	status: string;
+	accepted: number;
+	skipped: number;
+	dry_run: boolean;
+	message?: string;
 };
 
 const DEFAULT_TIMEOUT_MS = 20_000;
@@ -236,22 +251,29 @@ const normalizePlanPayload = (payload: unknown): AutoDraftPlanResponse => {
 	};
 };
 
-const withTimeout = (
-	timeoutMs: number,
-	signal?: AbortSignal,
-): { signal: AbortSignal; clear: () => void } => {
-	const controller = new AbortController();
-	const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
-	if (signal) {
-		if (signal.aborted) controller.abort();
-		else
-			signal.addEventListener("abort", () => controller.abort(), {
-				once: true,
-			});
+const normalizeExecutePayload = (payload: unknown): AutoDraftExecuteResponse => {
+	if (!isRecord(payload)) {
+		return {
+			ok: false,
+			source: "invalid-payload",
+			job_id: "",
+			status: "invalid",
+			accepted: 0,
+			skipped: 0,
+			dry_run: true,
+			message: "Execution payload was invalid.",
+		};
 	}
+
 	return {
-		signal: controller.signal,
-		clear: () => globalThis.clearTimeout(timer),
+		ok: Boolean(payload.ok),
+		source: toNonEmptyString(payload.source, "unknown"),
+		job_id: toNonEmptyString(payload.job_id),
+		status: toNonEmptyString(payload.status, "unknown"),
+		accepted: toInt(payload.accepted, 0),
+		skipped: toInt(payload.skipped, 0),
+		dry_run: Boolean(payload.dry_run),
+		message: toNonEmptyString(payload.message) || undefined,
 	};
 };
 
@@ -275,19 +297,10 @@ class AutoDraftService {
 	}
 
 	private async parseError(response: Response): Promise<string> {
-		try {
-			const payload = (await response.json()) as
-				| { error?: string; message?: string; detail?: string }
-				| undefined;
-			return (
-				payload?.error ||
-				payload?.message ||
-				payload?.detail ||
-				`Request failed (${response.status})`
-			);
-		} catch {
-			return `Request failed (${response.status})`;
-		}
+		return parseResponseErrorMessage(
+			response,
+			`Request failed (${response.status})`,
+		);
 	}
 
 	private async requestJson<T>(
@@ -295,20 +308,16 @@ class AutoDraftService {
 		init: RequestInit = {},
 		timeoutMs = DEFAULT_TIMEOUT_MS,
 	): Promise<T> {
-		const { signal, clear } = withTimeout(timeoutMs, init.signal ?? undefined);
-		try {
-			const response = await fetch(`${this.baseUrl}${path}`, {
-				...init,
-				headers: this.getHeaders(init.headers || {}),
-				signal,
-			});
-			if (!response.ok) {
-				throw new Error(await this.parseError(response));
-			}
-			return (await response.json()) as T;
-		} finally {
-			clear();
+		const response = await fetchWithTimeout(`${this.baseUrl}${path}`, {
+			...init,
+			headers: this.getHeaders(init.headers || {}),
+			timeoutMs,
+			requestName: `AutoDraft request (${path})`,
+		});
+		if (!response.ok) {
+			throw new Error(await this.parseError(response));
 		}
+		return (await response.json()) as T;
 	}
 
 	async health(): Promise<AutoDraftHealth> {
@@ -356,6 +365,20 @@ class AutoDraftService {
 			body: JSON.stringify({ markups }),
 		});
 		return normalizePlanPayload(payload);
+	}
+
+	async execute(
+		actions: AutoDraftAction[],
+		options?: { dryRun?: boolean },
+	): Promise<AutoDraftExecuteResponse> {
+		const payload = await this.requestJson<unknown>("/api/autodraft/execute", {
+			method: "POST",
+			body: JSON.stringify({
+				actions,
+				dry_run: options?.dryRun ?? true,
+			}),
+		});
+		return normalizeExecutePayload(payload);
 	}
 }
 

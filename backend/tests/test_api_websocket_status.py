@@ -60,10 +60,15 @@ class _ManagerStub:
     def __init__(self, status: dict) -> None:
         self.status = status
         self.calls = []
+        self.progress_calls = []
 
     def get_status(self, *, force_refresh: bool):
         self.calls.append(force_refresh)
         return self.status
+
+    def get_progress_events_since(self, event_id: int):
+        self.progress_calls.append(event_id)
+        return []
 
 
 class _TimeStub:
@@ -277,6 +282,34 @@ class TestApiWebsocketStatus(unittest.TestCase):
         payload = json.loads(ws.sent[0])
         self.assertEqual(payload["code"], "AUTH_INVALID")
         self.assertTrue(logger.warning_calls)
+
+    def test_websocket_status_bridge_backoff_and_status_dedup(self) -> None:
+        ws = _WsStub(receive_result=None)
+        logger = _LoggerStub()
+        manager = _ManagerStub({"connected": True, "autocad_running": True, "drawing_open": True})
+        time_stub = _TimeStub([1.0, 2.0, 3.0, 4.0])
+
+        websocket_status_bridge(
+            ws,
+            request_obj=_RequestStub(args={"api_key": "good"}, remote_addr="127.0.0.1"),
+            is_valid_api_key_fn=lambda _provided: True,
+            logger=logger,
+            get_manager=lambda: manager,
+            json_module=json,
+            time_module=time_stub,
+            backend_id="coordinates-grabber-api",
+            backend_version="1.0.0",
+            poll_interval_seconds=2.0,
+            status_keepalive_seconds=30.0,
+            max_iterations=3,
+        )
+
+        # Connected frame + first status frame only (unchanged status is deduplicated).
+        self.assertEqual(len(ws.sent), 2)
+        self.assertEqual(manager.calls, [True, True, True])
+        self.assertEqual(manager.progress_calls, [0, 0, 0])
+        self.assertEqual(len(time_stub.sleep_calls), 2)
+        self.assertLess(time_stub.sleep_calls[0], time_stub.sleep_calls[1])
 
 
 if __name__ == "__main__":

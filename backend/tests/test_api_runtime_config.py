@@ -4,10 +4,12 @@ from urllib.parse import urlparse
 import unittest
 
 from backend.route_groups.api_runtime_config import (
+    AUTODRAFT_DOTNET_API_DEFAULT_URL,
     derive_default_passkey_rp_id,
     normalize_auth_passkey_provider,
     resolve_agent_webhook_secret,
     resolve_api_key,
+    resolve_autodraft_dotnet_api_url,
     resolve_auth_email_require_turnstile,
     resolve_supabase_api_key,
     resolve_supabase_url,
@@ -157,6 +159,20 @@ class TestApiRuntimeConfig(unittest.TestCase):
                 os_module=_OSStub({"AUTH_EMAIL_REQUIRE_TURNSTILE": "false"}),
                 auth_email_turnstile_secret="secret",
             )
+        )
+
+    def test_resolve_autodraft_dotnet_api_url(self) -> None:
+        self.assertEqual(
+            resolve_autodraft_dotnet_api_url(
+                os_module=_OSStub({"AUTODRAFT_DOTNET_API_URL": "http://localhost:5009"}),
+            ),
+            "http://localhost:5009",
+        )
+        self.assertEqual(
+            resolve_autodraft_dotnet_api_url(
+                os_module=_OSStub({}),
+            ),
+            AUTODRAFT_DOTNET_API_DEFAULT_URL,
         )
 
 

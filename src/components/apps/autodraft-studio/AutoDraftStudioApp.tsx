@@ -21,6 +21,7 @@ import {
 } from "./autodraftData";
 import {
 	type AutoDraftHealth,
+	type AutoDraftExecuteResponse,
 	type AutoDraftPlanResponse,
 	autoDraftService,
 } from "./autodraftService";
@@ -87,7 +88,11 @@ export function AutoDraftStudioApp() {
 	const [planResult, setPlanResult] = useState<AutoDraftPlanResponse | null>(
 		null,
 	);
+	const [executeResult, setExecuteResult] =
+		useState<AutoDraftExecuteResponse | null>(null);
+	const [executeError, setExecuteError] = useState<string | null>(null);
 	const [loadingPlan, setLoadingPlan] = useState(false);
+	const [loadingExecute, setLoadingExecute] = useState(false);
 	const [loadingHealth, setLoadingHealth] = useState(false);
 
 	const translatedGeometryStats = useMemo(() => {
@@ -138,6 +143,8 @@ export function AutoDraftStudioApp() {
 
 	const runDemoPlan = async () => {
 		setLoadingPlan(true);
+		setExecuteResult(null);
+		setExecuteError(null);
 		try {
 			const planned = await autoDraftService.plan(DEMO_MARKUPS);
 			setPlanResult(planned);
@@ -145,6 +152,35 @@ export function AutoDraftStudioApp() {
 			setPlanResult(null);
 		} finally {
 			setLoadingPlan(false);
+		}
+	};
+
+	const runDemoExecuteDryRun = async () => {
+		setLoadingExecute(true);
+		setExecuteResult(null);
+		setExecuteError(null);
+		try {
+			const plan = planResult ?? (await autoDraftService.plan(DEMO_MARKUPS));
+			if (!planResult) {
+				setPlanResult(plan);
+			}
+			if (!Array.isArray(plan.actions) || plan.actions.length === 0) {
+				setExecuteError("No actions available to execute.");
+				return;
+			}
+
+			const executed = await autoDraftService.execute(plan.actions, {
+				dryRun: true,
+			});
+			setExecuteResult(executed);
+		} catch (error) {
+			const message =
+				error instanceof Error && error.message.trim().length > 0
+					? error.message
+					: "Execution request failed.";
+			setExecuteError(message);
+		} finally {
+			setLoadingExecute(false);
 		}
 	};
 
@@ -422,16 +458,26 @@ export function AutoDraftStudioApp() {
 			<Panel variant="inset" padding="md" className={styles.demoPanel}>
 				<HStack gap={2} align="center" justify="between">
 					<Text size="sm" weight="semibold">
-						Demo Plan Run
+						Demo Plan + Execute
 					</Text>
-					<Button
-						variant="primary"
-						size="sm"
-						onClick={() => void runDemoPlan()}
-						loading={loadingPlan}
-					>
-						Run sample markups
-					</Button>
+					<div className={styles.demoActions}>
+						<Button
+							variant="primary"
+							size="sm"
+							onClick={() => void runDemoPlan()}
+							loading={loadingPlan}
+						>
+							Run sample markups
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => void runDemoExecuteDryRun()}
+							loading={loadingExecute}
+						>
+							Execute dry run
+						</Button>
+					</div>
 				</HStack>
 				{planResult ? (
 					<div className={styles.planSummary}>
@@ -448,6 +494,37 @@ export function AutoDraftStudioApp() {
 					<Text size="sm" color="muted">
 						Uses the new `/api/autodraft/plan` contract (local fallback if .NET
 						API is not online).
+					</Text>
+				)}
+				{executeResult ? (
+					<div className={styles.executeSummary}>
+						<Text size="xs" color="muted">
+							Execute source: {executeResult.source} · status:{" "}
+							{executeResult.status}
+						</Text>
+						<Text size="sm">
+							Accepted {executeResult.accepted}, skipped {executeResult.skipped}
+							, dry run: {executeResult.dry_run ? "yes" : "no"}.
+						</Text>
+						{executeResult.job_id ? (
+							<Text size="xs" color="muted">
+								Job ID: {executeResult.job_id}
+							</Text>
+						) : null}
+						{executeResult.message ? (
+							<Text size="xs" color="muted">
+								{executeResult.message}
+							</Text>
+						) : null}
+					</div>
+				) : executeError ? (
+					<Text size="sm" color="warning">
+						{executeError}
+					</Text>
+				) : (
+					<Text size="xs" color="muted">
+						Execution uses `/api/autodraft/execute` and returns a backend error
+						until .NET execution is wired and reachable.
 					</Text>
 				)}
 			</Panel>

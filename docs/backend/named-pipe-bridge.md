@@ -30,7 +30,7 @@ Named pipes are local to each Windows machine, so the same name can be used on m
 - **Local-only**: Named pipes are not reachable from the network.
 - **Auth**: Use a short-lived HMAC token from the backend as a request field.
 - **Timeouts**: Set read/write timeouts in both client and server.
-- **Single-threaded execution**: The .NET service should execute one job at a time to avoid AutoCAD locks.
+- **Bounded concurrency**: The .NET service now supports multi-instance listeners with bounded workers; tune conservatively for AutoCAD stability.
 
 ## Message Protocol (JSON lines)
 
@@ -84,12 +84,23 @@ Named-pipe bridge settings:
 - `AUTOCAD_DOTNET_TIMEOUT_MS=30000`
 - `AUTOCAD_DOTNET_TOKEN=` (optional)
   - if set, .NET bridge rejects mismatched/missing tokens with `AUTH_INVALID_TOKEN`
+- `AUTOCAD_DOTNET_MAX_PIPE_INSTANCES=4` (optional)
+- `AUTOCAD_DOTNET_MAX_PIPE_WORKERS=2` (optional)
 - `AUTOCAD_DOTNET_COM_READ_RETRY_ATTEMPTS=3` (optional)
 - `AUTOCAD_DOTNET_COM_READ_RETRY_DELAY_MS=35` (optional)
 
-When `dotnet` is selected, `/api/conduit-route/terminal-scan` and
-`/api/conduit-route/obstacles/scan` call the pipe bridge directly. With
-`dotnet_fallback_com`, backend falls back to COM if the bridge call fails.
+When `dotnet` is selected, these endpoints call the pipe bridge directly:
+
+- `/api/conduit-route/terminal-scan`
+- `/api/conduit-route/obstacles/scan`
+- `/api/conduit-route/terminal-routes/draw`
+
+With `dotnet_fallback_com`, backend falls back to COM if the bridge call fails.
+
+Terminal label sync now has parallel endpoints for staged migration:
+
+- New bridge path (dotnet-only): `/api/conduit-route/bridge/terminal-labels/sync`
+- Existing COM path (unchanged): `/api/conduit-route/terminal-labels/sync`
 
 Obstacle scan requests can include optional preset-driven layer mapping:
 
@@ -114,6 +125,8 @@ Expected bridge actions for current Conduit Route integration:
 
 - `conduit_route_terminal_scan`
 - `conduit_route_obstacle_scan`
+- `conduit_route_terminal_routes_draw`
+- `conduit_route_terminal_labels_sync`
 
 Each action response should follow:
 
@@ -121,8 +134,64 @@ Each action response should follow:
 {"id":"job-123","ok":true,"result":{"success":true,"data":{},"meta":{},"warnings":[]}}
 ```
 
-Current implementation status: these two actions are wired and execute live
-AutoCAD scans through the .NET bridge process (COM-backed today).
+Bridge action responses now include shared telemetry in `result.meta`:
+
+- `action`: normalized bridge action key
+- `actionMs`: handler elapsed time (ms)
+- `queueWaitMs`: time waiting for an available worker (ms)
+- `comReadRetryCount`: transient COM read retries consumed during request execution
+- Action-specific scan/draw metrics also remain in `result.meta` (for example:
+  `scanMs`, `drawMs`, `scannedEntities`, `scannedBlockReferences`,
+  `scannedGeometryEntities`, `segmentsDrawn`, `labelsDrawn`).
+
+Current implementation status: these four actions are wired and execute live
+AutoCAD operations through the .NET bridge process (COM-backed today).
+
+Bridge maintainability refactor: action implementations are now split into
+dedicated files under `dotnet/named-pipe-bridge/`:
+
+- `ConduitRouteTerminalScanHandler.cs`
+- `ConduitRouteObstacleScanHandler.cs`
+- `ConduitRouteTerminalRouteDrawHandler.cs`
+- `ConduitRouteTerminalLabelSyncHandler.cs`
+- `ConduitRouteEtapCleanupHandler.cs`
+
+## Terminal Label Sync Cutover Plan
+
+Use this plan when moving UI/API traffic from COM label-sync to bridge label-sync.
+
+### 1) Keep both endpoints active during validation
+
+- Keep existing calls on `/api/conduit-route/terminal-labels/sync` for production behavior.
+- Run validation traffic against `/api/conduit-route/bridge/terminal-labels/sync`.
+- Frontend/client switch is controlled by `VITE_CONDUIT_TERMINAL_LABEL_SYNC_MODE`:
+  - `legacy` (default): always call COM path endpoint.
+  - `auto`: call bridge endpoint only when CAD provider is `dotnet` and sender is ready.
+  - `bridge`: always call bridge endpoint.
+
+### 2) Validate parity
+
+- Automated check: run `python -m pytest backend/tests/test_api_autocad_dotnet_provider.py -k terminal_label`.
+- Manual check in a real drawing:
+  - Same strip target list and terminal count.
+  - Same `TERMxx_LABEL` final values after sync.
+  - Same/matching failure signals for unmatched strips (`NO_TARGET_STRIPS_MATCHED`) and no-strip drawings (`NO_TERMINAL_STRIPS_FOUND`).
+  - No regression in existing auth/session flow.
+
+### 3) Swap criteria
+
+Swap UI/backend callers to `/api/conduit-route/bridge/terminal-labels/sync` only when:
+
+- Bridge endpoint passes automated tests in CI/local.
+- Manual drawing parity is verified on representative projects.
+- Bridge process is available/reliable in the target environment.
+
+### 4) Rollback path
+
+If bridge label-sync degrades, route traffic back to `/api/conduit-route/terminal-labels/sync`
+(COM path) immediately. This is low-risk because the legacy endpoint behavior is unchanged.
+
+Detailed operator runbook: `docs/development/conduit-terminal-label-sync-rollout.md`.
 
 ## Step 4: Long-running jobs (optional)
 

@@ -4,12 +4,14 @@ from types import SimpleNamespace
 import unittest
 
 from backend.route_groups.api_auth_runtime import create_auth_runtime
+from backend.route_groups.api_supabase_auth import SupabaseAuthProviderTimeoutError
 
 
 class _RequestStub:
     def __init__(self) -> None:
         self.headers = {}
         self.cookies = {}
+        self.path = "/"
 
 
 class _LoggerStub:
@@ -17,6 +19,9 @@ class _LoggerStub:
         return None
 
     def warning(self, *_args, **_kwargs) -> None:
+        return None
+
+    def exception(self, *_args, **_kwargs) -> None:
         return None
 
 
@@ -113,6 +118,33 @@ class TestApiAuthRuntime(unittest.TestCase):
         wrapped = runtime.require_supabase_user(endpoint)
         self.assertEqual(wrapped(), ({"ok": True}, 200))
         self.assertEqual(g_obj.supabase_user, {"id": "user-1"})
+
+    def test_require_supabase_user_timeout_envelope(self) -> None:
+        request_obj = _RequestStub()
+        request_obj.path = "/api/agent/session"
+        request_obj.headers["Authorization"] = "Bearer timeout"
+        g_obj = SimpleNamespace(agent_request_id="req-runtime-timeout")
+
+        def verify(_token: str):
+            raise SupabaseAuthProviderTimeoutError()
+
+        runtime = _build_runtime(
+            request_obj=request_obj,
+            g_obj=g_obj,
+            session_store={},
+            now_fn=_NowStub(),
+            verify_fn=verify,
+        )
+
+        def endpoint():
+            return {"ok": True}, 200
+
+        wrapped = runtime.require_supabase_user(endpoint)
+        payload, status = wrapped()
+        self.assertEqual(status, 503)
+        self.assertEqual(payload.get("code"), "AUTH_PROVIDER_TIMEOUT")
+        self.assertEqual(payload.get("requestId"), "req-runtime-timeout")
+        self.assertEqual((payload.get("meta") or {}).get("retryable"), True)
 
     def test_agent_session_lifecycle_and_decorator(self) -> None:
         request_obj = _RequestStub()

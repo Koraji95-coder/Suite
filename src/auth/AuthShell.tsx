@@ -57,7 +57,12 @@ export default function AuthShell({
 					className={styles.brandLink}
 					aria-label={`${APP_NAME} home`}
 				>
-					<AgentPixelMark profileId="koro" size={28} expression="neutral" />
+					<AgentPixelMark
+						profileId="koro"
+						size={28}
+						detailLevel="hero"
+						expression="neutral"
+					/>
 					<span className={styles.brandName}>{APP_NAME}</span>
 				</Link>
 
@@ -132,6 +137,7 @@ export default function AuthShell({
 											<AgentPixelMark
 												profileId={m.id}
 												size={m.size}
+												detailLevel="hero"
 												expression={m.id === "koro" ? "active" : "neutral"}
 											/>
 										</div>
@@ -163,7 +169,7 @@ export default function AuthShell({
 								>
 									{FLOATING_MARKS.map((m) => (
 										<div key={m.id} className={styles.agentBadge}>
-											<AgentPixelMark profileId={m.id} size={14} />
+											<AgentPixelMark profileId={m.id} size={14} detailLevel="hero" />
 											<Text
 												size="xs"
 												color="muted"

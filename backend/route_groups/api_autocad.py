@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import time
 from pathlib import Path
@@ -8,6 +9,12 @@ import os
 
 from flask import Blueprint, g, jsonify, request, send_file
 from flask_limiter import Limiter
+from .api_autocad_error_helpers import (
+    build_error_payload as autocad_build_error_payload,
+    derive_request_id as autocad_derive_request_id,
+    exception_message as autocad_exception_message,
+    log_autocad_exception as autocad_log_exception,
+)
 from .api_autocad_terminal_scan import scan_terminal_strips
 from .api_conduit_route_compute import compute_conduit_route
 from .api_conduit_route_obstacle_scan import scan_conduit_obstacles
@@ -73,8 +80,12 @@ def create_autocad_blueprint(
             try:
                 if bool(manager.is_allowed_export_path(str(path_value))):
                     return True
-            except Exception:
-                pass
+            except Exception as manager_scope_exc:
+                _log_ignored_exception(
+                    stage="export_path_validation",
+                    reason="Manager export-path scope check failed",
+                    exc=manager_scope_exc,
+                )
         return _is_under_dir(path_value, backend_exports_dir)
 
     def _normalize_conduit_provider(raw_value: str) -> str:
@@ -368,10 +379,103 @@ def create_autocad_blueprint(
         return merged_layer_names, merged_layer_type_overrides, preset_meta
 
     def _request_correlation_id() -> str:
-        raw_value = str(request.headers.get("X-Request-ID") or "").strip()
-        if raw_value:
-            return raw_value[:128]
-        return f"req-{int(time.time() * 1000)}"
+        cached = str(getattr(g, "autocad_request_id", "") or "").strip()
+        if cached:
+            return cached
+        request_id = autocad_derive_request_id(
+            request.headers.get("X-Request-ID"),
+            time_module=time,
+        )
+        g.autocad_request_id = request_id
+        return request_id
+
+    def _error_response(
+        *,
+        code: str,
+        message: str,
+        status_code: int,
+        request_id: str,
+        meta: Optional[Dict[str, Any]] = None,
+        extra: Optional[Dict[str, Any]] = None,
+    ):
+        payload = autocad_build_error_payload(
+            code=code,
+            message=message,
+            request_id=request_id,
+            meta=meta,
+            extra=extra,
+        )
+        return jsonify(payload), status_code
+
+    def _log_ignored_exception(*, stage: str, reason: str, exc: BaseException) -> None:
+        logger.debug(
+            "Ignored recoverable AutoCAD exception (stage=%s, reason=%s, error=%s)",
+            stage,
+            reason,
+            autocad_exception_message(exc),
+        )
+
+    def _default_error_code(status_code: int) -> str:
+        if status_code == 400:
+            return "INVALID_REQUEST"
+        if status_code == 401:
+            return "AUTH_INVALID"
+        if status_code == 403:
+            return "FORBIDDEN"
+        if status_code == 404:
+            return "NOT_FOUND"
+        if status_code == 409:
+            return "CONFLICT"
+        if status_code == 429:
+            return "RATE_LIMITED"
+        if status_code in {500, 502, 503, 504}:
+            return "SERVICE_ERROR"
+        return "REQUEST_FAILED"
+
+    @bp.before_request
+    def _autocad_bind_request_id():
+        _request_correlation_id()
+
+    @bp.after_request
+    def _autocad_attach_request_id(response):
+        request_id = str(getattr(g, "autocad_request_id", "") or "").strip()
+        if not request_id or not response.is_json:
+            return response
+
+        payload = response.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return response
+
+        is_error_payload = (
+            response.status_code >= 400
+            or payload.get("success") is False
+            or payload.get("ok") is False
+        )
+        if not is_error_payload:
+            return response
+
+        payload_changed = False
+        if "requestId" not in payload:
+            payload["requestId"] = request_id
+            payload_changed = True
+
+        if not str(payload.get("code") or "").strip():
+            payload["code"] = _default_error_code(response.status_code)
+            payload_changed = True
+
+        if not str(payload.get("message") or "").strip():
+            message_fallback = str(
+                payload.get("error")
+                or payload.get("detail")
+                or f"Request failed ({response.status_code})"
+            )
+            payload["message"] = message_fallback
+            payload_changed = True
+
+        if payload_changed:
+            response.set_data(json.dumps(payload))
+            response.mimetype = "application/json"
+        return response
 
     def _call_dotnet_bridge_action(
         *,
@@ -500,31 +604,46 @@ def create_autocad_blueprint(
     @limiter.limit("120 per hour")
     def api_selection_count():
         """Get count of currently selected objects in AutoCAD (fresh COM)."""
+        request_id = _request_correlation_id()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         manager = get_manager()
         status = manager.get_status()
 
         if not status.get("drawing_open"):
-            return jsonify({"success": False, "count": 0, "error": "No drawing open"}), 503
+            message = "No drawing open in AutoCAD."
+            return _error_response(
+                code="AUTOCAD_DRAWING_NOT_OPEN",
+                message=message,
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "selection_count", "providerPath": "com"},
+                extra={"count": 0, "error": message},
+            )
 
         if pythoncom is None:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "count": 0,
-                        "error": "AutoCAD COM bridge unavailable on this platform.",
-                    }
-                ),
-                503,
+            message = "AutoCAD COM bridge unavailable on this platform."
+            return _error_response(
+                code="COM_UNAVAILABLE",
+                message=message,
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "selection_count", "providerPath": "com"},
+                extra={"count": 0, "error": message},
             )
 
         try:
             pythoncom.CoInitialize()
             acad = connect_autocad()
             if acad is None:
-                return (
-                    jsonify({"success": False, "count": 0, "error": "Cannot connect to AutoCAD"}),
-                    503,
+                message = "Cannot connect to AutoCAD."
+                return _error_response(
+                    code="AUTOCAD_CONNECT_FAILED",
+                    message=message,
+                    status_code=503,
+                    request_id=request_id,
+                    meta={"stage": "selection_count", "providerPath": "com"},
+                    extra={"count": 0, "error": message},
                 )
 
             doc = dyn(acad.ActiveDocument)
@@ -532,8 +651,12 @@ def create_autocad_blueprint(
             try:
                 old_ss = doc.SelectionSets.Item("TEMP_COUNT")
                 old_ss.Delete()
-            except Exception:
-                pass
+            except Exception as selection_cleanup_exc:
+                _log_ignored_exception(
+                    stage="selection_count",
+                    reason="Previous TEMP_COUNT selection set cleanup failed",
+                    exc=selection_cleanup_exc,
+                )
 
             ss = doc.SelectionSets.Add("TEMP_COUNT")
             ss.SelectOnScreen()
@@ -543,13 +666,36 @@ def create_autocad_blueprint(
             return jsonify({"success": True, "count": count, "error": None})
 
         except Exception as exc:
-            traceback_module.print_exc()
-            return jsonify({"success": False, "count": 0, "error": f"COM error: {str(exc)}"}), 500
+            autocad_log_exception(
+                logger=logger,
+                message="Selection count failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="selection_count",
+                code="SELECTION_COUNT_FAILED",
+                provider="com",
+            )
+            return _error_response(
+                code="SELECTION_COUNT_FAILED",
+                message=f"Selection count failed: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "selection_count", "providerPath": "com"},
+                extra={
+                    "count": 0,
+                    "error": f"COM error: {autocad_exception_message(exc)}",
+                },
+            )
         finally:
             try:
                 pythoncom.CoUninitialize()
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                _log_ignored_exception(
+                    stage="selection_count_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
 
     @bp.route("/execute", methods=["POST"])
     @require_autocad_auth
@@ -558,20 +704,23 @@ def create_autocad_blueprint(
         """
         Execute coordinate extraction using manager.execute_layer_search.
         """
+        request_id = _request_correlation_id()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         manager = get_manager()
         status = manager.get_status()
 
         if not status.get("drawing_open"):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": "No drawing open in AutoCAD",
-                        "points_created": 0,
-                        "error_details": "Please open a drawing before executing",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="AUTOCAD_DRAWING_NOT_OPEN",
+                message="No drawing open in AutoCAD",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "execute_layer_search", "providerPath": "com"},
+                extra={
+                    "points_created": 0,
+                    "error_details": "Please open a drawing before executing",
+                },
             )
 
         try:
@@ -586,7 +735,13 @@ def create_autocad_blueprint(
             run_id = str(request.headers.get("X-Run-Id", "")).strip()[:80] or None
 
             started_at = time.time()
-            result = manager.execute_layer_search(config, run_id=run_id)
+            result = manager.execute_layer_search(
+                {
+                    **config,
+                    "requestId": request_id,
+                },
+                run_id=run_id,
+            )
             duration = time.time() - started_at
 
             if result.get("success"):
@@ -623,35 +778,44 @@ def create_autocad_blueprint(
                     200,
                 )
 
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": result.get("error", "No entities found"),
-                        "points_created": 0,
-                        "blocks_inserted": 0,
-                        "excel_path": "",
-                        "duration_seconds": round(duration, 2),
-                        "points": [],
-                        "error_details": result.get("error"),
-                        "run_id": run_id,
-                    }
-                ),
-                400,
+            return _error_response(
+                code=str(result.get("code") or "EXECUTE_LAYER_SEARCH_FAILED"),
+                message=str(result.get("message") or result.get("error") or "No entities found"),
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "execute_layer_search", "providerPath": "com"},
+                extra={
+                    "points_created": 0,
+                    "blocks_inserted": 0,
+                    "excel_path": "",
+                    "duration_seconds": round(duration, 2),
+                    "points": [],
+                    "error_details": result.get("error") or result.get("message"),
+                    "run_id": run_id,
+                },
             )
 
         except Exception as exc:
-            traceback_module.print_exc()
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": f"Execution failed: {str(exc)}",
-                        "points_created": 0,
-                        "error_details": str(exc),
-                    }
-                ),
-                500,
+            autocad_log_exception(
+                logger=logger,
+                message="Execute layer search failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="execute_layer_search",
+                code="EXECUTE_LAYER_SEARCH_FAILED",
+                provider="com",
+            )
+            return _error_response(
+                code="EXECUTE_LAYER_SEARCH_FAILED",
+                message=f"Execution failed: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "execute_layer_search", "providerPath": "com"},
+                extra={
+                    "points_created": 0,
+                    "error_details": autocad_exception_message(exc),
+                },
             )
 
     @bp.route("/ground-grid/plot", methods=["POST"])
@@ -659,19 +823,20 @@ def create_autocad_blueprint(
     @limiter.limit("30 per hour")
     def api_plot_ground_grid():
         """Plot generated ground-grid data into the active AutoCAD drawing."""
+        request_id = _request_correlation_id()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         manager = get_manager()
         status = manager.get_status()
 
         if not status.get("drawing_open"):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": "No drawing open in AutoCAD",
-                        "error_details": "Please open a drawing before plotting",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="AUTOCAD_DRAWING_NOT_OPEN",
+                message="No drawing open in AutoCAD",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "ground_grid_plot", "providerPath": "com"},
+                extra={"error_details": "Please open a drawing before plotting"},
             )
 
         try:
@@ -679,37 +844,49 @@ def create_autocad_blueprint(
                 raise ValueError("Expected application/json payload")
 
             payload = request.get_json(silent=False) or {}
-            result = manager.plot_ground_grid(payload)
+            result = manager.plot_ground_grid(
+                {
+                    **payload,
+                    "requestId": request_id,
+                }
+            )
 
             if result.get("success"):
                 return jsonify(result), 200
 
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": result.get("message", "Ground grid plot failed"),
-                        "lines_drawn": result.get("lines_drawn", 0),
-                        "blocks_inserted": result.get("blocks_inserted", 0),
-                        "layer_name": result.get("layer_name", ""),
-                        "test_well_block_name": result.get("test_well_block_name", ""),
-                        "error_details": result.get("error"),
-                    }
-                ),
-                400,
+            return _error_response(
+                code=str(result.get("code") or "GROUND_GRID_PLOT_FAILED"),
+                message=str(result.get("message", "Ground grid plot failed")),
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "ground_grid_plot", "providerPath": "com"},
+                extra={
+                    "lines_drawn": result.get("lines_drawn", 0),
+                    "blocks_inserted": result.get("blocks_inserted", 0),
+                    "layer_name": result.get("layer_name", ""),
+                    "test_well_block_name": result.get("test_well_block_name", ""),
+                    "error_details": result.get("error"),
+                },
             )
 
         except Exception as exc:
-            traceback_module.print_exc()
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "message": f"Ground grid plot failed: {str(exc)}",
-                        "error_details": str(exc),
-                    }
-                ),
-                500,
+            autocad_log_exception(
+                logger=logger,
+                message="Ground grid plot failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="ground_grid_plot",
+                code="GROUND_GRID_PLOT_FAILED",
+                provider="com",
+            )
+            return _error_response(
+                code="GROUND_GRID_PLOT_FAILED",
+                message=f"Ground grid plot failed: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "ground_grid_plot", "providerPath": "com"},
+                extra={"error_details": autocad_exception_message(exc)},
             )
 
     @bp.route("/trigger-selection", methods=["POST"])
@@ -717,79 +894,138 @@ def create_autocad_blueprint(
     @limiter.limit("120 per hour")
     def api_trigger_selection():
         """Bring AutoCAD to foreground (fresh COM)."""
+        request_id = _request_correlation_id()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         manager = get_manager()
         status = manager.get_status()
 
         if not status.get("drawing_open"):
-            return jsonify({"success": False, "message": "No drawing open"}), 503
+            return _error_response(
+                code="AUTOCAD_DRAWING_NOT_OPEN",
+                message="No drawing open in AutoCAD.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "trigger_selection", "providerPath": "com"},
+            )
 
         if pythoncom is None:
-            return (
-                jsonify({"success": False, "message": "AutoCAD COM bridge unavailable on this platform."}),
-                503,
+            return _error_response(
+                code="COM_UNAVAILABLE",
+                message="AutoCAD COM bridge unavailable on this platform.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "trigger_selection", "providerPath": "com"},
             )
 
         try:
             pythoncom.CoInitialize()
             acad = connect_autocad()
             if acad is None:
-                return jsonify({"success": False, "message": "Cannot connect to AutoCAD"}), 503
+                return _error_response(
+                    code="AUTOCAD_CONNECT_FAILED",
+                    message="Cannot connect to AutoCAD.",
+                    status_code=503,
+                    request_id=request_id,
+                    meta={"stage": "trigger_selection", "providerPath": "com"},
+                )
 
             acad.Visible = True
             acad.WindowState = 1
             return jsonify({"success": True, "message": "AutoCAD activated"})
 
         except Exception as exc:
-            traceback_module.print_exc()
-            return jsonify({"success": False, "message": f"Error: {str(exc)}"}), 500
+            autocad_log_exception(
+                logger=logger,
+                message="Trigger selection failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="trigger_selection",
+                code="TRIGGER_SELECTION_FAILED",
+                provider="com",
+            )
+            return _error_response(
+                code="TRIGGER_SELECTION_FAILED",
+                message=f"Error: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "trigger_selection", "providerPath": "com"},
+                extra={"error": autocad_exception_message(exc)},
+            )
         finally:
             try:
                 pythoncom.CoUninitialize()
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                _log_ignored_exception(
+                    stage="trigger_selection_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
 
     @bp.route("/download-result", methods=["GET"])
     @require_autocad_auth
     @limiter.limit("60 per hour")
     def api_download_result():
         """Download a generated Excel file from an absolute path returned by /api/execute."""
+        request_id = _request_correlation_id()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         try:
             manager = get_manager()
             raw_path = str(request.args.get("path", "")).strip()
             if not raw_path:
-                return jsonify({"success": False, "message": "Missing file path"}), 400
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="Missing file path.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "download_result"},
+                )
 
             resolved = Path(raw_path).expanduser()
             try:
                 resolved = resolved.resolve(strict=True)
             except FileNotFoundError:
-                return jsonify({"success": False, "message": "File not found"}), 404
+                return _error_response(
+                    code="FILE_NOT_FOUND",
+                    message="File not found.",
+                    status_code=404,
+                    request_id=request_id,
+                    meta={"stage": "download_result"},
+                )
 
             if not resolved.is_file():
-                return jsonify({"success": False, "message": "Path is not a file"}), 400
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="Path is not a file.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "download_result"},
+                )
 
             if resolved.suffix.lower() not in {".xlsx", ".xls", ".xlsm"}:
                 return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "message": "Only Excel files can be downloaded from this endpoint",
-                        }
-                    ),
-                    400,
+                    _error_response(
+                        code="INVALID_REQUEST",
+                        message="Only Excel files can be downloaded from this endpoint.",
+                        status_code=400,
+                        request_id=request_id,
+                        meta={"stage": "download_result"},
+                    )
                 )
             if not _is_safe_export_path(resolved, manager):
                 return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "message": (
-                                "File path is outside allowed export scope. "
-                                "Only generated coordinates export files are allowed."
-                            ),
-                        }
-                    ),
-                    403,
+                    _error_response(
+                        code="FORBIDDEN",
+                        message=(
+                            "File path is outside allowed export scope. "
+                            "Only generated coordinates export files are allowed."
+                        ),
+                        status_code=403,
+                        request_id=request_id,
+                        meta={"stage": "download_result"},
+                    )
                 )
 
             return send_file(
@@ -799,74 +1035,132 @@ def create_autocad_blueprint(
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
         except Exception as exc:
-            return jsonify({"success": False, "message": f"Download failed: {exc}"}), 500
+            autocad_log_exception(
+                logger=logger,
+                message="Download result failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="download_result",
+                code="DOWNLOAD_RESULT_FAILED",
+                provider="com",
+            )
+            return _error_response(
+                code="DOWNLOAD_RESULT_FAILED",
+                message=f"Download failed: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "download_result"},
+                extra={"error": autocad_exception_message(exc)},
+            )
 
     @bp.route("/open-export-folder", methods=["POST"])
     @require_autocad_auth
     @limiter.limit("60 per hour")
     def api_open_export_folder():
         """Open the folder containing a generated export file (Windows only)."""
+        request_id = _request_correlation_id()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         try:
             manager = get_manager()
             payload = request.get_json(silent=True) or {}
             raw_path = str(payload.get("path", "")).strip()
             if not raw_path:
-                return jsonify({"success": False, "message": "Missing file path"}), 400
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="Missing file path.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "open_export_folder"},
+                )
 
             resolved = Path(raw_path).expanduser()
             try:
                 resolved = resolved.resolve(strict=True)
             except FileNotFoundError:
-                return jsonify({"success": False, "message": "File not found"}), 404
+                return _error_response(
+                    code="FILE_NOT_FOUND",
+                    message="File not found.",
+                    status_code=404,
+                    request_id=request_id,
+                    meta={"stage": "open_export_folder"},
+                )
 
             if not resolved.is_file():
-                return jsonify({"success": False, "message": "Path is not a file"}), 400
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="Path is not a file.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "open_export_folder"},
+                )
 
             if resolved.suffix.lower() not in {".xlsx", ".xls", ".xlsm"}:
                 return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "message": "Only Excel export files are supported for open-folder",
-                        }
-                    ),
-                    400,
+                    _error_response(
+                        code="INVALID_REQUEST",
+                        message="Only Excel export files are supported for open-folder.",
+                        status_code=400,
+                        request_id=request_id,
+                        meta={"stage": "open_export_folder"},
+                    )
                 )
             if not _is_safe_export_path(resolved, manager):
                 return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "message": (
-                                "File path is outside allowed export scope. "
-                                "Only generated coordinates export files are allowed."
-                            ),
-                        }
-                    ),
-                    403,
+                    _error_response(
+                        code="FORBIDDEN",
+                        message=(
+                            "File path is outside allowed export scope. "
+                            "Only generated coordinates export files are allowed."
+                        ),
+                        status_code=403,
+                        request_id=request_id,
+                        meta={"stage": "open_export_folder"},
+                    )
                 )
 
             folder = resolved.parent
             if not folder.exists():
-                return jsonify({"success": False, "message": "Export folder not found"}), 404
+                return _error_response(
+                    code="FILE_NOT_FOUND",
+                    message="Export folder not found.",
+                    status_code=404,
+                    request_id=request_id,
+                    meta={"stage": "open_export_folder"},
+                )
 
             if os.name != "nt" or not hasattr(os, "startfile"):
                 return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "message": "Open-folder action is only available on Windows",
-                        }
-                    ),
-                    501,
+                    _error_response(
+                        code="PLATFORM_UNSUPPORTED",
+                        message="Open-folder action is only available on Windows.",
+                        status_code=501,
+                        request_id=request_id,
+                        meta={"stage": "open_export_folder"},
+                    )
                 )
 
             os.startfile(str(folder))
             return jsonify({"success": True, "message": f"Opened: {folder}"})
         except Exception as exc:
-            return (
-                jsonify({"success": False, "message": f"Could not open folder: {exc}"}),
-                500,
+            autocad_log_exception(
+                logger=logger,
+                message="Open export folder failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="open_export_folder",
+                code="OPEN_EXPORT_FOLDER_FAILED",
+                provider="com",
+            )
+            return _error_response(
+                code="OPEN_EXPORT_FOLDER_FAILED",
+                message=f"Could not open folder: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "open_export_folder"},
+                extra={"error": autocad_exception_message(exc)},
             )
 
     @bp.route("/conduit-route/terminal-scan", methods=["POST"])
@@ -881,7 +1175,19 @@ def create_autocad_blueprint(
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         request_id = _request_correlation_id()
 
-        payload = request.get_json(silent=True) or {}
+        raw_payload = request.get_json(silent=True)
+        if raw_payload is None:
+            payload: Dict[str, Any] = {}
+        elif not isinstance(raw_payload, dict):
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Request payload must be a JSON object.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_scan.validation"},
+            )
+        else:
+            payload = raw_payload
         selection_only = bool(
             payload.get("selectionOnly")
             if "selectionOnly" in payload
@@ -896,15 +1202,12 @@ def create_autocad_blueprint(
         try:
             max_entities = int(max_entities_raw)
         except Exception:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "maxEntities must be an integer.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="maxEntities must be an integer.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_scan.validation"},
             )
         max_entities = max(500, min(200000, max_entities))
         terminal_profile = _normalize_terminal_profile(
@@ -950,15 +1253,16 @@ def create_autocad_blueprint(
                     str(exc),
                 )
                 if not conduit_allow_com_fallback:
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "code": "DOTNET_BRIDGE_FAILED",
-                                "message": f".NET terminal scan failed: {str(exc)}",
-                            }
-                        ),
-                        503,
+                    return _error_response(
+                        code="DOTNET_BRIDGE_FAILED",
+                        message=f".NET terminal scan failed: {str(exc)}",
+                        status_code=503,
+                        request_id=request_id,
+                        meta={
+                            "stage": "terminal_scan.dotnet",
+                            "providerPath": "dotnet",
+                            "providerConfigured": conduit_provider,
+                        },
                     )
 
         manager = get_manager()
@@ -969,15 +1273,12 @@ def create_autocad_blueprint(
                 remote_addr,
                 auth_mode,
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
-                        "message": "No drawing open in AutoCAD.",
-                    }
-                ),
-                503,
+            return _error_response(
+                code="AUTOCAD_DRAWING_NOT_OPEN",
+                message="No drawing open in AutoCAD.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "terminal_scan.status", "providerPath": "com"},
             )
 
         if pythoncom is None:
@@ -986,15 +1287,12 @@ def create_autocad_blueprint(
                 remote_addr,
                 auth_mode,
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "COM_UNAVAILABLE",
-                        "message": "AutoCAD COM bridge unavailable on this platform.",
-                    }
-                ),
-                503,
+            return _error_response(
+                code="COM_UNAVAILABLE",
+                message="AutoCAD COM bridge unavailable on this platform.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "terminal_scan.status", "providerPath": "com"},
             )
 
         started_at = time.time()
@@ -1002,29 +1300,23 @@ def create_autocad_blueprint(
             pythoncom.CoInitialize()
             acad = connect_autocad()
             if acad is None:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "AUTOCAD_CONNECT_FAILED",
-                            "message": "Cannot connect to AutoCAD.",
-                        }
-                    ),
-                    503,
+                return _error_response(
+                    code="AUTOCAD_CONNECT_FAILED",
+                    message="Cannot connect to AutoCAD.",
+                    status_code=503,
+                    request_id=request_id,
+                    meta={"stage": "terminal_scan.connect", "providerPath": "com"},
                 )
 
             doc = dyn(acad.ActiveDocument)
             modelspace = dyn(doc.ModelSpace)
             if doc is None or modelspace is None:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "AUTOCAD_DOCUMENT_UNAVAILABLE",
-                            "message": "Cannot access ActiveDocument or ModelSpace.",
-                        }
-                    ),
-                    503,
+                return _error_response(
+                    code="AUTOCAD_DOCUMENT_UNAVAILABLE",
+                    message="Cannot access ActiveDocument or ModelSpace.",
+                    status_code=503,
+                    request_id=request_id,
+                    meta={"stage": "terminal_scan.connect", "providerPath": "com"},
                 )
 
             result = scan_terminal_strips(
@@ -1066,26 +1358,32 @@ def create_autocad_blueprint(
             # Return 200 for empty scans so UI can render diagnostics cleanly.
             return jsonify(result), 200
         except Exception as exc:
-            logger.exception(
-                "Terminal scan failed (remote=%s, auth_mode=%s)",
-                remote_addr,
-                auth_mode,
+            autocad_log_exception(
+                logger=logger,
+                message="Terminal scan failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="terminal_scan",
+                code="TERMINAL_SCAN_FAILED",
+                provider="com",
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "TERMINAL_SCAN_FAILED",
-                        "message": f"Terminal scan failed: {str(exc)}",
-                    }
-                ),
-                500,
+            return _error_response(
+                code="TERMINAL_SCAN_FAILED",
+                message=f"Terminal scan failed: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "terminal_scan", "providerPath": "com"},
             )
         finally:
             try:
                 pythoncom.CoUninitialize()
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                _log_ignored_exception(
+                    stage="terminal_scan_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
 
     @bp.route("/conduit-route/route/compute", methods=["POST"])
     @require_autocad_auth
@@ -1097,41 +1395,32 @@ def create_autocad_blueprint(
         request_id = _request_correlation_id()
 
         if not request.is_json:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "Expected application/json payload.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Expected application/json payload.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "route_compute.validation"},
             )
 
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "Request payload must be a JSON object.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Request payload must be a JSON object.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "route_compute.validation"},
             )
 
         obstacle_source = str(payload.get("obstacleSource", "client") or "client").strip().lower()
         if obstacle_source not in {"client", "autocad"}:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "obstacleSource must be 'client' or 'autocad'.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="obstacleSource must be 'client' or 'autocad'.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "route_compute.validation"},
             )
 
         resolved_payload = dict(payload)
@@ -1161,15 +1450,12 @@ def create_autocad_blueprint(
             try:
                 max_entities = int(max_entities_raw)
             except Exception:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "INVALID_REQUEST",
-                            "message": "obstacleScan.maxEntities must be an integer.",
-                        }
-                    ),
-                    400,
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="obstacleScan.maxEntities must be an integer.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "route_compute.obstacle_scan.validation"},
                 )
             max_entities = max(500, min(200000, max_entities))
 
@@ -1179,15 +1465,12 @@ def create_autocad_blueprint(
                 canvas_width = max(120.0, float(canvas_width_raw))
                 canvas_height = max(120.0, float(canvas_height_raw))
             except Exception:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "INVALID_REQUEST",
-                            "message": "canvasWidth/canvasHeight must be numbers.",
-                        }
-                    ),
-                    400,
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="canvasWidth/canvasHeight must be numbers.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "route_compute.obstacle_scan.validation"},
                 )
 
             layer_names, layer_type_overrides, layer_rules_meta = _resolve_obstacle_layer_rules(
@@ -1248,15 +1531,16 @@ def create_autocad_blueprint(
                         str(exc),
                     )
                     if not conduit_allow_com_fallback:
-                        return (
-                            jsonify(
-                                {
-                                    "success": False,
-                                    "code": "DOTNET_BRIDGE_FAILED",
-                                    "message": f".NET obstacle scan failed: {str(exc)}",
-                                }
-                            ),
-                            503,
+                        return _error_response(
+                            code="DOTNET_BRIDGE_FAILED",
+                            message=f".NET obstacle scan failed: {str(exc)}",
+                            status_code=503,
+                            request_id=request_id,
+                            meta={
+                                "stage": "route_compute.obstacle_scan.dotnet",
+                                "providerPath": "dotnet",
+                                "providerConfigured": conduit_provider,
+                            },
                         )
 
             if obstacle_scan_result is None:
@@ -1269,14 +1553,16 @@ def create_autocad_blueprint(
                         auth_mode,
                     )
                     return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "code": "AUTOCAD_DRAWING_NOT_OPEN",
-                                "message": "No drawing open in AutoCAD.",
-                            }
-                        ),
-                        503,
+                        _error_response(
+                            code="AUTOCAD_DRAWING_NOT_OPEN",
+                            message="No drawing open in AutoCAD.",
+                            status_code=503,
+                            request_id=request_id,
+                            meta={
+                                "stage": "route_compute.obstacle_scan.status",
+                                "providerPath": "com",
+                            },
+                        )
                     )
                 if pythoncom is None:
                     logger.warning(
@@ -1285,14 +1571,16 @@ def create_autocad_blueprint(
                         auth_mode,
                     )
                     return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "code": "COM_UNAVAILABLE",
-                                "message": "AutoCAD COM bridge unavailable on this platform.",
-                            }
-                        ),
-                        503,
+                        _error_response(
+                            code="COM_UNAVAILABLE",
+                            message="AutoCAD COM bridge unavailable on this platform.",
+                            status_code=503,
+                            request_id=request_id,
+                            meta={
+                                "stage": "route_compute.obstacle_scan.status",
+                                "providerPath": "com",
+                            },
+                        )
                     )
 
                 try:
@@ -1300,29 +1588,29 @@ def create_autocad_blueprint(
                     pythoncom.CoInitialize()
                     acad = connect_autocad()
                     if acad is None:
-                        return (
-                            jsonify(
-                                {
-                                    "success": False,
-                                    "code": "AUTOCAD_CONNECT_FAILED",
-                                    "message": "Cannot connect to AutoCAD.",
-                                }
-                            ),
-                            503,
+                        return _error_response(
+                            code="AUTOCAD_CONNECT_FAILED",
+                            message="Cannot connect to AutoCAD.",
+                            status_code=503,
+                            request_id=request_id,
+                            meta={
+                                "stage": "route_compute.obstacle_scan.connect",
+                                "providerPath": "com",
+                            },
                         )
 
                     doc = dyn(acad.ActiveDocument)
                     modelspace = dyn(doc.ModelSpace)
                     if doc is None or modelspace is None:
-                        return (
-                            jsonify(
-                                {
-                                    "success": False,
-                                    "code": "AUTOCAD_DOCUMENT_UNAVAILABLE",
-                                    "message": "Cannot access ActiveDocument or ModelSpace.",
-                                }
-                            ),
-                            503,
+                        return _error_response(
+                            code="AUTOCAD_DOCUMENT_UNAVAILABLE",
+                            message="Cannot access ActiveDocument or ModelSpace.",
+                            status_code=503,
+                            request_id=request_id,
+                            meta={
+                                "stage": "route_compute.obstacle_scan.connect",
+                                "providerPath": "com",
+                            },
                         )
 
                     obstacle_scan_result = scan_conduit_obstacles(
@@ -1347,8 +1635,12 @@ def create_autocad_blueprint(
                 finally:
                     try:
                         pythoncom.CoUninitialize()
-                    except Exception:
-                        pass
+                    except Exception as cleanup_exc:
+                        _log_ignored_exception(
+                            stage="route_compute_obstacle_scan_cleanup",
+                            reason="CoUninitialize failed",
+                            exc=cleanup_exc,
+                        )
 
         started_at = time.time()
         try:
@@ -1413,21 +1705,23 @@ def create_autocad_blueprint(
             )
             status_code = 400 if result.get("code") == "INVALID_REQUEST" else 422
             return jsonify(result), status_code
-        except Exception:
-            logger.exception(
-                "Conduit route compute failed (remote=%s, auth_mode=%s)",
-                remote_addr,
-                auth_mode,
+        except Exception as exc:
+            autocad_log_exception(
+                logger=logger,
+                message="Conduit route compute failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="route_compute",
+                code="ROUTE_COMPUTE_FAILED",
+                provider=conduit_provider,
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "ROUTE_COMPUTE_FAILED",
-                        "message": "Conduit route computation failed unexpectedly.",
-                    }
-                ),
-                500,
+            return _error_response(
+                code="ROUTE_COMPUTE_FAILED",
+                message=f"Conduit route computation failed unexpectedly: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "route_compute", "providerConfigured": conduit_provider},
             )
 
     @bp.route("/conduit-route/terminal-routes/draw", methods=["POST"])
@@ -1440,54 +1734,42 @@ def create_autocad_blueprint(
         request_id = _request_correlation_id()
 
         if not request.is_json:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "Expected application/json payload.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Expected application/json payload.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_route_draw.validation"},
             )
 
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "Request payload must be a JSON object.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Request payload must be a JSON object.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_route_draw.validation"},
             )
 
         operation = str(payload.get("operation") or "").strip().lower()
         if operation not in {"upsert", "delete", "reset"}:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "operation must be one of: upsert, delete, reset.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="operation must be one of: upsert, delete, reset.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_route_draw.validation"},
             )
 
         session_id = str(payload.get("sessionId") or payload.get("session_id") or "").strip()[:128]
         if not session_id:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "sessionId is required.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="sessionId is required.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_route_draw.validation"},
             )
 
         client_route_id = str(
@@ -1504,15 +1786,12 @@ def create_autocad_blueprint(
         try:
             text_height = max(0.01, float(text_height_raw))
         except Exception:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "textHeight must be a numeric value.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="textHeight must be a numeric value.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_route_draw.validation"},
             )
 
         warnings: list[str] = []
@@ -1527,15 +1806,12 @@ def create_autocad_blueprint(
 
         if operation in {"upsert", "delete"}:
             if not client_route_id:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "INVALID_REQUEST",
-                            "message": "clientRouteId is required for upsert/delete operations.",
-                        }
-                    ),
-                    400,
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="clientRouteId is required for upsert/delete operations.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "terminal_route_draw.validation"},
                 )
             normalized_payload["clientRouteId"] = client_route_id
             route_candidates = 1
@@ -1547,28 +1823,22 @@ def create_autocad_blueprint(
                 if isinstance(routes_fallback, list) and routes_fallback:
                     route_payload = routes_fallback[0]
             if not isinstance(route_payload, dict):
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "INVALID_REQUEST",
-                            "message": "route object is required for upsert operation.",
-                        }
-                    ),
-                    400,
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="route object is required for upsert operation.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "terminal_route_draw.validation"},
                 )
 
             path_raw = route_payload.get("path")
             if not isinstance(path_raw, list):
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "INVALID_REQUEST",
-                            "message": "route.path must be an array.",
-                        }
-                    ),
-                    400,
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="route.path must be an array.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "terminal_route_draw.validation"},
                 )
 
             color_aci: int | None = None
@@ -1598,15 +1868,12 @@ def create_autocad_blueprint(
                     route_index=0,
                 )
             except ValueError as exc:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "INVALID_REQUEST",
-                            "message": str(exc),
-                        }
-                    ),
-                    400,
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message=str(exc),
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "terminal_route_draw.validation"},
                 )
             warnings.extend(canonical_warnings)
             normalized_payload["route"] = normalized_route
@@ -1666,56 +1933,51 @@ def create_autocad_blueprint(
                     str(exc),
                 )
                 if not conduit_allow_com_fallback:
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "code": "DOTNET_BRIDGE_FAILED",
-                                "message": f".NET terminal route draw failed: {str(exc)}",
-                                "meta": {
-                                    "source": "dotnet",
-                                    "requestId": request_id,
-                                    "operation": operation,
-                                    "sessionId": session_id,
-                                    "clientRouteId": client_route_id,
-                                    "providerPath": "dotnet",
-                                    "providerConfigured": conduit_provider,
-                                },
-                            }
-                        ),
-                        503,
+                    return _error_response(
+                        code="DOTNET_BRIDGE_FAILED",
+                        message=f".NET terminal route draw failed: {str(exc)}",
+                        status_code=503,
+                        request_id=request_id,
+                        meta={
+                            "source": "dotnet",
+                            "operation": operation,
+                            "sessionId": session_id,
+                            "clientRouteId": client_route_id,
+                            "providerPath": "dotnet",
+                            "providerConfigured": conduit_provider,
+                            "stage": "terminal_route_draw.dotnet",
+                        },
                     )
                 provider_path = "com_fallback"
 
         manager = get_manager()
         status = manager.get_status()
         if not status.get("drawing_open"):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
-                        "message": "No drawing open in AutoCAD.",
-                    }
-                ),
-                503,
+            return _error_response(
+                code="AUTOCAD_DRAWING_NOT_OPEN",
+                message="No drawing open in AutoCAD.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "terminal_route_draw.status", "providerPath": provider_path},
             )
 
         if pythoncom is None:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "COM_UNAVAILABLE",
-                        "message": "AutoCAD COM bridge unavailable on this platform.",
-                    }
-                ),
-                503,
+            return _error_response(
+                code="COM_UNAVAILABLE",
+                message="AutoCAD COM bridge unavailable on this platform.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "terminal_route_draw.status", "providerPath": provider_path},
             )
 
         started_at = time.time()
         try:
-            result = manager.plot_terminal_routes(normalized_payload)
+            result = manager.plot_terminal_routes(
+                {
+                    **normalized_payload,
+                    "requestId": request_id,
+                }
+            )
             elapsed_ms = int((time.time() - started_at) * 1000)
             merged_warnings: list[str] = []
             merged_warnings.extend(result.get("warnings", []) or [])
@@ -1741,21 +2003,26 @@ def create_autocad_blueprint(
             status_code = 400 if result.get("code") == "INVALID_REQUEST" else 422
             return jsonify(result), status_code
         except Exception as exc:
-            logger.exception(
-                "Terminal route draw failed (request_id=%s, remote=%s, auth_mode=%s)",
-                request_id,
-                remote_addr,
-                auth_mode,
+            autocad_log_exception(
+                logger=logger,
+                message="Terminal route draw failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="terminal_route_draw",
+                code="TERMINAL_ROUTE_DRAW_FAILED",
+                provider=provider_path,
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "TERMINAL_ROUTE_DRAW_FAILED",
-                        "message": f"Terminal route draw failed: {str(exc)}",
-                    }
-                ),
-                500,
+            return _error_response(
+                code="TERMINAL_ROUTE_DRAW_FAILED",
+                message=f"Terminal route draw failed: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={
+                    "stage": "terminal_route_draw",
+                    "providerPath": provider_path,
+                    "providerConfigured": conduit_provider,
+                },
             )
 
     @bp.route("/etap/cleanup/run", methods=["POST"])
@@ -1773,30 +2040,24 @@ def create_autocad_blueprint(
         request_id = _request_correlation_id()
 
         if send_autocad_dotnet_command is None:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "DOTNET_BRIDGE_UNAVAILABLE",
-                        "message": "AutoCAD .NET bridge command sender is not configured.",
-                    }
-                ),
-                503,
+            return _error_response(
+                code="DOTNET_BRIDGE_UNAVAILABLE",
+                message="AutoCAD .NET bridge command sender is not configured.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "etap_cleanup.status", "providerPath": "dotnet"},
             )
 
         payload = request.get_json(silent=True) if request.is_json else {}
         if payload is None:
             payload = {}
         if not isinstance(payload, dict):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "Request payload must be a JSON object.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Request payload must be a JSON object.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "etap_cleanup.validation", "providerPath": "dotnet"},
             )
 
         command = str(payload.get("command") or "ETAPFIX").strip().upper()
@@ -1823,15 +2084,12 @@ def create_autocad_blueprint(
         try:
             timeout_ms = int(timeout_ms_raw)
         except Exception:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "timeoutMs must be an integer.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="timeoutMs must be an integer.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "etap_cleanup.validation", "providerPath": "dotnet"},
             )
         timeout_ms = max(1000, min(600000, timeout_ms))
 
@@ -1898,55 +2156,54 @@ def create_autocad_blueprint(
                 auth_mode,
                 str(exc),
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "DOTNET_BRIDGE_FAILED",
-                        "message": f".NET ETAP cleanup action failed: {str(exc)}",
-                        "meta": {
-                            "source": "dotnet",
-                            "requestId": request_id,
-                            "providerPath": "dotnet",
-                            "providerConfigured": conduit_provider,
-                        },
-                    }
-                ),
-                503,
+            return _error_response(
+                code="DOTNET_BRIDGE_FAILED",
+                message=f".NET ETAP cleanup action failed: {str(exc)}",
+                status_code=503,
+                request_id=request_id,
+                meta={
+                    "source": "dotnet",
+                    "providerPath": "dotnet",
+                    "providerConfigured": conduit_provider,
+                    "stage": "etap_cleanup.dotnet",
+                },
             )
 
-    @bp.route("/conduit-route/terminal-labels/sync", methods=["POST"])
+    @bp.route("/conduit-route/bridge/terminal-labels/sync", methods=["POST"])
     @require_autocad_auth
     @limiter.limit("300 per hour")
-    def api_conduit_route_terminal_labels_sync():
-        """Sync terminal label attribute values onto scanned strip blocks."""
+    def api_conduit_route_bridge_terminal_labels_sync():
+        """Sync terminal label attribute values through the .NET bridge path."""
         remote_addr = str(request.remote_addr or "unknown")
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         request_id = _request_correlation_id()
 
+        if send_autocad_dotnet_command is None:
+            return _error_response(
+                code="DOTNET_BRIDGE_UNAVAILABLE",
+                message="AutoCAD .NET bridge command sender is not configured.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "bridge_terminal_label_sync.status", "providerPath": "dotnet"},
+            )
+
         if not request.is_json:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "Expected application/json payload.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Expected application/json payload.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "bridge_terminal_label_sync.validation"},
             )
 
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "Request payload must be a JSON object.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Request payload must be a JSON object.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "bridge_terminal_label_sync.validation"},
             )
 
         selection_only = bool(
@@ -1963,15 +2220,12 @@ def create_autocad_blueprint(
         try:
             max_entities = int(max_entities_raw)
         except Exception:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "maxEntities must be an integer.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="maxEntities must be an integer.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "bridge_terminal_label_sync.validation"},
             )
         max_entities = max(100, min(250000, max_entities))
 
@@ -1979,15 +2233,185 @@ def create_autocad_blueprint(
         normalized_strips: list[dict[str, Any]] = []
         if raw_strips is not None:
             if not isinstance(raw_strips, list):
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "INVALID_REQUEST",
-                            "message": "strips must be an array when provided.",
-                        }
-                    ),
-                    400,
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="strips must be an array when provided.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "bridge_terminal_label_sync.validation"},
+                )
+            for entry in raw_strips:
+                if not isinstance(entry, dict):
+                    continue
+                strip_id = str(entry.get("stripId") or entry.get("strip_id") or "").strip()
+                if not strip_id:
+                    continue
+                terminal_count_raw = entry.get("terminalCount", entry.get("terminal_count", 12))
+                try:
+                    terminal_count = int(terminal_count_raw)
+                except (TypeError, ValueError):
+                    terminal_count = 12
+                terminal_count = max(1, min(2000, terminal_count))
+                labels_raw = entry.get("labels")
+                labels = []
+                if isinstance(labels_raw, list):
+                    labels = [str(value).strip() for value in labels_raw]
+                normalized_strips.append(
+                    {
+                        "stripId": strip_id,
+                        "terminalCount": terminal_count,
+                        "labels": labels,
+                    }
+                )
+            if raw_strips and not normalized_strips:
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="No valid strip entries were provided.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "bridge_terminal_label_sync.validation"},
+                )
+
+        terminal_profile = payload.get("terminalProfile", payload.get("terminal_profile"))
+        normalized_payload: dict[str, Any] = {
+            "selectionOnly": selection_only,
+            "includeModelspace": include_modelspace,
+            "maxEntities": max_entities,
+            "terminalProfile": terminal_profile,
+            "strips": normalized_strips,
+        }
+
+        logger.info(
+            "Bridge terminal label sync request received (request_id=%s, remote=%s, auth_mode=%s, strips=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
+            request_id,
+            remote_addr,
+            auth_mode,
+            len(normalized_strips),
+            selection_only,
+            include_modelspace,
+            max_entities,
+        )
+
+        manager = get_manager()
+        status = manager.get_status()
+        if not status.get("drawing_open"):
+            return _error_response(
+                code="AUTOCAD_DRAWING_NOT_OPEN",
+                message="No drawing open in AutoCAD.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "bridge_terminal_label_sync.status", "providerPath": "dotnet"},
+            )
+
+        try:
+            result = _call_dotnet_bridge_action(
+                action="conduit_route_terminal_labels_sync",
+                payload=normalized_payload,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                request_id=request_id,
+            )
+            result["meta"] = {
+                **(result.get("meta", {}) or {}),
+                "source": "dotnet",
+                "requestId": request_id,
+                "providerPath": "dotnet",
+                "providerConfigured": conduit_provider,
+                "selectionOnly": selection_only,
+                "includeModelspace": include_modelspace,
+                "targetStrips": len(normalized_strips),
+            }
+            if result.get("success"):
+                return jsonify(result), 200
+            status_code = 400 if result.get("code") == "INVALID_REQUEST" else 422
+            return jsonify(result), status_code
+        except Exception as exc:
+            logger.warning(
+                "Bridge terminal label sync failed (request_id=%s, remote=%s, auth_mode=%s, stage=%s, code=%s, error=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+                "bridge_terminal_label_sync",
+                "DOTNET_BRIDGE_FAILED",
+                autocad_exception_message(exc),
+            )
+            return _error_response(
+                code="DOTNET_BRIDGE_FAILED",
+                message=f".NET terminal label sync failed: {autocad_exception_message(exc)}",
+                status_code=503,
+                request_id=request_id,
+                meta={
+                    "source": "dotnet",
+                    "providerPath": "dotnet",
+                    "providerConfigured": conduit_provider,
+                    "selectionOnly": selection_only,
+                    "includeModelspace": include_modelspace,
+                    "targetStrips": len(normalized_strips),
+                    "stage": "bridge_terminal_label_sync",
+                },
+            )
+
+    @bp.route("/conduit-route/terminal-labels/sync", methods=["POST"])
+    @require_autocad_auth
+    @limiter.limit("300 per hour")
+    def api_conduit_route_terminal_labels_sync():
+        """Sync terminal label attribute values onto scanned strip blocks."""
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+        request_id = _request_correlation_id()
+
+        if not request.is_json:
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Expected application/json payload.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_label_sync.validation"},
+            )
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Request payload must be a JSON object.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_label_sync.validation"},
+            )
+
+        selection_only = bool(
+            payload.get("selectionOnly")
+            if "selectionOnly" in payload
+            else payload.get("selection_only", False)
+        )
+        include_modelspace = bool(
+            payload.get("includeModelspace")
+            if "includeModelspace" in payload
+            else payload.get("include_modelspace", True)
+        )
+        max_entities_raw = payload.get("maxEntities", payload.get("max_entities", 50000))
+        try:
+            max_entities = int(max_entities_raw)
+        except Exception:
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="maxEntities must be an integer.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "terminal_label_sync.validation"},
+            )
+        max_entities = max(100, min(250000, max_entities))
+
+        raw_strips = payload.get("strips")
+        normalized_strips: list[dict[str, Any]] = []
+        if raw_strips is not None:
+            if not isinstance(raw_strips, list):
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="strips must be an array when provided.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "terminal_label_sync.validation"},
                 )
             for entry in raw_strips:
                 if not isinstance(entry, dict):
@@ -2013,15 +2437,12 @@ def create_autocad_blueprint(
                     }
                 )
             if raw_strips and not normalized_strips:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "INVALID_REQUEST",
-                            "message": "No valid strip entries were provided.",
-                        }
-                    ),
-                    400,
+                return _error_response(
+                    code="INVALID_REQUEST",
+                    message="No valid strip entries were provided.",
+                    status_code=400,
+                    request_id=request_id,
+                    meta={"stage": "terminal_label_sync.validation"},
                 )
 
         terminal_profile = payload.get("terminalProfile", payload.get("terminal_profile"))
@@ -2047,32 +2468,31 @@ def create_autocad_blueprint(
         manager = get_manager()
         status = manager.get_status()
         if not status.get("drawing_open"):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
-                        "message": "No drawing open in AutoCAD.",
-                    }
-                ),
-                503,
+            return _error_response(
+                code="AUTOCAD_DRAWING_NOT_OPEN",
+                message="No drawing open in AutoCAD.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "terminal_label_sync.status", "providerPath": "com"},
             )
 
         if pythoncom is None:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "COM_UNAVAILABLE",
-                        "message": "AutoCAD COM bridge unavailable on this platform.",
-                    }
-                ),
-                503,
+            return _error_response(
+                code="COM_UNAVAILABLE",
+                message="AutoCAD COM bridge unavailable on this platform.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "terminal_label_sync.status", "providerPath": "com"},
             )
 
         started_at = time.time()
         try:
-            result = manager.sync_terminal_labels(normalized_payload)
+            result = manager.sync_terminal_labels(
+                {
+                    **normalized_payload,
+                    "requestId": request_id,
+                }
+            )
             elapsed_ms = int((time.time() - started_at) * 1000)
             result["meta"] = {
                 **(result.get("meta", {}) or {}),
@@ -2090,21 +2510,26 @@ def create_autocad_blueprint(
             status_code = 400 if result.get("code") == "INVALID_REQUEST" else 422
             return jsonify(result), status_code
         except Exception as exc:
-            logger.exception(
-                "Terminal label sync failed (request_id=%s, remote=%s, auth_mode=%s)",
-                request_id,
-                remote_addr,
-                auth_mode,
+            autocad_log_exception(
+                logger=logger,
+                message="Terminal label sync failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="terminal_label_sync",
+                code="TERMINAL_LABEL_SYNC_FAILED",
+                provider="com",
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "TERMINAL_LABEL_SYNC_FAILED",
-                        "message": f"Terminal label sync failed: {str(exc)}",
-                    }
-                ),
-                500,
+            return _error_response(
+                code="TERMINAL_LABEL_SYNC_FAILED",
+                message=f"Terminal label sync failed: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={
+                    "stage": "terminal_label_sync",
+                    "providerPath": "com",
+                    "providerConfigured": conduit_provider,
+                },
             )
 
     @bp.route("/conduit-route/obstacles/scan", methods=["POST"])
@@ -2133,15 +2558,12 @@ def create_autocad_blueprint(
         try:
             max_entities = int(max_entities_raw)
         except Exception:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "maxEntities must be an integer.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="maxEntities must be an integer.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "obstacle_scan.validation"},
             )
         max_entities = max(500, min(200000, max_entities))
 
@@ -2151,15 +2573,12 @@ def create_autocad_blueprint(
             canvas_width = max(120.0, float(canvas_width_raw))
             canvas_height = max(120.0, float(canvas_height_raw))
         except Exception:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "INVALID_REQUEST",
-                        "message": "canvasWidth/canvasHeight must be numbers.",
-                    }
-                ),
-                400,
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="canvasWidth/canvasHeight must be numbers.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "obstacle_scan.validation"},
             )
 
         layer_names, layer_type_overrides, layer_rules_meta = _resolve_obstacle_layer_rules(
@@ -2217,15 +2636,16 @@ def create_autocad_blueprint(
                     str(exc),
                 )
                 if not conduit_allow_com_fallback:
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "code": "DOTNET_BRIDGE_FAILED",
-                                "message": f".NET obstacle scan failed: {str(exc)}",
-                            }
-                        ),
-                        503,
+                    return _error_response(
+                        code="DOTNET_BRIDGE_FAILED",
+                        message=f".NET obstacle scan failed: {str(exc)}",
+                        status_code=503,
+                        request_id=request_id,
+                        meta={
+                            "stage": "obstacle_scan.dotnet",
+                            "providerPath": "dotnet",
+                            "providerConfigured": conduit_provider,
+                        },
                     )
 
         manager = get_manager()
@@ -2236,15 +2656,12 @@ def create_autocad_blueprint(
                 remote_addr,
                 auth_mode,
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "AUTOCAD_DRAWING_NOT_OPEN",
-                        "message": "No drawing open in AutoCAD.",
-                    }
-                ),
-                503,
+            return _error_response(
+                code="AUTOCAD_DRAWING_NOT_OPEN",
+                message="No drawing open in AutoCAD.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "obstacle_scan.status", "providerPath": "com"},
             )
         if pythoncom is None:
             logger.warning(
@@ -2252,15 +2669,12 @@ def create_autocad_blueprint(
                 remote_addr,
                 auth_mode,
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "COM_UNAVAILABLE",
-                        "message": "AutoCAD COM bridge unavailable on this platform.",
-                    }
-                ),
-                503,
+            return _error_response(
+                code="COM_UNAVAILABLE",
+                message="AutoCAD COM bridge unavailable on this platform.",
+                status_code=503,
+                request_id=request_id,
+                meta={"stage": "obstacle_scan.status", "providerPath": "com"},
             )
 
         started_at = time.time()
@@ -2268,29 +2682,23 @@ def create_autocad_blueprint(
             pythoncom.CoInitialize()
             acad = connect_autocad()
             if acad is None:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "AUTOCAD_CONNECT_FAILED",
-                            "message": "Cannot connect to AutoCAD.",
-                        }
-                    ),
-                    503,
+                return _error_response(
+                    code="AUTOCAD_CONNECT_FAILED",
+                    message="Cannot connect to AutoCAD.",
+                    status_code=503,
+                    request_id=request_id,
+                    meta={"stage": "obstacle_scan.connect", "providerPath": "com"},
                 )
 
             doc = dyn(acad.ActiveDocument)
             modelspace = dyn(doc.ModelSpace)
             if doc is None or modelspace is None:
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "code": "AUTOCAD_DOCUMENT_UNAVAILABLE",
-                            "message": "Cannot access ActiveDocument or ModelSpace.",
-                        }
-                    ),
-                    503,
+                return _error_response(
+                    code="AUTOCAD_DOCUMENT_UNAVAILABLE",
+                    message="Cannot access ActiveDocument or ModelSpace.",
+                    status_code=503,
+                    request_id=request_id,
+                    meta={"stage": "obstacle_scan.connect", "providerPath": "com"},
                 )
 
             result = scan_conduit_obstacles(
@@ -2332,26 +2740,36 @@ def create_autocad_blueprint(
                 )
             return jsonify(result), 200
         except Exception as exc:
-            logger.exception(
-                "Conduit obstacle scan failed (remote=%s, auth_mode=%s)",
-                remote_addr,
-                auth_mode,
+            autocad_log_exception(
+                logger=logger,
+                message="Conduit obstacle scan failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="obstacle_scan",
+                code="OBSTACLE_SCAN_FAILED",
+                provider="com",
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "code": "OBSTACLE_SCAN_FAILED",
-                        "message": f"Conduit obstacle scan failed: {str(exc)}",
-                    }
-                ),
-                500,
+            return _error_response(
+                code="OBSTACLE_SCAN_FAILED",
+                message=f"Conduit obstacle scan failed: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={
+                    "stage": "obstacle_scan",
+                    "providerPath": "com",
+                    "providerConfigured": conduit_provider,
+                },
             )
         finally:
             try:
                 pythoncom.CoUninitialize()
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                _log_ignored_exception(
+                    stage="obstacle_scan_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
 
     @bp.route("/autocad/ws-ticket", methods=["POST"])
     @require_autocad_auth
@@ -2362,6 +2780,7 @@ def create_autocad_blueprint(
         user_id = str(user.get("id") or user.get("sub") or "").strip()
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         remote_addr = str(request.remote_addr or "unknown")
+        request_id = _request_correlation_id()
 
         try:
             ticket_payload = issue_ws_ticket(
@@ -2372,16 +2791,16 @@ def create_autocad_blueprint(
             return jsonify({"ok": True, **ticket_payload}), 200
         except Exception as exc:
             logger.exception("Failed to issue websocket ticket (remote=%s)", remote_addr)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to issue websocket ticket",
-                        "code": "WS_TICKET_ISSUE_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _error_response(
+                code="WS_TICKET_ISSUE_FAILED",
+                message=str(exc),
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "ws_ticket.issue"},
+                extra={
+                    "ok": False,
+                    "error": "Failed to issue websocket ticket",
+                },
             )
 
     return bp

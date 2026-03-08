@@ -2,6 +2,17 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from .api_autocad_error_helpers import (
+    build_error_payload as autocad_build_error_payload,
+    derive_request_id as autocad_derive_request_id,
+    exception_message as autocad_exception_message,
+    log_autocad_exception as autocad_log_exception,
+)
+from .api_autocad_failures import (
+    AutoCadConnectionError,
+    AutoCadOperationError,
+    AutoCadValidationError,
+)
 from .api_autocad_ground_grid_plot import (
     plot_ground_grid_entities as autocad_plot_ground_grid_entities_helper,
 )
@@ -43,6 +54,7 @@ class AutoCADManager:
         com_call_with_retry_fn: Any | None = None,
         foundation_source_type: str,
         print_fn: Any = print,
+        logger_fn: Any | None = None,
     ) -> None:
         self.time = time_module
         self.threading = threading_module
@@ -65,6 +77,7 @@ class AutoCADManager:
         self.com_call_with_retry = com_call_with_retry_fn or (lambda fn: fn())
         self.foundation_source_type = foundation_source_type
         self.print_fn = print_fn
+        self.logger = logger_fn
 
         self.start_time = self.time.time()
         self._lock = self.threading.Lock()
@@ -148,6 +161,80 @@ class AutoCADManager:
                 for event in self._progress_events
                 if int(event.get("event_id") or 0) > int(last_event_id)
             ]
+
+    def _resolve_request_id(self, payload: Any = None) -> str:
+        if isinstance(payload, dict):
+            raw_value = payload.get("requestId", payload.get("request_id", ""))
+        else:
+            raw_value = ""
+        return autocad_derive_request_id(raw_value, time_module=self.time)
+
+    def _error_payload(
+        self,
+        *,
+        code: str,
+        message: str,
+        request_id: str,
+        stage: str,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return autocad_build_error_payload(
+            code=code,
+            message=message,
+            request_id=request_id,
+            meta={
+                "stage": stage,
+                "source": "autocad_manager",
+            },
+            extra=extra,
+        )
+
+    def _log_exception(
+        self,
+        *,
+        message: str,
+        code: str,
+        stage: str,
+        request_id: str,
+        exc: BaseException,
+    ) -> None:
+        if self.logger is not None:
+            autocad_log_exception(
+                logger=self.logger,
+                message=message,
+                request_id=request_id,
+                remote_addr="autocad_manager",
+                auth_mode="manager",
+                stage=stage,
+                code=code,
+                provider="com",
+            )
+            return
+        self.print_fn(
+            f"[AutoCADManager] {message} "
+            f"(request_id={request_id}, stage={stage}, code={code}, error={autocad_exception_message(exc)})"
+        )
+
+    def _log_ignored_exception(
+        self,
+        *,
+        stage: str,
+        reason: str,
+        exc: BaseException,
+    ) -> None:
+        text = autocad_exception_message(exc)
+        if self.logger is not None:
+            self.logger.debug(
+                "AutoCAD manager ignored recoverable exception (stage=%s, reason=%s, error=%s)",
+                stage,
+                reason,
+                text,
+            )
+            return
+        self.print_fn(
+            f"[AutoCADManager] Ignored recoverable exception "
+            f"(stage={stage}, reason={reason}, error={text})"
+        )
 
     def is_autocad_process_running(self) -> Tuple[bool, Optional[str]]:
         """
@@ -255,8 +342,12 @@ class AutoCADManager:
                 finally:
                     try:
                         self.pythoncom.CoUninitialize()
-                    except Exception:
-                        pass
+                    except Exception as cleanup_exc:
+                        self._log_ignored_exception(
+                            stage="status_cleanup",
+                            reason="CoUninitialize failed",
+                            exc=cleanup_exc,
+                        )
 
                 status = {
                     "connected": com_ok,
@@ -310,8 +401,12 @@ class AutoCADManager:
         finally:
             try:
                 self.pythoncom.CoUninitialize()
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                self._log_ignored_exception(
+                    stage="get_layers_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
 
     def execute_layer_search(self, config: Dict, run_id: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -322,6 +417,7 @@ class AutoCADManager:
         - Export Excel and auto-open it
         """
         run_key = run_id or "default"
+        request_id = self._resolve_request_id(config)
         try:
             self._set_progress(
                 run_id=run_key,
@@ -337,7 +433,11 @@ class AutoCADManager:
             ms = self.dyn(doc.ModelSpace)
 
             if doc is None or ms is None:
-                raise RuntimeError("Cannot access AutoCAD document or modelspace")
+                raise AutoCadConnectionError(
+                    "Cannot access AutoCAD document or modelspace",
+                    code="AUTOCAD_DOCUMENT_UNAVAILABLE",
+                    stage="execute_layer_search.connect",
+                )
 
             raw_layers = config.get("layer_search_names")
             requested_layers = []
@@ -370,15 +470,18 @@ class AutoCADManager:
                     message="No layer names provided",
                     active=False,
                 )
-                return {
-                    "success": False,
-                    "points": [],
-                    "count": 0,
-                    "layers": [],
-                    "excel_path": "",
-                    "blocks_inserted": 0,
-                    "error": "No layer names provided",
-                }
+                raise AutoCadValidationError(
+                    "No layer names provided",
+                    stage="execute_layer_search.validation",
+                    extra={
+                        "points": [],
+                        "count": 0,
+                        "layers": [],
+                        "excel_path": "",
+                        "blocks_inserted": 0,
+                        "error": "No layer names provided",
+                    },
+                )
 
             requested_layer_lookup = {layer.strip().lower() for layer in requested_layers}
             prefix = config.get("prefix", "P")
@@ -396,15 +499,18 @@ class AutoCADManager:
                     message="No scan source enabled (selection/modelspace)",
                     active=False,
                 )
-                return {
-                    "success": False,
-                    "points": [],
-                    "count": 0,
-                    "layers": requested_layers,
-                    "excel_path": "",
-                    "blocks_inserted": 0,
-                    "error": "No scan source enabled: enable modelspace or selection scan",
-                }
+                raise AutoCadValidationError(
+                    "No scan source enabled: enable modelspace or selection scan",
+                    stage="execute_layer_search.validation",
+                    extra={
+                        "points": [],
+                        "count": 0,
+                        "layers": requested_layers,
+                        "excel_path": "",
+                        "blocks_inserted": 0,
+                        "error": "No scan source enabled: enable modelspace or selection scan",
+                    },
+                )
 
             points = []
             point_num = start_num
@@ -423,12 +529,20 @@ class AutoCADManager:
                 selection_sets = []
                 try:
                     selection_sets.append(self.dyn(doc.PickfirstSelectionSet))
-                except Exception:
-                    pass
+                except Exception as pickfirst_exc:
+                    self._log_ignored_exception(
+                        stage="execute_layer_search",
+                        reason="PickfirstSelectionSet unavailable",
+                        exc=pickfirst_exc,
+                    )
                 try:
                     selection_sets.append(self.dyn(doc.ActiveSelectionSet))
-                except Exception:
-                    pass
+                except Exception as active_exc:
+                    self._log_ignored_exception(
+                        stage="execute_layer_search",
+                        reason="ActiveSelectionSet unavailable",
+                        exc=active_exc,
+                    )
 
                 seen_selection_handles: set[str] = set()
                 for ss in selection_sets:
@@ -459,18 +573,24 @@ class AutoCADManager:
                         message="No selected entities found",
                         active=False,
                     )
-                    return {
-                        "success": False,
-                        "points": [],
-                        "count": 0,
-                        "layers": requested_layers,
-                        "excel_path": "",
-                        "blocks_inserted": 0,
-                        "error": (
+                    raise AutoCadValidationError(
+                        (
                             "Selection scan enabled but no selected entities were found. "
                             "Select objects in AutoCAD first or enable modelspace scan."
                         ),
-                    }
+                        stage="execute_layer_search.validation",
+                        extra={
+                            "points": [],
+                            "count": 0,
+                            "layers": requested_layers,
+                            "excel_path": "",
+                            "blocks_inserted": 0,
+                            "error": (
+                                "Selection scan enabled but no selected entities were found. "
+                                "Select objects in AutoCAD first or enable modelspace scan."
+                            ),
+                        },
+                    )
 
             modelspace_count = int(ms.Count) if include_modelspace else 0
             total_sources = len(selected_entities) + modelspace_count
@@ -482,15 +602,18 @@ class AutoCADManager:
                     message="No entities available to scan",
                     active=False,
                 )
-                return {
-                    "success": False,
-                    "points": [],
-                    "count": 0,
-                    "layers": requested_layers,
-                    "excel_path": "",
-                    "blocks_inserted": 0,
-                    "error": "No entities available to scan from configured sources",
-                }
+                raise AutoCadValidationError(
+                    "No entities available to scan from configured sources",
+                    stage="execute_layer_search.validation",
+                    extra={
+                        "points": [],
+                        "count": 0,
+                        "layers": requested_layers,
+                        "excel_path": "",
+                        "blocks_inserted": 0,
+                        "error": "No entities available to scan from configured sources",
+                    },
+                )
 
             scan_step = max(1, total_sources // 25)
             source_parts = []
@@ -623,15 +746,19 @@ class AutoCADManager:
                     message="No points found on requested layers",
                     active=False,
                 )
-                return {
-                    "success": False,
-                    "points": [],
-                    "count": 0,
-                    "layers": requested_layers,
-                    "excel_path": "",
-                    "blocks_inserted": 0,
-                    "error": f'No entities found on requested layers: {", ".join(requested_layers)}',
-                }
+                raise AutoCadValidationError(
+                    f'No entities found on requested layers: {", ".join(requested_layers)}',
+                    code="NO_POINTS_FOUND",
+                    stage="execute_layer_search.validation",
+                    extra={
+                        "points": [],
+                        "count": 0,
+                        "layers": requested_layers,
+                        "excel_path": "",
+                        "blocks_inserted": 0,
+                        "error": f'No entities found on requested layers: {", ".join(requested_layers)}',
+                    },
+                )
 
             ref_dwg = config.get("ref_dwg_path", "").strip()
             if not ref_dwg:
@@ -696,8 +823,12 @@ class AutoCADManager:
 
                 try:
                     doc.Regen(1)
-                except Exception:
-                    pass
+                except Exception as regen_exc:
+                    self._log_ignored_exception(
+                        stage="execute_layer_search",
+                        reason="Document regen failed after block insertion",
+                        exc=regen_exc,
+                    )
 
                 if blocks_inserted > 0:
                     self.print_fn(f"[execute] Inserted {blocks_inserted} reference blocks")
@@ -712,8 +843,12 @@ class AutoCADManager:
                 drawing_path = str(doc.FullName)
                 if drawing_path:
                     drawing_dir = self.os.path.dirname(drawing_path)
-            except Exception:
-                pass
+            except Exception as drawing_path_exc:
+                self._log_ignored_exception(
+                    stage="execute_layer_search",
+                    reason="Unable to resolve drawing directory for Excel export",
+                    exc=drawing_path_exc,
+                )
 
             excel_path = ""
             try:
@@ -730,8 +865,12 @@ class AutoCADManager:
                 try:
                     if hasattr(self.os, "startfile"):
                         self.os.startfile(excel_path)
-                except Exception:
-                    pass
+                except Exception as startfile_exc:
+                    self._log_ignored_exception(
+                        stage="execute_layer_search",
+                        reason="Auto-open Excel export failed",
+                        exc=startfile_exc,
+                    )
             except Exception as exc:
                 block_errors.append(f"Excel export: {exc}")
                 self.print_fn(f"[execute] Excel export error: {exc}")
@@ -754,32 +893,73 @@ class AutoCADManager:
                 "error": None,
             }
 
-        except Exception as exc:
-            self.traceback.print_exc()
+        except AutoCadOperationError as op_exc:
+            error_message = str(op_exc)
             self._set_progress(
                 run_id=run_key,
                 stage="failed",
                 progress=100,
-                message=str(exc),
+                message=error_message,
                 active=False,
             )
-            return {
-                "success": False,
-                "points": [],
-                "count": 0,
-                "layers": [],
-                "excel_path": "",
-                "blocks_inserted": 0,
-                "error": str(exc),
-            }
+            return self._error_payload(
+                code=op_exc.code,
+                message=error_message,
+                request_id=request_id,
+                stage=op_exc.stage,
+                extra={
+                    "points": [],
+                    "count": 0,
+                    "layers": [],
+                    "excel_path": "",
+                    "blocks_inserted": 0,
+                    "error": error_message,
+                    **(op_exc.extra or {}),
+                },
+            )
+        except Exception as exc:
+            error_message = autocad_exception_message(exc)
+            self._log_exception(
+                message="Layer search execution failed",
+                code="EXECUTE_LAYER_SEARCH_FAILED",
+                stage="execute_layer_search",
+                request_id=request_id,
+                exc=exc,
+            )
+            self._set_progress(
+                run_id=run_key,
+                stage="failed",
+                progress=100,
+                message=error_message,
+                active=False,
+            )
+            return self._error_payload(
+                code="EXECUTE_LAYER_SEARCH_FAILED",
+                message=f"Layer search execution failed: {error_message}",
+                request_id=request_id,
+                stage="execute_layer_search",
+                extra={
+                    "points": [],
+                    "count": 0,
+                    "layers": [],
+                    "excel_path": "",
+                    "blocks_inserted": 0,
+                    "error": error_message,
+                },
+            )
         finally:
             try:
                 self.pythoncom.CoUninitialize()
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                self._log_ignored_exception(
+                    stage="execute_layer_search_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
 
     def plot_ground_grid(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Plot generated ground-grid lines and block placements into active AutoCAD drawing."""
+        request_id = self._resolve_request_id(payload)
         try:
             self.pythoncom.CoInitialize()
 
@@ -788,17 +968,33 @@ class AutoCADManager:
             config = payload.get("config") or {}
 
             if not isinstance(conductors, list):
-                raise ValueError("Payload field 'conductors' must be an array")
+                raise AutoCadValidationError(
+                    "Payload field 'conductors' must be an array",
+                    code="GROUND_GRID_PLOT_FAILED",
+                    stage="ground_grid_plot",
+                )
             if not isinstance(placements, list):
-                raise ValueError("Payload field 'placements' must be an array")
+                raise AutoCadValidationError(
+                    "Payload field 'placements' must be an array",
+                    code="GROUND_GRID_PLOT_FAILED",
+                    stage="ground_grid_plot",
+                )
             if len(conductors) == 0 and len(placements) == 0:
-                raise ValueError("Nothing to plot: conductors and placements are both empty")
+                raise AutoCadValidationError(
+                    "Nothing to plot: conductors and placements are both empty",
+                    code="GROUND_GRID_PLOT_FAILED",
+                    stage="ground_grid_plot",
+                )
 
             acad = self.connect_autocad()
             doc = self.dyn(acad.ActiveDocument)
             ms = self.dyn(doc.ModelSpace)
             if doc is None or ms is None:
-                raise RuntimeError("Cannot access AutoCAD document or modelspace")
+                raise AutoCadConnectionError(
+                    "Cannot access AutoCAD document or modelspace",
+                    code="AUTOCAD_DOCUMENT_UNAVAILABLE",
+                    stage="ground_grid_plot.connect",
+                )
 
             result = autocad_plot_ground_grid_entities_helper(
                 doc=doc,
@@ -814,8 +1010,12 @@ class AutoCADManager:
 
             try:
                 doc.Regen(1)
-            except Exception:
-                pass
+            except Exception as regen_exc:
+                self._log_ignored_exception(
+                    stage="terminal_route_draw",
+                    reason="Document regen failed",
+                    exc=regen_exc,
+                )
 
             return {
                 "success": True,
@@ -829,25 +1029,57 @@ class AutoCADManager:
                 "test_well_block_name": result.get("test_well_block_name", ""),
             }
 
+        except AutoCadOperationError as op_exc:
+            error_message = str(op_exc)
+            return self._error_payload(
+                code=op_exc.code,
+                message=error_message,
+                request_id=request_id,
+                stage=op_exc.stage,
+                extra={
+                    "lines_drawn": 0,
+                    "blocks_inserted": 0,
+                    "layer_name": "",
+                    "test_well_block_name": "",
+                    "error": error_message,
+                    **(op_exc.extra or {}),
+                },
+            )
         except Exception as exc:
-            self.traceback.print_exc()
-            return {
-                "success": False,
-                "message": f"Ground grid plot failed: {str(exc)}",
-                "lines_drawn": 0,
-                "blocks_inserted": 0,
-                "layer_name": "",
-                "test_well_block_name": "",
-                "error": str(exc),
-            }
+            error_message = autocad_exception_message(exc)
+            self._log_exception(
+                message="Ground grid plot failed",
+                code="GROUND_GRID_PLOT_FAILED",
+                stage="ground_grid_plot",
+                request_id=request_id,
+                exc=exc,
+            )
+            return self._error_payload(
+                code="GROUND_GRID_PLOT_FAILED",
+                message=f"Ground grid plot failed: {error_message}",
+                request_id=request_id,
+                stage="ground_grid_plot",
+                extra={
+                    "lines_drawn": 0,
+                    "blocks_inserted": 0,
+                    "layer_name": "",
+                    "test_well_block_name": "",
+                    "error": error_message,
+                },
+            )
         finally:
             try:
                 self.pythoncom.CoUninitialize()
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                self._log_ignored_exception(
+                    stage="ground_grid_plot_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
 
     def plot_terminal_routes(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Apply terminal route CAD sync operation (upsert/delete/reset)."""
+        request_id = self._resolve_request_id(payload)
         try:
             self.pythoncom.CoInitialize()
 
@@ -855,7 +1087,11 @@ class AutoCADManager:
             doc = self.dyn(acad.ActiveDocument)
             ms = self.dyn(doc.ModelSpace)
             if doc is None or ms is None:
-                raise RuntimeError("Cannot access AutoCAD document or modelspace")
+                raise AutoCadConnectionError(
+                    "Cannot access AutoCAD document or modelspace",
+                    code="AUTOCAD_DOCUMENT_UNAVAILABLE",
+                    stage="terminal_route_draw.connect",
+                )
 
             result = autocad_sync_terminal_route_operation_helper(
                 doc=doc,
@@ -870,8 +1106,12 @@ class AutoCADManager:
 
             try:
                 doc.Regen(1)
-            except Exception:
-                pass
+            except Exception as regen_exc:
+                self._log_ignored_exception(
+                    stage="ground_grid_plot",
+                    reason="Document regen failed",
+                    exc=regen_exc,
+                )
 
             units_value = "Unknown"
             try:
@@ -892,8 +1132,12 @@ class AutoCADManager:
             drawing_name = "Unknown.dwg"
             try:
                 drawing_name = str(doc.Name)
-            except Exception:
-                pass
+            except Exception as drawing_name_exc:
+                self._log_ignored_exception(
+                    stage="terminal_route_draw",
+                    reason="Unable to resolve drawing name",
+                    exc=drawing_name_exc,
+                )
 
             return {
                 "success": bool(result.get("success")),
@@ -909,29 +1153,63 @@ class AutoCADManager:
                 "warnings": result.get("warnings", []),
             }
 
-        except Exception as exc:
-            self.traceback.print_exc()
-            return {
-                "success": False,
-                "code": "TERMINAL_ROUTE_DRAW_FAILED",
-                "message": f"Terminal route draw failed: {str(exc)}",
-                "data": {
-                    "drawnRoutes": 0,
-                    "drawnSegments": 0,
-                    "labelsDrawn": 0,
-                    "layersUsed": [],
+        except AutoCadOperationError as op_exc:
+            error_message = str(op_exc)
+            return self._error_payload(
+                code=op_exc.code,
+                message=error_message,
+                request_id=request_id,
+                stage=op_exc.stage,
+                extra={
+                    "data": {
+                        "drawnRoutes": 0,
+                        "drawnSegments": 0,
+                        "labelsDrawn": 0,
+                        "layersUsed": [],
+                    },
+                    "warnings": [],
+                    "error": error_message,
+                    **(op_exc.extra or {}),
                 },
-                "warnings": [],
-                "error": str(exc),
-            }
+            )
+        except Exception as exc:
+            error_message = autocad_exception_message(exc)
+            self._log_exception(
+                message="Terminal route draw failed",
+                code="TERMINAL_ROUTE_DRAW_FAILED",
+                stage="terminal_route_draw",
+                request_id=request_id,
+                exc=exc,
+            )
+            return self._error_payload(
+                code="TERMINAL_ROUTE_DRAW_FAILED",
+                message=f"Terminal route draw failed: {error_message}",
+                request_id=request_id,
+                stage="terminal_route_draw",
+                extra={
+                    "data": {
+                        "drawnRoutes": 0,
+                        "drawnSegments": 0,
+                        "labelsDrawn": 0,
+                        "layersUsed": [],
+                    },
+                    "warnings": [],
+                    "error": error_message,
+                },
+            )
         finally:
             try:
                 self.pythoncom.CoUninitialize()
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                self._log_ignored_exception(
+                    stage="terminal_route_draw_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
 
     def sync_terminal_labels(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Apply terminal strip label updates to block attributes."""
+        request_id = self._resolve_request_id(payload)
         try:
             self.pythoncom.CoInitialize()
 
@@ -944,7 +1222,7 @@ class AutoCADManager:
             max_entities_raw = payload.get("maxEntities", payload.get("max_entities", 50000))
             try:
                 max_entities = int(max_entities_raw)
-            except Exception:
+            except (TypeError, ValueError):
                 max_entities = 50000
             max_entities = max(100, min(max_entities, 250000))
 
@@ -955,7 +1233,11 @@ class AutoCADManager:
             doc = self.dyn(acad.ActiveDocument)
             ms = self.dyn(doc.ModelSpace)
             if doc is None or ms is None:
-                raise RuntimeError("Cannot access AutoCAD document or modelspace")
+                raise AutoCadConnectionError(
+                    "Cannot access AutoCAD document or modelspace",
+                    code="AUTOCAD_DOCUMENT_UNAVAILABLE",
+                    stage="terminal_label_sync.connect",
+                )
 
             result = autocad_sync_terminal_strip_labels_helper(
                 doc=doc,
@@ -970,8 +1252,12 @@ class AutoCADManager:
 
             try:
                 doc.Regen(1)
-            except Exception:
-                pass
+            except Exception as regen_exc:
+                self._log_ignored_exception(
+                    stage="terminal_label_sync",
+                    reason="Document regen failed",
+                    exc=regen_exc,
+                )
 
             units_value = "Unknown"
             try:
@@ -992,8 +1278,12 @@ class AutoCADManager:
             drawing_name = "Unknown.dwg"
             try:
                 drawing_name = str(doc.Name)
-            except Exception:
-                pass
+            except Exception as drawing_name_exc:
+                self._log_ignored_exception(
+                    stage="terminal_label_sync",
+                    reason="Unable to resolve drawing name",
+                    exc=drawing_name_exc,
+                )
 
             return {
                 "success": bool(result.get("success")),
@@ -1009,32 +1299,69 @@ class AutoCADManager:
                 "meta": result.get("meta", {}),
                 "warnings": result.get("warnings", []),
             }
-        except Exception as exc:
-            self.traceback.print_exc()
-            return {
-                "success": False,
-                "code": "TERMINAL_LABEL_SYNC_FAILED",
-                "message": f"Terminal label sync failed: {str(exc)}",
-                "data": {
-                    "updatedStrips": 0,
-                    "matchedStrips": 0,
-                    "targetStrips": 0,
-                    "matchedBlocks": 0,
-                    "updatedBlocks": 0,
-                    "updatedAttributes": 0,
-                    "unchangedAttributes": 0,
-                    "missingAttributes": 0,
-                    "failedAttributes": 0,
+        except AutoCadOperationError as op_exc:
+            error_message = str(op_exc)
+            return self._error_payload(
+                code=op_exc.code,
+                message=error_message,
+                request_id=request_id,
+                stage=op_exc.stage,
+                extra={
+                    "data": {
+                        "updatedStrips": 0,
+                        "matchedStrips": 0,
+                        "targetStrips": 0,
+                        "matchedBlocks": 0,
+                        "updatedBlocks": 0,
+                        "updatedAttributes": 0,
+                        "unchangedAttributes": 0,
+                        "missingAttributes": 0,
+                        "failedAttributes": 0,
+                    },
+                    "warnings": [],
+                    "error": error_message,
+                    **(op_exc.extra or {}),
                 },
-                "meta": {},
-                "warnings": [],
-                "error": str(exc),
-            }
+            )
+        except Exception as exc:
+            error_message = autocad_exception_message(exc)
+            self._log_exception(
+                message="Terminal label sync failed",
+                code="TERMINAL_LABEL_SYNC_FAILED",
+                stage="terminal_label_sync",
+                request_id=request_id,
+                exc=exc,
+            )
+            return self._error_payload(
+                code="TERMINAL_LABEL_SYNC_FAILED",
+                message=f"Terminal label sync failed: {error_message}",
+                request_id=request_id,
+                stage="terminal_label_sync",
+                extra={
+                    "data": {
+                        "updatedStrips": 0,
+                        "matchedStrips": 0,
+                        "targetStrips": 0,
+                        "matchedBlocks": 0,
+                        "updatedBlocks": 0,
+                        "updatedAttributes": 0,
+                        "unchangedAttributes": 0,
+                        "missingAttributes": 0,
+                        "failedAttributes": 0,
+                    },
+                    "warnings": [],
+                    "error": error_message,
+                },
+            )
         finally:
             try:
                 self.pythoncom.CoUninitialize()
-            except Exception:
-                pass
+            except Exception as cleanup_exc:
+                self._log_ignored_exception(
+                    stage="terminal_label_sync_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
 
 
 _manager: Optional[AutoCADManager] = None

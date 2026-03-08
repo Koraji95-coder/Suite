@@ -164,6 +164,13 @@ const COMMAND_GROUPS: CommandGroup[] = [
 				description: "Check known package vulnerabilities.",
 				command: "npm run ci:audit",
 			},
+			{
+				id: "autodraft-dotnet-tests",
+				name: "AutoDraft .NET Tests",
+				description: "Run AutoDraft API contract test project.",
+				command:
+					"dotnet test dotnet/autodraft-api-contract.Tests/AutoDraft.ApiContract.Tests.csproj -v minimal",
+			},
 		],
 	},
 	{

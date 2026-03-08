@@ -1,3 +1,8 @@
+import {
+	fetchWithTimeout,
+	mapFetchErrorMessage,
+	parseResponseErrorMessage,
+} from "@/lib/fetchWithTimeout";
 import { logger } from "@/lib/logger";
 
 export type TransmittalRenderResult = {
@@ -39,25 +44,6 @@ const parseFilename = (value: string | null) => {
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 45_000;
 
-const withTimeout = (
-	signal: AbortSignal | null | undefined,
-	timeoutMs: number,
-) => {
-	const controller = new AbortController();
-	const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
-	if (signal) {
-		if (signal.aborted) controller.abort();
-		else
-			signal.addEventListener("abort", () => controller.abort(), {
-				once: true,
-			});
-	}
-	return {
-		signal: controller.signal,
-		clear: () => globalThis.clearTimeout(timeout),
-	};
-};
-
 class TransmittalService {
 	private baseUrl: string;
 	private apiKey: string;
@@ -85,22 +71,7 @@ class TransmittalService {
 	}
 
 	private async parseError(response: Response) {
-		const contentType = response.headers.get("content-type") || "";
-		let message = `Request failed (${response.status})`;
-		try {
-			if (contentType.includes("application/json")) {
-				const data = (await response.json()) as
-					| { message?: string; detail?: string; error?: string }
-					| undefined;
-				message = data?.message || data?.detail || data?.error || message;
-			} else {
-				const text = await response.text();
-				if (text.trim()) message = text.trim();
-			}
-		} catch {
-			// ignore parse failures and use default message
-		}
-		return message;
+		return parseResponseErrorMessage(response, `Request failed (${response.status})`);
 	}
 
 	private async request(
@@ -108,13 +79,13 @@ class TransmittalService {
 		init: RequestInit = {},
 		timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 	) {
-		const { signal, clear } = withTimeout(init.signal, timeoutMs);
 		const headers = { ...this.getHeaders(), ...(init.headers || {}) };
 		try {
-			const response = await fetch(`${this.baseUrl}${path}`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}${path}`, {
 				...init,
 				headers,
-				signal,
+				timeoutMs,
+				requestName: `Transmittal request (${path})`,
 			});
 			if (!response.ok) {
 				const message = await this.parseError(response);
@@ -127,12 +98,9 @@ class TransmittalService {
 			}
 			return response;
 		} catch (error) {
-			if (error instanceof Error && error.name === "AbortError") {
-				throw new Error("Request timed out. Please try again.");
-			}
-			throw error;
-		} finally {
-			clear();
+			throw new Error(
+				mapFetchErrorMessage(error, "Request failed. Please try again."),
+			);
 		}
 	}
 

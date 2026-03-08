@@ -1,6 +1,7 @@
 import { Plus, Search, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import { fetchWithTimeout, mapFetchErrorMessage } from "@/lib/fetchWithTimeout";
 import styles from "./BatchFindReplaceApp.module.css";
 
 type ReplaceRule = {
@@ -53,20 +54,13 @@ export function BatchFindReplaceApp() {
 
 	const ensureBatchSession = async () => {
 		if (sessionReady) return;
-		const res = await fetch("/api/batch-find-replace/session", {
+		await fetchWithTimeout("/api/batch-find-replace/session", {
 			method: "POST",
 			credentials: "include",
+			timeoutMs: 15_000,
+			requestName: "Batch session request",
+			throwOnHttpError: true,
 		});
-		if (!res.ok) {
-			let msg = "Unable to start batch session";
-			try {
-				const payload = await res.json();
-				msg = payload?.error || msg;
-			} catch {
-				/* keep default */
-			}
-			throw new Error(msg);
-		}
 		setSessionReady(true);
 	};
 
@@ -80,18 +74,23 @@ export function BatchFindReplaceApp() {
 			files.forEach((f) => body.append("files", f));
 			body.append("rules", JSON.stringify(rules));
 
-			const res = await fetch("/api/batch-find-replace/preview", {
+			const res = await fetchWithTimeout("/api/batch-find-replace/preview", {
 				method: "POST",
 				credentials: "include",
 				body,
+				timeoutMs: 120_000,
+				requestName: "Batch preview request",
+				throwOnHttpError: true,
 			});
 			const payload = await res.json();
-			if (!res.ok) throw new Error(payload?.error || "Preview failed");
+			if (!payload?.success) {
+				throw new Error(payload?.error || "Preview failed");
+			}
 
 			setPreview(Array.isArray(payload?.matches) ? payload.matches : []);
 			setMessage(payload?.message || "Preview completed.");
 		} catch (err) {
-			setMessage(err instanceof Error ? err.message : "Preview failed.");
+			setMessage(mapFetchErrorMessage(err, "Preview failed."));
 		} finally {
 			setRunningPreview(false);
 		}
@@ -107,21 +106,14 @@ export function BatchFindReplaceApp() {
 			files.forEach((f) => body.append("files", f));
 			body.append("rules", JSON.stringify(rules));
 
-			const res = await fetch("/api/batch-find-replace/apply", {
+			const res = await fetchWithTimeout("/api/batch-find-replace/apply", {
 				method: "POST",
 				credentials: "include",
 				body,
+				timeoutMs: 120_000,
+				requestName: "Batch apply request",
+				throwOnHttpError: true,
 			});
-			if (!res.ok) {
-				let msg = "Apply failed";
-				try {
-					const payload = await res.json();
-					msg = payload?.error || msg;
-				} catch {
-					/* keep default */
-				}
-				throw new Error(msg);
-			}
 
 			const blob = await res.blob();
 			const cd = res.headers.get("content-disposition") || "";
@@ -139,7 +131,7 @@ export function BatchFindReplaceApp() {
 
 			setMessage("Apply completed. Excel change report downloaded.");
 		} catch (err) {
-			setMessage(err instanceof Error ? err.message : "Apply failed.");
+			setMessage(mapFetchErrorMessage(err, "Apply failed."));
 		} finally {
 			setApplying(false);
 		}

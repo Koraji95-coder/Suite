@@ -1,0 +1,361 @@
+.page {
+	min-height: 100vh;
+	display: grid;
+	place-items: center;
+	padding: 2rem 1rem;
+	background:
+		radial-gradient(
+			circle at 16% 12%,
+			color-mix(in srgb, var(--agent-accent-cool) 20%, transparent),
+			transparent 48%
+		),
+		radial-gradient(
+			circle at 82% 8%,
+			color-mix(in srgb, var(--agent-accent-warm) 24%, transparent),
+			transparent 50%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--agent-ambient-start) 84%, var(--bg)),
+			color-mix(in srgb, var(--agent-ambient-end) 90%, var(--bg))
+		);
+}
+
+.card {
+	position: relative;
+	width: min(760px, 100%);
+	overflow: hidden;
+	border: 1px solid color-mix(in srgb, var(--agent-surface-border-strong) 76%, transparent);
+	border-radius: 1.1rem;
+	background:
+		linear-gradient(
+			168deg,
+			color-mix(in srgb, var(--agent-surface-base) 90%, transparent),
+			color-mix(in srgb, var(--agent-surface-elevated) 84%, transparent)
+		);
+	box-shadow: var(--agent-shadow-strong);
+	padding: 1.3rem;
+	display: grid;
+	gap: 1rem;
+}
+
+.ambientGlow {
+	position: absolute;
+	top: -4rem;
+	right: -3rem;
+	width: 13rem;
+	height: 13rem;
+	pointer-events: none;
+	opacity: 0.7;
+	background: radial-gradient(
+		circle,
+		color-mix(in srgb, var(--agent-accent-warm) 40%, transparent),
+		transparent 70%
+	);
+	filter: blur(20px);
+}
+
+.headerBlock {
+	position: relative;
+	display: grid;
+	gap: 0.9rem;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	gap: 0.8rem;
+}
+
+.iconWrap {
+	width: 2.35rem;
+	height: 2.35rem;
+	border-radius: 0.72rem;
+	display: grid;
+	place-items: center;
+	background: color-mix(in srgb, var(--agent-accent-cool) 14%, transparent);
+	color: color-mix(in srgb, var(--agent-accent-cool) 78%, var(--text) 22%);
+	border: 1px solid color-mix(in srgb, var(--agent-accent-cool) 38%, transparent);
+}
+
+.kicker {
+	margin: 0;
+	font-size: 0.73rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.11em;
+	color: color-mix(in srgb, var(--text-muted) 80%, transparent);
+}
+
+.title {
+	margin: 0.15rem 0 0;
+	font-size: 1.2rem;
+	font-weight: 700;
+	color: color-mix(in srgb, var(--text) 96%, #fff 4%);
+}
+
+.subtitle {
+	margin: 0.26rem 0 0;
+	font-size: 0.86rem;
+	color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+}
+
+.stepGrid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.6rem;
+}
+
+.stepCard {
+	padding: 0.58rem 0.62rem;
+	border-radius: 0.65rem;
+	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 88%, transparent);
+	background: color-mix(in srgb, var(--agent-surface-elevated) 68%, transparent);
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease,
+		transform var(--agent-motion-fast) ease;
+}
+
+.stepCardActive {
+	border-color: color-mix(in srgb, var(--agent-accent-cool) 52%, transparent);
+	background: color-mix(in srgb, var(--agent-accent-cool) 12%, transparent);
+}
+
+.stepCardComplete {
+	border-color: color-mix(in srgb, var(--success) 42%, transparent);
+	background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.stepCardError {
+	border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+	background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.stepLabel {
+	margin: 0;
+	font-size: 0.72rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+}
+
+.stepValue {
+	margin: 0.22rem 0 0;
+	font-size: 0.79rem;
+	color: color-mix(in srgb, var(--text) 92%, transparent);
+}
+
+.statusShell {
+	display: grid;
+	place-items: center;
+	gap: 0.56rem;
+	padding: 0.72rem 0.5rem 0.3rem;
+	border-radius: 0.85rem;
+	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 82%, transparent);
+	background: color-mix(in srgb, var(--agent-surface-elevated) 64%, transparent);
+}
+
+.animationWrap {
+	position: relative;
+	display: grid;
+	place-items: center;
+	padding: 0.2rem;
+}
+
+.ring {
+	width: 5.25rem;
+	height: 5.25rem;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--agent-accent-cool) 34%, transparent);
+	display: grid;
+	place-items: center;
+	animation: spin 8s linear infinite;
+}
+
+.pulse {
+	width: 3.2rem;
+	height: 3.2rem;
+	border-radius: 999px;
+	border: 2px dashed color-mix(in srgb, var(--agent-accent-cool) 52%, transparent);
+	animation: spin 4.2s linear infinite reverse;
+}
+
+.core {
+	position: absolute;
+	width: 0.85rem;
+	height: 0.85rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--agent-accent-warm) 82%, var(--success) 18%);
+	box-shadow: 0 0 0 0 color-mix(in srgb, var(--agent-accent-warm) 45%, transparent);
+	animation: ping 1.6s ease-out infinite;
+}
+
+.status {
+	margin: 0;
+	font-size: 0.93rem;
+	color: color-mix(in srgb, var(--text) 92%, transparent);
+	text-align: center;
+}
+
+.progressBlock {
+	display: grid;
+	gap: 0.42rem;
+}
+
+.progressTrack {
+	height: 0.58rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--agent-surface-elevated) 86%, transparent);
+	overflow: hidden;
+}
+
+.progressBar {
+	height: 100%;
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--agent-accent-warm) 88%, #ffc17b 12%),
+		color-mix(in srgb, var(--agent-accent-cool) 85%, #aee9ff 15%)
+	);
+	transition: width 120ms linear;
+}
+
+.progressText {
+	margin: 0;
+	font-size: 0.82rem;
+	color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+	text-align: center;
+}
+
+.stateRow {
+	display: flex;
+	justify-content: center;
+}
+
+.badgeNeutral,
+.badgeSuccess,
+.badgeError {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.35rem 0.65rem;
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	border: 1px solid transparent;
+}
+
+.badgeNeutral {
+	background: color-mix(in srgb, var(--agent-surface-elevated) 86%, transparent);
+	color: color-mix(in srgb, var(--text) 90%, transparent);
+	border-color: color-mix(in srgb, var(--agent-surface-border) 90%, transparent);
+}
+
+.badgeSuccess {
+	background: color-mix(in srgb, var(--success) 20%, transparent);
+	color: color-mix(in srgb, var(--success) 80%, white 20%);
+	border-color: color-mix(in srgb, var(--success) 45%, transparent);
+}
+
+.badgeError {
+	background: color-mix(in srgb, var(--danger) 20%, transparent);
+	color: color-mix(in srgb, var(--danger) 80%, white 20%);
+	border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+.error {
+	margin: 0;
+	font-size: 0.9rem;
+	text-align: center;
+	color: color-mix(in srgb, var(--danger) 85%, white 15%);
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.6rem;
+}
+
+.buttonPrimary,
+.buttonSecondary {
+	border-radius: 0.72rem;
+	padding: 0.58rem 0.96rem;
+	font-size: 0.84rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		filter var(--agent-motion-fast) ease,
+		transform var(--agent-motion-fast) ease;
+}
+
+.buttonPrimary {
+	border: 1px solid color-mix(in srgb, var(--agent-accent-warm) 55%, transparent);
+	color: color-mix(in srgb, var(--primary-contrast) 88%, #000 12%);
+	background: linear-gradient(
+		132deg,
+		color-mix(in srgb, var(--agent-accent-warm) 90%, #ffc17b 10%),
+		color-mix(in srgb, var(--agent-accent-cool) 78%, #b7ecff 22%)
+	);
+}
+
+.buttonSecondary {
+	border: 1px solid color-mix(in srgb, var(--agent-surface-border-strong) 82%, transparent);
+	color: color-mix(in srgb, var(--text) 90%, transparent);
+	background: color-mix(in srgb, var(--agent-surface-elevated) 85%, transparent);
+}
+
+.buttonPrimary:hover,
+.buttonSecondary:hover {
+	filter: brightness(1.06);
+}
+
+.buttonPrimary:active,
+.buttonSecondary:active {
+	transform: translateY(1px);
+}
+
+.spin {
+	animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes ping {
+	0% {
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--agent-accent-warm) 45%, transparent);
+	}
+
+	100% {
+		box-shadow: 0 0 0 18px color-mix(in srgb, var(--agent-accent-warm) 0%, transparent);
+	}
+}
+
+@media (max-width: 52rem) {
+	.stepGrid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.stepCard,
+	.progressBar,
+	.buttonPrimary,
+	.buttonSecondary,
+	.spin,
+	.ring,
+	.pulse,
+	.core {
+		transition: none;
+		animation: none;
+	}
+}

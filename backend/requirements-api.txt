@@ -1,5 +1,7 @@
 # Requirements for Coordinates Grabber API Server
-# Install with: pip install -r requirements-api.txt
+# Deterministic install (recommended): pip install -r requirements-api.lock.txt
+# Flexible install (unpinned): pip install -r requirements-api.txt
+# Refresh lock: python -m piptools compile requirements-api.in --output-file requirements-api.lock.txt
 
 flask>=3.0.0
 flask-cors>=4.0.0

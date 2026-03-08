@@ -1,12 +1,12 @@
 # Style Architecture
 
-This workspace is migrating from utility-first styling to component-owned CSS Modules.
+This workspace uses component-owned CSS Modules with a shared global token layer.
 
 ## Foundation
 
 - `tokens.css`: global design tokens (spacing, radius, container widths, semantic surfaces).
 - `globals.css`: baseline reset and app-wide defaults.
-- `theme.css`: current theme runtime bridge (still includes Tailwind for legacy components during migration).
+- `theme.css`: global theme variables and semantic color roles used by app components.
 
 ## Rules
 

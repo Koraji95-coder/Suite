@@ -10,11 +10,15 @@ import {
 	Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { buildAgentPairingSearchFromLocation } from "@/auth/agentPairingParams";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_TAGLINE } from "../appMeta";
 import { AgentPixelMark } from "../components/agent/AgentPixelMark";
-import { AGENT_PROFILES } from "../components/agent/agentProfiles";
+import {
+	AGENT_PROFILE_IDS,
+	AGENT_PROFILES,
+} from "../components/agent/agentProfiles";
 import { Badge } from "../components/primitives/Badge";
 import { Button } from "../components/primitives/Button";
 import { Panel } from "../components/primitives/Panel";
@@ -75,12 +79,11 @@ const FEATURES = [
 		icon: Sparkles,
 		title: "Multi-Agent System",
 		description:
-			"Four specialized agents — Koro, Devstral, Sentinel, Forge — each built for distinct tasks.",
+			"Five specialized agents — Koro, Devstral, Sentinel, Forge, and Draftsmith — each built for distinct tasks.",
 		to: "/app/agent",
 	},
 ] as const;
-
-const AGENT_IDS = ["koro", "devstral", "sentinel", "forge"] as const;
+const AGENT_IDS = AGENT_PROFILE_IDS;
 
 function useScrollAnimation(threshold = 0.1) {
 	const ref = useRef<HTMLDivElement>(null);
@@ -111,9 +114,29 @@ export default function LandingPage() {
 	const { schemeKey, setScheme } = useTheme();
 	const [mounted, setMounted] = useState(false);
 	const [scrolled, setScrolled] = useState(false);
+	const location = useLocation();
+	const navigate = useNavigate();
 
 	const featuresAnim = useScrollAnimation(0.1);
 	const agentsAnim = useScrollAnimation(0.1);
+
+	useEffect(() => {
+		const pairingSearch = buildAgentPairingSearchFromLocation(
+			location.search,
+			location.hash,
+		);
+		if (!pairingSearch) {
+			return;
+		}
+
+		navigate(
+			{
+				pathname: "/agent/pairing-callback",
+				search: pairingSearch,
+			},
+			{ replace: true },
+		);
+	}, [location.hash, location.search, navigate]);
 
 	useEffect(() => {
 		const id = requestAnimationFrame(() => setMounted(true));
@@ -147,6 +170,7 @@ export default function LandingPage() {
 							<AgentPixelMark
 								profileId="koro"
 								size={scrolled ? 24 : 28}
+								detailLevel="hero"
 								expression="neutral"
 							/>
 						</div>
@@ -234,6 +258,7 @@ export default function LandingPage() {
 										<AgentPixelMark
 											profileId="koro"
 											size={120}
+											detailLevel="hero"
 											expression="active"
 										/>
 									</div>
@@ -250,7 +275,7 @@ export default function LandingPage() {
 											className={styles.heroSecondaryAgent}
 											style={{ animationDelay: `${600 + i * 100}ms` }}
 										>
-											<AgentPixelMark profileId={id} size={28} />
+											<AgentPixelMark profileId={id} size={28} detailLevel="hero" />
 										</div>
 									))}
 								</HStack>
@@ -310,7 +335,7 @@ export default function LandingPage() {
 						</Badge>
 
 						<Text as="h2" size="xl" weight="semibold" block>
-							Four agents, built for distinct tasks
+							Five agents, built for distinct tasks
 						</Text>
 						<Text color="muted" size="sm" className={styles.agentsCopy} block>
 							Each agent has its own memory namespace, personality, and
@@ -339,6 +364,7 @@ export default function LandingPage() {
 											<AgentPixelMark
 												profileId={id}
 												size={32}
+												detailLevel="hero"
 												expression="neutral"
 											/>
 										</div>
@@ -426,7 +452,7 @@ export default function LandingPage() {
 					)}
 				>
 					<HStack gap={2} align="center" className={styles.footerBrand}>
-						<AgentPixelMark profileId="koro" size={16} />
+						<AgentPixelMark profileId="koro" size={16} detailLevel="hero" />
 						<Text size="xs" color="muted">
 							{APP_NAME}
 						</Text>

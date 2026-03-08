@@ -1,5 +1,6 @@
 // src/supabase/client.ts
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { shouldDetectSupabaseSessionInUrl } from "@/auth/supabaseCallback";
 import type { Database } from "./database";
 
 const supabaseUrl =
@@ -28,7 +29,7 @@ export const supabase = (_global.__supabase ??= createClient<Database>(
 		auth: {
 			storageKey: "suite-auth",
 			autoRefreshToken: true,
-			detectSessionInUrl: true,
+			detectSessionInUrl: shouldDetectSupabaseSessionInUrl,
 			persistSession: true,
 			...devAuthOverrides,
 		},

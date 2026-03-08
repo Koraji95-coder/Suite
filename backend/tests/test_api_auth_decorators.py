@@ -7,6 +7,7 @@ from backend.route_groups.api_auth_decorators import (
     decorate_require_agent_session,
     decorate_require_supabase_user,
 )
+from backend.route_groups.api_supabase_auth import SupabaseAuthProviderTimeoutError
 
 
 class TestApiAuthDecorators(unittest.TestCase):
@@ -71,6 +72,43 @@ class TestApiAuthDecorators(unittest.TestCase):
 
         self.assertEqual(wrapped("ready"), ({"ok": "ready"}, 200))
         self.assertEqual(g_obj.supabase_user, expected_user)
+
+    def test_require_supabase_user_returns_timeout_envelope(self) -> None:
+        g_obj = SimpleNamespace()
+
+        class _LoggerStub:
+            def __init__(self) -> None:
+                self.exceptions = []
+
+            def exception(self, message, *args):
+                self.exceptions.append((message, args))
+
+        logger = _LoggerStub()
+
+        def endpoint():
+            return {"ok": True}, 200
+
+        def verify(_token: str):
+            raise SupabaseAuthProviderTimeoutError()
+
+        wrapped = decorate_require_supabase_user(
+            endpoint,
+            get_bearer_token_fn=lambda: "valid-token",
+            verify_supabase_user_token_fn=verify,
+            jsonify_fn=self._jsonify,
+            g_obj=g_obj,
+            logger=logger,
+            get_request_id_fn=lambda: "req-timeout-1",
+            get_request_path_fn=lambda: "/api/agent/session",
+        )
+
+        payload, status = wrapped()
+        self.assertEqual(status, 503)
+        self.assertEqual(payload.get("success"), False)
+        self.assertEqual(payload.get("code"), "AUTH_PROVIDER_TIMEOUT")
+        self.assertEqual(payload.get("requestId"), "req-timeout-1")
+        self.assertEqual((payload.get("meta") or {}).get("retryable"), True)
+        self.assertGreaterEqual(len(logger.exceptions), 1)
 
     def test_require_agent_session_rejects_missing_or_mismatched_session(self) -> None:
         g_obj = SimpleNamespace(supabase_user={"id": "user-1"})

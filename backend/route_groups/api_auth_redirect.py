@@ -31,11 +31,13 @@ def build_auth_redirect_url(
         str(request_headers.get("Origin", "")).strip(),
         str(request_headers.get("Referer", "")).strip(),
     ]
+    normalized_candidates: list[str] = []
 
     for candidate in candidates:
         origin = normalize_origin_fn(candidate.strip())
         if not origin:
             continue
+        normalized_candidates.append(origin)
         if allowed and origin not in allowed:
             logger.warning("Rejected auth redirect origin outside allowlist: %s", origin)
             continue
@@ -52,6 +54,17 @@ def build_auth_redirect_url(
                 query = urlencode(normalized_query)
         return urlunparse((parsed.scheme, parsed.netloc, safe_path, "", query, ""))
 
+    if normalized_candidates:
+        logger.warning(
+            "Unable to build auth redirect URL for path=%s using candidates=%s",
+            safe_path,
+            normalized_candidates,
+        )
+    else:
+        logger.warning(
+            "Unable to build auth redirect URL for path=%s because no valid origin candidate was supplied.",
+            safe_path,
+        )
     return None
 
 

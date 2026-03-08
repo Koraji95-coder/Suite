@@ -15,27 +15,47 @@ import {
 	AGENT_PROFILES,
 	type AgentProfileId,
 } from "./agentProfiles";
+import type { AgentMarkState } from "./agentMarkState";
+
+function profileModelLabel(id: AgentProfileId): string {
+	const profile = AGENT_PROFILES[id];
+	if (!profile) return "";
+	const fallback = profile.modelFallbacks[0];
+	return fallback
+		? `${profile.modelPrimary} -> ${fallback}`
+		: profile.modelPrimary;
+}
 
 interface AgentProfileSwitcherProps {
 	activeProfileId: AgentProfileId;
 	onSelect: (id: AgentProfileId) => void;
 	/** Show as dropdown (default) or inline tabs */
 	variant?: "dropdown" | "tabs";
+	stateByProfile?: Partial<Record<AgentProfileId, AgentMarkState>>;
 }
 
 export function AgentProfileSwitcher({
 	activeProfileId,
 	onSelect,
 	variant = "dropdown",
+	stateByProfile,
 }: AgentProfileSwitcherProps) {
 	if (variant === "tabs") {
 		return (
-			<TabsSwitcher activeProfileId={activeProfileId} onSelect={onSelect} />
+			<TabsSwitcher
+				activeProfileId={activeProfileId}
+				onSelect={onSelect}
+				stateByProfile={stateByProfile}
+			/>
 		);
 	}
 
 	return (
-		<DropdownSwitcher activeProfileId={activeProfileId} onSelect={onSelect} />
+		<DropdownSwitcher
+			activeProfileId={activeProfileId}
+			onSelect={onSelect}
+			stateByProfile={stateByProfile}
+		/>
 	);
 }
 
@@ -45,13 +65,16 @@ export function AgentProfileSwitcher({
 function DropdownSwitcher({
 	activeProfileId,
 	onSelect,
+	stateByProfile,
 }: {
 	activeProfileId: AgentProfileId;
 	onSelect: (id: AgentProfileId) => void;
+	stateByProfile?: Partial<Record<AgentProfileId, AgentMarkState>>;
 }) {
 	const [open, setOpen] = useState(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const activeProfile = AGENT_PROFILES[activeProfileId];
+	const activeState = stateByProfile?.[activeProfileId] ?? "focus";
 
 	// Close on outside click
 	useEffect(() => {
@@ -97,10 +120,13 @@ function DropdownSwitcher({
 				<AgentPixelMark
 					profileId={activeProfileId}
 					size={26}
-					expression="active"
+					state={activeState}
 				/>
 				<Text size="sm" weight="semibold">
 					{activeProfile.name}
+				</Text>
+				<Text size="xs" color="muted" className={styles.triggerModelLabel}>
+					{activeProfile.modelPrimary}
 				</Text>
 				<ChevronDown
 					size={14}
@@ -149,7 +175,9 @@ function DropdownSwitcher({
 										<AgentPixelMark
 											profileId={id}
 											size={34}
-											expression={isActive ? "active" : "neutral"}
+											state={
+												stateByProfile?.[id] ?? (isActive ? "focus" : "idle")
+											}
 										/>
 										{isActive && (
 											<div className={styles.activeCheckBubble}>
@@ -177,6 +205,9 @@ function DropdownSwitcher({
 										<Text size="xs" color="muted" truncate>
 											{profile.tagline}
 										</Text>
+										<Text size="xs" color="muted" truncate>
+											{profileModelLabel(id)}
+										</Text>
 									</Stack>
 								</button>
 							);
@@ -186,7 +217,7 @@ function DropdownSwitcher({
 					{/* Footer hint */}
 					<div className={styles.menuFooter}>
 						<Text size="xs" color="muted">
-							Each agent has specialized capabilities
+							Each profile maps to a primary model with fallback coverage.
 						</Text>
 					</div>
 				</div>
@@ -201,9 +232,11 @@ function DropdownSwitcher({
 function TabsSwitcher({
 	activeProfileId,
 	onSelect,
+	stateByProfile,
 }: {
 	activeProfileId: AgentProfileId;
 	onSelect: (id: AgentProfileId) => void;
+	stateByProfile?: Partial<Record<AgentProfileId, AgentMarkState>>;
 }) {
 	return (
 		<div className={styles.tabsRoot}>
@@ -225,9 +258,10 @@ function TabsSwitcher({
 						<AgentPixelMark
 							profileId={id}
 							size={22}
-							expression={isActive ? "active" : "neutral"}
+							state={stateByProfile?.[id] ?? (isActive ? "focus" : "idle")}
 						/>
 						<span className={styles.tabName}>{profile.name}</span>
+						<span className={styles.tabModel}>{profile.shortName}</span>
 
 						{/* Active indicator dot */}
 						{isActive && <span className={styles.tabActiveDot} />}

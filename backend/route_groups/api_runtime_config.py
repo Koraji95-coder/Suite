@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterable
 
+AUTODRAFT_DOTNET_API_DEFAULT_URL = "http://127.0.0.1:5275"
+
 
 def resolve_api_key(
     *,
@@ -113,3 +115,11 @@ def resolve_auth_email_require_turnstile(
         .lower()
         != "false"
     )
+
+
+def resolve_autodraft_dotnet_api_url(
+    *,
+    os_module: Any,
+) -> str:
+    configured = (os_module.environ.get("AUTODRAFT_DOTNET_API_URL") or "").strip()
+    return configured or AUTODRAFT_DOTNET_API_DEFAULT_URL

@@ -3,9 +3,11 @@ import {
 	AppWindow,
 	BookOpen,
 	CalendarDays,
+	Clock3,
 	FolderOpen,
 	KeyRound,
 	LayoutDashboard,
+	LogOut,
 	Menu,
 	Settings,
 	Sparkles,
@@ -16,10 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { APP_NAME } from "../appMeta";
 import { useAuth } from "../auth/useAuth";
-import {
-	PageHeaderProvider,
-	usePageHeader,
-} from "../components/apps/ui/PageHeaderContext";
+import { PageHeaderProvider } from "../components/apps/ui/PageHeaderContext";
 import { Badge } from "../components/primitives/Badge";
 import AdminCrownPixel from "../components/roles/AdminCrownPixel";
 
@@ -28,16 +27,13 @@ import { Button } from "../components/primitives/Button";
 import { Container } from "../components/primitives/Container";
 import { Input } from "../components/primitives/Input";
 import { Panel } from "../components/primitives/Panel";
-import { HStack, Stack } from "../components/primitives/Stack";
+import { Stack } from "../components/primitives/Stack";
 import { Text } from "../components/primitives/Text";
 import { isCommandCenterAuthorized } from "../lib/devAccess";
 import { getAppRole } from "../lib/roles";
 import { cn } from "../lib/utils";
 import styles from "./AppShell.module.css";
 
-// ═══════════════════════════════════════════════════════════════════════════
-// NAV ITEMS
-// ═══════════════════════════════════════════════════════════════════════════
 const primaryNavItems = [
 	{ to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
 	{ to: "/app/projects", label: "Projects", icon: FolderOpen },
@@ -47,129 +43,6 @@ const primaryNavItems = [
 	{ to: "/app/agent", label: "Koro Agent", icon: Sparkles },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
-// APP TOPBAR
-// ═══════════════════════════════════════════════════════════════════════════
-function AppTopbar({ onMenuToggle }: { onMenuToggle: () => void }) {
-	const { signOut, user, profile, sessionAuthMethod } = useAuth();
-	const { header } = usePageHeader();
-	const [localTime, setLocalTime] = useState(() => new Date());
-
-	useEffect(() => {
-		const timer = window.setInterval(() => setLocalTime(new Date()), 1000);
-		return () => window.clearInterval(timer);
-	}, []);
-
-	const displayLabel = useMemo(() => {
-		const name = profile?.display_name?.trim();
-		if (name) return name;
-
-		const metadataName =
-			typeof user?.user_metadata?.display_name === "string"
-				? user.user_metadata.display_name.trim()
-				: typeof user?.user_metadata?.full_name === "string"
-					? user.user_metadata.full_name.trim()
-					: "";
-
-		if (metadataName) return metadataName;
-		return user?.email ?? "Signed in";
-	}, [profile?.display_name, user?.email, user?.user_metadata]);
-
-	const timeLabel = useMemo(
-		() =>
-			localTime.toLocaleTimeString([], {
-				hour: "numeric",
-				minute: "2-digit",
-				second: "2-digit",
-			}),
-		[localTime],
-	);
-
-	const passkeySessionActive = sessionAuthMethod === "passkey";
-	const appRole = useMemo(() => getAppRole(user), [user]);
-	const isAdmin = appRole === "Admin";
-
-	return (
-		<header className={styles.topbar}>
-			<div className={styles.topbarInner}>
-				{/* Mobile menu button */}
-				<button
-					type="button"
-					className={styles.mobileMenuBtn}
-					onClick={onMenuToggle}
-					aria-label="Toggle navigation menu"
-				>
-					<Menu size={18} />
-				</button>
-
-				{/* Center content (page header) */}
-				<div className={styles.centerHeader}>
-					{header.centerContent ? (
-						header.centerContent
-					) : header.title || header.subtitle || header.icon ? (
-						<Stack gap={0}>
-							<HStack gap={2} align="center">
-								{header.icon && (
-									<span className={styles.headerIconWrap}>{header.icon}</span>
-								)}
-								{header.title && (
-									<Text size="sm" weight="semibold">
-										{header.title}
-									</Text>
-								)}
-							</HStack>
-							{header.subtitle && (
-								<Text size="xs" color="muted">
-									{header.subtitle}
-								</Text>
-							)}
-						</Stack>
-					) : null}
-				</div>
-
-				{/* Right side */}
-				<HStack gap={2} align="center" className={styles.topbarActions}>
-					<span className={styles.timeBadge} aria-label="Local time">
-						{timeLabel}
-					</span>
-
-					{passkeySessionActive && (
-						<Badge
-							color="primary"
-							variant="outline"
-							size="sm"
-							className={styles.passkeyBadge}
-						>
-							<KeyRound size={12} />
-							Passkey session
-						</Badge>
-					)}
-
-					<span className={styles.userBadge}>
-						{isAdmin && <AdminCrownPixel size={15} className={styles.userCrown} />}
-						<span className={styles.userName}>{displayLabel}</span>
-						<span
-							className={cn(
-								styles.roleBadge,
-								isAdmin ? styles.roleBadgeAdmin : styles.roleBadgeUser,
-							)}
-						>
-							{appRole}
-						</span>
-					</span>
-
-					<Button variant="secondary" size="sm" onClick={() => void signOut()}>
-						Sign out
-					</Button>
-				</HStack>
-			</div>
-		</header>
-	);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// FIRST LOGIN NAME PROMPT
-// ═══════════════════════════════════════════════════════════════════════════
 function FirstLoginNamePrompt() {
 	const { user, profile, updateProfile } = useAuth();
 	const [value, setValue] = useState("");
@@ -259,15 +132,9 @@ function FirstLoginNamePrompt() {
 	);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// NAV ITEM STYLING
-// ═══════════════════════════════════════════════════════════════════════════
 const navItemClass = (isActive: boolean) =>
 	cn(styles.navItem, isActive && styles.navItemActive);
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SIDEBAR NAV
-// ═══════════════════════════════════════════════════════════════════════════
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 	const { user } = useAuth();
 	const canAccessCommandCenter = isCommandCenterAuthorized(user);
@@ -327,9 +194,6 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 	);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SIDEBAR BRAND
-// ═══════════════════════════════════════════════════════════════════════════
 function SidebarBrand() {
 	return (
 		<NavLink
@@ -350,9 +214,93 @@ function SidebarBrand() {
 	);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// DESKTOP SIDEBAR
-// ═══════════════════════════════════════════════════════════════════════════
+function SidebarSessionCluster({ compact = false }: { compact?: boolean }) {
+	const { signOut, user, profile, sessionAuthMethod } = useAuth();
+	const [localTime, setLocalTime] = useState(() => new Date());
+
+	useEffect(() => {
+		const timer = window.setInterval(() => setLocalTime(new Date()), 1000);
+		return () => window.clearInterval(timer);
+	}, []);
+
+	const displayLabel = useMemo(() => {
+		const name = profile?.display_name?.trim();
+		if (name) return name;
+
+		const metadataName =
+			typeof user?.user_metadata?.display_name === "string"
+				? user.user_metadata.display_name.trim()
+				: typeof user?.user_metadata?.full_name === "string"
+					? user.user_metadata.full_name.trim()
+					: "";
+
+		if (metadataName) return metadataName;
+		return user?.email ?? "Signed in";
+	}, [profile?.display_name, user?.email, user?.user_metadata]);
+
+	const timeLabel = useMemo(
+		() =>
+			localTime.toLocaleTimeString([], {
+				hour: "numeric",
+				minute: "2-digit",
+				second: "2-digit",
+			}),
+		[localTime],
+	);
+
+	const passkeySessionActive = sessionAuthMethod === "passkey";
+	const appRole = useMemo(() => getAppRole(user), [user]);
+	const isAdmin = appRole === "Admin";
+
+	return (
+		<div className={cn(styles.sidebarFooterCluster, compact && styles.sidebarFooterCompact)}>
+			<div className={styles.sessionClock} aria-label="Local time">
+				<Clock3 size={13} />
+				<span>{timeLabel}</span>
+			</div>
+
+			<div className={styles.sessionIdentity}>
+				{isAdmin && (
+					<AdminCrownPixel size={14} className={styles.sessionCrown} />
+				)}
+				<div className={styles.sessionIdentityText}>
+					<span className={styles.sessionName}>{displayLabel}</span>
+					<span
+						className={cn(
+							styles.sessionRole,
+							isAdmin ? styles.sessionRoleAdmin : styles.sessionRoleUser,
+						)}
+					>
+						{appRole}
+					</span>
+				</div>
+			</div>
+
+			{passkeySessionActive && (
+				<Badge
+					color="primary"
+					variant="outline"
+					size="sm"
+					className={styles.sessionPasskeyBadge}
+				>
+					<KeyRound size={11} />
+					Passkey session
+				</Badge>
+			)}
+
+			<Button
+				variant="secondary"
+				size="sm"
+				onClick={() => void signOut()}
+				className={styles.sessionSignOut}
+				iconLeft={<LogOut size={13} />}
+			>
+				Sign out
+			</Button>
+		</div>
+	);
+}
+
 function DesktopSidebar() {
 	return (
 		<aside className={styles.desktopSidebar} aria-label="Workspace navigation">
@@ -362,13 +310,13 @@ function DesktopSidebar() {
 			<div className={styles.desktopSidebarContent}>
 				<SidebarNav />
 			</div>
+			<div className={styles.desktopSidebarFooter}>
+				<SidebarSessionCluster />
+			</div>
 		</aside>
 	);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// MOBILE DRAWER
-// ═══════════════════════════════════════════════════════════════════════════
 function MobileDrawer({
 	open,
 	onClose,
@@ -389,10 +337,8 @@ function MobileDrawer({
 
 	return (
 		<div className={styles.mobileOverlay}>
-			{/* Backdrop */}
 			<div className={styles.mobileBackdrop} onClick={onClose} />
 
-			{/* Drawer */}
 			<aside className={styles.mobileDrawer}>
 				<div className={styles.mobileDrawerHeader}>
 					<SidebarBrand />
@@ -408,14 +354,14 @@ function MobileDrawer({
 				<div className={styles.mobileDrawerContent}>
 					<SidebarNav onNavigate={onClose} />
 				</div>
+				<div className={styles.mobileDrawerFooter}>
+					<SidebarSessionCluster compact />
+				</div>
 			</aside>
 		</div>
 	);
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// APP SHELL (MAIN EXPORT)
-// ═══════════════════════════════════════════════════════════════════════════
 export default function AppShell() {
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -426,18 +372,27 @@ export default function AppShell() {
 	useEffect(() => {
 		if (!pathname) return;
 		scrollRef.current?.scrollTo({ top: 0 });
+		setMobileMenuOpen(false);
 	}, [pathname]);
 
 	return (
 		<PageHeaderProvider>
 			<div className={styles.appRoot}>
-				<AppTopbar onMenuToggle={() => setMobileMenuOpen((p) => !p)} />
 				<FirstLoginNamePrompt />
 				<MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu} />
 
 				<div className={styles.shellBody}>
 					<DesktopSidebar />
 					<main ref={scrollRef} className={styles.main}>
+						<button
+							type="button"
+							className={styles.mobileMenuTrigger}
+							onClick={() => setMobileMenuOpen((previous) => !previous)}
+							aria-label="Open navigation menu"
+						>
+							<Menu size={18} />
+						</button>
+
 						<Container size="full" padded={false}>
 							<Outlet />
 						</Container>

@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { fetchWithTimeout, mapFetchErrorMessage } from "@/lib/fetchWithTimeout";
 import { supabase } from "@/supabase/client";
 
 export interface WatchdogConfig {
@@ -115,29 +116,12 @@ class WatchdogService {
 		return headers;
 	}
 
-	private async parseError(
-		response: Response,
-		fallback: string,
-	): Promise<string> {
-		try {
-			const payload = (await response.json()) as
-				| { error?: string; message?: string }
-				| undefined;
-			const message = payload?.error || payload?.message;
-			if (typeof message === "string" && message.trim().length > 0) {
-				return message.trim();
-			}
-		} catch {
-			// Ignore parse errors and keep fallback.
-		}
-		return fallback;
-	}
-
 	private async requestJson<T>(
 		path: string,
 		options?: {
 			method?: "GET" | "POST" | "PUT";
 			body?: unknown;
+			timeoutMs?: number;
 		},
 	): Promise<T> {
 		const method = options?.method || "GET";
@@ -145,28 +129,30 @@ class WatchdogService {
 			includeContentType: method !== "GET",
 		});
 
-		const response = await fetch(`${this.baseUrl}${path}`, {
-			method,
-			headers,
-			credentials: "include",
-			body: method === "GET" ? undefined : JSON.stringify(options?.body ?? {}),
-		});
+		try {
+			const response = await fetchWithTimeout(`${this.baseUrl}${path}`, {
+				method,
+				headers,
+				credentials: "include",
+				body: method === "GET" ? undefined : JSON.stringify(options?.body ?? {}),
+				timeoutMs: options?.timeoutMs ?? 20_000,
+				requestName: "Watchdog request",
+				throwOnHttpError: true,
+			});
 
-		if (!response.ok) {
-			const message = await this.parseError(
-				response,
-				`Watchdog request failed (${response.status})`,
+			return (await response.json()) as T;
+		} catch (error) {
+			throw new Error(
+				mapFetchErrorMessage(error, "Watchdog request failed."),
 			);
-			throw new Error(message);
 		}
-
-		return (await response.json()) as T;
 	}
 
 	async configure(config: WatchdogConfig): Promise<WatchdogConfigResponse> {
 		return this.requestJson<WatchdogConfigResponse>("/api/watchdog/config", {
 			method: "PUT",
 			body: config,
+			timeoutMs: 20_000,
 		});
 	}
 
@@ -174,11 +160,14 @@ class WatchdogService {
 		return this.requestJson<HeartbeatResponse>("/api/watchdog/heartbeat", {
 			method: "POST",
 			body: {},
+			timeoutMs: 25_000,
 		});
 	}
 
 	async status(): Promise<WatchdogStatusResponse> {
-		return this.requestJson<WatchdogStatusResponse>("/api/watchdog/status");
+		return this.requestJson<WatchdogStatusResponse>("/api/watchdog/status", {
+			timeoutMs: 12_000,
+		});
 	}
 
 	async pickRoot(
@@ -191,6 +180,7 @@ class WatchdogService {
 				body: {
 					initialPath: initialPath ?? null,
 				},
+				timeoutMs: 120_000,
 			},
 		);
 	}

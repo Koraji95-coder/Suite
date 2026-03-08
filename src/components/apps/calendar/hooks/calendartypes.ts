@@ -19,7 +19,7 @@ export interface CalendarEvent {
 	allDay?: boolean;
 
 	/**
-	 * Tailwind color token (your existing system)
+	 * Theme color token (existing semantic system)
 	 */
 	color?: EventColor;
 

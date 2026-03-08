@@ -85,8 +85,8 @@ DEBUG = False
 # See: https://support.pyxll.com/hc/en-gb/articles/360058200414
 try:
     gencache.EnsureModule("{00020813-0000-0000-C000-000000000046}", 0, 1, 9)  # Excel
-except Exception:
-    pass  # If cache is corrupted or doesn't exist, fall back to late binding
+except Exception as ignored_exc:
+    log_ignored_exception("Excel gencache warmup", ignored_exc)
 
 Point3D = Tuple[float, float, float]
 
@@ -171,6 +171,11 @@ def log(msg: str) -> None:
     print(msg, flush=True)
 
 
+def log_ignored_exception(context: str, exc: BaseException) -> None:
+    if DEBUG:
+        log(f"[Ignored] {context}: {format_com_error(exc)}")
+
+
 def format_com_error(exc: BaseException) -> str:
     if isinstance(exc, pywintypes.com_error):
         try:
@@ -199,8 +204,8 @@ def dyn(obj: Any) -> Any:
     try:
         if type(obj).__name__ == "CDispatch":
             return obj
-    except Exception:
-        pass
+    except Exception as ignored_exc:
+        log_ignored_exception("dyn CDispatch type check", ignored_exc)
 
     try:
         ole = obj._oleobj_  # type: ignore[attr-defined]
@@ -256,16 +261,16 @@ def get_or_create_selection_set(doc: Any, name: str) -> Any:
         ss = doc.SelectionSets.Item(name)
         ss.Clear()
         return dyn(ss)
-    except Exception:
-        pass
+    except Exception as ignored_exc:
+        log_ignored_exception("SelectionSet clear existing", ignored_exc)
     try:
         return dyn(doc.SelectionSets.Add(name))
     except Exception:
         try:
             ss = doc.SelectionSets.Item(name)
             ss.Delete()
-        except Exception:
-            pass
+        except Exception as ignored_exc:
+            log_ignored_exception("SelectionSet delete stale", ignored_exc)
         return dyn(doc.SelectionSets.Add(name))
 
 
@@ -283,8 +288,8 @@ def ensure_layer(doc: Any, layer_name: str) -> None:
             layers.Item(layer_name)
         except Exception:
             layers.Add(layer_name)
-    except Exception:
-        pass
+    except Exception as ignored_exc:
+        log_ignored_exception("ensure_layer failure", ignored_exc)
 
 
 def wait_for_command_finish(doc: Any, timeout_s: float = 10.0) -> bool:
@@ -499,8 +504,8 @@ def bbox_center(ent: Any) -> Point3D:
         y = (float(mn[1]) + float(mx[1])) / 2.0
         z = (float(mn[2]) + float(mx[2])) / 2.0 if len(mn) > 2 and len(mx) > 2 else 0.0
         return (x, y, z)
-    except Exception:
-        pass
+    except Exception as ignored_exc:
+        log_ignored_exception("bbox_center extent fallback", ignored_exc)
 
     try:
         ip = ent.InsertionPoint
@@ -1330,8 +1335,8 @@ def try_close_workbook_in_excel(target_path: str) -> bool:
 
     try:
         excel.DisplayAlerts = False
-    except Exception:
-        pass
+    except Exception as ignored_exc:
+        log_ignored_exception("excel DisplayAlerts disable", ignored_exc)
 
     closed = False
     try:
@@ -1348,15 +1353,15 @@ def try_close_workbook_in_excel(target_path: str) -> bool:
                 except Exception:
                     try:
                         wb.Close(False)
-                    except Exception:
-                        pass
+                    except Exception as ignored_exc:
+                        log_ignored_exception("excel workbook close fallback", ignored_exc)
                 closed = True
                 break
     finally:
         try:
             excel.DisplayAlerts = prev_alerts
-        except Exception:
-            pass
+        except Exception as ignored_exc:
+            log_ignored_exception("excel DisplayAlerts restore", ignored_exc)
 
     return closed
 
@@ -1589,8 +1594,8 @@ def ensure_block_exists(doc: Any, block_name: str, dwg_path: str) -> str:
         try:
             if xref_obj is not None:
                 dyn(xref_obj).Delete()
-        except Exception:
-            pass
+        except Exception as ignored_exc:
+            log_ignored_exception("xref object cleanup", ignored_exc)
 
         try:
             doc.Blocks.Item(block_name)
@@ -1674,8 +1679,8 @@ def insert_reference_block(
     br = dyn(br)
     try:
         br.Layer = layer_name
-    except Exception:
-        pass
+    except Exception as ignored_exc:
+        log_ignored_exception("set inserted block layer", ignored_exc)
     return br
 
 
@@ -1699,12 +1704,12 @@ def add_point_label(
     txt = dyn(txt)
     try:
         txt.Layer = layer_name
-    except Exception:
-        pass
+    except Exception as ignored_exc:
+        log_ignored_exception("set point label layer", ignored_exc)
     try:
         txt.Alignment = 0  # acAlignmentLeft
-    except Exception:
-        pass
+    except Exception as ignored_exc:
+        log_ignored_exception("set point label alignment", ignored_exc)
     return txt
 
 
@@ -2245,8 +2250,8 @@ class CoordinatesGrabberWindow(QMainWindow):
 
         try:
             self.doc.Regen(1)
-        except Exception:
-            pass
+        except Exception as ignored_exc:
+            log_ignored_exception("place refpoints regen", ignored_exc)
 
         self._append_log(f"[PlaceRefPoints] Placed reference points: {placed}/{len(rows)}")
     def on_browse_xlsx(self) -> None:
@@ -2297,8 +2302,8 @@ class CoordinatesGrabberWindow(QMainWindow):
 
         try:
             self._set_topmost(False)
-        except Exception:
-            pass
+        except Exception as ignored_exc:
+            log_ignored_exception("set_topmost false", ignored_exc)
 
         try:
             self.ss.Clear()
@@ -2314,8 +2319,8 @@ class CoordinatesGrabberWindow(QMainWindow):
         finally:
             try:
                 self._set_topmost(True)
-            except Exception:
-                pass
+            except Exception as ignored_exc:
+                log_ignored_exception("set_topmost true", ignored_exc)
 
         new_handles = self._collect_selection_handles()
         if not new_handles:
@@ -2384,8 +2389,8 @@ class CoordinatesGrabberWindow(QMainWindow):
             self._append_log(f"[Excel] Exported: {out_path}")
             try:
                 os.startfile(out_path)  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            except Exception as ignored_exc:
+                log_ignored_exception("open exported excel", ignored_exc)
 
             self._set_status(f"Exported + opened: {out_path}")
 
@@ -2526,8 +2531,8 @@ class CoordinatesGrabberWindow(QMainWindow):
             self._append_log(f"[LayerSearch] DONE → Exported: {out_path}")
             try:
                 os.startfile(out_path)  # type: ignore[attr-defined]
-            except Exception:
-                pass
+            except Exception as ignored_exc:
+                log_ignored_exception("open exported layer-search excel", ignored_exc)
 
             self.lbl_status.setText(f"Layer Search done → Exported: {out_path}")
         except BaseException as exc:

@@ -11,6 +11,10 @@ MAX_COLLAPSE_ITERS = 50
 POINT_DEDUPE_TOLERANCE = 1e-6
 
 
+class TerminalRouteValidationError(ValueError):
+    """Typed route normalization/validation failure."""
+
+
 def _snap_coord(value: float) -> float:
     return round(float(value), SNAP_PRECISION)
 
@@ -26,10 +30,14 @@ def _point_as_payload(point: tuple[float, float]) -> dict[str, float]:
 def _to_float(value: Any, *, field_name: str) -> float:
     try:
         parsed = float(value)
-    except Exception as exc:
-        raise ValueError(f"Invalid numeric value for '{field_name}': {value!r}") from exc
+    except (TypeError, ValueError) as exc:
+        raise TerminalRouteValidationError(
+            f"Invalid numeric value for '{field_name}': {value!r}"
+        ) from exc
     if not math.isfinite(parsed):
-        raise ValueError(f"Non-finite numeric value for '{field_name}': {value!r}")
+        raise TerminalRouteValidationError(
+            f"Non-finite numeric value for '{field_name}': {value!r}"
+        )
     return parsed
 
 
@@ -59,7 +67,9 @@ def _route_path_points(
 ) -> list[tuple[float, float]]:
     path = route.get("path")
     if not isinstance(path, list):
-        raise ValueError(f"Route index {route_index} must provide 'path' array.")
+        raise TerminalRouteValidationError(
+            f"Route index {route_index} must provide 'path' array."
+        )
 
     points: list[tuple[float, float]] = []
     for point_index, point in enumerate(path):
@@ -75,7 +85,9 @@ def _route_path_points(
         points.append(point_xy)
 
     if len(points) < 2:
-        raise ValueError(f"Route index {route_index} path requires at least two valid points.")
+        raise TerminalRouteValidationError(
+            f"Route index {route_index} path requires at least two valid points."
+        )
     return points
 
 
@@ -85,7 +97,7 @@ def _resolve_aci_color(route: Mapping[str, Any]) -> int | None:
         return None
     try:
         color = int(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return None
     if 1 <= color <= 255:
         return color
@@ -103,7 +115,7 @@ def _route_fillet_radius(route: Mapping[str, Any]) -> float:
     raw = route.get("filletRadius", route.get("fillet_radius", 0.1))
     try:
         value = float(raw)
-    except Exception:
+    except (TypeError, ValueError):
         return 0.1
     if not math.isfinite(value):
         return 0.1
@@ -330,7 +342,7 @@ def _normalize_route_points_for_cad(
 def _entity_handle(entity: Any) -> str:
     try:
         return _safe_upper(getattr(entity, "Handle", ""))
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         return ""
 
 
@@ -357,11 +369,11 @@ def _draw_line_entity(
     line = dyn_fn(line)
     try:
         line.Layer = layer_name
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         pass
     try:
         line.Color = 256  # BYLAYER
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         pass
     return _entity_handle(line)
 
@@ -402,11 +414,11 @@ def _draw_arc_entity(
     arc = dyn_fn(arc)
     try:
         arc.Layer = layer_name
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         pass
     try:
         arc.Color = 256  # BYLAYER
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         pass
     return _entity_handle(arc)
 
@@ -516,27 +528,27 @@ def _draw_route_label_entity(
         label = dyn_fn(label)
         try:
             label.Layer = layer_name
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         try:
             label.Color = 256  # BYLAYER
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         try:
             label.AttachmentPoint = 5  # Middle Center
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         try:
             label.Rotation = float(rotation)
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         try:
             label.BackgroundFill = True
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         try:
             label.UseBackgroundColor = True
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         handle = _entity_handle(label)
         if handle:
@@ -552,23 +564,23 @@ def _draw_route_label_entity(
         label = dyn_fn(label)
         try:
             label.Layer = layer_name
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         try:
             label.Color = 256  # BYLAYER
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         try:
             label.Alignment = 10  # Middle Center
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         try:
             label.TextAlignmentPoint = point
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         try:
             label.Rotation = float(rotation)
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             pass
         handle = _entity_handle(label)
         if handle:
@@ -657,7 +669,7 @@ def _point_from_payload(
     field_name: str,
 ) -> tuple[float, float]:
     if not isinstance(value, Mapping):
-        raise ValueError(f"Invalid point mapping for '{field_name}'.")
+        raise TerminalRouteValidationError(f"Invalid point mapping for '{field_name}'.")
     x = _to_float(value.get("x"), field_name=f"{field_name}.x")
     y = _to_float(value.get("y"), field_name=f"{field_name}.y")
     return _snap_point((x, y))
@@ -717,7 +729,7 @@ def _coerce_primitive_list(
                     primitive.get("end"),
                     field_name=f"route.primitives[{primitive_index}].end",
                 )
-            except ValueError as exc:
+            except TerminalRouteValidationError as exc:
                 warnings.append(str(exc))
                 continue
             if math.hypot(end[0] - start[0], end[1] - start[1]) <= 1e-9:
@@ -747,7 +759,7 @@ def _coerce_primitive_list(
                     primitive.get("turn", 1.0),
                     field_name=f"route.primitives[{primitive_index}].turn",
                 )
-            except ValueError as exc:
+            except TerminalRouteValidationError as exc:
                 warnings.append(str(exc))
                 continue
             if radius <= 1e-9:
@@ -910,7 +922,7 @@ def _draw_primitives(
                     primitive.get("end"),
                     field_name=f"route.primitives[{primitive_index}].end",
                 )
-            except ValueError as exc:
+            except TerminalRouteValidationError as exc:
                 warnings.append(f"Route '{route_ref}': {str(exc)}")
                 continue
             handle = _draw_line_entity(
@@ -950,7 +962,7 @@ def _draw_primitives(
                     primitive.get("turn", 1.0),
                     field_name=f"route.primitives[{primitive_index}].turn",
                 )
-            except ValueError as exc:
+            except TerminalRouteValidationError as exc:
                 warnings.append(f"Route '{route_ref}': {str(exc)}")
                 continue
             arc_handle = ""
@@ -1079,7 +1091,7 @@ def _draw_single_route(
 
     try:
         path_points = _route_path_points(route, route_index=route_index)
-    except ValueError:
+    except TerminalRouteValidationError:
         path_points = []
 
     if not primitives:
@@ -1093,7 +1105,7 @@ def _draw_single_route(
             ]
             primitives, primitive_warnings = _coerce_primitive_list(canonical_route)
             warnings.extend(primitive_warnings)
-        except ValueError as exc:
+        except TerminalRouteValidationError as exc:
             return {
                 "success": False,
                 "drawn_routes": 0,
@@ -1117,7 +1129,7 @@ def _draw_single_route(
             try:
                 points_for_mid.append(_point_from_payload(primitive.get("start"), field_name="primitive.start"))
                 points_for_mid.append(_point_from_payload(primitive.get("end"), field_name="primitive.end"))
-            except ValueError:
+            except TerminalRouteValidationError:
                 continue
         path_points = _dedupe_points(points_for_mid, tolerance=POINT_DEDUPE_TOLERANCE)
 

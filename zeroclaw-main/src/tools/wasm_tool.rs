@@ -32,7 +32,9 @@
 //! - Output capped at 1 MiB (enforced by [`MemoryOutputPipe`] capacity).
 
 use super::traits::{Tool, ToolResult};
-use anyhow::{bail, Context};
+#[cfg(feature = "wasm-tools")]
+use anyhow::bail;
+use anyhow::Context;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::path::Path;

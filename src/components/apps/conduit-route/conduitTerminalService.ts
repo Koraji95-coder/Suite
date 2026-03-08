@@ -1,3 +1,8 @@
+import {
+	fetchWithTimeout,
+	mapFetchErrorCode,
+	mapFetchErrorMessage,
+} from "@/lib/fetchWithTimeout";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import type {
@@ -13,15 +18,59 @@ import type {
 	TerminalScanResponse,
 } from "./conduitTerminalTypes";
 
+type TerminalLabelSyncMode = "legacy" | "bridge" | "auto";
+
 class ConduitTerminalService {
 	private baseUrl: string;
 	private apiKey: string;
 	private missingAuthWarningShown = false;
+	private terminalLabelSyncMode: TerminalLabelSyncMode;
 
 	constructor() {
 		this.baseUrl =
 			import.meta.env.VITE_COORDINATES_BACKEND_URL || "http://localhost:5000";
 		this.apiKey = import.meta.env.VITE_API_KEY ?? "";
+		this.terminalLabelSyncMode = this.normalizeTerminalLabelSyncMode(
+			import.meta.env.VITE_CONDUIT_TERMINAL_LABEL_SYNC_MODE,
+		);
+	}
+
+	private normalizeTerminalLabelSyncMode(rawValue: unknown): TerminalLabelSyncMode {
+		const value =
+			typeof rawValue === "string" ? rawValue.trim().toLowerCase() : "";
+		if (value === "bridge" || value === "auto") {
+			return value;
+		}
+		return "legacy";
+	}
+
+	private resolveTerminalLabelSyncEndpoint(options?: {
+		mode?: TerminalLabelSyncMode;
+		providerConfigured?: string;
+		dotnetSenderReady?: boolean;
+	}): string {
+		const mode = this.normalizeTerminalLabelSyncMode(
+			options?.mode ?? this.terminalLabelSyncMode,
+		);
+		if (mode === "bridge") {
+			return "/api/conduit-route/bridge/terminal-labels/sync";
+		}
+		if (mode === "legacy") {
+			return "/api/conduit-route/terminal-labels/sync";
+		}
+
+		const providerConfigured =
+			typeof options?.providerConfigured === "string"
+				? options.providerConfigured.trim().toLowerCase()
+				: "";
+		const dotnetSenderReady =
+			typeof options?.dotnetSenderReady === "boolean"
+				? options.dotnetSenderReady
+				: true;
+		if (providerConfigured === "dotnet" && dotnetSenderReady) {
+			return "/api/conduit-route/bridge/terminal-labels/sync";
+		}
+		return "/api/conduit-route/terminal-labels/sync";
 	}
 
 	private createRequestId(): string {
@@ -139,9 +188,11 @@ class ConduitTerminalService {
 		try {
 			const requestId = this.createRequestId();
 			const headers = await this.getHeaders(requestId);
-			const response = await fetch(`${this.baseUrl}/api/status`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}/api/status`, {
 				method: "GET",
 				headers,
+				timeoutMs: 15_000,
+				requestName: "AutoCAD status request",
 			});
 
 			const payload = await response.json().catch(() => null);
@@ -167,8 +218,7 @@ class ConduitTerminalService {
 							: `AutoCAD status check reported ${response.status}.`,
 			};
 		} catch (err) {
-			const message =
-				err instanceof Error ? err.message : "AutoCAD status request failed";
+			const message = mapFetchErrorMessage(err, "AutoCAD status request failed");
 			logger.error("AutoCAD status request failed", "ConduitTerminalService", err);
 			return {
 				success: false,
@@ -183,7 +233,7 @@ class ConduitTerminalService {
 		try {
 			const requestId = this.createRequestId();
 			const headers = await this.getHeaders(requestId);
-			const response = await fetch(
+			const response = await fetchWithTimeout(
 				`${this.baseUrl}/api/conduit-route/terminal-scan`,
 				{
 					method: "POST",
@@ -194,6 +244,8 @@ class ConduitTerminalService {
 						maxEntities: request.maxEntities ?? 50000,
 						terminalProfile: request.terminalProfile ?? undefined,
 					}),
+					timeoutMs: 45_000,
+					requestName: "Terminal scan request",
 				},
 			);
 
@@ -224,8 +276,7 @@ class ConduitTerminalService {
 				message: "Terminal scan returned an unexpected payload.",
 			};
 		} catch (err) {
-			const message =
-				err instanceof Error ? err.message : "Terminal scan request failed";
+			const message = mapFetchErrorMessage(err, "Terminal scan request failed");
 			logger.error(
 				"Terminal scan request failed",
 				"ConduitTerminalService",
@@ -233,7 +284,7 @@ class ConduitTerminalService {
 			);
 			return {
 				success: false,
-				code: "NETWORK_ERROR",
+				code: mapFetchErrorCode(err, "NETWORK_ERROR"),
 				message,
 			};
 		}
@@ -249,7 +300,7 @@ class ConduitTerminalService {
 				1000,
 				Math.min(600000, Math.trunc(request.timeoutMs ?? 90000)),
 			);
-			const response = await fetch(`${this.baseUrl}/api/etap/cleanup/run`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}/api/etap/cleanup/run`, {
 				method: "POST",
 				headers,
 				body: JSON.stringify({
@@ -259,6 +310,8 @@ class ConduitTerminalService {
 					timeoutMs,
 					saveDrawing: request.saveDrawing ?? false,
 				}),
+				timeoutMs: timeoutMs + 10_000,
+				requestName: "ETAP cleanup request",
 			});
 
 			const payload = (await response
@@ -291,12 +344,11 @@ class ConduitTerminalService {
 				message: "ETAP cleanup returned an unexpected payload.",
 			};
 		} catch (err) {
-			const message =
-				err instanceof Error ? err.message : "ETAP cleanup request failed";
+			const message = mapFetchErrorMessage(err, "ETAP cleanup request failed");
 			logger.error("ETAP cleanup request failed", "ConduitTerminalService", err);
 			return {
 				success: false,
-				code: "NETWORK_ERROR",
+				code: mapFetchErrorCode(err, "NETWORK_ERROR"),
 				message,
 			};
 		}
@@ -308,7 +360,7 @@ class ConduitTerminalService {
 		try {
 			const requestId = this.createRequestId();
 			const headers = await this.getHeaders(requestId);
-			const response = await fetch(
+			const response = await fetchWithTimeout(
 				`${this.baseUrl}/api/conduit-route/terminal-routes/draw`,
 				{
 					method: "POST",
@@ -322,6 +374,8 @@ class ConduitTerminalService {
 						annotateRefs: request.annotateRefs ?? true,
 						textHeight: request.textHeight ?? 0.125,
 					}),
+					timeoutMs: 120_000,
+					requestName: "Terminal route draw request",
 				},
 			);
 
@@ -355,10 +409,10 @@ class ConduitTerminalService {
 				message: "Terminal route draw returned an unexpected payload.",
 			};
 		} catch (err) {
-			const message =
-				err instanceof Error
-					? err.message
-					: "Terminal route draw request failed";
+			const message = mapFetchErrorMessage(
+				err,
+				"Terminal route draw request failed",
+			);
 			logger.error(
 				"Terminal route draw request failed",
 				"ConduitTerminalService",
@@ -366,7 +420,7 @@ class ConduitTerminalService {
 			);
 			return {
 				success: false,
-				code: "NETWORK_ERROR",
+				code: mapFetchErrorCode(err, "NETWORK_ERROR"),
 				message,
 			};
 		}
@@ -374,12 +428,18 @@ class ConduitTerminalService {
 
 	async syncTerminalLabels(
 		request: TerminalLabelSyncRequest,
+		options?: {
+			mode?: TerminalLabelSyncMode;
+			providerConfigured?: string;
+			dotnetSenderReady?: boolean;
+		},
 	): Promise<TerminalLabelSyncResponse> {
 		try {
 			const requestId = this.createRequestId();
 			const headers = await this.getHeaders(requestId);
-			const response = await fetch(
-				`${this.baseUrl}/api/conduit-route/terminal-labels/sync`,
+			const endpoint = this.resolveTerminalLabelSyncEndpoint(options);
+			const response = await fetchWithTimeout(
+				`${this.baseUrl}${endpoint}`,
 				{
 					method: "POST",
 					headers,
@@ -390,6 +450,8 @@ class ConduitTerminalService {
 						terminalProfile: request.terminalProfile ?? undefined,
 						strips: request.strips ?? [],
 					}),
+					timeoutMs: 60_000,
+					requestName: "Terminal label sync request",
 				},
 			);
 
@@ -423,10 +485,10 @@ class ConduitTerminalService {
 				message: "Terminal label sync returned an unexpected payload.",
 			};
 		} catch (err) {
-			const message =
-				err instanceof Error
-					? err.message
-					: "Terminal label sync request failed";
+			const message = mapFetchErrorMessage(
+				err,
+				"Terminal label sync request failed",
+			);
 			logger.error(
 				"Terminal label sync request failed",
 				"ConduitTerminalService",
@@ -434,7 +496,7 @@ class ConduitTerminalService {
 			);
 			return {
 				success: false,
-				code: "NETWORK_ERROR",
+				code: mapFetchErrorCode(err, "NETWORK_ERROR"),
 				message,
 			};
 		}

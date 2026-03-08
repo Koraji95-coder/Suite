@@ -21,6 +21,7 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_agent_pairing_challenge.py`: shared pairing challenge state helpers (`_purge_expired_agent_pairing_challenges`, `_create_agent_pairing_challenge`, `_consume_agent_pairing_challenge`)
 - `api_agent_abuse_controls.py`: shared agent pairing abuse/rate-control helpers (`_is_agent_pairing_action_allowed`, `_is_agent_pairing_confirm_blocked`, `_register_agent_pairing_confirm_failure`, `_clear_agent_pairing_confirm_failures`)
 - `api_agent_config.py`: shared static agent config validation (`_agent_broker_config_status`)
+- `api_agent_profiles.py`: shared agent-profile model catalog helpers (defaults + env overrides + route resolution)
 - `api_supabase_jwks.py`: shared Supabase JWT/JWKS support helpers (`_looks_like_uuid`, `_get_supabase_jwks_client`)
 - `api_passkey_capability.py`: shared passkey rollout/config status helper (`_auth_passkey_capability`)
 - `api_auth_email_abuse.py`: shared auth-email abuse/rate-control helpers (`_auth_email_key`, `_auth_email_ip_key`, `_compact_auth_email_state`, `_is_auth_email_request_allowed`)
@@ -63,11 +64,14 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_dependency_bundle.py`: shared dependency-bundle builders for route-group registration (`passkey_deps`, `agent_deps`, `transmittal_render_deps`)
 - `api_watchdog_service.py`: shared in-memory heartbeat monitor service for recursive folder snapshots/diff events (`WatchdogMonitorService`)
 - `api_agent.py`: `/api/agent/*`
+- `api_agent_orchestration.py`: `/api/agent/runs`, `/api/agent/runs/<run_id>`, `/api/agent/runs/<run_id>/events`, `/api/agent/runs/<run_id>/cancel`
+- `api_agent_orchestration_runtime.py`: persistent run-ledger + background worker orchestration runtime for parallel agent stages
+- `api_agent_orchestration_templates.py`: profile instruction templates + stage prompt builders for orchestration flows
 - `api_dashboard.py`: `/api/dashboard/load`, `/api/dashboard/load/<job_id>`
 - `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
 - `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
 - `api_transmittal_render.py`: `/api/transmittal/render`
-- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`, `/api/etap/cleanup/run`
+- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/terminal-routes/draw`, `/api/conduit-route/terminal-labels/sync`, `/api/conduit-route/bridge/terminal-labels/sync`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`, `/api/etap/cleanup/run`
 - `api_watchdog.py`: `/api/watchdog/config`, `/api/watchdog/status`, `/api/watchdog/heartbeat`, `/api/watchdog/pick-root`
 - `api_health.py`: `/health`
 - `api_registry.py`: central route-group registration for the Flask app

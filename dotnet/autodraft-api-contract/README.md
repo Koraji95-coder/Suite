@@ -19,6 +19,8 @@ execution from COM scripts into a .NET-native pipeline.
 
 ## Run locally
 
+Requires .NET SDK 8.x or newer (project targets `net8.0`).
+
 ```bash
 cd dotnet/autodraft-api-contract
 dotnet run
@@ -29,10 +31,11 @@ Default URL comes from `Properties/launchSettings.json` (currently
 
 ## Python backend integration
 
-Set this in your backend environment:
+Backend default target is `http://127.0.0.1:5275`. Set this only when you need
+to override the target address:
 
 ```bash
-AUTODRAFT_DOTNET_API_URL=http://localhost:5275
+AUTODRAFT_DOTNET_API_URL=http://127.0.0.1:5275
 ```
 
 Then the Python `/api/autodraft/*` routes will proxy `plan/execute` to this

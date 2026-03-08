@@ -42,6 +42,42 @@ def resolve_limiter_default_limits(
     ]
 
 
+def resolve_limiter_storage_uri(
+    *,
+    os_module: Any,
+    logger: Any,
+) -> str:
+    explicit_uri = (os_module.environ.get("API_LIMITER_STORAGE_URI") or "").strip()
+    if explicit_uri:
+        return explicit_uri
+
+    redis_url = (os_module.environ.get("REDIS_URL") or "").strip()
+    if redis_url:
+        return redis_url
+
+    mode = (
+        (os_module.environ.get("API_ENV") or "")
+        or (os_module.environ.get("FLASK_ENV") or "")
+        or ""
+    ).strip().lower()
+    require_shared = (
+        (os_module.environ.get("API_REQUIRE_SHARED_LIMITER_STORAGE") or "").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
+
+    if require_shared or mode in {"production", "prod"}:
+        raise RuntimeError(
+            "Shared rate-limit storage is required in production mode. "
+            "Set API_LIMITER_STORAGE_URI (or REDIS_URL) to a Redis-compatible backend."
+        )
+
+    logger.warning(
+        "Using in-memory rate-limit storage (memory://). "
+        "Set API_LIMITER_STORAGE_URI or REDIS_URL for shared limiter state."
+    )
+    return "memory://"
+
+
 def apply_security_headers(response: Any) -> Any:
     # Prevent clickjacking attacks.
     response.headers["X-Frame-Options"] = "DENY"

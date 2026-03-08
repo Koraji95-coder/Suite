@@ -32,6 +32,35 @@ export default defineConfig(({ mode }) => {
 		},
 		build: {
 			chunkSizeWarningLimit: 1800,
+			rollupOptions: {
+				output: {
+					manualChunks(id) {
+						if (!id.includes("node_modules")) return;
+						if (
+							id.includes("/react/") ||
+							id.includes("/react-dom/") ||
+							id.includes("/react-router-dom/")
+						) {
+							return "framework";
+						}
+						if (id.includes("/@supabase/")) {
+							return "supabase";
+						}
+						if (id.includes("/date-fns/")) {
+							return "date-fns";
+						}
+						if (id.includes("/lucide-react/")) {
+							return "lucide";
+						}
+						if (id.includes("/@dnd-kit/")) {
+							return "dnd-kit";
+						}
+						if (id.includes("/js-yaml/") || id.includes("/yaml/")) {
+							return "yaml-vendor";
+						}
+					},
+				},
+			},
 		},
 		optimizeDeps: {
 			exclude: ["lucide-react"],

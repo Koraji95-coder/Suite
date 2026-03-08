@@ -1053,7 +1053,7 @@ export function ConduitTerminalWorkflow() {
 				? ` Obstacle overlay: ${obstacleResult.count}.`
 				: " Obstacle overlay unavailable.";
 			const labelSyncSuffix = labelSyncResult.success
-				? ` Label sync: ${labelSyncResult.updatedStrips}/${Math.max(1, labelSyncResult.targetStrips)} strip(s) updated.`
+				? ` Label sync: ${labelSyncResult.updatedStrips}/${Math.max(1, labelSyncResult.targetStrips)} strip(s) updated via ${labelSyncResult.providerPath}.`
 				: ` Label sync failed: ${labelSyncResult.message}`;
 			setStatusMessage(
 				`${baseMessage}${jumperSuffix}${unresolvedSuffix}${preflightSuffix}${overlaySuffix}${labelSyncSuffix}`,
@@ -1143,6 +1143,7 @@ export function ConduitTerminalWorkflow() {
 		message: string;
 		updatedStrips: number;
 		targetStrips: number;
+		providerPath: string;
 	}> => {
 		if (syncingTerminalLabels) {
 			return {
@@ -1150,13 +1151,26 @@ export function ConduitTerminalWorkflow() {
 				message: "Terminal label sync already in progress.",
 				updatedStrips: 0,
 				targetStrips: 0,
+				providerPath: "client",
 			};
 		}
 
 		setSyncingTerminalLabels(true);
 		try {
+			const providerStatus = cadStatus?.conduit_route_provider;
 			const response = await conduitTerminalService.syncTerminalLabels(
 				buildTerminalLabelSyncRequest(targetScanData),
+				{
+					mode: "auto",
+					providerConfigured:
+						typeof providerStatus?.configured === "string"
+							? providerStatus.configured
+							: "",
+					dotnetSenderReady:
+						typeof providerStatus?.dotnet_sender_ready === "boolean"
+							? providerStatus.dotnet_sender_ready
+							: undefined,
+				},
 			);
 			return {
 				success: Boolean(response.success),
@@ -1167,6 +1181,7 @@ export function ConduitTerminalWorkflow() {
 						: "Terminal label sync failed."),
 				updatedStrips: response.data?.updatedStrips ?? 0,
 				targetStrips: response.data?.targetStrips ?? 0,
+				providerPath: resolveCadProviderPath(response.meta),
 			};
 		} catch (error) {
 			const message =
@@ -1178,6 +1193,7 @@ export function ConduitTerminalWorkflow() {
 				message,
 				updatedStrips: 0,
 				targetStrips: 0,
+				providerPath: "client",
 			};
 		} finally {
 			setSyncingTerminalLabels(false);
@@ -1193,7 +1209,7 @@ export function ConduitTerminalWorkflow() {
 			const result = await syncTerminalLabelsInCad(scanData);
 			if (result.success) {
 				setStatusMessage(
-					`Terminal labels synced to CAD (${result.updatedStrips}/${Math.max(1, result.targetStrips)} strip(s) updated).`,
+					`Terminal labels synced to CAD (${result.updatedStrips}/${Math.max(1, result.targetStrips)} strip(s) updated via ${result.providerPath}).`,
 				);
 				return;
 			}

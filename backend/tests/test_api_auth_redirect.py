@@ -71,6 +71,7 @@ class TestApiAuthRedirect(unittest.TestCase):
             logger=logger,
         )
         self.assertIsNone(result)
+        self.assertGreaterEqual(len(logger.warnings), 1)
 
     def test_build_external_passkey_redirect_invalid_inputs(self) -> None:
         pattern = re.compile(r"^[A-Za-z0-9_-]{20,200}$")

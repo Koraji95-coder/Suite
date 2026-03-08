@@ -1,7 +1,6 @@
 .appRoot {
 	display: flex;
 	height: 100dvh;
-	flex-direction: column;
 	overflow: hidden;
 	color: var(--text);
 	background:
@@ -16,133 +15,6 @@
 			transparent 52%
 		),
 		var(--bg);
-}
-
-.topbar {
-	flex: 0 0 auto;
-	position: relative;
-	z-index: 48;
-	border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-	background: color-mix(in srgb, var(--bg) 84%, transparent);
-	backdrop-filter: blur(12px);
-}
-
-.topbarInner {
-	display: flex;
-	width: 100%;
-	align-items: center;
-	justify-content: space-between;
-	gap: 1rem;
-	padding: 0.7rem 1rem;
-}
-
-.mobileMenuBtn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	border-radius: 0.75rem;
-	border: 1px solid var(--line-soft);
-	background: var(--surface);
-	color: var(--text);
-	padding: 0.5rem;
-	cursor: pointer;
-}
-
-.mobileMenuBtn:hover {
-	background: var(--surface-2);
-}
-
-.centerHeader {
-	display: none;
-	flex: 1;
-	justify-content: flex-start;
-	padding-inline: 0.25rem;
-}
-
-.headerIconWrap {
-	display: inline-flex;
-	height: 1.75rem;
-	width: 1.75rem;
-	align-items: center;
-	justify-content: center;
-	border-radius: 0.5rem;
-	border: 1px solid var(--line-soft);
-	background: var(--surface-2);
-	color: var(--text);
-}
-
-.topbarActions {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.5rem;
-}
-
-.timeBadge {
-	border-radius: 0.6rem;
-	border: 1px solid var(--line-soft);
-	background: var(--surface-2);
-	padding: 0.32rem 0.55rem;
-	font-size: 0.72rem;
-	color: var(--text-muted);
-}
-
-.passkeyBadge {
-	display: none;
-}
-
-.userBadge {
-	display: none;
-	align-items: center;
-	gap: 0.35rem;
-	border-radius: 0.6rem;
-	border: 1px solid var(--line-soft);
-	background:
-		linear-gradient(
-			130deg,
-			color-mix(in srgb, var(--surface) 86%, transparent),
-			color-mix(in srgb, var(--surface-2) 65%, transparent)
-		),
-		var(--surface);
-	padding: 0.32rem 0.48rem;
-	font-size: 0.72rem;
-	color: var(--text);
-}
-
-.userCrown {
-	flex: 0 0 auto;
-	filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 35%, transparent));
-}
-
-.userName {
-	max-width: 11.5rem;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.roleBadge {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	border-radius: 999px;
-	padding: 0.06rem 0.45rem;
-	font-size: 0.62rem;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	font-weight: 700;
-	border: 1px solid transparent;
-}
-
-.roleBadgeAdmin {
-	border-color: color-mix(in srgb, var(--accent) 42%, transparent);
-	background: color-mix(in srgb, var(--accent) 18%, transparent);
-	color: color-mix(in srgb, white 86%, var(--accent));
-}
-
-.roleBadgeUser {
-	border-color: color-mix(in srgb, var(--secondary) 35%, transparent);
-	background: color-mix(in srgb, var(--secondary) 15%, transparent);
-	color: color-mix(in srgb, white 72%, var(--secondary));
 }
 
 .promptOverlay {
@@ -177,12 +49,14 @@
 .shellBody {
 	display: flex;
 	flex: 1 1 auto;
+	min-width: 0;
 	overflow: hidden;
 }
 
 .desktopSidebar {
 	display: none;
-	flex: 0 0 13.75rem;
+	flex: 0 0 15rem;
+	min-width: 15rem;
 	flex-direction: column;
 	border-right: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
 	background:
@@ -197,14 +71,22 @@
 
 .desktopSidebarBrand {
 	flex: 0 0 auto;
-	padding: 1rem 0.75rem;
+	padding: 1rem 0.75rem 0.85rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
 }
 
 .desktopSidebarContent {
 	flex: 1 1 auto;
 	overflow-y: auto;
 	overscroll-behavior: contain;
-	padding: 0 0.75rem 1rem;
+	padding: 0.8rem 0.75rem 1rem;
+}
+
+.desktopSidebarFooter {
+	flex: 0 0 auto;
+	padding: 0.7rem;
+	border-top: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+	background: color-mix(in srgb, var(--surface) 62%, transparent);
 }
 
 .sidebarNav {
@@ -284,12 +166,129 @@
 	letter-spacing: -0.02em;
 }
 
+.sidebarFooterCluster {
+	display: grid;
+	gap: 0.55rem;
+}
+
+.sidebarFooterCompact {
+	gap: 0.45rem;
+}
+
+.sessionClock {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	border-radius: 0.55rem;
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-2) 75%, transparent);
+	padding: 0.32rem 0.5rem;
+	font-size: 0.69rem;
+	color: var(--text-muted);
+}
+
+.sessionIdentity {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	border-radius: 0.68rem;
+	border: 1px solid var(--line-soft);
+	background:
+		linear-gradient(
+			130deg,
+			color-mix(in srgb, var(--surface) 86%, transparent),
+			color-mix(in srgb, var(--surface-2) 65%, transparent)
+		),
+		var(--surface);
+	padding: 0.42rem 0.5rem;
+}
+
+.sessionCrown {
+	flex: 0 0 auto;
+	filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 35%, transparent));
+}
+
+.sessionIdentityText {
+	display: flex;
+	min-width: 0;
+	flex: 1;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.45rem;
+}
+
+.sessionName {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: 0.73rem;
+	color: var(--text);
+}
+
+.sessionRole {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	padding: 0.05rem 0.42rem;
+	font-size: 0.6rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	font-weight: 700;
+	border: 1px solid transparent;
+}
+
+.sessionRoleAdmin {
+	border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+	background: color-mix(in srgb, var(--accent) 18%, transparent);
+	color: color-mix(in srgb, white 86%, var(--accent));
+}
+
+.sessionRoleUser {
+	border-color: color-mix(in srgb, var(--secondary) 35%, transparent);
+	background: color-mix(in srgb, var(--secondary) 15%, transparent);
+	color: color-mix(in srgb, white 72%, var(--secondary));
+}
+
+.sessionPasskeyBadge {
+	justify-content: center;
+}
+
+.sessionSignOut {
+	width: 100%;
+	justify-content: center;
+}
+
 .main {
+	position: relative;
 	flex: 1 1 auto;
+	min-width: 0;
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	scroll-behavior: smooth;
-	padding: 0.8rem;
+	padding: 0.82rem;
+}
+
+.mobileMenuTrigger {
+	position: sticky;
+	top: 0.55rem;
+	left: 0;
+	z-index: 25;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.72rem;
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface) 88%, transparent);
+	color: var(--text);
+	padding: 0.5rem;
+	cursor: pointer;
+	backdrop-filter: blur(10px);
+	margin-bottom: 0.55rem;
+}
+
+.mobileMenuTrigger:hover {
+	background: color-mix(in srgb, var(--surface-2) 88%, transparent);
 }
 
 .mobileOverlay {
@@ -310,7 +309,7 @@
 	inset-block: 0;
 	left: 0;
 	display: flex;
-	width: min(17rem, 84vw);
+	width: min(18rem, 88vw);
 	flex-direction: column;
 	border-right: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
 	background:
@@ -328,6 +327,7 @@
 	align-items: center;
 	justify-content: space-between;
 	padding: 1rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
 }
 
 .mobileDrawerClose {
@@ -348,34 +348,29 @@
 	flex: 1 1 auto;
 	overflow-y: auto;
 	overscroll-behavior: contain;
-	padding: 0 0.75rem 1rem;
+	padding: 0.8rem 0.75rem;
 }
 
-@media (min-width: 640px) {
-	.passkeyBadge {
-		display: inline-flex;
-	}
-	.userBadge {
-		display: inline-flex;
-	}
+.mobileDrawerFooter {
+	flex: 0 0 auto;
+	padding: 0.75rem;
+	border-top: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+	background: color-mix(in srgb, var(--surface) 68%, transparent);
 }
 
 @media (min-width: 768px) {
-	.topbarInner {
-		padding-inline: 1.5rem;
-	}
-	.mobileMenuBtn {
-		display: none;
-	}
-	.centerHeader {
-		display: flex;
-	}
 	.desktopSidebar {
 		display: flex;
 	}
+
 	.main {
 		padding: 1rem 1.25rem;
 	}
+
+	.mobileMenuTrigger {
+		display: none;
+	}
+
 	.mobileOverlay {
 		display: none;
 	}

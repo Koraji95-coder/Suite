@@ -87,6 +87,51 @@ export const COLOR_SCHEMES: Record<string, ColorScheme> = {
 		glow: "rgba(59, 130, 246, 0.15)",
 	},
 
+	nexusCore: {
+		name: "Nexus Core",
+		description: "Deep navy command center with teal-cyan highlights",
+		background: "#040a15",
+		surface: "#0a1326",
+		surfaceLight: "#0f1d37",
+		primary: "#15e7d5",
+		secondary: "#4f6c8d",
+		tertiary: "#f2b94e",
+		accent: "#4f8cff",
+		text: "#eaf5ff",
+		textMuted: "#8aa5c7",
+		glow: "rgba(21, 231, 213, 0.18)",
+	},
+
+	nexusEmber: {
+		name: "Nexus Ember",
+		description: "Warm graphite command center with ember-amber accents",
+		background: "#110a06",
+		surface: "#1b110b",
+		surfaceLight: "#2a1a11",
+		primary: "#ff8a42",
+		secondary: "#b09078",
+		tertiary: "#ffba52",
+		accent: "#ffd18a",
+		text: "#fff4ea",
+		textMuted: "#cda98d",
+		glow: "rgba(255, 138, 66, 0.18)",
+	},
+
+	nexusOrchid: {
+		name: "Nexus Orchid",
+		description: "Midnight indigo command center with orchid-blue glow",
+		background: "#07071a",
+		surface: "#12122a",
+		surfaceLight: "#1b1d3d",
+		primary: "#8a7dff",
+		secondary: "#7681a8",
+		tertiary: "#69b4ff",
+		accent: "#b06dff",
+		text: "#f4f3ff",
+		textMuted: "#a9a5dc",
+		glow: "rgba(138, 125, 255, 0.18)",
+	},
+
 	// ═══════════════════════════════════════════════════════════════════════════
 	// WARM TONES
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -368,6 +413,7 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 
 	rootStyle.setProperty("--accent", palette.accent);
 	rootStyle.setProperty("--secondary", palette.secondary);
+	rootStyle.setProperty("--tertiary", palette.tertiary);
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// STATUS COLORS

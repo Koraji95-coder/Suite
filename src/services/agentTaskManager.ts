@@ -108,7 +108,99 @@ const MAX_CONVERSATIONS = 30;
 
 class AgentTaskManager {
 	private scope = "anon";
-	private profileScope = "koro";
+	private conversationScope = "koro";
+
+	private toIsoTimestamp(value: unknown, fallback?: string): string {
+		const text = String(value ?? "").trim();
+		if (!text) return fallback || new Date().toISOString();
+		const parsed = new Date(text);
+		if (Number.isNaN(parsed.getTime())) {
+			return fallback || new Date().toISOString();
+		}
+		return parsed.toISOString();
+	}
+
+	private sanitizeConversationMessage(
+		value: unknown,
+		index: number,
+		conversationId: string,
+	): AgentConversationMessage | null {
+		if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+		const item = value as Record<string, unknown>;
+		const role = String(item.role || "").trim();
+		if (role !== "user" && role !== "assistant") return null;
+
+		const content = String(item.content ?? "");
+		if (!content.trim()) return null;
+
+		const messageId = String(item.id || "").trim() || `${conversationId}-msg-${index}`;
+		const timestamp = this.toIsoTimestamp(item.timestamp);
+		return {
+			id: messageId,
+			role,
+			content,
+			timestamp,
+		};
+	}
+
+	private sanitizeConversation(value: unknown, index: number): AgentConversation | null {
+		if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+		const item = value as Record<string, unknown>;
+
+		const conversationId =
+			String(item.id || "").trim() || `conv-${Date.now()}-${index}`;
+		const profileId =
+			String(item.profileId || "").trim() || this.conversationScope || "koro";
+		const createdAt = this.toIsoTimestamp(item.createdAt);
+		const updatedAt = this.toIsoTimestamp(item.updatedAt, createdAt);
+		const rawMessages = Array.isArray(item.messages) ? item.messages : [];
+		const messages = rawMessages
+			.map((entry, messageIndex) =>
+				this.sanitizeConversationMessage(entry, messageIndex, conversationId),
+			)
+			.filter((entry): entry is AgentConversationMessage => Boolean(entry));
+		const firstUserMessage = messages.find((message) => message.role === "user");
+		const titleFromMessage = firstUserMessage
+			? `${firstUserMessage.content.slice(0, 60)}${firstUserMessage.content.length > 60 ? "..." : ""}`
+			: "New conversation";
+		const title = String(item.title || "").trim() || titleFromMessage;
+
+		return {
+			id: conversationId,
+			title,
+			profileId,
+			createdAt,
+			updatedAt,
+			messages,
+		};
+	}
+
+	private parseAndSanitizeConversations(stored: string | null): {
+		conversations: AgentConversation[];
+		rewritten: boolean;
+	} {
+		if (!stored) return { conversations: [], rewritten: false };
+		try {
+			const parsed = JSON.parse(stored) as unknown;
+			if (!Array.isArray(parsed)) {
+				return { conversations: [], rewritten: true };
+			}
+			const sanitized = parsed
+				.map((entry, index) => this.sanitizeConversation(entry, index))
+				.filter((entry): entry is AgentConversation => Boolean(entry));
+			const rewritten =
+				sanitized.length !== parsed.length ||
+				JSON.stringify(parsed) !== JSON.stringify(sanitized);
+			return { conversations: sanitized, rewritten };
+		} catch (error) {
+			logger.warn(
+				"Failed to parse conversations payload; resetting scope conversations.",
+				"AgentTaskManager",
+				error,
+			);
+			return { conversations: [], rewritten: true };
+		}
+	}
 
 	setScope(scope: string | null): void {
 		this.scope = scope?.trim() || "anon";
@@ -249,19 +341,34 @@ class AgentTaskManager {
 		return this.getTaskHistory().slice(0, limit);
 	}
 
+	setConversationScope(scope: string): void {
+		this.conversationScope = scope.trim() || "koro";
+	}
+
+	// Backward-compatible alias for older call sites.
 	setProfileScope(profileId: string): void {
-		this.profileScope = profileId.trim() || "koro";
+		this.setConversationScope(profileId);
 	}
 
 	private getConversationsKey(): string {
-		return `${CONV_KEY_PREFIX}:${this.scope}:${this.profileScope}`;
+		return `${CONV_KEY_PREFIX}:${this.scope}:${this.conversationScope}`;
 	}
 
 	getConversations(): AgentConversation[] {
 		try {
-			const stored = localStorage.getItem(this.getConversationsKey());
-			return stored ? JSON.parse(stored) : [];
-		} catch {
+			const key = this.getConversationsKey();
+			const stored = localStorage.getItem(key);
+			const { conversations, rewritten } = this.parseAndSanitizeConversations(stored);
+			if (rewritten) {
+				localStorage.setItem(key, JSON.stringify(conversations));
+			}
+			return conversations;
+		} catch (error) {
+			logger.warn(
+				"Failed to load conversations; returning empty list.",
+				"AgentTaskManager",
+				error,
+			);
 			return [];
 		}
 	}
@@ -272,17 +379,30 @@ class AgentTaskManager {
 
 	saveConversation(conversation: AgentConversation): void {
 		try {
+			const sanitized = this.sanitizeConversation(conversation, 0);
+			if (!sanitized) {
+				logger.warn(
+					"Dropped invalid conversation payload during save.",
+					"AgentTaskManager",
+					{ conversationId: String((conversation as { id?: string }).id || "") },
+				);
+				return;
+			}
 			const convs = this.getConversations();
-			const idx = convs.findIndex((c) => c.id === conversation.id);
+			const idx = convs.findIndex((c) => c.id === sanitized.id);
 			if (idx >= 0) {
-				convs[idx] = conversation;
+				convs[idx] = sanitized;
 			} else {
-				convs.unshift(conversation);
+				convs.unshift(sanitized);
 			}
 			if (convs.length > MAX_CONVERSATIONS) convs.splice(MAX_CONVERSATIONS);
 			localStorage.setItem(this.getConversationsKey(), JSON.stringify(convs));
-		} catch {
-			/* noop */
+		} catch (error) {
+			logger.warn(
+				"Failed to save conversation.",
+				"AgentTaskManager",
+				error,
+			);
 		}
 	}
 
@@ -292,8 +412,34 @@ class AgentTaskManager {
 				(c) => c.id !== conversationId,
 			);
 			localStorage.setItem(this.getConversationsKey(), JSON.stringify(convs));
-		} catch {
-			/* noop */
+		} catch (error) {
+			logger.warn(
+				"Failed to delete conversation.",
+				"AgentTaskManager",
+				error,
+			);
+		}
+	}
+
+	clearConversationCacheForCurrentScope(): void {
+		try {
+			const scopePrefix = `${CONV_KEY_PREFIX}:${this.scope}:`;
+			const keysToRemove: string[] = [];
+			for (let index = 0; index < localStorage.length; index += 1) {
+				const key = localStorage.key(index);
+				if (key && key.startsWith(scopePrefix)) {
+					keysToRemove.push(key);
+				}
+			}
+			for (const key of keysToRemove) {
+				localStorage.removeItem(key);
+			}
+		} catch (error) {
+			logger.warn(
+				"Failed to clear conversation cache for scope.",
+				"AgentTaskManager",
+				error,
+			);
 		}
 	}
 

@@ -64,7 +64,7 @@ pip install pytest pytest-cov black ruff mypy
 
 ```bash
 # Frontend project setup
-npx create-next-app@latest conduitroute-ui --typescript --tailwind
+npx create-next-app@latest conduitroute-ui --typescript --css
 cd conduitroute-ui
 
 # Additional dependencies
@@ -869,4 +869,3 @@ https://apps.autodesk.com/ACD/en/Detail/Index?id=8830477268989461753&appLang=en&
 https://apps.autodesk.com/ACD/en/Detail/HelpDoc?appId=8830477268989461753&appLang=en&os=Win32_64
 
 *ConduitRoute — Built for substation P&C engineers who are tired of routing wires by hand.*
-

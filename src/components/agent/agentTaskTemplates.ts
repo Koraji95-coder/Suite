@@ -213,6 +213,40 @@ const FORGE_TEMPLATES: TaskTemplate[] = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DRAFTSMITH - CAD & Electrical Drafting Specialist
+// ═══════════════════════════════════════════════════════════════════════════
+const DRAFTSMITH_TEMPLATES: TaskTemplate[] = [
+	{
+		label: "CAD route strategy",
+		prompt:
+			"Propose a CAD-ready conduit route strategy for this run set. Include preferred pathing constraints, obstacle handling, and draw-order guidance.",
+		category: "analysis",
+		icon: "search",
+	},
+	{
+		label: "Terminal label plan",
+		prompt:
+			"Generate a terminal-strip label sync plan with naming rules, collision handling, and expected update sequence for AutoCAD writeback.",
+		category: "generation",
+		icon: "file",
+	},
+	{
+		label: "Ground grid review",
+		prompt:
+			"Review this grounding layout against IEEE 80 assumptions and flag spacing, fault-path, or continuity risks before drafting changes.",
+		category: "review",
+		icon: "check",
+	},
+	{
+		label: "AutoCAD automation script",
+		prompt:
+			"Generate a robust AutoCAD automation script outline for this drafting workflow, including validation checkpoints and rollback-safe error handling.",
+		category: "automation",
+		icon: "code",
+	},
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
 // TEMPLATE MAP
 // ═══════════════════════════════════════════════════════════════════════════
 const TEMPLATE_MAP: Record<AgentProfileId, TaskTemplate[]> = {
@@ -220,6 +254,7 @@ const TEMPLATE_MAP: Record<AgentProfileId, TaskTemplate[]> = {
 	devstral: DEVSTRAL_TEMPLATES,
 	sentinel: SENTINEL_TEMPLATES,
 	forge: FORGE_TEMPLATES,
+	draftsmith: DRAFTSMITH_TEMPLATES,
 };
 
 /**

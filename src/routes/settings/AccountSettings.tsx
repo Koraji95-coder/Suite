@@ -8,7 +8,6 @@ import {
 	KeyRound,
 	Loader2,
 	LogOut,
-	Mail,
 	RefreshCw,
 	Save,
 	Settings2,
@@ -18,6 +17,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { extractAgentPairingParamsFromLocation } from "@/auth/agentPairingParams";
 import { completePasskeyCallback } from "@/auth/passkeyAuthApi";
 import {
 	fetchPasskeyCapability,
@@ -34,11 +34,16 @@ import { HStack, Stack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
 import { cn } from "@/lib/utils";
-import { type AgentPairingAction, agentService } from "@/services/agentService";
+import {
+	type AgentPairingAction,
+	AgentPairingRequestError,
+	agentService,
+} from "@/services/agentService";
 import {
 	logAuthMethodTelemetry,
 	logSecurityEvent,
 } from "@/services/securityEventService";
+import { useAgentConnectionStatus } from "@/services/useAgentConnectionStatus";
 import { supabase } from "@/supabase/client";
 import styles from "./AccountSettings.module.css";
 
@@ -46,6 +51,58 @@ import styles from "./AccountSettings.module.css";
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 type StatusTone = "success" | "danger" | "warning" | "muted";
+const AGENT_VERIFICATION_COOLDOWN_SECONDS = 20;
+
+function parseRetryCooldownSeconds(message: string): number {
+	const source = String(message || "").trim();
+	if (!source) {
+		return 0;
+	}
+	const match = source.match(/after\s+(\d+)\s+seconds?/i);
+	if (match?.[1]) {
+		const parsed = Number.parseInt(match[1], 10);
+		return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+	}
+	const genericMatch = source.match(/retry(?:\s+in)?\s+(\d+)\s*s/i);
+	if (genericMatch?.[1]) {
+		const parsed = Number.parseInt(genericMatch[1], 10);
+		return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+	}
+	return 0;
+}
+
+function stripAgentChallengeFromHash(hash: string): string {
+	const trimmed = String(hash || "").replace(/^#/, "");
+	if (!trimmed) {
+		return "";
+	}
+
+	if (trimmed.startsWith("/")) {
+		const queryIndex = trimmed.indexOf("?");
+		if (queryIndex < 0) {
+			return hash;
+		}
+
+		const routePath = trimmed.slice(0, queryIndex);
+		const params = new URLSearchParams(trimmed.slice(queryIndex + 1));
+		if (!params.has("agent_challenge") && !params.has("agent_action")) {
+			return hash;
+		}
+		params.delete("agent_challenge");
+		params.delete("agent_action");
+		const next = params.toString();
+		return next ? `#${routePath}?${next}` : `#${routePath}`;
+	}
+
+	const params = new URLSearchParams(trimmed);
+	if (!params.has("agent_challenge") && !params.has("agent_action")) {
+		return hash;
+	}
+	params.delete("agent_challenge");
+	params.delete("agent_action");
+	const next = params.toString();
+	return next ? `#${next}` : "";
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SUB-COMPONENTS
@@ -202,13 +259,27 @@ export default function AccountSettings() {
 	const [, setPasskeyNotice] = useState("");
 
 	// Agent state
-	const [agentHealthy, setAgentHealthy] = useState<boolean | null>(null);
-	const [agentPaired, setAgentPaired] = useState(false);
-	const [agentLoading, setAgentLoading] = useState(true);
+	const {
+		healthy: agentHealthy,
+		paired: agentPaired,
+		loading: agentLoading,
+		error: agentStatusError,
+		refreshNow: refreshAgentStatus,
+	} = useAgentConnectionStatus({
+		userId: user?.id ?? null,
+	});
 	const [agentPairingCode, setAgentPairingCode] = useState("");
 	const [isAgentActionBusy, setIsAgentActionBusy] = useState(false);
 	const [agentError, setAgentError] = useState("");
 	const [agentNotice, setAgentNotice] = useState("");
+	const [
+		agentVerificationCooldownSeconds,
+		setAgentVerificationCooldownSeconds,
+	] = useState(0);
+	const [agentVerificationCooldownUntil, setAgentVerificationCooldownUntil] =
+		useState<number | null>(null);
+	const [lastAgentVerificationAction, setLastAgentVerificationAction] =
+		useState<AgentPairingAction | null>(null);
 
 	// Computed values
 	const frontendPasskeyEnabled = useMemo(() => isFrontendPasskeyEnabled(), []);
@@ -228,15 +299,22 @@ export default function AccountSettings() {
 
 	const clearAgentChallengeParams = useCallback(() => {
 		const params = new URLSearchParams(location.search);
-		if (!params.has("agent_challenge") && !params.has("agent_action")) return;
+		const hadSearchParams =
+			params.has("agent_challenge") || params.has("agent_action");
+		const nextHash = stripAgentChallengeFromHash(location.hash);
+		if (!hadSearchParams && nextHash === location.hash) return;
 		params.delete("agent_challenge");
 		params.delete("agent_action");
 		const search = params.toString();
 		navigate(
-			{ pathname: location.pathname, search: search ? `?${search}` : "" },
+			{
+				pathname: location.pathname,
+				search: search ? `?${search}` : "",
+				hash: nextHash,
+			},
 			{ replace: true },
 		);
-	}, [location.pathname, location.search, navigate]);
+	}, [location.hash, location.pathname, location.search, navigate]);
 
 	const clearAgentPairingCodeParams = useCallback(() => {
 		const params = new URLSearchParams(location.search);
@@ -253,6 +331,18 @@ export default function AccountSettings() {
 			{ replace: true },
 		);
 	}, [location.pathname, location.search, navigate]);
+
+	const startAgentVerificationCooldown = useCallback((seconds: number) => {
+		const normalizedSeconds = Math.max(0, Math.floor(seconds));
+		if (normalizedSeconds <= 0) {
+			setAgentVerificationCooldownUntil(null);
+			setAgentVerificationCooldownSeconds(0);
+			return;
+		}
+		const untilMs = Date.now() + normalizedSeconds * 1000;
+		setAgentVerificationCooldownUntil(untilMs);
+		setAgentVerificationCooldownSeconds(normalizedSeconds);
+	}, []);
 
 	// Wrap in useCallback so it can be a stable dependency
 	const loadPasskeyCapability = useCallback(async () => {
@@ -273,25 +363,6 @@ export default function AccountSettings() {
 		}
 	}, []);
 
-	const refreshAgentStatus = useCallback(async () => {
-		setAgentLoading(true);
-		try {
-			const isHealthy = await agentService.healthCheck();
-			setAgentHealthy(isHealthy);
-			if (isHealthy && user?.id) {
-				await agentService.restorePairingForActiveUser();
-			}
-			const pairedState = await agentService.refreshPairingStatus();
-			setAgentPaired(pairedState);
-		} catch (err: unknown) {
-			setAgentError(
-				err instanceof Error ? err.message : "Unable to refresh agent status.",
-			);
-		} finally {
-			setAgentLoading(false);
-		}
-	}, [user?.id]);
-
 	// ═══════════════════════════════════════════════════════════════════════════
 	// EFFECTS
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -299,15 +370,7 @@ export default function AccountSettings() {
 	// Initial load - now properly includes loadPasskeyCapability
 	useEffect(() => {
 		void loadPasskeyCapability();
-		void refreshAgentStatus();
-	}, [loadPasskeyCapability, refreshAgentStatus]);
-
-	// Polling for agent status
-	useEffect(() => {
-		if (agentHealthy === true && agentPaired) return;
-		const timer = window.setInterval(() => void refreshAgentStatus(), 5000);
-		return () => window.clearInterval(timer);
-	}, [agentHealthy, agentPaired, refreshAgentStatus]);
+	}, [loadPasskeyCapability]);
 
 	// Sync profile fields
 	useEffect(() => {
@@ -315,19 +378,45 @@ export default function AccountSettings() {
 		setAccountEmail(profile?.email ?? user?.email ?? "");
 	}, [profile?.display_name, profile?.email, user?.email]);
 
-	// Handle agent pairing code from URL
+	// Pair/unpair verification cooldown timer
 	useEffect(() => {
+		if (!agentVerificationCooldownUntil) {
+			setAgentVerificationCooldownSeconds(0);
+			return;
+		}
+
+		const tick = () => {
+			const remainingMs = Math.max(
+				0,
+				agentVerificationCooldownUntil - Date.now(),
+			);
+			const nextSeconds = Math.ceil(remainingMs / 1000);
+			setAgentVerificationCooldownSeconds(nextSeconds);
+			if (nextSeconds <= 0) {
+				setAgentVerificationCooldownUntil(null);
+			}
+		};
+
+		tick();
+		const timer = window.setInterval(tick, 250);
+		return () => window.clearInterval(timer);
+	}, [agentVerificationCooldownUntil]);
+
+	// Legacy pairing-code links (deprecated in broker mode)
+	useEffect(() => {
+		if (!usesBroker) return;
 		const params = new URLSearchParams(location.search);
-		const candidateCode = (params.get("agent_pairing_code") || "")
-			.trim()
-			.replace(/\D+/g, "")
-			.slice(0, 6);
-		if (candidateCode.length !== 6) return;
-		setAgentPairingCode(candidateCode);
-		setAgentNotice("Pairing code loaded from your email link.");
+		if (
+			!params.has("agent_pairing_code") &&
+			!params.has("agent_pairing_notice")
+		)
+			return;
+		setAgentNotice(
+			"Pairing code links are deprecated. Use 'Pair this device' to request a verification link.",
+		);
 		setAgentError("");
 		clearAgentPairingCodeParams();
-	}, [clearAgentPairingCodeParams, location.search]);
+	}, [clearAgentPairingCodeParams, location.search, usesBroker]);
 
 	// Passkey callback effect
 	useEffect(() => {
@@ -468,10 +557,13 @@ export default function AccountSettings() {
 	// Agent challenge effect
 	useEffect(() => {
 		if (!usesBroker || !user?.id) return;
-		const params = new URLSearchParams(location.search);
-		const challengeId = (params.get("agent_challenge") || "").trim();
-		const action = (params.get("agent_action") || "").trim().toLowerCase();
-		if (!challengeId || (action !== "pair" && action !== "unpair")) return;
+		const pairingParams = extractAgentPairingParamsFromLocation(
+			location.search,
+			location.hash,
+		);
+		const challengeId = (pairingParams?.challengeId || "").trim();
+		const action = pairingParams?.action;
+		if (!challengeId || !action) return;
 
 		const handleKey = `${action}:${challengeId}`;
 		if (agentChallengeHandledRef.current === handleKey) return;
@@ -487,11 +579,9 @@ export default function AccountSettings() {
 			);
 			setIsAgentActionBusy(true);
 			try {
-				await agentService.confirmPairingVerification(
-					action as AgentPairingAction,
-					challengeId,
-				);
+				await agentService.confirmPairingVerification(action, challengeId);
 				if (!active) return;
+				startAgentVerificationCooldown(0);
 				setAgentNotice(
 					action === "pair"
 						? "Pairing verified. Agent access is active."
@@ -520,8 +610,10 @@ export default function AccountSettings() {
 		};
 	}, [
 		clearAgentChallengeParams,
+		location.hash,
 		location.search,
 		refreshAgentStatus,
+		startAgentVerificationCooldown,
 		usesBroker,
 		user?.id,
 	]);
@@ -550,10 +642,12 @@ export default function AccountSettings() {
 		}
 	};
 
-	const requestAgentPairingCodeByEmail = async () => {
+	const requestAgentPairingVerification = async (
+		action: AgentPairingAction,
+	) => {
 		if (!usesBroker) {
 			setAgentError(
-				"Email pairing-code request is only available in broker mode.",
+				"Email verification flow is only available in broker mode.",
 			);
 			return;
 		}
@@ -563,27 +657,57 @@ export default function AccountSettings() {
 		try {
 			const redirectTo =
 				typeof window !== "undefined"
-					? `${window.location.origin}/app/settings`
+					? `${window.location.origin}/agent/pairing-callback`
 					: undefined;
-			await agentService.requestPairingCodeByEmail({
+			await agentService.requestPairingVerificationLink(action, undefined, {
 				redirectTo,
-				redirectPath: "/app/settings",
+				redirectPath: "/agent/pairing-callback",
 			});
+			setLastAgentVerificationAction(action);
+			startAgentVerificationCooldown(AGENT_VERIFICATION_COOLDOWN_SECONDS);
 			setAgentNotice(
-				"Pairing code email sent. Open the link from your inbox to load the code here.",
+				action === "pair"
+					? "Verification link sent. Open it from your email to finish pairing this device."
+					: "Verification link sent. Open it from your email to finish unpairing.",
 			);
 		} catch (err: unknown) {
-			setAgentError(
-				err instanceof Error
-					? err.message
-					: "Unable to request pairing code email.",
-			);
+			const fallbackMessage = `Unable to request ${action} verification link.`;
+			const message =
+				err instanceof Error ? err.message : fallbackMessage;
+			let retrySeconds = 0;
+			if (err instanceof AgentPairingRequestError) {
+				retrySeconds = Math.max(0, err.retryAfterSeconds);
+			}
+			if (retrySeconds <= 0) {
+				retrySeconds = parseRetryCooldownSeconds(message);
+			}
+			if (retrySeconds > 0) {
+				startAgentVerificationCooldown(retrySeconds);
+			}
+
+			if (err instanceof AgentPairingRequestError) {
+				if (err.throttleSource === "supabase") {
+					setAgentNotice(
+						"Verification email delivery is temporarily rate-limited by the email provider.",
+					);
+				} else if (err.throttleSource === "local-abuse") {
+					setAgentNotice(
+						"Verification actions are cooling down to protect the pairing flow.",
+					);
+				}
+			}
+			setAgentError(message);
 		} finally {
 			setIsAgentActionBusy(false);
 		}
 	};
 
 	const pairAgent = async () => {
+		if (usesBroker) {
+			await requestAgentPairingVerification("pair");
+			return;
+		}
+
 		const code = agentPairingCode.trim();
 		if (!code) {
 			setAgentError("Enter a 6-digit pairing code.");
@@ -615,32 +739,21 @@ export default function AccountSettings() {
 	const unpairAgent = async () => {
 		setAgentError("");
 		setAgentNotice("");
+		if (usesBroker) {
+			await requestAgentPairingVerification("unpair");
+			return;
+		}
+
 		setIsAgentActionBusy(true);
 		try {
-			if (usesBroker) {
-				const redirectTo =
-					typeof window !== "undefined"
-						? `${window.location.origin}/app/settings`
-						: undefined;
-				await agentService.requestPairingVerificationLink("unpair", undefined, {
-					redirectTo,
-					redirectPath: "/app/settings",
-				});
-				setAgentNotice(
-					"Verification link sent. Open it from your email to finish unpairing.",
-				);
-			} else {
-				await agentService.unpair();
-				setAgentNotice("Agent pairing removed for this browser session.");
-				await refreshAgentStatus();
-			}
+			await agentService.unpair();
+			setAgentNotice("Agent pairing removed for this browser session.");
+			await refreshAgentStatus();
 		} catch (err: unknown) {
 			setAgentError(
 				err instanceof Error
 					? err.message
-					: usesBroker
-						? "Unable to send unpair verification link."
-						: "Unable to unpair from the gateway.",
+					: "Unable to unpair from the gateway.",
 			);
 		} finally {
 			setIsAgentActionBusy(false);
@@ -749,6 +862,7 @@ export default function AccountSettings() {
 		}),
 		[usesBroker],
 	);
+	const effectiveAgentError = agentError || agentStatusError;
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// RENDER
@@ -894,7 +1008,11 @@ export default function AccountSettings() {
 			{/* ─────────────────────────────────────────────────────────────────
           AGENT PAIRING
       ───────────────────────────────────────────────────────────────── */}
-			<Panel variant="default" padding="lg">
+			<Panel
+				variant="default"
+				padding="lg"
+				className={styles.agentPairingPanel}
+			>
 				<Stack gap={4}>
 					<SectionHeader
 						icon={Bot}
@@ -903,30 +1021,58 @@ export default function AccountSettings() {
 						tone="primary"
 					/>
 
-					<HStack gap={2} wrap align="end">
-						<div className={styles.agentCodeWrap}>
-							<Input
-								value={agentPairingCode}
-								onChange={(e) => {
-									const digitsOnly = e.target.value.replace(/\D+/g, "");
-									setAgentPairingCode(digitsOnly.slice(0, 6));
-								}}
-								placeholder="000000"
-								maxLength={6}
-								className={styles.agentCodeInput}
-							/>
-						</div>
-
-						{usesBroker && (
-							<Button
-								variant="secondary"
+					<div className={styles.agentPairingSummary}>
+						<HStack gap={2} wrap>
+							<Badge
 								size="sm"
-								disabled={isAgentActionBusy}
-								onClick={() => void requestAgentPairingCodeByEmail()}
-								iconLeft={<Mail size={14} />}
+								variant="soft"
+								color={
+									agentHealthy === true
+										? "success"
+										: agentHealthy === false
+											? "danger"
+											: "default"
+								}
 							>
-								Email code
-							</Button>
+								Agent gateway:{" "}
+								{agentHealthy === null
+									? "Checking"
+									: agentHealthy
+										? "Online"
+										: "Offline"}
+							</Badge>
+							<Badge
+								size="sm"
+								variant="soft"
+								color={agentPaired ? "success" : "warning"}
+							>
+								Pairing status: {agentPaired ? "Paired" : "Not paired"}
+							</Badge>
+							<Badge size="sm" variant="outline" color="default">
+								Mode: {usesBroker ? "Brokered verification" : "Direct gateway"}
+							</Badge>
+						</HStack>
+						<Text size="xs" color="muted">
+							{usesBroker
+								? "Pairing and unpairing are completed through email verification links for this signed-in account."
+								: "Direct mode is for local troubleshooting and stores pairing only in this browser session."}
+						</Text>
+					</div>
+
+					<div className={styles.agentActionRow}>
+						{!usesBroker && (
+							<div className={styles.agentCodeWrap}>
+								<Input
+									value={agentPairingCode}
+									onChange={(e) => {
+										const digitsOnly = e.target.value.replace(/\D+/g, "");
+										setAgentPairingCode(digitsOnly.slice(0, 6));
+									}}
+									placeholder="000000"
+									maxLength={6}
+									className={styles.agentCodeInput}
+								/>
+							</div>
 						)}
 
 						<Button
@@ -934,23 +1080,58 @@ export default function AccountSettings() {
 							size="sm"
 							disabled={
 								isAgentActionBusy ||
-								agentPairingCode.trim().length !== 6 ||
-								(!usesBroker && agentHealthy !== true)
+								(usesBroker && agentVerificationCooldownSeconds > 0) ||
+								(!usesBroker &&
+									(agentPairingCode.trim().length !== 6 ||
+										agentHealthy !== true))
 							}
 							loading={isAgentActionBusy}
 							onClick={() => void pairAgent()}
+							className={styles.agentActionButton}
 						>
-							Pair
+							{usesBroker && agentVerificationCooldownSeconds > 0
+								? `Pair this device (${agentVerificationCooldownSeconds}s)`
+								: usesBroker
+									? "Pair this device"
+									: "Pair"}
 						</Button>
 
 						<Button
 							variant="secondary"
 							size="sm"
-							disabled={isAgentActionBusy || !agentPaired}
+							disabled={
+								isAgentActionBusy ||
+								(usesBroker && agentVerificationCooldownSeconds > 0) ||
+								!agentPaired
+							}
 							onClick={() => void unpairAgent()}
+							className={styles.agentActionButton}
 						>
-							Unpair
+							{usesBroker ? "Unpair this device" : "Unpair"}
 						</Button>
+
+						{usesBroker && (
+							<Button
+								variant="secondary"
+								size="sm"
+								disabled={
+									isAgentActionBusy ||
+									agentVerificationCooldownSeconds > 0 ||
+									!lastAgentVerificationAction
+								}
+								onClick={() => {
+									if (!lastAgentVerificationAction) return;
+									void requestAgentPairingVerification(
+										lastAgentVerificationAction,
+									);
+								}}
+								className={styles.agentActionButton}
+							>
+								{agentVerificationCooldownSeconds > 0
+									? `Resend verification (${agentVerificationCooldownSeconds}s)`
+									: "Resend verification"}
+							</Button>
+						)}
 
 						<IconButton
 							icon={
@@ -966,24 +1147,24 @@ export default function AccountSettings() {
 							disabled={agentLoading}
 							onClick={() => void refreshAgentStatus()}
 						/>
-					</HStack>
+					</div>
 
-					{agentError && (
-						<Text size="xs" color="danger">
-							{agentError}
+					{effectiveAgentError && (
+						<Text size="xs" color="danger" className={styles.agentNoticeError}>
+							{effectiveAgentError}
 						</Text>
 					)}
 					{agentNotice && (
-						<Text size="xs" color="muted">
+						<Text size="xs" color="muted" className={styles.agentNotice}>
 							{agentNotice}
 						</Text>
 					)}
-
-					<Text size="xs" color="muted">
-						{usesBroker
-							? "Request a code by email, open the link, then pair with the 6-digit code."
-							: "Direct mode stores pairing only in this browser session."}
-					</Text>
+					{usesBroker && agentVerificationCooldownSeconds > 0 && (
+						<Text size="xs" color="muted" className={styles.agentCooldown}>
+							Verification requests are temporarily cooling down. Try again in{" "}
+							{agentVerificationCooldownSeconds}s.
+						</Text>
+					)}
 				</Stack>
 			</Panel>
 

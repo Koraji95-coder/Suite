@@ -169,6 +169,121 @@ class TestApiRouteGroups(unittest.TestCase):
                 "next_step": "Set AUTH_PASSKEY_ENABLED=true and restart backend.",
             }
 
+        class _AgentRunOrchestratorStub:
+            def __init__(self) -> None:
+                self.run_snapshot = {
+                    "runId": "run-1",
+                    "userId": "user-1",
+                    "status": "queued",
+                    "requestId": "req-run-1",
+                    "steps": [],
+                    "messages": [],
+                    "stages": {},
+                }
+                self.task_snapshot = {
+                    "taskId": "task-1",
+                    "runId": "run-1",
+                    "userId": "user-1",
+                    "assigneeProfile": "devstral",
+                    "stage": "stage_b",
+                    "title": "Devstral task",
+                    "description": "Review run output.",
+                    "priority": "high",
+                    "status": "awaiting_review",
+                    "reviewAction": "",
+                    "reviewerId": "",
+                    "reviewerNote": "",
+                    "requestId": "req-task-1",
+                    "createdAt": "2026-01-01T00:00:00Z",
+                    "updatedAt": "2026-01-01T00:00:00Z",
+                    "startedAt": "2026-01-01T00:00:00Z",
+                    "finishedAt": "",
+                }
+
+            def enqueue_run(self, **_kwargs):
+                return "run-1"
+
+            def get_run_owner(self, run_id: str):
+                if run_id != "run-1":
+                    return None
+                return "user-1"
+
+            def get_run_snapshot(self, run_id: str):
+                if run_id != "run-1":
+                    return None
+                return dict(self.run_snapshot)
+
+            def cancel_run(self, **_kwargs):
+                self.run_snapshot["status"] = "cancel_requested"
+                return {"status": "cancel_requested", "requestId": "req-cancel-1"}
+
+            def list_events(self, _run_id: str, *, after_id: int = 0, limit: int = 200):
+                return [] if after_id > 0 else [
+                    {
+                        "id": 1,
+                        "eventType": "run_enqueued",
+                        "stage": "",
+                        "profileId": "",
+                        "requestId": "req-run-1",
+                        "message": "Agent orchestration run enqueued.",
+                        "payload": {"status": "queued"},
+                        "createdAt": "2026-01-01T00:00:00Z",
+                    }
+                ]
+
+            def get_run_status(self, _run_id: str):
+                return "completed"
+
+            def list_tasks(self, **_kwargs):
+                return [dict(self.task_snapshot)]
+
+            def get_task_owner(self, task_id: str):
+                if task_id != "task-1":
+                    return None
+                return "user-1"
+
+            def get_task(self, task_id: str):
+                if task_id != "task-1":
+                    return None
+                return dict(self.task_snapshot)
+
+            def review_task(self, *, task_id: str, reviewer_id: str, action: str, note: str, request_id: str):
+                if task_id != "task-1":
+                    return None
+                status_map = {
+                    "approve": "approved",
+                    "rework": "rework_requested",
+                    "defer": "deferred",
+                }
+                status = status_map.get(action, "awaiting_review")
+                self.task_snapshot["status"] = status
+                self.task_snapshot["reviewAction"] = action
+                self.task_snapshot["reviewerId"] = reviewer_id
+                self.task_snapshot["reviewerNote"] = note
+                self.task_snapshot["requestId"] = request_id
+                return dict(self.task_snapshot)
+
+            def list_activity(self, **_kwargs):
+                return [
+                    {
+                        "activityId": "run-1",
+                        "source": "run",
+                        "eventType": "run_enqueued",
+                        "runId": "run-1",
+                        "taskId": "",
+                        "profileId": "",
+                        "status": "queued",
+                        "priority": "",
+                        "stage": "",
+                        "requestId": "req-run-1",
+                        "message": "Agent orchestration run enqueued.",
+                        "payload": {"status": "queued"},
+                        "createdAt": "2026-01-01T00:00:00Z",
+                    }
+                ]
+
+        agent_run_orchestrator = _AgentRunOrchestratorStub()
+
         register_route_groups(
             self.app,
             require_api_key=require_api_key,
@@ -203,6 +318,9 @@ class TestApiRouteGroups(unittest.TestCase):
             batch_session_ttl_seconds=3600,
             require_supabase_user=require_supabase_user,
             require_agent_session=require_agent_session,
+            get_supabase_user_id=lambda user: str(user.get("id") or ""),
+            get_supabase_user_email=lambda user: str(user.get("email") or ""),
+            is_admin_user=lambda _user: False,
             passkey_deps={
                 "_auth_passkey_capability": auth_passkey_capability,
                 "_get_request_ip": get_request_ip,
@@ -212,6 +330,7 @@ class TestApiRouteGroups(unittest.TestCase):
                 "_get_supabase_user_id": lambda user: str(user.get("id") or ""),
                 "_get_supabase_user_email": lambda user: str(user.get("email") or ""),
             },
+            agent_run_orchestrator=agent_run_orchestrator,
             transmittal_render_deps={
                 "TRANSMITTAL_RENDER_AVAILABLE": False,
             },
@@ -255,11 +374,20 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/agent/pairing-confirm": ["POST"],
             "/api/agent/health": ["GET"],
             "/api/agent/config": ["GET"],
+            "/api/agent/profiles": ["GET"],
             "/api/agent/session": ["GET"],
             "/api/agent/pair": ["POST"],
             "/api/agent/unpair": ["POST"],
             "/api/agent/session/clear": ["POST"],
             "/api/agent/webhook": ["POST"],
+            "/api/agent/runs": ["POST"],
+            "/api/agent/runs/<run_id>": ["GET"],
+            "/api/agent/runs/<run_id>/events": ["GET"],
+            "/api/agent/runs/<run_id>/cancel": ["POST"],
+            "/api/agent/tasks": ["GET"],
+            "/api/agent/tasks/<task_id>": ["GET"],
+            "/api/agent/tasks/<task_id>/review": ["POST"],
+            "/api/agent/activity": ["GET"],
             "/api/dashboard/load": ["POST"],
             "/api/dashboard/load/<job_id>": ["GET"],
             "/api/transmittal/profiles": ["GET"],
@@ -272,6 +400,7 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/trigger-selection": ["POST"],
             "/api/conduit-route/terminal-scan": ["POST"],
             "/api/conduit-route/terminal-routes/draw": ["POST"],
+            "/api/conduit-route/bridge/terminal-labels/sync": ["POST"],
             "/api/conduit-route/terminal-labels/sync": ["POST"],
             "/api/conduit-route/obstacles/scan": ["POST"],
             "/api/conduit-route/route/compute": ["POST"],
@@ -371,6 +500,65 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertIsInstance(payload, dict)
         self.assertTrue(payload.get("ok"))
 
+    def test_agent_profiles_endpoint(self) -> None:
+        response = self.client.get("/api/agent/profiles")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        self.assertTrue(payload.get("ok"))
+        self.assertIsInstance(payload.get("profiles"), list)
+
+    def test_agent_runs_create_endpoint(self) -> None:
+        response = self.client.post(
+            "/api/agent/runs",
+            json={"objective": "Test orchestration"},
+        )
+        self.assertEqual(response.status_code, 202)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(payload.get("runId"), "run-1")
+
+    def test_agent_runs_get_and_cancel_endpoints(self) -> None:
+        get_response = self.client.get("/api/agent/runs/run-1")
+        self.assertEqual(get_response.status_code, 200)
+        get_payload = get_response.get_json() or {}
+        self.assertTrue(get_payload.get("success"))
+        self.assertEqual((get_payload.get("run") or {}).get("runId"), "run-1")
+
+        cancel_response = self.client.post("/api/agent/runs/run-1/cancel")
+        self.assertEqual(cancel_response.status_code, 200)
+        cancel_payload = cancel_response.get_json() or {}
+        self.assertTrue(cancel_payload.get("success"))
+        self.assertEqual(cancel_payload.get("status"), "cancel_requested")
+
+    def test_agent_task_and_activity_endpoints(self) -> None:
+        tasks_response = self.client.get("/api/agent/tasks")
+        self.assertEqual(tasks_response.status_code, 200)
+        tasks_payload = tasks_response.get_json() or {}
+        self.assertTrue(tasks_payload.get("success"))
+        self.assertEqual(len(tasks_payload.get("tasks") or []), 1)
+
+        task_response = self.client.get("/api/agent/tasks/task-1")
+        self.assertEqual(task_response.status_code, 200)
+        task_payload = task_response.get_json() or {}
+        self.assertTrue(task_payload.get("success"))
+        self.assertEqual((task_payload.get("task") or {}).get("taskId"), "task-1")
+
+        review_response = self.client.post(
+            "/api/agent/tasks/task-1/review",
+            json={"action": "approve", "note": "Looks good."},
+        )
+        self.assertEqual(review_response.status_code, 200)
+        review_payload = review_response.get_json() or {}
+        self.assertTrue(review_payload.get("success"))
+        self.assertEqual((review_payload.get("task") or {}).get("status"), "approved")
+
+        activity_response = self.client.get("/api/agent/activity")
+        self.assertEqual(activity_response.status_code, 200)
+        activity_payload = activity_response.get_json() or {}
+        self.assertTrue(activity_payload.get("success"))
+        self.assertEqual(len(activity_payload.get("activity") or []), 1)
+
     def test_api_status_endpoint(self) -> None:
         response = self.client.get("/api/status")
         self.assertEqual(response.status_code, 401)
@@ -468,6 +656,43 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertIsInstance(summary.get("classified"), int)
         self.assertIsInstance(summary.get("needs_review"), int)
 
+    def test_autodraft_execute_requires_api_key(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/execute",
+            json={"actions": [], "dry_run": True},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_autodraft_execute_validation_and_fallback(self) -> None:
+        not_json = self.client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            data="not-json",
+            content_type="text/plain",
+        )
+        self.assertEqual(not_json.status_code, 400)
+        not_json_payload = not_json.get_json() or {}
+        self.assertEqual(not_json_payload.get("error"), "Expected JSON payload.")
+
+        invalid_object = self.client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json=["invalid"],
+        )
+        self.assertEqual(invalid_object.status_code, 400)
+        invalid_object_payload = invalid_object.get_json() or {}
+        self.assertEqual(invalid_object_payload.get("error"), "Invalid JSON payload.")
+
+        response = self.client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={"actions": [], "dry_run": True},
+        )
+        self.assertEqual(response.status_code, 501)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("ok", True))
+        self.assertIn("AUTODRAFT_DOTNET_API_URL", str(payload.get("error")))
+
     def test_terminal_scan_endpoint_requires_auth(self) -> None:
         response = self.client.post("/api/conduit-route/terminal-scan")
         self.assertEqual(response.status_code, 401)
@@ -493,6 +718,13 @@ class TestApiRouteGroups(unittest.TestCase):
     def test_terminal_label_sync_endpoint_requires_auth(self) -> None:
         response = self.client.post(
             "/api/conduit-route/terminal-labels/sync",
+            json={"strips": []},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_bridge_terminal_label_sync_endpoint_requires_auth(self) -> None:
+        response = self.client.post(
+            "/api/conduit-route/bridge/terminal-labels/sync",
             json={"strips": []},
         )
         self.assertEqual(response.status_code, 401)

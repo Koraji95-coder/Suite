@@ -4,8 +4,10 @@ import json
 import logging
 import re
 import threading
+import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict
+from urllib.parse import urlparse
 
 import requests
 from flask import Blueprint, g, jsonify, request
@@ -31,6 +33,11 @@ def create_agent_blueprint(
         "_agent_broker_config_status",
         lambda: {"ok": False, "missing": ["agent_deps_missing"], "warnings": []},
     )
+    _list_agent_profiles = deps.get("_list_agent_profiles", lambda: [])
+    _resolve_agent_profile_route = deps.get(
+        "_resolve_agent_profile_route",
+        lambda _profile_id: None,
+    )
     _get_supabase_user_id = deps.get("_get_supabase_user_id", lambda _user: None)
     _get_supabase_user_email = deps.get("_get_supabase_user_email", lambda _user: None)
     _get_request_ip = deps.get("_get_request_ip", lambda: "unknown")
@@ -41,6 +48,10 @@ def create_agent_blueprint(
     _create_agent_pairing_challenge = deps.get(
         "_create_agent_pairing_challenge",
         lambda **_kwargs: ("", 0.0),
+    )
+    _build_auth_redirect_url = deps.get(
+        "_build_auth_redirect_url",
+        lambda _path, _client_redirect_to="", query_params=None: None,
     )
     _send_supabase_email_link = deps.get("_send_supabase_email_link", lambda *_args, **_kwargs: None)
     _email_fingerprint = deps.get("_email_fingerprint", lambda value: str(value or ""))
@@ -85,7 +96,10 @@ def create_agent_blueprint(
         "PAIRING_CHALLENGE_ID_PATTERN",
         re.compile(r"^[A-Za-z0-9_-]{16,128}$"),
     )
-    AGENT_PAIRING_REDIRECT_PATH = deps.get("AGENT_PAIRING_REDIRECT_PATH", "/app/agent")
+    AGENT_PAIRING_REDIRECT_PATH = deps.get(
+        "AGENT_PAIRING_REDIRECT_PATH",
+        "/login",
+    )
     AGENT_PAIRING_CHALLENGE_LOCK = deps.get("AGENT_PAIRING_CHALLENGE_LOCK", threading.Lock())
     AGENT_PAIRING_CHALLENGES = deps.get("AGENT_PAIRING_CHALLENGES", {})
 
@@ -96,9 +110,74 @@ def create_agent_blueprint(
     AGENT_WEBHOOK_SECRET = str(deps.get("AGENT_WEBHOOK_SECRET", "") or "")
     AGENT_GATEWAY_URL = str(deps.get("AGENT_GATEWAY_URL", "") or "")
     AGENT_SESSIONS = deps.get("AGENT_SESSIONS", {})
+    ALLOWED_PAIRING_REDIRECT_PATHS = {
+        "/login",
+        "/agent/pairing-callback",
+        "/app/agent/pairing-callback",
+        "/app/agent",
+        "/app/settings",
+    }
 
     def _utc_iso(ts: float) -> str:
         return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+    def _normalize_model_candidates(values: Any) -> list[str]:
+        if isinstance(values, (list, tuple)):
+            raw_values = values
+        elif values is None:
+            raw_values = []
+        else:
+            raw_values = [values]
+
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for candidate in raw_values:
+            text = str(candidate or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            deduped.append(text)
+        return deduped
+
+    def _derive_request_id(payload: Any = None) -> str:
+        payload_dict = payload if isinstance(payload, dict) else {}
+        request_id = (
+            str(payload_dict.get("requestId") or payload_dict.get("request_id") or "").strip()
+            or str(request.args.get("requestId") or request.args.get("request_id") or "").strip()
+            or str(request.headers.get("X-Request-ID") or request.headers.get("X-Request-Id") or "").strip()
+        )
+        if request_id:
+            return request_id[:160]
+        timestamp_ms = int(time.time() * 1000)
+        return f"agent-{timestamp_ms:x}"
+
+    def _request_id() -> str:
+        request_id = str(getattr(g, "agent_request_id", "") or "").strip()
+        if request_id:
+            return request_id
+        request_id = _derive_request_id()
+        g.agent_request_id = request_id
+        return request_id
+
+    @bp.before_request
+    def _agent_bind_request_id():
+        payload = request.get_json(silent=True) if request.is_json else None
+        g.agent_request_id = _derive_request_id(payload)
+
+    @bp.after_request
+    def _agent_attach_request_id(response):
+        request_id = _request_id()
+        if request_id:
+            response.headers.setdefault("X-Request-ID", request_id)
+        if not request_id or not response.is_json:
+            return response
+        payload = response.get_json(silent=True)
+        if not isinstance(payload, dict) or "requestId" in payload:
+            return response
+        payload["requestId"] = request_id
+        response.set_data(json_module.dumps(payload))
+        response.mimetype = "application/json"
+        return response
 
     @bp.route("/pairing-challenge", methods=["POST"])
     @require_supabase_user
@@ -122,6 +201,7 @@ def create_agent_blueprint(
             return jsonify({"error": "Expected JSON payload"}), 400
 
         payload = request.get_json(silent=True) or {}
+        request_id = _request_id()
         action = str(payload.get("action") or "").strip().lower()
         if action not in {"pair", "unpair"}:
             return jsonify({"error": "Invalid action. Use pair or unpair."}), 400
@@ -131,29 +211,30 @@ def create_agent_blueprint(
         user_email = _get_supabase_user_email(user)
         if not user_id or not user_email:
             return jsonify({"error": "Authenticated user must have a valid email address."}), 400
-
-        pairing_code = ""
-        if action == "pair":
-            pairing_code = str(payload.get("pairing_code") or payload.get("pairingCode") or "").strip()
-            if not pairing_code:
-                return jsonify({"error": "Pairing code required for pair action."}), 400
-            if not PAIRING_CODE_PATTERN.match(pairing_code):
-                return jsonify({"error": "Pairing code must be a 6-digit value."}), 400
+        client_ip = _get_request_ip()
 
         client_redirect_to = str(payload.get("redirectTo") or payload.get("redirect_to") or "").strip()
         requested_redirect_path = str(
             payload.get("redirectPath") or payload.get("redirect_path") or ""
         ).strip()
         redirect_path = AGENT_PAIRING_REDIRECT_PATH
-        if requested_redirect_path in {"/app/agent", "/app/settings"}:
+        if requested_redirect_path in ALLOWED_PAIRING_REDIRECT_PATHS:
             redirect_path = requested_redirect_path
-        client_ip = _get_request_ip()
+        elif requested_redirect_path:
+            _logger.warning(
+                "Pairing challenge requested redirect path rejected request_id=%s requested_redirect_path=%s allowed_paths=%s",
+                request_id,
+                requested_redirect_path,
+                sorted(ALLOWED_PAIRING_REDIRECT_PATHS),
+            )
         allowed, reason, retry_after_seconds = _is_agent_pairing_action_allowed(user_id, action)
         if not allowed:
             _logger.warning(
-                "Pairing challenge throttled action=%s reason=%s user=%s ip=%s",
+                "Pairing challenge throttled request_id=%s action=%s reason=%s throttle_source=%s user=%s ip=%s",
+                request_id,
                 action,
                 reason,
+                "local-abuse",
                 _email_fingerprint(user_email),
                 client_ip,
             )
@@ -161,12 +242,31 @@ def create_agent_blueprint(
                 {
                     "error": "Too many verification requests. Please wait and try again.",
                     "reason": reason,
+                    "code": "pairing-challenge-throttled",
+                    "throttle_source": "local-abuse",
                     "retry_after_seconds": retry_after_seconds,
                 }
             )
             if retry_after_seconds > 0:
                 response.headers["Retry-After"] = str(retry_after_seconds)
             return response, 429
+
+        pairing_code = ""
+        if action == "pair":
+            pairing_code, gateway_error, gateway_status = _request_gateway_pairing_code()
+            if not pairing_code:
+                _logger.warning(
+                    "Pairing challenge code request failed request_id=%s user=%s ip=%s status=%s err=%s",
+                    request_id,
+                    _email_fingerprint(user_email),
+                    client_ip,
+                    gateway_status,
+                    gateway_error,
+                )
+                return (
+                    jsonify({"error": gateway_error or "Unable to request pairing code from gateway."}),
+                    gateway_status if gateway_status >= 400 else 502,
+                )
 
         challenge_id, expires_at = _create_agent_pairing_challenge(
             action=action,
@@ -176,6 +276,43 @@ def create_agent_blueprint(
             client_ip=client_ip,
         )
 
+        resolved_redirect_url = ""
+        selected_redirect_origin = ""
+        if callable(_build_auth_redirect_url):
+            resolved_redirect_url = str(
+                _build_auth_redirect_url(
+                    redirect_path,
+                    client_redirect_to,
+                    query_params={"agent_action": action, "agent_challenge": challenge_id},
+                )
+                or ""
+            ).strip()
+        if resolved_redirect_url:
+            parsed_redirect = urlparse(resolved_redirect_url)
+            if parsed_redirect.scheme and parsed_redirect.netloc:
+                selected_redirect_origin = f"{parsed_redirect.scheme}://{parsed_redirect.netloc}"
+
+        if not resolved_redirect_url:
+            _logger.warning(
+                "Pairing challenge redirect unresolved request_id=%s action=%s user=%s ip=%s requested_redirect_path=%s client_redirect_supplied=%s",
+                request_id,
+                action,
+                _email_fingerprint(user_email),
+                client_ip,
+                redirect_path,
+                bool(client_redirect_to),
+            )
+        else:
+            _logger.info(
+                "Pairing challenge email dispatch request_id=%s action=%s user=%s ip=%s selected_redirect_origin=%s final_redirect_path=%s",
+                request_id,
+                action,
+                _email_fingerprint(user_email),
+                client_ip,
+                selected_redirect_origin or "unknown",
+                redirect_path,
+            )
+
         try:
             _send_supabase_email_link(
                 user_email,
@@ -183,18 +320,40 @@ def create_agent_blueprint(
                 client_redirect_to=client_redirect_to,
                 redirect_path=redirect_path,
                 redirect_query={"agent_action": action, "agent_challenge": challenge_id},
+                require_redirect=True,
             )
         except Exception as exc:
+            status_code = int(getattr(exc, "status_code", 0) or 0)
+            retry_after_seconds = int(getattr(exc, "retry_after_seconds", 0) or 0)
+            safe_status = status_code if 400 <= status_code <= 599 else 502
+            throttle_source = "supabase" if safe_status == 429 else "none"
             _logger.warning(
-                "Agent pairing challenge email failed action=%s user=%s ip=%s: %s",
+                "Agent pairing challenge email failed request_id=%s action=%s throttle_source=%s user=%s ip=%s status=%s retry_after=%s error=%s",
+                request_id,
                 action,
+                throttle_source,
                 _email_fingerprint(user_email),
                 client_ip,
+                safe_status,
+                retry_after_seconds,
                 exc,
             )
             with AGENT_PAIRING_CHALLENGE_LOCK:
                 AGENT_PAIRING_CHALLENGES.pop(challenge_id, None)
-            return jsonify({"error": "Unable to send verification email right now. Please retry."}), 502
+            message = str(exc or "").strip()
+            if not message:
+                message = "Unable to send verification email right now. Please retry."
+            payload = {
+                "error": message,
+                "code": "pairing-email-delivery-failed",
+                "throttle_source": throttle_source,
+            }
+            if retry_after_seconds > 0:
+                payload["retry_after_seconds"] = retry_after_seconds
+            response = jsonify(payload)
+            if retry_after_seconds > 0:
+                response.headers["Retry-After"] = str(retry_after_seconds)
+            return response, safe_status
 
         return (
             jsonify(
@@ -228,13 +387,21 @@ def create_agent_blueprint(
 
         payload = request.get_json(silent=True) if request.is_json else {}
         payload = payload or {}
+        request_id = _request_id()
         client_redirect_to = str(payload.get("redirectTo") or payload.get("redirect_to") or "").strip()
         requested_redirect_path = str(
             payload.get("redirectPath") or payload.get("redirect_path") or ""
         ).strip()
         redirect_path = "/app/settings"
-        if requested_redirect_path in {"/app/agent", "/app/settings"}:
+        if requested_redirect_path in ALLOWED_PAIRING_REDIRECT_PATHS:
             redirect_path = requested_redirect_path
+        elif requested_redirect_path:
+            _logger.warning(
+                "Pairing code request redirect path rejected request_id=%s requested_redirect_path=%s allowed_paths=%s",
+                request_id,
+                requested_redirect_path,
+                sorted(ALLOWED_PAIRING_REDIRECT_PATHS),
+            )
 
         user = getattr(g, "supabase_user", {}) or {}
         user_id = _get_supabase_user_id(user)
@@ -249,8 +416,10 @@ def create_agent_blueprint(
         )
         if not allowed:
             _logger.warning(
-                "Pairing code request throttled reason=%s user=%s ip=%s",
+                "Pairing code request throttled request_id=%s reason=%s throttle_source=%s user=%s ip=%s",
+                request_id,
                 reason,
+                "local-abuse",
                 _email_fingerprint(user_email),
                 client_ip,
             )
@@ -258,6 +427,8 @@ def create_agent_blueprint(
                 {
                     "error": "Too many pairing code requests. Please wait and try again.",
                     "reason": reason,
+                    "code": "pairing-code-request-throttled",
+                    "throttle_source": "local-abuse",
                     "retry_after_seconds": retry_after_seconds,
                 }
             )
@@ -268,7 +439,8 @@ def create_agent_blueprint(
         pairing_code, gateway_error, gateway_status = _request_gateway_pairing_code()
         if not pairing_code:
             _logger.warning(
-                "Pairing code request failed user=%s ip=%s status=%s err=%s",
+                "Pairing code request failed request_id=%s user=%s ip=%s status=%s err=%s",
+                request_id,
                 _email_fingerprint(user_email),
                 client_ip,
                 gateway_status,
@@ -289,15 +461,34 @@ def create_agent_blueprint(
                     "agent_pairing_code": pairing_code,
                     "agent_pairing_notice": "code-loaded",
                 },
+                require_redirect=True,
             )
         except Exception as exc:
+            status_code = int(getattr(exc, "status_code", 0) or 0)
+            safe_status = status_code if 400 <= status_code <= 599 else 502
+            throttle_source = "supabase" if safe_status == 429 else "none"
             _logger.warning(
-                "Pairing code email failed user=%s ip=%s: %s",
+                "Pairing code email failed request_id=%s throttle_source=%s user=%s ip=%s status=%s error=%s",
+                request_id,
+                throttle_source,
                 _email_fingerprint(user_email),
                 client_ip,
+                safe_status,
                 exc,
             )
-            return jsonify({"error": "Unable to send pairing code email right now. Please retry."}), 502
+            message = str(exc or "").strip()
+            if not message:
+                message = "Unable to send pairing code email right now. Please retry."
+            return (
+                jsonify(
+                    {
+                        "error": message,
+                        "code": "pairing-code-email-delivery-failed",
+                        "throttle_source": throttle_source,
+                    }
+                ),
+                safe_status,
+            )
 
         return jsonify({"ok": True, "message": "Pairing code email sent."}), 202
 
@@ -323,6 +514,7 @@ def create_agent_blueprint(
             return jsonify({"error": "Expected JSON payload"}), 400
 
         payload = request.get_json(silent=True) or {}
+        request_id = _request_id()
         challenge_id = str(payload.get("challenge_id") or payload.get("challengeId") or "").strip()
         if not challenge_id:
             return jsonify({"error": "challenge_id is required"}), 400
@@ -338,9 +530,20 @@ def create_agent_blueprint(
 
         blocked, retry_after_seconds = _is_agent_pairing_confirm_blocked(user_id, client_ip)
         if blocked:
+            _logger.warning(
+                "Pairing confirm throttled request_id=%s reason=%s throttle_source=%s user=%s ip=%s retry_after=%s",
+                request_id,
+                "invalid-attempts",
+                "local-abuse",
+                _email_fingerprint(user_email),
+                client_ip,
+                retry_after_seconds,
+            )
             response = jsonify(
                 {
                     "error": "Too many invalid verification attempts. Please request a new link and try later.",
+                    "code": "pairing-confirm-throttled",
+                    "throttle_source": "local-abuse",
                     "retry_after_seconds": retry_after_seconds,
                 }
             )
@@ -360,9 +563,20 @@ def create_agent_blueprint(
                     client_ip,
                 )
                 if blocked_after_failure:
+                    _logger.warning(
+                        "Pairing confirm blocked after failure request_id=%s reason=%s throttle_source=%s user=%s ip=%s retry_after=%s",
+                        request_id,
+                        reason,
+                        "local-abuse",
+                        _email_fingerprint(user_email),
+                        client_ip,
+                        blocked_retry_after,
+                    )
                     response = jsonify(
                         {
                             "error": "Too many invalid verification attempts. Please request a new link and try later.",
+                            "code": "pairing-confirm-throttled",
+                            "throttle_source": "local-abuse",
                             "retry_after_seconds": blocked_retry_after,
                         }
                     )
@@ -386,6 +600,13 @@ def create_agent_blueprint(
                 extra_payload={"verified": True, "action": "pair"},
             )
             if response[1] < 400:
+                _logger.info(
+                    "Pairing confirm succeeded request_id=%s action=%s user=%s ip=%s",
+                    request_id,
+                    action,
+                    _email_fingerprint(user_email),
+                    client_ip,
+                )
                 _clear_agent_pairing_confirm_failures(user_id, client_ip)
             return response
 
@@ -403,6 +624,13 @@ def create_agent_blueprint(
             payload = revoke_response.get_json(silent=True) or {}
             payload.update({"paired": False, "verified": True, "action": "unpair"})
             _clear_agent_pairing_confirm_failures(user_id, client_ip)
+            _logger.info(
+                "Pairing confirm succeeded request_id=%s action=%s user=%s ip=%s",
+                request_id,
+                action,
+                _email_fingerprint(user_email),
+                client_ip,
+            )
             resp = jsonify(payload)
             resp.delete_cookie(AGENT_SESSION_COOKIE, path="/")
             return resp, 200
@@ -412,6 +640,7 @@ def create_agent_blueprint(
 
     @bp.route("/health", methods=["GET"])
     @require_supabase_user
+    @limiter.limit("30 per minute; 2000 per day")
     def api_agent_health():
         """Proxy ZeroClaw health check through the backend."""
         config_status = _agent_broker_config_status()
@@ -442,8 +671,30 @@ def create_agent_blueprint(
         """Expose broker configuration readiness (no secrets)."""
         return jsonify(_agent_broker_config_status()), 200
 
+    @bp.route("/profiles", methods=["GET"])
+    @require_supabase_user
+    def api_agent_profiles():
+        """Expose profile/model routing metadata for the Suite agent UI."""
+        config_status = _agent_broker_config_status()
+        if not config_status["ok"]:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Agent broker misconfigured",
+                        "missing": config_status["missing"],
+                        "warnings": config_status["warnings"],
+                    }
+                ),
+                503,
+            )
+
+        profiles = _list_agent_profiles() or []
+        return jsonify({"ok": True, "profiles": profiles}), 200
+
     @bp.route("/session", methods=["GET"])
     @require_supabase_user
+    @limiter.limit("20 per minute; 1200 per day")
     def api_agent_session():
         """Return whether a valid agent session cookie exists."""
         config_status = _agent_broker_config_status()
@@ -469,59 +720,17 @@ def create_agent_blueprint(
     @require_supabase_user
     @limiter.limit("10 per hour")
     def api_agent_pair():
-        config_status = _agent_broker_config_status()
-        if not config_status["ok"]:
-            return (
-                jsonify(
-                    {
-                        "error": "Agent broker misconfigured",
-                        "missing": config_status["missing"],
-                        "warnings": config_status["warnings"],
-                    }
-                ),
-                503,
-            )
-
-        if not request.is_json:
-            return jsonify({"error": "Expected JSON payload"}), 400
-
-        payload = request.get_json(silent=True) or {}
-        pairing_code = str(payload.get("pairing_code") or payload.get("pairingCode") or "").strip()
-        if not pairing_code:
-            return jsonify({"error": "pairing_code is required"}), 400
-        if not PAIRING_CODE_PATTERN.match(pairing_code):
-            return jsonify({"error": "Pairing code must be a 6-digit value."}), 400
-
-        user = getattr(g, "supabase_user", {}) or {}
-        user_id = _get_supabase_user_id(user)
-        user_email = _get_supabase_user_email(user)
-        if not user_id or not user_email:
-            return jsonify({"error": "Authenticated user must have a valid email address."}), 400
-
-        client_ip = _get_request_ip()
-        allowed, reason, retry_after_seconds = _is_agent_pairing_action_allowed(user_id, "pair")
-        if not allowed:
-            _logger.warning(
-                "Direct pair throttled reason=%s user=%s ip=%s",
-                reason,
-                _email_fingerprint(user_email),
-                client_ip,
-            )
-            response = jsonify(
+        return (
+            jsonify(
                 {
-                    "error": "Too many pairing attempts. Please wait and try again.",
-                    "reason": reason,
-                    "retry_after_seconds": retry_after_seconds,
+                    "error": "Direct pair is disabled. Request email verification first.",
+                    "next": [
+                        "POST /api/agent/pairing-challenge",
+                        "POST /api/agent/pairing-confirm",
+                    ],
                 }
-            )
-            if retry_after_seconds > 0:
-                response.headers["Retry-After"] = str(retry_after_seconds)
-            return response, 429
-
-        return _pair_agent_session_for_user(
-            pairing_code,
-            user_id,
-            extra_payload={"verified": False, "action": "pair"},
+            ),
+            428,
         )
 
     @bp.route("/unpair", methods=["POST"])
@@ -581,6 +790,29 @@ def create_agent_blueprint(
             )
 
         payload = request.get_json(silent=False)
+        profile_id = str(payload.get("profile_id") or payload.get("profileId") or "").strip().lower()
+        route = _resolve_agent_profile_route(profile_id) if profile_id else None
+
+        requested_model_candidates = _normalize_model_candidates(
+            payload.get("model_candidates") or payload.get("modelCandidates")
+        )
+        requested_model_candidates.extend(
+            _normalize_model_candidates(
+                [
+                    payload.get("model"),
+                    payload.get("model_hint"),
+                    payload.get("modelHint"),
+                ]
+            )
+        )
+
+        if route:
+            model_candidates = _normalize_model_candidates(
+                [route.get("primary_model"), *(route.get("fallback_models") or [])]
+            )
+        else:
+            model_candidates = _normalize_model_candidates(requested_model_candidates)
+
         raw_message = payload.get("message")
         task_name = ""
         try:
@@ -621,15 +853,59 @@ def create_agent_blueprint(
         if AGENT_WEBHOOK_SECRET:
             headers["X-Webhook-Secret"] = AGENT_WEBHOOK_SECRET
 
-        try:
-            response = requests_module.post(
-                f"{AGENT_GATEWAY_URL.rstrip('/')}/webhook",
-                headers=headers,
-                json=payload,
-                timeout=timeout_seconds,
+        response = None
+        request_exception = None
+        model_attempts = model_candidates if model_candidates else [""]
+
+        for attempt_index, attempt_model in enumerate(model_attempts):
+            proxy_payload = dict(payload)
+            if attempt_model:
+                proxy_payload["model"] = attempt_model
+            else:
+                proxy_payload.pop("model", None)
+
+            if attempt_index < len(model_attempts) - 1:
+                proxy_payload["fallback_models"] = model_attempts[attempt_index + 1 :]
+            else:
+                proxy_payload.pop("fallback_models", None)
+
+            try:
+                response = requests_module.post(
+                    f"{AGENT_GATEWAY_URL.rstrip('/')}/webhook",
+                    headers=headers,
+                    json=proxy_payload,
+                    timeout=timeout_seconds,
+                )
+            except Exception as exc:
+                request_exception = exc
+                if attempt_index < len(model_attempts) - 1:
+                    _logger.warning(
+                        "Agent webhook proxy attempt failed profile=%s model=%s; trying fallback: %s",
+                        profile_id or "default",
+                        attempt_model or "default",
+                        exc,
+                    )
+                    continue
+                _logger.warning("Agent webhook proxy failed: %s", exc)
+                return jsonify({"error": "Agent gateway unavailable"}), 503
+
+            if response.status_code >= 500 and attempt_index < len(model_attempts) - 1:
+                _logger.warning(
+                    "Agent webhook gateway status=%s profile=%s model=%s; trying fallback model=%s",
+                    response.status_code,
+                    profile_id or "default",
+                    attempt_model or "default",
+                    model_attempts[attempt_index + 1],
+                )
+                continue
+            break
+
+        if response is None:
+            _logger.warning(
+                "Agent webhook proxy returned no response profile=%s err=%s",
+                profile_id or "default",
+                request_exception,
             )
-        except Exception as exc:
-            _logger.warning("Agent webhook proxy failed: %s", exc)
             return jsonify({"error": "Agent gateway unavailable"}), 503
 
         if response.status_code in (401, 403):

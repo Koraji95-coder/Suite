@@ -8,6 +8,7 @@ const snapshotPath = path.join(
 	repoRoot,
 	"src/data/architectureSnapshot.generated.ts",
 );
+const verifyOnly = process.argv.includes("--verify");
 
 const INPUT_ROOTS = [
 	"src/routes",
@@ -157,6 +158,12 @@ function runArchitectureGenerator() {
 async function main() {
 	const snapshotStat = await statSafe(snapshotPath);
 	if (!snapshotStat?.isFile()) {
+		if (verifyOnly) {
+			console.error(
+				"Architecture snapshot is missing. Run `npm run arch:generate` and commit the updated snapshot.",
+			);
+			process.exit(1);
+		}
 		console.log("Architecture snapshot missing. Generating...");
 		runArchitectureGenerator();
 		return;
@@ -164,6 +171,12 @@ async function main() {
 
 	const newestInput = await newestInputMtimeMs();
 	if (newestInput > snapshotStat.mtimeMs) {
+		if (verifyOnly) {
+			console.error(
+				"Architecture snapshot is stale. Run `npm run arch:generate` and commit the updated snapshot.",
+			);
+			process.exit(1);
+		}
 		console.log("Architecture snapshot is stale. Regenerating...");
 		runArchitectureGenerator();
 		return;

@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Agent Pairing</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Geist+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════
+   GLOBAL CSS — NEXUS REFINED PAIRING
+   ═══════════════════════════════════════════════════════ */
+
+:root {
+  /* Surface */
+  --surface-base: #101014;
+  --surface-raised: #16161c;
+  --surface-overlay: #1c1c24;
+  --surface-card: rgba(24, 24, 34, 0.7);
+  --surface-glass: rgba(255, 255, 255, 0.03);
+  --surface-glass-border: rgba(255, 255, 255, 0.06);
+
+  /* Warm Neutrals */
+  --warm-50: #faf9f7;
+  --warm-100: #f0eeea;
+  --warm-200: #d8d4cc;
+  --warm-300: #b0a898;
+  --warm-400: #8a8070;
+  --warm-600: #4a4540;
+  --warm-800: #26241f;
+
+  /* Text */
+  --text-white: #ededf0;
+  --text-soft: #a0a0b4;
+  --text-muted: #606070;
+  --text-faint: #383844;
+
+  /* Agent Colors — kept from original */
+  --cyan: #00f0ff;
+  --cyan-soft: rgba(0, 240, 255, 0.12);
+  --cyan-border: rgba(0, 240, 255, 0.25);
+
+  --purple: #a855f7;
+  --purple-soft: rgba(168, 85, 247, 0.12);
+  --purple-border: rgba(168, 85, 247, 0.25);
+
+  --coral: #ff3366;
+  --coral-soft: rgba(255, 51, 102, 0.12);
+  --coral-border: rgba(255, 51, 102, 0.25);
+
+  --amber: #ff8a00;
+  --amber-soft: rgba(255, 138, 0, 0.12);
+  --amber-border: rgba(255, 138, 0, 0.25);
+
+  --blue: #3b82f6;
+  --blue-soft: rgba(59, 130, 246, 0.12);
+  --blue-border: rgba(59, 130, 246, 0.25);
+
+  /* Success */
+  --green: #34d399;
+  --green-soft: rgba(52, 211, 153, 0.1);
+  --green-border: rgba(52, 211, 153, 0.2);
+  --green-glow: rgba(52, 211, 153, 0.15);
+
+  /* Type */
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', monospace;
+
+  /* Motion */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background: var(--surface-base);
+  color: var(--text-white);
+  font-family: var(--font-sans);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-glass-border); border-radius: 3px; }
+
+/* ═══ KEYFRAMES ═══ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; pointer-events: none; }
+}
+
+@keyframes softPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes drawCheck {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes ringExpand {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes gentleDrift {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(30px, -20px); }
+  50% { transform: translate(-20px, 15px); }
+  75% { transform: translate(15px, 25px); }
+}
+
+@keyframes successGlow {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.3); }
+  70% { box-shadow: 0 0 0 16px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+@keyframes lineSweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* ═══ AMBIENT BACKGROUND ═══ */
+
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.035;
+  animation: gentleDrift 20s ease-in-out infinite;
+}
+
+.ambient-orb:nth-child(1) {
+  width: 500px; height: 500px;
+  top: -10%; left: 20%;
+  background: var(--cyan);
+  animation-delay: 0s;
+}
+
+.ambient-orb:nth-child(2) {
+  width: 400px; height: 400px;
+  bottom: -5%; right: 15%;
+  background: var(--purple);
+  animation-delay: -7s;
+}
+
+.ambient-orb:nth-child(3) {
+  width: 350px; height: 350px;
+  top: 40%; left: 60%;
+  background: var(--amber);
+  animation-delay: -14s;
+}
+
+.ambient-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+}
+
+/* ═══ LAYOUT ═══ */
+
+.screen {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  padding: 40px 24px;
+  transition: opacity 0.6s var(--ease);
+}
+
+/* ═══ BRAND HEADER ═══ */
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 44px;
+  animation: fadeInUp 0.7s var(--ease) backwards;
+}
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--warm-50), var(--warm-200));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  position: relative;
+}
+
+.brand-mark span {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  color: var(--surface-base);
+  line-height: 1;
+}
+
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--warm-200), transparent);
+  opacity: 0.15;
+  filter: blur(12px);
+  z-index: -1;
+}
+
+.brand-name {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  color: var(--text-white);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.brand-tagline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+/* ═══ STATUS HUB ═══ */
+
+.status-hub {
+  text-align: center;
+  margin-bottom: 32px;
+  animation: fadeInUp 0.7s var(--ease) 0.15s backwards;
+}
+
+.status-primary {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 17px;
+  color: var(--text-white);
+  margin-bottom: 6px;
+  min-height: 24px;
+}
+
+.status-secondary {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* ═══ OVERALL PROGRESS ═══ */
+
+.overall-progress {
+  width: 100%;
+  max-width: 460px;
+  margin-bottom: 28px;
+  animation: fadeInUp 0.7s var(--ease) 0.25s backwards;
+}
+
+.overall-bar-track {
+  width: 100%;
+  height: 3px;
+  background: var(--surface-overlay);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.overall-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--cyan), var(--purple), var(--green));
+  background-size: 200% 100%;
+  transition: width 0.4s var(--ease-soft);
+  position: relative;
+}
+
+.overall-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 0 8px rgba(255,255,255,0.3);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.overall-bar-fill.active::after {
+  opacity: 1;
+}
+
+.overall-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.overall-percent {
+  color: var(--text-soft);
+  transition: color 0.3s;
+}
+
+/* ═══ AGENT CARDS ═══ */
+
+.agent-list {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.agent-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-glass-border);
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+  animation: fadeInUp 0.6s var(--ease) backwards;
+  transition: border-color 0.5s var(--ease), background 0.5s var(--ease);
+}
+
+.agent-card.active {
+  border-color: rgba(255,255,255,0.1);
+}
+
+.agent-card.complete {
+  border-color: var(--green-border);
+  background: rgba(24, 24, 34, 0.5);
+}
+
+/* Shimmer sweep on active */
+.agent-card .shimmer-sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.02), transparent);
+  background-size: 200% 100%;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.agent-card.active .shimmer-sweep {
+  opacity: 1;
+  animation: shimmer 2.5s ease-in-out infinite;
+}
+
+/* Agent icon */
+.agent-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 16px;
+  flex-shrink: 0;
+  position: relative;
+  transition: box-shadow 0.5s var(--ease);
+}
+
+.agent-card.complete .agent-icon {
+  box-shadow: 0 0 12px var(--green-glow);
+}
+
+.icon-cyan    { background: var(--cyan-soft);   color: var(--cyan);   border: 1px solid var(--cyan-border); }
+.icon-purple  { background: var(--purple-soft); color: var(--purple); border: 1px solid var(--purple-border); }
+.icon-coral   { background: var(--coral-soft);  color: var(--coral);  border: 1px solid var(--coral-border); }
+.icon-amber   { background: var(--amber-soft);  color: var(--amber);  border: 1px solid var(--amber-border); }
+.icon-blue    { background: var(--blue-soft);   color: var(--blue);   border: 1px solid var(--blue-border); }
+
+.agent-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-white);
+  margin-bottom: 2px;
+}
+
+.agent-role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.agent-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 100px;
+}
+
+.agent-status-text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  font-weight: 400;
+  transition: color 0.3s;
+  text-align: right;
+}
+
+.agent-card.active .agent-status-text {
+  color: var(--text-soft);
+}
+
+.agent-card.complete .agent-status-text {
+  color: var(--green);
+}
+
+/* Individual progress bar */
+.agent-bar-track {
+  width: 100px;
+  height: 2px;
+  background: var(--surface-overlay);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.agent-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  transition: width 0.15s linear, background 0.3s;
+}
+
+/* Spinner & Check */
+.agent-indicator {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.agent-spinner-ring {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--surface-overlay);
+  border-radius: 50%;
+  position: absolute;
+  inset: 0;
+}
+
+.agent-spinner-arc {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid transparent;
+  border-top-color: var(--text-muted);
+  border-radius: 50%;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.agent-card.active .agent-spinner-arc {
+  opacity: 1;
+  animation: rotate 0.9s linear infinite;
+}
+
+.agent-check-circle {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.agent-card.complete .agent-spinner-ring,
+.agent-card.complete .agent-spinner-arc { opacity: 0; }
+
+.agent-card.complete .agent-check-circle { opacity: 1; }
+
+.agent-check-circle svg {
+  width: 20px;
+  height: 20px;
+}
+
+.agent-check-circle circle {
+  fill: var(--green);
+}
+
+.agent-check-circle polyline {
+  stroke: var(--surface-base);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+}
+
+.agent-card.complete .agent-check-circle polyline {
+  animation: drawCheck 0.35s var(--ease) 0.1s forwards;
+}
+
+/* ═══ LOG PANEL ═══ */
+
+.log-panel {
+  width: 100%;
+  max-width: 460px;
+  background: rgba(10, 10, 14, 0.6);
+  border: 1px solid var(--surface-glass-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  max-height: 100px;
+  overflow-y: auto;
+  animation: fadeInUp 0.7s var(--ease) 1.4s backwards;
+}
+
+.log-entry {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.9;
+  color: var(--text-faint);
+  animation: fadeIn 0.25s var(--ease);
+}
+
+.log-entry .time { color: var(--text-faint); opacity: 0.6; margin-right: 6px; }
+.log-entry .ok { color: var(--green); }
+.log-entry .info { color: var(--text-muted); }
+.log-entry .agent-hl { color: var(--text-soft); }
+
+/* ═══ COMPLETION SCREEN ═══ */
+
+.completion {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-base);
+  padding: 40px 24px;
+}
+
+.completion.visible {
+  display: flex;
+  animation: fadeIn 0.8s var(--ease);
+}
+
+.completion-check {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--green-soft);
+  border: 1.5px solid var(--green-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+  animation: fadeInScale 0.5s var(--ease) 0.2s backwards, successGlow 2.5s ease-out 1s infinite;
+  position: relative;
+}
+
+.completion-check::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: var(--green-soft);
+  filter: blur(16px);
+  z-index: -1;
+}
+
+.completion-check svg {
+  width: 30px;
+  height: 30px;
+}
+
+.completion-check polyline {
+  stroke: var(--green);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke-dasharray: 32;
+  stroke-dashoffset: 32;
+  animation: drawCheck 0.5s var(--ease) 0.5s forwards;
+}
+
+.completion-title {
+  font-family: var(--font-serif);
+  font-size: 32px;
+  color: var(--text-white);
+  margin-bottom: 8px;
+  animation: fadeInUp 0.6s var(--ease) 0.35s backwards;
+}
+
+.completion-subtitle {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-soft);
+  margin-bottom: 36px;
+  animation: fadeInUp 0.6s var(--ease) 0.5s backwards;
+}
+
+.completion-agents {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 32px;
+  animation: fadeInUp 0.6s var(--ease) 0.65s backwards;
+}
+
+.completion-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.completion-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid;
+  border-color: inherit;
+  opacity: 0.25;
+}
+
+.completion-info {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 2;
+  animation: fadeInUp 0.6s var(--ease) 0.8s backwards;
+}
+
+.completion-info .green { color: var(--green); }
+
+.completion-session {
+  margin-top: 36px;
+  padding: 10px 24px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-glass-border);
+  background: var(--surface-glass);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  animation: fadeInUp 0.6s var(--ease) 0.95s backwards;
+}
+</style>
+</head>
+<body>
+
+<div class="ambient">
+  <div class="ambient-orb"></div>
+  <div class="ambient-orb"></div>
+  <div class="ambient-orb"></div>
+  <div class="ambient-grain"></div>
+</div>
+
+<!-- ═══ LOADING SCREEN ═══ -->
+<div class="screen" id="loadingScreen">
+
+  <div class="brand">
+    <div class="brand-mark"><span>N</span></div>
+    <div class="brand-name">Nexus</div>
+    <div class="brand-tagline">Agent Pairing Protocol</div>
+  </div>
+
+  <div class="status-hub">
+    <div class="status-primary" id="statusPrimary">Preparing secure channels...</div>
+    <div class="status-secondary" id="statusSecondary">0 of 5 agents connected</div>
+  </div>
+
+  <div class="overall-progress">
+    <div class="overall-bar-track">
+      <div class="overall-bar-fill" id="overallFill"></div>
+    </div>
+    <div class="overall-meta">
+      <span>Pairing progress</span>
+      <span class="overall-percent" id="overallPercent">0%</span>
+    </div>
+  </div>
+
+  <div class="agent-list">
+    <div class="agent-card" id="card-0" style="animation-delay:0.35s">
+      <div class="shimmer-sweep"></div>
+      <div class="agent-icon icon-cyan">λ</div>
+      <div class="agent-details">
+        <div class="agent-name">ATLAS</div>
+        <div class="agent-role">Senior Engineer</div>
+      </div>
+      <div class="agent-right">
+        <div class="agent-status-text" id="status-0">Waiting</div>
+        <div class="agent-bar-track"><div class="agent-bar-fill" id="bar-0" style="background:var(--cyan)"></div></div>
+      </div>
+      <div class="agent-indicator">
+        <div class="agent-spinner-ring"></div>
+        <div class="agent-spinner-arc"></div>
+        <div class="agent-check-circle"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><polyline points="5.5 10.5 8.5 13.5 14.5 7"/></svg></div>
+      </div>
+    </div>
+
+    <div class="agent-card" id="card-1" style="animation-delay:0.45s">
+      <div class="shimmer-sweep"></div>
+      <div class="agent-icon icon-purple">Ω</div>
+      <div class="agent-details">
+        <div class="agent-name">NOVA</div>
+        <div class="agent-role">Project Lead</div>
+      </div>
+      <div class="agent-right">
+        <div class="agent-status-text" id="status-1">Waiting</div>
+        <div class="agent-bar-track"><div class="agent-bar-fill" id="bar-1" style="background:var(--purple)"></div></div>
+      </div>
+      <div class="agent-indicator">
+        <div class="agent-spinner-ring"></div>
+        <div class="agent-spinner-arc"></div>
+        <div class="agent-check-circle"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><polyline points="5.5 10.5 8.5 13.5 14.5 7"/></svg></div>
+      </div>
+    </div>
+
+    <div class="agent-card" id="card-2" style="animation-delay:0.55s">
+      <div class="shimmer-sweep"></div>
+      <div class="agent-icon icon-coral">Δ</div>
+      <div class="agent-details">
+        <div class="agent-name">SENTINEL</div>
+        <div class="agent-role">QA & Testing</div>
+      </div>
+      <div class="agent-right">
+        <div class="agent-status-text" id="status-2">Waiting</div>
+        <div class="agent-bar-track"><div class="agent-bar-fill" id="bar-2" style="background:var(--coral)"></div></div>
+      </div>
+      <div class="agent-indicator">
+        <div class="agent-spinner-ring"></div>
+        <div class="agent-spinner-arc"></div>
+        <div class="agent-check-circle"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><polyline points="5.5 10.5 8.5 13.5 14.5 7"/></svg></div>
+      </div>
+    </div>
+
+    <div class="agent-card" id="card-3" style="animation-delay:0.65s">
+      <div class="shimmer-sweep"></div>
+      <div class="agent-icon icon-amber">Σ</div>
+      <div class="agent-details">
+        <div class="agent-name">FORGE</div>
+        <div class="agent-role">DevOps & Infrastructure</div>
+      </div>
+      <div class="agent-right">
+        <div class="agent-status-text" id="status-3">Waiting</div>
+        <div class="agent-bar-track"><div class="agent-bar-fill" id="bar-3" style="background:var(--amber)"></div></div>
+      </div>
+      <div class="agent-indicator">
+        <div class="agent-spinner-ring"></div>
+        <div class="agent-spinner-arc"></div>
+        <div class="agent-check-circle"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><polyline points="5.5 10.5 8.5 13.5 14.5 7"/></svg></div>
+      </div>
+    </div>
+
+    <div class="agent-card" id="card-4" style="animation-delay:0.75s">
+      <div class="shimmer-sweep"></div>
+      <div class="agent-icon icon-blue">Φ</div>
+      <div class="agent-details">
+        <div class="agent-name">CIPHER</div>
+        <div class="agent-role">System Architect</div>
+      </div>
+      <div class="agent-right">
+        <div class="agent-status-text" id="status-4">Waiting</div>
+        <div class="agent-bar-track"><div class="agent-bar-fill" id="bar-4" style="background:var(--blue)"></div></div>
+      </div>
+      <div class="agent-indicator">
+        <div class="agent-spinner-ring"></div>
+        <div class="agent-spinner-arc"></div>
+        <div class="agent-check-circle"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="10"/><polyline points="5.5 10.5 8.5 13.5 14.5 7"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="log-panel" id="logPanel"></div>
+
+</div>
+
+<!-- ═══ COMPLETION SCREEN ═══ -->
+<div class="completion" id="completionScreen">
+  <div class="ambient">
+    <div class="ambient-orb" style="background:var(--green);opacity:0.03;top:30%;left:40%"></div>
+    <div class="ambient-grain"></div>
+  </div>
+
+  <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center">
+    <div class="completion-check">
+      <svg viewBox="0 0 30 30"><polyline points="8 15.5 13 20.5 22 10"/></svg>
+    </div>
+    <div class="completion-title">Pairing Active</div>
+    <div class="completion-subtitle">You may now close this screen</div>
+
+    <div class="completion-agents">
+      <div class="completion-dot" style="background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 8px rgba(0,240,255,0.2)"></div>
+      <div class="completion-dot" style="background:var(--purple);border-color:var(--purple);box-shadow:0 0 8px rgba(168,85,247,0.2)"></div>
+      <div class="completion-dot" style="background:var(--coral);border-color:var(--coral);box-shadow:0 0 8px rgba(255,51,102,0.2)"></div>
+      <div class="completion-dot" style="background:var(--amber);border-color:var(--amber);box-shadow:0 0 8px rgba(255,138,0,0.2)"></div>
+      <div class="completion-dot" style="background:var(--blue);border-color:var(--blue);box-shadow:0 0 8px rgba(59,130,246,0.2)"></div>
+    </div>
+
+    <div class="completion-info">
+      <span class="green">5 of 5</span> agents authenticated and connected<br>
+      All secure channels established
+    </div>
+
+    <div class="completion-session">Session <span id="sessionId"></span> · Encrypted</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  Pairing Engine — Smooth & Continuous
+// ═══════════════════════════════════════════
+
+const AGENTS = [
+  { name: 'ATLAS',    phases: ['Handshake','Key exchange','Validating token','Syncing systems'] },
+  { name: 'NOVA',     phases: ['Handshake','Auth challenge','Verifying scope','Syncing systems'] },
+  { name: 'SENTINEL', phases: ['Handshake','Certificate check','Linking test env','Syncing systems'] },
+  { name: 'FORGE',    phases: ['Handshake','Infra scan','Pipeline auth','Syncing systems'] },
+  { name: 'CIPHER',   phases: ['Handshake','Schema sync','Blueprint load','Syncing systems'] },
+];
+
+const statusPrimary = document.getElementById('statusPrimary');
+const statusSecondary = document.getElementById('statusSecondary');
+const overallFill = document.getElementById('overallFill');
+const overallPercent = document.getElementById('overallPercent');
+const logPanel = document.getElementById('logPanel');
+
+// Session ID
+document.getElementById('sessionId').textContent =
+  'NX-' + Math.random().toString(36).substring(2,6).toUpperCase() +
+  '-' + Math.random().toString(36).substring(2,6).toUpperCase();
+
+function ts() {
+  const n = new Date();
+  return n.toLocaleTimeString('en-US', { hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function log(text, cls = 'info') {
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="time">${ts()}</span><span class="${cls}">${text}</span>`;
+  logPanel.appendChild(el);
+  logPanel.scrollTop = logPanel.scrollHeight;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function setOverall(pct) {
+  overallFill.style.width = pct + '%';
+  overallFill.classList.toggle('active', pct > 0 && pct < 100);
+  overallPercent.textContent = Math.round(pct) + '%';
+}
+
+// Smooth continuous fill for an agent bar from 0→100
+function smoothFill(barEl, durationMs) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    function tick(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / durationMs, 1);
+      // Ease-in-out cubic
+      const eased = progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      barEl.style.width = (eased * 100) + '%';
+      if (progress < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        barEl.style.width = '100%';
+        resolve();
+      }
+    }
+    requestAnimationFrame(tick);
+  });
+}
+
+async function pairAgent(index) {
+  const agent = AGENTS[index];
+  const card = document.getElementById('card-' + index);
+  const bar = document.getElementById('bar-' + index);
+  const statusText = document.getElementById('status-' + index);
+
+  card.classList.add('active');
+  statusText.textContent = agent.phases[0];
+  log(`${agent.name} → Initiating connection`, 'agent-hl');
+
+  // Total duration for this agent: ~3 seconds of smooth bar fill
+  const totalDuration = 2800 + Math.random() * 600;
+  const phaseInterval = totalDuration / agent.phases.length;
+
+  // Start smooth bar fill
+  const fillPromise = smoothFill(bar, totalDuration);
+
+  // Update status text at each phase point
+  for (let p = 1; p < agent.phases.length; p++) {
+    await sleep(phaseInterval);
+    statusText.textContent = agent.phases[p];
+    log(`${agent.name} → ${agent.phases[p]}`, 'info');
+  }
+
+  // Wait for bar to finish
+  await fillPromise;
+
+  // Complete
+  card.classList.remove('active');
+  card.classList.add('complete');
+  statusText.textContent = 'Paired';
+  log(`${agent.name} → <span class="ok">Paired successfully</span>`, 'ok');
+
+  // Update overall
+  const paired = index + 1;
+  const overallPct = (paired / AGENTS.length) * 100;
+  setOverall(overallPct);
+  statusSecondary.textContent = `${paired} of 5 agents connected`;
+
+  await sleep(250);
+}
+
+async function run() {
+  // Init
+  log('Nexus Pairing Protocol starting', 'info');
+  await sleep(700);
+  log('Generating secure session keys', 'info');
+  await sleep(500);
+  log('Encrypted channel ready — TLS 1.3', 'ok');
+  await sleep(400);
+  log('Scanning for registered agents...', 'info');
+  await sleep(600);
+  log('<span class="ok">5 agents found on network</span>', 'ok');
+  await sleep(400);
+
+  statusPrimary.textContent = 'Authenticating agents...';
+
+  // Pair each agent
+  for (let i = 0; i < AGENTS.length; i++) {
+    statusPrimary.textContent = `Pairing ${AGENTS[i].name}...`;
+    await pairAgent(i);
+    if (i < AGENTS.length - 1) await sleep(400);
+  }
+
+  // Done
+  statusPrimary.textContent = 'All agents paired';
+  overallPercent.style.color = 'var(--green)';
+  log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+  log('<span class="ok">✓ Session active — all agents connected</span>', 'ok');
+
+  await sleep(1800);
+
+  // Transition
+  const loading = document.getElementById('loadingScreen');
+  loading.style.animation = 'fadeOut 0.7s var(--ease) forwards';
+  await sleep(700);
+  loading.style.display = 'none';
+  document.getElementById('completionScreen').classList.add('visible');
+}
+
+setTimeout(run, 1000);
+</script>
+
+</body>
+</html>

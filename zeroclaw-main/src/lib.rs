@@ -38,6 +38,7 @@
 
 use clap::Subcommand;
 use serde::{Deserialize, Serialize};
+use anyhow::Context;
 
 pub mod agent;
 pub(crate) mod approval;
@@ -78,6 +79,22 @@ pub mod update;
 pub(crate) mod util;
 
 pub use config::Config;
+
+/// Initialize OTP secret material when OTP is enabled, mirroring CLI preflight behavior.
+pub fn ensure_otp_secret_initialized(config: &Config) -> anyhow::Result<Option<String>> {
+	if !config.security.otp.enabled {
+		return Ok(None);
+	}
+
+	let config_dir = config
+		.config_path
+		.parent()
+		.context("Config path must have a parent directory")?;
+	let store = security::SecretStore::new(config_dir, config.secrets.encrypt);
+	let (_validator, enrollment_uri) =
+		security::OtpValidator::from_config(&config.security.otp, config_dir, &store)?;
+	Ok(enrollment_uri)
+}
 
 /// Service management subcommands
 #[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

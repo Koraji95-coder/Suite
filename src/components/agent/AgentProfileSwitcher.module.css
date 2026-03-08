@@ -18,6 +18,10 @@
 		border-color 150ms ease;
 }
 
+.triggerModelLabel {
+	display: none;
+}
+
 .triggerButtonOpen {
 	border-color: var(--primary);
 	background: color-mix(in srgb, var(--primary) 10%, transparent);
@@ -175,6 +179,14 @@
 	display: none;
 }
 
+.tabModel {
+	display: none;
+	font-size: 0.65rem;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
 .tabActiveDot {
 	position: absolute;
 	top: -0.125rem;
@@ -197,7 +209,19 @@
 }
 
 @media (min-width: 40rem) {
+	.triggerModelLabel {
+		display: inline;
+		max-width: 10rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
 	.tabName {
+		display: inline;
+	}
+
+	.tabModel {
 		display: inline;
 	}
 }

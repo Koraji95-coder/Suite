@@ -1,66 +1,66 @@
 import { RefreshCw, Settings2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
+import { buildAgentPairingSearchFromLocation } from "@/auth/agentPairingParams";
 import { AgentChatPanel } from "@/components/agent/AgentChatPanel";
+import { AgentPanelBoundary } from "@/components/agent/AgentPanelBoundary";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 import { agentService } from "@/services/agentService";
+import { agentTaskManager } from "@/services/agentTaskManager";
+import { useAgentConnectionStatus } from "@/services/useAgentConnectionStatus";
 import styles from "./AgentRoutePage.module.css";
 
 export default function AgentRoutePage() {
 	const { user } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const [healthy, setHealthy] = useState<boolean | null>(null);
-	const [paired, setPaired] = useState(false);
-	const userId = user?.id ?? null;
-
-	const refreshConnectionState = useCallback(async () => {
-		const isHealthy = await agentService.healthCheck();
-		setHealthy(isHealthy);
-
-		if (isHealthy && userId) {
-			await agentService.restorePairingForActiveUser();
-		}
-
-		const pairedState = await agentService.refreshPairingStatus();
-		setPaired(pairedState);
-	}, [userId]);
+	const {
+		healthy,
+		paired,
+		error: connectionError,
+		refreshNow: refreshConnectionState,
+	} =
+		useAgentConnectionStatus({
+			userId: user?.id ?? null,
+		});
 
 	useEffect(() => {
-		void refreshConnectionState();
-	}, [refreshConnectionState]);
-
-	useEffect(() => {
-		if (healthy === true && paired) return;
-		const timer = window.setInterval(() => {
-			void refreshConnectionState();
-		}, 5000);
-		return () => window.clearInterval(timer);
-	}, [healthy, paired, refreshConnectionState]);
-
-	useEffect(() => {
-		const params = new URLSearchParams(location.search);
-		if (!params.has("agent_challenge") && !params.has("agent_action")) {
+		const pairingSearch = buildAgentPairingSearchFromLocation(
+			location.search,
+			location.hash,
+		);
+		if (!pairingSearch) {
 			return;
 		}
 		navigate(
 			{
-				pathname: "/app/settings",
-				search: location.search,
+				pathname: "/agent/pairing-callback",
+				search: pairingSearch,
 			},
 			{ replace: true },
 		);
-	}, [location.search, navigate]);
+	}, [location.hash, location.search, navigate]);
 
-	const isReady = healthy === true && paired;
+	const handleResetPanelCache = () => {
+		try {
+			agentTaskManager.clearConversationCacheForCurrentScope();
+			localStorage.removeItem("agent-channel-scope");
+			localStorage.removeItem("agent-active-profile");
+			void refreshConnectionState();
+		} catch (error) {
+			logger.error("Failed to reset local agent panel cache.", "AgentRoutePage", error);
+		}
+	};
 
 	return (
 		<PageFrame
 			title="Agent"
-			description="AI-powered task orchestration"
+			description="Profile-based AI orchestration and automation"
 			maxWidth="full"
+			padded={false}
 		>
 			<div className={styles.statusPanel}>
 				<div className={styles.statusRow}>
@@ -100,7 +100,7 @@ export default function AgentRoutePage() {
 							className={styles.button}
 						>
 							<RefreshCw className={styles.buttonIcon} />
-							Refresh
+							Refresh state
 						</button>
 
 						<button
@@ -113,10 +113,15 @@ export default function AgentRoutePage() {
 						</button>
 					</div>
 				</div>
+				{connectionError ? (
+					<p className={styles.errorText}>{connectionError}</p>
+				) : null}
 			</div>
 
 			<div className={styles.chatWrap}>
-				<AgentChatPanel healthy={isReady} paired={paired} />
+				<AgentPanelBoundary onResetPanelCache={handleResetPanelCache}>
+					<AgentChatPanel healthy={healthy === true} paired={paired} />
+				</AgentPanelBoundary>
 			</div>
 		</PageFrame>
 	);

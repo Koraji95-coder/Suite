@@ -8,6 +8,7 @@ from flask_limiter import Limiter
 
 from .api_autodraft import create_autodraft_blueprint
 from .api_agent import create_agent_blueprint
+from .api_agent_orchestration import create_agent_orchestration_blueprint
 from .api_auth_passkey import create_auth_passkey_blueprint
 from .api_autocad import create_autocad_blueprint
 from .api_backup import create_backup_blueprint
@@ -55,8 +56,12 @@ def register_route_groups(
     batch_session_ttl_seconds: int,
     require_supabase_user: Callable,
     require_agent_session: Callable,
+    get_supabase_user_id: Callable[[dict[str, Any]], Optional[str]],
+    get_supabase_user_email: Callable[[dict[str, Any]], Optional[str]],
+    is_admin_user: Callable[[dict[str, Any]], bool],
     passkey_deps: dict[str, Any],
     agent_deps: dict[str, Any],
+    agent_run_orchestrator: Any,
     transmittal_render_deps: dict[str, Any],
     get_manager: Callable[[], Any],
     connect_autocad: Callable[[], Any],
@@ -130,6 +135,18 @@ def register_route_groups(
             require_supabase_user=require_supabase_user,
             require_agent_session=require_agent_session,
             deps=agent_deps,
+        )
+    )
+    app.register_blueprint(
+        create_agent_orchestration_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
+            require_agent_session=require_agent_session,
+            get_supabase_user_id=get_supabase_user_id,
+            get_supabase_user_email=get_supabase_user_email,
+            is_admin_user=is_admin_user,
+            orchestrator=agent_run_orchestrator,
         )
     )
     app.register_blueprint(

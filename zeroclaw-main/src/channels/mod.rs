@@ -18,6 +18,11 @@ pub mod clawdtalk;
 pub mod cli;
 pub mod dingtalk;
 pub mod discord;
+#[cfg(not(windows))]
+#[path = "email_channel.rs"]
+pub mod email_channel;
+#[cfg(windows)]
+#[path = "email_channel_windows.rs"]
 pub mod email_channel;
 pub mod imessage;
 pub mod irc;

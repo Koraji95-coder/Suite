@@ -1,3 +1,9 @@
+import {
+	fetchWithTimeout,
+	mapFetchErrorCode,
+	mapFetchErrorMessage,
+	parseResponseErrorMessage,
+} from "@/lib/fetchWithTimeout";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import type {
@@ -86,19 +92,7 @@ class ConduitRouteService {
 		response: Response,
 		fallback: string,
 	): Promise<string> {
-		try {
-			const payload = (await response.json()) as {
-				error?: string;
-				message?: string;
-			} | null;
-			const candidate = payload?.error || payload?.message;
-			if (typeof candidate === "string" && candidate.trim().length > 0) {
-				return candidate.trim();
-			}
-		} catch {
-			// Keep fallback message when body parse fails.
-		}
-		return fallback;
+		return parseResponseErrorMessage(response, fallback);
 	}
 
 	async computeRoute(
@@ -107,7 +101,7 @@ class ConduitRouteService {
 		try {
 			const requestId = this.createRequestId();
 			const headers = await this.getHeaders(requestId);
-			const response = await fetch(
+			const response = await fetchWithTimeout(
 				`${this.baseUrl}/api/conduit-route/route/compute`,
 				{
 					method: "POST",
@@ -125,10 +119,13 @@ class ConduitRouteService {
 						gridStep: request.gridStep,
 						tagText: request.tagText,
 					}),
+					timeoutMs: 60_000,
+					requestName: "Conduit route compute request",
 				},
 			);
 
 			const payload = (await response
+				.clone()
 				.json()
 				.catch(() => null)) as ConduitRouteComputeResponse | null;
 
@@ -160,9 +157,8 @@ class ConduitRouteService {
 			logger.error("Route compute request failed", "ConduitRouteService", err);
 			return {
 				success: false,
-				code: "NETWORK_ERROR",
-				message:
-					err instanceof Error ? err.message : "Route compute request failed",
+				code: mapFetchErrorCode(err, "NETWORK_ERROR"),
+				message: mapFetchErrorMessage(err, "Route compute request failed"),
 			};
 		}
 	}
@@ -171,9 +167,11 @@ class ConduitRouteService {
 		try {
 			const requestId = this.createRequestId();
 			const headers = await this.getHeaders(requestId);
-			const response = await fetch(`${this.baseUrl}/api/layers`, {
+			const response = await fetchWithTimeout(`${this.baseUrl}/api/layers`, {
 				method: "GET",
 				headers,
+				timeoutMs: 20_000,
+				requestName: "Conduit route layer request",
 			});
 
 			if (!response.ok) {
@@ -205,7 +203,7 @@ class ConduitRouteService {
 		try {
 			const requestId = this.createRequestId();
 			const headers = await this.getHeaders(requestId);
-			const response = await fetch(
+			const response = await fetchWithTimeout(
 				`${this.baseUrl}/api/conduit-route/obstacles/scan`,
 				{
 					method: "POST",
@@ -220,10 +218,13 @@ class ConduitRouteService {
 						layerTypeOverrides: request.layerTypeOverrides ?? {},
 						layerPreset: request.layerPreset ?? "",
 					}),
+					timeoutMs: 45_000,
+					requestName: "Conduit obstacle scan request",
 				},
 			);
 
 			const payload = (await response
+				.clone()
 				.json()
 				.catch(() => null)) as ConduitObstacleScanResponse | null;
 
@@ -255,9 +256,8 @@ class ConduitRouteService {
 			logger.error("Obstacle scan request failed", "ConduitRouteService", err);
 			return {
 				success: false,
-				code: "NETWORK_ERROR",
-				message:
-					err instanceof Error ? err.message : "Obstacle scan request failed",
+				code: mapFetchErrorCode(err, "NETWORK_ERROR"),
+				message: mapFetchErrorMessage(err, "Obstacle scan request failed"),
 			};
 		}
 	}

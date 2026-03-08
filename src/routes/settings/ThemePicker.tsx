@@ -12,6 +12,9 @@ import styles from "./ThemePicker.module.css";
 
 // New theme keys matching palette.ts
 const THEME_KEYS = [
+	"nexusCore",
+	"nexusEmber",
+	"nexusOrchid",
 	"midnight",
 	"graphite",
 	"slate",

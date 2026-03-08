@@ -154,12 +154,12 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 			"CSS variable tokens, global foundations, and spacing/radius system for long-term visual consistency.",
 	},
 	{
-		id: "tailwind-bridge",
+		id: "global-theme-layer",
 		domainId: "frontend",
-		label: "Tailwind Compatibility Bridge",
+		label: "Global Theme Layer",
 		path: "src/theme.css",
 		summary:
-			"Legacy utility compatibility layer still active while components are migrated to CSS Modules.",
+			"Global CSS variable and foundation layer used by app components and CSS modules.",
 	},
 	{
 		id: "frontend-services",
@@ -336,7 +336,7 @@ export const ARCHITECTURE_DEPENDENCIES: ArchitectureDependency[] = [
 		weight: 0.9,
 	},
 	{
-		sourceId: "tailwind-bridge",
+		sourceId: "global-theme-layer",
 		targetId: "feature-components",
 		kind: "powers",
 		weight: 0.7,

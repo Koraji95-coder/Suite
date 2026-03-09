@@ -198,6 +198,7 @@ export type PythonToolRequest = Record<string, unknown> & {
 const AGENT_PAIRING_SETTING_KEY = "agent_pairing_state_v1";
 const MAX_RESTORE_AGE_MS = 24 * 60 * 60 * 1000;
 const AGENT_SESSION_RETRY_AFTER_MAX_SECONDS = 120;
+const SUPABASE_SESSION_LOOKUP_TIMEOUT_MS = 8_000;
 export const AGENT_PAIRING_STATE_EVENT = "suite:agent-pairing-state-changed";
 
 interface AgentPairingState {
@@ -392,10 +393,31 @@ class AgentService {
 		}
 
 		try {
+			let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+			const sessionResult = await Promise.race([
+				supabase.auth.getSession().then((value) => ({
+					timedOut: false as const,
+					value,
+				})),
+				new Promise<{ timedOut: true }>((resolve) => {
+					timeoutHandle = setTimeout(() => resolve({ timedOut: true }), SUPABASE_SESSION_LOOKUP_TIMEOUT_MS);
+				}),
+			]);
+			if (timeoutHandle) {
+				clearTimeout(timeoutHandle);
+			}
+			if (sessionResult.timedOut) {
+				logger.warn(
+					"Supabase session lookup timed out",
+					"AgentService",
+					{ timeoutMs: SUPABASE_SESSION_LOOKUP_TIMEOUT_MS },
+				);
+				return null;
+			}
 			const {
 				data: { session },
 				error,
-			} = await supabase.auth.getSession();
+			} = sessionResult.value;
 			if (error) {
 				logger.warn("Failed to fetch Supabase session", "AgentService", {
 					error,
@@ -414,6 +436,32 @@ class AgentService {
 		fallback: string,
 	): Promise<string> {
 		return parseResponseErrorMessage(response, fallback);
+	}
+
+	private formatAgentGatewayFailureMessage(
+		status: number,
+		details: string,
+	): string {
+		const message = String(details || "").trim();
+		if (message && !/internal server error/i.test(message)) {
+			if (status >= 500 && /llm request failed/i.test(message)) {
+				return (
+					"Agent model request failed in the gateway. " +
+					"Try another agent/profile or restart the gateway/provider runtime."
+				);
+			}
+			return message;
+		}
+		if (status >= 500) {
+			return (
+				"Agent request failed in the gateway/provider runtime. " +
+				"Try another profile or restart gateway/provider services."
+			);
+		}
+		if (status === 429) {
+			return "Agent request is rate-limited. Please retry in a few seconds.";
+		}
+		return message || `Agent request failed (status ${status}).`;
 	}
 
 	private parsePositiveInteger(value: unknown): number {
@@ -1429,6 +1477,14 @@ class AgentService {
 				});
 
 				if (!response.ok) {
+					const rawDetails = await this.readBrokerError(
+						response,
+						`Agent request failed (${response.status})`,
+					);
+					const failureMessage = this.formatAgentGatewayFailureMessage(
+						response.status,
+						rawDetails,
+					);
 					if (response.status === 401 || response.status === 403) {
 						await this.unpair();
 						await logSecurityEvent(
@@ -1436,11 +1492,14 @@ class AgentService {
 							"Agent request returned unauthorized; pairing was revoked.",
 						);
 					}
-					logger.error(
-						`Agent request failed: ${response.statusText}`,
-						"AgentService",
-					);
-					throw new Error(`Agent request failed: ${response.statusText}`);
+					logger.error("Agent request failed", "AgentService", {
+						status: response.status,
+						statusText: response.statusText,
+						task: task.task,
+						profileId,
+						message: failureMessage,
+					});
+					throw new Error(failureMessage);
 				}
 
 				const data = await response.json();
@@ -1552,6 +1611,14 @@ class AgentService {
 			}
 
 			if (!response.ok) {
+				const rawDetails = await this.readBrokerError(
+					response,
+					`Agent request failed (${response.status})`,
+				);
+				const failureMessage = this.formatAgentGatewayFailureMessage(
+					response.status,
+					rawDetails,
+				);
 				if (response.status === 401 || response.status === 403) {
 					const responseBody = await response.text().catch(() => "");
 					const mentionsSecret = /secret/i.test(responseBody);
@@ -1572,11 +1639,14 @@ class AgentService {
 						"Agent request returned unauthorized; pairing was revoked.",
 					);
 				}
-				logger.error(
-					`Agent request failed: ${response.statusText}`,
-					"AgentService",
-				);
-				throw new Error(`Agent request failed: ${response.statusText}`);
+				logger.error("Agent request failed", "AgentService", {
+					status: response.status,
+					statusText: response.statusText,
+					task: task.task,
+					profileId,
+					message: failureMessage,
+				});
+				throw new Error(failureMessage);
 			}
 
 			const data = await response.json();

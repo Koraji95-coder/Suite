@@ -86,10 +86,14 @@ python-dateutil==2.9.0.post0
     # via pandas
 python-docx==1.2.0
     # via -r backend/requirements-api.in
+python-dotenv==1.2.2
+    # via -r backend/requirements-api.in
 pywin32==311 ; sys_platform == "win32"
     # via
     #   -r backend/requirements-api.in
     #   docx2pdf
+redis==7.3.0
+    # via -r backend/requirements-api.in
 requests==2.32.5
     # via -r backend/requirements-api.in
 simple-websocket==1.1.0

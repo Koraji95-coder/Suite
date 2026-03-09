@@ -16,3 +16,5 @@ docx2pdf>=0.1.8
 PyJWT[crypto]>=2.8.0
 requests>=2.31.0
 webauthn>=2.7.1
+python-dotenv>=1.0.1
+redis>=5.0.0

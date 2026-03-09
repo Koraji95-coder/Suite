@@ -856,8 +856,10 @@ def create_agent_blueprint(
         response = None
         request_exception = None
         model_attempts = model_candidates if model_candidates else [""]
+        last_attempt_model = ""
 
         for attempt_index, attempt_model in enumerate(model_attempts):
+            last_attempt_model = attempt_model
             proxy_payload = dict(payload)
             if attempt_model:
                 proxy_payload["model"] = attempt_model
@@ -907,6 +909,18 @@ def create_agent_blueprint(
                 request_exception,
             )
             return jsonify({"error": "Agent gateway unavailable"}), 503
+
+        if response.status_code >= 500:
+            gateway_body_preview = (response.text or "").strip().replace("\n", " ")
+            if len(gateway_body_preview) > 320:
+                gateway_body_preview = f"{gateway_body_preview[:320]}..."
+            _logger.error(
+                "Agent webhook gateway failure status=%s profile=%s model=%s body=%s",
+                response.status_code,
+                profile_id or "default",
+                last_attempt_model or "default",
+                gateway_body_preview or "<empty>",
+            )
 
         if response.status_code in (401, 403):
             session_id = request.cookies.get(AGENT_SESSION_COOKIE)

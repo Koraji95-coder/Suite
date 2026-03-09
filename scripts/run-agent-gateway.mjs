@@ -4,8 +4,39 @@ import fs from "node:fs";
 import path from "node:path";
 
 const repoRoot = process.cwd();
-const host = (process.env.AGENT_GATEWAY_HOST || "").trim() || "127.0.0.1";
-const port = (process.env.AGENT_GATEWAY_PORT || "").trim() || "3000";
+const envFilePath = path.join(repoRoot, ".env");
+
+function parseDotEnv(filePath) {
+	if (!fs.existsSync(filePath)) return {};
+	const out = {};
+	for (const rawLine of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
+		const line = rawLine.trim();
+		if (!line || line.startsWith("#")) continue;
+		const splitAt = line.indexOf("=");
+		if (splitAt <= 0) continue;
+		const key = line.slice(0, splitAt).trim();
+		let value = line.slice(splitAt + 1).trim();
+		if (!key) continue;
+		if (
+			(value.startsWith('"') && value.endsWith('"')) ||
+			(value.startsWith("'") && value.endsWith("'"))
+		) {
+			value = value.slice(1, -1);
+		}
+		out[key] = value;
+	}
+	return out;
+}
+
+const dotEnvValues = parseDotEnv(envFilePath);
+const runtimeEnv = { ...dotEnvValues, ...process.env };
+
+function envString(key) {
+	return String(runtimeEnv[key] || "").trim();
+}
+
+const host = envString("AGENT_GATEWAY_HOST") || "127.0.0.1";
+const port = envString("AGENT_GATEWAY_PORT") || "3000";
 const forwardedArgs = process.argv.slice(2);
 const gatewayCommandArgs =
 	forwardedArgs.length > 0
@@ -16,7 +47,7 @@ const gatewayBinaryArgs =
 		? [...forwardedArgs]
 		: ["--host", host, "--port", port];
 const executableExt = process.platform === "win32" ? ".exe" : "";
-const userHome = process.env.USERPROFILE || process.env.HOME || "";
+const userHome = runtimeEnv.USERPROFILE || runtimeEnv.HOME || "";
 const cargoBinDir = userHome ? path.join(userHome, ".cargo", "bin") : "";
 const userCargoPath = cargoBinDir
 	? path.join(cargoBinDir, `cargo${executableExt}`)
@@ -29,15 +60,20 @@ const userZeroclawPath = cargoBinDir
 	: "";
 const useFullCliGateway =
 	/^(1|true|yes)$/i.test(
-		String(process.env.SUITE_GATEWAY_USE_FULL_CLI || "").trim(),
+		envString("SUITE_GATEWAY_USE_FULL_CLI"),
 	);
+const providerMode = (envString("SUITE_AGENT_PROVIDER_MODE") || "auto")
+	.toLowerCase()
+	.trim();
+const preferredLocalProvider = envString("SUITE_LOCAL_PROVIDER") || "ollama";
+const preferredLocalModel =
+	envString("SUITE_LOCAL_AGENT_MODEL") || "devstral-small-2:latest";
 
 function resolveGatewayTargetDir() {
-	const targetDirSuffix =
-		(process.env.SUITE_GATEWAY_TARGET_SUFFIX || "").trim() || "v2";
+	const targetDirSuffix = envString("SUITE_GATEWAY_TARGET_SUFFIX") || "v2";
 	const localWritableRoot =
-		process.env.LOCALAPPDATA ||
-		process.env.TEMP ||
+		runtimeEnv.LOCALAPPDATA ||
+		runtimeEnv.TEMP ||
 		path.join(repoRoot, ".runlogs");
 	return path.join(localWritableRoot, "Suite", `zeroclaw-target-${targetDirSuffix}`);
 }
@@ -61,6 +97,7 @@ function launch(command, args, options = {}) {
 	const child = spawn(command, args, {
 		cwd: repoRoot,
 		stdio: "inherit",
+		env: runtimeEnv,
 		...options,
 	});
 
@@ -131,7 +168,7 @@ function ensureEmbeddedWebAssets() {
 }
 
 function withCargoWorkarounds() {
-	const env = { ...process.env };
+	const env = { ...runtimeEnv };
 
 	// On some Windows setups (including this repo checkout), Cargo target directories
 	// can inherit a read-only attribute that breaks autocfg/num-traits build scripts.
@@ -163,7 +200,7 @@ function withCargoWorkarounds() {
 function resolveVsDevCmdPath() {
 	if (process.platform !== "win32") return null;
 
-	const fromEnv = (process.env.VSDEVCMD_PATH || "").trim();
+	const fromEnv = envString("VSDEVCMD_PATH");
 	if (fromEnv && fs.existsSync(fromEnv)) {
 		return fromEnv;
 	}
@@ -259,12 +296,70 @@ function launchCargoWithVsDevCmd(vsDevCmdPath, cargoCommand, cargoArgs) {
 	);
 }
 
+function applySuiteProviderPolicy() {
+	const explicitProvider =
+		envString("ZEROCLAW_PROVIDER") ||
+		envString("ZEROCLAW_MODEL_PROVIDER") ||
+		envString("MODEL_PROVIDER") ||
+		envString("PROVIDER");
+	const hasOpenRouterKey = Boolean(envString("OPENROUTER_API_KEY"));
+	const selectedMode =
+		providerMode === "local" || providerMode === "config" || providerMode === "auto"
+			? providerMode
+			: "auto";
+	const shouldUseLocal =
+		selectedMode === "local" ||
+		(selectedMode === "auto" && !explicitProvider && !hasOpenRouterKey);
+
+	if (shouldUseLocal) {
+		runtimeEnv.ZEROCLAW_PROVIDER = preferredLocalProvider;
+		if (!envString("ZEROCLAW_MODEL") && !envString("MODEL")) {
+			runtimeEnv.ZEROCLAW_MODEL = preferredLocalModel;
+		}
+		console.warn(
+			`Gateway provider policy applied: provider=${runtimeEnv.ZEROCLAW_PROVIDER} model=${
+				runtimeEnv.ZEROCLAW_MODEL || envString("MODEL") || "<config-default>"
+			} mode=${selectedMode}`,
+		);
+		return;
+	}
+
+	if (!hasOpenRouterKey && (explicitProvider || "").trim().toLowerCase() === "openrouter") {
+		console.warn(
+			"OPENROUTER_API_KEY is missing while provider is openrouter. Set OPENROUTER_API_KEY or set SUITE_AGENT_PROVIDER_MODE=local.",
+		);
+	}
+}
+
+function warnIfLikelyMissingProviderKeys() {
+	const effectiveProvider =
+		(envString("ZEROCLAW_PROVIDER") ||
+			envString("ZEROCLAW_MODEL_PROVIDER") ||
+			envString("MODEL_PROVIDER") ||
+			envString("PROVIDER") ||
+			"")
+			.trim()
+			.toLowerCase();
+	if (effectiveProvider && effectiveProvider !== "openrouter") {
+		return;
+	}
+	const hasOpenRouter = Boolean(envString("OPENROUTER_API_KEY"));
+	if (!hasOpenRouter) {
+		console.warn(
+			"OPENROUTER_API_KEY is not set in process env or .env. OpenRouter-backed agent models will fail with 500 until configured.",
+		);
+	}
+}
+
 function main() {
+	applySuiteProviderPolicy();
+
 	if (useFullCliGateway) {
 		console.warn(
 			"SUITE_GATEWAY_USE_FULL_CLI is enabled; forcing legacy `zeroclaw gateway` launch path.",
 		);
 	}
+	warnIfLikelyMissingProviderKeys();
 
 	const cargoArgs = useFullCliGateway
 		? [

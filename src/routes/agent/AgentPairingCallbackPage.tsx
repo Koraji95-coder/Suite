@@ -25,6 +25,7 @@ type PairingPhase =
 	| "error";
 
 const COOLDOWN_MS = 10_000;
+const VERIFY_TIMEOUT_MS = 35_000;
 
 function isValidAction(value: string): value is AgentPairingAction {
 	return value === "pair" || value === "unpair";
@@ -101,8 +102,26 @@ export default function AgentPairingCallbackPage() {
 			);
 
 			try {
-				await agentService.confirmPairingVerification(action, challengeId);
-				await agentService.refreshPairingStatus();
+				let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+				await Promise.race([
+					(async () => {
+						await agentService.confirmPairingVerification(action, challengeId);
+						await agentService.refreshPairingStatus();
+					})(),
+					new Promise<never>((_resolve, reject) => {
+						timeoutHandle = setTimeout(() => {
+							reject(
+								new Error(
+									"Verification timed out. Please refresh this page and try the pairing link again.",
+								),
+							);
+						}, VERIFY_TIMEOUT_MS);
+					}),
+				]).finally(() => {
+					if (timeoutHandle) {
+						clearTimeout(timeoutHandle);
+					}
+				});
 				if (!active) {
 					return;
 				}

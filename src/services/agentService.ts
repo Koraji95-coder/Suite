@@ -246,6 +246,7 @@ class AgentService {
 	private brokerUrl: string;
 	private useBroker: boolean;
 	private brokerPaired = false;
+	private pairingConfirmInFlight = new Map<string, Promise<boolean>>();
 	private lastHealthError: string | null = null;
 	private activeUserId: string | null = null;
 	private activeUserEmail: string | null = null;
@@ -753,58 +754,79 @@ class AgentService {
 			throw new Error("Supabase session required for brokered pairing.");
 		}
 
-		const response = await fetchWithTimeout(
-			`${this.brokerUrl}/pairing-confirm`,
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${accessToken}`,
+		const normalizedChallengeId = challengeId.trim();
+		if (!normalizedChallengeId) {
+			throw new Error("challenge_id is required");
+		}
+		const requestKey = `${action}:${normalizedChallengeId}`;
+		const activeRequest = this.pairingConfirmInFlight.get(requestKey);
+		if (activeRequest) {
+			return activeRequest;
+		}
+
+		const inFlight = (async (): Promise<boolean> => {
+			const response = await fetchWithTimeout(
+				`${this.brokerUrl}/pairing-confirm`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${accessToken}`,
+					},
+					credentials: "include",
+					body: JSON.stringify({ challenge_id: normalizedChallengeId }),
+					timeoutMs: 20_000,
+					requestName: "Agent pairing confirm request",
 				},
-				credentials: "include",
-				body: JSON.stringify({ challenge_id: challengeId.trim() }),
-				timeoutMs: 20_000,
-				requestName: "Agent pairing confirm request",
-			},
-		);
-
-		if (!response.ok) {
-			const details = await this.readPairingBrokerError(
-				response,
-				"Unable to verify pairing action.",
 			);
-			throw new AgentPairingRequestError(details);
-		}
 
-		const data = (await response.json()) as
-			| { paired?: boolean; action?: AgentPairingAction }
-			| undefined;
-		if (data?.action && data.action !== action) {
-			throw new Error(
-				`Verification action mismatch. Expected ${action}, received ${data.action}.`,
-			);
-		}
-		this.brokerPaired = Boolean(data?.paired);
+			if (!response.ok) {
+				const details = await this.readPairingBrokerError(
+					response,
+					"Unable to verify pairing action.",
+				);
+				throw new AgentPairingRequestError(details);
+			}
 
-		if (action === "pair") {
-			await logSecurityEvent(
-				"agent_pair_success",
-				"Agent pair action verified and completed via email challenge.",
-			);
-			this.emitPairingStateChanged();
-		}
+			const data = (await response.json()) as
+				| { paired?: boolean; action?: AgentPairingAction }
+				| undefined;
+			if (data?.action && data.action !== action) {
+				throw new Error(
+					`Verification action mismatch. Expected ${action}, received ${data.action}.`,
+				);
+			}
+			this.brokerPaired = Boolean(data?.paired);
 
-		if (action === "unpair") {
-			secureTokenStorage.clearToken();
-			await this.clearPersistedPairingForActiveUser();
-			await logSecurityEvent(
-				"agent_unpair",
-				"Agent unpair action verified and completed via email challenge.",
-			);
-			this.emitPairingStateChanged();
-		}
+			if (action === "pair") {
+				await logSecurityEvent(
+					"agent_pair_success",
+					"Agent pair action verified and completed via email challenge.",
+				);
+				this.emitPairingStateChanged();
+			}
 
-		return this.brokerPaired;
+			if (action === "unpair") {
+				secureTokenStorage.clearToken();
+				await this.clearPersistedPairingForActiveUser();
+				await logSecurityEvent(
+					"agent_unpair",
+					"Agent unpair action verified and completed via email challenge.",
+				);
+				this.emitPairingStateChanged();
+			}
+
+			return this.brokerPaired;
+		})();
+
+		this.pairingConfirmInFlight.set(requestKey, inFlight);
+		try {
+			return await inFlight;
+		} finally {
+			if (this.pairingConfirmInFlight.get(requestKey) === inFlight) {
+				this.pairingConfirmInFlight.delete(requestKey);
+			}
+		}
 	}
 
 	private isTaskAllowedForCurrentUser(taskName: string): boolean {
@@ -1454,8 +1476,12 @@ class AgentService {
 				};
 			}
 
+			const configuredTimeout = Number(import.meta.env.VITE_AGENT_TIMEOUT);
 			const timeout =
-				task.timeout ?? (Number(import.meta.env.VITE_AGENT_TIMEOUT) || 30_000);
+				task.timeout ??
+				(Number.isFinite(configuredTimeout) && configuredTimeout > 0
+					? Math.max(configuredTimeout, 90_000)
+					: 90_000);
 
 			try {
 				const response = await fetchWithTimeout(`${this.brokerUrl}/webhook`, {
@@ -1678,6 +1704,7 @@ class AgentService {
 	 * Check if agent is running and healthy
 	 */
 	async healthCheck(): Promise<boolean> {
+		const healthEndpoint = this.useBroker ? this.brokerUrl : this.baseUrl;
 		try {
 			if (this.useBroker) {
 				const accessToken = await this.getSupabaseAccessToken();
@@ -1726,7 +1753,7 @@ class AgentService {
 			const message = mapFetchErrorMessage(error, "Unknown connection error");
 			this.lastHealthError = message;
 			logger.warn(
-				`Agent health check unavailable at ${this.baseUrl}: ${message}`,
+				`Agent health check unavailable at ${healthEndpoint}: ${message}`,
 				"AgentService",
 			);
 			return false;

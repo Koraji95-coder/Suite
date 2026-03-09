@@ -1,5 +1,5 @@
 // src/components/agent/AgentPixelMark.tsx
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { memo, type CSSProperties, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import styles from "./AgentPixelMark.module.css";
 import { AGENT_MARKS, type MarkExpression } from "./agentMarkPatterns";
@@ -100,7 +100,7 @@ function reduceGridForDetail(
 	return reduced;
 }
 
-export function AgentPixelMark({
+function AgentPixelMarkInner({
 	profileId,
 	size = 48,
 	state,
@@ -168,14 +168,12 @@ export function AgentPixelMark({
 		const lowCostMultiplier = size <= 26 ? 1.85 : 1;
 		return Math.round(baseCadence * lowCostMultiplier);
 	}, [effectiveState, size]);
+	const shouldAnimateFrames =
+		!reducedMotion && framesForState.length > 1 && size >= 40;
 
 	useEffect(() => {
 		setFrameIndex(0);
-	}, [effectiveState]);
-
-	useEffect(() => {
-		if (reducedMotion || framesForState.length <= 1) {
-			setFrameIndex(0);
+		if (!shouldAnimateFrames) {
 			return;
 		}
 		const timer = window.setInterval(() => {
@@ -184,7 +182,7 @@ export function AgentPixelMark({
 		return () => {
 			window.clearInterval(timer);
 		};
-	}, [reducedMotion, framesForState.length, cadenceMs]);
+	}, [shouldAnimateFrames, framesForState.length, cadenceMs]);
 
 	const sourceGrid = useMemo(() => {
 		const rows = mark.grid.length;
@@ -261,15 +259,17 @@ export function AgentPixelMark({
 		}
 	}, [effectiveState, mark.colors]);
 	const showGlow =
-		effectiveState !== "idle" && effectiveState !== "waiting";
+		size >= 28 && effectiveState !== "idle" && effectiveState !== "waiting";
 	const showPulseRing =
 		!reducedMotion &&
+		size >= 34 &&
 		(pulse ||
 			effectiveState === "speaking" ||
 			effectiveState === "running" ||
 			effectiveState === "error" ||
 			effectiveState === "warning");
-	const showBreathe = !reducedMotion && (breathe || effectiveState === "focus");
+	const showBreathe =
+		!reducedMotion && size >= 40 && (breathe || effectiveState === "focus");
 	const motionMode = reducedMotion ? "reduced" : "balanced";
 
 	return (
@@ -336,3 +336,22 @@ export function AgentPixelMark({
 		</div>
 	);
 }
+
+function areEqual(
+	prev: Readonly<AgentPixelMarkProps>,
+	next: Readonly<AgentPixelMarkProps>,
+): boolean {
+	return (
+		prev.profileId === next.profileId &&
+		(prev.size ?? 48) === (next.size ?? 48) &&
+		(prev.state ?? "idle") === (next.state ?? "idle") &&
+		(prev.motionPreset ?? "balanced") === (next.motionPreset ?? "balanced") &&
+		(prev.detailLevel ?? "auto") === (next.detailLevel ?? "auto") &&
+		(prev.expression ?? "neutral") === (next.expression ?? "neutral") &&
+		(prev.className ?? "") === (next.className ?? "") &&
+		Boolean(prev.pulse) === Boolean(next.pulse) &&
+		Boolean(prev.breathe) === Boolean(next.breathe)
+	);
+}
+
+export const AgentPixelMark = memo(AgentPixelMarkInner, areEqual);

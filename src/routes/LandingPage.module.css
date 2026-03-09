@@ -278,11 +278,6 @@
 		opacity 400ms ease;
 }
 
-.featureCard:hover {
-	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
-	box-shadow: 0 14px 24px color-mix(in srgb, var(--primary) 8%, transparent);
-}
-
 .featureVisible {
 	opacity: 1;
 	transform: translateY(0);
@@ -300,10 +295,6 @@
 	border-radius: 0.7rem;
 	background: var(--surface-2);
 	transition: background 220ms ease;
-}
-
-.featureCard:hover .featureIconWrap {
-	background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .featureIcon {
@@ -328,10 +319,6 @@
 	transition:
 		opacity 240ms ease,
 		transform 240ms ease;
-}
-
-.featureCard:hover .featureArrow {
-	opacity: 0.6;
 }
 
 .agentsSection {
@@ -392,11 +379,6 @@
 		background 300ms ease,
 		opacity 300ms ease,
 		transform 300ms ease;
-}
-
-.agentCard:hover {
-	border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
-	background: var(--surface);
 }
 
 .agentCardVisible {

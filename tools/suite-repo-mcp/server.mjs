@@ -1389,7 +1389,13 @@ ${risk || "- Identify likely regressions and edge cases."}
    - use \`SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev\` only for explicit diagnostics
    - if full CLI compile fails with rustc stack overflow / 0xc0000005 / ICE, capture versions + failure signature once, classify as compiler/toolchain instability, stop workaround iteration, and continue on the default gateway path
    - escalate upstream only after a minimal reproducible diagnostic capture is available
-7. Adjacent auth-noise guidance:
+7. Local Ollama startup gate (required before conversation/run creation):
+   - run \`npm run gateway:dev\`
+   - confirm startup logs show \`provider=ollama\` and \`mode=local\`
+   - confirm Ollama preflight reports all required profile models are available
+   - if any required model is missing, stop and pull missing models before starting single-agent chat or orchestration
+   - default required models (unless overridden by \`AGENT_MODEL_*\` / \`VITE_AGENT_MODEL_*\`): \`qwen3:14b\`, \`gemma3:12b\`, \`devstral-small-2:latest\`, \`qwen2.5-coder:14b\`, \`qwen3:8b\`, \`joshuaokolo/C3Dv0:latest\`, \`ALIENTELLIGENCE/electricalengineerv2:latest\`
+8. Adjacent auth-noise guidance:
    - Supabase "issued in the future" warning spam is handled by docs/security/supabase-clock-skew-runbook.md
    - do not treat clock-skew warning noise as a reason to reopen gateway workaround loops
 `,
@@ -1430,6 +1436,15 @@ ${risk || "- Identify likely regressions and edge cases."}
 		description:
 			"Return a concise runbook for backend-led parallel agent orchestration endpoints.",
 		template: () => `## Orchestration Runbook
+
+0. Mandatory preflight gate (before any run creation)
+- Run \`npm run gateway:dev\`.
+- Confirm startup logs include \`provider=ollama\` and \`mode=local\`.
+- Confirm Ollama preflight passes with all required profile models available.
+- If preflight reports missing models, stop and run \`ollama pull <model>\` for each missing model, then rerun preflight.
+- Required model set:
+  - use active \`AGENT_MODEL_*\` / \`VITE_AGENT_MODEL_*\` routing values when overridden.
+  - otherwise require default pack: \`qwen3:14b\`, \`gemma3:12b\`, \`devstral-small-2:latest\`, \`qwen2.5-coder:14b\`, \`qwen3:8b\`, \`joshuaokolo/C3Dv0:latest\`, \`ALIENTELLIGENCE/electricalengineerv2:latest\`.
 
 1. Create run
 - POST /api/agent/runs
@@ -1488,6 +1503,21 @@ Operational notes:
    - classification: <normal | compiler/toolchain instability>
 5. Incident protocol:
    - if diagnostic full CLI compile fails with rustc stack overflow / 0xc0000005 / ICE, record the signature once, stop workaround iteration, and continue on default gateway path.
+
+### Model Readiness State (Required Before Conversation/Run Handoff)
+1. Provider mode:
+   - \`SUITE_AGENT_PROVIDER_MODE\`: <local | auto | config>
+2. Provider selected at startup:
+   - observed provider: <ollama | other>
+   - observed startup mode marker: <mode=local | other>
+3. Ollama preflight status:
+   - result: <pass | fail>
+   - evidence line: <copy startup preflight line>
+4. Missing-model status:
+   - missing models: <none | comma-separated model IDs>
+   - pull completion: <complete | pending>
+5. Gate policy:
+   - if preflight is fail or pull completion is pending, do not start or hand off single-agent conversation/orchestration run work.
 
 ### Guardrails
 1. No Tailwind in Suite app.

@@ -62,7 +62,7 @@ const useFullCliGateway =
 	/^(1|true|yes)$/i.test(
 		envString("SUITE_GATEWAY_USE_FULL_CLI"),
 	);
-const providerMode = (envString("SUITE_AGENT_PROVIDER_MODE") || "auto")
+const providerMode = (envString("SUITE_AGENT_PROVIDER_MODE") || "local")
 	.toLowerCase()
 	.trim();
 const preferredLocalProvider = envString("SUITE_LOCAL_PROVIDER") || "ollama";
@@ -91,6 +91,57 @@ function commandExists(command) {
 			? spawnSync("where", [command], { stdio: "ignore" })
 			: spawnSync("which", [command], { stdio: "ignore" });
 	return probe.status === 0;
+}
+
+function parseModelList(rawValue) {
+	if (!rawValue) return [];
+	return String(rawValue)
+		.split(",")
+		.map((value) => value.trim())
+		.filter(Boolean);
+}
+
+function dedupe(values = []) {
+	const out = [];
+	const seen = new Set();
+	for (const value of values) {
+		const normalized = String(value || "").trim();
+		if (!normalized || seen.has(normalized)) continue;
+		seen.add(normalized);
+		out.push(normalized);
+	}
+	return out;
+}
+
+function collectExpectedProfileModels() {
+	const profileKeys = ["KORO", "DEVSTRAL", "SENTINEL", "FORGE", "DRAFTSMITH"];
+	const expected = [];
+	for (const key of profileKeys) {
+		const primary =
+			envString(`AGENT_MODEL_${key}_PRIMARY`) ||
+			envString(`VITE_AGENT_MODEL_${key}_PRIMARY`);
+		expected.push(primary);
+		const fallbacks =
+			envString(`AGENT_MODEL_${key}_FALLBACKS`) ||
+			envString(`VITE_AGENT_MODEL_${key}_FALLBACKS`);
+		expected.push(...parseModelList(fallbacks));
+	}
+	return dedupe(expected);
+}
+
+function listPulledOllamaModels() {
+	if (!commandExists("ollama")) return null;
+	const probe = spawnSync("ollama", ["list"], { encoding: "utf8" });
+	if (probe.status !== 0) return null;
+	const lines = String(probe.stdout || "")
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean);
+	if (lines.length <= 1) return [];
+	return lines
+		.slice(1)
+		.map((line) => line.split(/\s+/)[0]?.trim())
+		.filter(Boolean);
 }
 
 function launch(command, args, options = {}) {
@@ -306,7 +357,7 @@ function applySuiteProviderPolicy() {
 	const selectedMode =
 		providerMode === "local" || providerMode === "config" || providerMode === "auto"
 			? providerMode
-			: "auto";
+			: "local";
 	const shouldUseLocal =
 		selectedMode === "local" ||
 		(selectedMode === "auto" && !explicitProvider && !hasOpenRouterKey);
@@ -331,6 +382,53 @@ function applySuiteProviderPolicy() {
 	}
 }
 
+function warnIfMissingLocalOllamaProfileModels() {
+	const effectiveProvider = (
+		envString("ZEROCLAW_PROVIDER") ||
+		envString("ZEROCLAW_MODEL_PROVIDER") ||
+		envString("MODEL_PROVIDER") ||
+		envString("PROVIDER") ||
+		""
+	)
+		.trim()
+		.toLowerCase();
+
+	if (effectiveProvider !== "ollama") {
+		return;
+	}
+
+	const expectedModels = collectExpectedProfileModels();
+	if (!expectedModels.length) {
+		return;
+	}
+
+	const localModels = listPulledOllamaModels();
+	if (localModels === null) {
+		console.warn(
+			"Ollama preflight skipped: `ollama` CLI not available or `ollama list` failed.",
+		);
+		return;
+	}
+
+	const localSet = new Set(localModels);
+	const missing = expectedModels.filter((model) => !localSet.has(model));
+	if (!missing.length) {
+		console.warn(
+			`Ollama preflight: all ${expectedModels.length} profile models are available locally.`,
+		);
+		return;
+	}
+
+	console.warn("Ollama preflight: missing profile models:");
+	for (const model of missing) {
+		console.warn(`  - ${model}`);
+	}
+	console.warn("Pull missing models before running agent workflows:");
+	console.warn(
+		`  ollama pull ${missing.join(" && ollama pull ")}`,
+	);
+}
+
 function warnIfLikelyMissingProviderKeys() {
 	const effectiveProvider =
 		(envString("ZEROCLAW_PROVIDER") ||
@@ -353,6 +451,7 @@ function warnIfLikelyMissingProviderKeys() {
 
 function main() {
 	applySuiteProviderPolicy();
+	warnIfMissingLocalOllamaProfileModels();
 
 	if (useFullCliGateway) {
 		console.warn(

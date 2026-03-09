@@ -98,6 +98,12 @@
 	text-align: center;
 }
 
+.dashboardLoaderWrap {
+	display: grid;
+	place-items: center;
+	padding-block: 0.2rem;
+}
+
 .loadingTrack {
 	height: 0.5rem;
 	width: 100%;

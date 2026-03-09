@@ -340,6 +340,9 @@ process.on("SIGTERM", () => {
 
 async function main() {
 	const sharedEnv = { ...process.env };
+	if (!sharedEnv.API_DEV_SERVER_THREADED) {
+		sharedEnv.API_DEV_SERVER_THREADED = "true";
+	}
 	if (
 		!redisAutostartDisabled &&
 		!sharedEnv.API_LIMITER_STORAGE_URI &&

@@ -69,6 +69,7 @@ def _normalize_profile_id(value: Any) -> str:
 
 
 def _extract_gateway_error(response: Any) -> str:
+    status_code = int(getattr(response, "status_code", 500) or 500)
     try:
         payload = response.json()
     except Exception:
@@ -85,7 +86,12 @@ def _extract_gateway_error(response: Any) -> str:
     if text_body:
         return text_body[:1000]
 
-    status_code = int(getattr(response, "status_code", 500) or 500)
+    if status_code == 408:
+        return (
+            "Gateway request timed out after 30s. Start or restart the local gateway "
+            "with `npm run gateway:dev`, then retry. For local Ollama runs, reduce "
+            "parallel profiles if this persists."
+        )
     return f"Gateway request failed with status {status_code}."
 
 
@@ -129,6 +135,7 @@ class AgentRunOrchestrator:
         default_timeout_ms: int = 45_000,
         max_timeout_ms: int = 180_000,
         max_parallel_profiles: int = 4,
+        verbose_logging: bool = False,
     ) -> None:
         self._ledger_path = Path(ledger_path).expanduser().resolve()
         self._requests = requests_module
@@ -141,6 +148,7 @@ class AgentRunOrchestrator:
         self._default_timeout_ms = int(default_timeout_ms)
         self._max_timeout_ms = int(max_timeout_ms)
         self._max_parallel_profiles = max(1, int(max_parallel_profiles))
+        self._verbose_logging = bool(verbose_logging)
 
         self._db_lock = threading.Lock()
         self._state_lock = threading.Lock()
@@ -1433,13 +1441,28 @@ class AgentRunOrchestrator:
         response_text = ""
         error_text = ""
         model_used = ""
+        attempt_total = max(1, len(model_candidates))
 
         for index, candidate in enumerate(model_candidates):
+            attempt_started_perf = time.perf_counter()
             payload: Dict[str, Any] = {"message": prompt, "profile_id": profile_id}
             if candidate:
                 payload["model"] = candidate
             if index < len(model_candidates) - 1:
                 payload["fallback_models"] = model_candidates[index + 1 :]
+
+            if self._verbose_logging:
+                self._logger.info(
+                    "Agent step attempt start (run_id=%s stage=%s profile=%s model=%s attempt=%s/%s timeout_s=%s request_id=%s)",
+                    run_id,
+                    stage,
+                    profile_id,
+                    candidate or "default",
+                    index + 1,
+                    attempt_total,
+                    timeout_seconds,
+                    step_request_id,
+                )
 
             try:
                 response = self._requests.post(
@@ -1449,8 +1472,42 @@ class AgentRunOrchestrator:
                     timeout=timeout_seconds,
                 )
                 status_code = int(getattr(response, "status_code", 0) or 0)
+                if self._verbose_logging:
+                    attempt_latency_ms = max(
+                        0,
+                        int((time.perf_counter() - attempt_started_perf) * 1000),
+                    )
+                    self._logger.info(
+                        "Agent step attempt response (run_id=%s stage=%s profile=%s model=%s attempt=%s/%s status=%s latency_ms=%s request_id=%s)",
+                        run_id,
+                        stage,
+                        profile_id,
+                        candidate or "default",
+                        index + 1,
+                        attempt_total,
+                        status_code,
+                        attempt_latency_ms,
+                        step_request_id,
+                    )
             except Exception as exc:
                 error_text = str(exc).strip() or exc.__class__.__name__
+                if self._verbose_logging:
+                    attempt_latency_ms = max(
+                        0,
+                        int((time.perf_counter() - attempt_started_perf) * 1000),
+                    )
+                    self._logger.warning(
+                        "Agent step attempt exception (run_id=%s stage=%s profile=%s model=%s attempt=%s/%s latency_ms=%s request_id=%s error=%s)",
+                        run_id,
+                        stage,
+                        profile_id,
+                        candidate or "default",
+                        index + 1,
+                        attempt_total,
+                        attempt_latency_ms,
+                        step_request_id,
+                        exc,
+                    )
                 if index < len(model_candidates) - 1:
                     self._logger.warning(
                         "Agent step request failed; trying fallback model (run_id=%s, stage=%s, profile=%s, model=%s, request_id=%s, error=%s)",
@@ -1492,6 +1549,15 @@ class AgentRunOrchestrator:
             break
 
         if response_text:
+            if self._verbose_logging:
+                self._logger.info(
+                    "Agent step completed (run_id=%s stage=%s profile=%s model_used=%s request_id=%s)",
+                    run_id,
+                    stage,
+                    profile_id,
+                    model_used or "unknown",
+                    step_request_id,
+                )
             return self._finalize_step(
                 run_id=run_id,
                 stage=stage,
@@ -1509,6 +1575,18 @@ class AgentRunOrchestrator:
                 error_text = f"Gateway step failed with status {status_code}."
             else:
                 error_text = "Gateway step failed without response."
+
+        if self._verbose_logging:
+            self._logger.warning(
+                "Agent step failed (run_id=%s stage=%s profile=%s model_used=%s status_code=%s request_id=%s error=%s)",
+                run_id,
+                stage,
+                profile_id,
+                model_used or "unknown",
+                status_code,
+                step_request_id,
+                error_text,
+            )
 
         return self._finalize_step(
             run_id=run_id,

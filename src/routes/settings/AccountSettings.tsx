@@ -589,6 +589,19 @@ export default function AccountSettings() {
 				);
 			} catch (err: unknown) {
 				if (!active) return;
+				if (action === "pair") {
+					try {
+						const recovered = await agentService.refreshPairingStatusDetailed();
+						if (active && recovered.paired) {
+							setAgentError("");
+							setAgentNotice("Pairing verified. Agent access is active.");
+							startAgentVerificationCooldown(0);
+							return;
+						}
+					} catch {
+						// Keep original error handling below.
+					}
+				}
 				setAgentError(
 					err instanceof Error
 						? err.message

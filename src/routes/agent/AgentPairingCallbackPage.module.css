@@ -157,41 +157,6 @@
 	background: color-mix(in srgb, var(--agent-surface-elevated) 64%, transparent);
 }
 
-.animationWrap {
-	position: relative;
-	display: grid;
-	place-items: center;
-	padding: 0.2rem;
-}
-
-.ring {
-	width: 5.25rem;
-	height: 5.25rem;
-	border-radius: 999px;
-	border: 1px solid color-mix(in srgb, var(--agent-accent-cool) 34%, transparent);
-	display: grid;
-	place-items: center;
-	animation: spin 8s linear infinite;
-}
-
-.pulse {
-	width: 3.2rem;
-	height: 3.2rem;
-	border-radius: 999px;
-	border: 2px dashed color-mix(in srgb, var(--agent-accent-cool) 52%, transparent);
-	animation: spin 4.2s linear infinite reverse;
-}
-
-.core {
-	position: absolute;
-	width: 0.85rem;
-	height: 0.85rem;
-	border-radius: 999px;
-	background: color-mix(in srgb, var(--agent-accent-warm) 82%, var(--success) 18%);
-	box-shadow: 0 0 0 0 color-mix(in srgb, var(--agent-accent-warm) 45%, transparent);
-	animation: ping 1.6s ease-out infinite;
-}
-
 .status {
 	margin: 0;
 	font-size: 0.93rem;
@@ -330,16 +295,6 @@
 	}
 }
 
-@keyframes ping {
-	0% {
-		box-shadow: 0 0 0 0 color-mix(in srgb, var(--agent-accent-warm) 45%, transparent);
-	}
-
-	100% {
-		box-shadow: 0 0 0 18px color-mix(in srgb, var(--agent-accent-warm) 0%, transparent);
-	}
-}
-
 @media (max-width: 52rem) {
 	.stepGrid {
 		grid-template-columns: 1fr;
@@ -351,10 +306,7 @@
 	.progressBar,
 	.buttonPrimary,
 	.buttonSecondary,
-	.spin,
-	.ring,
-	.pulse,
-	.core {
+	.spin {
 		transition: none;
 		animation: none;
 	}

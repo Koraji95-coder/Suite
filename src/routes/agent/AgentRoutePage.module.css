@@ -118,6 +118,20 @@
 	color: color-mix(in srgb, var(--danger) 86%, white 14%);
 }
 
+.hintText {
+	margin: 0;
+	padding: 0 0.95rem 0.86rem;
+	font-size: 0.74rem;
+	color: color-mix(in srgb, var(--warning) 80%, white 20%);
+}
+
+.inlineCode {
+	font-family:
+		ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+	font-size: 0.72rem;
+	color: color-mix(in srgb, var(--text) 90%, transparent);
+}
+
 .chatWrap {
 	min-height: 34rem;
 	height: clamp(42rem, 86dvh, 92rem);

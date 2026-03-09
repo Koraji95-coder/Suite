@@ -117,6 +117,31 @@ Gateway policy is locked for handoffs and MCP usage:
   - stop workaround iteration and continue on default gateway path.
 - upstream bug report only after collecting a minimal reproducible diagnostic capture.
 
+Local Ollama startup gate is required before booting conversations or orchestration:
+
+1. Run `npm run gateway:dev` (canonical path).
+2. Confirm gateway startup logs show `provider=ollama` and `mode=local`.
+3. Confirm gateway preflight reports all required profile models are available.
+4. If preflight reports missing models, stop and pull missing models before starting agent conversation or orchestration.
+
+Default required model pack (unless overridden):
+
+- `qwen3:14b`
+- `gemma3:12b`
+- `devstral-small-2:latest`
+- `qwen2.5-coder:14b`
+- `qwen3:8b`
+- `joshuaokolo/C3Dv0:latest`
+- `ALIENTELLIGENCE/electricalengineerv2:latest`
+
+Override rule:
+
+- If `AGENT_MODEL_*` and/or `VITE_AGENT_MODEL_*` model routing values are changed, those configured model IDs replace the defaults above and become the required pull set.
+
+Conversation start policy:
+
+- "Starting conversation" includes both single-agent interaction and orchestration run creation.
+
 Runbooks:
 
 - gateway decision tree and incident protocol: `docs/development/gateway-stability-policy.md`
@@ -137,6 +162,10 @@ Use backend orchestration endpoints to run agents while coding continues in para
 
 Recommended startup checks before orchestration:
 
-1. `repo.verify_agent_routing_guardrails`
-2. `repo.run_typecheck` with `{ \"scope\": \"all\" }`
-3. `repo.run_tests` with a focused target for changed modules
+1. `npm run gateway:dev`
+2. Confirm startup logs include `provider=ollama` and `mode=local`.
+3. Confirm preflight reports all required profile models are available.
+4. If any model is missing, stop and run `ollama pull <model>` for each missing model before proceeding.
+5. `repo.verify_agent_routing_guardrails`
+6. `repo.run_typecheck` with `{ \"scope\": \"all\" }`
+7. `repo.run_tests` with a focused target for changed modules

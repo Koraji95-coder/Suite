@@ -5,9 +5,10 @@ import {
 	Loader2,
 	ShieldCheck,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
+import { AgentOrbitLoader } from "@/components/agent/AgentOrbitLoader";
 import {
 	buildAgentPairingSearchFromLocation,
 	extractAgentPairingParamsFromLocation,
@@ -26,6 +27,8 @@ type PairingPhase =
 
 const COOLDOWN_MS = 10_000;
 const VERIFY_TIMEOUT_MS = 35_000;
+const VERIFY_RECOVERY_WINDOW_MS = 12_000;
+const VERIFY_RECOVERY_POLL_MS = 1_200;
 
 function isValidAction(value: string): value is AgentPairingAction {
 	return value === "pair" || value === "unpair";
@@ -35,7 +38,6 @@ export default function AgentPairingCallbackPage() {
 	const { user, loading } = useAuth();
 	const location = useLocation();
 	const navigate = useNavigate();
-	const handledRef = useRef("");
 	const [phase, setPhase] = useState<PairingPhase>("loading-auth");
 	const [statusMessage, setStatusMessage] = useState(
 		"Preparing verification...",
@@ -84,12 +86,6 @@ export default function AgentPairingCallbackPage() {
 			return;
 		}
 
-		const handleKey = `${user.id}:${action}:${challengeId}`;
-		if (handledRef.current === handleKey) {
-			return;
-		}
-		handledRef.current = handleKey;
-
 		let active = true;
 		const runVerification = async () => {
 			setPhase("verifying");
@@ -105,8 +101,13 @@ export default function AgentPairingCallbackPage() {
 				let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 				await Promise.race([
 					(async () => {
-						await agentService.confirmPairingVerification(action, challengeId);
-						await agentService.refreshPairingStatus();
+						const paired = await agentService.confirmPairingVerification(
+							action,
+							challengeId,
+						);
+						if (action === "pair" && !paired) {
+							await agentService.refreshPairingStatus();
+						}
 					})(),
 					new Promise<never>((_resolve, reject) => {
 						timeoutHandle = setTimeout(() => {
@@ -134,6 +135,30 @@ export default function AgentPairingCallbackPage() {
 			} catch (error) {
 				if (!active) {
 					return;
+				}
+				if (action === "pair") {
+					setStatusMessage(
+						"Verification response delayed. Checking pairing session...",
+					);
+					setErrorMessage("");
+
+					const recoveryDeadline = Date.now() + VERIFY_RECOVERY_WINDOW_MS;
+					while (active && Date.now() < recoveryDeadline) {
+						try {
+							const recovered = await agentService.refreshPairingStatusDetailed();
+							if (recovered.paired) {
+								setPhase("complete");
+								setStatusMessage("Pairing active, you may now close this screen.");
+								setErrorMessage("");
+								return;
+							}
+						} catch {
+							// Continue polling until the recovery window expires.
+						}
+						await new Promise((resolve) =>
+							window.setTimeout(resolve, VERIFY_RECOVERY_POLL_MS),
+						);
+					}
 				}
 				setPhase("error");
 				setStatusMessage("");
@@ -277,12 +302,7 @@ export default function AgentPairingCallbackPage() {
 				</div>
 
 				<div className={styles.statusShell}>
-					<div className={styles.animationWrap} aria-hidden>
-						<div className={styles.ring}>
-							<div className={styles.pulse} />
-						</div>
-						<div className={styles.core} />
-					</div>
+					<AgentOrbitLoader />
 
 					{statusMessage ? (
 						<p className={styles.status}>{statusMessage}</p>

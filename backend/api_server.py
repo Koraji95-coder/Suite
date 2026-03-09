@@ -600,6 +600,25 @@ AGENT_SESSION_TTL_SECONDS = _parse_int_env(
 AGENT_DEFAULT_TIMEOUT_SECONDS = _parse_int_env("AGENT_TIMEOUT_SECONDS", 30, minimum=3)
 AGENT_MAX_TIMEOUT_SECONDS = _parse_int_env("AGENT_MAX_TIMEOUT_SECONDS", 300, minimum=30)
 
+
+def _resolve_agent_orchestration_parallel_profiles_default() -> int:
+    provider_mode = (os.environ.get("SUITE_AGENT_PROVIDER_MODE") or "local").strip().lower()
+    local_provider = (os.environ.get("SUITE_LOCAL_PROVIDER") or "ollama").strip().lower()
+    if local_provider == "ollama" and provider_mode in {"", "local", "auto"}:
+        return 1
+    return 4
+
+
+AGENT_ORCHESTRATION_MAX_PARALLEL_PROFILES = _parse_int_env(
+    "AGENT_ORCHESTRATION_MAX_PARALLEL_PROFILES",
+    _resolve_agent_orchestration_parallel_profiles_default(),
+    minimum=1,
+)
+AGENT_ORCHESTRATION_VERBOSE_LOGS = _parse_bool_env(
+    "AGENT_ORCHESTRATION_VERBOSE_LOGS",
+    False,
+)
+
 AGENT_SESSIONS = server_state.agent_sessions
 AGENT_PAIRING_CHALLENGES = server_state.agent_pairing_challenges
 AGENT_PAIRING_CHALLENGE_LOCK = server_state.agent_pairing_challenge_lock
@@ -632,6 +651,15 @@ AGENT_RUN_ORCHESTRATOR = AgentRunOrchestrator(
     resolve_agent_profile_route_fn=_resolve_agent_profile_route,
     default_timeout_ms=AGENT_DEFAULT_TIMEOUT_SECONDS * 1000,
     max_timeout_ms=AGENT_MAX_TIMEOUT_SECONDS * 1000,
+    max_parallel_profiles=AGENT_ORCHESTRATION_MAX_PARALLEL_PROFILES,
+    verbose_logging=AGENT_ORCHESTRATION_VERBOSE_LOGS,
+)
+logger.info(
+    "Agent orchestration configured (max_parallel_profiles=%s, verbose_logs=%s, provider_mode=%s, local_provider=%s).",
+    AGENT_ORCHESTRATION_MAX_PARALLEL_PROFILES,
+    AGENT_ORCHESTRATION_VERBOSE_LOGS,
+    (os.environ.get("SUITE_AGENT_PROVIDER_MODE") or "local").strip().lower() or "local",
+    (os.environ.get("SUITE_LOCAL_PROVIDER") or "ollama").strip().lower() or "ollama",
 )
 AUTH_PASSKEY_ENABLED = _parse_bool_env("AUTH_PASSKEY_ENABLED", False)
 AUTH_PASSKEY_PROVIDER = runtime_config_normalize_auth_passkey_provider_helper(
@@ -1796,7 +1824,8 @@ if __name__ == '__main__':
         "API_ALLOW_FLASK_DEV_SERVER",
         dev_server_allowed_default,
     )
-    dev_server_threaded = _parse_bool_env("API_DEV_SERVER_THREADED", False)
+    # Keep the dev server responsive while long-running agent webhook calls are in flight.
+    dev_server_threaded = _parse_bool_env("API_DEV_SERVER_THREADED", True)
 
     server_entrypoint_run_helper(
         app=app,

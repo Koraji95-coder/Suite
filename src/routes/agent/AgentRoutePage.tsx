@@ -13,6 +13,20 @@ import { agentTaskManager } from "@/services/agentTaskManager";
 import { useAgentConnectionStatus } from "@/services/useAgentConnectionStatus";
 import styles from "./AgentRoutePage.module.css";
 
+const GATEWAY_UNREACHABLE_PATTERNS = [
+	/timed out/i,
+	/unavailable/i,
+	/failed to fetch/i,
+	/network/i,
+	/unable to refresh pairing status/i,
+];
+
+function shouldShowGatewayRestartHint(message: string): boolean {
+	const text = String(message || "").trim();
+	if (!text) return false;
+	return GATEWAY_UNREACHABLE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 export default function AgentRoutePage() {
 	const { user } = useAuth();
 	const navigate = useNavigate();
@@ -26,6 +40,7 @@ export default function AgentRoutePage() {
 		useAgentConnectionStatus({
 			userId: user?.id ?? null,
 		});
+	const showGatewayRestartHint = shouldShowGatewayRestartHint(connectionError);
 
 	useEffect(() => {
 		const pairingSearch = buildAgentPairingSearchFromLocation(
@@ -115,6 +130,13 @@ export default function AgentRoutePage() {
 				</div>
 				{connectionError ? (
 					<p className={styles.errorText}>{connectionError}</p>
+				) : null}
+				{showGatewayRestartHint ? (
+					<p className={styles.hintText}>
+						Start or restart the local gateway with{" "}
+						<code className={styles.inlineCode}>npm run gateway:dev</code>, then
+						click Refresh state.
+					</p>
 				) : null}
 			</div>
 

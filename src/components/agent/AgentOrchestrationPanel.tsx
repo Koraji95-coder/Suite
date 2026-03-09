@@ -13,6 +13,7 @@ import { TextArea } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
+import { logger } from "@/lib/logger";
 import { type AgentRunSnapshot, agentService } from "@/services/agentService";
 import styles from "./AgentOrchestrationPanel.module.css";
 import { AgentPixelMark } from "./AgentPixelMark";
@@ -69,6 +70,11 @@ const TERMINAL_EVENT_TYPES = new Set([
 ]);
 const STREAM_RETRY_BASE_MS = 800;
 const STREAM_RETRY_MAX_MS = 10_000;
+const MAX_TIMELINE_EVENTS = 400;
+const REFRESH_POLL_INTERVAL_MS = 5_000;
+const ORCHESTRATION_DEBUG_ENABLED = /^(1|true|yes)$/i.test(
+	String(import.meta.env.VITE_AGENT_DEBUG_ORCHESTRATION || "").trim(),
+);
 
 function asRecord(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -100,7 +106,18 @@ function parseEvents(snapshot?: AgentRunSnapshot): OrchestrationEvent[] {
 		});
 	}
 	parsed.sort((a, b) => a.id - b.id);
-	return parsed;
+	return parsed.slice(-MAX_TIMELINE_EVENTS);
+}
+
+function eventWindowMatches(
+	current: OrchestrationEvent[],
+	next: OrchestrationEvent[],
+): boolean {
+	if (current.length !== next.length) return false;
+	for (let index = 0; index < current.length; index += 1) {
+		if (current[index]?.id !== next[index]?.id) return false;
+	}
+	return true;
 }
 
 function parseStageSummary(snapshot?: AgentRunSnapshot): Array<{
@@ -193,8 +210,23 @@ function extractEventBody(event: OrchestrationEvent): string {
 	const response = event.payload.response;
 	if (typeof response === "string" && response.trim()) return response.trim();
 	const error = event.payload.error;
-	if (typeof error === "string" && error.trim()) return error.trim();
-	return event.message;
+	const detailParts: string[] = [];
+	const modelUsed = String(event.payload.modelUsed || "").trim();
+	if (modelUsed) {
+		detailParts.push(`model ${modelUsed}`);
+	}
+	const latencyMs = Number(event.payload.latencyMs ?? 0);
+	if (Number.isFinite(latencyMs) && latencyMs > 0) {
+		detailParts.push(`${Math.trunc(latencyMs)}ms`);
+	}
+	const detailSuffix =
+		event.eventType.startsWith("step_") && detailParts.length
+			? ` (${detailParts.join(" \u00b7 ")})`
+			: "";
+	if (typeof error === "string" && error.trim()) {
+		return `${error.trim()}${detailSuffix}`;
+	}
+	return `${event.message}${detailSuffix}`;
 }
 
 function eventAvatarState(eventType: string): AgentMarkState {
@@ -251,6 +283,7 @@ export function AgentOrchestrationPanel({
 	const reconnectAttemptRef = useRef(0);
 	const manualStopRef = useRef(false);
 	const lastEventIdRef = useRef(0);
+	const lastScrolledEventIdRef = useRef(0);
 
 	const orchestrationAvailable = agentService.usesBroker();
 	const ready = orchestrationAvailable && healthy && paired;
@@ -322,11 +355,21 @@ export function AgentOrchestrationPanel({
 			lastEventIdRef.current = Math.max(lastEventIdRef.current, event.id);
 		}
 		setEvents((current) => {
-			if (event.id > 0 && current.some((item) => item.id === event.id)) {
-				return current;
+			if (event.id > 0) {
+				const last = current[current.length - 1];
+				if (last?.id === event.id) return current;
+				if (!last || event.id > last.id) {
+					if (current.length >= MAX_TIMELINE_EVENTS) {
+						return [...current.slice(-(MAX_TIMELINE_EVENTS - 1)), event];
+					}
+					return [...current, event];
+				}
+				if (current.some((item) => item.id === event.id)) {
+					return current;
+				}
 			}
 			const next = [...current, event].sort((a, b) => a.id - b.id);
-			return next.slice(-600);
+			return next.slice(-MAX_TIMELINE_EVENTS);
 		});
 	}, []);
 
@@ -335,15 +378,23 @@ export function AgentOrchestrationPanel({
 		const nextStatus = String(snapshot.status || "running") as RunStatus;
 		const parsedEvents = parseEvents(snapshot);
 		const parsedSummary = parseStageSummary(snapshot);
+		const nextFinalOutput = String(snapshot.finalOutput || "");
+		const nextFinalError = String(snapshot.finalError || "");
 		const maxId = parsedEvents[parsedEvents.length - 1]?.id ?? 0;
 		if (maxId > 0) {
 			lastEventIdRef.current = Math.max(lastEventIdRef.current, maxId);
 		}
-		setStatus(nextStatus);
-		setEvents(parsedEvents);
+		setStatus((current) => (current === nextStatus ? current : nextStatus));
+		setEvents((current) =>
+			eventWindowMatches(current, parsedEvents) ? current : parsedEvents,
+		);
 		setStageSummary(parsedSummary);
-		setFinalOutput(String(snapshot.finalOutput || ""));
-		setFinalError(String(snapshot.finalError || ""));
+		setFinalOutput((current) =>
+			current === nextFinalOutput ? current : nextFinalOutput,
+		);
+		setFinalError((current) =>
+			current === nextFinalError ? current : nextFinalError,
+		);
 	}, []);
 
 	const refreshRun = useCallback(async () => {
@@ -351,11 +402,26 @@ export function AgentOrchestrationPanel({
 		const result = await agentService.getOrchestrationRun(runId);
 		if (!result.success) {
 			setError(result.error || "Unable to refresh run.");
+			if (ORCHESTRATION_DEBUG_ENABLED) {
+				logger.warn("Orchestration run refresh failed", "AgentOrchestrationPanel", {
+					runId,
+					error: result.error,
+				});
+			}
 			return;
 		}
 		setError("");
 		setRequestId(String(result.requestId || ""));
 		hydrateFromSnapshot(result.run);
+		if (ORCHESTRATION_DEBUG_ENABLED) {
+			logger.debug("Orchestration run refresh succeeded", "AgentOrchestrationPanel", {
+				runId,
+				status: result.run?.status,
+				eventCount: Array.isArray(result.run?.messages)
+					? result.run?.messages.length
+					: 0,
+			});
+		}
 	}, [runId, hydrateFromSnapshot]);
 
 	useEffect(() => {
@@ -379,6 +445,13 @@ export function AgentOrchestrationPanel({
 				setStreamState("live");
 				setStreamNotice("");
 				setError("");
+				if (ORCHESTRATION_DEBUG_ENABLED) {
+					logger.debug(
+						"Orchestration stream connected",
+						"AgentOrchestrationPanel",
+						{ runId },
+					);
+				}
 			},
 			onEvent: (event) => {
 				if (!effectActive) return;
@@ -393,8 +466,23 @@ export function AgentOrchestrationPanel({
 					payload: asRecord(event.payload),
 				};
 				appendEvent(normalized);
+				if (ORCHESTRATION_DEBUG_ENABLED) {
+					logger.debug(
+						"Orchestration stream event",
+						"AgentOrchestrationPanel",
+						{
+							runId,
+							eventId: normalized.id,
+							eventType: normalized.eventType,
+							stage: normalized.stage,
+							profileId: normalized.profileId,
+							latencyMs: Number(normalized.payload.latencyMs ?? 0),
+						},
+					);
+				}
 
 				const payloadStatus = String(normalized.payload.status || "").trim();
+				let nextStatus: RunStatus | null = null;
 				if (
 					payloadStatus === "queued" ||
 					payloadStatus === "running" ||
@@ -403,11 +491,15 @@ export function AgentOrchestrationPanel({
 					payloadStatus === "failed" ||
 					payloadStatus === "cancelled"
 				) {
-					setStatus(payloadStatus as RunStatus);
+					nextStatus = payloadStatus as RunStatus;
 				} else if (normalized.eventType === "run_started") {
-					setStatus("running");
+					nextStatus = "running";
 				} else if (normalized.eventType === "run_cancel_requested") {
-					setStatus("cancel_requested");
+					nextStatus = "cancel_requested";
+				}
+
+				if (nextStatus) {
+					setStatus((current) => (current === nextStatus ? current : nextStatus));
 				}
 
 				if (TERMINAL_EVENT_TYPES.has(normalized.eventType)) {
@@ -418,12 +510,23 @@ export function AgentOrchestrationPanel({
 				if (!effectActive) return;
 				setStreamState("error");
 				setError(message);
+				if (ORCHESTRATION_DEBUG_ENABLED) {
+					logger.warn("Orchestration stream error", "AgentOrchestrationPanel", {
+						runId,
+						message,
+					});
+				}
 				scheduleReconnect("disconnected");
 			},
 			onClosed: () => {
 				streamRef.current = null;
 				if (!effectActive) return;
 				if (manualStopRef.current) return;
+				if (ORCHESTRATION_DEBUG_ENABLED) {
+					logger.warn("Orchestration stream closed", "AgentOrchestrationPanel", {
+						runId,
+					});
+				}
 				scheduleReconnect("closed");
 			},
 		});
@@ -445,12 +548,12 @@ export function AgentOrchestrationPanel({
 	]);
 
 	useEffect(() => {
-		if (!runActive) return;
+		if (!runActive || streamState === "live") return;
 		const timer = window.setInterval(() => {
 			void refreshRun();
-		}, 2800);
+		}, REFRESH_POLL_INTERVAL_MS);
 		return () => window.clearInterval(timer);
-	}, [runActive, refreshRun]);
+	}, [runActive, streamState, refreshRun]);
 
 	useEffect(() => {
 		return () => {
@@ -461,10 +564,13 @@ export function AgentOrchestrationPanel({
 	}, [clearReconnectTimer, closeStreamSilently]);
 
 	useEffect(() => {
-		if (!events.length) return;
+		const latestEventId = events[events.length - 1]?.id ?? 0;
+		if (latestEventId <= 0) return;
+		if (latestEventId === lastScrolledEventIdRef.current) return;
+		lastScrolledEventIdRef.current = latestEventId;
 		timelineRef.current?.scrollTo({
 			top: timelineRef.current.scrollHeight,
-			behavior: "smooth",
+			behavior: "auto",
 		});
 	}, [events]);
 
@@ -486,6 +592,7 @@ export function AgentOrchestrationPanel({
 		stopStreaming();
 		reconnectAttemptRef.current = 0;
 		lastEventIdRef.current = 0;
+		lastScrolledEventIdRef.current = 0;
 		setError("");
 		setIsSubmitting(true);
 		try {
@@ -540,6 +647,7 @@ export function AgentOrchestrationPanel({
 		stopStreaming();
 		reconnectAttemptRef.current = 0;
 		lastEventIdRef.current = 0;
+		lastScrolledEventIdRef.current = 0;
 		setRunId("");
 		setRequestId("");
 		setStatus("idle");

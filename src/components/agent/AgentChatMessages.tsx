@@ -25,6 +25,8 @@ interface AgentChatMessagesProps {
 	baseAvatarState?: AgentMarkState;
 }
 
+const SPEAKING_TRANSIENT_MS = 1_400;
+
 export function AgentChatMessages({
 	messages,
 	profileId,
@@ -32,6 +34,8 @@ export function AgentChatMessages({
 	baseAvatarState = "idle",
 }: AgentChatMessagesProps) {
 	const bottomRef = useRef<HTMLDivElement>(null);
+	const latestMessage = messages[messages.length - 1];
+	const showThinking = isThinking && latestMessage?.role !== "assistant";
 
 	// Scroll to bottom when messages change
 	useEffect(() => {
@@ -50,14 +54,14 @@ export function AgentChatMessages({
 								key={msg.id}
 								content={msg.content}
 								profileId={profileId}
-								isLatest={index === messages.length - 1 && !isThinking}
+								isLatest={index === messages.length - 1 && !showThinking}
 								baseAvatarState={baseAvatarState}
 							/>
 						),
 					)}
 
 					{/* Thinking indicator */}
-					{isThinking && (
+					{showThinking && (
 						<ThinkingIndicator
 							profileId={profileId}
 							baseAvatarState={baseAvatarState}
@@ -104,11 +108,27 @@ function AssistantRow({
 	baseAvatarState: AgentMarkState;
 }) {
 	const [copied, setCopied] = useState(false);
+	const [isSpeaking, setIsSpeaking] = useState(isLatest);
+
+	useEffect(() => {
+		if (!isLatest) {
+			setIsSpeaking(false);
+			return;
+		}
+		setIsSpeaking(true);
+		const timer = window.setTimeout(() => {
+			setIsSpeaking(false);
+		}, SPEAKING_TRANSIENT_MS);
+		return () => {
+			window.clearTimeout(timer);
+		};
+	}, [isLatest]);
+
 	const avatarState = resolveAgentMarkState({
 		error: baseAvatarState === "error",
 		waiting: baseAvatarState === "waiting",
 		running: baseAvatarState === "running",
-		speaking: isLatest,
+		speaking: isSpeaking,
 		focus: baseAvatarState === "focus",
 	});
 

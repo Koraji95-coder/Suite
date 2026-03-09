@@ -24,6 +24,7 @@ import {
 import { markPasskeySignInPending } from "../auth/passkeySessionState";
 import { useAuth } from "../auth/useAuth";
 // Components
+import { AgentOrbitLoader } from "../components/agent/AgentOrbitLoader";
 import { AgentPixelMark } from "../components/agent/AgentPixelMark";
 import { AGENT_PROFILE_IDS } from "../components/agent/agentProfiles";
 import { loadDashboardOverviewFromBackend } from "../components/apps/dashboard/dashboardOverviewService";
@@ -41,6 +42,9 @@ import { logAuthMethodTelemetry } from "../services/securityEventService";
 import styles from "./LoginPage.module.css";
 
 const AGENT_IDS = AGENT_PROFILE_IDS;
+const DASHBOARD_REDIRECT_MIN_MS = 10_000;
+const DASHBOARD_REDIRECT_MIN_PROGRESS = 4;
+const DASHBOARD_REDIRECT_MAX_PROGRESS_BEFORE_READY = 95;
 
 type LocationState = { from?: string };
 
@@ -119,6 +123,9 @@ export default function LoginPage() {
 
 		let timeoutId: number | null = null;
 		let rafId: number | null = null;
+		let minimumDelayTimerId: number | null = null;
+		let minimumDelayResolve: (() => void) | null = null;
+		let baselineProgressTimerId: number | null = null;
 		let cancelled = false;
 
 		const navigateToDestination = () => {
@@ -128,25 +135,86 @@ export default function LoginPage() {
 
 		if (shouldPreloadDashboard) {
 			setRedirectMessage("Preparing dashboard...");
-			setRedirectProgress(4);
+			setRedirectProgress(DASHBOARD_REDIRECT_MIN_PROGRESS);
+			const startedAt = performance.now();
+			const updateBaselineProgress = () => {
+				if (cancelled) return;
+				const elapsed = performance.now() - startedAt;
+				const ratio = Math.min(1, elapsed / DASHBOARD_REDIRECT_MIN_MS);
+				const baseline = Math.round(
+					DASHBOARD_REDIRECT_MIN_PROGRESS +
+						ratio *
+							(DASHBOARD_REDIRECT_MAX_PROGRESS_BEFORE_READY -
+								DASHBOARD_REDIRECT_MIN_PROGRESS),
+				);
+				setRedirectProgress((current) =>
+					Math.max(
+						current,
+						Math.min(
+							baseline,
+							DASHBOARD_REDIRECT_MAX_PROGRESS_BEFORE_READY,
+						),
+					),
+				);
+				if (ratio >= 1 && baselineProgressTimerId !== null) {
+					window.clearInterval(baselineProgressTimerId);
+					baselineProgressTimerId = null;
+				}
+			};
+			baselineProgressTimerId = window.setInterval(updateBaselineProgress, 120);
+			updateBaselineProgress();
+			const waitForMinimumRedirectDuration = () => {
+				const elapsed = performance.now() - startedAt;
+				const remaining = Math.max(0, DASHBOARD_REDIRECT_MIN_MS - elapsed);
+				if (remaining <= 0) return Promise.resolve();
+				return new Promise<void>((resolve) => {
+					minimumDelayResolve = resolve;
+					minimumDelayTimerId = window.setTimeout(() => {
+						minimumDelayResolve = null;
+						resolve();
+					}, remaining);
+				});
+			};
 			void loadDashboardOverviewFromBackend((progress) => {
 				if (cancelled) return;
-				setRedirectProgress(Math.max(4, Math.round(progress.progress)));
-				setRedirectMessage(progress.message || "Loading dashboard...");
+				const backendProgress = Math.round(progress.progress);
+				const cappedProgress = Math.max(
+					DASHBOARD_REDIRECT_MIN_PROGRESS,
+					Math.min(
+						DASHBOARD_REDIRECT_MAX_PROGRESS_BEFORE_READY,
+						backendProgress,
+					),
+				);
+				setRedirectProgress((current) => Math.max(current, cappedProgress));
+				setRedirectMessage(
+					backendProgress >= 100
+						? "Finalizing dashboard session..."
+						: progress.message || "Loading dashboard...",
+				);
 			})
-				.then(() => {
+				.then(async () => {
+					await waitForMinimumRedirectDuration();
 					if (cancelled) return;
+					if (baselineProgressTimerId !== null) {
+						window.clearInterval(baselineProgressTimerId);
+						baselineProgressTimerId = null;
+					}
 					setRedirectProgress(100);
 					setRedirectMessage("Dashboard ready.");
 					timeoutId = window.setTimeout(navigateToDestination, 120);
 				})
-				.catch((preloadError) => {
+				.catch(async (preloadError) => {
 					logger.warn(
 						"LoginPage",
 						"Dashboard preload failed during sign-in redirect. Continuing navigation.",
 						{ error: preloadError },
 					);
+					await waitForMinimumRedirectDuration();
 					if (cancelled) return;
+					if (baselineProgressTimerId !== null) {
+						window.clearInterval(baselineProgressTimerId);
+						baselineProgressTimerId = null;
+					}
 					setRedirectProgress(100);
 					setRedirectMessage("Opening dashboard...");
 					timeoutId = window.setTimeout(navigateToDestination, 120);
@@ -172,6 +240,16 @@ export default function LoginPage() {
 			cancelled = true;
 			if (timeoutId !== null) {
 				window.clearTimeout(timeoutId);
+			}
+			if (minimumDelayTimerId !== null) {
+				window.clearTimeout(minimumDelayTimerId);
+			}
+			if (baselineProgressTimerId !== null) {
+				window.clearInterval(baselineProgressTimerId);
+			}
+			if (minimumDelayResolve) {
+				minimumDelayResolve();
+				minimumDelayResolve = null;
 			}
 			if (rafId !== null) {
 				window.cancelAnimationFrame(rafId);
@@ -554,6 +632,11 @@ export default function LoginPage() {
 
 						{/* Progress */}
 						<Stack gap={3}>
+							{redirecting && shouldPreloadDashboard ? (
+								<div className={styles.dashboardLoaderWrap}>
+									<AgentOrbitLoader size="sm" />
+								</div>
+							) : null}
 							{redirecting ? (
 								<Progress
 									value={Math.max(8, redirectProgress)}

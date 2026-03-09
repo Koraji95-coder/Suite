@@ -33,6 +33,15 @@ function resolveBasePollIntervalMs(): number {
 	return AGENT_POLL_VISIBLE_MS;
 }
 
+function resolvePairingCacheKey(userId: string | null): string {
+	const endpoint =
+		typeof (agentService as { getEndpoint?: () => string }).getEndpoint ===
+		"function"
+			? (agentService as { getEndpoint: () => string }).getEndpoint()
+			: "default-endpoint";
+	return `suite:agent:paired:${userId || "anonymous"}:${endpoint}`;
+}
+
 export function useAgentConnectionStatus(
 	options: UseAgentConnectionStatusOptions,
 ): AgentConnectionStatusState {
@@ -45,6 +54,26 @@ export function useAgentConnectionStatus(
 	const retryAfterUntilMsRef = useRef(0);
 	const transientRetryCountRef = useRef(0);
 	const mountedRef = useRef(true);
+	const pairingCacheKey = resolvePairingCacheKey(userId);
+
+	const readCachedPaired = useCallback((): boolean => {
+		try {
+			return localStorage.getItem(pairingCacheKey) === "1";
+		} catch {
+			return false;
+		}
+	}, [pairingCacheKey]);
+
+	const writeCachedPaired = useCallback(
+		(nextPaired: boolean) => {
+			try {
+				localStorage.setItem(pairingCacheKey, nextPaired ? "1" : "0");
+			} catch {
+				/* noop */
+			}
+		},
+		[pairingCacheKey],
+	);
 
 	const clearPollTimer = useCallback(() => {
 		if (pollTimerRef.current !== null) {
@@ -62,7 +91,15 @@ export function useAgentConnectionStatus(
 				const result = await agentService.refreshPairingStatusDetailed();
 				if (!mountedRef.current) return;
 
-				setPaired(result.paired);
+				setPaired((currentPaired) => {
+					const nextPaired = result.ok
+						? result.paired
+						: result.transient
+							? currentPaired || result.paired
+							: result.paired;
+					writeCachedPaired(nextPaired);
+					return nextPaired;
+				});
 
 				let shouldRunHealthCheck = refreshOptions.includeHealth;
 				if (!result.ok) {
@@ -110,13 +147,12 @@ export function useAgentConnectionStatus(
 				if (!mountedRef.current) return;
 				setHealthy(isHealthy);
 			} finally {
-				if (!mountedRef.current) return;
-				if (refreshOptions.showLoading) {
+				if (mountedRef.current && refreshOptions.showLoading) {
 					setLoading(false);
 				}
 			}
 		},
-		[],
+		[writeCachedPaired],
 	);
 
 	const scheduleNextPoll = useCallback(() => {
@@ -153,7 +189,7 @@ export function useAgentConnectionStatus(
 		retryAfterUntilMsRef.current = 0;
 		transientRetryCountRef.current = 0;
 		setHealthy(null);
-		setPaired(false);
+		setPaired(readCachedPaired());
 		setError("");
 		setLoading(true);
 
@@ -166,7 +202,7 @@ export function useAgentConnectionStatus(
 			mountedRef.current = false;
 			clearPollTimer();
 		};
-	}, [clearPollTimer, refreshState, scheduleNextPoll, userId]);
+	}, [clearPollTimer, refreshState, scheduleNextPoll, readCachedPaired]);
 
 	useEffect(() => {
 		const handleFocus = () => {

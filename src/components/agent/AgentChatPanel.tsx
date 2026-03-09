@@ -178,6 +178,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const [taskItems, setTaskItems] = useState<AgentTaskItem[]>([]);
 	const [activityItems, setActivityItems] = useState<AgentActivityItem[]>([]);
 	const [workflowLoading, setWorkflowLoading] = useState(false);
+	const [workflowInitialLoadDone, setWorkflowInitialLoadDone] = useState(false);
 	const [workflowError, setWorkflowError] = useState("");
 	const [reviewBusyTaskId, setReviewBusyTaskId] = useState("");
 	const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
@@ -337,10 +338,16 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						? JSON.stringify(response.data, null, 2)
 						: String(response.data ?? "Task completed.")
 					: response.error || "Request failed.";
+				if (mountedRef.current) {
+					setIsThinking(false);
+				}
 				agentTaskManager.addMessageToConversation(conversationId, "assistant", reply);
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : "Unknown error occurred.";
+				if (mountedRef.current) {
+					setIsThinking(false);
+				}
 				agentTaskManager.addMessageToConversation(
 					conversationId,
 					"assistant",
@@ -375,6 +382,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				setActivityItems([]);
 				setWorkflowError("");
 				if (!silent) setWorkflowLoading(false);
+				setWorkflowInitialLoadDone(true);
 			}
 			return Promise.resolve();
 		}
@@ -453,6 +461,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				epoch === workflowRefreshEpochRef.current
 			) {
 				setWorkflowLoading(false);
+				setWorkflowInitialLoadDone(true);
 			}
 		});
 		workflowRefreshInFlightRef.current = trackedPromise;
@@ -505,6 +514,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	}, [activityItems, markProfileSuccess]);
 
 	const isReady = healthy && paired;
+	const showQueueRefreshSpinner = workflowLoading && !workflowInitialLoadDone;
 
 	const scopedTaskItems = useMemo(
 		() =>
@@ -818,7 +828,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 								Task queue
 							</Text>
 						</HStack>
-						{workflowLoading ? (
+						{showQueueRefreshSpinner ? (
 							<Loader2 size={12} className={styles.spin} />
 						) : (
 							<button

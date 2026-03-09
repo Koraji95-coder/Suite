@@ -59,6 +59,19 @@ export const AuthContext = createContext<AuthContextValue | undefined>(
 	undefined,
 );
 
+function readBooleanEnv(value: unknown, fallback: boolean): boolean {
+	if (typeof value !== "string") return fallback;
+	const normalized = value.trim().toLowerCase();
+	if (["1", "true", "yes", "on"].includes(normalized)) return true;
+	if (["0", "false", "no", "off"].includes(normalized)) return false;
+	return fallback;
+}
+
+const SHOULD_UNPAIR_ON_SIGN_OUT = readBooleanEnv(
+	import.meta.env.VITE_AGENT_SIGNOUT_UNPAIR,
+	true,
+);
+
 function isUserAdmin(authUser: User | null): boolean {
 	return hasAdminClaim(authUser);
 }
@@ -123,6 +136,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const lastSignedInTelemetryKeyRef = useRef<string>("");
 
 	useEffect(() => {
+		const restoreAgentPairing = async (
+			context: "rehydrate" | "auth-change",
+		): Promise<void> => {
+			try {
+				const result = await agentService.restorePairingForActiveUser();
+				logger.debug("Agent pairing restore evaluated", "AuthContext", {
+					context,
+					restored: result.restored,
+					reason: result.reason,
+				});
+			} catch (error) {
+				logger.warn("Agent pairing restore failed", "AuthContext", {
+					context,
+					error,
+				});
+			}
+		};
+
 		// Rehydrate session from storage on mount
 		const rehydrateSession = async () => {
 			try {
@@ -152,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				if (currentUser) {
 					const restoredMethod = readSessionAuthMethod(sessionKey);
 					setSessionAuthMethod(restoredMethod ?? "email_link");
+					await restoreAgentPairing("rehydrate");
 					const p = await ensureProfileForUser(currentUser);
 					setProfile(p);
 				} else {
@@ -217,11 +249,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					setSessionAuthMethod(restoredMethod ?? "email_link");
 				}
 
-				// Async-safe pattern: avoid deadlocks by not awaiting directly inside the callback
-				(async () => {
-					const p = await ensureProfileForUser(currentUser);
-					setProfile(p);
-				})();
+					// Async-safe pattern: avoid deadlocks by not awaiting directly inside the callback
+					(async () => {
+						await restoreAgentPairing("auth-change");
+						const p = await ensureProfileForUser(currentUser);
+						setProfile(p);
+					})();
 			} else {
 				setSessionAuthMethod("email_link");
 				clearSessionAuthMarkers();
@@ -261,12 +294,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	};
 
 	const signOut = async () => {
-		try {
-			await agentService.unpair();
-		} catch (error) {
-			logger.warn("Failed to clear agent pairing on sign-out", "AuthContext", {
-				error,
-			});
+		if (SHOULD_UNPAIR_ON_SIGN_OUT) {
+			try {
+				await agentService.unpair();
+			} catch (error) {
+				logger.warn("Failed to clear agent pairing on sign-out", "AuthContext", {
+					error,
+				});
+			}
+		} else {
+			logger.info(
+				"Preserving agent pairing on sign-out (VITE_AGENT_SIGNOUT_UNPAIR=false)",
+				"AuthContext",
+			);
 		}
 
 		const { error } = await supabase.auth.signOut();

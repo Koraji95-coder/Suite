@@ -298,6 +298,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         text = str(content.get("text") or "")
         self.assertIn("Agent Profile Playbook", text)
         self.assertIn("draftsmith", text)
+        self.assertIn("gridsage", text)
 
     def test_tool_verify_agent_routing_guardrails(self) -> None:
         with _McpServerProcess() as server:

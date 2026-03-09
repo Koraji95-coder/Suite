@@ -66,6 +66,7 @@ def _build_orchestrator(*, ledger_path: Path, requests_stub: _RequestsStub) -> A
             {"id": "sentinel"},
             {"id": "forge"},
             {"id": "draftsmith"},
+            {"id": "gridsage"},
         ]
 
     def resolve_route(profile_id: str) -> Optional[Dict[str, Any]]:
@@ -74,13 +75,13 @@ def _build_orchestrator(*, ledger_path: Path, requests_stub: _RequestsStub) -> A
             return {
                 "id": "devstral",
                 "primary_model": "dev-primary",
-                "fallback_models": ["dev-fallback"],
+                "fallback_models": [],
             }
         if normalized == "koro":
             return {
                 "id": "koro",
                 "primary_model": "koro-primary",
-                "fallback_models": ["koro-fallback"],
+                "fallback_models": [],
             }
         return {
             "id": normalized,
@@ -155,11 +156,10 @@ class TestApiAgentOrchestrationRuntime(unittest.TestCase):
             finally:
                 orchestrator.shutdown()
 
-    def test_step_retries_fallback_model_on_5xx(self) -> None:
+    def test_step_does_not_retry_alternate_model_on_5xx(self) -> None:
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             responses = [
                 _ResponseStub(status_code=500, payload={"error": "upstream unavailable"}),
-                _ResponseStub(status_code=200, payload={"response": "A fallback", "model": "dev-fallback"}),
                 _ResponseStub(status_code=200, payload={"response": "B primary", "model": "dev-primary"}),
                 _ResponseStub(status_code=200, payload={"response": "C synth", "model": "koro-primary"}),
             ]
@@ -195,8 +195,12 @@ class TestApiAgentOrchestrationRuntime(unittest.TestCase):
 
                 stage_a_steps = [step for step in snapshot["steps"] if step["stage"] == "stage_a"]
                 self.assertEqual(len(stage_a_steps), 1)
-                self.assertEqual(stage_a_steps[0]["modelUsed"], "dev-fallback")
-                self.assertGreaterEqual(len(requests_stub.calls), 4)
+                self.assertEqual(stage_a_steps[0]["modelUsed"], "dev-primary")
+                self.assertEqual(stage_a_steps[0]["status"], "failed")
+                self.assertEqual(len(requests_stub.calls), 3)
+                self.assertTrue(
+                    all("fallback_models" not in call.get("json", {}) for call in requests_stub.calls)
+                )
             finally:
                 orchestrator.shutdown()
 

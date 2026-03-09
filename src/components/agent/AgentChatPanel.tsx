@@ -149,6 +149,31 @@ function shortRunId(runId: string): string {
 	return text.length > 14 ? text.slice(-10) : text;
 }
 
+function normalizeAssistantReply(
+	data: Record<string, unknown> | undefined,
+): {
+	text: string;
+	incomplete: boolean;
+	warning: string;
+} {
+	if (!data) {
+		return { text: "", incomplete: false, warning: "" };
+	}
+	const responseText = String(data.response ?? "").trim();
+	if (responseText) {
+		return {
+			text: responseText,
+			incomplete: Boolean(data.incomplete),
+			warning: String(data.warning || "").trim(),
+		};
+	}
+	return {
+		text: JSON.stringify(data, null, 2),
+		incomplete: Boolean(data.incomplete),
+		warning: String(data.warning || "").trim(),
+	};
+}
+
 export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const navigate = useNavigate();
 	const [profileId, setProfileId] = useState<AgentProfileId>(() => {
@@ -174,6 +199,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const [conversations, setConversations] = useState<AgentConversation[]>([]);
 	const [activeConvId, setActiveConvId] = useState<string | null>(null);
 	const [isThinking, setIsThinking] = useState(false);
+	const [thinkingProfileId, setThinkingProfileId] =
+		useState<AgentProfileId>(DEFAULT_AGENT_PROFILE);
+	const [liveStreamText, setLiveStreamText] = useState("");
 
 	const [taskItems, setTaskItems] = useState<AgentTaskItem[]>([]);
 	const [activityItems, setActivityItems] = useState<AgentActivityItem[]>([]);
@@ -193,8 +221,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const workflowRefreshInFlightRef = useRef<Promise<void> | null>(null);
 
 	useEffect(() => {
+		mountedRef.current = true;
 		return () => {
 			mountedRef.current = false;
+			agentService.cancelActiveRequest();
 			workflowRefreshEpochRef.current += 1;
 		};
 	}, []);
@@ -231,12 +261,12 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	);
 	const scopeProfileId: AgentProfileId = isAgentProfileScope(channelScope)
 		? channelScope
-		: "koro";
+		: profileId;
 	const scopeProfile = AGENT_PROFILES[scopeProfileId];
 	const profile =
 		channelScope === "team"
 			? {
-					name: "Team Home",
+					name: "Shared Channel",
 					tagline: "Unified multi-agent command view",
 					focus: "Monitor collaboration, queue, and review flow across all agents.",
 				}
@@ -244,12 +274,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const templates = getAgentTaskTemplates(scopeProfileId);
 	const profileRouteLabel =
 		channelScope === "team"
-			? `Coordinator ${scopeProfile.name} · aggregated channel`
-			: scopeProfile.modelFallbacks.length
-				? `Model ${scopeProfile.modelPrimary} (fallback ${scopeProfile.modelFallbacks[0]})`
-				: `Model ${scopeProfile.modelPrimary}`;
+			? `Shared feed - coordinator ${scopeProfile.name}`
+			: `Model ${scopeProfile.modelPrimary}`;
 	const channelLabel =
-		channelScope === "team" ? "Team Home" : scopeProfile.name;
+		channelScope === "team" ? "Shared Channel" : scopeProfile.name;
 
 	const refreshConversations = useCallback(() => {
 		const next = agentTaskManager.getConversations();
@@ -284,7 +312,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const handleNewConversation = useCallback(() => {
 		const conversation = agentTaskManager.createConversation(
 			channelScope === "team" ? "team" : scopeProfileId,
-			channelScope === "team" ? "Team Home conversation" : undefined,
+			channelScope === "team" ? "Shared channel conversation" : undefined,
 		);
 		agentTaskManager.saveConversation(conversation);
 		refreshConversations();
@@ -310,52 +338,82 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		async (message: string) => {
 			if (!healthy || !paired) return;
 			const outboundProfileId: AgentProfileId =
-				channelScope === "team" ? "koro" : scopeProfileId;
-			const outboundMessage =
-				channelScope === "team" ? `[team-home]\n${message}` : message;
+				channelScope === "team" ? profileId : scopeProfileId;
+			const outboundMessage = message;
+			const templateMatch = getAgentTaskTemplates(outboundProfileId).find(
+				(template) => template.prompt.trim() === outboundMessage.trim(),
+			);
 
 			let conversationId = activeConvId;
 			if (!conversationId) {
 				const created = agentTaskManager.createConversation(
 					channelScope === "team" ? "team" : scopeProfileId,
-					channelScope === "team" ? "Team Home conversation" : undefined,
+					channelScope === "team" ? "Shared channel conversation" : undefined,
 				);
 				agentTaskManager.saveConversation(created);
 				conversationId = created.id;
 				setActiveConvId(conversationId);
 			}
 
-			agentTaskManager.addMessageToConversation(conversationId, "user", message);
+			agentTaskManager.addMessageToConversation(
+				conversationId,
+				"user",
+				message,
+				{ profileId: outboundProfileId },
+			);
 			refreshConversations();
 
+			setThinkingProfileId(outboundProfileId);
 			setIsThinking(true);
+			setLiveStreamText("");
 			try {
 				const response = await agentService.sendMessage(outboundMessage, {
 					profileId: outboundProfileId,
+					promptMode: templateMatch ? "template" : "manual",
+					templateLabel: templateMatch?.label,
+					onStreamUpdate: (partialResponse) => {
+						if (!mountedRef.current) return;
+						setLiveStreamText(partialResponse);
+					},
 				});
-				const reply = response.success
-					? typeof response.data === "object"
-						? JSON.stringify(response.data, null, 2)
-						: String(response.data ?? "Task completed.")
-					: response.error || "Request failed.";
+				let reply = response.error || "Request failed.";
+				if (response.success) {
+					const normalized = normalizeAssistantReply(response.data);
+					reply = normalized.text || "Task completed.";
+					if (normalized.incomplete) {
+						const suffix = normalized.warning
+							? `\n\n[Response incomplete: ${normalized.warning}]`
+							: "\n\n[Response incomplete]";
+						reply += suffix;
+					}
+				}
 				if (mountedRef.current) {
 					setIsThinking(false);
+					setLiveStreamText("");
 				}
-				agentTaskManager.addMessageToConversation(conversationId, "assistant", reply);
+				agentTaskManager.addMessageToConversation(
+					conversationId,
+					"assistant",
+					reply,
+					{ profileId: outboundProfileId },
+				);
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : "Unknown error occurred.";
 				if (mountedRef.current) {
 					setIsThinking(false);
+					setLiveStreamText("");
 				}
 				agentTaskManager.addMessageToConversation(
 					conversationId,
 					"assistant",
 					errorMessage,
+					{ profileId: outboundProfileId },
 				);
 			} finally {
 				if (mountedRef.current) {
 					setIsThinking(false);
+					setLiveStreamText("");
 					refreshConversations();
 				}
 			}
@@ -364,11 +422,16 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			healthy,
 			paired,
 			channelScope,
+			profileId,
 			scopeProfileId,
 			activeConvId,
 			refreshConversations,
 		],
 	);
+
+	const handleCancel = useCallback(() => {
+		agentService.cancelActiveRequest();
+	}, []);
 
 	const refreshWorkflowData = useCallback((silent = false) => {
 		if (workflowRefreshInFlightRef.current) {
@@ -749,7 +812,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 									<House size={14} />
 								</div>
 								<div>
-									<p className={styles.rosterName}>Team Home</p>
+									<p className={styles.rosterName}>Shared Channel</p>
 									<p className={styles.rosterMeta}>
 										Unified multi-agent command channel
 									</p>
@@ -1006,8 +1069,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					{activeConv && activeConv.messages.length > 0 ? (
 						<AgentChatMessages
 							messages={activeConv.messages}
-							profileId={scopeProfileId}
+							defaultProfileId={scopeProfileId}
+							thinkingProfileId={thinkingProfileId}
 							isThinking={isThinking}
+							thinkingContent={liveStreamText}
 							baseAvatarState={assistantBaseState}
 						/>
 					) : (
@@ -1028,6 +1093,8 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					<AgentChatComposer
 						onSend={handleSend}
 						disabled={!isReady || isThinking}
+						isStreaming={isThinking}
+						onCancel={handleCancel}
 						templates={activeConv?.messages.length ? [] : templates.slice(0, 4)}
 					/>
 				</div>
@@ -1046,27 +1113,30 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						</Text>
 					</HStack>
 					<div className={styles.networkSurface}>
-						<svg
-							className={styles.networkLines}
-							viewBox="0 0 240 180"
-							aria-hidden
-						>
-							<line x1="120" y1="34" x2="58" y2="94" />
-							<line x1="120" y1="34" x2="120" y2="126" />
-							<line x1="120" y1="34" x2="182" y2="94" />
-							<line x1="58" y1="94" x2="182" y2="94" />
-							<line x1="58" y1="94" x2="120" y2="126" />
-							<line x1="182" y1="94" x2="120" y2="126" />
-							<line x1="182" y1="94" x2="204" y2="136" />
-							<line x1="120" y1="126" x2="204" y2="136" />
-						</svg>
-						{[
-							{ profileId: "koro" as AgentProfileId, x: 120, y: 34 },
-							{ profileId: "devstral" as AgentProfileId, x: 58, y: 94 },
-							{ profileId: "sentinel" as AgentProfileId, x: 182, y: 94 },
-							{ profileId: "forge" as AgentProfileId, x: 120, y: 126 },
-							{ profileId: "draftsmith" as AgentProfileId, x: 204, y: 136 },
-						].map((node) => {
+							<svg
+								className={styles.networkLines}
+								viewBox="0 0 240 180"
+								aria-hidden
+							>
+								<line x1="120" y1="34" x2="58" y2="94" />
+								<line x1="120" y1="34" x2="120" y2="126" />
+								<line x1="120" y1="34" x2="182" y2="94" />
+								<line x1="58" y1="94" x2="182" y2="94" />
+								<line x1="58" y1="94" x2="120" y2="126" />
+								<line x1="182" y1="94" x2="120" y2="126" />
+								<line x1="58" y1="94" x2="36" y2="136" />
+								<line x1="120" y1="126" x2="36" y2="136" />
+								<line x1="182" y1="94" x2="204" y2="136" />
+								<line x1="120" y1="126" x2="204" y2="136" />
+							</svg>
+							{[
+								{ profileId: "koro" as AgentProfileId, x: 120, y: 34 },
+								{ profileId: "devstral" as AgentProfileId, x: 58, y: 94 },
+								{ profileId: "sentinel" as AgentProfileId, x: 182, y: 94 },
+								{ profileId: "forge" as AgentProfileId, x: 120, y: 126 },
+								{ profileId: "gridsage" as AgentProfileId, x: 36, y: 136 },
+								{ profileId: "draftsmith" as AgentProfileId, x: 204, y: 136 },
+							].map((node) => {
 							const queued = taskItems.filter(
 								(task) =>
 									task.assigneeProfile === node.profileId &&

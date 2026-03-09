@@ -11,7 +11,7 @@ describe("agentTaskManager conversation scope", () => {
 	it("keeps team and profile conversations isolated", () => {
 		const teamConversation = agentTaskManager.createConversation(
 			"team",
-			"Team Home conversation",
+			"Shared channel conversation",
 		);
 		agentTaskManager.saveConversation(teamConversation);
 		expect(agentTaskManager.getConversations()).toHaveLength(1);
@@ -29,7 +29,7 @@ describe("agentTaskManager conversation scope", () => {
 		agentTaskManager.setConversationScope("team");
 		expect(agentTaskManager.getConversations()).toHaveLength(1);
 		expect(agentTaskManager.getConversations()[0]?.title).toBe(
-			"Team Home conversation",
+			"Shared channel conversation",
 		);
 	});
 
@@ -93,5 +93,60 @@ describe("agentTaskManager conversation scope", () => {
 				key.startsWith("agent-conversations:test-user:"),
 			),
 		).toBe(false);
+	});
+
+	it("persists per-message profile attribution for shared chat history", () => {
+		const conversation = agentTaskManager.createConversation("team", "Shared");
+		agentTaskManager.saveConversation(conversation);
+
+		agentTaskManager.addMessageToConversation(
+			conversation.id,
+			"user",
+			"Hello",
+			{ profileId: "draftsmith" },
+		);
+		agentTaskManager.addMessageToConversation(
+			conversation.id,
+			"assistant",
+			"Acknowledged",
+			{ profileId: "draftsmith" },
+		);
+
+		const stored = agentTaskManager.getConversation(conversation.id);
+		expect(stored?.messages).toHaveLength(2);
+		expect(stored?.messages[0]?.profileId).toBe("draftsmith");
+		expect(stored?.messages[1]?.profileId).toBe("draftsmith");
+	});
+
+	it("applies transcript safety limits for message length and history size", () => {
+		const conversation = agentTaskManager.createConversation("team", "Stress");
+		agentTaskManager.saveConversation(conversation);
+
+		for (let index = 0; index < 240; index += 1) {
+			agentTaskManager.addMessageToConversation(
+				conversation.id,
+				"assistant",
+				`message-${index}`,
+				{ profileId: "gridsage" },
+			);
+		}
+		const largeMessage = "x".repeat(13_500);
+		agentTaskManager.addMessageToConversation(
+			conversation.id,
+			"assistant",
+			largeMessage,
+			{ profileId: "gridsage" },
+		);
+
+		const stored = agentTaskManager.getConversation(conversation.id);
+		expect((stored?.messages.length || 0) <= 200).toBe(true);
+		expect(stored?.messages.some((entry) => entry.profileId === "gridsage")).toBe(
+			true,
+		);
+		expect(
+			stored?.messages.some((entry) =>
+				entry.content.includes("[message truncated for chat stability]"),
+			),
+		).toBe(true);
 	});
 });

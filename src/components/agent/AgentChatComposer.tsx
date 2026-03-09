@@ -1,5 +1,5 @@
 // src/components/agent/AgentChatComposer.tsx
-import { ArrowUp, Mic, Paperclip, Sparkles } from "lucide-react";
+import { ArrowUp, Mic, Paperclip, Sparkles, Square } from "lucide-react";
 import { useRef, useState } from "react";
 // Primitives
 import { Button, IconButton } from "@/components/primitives/Button";
@@ -12,12 +12,16 @@ import type { TaskTemplate } from "./agentTaskTemplates";
 interface AgentChatComposerProps {
 	onSend: (message: string) => void;
 	disabled?: boolean;
+	isStreaming?: boolean;
+	onCancel?: () => void;
 	templates?: TaskTemplate[];
 }
 
 export function AgentChatComposer({
 	onSend,
 	disabled = false,
+	isStreaming = false,
+	onCancel,
 	templates = [],
 }: AgentChatComposerProps) {
 	const [value, setValue] = useState("");
@@ -99,7 +103,11 @@ export function AgentChatComposer({
 						onFocus={() => setIsFocused(true)}
 						onBlur={() => setIsFocused(false)}
 						placeholder={
-							disabled ? "Connecting to agent..." : "Message the agent..."
+							disabled
+								? isStreaming
+									? "Generating response..."
+									: "Connecting to agent..."
+								: "Message the agent..."
 						}
 						disabled={disabled}
 						rows={1}
@@ -138,17 +146,28 @@ export function AgentChatComposer({
 							</Text>
 						)}
 
-						<button
-							type="button"
-							onClick={handleSubmit}
-							disabled={!canSend}
-							className={cn(
-								styles.sendButton,
-								canSend ? styles.sendButtonReady : styles.sendButtonDisabled,
-							)}
-						>
-							<ArrowUp size={16} strokeWidth={2.5} />
-						</button>
+						{isStreaming ? (
+							<button
+								type="button"
+								onClick={() => onCancel?.()}
+								disabled={!onCancel}
+								className={cn(styles.sendButton, styles.stopButtonReady)}
+							>
+								<Square size={14} strokeWidth={2.2} />
+							</button>
+						) : (
+							<button
+								type="button"
+								onClick={handleSubmit}
+								disabled={!canSend}
+								className={cn(
+									styles.sendButton,
+									canSend ? styles.sendButtonReady : styles.sendButtonDisabled,
+								)}
+							>
+								<ArrowUp size={16} strokeWidth={2.5} />
+							</button>
+						)}
 					</HStack>
 				</div>
 			</div>

@@ -1,33 +1,30 @@
 # Agent Profile Model Pack (Ollama)
 
-This repo now uses deterministic profile-based model routing for Suite Agent.
+This repo uses deterministic profile-based model routing for Suite Agent.
 
 ## Active Profiles
 
 1. `koro`
    - Primary: `qwen3:14b`
-   - Fallback: `gemma3:12b`
 2. `devstral`
    - Primary: `devstral-small-2:latest`
-   - Fallback: `qwen2.5-coder:14b`
 3. `sentinel`
    - Primary: `gemma3:12b`
-   - Fallback: `qwen3:8b`
 4. `forge`
    - Primary: `qwen2.5-coder:14b`
-   - Fallback: `devstral-small-2:latest`
 5. `draftsmith`
    - Primary: `joshuaokolo/C3Dv0:latest`
-   - Fallback: `ALIENTELLIGENCE/electricalengineerv2:latest`
+6. `gridsage`
+   - Primary: `ALIENTELLIGENCE/electricalengineerv2:latest`
 
 ## Transport Behavior
 
 1. `VITE_AGENT_TRANSPORT=backend` (or `broker`) [default]
    - Frontend sends profile metadata to backend `/api/agent/webhook`.
-   - Backend resolves profile route and retries fallback models server-side.
+   - Backend resolves profile route and performs a single-model attempt per request.
 2. `VITE_AGENT_TRANSPORT=direct` [local override]
-   - Frontend sends profile + model candidate metadata directly to ZeroClaw `/webhook`.
-   - Frontend performs retry to fallback model on retryable gateway failures.
+   - Frontend sends profile + primary model metadata directly to ZeroClaw `/webhook`.
+   - Frontend performs a single-model attempt per request.
 
 ## Runtime Override (No Code Changes)
 
@@ -36,30 +33,34 @@ Use `.env` keys to swap model pack values.
 Frontend (direct mode):
 
 - `VITE_AGENT_MODEL_<PROFILE>_PRIMARY`
-- `VITE_AGENT_MODEL_<PROFILE>_FALLBACKS` (comma-separated)
 
 Backend (broker mode):
 
 - `AGENT_MODEL_<PROFILE>_PRIMARY`
-- `AGENT_MODEL_<PROFILE>_FALLBACKS` (comma-separated)
 
 Examples:
 
 - `AGENT_MODEL_DEVSTRAL_PRIMARY=devstral-small-2:latest`
-- `AGENT_MODEL_DRAFTSMITH_FALLBACKS=ALIENTELLIGENCE/electricalengineerv2:latest`
+- `AGENT_MODEL_GRIDSAGE_PRIMARY=ALIENTELLIGENCE/electricalengineerv2:latest`
+- `AGENT_ORCHESTRATION_MAX_PARALLEL_PROFILES=2` (recommended local cap for heavy model packs)
+
+Compatibility note:
+
+- `*_FALLBACKS` keys are deprecated and ignored in current runtime behavior.
+- API compatibility fields (`model_fallbacks`, `fallback_models`) remain present as empty arrays in this phase.
 
 ## API Surface
 
 Backend exposes:
 
 - `GET /api/agent/profiles` for profile/model metadata
-- `POST /api/agent/webhook` for brokered requests with profile route + fallback retry
+- `POST /api/agent/webhook` for brokered requests with strict profile route selection
 - `POST /api/agent/runs` for background multi-agent orchestration enqueue
 - `GET /api/agent/runs/:runId` for run status + outputs
 - `GET /api/agent/runs/:runId/events` for SSE progress events
 - `POST /api/agent/runs/:runId/cancel` for cancellation
 
-ZeroClaw webhook now accepts optional:
+ZeroClaw webhook accepts:
 
 - `model` in request body for explicit model override per request
 
@@ -68,13 +69,16 @@ ZeroClaw webhook now accepts optional:
 1. CAD route drafting:
    - Switch to `draftsmith`.
    - Ask for route constraints + obstacle strategy + draw order in one prompt.
-2. Implementation pass:
+2. Electrical system strategy:
+   - Switch to `gridsage`.
+   - Ask for assumptions, protection checks, and implementation constraints.
+3. Implementation pass:
    - Switch to `devstral`.
    - Ask for concrete refactor + test additions + rollback notes.
-3. Pre-merge QA:
+4. Pre-merge QA:
    - Switch to `sentinel`.
    - Ask for regression/failure-mode checklist by changed module.
-4. Documentation package generation:
+5. Documentation package generation:
    - Switch to `forge`.
    - Ask for structured release notes + operator runbook draft.
 

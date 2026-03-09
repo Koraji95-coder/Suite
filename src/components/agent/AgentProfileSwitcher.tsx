@@ -20,10 +20,7 @@ import type { AgentMarkState } from "./agentMarkState";
 function profileModelLabel(id: AgentProfileId): string {
 	const profile = AGENT_PROFILES[id];
 	if (!profile) return "";
-	const fallback = profile.modelFallbacks[0];
-	return fallback
-		? `${profile.modelPrimary} -> ${fallback}`
-		: profile.modelPrimary;
+	return profile.modelPrimary;
 }
 
 interface AgentProfileSwitcherProps {
@@ -217,7 +214,7 @@ function DropdownSwitcher({
 					{/* Footer hint */}
 					<div className={styles.menuFooter}>
 						<Text size="xs" color="muted">
-							Each profile maps to a primary model with fallback coverage.
+							Each profile is pinned to one deterministic model route.
 						</Text>
 					</div>
 				</div>

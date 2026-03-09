@@ -1246,13 +1246,8 @@ class AgentRunOrchestrator:
     def _resolve_models(self, profile_id: str) -> tuple[str, List[str]]:
         route = self._resolve_agent_profile_route(profile_id) or {}
         primary = str(route.get("primary_model") or "").strip()
-        fallbacks = [
-            str(value).strip()
-            for value in (route.get("fallback_models") or [])
-            if str(value).strip()
-        ]
-        candidates = dedupe_model_candidates([primary, *fallbacks])
-        return primary, candidates if candidates else [""]
+        candidates = [primary] if primary else [""]
+        return primary, candidates
 
     def _finalize_step(
         self,
@@ -1441,103 +1436,86 @@ class AgentRunOrchestrator:
         response_text = ""
         error_text = ""
         model_used = ""
-        attempt_total = max(1, len(model_candidates))
+        candidate = model_candidates[0] if model_candidates else ""
+        attempt_started_perf = time.perf_counter()
+        payload: Dict[str, Any] = {"message": prompt, "profile_id": profile_id}
+        if candidate:
+            payload["model"] = candidate
 
-        for index, candidate in enumerate(model_candidates):
-            attempt_started_perf = time.perf_counter()
-            payload: Dict[str, Any] = {"message": prompt, "profile_id": profile_id}
-            if candidate:
-                payload["model"] = candidate
-            if index < len(model_candidates) - 1:
-                payload["fallback_models"] = model_candidates[index + 1 :]
+        if self._verbose_logging:
+            self._logger.info(
+                "Agent step attempt start (run_id=%s stage=%s profile=%s model=%s attempt=%s/%s timeout_s=%s request_id=%s)",
+                run_id,
+                stage,
+                profile_id,
+                candidate or "default",
+                1,
+                1,
+                timeout_seconds,
+                step_request_id,
+            )
 
+        try:
+            response = self._requests.post(
+                f"{self._agent_gateway_url}/webhook",
+                headers=headers,
+                json=payload,
+                timeout=timeout_seconds,
+            )
+        except Exception as exc:
+            error_text = str(exc).strip() or exc.__class__.__name__
             if self._verbose_logging:
-                self._logger.info(
-                    "Agent step attempt start (run_id=%s stage=%s profile=%s model=%s attempt=%s/%s timeout_s=%s request_id=%s)",
-                    run_id,
-                    stage,
-                    profile_id,
-                    candidate or "default",
-                    index + 1,
-                    attempt_total,
-                    timeout_seconds,
-                    step_request_id,
+                attempt_latency_ms = max(
+                    0,
+                    int((time.perf_counter() - attempt_started_perf) * 1000),
                 )
-
-            try:
-                response = self._requests.post(
-                    f"{self._agent_gateway_url}/webhook",
-                    headers=headers,
-                    json=payload,
-                    timeout=timeout_seconds,
-                )
-                status_code = int(getattr(response, "status_code", 0) or 0)
-                if self._verbose_logging:
-                    attempt_latency_ms = max(
-                        0,
-                        int((time.perf_counter() - attempt_started_perf) * 1000),
-                    )
-                    self._logger.info(
-                        "Agent step attempt response (run_id=%s stage=%s profile=%s model=%s attempt=%s/%s status=%s latency_ms=%s request_id=%s)",
-                        run_id,
-                        stage,
-                        profile_id,
-                        candidate or "default",
-                        index + 1,
-                        attempt_total,
-                        status_code,
-                        attempt_latency_ms,
-                        step_request_id,
-                    )
-            except Exception as exc:
-                error_text = str(exc).strip() or exc.__class__.__name__
-                if self._verbose_logging:
-                    attempt_latency_ms = max(
-                        0,
-                        int((time.perf_counter() - attempt_started_perf) * 1000),
-                    )
-                    self._logger.warning(
-                        "Agent step attempt exception (run_id=%s stage=%s profile=%s model=%s attempt=%s/%s latency_ms=%s request_id=%s error=%s)",
-                        run_id,
-                        stage,
-                        profile_id,
-                        candidate or "default",
-                        index + 1,
-                        attempt_total,
-                        attempt_latency_ms,
-                        step_request_id,
-                        exc,
-                    )
-                if index < len(model_candidates) - 1:
-                    self._logger.warning(
-                        "Agent step request failed; trying fallback model (run_id=%s, stage=%s, profile=%s, model=%s, request_id=%s, error=%s)",
-                        run_id,
-                        stage,
-                        profile_id,
-                        candidate or "default",
-                        step_request_id,
-                        exc,
-                    )
-                    continue
-                break
-
-            if status_code >= 500 and index < len(model_candidates) - 1:
                 self._logger.warning(
-                    "Agent step gateway status=%s; trying fallback model (run_id=%s, stage=%s, profile=%s, model=%s, request_id=%s)",
-                    status_code,
+                    "Agent step attempt exception (run_id=%s stage=%s profile=%s model=%s attempt=%s/%s latency_ms=%s request_id=%s error=%s)",
                     run_id,
                     stage,
                     profile_id,
                     candidate or "default",
+                    1,
+                    1,
+                    attempt_latency_ms,
                     step_request_id,
+                    exc,
                 )
-                continue
+            return self._finalize_step(
+                run_id=run_id,
+                stage=stage,
+                profile_id=profile_id,
+                step_request_id=step_request_id,
+                status="failed",
+                started_perf=started_perf,
+                model_used=str(candidate or ""),
+                response_text="",
+                error_text=error_text,
+            )
 
-            model_used = str(candidate or "")
-            if status_code >= 400:
-                error_text = _extract_gateway_error(response)
-                break
+        status_code = int(getattr(response, "status_code", 0) or 0)
+        if self._verbose_logging:
+            attempt_latency_ms = max(
+                0,
+                int((time.perf_counter() - attempt_started_perf) * 1000),
+            )
+            self._logger.info(
+                "Agent step attempt response (run_id=%s stage=%s profile=%s model=%s attempt=%s/%s status=%s latency_ms=%s request_id=%s)",
+                run_id,
+                stage,
+                profile_id,
+                candidate or "default",
+                1,
+                1,
+                status_code,
+                attempt_latency_ms,
+                step_request_id,
+            )
 
+        model_used = str(candidate or "")
+        if status_code >= 400:
+            error_text = _extract_gateway_error(response)
+        else:
             try:
                 payload_obj = response.json()
             except Exception:
@@ -1546,7 +1524,6 @@ class AgentRunOrchestrator:
             response_text = _extract_gateway_response_text(payload_obj)
             if isinstance(payload_obj, dict):
                 model_used = str(payload_obj.get("model") or model_used).strip()
-            break
 
         if response_text:
             if self._verbose_logging:

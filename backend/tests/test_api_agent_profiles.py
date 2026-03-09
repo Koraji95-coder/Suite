@@ -25,27 +25,31 @@ class TestApiAgentProfiles(unittest.TestCase):
         self.assertIn("koro", catalog)
         self.assertIn("devstral", catalog)
         self.assertIn("draftsmith", catalog)
+        self.assertIn("gridsage", catalog)
+        self.assertEqual(catalog["koro"]["model_primary"], "qwen3:14b")
         self.assertEqual(catalog["devstral"]["model_primary"], "devstral-small-2:latest")
+        self.assertEqual(catalog["draftsmith"]["model_primary"], "joshuaokolo/C3Dv0:latest")
         self.assertEqual(
-            catalog["draftsmith"]["model_fallbacks"],
-            ["ALIENTELLIGENCE/electricalengineerv2:latest"],
+            catalog["gridsage"]["model_primary"],
+            "ALIENTELLIGENCE/electricalengineerv2:latest",
         )
+        self.assertTrue(all((entry.get("model_fallbacks") or []) == [] for entry in catalog.values()))
         self.assertEqual(logger.warnings, [])
 
-    def test_build_catalog_applies_env_overrides(self) -> None:
+    def test_build_catalog_applies_primary_override_and_ignores_fallback_override(self) -> None:
         logger = _LoggerStub()
         catalog = build_agent_profile_catalog(
             environ={
-                "AGENT_MODEL_KORO_PRIMARY": "qwen3:8b",
+                "AGENT_MODEL_KORO_PRIMARY": "qwen3:14b",
                 "AGENT_MODEL_KORO_FALLBACKS": "gemma3:4b, qwen2.5:7b",
             },
             logger=logger,
         )
 
-        self.assertEqual(catalog["koro"]["model_primary"], "qwen3:8b")
-        self.assertEqual(
-            catalog["koro"]["model_fallbacks"],
-            ["gemma3:4b", "qwen2.5:7b"],
+        self.assertEqual(catalog["koro"]["model_primary"], "qwen3:14b")
+        self.assertEqual(catalog["koro"]["model_fallbacks"], [])
+        self.assertTrue(
+            any("Ignoring deprecated fallback env override" in message for message, _ in logger.warnings)
         )
 
     def test_profile_listing_and_route_resolution(self) -> None:
@@ -53,17 +57,25 @@ class TestApiAgentProfiles(unittest.TestCase):
         catalog = build_agent_profile_catalog(environ={}, logger=logger)
 
         profiles = list_agent_profiles(catalog)
-        self.assertGreaterEqual(len(profiles), 5)
+        self.assertGreaterEqual(len(profiles), 6)
         self.assertEqual(profiles[0]["id"], "koro")
+        self.assertIn("gridsage", [str(entry.get("id") or "") for entry in profiles])
+        self.assertTrue(all((entry.get("model_fallbacks") or []) == [] for entry in profiles))
 
-        route = resolve_agent_profile_route(catalog, "DRAFTSMITH")
-        self.assertIsNotNone(route)
-        assert route is not None
-        self.assertEqual(route["primary_model"], "joshuaokolo/C3Dv0:latest")
+        draft_route = resolve_agent_profile_route(catalog, "DRAFTSMITH")
+        self.assertIsNotNone(draft_route)
+        assert draft_route is not None
+        self.assertEqual(draft_route["primary_model"], "joshuaokolo/C3Dv0:latest")
+        self.assertEqual(draft_route["fallback_models"], [])
+
+        gridsage_route = resolve_agent_profile_route(catalog, "gridsage")
+        self.assertIsNotNone(gridsage_route)
+        assert gridsage_route is not None
         self.assertEqual(
-            route["fallback_models"],
-            ["ALIENTELLIGENCE/electricalengineerv2:latest"],
+            gridsage_route["primary_model"],
+            "ALIENTELLIGENCE/electricalengineerv2:latest",
         )
+        self.assertEqual(gridsage_route["fallback_models"], [])
 
         self.assertIsNone(resolve_agent_profile_route(catalog, "missing-profile"))
 

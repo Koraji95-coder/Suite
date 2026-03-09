@@ -807,9 +807,7 @@ def create_agent_blueprint(
         )
 
         if route:
-            model_candidates = _normalize_model_candidates(
-                [route.get("primary_model"), *(route.get("fallback_models") or [])]
-            )
+            model_candidates = _normalize_model_candidates([route.get("primary_model")])
         else:
             model_candidates = _normalize_model_candidates(requested_model_candidates)
 
@@ -853,60 +851,29 @@ def create_agent_blueprint(
         if AGENT_WEBHOOK_SECRET:
             headers["X-Webhook-Secret"] = AGENT_WEBHOOK_SECRET
 
-        response = None
-        request_exception = None
-        model_attempts = model_candidates if model_candidates else [""]
-        last_attempt_model = ""
+        selected_model = model_candidates[0] if model_candidates else ""
+        proxy_payload = dict(payload)
+        proxy_payload.pop("fallback_models", None)
+        proxy_payload.pop("model_candidates", None)
+        proxy_payload.pop("modelCandidates", None)
+        if selected_model:
+            proxy_payload["model"] = selected_model
+        else:
+            proxy_payload.pop("model", None)
 
-        for attempt_index, attempt_model in enumerate(model_attempts):
-            last_attempt_model = attempt_model
-            proxy_payload = dict(payload)
-            if attempt_model:
-                proxy_payload["model"] = attempt_model
-            else:
-                proxy_payload.pop("model", None)
-
-            if attempt_index < len(model_attempts) - 1:
-                proxy_payload["fallback_models"] = model_attempts[attempt_index + 1 :]
-            else:
-                proxy_payload.pop("fallback_models", None)
-
-            try:
-                response = requests_module.post(
-                    f"{AGENT_GATEWAY_URL.rstrip('/')}/webhook",
-                    headers=headers,
-                    json=proxy_payload,
-                    timeout=timeout_seconds,
-                )
-            except Exception as exc:
-                request_exception = exc
-                if attempt_index < len(model_attempts) - 1:
-                    _logger.warning(
-                        "Agent webhook proxy attempt failed profile=%s model=%s; trying fallback: %s",
-                        profile_id or "default",
-                        attempt_model or "default",
-                        exc,
-                    )
-                    continue
-                _logger.warning("Agent webhook proxy failed: %s", exc)
-                return jsonify({"error": "Agent gateway unavailable"}), 503
-
-            if response.status_code >= 500 and attempt_index < len(model_attempts) - 1:
-                _logger.warning(
-                    "Agent webhook gateway status=%s profile=%s model=%s; trying fallback model=%s",
-                    response.status_code,
-                    profile_id or "default",
-                    attempt_model or "default",
-                    model_attempts[attempt_index + 1],
-                )
-                continue
-            break
-
-        if response is None:
+        try:
+            response = requests_module.post(
+                f"{AGENT_GATEWAY_URL.rstrip('/')}/webhook",
+                headers=headers,
+                json=proxy_payload,
+                timeout=timeout_seconds,
+            )
+        except Exception as exc:
             _logger.warning(
-                "Agent webhook proxy returned no response profile=%s err=%s",
+                "Agent webhook proxy failed profile=%s model=%s: %s",
                 profile_id or "default",
-                request_exception,
+                selected_model or "default",
+                exc,
             )
             return jsonify({"error": "Agent gateway unavailable"}), 503
 
@@ -918,7 +885,7 @@ def create_agent_blueprint(
                 "Agent webhook gateway failure status=%s profile=%s model=%s body=%s",
                 response.status_code,
                 profile_id or "default",
-                last_attempt_model or "default",
+                selected_model or "default",
                 gateway_body_preview or "<empty>",
             )
 

@@ -144,6 +144,24 @@
 	transform: scale(0.96);
 }
 
+.stopButtonReady {
+	color: var(--primary-contrast);
+	background: linear-gradient(
+		130deg,
+		color-mix(in srgb, var(--danger) 82%, #ff9f9f 18%),
+		color-mix(in srgb, var(--warning) 62%, #ffcf8f 38%)
+	);
+	box-shadow: 0 10px 20px color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+.stopButtonReady:hover {
+	filter: brightness(1.07);
+}
+
+.stopButtonReady:active {
+	transform: scale(0.96);
+}
+
 .sendButtonDisabled {
 	color: var(--text-muted);
 	background: color-mix(in srgb, var(--agent-surface-elevated) 82%, transparent);

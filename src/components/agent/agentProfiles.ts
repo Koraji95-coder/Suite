@@ -3,7 +3,8 @@ export type AgentProfileId =
 	| "devstral"
 	| "sentinel"
 	| "forge"
-	| "draftsmith";
+	| "draftsmith"
+	| "gridsage";
 
 export interface AgentProfile {
 	id: AgentProfileId;
@@ -24,22 +25,8 @@ function envString(key: string): string {
 	return typeof value === "string" ? value.trim() : "";
 }
 
-function parseModelList(raw: string): string[] {
-	return raw
-		.split(",")
-		.map((item) => item.trim())
-		.filter(Boolean);
-}
-
 function resolvePrimary(profileKey: string, fallback: string): string {
 	return envString(`VITE_AGENT_MODEL_${profileKey}_PRIMARY`) || fallback;
-}
-
-function resolveFallbacks(profileKey: string, fallback: string[]): string[] {
-	const fromEnv = parseModelList(
-		envString(`VITE_AGENT_MODEL_${profileKey}_FALLBACKS`),
-	);
-	return fromEnv.length > 0 ? fromEnv : fallback;
 }
 
 export const AGENT_PROFILES: Record<AgentProfileId, AgentProfile> = {
@@ -51,7 +38,7 @@ export const AGENT_PROFILES: Record<AgentProfileId, AgentProfile> = {
 		focus: "Planning, orchestration, and multi-step coordination.",
 		modelId: "suite-koro",
 		modelPrimary: resolvePrimary("KORO", "qwen3:14b"),
-		modelFallbacks: resolveFallbacks("KORO", ["gemma3:12b"]),
+		modelFallbacks: [],
 		memoryNamespace: "koro",
 	},
 	devstral: {
@@ -62,7 +49,7 @@ export const AGENT_PROFILES: Record<AgentProfileId, AgentProfile> = {
 		focus: "Refactors, diagnostics, scripts, and technical implementation.",
 		modelId: "suite-devstral",
 		modelPrimary: resolvePrimary("DEVSTRAL", "devstral-small-2:latest"),
-		modelFallbacks: resolveFallbacks("DEVSTRAL", ["qwen2.5-coder:14b"]),
+		modelFallbacks: [],
 		memoryNamespace: "devstral",
 	},
 	sentinel: {
@@ -73,7 +60,7 @@ export const AGENT_PROFILES: Record<AgentProfileId, AgentProfile> = {
 		focus: "Checks, risk reviews, and standards-compliance validation.",
 		modelId: "suite-sentinel",
 		modelPrimary: resolvePrimary("SENTINEL", "gemma3:12b"),
-		modelFallbacks: resolveFallbacks("SENTINEL", ["qwen3:8b"]),
+		modelFallbacks: [],
 		memoryNamespace: "sentinel",
 	},
 	forge: {
@@ -84,7 +71,7 @@ export const AGENT_PROFILES: Record<AgentProfileId, AgentProfile> = {
 		focus: "Structured output generation for docs, summaries, and artifacts.",
 		modelId: "suite-forge",
 		modelPrimary: resolvePrimary("FORGE", "qwen2.5-coder:14b"),
-		modelFallbacks: resolveFallbacks("FORGE", ["devstral-small-2:latest"]),
+		modelFallbacks: [],
 		memoryNamespace: "forge",
 	},
 	draftsmith: {
@@ -96,10 +83,23 @@ export const AGENT_PROFILES: Record<AgentProfileId, AgentProfile> = {
 			"CAD-aware drafting intent, electrical reasoning, and route guidance.",
 		modelId: "suite-draftsmith",
 		modelPrimary: resolvePrimary("DRAFTSMITH", "joshuaokolo/C3Dv0:latest"),
-		modelFallbacks: resolveFallbacks("DRAFTSMITH", [
-			"ALIENTELLIGENCE/electricalengineerv2:latest",
-		]),
+		modelFallbacks: [],
 		memoryNamespace: "draftsmith",
+	},
+	gridsage: {
+		id: "gridsage",
+		name: "GridSage",
+		shortName: "GS",
+		tagline: "Electrical systems specialist",
+		focus:
+			"Power-system reasoning, electrical design constraints, and implementation guidance.",
+		modelId: "suite-gridsage",
+		modelPrimary: resolvePrimary(
+			"GRIDSAGE",
+			"ALIENTELLIGENCE/electricalengineerv2:latest",
+		),
+		modelFallbacks: [],
+		memoryNamespace: "gridsage",
 	},
 };
 
@@ -110,10 +110,7 @@ export const AGENT_PROFILE_IDS = Object.keys(
 export function getAgentModelCandidates(profileId: AgentProfileId): string[] {
 	const profile = AGENT_PROFILES[profileId];
 	if (!profile) return [];
-	const merged = [profile.modelPrimary, ...profile.modelFallbacks].filter(
-		Boolean,
-	);
-	return [...new Set(merged)];
+	return profile.modelPrimary ? [profile.modelPrimary] : [];
 }
 
 export const DEFAULT_AGENT_PROFILE: AgentProfileId = "koro";

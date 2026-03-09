@@ -120,6 +120,25 @@ These files are still larger than ideal and should be split next:
 
 Refactor target for each: separate pure models/types, API/service wrappers, and UI state hooks to reduce collision risk when adding future panels.
 
+## P1 - Agent output normalization
+
+1. Normalize direct-model chat responses before rendering in the panel.
+   - Detect tool-call/XML-like payloads (for example `<tool_call ...>` wrappers) and convert to user-facing assistant text.
+   - Keep raw payload available for diagnostics, but default chat view should show normalized natural-language output.
+
+## P1 - Agent routing contract cleanup
+
+1. Keep strict one-model-per-profile execution behavior across direct, broker, and orchestration flows.
+2. Maintain `model_fallbacks` / `fallback_models` compatibility fields as empty arrays in this phase.
+3. Schedule an explicit breaking-contract pass to remove fallback fields after downstream consumers are migrated.
+
+## P1 - Shared channel identity + transcript cleanup
+
+1. Keep shared channel label as `Shared Channel` across all agent UI entry points.
+2. Ensure shared-channel messages show real participating agent identities/models (Koro, Devstral, Sentinel, Forge).
+3. Fix profile visual mapping so agent color/identity matches actual profile intent (for example Devstral should map to the green profile mark consistently).
+4. In shared-channel orchestration, stream per-agent "thinking/progress/output" events into one transcript tagged by agent, instead of showing a single pseudo-agent voice.
+
 ## P1 - Transmittal Builder protected name selection
 
 Goal: safely select template-defined names/values from `config.yaml` without brittle hardcoding.

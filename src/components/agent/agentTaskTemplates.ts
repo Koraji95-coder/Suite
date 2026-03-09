@@ -246,6 +246,37 @@ const DRAFTSMITH_TEMPLATES: TaskTemplate[] = [
 	},
 ];
 
+const GRIDSAGE_TEMPLATES: TaskTemplate[] = [
+	{
+		label: "Feeder sizing review",
+		prompt:
+			"Review feeder sizing assumptions for this scope and flag ampacity, voltage-drop, and derating risks with concrete correction steps.",
+		category: "review",
+		icon: "check",
+	},
+	{
+		label: "Protection coordination outline",
+		prompt:
+			"Outline protection coordination checkpoints for this system, including relay/breaker hierarchy assumptions and validation sequence.",
+		category: "analysis",
+		icon: "search",
+	},
+	{
+		label: "Load study assumptions",
+		prompt:
+			"Draft load-study assumptions and diversity factors for this project and identify where field validation is required before release.",
+		category: "analysis",
+		icon: "file",
+	},
+	{
+		label: "Electrical implementation plan",
+		prompt:
+			"Generate an implementation-ready electrical design action plan with dependencies, test gates, and rollback-safe milestones.",
+		category: "automation",
+		icon: "settings",
+	},
+];
+
 // ═══════════════════════════════════════════════════════════════════════════
 // TEMPLATE MAP
 // ═══════════════════════════════════════════════════════════════════════════
@@ -255,6 +286,7 @@ const TEMPLATE_MAP: Record<AgentProfileId, TaskTemplate[]> = {
 	sentinel: SENTINEL_TEMPLATES,
 	forge: FORGE_TEMPLATES,
 	draftsmith: DRAFTSMITH_TEMPLATES,
+	gridsage: GRIDSAGE_TEMPLATES,
 };
 
 /**

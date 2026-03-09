@@ -90,6 +90,7 @@ export interface AgentConversationMessage {
 	role: "user" | "assistant";
 	content: string;
 	timestamp: string;
+	profileId?: string;
 }
 
 export interface AgentConversation {
@@ -105,10 +106,43 @@ const TASK_HISTORY_KEY_PREFIX = "agent-task-history";
 const CONV_KEY_PREFIX = "agent-conversations";
 const MAX_HISTORY = 50;
 const MAX_CONVERSATIONS = 30;
+const ENV = import.meta.env as Record<string, string | undefined>;
+
+function parsePositiveIntEnv(
+	key: string,
+	fallback: number,
+	{ min = 1, max = Number.MAX_SAFE_INTEGER } = {},
+): number {
+	const raw = Number(String(ENV[key] || "").trim());
+	if (!Number.isFinite(raw)) return fallback;
+	const value = Math.trunc(raw);
+	if (value < min || value > max) return fallback;
+	return value;
+}
+
+const MAX_MESSAGES_PER_CONVERSATION = parsePositiveIntEnv(
+	"VITE_AGENT_CHAT_MAX_MESSAGES_PER_CONVERSATION",
+	200,
+	{ min: 50, max: 2000 },
+);
+const MAX_MESSAGE_CHARS = parsePositiveIntEnv(
+	"VITE_AGENT_CHAT_MAX_MESSAGE_CHARS",
+	12_000,
+	{ min: 256, max: 100_000 },
+);
 
 class AgentTaskManager {
 	private scope = "anon";
 	private conversationScope = "koro";
+
+	private normalizeMessageContent(value: unknown): string {
+		const trimmed = String(value ?? "").trim();
+		if (!trimmed) return "";
+		if (trimmed.length <= MAX_MESSAGE_CHARS) return trimmed;
+		const suffix = "\n\n[message truncated for chat stability]";
+		const available = Math.max(0, MAX_MESSAGE_CHARS - suffix.length);
+		return `${trimmed.slice(0, available)}${suffix}`;
+	}
 
 	private toIsoTimestamp(value: unknown, fallback?: string): string {
 		const text = String(value ?? "").trim();
@@ -130,16 +164,18 @@ class AgentTaskManager {
 		const role = String(item.role || "").trim();
 		if (role !== "user" && role !== "assistant") return null;
 
-		const content = String(item.content ?? "");
-		if (!content.trim()) return null;
+		const content = this.normalizeMessageContent(item.content);
+		if (!content) return null;
 
 		const messageId = String(item.id || "").trim() || `${conversationId}-msg-${index}`;
 		const timestamp = this.toIsoTimestamp(item.timestamp);
+		const profileId = String(item.profileId || "").trim();
 		return {
 			id: messageId,
 			role,
 			content,
 			timestamp,
+			...(profileId ? { profileId } : {}),
 		};
 	}
 
@@ -158,7 +194,8 @@ class AgentTaskManager {
 			.map((entry, messageIndex) =>
 				this.sanitizeConversationMessage(entry, messageIndex, conversationId),
 			)
-			.filter((entry): entry is AgentConversationMessage => Boolean(entry));
+			.filter((entry): entry is AgentConversationMessage => Boolean(entry))
+			.slice(-MAX_MESSAGES_PER_CONVERSATION);
 		const firstUserMessage = messages.find((message) => message.role === "user");
 		const titleFromMessage = firstUserMessage
 			? `${firstUserMessage.content.slice(0, 60)}${firstUserMessage.content.length > 60 ? "..." : ""}`
@@ -459,20 +496,34 @@ class AgentTaskManager {
 		conversationId: string,
 		role: "user" | "assistant",
 		content: string,
+		options?: { profileId?: string },
 	): AgentConversation | null {
 		const conv = this.getConversation(conversationId);
 		if (!conv) return null;
 
+		const normalizedContent = this.normalizeMessageContent(content);
+		if (!normalizedContent) return conv;
+		const profileId = String(options?.profileId || "").trim();
+
 		conv.messages.push({
 			id: this.generateId(),
 			role,
-			content,
+			content: normalizedContent,
 			timestamp: new Date().toISOString(),
+			...(profileId ? { profileId } : {}),
 		});
+		if (conv.messages.length > MAX_MESSAGES_PER_CONVERSATION) {
+			conv.messages.splice(
+				0,
+				conv.messages.length - MAX_MESSAGES_PER_CONVERSATION,
+			);
+		}
 		conv.updatedAt = new Date().toISOString();
 
 		if (conv.messages.length === 1 && role === "user") {
-			conv.title = content.slice(0, 60) + (content.length > 60 ? "..." : "");
+			conv.title =
+				normalizedContent.slice(0, 60) +
+				(normalizedContent.length > 60 ? "..." : "");
 		}
 
 		this.saveConversation(conv);

@@ -605,7 +605,7 @@ def _resolve_agent_orchestration_parallel_profiles_default() -> int:
     provider_mode = (os.environ.get("SUITE_AGENT_PROVIDER_MODE") or "local").strip().lower()
     local_provider = (os.environ.get("SUITE_LOCAL_PROVIDER") or "ollama").strip().lower()
     if local_provider == "ollama" and provider_mode in {"", "local", "auto"}:
-        return 1
+        return 2
     return 4
 
 

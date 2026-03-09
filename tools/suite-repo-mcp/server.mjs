@@ -1204,12 +1204,10 @@ function parseFrontendAgentProfileModelMap(sourceText, profileIds) {
 		const block = sliceObjectBlock(sourceText, profileId);
 		if (!block) continue;
 
-		const primaryMatch = block.match(
-			/modelPrimary:\s*resolvePrimary\([^,]+,\s*"([^"]+)"\)/,
-		);
-		const fallbackMatch = block.match(
-			/modelFallbacks:\s*resolveFallbacks\([^,]+,\s*\[([\s\S]*?)\]\)/,
-		);
+		const primaryMatch =
+			block.match(/modelPrimary:\s*resolvePrimary\([^,]+,\s*"([^"]+)"\)/) ||
+			block.match(/modelPrimary:\s*"([^"]+)"/);
+		const fallbackMatch = block.match(/modelFallbacks:\s*\[([\s\S]*?)\]/);
 		const fallbackValues = fallbackMatch
 			? [...fallbackMatch[1].matchAll(/"([^"]+)"/g)]
 					.map((item) => String(item[1] || "").trim())
@@ -1245,6 +1243,7 @@ async function toolVerifyAgentRoutingGuardrails() {
 		"`zeroclaw-gateway` is the default gateway path for Suite workflows.",
 		"Use `npm run gateway:dev` as the canonical command",
 		"`SUITE_GATEWAY_USE_FULL_CLI=1` is allowed only for explicit diagnostics",
+		"strict single-model per profile",
 	];
 	const missingGuardrails = requiredGuardrails.filter(
 		(item) => !guardrailsText.includes(item),
@@ -1278,17 +1277,18 @@ async function toolVerifyAgentRoutingGuardrails() {
 				`${profileId} fallback mismatch (backend=${backendFallback}, frontend=${frontendFallback})`,
 			);
 		}
+		if (
+			(backendModel.fallbacks || []).length > 0 ||
+			(frontendModel.fallbacks || []).length > 0
+		) {
+			mismatches.push(
+				`${profileId} fallback list must be empty in strict-routing mode`,
+			);
+		}
 	}
 
-	const draftsmithBackend = backendMap.get("draftsmith");
-	const draftsmithFallbacks = draftsmithBackend?.fallbacks || [];
-	const hasElectricalFallback = draftsmithFallbacks.some((item) =>
-		item.toLowerCase().includes("electricalengineerv2"),
-	);
-	if (!hasElectricalFallback) {
-		mismatches.push(
-			"draftsmith fallback does not include electricalengineerv2 in backend profile catalog",
-		);
+	if (!backendMap.has("gridsage")) {
+		mismatches.push("gridsage profile missing from backend profile catalog");
 	}
 
 	const ok = missingGuardrails.length === 0 && mismatches.length === 0;
@@ -1378,9 +1378,9 @@ ${risk || "- Identify likely regressions and edge cases."}
    - structured logger.exception with stage context
    - no silent broad exception swallow patterns
 4. Preserve agent profile routing contract:
-   - profile-driven primary model + fallback behavior
+   - profile-driven primary model routing only
    - keep frontend/backend mappings consistent
-   - keep Draftsmith fallback to ALIENTELLIGENCE/electricalengineerv2 unless explicitly changed
+   - do not re-enable cross-profile fallback retries
 5. Preserve orchestration contract:
    - keep /api/agent/runs* run-ledger flow additive
    - do not alter single-chat or pairing behavior as part of orchestration changes
@@ -1394,7 +1394,7 @@ ${risk || "- Identify likely regressions and edge cases."}
    - confirm startup logs show \`provider=ollama\` and \`mode=local\`
    - confirm Ollama preflight reports all required profile models are available
    - if any required model is missing, stop and pull missing models before starting single-agent chat or orchestration
-   - default required models (unless overridden by \`AGENT_MODEL_*\` / \`VITE_AGENT_MODEL_*\`): \`qwen3:14b\`, \`gemma3:12b\`, \`devstral-small-2:latest\`, \`qwen2.5-coder:14b\`, \`qwen3:8b\`, \`joshuaokolo/C3Dv0:latest\`, \`ALIENTELLIGENCE/electricalengineerv2:latest\`
+   - default required models (unless overridden by \`AGENT_MODEL_*\` / \`VITE_AGENT_MODEL_*\`): \`qwen3:14b\`, \`gemma3:12b\`, \`devstral-small-2:latest\`, \`qwen2.5-coder:14b\`, \`joshuaokolo/C3Dv0:latest\`, \`ALIENTELLIGENCE/electricalengineerv2:latest\`
 8. Adjacent auth-noise guidance:
    - Supabase "issued in the future" warning spam is handled by docs/security/supabase-clock-skew-runbook.md
    - do not treat clock-skew warning noise as a reason to reopen gateway workaround loops
@@ -1402,7 +1402,7 @@ ${risk || "- Identify likely regressions and edge cases."}
 	},
 	"repo.agent_profile_playbook": {
 		description:
-			"Return profile-specific operating instructions for Suite's 5-agent model pack.",
+			"Return profile-specific operating instructions for Suite's 6-agent model pack.",
 		template: () => `## Agent Profile Playbook
 
 1. koro
@@ -1429,7 +1429,11 @@ ${risk || "- Identify likely regressions and edge cases."}
 - Mission: CAD/electrical drafting strategy.
 - Use for: route/label sequencing, AutoCAD-safe drafting guidance.
 - Avoid: geometry behavior changes without explicit approval.
-- Fallback: ALIENTELLIGENCE/electricalengineerv2.
+
+6. gridsage
+- Mission: electrical systems analysis and implementation constraints.
+- Use for: load/protection assumptions, electrical standards checks, implementation boundaries.
+- Avoid: ambiguous recommendations without stated assumptions.
 `,
 	},
 	"repo.agent_orchestration_runbook": {
@@ -1444,7 +1448,7 @@ ${risk || "- Identify likely regressions and edge cases."}
 - If preflight reports missing models, stop and run \`ollama pull <model>\` for each missing model, then rerun preflight.
 - Required model set:
   - use active \`AGENT_MODEL_*\` / \`VITE_AGENT_MODEL_*\` routing values when overridden.
-  - otherwise require default pack: \`qwen3:14b\`, \`gemma3:12b\`, \`devstral-small-2:latest\`, \`qwen2.5-coder:14b\`, \`qwen3:8b\`, \`joshuaokolo/C3Dv0:latest\`, \`ALIENTELLIGENCE/electricalengineerv2:latest\`.
+  - otherwise require default pack: \`qwen3:14b\`, \`gemma3:12b\`, \`devstral-small-2:latest\`, \`qwen2.5-coder:14b\`, \`joshuaokolo/C3Dv0:latest\`, \`ALIENTELLIGENCE/electricalengineerv2:latest\`.
 
 1. Create run
 - POST /api/agent/runs
@@ -1523,9 +1527,9 @@ Operational notes:
 1. No Tailwind in Suite app.
 2. No major auth flow changes without approval.
 3. Preserve AutoCAD requestId/error-envelope contract.
-4. Preserve profile-model fallback mapping parity.
+4. Preserve deterministic profile-model routing parity (no fallback retries).
 5. Preserve gateway policy parity with docs/development/gateway-stability-policy.md.
-`,
+	`,
 	},
 };
 

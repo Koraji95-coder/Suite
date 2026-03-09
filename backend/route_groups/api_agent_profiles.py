@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Dict, Iterable, Mapping, Optional
 
 
 DEFAULT_AGENT_PROFILE_CATALOG: tuple[dict[str, Any], ...] = (
@@ -11,7 +11,7 @@ DEFAULT_AGENT_PROFILE_CATALOG: tuple[dict[str, Any], ...] = (
         "focus": "Planning, orchestration, and multi-step coordination.",
         "memory_namespace": "koro",
         "model_primary": "qwen3:14b",
-        "model_fallbacks": ["gemma3:12b"],
+        "model_fallbacks": [],
     },
     {
         "id": "devstral",
@@ -20,7 +20,7 @@ DEFAULT_AGENT_PROFILE_CATALOG: tuple[dict[str, Any], ...] = (
         "focus": "Refactors, diagnostics, scripts, and technical implementation.",
         "memory_namespace": "devstral",
         "model_primary": "devstral-small-2:latest",
-        "model_fallbacks": ["qwen2.5-coder:14b"],
+        "model_fallbacks": [],
     },
     {
         "id": "sentinel",
@@ -29,7 +29,7 @@ DEFAULT_AGENT_PROFILE_CATALOG: tuple[dict[str, Any], ...] = (
         "focus": "Checks, risk reviews, and standards-compliance validation.",
         "memory_namespace": "sentinel",
         "model_primary": "gemma3:12b",
-        "model_fallbacks": ["qwen3:8b"],
+        "model_fallbacks": [],
     },
     {
         "id": "forge",
@@ -38,7 +38,7 @@ DEFAULT_AGENT_PROFILE_CATALOG: tuple[dict[str, Any], ...] = (
         "focus": "Structured output generation for docs, summaries, and artifacts.",
         "memory_namespace": "forge",
         "model_primary": "qwen2.5-coder:14b",
-        "model_fallbacks": ["devstral-small-2:latest"],
+        "model_fallbacks": [],
     },
     {
         "id": "draftsmith",
@@ -47,7 +47,16 @@ DEFAULT_AGENT_PROFILE_CATALOG: tuple[dict[str, Any], ...] = (
         "focus": "CAD-aware drafting intent, electrical reasoning, and route guidance.",
         "memory_namespace": "draftsmith",
         "model_primary": "joshuaokolo/C3Dv0:latest",
-        "model_fallbacks": ["ALIENTELLIGENCE/electricalengineerv2:latest"],
+        "model_fallbacks": [],
+    },
+    {
+        "id": "gridsage",
+        "name": "GridSage",
+        "tagline": "Electrical systems specialist",
+        "focus": "Power-system reasoning, electrical design constraints, and implementation guidance.",
+        "memory_namespace": "gridsage",
+        "model_primary": "ALIENTELLIGENCE/electricalengineerv2:latest",
+        "model_fallbacks": [],
     },
 )
 
@@ -56,23 +65,13 @@ def _normalize_model(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _parse_model_fallbacks(raw_value: Any) -> list[str]:
-    if raw_value is None:
-        return []
-    if isinstance(raw_value, (list, tuple)):
-        values = [str(entry or "").strip() for entry in raw_value]
-    else:
-        values = [entry.strip() for entry in str(raw_value).split(",")]
-    return [value for value in values if value]
-
-
 def build_agent_profile_catalog(*, environ: Mapping[str, Any], logger: Any) -> Dict[str, Dict[str, Any]]:
     catalog: Dict[str, Dict[str, Any]] = {
         str(entry["id"]).strip().lower(): {
             **entry,
             "id": str(entry["id"]).strip().lower(),
             "model_primary": _normalize_model(entry.get("model_primary")),
-            "model_fallbacks": _parse_model_fallbacks(entry.get("model_fallbacks")),
+            "model_fallbacks": [],
         }
         for entry in DEFAULT_AGENT_PROFILE_CATALOG
     }
@@ -88,7 +87,12 @@ def build_agent_profile_catalog(*, environ: Mapping[str, Any], logger: Any) -> D
 
         env_fallbacks_raw = environ.get(fallback_env_key)
         if env_fallbacks_raw is not None and str(env_fallbacks_raw).strip():
-            profile["model_fallbacks"] = _parse_model_fallbacks(env_fallbacks_raw)
+            logger.warning(
+                "Ignoring deprecated fallback env override %s for profile=%s; fallback routing is disabled.",
+                fallback_env_key,
+                profile_id,
+            )
+        profile["model_fallbacks"] = []
 
     for profile_id, profile in catalog.items():
         if not profile.get("model_primary"):
@@ -115,7 +119,7 @@ def list_agent_profiles(catalog: Mapping[str, Mapping[str, Any]]) -> list[dict[s
                 "focus": str(profile.get("focus") or ""),
                 "memory_namespace": str(profile.get("memory_namespace") or profile_id),
                 "model_primary": _normalize_model(profile.get("model_primary")),
-                "model_fallbacks": _parse_model_fallbacks(profile.get("model_fallbacks")),
+                "model_fallbacks": [],
             }
         )
     return result
@@ -137,11 +141,10 @@ def resolve_agent_profile_route(
     if not primary:
         return None
 
-    fallbacks = _parse_model_fallbacks(profile.get("model_fallbacks"))
     return {
         "id": normalized_id,
         "primary_model": primary,
-        "fallback_models": fallbacks,
+        "fallback_models": [],
     }
 
 

@@ -33,6 +33,7 @@ import {
 import { isDevAdminEmail } from "../lib/devAccess";
 import {
 	fetchWithTimeout,
+	isFetchRequestError,
 	mapFetchErrorMessage,
 	parseResponseErrorMessage,
 } from "../lib/fetchWithTimeout";
@@ -46,6 +47,10 @@ import {
 import { supabase } from "../supabase/client";
 import { isSupabaseConfigured } from "../supabase/utils";
 import { logSecurityEvent } from "./securityEventService";
+import {
+	type AgentPromptMode,
+	buildPromptForProfile,
+} from "./agentPromptPacks";
 
 export interface AgentResponse {
 	success: boolean;
@@ -65,6 +70,9 @@ export interface AgentTask {
 
 export interface AgentSendOptions {
 	profileId?: AgentProfileId;
+	promptMode?: AgentPromptMode;
+	templateLabel?: string;
+	onStreamUpdate?: (partialResponse: string) => void;
 }
 
 export interface AgentRunCreateRequest {
@@ -196,9 +204,28 @@ export type PythonToolRequest = Record<string, unknown> & {
 };
 
 const AGENT_PAIRING_SETTING_KEY = "agent_pairing_state_v1";
-const MAX_RESTORE_AGE_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_RESTORE_WINDOW_HOURS = 24;
+const MAX_RESTORE_WINDOW_HOURS = 24 * 30;
+
+function resolvePairingRestoreWindowMs(): number {
+	const rawValue = Number(
+		String(import.meta.env.VITE_AGENT_PAIRING_RESTORE_WINDOW_HOURS || "").trim(),
+	);
+	const normalizedHours =
+		Number.isFinite(rawValue) && rawValue > 0
+			? Math.min(MAX_RESTORE_WINDOW_HOURS, Math.max(1, Math.trunc(rawValue)))
+			: DEFAULT_RESTORE_WINDOW_HOURS;
+	return normalizedHours * 60 * 60 * 1000;
+}
+
+const MAX_RESTORE_AGE_MS = resolvePairingRestoreWindowMs();
 const AGENT_SESSION_RETRY_AFTER_MAX_SECONDS = 120;
 const SUPABASE_SESSION_LOOKUP_TIMEOUT_MS = 8_000;
+const DEFAULT_AGENT_CONNECT_TIMEOUT_MS = 30_000;
+const MAX_DIRECT_CONNECT_TIMEOUT_MS = 30_000;
+const DEFAULT_AGENT_STREAM_MAX_MS = 20 * 60 * 1000;
+const MIN_AGENT_STREAM_MAX_MS = 30_000;
+const MAX_AGENT_STREAM_MAX_MS = 60 * 60 * 1000;
 export const AGENT_PAIRING_STATE_EVENT = "suite:agent-pairing-state-changed";
 
 interface AgentPairingState {
@@ -253,6 +280,8 @@ class AgentService {
 	private activeUserIsAdmin = false;
 	private pairingRefreshInFlight: Promise<AgentPairingRefreshResult> | null =
 		null;
+	private activeDirectChatAbortController: AbortController | null = null;
+	private activeDirectChatCancelledByUser = false;
 
 	constructor() {
 		const transport = String(import.meta.env.VITE_AGENT_TRANSPORT || "")
@@ -1263,6 +1292,44 @@ class AgentService {
 		return value.trim().toLowerCase() !== "false";
 	}
 
+	private resolveDirectConnectTimeoutMs(taskTimeout?: number): number {
+		const configuredConnectTimeout = Number(
+			import.meta.env.VITE_AGENT_CONNECT_TIMEOUT_MS,
+		);
+		const configuredTimeout = Number(import.meta.env.VITE_AGENT_TIMEOUT);
+		const candidate =
+			taskTimeout ??
+			(Number.isFinite(configuredConnectTimeout) && configuredConnectTimeout > 0
+				? configuredConnectTimeout
+				: Number.isFinite(configuredTimeout) && configuredTimeout > 0
+					? configuredTimeout
+				: DEFAULT_AGENT_CONNECT_TIMEOUT_MS);
+		return Math.min(
+			MAX_DIRECT_CONNECT_TIMEOUT_MS,
+			Math.max(1_000, Math.trunc(candidate)),
+		);
+	}
+
+	private resolveDirectStreamMaxMs(): number {
+		const configured = Number(import.meta.env.VITE_AGENT_STREAM_MAX_MS);
+		if (!Number.isFinite(configured) || configured <= 0) {
+			return DEFAULT_AGENT_STREAM_MAX_MS;
+		}
+		return Math.min(
+			MAX_AGENT_STREAM_MAX_MS,
+			Math.max(MIN_AGENT_STREAM_MAX_MS, Math.trunc(configured)),
+		);
+	}
+
+	cancelActiveRequest(): boolean {
+		if (!this.activeDirectChatAbortController) {
+			return false;
+		}
+		this.activeDirectChatCancelledByUser = true;
+		this.activeDirectChatAbortController.abort();
+		return true;
+	}
+
 	/**
 	 * Send a message to the agent for AI processing
 	 */
@@ -1270,11 +1337,16 @@ class AgentService {
 		message: string,
 		options?: AgentSendOptions,
 	): Promise<AgentResponse> {
+		const profileId = options?.profileId ?? DEFAULT_AGENT_PROFILE;
+		const prompt = buildPromptForProfile(profileId, message, {
+			mode: options?.promptMode ?? "manual",
+			templateLabel: options?.templateLabel,
+		});
 		return this.makeRequest({
 			task: "chat",
-			params: { message },
-			profileId: options?.profileId,
-		});
+			params: { message: prompt || message },
+			profileId,
+		}, options);
 	}
 
 	/**
@@ -1427,10 +1499,298 @@ class AgentService {
 		);
 	}
 
+	private async makeDirectChatStreamRequest(args: {
+		task: AgentTask;
+		profileId: AgentProfileId;
+		modelCandidates: string[];
+		headers: Record<string, string>;
+		startTime: number;
+		options?: AgentSendOptions;
+	}): Promise<AgentResponse> {
+		const { task, profileId, modelCandidates, headers, startTime, options } =
+			args;
+		const connectTimeoutMs = this.resolveDirectConnectTimeoutMs(task.timeout);
+		const streamMaxMs = this.resolveDirectStreamMaxMs();
+		const model = modelCandidates[0] || "";
+		const chatMessage =
+			typeof task.params?.message === "string" && task.params.message.trim()
+				? task.params.message
+				: JSON.stringify(task);
+		const payload: Record<string, unknown> = {
+			message: chatMessage,
+			profile_id: profileId,
+			stream: true,
+		};
+		if (model) {
+			payload.model = model;
+		}
+
+		const abortController = new AbortController();
+		this.activeDirectChatCancelledByUser = false;
+		this.activeDirectChatAbortController = abortController;
+		let streamTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+		let streamTimedOut = false;
+		let streamedResponse = "";
+		let streamModel = model;
+		let streamError = "";
+		let streamDone = false;
+
+		const applyStreamPayload = (payloadValue: string) => {
+			const trimmed = payloadValue.trim();
+			if (!trimmed) return;
+			if (trimmed === "[DONE]") {
+				streamDone = true;
+				return;
+			}
+
+			try {
+				const decoded = JSON.parse(trimmed) as
+					| {
+							delta?: string;
+							response?: string;
+							model?: string;
+							error?: string;
+					  }
+					| null;
+				if (!decoded || typeof decoded !== "object") {
+					return;
+				}
+				if (typeof decoded.model === "string" && decoded.model.trim()) {
+					streamModel = decoded.model.trim();
+				}
+				if (typeof decoded.error === "string" && decoded.error.trim()) {
+					streamError = decoded.error.trim();
+				}
+				const delta =
+					typeof decoded.delta === "string"
+						? decoded.delta
+						: typeof decoded.response === "string"
+							? decoded.response
+							: "";
+				if (delta) {
+					streamedResponse += delta;
+					options?.onStreamUpdate?.(streamedResponse);
+				}
+			} catch {
+				streamedResponse += trimmed;
+				options?.onStreamUpdate?.(streamedResponse);
+			}
+		};
+
+		try {
+			const response = await fetchWithTimeout(`${this.baseUrl}/webhook`, {
+				method: "POST",
+				headers,
+				body: JSON.stringify(payload),
+				timeoutMs: connectTimeoutMs,
+				signal: abortController.signal,
+				requestName: "Agent gateway webhook connect",
+			});
+
+			if (!response.ok) {
+				const rawDetails = await this.readBrokerError(
+					response,
+					`Agent request failed (${response.status})`,
+				);
+				const failureMessage = this.formatAgentGatewayFailureMessage(
+					response.status,
+					rawDetails,
+				);
+				if (response.status === 401 || response.status === 403) {
+					const responseBody = await response.text().catch(() => "");
+					const mentionsSecret = /secret/i.test(responseBody);
+
+					if (mentionsSecret) {
+						await logSecurityEvent(
+							"agent_webhook_secret_rejected",
+							"Agent rejected webhook secret; check VITE_AGENT_WEBHOOK_SECRET and gateway secret configuration.",
+						);
+						throw new Error(
+							"Webhook secret rejected by gateway. Verify VITE_AGENT_WEBHOOK_SECRET matches the gateway configuration.",
+						);
+					}
+
+					await this.unpair();
+					await logSecurityEvent(
+						"agent_request_unauthorized",
+						"Agent request returned unauthorized; pairing was revoked.",
+					);
+				}
+				throw new Error(failureMessage);
+			}
+
+			const contentType = String(response.headers.get("content-type") || "")
+				.trim()
+				.toLowerCase();
+			if (!contentType.includes("text/event-stream") || !response.body) {
+				let data: Record<string, unknown>;
+				try {
+					data = (await response.json()) as Record<string, unknown>;
+				} catch {
+					const text = await response.text().catch(() => "");
+					data = {
+						model: streamModel || model || "",
+						response: text,
+					};
+				}
+				const executionTime = Date.now() - startTime;
+				return {
+					success: true,
+					data,
+					executionTime,
+				};
+			}
+
+			streamTimeoutHandle = setTimeout(() => {
+				streamTimedOut = true;
+				abortController.abort();
+			}, streamMaxMs);
+
+			const reader = response.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = "";
+
+			while (true) {
+				const read = await reader.read();
+				if (read.done) break;
+
+				buffer += decoder
+					.decode(read.value, { stream: true })
+					.replace(/\r\n/g, "\n")
+					.replace(/\r/g, "\n");
+
+				let separatorIndex = buffer.indexOf("\n\n");
+				while (separatorIndex !== -1) {
+					const block = buffer.slice(0, separatorIndex);
+					buffer = buffer.slice(separatorIndex + 2);
+					separatorIndex = buffer.indexOf("\n\n");
+
+					if (!block.trim()) continue;
+					for (const line of block.split("\n")) {
+						if (!line || line.startsWith(":")) continue;
+						if (!line.startsWith("data:")) continue;
+						const dataValue = line.slice(5).trimStart();
+						applyStreamPayload(dataValue);
+					}
+				}
+			}
+
+			const trailing = decoder.decode().trim();
+			if (trailing) {
+				for (const line of trailing.split("\n")) {
+					if (!line || line.startsWith(":")) continue;
+					if (!line.startsWith("data:")) continue;
+					applyStreamPayload(line.slice(5).trimStart());
+				}
+			}
+
+			const executionTime = Date.now() - startTime;
+			if (streamError && !streamedResponse.trim()) {
+				return {
+					success: false,
+					error: streamError,
+					executionTime,
+				};
+			}
+
+			if (streamError && streamedResponse.trim()) {
+				return {
+					success: true,
+					data: {
+						model: streamModel || model || "",
+						response: streamedResponse,
+						incomplete: true,
+						finish_reason: "error",
+						warning: streamError,
+					},
+					executionTime,
+				};
+			}
+
+			if (!streamDone && !streamedResponse.trim()) {
+				return {
+					success: false,
+					error: "Agent stream ended before returning a response.",
+					executionTime,
+				};
+			}
+
+			return {
+				success: true,
+				data: {
+					model: streamModel || model || "",
+					response: streamedResponse,
+				},
+				executionTime,
+			};
+		} catch (error) {
+			const executionTime = Date.now() - startTime;
+			if (isFetchRequestError(error) && error.kind === "aborted") {
+				if (streamTimedOut) {
+					if (streamedResponse.trim()) {
+						return {
+							success: true,
+							data: {
+								model: streamModel || model || "",
+								response: streamedResponse,
+								incomplete: true,
+								finish_reason: "timeout",
+								warning: `Stream exceeded ${Math.round(streamMaxMs / 1000)} seconds and was stopped.`,
+							},
+							executionTime,
+						};
+					}
+					return {
+						success: false,
+						error: `Agent stream timed out after ${Math.round(streamMaxMs / 1000)} seconds.`,
+						executionTime,
+					};
+				}
+
+				if (this.activeDirectChatCancelledByUser) {
+					if (streamedResponse.trim()) {
+						return {
+							success: true,
+							data: {
+								model: streamModel || model || "",
+								response: streamedResponse,
+								incomplete: true,
+								finish_reason: "cancelled",
+								warning: "Request cancelled by user.",
+							},
+							executionTime,
+						};
+					}
+					return {
+						success: false,
+						error: "Request cancelled before the agent produced a response.",
+						executionTime,
+					};
+				}
+			}
+			return {
+				success: false,
+				error: mapFetchErrorMessage(error, "Unknown error"),
+				executionTime,
+			};
+		} finally {
+			if (streamTimeoutHandle) {
+				clearTimeout(streamTimeoutHandle);
+			}
+			if (this.activeDirectChatAbortController === abortController) {
+				this.activeDirectChatAbortController = null;
+				this.activeDirectChatCancelledByUser = false;
+			}
+		}
+	}
+
 	/**
 	 * Core request method
 	 */
-	private async makeRequest(task: AgentTask): Promise<AgentResponse> {
+	private async makeRequest(
+		task: AgentTask,
+		options?: AgentSendOptions,
+	): Promise<AgentResponse> {
 		if (!this.isTaskAllowedForCurrentUser(task.task)) {
 			await logSecurityEvent(
 				"agent_task_blocked_non_admin",
@@ -1466,92 +1826,90 @@ class AgentService {
 			}
 		}
 
-		if (this.useBroker) {
-			const accessToken = await this.getSupabaseAccessToken();
-			if (!accessToken) {
-				return {
-					success: false,
-					error:
-						"Supabase session required for brokered agent access. Please sign in.",
-				};
-			}
-
-			const configuredTimeout = Number(import.meta.env.VITE_AGENT_TIMEOUT);
-			const timeout =
-				task.timeout ??
-				(Number.isFinite(configuredTimeout) && configuredTimeout > 0
-					? Math.max(configuredTimeout, 90_000)
-					: 90_000);
-
-			try {
-				const response = await fetchWithTimeout(`${this.brokerUrl}/webhook`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${accessToken}`,
-					},
-					credentials: "include",
-					body: JSON.stringify({
-						message: JSON.stringify(task),
-						profile_id: profileId,
-						model: modelCandidates[0],
-						model_candidates: modelCandidates,
-						fallback_models: modelCandidates.slice(1),
-					}),
-					timeoutMs: timeout,
-					requestName: "Agent broker webhook request",
-				});
-
-				if (!response.ok) {
-					const rawDetails = await this.readBrokerError(
-						response,
-						`Agent request failed (${response.status})`,
-					);
-					const failureMessage = this.formatAgentGatewayFailureMessage(
-						response.status,
-						rawDetails,
-					);
-					if (response.status === 401 || response.status === 403) {
-						await this.unpair();
-						await logSecurityEvent(
-							"agent_request_unauthorized",
-							"Agent request returned unauthorized; pairing was revoked.",
-						);
-					}
-					logger.error("Agent request failed", "AgentService", {
-						status: response.status,
-						statusText: response.statusText,
-						task: task.task,
-						profileId,
-						message: failureMessage,
-					});
-					throw new Error(failureMessage);
+			if (this.useBroker) {
+				const accessToken = await this.getSupabaseAccessToken();
+				if (!accessToken) {
+					return {
+						success: false,
+						error:
+							"Supabase session required for brokered agent access. Please sign in.",
+					};
 				}
 
-				const data = await response.json();
-				const executionTime = Date.now() - startTime;
+				const configuredTimeout = Number(import.meta.env.VITE_AGENT_TIMEOUT);
+				const timeout =
+					task.timeout ??
+					(Number.isFinite(configuredTimeout) && configuredTimeout > 0
+						? Math.max(configuredTimeout, 90_000)
+						: 90_000);
 
-				logger.info(
-					`Agent request completed in ${executionTime}ms`,
-					"AgentService",
-					{ task: task.task },
-				);
+				try {
+					const response = await fetchWithTimeout(`${this.brokerUrl}/webhook`, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${accessToken}`,
+						},
+						credentials: "include",
+						body: JSON.stringify({
+							message: JSON.stringify(task),
+							profile_id: profileId,
+							model: modelCandidates[0],
+						}),
+						timeoutMs: timeout,
+						requestName: "Agent broker webhook request",
+					});
 
-				return {
-					success: true,
-					data: data,
-					executionTime: executionTime,
-				};
-			} catch (error) {
-				const executionTime = Date.now() - startTime;
-				logger.error("Agent request error", "AgentService", error);
-				return {
-					success: false,
-					error: mapFetchErrorMessage(error, "Unknown error"),
-					executionTime,
-				};
+					if (!response.ok) {
+						const rawDetails = await this.readBrokerError(
+							response,
+							`Agent request failed (${response.status})`,
+						);
+						const failureMessage = this.formatAgentGatewayFailureMessage(
+							response.status,
+							rawDetails,
+						);
+						if (response.status === 401 || response.status === 403) {
+							await this.unpair();
+							await logSecurityEvent(
+								"agent_request_unauthorized",
+								"Agent request returned unauthorized; pairing was revoked.",
+							);
+						}
+						logger.error("Agent request failed", "AgentService", {
+							status: response.status,
+							statusText: response.statusText,
+							task: task.task,
+							profileId,
+							message: failureMessage,
+						});
+						throw new Error(failureMessage);
+					}
+
+					const data = await response.json();
+					const executionTime = Date.now() - startTime;
+
+					logger.info(
+						`Agent request completed in ${executionTime}ms`,
+						"AgentService",
+						{ task: task.task },
+					);
+
+					return {
+						success: true,
+						data: data,
+						executionTime: executionTime,
+					};
+				} catch (error) {
+					const executionTime = Date.now() - startTime;
+					logger.error("Agent request error", "AgentService", error);
+					return {
+						success: false,
+						error: mapFetchErrorMessage(error, "Unknown error"),
+						executionTime,
+					};
+				}
 			}
-		}
 
 		const token = this.getToken();
 		if (!token) {
@@ -1576,25 +1934,31 @@ class AgentService {
 			const webhookSecret = import.meta.env.VITE_AGENT_WEBHOOK_SECRET;
 			const requireWebhookSecret = this.shouldRequireWebhookSecret();
 
-			if (requireWebhookSecret && !webhookSecret) {
-				return {
-					success: false,
-					error:
-						"Agent webhook secret is required but not configured. Set VITE_AGENT_WEBHOOK_SECRET in your environment.",
-				};
-			}
+				if (requireWebhookSecret && !webhookSecret) {
+					return {
+						success: false,
+						error:
+							"Agent webhook secret is required but not configured. Set VITE_AGENT_WEBHOOK_SECRET in your environment.",
+					};
+				}
 
-			if (webhookSecret) {
-				headers["X-Webhook-Secret"] = webhookSecret;
-			}
+				if (webhookSecret) {
+					headers["X-Webhook-Secret"] = webhookSecret;
+				}
 
-			const timeout =
-				task.timeout ?? (Number(import.meta.env.VITE_AGENT_TIMEOUT) || 30_000);
-			const attempts = modelCandidates.length > 0 ? modelCandidates : [""];
-			let response: Response | null = null;
+				if (task.task === "chat") {
+					return await this.makeDirectChatStreamRequest({
+						task,
+						profileId,
+						modelCandidates,
+						headers,
+						startTime,
+						options,
+					});
+				}
 
-			for (let index = 0; index < attempts.length; index += 1) {
-				const model = attempts[index];
+				const timeout = this.resolveDirectConnectTimeoutMs(task.timeout);
+				const model = modelCandidates[0] || "";
 				const payload: Record<string, unknown> = {
 					message: JSON.stringify(task),
 					profile_id: profileId,
@@ -1602,39 +1966,14 @@ class AgentService {
 				if (model) {
 					payload.model = model;
 				}
-				if (index < attempts.length - 1) {
-					payload.fallback_models = attempts.slice(index + 1);
-				}
 
-				response = await fetchWithTimeout(`${this.baseUrl}/webhook`, {
+				const response = await fetchWithTimeout(`${this.baseUrl}/webhook`, {
 					method: "POST",
 					headers,
 					body: JSON.stringify(payload),
 					timeoutMs: timeout,
 					requestName: "Agent gateway webhook request",
 				});
-
-				const canRetry =
-					!response.ok && response.status >= 500 && index < attempts.length - 1;
-				if (canRetry) {
-					logger.warn(
-						"Agent model attempt failed; trying fallback.",
-						"AgentService",
-						{
-							profileId,
-							failedModel: model,
-							nextModel: attempts[index + 1],
-							status: response.status,
-						},
-					);
-					continue;
-				}
-				break;
-			}
-
-			if (!response) {
-				throw new Error("Agent gateway did not return a response.");
-			}
 
 			if (!response.ok) {
 				const rawDetails = await this.readBrokerError(

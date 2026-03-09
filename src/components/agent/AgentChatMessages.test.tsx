@@ -26,7 +26,7 @@ describe("AgentChatMessages", () => {
 						timestamp: new Date().toISOString(),
 					},
 				]}
-				profileId="koro"
+				defaultProfileId="koro"
 				isThinking={false}
 			/>,
 		);
@@ -58,7 +58,7 @@ describe("AgentChatMessages", () => {
 						timestamp: new Date().toISOString(),
 					},
 				]}
-				profileId="koro"
+				defaultProfileId="koro"
 				isThinking
 			/>,
 		);
@@ -77,7 +77,7 @@ describe("AgentChatMessages", () => {
 						timestamp: new Date().toISOString(),
 					},
 				]}
-				profileId="koro"
+				defaultProfileId="koro"
 				isThinking
 			/>,
 		);

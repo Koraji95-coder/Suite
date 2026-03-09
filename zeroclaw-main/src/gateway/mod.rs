@@ -32,9 +32,9 @@ use anyhow::{Context, Result};
 use axum::{
     body::{Body, Bytes},
     extract::{ConnectInfo, Query, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{header, HeaderMap, HeaderValue, Method, StatusCode},
     response::{IntoResponse, Json, Redirect, Response},
-    routing::{delete, get, post, put},
+    routing::{delete, get, options, post, put},
     Router,
 };
 use futures_util::StreamExt;
@@ -43,14 +43,23 @@ use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
+use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
 /// Maximum request body size (64KB) — prevents memory exhaustion
 pub const MAX_BODY_SIZE: usize = 65_536;
 /// Request timeout (30s) — prevents slow-loris attacks
 pub const REQUEST_TIMEOUT_SECS: u64 = 30;
+/// Optional env override for gateway request timeout in seconds.
+pub const REQUEST_TIMEOUT_ENV_VAR: &str = "ZEROCLAW_GATEWAY_REQUEST_TIMEOUT_SECS";
+/// Max runtime for webhook SSE streams (20m default).
+pub const STREAM_MAX_SECS: u64 = 1_200;
+/// Optional env override for webhook SSE stream max runtime in seconds.
+pub const STREAM_MAX_ENV_VAR: &str = "ZEROCLAW_GATEWAY_STREAM_MAX_SECS";
 /// Sliding window used by gateway rate limiting.
 pub const RATE_LIMIT_WINDOW_SECS: u64 = 60;
 /// Fallback max distinct client keys tracked in gateway rate limiter.
@@ -87,6 +96,62 @@ fn hash_webhook_secret(value: &str) -> String {
 
     let digest = Sha256::digest(value.as_bytes());
     hex::encode(digest)
+}
+
+fn gateway_request_timeout_secs() -> u64 {
+    std::env::var(REQUEST_TIMEOUT_ENV_VAR)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map(|value| value.clamp(5, 300))
+        .unwrap_or(REQUEST_TIMEOUT_SECS)
+}
+
+fn gateway_stream_max_secs() -> u64 {
+    std::env::var(STREAM_MAX_ENV_VAR)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map(|value| value.clamp(30, 7_200))
+        .unwrap_or(STREAM_MAX_SECS)
+}
+
+fn gateway_cors_layer() -> CorsLayer {
+    let configured_origins = std::env::var("ZEROCLAW_GATEWAY_CORS_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:5173,http://127.0.0.1:5173".to_string());
+
+    let parsed_origins: Vec<HeaderValue> = configured_origins
+        .split(',')
+        .map(str::trim)
+        .filter(|origin| !origin.is_empty())
+        .filter_map(|origin| HeaderValue::from_str(origin).ok())
+        .collect();
+
+    let cors = CorsLayer::new()
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            header::ACCEPT,
+            header::HeaderName::from_static("x-webhook-secret"),
+            header::HeaderName::from_static("x-pairing-code"),
+            header::HeaderName::from_static("x-idempotency-key"),
+        ]);
+
+    if configured_origins.trim() == "*" {
+        cors.allow_origin(Any)
+    } else if parsed_origins.is_empty() {
+        cors.allow_origin([
+            HeaderValue::from_static("http://localhost:5173"),
+            HeaderValue::from_static("http://127.0.0.1:5173"),
+        ])
+    } else {
+        cors.allow_origin(parsed_origins)
+    }
 }
 
 /// How often the rate limiter sweeps stale IP entries from its map.
@@ -731,10 +796,18 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
             "/suite/passkey/callback",
             get(handle_suite_passkey_callback),
         )
-        .route("/pairing-code", post(handle_pairing_code))
-        .route("/pair", post(handle_pair))
-        .route("/unpair", post(handle_unpair))
-        .route("/webhook", get(handle_webhook_usage).post(handle_webhook))
+        .route(
+            "/pairing-code",
+            post(handle_pairing_code).options(handle_cors_preflight),
+        )
+        .route("/pair", post(handle_pair).options(handle_cors_preflight))
+        .route("/unpair", post(handle_unpair).options(handle_cors_preflight))
+        .route(
+            "/webhook",
+            get(handle_webhook_usage)
+                .post(handle_webhook)
+                .options(handle_cors_preflight),
+        )
         .route("/whatsapp", get(handle_whatsapp_verify))
         .route("/whatsapp", post(handle_whatsapp_message))
         .route("/linq", post(handle_linq_webhook))
@@ -748,7 +821,10 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         .route("/v1/models", get(openai_compat::handle_v1_models))
         .merge(openai_compat_routes)
         // ── Web Dashboard API routes ──
-        .route("/api/status", get(api::handle_api_status))
+        .route(
+            "/api/status",
+            get(api::handle_api_status).options(handle_cors_preflight),
+        )
         .route("/api/config", get(api::handle_api_config_get))
         .route("/api/tools", get(api::handle_api_tools))
         .route("/api/cron", get(api::handle_api_cron_list))
@@ -770,15 +846,17 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         .route("/api/events", get(sse::handle_sse_events))
         // ── WebSocket agent chat ──
         .route("/ws/chat", get(ws::handle_ws_chat))
+        .route("/{*path}", options(handle_cors_preflight))
         // ── Static assets (web dashboard) ──
         .route("/_app/{*path}", get(static_files::handle_static))
         // ── Config PUT with larger body limit ──
         .merge(config_put_router)
         .with_state(state)
+        .layer(gateway_cors_layer())
         .layer(RequestBodyLimitLayer::new(MAX_BODY_SIZE))
         .layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
-            Duration::from_secs(REQUEST_TIMEOUT_SECS),
+            Duration::from_secs(gateway_request_timeout_secs()),
         ))
         // ── SPA fallback: non-API GET requests serve index.html ──
         .fallback(get(static_files::handle_spa_fallback));
@@ -806,6 +884,10 @@ async fn handle_health(State(state): State<AppState>) -> impl IntoResponse {
         "runtime": crate::health::snapshot_json(),
     });
     Json(body)
+}
+
+async fn handle_cors_preflight() -> impl IntoResponse {
+    StatusCode::NO_CONTENT
 }
 
 /// Prometheus content type for text exposition format.
@@ -1941,215 +2023,374 @@ async fn handle_webhook_usage() -> impl IntoResponse {
     )
 }
 
+async fn send_sse_json(
+    tx: &mpsc::Sender<Result<Bytes, std::io::Error>>,
+    payload: serde_json::Value,
+) -> bool {
+    tx.send(Ok(Bytes::from(format!("data: {payload}\n\n"))))
+        .await
+        .is_ok()
+}
+
+async fn send_sse_done(tx: &mpsc::Sender<Result<Bytes, std::io::Error>>) {
+    let _ = tx.send(Ok(Bytes::from("data: [DONE]\n\n"))).await;
+}
+
 fn handle_webhook_streaming(
     state: AppState,
-    prepared_messages: Vec<ChatMessage>,
+    message: String,
     provider_label: String,
     model_label: String,
     model_for_call: String,
     started_at: Instant,
 ) -> Response {
-    if !state.provider.supports_streaming() {
-        let provider_label_for_call = provider_label.clone();
-        let model_label_for_call = model_label.clone();
-        let state_for_call = state.clone();
-        let messages_for_call = prepared_messages.clone();
-        let model_for_call_sync = model_for_call.clone();
+    let stream_max_secs = gateway_stream_max_secs();
+    let stream_max_duration = Duration::from_secs(stream_max_secs);
+    let (tx, rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(32);
 
-        let stream = futures_util::stream::once(async move {
-            match state_for_call
-                .provider
-                .chat_with_history(
-                    &messages_for_call,
-                    &model_for_call_sync,
-                    state_for_call.temperature,
-                )
-                .await
-            {
-                Ok(response) => {
-                    let safe_response = sanitize_gateway_response(
-                        &response,
-                        state_for_call.tools_registry_exec.as_ref(),
-                    );
-                    let duration = started_at.elapsed();
-                    state_for_call.observer.record_event(
-                        &crate::observability::ObserverEvent::LlmResponse {
-                            provider: provider_label_for_call.clone(),
-                            model: model_label_for_call.clone(),
-                            duration,
-                            success: true,
-                            error_message: None,
-                            input_tokens: None,
-                            output_tokens: None,
-                        },
-                    );
-                    state_for_call.observer.record_metric(
-                        &crate::observability::traits::ObserverMetric::RequestLatency(duration),
-                    );
-                    state_for_call.observer.record_event(
-                        &crate::observability::ObserverEvent::AgentEnd {
-                            provider: provider_label_for_call,
-                            model: model_label_for_call,
-                            duration,
-                            tokens_used: None,
-                            cost_usd: None,
-                        },
-                    );
+    tokio::spawn(async move {
+        // Emit an immediate SSE comment frame so dev proxies flush headers/body
+        // promptly. This preserves a true "connect timeout" on the frontend
+        // even when upstream model prep or first-token latency is high.
+        if tx
+            .send(Ok(Bytes::from(": stream-open\n\n")))
+            .await
+            .is_err()
+        {
+            return;
+        }
 
-                    let payload = serde_json::json!({"response": safe_response, "model": model_for_call_sync});
-                    let mut output = format!("data: {payload}\n\n");
-                    output.push_str("data: [DONE]\n\n");
-                    Ok::<_, std::io::Error>(Bytes::from(output))
-                }
+        let prepared_messages =
+            match prepare_gateway_messages_for_provider(&state, &message, &model_for_call).await {
+                Ok(messages) => messages,
                 Err(e) => {
                     let duration = started_at.elapsed();
                     let sanitized = providers::sanitize_api_error(&e.to_string());
 
-                    state_for_call.observer.record_event(
-                        &crate::observability::ObserverEvent::LlmResponse {
-                            provider: provider_label_for_call.clone(),
-                            model: model_label_for_call.clone(),
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::LlmResponse {
+                            provider: provider_label.clone(),
+                            model: model_label.clone(),
                             duration,
                             success: false,
                             error_message: Some(sanitized.clone()),
                             input_tokens: None,
                             output_tokens: None,
-                        },
-                    );
-                    state_for_call.observer.record_metric(
+                        });
+                    state.observer.record_metric(
                         &crate::observability::traits::ObserverMetric::RequestLatency(duration),
                     );
-                    state_for_call.observer.record_event(
-                        &crate::observability::ObserverEvent::Error {
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::Error {
                             component: "gateway".to_string(),
                             message: sanitized.clone(),
-                        },
-                    );
-                    state_for_call.observer.record_event(
-                        &crate::observability::ObserverEvent::AgentEnd {
-                            provider: provider_label_for_call,
-                            model: model_label_for_call,
+                        });
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::AgentEnd {
+                            provider: provider_label,
+                            model: model_label,
                             duration,
                             tokens_used: None,
                             cost_usd: None,
-                        },
+                        });
+
+                    tracing::error!("Webhook streaming setup failed: {}", sanitized);
+                    let _ = send_sse_json(&tx, serde_json::json!({"error": "LLM request failed"}))
+                        .await;
+                    send_sse_done(&tx).await;
+                    return;
+                }
+            };
+
+        if !state.provider.supports_streaming() {
+            match tokio::time::timeout(
+                stream_max_duration,
+                state.provider.chat_with_history(
+                    &prepared_messages,
+                    &model_for_call,
+                    state.temperature,
+                ),
+            )
+            .await
+            {
+                Ok(Ok(response)) => {
+                    let safe_response =
+                        sanitize_gateway_response(&response, state.tools_registry_exec.as_ref());
+                    let duration = started_at.elapsed();
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::LlmResponse {
+                            provider: provider_label.clone(),
+                            model: model_label.clone(),
+                            duration,
+                            success: true,
+                            error_message: None,
+                            input_tokens: None,
+                            output_tokens: None,
+                        });
+                    state.observer.record_metric(
+                        &crate::observability::traits::ObserverMetric::RequestLatency(duration),
                     );
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::AgentEnd {
+                            provider: provider_label.clone(),
+                            model: model_label.clone(),
+                            duration,
+                            tokens_used: None,
+                            cost_usd: None,
+                        });
+
+                    let _ = send_sse_json(
+                        &tx,
+                        serde_json::json!({"response": safe_response, "model": model_for_call}),
+                    )
+                    .await;
+                    send_sse_done(&tx).await;
+                }
+                Ok(Err(e)) => {
+                    let duration = started_at.elapsed();
+                    let sanitized = providers::sanitize_api_error(&e.to_string());
+
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::LlmResponse {
+                            provider: provider_label.clone(),
+                            model: model_label.clone(),
+                            duration,
+                            success: false,
+                            error_message: Some(sanitized.clone()),
+                            input_tokens: None,
+                            output_tokens: None,
+                        });
+                    state.observer.record_metric(
+                        &crate::observability::traits::ObserverMetric::RequestLatency(duration),
+                    );
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::Error {
+                            component: "gateway".to_string(),
+                            message: sanitized.clone(),
+                        });
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::AgentEnd {
+                            provider: provider_label.clone(),
+                            model: model_label.clone(),
+                            duration,
+                            tokens_used: None,
+                            cost_usd: None,
+                        });
 
                     tracing::error!("Webhook provider error: {}", sanitized);
-                    let mut output = format!(
-                        "data: {}\n\n",
-                        serde_json::json!({"error": "LLM request failed"})
+                    let _ = send_sse_json(&tx, serde_json::json!({"error": "LLM request failed"}))
+                        .await;
+                    send_sse_done(&tx).await;
+                }
+                Err(_) => {
+                    let duration = started_at.elapsed();
+                    let timeout_message = format!(
+                        "LLM request exceeded gateway max stream runtime of {stream_max_secs}s."
                     );
-                    output.push_str("data: [DONE]\n\n");
-                    Ok(Bytes::from(output))
+
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::LlmResponse {
+                            provider: provider_label.clone(),
+                            model: model_label.clone(),
+                            duration,
+                            success: false,
+                            error_message: Some(timeout_message.clone()),
+                            input_tokens: None,
+                            output_tokens: None,
+                        });
+                    state.observer.record_metric(
+                        &crate::observability::traits::ObserverMetric::RequestLatency(duration),
+                    );
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::Error {
+                            component: "gateway".to_string(),
+                            message: timeout_message.clone(),
+                        });
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::AgentEnd {
+                            provider: provider_label.clone(),
+                            model: model_label.clone(),
+                            duration,
+                            tokens_used: None,
+                            cost_usd: None,
+                        });
+
+                    tracing::warn!("Webhook stream timed out after {}s", stream_max_secs);
+                    let _ = send_sse_json(&tx, serde_json::json!({"error": timeout_message})).await;
+                    send_sse_done(&tx).await;
                 }
             }
-        });
 
-        return Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "text/event-stream")
-            .header(header::CACHE_CONTROL, "no-cache")
-            .header(header::CONNECTION, "keep-alive")
-            .body(Body::from_stream(stream))
-            .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response());
-    }
-
-    let provider_stream = state.provider.stream_chat_with_history(
-        &prepared_messages,
-        &model_for_call,
-        state.temperature,
-        crate::providers::traits::StreamOptions::new(true),
-    );
-
-    let state_for_stream = state.clone();
-    let provider_label_for_stream = provider_label.clone();
-    let model_label_for_stream = model_label.clone();
-    let mut stream_failed = false;
-
-    let sse_stream = provider_stream.map(move |result| match result {
-        Ok(chunk) if chunk.is_final => {
-            if !stream_failed {
-                let duration = started_at.elapsed();
-                state_for_stream.observer.record_event(
-                    &crate::observability::ObserverEvent::LlmResponse {
-                        provider: provider_label_for_stream.clone(),
-                        model: model_label_for_stream.clone(),
-                        duration,
-                        success: true,
-                        error_message: None,
-                        input_tokens: None,
-                        output_tokens: None,
-                    },
-                );
-                state_for_stream.observer.record_metric(
-                    &crate::observability::traits::ObserverMetric::RequestLatency(duration),
-                );
-                state_for_stream.observer.record_event(
-                    &crate::observability::ObserverEvent::AgentEnd {
-                        provider: provider_label_for_stream.clone(),
-                        model: model_label_for_stream.clone(),
-                        duration,
-                        tokens_used: None,
-                        cost_usd: None,
-                    },
-                );
-            }
-            Ok::<_, std::io::Error>(Bytes::from("data: [DONE]\n\n"))
+            return;
         }
-        Ok(chunk) => {
-            if chunk.delta.is_empty() {
-                return Ok(Bytes::new());
+
+        let mut provider_stream = state.provider.stream_chat_with_history(
+            &prepared_messages,
+            &model_for_call,
+            state.temperature,
+            crate::providers::traits::StreamOptions::new(true),
+        );
+
+        let deadline = tokio::time::Instant::now() + stream_max_duration;
+        let mut stream_failed = false;
+        let mut stream_completed = false;
+        let mut stream_timed_out = false;
+
+        loop {
+            let now = tokio::time::Instant::now();
+            if now >= deadline {
+                stream_timed_out = true;
+                break;
             }
-            let payload = serde_json::json!({
-                "delta": chunk.delta,
-                "model": model_label_for_stream
-            });
-            Ok(Bytes::from(format!("data: {payload}\n\n")))
+
+            let remaining = deadline.saturating_duration_since(now);
+            match tokio::time::timeout(remaining, provider_stream.next()).await {
+                Ok(Some(Ok(chunk))) => {
+                    if !chunk.delta.is_empty() {
+                        let sent = send_sse_json(
+                            &tx,
+                            serde_json::json!({
+                                "delta": chunk.delta,
+                                "model": model_label
+                            }),
+                        )
+                        .await;
+                        if !sent {
+                            return;
+                        }
+                    }
+
+                    if chunk.is_final {
+                        stream_completed = true;
+                        let duration = started_at.elapsed();
+                        state
+                            .observer
+                            .record_event(&crate::observability::ObserverEvent::LlmResponse {
+                                provider: provider_label.clone(),
+                                model: model_label.clone(),
+                                duration,
+                                success: true,
+                                error_message: None,
+                                input_tokens: None,
+                                output_tokens: None,
+                            });
+                        state.observer.record_metric(
+                            &crate::observability::traits::ObserverMetric::RequestLatency(duration),
+                        );
+                        state
+                            .observer
+                            .record_event(&crate::observability::ObserverEvent::AgentEnd {
+                                provider: provider_label.clone(),
+                                model: model_label.clone(),
+                                duration,
+                                tokens_used: None,
+                                cost_usd: None,
+                            });
+                        break;
+                    }
+                }
+                Ok(Some(Err(e))) => {
+                    stream_failed = true;
+                    let duration = started_at.elapsed();
+                    let sanitized = providers::sanitize_api_error(&e.to_string());
+
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::LlmResponse {
+                            provider: provider_label.clone(),
+                            model: model_label.clone(),
+                            duration,
+                            success: false,
+                            error_message: Some(sanitized.clone()),
+                            input_tokens: None,
+                            output_tokens: None,
+                        });
+                    state.observer.record_metric(
+                        &crate::observability::traits::ObserverMetric::RequestLatency(duration),
+                    );
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::Error {
+                            component: "gateway".to_string(),
+                            message: sanitized.clone(),
+                        });
+                    state
+                        .observer
+                        .record_event(&crate::observability::ObserverEvent::AgentEnd {
+                            provider: provider_label.clone(),
+                            model: model_label.clone(),
+                            duration,
+                            tokens_used: None,
+                            cost_usd: None,
+                        });
+
+                    tracing::error!("Webhook streaming provider error: {}", sanitized);
+                    let _ = send_sse_json(&tx, serde_json::json!({"error": "LLM request failed"}))
+                        .await;
+                    break;
+                }
+                Ok(None) => break,
+                Err(_) => {
+                    stream_timed_out = true;
+                    break;
+                }
+            }
         }
-        Err(e) => {
-            stream_failed = true;
+
+        if stream_timed_out && !stream_failed && !stream_completed {
             let duration = started_at.elapsed();
-            let sanitized = providers::sanitize_api_error(&e.to_string());
+            let timeout_message = format!("LLM stream exceeded gateway max runtime of {stream_max_secs}s.");
 
-            state_for_stream.observer.record_event(
-                &crate::observability::ObserverEvent::LlmResponse {
-                    provider: provider_label_for_stream.clone(),
-                    model: model_label_for_stream.clone(),
+            state
+                .observer
+                .record_event(&crate::observability::ObserverEvent::LlmResponse {
+                    provider: provider_label.clone(),
+                    model: model_label.clone(),
                     duration,
                     success: false,
-                    error_message: Some(sanitized.clone()),
+                    error_message: Some(timeout_message.clone()),
                     input_tokens: None,
                     output_tokens: None,
-                },
-            );
-            state_for_stream.observer.record_metric(
-                &crate::observability::traits::ObserverMetric::RequestLatency(duration),
-            );
-            state_for_stream
+                });
+            state
+                .observer
+                .record_metric(&crate::observability::traits::ObserverMetric::RequestLatency(
+                    duration,
+                ));
+            state
                 .observer
                 .record_event(&crate::observability::ObserverEvent::Error {
                     component: "gateway".to_string(),
-                    message: sanitized.clone(),
+                    message: timeout_message.clone(),
                 });
-            state_for_stream.observer.record_event(
-                &crate::observability::ObserverEvent::AgentEnd {
-                    provider: provider_label_for_stream.clone(),
-                    model: model_label_for_stream.clone(),
+            state
+                .observer
+                .record_event(&crate::observability::ObserverEvent::AgentEnd {
+                    provider: provider_label,
+                    model: model_label,
                     duration,
                     tokens_used: None,
                     cost_usd: None,
-                },
-            );
+                });
 
-            tracing::error!("Webhook streaming provider error: {}", sanitized);
-            let output = format!(
-                "data: {}\n\ndata: [DONE]\n\n",
-                serde_json::json!({"error": "LLM request failed"})
-            );
-            Ok(Bytes::from(output))
+            let _ = send_sse_json(&tx, serde_json::json!({"error": timeout_message})).await;
         }
+
+        send_sse_done(&tx).await;
     });
+
+    let sse_stream = ReceiverStream::new(rx);
 
     Response::builder()
         .status(StatusCode::OK)
@@ -2303,56 +2544,9 @@ async fn handle_webhook(
         });
 
     if webhook_body.stream.unwrap_or(false) {
-        let prepared_messages = match prepare_gateway_messages_for_provider(
-            &state,
-            message,
-            &model_for_request,
-        )
-        .await
-        {
-            Ok(messages) => messages,
-            Err(e) => {
-                let duration = started_at.elapsed();
-                let sanitized = providers::sanitize_api_error(&e.to_string());
-                state
-                    .observer
-                    .record_event(&crate::observability::ObserverEvent::LlmResponse {
-                        provider: provider_label.clone(),
-                        model: model_label.clone(),
-                        duration,
-                        success: false,
-                        error_message: Some(sanitized.clone()),
-                        input_tokens: None,
-                        output_tokens: None,
-                    });
-                state.observer.record_metric(
-                    &crate::observability::traits::ObserverMetric::RequestLatency(duration),
-                );
-                state
-                    .observer
-                    .record_event(&crate::observability::ObserverEvent::Error {
-                        component: "gateway".to_string(),
-                        message: sanitized.clone(),
-                    });
-                state
-                    .observer
-                    .record_event(&crate::observability::ObserverEvent::AgentEnd {
-                        provider: provider_label,
-                        model: model_label,
-                        duration,
-                        tokens_used: None,
-                        cost_usd: None,
-                    });
-
-                tracing::error!("Webhook streaming setup failed: {}", sanitized);
-                let err = serde_json::json!({"error": "LLM request failed"});
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(err)).into_response();
-            }
-        };
-
         return handle_webhook_streaming(
             state,
-            prepared_messages,
+            message.to_string(),
             provider_label,
             model_label,
             model_for_request,
@@ -5076,3 +5270,4 @@ Reminder set successfully."#;
         assert!(limiter.allow("burst-ip"));
     }
 }
+

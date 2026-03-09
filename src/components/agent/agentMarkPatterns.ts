@@ -1151,13 +1151,13 @@ const FORGE_RAW: RawMarkDefinition = {
 const DRAFTSMITH_RAW: RawMarkDefinition = {
 	colors: [
 		"transparent",
-		"#25183f",
-		"#4f34a8",
-		"#6d4bde",
-		"#9f82ff",
-		"#c8b6ff",
-		"#ece4ff",
-		"#05060b",
+		"#3A2466",
+		"#5C3CB2",
+		"#7C5CFF",
+		"#B29CFF",
+		"#E8DEFF",
+		"#F6F1FF",
+		"#08070f",
 	],
 	outlineColorIndex: 7,
 	heroBrushes: [
@@ -1276,10 +1276,25 @@ const DRAFTSMITH_RAW: RawMarkDefinition = {
 	},
 };
 
+const GRIDSAGE_RAW: RawMarkDefinition = {
+	...DRAFTSMITH_RAW,
+	colors: [
+		"transparent",
+		"#113A44",
+		"#1F6F7A",
+		"#2FA7B5",
+		"#6ED6DF",
+		"#CFF9FF",
+		"#ECFEFF",
+		"#04090a",
+	],
+};
+
 export const AGENT_MARKS: Record<AgentProfileId, AgentMarkDefinition> = {
 	koro: buildHiResMark(KORO_RAW),
 	devstral: buildHiResMark(DEVSTRAL_RAW),
 	sentinel: buildHiResMark(SENTINEL_RAW),
 	forge: buildHiResMark(FORGE_RAW),
 	draftsmith: buildHiResMark(DRAFTSMITH_RAW),
+	gridsage: buildHiResMark(GRIDSAGE_RAW),
 };

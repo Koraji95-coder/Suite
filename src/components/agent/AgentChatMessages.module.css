@@ -1,7 +1,11 @@
 .root {
 	flex: 1;
+	height: 100%;
+	min-height: 0;
 	padding: 1.35rem 1rem;
 	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-gutter: stable both-edges;
 }
 
 .inner {
@@ -76,6 +80,14 @@
 	min-width: 0;
 }
 
+.assistantTag {
+	margin: 0 0 0.22rem;
+	font-size: 0.62rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: color-mix(in srgb, var(--agent-text-soft) 86%, transparent);
+}
+
 .codePanel {
 	position: relative;
 	overflow-x: auto;
@@ -138,6 +150,13 @@
 	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 82%, transparent);
 	border-radius: 1rem 1rem 1rem 0.4rem;
 	background: color-mix(in srgb, var(--agent-surface-elevated) 68%, transparent);
+}
+
+.thinkingStreamBubble {
+	padding: 0.8rem 0.95rem;
+	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 82%, transparent);
+	border-radius: 1rem 1rem 1rem 0.4rem;
+	background: color-mix(in srgb, var(--agent-surface-elevated) 66%, transparent);
 }
 
 .thinkingDots {

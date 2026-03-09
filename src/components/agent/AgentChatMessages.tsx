@@ -16,11 +16,13 @@ import {
 	type AgentMarkState,
 	resolveAgentMarkState,
 } from "./agentMarkState";
-import type { AgentProfileId } from "./agentProfiles";
+import { AGENT_PROFILES, type AgentProfileId } from "./agentProfiles";
 
 interface AgentChatMessagesProps {
 	messages: AgentConversationMessage[];
-	profileId: AgentProfileId;
+	defaultProfileId: AgentProfileId;
+	thinkingProfileId?: AgentProfileId;
+	thinkingContent?: string;
 	isThinking?: boolean;
 	baseAvatarState?: AgentMarkState;
 }
@@ -29,7 +31,9 @@ const SPEAKING_TRANSIENT_MS = 1_400;
 
 export function AgentChatMessages({
 	messages,
-	profileId,
+	defaultProfileId,
+	thinkingProfileId,
+	thinkingContent = "",
 	isThinking = false,
 	baseAvatarState = "idle",
 }: AgentChatMessagesProps) {
@@ -40,31 +44,37 @@ export function AgentChatMessages({
 	// Scroll to bottom when messages change
 	useEffect(() => {
 		bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-	});
+	}, [latestMessage?.id, messages.length, showThinking]);
 
 	return (
 		<div className={styles.root}>
 			<div className={styles.inner}>
 				<Stack gap={4}>
-					{messages.map((msg, index) =>
-						msg.role === "user" ? (
-							<UserBubble key={msg.id} content={msg.content} />
-						) : (
+					{messages.map((msg, index) => {
+						if (msg.role === "user") {
+							return <UserBubble key={msg.id} content={msg.content} />;
+						}
+						const messageProfileId = resolveMessageProfileId(
+							msg.profileId,
+							defaultProfileId,
+						);
+						return (
 							<AssistantRow
 								key={msg.id}
 								content={msg.content}
-								profileId={profileId}
+								profileId={messageProfileId}
 								isLatest={index === messages.length - 1 && !showThinking}
 								baseAvatarState={baseAvatarState}
 							/>
-						),
-					)}
+						);
+					})}
 
 					{/* Thinking indicator */}
 					{showThinking && (
 						<ThinkingIndicator
-							profileId={profileId}
+							profileId={thinkingProfileId ?? defaultProfileId}
 							baseAvatarState={baseAvatarState}
+							content={thinkingContent}
 						/>
 					)}
 				</Stack>
@@ -73,6 +83,17 @@ export function AgentChatMessages({
 			</div>
 		</div>
 	);
+}
+
+function resolveMessageProfileId(
+	profileId: string | undefined,
+	fallbackProfileId: AgentProfileId,
+): AgentProfileId {
+	const normalized = String(profileId || "").trim().toLowerCase();
+	if (normalized in AGENT_PROFILES) {
+		return normalized as AgentProfileId;
+	}
+	return fallbackProfileId;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -160,6 +181,9 @@ function AssistantRow({
 
 			{/* Content */}
 			<Stack gap={1} className={styles.assistantContent}>
+				<p className={styles.assistantTag}>
+					{AGENT_PROFILES[profileId]?.name ?? profileId}
+				</p>
 				{isCodeBlock ? (
 					<Panel variant="inset" padding="md" className={styles.codePanel}>
 						{/* Copy button */}
@@ -203,9 +227,11 @@ function AssistantRow({
 function ThinkingIndicator({
 	profileId,
 	baseAvatarState,
+	content,
 }: {
 	profileId: AgentProfileId;
 	baseAvatarState: AgentMarkState;
+	content: string;
 }) {
 	const avatarState = resolveAgentMarkState({
 		error: baseAvatarState === "error",
@@ -213,6 +239,7 @@ function ThinkingIndicator({
 		running: baseAvatarState === "running",
 		thinking: true,
 	});
+	const hasContent = content.trim().length > 0;
 	return (
 		<HStack gap={3} align="start" className={styles.thinkingRow}>
 			<div className={styles.assistantAvatarShell}>
@@ -224,12 +251,20 @@ function ThinkingIndicator({
 				/>
 			</div>
 
-			<HStack gap={2} align="center" className={styles.thinkingBubble}>
-				<ThinkingDots />
-				<Text size="xs" color="muted">
-					Thinking...
-				</Text>
-			</HStack>
+			{hasContent ? (
+				<div className={styles.thinkingStreamBubble}>
+					<Text size="sm" className={styles.assistantText}>
+						{content}
+					</Text>
+				</div>
+			) : (
+				<HStack gap={2} align="center" className={styles.thinkingBubble}>
+					<ThinkingDots />
+					<Text size="xs" color="muted">
+						Thinking...
+					</Text>
+				</HStack>
+			)}
 		</HStack>
 	);
 }

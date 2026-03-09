@@ -26,7 +26,8 @@ This makes every run inspectable and replayable.
 2. `devstral`: implementation and debugging.
 3. `sentinel`: risk/compliance/reliability review.
 4. `forge`: documentation and operator packaging.
-5. `draftsmith`: CAD/electrical drafting strategy (with `ALIENTELLIGENCE/electricalengineerv2` fallback support).
+5. `draftsmith`: CAD/electrical drafting strategy.
+6. `gridsage`: electrical systems reasoning and implementation constraints.
 
 Model mapping details live in:
 
@@ -40,7 +41,7 @@ Behavior contracts live in:
 
 1. Do not make major auth-flow changes without explicit approval.
 2. Keep profile mapping parity between frontend and backend.
-3. Keep Draftsmith fallback mapped to `ALIENTELLIGENCE/electricalengineerv2`.
+3. Keep strict one-profile-to-one-model routing (no cross-profile fallback retries).
 4. Keep AutoCAD behavior stable unless you explicitly approve behavior changes.
 
 ## 4) Startup and preflight checklist
@@ -105,7 +106,7 @@ For strict endpoint contract details, use:
 - One concrete outcome, constraints, and success criteria.
 
 2. Select profiles:
-- Typical engineering run: `devstral`, `sentinel`, `forge`, `draftsmith`.
+- Typical engineering run: `devstral`, `sentinel`, `forge`, `draftsmith`, `gridsage`.
 - Synthesis profile usually `koro`.
 
 3. Launch run:
@@ -188,7 +189,7 @@ Objective example:
 
 Suggested profiles:
 
-- `draftsmith`, `sentinel`, `forge`
+- `draftsmith`, `gridsage`, `sentinel`
 
 ## 9) Real-life scenario playbooks
 
@@ -211,7 +212,7 @@ Use when:
 - A CAD pathing or draw workflow is failing in a way that is hard to reproduce.
 
 Run:
-1. Profiles: `devstral`, `draftsmith`, `sentinel`.
+1. Profiles: `devstral`, `draftsmith`, `gridsage`, `sentinel`.
 2. Include logs, request IDs, and failing payload samples in `context`.
 3. Require failure classification and recovery sequence.
 
@@ -248,7 +249,7 @@ Use when:
 - You need a same-day estimate for drafting automation effort.
 
 Run:
-1. Profiles: `draftsmith`, `devstral`, `forge`.
+1. Profiles: `draftsmith`, `gridsage`, `devstral`, `forge`.
 2. Ask for phased estimate, assumptions, and acceptance tests per phase.
 
 Outcome:
@@ -262,12 +263,12 @@ Outcome:
 
 2. Frequent `step_failed`:
 - Inspect `agent_run_steps.error_message`.
-- Check model fallback path in `model_attempts_json`.
+- Check the single-model route in `model_attempts_json` and the configured primary mapping.
 - Confirm gateway URL/token/secret settings.
 
 3. SSE disconnects:
 - Reconnect using last received event ID.
-- Poll `GET /api/agent/runs/:runId` as fallback.
+- Poll `GET /api/agent/runs/:runId` as recovery path.
 
 4. Low-quality outputs:
 - Tighten objective and context.
@@ -295,7 +296,7 @@ These are practical, low-risk options to test marketability.
 
 ## 12) Optional business agent concept (future)
 
-If you want a dedicated business profile later, add a sixth profile (example: `broker`) with:
+If you want a dedicated business profile later, add a seventh profile (example: `broker`) with:
 
 1. Mission:
 - Packaging, pricing experiments, customer discovery scripts, and sales collateral drafts.
@@ -339,7 +340,7 @@ PowerShell examples (replace placeholders):
 # enqueue run
 $body = @{
   objective = "Harden AutoCAD route draw reliability without behavior changes."
-  profiles = @("devstral","sentinel","forge","draftsmith")
+  profiles = @("devstral","sentinel","forge","draftsmith","gridsage")
   synthesisProfile = "koro"
   context = @{ ticket = "INC-1422"; branch = "feature/reliability" }
   timeoutMs = 90000

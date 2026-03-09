@@ -24,16 +24,18 @@
 - Agent profile routing is deterministic and profile-driven.
 - Keep profile to model mapping consistent across frontend and backend.
 - If broker transport is enabled, backend profile routing is source of truth.
-- Keep fallback model behavior intact for reliability (especially Draftsmith -> `ALIENTELLIGENCE/electricalengineerv2` fallback).
+- Active profile catalog is six profiles: `koro`, `devstral`, `sentinel`, `forge`, `draftsmith`, `gridsage`.
+- Runtime routing is strict single-model per profile (no cross-profile fallback retries).
+- Keep compatibility fields (`model_fallbacks`, `fallback_models`) present in contracts as empty arrays until explicit breaking cleanup.
 
 ## MCP/Handoff Guardrail
 
-- When using `suite_repo_mcp`, prefer observability-safe tools/prompts and preserve this repo’s guardrails.
+- When using `suite_repo_mcp`, prefer observability-safe tools/prompts and preserve this repo's guardrails.
 - Any codex handoff should retain:
   - no Tailwind in Suite app,
   - no major auth changes without approval,
   - AutoCAD requestId/error-envelope conventions,
-  - profile-model routing + fallback conventions.
+  - deterministic profile-model routing with no cross-model fallback retries.
 
 ## Gateway Build/Runtime Guardrail
 

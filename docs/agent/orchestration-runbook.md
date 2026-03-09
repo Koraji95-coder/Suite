@@ -57,6 +57,6 @@ For full operator instructions and scenario playbooks, start with `docs/agent/RE
 ## Guardrails
 
 - No major auth-flow redesigns.
-- Preserve profile-based model routing and fallback behavior.
-- Keep Draftsmith fallback aligned to `ALIENTELLIGENCE/electricalengineerv2`.
+- Preserve deterministic profile-based single-model routing across frontend/backend.
+- Keep compatibility fallback fields present as empty arrays until explicit contract cleanup.
 - Keep AutoCAD and other domain behavior unchanged unless explicitly approved.

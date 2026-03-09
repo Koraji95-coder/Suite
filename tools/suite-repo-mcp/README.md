@@ -104,7 +104,7 @@ Future Codex sessions should preserve the repository guardrails in `AGENTS.md`, 
 - no Tailwind usage in Suite app paths,
 - no major auth-flow changes without explicit approval,
 - AutoCAD error envelope + `requestId` observability contract,
-- profile-based agent model routing with configured fallback models.
+- deterministic profile-based single-model routing (no fallback retries).
 
 Gateway policy is locked for handoffs and MCP usage:
 
@@ -126,11 +126,10 @@ Local Ollama startup gate is required before booting conversations or orchestrat
 
 Default required model pack (unless overridden):
 
-- `qwen3:14b`
 - `gemma3:12b`
 - `devstral-small-2:latest`
 - `qwen2.5-coder:14b`
-- `qwen3:8b`
+- `qwen3:14b`
 - `joshuaokolo/C3Dv0:latest`
 - `ALIENTELLIGENCE/electricalengineerv2:latest`
 

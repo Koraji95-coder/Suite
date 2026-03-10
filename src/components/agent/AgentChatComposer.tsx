@@ -1,6 +1,6 @@
 // src/components/agent/AgentChatComposer.tsx
 import { ArrowUp, Mic, Paperclip, Sparkles, Square } from "lucide-react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 // Primitives
 import { Button, IconButton } from "@/components/primitives/Button";
 import { HStack } from "@/components/primitives/Stack";
@@ -9,12 +9,17 @@ import { cn } from "@/lib/utils";
 import styles from "./AgentChatComposer.module.css";
 import type { TaskTemplate } from "./agentTaskTemplates";
 
+export type AgentComposerMode = "direct" | "run";
+
 interface AgentChatComposerProps {
 	onSend: (message: string) => void;
 	disabled?: boolean;
 	isStreaming?: boolean;
 	onCancel?: () => void;
 	templates?: TaskTemplate[];
+	mode?: AgentComposerMode;
+	onModeChange?: (mode: AgentComposerMode) => void;
+	runModeDisabled?: boolean;
 }
 
 export function AgentChatComposer({
@@ -23,10 +28,14 @@ export function AgentChatComposer({
 	isStreaming = false,
 	onCancel,
 	templates = [],
+	mode = "direct",
+	onModeChange,
+	runModeDisabled = false,
 }: AgentChatComposerProps) {
 	const [value, setValue] = useState("");
 	const [isFocused, setIsFocused] = useState(false);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const messageInputId = useId();
 
 	const handleSubmit = () => {
 		const msg = value.trim();
@@ -58,11 +67,38 @@ export function AgentChatComposer({
 	};
 
 	const canSend = value.trim().length > 0 && !disabled;
+	const showTemplates = mode === "direct" && templates.length > 0 && !value;
+	const isDirectMode = mode === "direct";
+	const runModeBlocked = runModeDisabled && mode === "run";
 
 	return (
 		<div className={styles.root}>
+			<div className={styles.modeRow}>
+				<button
+					type="button"
+					className={cn(
+						styles.modeButton,
+						isDirectMode ? styles.modeButtonActive : styles.modeButtonIdle,
+					)}
+					onClick={() => onModeChange?.("direct")}
+				>
+					Direct chat
+				</button>
+				<button
+					type="button"
+					className={cn(
+						styles.modeButton,
+						!isDirectMode ? styles.modeButtonActive : styles.modeButtonIdle,
+					)}
+					onClick={() => onModeChange?.("run")}
+					disabled={runModeDisabled}
+				>
+					Run objective
+				</button>
+			</div>
+
 			{/* Template suggestions */}
-			{templates.length > 0 && !value && (
+			{showTemplates && (
 				<div className={styles.templatesWrap}>
 					<Text size="xs" color="muted" className={styles.templatesLabel}>
 						Quick prompts
@@ -95,6 +131,8 @@ export function AgentChatComposer({
 				{/* Textarea */}
 				<div className={styles.textareaWrap}>
 					<textarea
+						id={messageInputId}
+						name="agent_message"
 						ref={textareaRef}
 						value={value}
 						onChange={(e) => setValue(e.target.value)}
@@ -107,7 +145,9 @@ export function AgentChatComposer({
 								? isStreaming
 									? "Generating response..."
 									: "Connecting to agent..."
-								: "Message the agent..."
+								: isDirectMode
+									? "Message the agent..."
+									: "Describe the objective for your multi-agent run..."
 						}
 						disabled={disabled}
 						rows={1}
@@ -146,7 +186,7 @@ export function AgentChatComposer({
 							</Text>
 						)}
 
-						{isStreaming ? (
+						{isStreaming && isDirectMode ? (
 							<button
 								type="button"
 								onClick={() => onCancel?.()}
@@ -159,10 +199,12 @@ export function AgentChatComposer({
 							<button
 								type="button"
 								onClick={handleSubmit}
-								disabled={!canSend}
+								disabled={!canSend || runModeBlocked}
 								className={cn(
 									styles.sendButton,
-									canSend ? styles.sendButtonReady : styles.sendButtonDisabled,
+									canSend && !runModeBlocked
+										? styles.sendButtonReady
+										: styles.sendButtonDisabled,
 								)}
 							>
 								<ArrowUp size={16} strokeWidth={2.5} />
@@ -174,7 +216,8 @@ export function AgentChatComposer({
 
 			{/* Hint text */}
 			<Text size="xs" color="muted" align="center" className={styles.hint}>
-				Press <kbd className={styles.hintKey}>Enter</kbd> to send,{" "}
+				Press <kbd className={styles.hintKey}>Enter</kbd> to{" "}
+				{isDirectMode ? "send chat" : "start run"},{" "}
 				<kbd className={styles.hintKey}>Shift + Enter</kbd> for new line
 			</Text>
 		</div>

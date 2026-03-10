@@ -4,11 +4,12 @@ import {
 	type InputHTMLAttributes,
 	type ReactNode,
 	type TextareaHTMLAttributes,
+	useId,
 } from "react";
 import { cn } from "@/lib/utils";
 import styles from "./Input.module.css";
 import { Stack } from "./Stack";
-import { Text } from "./Text";
+import { Label, Text } from "./Text";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -109,10 +110,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 			required,
 			fluid = true,
 			className,
+			id,
+			name,
 			...props
 		},
 		ref,
 	) => {
+		const generatedId = useId();
+		const inputId = String(id || `input-${generatedId.replace(/:/g, "")}`);
+		const inputName = String(name || inputId);
 		const hasError = error || !!errorMessage;
 		const variantStyle = variantClasses[variant];
 
@@ -124,6 +130,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
 				<input
 					ref={ref}
+					id={inputId}
+					name={inputName}
 					className={cn(
 						styles.inputBase,
 						sizeClasses[inputSize],
@@ -152,14 +160,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 		return (
 			<Stack gap={1} className={cn(fluid && styles.fluid)}>
 				{label && (
-					<Text as="label" size="sm" weight="medium">
+					<Label htmlFor={inputId} size="sm" weight="medium">
 						{label}
 						{required && (
 							<Text color="danger" className={styles.requiredAsterisk}>
 								*
 							</Text>
 						)}
-					</Text>
+					</Label>
 				)}
 				{inputElement}
 				{(errorMessage || helperText) && (
@@ -194,10 +202,17 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 			fluid = true,
 			minRows = 3,
 			className,
+			id,
+			name,
 			...props
 		},
 		ref,
 	) => {
+		const generatedId = useId();
+		const textareaId = String(
+			id || `textarea-${generatedId.replace(/:/g, "")}`,
+		);
+		const textareaName = String(name || textareaId);
 		const hasError = error || !!errorMessage;
 		const variantStyle = variantClasses[variant];
 
@@ -211,6 +226,8 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 		const textareaElement = (
 			<textarea
 				ref={ref}
+				id={textareaId}
+				name={textareaName}
 				rows={minRows}
 				className={cn(
 					styles.inputBase,
@@ -230,14 +247,14 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 		return (
 			<Stack gap={1} className={cn(fluid && styles.fluid)}>
 				{label && (
-					<Text as="label" size="sm" weight="medium">
+					<Label htmlFor={textareaId} size="sm" weight="medium">
 						{label}
 						{required && (
 							<Text color="danger" className={styles.requiredAsterisk}>
 								*
 							</Text>
 						)}
-					</Text>
+					</Label>
 				)}
 				{textareaElement}
 				{(errorMessage || helperText) && (

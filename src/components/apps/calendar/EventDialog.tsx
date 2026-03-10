@@ -63,10 +63,8 @@ export function EventDialog({
 
 	if (!isOpen) return null;
 
-	const dialogCard = (
-		<DialogContent
-			className={cn(styles.dialogContent, inline && styles.dialogContentInline)}
-		>
+	const dialogBody = (
+		<>
 			<DialogHeader>
 				<DialogTitle>{event?.id ? "Edit Event" : "Create Event"}</DialogTitle>
 				<DialogDescription className={styles.srOnly}>
@@ -116,16 +114,22 @@ export function EventDialog({
 				onCancel={onClose}
 				onSave={handleSave}
 			/>
-		</DialogContent>
+		</>
 	);
 
 	if (inline) {
-		return <div className={styles.inlineWrap}>{dialogCard}</div>;
+		return (
+			<div className={styles.inlineWrap}>
+				<div className={cn(styles.dialogContent, styles.dialogContentInline)}>
+					{dialogBody}
+				</div>
+			</div>
+		);
 	}
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-			{dialogCard}
+			<DialogContent className={styles.dialogContent}>{dialogBody}</DialogContent>
 		</Dialog>
 	);
 }

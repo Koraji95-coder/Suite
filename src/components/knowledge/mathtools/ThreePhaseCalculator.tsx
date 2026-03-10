@@ -1,10 +1,11 @@
 import { Zap } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
 import { cn } from "@/lib/utils";
 import styles from "./ThreePhaseCalculator.module.css";
 
 export function ThreePhaseCalculator() {
+	const fieldPrefix = useId().replace(/:/g, "");
 	const [lineVoltage, setLineVoltage] = useState(415);
 	const [lineCurrent, setLineCurrent] = useState(100);
 	const [powerFactor, setPowerFactor] = useState(0.85);
@@ -94,8 +95,12 @@ export function ThreePhaseCalculator() {
 				<div className={styles.twoColumnLayout}>
 					<div className={styles.stack}>
 						<div>
-							<label className={styles.label}>Configuration</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-configuration`}>
+								Configuration
+							</label>
 							<select
+								id={`${fieldPrefix}-configuration`}
+								name="three_phase_configuration"
 								value={configuration}
 								onChange={(e) =>
 									setConfiguration(e.target.value as "wye" | "delta")
@@ -108,10 +113,15 @@ export function ThreePhaseCalculator() {
 						</div>
 
 						<div>
-							<label className={styles.label}>
+							<label
+								className={styles.label}
+								htmlFor={`${fieldPrefix}-line-voltage`}
+							>
 								Line Voltage (V<sub>L</sub>)
 							</label>
 							<input
+								id={`${fieldPrefix}-line-voltage`}
+								name="three_phase_line_voltage"
 								type="number"
 								value={lineVoltage}
 								onChange={(e) =>
@@ -122,10 +132,15 @@ export function ThreePhaseCalculator() {
 						</div>
 
 						<div>
-							<label className={styles.label}>
+							<label
+								className={styles.label}
+								htmlFor={`${fieldPrefix}-line-current`}
+							>
 								Line Current (I<sub>L</sub>)
 							</label>
 							<input
+								id={`${fieldPrefix}-line-current`}
+								name="three_phase_line_current"
 								type="number"
 								value={lineCurrent}
 								onChange={(e) =>
@@ -136,8 +151,12 @@ export function ThreePhaseCalculator() {
 						</div>
 
 						<div>
-							<label className={styles.label}>Power Factor (cos φ)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-power-factor`}>
+								Power Factor (cos φ)
+							</label>
 							<input
+								id={`${fieldPrefix}-power-factor`}
+								name="three_phase_power_factor"
 								type="number"
 								step="0.01"
 								min="0"
@@ -275,8 +294,12 @@ export function ThreePhaseCalculator() {
 				<div className={styles.twoColumnLayout}>
 					<div className={styles.stack}>
 						<div>
-							<label className={styles.label}>Base Voltage (kV)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-base-voltage`}>
+								Base Voltage (kV)
+							</label>
 							<input
+								id={`${fieldPrefix}-base-voltage`}
+								name="three_phase_base_voltage"
 								type="number"
 								value={baseVoltage}
 								onChange={(e) =>
@@ -287,8 +310,15 @@ export function ThreePhaseCalculator() {
 						</div>
 
 						<div>
-							<label className={styles.label}>Source Impedance (Ω)</label>
+							<label
+								className={styles.label}
+								htmlFor={`${fieldPrefix}-source-impedance`}
+							>
+								Source Impedance (Ω)
+							</label>
 							<input
+								id={`${fieldPrefix}-source-impedance`}
+								name="three_phase_source_impedance"
 								type="number"
 								step="0.01"
 								value={sourceImpedance}
@@ -300,8 +330,12 @@ export function ThreePhaseCalculator() {
 						</div>
 
 						<div>
-							<label className={styles.label}>Fault Type</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-fault-type`}>
+								Fault Type
+							</label>
 							<select
+								id={`${fieldPrefix}-fault-type`}
+								name="three_phase_fault_type"
 								value={faultType}
 								onChange={(e) =>
 									setFaultType(

@@ -1366,6 +1366,44 @@ ${risk || "- Identify likely regressions and edge cases."}
 4. Validate error states and invalid inputs.
 `,
 	},
+	"repo.ui_semantics_sweep": {
+		description:
+			"Return a UI semantics sweep checklist for form fields, labels, and dialog composition safety.",
+		template: ({
+			scope = "src/components src/routes",
+			notes = "Use Biome-only workflow; do not introduce ESLint.",
+		}) => `## UI Semantics Sweep Checklist
+
+Scope: ${scope}
+Notes: ${notes}
+
+1. Form-field identity
+- Every interactive \`input\`, \`textarea\`, and \`select\` has a stable \`id\`.
+- Every interactive \`input\`, \`textarea\`, and \`select\` has a stable \`name\`.
+- Shared input primitives provide fallback \`id\` + \`name\` to reduce repeated defects.
+
+2. Label association
+- Standalone \`<label>\` elements use \`htmlFor\` matching the target control \`id\`.
+- Wrapped-label patterns (label contains control) remain valid and are not double-wired.
+- Placeholder-only fields gain explicit labels or \`aria-label\` when visual labels are intentionally omitted.
+
+3. Dialog composition safety
+- Components using \`DialogPortal\`/dialog content primitives are always rendered under a dialog root context.
+- Inline/non-modal variants avoid portal-only primitives that require dialog context.
+- Remove duplicate close controls when the shared dialog content already renders a close affordance.
+
+4. Agent UI consistency checks
+- Only one objective/chat input surface is visible in the active command region.
+- Mode switching (direct vs orchestration) is explicit and deterministic.
+- Existing run-ledger, profile routing, and pairing contracts remain unchanged.
+
+5. Validation commands (Biome-only)
+1. \`npm run guard:eslint\`
+2. \`npm run lint\`
+3. \`npm run typecheck\`
+4. \`npm run check\`
+`,
+	},
 	"repo.suite_guardrails": {
 		description:
 			"Return the Suite guardrails that must be preserved across handoffs.",

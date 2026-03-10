@@ -46,11 +46,11 @@ import {
 } from "../settings/userSettings";
 import { supabase } from "../supabase/client";
 import { isSupabaseConfigured } from "../supabase/utils";
-import { logSecurityEvent } from "./securityEventService";
 import {
 	type AgentPromptMode,
 	buildPromptForProfile,
 } from "./agentPromptPacks";
+import { logSecurityEvent } from "./securityEventService";
 
 export interface AgentResponse {
 	success: boolean;
@@ -86,6 +86,7 @@ export interface AgentRunCreateRequest {
 export interface AgentRunEvent {
 	id: number;
 	eventType: string;
+	runId?: string;
 	stage: string;
 	profileId: string;
 	requestId: string;
@@ -206,10 +207,21 @@ export type PythonToolRequest = Record<string, unknown> & {
 const AGENT_PAIRING_SETTING_KEY = "agent_pairing_state_v1";
 const DEFAULT_RESTORE_WINDOW_HOURS = 24;
 const MAX_RESTORE_WINDOW_HOURS = 24 * 30;
+const NO_EXPIRY_ENV_TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
+
+function isTrueEnvValue(rawValue: string | undefined): boolean {
+	return NO_EXPIRY_ENV_TRUE_VALUES.has(
+		String(rawValue || "")
+			.trim()
+			.toLowerCase(),
+	);
+}
 
 function resolvePairingRestoreWindowMs(): number {
 	const rawValue = Number(
-		String(import.meta.env.VITE_AGENT_PAIRING_RESTORE_WINDOW_HOURS || "").trim(),
+		String(
+			import.meta.env.VITE_AGENT_PAIRING_RESTORE_WINDOW_HOURS || "",
+		).trim(),
 	);
 	const normalizedHours =
 		Number.isFinite(rawValue) && rawValue > 0
@@ -219,10 +231,16 @@ function resolvePairingRestoreWindowMs(): number {
 }
 
 const MAX_RESTORE_AGE_MS = resolvePairingRestoreWindowMs();
+const PAIRING_RESTORE_NO_EXPIRY = isTrueEnvValue(
+	import.meta.env.VITE_AGENT_PAIRING_RESTORE_NO_EXPIRY,
+);
 const AGENT_SESSION_RETRY_AFTER_MAX_SECONDS = 120;
 const SUPABASE_SESSION_LOOKUP_TIMEOUT_MS = 8_000;
 const DEFAULT_AGENT_CONNECT_TIMEOUT_MS = 30_000;
 const MAX_DIRECT_CONNECT_TIMEOUT_MS = 30_000;
+const DEFAULT_AGENT_HEALTH_TIMEOUT_MS = 8_000;
+const MIN_AGENT_HEALTH_TIMEOUT_MS = 3_000;
+const MAX_AGENT_HEALTH_TIMEOUT_MS = 30_000;
 const DEFAULT_AGENT_STREAM_MAX_MS = 20 * 60 * 1000;
 const MIN_AGENT_STREAM_MAX_MS = 30_000;
 const MAX_AGENT_STREAM_MAX_MS = 60 * 60 * 1000;
@@ -430,18 +448,19 @@ class AgentService {
 					value,
 				})),
 				new Promise<{ timedOut: true }>((resolve) => {
-					timeoutHandle = setTimeout(() => resolve({ timedOut: true }), SUPABASE_SESSION_LOOKUP_TIMEOUT_MS);
+					timeoutHandle = setTimeout(
+						() => resolve({ timedOut: true }),
+						SUPABASE_SESSION_LOOKUP_TIMEOUT_MS,
+					);
 				}),
 			]);
 			if (timeoutHandle) {
 				clearTimeout(timeoutHandle);
 			}
 			if (sessionResult.timedOut) {
-				logger.warn(
-					"Supabase session lookup timed out",
-					"AgentService",
-					{ timeoutMs: SUPABASE_SESSION_LOOKUP_TIMEOUT_MS },
-				);
+				logger.warn("Supabase session lookup timed out", "AgentService", {
+					timeoutMs: SUPABASE_SESSION_LOOKUP_TIMEOUT_MS,
+				});
 				return null;
 			}
 			const {
@@ -526,20 +545,20 @@ class AgentService {
 		let retryable = false;
 
 		try {
-			const payload = (await response.clone().json()) as
-				| {
-						code?: string;
-						error?: string;
-						message?: string;
-						retry_after_seconds?: number | string;
-						meta?: {
-							retryable?: boolean;
-						};
-				  }
-				| null;
+			const payload = (await response.clone().json()) as {
+				code?: string;
+				error?: string;
+				message?: string;
+				retry_after_seconds?: number | string;
+				meta?: {
+					retryable?: boolean;
+				};
+			} | null;
 			code = String(payload?.code || "").trim();
 			message = String(payload?.error || payload?.message || "").trim();
-			payloadRetryAfter = this.parsePositiveInteger(payload?.retry_after_seconds);
+			payloadRetryAfter = this.parsePositiveInteger(
+				payload?.retry_after_seconds,
+			);
 			retryable = Boolean(payload?.meta?.retryable);
 		} catch {
 			// Ignore parse issues and fallback to response text.
@@ -616,19 +635,21 @@ class AgentService {
 		let payloadRetryAfter = 0;
 
 		try {
-			const payload = (await response.clone().json()) as
-				| {
-						error?: string;
-						message?: string;
-						reason?: string;
-						retry_after_seconds?: number | string;
-						throttle_source?: string;
-				  }
-				| null;
+			const payload = (await response.clone().json()) as {
+				error?: string;
+				message?: string;
+				reason?: string;
+				retry_after_seconds?: number | string;
+				throttle_source?: string;
+			} | null;
 			payloadMessage = String(payload?.error || payload?.message || "").trim();
-			payloadReason = String(payload?.reason || "").trim().toLowerCase();
+			payloadReason = String(payload?.reason || "")
+				.trim()
+				.toLowerCase();
 			payloadSource = String(payload?.throttle_source || "").trim();
-			payloadRetryAfter = this.parsePositiveInteger(payload?.retry_after_seconds);
+			payloadRetryAfter = this.parsePositiveInteger(
+				payload?.retry_after_seconds,
+			);
 		} catch {
 			// Ignore parse errors; fallback message handling already covers this.
 		}
@@ -930,17 +951,19 @@ class AgentService {
 			return { restored: false, reason: "invalid-saved-pairing" };
 		}
 
-		const updatedAt = Date.parse(saved.updatedAt);
-		if (
-			!Number.isFinite(updatedAt) ||
-			Date.now() - updatedAt > MAX_RESTORE_AGE_MS
-		) {
-			await this.clearPersistedPairingForActiveUser();
-			await logSecurityEvent(
-				"agent_restore_failed",
-				"Agent restore failed: trusted pairing window expired.",
-			);
-			return { restored: false, reason: "restore-window-expired" };
+		if (!PAIRING_RESTORE_NO_EXPIRY) {
+			const updatedAt = Date.parse(saved.updatedAt);
+			if (
+				!Number.isFinite(updatedAt) ||
+				Date.now() - updatedAt > MAX_RESTORE_AGE_MS
+			) {
+				await this.clearPersistedPairingForActiveUser();
+				await logSecurityEvent(
+					"agent_restore_failed",
+					"Agent restore failed: trusted pairing window expired.",
+				);
+				return { restored: false, reason: "restore-window-expired" };
+			}
 		}
 
 		const imported = secureTokenStorage.importOpaqueToken(saved.token);
@@ -1162,7 +1185,8 @@ class AgentService {
 				}
 
 				const errorPayload = await this.readSessionBrokerError(response);
-				const isUnauthorized = response.status === 401 || response.status === 403;
+				const isUnauthorized =
+					response.status === 401 || response.status === 403;
 				const isProviderTimeout =
 					response.status === 503 &&
 					(errorPayload.code === "AUTH_PROVIDER_TIMEOUT" ||
@@ -1303,7 +1327,7 @@ class AgentService {
 				? configuredConnectTimeout
 				: Number.isFinite(configuredTimeout) && configuredTimeout > 0
 					? configuredTimeout
-				: DEFAULT_AGENT_CONNECT_TIMEOUT_MS);
+					: DEFAULT_AGENT_CONNECT_TIMEOUT_MS);
 		return Math.min(
 			MAX_DIRECT_CONNECT_TIMEOUT_MS,
 			Math.max(1_000, Math.trunc(candidate)),
@@ -1318,6 +1342,20 @@ class AgentService {
 		return Math.min(
 			MAX_AGENT_STREAM_MAX_MS,
 			Math.max(MIN_AGENT_STREAM_MAX_MS, Math.trunc(configured)),
+		);
+	}
+
+	private resolveHealthCheckTimeoutMs(): number {
+		const configuredTimeout = Number(
+			String(import.meta.env.VITE_AGENT_HEALTH_TIMEOUT_MS || "").trim(),
+		);
+		const candidate =
+			Number.isFinite(configuredTimeout) && configuredTimeout > 0
+				? configuredTimeout
+				: DEFAULT_AGENT_HEALTH_TIMEOUT_MS;
+		return Math.min(
+			MAX_AGENT_HEALTH_TIMEOUT_MS,
+			Math.max(MIN_AGENT_HEALTH_TIMEOUT_MS, Math.trunc(candidate)),
 		);
 	}
 
@@ -1342,11 +1380,14 @@ class AgentService {
 			mode: options?.promptMode ?? "manual",
 			templateLabel: options?.templateLabel,
 		});
-		return this.makeRequest({
-			task: "chat",
-			params: { message: prompt || message },
-			profileId,
-		}, options);
+		return this.makeRequest(
+			{
+				task: "chat",
+				params: { message: prompt || message },
+				profileId,
+			},
+			options,
+		);
 	}
 
 	/**
@@ -1544,14 +1585,12 @@ class AgentService {
 			}
 
 			try {
-				const decoded = JSON.parse(trimmed) as
-					| {
-							delta?: string;
-							response?: string;
-							model?: string;
-							error?: string;
-					  }
-					| null;
+				const decoded = JSON.parse(trimmed) as {
+					delta?: string;
+					response?: string;
+					model?: string;
+					error?: string;
+				} | null;
 				if (!decoded || typeof decoded !== "object") {
 					return;
 				}
@@ -1826,90 +1865,90 @@ class AgentService {
 			}
 		}
 
-			if (this.useBroker) {
-				const accessToken = await this.getSupabaseAccessToken();
-				if (!accessToken) {
-					return {
-						success: false,
-						error:
-							"Supabase session required for brokered agent access. Please sign in.",
-					};
-				}
-
-				const configuredTimeout = Number(import.meta.env.VITE_AGENT_TIMEOUT);
-				const timeout =
-					task.timeout ??
-					(Number.isFinite(configuredTimeout) && configuredTimeout > 0
-						? Math.max(configuredTimeout, 90_000)
-						: 90_000);
-
-				try {
-					const response = await fetchWithTimeout(`${this.brokerUrl}/webhook`, {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							Authorization: `Bearer ${accessToken}`,
-						},
-						credentials: "include",
-						body: JSON.stringify({
-							message: JSON.stringify(task),
-							profile_id: profileId,
-							model: modelCandidates[0],
-						}),
-						timeoutMs: timeout,
-						requestName: "Agent broker webhook request",
-					});
-
-					if (!response.ok) {
-						const rawDetails = await this.readBrokerError(
-							response,
-							`Agent request failed (${response.status})`,
-						);
-						const failureMessage = this.formatAgentGatewayFailureMessage(
-							response.status,
-							rawDetails,
-						);
-						if (response.status === 401 || response.status === 403) {
-							await this.unpair();
-							await logSecurityEvent(
-								"agent_request_unauthorized",
-								"Agent request returned unauthorized; pairing was revoked.",
-							);
-						}
-						logger.error("Agent request failed", "AgentService", {
-							status: response.status,
-							statusText: response.statusText,
-							task: task.task,
-							profileId,
-							message: failureMessage,
-						});
-						throw new Error(failureMessage);
-					}
-
-					const data = await response.json();
-					const executionTime = Date.now() - startTime;
-
-					logger.info(
-						`Agent request completed in ${executionTime}ms`,
-						"AgentService",
-						{ task: task.task },
-					);
-
-					return {
-						success: true,
-						data: data,
-						executionTime: executionTime,
-					};
-				} catch (error) {
-					const executionTime = Date.now() - startTime;
-					logger.error("Agent request error", "AgentService", error);
-					return {
-						success: false,
-						error: mapFetchErrorMessage(error, "Unknown error"),
-						executionTime,
-					};
-				}
+		if (this.useBroker) {
+			const accessToken = await this.getSupabaseAccessToken();
+			if (!accessToken) {
+				return {
+					success: false,
+					error:
+						"Supabase session required for brokered agent access. Please sign in.",
+				};
 			}
+
+			const configuredTimeout = Number(import.meta.env.VITE_AGENT_TIMEOUT);
+			const timeout =
+				task.timeout ??
+				(Number.isFinite(configuredTimeout) && configuredTimeout > 0
+					? Math.max(configuredTimeout, 90_000)
+					: 90_000);
+
+			try {
+				const response = await fetchWithTimeout(`${this.brokerUrl}/webhook`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${accessToken}`,
+					},
+					credentials: "include",
+					body: JSON.stringify({
+						message: JSON.stringify(task),
+						profile_id: profileId,
+						model: modelCandidates[0],
+					}),
+					timeoutMs: timeout,
+					requestName: "Agent broker webhook request",
+				});
+
+				if (!response.ok) {
+					const rawDetails = await this.readBrokerError(
+						response,
+						`Agent request failed (${response.status})`,
+					);
+					const failureMessage = this.formatAgentGatewayFailureMessage(
+						response.status,
+						rawDetails,
+					);
+					if (response.status === 401 || response.status === 403) {
+						await this.unpair();
+						await logSecurityEvent(
+							"agent_request_unauthorized",
+							"Agent request returned unauthorized; pairing was revoked.",
+						);
+					}
+					logger.error("Agent request failed", "AgentService", {
+						status: response.status,
+						statusText: response.statusText,
+						task: task.task,
+						profileId,
+						message: failureMessage,
+					});
+					throw new Error(failureMessage);
+				}
+
+				const data = await response.json();
+				const executionTime = Date.now() - startTime;
+
+				logger.info(
+					`Agent request completed in ${executionTime}ms`,
+					"AgentService",
+					{ task: task.task },
+				);
+
+				return {
+					success: true,
+					data: data,
+					executionTime: executionTime,
+				};
+			} catch (error) {
+				const executionTime = Date.now() - startTime;
+				logger.error("Agent request error", "AgentService", error);
+				return {
+					success: false,
+					error: mapFetchErrorMessage(error, "Unknown error"),
+					executionTime,
+				};
+			}
+		}
 
 		const token = this.getToken();
 		if (!token) {
@@ -1934,46 +1973,46 @@ class AgentService {
 			const webhookSecret = import.meta.env.VITE_AGENT_WEBHOOK_SECRET;
 			const requireWebhookSecret = this.shouldRequireWebhookSecret();
 
-				if (requireWebhookSecret && !webhookSecret) {
-					return {
-						success: false,
-						error:
-							"Agent webhook secret is required but not configured. Set VITE_AGENT_WEBHOOK_SECRET in your environment.",
-					};
-				}
-
-				if (webhookSecret) {
-					headers["X-Webhook-Secret"] = webhookSecret;
-				}
-
-				if (task.task === "chat") {
-					return await this.makeDirectChatStreamRequest({
-						task,
-						profileId,
-						modelCandidates,
-						headers,
-						startTime,
-						options,
-					});
-				}
-
-				const timeout = this.resolveDirectConnectTimeoutMs(task.timeout);
-				const model = modelCandidates[0] || "";
-				const payload: Record<string, unknown> = {
-					message: JSON.stringify(task),
-					profile_id: profileId,
+			if (requireWebhookSecret && !webhookSecret) {
+				return {
+					success: false,
+					error:
+						"Agent webhook secret is required but not configured. Set VITE_AGENT_WEBHOOK_SECRET in your environment.",
 				};
-				if (model) {
-					payload.model = model;
-				}
+			}
 
-				const response = await fetchWithTimeout(`${this.baseUrl}/webhook`, {
-					method: "POST",
+			if (webhookSecret) {
+				headers["X-Webhook-Secret"] = webhookSecret;
+			}
+
+			if (task.task === "chat") {
+				return await this.makeDirectChatStreamRequest({
+					task,
+					profileId,
+					modelCandidates,
 					headers,
-					body: JSON.stringify(payload),
-					timeoutMs: timeout,
-					requestName: "Agent gateway webhook request",
+					startTime,
+					options,
 				});
+			}
+
+			const timeout = this.resolveDirectConnectTimeoutMs(task.timeout);
+			const model = modelCandidates[0] || "";
+			const payload: Record<string, unknown> = {
+				message: JSON.stringify(task),
+				profile_id: profileId,
+			};
+			if (model) {
+				payload.model = model;
+			}
+
+			const response = await fetchWithTimeout(`${this.baseUrl}/webhook`, {
+				method: "POST",
+				headers,
+				body: JSON.stringify(payload),
+				timeoutMs: timeout,
+				requestName: "Agent gateway webhook request",
+			});
 
 			if (!response.ok) {
 				const rawDetails = await this.readBrokerError(
@@ -2044,6 +2083,7 @@ class AgentService {
 	 */
 	async healthCheck(): Promise<boolean> {
 		const healthEndpoint = this.useBroker ? this.brokerUrl : this.baseUrl;
+		const timeoutMs = this.resolveHealthCheckTimeoutMs();
 		try {
 			if (this.useBroker) {
 				const accessToken = await this.getSupabaseAccessToken();
@@ -2059,7 +2099,7 @@ class AgentService {
 						Authorization: `Bearer ${accessToken}`,
 					},
 					credentials: "include",
-					timeoutMs: 3000,
+					timeoutMs,
 					requestName: "Agent broker health check",
 				});
 
@@ -2076,7 +2116,7 @@ class AgentService {
 
 			const response = await fetchWithTimeout(`${this.baseUrl}/health`, {
 				method: "GET",
-				timeoutMs: 3000,
+				timeoutMs,
 				requestName: "Agent gateway health check",
 			});
 			const isHealthy = response.ok;
@@ -2349,7 +2389,10 @@ class AgentService {
 			if (filters?.runId) {
 				search.set("runId", String(filters.runId).trim());
 			}
-			if (typeof filters?.limit === "number" && Number.isFinite(filters.limit)) {
+			if (
+				typeof filters?.limit === "number" &&
+				Number.isFinite(filters.limit)
+			) {
 				search.set("limit", String(Math.max(1, Math.trunc(filters.limit))));
 			}
 			const url = `${this.brokerUrl}/tasks${search.toString() ? `?${search.toString()}` : ""}`;
@@ -2361,19 +2404,29 @@ class AgentService {
 				timeoutMs: 20_000,
 				requestName: "Agent task list request",
 			});
-			const data = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
 			if (!response.ok) {
+				const message =
+					response.status === 429
+						? "Agent task queue is temporarily rate-limited. Please wait and retry."
+						: await parseResponseErrorMessage(
+								response,
+								"Unable to list agent tasks.",
+							);
+				const data = (await response.json().catch(() => ({}))) as Record<
+					string,
+					unknown
+				>;
 				return {
 					success: false,
 					tasks: [],
 					requestId: String(data.requestId || ""),
-					error:
-						String(data.error || "").trim() || "Unable to list agent tasks.",
+					error: message,
 				};
 			}
+			const data = (await response.json().catch(() => ({}))) as Record<
+				string,
+				unknown
+			>;
 			const tasks = Array.isArray(data.tasks)
 				? (data.tasks as AgentTaskItem[])
 				: [];
@@ -2547,7 +2600,10 @@ class AgentService {
 			if (options?.runId) {
 				search.set("runId", String(options.runId).trim());
 			}
-			if (typeof options?.limit === "number" && Number.isFinite(options.limit)) {
+			if (
+				typeof options?.limit === "number" &&
+				Number.isFinite(options.limit)
+			) {
 				search.set("limit", String(Math.max(1, Math.trunc(options.limit))));
 			}
 			const url = `${this.brokerUrl}/activity${search.toString() ? `?${search.toString()}` : ""}`;
@@ -2558,18 +2614,29 @@ class AgentService {
 				timeoutMs: 20_000,
 				requestName: "Agent activity request",
 			});
-			const data = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
 			if (!response.ok) {
+				const message =
+					response.status === 429
+						? "Agent activity feed is temporarily rate-limited. Please wait and retry."
+						: await parseResponseErrorMessage(
+								response,
+								"Unable to load activity.",
+							);
+				const data = (await response.json().catch(() => ({}))) as Record<
+					string,
+					unknown
+				>;
 				return {
 					success: false,
 					activity: [],
 					requestId: String(data.requestId || ""),
-					error: String(data.error || "").trim() || "Unable to load activity.",
+					error: message,
 				};
 			}
+			const data = (await response.json().catch(() => ({}))) as Record<
+				string,
+				unknown
+			>;
 			const activity = Array.isArray(data.activity)
 				? (data.activity as AgentActivityItem[])
 				: [];
@@ -2683,6 +2750,7 @@ class AgentService {
 			return {
 				id: numericId > 0 ? numericId : 0,
 				eventType: String(parsed.eventType ?? eventType ?? "message"),
+				runId: String(parsed.runId ?? ""),
 				stage: String(parsed.stage ?? ""),
 				profileId: String(parsed.profileId ?? ""),
 				requestId: String(parsed.requestId ?? ""),
@@ -2783,4 +2851,3 @@ class AgentService {
 
 // Export singleton instance
 export const agentService = new AgentService();
-

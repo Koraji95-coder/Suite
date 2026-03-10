@@ -149,4 +149,34 @@ describe("agentTaskManager conversation scope", () => {
 			),
 		).toBe(true);
 	});
+
+	it("creates and reuses run-linked conversations for General threads", () => {
+		const first = agentTaskManager.getOrCreateRunConversation("run-abc-123", {
+			profileId: "team",
+			title: "Run abc",
+		});
+		expect(first.runId).toBe("run-abc-123");
+		expect(first.kind).toBe("run");
+
+		agentTaskManager.addMessageToConversation(
+			first.id,
+			"assistant",
+			"Step started",
+			{
+				kind: "event",
+				eventType: "step_started",
+				runId: "run-abc-123",
+				source: "run",
+			},
+		);
+
+		const second = agentTaskManager.getOrCreateRunConversation("run-abc-123", {
+			profileId: "team",
+		});
+		expect(second.id).toBe(first.id);
+		const stored = agentTaskManager.getConversation(second.id);
+		expect(stored?.messages[0]?.kind).toBe("event");
+		expect(stored?.messages[0]?.eventType).toBe("step_started");
+		expect(stored?.messages[0]?.runId).toBe("run-abc-123");
+	});
 });

@@ -1,4 +1,5 @@
 import { logger } from "../lib/logger";
+import { fetchWithTimeout, mapFetchErrorMessage } from "../lib/fetchWithTimeout";
 import { resolveAuthRedirect } from "./authRedirect";
 
 export type EmailAuthFlow = "signin" | "signup";
@@ -55,31 +56,47 @@ export async function requestEmailAuthLink(
 		payload[honeypotField] = options.honeypot;
 	}
 
-	const response = await fetch("/api/auth/email-link", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-		},
-		body: JSON.stringify(payload),
-	});
-
-	if (response.ok) {
-		return;
-	}
-
-	let message = "Unable to send email link right now. Please try again.";
 	try {
-		const payload = (await response.json()) as EmailLinkResponse;
-		if (typeof payload.error === "string" && payload.error.trim().length > 0) {
-			message = payload.error.trim();
-		}
-	} catch (error) {
-		logger.warn(
-			"Email auth API response was not JSON; using generic error.",
-			"emailAuthApi",
-			{ error },
-		);
-	}
+		const response = await fetchWithTimeout("/api/auth/email-link", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Accept: "application/json",
+			},
+			body: JSON.stringify(payload),
+			timeoutMs: 20_000,
+			requestName: "Email auth request",
+		});
 
-	throw new Error(message);
+		if (response.ok) {
+			return;
+		}
+
+		let message = "Unable to send email link right now. Please try again.";
+		try {
+			const errorPayload = (await response.clone().json()) as EmailLinkResponse;
+			const candidate = String(
+				errorPayload?.error || errorPayload?.message || "",
+			).trim();
+			if (candidate) {
+				message = candidate;
+			}
+		} catch (jsonError) {
+			const rawText = (await response.text().catch(() => "")).trim();
+			if (rawText) {
+				message = rawText;
+			} else {
+				logger.warn(
+					"Email auth API response was not JSON; using generic error.",
+					"emailAuthApi",
+					{ error: jsonError },
+				);
+			}
+		}
+
+		throw new Error(message);
+	} catch (error) {
+		const fallback = "Unable to send email link right now. Please try again.";
+		throw new Error(mapFetchErrorMessage(error, fallback));
+	}
 }

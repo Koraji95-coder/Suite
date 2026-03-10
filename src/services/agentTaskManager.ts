@@ -91,6 +91,12 @@ export interface AgentConversationMessage {
 	content: string;
 	timestamp: string;
 	profileId?: string;
+	kind?: "chat" | "event";
+	eventType?: string;
+	runId?: string;
+	status?: string;
+	requestId?: string;
+	source?: "run" | "task" | "review" | "system";
 }
 
 export interface AgentConversation {
@@ -100,6 +106,8 @@ export interface AgentConversation {
 	createdAt: string;
 	updatedAt: string;
 	messages: AgentConversationMessage[];
+	kind?: "manual" | "run";
+	runId?: string;
 }
 
 const TASK_HISTORY_KEY_PREFIX = "agent-task-history";
@@ -135,6 +143,14 @@ class AgentTaskManager {
 	private scope = "anon";
 	private conversationScope = "koro";
 
+	private buildRunConversationTitle(runId: string): string {
+		const normalized = String(runId || "").trim();
+		if (!normalized) return "Run";
+		const suffix =
+			normalized.length > 12 ? normalized.slice(-8) : normalized;
+		return `Run ${suffix}`;
+	}
+
 	private normalizeMessageContent(value: unknown): string {
 		const trimmed = String(value ?? "").trim();
 		if (!trimmed) return "";
@@ -158,6 +174,7 @@ class AgentTaskManager {
 		value: unknown,
 		index: number,
 		conversationId: string,
+		defaultRunId = "",
 	): AgentConversationMessage | null {
 		if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 		const item = value as Record<string, unknown>;
@@ -170,12 +187,34 @@ class AgentTaskManager {
 		const messageId = String(item.id || "").trim() || `${conversationId}-msg-${index}`;
 		const timestamp = this.toIsoTimestamp(item.timestamp);
 		const profileId = String(item.profileId || "").trim();
+		const kind =
+			String(item.kind || "").trim().toLowerCase() === "event"
+				? "event"
+				: "chat";
+		const eventType = String(item.eventType || "").trim();
+		const runId = String(item.runId || defaultRunId || "").trim();
+		const status = String(item.status || "").trim();
+		const requestId = String(item.requestId || "").trim();
+		const sourceText = String(item.source || "").trim().toLowerCase();
+		const source =
+			sourceText === "run" ||
+			sourceText === "task" ||
+			sourceText === "review" ||
+			sourceText === "system"
+				? sourceText
+				: "";
 		return {
 			id: messageId,
 			role,
 			content,
 			timestamp,
 			...(profileId ? { profileId } : {}),
+			...(kind !== "chat" ? { kind } : {}),
+			...(eventType ? { eventType } : {}),
+			...(runId ? { runId } : {}),
+			...(status ? { status } : {}),
+			...(requestId ? { requestId } : {}),
+			...(source ? { source } : {}),
 		};
 	}
 
@@ -185,6 +224,11 @@ class AgentTaskManager {
 
 		const conversationId =
 			String(item.id || "").trim() || `conv-${Date.now()}-${index}`;
+		const kind =
+			String(item.kind || "").trim().toLowerCase() === "run"
+				? "run"
+				: "manual";
+		const runId = String(item.runId || "").trim();
 		const profileId =
 			String(item.profileId || "").trim() || this.conversationScope || "koro";
 		const createdAt = this.toIsoTimestamp(item.createdAt);
@@ -192,14 +236,21 @@ class AgentTaskManager {
 		const rawMessages = Array.isArray(item.messages) ? item.messages : [];
 		const messages = rawMessages
 			.map((entry, messageIndex) =>
-				this.sanitizeConversationMessage(entry, messageIndex, conversationId),
+				this.sanitizeConversationMessage(
+					entry,
+					messageIndex,
+					conversationId,
+					runId,
+				),
 			)
 			.filter((entry): entry is AgentConversationMessage => Boolean(entry))
 			.slice(-MAX_MESSAGES_PER_CONVERSATION);
 		const firstUserMessage = messages.find((message) => message.role === "user");
 		const titleFromMessage = firstUserMessage
 			? `${firstUserMessage.content.slice(0, 60)}${firstUserMessage.content.length > 60 ? "..." : ""}`
-			: "New conversation";
+			: kind === "run"
+				? this.buildRunConversationTitle(runId || conversationId)
+				: "New conversation";
 		const title = String(item.title || "").trim() || titleFromMessage;
 
 		return {
@@ -209,6 +260,8 @@ class AgentTaskManager {
 			createdAt,
 			updatedAt,
 			messages,
+			...(kind !== "manual" ? { kind } : {}),
+			...(runId ? { runId } : {}),
 		};
 	}
 
@@ -428,10 +481,9 @@ class AgentTaskManager {
 			const convs = this.getConversations();
 			const idx = convs.findIndex((c) => c.id === sanitized.id);
 			if (idx >= 0) {
-				convs[idx] = sanitized;
-			} else {
-				convs.unshift(sanitized);
+				convs.splice(idx, 1);
 			}
+			convs.unshift(sanitized);
 			if (convs.length > MAX_CONVERSATIONS) convs.splice(MAX_CONVERSATIONS);
 			localStorage.setItem(this.getConversationsKey(), JSON.stringify(convs));
 		} catch (error) {
@@ -480,15 +532,69 @@ class AgentTaskManager {
 		}
 	}
 
-	createConversation(profileId: string, title?: string): AgentConversation {
+	getConversationByRunId(runId: string): AgentConversation | null {
+		const normalizedRunId = String(runId || "").trim();
+		if (!normalizedRunId) return null;
+		return (
+			this.getConversations().find(
+				(conversation) => String(conversation.runId || "").trim() === normalizedRunId,
+			) ?? null
+		);
+	}
+
+	getOrCreateRunConversation(
+		runId: string,
+		options?: { profileId?: string; title?: string },
+	): AgentConversation {
+		const normalizedRunId = String(runId || "").trim();
+		const normalizedProfile = String(options?.profileId || "").trim() || "team";
+		const preferredTitle =
+			String(options?.title || "").trim() ||
+			this.buildRunConversationTitle(normalizedRunId);
+		const existing = this.getConversationByRunId(normalizedRunId);
+		if (existing) {
+			const updated: AgentConversation = {
+				...existing,
+				profileId: normalizedProfile,
+				kind: "run",
+				runId: normalizedRunId,
+				title: preferredTitle || existing.title,
+				updatedAt: new Date().toISOString(),
+			};
+			this.saveConversation(updated);
+			return this.getConversation(updated.id) || updated;
+		}
+
+		const created = this.createConversation(normalizedProfile, preferredTitle, {
+			kind: "run",
+			runId: normalizedRunId,
+		});
+		this.saveConversation(created);
+		return created;
+	}
+
+	createConversation(
+		profileId: string,
+		title?: string,
+		options?: { kind?: "manual" | "run"; runId?: string },
+	): AgentConversation {
 		const now = new Date().toISOString();
+		const kind = options?.kind === "run" ? "run" : "manual";
+		const runId = String(options?.runId || "").trim();
+		const resolvedTitle =
+			String(title || "").trim() ||
+			(kind === "run"
+				? this.buildRunConversationTitle(runId)
+				: "New conversation");
 		return {
 			id: this.generateId(),
-			title: title || "New conversation",
+			title: resolvedTitle,
 			profileId,
 			createdAt: now,
 			updatedAt: now,
 			messages: [],
+			...(kind !== "manual" ? { kind } : {}),
+			...(runId ? { runId } : {}),
 		};
 	}
 
@@ -496,7 +602,15 @@ class AgentTaskManager {
 		conversationId: string,
 		role: "user" | "assistant",
 		content: string,
-		options?: { profileId?: string },
+		options?: {
+			profileId?: string;
+			kind?: "chat" | "event";
+			eventType?: string;
+			runId?: string;
+			status?: string;
+			requestId?: string;
+			source?: "run" | "task" | "review" | "system";
+		},
 	): AgentConversation | null {
 		const conv = this.getConversation(conversationId);
 		if (!conv) return null;
@@ -504,6 +618,19 @@ class AgentTaskManager {
 		const normalizedContent = this.normalizeMessageContent(content);
 		if (!normalizedContent) return conv;
 		const profileId = String(options?.profileId || "").trim();
+		const kind = options?.kind === "event" ? "event" : "chat";
+		const eventType = String(options?.eventType || "").trim();
+		const runId =
+			String(options?.runId || "").trim() || String(conv.runId || "").trim();
+		const status = String(options?.status || "").trim();
+		const requestId = String(options?.requestId || "").trim();
+		const source =
+			options?.source === "run" ||
+			options?.source === "task" ||
+			options?.source === "review" ||
+			options?.source === "system"
+				? options.source
+				: undefined;
 
 		conv.messages.push({
 			id: this.generateId(),
@@ -511,6 +638,12 @@ class AgentTaskManager {
 			content: normalizedContent,
 			timestamp: new Date().toISOString(),
 			...(profileId ? { profileId } : {}),
+			...(kind !== "chat" ? { kind } : {}),
+			...(eventType ? { eventType } : {}),
+			...(runId ? { runId } : {}),
+			...(status ? { status } : {}),
+			...(requestId ? { requestId } : {}),
+			...(source ? { source } : {}),
 		});
 		if (conv.messages.length > MAX_MESSAGES_PER_CONVERSATION) {
 			conv.messages.splice(
@@ -519,8 +652,14 @@ class AgentTaskManager {
 			);
 		}
 		conv.updatedAt = new Date().toISOString();
+		if (runId && (!conv.runId || conv.kind === "run")) {
+			conv.runId = runId;
+		}
+		if (runId && !conv.kind) {
+			conv.kind = "manual";
+		}
 
-		if (conv.messages.length === 1 && role === "user") {
+		if (conv.messages.length === 1 && role === "user" && kind === "chat") {
 			conv.title =
 				normalizedContent.slice(0, 60) +
 				(normalizedContent.length > 60 ? "..." : "");

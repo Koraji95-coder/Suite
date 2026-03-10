@@ -1,4 +1,4 @@
-import { Info, X } from "lucide-react";
+﻿import { Info } from "lucide-react";
 import { useState } from "react";
 import {
 	Dialog,
@@ -37,12 +37,6 @@ export function PanelInfoDialog({ title, sections }: PanelInfoDialogProps) {
 							<Info className={styles.headerIcon} />
 							<DialogTitle className={styles.dialogTitle}>{title}</DialogTitle>
 						</div>
-						<button
-							onClick={() => setIsOpen(false)}
-							className={styles.closeButton}
-						>
-							<X className={styles.closeIcon} />
-						</button>
 					</DialogHeader>
 
 					<div className={styles.body}>
@@ -54,7 +48,7 @@ export function PanelInfoDialog({ title, sections }: PanelInfoDialogProps) {
 									<ul className={styles.contentList}>
 										{section.content.map((item, i) => (
 											<li key={i} className={styles.contentListItem}>
-												<span className={styles.bullet}>•</span>
+												<span className={styles.bullet}>*</span>
 												<span>{item}</span>
 											</li>
 										))}
@@ -92,3 +86,4 @@ export function PanelInfoDialog({ title, sections }: PanelInfoDialogProps) {
 		</>
 	);
 }
+

@@ -37,23 +37,28 @@ import {
 	type AgentConversation,
 	agentTaskManager,
 } from "@/services/agentTaskManager";
-import { AgentChatComposer } from "./AgentChatComposer";
+import {
+	AgentChatComposer,
+	type AgentComposerMode,
+} from "./AgentChatComposer";
 import { AgentChatMessages } from "./AgentChatMessages";
 import styles from "./AgentChatPanel.module.css";
 import {
-	sanitizeActivityItems,
-	sanitizeTaskItems,
-} from "./agentPanelSanitizers";
+	AgentOrchestrationPanel,
+	type AgentOrchestrationRunEventPayload,
+	type AgentOrchestrationRunStartedPayload,
+	type AgentOrchestrationRunStatusPayload,
+} from "./AgentOrchestrationPanel";
+import { AgentPixelMark } from "./AgentPixelMark";
 import {
 	type AgentChannelScope,
 	isAgentProfileScope,
 } from "./agentChannelScope";
-import { AgentOrchestrationPanel } from "./AgentOrchestrationPanel";
-import { AgentPixelMark } from "./AgentPixelMark";
+import { type AgentMarkState, resolveAgentMarkState } from "./agentMarkState";
 import {
-	type AgentMarkState,
-	resolveAgentMarkState,
-} from "./agentMarkState";
+	sanitizeActivityItems,
+	sanitizeTaskItems,
+} from "./agentPanelSanitizers";
 import {
 	AGENT_PROFILE_IDS,
 	AGENT_PROFILES,
@@ -84,6 +89,33 @@ const ACTIVE_AGENT_STORAGE_KEY = "agent-active-profile";
 const STATUS_FILTERS = ["all", ...OPEN_QUEUE_STATUSES] as const;
 type QueueStatusFilter = (typeof STATUS_FILTERS)[number];
 type QueuePriorityFilter = AgentTaskPriority | "all";
+type QueueProfileFilter = AgentProfileId | "all";
+type QueueRunFilter = string | "all";
+type ActivitySourceFilter = AgentActivityItem["source"] | "all";
+const ACTIVITY_DETAIL_PREVIEW_CHARS = 260;
+const GENERAL_SCOPE_ID = "team";
+const DEFAULT_ORCHESTRATION_OBJECTIVE =
+	"Coordinate a reliability review for my active feature. Return concrete implementation steps, high-risk findings, and validation checks.";
+const TERMINAL_RUN_EVENT_TYPES = new Set([
+	"run_completed",
+	"run_failed",
+	"run_cancelled",
+]);
+const ACTIVE_STEP_EVENT_TYPES = new Set([
+	"step_started",
+	"task_running",
+	"run_started",
+]);
+const IDLE_STEP_EVENT_TYPES = new Set([
+	"step_completed",
+	"step_failed",
+	"step_cancelled",
+	"task_awaiting_review",
+	"task_reviewed",
+	"run_completed",
+	"run_failed",
+	"run_cancelled",
+]);
 
 const PRIORITY_ORDER: Record<AgentTaskPriority, number> = {
 	critical: 0,
@@ -105,7 +137,9 @@ function formatTimestamp(value: string | undefined): string {
 	});
 }
 
-function priorityColor(priority: AgentTaskPriority): "danger" | "warning" | "primary" | "default" {
+function priorityColor(
+	priority: AgentTaskPriority,
+): "danger" | "warning" | "primary" | "default" {
 	switch (priority) {
 		case "critical":
 			return "danger";
@@ -118,7 +152,9 @@ function priorityColor(priority: AgentTaskPriority): "danger" | "warning" | "pri
 	}
 }
 
-function statusColor(status: AgentTaskStatus): "success" | "warning" | "danger" | "primary" | "default" {
+function statusColor(
+	status: AgentTaskStatus,
+): "success" | "warning" | "danger" | "primary" | "default" {
 	switch (status) {
 		case "approved":
 			return "success";
@@ -134,7 +170,9 @@ function statusColor(status: AgentTaskStatus): "success" | "warning" | "danger" 
 	}
 }
 
-function activityTone(item: AgentActivityItem): "success" | "warning" | "danger" | "primary" | "default" {
+function activityTone(
+	item: AgentActivityItem,
+): "success" | "warning" | "danger" | "primary" | "default" {
 	const type = String(item.eventType || "").toLowerCase();
 	if (type.includes("fail") || type.includes("deferred")) return "danger";
 	if (type.includes("review") || type.includes("awaiting")) return "warning";
@@ -149,9 +187,78 @@ function shortRunId(runId: string): string {
 	return text.length > 14 ? text.slice(-10) : text;
 }
 
-function normalizeAssistantReply(
-	data: Record<string, unknown> | undefined,
-): {
+function runConversationTitle(runId: string): string {
+	const normalized = String(runId || "").trim();
+	if (!normalized) return "Run";
+	return `Run ${shortRunId(normalized)}`;
+}
+
+function truncateText(value: string | undefined, maxChars: number): string {
+	const text = String(value || "").trim();
+	if (!text) return "";
+	if (text.length <= maxChars) return text;
+	return `${text.slice(0, Math.max(1, maxChars - 3)).trimEnd()}...`;
+}
+
+function payloadText(
+	payload: Record<string, unknown> | undefined,
+	keys: string[],
+): string {
+	if (!payload) return "";
+	for (const key of keys) {
+		const value = payload[key];
+		if (typeof value === "string" && value.trim()) return value.trim();
+		if (typeof value === "number" || typeof value === "boolean") {
+			return String(value);
+		}
+	}
+	return "";
+}
+
+function deriveActivityDetail(item: AgentActivityItem): {
+	text: string;
+	meta: string;
+	isError: boolean;
+} | null {
+	const payload = item.payload;
+	if (!payload) return null;
+
+	const eventType = String(item.eventType || "").toLowerCase();
+	const error = payloadText(payload, ["error", "detail", "reason"]);
+	const response = payloadText(payload, ["response", "output", "result"]);
+	const reviewNote = payloadText(payload, ["reviewNote", "review_note"]);
+	const stage = payloadText(payload, ["stage"]);
+	const modelUsed = payloadText(payload, ["modelUsed", "model", "model_used"]);
+	const latencyCandidate = Number(
+		payload.latencyMs ?? payload.latency_ms ?? Number.NaN,
+	);
+	const latencyMs = Number.isFinite(latencyCandidate)
+		? Math.max(0, Math.trunc(latencyCandidate))
+		: 0;
+
+	const metaParts: string[] = [];
+	if (stage) metaParts.push(`stage ${stage}`);
+	if (modelUsed) metaParts.push(`model ${modelUsed}`);
+	if (latencyMs > 0) metaParts.push(`latency ${latencyMs}ms`);
+
+	let text = "";
+	if (error) {
+		text = error;
+	} else if (eventType.includes("awaiting_review")) {
+		text = reviewNote || response;
+	} else if (eventType.includes("agent_message")) {
+		text = response;
+	}
+
+	if (!text && metaParts.length === 0) return null;
+	return {
+		text: text.trim(),
+		meta: metaParts.join(" | "),
+		isError: Boolean(error),
+	};
+}
+
+function normalizeAssistantReply(data: Record<string, unknown> | undefined): {
 	text: string;
 	incomplete: boolean;
 	warning: string;
@@ -174,6 +281,30 @@ function normalizeAssistantReply(
 	};
 }
 
+function eventBodyFromPayload(
+	eventType: string,
+	payload: Record<string, unknown> | undefined,
+	defaultMessage: string,
+): string {
+	const normalizedType = String(eventType || "").toLowerCase();
+	const detail = payloadText(payload, ["error", "detail", "reason"]);
+	if (detail && normalizedType.includes("fail")) return detail;
+	const response = payloadText(payload, ["response", "output", "result"]);
+	if (response && normalizedType === "agent_message") return response;
+
+	const stage = payloadText(payload, ["stage"]);
+	const modelUsed = payloadText(payload, ["modelUsed", "model", "model_used"]);
+	const latency = Number(payload?.latencyMs ?? payload?.latency_ms ?? Number.NaN);
+	const metaParts: string[] = [];
+	if (stage) metaParts.push(`stage ${stage}`);
+	if (modelUsed) metaParts.push(`model ${modelUsed}`);
+	if (Number.isFinite(latency) && latency > 0) {
+		metaParts.push(`${Math.trunc(latency)}ms`);
+	}
+	if (metaParts.length === 0) return defaultMessage;
+	return `${defaultMessage} (${metaParts.join(" | ")})`;
+}
+
 export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const navigate = useNavigate();
 	const [profileId, setProfileId] = useState<AgentProfileId>(() => {
@@ -189,7 +320,8 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		try {
 			const stored = localStorage.getItem(CHANNEL_SCOPE_STORAGE_KEY);
 			if (stored === "team") return "team";
-			if (stored && stored in AGENT_PROFILES) return stored as AgentChannelScope;
+			if (stored && stored in AGENT_PROFILES)
+				return stored as AgentChannelScope;
 		} catch {
 			/* noop */
 		}
@@ -198,8 +330,18 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const [focusMode, setFocusMode] = useState(false);
 	const [conversations, setConversations] = useState<AgentConversation[]>([]);
 	const [activeConvId, setActiveConvId] = useState<string | null>(null);
-	const [isThinking, setIsThinking] = useState(false);
-	const [thinkingProfileId, setThinkingProfileId] =
+	const [directThinking, setDirectThinking] = useState(false);
+	const [composerMode, setComposerMode] =
+		useState<AgentComposerMode>("direct");
+	const [orchestrationObjective, setOrchestrationObjective] = useState(
+		DEFAULT_ORCHESTRATION_OBJECTIVE,
+	);
+	const [orchestrationRunStartSignal, setOrchestrationRunStartSignal] =
+		useState(0);
+	const [directThinkingProfileId, setDirectThinkingProfileId] =
+		useState<AgentProfileId>(DEFAULT_AGENT_PROFILE);
+	const [workflowThinkingRunId, setWorkflowThinkingRunId] = useState("");
+	const [workflowThinkingProfileId, setWorkflowThinkingProfileId] =
 		useState<AgentProfileId>(DEFAULT_AGENT_PROFILE);
 	const [liveStreamText, setLiveStreamText] = useState("");
 
@@ -211,11 +353,24 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const [reviewBusyTaskId, setReviewBusyTaskId] = useState("");
 	const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 	const [statusFilter, setStatusFilter] = useState<QueueStatusFilter>("all");
-	const [priorityFilter, setPriorityFilter] = useState<QueuePriorityFilter>("all");
+	const [priorityFilter, setPriorityFilter] =
+		useState<QueuePriorityFilter>("all");
+	const [queueProfileFilter, setQueueProfileFilter] =
+		useState<QueueProfileFilter>("all");
+	const [queueRunFilter, setQueueRunFilter] = useState<QueueRunFilter>("all");
+	const [activityProfileFilter, setActivityProfileFilter] =
+		useState<QueueProfileFilter>("all");
+	const [activityRunFilter, setActivityRunFilter] =
+		useState<QueueRunFilter>("all");
+	const [activitySourceFilter, setActivitySourceFilter] =
+		useState<ActivitySourceFilter>("all");
 	const [profileSuccessUntil, setProfileSuccessUntil] = useState<
 		Partial<Record<AgentProfileId, number>>
 	>({});
 	const seenActivityIdsRef = useRef<Set<string>>(new Set());
+	const eventMirrorKeysRef = useRef<Set<string>>(new Set());
+	const activityBridgeReadyRef = useRef(false);
+	const workflowThinkingRunRef = useRef("");
 	const mountedRef = useRef(true);
 	const workflowRefreshEpochRef = useRef(0);
 	const workflowRefreshInFlightRef = useRef<Promise<void> | null>(null);
@@ -230,6 +385,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	}, []);
 
 	useEffect(() => {
+		workflowThinkingRunRef.current = workflowThinkingRunId;
+	}, [workflowThinkingRunId]);
+
+	useEffect(() => {
 		if (isAgentProfileScope(channelScope) && channelScope !== profileId) {
 			setProfileId(channelScope);
 		}
@@ -240,23 +399,27 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		agentTaskManager.setConversationScope(conversationScope);
 		const convs = agentTaskManager.getConversations();
 		setConversations(convs);
-		setActiveConvId(convs[0]?.id ?? null);
+		setActiveConvId((current) => {
+			if (current && convs.some((conversation) => conversation.id === current)) {
+				return current;
+			}
+			return convs[0]?.id ?? null;
+		});
 		try {
 			localStorage.setItem(
 				ACTIVE_AGENT_STORAGE_KEY,
 				channelScope === "team" ? profileId : channelScope,
 			);
-			localStorage.setItem(
-				CHANNEL_SCOPE_STORAGE_KEY,
-				conversationScope,
-			);
+			localStorage.setItem(CHANNEL_SCOPE_STORAGE_KEY, conversationScope);
 		} catch {
 			/* noop */
 		}
 	}, [channelScope, profileId]);
 
 	const activeConv = useMemo(
-		() => conversations.find((conversation) => conversation.id === activeConvId) ?? null,
+		() =>
+			conversations.find((conversation) => conversation.id === activeConvId) ??
+			null,
 		[conversations, activeConvId],
 	);
 	const scopeProfileId: AgentProfileId = isAgentProfileScope(channelScope)
@@ -266,23 +429,151 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const profile =
 		channelScope === "team"
 			? {
-					name: "Shared Channel",
+					name: "General",
 					tagline: "Unified multi-agent command view",
-					focus: "Monitor collaboration, queue, and review flow across all agents.",
+					focus:
+						"Monitor collaboration, queue, and review flow across all agents.",
 				}
 			: scopeProfile;
 	const templates = getAgentTaskTemplates(scopeProfileId);
 	const profileRouteLabel =
 		channelScope === "team"
-			? `Shared feed - coordinator ${scopeProfile.name}`
+			? `General live feed - coordinator ${scopeProfile.name}`
 			: `Model ${scopeProfile.modelPrimary}`;
 	const channelLabel =
-		channelScope === "team" ? "Shared Channel" : scopeProfile.name;
+		channelScope === "team" ? "General" : scopeProfile.name;
 
 	const refreshConversations = useCallback(() => {
 		const next = agentTaskManager.getConversations();
 		setConversations(next);
 	}, []);
+
+	const openGeneralRunConversation = useCallback(
+		(
+			runId: string,
+			options?: { focus?: boolean; title?: string },
+		): AgentConversation | null => {
+			const normalizedRunId = String(runId || "").trim();
+			if (!normalizedRunId) return null;
+			const shouldFocus =
+				options?.focus !== false || channelScope === GENERAL_SCOPE_ID;
+			const previousScope =
+				channelScope === GENERAL_SCOPE_ID ? GENERAL_SCOPE_ID : channelScope;
+
+			agentTaskManager.setConversationScope(GENERAL_SCOPE_ID);
+			const conversation = agentTaskManager.getOrCreateRunConversation(
+				normalizedRunId,
+				{
+					profileId: GENERAL_SCOPE_ID,
+					title:
+						String(options?.title || "").trim() ||
+						runConversationTitle(normalizedRunId),
+				},
+			);
+			if (shouldFocus) {
+				const nextConversations = agentTaskManager.getConversations();
+				setConversations(nextConversations);
+				setActiveConvId(conversation.id);
+				setChannelScope("team");
+			} else {
+				agentTaskManager.setConversationScope(previousScope);
+			}
+			return conversation;
+		},
+		[channelScope],
+	);
+
+	const appendRunEventToConversation = useCallback(
+		(
+			runId: string,
+			eventType: string,
+			message: string,
+			options?: {
+				profileId?: string;
+				status?: string;
+				source?: "run" | "task" | "review" | "system";
+				requestId?: string;
+				dedupeKey?: string;
+			},
+		) => {
+			const normalizedRunId = String(runId || "").trim();
+			const normalizedMessage = String(message || "").trim();
+			if (!normalizedRunId || !normalizedMessage) return;
+			const dedupeKey = String(options?.dedupeKey || "").trim();
+			if (dedupeKey && eventMirrorKeysRef.current.has(dedupeKey)) return;
+			if (dedupeKey) {
+				eventMirrorKeysRef.current.add(dedupeKey);
+			}
+
+			const previousScope =
+				channelScope === GENERAL_SCOPE_ID ? GENERAL_SCOPE_ID : channelScope;
+			agentTaskManager.setConversationScope(GENERAL_SCOPE_ID);
+			const conversation = agentTaskManager.getOrCreateRunConversation(
+				normalizedRunId,
+				{
+					profileId: GENERAL_SCOPE_ID,
+					title: runConversationTitle(normalizedRunId),
+				},
+			);
+
+			const normalizedEventType = String(eventType || "").trim().toLowerCase();
+			const resolvedProfileId = String(options?.profileId || "").trim();
+			const isAgentMessage = normalizedEventType === "agent_message";
+
+			agentTaskManager.addMessageToConversation(
+				conversation.id,
+				"assistant",
+				normalizedMessage,
+				{
+					profileId: resolvedProfileId || undefined,
+					kind: isAgentMessage ? "chat" : "event",
+					eventType: normalizedEventType,
+					runId: normalizedRunId,
+					status: options?.status,
+					source: options?.source || "run",
+					requestId: options?.requestId,
+				},
+			);
+			if (channelScope === GENERAL_SCOPE_ID) {
+				refreshConversations();
+			} else {
+				agentTaskManager.setConversationScope(previousScope);
+			}
+		},
+		[channelScope, refreshConversations],
+	);
+
+	const applyWorkflowThinkingEvent = useCallback(
+		(runId: string, eventType: string, profileIdCandidate?: string) => {
+			const normalizedRunId = String(runId || "").trim();
+			const normalizedEventType = String(eventType || "").trim().toLowerCase();
+			if (!normalizedRunId || !normalizedEventType) return;
+			if (ACTIVE_STEP_EVENT_TYPES.has(normalizedEventType)) {
+				const normalizedProfile = String(profileIdCandidate || "")
+					.trim()
+					.toLowerCase();
+				if (normalizedProfile && normalizedProfile in AGENT_PROFILES) {
+					setWorkflowThinkingProfileId(normalizedProfile as AgentProfileId);
+				}
+				setWorkflowThinkingRunId(normalizedRunId);
+				return;
+			}
+			if (
+				IDLE_STEP_EVENT_TYPES.has(normalizedEventType) &&
+				workflowThinkingRunRef.current === normalizedRunId
+			) {
+				setWorkflowThinkingRunId("");
+				return;
+			}
+			if (
+				TERMINAL_RUN_EVENT_TYPES.has(normalizedEventType) &&
+				workflowThinkingRunRef.current === normalizedRunId
+			) {
+				setWorkflowThinkingRunId("");
+			}
+		},
+		[],
+	);
 
 	const applyChannelScope = useCallback((nextScope: AgentChannelScope) => {
 		if (nextScope === "team") {
@@ -312,7 +603,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const handleNewConversation = useCallback(() => {
 		const conversation = agentTaskManager.createConversation(
 			channelScope === "team" ? "team" : scopeProfileId,
-			channelScope === "team" ? "Shared channel conversation" : undefined,
+			channelScope === "team" ? "General conversation" : undefined,
 		);
 		agentTaskManager.saveConversation(conversation);
 		refreshConversations();
@@ -334,7 +625,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		[refreshConversations],
 	);
 
-	const handleSend = useCallback(
+	const handleDirectSend = useCallback(
 		async (message: string) => {
 			if (!healthy || !paired) return;
 			const outboundProfileId: AgentProfileId =
@@ -348,7 +639,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			if (!conversationId) {
 				const created = agentTaskManager.createConversation(
 					channelScope === "team" ? "team" : scopeProfileId,
-					channelScope === "team" ? "Shared channel conversation" : undefined,
+					channelScope === "team" ? "General conversation" : undefined,
 				);
 				agentTaskManager.saveConversation(created);
 				conversationId = created.id;
@@ -363,8 +654,8 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			);
 			refreshConversations();
 
-			setThinkingProfileId(outboundProfileId);
-			setIsThinking(true);
+			setDirectThinkingProfileId(outboundProfileId);
+			setDirectThinking(true);
 			setLiveStreamText("");
 			try {
 				const response = await agentService.sendMessage(outboundMessage, {
@@ -388,7 +679,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					}
 				}
 				if (mountedRef.current) {
-					setIsThinking(false);
+					setDirectThinking(false);
 					setLiveStreamText("");
 				}
 				agentTaskManager.addMessageToConversation(
@@ -401,7 +692,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				const errorMessage =
 					error instanceof Error ? error.message : "Unknown error occurred.";
 				if (mountedRef.current) {
-					setIsThinking(false);
+					setDirectThinking(false);
 					setLiveStreamText("");
 				}
 				agentTaskManager.addMessageToConversation(
@@ -412,7 +703,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				);
 			} finally {
 				if (mountedRef.current) {
-					setIsThinking(false);
+					setDirectThinking(false);
 					setLiveStreamText("");
 					refreshConversations();
 				}
@@ -431,105 +722,141 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 
 	const handleCancel = useCallback(() => {
 		agentService.cancelActiveRequest();
+		setDirectThinking(false);
+		setLiveStreamText("");
 	}, []);
 
-	const refreshWorkflowData = useCallback((silent = false) => {
-		if (workflowRefreshInFlightRef.current) {
-			return workflowRefreshInFlightRef.current;
-		}
-
-		const epoch = ++workflowRefreshEpochRef.current;
-		if (!agentService.usesBroker()) {
-			if (mountedRef.current) {
-				setTaskItems([]);
-				setActivityItems([]);
-				setWorkflowError("");
-				if (!silent) setWorkflowLoading(false);
-				setWorkflowInitialLoadDone(true);
+	const handleComposerSend = useCallback(
+		(message: string) => {
+			if (composerMode === "run") {
+				setOrchestrationObjective(message);
+				setOrchestrationRunStartSignal((current) => current + 1);
+				if (channelScope !== GENERAL_SCOPE_ID) {
+					applyChannelScope("team");
+				}
+				return;
 			}
-			return Promise.resolve();
-		}
-		if (!silent && mountedRef.current) {
-			setWorkflowLoading(true);
-		}
+			void handleDirectSend(message);
+		},
+		[composerMode, channelScope, applyChannelScope, handleDirectSend],
+	);
 
-		const requestPromise = (async () => {
-			try {
-				const [tasksResult, activityResult] = await Promise.all([
-					agentService.listAgentTasks({ limit: 240 }),
-					agentService.getAgentActivity({ limit: 240 }),
-				]);
-				if (!mountedRef.current || epoch !== workflowRefreshEpochRef.current) {
-					return;
+	const refreshWorkflowData = useCallback(
+		(silent = false) => {
+			if (workflowRefreshInFlightRef.current) {
+				return workflowRefreshInFlightRef.current;
+			}
+
+			const epoch = ++workflowRefreshEpochRef.current;
+			if (!agentService.usesBroker()) {
+				if (mountedRef.current) {
+					setTaskItems([]);
+					setActivityItems([]);
+					setWorkflowError("");
+					if (!silent) setWorkflowLoading(false);
+					setWorkflowInitialLoadDone(true);
 				}
+				return Promise.resolve();
+			}
+			if (!silent && mountedRef.current) {
+				setWorkflowLoading(true);
+			}
 
-				const normalizedTasks = sanitizeTaskItems(tasksResult.tasks);
-				const normalizedActivity = sanitizeActivityItems(activityResult.activity);
+			const requestPromise = (async () => {
+				try {
+					const [tasksResult, activityResult] = await Promise.all([
+						agentService.listAgentTasks({ limit: 240 }),
+						agentService.getAgentActivity({ limit: 240 }),
+					]);
+					if (
+						!mountedRef.current ||
+						epoch !== workflowRefreshEpochRef.current
+					) {
+						return;
+					}
 
-				if (tasksResult.success) {
-					setTaskItems(normalizedTasks);
-				} else {
-					logger.warn("Task queue refresh returned unsuccessful response.", "AgentChatPanel", {
-						stage: "refreshWorkflowData.tasks",
+					const normalizedTasks = sanitizeTaskItems(tasksResult.tasks);
+					const normalizedActivity = sanitizeActivityItems(
+						activityResult.activity,
+					);
+
+					if (tasksResult.success) {
+						setTaskItems(normalizedTasks);
+					} else {
+						logger.warn(
+							"Task queue refresh returned unsuccessful response.",
+							"AgentChatPanel",
+							{
+								stage: "refreshWorkflowData.tasks",
+								scope: channelScope,
+								activeProfile: scopeProfileId,
+								error: tasksResult.error,
+							},
+						);
+						setWorkflowError(tasksResult.error || "Unable to load task queue.");
+					}
+
+					if (activityResult.success) {
+						setActivityItems(normalizedActivity);
+					} else if (!tasksResult.success) {
+						logger.warn(
+							"Activity refresh returned unsuccessful response.",
+							"AgentChatPanel",
+							{
+								stage: "refreshWorkflowData.activity",
+								scope: channelScope,
+								activeProfile: scopeProfileId,
+								error: activityResult.error,
+							},
+						);
+						setWorkflowError(
+							activityResult.error || "Unable to load unified activity feed.",
+						);
+					}
+
+					if (tasksResult.success && activityResult.success) {
+						setWorkflowError("");
+					}
+				} catch (error) {
+					logger.error("Workflow refresh crashed.", "AgentChatPanel", {
+						stage: "refreshWorkflowData.exception",
 						scope: channelScope,
 						activeProfile: scopeProfileId,
-						error: tasksResult.error,
+						silent,
+						error,
 					});
-					setWorkflowError(tasksResult.error || "Unable to load task queue.");
-				}
-
-				if (activityResult.success) {
-					setActivityItems(normalizedActivity);
-				} else if (!tasksResult.success) {
-					logger.warn("Activity refresh returned unsuccessful response.", "AgentChatPanel", {
-						stage: "refreshWorkflowData.activity",
-						scope: channelScope,
-						activeProfile: scopeProfileId,
-						error: activityResult.error,
-					});
+					if (
+						!mountedRef.current ||
+						epoch !== workflowRefreshEpochRef.current
+					) {
+						return;
+					}
 					setWorkflowError(
-						activityResult.error || "Unable to load unified activity feed.",
+						error instanceof Error
+							? error.message
+							: "Unable to load workflow data right now.",
 					);
 				}
-
-				if (tasksResult.success && activityResult.success) {
-					setWorkflowError("");
+			})();
+			let trackedPromise: Promise<void> | null = null;
+			trackedPromise = requestPromise.finally(() => {
+				if (workflowRefreshInFlightRef.current === trackedPromise) {
+					workflowRefreshInFlightRef.current = null;
 				}
-			} catch (error) {
-				logger.error("Workflow refresh crashed.", "AgentChatPanel", {
-					stage: "refreshWorkflowData.exception",
-					scope: channelScope,
-					activeProfile: scopeProfileId,
-					silent,
-					error,
-				});
-				if (!mountedRef.current || epoch !== workflowRefreshEpochRef.current) {
-					return;
+				if (
+					!silent &&
+					mountedRef.current &&
+					epoch === workflowRefreshEpochRef.current
+				) {
+					setWorkflowLoading(false);
+					setWorkflowInitialLoadDone(true);
 				}
-				setWorkflowError(
-					error instanceof Error
-						? error.message
-						: "Unable to load workflow data right now.",
-				);
-			}
-		})();
-		let trackedPromise: Promise<void> | null = null;
-		trackedPromise = requestPromise.finally(() => {
-			if (workflowRefreshInFlightRef.current === trackedPromise) {
-				workflowRefreshInFlightRef.current = null;
-			}
-			if (
-				!silent &&
-				mountedRef.current &&
-				epoch === workflowRefreshEpochRef.current
-			) {
-				setWorkflowLoading(false);
-				setWorkflowInitialLoadDone(true);
-			}
-		});
-		workflowRefreshInFlightRef.current = trackedPromise;
-		return trackedPromise;
-	}, [channelScope, scopeProfileId]);
+			});
+			workflowRefreshInFlightRef.current = trackedPromise;
+			return trackedPromise;
+		},
+		[channelScope, scopeProfileId],
+	);
 
 	useEffect(() => {
 		void refreshWorkflowData();
@@ -559,49 +886,131 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	}, [refreshWorkflowData]);
 
 	useEffect(() => {
+		if (!activityBridgeReadyRef.current) {
+			for (const item of activityItems) {
+				const activityId = String(item.activityId || "").trim();
+				if (activityId) {
+					seenActivityIdsRef.current.add(activityId);
+				}
+				const eventType = String(item.eventType || "").toLowerCase();
+				if (
+					eventType.includes("approved") ||
+					eventType.includes("completed")
+				) {
+					const profile = String(item.profileId || "").trim().toLowerCase();
+					if (profile && profile in AGENT_PROFILES) {
+						markProfileSuccess(profile as AgentProfileId);
+					}
+				}
+			}
+			activityBridgeReadyRef.current = true;
+			return;
+		}
+
 		for (const item of activityItems) {
 			const activityId = String(item.activityId || "").trim();
 			if (!activityId || seenActivityIdsRef.current.has(activityId)) continue;
 			seenActivityIdsRef.current.add(activityId);
 
 			const eventType = String(item.eventType || "").toLowerCase();
+			const profile = String(item.profileId || "").trim().toLowerCase();
 			if (
-				!(eventType.includes("approved") || eventType.includes("completed"))
+				eventType.includes("approved") ||
+				eventType.includes("completed")
 			) {
-				continue;
+				if (profile && profile in AGENT_PROFILES) {
+					markProfileSuccess(profile as AgentProfileId);
+				}
 			}
-			const profile = String(item.profileId || "").trim();
-			if (!profile || !(profile in AGENT_PROFILES)) continue;
-			markProfileSuccess(profile as AgentProfileId);
+
+			const runId = String(item.runId || "").trim();
+			if (!runId) continue;
+			const detail = eventBodyFromPayload(eventType, item.payload, item.message);
+			const runEventId = Number(
+				String(activityId || "")
+					.trim()
+					.replace(/^run-/, ""),
+			);
+			const dedupeKey =
+				item.source === "run" && Number.isFinite(runEventId) && runEventId > 0
+					? `run:${runId}:event:${Math.trunc(runEventId)}`
+					: `activity:${activityId}`;
+			appendRunEventToConversation(runId, eventType, detail, {
+				profileId: item.profileId,
+				status: item.status,
+				source: item.source,
+				requestId: item.requestId,
+				dedupeKey,
+			});
+			applyWorkflowThinkingEvent(runId, eventType, profile);
 		}
-	}, [activityItems, markProfileSuccess]);
+	}, [
+		activityItems,
+		appendRunEventToConversation,
+		markProfileSuccess,
+		applyWorkflowThinkingEvent,
+	]);
+
+	// Defensive guard: avoid a permanently spinning queue loader if first-load
+	// workflow requests stall or are interrupted by fast route changes.
+	useEffect(() => {
+		if (workflowInitialLoadDone) return;
+		const timer = window.setTimeout(() => {
+			if (!mountedRef.current) return;
+			setWorkflowLoading(false);
+			setWorkflowInitialLoadDone(true);
+		}, 10_000);
+		return () => window.clearTimeout(timer);
+	}, [workflowInitialLoadDone]);
 
 	const isReady = healthy && paired;
-	const showQueueRefreshSpinner = workflowLoading && !workflowInitialLoadDone;
-
-	const scopedTaskItems = useMemo(
-		() =>
-			channelScope === "team"
-				? taskItems
-				: taskItems.filter((task) => task.assigneeProfile === scopeProfileId),
-		[channelScope, taskItems, scopeProfileId],
-	);
-	const scopedActivityItems = useMemo(
-		() =>
-			channelScope === "team"
-				? activityItems
-				: activityItems.filter((item) => item.profileId === scopeProfileId),
-		[channelScope, activityItems, scopeProfileId],
-	);
+	const showQueueRefreshSpinner =
+		workflowLoading &&
+		!workflowInitialLoadDone &&
+		taskItems.length === 0 &&
+		activityItems.length === 0 &&
+		!workflowError;
 
 	const queueTasks = useMemo(
-		() => scopedTaskItems.filter((task) => OPEN_QUEUE_STATUSES.includes(task.status)),
-		[scopedTaskItems],
-	);
-	const globalQueueTasks = useMemo(
 		() => taskItems.filter((task) => OPEN_QUEUE_STATUSES.includes(task.status)),
 		[taskItems],
 	);
+
+	const availableRunIds = useMemo(() => {
+		const stampByRun = new Map<string, string>();
+		for (const task of taskItems) {
+			const runId = String(task.runId || "").trim();
+			if (!runId) continue;
+			const stamp = String(task.updatedAt || task.createdAt || "").trim();
+			if (!stampByRun.has(runId) || stamp > String(stampByRun.get(runId) || "")) {
+				stampByRun.set(runId, stamp);
+			}
+		}
+		for (const activity of activityItems) {
+			const runId = String(activity.runId || "").trim();
+			if (!runId) continue;
+			const stamp = String(activity.createdAt || "").trim();
+			if (!stampByRun.has(runId) || stamp > String(stampByRun.get(runId) || "")) {
+				stampByRun.set(runId, stamp);
+			}
+		}
+		return Array.from(stampByRun.entries())
+			.sort((left, right) => right[1].localeCompare(left[1]))
+			.map(([runId]) => runId)
+			.slice(0, 40);
+	}, [taskItems, activityItems]);
+
+	useEffect(() => {
+		if (queueRunFilter !== "all" && !availableRunIds.includes(queueRunFilter)) {
+			setQueueRunFilter("all");
+		}
+		if (
+			activityRunFilter !== "all" &&
+			!availableRunIds.includes(activityRunFilter)
+		) {
+			setActivityRunFilter("all");
+		}
+	}, [queueRunFilter, activityRunFilter, availableRunIds]);
 
 	const filteredQueueTasks = useMemo(() => {
 		return [...queueTasks]
@@ -611,6 +1020,17 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			.filter((task) =>
 				priorityFilter === "all" ? true : task.priority === priorityFilter,
 			)
+			.filter((task) =>
+				queueProfileFilter === "all"
+					? true
+					: String(task.assigneeProfile || "").trim().toLowerCase() ===
+						queueProfileFilter,
+			)
+			.filter((task) =>
+				queueRunFilter === "all"
+					? true
+					: String(task.runId || "").trim() === queueRunFilter,
+			)
 			.sort((left, right) => {
 				const priorityDelta =
 					PRIORITY_ORDER[left.priority] - PRIORITY_ORDER[right.priority];
@@ -619,11 +1039,53 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					String(left.createdAt || ""),
 				);
 			});
-	}, [queueTasks, statusFilter, priorityFilter]);
+	}, [
+		queueTasks,
+		statusFilter,
+		priorityFilter,
+		queueProfileFilter,
+		queueRunFilter,
+	]);
+
+	const filteredActivityItems = useMemo(() => {
+		return activityItems
+			.filter((item) =>
+				activitySourceFilter === "all" ? true : item.source === activitySourceFilter,
+			)
+			.filter((item) =>
+				activityProfileFilter === "all"
+					? true
+					: String(item.profileId || "").trim().toLowerCase() ===
+						activityProfileFilter,
+			)
+			.filter((item) =>
+				activityRunFilter === "all"
+					? true
+					: String(item.runId || "").trim() === activityRunFilter,
+			);
+	}, [
+		activityItems,
+		activitySourceFilter,
+		activityProfileFilter,
+		activityRunFilter,
+	]);
 
 	const reviewInboxTasks = useMemo(
-		() => scopedTaskItems.filter((task) => task.status === "awaiting_review"),
-		[scopedTaskItems],
+		() =>
+			queueTasks
+				.filter((task) => task.status === "awaiting_review")
+				.filter((task) =>
+					queueProfileFilter === "all"
+						? true
+						: String(task.assigneeProfile || "").trim().toLowerCase() ===
+							queueProfileFilter,
+				)
+				.filter((task) =>
+					queueRunFilter === "all"
+						? true
+						: String(task.runId || "").trim() === queueRunFilter,
+				),
+		[queueTasks, queueProfileFilter, queueRunFilter],
 	);
 
 	const priorityCounts = useMemo(() => {
@@ -641,7 +1103,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 
 	const profileRoster = useMemo(() => {
 		return AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((id) => {
-			const assigned = globalQueueTasks.filter(
+			const assigned = queueTasks.filter(
 				(task) => task.assigneeProfile === id,
 			);
 			const active = assigned.some((task) =>
@@ -657,11 +1119,36 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				warningCount,
 			};
 		});
-	}, [globalQueueTasks]);
+	}, [queueTasks]);
 
 	const handleReviewAction = useCallback(
 		async (taskId: string, action: AgentReviewAction) => {
 			setReviewBusyTaskId(taskId);
+			const task = taskItems.find((entry) => entry.taskId === taskId);
+			const pendingRunId = String(task?.runId || "").trim();
+			if (pendingRunId) {
+				appendRunEventToConversation(
+					pendingRunId,
+					"task_review_pending",
+					`Review action "${action}" submitted for ${String(
+						task?.assigneeProfile || "agent",
+					)}. Awaiting workflow update...`,
+					{
+						profileId: String(task?.assigneeProfile || "").trim(),
+						status: String(task?.status || "").trim(),
+						source: "review",
+						dedupeKey: `review-pending:${taskId}:${action}:${Date.now()}`,
+					},
+				);
+				openGeneralRunConversation(pendingRunId, { focus: true });
+				setWorkflowThinkingRunId(pendingRunId);
+				const pendingProfile = String(task?.assigneeProfile || "")
+					.trim()
+					.toLowerCase();
+				if (pendingProfile && pendingProfile in AGENT_PROFILES) {
+					setWorkflowThinkingProfileId(pendingProfile as AgentProfileId);
+				}
+			}
 			try {
 				const result = await agentService.reviewAgentTask(
 					taskId,
@@ -698,6 +1185,20 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				if (mountedRef.current) {
 					setWorkflowError("Unable to submit review action.");
 				}
+				if (pendingRunId) {
+					appendRunEventToConversation(
+						pendingRunId,
+						"task_review_failed",
+						`Review action failed: ${
+							error instanceof Error ? error.message : "Unknown error"
+						}`,
+						{
+							profileId: String(task?.assigneeProfile || "").trim(),
+							source: "review",
+							dedupeKey: `review-error:${taskId}:${action}:${Date.now()}`,
+						},
+					);
+				}
 			} finally {
 				if (mountedRef.current) {
 					setReviewBusyTaskId("");
@@ -711,11 +1212,135 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			markProfileSuccess,
 			channelScope,
 			scopeProfileId,
+			appendRunEventToConversation,
+			openGeneralRunConversation,
 		],
 	);
 
-	const conversationCount = conversations.length;
+	const handleOrchestrationRunStarted = useCallback(
+		(payload: AgentOrchestrationRunStartedPayload) => {
+			const runId = String(payload.runId || "").trim();
+			if (!runId) return;
+			const conversation = openGeneralRunConversation(runId, {
+				focus: true,
+				title: runConversationTitle(runId),
+			});
+			if (conversation) {
+				agentTaskManager.addMessageToConversation(
+					conversation.id,
+					"user",
+					String(payload.objective || "").trim(),
+					{
+						profileId: "koro",
+						kind: "chat",
+						runId,
+						source: "run",
+					},
+				);
+			}
+			appendRunEventToConversation(
+				runId,
+				"run_enqueued",
+				"Run queued from Live Agent Collaboration.",
+				{
+					source: "run",
+					requestId: payload.requestId,
+				dedupeKey: `client-run-start:${runId}`,
+				},
+			);
+			refreshConversations();
+			setWorkflowThinkingRunId(runId);
+			setWorkflowThinkingProfileId("koro");
+		},
+		[appendRunEventToConversation, openGeneralRunConversation, refreshConversations],
+	);
+
+	const handleOrchestrationRunEvent = useCallback(
+		(payload: AgentOrchestrationRunEventPayload) => {
+			const runId = String(payload.runId || "").trim();
+			if (!runId) return;
+			const event = payload.event;
+			const normalizedType = String(event.eventType || "").trim().toLowerCase();
+			const message = eventBodyFromPayload(
+				normalizedType,
+				event.payload,
+				String(event.message || "Workflow event"),
+			);
+			const profile = String(event.profileId || "").trim();
+			appendRunEventToConversation(runId, normalizedType, message, {
+				profileId: profile,
+				source: "run",
+				requestId: event.requestId,
+				status: payloadText(event.payload, ["status"]),
+				dedupeKey:
+					event.id > 0
+						? `run:${runId}:event:${event.id}`
+						: `run:${runId}:event:${normalizedType}:${event.requestId}`,
+			});
+			applyWorkflowThinkingEvent(runId, normalizedType, profile);
+		},
+		[appendRunEventToConversation, applyWorkflowThinkingEvent],
+	);
+
+	const handleOrchestrationRunStatusChange = useCallback(
+		(payload: AgentOrchestrationRunStatusPayload) => {
+			const runId = String(payload.runId || "").trim();
+			if (!runId) return;
+			const status = String(payload.status || "").trim().toLowerCase();
+			if (status === "running" || status === "queued" || status === "cancel_requested") {
+				setWorkflowThinkingRunId(runId);
+				return;
+			}
+			if (workflowThinkingRunRef.current === runId) {
+				setWorkflowThinkingRunId("");
+			}
+		},
+		[],
+	);
+
+	const handleOrchestrationRunCleared = useCallback(
+		(payload: { runId: string }) => {
+			const runId = String(payload.runId || "").trim();
+			if (runId && workflowThinkingRunRef.current === runId) {
+				setWorkflowThinkingRunId("");
+			}
+		},
+		[],
+	);
+
+	const visibleConversations = useMemo(() => {
+		if (channelScope !== "team") return conversations;
+		const runConversations = conversations.filter(
+			(conversation) =>
+				conversation.kind === "run" ||
+				Boolean(String(conversation.runId || "").trim()),
+		);
+		return runConversations.length > 0 ? runConversations : conversations;
+	}, [channelScope, conversations]);
+	const conversationCount = visibleConversations.length;
 	const activeMessageCount = activeConv?.messages.length ?? 0;
+	useEffect(() => {
+		if (
+			activeConvId &&
+			visibleConversations.some((conversation) => conversation.id === activeConvId)
+		) {
+			return;
+		}
+		setActiveConvId(visibleConversations[0]?.id ?? null);
+	}, [visibleConversations, activeConvId]);
+
+	const workflowThinkingActive = Boolean(workflowThinkingRunId);
+	const activeConversationRunId = String(activeConv?.runId || "").trim();
+	const showWorkflowThinking =
+		workflowThinkingActive &&
+		channelScope === GENERAL_SCOPE_ID &&
+		(!activeConversationRunId ||
+			activeConversationRunId === workflowThinkingRunId);
+	const isThinking = directThinking || showWorkflowThinking;
+	const thinkingProfileId = directThinking
+		? directThinkingProfileId
+		: workflowThinkingProfileId;
+	const thinkingContent = directThinking ? liveStreamText : "";
 	const now = Date.now();
 	const hasRunningQueue = queueTasks.some((task) =>
 		RUNNING_TASK_STATUSES.includes(task.status),
@@ -724,7 +1349,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		REVIEW_WARNING_STATUSES.includes(task.status),
 	);
 	const activeProfileSuccess =
-		channelScope === "team" ? false : (profileSuccessUntil[scopeProfileId] ?? 0) > now;
+		channelScope === "team"
+			? false
+			: (profileSuccessUntil[scopeProfileId] ?? 0) > now;
 	const profileStateById = useMemo(() => {
 		const entries = Object.fromEntries(
 			profileRoster.map((entry) => [entry.profileId, entry]),
@@ -746,10 +1373,11 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				waiting: healthy && !paired,
 				running:
 					Boolean(rosterEntry?.active) ||
-					(channelScope !== "team" && id === scopeProfileId && isThinking),
+					(channelScope !== "team" && id === scopeProfileId && directThinking),
 				warning: Boolean(rosterEntry?.warningCount),
 				success: (profileSuccessUntil[id] ?? 0) > currentTime,
-				focus: channelScope !== "team" && id === scopeProfileId && healthy && paired,
+				focus:
+					channelScope !== "team" && id === scopeProfileId && healthy && paired,
 			});
 		}
 		return next;
@@ -759,7 +1387,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		paired,
 		channelScope,
 		scopeProfileId,
-		isThinking,
+		directThinking,
 		profileSuccessUntil,
 	]);
 	const centerAvatarState = resolveAgentMarkState({
@@ -812,9 +1440,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 									<House size={14} />
 								</div>
 								<div>
-									<p className={styles.rosterName}>Shared Channel</p>
+									<p className={styles.rosterName}>General</p>
 									<p className={styles.rosterMeta}>
-										Unified multi-agent command channel
+										Unified live collaboration channel
 									</p>
 								</div>
 							</div>
@@ -937,12 +1565,52 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 								onClick={() => setStatusFilter(filterValue)}
 								className={cn(
 									styles.statusFilterButton,
-									statusFilter === filterValue && styles.statusFilterButtonActive,
+									statusFilter === filterValue &&
+										styles.statusFilterButtonActive,
 								)}
 							>
 								{filterValue === "all" ? "all" : filterValue.replace("_", " ")}
 							</button>
 						))}
+					</div>
+
+					<div className={styles.filterGrid}>
+						<label className={styles.filterField} htmlFor="queue-profile-filter">
+							<span>profile</span>
+							<select
+								id="queue-profile-filter"
+								name="queue_profile_filter"
+								value={queueProfileFilter}
+								onChange={(event) =>
+									setQueueProfileFilter(
+										event.target.value as QueueProfileFilter,
+									)
+								}
+							>
+								<option value="all">all profiles</option>
+								{AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((id) => (
+									<option key={id} value={id}>
+										{AGENT_PROFILES[id].name}
+									</option>
+								))}
+							</select>
+						</label>
+						<label className={styles.filterField} htmlFor="queue-run-filter">
+							<span>run</span>
+							<select
+								id="queue-run-filter"
+								name="queue_run_filter"
+								value={queueRunFilter}
+								onChange={(event) => setQueueRunFilter(event.target.value)}
+							>
+								<option value="all">all runs</option>
+								{availableRunIds.map((runId) => (
+									<option key={runId} value={runId}>
+										{runConversationTitle(runId)}
+									</option>
+								))}
+							</select>
+						</label>
 					</div>
 
 					<div className={styles.queueList}>
@@ -954,20 +1622,41 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 							</div>
 						) : (
 							filteredQueueTasks.slice(0, 16).map((task) => (
-								<div key={task.taskId} className={styles.queueItem}>
-									<HStack gap={2} align="center" className={styles.queueItemHeader}>
-										<Badge size="sm" variant="soft" color={priorityColor(task.priority)}>
+								<button
+									key={task.taskId}
+									type="button"
+									className={cn(styles.queueItem, styles.queueItemButton)}
+									onClick={() => {
+										if (task.runId) {
+											openGeneralRunConversation(task.runId, { focus: true });
+										}
+									}}
+								>
+									<HStack
+										gap={2}
+										align="center"
+										className={styles.queueItemHeader}
+									>
+										<Badge
+											size="sm"
+											variant="soft"
+											color={priorityColor(task.priority)}
+										>
 											{task.priority}
 										</Badge>
-										<Badge size="sm" variant="outline" color={statusColor(task.status)}>
+										<Badge
+											size="sm"
+											variant="outline"
+											color={statusColor(task.status)}
+										>
 											{task.status.replace("_", " ")}
 										</Badge>
 									</HStack>
 									<p className={styles.queueItemTitle}>{task.title}</p>
 									<p className={styles.queueItemMeta}>
-										{task.assigneeProfile} · run {shortRunId(task.runId)}
+										{task.assigneeProfile} | run {shortRunId(task.runId)}
 									</p>
-								</div>
+								</button>
 							))
 						)}
 					</div>
@@ -991,10 +1680,18 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 							</div>
 						</div>
 						<div className={styles.centerHeaderMetrics}>
-							<Badge size="sm" variant="soft" color={healthy ? "success" : "danger"}>
+							<Badge
+								size="sm"
+								variant="soft"
+								color={healthy ? "success" : "danger"}
+							>
 								{healthy ? "online" : "offline"}
 							</Badge>
-							<Badge size="sm" variant="soft" color={paired ? "primary" : "warning"}>
+							<Badge
+								size="sm"
+								variant="soft"
+								color={paired ? "primary" : "warning"}
+							>
 								{paired ? "paired" : "unpaired"}
 							</Badge>
 							<Badge size="sm" variant="outline" color="default">
@@ -1027,16 +1724,22 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				</div>
 
 				<div className={styles.threadStrip}>
-					<button
-						type="button"
-						onClick={handleNewConversation}
-						className={styles.threadNewButton}
-					>
-						<Plus size={13} />
-						<span>New conversation</span>
-					</button>
+					{channelScope !== "team" ? (
+						<button
+							type="button"
+							onClick={handleNewConversation}
+							className={styles.threadNewButton}
+						>
+							<Plus size={13} />
+							<span>New conversation</span>
+						</button>
+					) : (
+						<div className={styles.threadStaticLabel}>
+							<span>Run threads</span>
+						</div>
+					)}
 					<div className={styles.threadList}>
-						{conversations.map((conversation) => (
+						{visibleConversations.map((conversation) => (
 							<div
 								key={conversation.id}
 								className={cn(
@@ -1050,16 +1753,22 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 									className={styles.threadSelectButton}
 								>
 									<p>{conversation.title}</p>
-									<span>{conversation.messages.length} msg</span>
+									<span>
+										{conversation.runId
+											? `run ${shortRunId(conversation.runId)}`
+											: `${conversation.messages.length} msg`}
+									</span>
 								</button>
-								<button
-									type="button"
-									onClick={() => handleDeleteConversation(conversation.id)}
-									className={styles.threadDeleteButton}
-									aria-label="Delete conversation"
-								>
-									<Trash2 size={13} />
-								</button>
+								{channelScope !== "team" ? (
+									<button
+										type="button"
+										onClick={() => handleDeleteConversation(conversation.id)}
+										className={styles.threadDeleteButton}
+										aria-label="Delete conversation"
+									>
+										<Trash2 size={13} />
+									</button>
+								) : null}
 							</div>
 						))}
 					</div>
@@ -1072,7 +1781,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 							defaultProfileId={scopeProfileId}
 							thinkingProfileId={thinkingProfileId}
 							isThinking={isThinking}
-							thinkingContent={liveStreamText}
+							thinkingContent={thinkingContent}
 							baseAvatarState={assistantBaseState}
 						/>
 					) : (
@@ -1083,7 +1792,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 							isReady={isReady}
 							avatarState={centerAvatarState}
 							onTemplateClick={(prompt) => {
-								if (isReady) handleSend(prompt);
+								if (!isReady) return;
+								setComposerMode("direct");
+								void handleDirectSend(prompt);
 							}}
 						/>
 					)}
@@ -1091,16 +1802,34 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 
 				<div className={styles.composerDock}>
 					<AgentChatComposer
-						onSend={handleSend}
-						disabled={!isReady || isThinking}
-						isStreaming={isThinking}
-						onCancel={handleCancel}
-						templates={activeConv?.messages.length ? [] : templates.slice(0, 4)}
+						mode={composerMode}
+						onModeChange={setComposerMode}
+						onSend={handleComposerSend}
+						disabled={!isReady || (composerMode === "direct" && directThinking)}
+						isStreaming={composerMode === "direct" && directThinking}
+						onCancel={composerMode === "direct" ? handleCancel : undefined}
+						runModeDisabled={!agentService.usesBroker()}
+						templates={
+							composerMode === "run"
+								? []
+								: activeConv?.messages.length
+									? []
+									: templates.slice(0, 4)
+						}
 					/>
 				</div>
 
 				<div className={styles.orchestrationDock}>
-					<AgentOrchestrationPanel healthy={healthy} paired={paired} />
+					<AgentOrchestrationPanel
+						healthy={healthy}
+						paired={paired}
+						objective={orchestrationObjective}
+						runStartSignal={orchestrationRunStartSignal}
+						onRunStarted={handleOrchestrationRunStarted}
+						onRunEvent={handleOrchestrationRunEvent}
+						onRunStatusChange={handleOrchestrationRunStatusChange}
+						onRunCleared={handleOrchestrationRunCleared}
+					/>
 				</div>
 			</div>
 
@@ -1113,30 +1842,30 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						</Text>
 					</HStack>
 					<div className={styles.networkSurface}>
-							<svg
-								className={styles.networkLines}
-								viewBox="0 0 240 180"
-								aria-hidden
-							>
-								<line x1="120" y1="34" x2="58" y2="94" />
-								<line x1="120" y1="34" x2="120" y2="126" />
-								<line x1="120" y1="34" x2="182" y2="94" />
-								<line x1="58" y1="94" x2="182" y2="94" />
-								<line x1="58" y1="94" x2="120" y2="126" />
-								<line x1="182" y1="94" x2="120" y2="126" />
-								<line x1="58" y1="94" x2="36" y2="136" />
-								<line x1="120" y1="126" x2="36" y2="136" />
-								<line x1="182" y1="94" x2="204" y2="136" />
-								<line x1="120" y1="126" x2="204" y2="136" />
-							</svg>
-							{[
-								{ profileId: "koro" as AgentProfileId, x: 120, y: 34 },
-								{ profileId: "devstral" as AgentProfileId, x: 58, y: 94 },
-								{ profileId: "sentinel" as AgentProfileId, x: 182, y: 94 },
-								{ profileId: "forge" as AgentProfileId, x: 120, y: 126 },
-								{ profileId: "gridsage" as AgentProfileId, x: 36, y: 136 },
-								{ profileId: "draftsmith" as AgentProfileId, x: 204, y: 136 },
-							].map((node) => {
+						<svg
+							className={styles.networkLines}
+							viewBox="0 0 240 180"
+							aria-hidden
+						>
+							<line x1="120" y1="34" x2="58" y2="94" />
+							<line x1="120" y1="34" x2="120" y2="126" />
+							<line x1="120" y1="34" x2="182" y2="94" />
+							<line x1="58" y1="94" x2="182" y2="94" />
+							<line x1="58" y1="94" x2="120" y2="126" />
+							<line x1="182" y1="94" x2="120" y2="126" />
+							<line x1="58" y1="94" x2="36" y2="136" />
+							<line x1="120" y1="126" x2="36" y2="136" />
+							<line x1="182" y1="94" x2="204" y2="136" />
+							<line x1="120" y1="126" x2="204" y2="136" />
+						</svg>
+						{[
+							{ profileId: "koro" as AgentProfileId, x: 120, y: 34 },
+							{ profileId: "devstral" as AgentProfileId, x: 58, y: 94 },
+							{ profileId: "sentinel" as AgentProfileId, x: 182, y: 94 },
+							{ profileId: "forge" as AgentProfileId, x: 120, y: 126 },
+							{ profileId: "gridsage" as AgentProfileId, x: 36, y: 136 },
+							{ profileId: "draftsmith" as AgentProfileId, x: 204, y: 136 },
+						].map((node) => {
 							const queued = taskItems.filter(
 								(task) =>
 									task.assigneeProfile === node.profileId &&
@@ -1167,7 +1896,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 										detailLevel="auto"
 										state={nodeState}
 									/>
-									{queued > 0 ? <span className={styles.networkCount}>{queued}</span> : null}
+									{queued > 0 ? (
+										<span className={styles.networkCount}>{queued}</span>
+									) : null}
 								</button>
 							);
 						})}
@@ -1194,8 +1925,16 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						) : (
 							reviewInboxTasks.slice(0, 8).map((task) => (
 								<div key={task.taskId} className={styles.reviewItem}>
-									<HStack gap={2} align="center" className={styles.reviewMetaRow}>
-										<Badge size="sm" variant="soft" color={priorityColor(task.priority)}>
+									<HStack
+										gap={2}
+										align="center"
+										className={styles.reviewMetaRow}
+									>
+										<Badge
+											size="sm"
+											variant="soft"
+											color={priorityColor(task.priority)}
+										>
 											{task.priority}
 										</Badge>
 										<Text size="xs" color="muted">
@@ -1203,7 +1942,14 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 										</Text>
 									</HStack>
 									<p className={styles.reviewTitle}>{task.title}</p>
+									{task.description ? (
+										<p className={styles.reviewDescription}>
+											{truncateText(task.description, 220)}
+										</p>
+									) : null}
 									<textarea
+										id={`review-note-${task.taskId}`}
+										name={`review_note_${task.taskId}`}
 										value={reviewNotes[task.taskId] || ""}
 										onChange={(event) =>
 											setReviewNotes((current) => ({
@@ -1218,27 +1964,42 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 									<div className={styles.reviewActions}>
 										<button
 											type="button"
-											onClick={() => void handleReviewAction(task.taskId, "approve")}
+											onClick={() =>
+												void handleReviewAction(task.taskId, "approve")
+											}
 											disabled={reviewBusyTaskId === task.taskId}
-											className={cn(styles.reviewActionButton, styles.reviewApprove)}
+											className={cn(
+												styles.reviewActionButton,
+												styles.reviewApprove,
+											)}
 										>
 											<Check size={12} />
 											Approve
 										</button>
 										<button
 											type="button"
-											onClick={() => void handleReviewAction(task.taskId, "rework")}
+											onClick={() =>
+												void handleReviewAction(task.taskId, "rework")
+											}
 											disabled={reviewBusyTaskId === task.taskId}
-											className={cn(styles.reviewActionButton, styles.reviewRework)}
+											className={cn(
+												styles.reviewActionButton,
+												styles.reviewRework,
+											)}
 										>
 											<Undo2 size={12} />
 											Rework
 										</button>
 										<button
 											type="button"
-											onClick={() => void handleReviewAction(task.taskId, "defer")}
+											onClick={() =>
+												void handleReviewAction(task.taskId, "defer")
+											}
 											disabled={reviewBusyTaskId === task.taskId}
-											className={cn(styles.reviewActionButton, styles.reviewDefer)}
+											className={cn(
+												styles.reviewActionButton,
+												styles.reviewDefer,
+											)}
 										>
 											<WifiOff size={12} />
 											Defer
@@ -1256,16 +2017,82 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 							Unified activity
 						</Text>
 					</div>
+					<div className={styles.filterGrid}>
+						<label className={styles.filterField} htmlFor="activity-profile-filter">
+							<span>profile</span>
+							<select
+								id="activity-profile-filter"
+								name="activity_profile_filter"
+								value={activityProfileFilter}
+								onChange={(event) =>
+									setActivityProfileFilter(
+										event.target.value as QueueProfileFilter,
+									)
+								}
+							>
+								<option value="all">all profiles</option>
+								{AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((id) => (
+									<option key={id} value={id}>
+										{AGENT_PROFILES[id].name}
+									</option>
+								))}
+							</select>
+						</label>
+						<label className={styles.filterField} htmlFor="activity-run-filter">
+							<span>run</span>
+							<select
+								id="activity-run-filter"
+								name="activity_run_filter"
+								value={activityRunFilter}
+								onChange={(event) => setActivityRunFilter(event.target.value)}
+							>
+								<option value="all">all runs</option>
+								{availableRunIds.map((runId) => (
+									<option key={runId} value={runId}>
+										{runConversationTitle(runId)}
+									</option>
+								))}
+							</select>
+						</label>
+						<label className={styles.filterField} htmlFor="activity-source-filter">
+							<span>source</span>
+							<select
+								id="activity-source-filter"
+								name="activity_source_filter"
+								value={activitySourceFilter}
+								onChange={(event) =>
+									setActivitySourceFilter(
+										event.target.value as ActivitySourceFilter,
+									)
+								}
+							>
+								<option value="all">all sources</option>
+								<option value="run">run</option>
+								<option value="task">task</option>
+								<option value="review">review</option>
+							</select>
+						</label>
+					</div>
 					<div className={styles.activityList}>
-						{scopedActivityItems.length === 0 ? (
+						{filteredActivityItems.length === 0 ? (
 							<div className={styles.emptyQueue}>
 								<Text size="xs" color="muted">
-									No activity yet. Start an orchestration run to generate events.
+									No activity yet. Start an orchestration run to generate
+									events.
 								</Text>
 							</div>
 						) : (
-							scopedActivityItems.slice(0, 60).map((item) => (
-								<div key={item.activityId} className={styles.activityItem}>
+							filteredActivityItems.slice(0, 60).map((item) => (
+								<button
+									key={item.activityId}
+									type="button"
+									className={cn(styles.activityItem, styles.activityItemButton)}
+									onClick={() => {
+										if (item.runId) {
+											openGeneralRunConversation(item.runId, { focus: true });
+										}
+									}}
+								>
 									<div className={styles.activityItemMeta}>
 										<Badge size="sm" variant="soft" color={activityTone(item)}>
 											{item.source}
@@ -1274,10 +2101,38 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 									</div>
 									<p className={styles.activityMessage}>{item.message}</p>
 									<p className={styles.activityContext}>
-										{item.profileId ? `${item.profileId} · ` : ""}
-										{item.runId ? `run ${shortRunId(item.runId)}` : item.eventType}
+										{item.profileId ? `${item.profileId} | ` : ""}
+										{item.eventType}
+										{item.runId ? ` | run ${shortRunId(item.runId)}` : ""}
 									</p>
-								</div>
+									{(() => {
+										const detail = deriveActivityDetail(item);
+										if (!detail) return null;
+										return (
+											<>
+												{detail.meta ? (
+													<p className={styles.activityDetailMeta}>
+														{detail.meta}
+													</p>
+												) : null}
+												{detail.text ? (
+													<p
+														title={detail.text}
+														className={cn(
+															styles.activityDetail,
+															detail.isError && styles.activityDetailError,
+														)}
+													>
+														{truncateText(
+															detail.text,
+															ACTIVITY_DETAIL_PREVIEW_CHARS,
+														)}
+													</p>
+												) : null}
+											</>
+										);
+									})()}
+								</button>
 							))
 						)}
 					</div>

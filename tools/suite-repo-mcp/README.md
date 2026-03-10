@@ -30,6 +30,7 @@ Server name (to avoid conflicts): `suite_repo_mcp`
 - `repo.pr_description`
 - `repo.commit_message`
 - `repo.test_plan`
+- `repo.ui_semantics_sweep`
 - `repo.suite_guardrails`
 - `repo.agent_profile_playbook`
 - `repo.agent_orchestration_runbook`
@@ -81,6 +82,8 @@ Then restart Codex.
   - `repo.search` with `{ "pattern": "passkey", "paths": ["src", "backend"] }`
 - Generate protected route scaffold:
   - `repo.generate_route` with `{ "name": "Drawing Audit", "auth_policy": "protected" }`
+- Generate UI form/dialog semantics checklist:
+  - `repo.ui_semantics_sweep` with `{ "scope": "src/components src/routes" }`
 - Add structured log after a marker:
   - `repo.add_structured_log` with
     `{ "file": "src/routes/LoginPage.tsx", "event_name": "auth.login.submit", "fields": { "flow": "email-link" }, "insert_after": "const onSubmit = async () => {" }`

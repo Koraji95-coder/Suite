@@ -13,13 +13,29 @@ import { logger } from "./logger";
 
 interface TokenData {
 	token: string;
-	expiresAt: number;
+	expiresAt: number | null;
 	issuedAt: number;
+}
+
+const DEFAULT_TOKEN_LIFETIME_HOURS = 24;
+const MAX_TOKEN_LIFETIME_HOURS = 24 * 365;
+
+function resolveTokenLifetimeHours(): number | null {
+	const parsed = Number(
+		String(import.meta.env.VITE_AGENT_TOKEN_TTL_HOURS || "").trim(),
+	);
+	if (!Number.isFinite(parsed)) {
+		return DEFAULT_TOKEN_LIFETIME_HOURS;
+	}
+	if (parsed <= 0) {
+		return null;
+	}
+	return Math.min(MAX_TOKEN_LIFETIME_HOURS, Math.max(1, Math.trunc(parsed)));
 }
 
 class SecureTokenStorage {
 	private readonly STORAGE_KEY_PREFIX = "suite_auth_token";
-	private readonly TOKEN_LIFETIME_MS = 24 * 60 * 60 * 1000; // 24 hours
+	private readonly tokenLifetimeHours = resolveTokenLifetimeHours();
 	private scope = "anon";
 
 	setScope(scope: string | null): void {
@@ -87,7 +103,10 @@ class SecureTokenStorage {
 			const tokenData: TokenData = {
 				token,
 				issuedAt: now,
-				expiresAt: now + this.TOKEN_LIFETIME_MS,
+				expiresAt:
+					this.tokenLifetimeHours === null
+						? null
+						: now + this.tokenLifetimeHours * 60 * 60 * 1000,
 			};
 
 			const serialized = JSON.stringify(tokenData);
@@ -120,9 +139,13 @@ class SecureTokenStorage {
 			}
 
 			const tokenData: TokenData = JSON.parse(serialized);
+			const expiresAt =
+				typeof tokenData.expiresAt === "number"
+					? tokenData.expiresAt
+					: null;
 
 			// Check if token is expired
-			if (Date.now() > tokenData.expiresAt) {
+			if (expiresAt !== null && Date.now() > expiresAt) {
 				logger.warn("Token expired", "SecureTokenStorage");
 				this.clearToken();
 				return null;
@@ -164,7 +187,12 @@ class SecureTokenStorage {
 			if (!serialized) return 0;
 
 			const tokenData: TokenData = JSON.parse(serialized);
-			const remaining = tokenData.expiresAt - Date.now();
+			const expiresAt =
+				typeof tokenData.expiresAt === "number"
+					? tokenData.expiresAt
+					: null;
+			if (expiresAt === null) return Number.POSITIVE_INFINITY;
+			const remaining = expiresAt - Date.now();
 			return Math.max(0, remaining);
 		} catch {
 			return 0;
@@ -183,7 +211,11 @@ class SecureTokenStorage {
 			if (!serialized) return false;
 
 			const tokenData: TokenData = JSON.parse(serialized);
-			if (!tokenData?.token || Date.now() > tokenData.expiresAt) {
+			const expiresAt =
+				typeof tokenData.expiresAt === "number"
+					? tokenData.expiresAt
+					: null;
+			if (!tokenData?.token || (expiresAt !== null && Date.now() > expiresAt)) {
 				return false;
 			}
 

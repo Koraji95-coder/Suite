@@ -106,6 +106,10 @@ def create_agent_blueprint(
     AGENT_SESSION_COOKIE = deps.get("AGENT_SESSION_COOKIE", "suite_agent_session")
     AGENT_DEFAULT_TIMEOUT_SECONDS = int(deps.get("AGENT_DEFAULT_TIMEOUT_SECONDS", 45))
     AGENT_MAX_TIMEOUT_SECONDS = int(deps.get("AGENT_MAX_TIMEOUT_SECONDS", 180))
+    AGENT_HEALTH_PROXY_TIMEOUT_SECONDS = max(
+        2,
+        int(deps.get("AGENT_HEALTH_PROXY_TIMEOUT_SECONDS", 8)),
+    )
     AGENT_REQUIRE_WEBHOOK_SECRET = bool(deps.get("AGENT_REQUIRE_WEBHOOK_SECRET", False))
     AGENT_WEBHOOK_SECRET = str(deps.get("AGENT_WEBHOOK_SECRET", "") or "")
     AGENT_GATEWAY_URL = str(deps.get("AGENT_GATEWAY_URL", "") or "")
@@ -658,7 +662,7 @@ def create_agent_blueprint(
         try:
             response = requests_module.get(
                 f"{AGENT_GATEWAY_URL.rstrip('/')}/health",
-                timeout=3,
+                timeout=AGENT_HEALTH_PROXY_TIMEOUT_SECONDS,
             )
             return jsonify(response.json()), response.status_code
         except Exception as exc:

@@ -1,5 +1,5 @@
 import { Save, Zap } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useAuth } from "@/auth/useAuth";
 import { Section } from "@/components/apps/ui/PageFrame";
 import { useToast } from "@/components/notification-system/ToastProvider";
@@ -23,6 +23,7 @@ interface CalculationResult {
 }
 
 export function CalculatorPanel() {
+	const formFieldPrefix = useId().replace(/:/g, "");
 	const [calcType, setCalcType] = useState<CalculationType>("ohms-law");
 	const [inputs, setInputs] = useState<Record<string, string>>({});
 	const [results, setResults] = useState<CalculationResult[]>([]);
@@ -294,7 +295,12 @@ export function CalculatorPanel() {
 			</div>
 
 			<Section title="Calculation Type">
+				<label className={styles.fieldLabel} htmlFor={`${formFieldPrefix}-calc-type`}>
+					Calculator type
+				</label>
 				<select
+					id={`${formFieldPrefix}-calc-type`}
+					name="calculator_type"
 					value={calcType}
 					onChange={(e) => {
 						setCalcType(e.target.value as CalculationType);
@@ -313,10 +319,16 @@ export function CalculatorPanel() {
 
 			<Section title="Input Values">
 				<div className={styles.inputGrid}>
-					{calculations[calcType].fields.map((field) => (
+					{calculations[calcType].fields.map((field) => {
+						const fieldId = `${formFieldPrefix}-${calcType}-${field.id}`;
+						return (
 						<div key={field.id}>
-							<label className={styles.fieldLabel}>{field.label}</label>
+							<label className={styles.fieldLabel} htmlFor={fieldId}>
+								{field.label}
+							</label>
 							<input
+								id={fieldId}
+								name={`calculator_${field.id}`}
 								type="number"
 								step="any"
 								value={inputs[field.id] || ""}
@@ -327,7 +339,8 @@ export function CalculatorPanel() {
 								placeholder={`Enter ${field.label.toLowerCase()}`}
 							/>
 						</div>
-					))}
+						);
+					})}
 				</div>
 
 				<button onClick={calculate} className={styles.primaryButton}>
@@ -349,8 +362,15 @@ export function CalculatorPanel() {
 					</div>
 
 					<div className={styles.notesBlock}>
-						<label className={styles.fieldLabel}>Notes (Optional)</label>
+						<label
+							className={styles.fieldLabel}
+							htmlFor={`${formFieldPrefix}-notes`}
+						>
+							Notes (Optional)
+						</label>
 						<textarea
+							id={`${formFieldPrefix}-notes`}
+							name="calculator_notes"
 							value={notes}
 							onChange={(e) => setNotes(e.target.value)}
 							className={styles.notesInput}

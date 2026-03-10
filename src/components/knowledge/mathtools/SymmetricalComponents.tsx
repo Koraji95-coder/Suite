@@ -1,9 +1,10 @@
 import { GitBranch } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
 import styles from "./SymmetricalComponents.module.css";
 
 export function SymmetricalComponents() {
+	const fieldPrefix = useId().replace(/:/g, "");
 	const [va, setVa] = useState({ mag: 100, angle: 0 });
 	const [vb, setVb] = useState({ mag: 80, angle: -110 });
 	const [vc, setVc] = useState({ mag: 90, angle: 125 });
@@ -154,8 +155,12 @@ export function SymmetricalComponents() {
 					<div className={styles.phaseColumn}>
 						<h4 className={styles.subheading}>Phase A Voltage</h4>
 						<div>
-							<label className={styles.fieldLabel}>Magnitude (V)</label>
+							<label className={styles.fieldLabel} htmlFor={`${fieldPrefix}-va-mag`}>
+								Magnitude (V)
+							</label>
 							<input
+								id={`${fieldPrefix}-va-mag`}
+								name="symcomp_va_mag"
 								type="number"
 								step="0.1"
 								value={va.mag}
@@ -166,8 +171,15 @@ export function SymmetricalComponents() {
 							/>
 						</div>
 						<div>
-							<label className={styles.fieldLabel}>Angle (°)</label>
+							<label
+								className={styles.fieldLabel}
+								htmlFor={`${fieldPrefix}-va-angle`}
+							>
+								Angle (°)
+							</label>
 							<input
+								id={`${fieldPrefix}-va-angle`}
+								name="symcomp_va_angle"
 								type="number"
 								step="0.1"
 								value={va.angle}
@@ -187,8 +199,12 @@ export function SymmetricalComponents() {
 					<div className={styles.phaseColumn}>
 						<h4 className={styles.subheading}>Phase B Voltage</h4>
 						<div>
-							<label className={styles.fieldLabel}>Magnitude (V)</label>
+							<label className={styles.fieldLabel} htmlFor={`${fieldPrefix}-vb-mag`}>
+								Magnitude (V)
+							</label>
 							<input
+								id={`${fieldPrefix}-vb-mag`}
+								name="symcomp_vb_mag"
 								type="number"
 								step="0.1"
 								value={vb.mag}
@@ -199,8 +215,15 @@ export function SymmetricalComponents() {
 							/>
 						</div>
 						<div>
-							<label className={styles.fieldLabel}>Angle (°)</label>
+							<label
+								className={styles.fieldLabel}
+								htmlFor={`${fieldPrefix}-vb-angle`}
+							>
+								Angle (°)
+							</label>
 							<input
+								id={`${fieldPrefix}-vb-angle`}
+								name="symcomp_vb_angle"
 								type="number"
 								step="0.1"
 								value={vb.angle}
@@ -220,8 +243,12 @@ export function SymmetricalComponents() {
 					<div className={styles.phaseColumn}>
 						<h4 className={styles.subheading}>Phase C Voltage</h4>
 						<div>
-							<label className={styles.fieldLabel}>Magnitude (V)</label>
+							<label className={styles.fieldLabel} htmlFor={`${fieldPrefix}-vc-mag`}>
+								Magnitude (V)
+							</label>
 							<input
+								id={`${fieldPrefix}-vc-mag`}
+								name="symcomp_vc_mag"
 								type="number"
 								step="0.1"
 								value={vc.mag}
@@ -232,8 +259,15 @@ export function SymmetricalComponents() {
 							/>
 						</div>
 						<div>
-							<label className={styles.fieldLabel}>Angle (°)</label>
+							<label
+								className={styles.fieldLabel}
+								htmlFor={`${fieldPrefix}-vc-angle`}
+							>
+								Angle (°)
+							</label>
 							<input
+								id={`${fieldPrefix}-vc-angle`}
+								name="symcomp_vc_angle"
 								type="number"
 								step="0.1"
 								value={vc.angle}

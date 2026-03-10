@@ -599,6 +599,11 @@ AGENT_SESSION_TTL_SECONDS = _parse_int_env(
 )
 AGENT_DEFAULT_TIMEOUT_SECONDS = _parse_int_env("AGENT_TIMEOUT_SECONDS", 30, minimum=3)
 AGENT_MAX_TIMEOUT_SECONDS = _parse_int_env("AGENT_MAX_TIMEOUT_SECONDS", 300, minimum=30)
+AGENT_HEALTH_PROXY_TIMEOUT_SECONDS = _parse_int_env(
+    "AGENT_HEALTH_PROXY_TIMEOUT_SECONDS",
+    8,
+    minimum=2,
+)
 
 
 def _resolve_agent_orchestration_parallel_profiles_default() -> int:

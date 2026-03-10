@@ -7,6 +7,18 @@ export default function AuthEnvDebugCard() {
 	const projectUrl = import.meta.env.VITE_SUPABASE_URL ?? "";
 	const redirectEnv = import.meta.env.VITE_AUTH_REDIRECT_URL ?? "";
 	const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "";
+	const passkeyEnabled = (import.meta.env.VITE_AUTH_PASSKEY_ENABLED ?? "").trim();
+	const agentTransport = (import.meta.env.VITE_AGENT_TRANSPORT ?? "").trim();
+	const signOutUnpair = (import.meta.env.VITE_AGENT_SIGNOUT_UNPAIR ?? "").trim();
+	const pairingRestoreWindowHours = String(
+		import.meta.env.VITE_AGENT_PAIRING_RESTORE_WINDOW_HOURS ?? "",
+	).trim();
+	const pairingRestoreNoExpiry = String(
+		import.meta.env.VITE_AGENT_PAIRING_RESTORE_NO_EXPIRY ?? "",
+	).trim();
+	const pairingTokenTtlHours = String(
+		import.meta.env.VITE_AGENT_TOKEN_TTL_HOURS ?? "",
+	).trim();
 	const origin = typeof window !== "undefined" ? window.location.origin : "";
 
 	const parseHost = (value: string, fallback: string): string => {
@@ -78,6 +90,42 @@ export default function AuthEnvDebugCard() {
 					<span style={labelStyle}>Captcha</span>
 					<span style={valueStyle}>
 						{turnstileSiteKey.trim() ? "Turnstile enabled" : "disabled"}
+					</span>
+				</div>
+				<div style={rowStyle}>
+					<span style={labelStyle}>Passkey</span>
+					<span style={valueStyle}>
+						{passkeyEnabled.toLowerCase() === "true" ? "enabled" : "disabled"}
+					</span>
+				</div>
+				<div style={rowStyle}>
+					<span style={labelStyle}>Agent Transport</span>
+					<span style={valueStyle}>{agentTransport || "(default)"}</span>
+				</div>
+				<div style={rowStyle}>
+					<span style={labelStyle}>Sign-out Unpair</span>
+					<span style={valueStyle}>
+						{signOutUnpair || "(default true)"}
+					</span>
+				</div>
+				<div style={rowStyle}>
+					<span style={labelStyle}>Pairing Restore</span>
+					<span style={valueStyle}>
+						{pairingRestoreNoExpiry.toLowerCase() === "true"
+							? "no-expiry"
+							: pairingRestoreWindowHours
+								? `${pairingRestoreWindowHours}h`
+								: "(default 24h)"}
+					</span>
+				</div>
+				<div style={rowStyle}>
+					<span style={labelStyle}>Pairing Token TTL</span>
+					<span style={valueStyle}>
+						{pairingTokenTtlHours
+							? Number(pairingTokenTtlHours) <= 0
+								? "no-expiry"
+								: `${pairingTokenTtlHours}h`
+							: "(default 24h)"}
 					</span>
 				</div>
 			</div>

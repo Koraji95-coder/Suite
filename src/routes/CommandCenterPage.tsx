@@ -1475,9 +1475,16 @@ export default function CommandCenterPage() {
 								</HStack>
 
 								<div className={styles.watchdogPresetSection}>
-									<label className={styles.fieldLabel}>Watchdog Presets</label>
+									<label
+										className={styles.fieldLabel}
+										htmlFor="watchdog-preset-select"
+									>
+										Watchdog Presets
+									</label>
 									<div className={styles.watchdogPresetRow}>
 										<select
+											id="watchdog-preset-select"
+											name="watchdog_preset_select"
 											className={styles.watchdogPresetSelect}
 											value={selectedPresetId}
 											onChange={(event) =>
@@ -1585,6 +1592,8 @@ export default function CommandCenterPage() {
 
 								<label className={styles.toggleRow}>
 									<input
+										id="watchdog-enabled-toggle"
+										name="watchdog_enabled"
 										type="checkbox"
 										checked={watchdogConfig.enabled}
 										onChange={(event) =>
@@ -1611,20 +1620,24 @@ export default function CommandCenterPage() {
 									}
 								/>
 
-								<label className={styles.fieldLabel}>
+								<label className={styles.fieldLabel} htmlFor="watchdog-include-globs">
 									Include globs (newline or comma separated)
 								</label>
 								<textarea
+									id="watchdog-include-globs"
+									name="watchdog_include_globs"
 									value={includeDraft}
 									onChange={(event) => setIncludeDraft(event.target.value)}
 									className={styles.watchdogTextarea}
 									placeholder="*.dwg&#10;*.pdf&#10;subfolder/**/*.xlsx"
 								/>
 
-								<label className={styles.fieldLabel}>
+								<label className={styles.fieldLabel} htmlFor="watchdog-exclude-globs">
 									Exclude globs (newline or comma separated)
 								</label>
 								<textarea
+									id="watchdog-exclude-globs"
+									name="watchdog_exclude_globs"
 									value={excludeDraft}
 									onChange={(event) => setExcludeDraft(event.target.value)}
 									className={styles.watchdogTextarea}
@@ -1752,6 +1765,8 @@ export default function CommandCenterPage() {
 									<div className={styles.watchdogToolbarBottom}>
 										<label className={styles.watchdogToggleChip}>
 											<input
+												id="watchdog-dedupe-toggle"
+												name="watchdog_dedupe_enabled"
 												type="checkbox"
 												checked={watchdogDedupeEnabled}
 												onChange={(event) =>

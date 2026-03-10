@@ -21,6 +21,8 @@ export function WhiteboardSaveDialog({
 	onSave,
 	panelContext,
 }: WhiteboardSaveDialogProps) {
+	const titleInputId = "whiteboard-save-title";
+	const tagsInputId = "whiteboard-save-tags";
 	const [title, setTitle] = useState("");
 	const [tags, setTags] = useState("");
 	const [error, setError] = useState("");
@@ -48,8 +50,12 @@ export function WhiteboardSaveDialog({
 
 				<div className={styles.body}>
 					<div>
-						<label className={styles.label}>Title *</label>
+						<label className={styles.label} htmlFor={titleInputId}>
+							Title *
+						</label>
 						<input
+							id={titleInputId}
+							name="whiteboard_title"
 							type="text"
 							value={title}
 							onChange={(e) => setTitle(e.target.value)}
@@ -60,8 +66,12 @@ export function WhiteboardSaveDialog({
 					</div>
 
 					<div>
-						<label className={styles.label}>Tags (comma separated)</label>
+						<label className={styles.label} htmlFor={tagsInputId}>
+							Tags (comma separated)
+						</label>
 						<input
+							id={tagsInputId}
+							name="whiteboard_tags"
 							type="text"
 							value={tags}
 							onChange={(e) => setTags(e.target.value)}

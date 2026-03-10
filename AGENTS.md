@@ -36,6 +36,7 @@
   - no major auth changes without approval,
   - AutoCAD requestId/error-envelope conventions,
   - deterministic profile-model routing with no cross-model fallback retries.
+  - UI semantics checks for form fields/labels/dialog composition (id/name/htmlFor and Dialog context safety).
 
 ## Gateway Build/Runtime Guardrail
 

@@ -266,6 +266,7 @@ def create_agent_orchestration_blueprint(
 
     @bp.route("/tasks", methods=["GET"])
     @require_supabase_user
+    @limiter.limit("1200 per hour", override_defaults=True)
     def api_agent_tasks_list():
         request_id = _derive_request_id()
         user = getattr(g, "supabase_user", {}) or {}
@@ -356,6 +357,7 @@ def create_agent_orchestration_blueprint(
 
     @bp.route("/activity", methods=["GET"])
     @require_supabase_user
+    @limiter.limit("1200 per hour", override_defaults=True)
     def api_agent_activity_list():
         request_id = _derive_request_id()
         user = getattr(g, "supabase_user", {}) or {}

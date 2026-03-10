@@ -1,5 +1,5 @@
 import { BookOpen, Plus, Search } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
@@ -11,6 +11,7 @@ import styles from "./FormulaBank.module.css";
 type Formula = Database["public"]["Tables"]["formulas"]["Row"];
 
 export function FormulaBank() {
+	const formFieldPrefix = useId().replace(/:/g, "");
 	const [formulas, setFormulas] = useState<Formula[]>([]);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [selectedCategory, setSelectedCategory] = useState("All");
@@ -142,8 +143,15 @@ export function FormulaBank() {
 				<Section title="Add New Formula">
 					<div className={styles.formGrid}>
 						<div>
-							<label className={styles.fieldLabel}>Name</label>
+							<label
+								className={styles.fieldLabel}
+								htmlFor={`${formFieldPrefix}-formula-name`}
+							>
+								Name
+							</label>
 							<input
+								id={`${formFieldPrefix}-formula-name`}
+								name="formula_name"
 								type="text"
 								value={newFormula.name}
 								onChange={(e) =>
@@ -154,8 +162,15 @@ export function FormulaBank() {
 							/>
 						</div>
 						<div>
-							<label className={styles.fieldLabel}>Category</label>
+							<label
+								className={styles.fieldLabel}
+								htmlFor={`${formFieldPrefix}-formula-category`}
+							>
+								Category
+							</label>
 							<input
+								id={`${formFieldPrefix}-formula-category`}
+								name="formula_category"
 								type="text"
 								value={newFormula.category}
 								onChange={(e) =>
@@ -166,8 +181,15 @@ export function FormulaBank() {
 							/>
 						</div>
 						<div>
-							<label className={styles.fieldLabel}>Formula</label>
+							<label
+								className={styles.fieldLabel}
+								htmlFor={`${formFieldPrefix}-formula-expression`}
+							>
+								Formula
+							</label>
 							<input
+								id={`${formFieldPrefix}-formula-expression`}
+								name="formula_expression"
 								type="text"
 								value={newFormula.formula}
 								onChange={(e) =>
@@ -178,8 +200,15 @@ export function FormulaBank() {
 							/>
 						</div>
 						<div>
-							<label className={styles.fieldLabel}>Description</label>
+							<label
+								className={styles.fieldLabel}
+								htmlFor={`${formFieldPrefix}-formula-description`}
+							>
+								Description
+							</label>
 							<input
+								id={`${formFieldPrefix}-formula-description`}
+								name="formula_description"
 								type="text"
 								value={newFormula.description}
 								onChange={(e) =>
@@ -214,6 +243,9 @@ export function FormulaBank() {
 					<div className={styles.searchWrap}>
 						<Search className={styles.searchIcon} />
 						<input
+							id={`${formFieldPrefix}-search`}
+							name="formula_search"
+							aria-label="Search formulas"
 							type="text"
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
@@ -223,6 +255,8 @@ export function FormulaBank() {
 					</div>
 					<div>
 						<select
+							id={`${formFieldPrefix}-category-filter`}
+							name="formula_category_filter"
 							value={selectedCategory}
 							onChange={(e) => setSelectedCategory(e.target.value)}
 							className={styles.inputControl}

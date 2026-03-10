@@ -1,10 +1,11 @@
 import { Activity } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
 import { cn } from "@/lib/utils";
 import styles from "./SinusoidalCalculator.module.css";
 
 export function SinusoidalCalculator() {
+	const fieldPrefix = useId().replace(/:/g, "");
 	const [amplitude, setAmplitude] = useState(220);
 	const [frequency, setFrequency] = useState(50);
 	const [phase, setPhase] = useState(0);
@@ -102,10 +103,15 @@ export function SinusoidalCalculator() {
 				<div className={styles.twoColumnLayout}>
 					<div className={styles.stack}>
 						<div>
-							<label className={styles.label}>
+							<label
+								className={styles.label}
+								htmlFor={`${fieldPrefix}-amplitude`}
+							>
 								Peak Amplitude (V<sub>m</sub> or I<sub>m</sub>)
 							</label>
 							<input
+								id={`${fieldPrefix}-amplitude`}
+								name="sinusoidal_amplitude"
 								type="number"
 								value={amplitude}
 								onChange={(e) => setAmplitude(parseFloat(e.target.value) || 0)}
@@ -114,8 +120,12 @@ export function SinusoidalCalculator() {
 						</div>
 
 						<div>
-							<label className={styles.label}>Frequency (Hz)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-frequency`}>
+								Frequency (Hz)
+							</label>
 							<input
+								id={`${fieldPrefix}-frequency`}
+								name="sinusoidal_frequency"
 								type="number"
 								value={frequency}
 								onChange={(e) => setFrequency(parseFloat(e.target.value) || 0)}
@@ -124,8 +134,12 @@ export function SinusoidalCalculator() {
 						</div>
 
 						<div>
-							<label className={styles.label}>Phase Angle (degrees)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-phase`}>
+								Phase Angle (degrees)
+							</label>
 							<input
+								id={`${fieldPrefix}-phase`}
+								name="sinusoidal_phase"
 								type="number"
 								value={phase}
 								onChange={(e) => setPhase(parseFloat(e.target.value) || 0)}
@@ -259,10 +273,15 @@ export function SinusoidalCalculator() {
 						<h4 className={styles.subheading}>Base Values</h4>
 
 						<div>
-							<label className={styles.label}>
+							<label
+								className={styles.label}
+								htmlFor={`${fieldPrefix}-base-mva`}
+							>
 								Base MVA (S<sub>base</sub>)
 							</label>
 							<input
+								id={`${fieldPrefix}-base-mva`}
+								name="per_unit_base_mva"
 								type="number"
 								value={baseMVA}
 								onChange={(e) => setBaseMVA(parseFloat(e.target.value) || 0)}
@@ -271,10 +290,15 @@ export function SinusoidalCalculator() {
 						</div>
 
 						<div>
-							<label className={styles.label}>
+							<label
+								className={styles.label}
+								htmlFor={`${fieldPrefix}-base-kv`}
+							>
 								Base kV (V<sub>base</sub>)
 							</label>
 							<input
+								id={`${fieldPrefix}-base-kv`}
+								name="per_unit_base_kv"
 								type="number"
 								value={baseKV}
 								onChange={(e) => setBaseKV(parseFloat(e.target.value) || 0)}
@@ -297,8 +321,12 @@ export function SinusoidalCalculator() {
 						<h4 className={styles.subheading}>Actual Values</h4>
 
 						<div>
-							<label className={styles.label}>Actual Power (MW)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-actual-mw`}>
+								Actual Power (MW)
+							</label>
 							<input
+								id={`${fieldPrefix}-actual-mw`}
+								name="per_unit_actual_mw"
 								type="number"
 								value={actualMW}
 								onChange={(e) => setActualMW(parseFloat(e.target.value) || 0)}
@@ -307,8 +335,12 @@ export function SinusoidalCalculator() {
 						</div>
 
 						<div>
-							<label className={styles.label}>Actual Voltage (kV)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-actual-kv`}>
+								Actual Voltage (kV)
+							</label>
 							<input
+								id={`${fieldPrefix}-actual-kv`}
+								name="per_unit_actual_kv"
 								type="number"
 								value={actualKV}
 								onChange={(e) => setActualKV(parseFloat(e.target.value) || 0)}

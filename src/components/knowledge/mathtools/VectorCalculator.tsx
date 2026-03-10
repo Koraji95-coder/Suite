@@ -1,10 +1,11 @@
 import { Compass, Divide, Minus, Plus, X } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
 import { cn } from "@/lib/utils";
 import styles from "./VectorCalculator.module.css";
 
 export function VectorCalculator() {
+	const fieldPrefix = useId().replace(/:/g, "");
 	const [rectangular, setRectangular] = useState({ x: 3, y: 4 });
 	const [polar, setPolar] = useState({ r: 5, theta: 53.13 });
 	const [showWork, setShowWork] = useState(true);
@@ -169,8 +170,12 @@ export function VectorCalculator() {
 						<h4 className={styles.subheading}>Rectangular Form (x + jy)</h4>
 						<div className={styles.stackTight}>
 							<div>
-								<label className={styles.label}>Real Part (x)</label>
+								<label className={styles.label} htmlFor={`${fieldPrefix}-rect-x`}>
+									Real Part (x)
+								</label>
 								<input
+									id={`${fieldPrefix}-rect-x`}
+									name="vector_rect_x"
 									type="number"
 									step="0.01"
 									value={x}
@@ -179,8 +184,12 @@ export function VectorCalculator() {
 								/>
 							</div>
 							<div>
-								<label className={styles.label}>Imaginary Part (y)</label>
+								<label className={styles.label} htmlFor={`${fieldPrefix}-rect-y`}>
+									Imaginary Part (y)
+								</label>
 								<input
+									id={`${fieldPrefix}-rect-y`}
+									name="vector_rect_y"
 									type="number"
 									step="0.01"
 									value={y}
@@ -200,8 +209,12 @@ export function VectorCalculator() {
 						<h4 className={styles.subheading}>Polar Form (r∠θ)</h4>
 						<div className={styles.stackTight}>
 							<div>
-								<label className={styles.label}>Magnitude (r)</label>
+								<label className={styles.label} htmlFor={`${fieldPrefix}-polar-r`}>
+									Magnitude (r)
+								</label>
 								<input
+									id={`${fieldPrefix}-polar-r`}
+									name="vector_polar_r"
 									type="number"
 									step="0.01"
 									value={r}
@@ -210,8 +223,15 @@ export function VectorCalculator() {
 								/>
 							</div>
 							<div>
-								<label className={styles.label}>Angle θ (degrees)</label>
+								<label
+									className={styles.label}
+									htmlFor={`${fieldPrefix}-polar-theta`}
+								>
+									Angle θ (degrees)
+								</label>
 								<input
+									id={`${fieldPrefix}-polar-theta`}
+									name="vector_polar_theta"
 									type="number"
 									step="0.01"
 									value={theta}
@@ -290,8 +310,12 @@ export function VectorCalculator() {
 					<div className={styles.stack}>
 						<h4 className={styles.subheading}>Vector 1 (Z₁)</h4>
 						<div>
-							<label className={styles.label}>Real (x₁)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-v1-x`}>
+								Real (x₁)
+							</label>
 							<input
+								id={`${fieldPrefix}-v1-x`}
+								name="vector1_x"
 								type="number"
 								step="0.01"
 								value={vector1.x}
@@ -302,8 +326,12 @@ export function VectorCalculator() {
 							/>
 						</div>
 						<div>
-							<label className={styles.label}>Imaginary (y₁)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-v1-y`}>
+								Imaginary (y₁)
+							</label>
 							<input
+								id={`${fieldPrefix}-v1-y`}
+								name="vector1_y"
 								type="number"
 								step="0.01"
 								value={vector1.y}
@@ -377,8 +405,12 @@ export function VectorCalculator() {
 					<div className={styles.stack}>
 						<h4 className={styles.subheading}>Vector 2 (Z₂)</h4>
 						<div>
-							<label className={styles.label}>Real (x₂)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-v2-x`}>
+								Real (x₂)
+							</label>
 							<input
+								id={`${fieldPrefix}-v2-x`}
+								name="vector2_x"
 								type="number"
 								step="0.01"
 								value={vector2.x}
@@ -389,8 +421,12 @@ export function VectorCalculator() {
 							/>
 						</div>
 						<div>
-							<label className={styles.label}>Imaginary (y₂)</label>
+							<label className={styles.label} htmlFor={`${fieldPrefix}-v2-y`}>
+								Imaginary (y₂)
+							</label>
 							<input
+								id={`${fieldPrefix}-v2-y`}
+								name="vector2_y"
 								type="number"
 								step="0.01"
 								value={vector2.y}

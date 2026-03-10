@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentService } from "@/services/agentService";
+import type { AgentActivityItem, AgentTaskItem } from "@/services/agentService";
 import { agentTaskManager } from "@/services/agentTaskManager";
 import { AgentChatPanel } from "./AgentChatPanel";
 
@@ -25,7 +26,7 @@ describe("AgentChatPanel defensive rendering", () => {
 		vi.spyOn(agentService, "listAgentTasks").mockResolvedValue({
 			success: true,
 			tasks: [
-				null as any,
+				null as unknown as AgentTaskItem,
 				{
 					taskId: "task-1",
 					runId: "run-1",
@@ -36,13 +37,13 @@ describe("AgentChatPanel defensive rendering", () => {
 					assigneeProfile: "devstral",
 					stage: "draft",
 					userId: "u1",
-				} as any,
+				} as AgentTaskItem,
 			],
 		});
 		vi.spyOn(agentService, "getAgentActivity").mockResolvedValue({
 			success: true,
 			activity: [
-				undefined as any,
+				undefined as unknown as AgentActivityItem,
 				{
 					activityId: "activity-1",
 					source: "run",
@@ -50,7 +51,7 @@ describe("AgentChatPanel defensive rendering", () => {
 					runId: "run-1",
 					requestId: "req-1",
 					message: "Started",
-				} as any,
+				} as AgentActivityItem,
 			],
 		});
 

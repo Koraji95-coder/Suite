@@ -2,6 +2,7 @@
 
 import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Badge } from "@/components/primitives/Badge";
 import { IconButton } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
@@ -44,20 +45,35 @@ export function AgentChatMessages({
 	// Scroll to bottom when messages change
 	useEffect(() => {
 		bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [latestMessage?.id, messages.length, showThinking]);
+	});
 
 	return (
 		<div className={styles.root}>
 			<div className={styles.inner}>
 				<Stack gap={4}>
 					{messages.map((msg, index) => {
-						if (msg.role === "user") {
-							return <UserBubble key={msg.id} content={msg.content} />;
-						}
 						const messageProfileId = resolveMessageProfileId(
 							msg.profileId,
 							defaultProfileId,
 						);
+						if (msg.kind === "event") {
+							return (
+								<SystemEventRow
+									key={msg.id}
+									content={msg.content}
+									eventType={msg.eventType}
+									source={msg.source}
+									status={msg.status}
+									timestamp={msg.timestamp}
+									profileId={
+										msg.profileId ? messageProfileId : undefined
+									}
+								/>
+							);
+						}
+						if (msg.role === "user") {
+							return <UserBubble key={msg.id} content={msg.content} />;
+						}
 						return (
 							<AssistantRow
 								key={msg.id}
@@ -94,6 +110,63 @@ function resolveMessageProfileId(
 		return normalized as AgentProfileId;
 	}
 	return fallbackProfileId;
+}
+
+function normalizeEventTone(
+	eventType: string | undefined,
+	status: string | undefined,
+): "default" | "primary" | "success" | "warning" | "danger" {
+	const normalizedEventType = String(eventType || "").toLowerCase();
+	const normalizedStatus = String(status || "").toLowerCase();
+	if (
+		normalizedEventType.includes("fail") ||
+		normalizedEventType.includes("defer") ||
+		normalizedStatus === "failed" ||
+		normalizedStatus === "deferred"
+	) {
+		return "danger";
+	}
+	if (
+		normalizedEventType.includes("review") ||
+		normalizedEventType.includes("awaiting") ||
+		normalizedStatus === "awaiting_review"
+	) {
+		return "warning";
+	}
+	if (
+		normalizedEventType.includes("completed") ||
+		normalizedEventType.includes("approved") ||
+		normalizedStatus === "approved"
+	) {
+		return "success";
+	}
+	if (
+		normalizedEventType.includes("started") ||
+		normalizedEventType.includes("running") ||
+		normalizedStatus === "running"
+	) {
+		return "primary";
+	}
+	return "default";
+}
+
+function formatEventLabel(eventType: string | undefined): string {
+	return String(eventType || "event")
+		.split("_")
+		.join(" ")
+		.trim();
+}
+
+function formatEventTime(timestamp: string | undefined): string {
+	const raw = String(timestamp || "").trim();
+	if (!raw) return "";
+	const parsed = new Date(raw);
+	if (Number.isNaN(parsed.getTime())) return "";
+	return parsed.toLocaleTimeString([], {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+	});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -266,6 +339,57 @@ function ThinkingIndicator({
 				</HStack>
 			)}
 		</HStack>
+	);
+}
+
+function SystemEventRow({
+	content,
+	eventType,
+	source,
+	status,
+	timestamp,
+	profileId,
+}: {
+	content: string;
+	eventType?: string;
+	source?: "run" | "task" | "review" | "system";
+	status?: string;
+	timestamp?: string;
+	profileId?: AgentProfileId;
+}) {
+	const tone = normalizeEventTone(eventType, status);
+	const eventLabel = formatEventLabel(eventType);
+	const timeLabel = formatEventTime(timestamp);
+	return (
+		<div className={styles.systemEventRow}>
+			<div className={styles.systemEventAvatar}>
+				{profileId ? (
+					<AgentPixelMark profileId={profileId} size={28} detailLevel="micro" />
+				) : (
+					<div className={styles.systemEventBadge}>SYS</div>
+				)}
+			</div>
+			<div className={styles.systemEventBody}>
+				<HStack gap={1} align="center" className={styles.systemEventMeta}>
+					<Badge size="sm" variant="soft" color={tone}>
+						{eventLabel}
+					</Badge>
+					{source ? (
+						<Badge size="sm" variant="outline" color="default">
+							{source}
+						</Badge>
+					) : null}
+					{timeLabel ? (
+						<Text size="xs" color="muted">
+							{timeLabel}
+						</Text>
+					) : null}
+				</HStack>
+				<Text size="sm" className={styles.systemEventText}>
+					{content}
+				</Text>
+			</div>
+		</div>
 	);
 }
 

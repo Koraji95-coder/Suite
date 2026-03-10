@@ -6,10 +6,15 @@ import {
 	RefreshCw,
 	Sparkles,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
-import { TextArea } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
@@ -17,10 +22,7 @@ import { logger } from "@/lib/logger";
 import { type AgentRunSnapshot, agentService } from "@/services/agentService";
 import styles from "./AgentOrchestrationPanel.module.css";
 import { AgentPixelMark } from "./AgentPixelMark";
-import {
-	type AgentMarkState,
-	resolveAgentMarkState,
-} from "./agentMarkState";
+import { type AgentMarkState, resolveAgentMarkState } from "./agentMarkState";
 import {
 	AGENT_PROFILE_IDS,
 	AGENT_PROFILES,
@@ -38,7 +40,7 @@ type RunStatus =
 
 type StreamState = "idle" | "connecting" | "live" | "error";
 
-type OrchestrationEvent = {
+export type OrchestrationEvent = {
 	id: number;
 	eventType: string;
 	stage: string;
@@ -48,6 +50,33 @@ type OrchestrationEvent = {
 	createdAt: string;
 	payload: Record<string, unknown>;
 };
+
+export type AgentOrchestrationRunStatus =
+	| "idle"
+	| "queued"
+	| "running"
+	| "cancel_requested"
+	| "completed"
+	| "failed"
+	| "cancelled";
+
+export interface AgentOrchestrationRunStartedPayload {
+	runId: string;
+	requestId: string;
+	objective: string;
+	profiles: AgentProfileId[];
+	status: AgentOrchestrationRunStatus;
+}
+
+export interface AgentOrchestrationRunEventPayload {
+	runId: string;
+	event: OrchestrationEvent;
+}
+
+export interface AgentOrchestrationRunStatusPayload {
+	runId: string;
+	status: AgentOrchestrationRunStatus;
+}
 
 const DEFAULT_OBJECTIVE =
 	"Coordinate a reliability review for my active feature. Return concrete implementation steps, high-risk findings, and validation checks.";
@@ -233,8 +262,7 @@ function eventAvatarState(eventType: string): AgentMarkState {
 	const normalizedType = String(eventType || "").toLowerCase();
 	return resolveAgentMarkState({
 		error:
-			normalizedType.includes("failed") ||
-			normalizedType.includes("cancelled"),
+			normalizedType.includes("failed") || normalizedType.includes("cancelled"),
 		warning: normalizedType.includes("cancel_requested"),
 		running:
 			normalizedType.includes("started") ||
@@ -250,13 +278,24 @@ function eventAvatarState(eventType: string): AgentMarkState {
 interface AgentOrchestrationPanelProps {
 	healthy: boolean;
 	paired: boolean;
+	objective?: string;
+	runStartSignal?: number;
+	onRunStarted?: (payload: AgentOrchestrationRunStartedPayload) => void;
+	onRunEvent?: (payload: AgentOrchestrationRunEventPayload) => void;
+	onRunStatusChange?: (payload: AgentOrchestrationRunStatusPayload) => void;
+	onRunCleared?: (payload: { runId: string }) => void;
 }
 
 export function AgentOrchestrationPanel({
 	healthy,
 	paired,
+	objective,
+	runStartSignal,
+	onRunStarted,
+	onRunEvent,
+	onRunStatusChange,
+	onRunCleared,
 }: AgentOrchestrationPanelProps) {
-	const [objective, setObjective] = useState(DEFAULT_OBJECTIVE);
 	const [selectedProfiles, setSelectedProfiles] =
 		useState<AgentProfileId[]>(DEFAULT_PROFILES);
 	const [runId, setRunId] = useState<string>("");
@@ -284,6 +323,7 @@ export function AgentOrchestrationPanel({
 	const manualStopRef = useRef(false);
 	const lastEventIdRef = useRef(0);
 	const lastScrolledEventIdRef = useRef(0);
+	const lastRunStartSignalRef = useRef(0);
 
 	const orchestrationAvailable = agentService.usesBroker();
 	const ready = orchestrationAvailable && healthy && paired;
@@ -403,10 +443,14 @@ export function AgentOrchestrationPanel({
 		if (!result.success) {
 			setError(result.error || "Unable to refresh run.");
 			if (ORCHESTRATION_DEBUG_ENABLED) {
-				logger.warn("Orchestration run refresh failed", "AgentOrchestrationPanel", {
-					runId,
-					error: result.error,
-				});
+				logger.warn(
+					"Orchestration run refresh failed",
+					"AgentOrchestrationPanel",
+					{
+						runId,
+						error: result.error,
+					},
+				);
 			}
 			return;
 		}
@@ -414,13 +458,17 @@ export function AgentOrchestrationPanel({
 		setRequestId(String(result.requestId || ""));
 		hydrateFromSnapshot(result.run);
 		if (ORCHESTRATION_DEBUG_ENABLED) {
-			logger.debug("Orchestration run refresh succeeded", "AgentOrchestrationPanel", {
-				runId,
-				status: result.run?.status,
-				eventCount: Array.isArray(result.run?.messages)
-					? result.run?.messages.length
-					: 0,
-			});
+			logger.debug(
+				"Orchestration run refresh succeeded",
+				"AgentOrchestrationPanel",
+				{
+					runId,
+					status: result.run?.status,
+					eventCount: Array.isArray(result.run?.messages)
+						? result.run?.messages.length
+						: 0,
+				},
+			);
 		}
 	}, [runId, hydrateFromSnapshot]);
 
@@ -466,6 +514,7 @@ export function AgentOrchestrationPanel({
 					payload: asRecord(event.payload),
 				};
 				appendEvent(normalized);
+				onRunEvent?.({ runId, event: normalized });
 				if (ORCHESTRATION_DEBUG_ENABLED) {
 					logger.debug(
 						"Orchestration stream event",
@@ -499,7 +548,9 @@ export function AgentOrchestrationPanel({
 				}
 
 				if (nextStatus) {
-					setStatus((current) => (current === nextStatus ? current : nextStatus));
+					setStatus((current) =>
+						current === nextStatus ? current : nextStatus,
+					);
 				}
 
 				if (TERMINAL_EVENT_TYPES.has(normalized.eventType)) {
@@ -523,9 +574,13 @@ export function AgentOrchestrationPanel({
 				if (!effectActive) return;
 				if (manualStopRef.current) return;
 				if (ORCHESTRATION_DEBUG_ENABLED) {
-					logger.warn("Orchestration stream closed", "AgentOrchestrationPanel", {
-						runId,
-					});
+					logger.warn(
+						"Orchestration stream closed",
+						"AgentOrchestrationPanel",
+						{
+							runId,
+						},
+					);
 				}
 				scheduleReconnect("closed");
 			},
@@ -545,7 +600,13 @@ export function AgentOrchestrationPanel({
 		scheduleReconnect,
 		closeStreamSilently,
 		streamEpoch,
+		onRunEvent,
 	]);
+
+	useEffect(() => {
+		if (!runId) return;
+		onRunStatusChange?.({ runId, status });
+	}, [runId, status, onRunStatusChange]);
 
 	useEffect(() => {
 		if (!runActive || streamState === "live") return;
@@ -579,7 +640,11 @@ export function AgentOrchestrationPanel({
 			setError("Agent orchestration requires online paired broker mode.");
 			return;
 		}
-		const objectiveText = objective.trim();
+		if (runActive || isSubmitting) {
+			setError("A run is already active.");
+			return;
+		}
+		const objectiveText = String(objective || DEFAULT_OBJECTIVE).trim();
 		if (objectiveText.length < 12) {
 			setError("Add a more specific objective before starting.");
 			return;
@@ -621,6 +686,13 @@ export function AgentOrchestrationPanel({
 			setFinalError("");
 			setStreamState("idle");
 			setStreamNotice("");
+			onRunStarted?.({
+				runId: result.runId,
+				requestId: String(result.requestId || ""),
+				objective: objectiveText,
+				profiles: selectedProfiles,
+				status: (result.status || "queued") as AgentOrchestrationRunStatus,
+			});
 			setIsExpanded(true);
 			const snapshot = await agentService.getOrchestrationRun(result.runId);
 			if (snapshot.success) {
@@ -630,7 +702,24 @@ export function AgentOrchestrationPanel({
 		} finally {
 			setIsSubmitting(false);
 		}
-	}, [ready, objective, selectedProfiles, hydrateFromSnapshot, stopStreaming]);
+	}, [
+		ready,
+		runActive,
+		isSubmitting,
+		objective,
+		selectedProfiles,
+		hydrateFromSnapshot,
+		stopStreaming,
+		onRunStarted,
+	]);
+
+	useEffect(() => {
+		const signal = Number(runStartSignal ?? 0);
+		if (!Number.isFinite(signal) || signal <= 0) return;
+		if (signal === lastRunStartSignalRef.current) return;
+		lastRunStartSignalRef.current = signal;
+		void handleStart();
+	}, [runStartSignal, handleStart]);
 
 	const handleCancel = useCallback(async () => {
 		if (!runId || TERMINAL_STATUSES.has(status)) return;
@@ -644,6 +733,9 @@ export function AgentOrchestrationPanel({
 	}, [runId, status]);
 
 	const handleClear = useCallback(() => {
+		if (runId) {
+			onRunCleared?.({ runId });
+		}
 		stopStreaming();
 		reconnectAttemptRef.current = 0;
 		lastEventIdRef.current = 0;
@@ -657,7 +749,7 @@ export function AgentOrchestrationPanel({
 		setFinalError("");
 		setStreamState("idle");
 		setStreamNotice("");
-	}, [stopStreaming]);
+	}, [stopStreaming, runId, onRunCleared]);
 
 	const handleReconnectNow = useCallback(() => {
 		if (!runId || !runActive) return;
@@ -743,20 +835,19 @@ export function AgentOrchestrationPanel({
 				</HStack>
 			</div>
 
-			<TextArea
-				minRows={2}
-				value={objective}
-				onChange={(event) => setObjective(event.target.value)}
-				placeholder="Describe the objective for your multi-agent run..."
-				disabled={runActive || isSubmitting}
-				className={styles.objectiveInput}
-			/>
+			<Text size="xs" color="muted" block>
+				Objective is provided by the unified command composer.
+			</Text>
 
 			<div className={styles.profileRow}>
 				{AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((profileId) => {
 					const active = selectedProfiles.includes(profileId);
 					const profileState = resolveAgentMarkState({
-						error: !healthy || streamError || status === "failed" || status === "cancelled",
+						error:
+							!healthy ||
+							streamError ||
+							status === "failed" ||
+							status === "cancelled",
 						waiting: healthy && !paired,
 						running: runActive && active,
 						warning: active && status === "cancel_requested",

@@ -18,6 +18,7 @@ import {
 	startPasskeySignIn,
 } from "../auth/passkeyAuthApi";
 import {
+	fetchPasskeyCapability,
 	isBrowserPasskeySupported,
 	isFrontendPasskeyEnabled,
 } from "../auth/passkeyCapabilityApi";
@@ -74,6 +75,7 @@ export default function LoginPage() {
 	const [honeypot, setHoneypot] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [passkeySubmitting, setPasskeySubmitting] = useState(false);
+	const [backendPasskeyReady, setBackendPasskeyReady] = useState(false);
 	const [sent, setSent] = useState(false);
 	const [error, setError] = useState("");
 	const [redirectProgress, setRedirectProgress] = useState(0);
@@ -100,9 +102,14 @@ export default function LoginPage() {
 		return true;
 	}, [email, loading, submitting, requiresCaptcha, captchaToken]);
 
+	const frontendPasskeyEnabled = useMemo(() => isFrontendPasskeyEnabled(), []);
+	const browserPasskeySupported = useMemo(() => isBrowserPasskeySupported(), []);
 	const passkeyAvailable = useMemo(
-		() => isFrontendPasskeyEnabled() && isBrowserPasskeySupported(),
-		[],
+		() =>
+			frontendPasskeyEnabled &&
+			browserPasskeySupported &&
+			backendPasskeyReady,
+		[frontendPasskeyEnabled, browserPasskeySupported, backendPasskeyReady],
 	);
 
 	// Mount animation
@@ -110,6 +117,54 @@ export default function LoginPage() {
 		const id = requestAnimationFrame(() => setMounted(true));
 		return () => cancelAnimationFrame(id);
 	}, []);
+
+	useEffect(() => {
+		if (!frontendPasskeyEnabled || !browserPasskeySupported) {
+			setBackendPasskeyReady(false);
+			return;
+		}
+
+		let active = true;
+		void fetchPasskeyCapability()
+			.then((payload) => {
+				if (!active) return;
+				const capability = payload.passkey;
+				const ready = Boolean(
+					capability.enabled &&
+						capability.handlers_ready &&
+						capability.config_ready,
+				);
+				setBackendPasskeyReady(ready);
+
+				if (!ready) {
+					logger.info(
+						"Passkey capability probe reports passkey unavailable; hiding passkey login action.",
+						"LoginPage",
+						{
+							enabled: capability.enabled,
+							provider: capability.provider,
+							rollout_state: capability.rollout_state,
+							handlers_ready: capability.handlers_ready,
+							config_ready: capability.config_ready,
+							config_missing: capability.config_missing,
+						},
+					);
+				}
+			})
+			.catch((capabilityError) => {
+				if (!active) return;
+				setBackendPasskeyReady(false);
+				logger.warn(
+					"Passkey capability probe failed; passkey sign-in remains hidden.",
+					"LoginPage",
+					{ error: capabilityError },
+				);
+			});
+
+		return () => {
+			active = false;
+		};
+	}, [frontendPasskeyEnabled, browserPasskeySupported]);
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// REDIRECT PROGRESS EFFECT

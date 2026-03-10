@@ -1,5 +1,5 @@
 import { TrendingUp } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Section } from "@/components/apps/ui/PageFrame";
 import styles from "./PlotGenerator.module.css";
 
@@ -12,6 +12,7 @@ type PlotType =
 	| "bode";
 
 export function PlotGenerator() {
+	const fieldPrefix = useId().replace(/:/g, "");
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [plotType, setPlotType] = useState<PlotType>("sine");
 	const [frequency, setFrequency] = useState(1);
@@ -135,6 +136,8 @@ export function PlotGenerator() {
 				<div className={styles.controls}>
 					<Section title="Plot Type">
 						<select
+							id={`${fieldPrefix}-plot-type`}
+							name="plot_type"
 							value={plotType}
 							onChange={(e) => setPlotType(e.target.value as PlotType)}
 							className={styles.select}
@@ -153,6 +156,9 @@ export function PlotGenerator() {
 						plotType === "sawtooth") && (
 						<Section title={`Frequency (Hz): ${frequency}`}>
 							<input
+								id={`${fieldPrefix}-frequency`}
+								name="plot_frequency"
+								aria-label="Plot frequency"
 								type="range"
 								min="0.1"
 								max="5"
@@ -167,6 +173,9 @@ export function PlotGenerator() {
 					{(plotType === "rc-charge" || plotType === "rl-response") && (
 						<Section title={`Time Constant (s): ${timeConstant}`}>
 							<input
+								id={`${fieldPrefix}-time-constant`}
+								name="plot_time_constant"
+								aria-label="Plot time constant"
 								type="range"
 								min="0.1"
 								max="3"
@@ -180,6 +189,9 @@ export function PlotGenerator() {
 
 					<Section title={`Amplitude: ${amplitude}`}>
 						<input
+							id={`${fieldPrefix}-amplitude`}
+							name="plot_amplitude"
+							aria-label="Plot amplitude"
 							type="range"
 							min="0.1"
 							max="2"

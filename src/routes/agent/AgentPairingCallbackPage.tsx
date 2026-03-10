@@ -148,7 +148,7 @@ export default function AgentPairingCallbackPage() {
 							const recovered = await agentService.refreshPairingStatusDetailed();
 							if (recovered.paired) {
 								setPhase("complete");
-								setStatusMessage("Pairing active, you may now close this screen.");
+								setStatusMessage("Pairing active, you may now close this window.");
 								setErrorMessage("");
 								return;
 							}
@@ -195,8 +195,8 @@ export default function AgentPairingCallbackPage() {
 				setPhase("complete");
 				setStatusMessage(
 					action === "pair"
-						? "Pairing active, you may now close this screen."
-						: "Unpair complete, you may now close this screen.",
+						? "Pairing active, you may now close this window."
+						: "Unpair complete, you may now close this window.",
 				);
 			}
 		}, 120);
@@ -365,25 +365,6 @@ export default function AgentPairingCallbackPage() {
 						>
 							Sign in to continue
 						</button>
-					) : null}
-
-					{phase === "complete" ? (
-						<>
-							<button
-								type="button"
-								className={styles.buttonPrimary}
-								onClick={() => navigate("/app/settings")}
-							>
-								Open account settings
-							</button>
-							<button
-								type="button"
-								className={styles.buttonSecondary}
-								onClick={() => navigate("/app/agent")}
-							>
-								Open agent studio
-							</button>
-						</>
 					) : null}
 
 					{phase === "error" ? (

@@ -97,6 +97,8 @@ export function WhiteboardToolbar({
 			{/* Color + line width */}
 			<div className={styles.controls}>
 				<input
+					id="whiteboard-tool-color"
+					name="whiteboard_tool_color"
 					type="color"
 					value={color}
 					onChange={(e) => onColorChange(e.target.value)}
@@ -104,6 +106,8 @@ export function WhiteboardToolbar({
 					title="Color"
 				/>
 				<input
+					id="whiteboard-line-width"
+					name="whiteboard_line_width"
 					type="range"
 					min="1"
 					max="20"

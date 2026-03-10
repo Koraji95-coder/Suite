@@ -1,4 +1,5 @@
 import { Filter, Search, Tag } from "lucide-react";
+import { useId } from "react";
 import styles from "./LibraryFilters.module.css";
 
 interface LibraryFiltersProps {
@@ -28,12 +29,15 @@ export function LibraryFilters({
 	filteredCount,
 	hidePanelFilter = false,
 }: LibraryFiltersProps) {
+	const fieldPrefix = useId().replace(/:/g, "");
 	return (
 		<div className={styles.root}>
 			<div className={styles.controlsGrid}>
 				<div className={styles.searchWrap}>
 					<Search className={styles.searchIcon} />
 					<input
+						id={`${fieldPrefix}-search`}
+						name="whiteboard_library_search"
 						type="text"
 						value={searchTerm}
 						onChange={(e) => onSearchChange(e.target.value)}
@@ -44,6 +48,8 @@ export function LibraryFilters({
 
 				{!hidePanelFilter && (
 					<select
+						id={`${fieldPrefix}-panel-filter`}
+						name="whiteboard_library_panel"
 						value={selectedPanel}
 						onChange={(e) => onPanelChange(e.target.value)}
 						className={styles.input}
@@ -57,6 +63,8 @@ export function LibraryFilters({
 				)}
 
 				<select
+					id={`${fieldPrefix}-tag-filter`}
+					name="whiteboard_library_tag"
 					value={selectedTag}
 					onChange={(e) => onTagChange(e.target.value)}
 					className={styles.input}

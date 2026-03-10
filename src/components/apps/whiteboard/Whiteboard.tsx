@@ -291,14 +291,17 @@ export function Whiteboard({
 					}
 				}}
 			>
-				<DialogContent className={styles.textDialogContent}>
-					<DialogHeader>
-						<DialogTitle>Add Text</DialogTitle>
-					</DialogHeader>
-					<input
-						type="text"
-						value={textValue}
-						onChange={(e) => setTextValue(e.target.value)}
+					<DialogContent className={styles.textDialogContent}>
+						<DialogHeader>
+							<DialogTitle>Add Text</DialogTitle>
+						</DialogHeader>
+						<input
+							id="whiteboard-text-input"
+							name="whiteboard_text"
+							aria-label="Whiteboard text"
+							type="text"
+							value={textValue}
+							onChange={(e) => setTextValue(e.target.value)}
 						className={styles.textInput}
 						placeholder="Enter text"
 						autoFocus

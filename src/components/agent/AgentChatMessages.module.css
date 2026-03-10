@@ -55,6 +55,51 @@
 	padding-right: 3rem;
 }
 
+.systemEventRow {
+	display: flex;
+	gap: 0.6rem;
+	padding-right: 3rem;
+}
+
+.systemEventAvatar {
+	flex-shrink: 0;
+	padding-top: 0.22rem;
+}
+
+.systemEventBadge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 78%, transparent);
+	background: color-mix(in srgb, var(--agent-surface-muted) 74%, transparent);
+	font-size: 0.58rem;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	color: color-mix(in srgb, var(--agent-text-soft) 88%, transparent);
+}
+
+.systemEventBody {
+	flex: 1;
+	min-width: 0;
+	padding: 0.56rem 0.72rem;
+	border-radius: 0.8rem;
+	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 74%, transparent);
+	background: color-mix(in srgb, var(--agent-surface-base) 70%, transparent);
+}
+
+.systemEventMeta {
+	flex-wrap: wrap;
+}
+
+.systemEventText {
+	margin-top: 0.28rem;
+	line-height: 1.45;
+	white-space: pre-wrap;
+}
+
 .assistantAvatarShell {
 	flex-shrink: 0;
 	padding-top: 0.25rem;

@@ -973,12 +973,14 @@ export default function AccountSettings() {
 					<div className={styles.profileGrid}>
 						<Input
 							label="Display Name"
+							name="display_name"
 							value={displayName}
 							onChange={(e) => setDisplayName(e.target.value)}
 							placeholder="Your name"
 						/>
 						<Input
 							label="Email"
+							name="account_email"
 							type="email"
 							value={accountEmail}
 							onChange={(e) => setAccountEmail(e.target.value)}

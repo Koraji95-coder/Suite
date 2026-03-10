@@ -221,6 +221,9 @@ export function CircuitGenerator() {
 
 						<div className={styles.saveRow}>
 							<input
+								id="circuit-generator-name"
+								name="circuit_name"
+								aria-label="Circuit name"
 								type="text"
 								value={circuitName}
 								onChange={(e) => setCircuitName(e.target.value)}

@@ -31,8 +31,10 @@ export function BlockLibraryUploadDialog({
 				<h3 className={styles.title}>Upload Block</h3>
 
 				<div className={styles.form} role="form" onSubmit={onSubmit}>
-					<Field label="Block Name">
+					<Field label="Block Name" labelFor="block-upload-name">
 						<input
+							id="block-upload-name"
+							name="block_upload_name"
 							type="text"
 							value={uploadForm.name}
 							onChange={(e) =>
@@ -44,8 +46,10 @@ export function BlockLibraryUploadDialog({
 						/>
 					</Field>
 
-					<Field label="Category">
+					<Field label="Category" labelFor="block-upload-category">
 						<select
+							id="block-upload-category"
+							name="block_upload_category"
 							value={uploadForm.category}
 							onChange={(e) =>
 								setUploadForm((p) => ({ ...p, category: e.target.value }))
@@ -60,8 +64,10 @@ export function BlockLibraryUploadDialog({
 						</select>
 					</Field>
 
-					<Field label="Tags (comma separated)">
+					<Field label="Tags (comma separated)" labelFor="block-upload-tags">
 						<input
+							id="block-upload-tags"
+							name="block_upload_tags"
 							type="text"
 							value={uploadForm.tags}
 							onChange={(e) =>
@@ -74,6 +80,8 @@ export function BlockLibraryUploadDialog({
 
 					<label className={styles.checkboxLabel}>
 						<input
+							id="block-upload-dynamic"
+							name="block_upload_dynamic"
 							type="checkbox"
 							checked={uploadForm.is_dynamic}
 							onChange={(e) =>
@@ -108,10 +116,20 @@ export function BlockLibraryUploadDialog({
 	);
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+	label,
+	labelFor,
+	children,
+}: {
+	label: string;
+	labelFor: string;
+	children: ReactNode;
+}) {
 	return (
 		<div>
-			<label className={styles.fieldLabel}>{label}</label>
+			<label className={styles.fieldLabel} htmlFor={labelFor}>
+				{label}
+			</label>
 			{children}
 		</div>
 	);

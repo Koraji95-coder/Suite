@@ -34,6 +34,13 @@
 	padding: 0 0.5rem 0.5rem;
 }
 
+.inlineTitle {
+	margin: 0 0 0.75rem;
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--foreground);
+}
+
 @media (min-width: 640px) {
 	.inlineWrap {
 		padding: 0 1.25rem 1.25rem;

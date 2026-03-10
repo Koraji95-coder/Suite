@@ -280,6 +280,7 @@ export function GridGeneratorPreviewColumn({
 								color: paletteText,
 								outline: "none",
 							}}
+						name="gridgeneratorpreviewcolumn_input_266"
 						/>
 						ohm-m
 					</label>
@@ -302,6 +303,7 @@ export function GridGeneratorPreviewColumn({
 								color: paletteText,
 								outline: "none",
 							}}
+						name="gridgeneratorpreviewcolumn_input_288"
 						/>
 						A
 					</label>
@@ -430,6 +432,7 @@ export function GridGeneratorPreviewColumn({
 							onChange={(event) =>
 								setCalloutScale(Number(event.target.value) || 1.2)
 							}
+						name="gridgeneratorpreviewcolumn_input_424"
 						/>
 					</label>
 				</div>

@@ -160,6 +160,7 @@ export function GridGeneratorPastePanel({
 					whiteSpace: "pre",
 					fontVariantNumeric: "tabular-nums",
 				}}
+			name="gridgeneratorpastepanel_textarea_137"
 			/>
 			<div style={{ display: "flex", gap: 6, padding: "6px 10px" }}>
 				<button onClick={onApplyPaste} style={btnStyle()}>

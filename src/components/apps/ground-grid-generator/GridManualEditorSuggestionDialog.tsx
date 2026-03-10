@@ -57,10 +57,15 @@ export function GridManualEditorSuggestionDialog({
 				</DialogHeader>
 				<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 					<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-						<label style={{ fontSize: 11, color: mutedTextColor, width: 24 }}>
+						<label
+							htmlFor="grid-suggestion-x1"
+							style={{ fontSize: 11, color: mutedTextColor, width: 24 }}
+						>
 							{suggestion?.type === "add-conductor" ? "X1" : "X"}
 						</label>
 						<input
+							id="grid-suggestion-x1"
+							name="grid_suggestion_x1"
 							value={suggestionCoords.x}
 							onChange={(e) => updateCoords({ x: e.target.value })}
 							style={{ ...inputStyle, flex: 1 }}
@@ -68,10 +73,15 @@ export function GridManualEditorSuggestionDialog({
 						/>
 					</div>
 					<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-						<label style={{ fontSize: 11, color: mutedTextColor, width: 24 }}>
+						<label
+							htmlFor="grid-suggestion-y1"
+							style={{ fontSize: 11, color: mutedTextColor, width: 24 }}
+						>
 							{suggestion?.type === "add-conductor" ? "Y1" : "Y"}
 						</label>
 						<input
+							id="grid-suggestion-y1"
+							name="grid_suggestion_y1"
 							value={suggestionCoords.y}
 							onChange={(e) => updateCoords({ y: e.target.value })}
 							style={{ ...inputStyle, flex: 1 }}
@@ -81,6 +91,7 @@ export function GridManualEditorSuggestionDialog({
 						<>
 							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 								<label
+									htmlFor="grid-suggestion-x2"
 									style={{
 										fontSize: 11,
 										color: mutedTextColor,
@@ -90,6 +101,8 @@ export function GridManualEditorSuggestionDialog({
 									X2
 								</label>
 								<input
+									id="grid-suggestion-x2"
+									name="grid_suggestion_x2"
 									value={suggestionCoords.endX}
 									onChange={(e) => updateCoords({ endX: e.target.value })}
 									style={{ ...inputStyle, flex: 1 }}
@@ -97,6 +110,7 @@ export function GridManualEditorSuggestionDialog({
 							</div>
 							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
 								<label
+									htmlFor="grid-suggestion-y2"
 									style={{
 										fontSize: 11,
 										color: mutedTextColor,
@@ -106,6 +120,8 @@ export function GridManualEditorSuggestionDialog({
 									Y2
 								</label>
 								<input
+									id="grid-suggestion-y2"
+									name="grid_suggestion_y2"
 									value={suggestionCoords.endY}
 									onChange={(e) => updateCoords({ endY: e.target.value })}
 									style={{ ...inputStyle, flex: 1 }}

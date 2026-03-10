@@ -73,7 +73,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 						}
 						className={styles.typeGrid}
 					>
-						<label className={styles.typeOption}>
+						<div className={styles.typeOption}>
 							<RadioGroupItem value="standard" aria-label="Standard" />
 							<div>
 								<div className={styles.typeTitle}>Standard</div>
@@ -81,8 +81,8 @@ export function TransmittalBuilderTypeAndFilesSection({
 									PDF documents with an Excel index.
 								</div>
 							</div>
-						</label>
-						<label className={styles.typeOption}>
+						</div>
+						<div className={styles.typeOption}>
 							<RadioGroupItem value="cid" aria-label="CID" />
 							<div>
 								<div className={styles.typeTitle}>CID</div>
@@ -90,7 +90,7 @@ export function TransmittalBuilderTypeAndFilesSection({
 									CID files with document index entries.
 								</div>
 							</div>
-						</label>
+						</div>
 					</RadioGroup>
 				</div>
 			</TransmittalSection>

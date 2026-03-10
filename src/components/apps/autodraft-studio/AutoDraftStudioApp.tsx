@@ -1,5 +1,6 @@
 import {
 	CheckCircle2,
+	HardDriveDownload,
 	RefreshCw,
 	Server,
 	Sparkles,
@@ -21,6 +22,7 @@ import {
 } from "./autodraftData";
 import {
 	type AutoDraftHealth,
+	type AutoDraftBackcheckResponse,
 	type AutoDraftExecuteResponse,
 	type AutoDraftPlanResponse,
 	autoDraftService,
@@ -91,8 +93,12 @@ export function AutoDraftStudioApp() {
 	const [executeResult, setExecuteResult] =
 		useState<AutoDraftExecuteResponse | null>(null);
 	const [executeError, setExecuteError] = useState<string | null>(null);
+	const [backcheckResult, setBackcheckResult] =
+		useState<AutoDraftBackcheckResponse | null>(null);
+	const [backcheckError, setBackcheckError] = useState<string | null>(null);
 	const [loadingPlan, setLoadingPlan] = useState(false);
 	const [loadingExecute, setLoadingExecute] = useState(false);
+	const [loadingBackcheck, setLoadingBackcheck] = useState(false);
 	const [loadingHealth, setLoadingHealth] = useState(false);
 
 	const translatedGeometryStats = useMemo(() => {
@@ -145,6 +151,8 @@ export function AutoDraftStudioApp() {
 		setLoadingPlan(true);
 		setExecuteResult(null);
 		setExecuteError(null);
+		setBackcheckResult(null);
+		setBackcheckError(null);
 		try {
 			const planned = await autoDraftService.plan(DEMO_MARKUPS);
 			setPlanResult(planned);
@@ -182,6 +190,47 @@ export function AutoDraftStudioApp() {
 		} finally {
 			setLoadingExecute(false);
 		}
+	};
+
+	const runDemoBackcheck = async () => {
+		setLoadingBackcheck(true);
+		setBackcheckResult(null);
+		setBackcheckError(null);
+		try {
+			const plan = planResult ?? (await autoDraftService.plan(DEMO_MARKUPS));
+			if (!planResult) {
+				setPlanResult(plan);
+			}
+			if (!Array.isArray(plan.actions) || plan.actions.length === 0) {
+				setBackcheckError("No actions available to backcheck.");
+				return;
+			}
+			const checked = await autoDraftService.backcheck(plan.actions);
+			setBackcheckResult(checked);
+		} catch (error) {
+			const message =
+				error instanceof Error && error.message.trim().length > 0
+					? error.message
+					: "Backcheck request failed.";
+			setBackcheckError(message);
+		} finally {
+			setLoadingBackcheck(false);
+		}
+	};
+
+	const exportBackcheckReport = () => {
+		if (!backcheckResult) return;
+		const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+		const payload = JSON.stringify(backcheckResult, null, 2);
+		const blob = new Blob([payload], { type: "application/json" });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement("a");
+		anchor.href = url;
+		anchor.download = `autodraft-backcheck-${stamp}.json`;
+		document.body.appendChild(anchor);
+		anchor.click();
+		document.body.removeChild(anchor);
+		URL.revokeObjectURL(url);
 	};
 
 	return (
@@ -472,6 +521,14 @@ export function AutoDraftStudioApp() {
 						<Button
 							variant="outline"
 							size="sm"
+							onClick={() => void runDemoBackcheck()}
+							loading={loadingBackcheck}
+						>
+							Run backcheck
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
 							onClick={() => void runDemoExecuteDryRun()}
 							loading={loadingExecute}
 						>
@@ -496,6 +553,90 @@ export function AutoDraftStudioApp() {
 						API is not online).
 					</Text>
 				)}
+				{planResult && !backcheckResult && !backcheckError ? (
+					<Text size="xs" color="warning">
+						Backcheck has not been run yet. Execution is still available, but
+						CAD mismatch checks are reduced.
+					</Text>
+				) : null}
+				{backcheckResult ? (
+					<div className={styles.backcheckPanel}>
+						<HStack gap={2} align="center" justify="between">
+							<Text size="xs" color="muted">
+								Backcheck {backcheckResult.requestId} ·{" "}
+								{backcheckResult.cad.degraded ? "degraded" : "cad-aware"}
+							</Text>
+							<Button
+								variant="ghost"
+								size="sm"
+								iconLeft={<HardDriveDownload size={13} />}
+								onClick={exportBackcheckReport}
+							>
+								Export JSON
+							</Button>
+						</HStack>
+						<HStack gap={2} align="center" wrap>
+							<Badge color="success" variant="soft">
+								pass {backcheckResult.summary.pass_count}
+							</Badge>
+							<Badge color="warning" variant="soft">
+								warn {backcheckResult.summary.warn_count}
+							</Badge>
+							<Badge color="danger" variant="soft">
+								fail {backcheckResult.summary.fail_count}
+							</Badge>
+						</HStack>
+						{backcheckResult.warnings.map((warning) => (
+							<Text key={warning} size="xs" color="warning">
+								{warning}
+							</Text>
+						))}
+						<div className={styles.findingList}>
+							{backcheckResult.findings.map((finding) => (
+								<div key={finding.id} className={styles.findingCard}>
+									<HStack gap={2} align="center" wrap>
+										<Badge
+											color={
+												finding.status === "fail"
+													? "danger"
+													: finding.status === "warn"
+														? "warning"
+														: "success"
+											}
+											variant="soft"
+										>
+											{finding.status}
+										</Badge>
+										<Text size="xs" color="muted">
+											{finding.action_id} · {finding.category}
+										</Text>
+									</HStack>
+									{finding.notes.map((note) => (
+										<Text key={`${finding.id}:${note}`} size="xs" color="muted">
+											{note}
+										</Text>
+									))}
+									{finding.suggestions.length > 0 ? (
+										<Text size="xs" color="muted">
+											Next: {finding.suggestions.join(" ")}
+										</Text>
+									) : null}
+								</div>
+							))}
+						</div>
+						{backcheckResult.summary.fail_count > 0 ? (
+							<Text size="xs" color="warning">
+								Backcheck found failing actions. Execute remains available in
+								v1, but manual confirmation is strongly recommended.
+							</Text>
+						) : null}
+					</div>
+				) : null}
+				{backcheckError ? (
+					<Text size="sm" color="warning">
+						{backcheckError}
+					</Text>
+				) : null}
 				{executeResult ? (
 					<div className={styles.executeSummary}>
 						<Text size="xs" color="muted">

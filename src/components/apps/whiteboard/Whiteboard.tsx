@@ -186,7 +186,7 @@ export function Whiteboard({
 	return (
 		<>
 			<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-				<DialogContent className={styles.dialogContent}>
+				<DialogContent className={styles.dialogContent} showCloseButton={false}>
 					<div className={styles.root}>
 						{/* Header */}
 						<div className={styles.header}>

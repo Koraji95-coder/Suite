@@ -39,6 +39,7 @@ export function FilesBrowser({
 							onChange={(e) => onFilterChange(e.target.value)}
 							placeholder="Search files..."
 							className={styles.searchInput}
+						name="filesbrowser_input_36"
 						/>
 					</div>
 					<label className={styles.uploadButton}>
@@ -48,6 +49,7 @@ export function FilesBrowser({
 							type="file"
 							onChange={onUpload}
 							className={styles.hiddenInput}
+						name="filesbrowser_input_47"
 						/>
 					</label>
 				</div>

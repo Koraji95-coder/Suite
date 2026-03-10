@@ -163,6 +163,7 @@ export function ArchitectureMapPanel() {
 						onChange={(event) => setSearchValue(event.target.value)}
 						placeholder="Search domains, modules, flows, and paths..."
 						className={styles.archSearchInput}
+					name="architecturemappanel_input_160"
 					/>
 				</label>
 				<div className={styles.archDomainFilters}>

@@ -19,7 +19,7 @@ export function BlockLibraryDetailsDialog({
 
 	return (
 		<Dialog open onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className={styles.dialogContent}>
+			<DialogContent className={styles.dialogContent} showCloseButton={false}>
 				<div className={styles.header}>
 					<div className={styles.headerText}>
 						<h3 className={styles.title}>{selectedBlock.name}</h3>

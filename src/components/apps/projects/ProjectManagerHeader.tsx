@@ -116,6 +116,7 @@ export function ProjectManagerHeader({
 								onChange={(event) => onProjectSearchChange(event.target.value)}
 								placeholder="Search projects..."
 								className={styles.searchInput}
+							name="projectmanagerheader_input_113"
 							/>
 						</div>
 						<div className={styles.stats}>

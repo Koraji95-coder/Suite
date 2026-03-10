@@ -16,7 +16,10 @@ type DialogOverlayProps = React.ComponentPropsWithoutRef<
 >;
 type DialogContentProps = React.ComponentPropsWithoutRef<
 	typeof DialogPrimitive.Content
->;
+> & {
+	showCloseButton?: boolean;
+	closeButtonLabel?: string;
+};
 type DialogTitleProps = React.ComponentPropsWithoutRef<
 	typeof DialogPrimitive.Title
 >;
@@ -36,7 +39,16 @@ const DialogOverlay = React.forwardRef<HTMLDivElement, DialogOverlayProps>(
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
-	({ className, children, ...props }, ref) => (
+	(
+		{
+			className,
+			children,
+			showCloseButton = true,
+			closeButtonLabel = "Close",
+			...props
+		},
+		ref,
+	) => (
 		<DialogPortal>
 			<DialogOverlay />
 			<DialogPrimitive.Content
@@ -45,10 +57,12 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
 				{...props}
 			>
 				{children}
-				<DialogPrimitive.Close className={styles.closeButton}>
-					<X className={styles.closeIcon} />
-					<span className={styles.srOnly}>Close</span>
-				</DialogPrimitive.Close>
+				{showCloseButton ? (
+					<DialogPrimitive.Close className={styles.closeButton}>
+						<X className={styles.closeIcon} />
+						<span className={styles.srOnly}>{closeButtonLabel}</span>
+					</DialogPrimitive.Close>
+				) : null}
 			</DialogPrimitive.Content>
 		</DialogPortal>
 	),

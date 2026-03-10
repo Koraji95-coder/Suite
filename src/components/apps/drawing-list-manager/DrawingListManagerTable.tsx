@@ -36,6 +36,7 @@ export function DrawingListManagerTable({
 										value={drawing.title}
 										onChange={(e) => onTitleChange(drawing.id, e.target.value)}
 										className={styles.titleInput}
+									name="drawinglistmanagertable_input_35"
 									/>
 								</td>
 								<td className={styles.fileCell}>{drawing.fileName || "–"}</td>

@@ -148,6 +148,7 @@ export function GridManualEditorToolbar({
 								onCoordInputChange({ ...coordInput, x: e.target.value })
 							}
 							style={inputStyle}
+						name="gridmanualeditortoolbar_input_144"
 						/>
 						<input
 							placeholder="Y"
@@ -156,6 +157,7 @@ export function GridManualEditorToolbar({
 								onCoordInputChange({ ...coordInput, y: e.target.value })
 							}
 							style={inputStyle}
+						name="gridmanualeditortoolbar_input_152"
 						/>
 						<button onClick={onAddRodByCoord} style={btnStyle(false)}>
 							Add
@@ -179,6 +181,7 @@ export function GridManualEditorToolbar({
 								onLineInputChange({ ...lineInput, x1: e.target.value })
 							}
 							style={inputStyle}
+						name="gridmanualeditortoolbar_input_175"
 						/>
 						<input
 							placeholder="Y1"
@@ -187,6 +190,7 @@ export function GridManualEditorToolbar({
 								onLineInputChange({ ...lineInput, y1: e.target.value })
 							}
 							style={inputStyle}
+						name="gridmanualeditortoolbar_input_183"
 						/>
 						<input
 							placeholder="X2"
@@ -195,6 +199,7 @@ export function GridManualEditorToolbar({
 								onLineInputChange({ ...lineInput, x2: e.target.value })
 							}
 							style={inputStyle}
+						name="gridmanualeditortoolbar_input_191"
 						/>
 						<input
 							placeholder="Y2"
@@ -203,6 +208,7 @@ export function GridManualEditorToolbar({
 								onLineInputChange({ ...lineInput, y2: e.target.value })
 							}
 							style={inputStyle}
+						name="gridmanualeditortoolbar_input_199"
 						/>
 						<button onClick={onAddConductorByCoord} style={btnStyle(false)}>
 							Add

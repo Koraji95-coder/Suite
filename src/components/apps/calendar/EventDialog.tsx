@@ -63,17 +63,12 @@ export function EventDialog({
 
 	if (!isOpen) return null;
 
-	const dialogBody = (
+	const dialogTitle = event?.id ? "Edit Event" : "Create Event";
+	const dialogDescription = event?.id
+		? "Edit the details of this event"
+		: "Add a new event to your calendar";
+	const eventFormFields = (
 		<>
-			<DialogHeader>
-				<DialogTitle>{event?.id ? "Edit Event" : "Create Event"}</DialogTitle>
-				<DialogDescription className={styles.srOnly}>
-					{event?.id
-						? "Edit the details of this event"
-						: "Add a new event to your calendar"}
-				</DialogDescription>
-			</DialogHeader>
-
 			{error ? <div className={styles.errorBanner}>{error}</div> : null}
 
 			<EventDialogFields
@@ -121,7 +116,9 @@ export function EventDialog({
 		return (
 			<div className={styles.inlineWrap}>
 				<div className={cn(styles.dialogContent, styles.dialogContentInline)}>
-					{dialogBody}
+					<h2 className={styles.inlineTitle}>{dialogTitle}</h2>
+					<p className={styles.srOnly}>{dialogDescription}</p>
+					{eventFormFields}
 				</div>
 			</div>
 		);
@@ -129,7 +126,15 @@ export function EventDialog({
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className={styles.dialogContent}>{dialogBody}</DialogContent>
+			<DialogContent className={styles.dialogContent}>
+				<DialogHeader>
+					<DialogTitle>{dialogTitle}</DialogTitle>
+					<DialogDescription className={styles.srOnly}>
+						{dialogDescription}
+					</DialogDescription>
+				</DialogHeader>
+				{eventFormFields}
+			</DialogContent>
 		</Dialog>
 	);
 }

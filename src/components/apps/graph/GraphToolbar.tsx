@@ -82,6 +82,7 @@ export function GraphToolbar({
 					value={searchQuery}
 					onChange={(e) => onSearchChange(e.target.value)}
 					className={styles.searchInput}
+				name="graphtoolbar_input_79"
 				/>
 			</div>
 

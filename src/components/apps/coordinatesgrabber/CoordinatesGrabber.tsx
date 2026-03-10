@@ -218,7 +218,7 @@ export function CoordinatesGrabber() {
 					<div className={styles.cardGrid}>
 						<div className={styles.fieldBlock}>
 							<div className={styles.fieldHeader}>
-								<label>Layers</label>
+								<span>Layers</span>
 								<button
 									type="button"
 									className={styles.inlineButton}
@@ -244,7 +244,7 @@ export function CoordinatesGrabber() {
 										setState((prev) => ({ ...prev, layerName: nextLayer }));
 									}}
 									className={styles.input}
-								>
+								 name="coordinatesgrabber_select_240">
 									<option value="">{layerInputPlaceholder}</option>
 									{availableLayers.map((layer) => (
 										<option key={layer} value={layer}>
@@ -262,6 +262,7 @@ export function CoordinatesGrabber() {
 									}}
 									placeholder={layerInputPlaceholder}
 									className={styles.input}
+								name="coordinatesgrabber_input_256"
 								/>
 							)}
 							<div className={styles.inlineActions}>
@@ -301,7 +302,7 @@ export function CoordinatesGrabber() {
 						</div>
 
 						<div className={styles.fieldBlock}>
-							<label>Geometry Style</label>
+							<span>Geometry Style</span>
 							<div className={styles.choiceGrid}>
 								<button
 									type="button"
@@ -335,6 +336,7 @@ export function CoordinatesGrabber() {
 												scanSelection: event.target.checked,
 											}))
 										}
+									name="coordinatesgrabber_input_329"
 									/>
 									Scan selected entities only
 								</label>
@@ -348,6 +350,7 @@ export function CoordinatesGrabber() {
 												includeModelspace: event.target.checked,
 											}))
 										}
+									name="coordinatesgrabber_input_342"
 									/>
 									Include ModelSpace geometry
 								</label>
@@ -355,7 +358,7 @@ export function CoordinatesGrabber() {
 						</div>
 
 						<div className={cn(styles.fieldBlock, styles.pointNamingBlock)}>
-							<label>Point Naming</label>
+							<span>Point Naming</span>
 							<div className={styles.splitInputs}>
 								<div className={styles.pointNamingField}>
 									<span className={cn(styles.labelSmall, styles.centerText)}>
@@ -371,6 +374,7 @@ export function CoordinatesGrabber() {
 											}))
 										}
 										className={cn(styles.input, styles.centerInput)}
+									name="coordinatesgrabber_input_364"
 									/>
 								</div>
 								<div className={styles.pointNamingField}>
@@ -389,6 +393,7 @@ export function CoordinatesGrabber() {
 											}))
 										}
 										className={cn(styles.input, styles.centerInput)}
+									name="coordinatesgrabber_input_380"
 									/>
 								</div>
 								<div className={styles.pointNamingField}>
@@ -408,6 +413,7 @@ export function CoordinatesGrabber() {
 											}))
 										}
 										className={cn(styles.input, styles.centerInput)}
+									name="coordinatesgrabber_input_398"
 									/>
 								</div>
 								<div className={styles.pointNamingField}>
@@ -426,6 +432,7 @@ export function CoordinatesGrabber() {
 											}))
 										}
 										className={cn(styles.input, styles.centerInput)}
+									name="coordinatesgrabber_input_417"
 									/>
 								</div>
 							</div>

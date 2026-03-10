@@ -2008,7 +2008,7 @@ export function ConduitTerminalWorkflow() {
 											)
 										}
 										disabled={etapCleanupRunning || scanning}
-									>
+									 name="conduitterminalworkflow_select_2002">
 										{ETAP_CLEANUP_COMMANDS.map((command) => (
 											<option key={command} value={command}>
 												{command}
@@ -2027,6 +2027,7 @@ export function ConduitTerminalWorkflow() {
 											setEtapCleanupPluginDllPath(event.target.value)
 										}
 										disabled={etapCleanupRunning || scanning}
+									name="conduitterminalworkflow_input_2021"
 									/>
 								</label>
 								<label className={styles.etapField}>
@@ -2042,6 +2043,7 @@ export function ConduitTerminalWorkflow() {
 											setEtapCleanupTimeoutMs(Number(event.target.value) || 90000)
 										}
 										disabled={etapCleanupRunning || scanning}
+									name="conduitterminalworkflow_input_2034"
 									/>
 								</label>
 								<div className={styles.etapToggleRow}>
@@ -2053,6 +2055,7 @@ export function ConduitTerminalWorkflow() {
 												setEtapCleanupWaitForCompletion(event.target.checked)
 											}
 											disabled={etapCleanupRunning || scanning}
+										name="conduitterminalworkflow_input_2049"
 										/>
 										<span>Wait for completion</span>
 									</label>
@@ -2064,6 +2067,7 @@ export function ConduitTerminalWorkflow() {
 												setEtapCleanupSaveDrawing(event.target.checked)
 											}
 											disabled={etapCleanupRunning || scanning}
+										name="conduitterminalworkflow_input_2060"
 										/>
 										<span>Save drawing after run</span>
 									</label>

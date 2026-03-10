@@ -72,7 +72,7 @@ export function DatabaseBrowserDataPanel({
 					value={pageSize}
 					onChange={(event) => onPageSizeChange(Number(event.target.value))}
 					className={styles.pageSizeSelect}
-				>
+				 name="databasebrowserdatapanel_select_71">
 					{[25, 50, 100].map((value) => (
 						<option key={value} value={value}>
 							{value} / page
@@ -89,6 +89,7 @@ export function DatabaseBrowserDataPanel({
 						onChange={(event) => onSearchChange(event.target.value)}
 						placeholder="Filter rows..."
 						className={styles.searchInput}
+					name="databasebrowserdatapanel_input_87"
 					/>
 					{search && (
 						<span className={styles.searchMeta}>

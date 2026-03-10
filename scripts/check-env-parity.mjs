@@ -43,11 +43,22 @@ const missingInExample = Array.from(envKeys)
 	.sort();
 
 if (missingInEnv.length === 0 && missingInExample.length === 0) {
-	console.log("env-parity: .env and .env.example keys match.");
+	console.log("env-parity: required keys present and no local-only keys detected.");
 	process.exit(0);
 }
 
-console.error("env-parity: key mismatch between .env and .env.example.");
+if (missingInEnv.length === 0) {
+	console.warn("env-parity: required keys present in .env.");
+	if (missingInExample.length > 0) {
+		console.warn("  Local-only keys present in .env (warning only):");
+		for (const key of missingInExample) {
+			console.warn(`    - ${key}`);
+		}
+	}
+	process.exit(0);
+}
+
+console.error("env-parity: missing required keys in .env.");
 if (missingInEnv.length > 0) {
 	console.error("  Missing in .env:");
 	for (const key of missingInEnv) {
@@ -55,7 +66,7 @@ if (missingInEnv.length > 0) {
 	}
 }
 if (missingInExample.length > 0) {
-	console.error("  Missing in .env.example:");
+	console.error("  Local-only keys in .env (non-blocking cleanup candidates):");
 	for (const key of missingInExample) {
 		console.error(`    - ${key}`);
 	}

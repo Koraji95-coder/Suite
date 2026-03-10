@@ -32,7 +32,7 @@ export function TransmittalBuilderOptionsSection({
 						<div className={styles.groupTitle}>{group.label}</div>
 						<div className={styles.optionsList}>
 							{group.options.map((option) => (
-								<label key={option.key} className={styles.optionLabel}>
+								<div key={option.key} className={styles.optionLabel}>
 									<Checkbox
 										checked={draft.options[option.key]}
 										onCheckedChange={(checked) =>
@@ -40,7 +40,7 @@ export function TransmittalBuilderOptionsSection({
 										}
 									/>
 									<span>{option.label}</span>
-								</label>
+								</div>
 							))}
 						</div>
 					</Panel>

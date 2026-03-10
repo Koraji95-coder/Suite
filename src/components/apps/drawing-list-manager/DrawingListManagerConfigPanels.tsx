@@ -45,6 +45,7 @@ export function DrawingListManagerConfigPanels({
 							}}
 							placeholder="25074"
 							className={styles.input}
+						name="drawinglistmanagerconfigpanels_input_37"
 						/>
 					</label>
 					<label className={styles.labelGroup}>
@@ -58,6 +59,7 @@ export function DrawingListManagerConfigPanels({
 								}))
 							}
 							className={styles.input}
+						name="drawinglistmanagerconfigpanels_input_52"
 						/>
 					</label>
 					<label className={styles.checkboxRow}>
@@ -70,6 +72,7 @@ export function DrawingListManagerConfigPanels({
 									enforceProjectCode: e.target.checked,
 								}))
 							}
+						name="drawinglistmanagerconfigpanels_input_64"
 						/>
 						Enforce project code in naming convention
 					</label>
@@ -95,7 +98,7 @@ export function DrawingListManagerConfigPanels({
 							const count = templateCounts[typeKey] || 0;
 							return (
 								<div key={typeKey} className={styles.typeCard}>
-									<label className={styles.typeLabel}>{typeKey}</label>
+									<div className={styles.typeLabel}>{typeKey}</div>
 									<input
 										type="number"
 										min={0}
@@ -108,6 +111,7 @@ export function DrawingListManagerConfigPanels({
 											}))
 										}
 										className={styles.input}
+									name="drawinglistmanagerconfigpanels_input_99"
 									/>
 								</div>
 							);
@@ -139,6 +143,7 @@ export function DrawingListManagerConfigPanels({
 								}
 								placeholder="From"
 								className={styles.input}
+							name="drawinglistmanagerconfigpanels_input_129"
 							/>
 							<input
 								value={rule.to}
@@ -153,6 +158,7 @@ export function DrawingListManagerConfigPanels({
 								}
 								placeholder="To"
 								className={styles.input}
+							name="drawinglistmanagerconfigpanels_input_143"
 							/>
 						</div>
 					))}

@@ -38,6 +38,7 @@ export function StandardsDrawingFiltersPanel({
 						onChange={(event) => onSearchTermChange(event.target.value)}
 						placeholder="Search drawings..."
 						className={styles.searchInput}
+					name="standardsdrawingfilterspanel_input_35"
 					/>
 				</div>
 
@@ -46,7 +47,7 @@ export function StandardsDrawingFiltersPanel({
 						value={filterStatus}
 						onChange={(event) => onFilterStatusChange(event.target.value)}
 						className={styles.statusSelect}
-					>
+					 name="standardsdrawingfilterspanel_select_45">
 						<option value="all">All Status</option>
 						<option value="pass">Pass</option>
 						<option value="warning">Warning</option>

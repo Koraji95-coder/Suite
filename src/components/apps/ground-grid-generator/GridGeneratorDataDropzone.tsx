@@ -66,6 +66,7 @@ export function GridGeneratorDataDropzone({
 				accept=".csv,.txt"
 				onChange={onFileSelect}
 				style={{ display: "none" }}
+			name="gridgeneratordatadropzone_input_63"
 			/>
 		</div>
 	);

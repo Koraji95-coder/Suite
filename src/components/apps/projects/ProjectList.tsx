@@ -103,6 +103,7 @@ export function ProjectList({
 					onChange={(e) => handleSearchChange(e.target.value)}
 					placeholder="Search projects..."
 					className={styles.searchInput}
+				name="projectlist_input_100"
 				/>
 			</div>
 

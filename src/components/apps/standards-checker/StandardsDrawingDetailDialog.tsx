@@ -46,7 +46,10 @@ export function StandardsDrawingDetailDialog({
 			open={Boolean(selectedDrawing)}
 			onOpenChange={(open) => !open && onClose()}
 		>
-			<DialogContent className={cn(styles.dialogShell, styles.scroll)}>
+			<DialogContent
+				className={cn(styles.dialogShell, styles.scroll)}
+				showCloseButton={false}
+			>
 				<div className={styles.header}>
 					<div className={styles.headerMeta}>
 						<StandardsDrawingStatusIcon

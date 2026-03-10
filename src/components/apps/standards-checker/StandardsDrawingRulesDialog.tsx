@@ -26,7 +26,10 @@ export function StandardsDrawingRulesDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className={cn(styles.dialogShell, styles.scroll)}>
+			<DialogContent
+				className={cn(styles.dialogShell, styles.scroll)}
+				showCloseButton={false}
+			>
 				<div className={styles.header}>
 					<h3 className={styles.title}>Standards Rules Configuration</h3>
 					<button
@@ -58,6 +61,7 @@ export function StandardsDrawingRulesDialog({
 												checked={rule.enabled}
 												onChange={() => onToggleRule(rule.id)}
 												className={styles.toggle}
+											name="standardsdrawingrulesdialog_input_59"
 											/>
 											<h4 className={styles.ruleName}>{rule.name}</h4>
 											<span

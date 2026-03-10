@@ -180,6 +180,7 @@ export function BatchFindReplaceApp() {
 							setFiles(Array.from(e.target.files || []));
 							setPreview([]);
 						}}
+					name="batchfindreplaceapp_input_175"
 					/>
 				</label>
 				{files.length > 0 && (
@@ -203,6 +204,7 @@ export function BatchFindReplaceApp() {
 									}
 									placeholder="Find"
 									className={styles.textInput}
+								name="batchfindreplaceapp_input_199"
 								/>
 								<input
 									value={rule.replace}
@@ -211,6 +213,7 @@ export function BatchFindReplaceApp() {
 									}
 									placeholder="Replace"
 									className={styles.textInput}
+								name="batchfindreplaceapp_input_207"
 								/>
 								<button
 									type="button"
@@ -229,6 +232,7 @@ export function BatchFindReplaceApp() {
 											updateRule(rule.id, { useRegex: e.target.checked })
 										}
 										className={styles.checkbox}
+									name="batchfindreplaceapp_input_225"
 									/>
 									Regex
 								</label>
@@ -240,6 +244,7 @@ export function BatchFindReplaceApp() {
 											updateRule(rule.id, { matchCase: e.target.checked })
 										}
 										className={styles.checkbox}
+									name="batchfindreplaceapp_input_236"
 									/>
 									Case sensitive
 								</label>

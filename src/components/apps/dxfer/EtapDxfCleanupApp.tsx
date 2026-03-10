@@ -253,7 +253,7 @@ export function EtapDxfCleanupApp() {
 									setCommand(event.target.value as EtapCleanupCommand)
 								}
 								disabled={running}
-							>
+							 name="etapdxfcleanupapp_select_249">
 								{COMMAND_OPTIONS.map((entry) => (
 									<option key={entry.value} value={entry.value}>
 										{entry.value} - {entry.label}
@@ -294,6 +294,7 @@ export function EtapDxfCleanupApp() {
 										setWaitForCompletion(event.target.checked)
 									}
 									disabled={running}
+								name="etapdxfcleanupapp_input_290"
 								/>
 								<span>Wait for completion</span>
 							</label>
@@ -303,6 +304,7 @@ export function EtapDxfCleanupApp() {
 									checked={saveDrawing}
 									onChange={(event) => setSaveDrawing(event.target.checked)}
 									disabled={running}
+								name="etapdxfcleanupapp_input_301"
 								/>
 								<span>Save drawing after run</span>
 							</label>

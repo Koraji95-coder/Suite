@@ -35,8 +35,12 @@ export function ProjectFormModal({
 				</DialogHeader>
 				<div className={styles.fields}>
 					<div>
-						<label className={styles.label}>Project Name</label>
+						<label className={styles.label} htmlFor="project-form-name">
+							Project Name
+						</label>
 						<input
+							id="project-form-name"
+							name="project_form_name"
 							type="text"
 							value={formData.name}
 							onChange={(e) =>
@@ -47,8 +51,12 @@ export function ProjectFormModal({
 						/>
 					</div>
 					<div>
-						<label className={styles.label}>Description</label>
+						<label className={styles.label} htmlFor="project-form-description">
+							Description
+						</label>
 						<textarea
+							id="project-form-description"
+							name="project_form_description"
 							value={formData.description}
 							onChange={(e) =>
 								setFormData({ ...formData, description: e.target.value })
@@ -59,8 +67,12 @@ export function ProjectFormModal({
 					</div>
 					<div className={styles.gridTwo}>
 						<div>
-							<label className={styles.label}>Deadline</label>
+							<label className={styles.label} htmlFor="project-form-deadline">
+								Deadline
+							</label>
 							<input
+								id="project-form-deadline"
+								name="project_form_deadline"
 								type="date"
 								value={formData.deadline ? formData.deadline.split("T")[0] : ""}
 								onChange={(e) =>
@@ -70,8 +82,12 @@ export function ProjectFormModal({
 							/>
 						</div>
 						<div>
-							<label className={styles.label}>Priority</label>
+							<label className={styles.label} htmlFor="project-form-priority">
+								Priority
+							</label>
 							<select
+								id="project-form-priority"
+								name="project_form_priority"
 								value={formData.priority}
 								onChange={(e) =>
 									setFormData({
@@ -90,8 +106,12 @@ export function ProjectFormModal({
 					</div>
 					<div className={styles.gridTwo}>
 						<div>
-							<label className={styles.label}>Category</label>
+							<label className={styles.label} htmlFor="project-form-category">
+								Category
+							</label>
 							<select
+								id="project-form-category"
+								name="project_form_category"
 								value={formData.category ?? ""}
 								onChange={(e) =>
 									setFormData({ ...formData, category: e.target.value })
@@ -107,8 +127,12 @@ export function ProjectFormModal({
 							</select>
 						</div>
 						<div>
-							<label className={styles.label}>Status</label>
+							<label className={styles.label} htmlFor="project-form-status">
+								Status
+							</label>
 							<select
+								id="project-form-status"
+								name="project_form_status"
 								value={formData.status}
 								onChange={(e) =>
 									setFormData({

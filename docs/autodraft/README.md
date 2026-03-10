@@ -65,6 +65,7 @@ Build an AutoDraft pipeline that:
 - `GET /api/autodraft/rules`
 - `POST /api/autodraft/plan`
 - `POST /api/autodraft/execute`
+- `POST /api/autodraft/backcheck`
 
 These endpoints support staged rollout: local fallback logic now, .NET-backed
 execution when the external API is available.

@@ -40,7 +40,7 @@ export function CoordinatesGrabberLayerSearchPanels({
 				<h3 style={configTitleStyle(palette)}>Layer Configuration</h3>
 				<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
 					<div>
-						<label
+						<div
 							style={{
 								fontSize: "12px",
 								color: palette.textMuted,
@@ -73,7 +73,7 @@ export function CoordinatesGrabberLayerSearchPanels({
 							>
 								🔄 Refresh
 							</button>
-						</label>
+						</div>
 						{availableLayers.length > 0 ? (
 							<select
 								value={state.layerName}
@@ -84,7 +84,7 @@ export function CoordinatesGrabberLayerSearchPanels({
 									}))
 								}
 								style={configInputStyle(palette)}
-							>
+							 name="coordinatesgrabberlayersearchpanels_select_78">
 								<option value="">-- Select a layer --</option>
 								{availableLayers.map((layer) => (
 									<option key={layer} value={layer}>
@@ -104,6 +104,7 @@ export function CoordinatesGrabberLayerSearchPanels({
 									}))
 								}
 								style={configInputStyle(palette)}
+							name="coordinatesgrabberlayersearchpanels_input_96"
 							/>
 						)}
 						<div
@@ -287,6 +288,7 @@ export function CoordinatesGrabberLayerSearchPanels({
 								}))
 							}
 							style={{ cursor: "pointer" }}
+						name="coordinatesgrabberlayersearchpanels_input_280"
 						/>
 						<span style={{ color: palette.text }}>
 							Scan selected entities only
@@ -311,6 +313,7 @@ export function CoordinatesGrabberLayerSearchPanels({
 								}))
 							}
 							style={{ cursor: "pointer" }}
+						name="coordinatesgrabberlayersearchpanels_input_304"
 						/>
 						<span style={{ color: palette.text }}>
 							Include ModelSpace geometry (outside blocks)
@@ -321,10 +324,14 @@ export function CoordinatesGrabberLayerSearchPanels({
 
 			<div style={configCardStyle(palette)}>
 				<h3 style={configTitleStyle(palette)}>Reference Block</h3>
-				<label style={{ fontSize: "12px", color: palette.textMuted }}>
+				<label
+					htmlFor="coords-layer-search-ref-scale"
+					style={{ fontSize: "12px", color: palette.textMuted }}
+				>
 					Scale:
 				</label>
 				<input
+					id="coords-layer-search-ref-scale"
 					type="number"
 					value={state.refScale}
 					onChange={(e) =>
@@ -336,6 +343,7 @@ export function CoordinatesGrabberLayerSearchPanels({
 					min="0.0001"
 					step="0.1"
 					style={configInputStyle(palette)}
+				name="coordinatesgrabberlayersearchpanels_input_327"
 				/>
 			</div>
 		</>

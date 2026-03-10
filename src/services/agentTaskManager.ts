@@ -113,7 +113,6 @@ export interface AgentConversation {
 const TASK_HISTORY_KEY_PREFIX = "agent-task-history";
 const CONV_KEY_PREFIX = "agent-conversations";
 const MAX_HISTORY = 50;
-const MAX_CONVERSATIONS = 30;
 const ENV = import.meta.env as Record<string, string | undefined>;
 
 function parsePositiveIntEnv(
@@ -128,15 +127,20 @@ function parsePositiveIntEnv(
 	return value;
 }
 
+const MAX_CONVERSATIONS = parsePositiveIntEnv(
+	"VITE_AGENT_CHAT_MAX_CONVERSATIONS",
+	18,
+	{ min: 8, max: 120 },
+);
 const MAX_MESSAGES_PER_CONVERSATION = parsePositiveIntEnv(
 	"VITE_AGENT_CHAT_MAX_MESSAGES_PER_CONVERSATION",
-	200,
-	{ min: 50, max: 2000 },
+	120,
+	{ min: 40, max: 1200 },
 );
 const MAX_MESSAGE_CHARS = parsePositiveIntEnv(
 	"VITE_AGENT_CHAT_MAX_MESSAGE_CHARS",
-	12_000,
-	{ min: 256, max: 100_000 },
+	6_000,
+	{ min: 256, max: 40_000 },
 );
 
 class AgentTaskManager {
@@ -275,12 +279,68 @@ class AgentTaskManager {
 			if (!Array.isArray(parsed)) {
 				return { conversations: [], rewritten: true };
 			}
-			const sanitized = parsed
+			let sanitized = parsed
 				.map((entry, index) => this.sanitizeConversation(entry, index))
 				.filter((entry): entry is AgentConversation => Boolean(entry));
-			const rewritten =
-				sanitized.length !== parsed.length ||
-				JSON.stringify(parsed) !== JSON.stringify(sanitized);
+			let rewritten = sanitized.length !== parsed.length;
+			if (sanitized.length > MAX_CONVERSATIONS) {
+				sanitized = sanitized.slice(0, MAX_CONVERSATIONS);
+				rewritten = true;
+			}
+			if (!rewritten) {
+				outer: for (const rawConversation of parsed) {
+					if (
+						!rawConversation ||
+						typeof rawConversation !== "object" ||
+						Array.isArray(rawConversation)
+					) {
+						rewritten = true;
+						break;
+					}
+					const conversationRecord = rawConversation as Record<string, unknown>;
+					if (
+						typeof conversationRecord.id !== "string" ||
+						("title" in conversationRecord &&
+							typeof conversationRecord.title !== "string")
+					) {
+						rewritten = true;
+						break;
+					}
+					const messages = Array.isArray(
+						(rawConversation as { messages?: unknown }).messages,
+					)
+						? ((rawConversation as { messages: unknown[] }).messages ?? [])
+						: [];
+					if (messages.length > MAX_MESSAGES_PER_CONVERSATION) {
+						rewritten = true;
+						break;
+					}
+					for (const rawMessage of messages) {
+						if (
+							!rawMessage ||
+							typeof rawMessage !== "object" ||
+							Array.isArray(rawMessage)
+						) {
+							rewritten = true;
+							break outer;
+						}
+						const rawRole = (rawMessage as { role?: unknown }).role;
+						const rawContent = (rawMessage as { content?: unknown }).content;
+						if (rawRole !== "user" && rawRole !== "assistant") {
+							rewritten = true;
+							break outer;
+						}
+						if (typeof rawContent !== "string" || !rawContent.trim()) {
+							rewritten = true;
+							break outer;
+						}
+						if (rawContent.trim().length > MAX_MESSAGE_CHARS) {
+							rewritten = true;
+							continue;
+						}
+					}
+				}
+			}
 			return { conversations: sanitized, rewritten };
 		} catch (error) {
 			logger.warn(

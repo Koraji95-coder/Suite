@@ -35,8 +35,12 @@ export function StandardsDrawingUploadDialog({
 				) : (
 					<form onSubmit={onSubmit} className={styles.form}>
 						<div>
-							<label className={styles.fieldLabel}>Drawing Name *</label>
+							<label className={styles.fieldLabel} htmlFor="standards-drawing-name">
+								Drawing Name *
+							</label>
 							<input
+								id="standards-drawing-name"
+								name="standards_drawing_name"
 								type="text"
 								value={uploadForm.name}
 								onChange={(event) =>

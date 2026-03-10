@@ -41,8 +41,12 @@ export function TransmittalBuilderProjectAndSenderSection({
 				<div className={styles.sectionGrid}>
 					<div className={styles.twoColumns}>
 						<div className={styles.field}>
-							<label className={styles.label}>Project Name</label>
+							<label className={styles.label} htmlFor="transmittal-project-name">
+								Project Name
+							</label>
 							<Input
+								id="transmittal-project-name"
+								name="transmittal_project_name"
 								value={draft.projectName}
 								onChange={(event) =>
 									updateDraft("projectName", event.target.value)
@@ -52,8 +56,12 @@ export function TransmittalBuilderProjectAndSenderSection({
 							/>
 						</div>
 						<div className={styles.field}>
-							<label className={styles.label}>Project Number</label>
+							<label className={styles.label} htmlFor="transmittal-project-number">
+								Project Number
+							</label>
 							<Input
+								id="transmittal-project-number"
+								name="transmittal_project_number"
 								value={draft.projectNumber}
 								onChange={(event) =>
 									updateDraft("projectNumber", event.target.value)
@@ -67,8 +75,12 @@ export function TransmittalBuilderProjectAndSenderSection({
 					</div>
 					<div className={styles.twoColumns}>
 						<div className={styles.field}>
-							<label className={styles.label}>Date</label>
+							<label className={styles.label} htmlFor="transmittal-date">
+								Date
+							</label>
 							<Input
+								id="transmittal-date"
+								name="transmittal_date"
 								value={draft.date}
 								onChange={(event) => updateDraft("date", event.target.value)}
 								className={isInvalid("date") ? styles.invalidField : ""}
@@ -76,8 +88,12 @@ export function TransmittalBuilderProjectAndSenderSection({
 							/>
 						</div>
 						<div className={styles.field}>
-							<label className={styles.label}>Transmittal</label>
+							<label className={styles.label} htmlFor="transmittal-number">
+								Transmittal
+							</label>
 							<Input
+								id="transmittal-number"
+								name="transmittal_number"
 								value={draft.transmittalNumber}
 								onChange={(event) =>
 									updateDraft("transmittalNumber", event.target.value)
@@ -90,8 +106,12 @@ export function TransmittalBuilderProjectAndSenderSection({
 						</div>
 					</div>
 					<div className={styles.field}>
-						<label className={styles.label}>Description</label>
+						<label className={styles.label} htmlFor="transmittal-description">
+							Description
+						</label>
 						<TextArea
+							id="transmittal-description"
+							name="transmittal_description"
 							value={draft.description}
 							onChange={(event) =>
 								updateDraft("description", event.target.value)
@@ -107,7 +127,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 				<div className={styles.sectionGrid}>
 					<div className={styles.twoColumns}>
 						<div className={styles.field}>
-							<label className={styles.label}>PE</label>
+							<div className={styles.label}>PE</div>
 							<Select value={draft.peName} onValueChange={handlePeChange}>
 								<SelectTrigger
 									className={isInvalid("peName") ? styles.invalidField : ""}
@@ -131,8 +151,12 @@ export function TransmittalBuilderProjectAndSenderSection({
 							)}
 						</div>
 						<div className={styles.field}>
-							<label className={styles.label}>Title</label>
+							<label className={styles.label} htmlFor="transmittal-from-title">
+								Title
+							</label>
 							<Input
+								id="transmittal-from-title"
+								name="transmittal_from_title"
 								value={draft.fromTitle}
 								readOnly
 								className={isInvalid("fromTitle") ? styles.invalidField : ""}
@@ -143,8 +167,12 @@ export function TransmittalBuilderProjectAndSenderSection({
 
 					<div className={styles.twoColumns}>
 						<div className={styles.field}>
-							<label className={styles.label}>Email</label>
+							<label className={styles.label} htmlFor="transmittal-from-email">
+								Email
+							</label>
 							<Input
+								id="transmittal-from-email"
+								name="transmittal_from_email"
 								value={draft.fromEmail}
 								readOnly
 								className={isInvalid("fromEmail") ? styles.invalidField : ""}
@@ -152,8 +180,12 @@ export function TransmittalBuilderProjectAndSenderSection({
 							/>
 						</div>
 						<div className={styles.field}>
-							<label className={styles.label}>Phone</label>
+							<label className={styles.label} htmlFor="transmittal-from-phone">
+								Phone
+							</label>
 							<Input
+								id="transmittal-from-phone"
+								name="transmittal_from_phone"
 								value={draft.fromPhone}
 								readOnly
 								placeholder="Managed from profile"
@@ -162,7 +194,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 					</div>
 
 					<div className={styles.field}>
-						<label className={styles.label}>Firm Number</label>
+						<div className={styles.label}>Firm Number</div>
 						<Select
 							value={draft.firmNumber}
 							onValueChange={(value) => updateDraft("firmNumber", value)}

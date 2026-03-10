@@ -44,6 +44,7 @@ import {
 	SECTION_PRESETS,
 	WIRE_COLORS,
 } from "./conduitRouteData";
+import { AUTOWIRE_OBSTACLE_LAYER_PRESET_OPTIONS } from "./autowirePresets";
 import {
 	bendCount,
 	buildCostGrid,
@@ -137,13 +138,6 @@ function inferObstacleTypeFromLayer(layerName: string): ObstacleType | null {
 	if (layer.startsWith("E-CONDUIT") || layer === "E-CONDUIT") return "road";
 	return null;
 }
-
-const OBSTACLE_LAYER_PRESET_OPTIONS = [
-	{ id: "", label: "Manual Rules" },
-	{ id: "substation_default", label: "Substation Default" },
-	{ id: "industrial_plant", label: "Industrial Plant" },
-	{ id: "utility_yard", label: "Utility Yard" },
-] as const;
 
 function SectionSketch({ preset }: { preset: SectionPreset["id"] }) {
 	if (preset === "stub_up") {
@@ -876,7 +870,7 @@ export function ConduitRouteApp() {
 
 	const handleLayerPresetChange = (presetId: string) => {
 		setObstacleLayerPreset(presetId);
-		const selected = OBSTACLE_LAYER_PRESET_OPTIONS.find(
+		const selected = AUTOWIRE_OBSTACLE_LAYER_PRESET_OPTIONS.find(
 			(entry) => entry.id === presetId,
 		);
 		setStatusMessage(
@@ -1067,6 +1061,7 @@ export function ConduitRouteApp() {
 											setClearance(Number(event.target.value) || 18)
 										}
 										className={styles.slider}
+									name="conduitrouteapp_input_1061"
 									/>
 								</div>
 
@@ -1129,8 +1124,8 @@ export function ConduitRouteApp() {
 												}
 												className={styles.layerEditorSelect}
 												disabled={routeComputing || obstacleSyncing}
-											>
-												{OBSTACLE_LAYER_PRESET_OPTIONS.map((preset) => (
+											 name="conduitrouteapp_select_1125">
+												{AUTOWIRE_OBSTACLE_LAYER_PRESET_OPTIONS.map((preset) => (
 													<option key={preset.id || "manual"} value={preset.id}>
 														{preset.label}
 													</option>
@@ -1145,7 +1140,7 @@ export function ConduitRouteApp() {
 														setLayerPickerValue(event.target.value)
 													}
 													className={styles.layerEditorSelect}
-												>
+												 name="conduitrouteapp_select_1142">
 													<option value="">-- Select layer --</option>
 													{availableCadLayers.map((layer) => (
 														<option key={layer} value={layer}>
@@ -1162,6 +1157,7 @@ export function ConduitRouteApp() {
 													}
 													className={styles.layerEditorInput}
 													placeholder="Type layer name..."
+												name="conduitrouteapp_input_1157"
 												/>
 											)}
 											<Button
@@ -1229,7 +1225,7 @@ export function ConduitRouteApp() {
 																)
 															}
 															className={styles.layerTypeSelect}
-														>
+														 name="conduitrouteapp_select_1216">
 															<option value="foundation">Foundation</option>
 															<option value="building">Building</option>
 															<option value="equipment_pad">Pad</option>
@@ -1708,7 +1704,7 @@ export function ConduitRouteApp() {
 												className={styles.selectField}
 												value={necConduit}
 												onChange={(event) => setNecConduit(event.target.value)}
-											>
+											 name="conduitrouteapp_select_1707">
 												{Object.keys(CONDUIT_AREAS).map((option) => (
 													<option key={option} value={option}>
 														{option}
@@ -1746,7 +1742,7 @@ export function ConduitRouteApp() {
 															return next;
 														});
 													}}
-												>
+												 name="conduitrouteapp_select_1736">
 													{Object.keys(CONDUCTOR_AREAS).map((option) => (
 														<option key={option} value={option}>
 															{option}
@@ -1771,6 +1767,7 @@ export function ConduitRouteApp() {
 															return next;
 														});
 													}}
+												name="conduitrouteapp_input_1756"
 												/>
 												<Button
 													variant="ghost"

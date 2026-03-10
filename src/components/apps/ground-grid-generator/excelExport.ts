@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import type * as ExcelJS from "exceljs";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
 
 const TITLE_FILL: ExcelJS.FillPattern = {
@@ -95,6 +95,15 @@ const SECTION_FONT: Partial<ExcelJS.Font> = {
 	size: 12,
 	name: "Arial",
 };
+
+let excelJsModulePromise: Promise<typeof import("exceljs")> | null = null;
+
+async function loadExcelJs(): Promise<typeof import("exceljs")> {
+	if (!excelJsModulePromise) {
+		excelJsModulePromise = import("exceljs");
+	}
+	return excelJsModulePromise;
+}
 
 type QaSeverity = "ERROR" | "WARNING" | "INFO";
 type QaItem = { severity: QaSeverity; message: string };
@@ -253,7 +262,8 @@ export async function exportGridToExcel(
 	rods: GridRod[],
 	conductors: GridConductor[],
 ): Promise<void> {
-	const wb = new ExcelJS.Workbook();
+	const ExcelJSRuntime = await loadExcelJs();
+	const wb = new ExcelJSRuntime.Workbook();
 	const qaItems = buildQaItems({ placements, conductors, rods });
 	const testWellCount = placements.filter(
 		(placement) => placement.type === "GROUND_ROD_WITH_TEST_WELL",

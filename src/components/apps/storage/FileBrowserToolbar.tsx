@@ -29,6 +29,7 @@ export function FileBrowserToolbar({
 					onChange={(event) => onSearchChange(event.target.value)}
 					placeholder="Search files..."
 					className={styles.searchInput}
+				name="filebrowsertoolbar_input_27"
 				/>
 			</div>
 			<button
@@ -43,6 +44,7 @@ export function FileBrowserToolbar({
 				multiple
 				className={styles.hiddenInput}
 				onChange={onFileInputChange}
+			name="filebrowsertoolbar_input_40"
 			/>
 			<button
 				onClick={onRefresh}

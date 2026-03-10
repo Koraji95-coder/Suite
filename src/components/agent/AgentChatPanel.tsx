@@ -96,6 +96,12 @@ const ACTIVITY_DETAIL_PREVIEW_CHARS = 260;
 const GENERAL_SCOPE_ID = "team";
 const DEFAULT_ORCHESTRATION_OBJECTIVE =
 	"Coordinate a reliability review for my active feature. Return concrete implementation steps, high-risk findings, and validation checks.";
+const WORKFLOW_POLL_VISIBLE_MS = 20_000;
+const WORKFLOW_POLL_HIDDEN_MS = 60_000;
+const WORKFLOW_POLL_ERROR_MS = 45_000;
+const WORKFLOW_POLL_MAX_BACKOFF_MS = 120_000;
+const MAX_SEEN_ACTIVITY_IDS = 2_000;
+const MAX_EVENT_MIRROR_KEYS = 4_000;
 const TERMINAL_RUN_EVENT_TYPES = new Set([
 	"run_completed",
 	"run_failed",
@@ -191,6 +197,26 @@ function runConversationTitle(runId: string): string {
 	const normalized = String(runId || "").trim();
 	if (!normalized) return "Run";
 	return `Run ${shortRunId(normalized)}`;
+}
+
+function addToBoundedSet(
+	target: Set<string>,
+	value: string,
+	maxSize: number,
+): boolean {
+	const key = String(value || "").trim();
+	if (!key) return false;
+	if (target.has(key)) return true;
+	target.add(key);
+	if (target.size <= maxSize) return false;
+	const overflow = target.size - maxSize;
+	let removed = 0;
+	for (const existing of target) {
+		target.delete(existing);
+		removed += 1;
+		if (removed >= overflow) break;
+	}
+	return false;
 }
 
 function truncateText(value: string | undefined, maxChars: number): string {
@@ -374,6 +400,8 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const mountedRef = useRef(true);
 	const workflowRefreshEpochRef = useRef(0);
 	const workflowRefreshInFlightRef = useRef<Promise<void> | null>(null);
+	const workflowPollFailureCountRef = useRef(0);
+	const workflowErrorRef = useRef("");
 
 	useEffect(() => {
 		mountedRef.current = true;
@@ -387,6 +415,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	useEffect(() => {
 		workflowThinkingRunRef.current = workflowThinkingRunId;
 	}, [workflowThinkingRunId]);
+
+	useEffect(() => {
+		workflowErrorRef.current = workflowError;
+	}, [workflowError]);
 
 	useEffect(() => {
 		if (isAgentProfileScope(channelScope) && channelScope !== profileId) {
@@ -500,9 +532,15 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			const normalizedMessage = String(message || "").trim();
 			if (!normalizedRunId || !normalizedMessage) return;
 			const dedupeKey = String(options?.dedupeKey || "").trim();
-			if (dedupeKey && eventMirrorKeysRef.current.has(dedupeKey)) return;
-			if (dedupeKey) {
-				eventMirrorKeysRef.current.add(dedupeKey);
+			if (
+				dedupeKey &&
+				addToBoundedSet(
+					eventMirrorKeysRef.current,
+					dedupeKey,
+					MAX_EVENT_MIRROR_KEYS,
+				)
+			) {
+				return;
 			}
 
 			const previousScope =
@@ -756,6 +794,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					if (!silent) setWorkflowLoading(false);
 					setWorkflowInitialLoadDone(true);
 				}
+				workflowPollFailureCountRef.current = 0;
 				return Promise.resolve();
 			}
 			if (!silent && mountedRef.current) {
@@ -765,8 +804,8 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			const requestPromise = (async () => {
 				try {
 					const [tasksResult, activityResult] = await Promise.all([
-						agentService.listAgentTasks({ limit: 240 }),
-						agentService.getAgentActivity({ limit: 240 }),
+						agentService.listAgentTasks({ limit: 120 }),
+						agentService.getAgentActivity({ limit: 120 }),
 					]);
 					if (
 						!mountedRef.current ||
@@ -779,6 +818,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					const normalizedActivity = sanitizeActivityItems(
 						activityResult.activity,
 					);
+					const refreshErrors: string[] = [];
 
 					if (tasksResult.success) {
 						setTaskItems(normalizedTasks);
@@ -793,12 +833,14 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 								error: tasksResult.error,
 							},
 						);
-						setWorkflowError(tasksResult.error || "Unable to load task queue.");
+						refreshErrors.push(
+							tasksResult.error || "Unable to load task queue.",
+						);
 					}
 
 					if (activityResult.success) {
 						setActivityItems(normalizedActivity);
-					} else if (!tasksResult.success) {
+					} else {
 						logger.warn(
 							"Activity refresh returned unsuccessful response.",
 							"AgentChatPanel",
@@ -809,13 +851,20 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 								error: activityResult.error,
 							},
 						);
-						setWorkflowError(
+						refreshErrors.push(
 							activityResult.error || "Unable to load unified activity feed.",
 						);
 					}
 
-					if (tasksResult.success && activityResult.success) {
+					if (refreshErrors.length === 0) {
+						workflowPollFailureCountRef.current = 0;
 						setWorkflowError("");
+					} else {
+						workflowPollFailureCountRef.current = Math.min(
+							workflowPollFailureCountRef.current + 1,
+							8,
+						);
+						setWorkflowError(refreshErrors.join(" | "));
 					}
 				} catch (error) {
 					logger.error("Workflow refresh crashed.", "AgentChatPanel", {
@@ -835,6 +884,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						error instanceof Error
 							? error.message
 							: "Unable to load workflow data right now.",
+					);
+					workflowPollFailureCountRef.current = Math.min(
+						workflowPollFailureCountRef.current + 1,
+						8,
 					);
 				}
 			})();
@@ -860,24 +913,62 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 
 	useEffect(() => {
 		void refreshWorkflowData();
+		let cancelled = false;
+		let pollTimeout: number | null = null;
 
-		const interval = window.setInterval(() => {
+		const nextPollDelay = () => {
+			const hidden = document.visibilityState === "hidden";
+			const baseDelay = hidden
+				? WORKFLOW_POLL_HIDDEN_MS
+				: WORKFLOW_POLL_VISIBLE_MS;
+			const failureCount = workflowPollFailureCountRef.current;
+			const backoffMultiplier =
+				failureCount <= 0 ? 1 : 2 ** Math.min(failureCount - 1, 3);
+			const backoffDelay = Math.min(
+				WORKFLOW_POLL_MAX_BACKOFF_MS,
+				baseDelay * backoffMultiplier,
+			);
+			const errorDelay = workflowErrorRef.current ? WORKFLOW_POLL_ERROR_MS : 0;
+			return Math.max(baseDelay, errorDelay, backoffDelay);
+		};
+
+		const scheduleNextPoll = () => {
+			if (cancelled) return;
+			pollTimeout = window.setTimeout(async () => {
+				await refreshWorkflowData(true);
+				scheduleNextPoll();
+			}, nextPollDelay());
+		};
+
+		scheduleNextPoll();
+
+		const requestRefresh = () => {
 			void refreshWorkflowData(true);
-		}, 15_000);
+		};
 		const onFocus = () => {
-			void refreshWorkflowData(true);
+			requestRefresh();
+		};
+		const onVisibilityChange = () => {
+			if (document.visibilityState === "visible") {
+				requestRefresh();
+			}
 		};
 		const onPairingState = () => {
-			void refreshWorkflowData(true);
+			requestRefresh();
 		};
 		window.addEventListener("focus", onFocus);
+		document.addEventListener("visibilitychange", onVisibilityChange);
 		window.addEventListener(
 			AGENT_PAIRING_STATE_EVENT,
 			onPairingState as EventListener,
 		);
 		return () => {
-			window.clearInterval(interval);
+			cancelled = true;
+			if (pollTimeout !== null) {
+				window.clearTimeout(pollTimeout);
+			}
 			window.removeEventListener("focus", onFocus);
+			document.removeEventListener("visibilitychange", onVisibilityChange);
 			window.removeEventListener(
 				AGENT_PAIRING_STATE_EVENT,
 				onPairingState as EventListener,
@@ -890,7 +981,11 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			for (const item of activityItems) {
 				const activityId = String(item.activityId || "").trim();
 				if (activityId) {
-					seenActivityIdsRef.current.add(activityId);
+					addToBoundedSet(
+						seenActivityIdsRef.current,
+						activityId,
+						MAX_SEEN_ACTIVITY_IDS,
+					);
 				}
 				const eventType = String(item.eventType || "").toLowerCase();
 				if (
@@ -909,8 +1004,16 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 
 		for (const item of activityItems) {
 			const activityId = String(item.activityId || "").trim();
-			if (!activityId || seenActivityIdsRef.current.has(activityId)) continue;
-			seenActivityIdsRef.current.add(activityId);
+			if (
+				!activityId ||
+				addToBoundedSet(
+					seenActivityIdsRef.current,
+					activityId,
+					MAX_SEEN_ACTIVITY_IDS,
+				)
+			) {
+				continue;
+			}
 
 			const eventType = String(item.eventType || "").toLowerCase();
 			const profile = String(item.profileId || "").trim().toLowerCase();

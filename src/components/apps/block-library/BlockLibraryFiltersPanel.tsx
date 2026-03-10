@@ -43,6 +43,7 @@ export function BlockLibraryFiltersPanel({
 						onChange={(event) => onSearchTermChange(event.target.value)}
 						placeholder="Search blocks..."
 						className={styles.searchInput}
+					name="blocklibraryfilterspanel_input_40"
 					/>
 				</div>
 
@@ -51,7 +52,7 @@ export function BlockLibraryFiltersPanel({
 						value={selectedCategory}
 						onChange={(event) => onSelectedCategoryChange(event.target.value)}
 						className={styles.select}
-					>
+					 name="blocklibraryfilterspanel_select_50">
 						{categories.map((category) => (
 							<option key={category} value={category}>
 								{category === "all" ? "All Categories" : category}
@@ -65,7 +66,7 @@ export function BlockLibraryFiltersPanel({
 						value={selectedTag}
 						onChange={(event) => onSelectedTagChange(event.target.value)}
 						className={styles.select}
-					>
+					 name="blocklibraryfilterspanel_select_64">
 						{allTags.map((tag) => (
 							<option key={tag} value={tag}>
 								{tag === "all" ? "All Tags" : tag}

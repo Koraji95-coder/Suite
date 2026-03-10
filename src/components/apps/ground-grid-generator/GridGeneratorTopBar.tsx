@@ -109,6 +109,7 @@ export function GridGeneratorTopBar({
 					border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
 					color: paletteText,
 				}}
+			name="gridgeneratortopbar_input_103"
 			/>
 
 			<button onClick={onSaveDesign} disabled={saving} style={btnStyle()}>

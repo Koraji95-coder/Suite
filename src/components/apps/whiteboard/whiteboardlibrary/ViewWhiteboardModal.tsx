@@ -20,7 +20,7 @@ export function ViewWhiteboardModal({
 			open={Boolean(whiteboard)}
 			onOpenChange={(open) => !open && onClose()}
 		>
-			<DialogContent className={styles.dialogContent}>
+			<DialogContent className={styles.dialogContent} showCloseButton={false}>
 				{/* Sticky header */}
 				<div className={styles.header}>
 					<div>

@@ -245,6 +245,7 @@ export default function EmailConfig() {
 									}))
 								}
 								placeholder="smtp.example.com"
+							name="smtp-host"
 							/>
 						</div>
 
@@ -263,6 +264,7 @@ export default function EmailConfig() {
 										smtp: { ...c.smtp, port: Number(e.target.value) || 587 },
 									}))
 								}
+							name="smtp-port"
 							/>
 						</div>
 
@@ -281,6 +283,7 @@ export default function EmailConfig() {
 									}))
 								}
 								placeholder="user@example.com"
+							name="smtp-user"
 							/>
 						</div>
 
@@ -298,7 +301,7 @@ export default function EmailConfig() {
 										smtp: { ...c.smtp, secure: e.target.value === "true" },
 									}))
 								}
-							>
+							 name="smtp-secure">
 								<option value="false">false</option>
 								<option value="true">true</option>
 							</select>
@@ -319,6 +322,7 @@ export default function EmailConfig() {
 									}))
 								}
 								placeholder={`noreply@${APP_SLUG}.com`}
+							name="from"
 							/>
 						</div>
 
@@ -337,6 +341,7 @@ export default function EmailConfig() {
 									}))
 								}
 								placeholder={`support@${APP_SLUG}.com`}
+							name="replyto"
 							/>
 						</div>
 
@@ -354,6 +359,7 @@ export default function EmailConfig() {
 										defaults: { ...c.defaults, subject_prefix: e.target.value },
 									}))
 								}
+							name="subj"
 							/>
 						</div>
 
@@ -366,6 +372,7 @@ export default function EmailConfig() {
 						className={styles.textarea}
 						value={yamlText}
 						onChange={(e) => setYamlText(e.target.value)}
+					name="emailconfig_textarea_365"
 					/>
 				)}
 

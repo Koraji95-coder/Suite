@@ -29,10 +29,15 @@ export function CoordinatesGrabberPointNamingPanel({
 				}}
 			>
 				<div>
-					<label style={{ fontSize: "12px", color: palette.textMuted }}>
+					<label
+						htmlFor="coords-point-prefix"
+						style={{ fontSize: "12px", color: palette.textMuted }}
+					>
 						Prefix:
 					</label>
 					<input
+						id="coords-point-prefix"
+						name="coords_point_prefix"
 						type="text"
 						value={state.pointPrefix}
 						onChange={(e) =>
@@ -45,10 +50,15 @@ export function CoordinatesGrabberPointNamingPanel({
 					/>
 				</div>
 				<div>
-					<label style={{ fontSize: "12px", color: palette.textMuted }}>
+					<label
+						htmlFor="coords-point-start-number"
+						style={{ fontSize: "12px", color: palette.textMuted }}
+					>
 						Start #:
 					</label>
 					<input
+						id="coords-point-start-number"
+						name="coords_point_start_number"
 						type="number"
 						value={state.startNumber}
 						onChange={(e) =>
@@ -62,10 +72,15 @@ export function CoordinatesGrabberPointNamingPanel({
 					/>
 				</div>
 				<div>
-					<label style={{ fontSize: "12px", color: palette.textMuted }}>
+					<label
+						htmlFor="coords-point-decimals"
+						style={{ fontSize: "12px", color: palette.textMuted }}
+					>
 						Decimals:
 					</label>
 					<input
+						id="coords-point-decimals"
+						name="coords_point_decimals"
 						type="number"
 						value={state.decimalPlaces}
 						onChange={(e) =>

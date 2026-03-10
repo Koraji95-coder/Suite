@@ -159,6 +159,105 @@ public sealed class AutoDraftExecuteResponse
     public string? Message { get; init; }
 }
 
+public sealed class AutoDraftBackcheckRequest
+{
+    [JsonPropertyName("actions")]
+    public List<AutoDraftActionItem> Actions { get; init; } = [];
+
+    [JsonPropertyName("cad_context")]
+    public Dictionary<string, JsonElement>? CadContext { get; init; }
+
+    [JsonPropertyName("require_cad_context")]
+    public bool RequireCadContext { get; init; }
+
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; init; }
+}
+
+public sealed class AutoDraftBackcheckSummary
+{
+    [JsonPropertyName("total_actions")]
+    public int TotalActions { get; init; }
+
+    [JsonPropertyName("pass_count")]
+    public int PassCount { get; init; }
+
+    [JsonPropertyName("warn_count")]
+    public int WarnCount { get; init; }
+
+    [JsonPropertyName("fail_count")]
+    public int FailCount { get; init; }
+}
+
+public sealed class AutoDraftBackcheckCadStatus
+{
+    [JsonPropertyName("available")]
+    public bool Available { get; init; }
+
+    [JsonPropertyName("degraded")]
+    public bool Degraded { get; init; }
+
+    [JsonPropertyName("entity_count")]
+    public int EntityCount { get; init; }
+
+    [JsonPropertyName("locked_layer_count")]
+    public int LockedLayerCount { get; init; }
+}
+
+public sealed class AutoDraftBackcheckFinding
+{
+    [JsonPropertyName("id")]
+    public required string Id { get; init; }
+
+    [JsonPropertyName("action_id")]
+    public required string ActionId { get; init; }
+
+    [JsonPropertyName("status")]
+    public required string Status { get; init; }
+
+    [JsonPropertyName("severity")]
+    public required string Severity { get; init; }
+
+    [JsonPropertyName("category")]
+    public required string Category { get; init; }
+
+    [JsonPropertyName("notes")]
+    public IReadOnlyList<string> Notes { get; init; } = [];
+
+    [JsonPropertyName("suggestions")]
+    public IReadOnlyList<string> Suggestions { get; init; } = [];
+}
+
+public sealed class AutoDraftBackcheckResponse
+{
+    [JsonPropertyName("ok")]
+    public bool Ok { get; init; }
+
+    [JsonPropertyName("success")]
+    public bool Success { get; init; }
+
+    [JsonPropertyName("requestId")]
+    public required string RequestId { get; init; }
+
+    [JsonPropertyName("source")]
+    public required string Source { get; init; }
+
+    [JsonPropertyName("mode")]
+    public required string Mode { get; init; }
+
+    [JsonPropertyName("cad")]
+    public required AutoDraftBackcheckCadStatus Cad { get; init; }
+
+    [JsonPropertyName("summary")]
+    public required AutoDraftBackcheckSummary Summary { get; init; }
+
+    [JsonPropertyName("warnings")]
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    [JsonPropertyName("findings")]
+    public IReadOnlyList<AutoDraftBackcheckFinding> Findings { get; init; } = [];
+}
+
 public sealed class AutoDraftRulesResponse
 {
     [JsonPropertyName("ok")]

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import requests
 from flask import Blueprint, jsonify, request
 from flask_limiter import Limiter
+
+from .api_autocad_error_helpers import (
+    build_error_payload as autocad_build_error_payload,
+    derive_request_id as autocad_derive_request_id,
+)
 
 DEFAULT_RULES: List[Dict[str, Any]] = [
     {
@@ -65,6 +70,10 @@ _CLOUD_COLOR_TO_CATEGORY: Dict[str, str] = {
     "green": "DELETE",
     "red": "ADD",
 }
+
+_BACKCHECK_PASS = "pass"
+_BACKCHECK_WARN = "warn"
+_BACKCHECK_FAIL = "fail"
 
 def _read_json_error(response: requests.Response) -> str:
     try:
@@ -217,6 +226,227 @@ def _build_local_plan(markups: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {"actions": actions, "summary": summary}
 
 
+def _derive_request_id(payload: Dict[str, Any]) -> str:
+    raw_request_id = (
+        str(payload.get("requestId") or payload.get("request_id") or "").strip()
+        or str(request.args.get("requestId") or request.args.get("request_id") or "").strip()
+    )
+    return autocad_derive_request_id(raw_request_id)
+
+
+def _normalize_bounds(value: Any) -> Optional[Dict[str, float]]:
+    if not isinstance(value, dict):
+        return None
+    try:
+        x = float(value.get("x", 0))
+        y = float(value.get("y", 0))
+        width = float(value.get("width", 0))
+        height = float(value.get("height", 0))
+    except Exception:
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    return {"x": x, "y": y, "width": width, "height": height}
+
+
+def _bounds_overlap(bounds_a: Dict[str, float], bounds_b: Dict[str, float]) -> bool:
+    ax0 = bounds_a["x"]
+    ay0 = bounds_a["y"]
+    ax1 = ax0 + bounds_a["width"]
+    ay1 = ay0 + bounds_a["height"]
+
+    bx0 = bounds_b["x"]
+    by0 = bounds_b["y"]
+    bx1 = bx0 + bounds_b["width"]
+    by1 = by0 + bounds_b["height"]
+
+    return ax0 < bx1 and ax1 > bx0 and ay0 < by1 and ay1 > by0
+
+
+def _extract_locked_layers(cad_context: Dict[str, Any]) -> Set[str]:
+    locked_layers: Set[str] = set()
+
+    raw_locked_layers = cad_context.get("locked_layers")
+    if isinstance(raw_locked_layers, list):
+        for value in raw_locked_layers:
+            if isinstance(value, str) and value.strip():
+                locked_layers.add(value.strip().lower())
+
+    raw_layers = cad_context.get("layers")
+    if isinstance(raw_layers, list):
+        for entry in raw_layers:
+            if not isinstance(entry, dict):
+                continue
+            if not bool(entry.get("locked")):
+                continue
+            layer_name = str(entry.get("name") or "").strip().lower()
+            if layer_name:
+                locked_layers.add(layer_name)
+
+    return locked_layers
+
+
+def _extract_entities(cad_context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    raw_entities = cad_context.get("entities")
+    if not isinstance(raw_entities, list):
+        return []
+    return [entry for entry in raw_entities if isinstance(entry, dict)]
+
+
+def _finding_status_rank(status: str) -> int:
+    if status == _BACKCHECK_FAIL:
+        return 3
+    if status == _BACKCHECK_WARN:
+        return 2
+    return 1
+
+
+def _build_local_backcheck(
+    *,
+    actions: List[Dict[str, Any]],
+    cad_context: Optional[Dict[str, Any]],
+    request_id: str,
+) -> Dict[str, Any]:
+    findings: List[Dict[str, Any]] = []
+    warnings: List[str] = []
+
+    cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
+    locked_layers = _extract_locked_layers(cad_context_obj)
+    entities = _extract_entities(cad_context_obj)
+    cad_available = bool(cad_context_obj) and (
+        bool(locked_layers) or bool(entities) or bool(cad_context_obj.get("drawing"))
+    )
+
+    if not cad_available:
+        warnings.append(
+            "CAD context is unavailable; backcheck degraded to action-level verification."
+        )
+
+    for index, action in enumerate(actions, start=1):
+        action_id = str(action.get("id") or f"action-{index}")
+        rule_id = action.get("rule_id")
+        category = _normalize_text(action.get("category"))
+        confidence_raw = action.get("confidence")
+        markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+        markup_bounds = _normalize_bounds(markup.get("bounds"))
+
+        notes: List[str] = []
+        suggestions: List[str] = []
+        status = _BACKCHECK_PASS
+        severity = "low"
+
+        if not isinstance(rule_id, str) or not rule_id.strip():
+            status = _BACKCHECK_FAIL
+            severity = "high"
+            notes.append("Action is unclassified and requires operator review.")
+            suggestions.append("Classify this markup manually before execute.")
+
+        try:
+            confidence = float(confidence_raw)
+        except Exception:
+            confidence = 0.0
+        if confidence < 0.5:
+            if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                status = _BACKCHECK_WARN
+                severity = "medium"
+            notes.append(f"Confidence is low ({confidence:.2f}).")
+            suggestions.append(
+                "Review mapped geometry and text intent before execution."
+            )
+
+        if _cloud_intent_conflicts(markup):
+            status = _BACKCHECK_FAIL
+            severity = "high"
+            notes.append("Markup color/text intent conflict detected.")
+            suggestions.append(
+                "Correct cloud color or action wording to remove conflicting intent."
+            )
+
+        if category in {"delete", "add", "swap"} and not markup_bounds:
+            if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                status = _BACKCHECK_WARN
+                severity = "medium"
+            notes.append("Action has no geometry bounds for CAD-aware validation.")
+            suggestions.append("Attach markup bounds to enable CAD collision checks.")
+
+        layer_name = _normalize_text(markup.get("layer"))
+        if cad_available and layer_name and layer_name in locked_layers:
+            status = _BACKCHECK_FAIL
+            severity = "high"
+            notes.append(f"Layer '{layer_name}' is locked.")
+            suggestions.append(
+                "Move action target to an editable layer or unlock the target layer."
+            )
+
+        if cad_available and markup_bounds:
+            overlapping_count = 0
+            for entity in entities:
+                entity_bounds = _normalize_bounds(entity.get("bounds"))
+                if entity_bounds and _bounds_overlap(markup_bounds, entity_bounds):
+                    overlapping_count += 1
+
+            if category == "delete" and overlapping_count == 0:
+                if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                    status = _BACKCHECK_WARN
+                    severity = "medium"
+                notes.append("DELETE action has no intersecting CAD entities in bounds.")
+                suggestions.append("Expand bounds or verify target geometry selection.")
+            elif category == "add" and overlapping_count > 0:
+                if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                    status = _BACKCHECK_WARN
+                    severity = "medium"
+                notes.append(
+                    f"ADD action overlaps {overlapping_count} existing CAD entities."
+                )
+                suggestions.append(
+                    "Validate insertion offset or route to avoid geometry overlap."
+                )
+            elif category == "swap" and overlapping_count < 2:
+                if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                    status = _BACKCHECK_WARN
+                    severity = "medium"
+                notes.append("SWAP action found fewer than two intersecting targets.")
+                suggestions.append(
+                    "Verify both swap endpoints are represented in markup bounds."
+                )
+
+        findings.append(
+            {
+                "id": f"finding-{index}",
+                "action_id": action_id,
+                "status": status,
+                "severity": severity,
+                "category": category or "unclassified",
+                "notes": notes,
+                "suggestions": sorted(set(suggestions)),
+            }
+        )
+
+    summary = {
+        "total_actions": len(findings),
+        "pass_count": sum(1 for item in findings if item["status"] == _BACKCHECK_PASS),
+        "warn_count": sum(1 for item in findings if item["status"] == _BACKCHECK_WARN),
+        "fail_count": sum(1 for item in findings if item["status"] == _BACKCHECK_FAIL),
+    }
+
+    return {
+        "ok": True,
+        "success": True,
+        "requestId": request_id,
+        "source": "python-local-backcheck",
+        "mode": "cad-aware",
+        "cad": {
+            "available": cad_available,
+            "degraded": not cad_available,
+            "entity_count": len(entities),
+            "locked_layer_count": len(locked_layers),
+        },
+        "summary": summary,
+        "warnings": warnings,
+        "findings": findings,
+    }
+
+
 def create_autodraft_blueprint(
     *,
     require_api_key: Callable,
@@ -347,5 +577,79 @@ def create_autodraft_blueprint(
 
         upstream["source"] = "dotnet"
         return jsonify(upstream), status
+
+    @bp.route("/backcheck", methods=["POST"])
+    @require_api_key
+    @limiter.limit("60 per hour")
+    def api_autodraft_backcheck():
+        if not request.is_json:
+            payload = autocad_build_error_payload(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Expected JSON payload.",
+                request_id=autocad_derive_request_id(""),
+            )
+            payload["ok"] = False
+            return jsonify(payload), 400
+
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            request_id = autocad_derive_request_id("")
+            response_payload = autocad_build_error_payload(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Invalid JSON payload.",
+                request_id=request_id,
+            )
+            response_payload["ok"] = False
+            return jsonify(response_payload), 400
+
+        request_id = _derive_request_id(payload)
+
+        if dotnet_base_url:
+            upstream, error, status = _proxy_json(
+                base_url=dotnet_base_url,
+                method="POST",
+                path="/api/autodraft/backcheck",
+                timeout_seconds=25,
+                payload=payload,
+            )
+            if upstream is not None:
+                upstream.setdefault("requestId", request_id)
+                upstream["source"] = "dotnet"
+                return jsonify(upstream), status
+            logger.warning(
+                "AutoDraft .NET /backcheck unavailable. Falling back: %s", error
+            )
+
+        raw_actions = payload.get("actions")
+        actions = raw_actions if isinstance(raw_actions, list) else []
+        clean_actions = [item for item in actions if isinstance(item, dict)]
+        cad_context = payload.get("cad_context") if isinstance(payload.get("cad_context"), dict) else None
+        require_cad_context = bool(payload.get("require_cad_context"))
+        has_cad_context = bool(cad_context)
+
+        if require_cad_context and not has_cad_context:
+            error_payload = autocad_build_error_payload(
+                code="AUTODRAFT_CAD_CONTEXT_UNAVAILABLE",
+                message=(
+                    "CAD context was required but is not available in this request."
+                ),
+                request_id=request_id,
+                meta={
+                    "endpoint": "/api/autodraft/backcheck",
+                    "degraded": True,
+                },
+                extra={
+                    "ok": False,
+                    "source": "python-local-backcheck",
+                },
+            )
+            return jsonify(error_payload), 503
+
+        result = _build_local_backcheck(
+            actions=clean_actions,
+            cad_context=cad_context,
+            request_id=request_id,
+        )
+        return jsonify(result), 200
 
     return bp

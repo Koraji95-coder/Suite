@@ -54,8 +54,8 @@ const DrawingListManagerRoutePage = lazy(
 	() =>
 		import("./routes/apps/drawing-list-manager/DrawingListManagerRoutePage"),
 );
-const ConduitRouteRoutePage = lazy(
-	() => import("./routes/apps/conduit-route/ConduitRouteRoutePage"),
+const AutoWireRoutePage = lazy(
+	() => import("./routes/apps/autowire/AutoWireRoutePage"),
 );
 const KnowledgeRoutePage = lazy(
 	() => import("./routes/knowledge/KnowledgeRoutePage"),
@@ -154,8 +154,12 @@ export default function App() {
 										element={withRouteSuspense(<DrawingListManagerRoutePage />)}
 									/>
 									<Route
+										path="apps/autowire"
+										element={withRouteSuspense(<AutoWireRoutePage />)}
+									/>
+									<Route
 										path="apps/conduit-route"
-										element={withRouteSuspense(<ConduitRouteRoutePage />)}
+										element={<Navigate to="/app/apps/autowire" replace />}
 									/>
 									<Route
 										path="apps/graph"

@@ -31,8 +31,12 @@ export function TaskFormModal({
 				</DialogHeader>
 				<div className={styles.fields}>
 					<div>
-						<label className={styles.label}>Task Name</label>
+						<label className={styles.label} htmlFor="task-form-name">
+							Task Name
+						</label>
 						<input
+							id="task-form-name"
+							name="task_form_name"
 							type="text"
 							value={formData.name}
 							onChange={(e) =>
@@ -43,8 +47,12 @@ export function TaskFormModal({
 						/>
 					</div>
 					<div>
-						<label className={styles.label}>Description</label>
+						<label className={styles.label} htmlFor="task-form-description">
+							Description
+						</label>
 						<textarea
+							id="task-form-description"
+							name="task_form_description"
 							value={formData.description}
 							onChange={(e) =>
 								setFormData({ ...formData, description: e.target.value })
@@ -55,8 +63,12 @@ export function TaskFormModal({
 					</div>
 					<div className={styles.gridTwo}>
 						<div>
-							<label className={styles.label}>Due Date</label>
+							<label className={styles.label} htmlFor="task-form-due-date">
+								Due Date
+							</label>
 							<input
+								id="task-form-due-date"
+								name="task_form_due_date"
 								type="date"
 								value={formData.due_date ? formData.due_date.split("T")[0] : ""}
 								onChange={(e) =>
@@ -66,8 +78,12 @@ export function TaskFormModal({
 							/>
 						</div>
 						<div>
-							<label className={styles.label}>Priority</label>
+							<label className={styles.label} htmlFor="task-form-priority">
+								Priority
+							</label>
 							<select
+								id="task-form-priority"
+								name="task_form_priority"
 								value={formData.priority}
 								onChange={(e) =>
 									setFormData({

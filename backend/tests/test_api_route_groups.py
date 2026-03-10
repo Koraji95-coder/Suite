@@ -404,6 +404,7 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/conduit-route/terminal-labels/sync": ["POST"],
             "/api/conduit-route/obstacles/scan": ["POST"],
             "/api/conduit-route/route/compute": ["POST"],
+            "/api/autodraft/backcheck": ["POST"],
             "/api/etap/cleanup/run": ["POST"],
             "/api/autocad/ws-ticket": ["POST"],
             "/api/watchdog/config": ["PUT"],
@@ -663,6 +664,13 @@ class TestApiRouteGroups(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 401)
 
+    def test_autodraft_backcheck_requires_api_key(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/backcheck",
+            json={"actions": []},
+        )
+        self.assertEqual(response.status_code, 401)
+
     def test_autodraft_execute_validation_and_fallback(self) -> None:
         not_json = self.client.post(
             "/api/autodraft/execute",
@@ -692,6 +700,68 @@ class TestApiRouteGroups(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertFalse(payload.get("ok", True))
         self.assertIn("AUTODRAFT_DOTNET_API_URL", str(payload.get("error")))
+
+    def test_autodraft_backcheck_payload_shape(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/backcheck",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "actions": [
+                    {
+                        "id": "action-1",
+                        "rule_id": "delete-green-cloud",
+                        "category": "DELETE",
+                        "confidence": 0.9,
+                        "markup": {
+                            "type": "cloud",
+                            "color": "green",
+                            "text": "delete line",
+                            "bounds": {"x": 10, "y": 10, "width": 40, "height": 20},
+                        },
+                    },
+                    {
+                        "id": "action-2",
+                        "rule_id": None,
+                        "category": "UNCLASSIFIED",
+                        "confidence": 0.2,
+                        "markup": {"type": "text", "color": "blue", "text": "review"},
+                    },
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        self.assertTrue(payload.get("success"))
+        self.assertTrue(str(payload.get("requestId", "")).startswith("req-"))
+        self.assertEqual(payload.get("source"), "python-local-backcheck")
+
+        summary = payload.get("summary") or {}
+        self.assertEqual(summary.get("total_actions"), 2)
+        self.assertIsInstance(summary.get("warn_count"), int)
+        self.assertIsInstance(summary.get("fail_count"), int)
+
+        findings = payload.get("findings") or []
+        self.assertIsInstance(findings, list)
+        self.assertEqual(len(findings), 2)
+        first_finding = findings[0] or {}
+        self.assertIn(first_finding.get("status"), {"pass", "warn", "fail"})
+        self.assertIsInstance(first_finding.get("suggestions"), list)
+
+    def test_autodraft_backcheck_required_cad_context_error_envelope(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/backcheck",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "require_cad_context": True,
+                "actions": [],
+            },
+        )
+        self.assertEqual(response.status_code, 503)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+        self.assertEqual(payload.get("code"), "AUTODRAFT_CAD_CONTEXT_UNAVAILABLE")
+        self.assertIn("requestId", payload)
 
     def test_terminal_scan_endpoint_requires_auth(self) -> None:
         response = self.client.post("/api/conduit-route/terminal-scan")

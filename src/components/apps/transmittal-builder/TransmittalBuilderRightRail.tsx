@@ -77,7 +77,7 @@ export function TransmittalBuilderRightRail({
 								const Icon = format.icon;
 								const active = outputFormat === format.value;
 								return (
-									<label
+									<div
 										key={format.value}
 										className={cn(
 											styles.formatOption,
@@ -95,7 +95,7 @@ export function TransmittalBuilderRightRail({
 												{format.description}
 											</div>
 										</div>
-									</label>
+									</div>
 								);
 							})}
 						</RadioGroup>

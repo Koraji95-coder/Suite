@@ -38,11 +38,11 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		status: "active",
 	},
 	{
-		id: "conduit-route",
-		title: "Conduit Route",
+		id: "autowire",
+		title: "AutoWire",
 		description:
-			"Route conduit and cable runs with clash-aware paths, schedule output, and NEC snapshots.",
-		to: "/app/apps/conduit-route",
+			"Unified conduit/cable routing workspace with terminal workflows, schedule output, and NEC snapshots.",
+		to: "/app/apps/autowire",
 		status: "active",
 	},
 	{

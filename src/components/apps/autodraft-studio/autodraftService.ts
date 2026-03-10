@@ -59,6 +59,38 @@ export type AutoDraftExecuteResponse = {
 	message?: string;
 };
 
+export type AutoDraftBackcheckFinding = {
+	id: string;
+	action_id: string;
+	status: "pass" | "warn" | "fail" | string;
+	severity: "low" | "medium" | "high" | string;
+	category: string;
+	notes: string[];
+	suggestions: string[];
+};
+
+export type AutoDraftBackcheckResponse = {
+	ok: boolean;
+	success: boolean;
+	requestId: string;
+	source: string;
+	mode: string;
+	cad: {
+		available: boolean;
+		degraded: boolean;
+		entity_count: number;
+		locked_layer_count: number;
+	};
+	summary: {
+		total_actions: number;
+		pass_count: number;
+		warn_count: number;
+		fail_count: number;
+	};
+	warnings: string[];
+	findings: AutoDraftBackcheckFinding[];
+};
+
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 const FALLBACK_HEALTH: AutoDraftHealth = {
@@ -277,6 +309,86 @@ const normalizeExecutePayload = (payload: unknown): AutoDraftExecuteResponse => 
 	};
 };
 
+const normalizeBackcheckFinding = (
+	payload: unknown,
+	index: number,
+): AutoDraftBackcheckFinding | null => {
+	if (!isRecord(payload)) return null;
+	const notes = Array.isArray(payload.notes)
+		? payload.notes.filter((item): item is string => typeof item === "string")
+		: [];
+	const suggestions = Array.isArray(payload.suggestions)
+		? payload.suggestions.filter((item): item is string => typeof item === "string")
+		: [];
+	return {
+		id: toNonEmptyString(payload.id, `finding-${index + 1}`),
+		action_id: toNonEmptyString(payload.action_id, `action-${index + 1}`),
+		status: toNonEmptyString(payload.status, "warn"),
+		severity: toNonEmptyString(payload.severity, "medium"),
+		category: toNonEmptyString(payload.category, "unclassified"),
+		notes,
+		suggestions,
+	};
+};
+
+const normalizeBackcheckPayload = (payload: unknown): AutoDraftBackcheckResponse => {
+	if (!isRecord(payload)) {
+		return {
+			ok: false,
+			success: false,
+			requestId: "",
+			source: "invalid-payload",
+			mode: "cad-aware",
+			cad: {
+				available: false,
+				degraded: true,
+				entity_count: 0,
+				locked_layer_count: 0,
+			},
+			summary: {
+				total_actions: 0,
+				pass_count: 0,
+				warn_count: 0,
+				fail_count: 0,
+			},
+			warnings: ["Backcheck payload was invalid."],
+			findings: [],
+		};
+	}
+
+	const findingsRaw = Array.isArray(payload.findings) ? payload.findings : [];
+	const findings = findingsRaw
+		.map((item, index) => normalizeBackcheckFinding(item, index))
+		.filter((item): item is AutoDraftBackcheckFinding => item !== null);
+	const summaryRaw = isRecord(payload.summary) ? payload.summary : {};
+	const cadRaw = isRecord(payload.cad) ? payload.cad : {};
+	const warnings = Array.isArray(payload.warnings)
+		? payload.warnings.filter((item): item is string => typeof item === "string")
+		: [];
+
+	return {
+		ok: Boolean(payload.ok),
+		success: Boolean(payload.success),
+		requestId: toNonEmptyString(payload.requestId),
+		source: toNonEmptyString(payload.source, "unknown"),
+		mode: toNonEmptyString(payload.mode, "cad-aware"),
+		cad: {
+			available: Boolean(cadRaw["available"]),
+			degraded: Boolean(cadRaw["degraded"]),
+			entity_count: toInt(cadRaw["entity_count"], 0),
+			locked_layer_count: toInt(cadRaw["locked_layer_count"], 0),
+		},
+		summary: {
+			total_actions: toInt(summaryRaw["total_actions"], findings.length),
+			pass_count: toInt(summaryRaw["pass_count"], 0),
+			warn_count: toInt(summaryRaw["warn_count"], 0),
+			fail_count: toInt(summaryRaw["fail_count"], 0),
+		},
+		warnings,
+		findings,
+	};
+};
+
 class AutoDraftService {
 	private readonly baseUrl: string;
 	private readonly apiKey: string;
@@ -379,6 +491,24 @@ class AutoDraftService {
 			}),
 		});
 		return normalizeExecutePayload(payload);
+	}
+
+	async backcheck(
+		actions: AutoDraftAction[],
+		options?: {
+			cadContext?: Record<string, unknown>;
+			requireCadContext?: boolean;
+		},
+	): Promise<AutoDraftBackcheckResponse> {
+		const payload = await this.requestJson<unknown>("/api/autodraft/backcheck", {
+			method: "POST",
+			body: JSON.stringify({
+				actions,
+				cad_context: options?.cadContext,
+				require_cad_context: options?.requireCadContext ?? false,
+			}),
+		});
+		return normalizeBackcheckPayload(payload);
 	}
 }
 

@@ -40,6 +40,7 @@ export function DrawingListManagerScanPanel({
 						webkitdirectory="true"
 						onChange={(e) => onFolderScan(e.target.files)}
 						className={styles.hiddenInput}
+					name="drawinglistmanagerscanpanel_input_36"
 					/>
 				</label>
 			</div>
@@ -52,6 +53,7 @@ export function DrawingListManagerScanPanel({
 					onChange={(e) => setScanQuery(e.target.value)}
 					placeholder="Search drawings, titles, or numbers"
 					className={styles.searchInput}
+				name="drawinglistmanagerscanpanel_input_50"
 				/>
 				<button
 					type="button"

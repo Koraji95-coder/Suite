@@ -50,6 +50,7 @@ export function BackupManagerActionBar({
 				accept=".yaml,.yml"
 				onChange={onFileRestore}
 				className={styles.hiddenInput}
+			name="backupmanageractionbar_input_47"
 			/>
 
 			<button

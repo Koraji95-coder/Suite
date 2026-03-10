@@ -16,7 +16,7 @@ execution from COM scripts into a .NET-native pipeline.
 
 - `plan` uses seed deterministic rules and returns normalized action output.
 - `execute` is a mock executor (dry-run/accepted responses only).
-- `backcheck` is a mock verifier (read-only findings, no CAD writes).
+- `backcheck` is a deterministic CAD-context verifier (read-only findings, no CAD writes).
 - The API schema is intended to stay stable while internals evolve.
 
 ## Run locally

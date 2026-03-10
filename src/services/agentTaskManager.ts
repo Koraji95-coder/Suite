@@ -129,18 +129,23 @@ function parsePositiveIntEnv(
 
 const MAX_CONVERSATIONS = parsePositiveIntEnv(
 	"VITE_AGENT_CHAT_MAX_CONVERSATIONS",
-	18,
-	{ min: 8, max: 120 },
+	12,
+	{ min: 4, max: 48 },
 );
 const MAX_MESSAGES_PER_CONVERSATION = parsePositiveIntEnv(
 	"VITE_AGENT_CHAT_MAX_MESSAGES_PER_CONVERSATION",
-	120,
-	{ min: 40, max: 1200 },
+	80,
+	{ min: 20, max: 300 },
 );
 const MAX_MESSAGE_CHARS = parsePositiveIntEnv(
 	"VITE_AGENT_CHAT_MAX_MESSAGE_CHARS",
-	6_000,
-	{ min: 256, max: 40_000 },
+	3_000,
+	{ min: 256, max: 12_000 },
+);
+const MAX_CONVERSATION_STORAGE_BYTES = parsePositiveIntEnv(
+	"VITE_AGENT_CHAT_STORAGE_MAX_BYTES",
+	1_200_000,
+	{ min: 128_000, max: 8_000_000 },
 );
 
 class AgentTaskManager {
@@ -352,6 +357,119 @@ class AgentTaskManager {
 		}
 	}
 
+	private estimateSerializedBytes(value: string): number {
+		return new TextEncoder().encode(value).length;
+	}
+
+	private isStorageQuotaError(error: unknown): boolean {
+		return (
+			error instanceof DOMException &&
+			(error.name === "QuotaExceededError" || error.code === 22)
+		);
+	}
+
+	private enforceConversationStorageBudget(
+		conversations: AgentConversation[],
+	): {
+		conversations: AgentConversation[];
+		trimmedConversations: number;
+		trimmedMessages: number;
+		bytes: number;
+	} {
+		const working = conversations.map((conversation) => ({
+			...conversation,
+			messages: [...conversation.messages],
+		}));
+
+		let serialized = JSON.stringify(working);
+		let bytes = this.estimateSerializedBytes(serialized);
+		let trimmedConversations = 0;
+		let trimmedMessages = 0;
+		let safetyCounter = 0;
+
+		while (
+			bytes > MAX_CONVERSATION_STORAGE_BYTES &&
+			working.length > 0 &&
+			safetyCounter < 50_000
+		) {
+			safetyCounter += 1;
+			const oldestConversation = working[working.length - 1];
+			if (!oldestConversation) break;
+
+			if (oldestConversation.messages.length > 1) {
+				oldestConversation.messages.shift();
+				oldestConversation.updatedAt = new Date().toISOString();
+				trimmedMessages += 1;
+			} else {
+				working.pop();
+				trimmedConversations += 1;
+			}
+
+			serialized = JSON.stringify(working);
+			bytes = this.estimateSerializedBytes(serialized);
+		}
+
+		return {
+			conversations: working,
+			trimmedConversations,
+			trimmedMessages,
+			bytes,
+		};
+	}
+
+	private persistConversations(
+		key: string,
+		conversations: AgentConversation[],
+		{
+			stage,
+			allowAggressiveRetry = true,
+		}: {
+			stage: string;
+			allowAggressiveRetry?: boolean;
+		},
+	): void {
+		const budgeted = this.enforceConversationStorageBudget(conversations);
+		if (budgeted.trimmedConversations > 0 || budgeted.trimmedMessages > 0) {
+			logger.warn(
+				"Conversation cache trimmed to enforce byte budget.",
+				"AgentTaskManager",
+				{
+					stage,
+					maxBytes: MAX_CONVERSATION_STORAGE_BYTES,
+					bytesAfterTrim: budgeted.bytes,
+					trimmedConversations: budgeted.trimmedConversations,
+					trimmedMessages: budgeted.trimmedMessages,
+				},
+			);
+		}
+
+		const serialized = JSON.stringify(budgeted.conversations);
+		try {
+			localStorage.setItem(key, serialized);
+		} catch (error) {
+			if (!this.isStorageQuotaError(error) || !allowAggressiveRetry) {
+				throw error;
+			}
+
+			logger.warn(
+				"Conversation cache hit storage quota; applying aggressive trim retry.",
+				"AgentTaskManager",
+				{
+					stage,
+					maxBytes: MAX_CONVERSATION_STORAGE_BYTES,
+				},
+			);
+
+			const aggressivelyTrimmed = this.enforceConversationStorageBudget(
+				budgeted.conversations.slice(0, Math.max(1, Math.floor(budgeted.conversations.length / 2))),
+			);
+			localStorage.setItem(
+				key,
+				JSON.stringify(aggressivelyTrimmed.conversations),
+			);
+		}
+	}
+
 	setScope(scope: string | null): void {
 		this.scope = scope?.trim() || "anon";
 	}
@@ -510,7 +628,11 @@ class AgentTaskManager {
 			const stored = localStorage.getItem(key);
 			const { conversations, rewritten } = this.parseAndSanitizeConversations(stored);
 			if (rewritten) {
-				localStorage.setItem(key, JSON.stringify(conversations));
+				this.persistConversations(key, conversations, {
+					stage: "getConversations.rewrite",
+				});
+				return this.parseAndSanitizeConversations(localStorage.getItem(key))
+					.conversations;
 			}
 			return conversations;
 		} catch (error) {
@@ -545,7 +667,9 @@ class AgentTaskManager {
 			}
 			convs.unshift(sanitized);
 			if (convs.length > MAX_CONVERSATIONS) convs.splice(MAX_CONVERSATIONS);
-			localStorage.setItem(this.getConversationsKey(), JSON.stringify(convs));
+			this.persistConversations(this.getConversationsKey(), convs, {
+				stage: "saveConversation",
+			});
 		} catch (error) {
 			logger.warn(
 				"Failed to save conversation.",
@@ -560,7 +684,9 @@ class AgentTaskManager {
 			const convs = this.getConversations().filter(
 				(c) => c.id !== conversationId,
 			);
-			localStorage.setItem(this.getConversationsKey(), JSON.stringify(convs));
+			this.persistConversations(this.getConversationsKey(), convs, {
+				stage: "deleteConversation",
+			});
 		} catch (error) {
 			logger.warn(
 				"Failed to delete conversation.",

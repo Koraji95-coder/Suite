@@ -9,6 +9,7 @@ import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 import { getUrgencyLevel } from "../calendar/urgencyUtils";
 import { formatDateString } from "./dashboardUtils";
 
@@ -86,7 +87,9 @@ export function CalendarWidget({
 
 	// Empty cells before first day
 	for (let i = 0; i < startingDayOfWeek; i++) {
-		calendarDays.push(<div key={`empty-${i}`} className="h-9" />);
+		calendarDays.push(
+			<div key={`empty-${i}`} className="suite-dashboard-calendar-empty-cell" />,
+		);
 	}
 
 	// Days of the month
@@ -117,12 +120,12 @@ export function CalendarWidget({
 			const urgency = getUrgencyLevel(allDatesOnDay[0]);
 			urgencyClass =
 				urgency === "OVERDUE"
-					? "bg-danger/20 text-danger border-danger/30"
+					? "suite-dashboard-calendar-day-overdue"
 					: urgency === "CRITICAL"
-						? "bg-warning/20 text-warning border-warning/30"
+						? "suite-dashboard-calendar-day-critical"
 						: urgency === "WARNING"
-							? "bg-info/20 text-info border-info/30"
-							: "bg-success/20 text-success border-success/30";
+							? "suite-dashboard-calendar-day-warning"
+							: "suite-dashboard-calendar-day-normal";
 		}
 
 		calendarDays.push(
@@ -130,19 +133,16 @@ export function CalendarWidget({
 				key={day}
 				type="button"
 				onClick={() => handleDateClick(dateStr)}
-				className={`
-          h-9 w-9 flex items-center justify-center rounded-lg text-sm font-medium
-          transition-all duration-150
-          ${
-						isSelected
-							? "bg-primary text-primary-contrast ring-2 ring-primary/30"
-							: isToday
-								? "bg-primary/20 text-primary font-bold"
-								: hasDueDate
-									? `border ${urgencyClass}`
-									: "text-text-muted hover:bg-surface-2 hover:text-text"
-					}
-        `}
+				className={cn(
+					"suite-dashboard-calendar-day",
+					isSelected
+						? "suite-dashboard-calendar-day-selected"
+						: isToday
+							? "suite-dashboard-calendar-day-today"
+							: hasDueDate
+								? urgencyClass
+								: "suite-dashboard-calendar-day-default",
+				)}
 			>
 				{day}
 			</button>,
@@ -169,7 +169,11 @@ export function CalendarWidget({
 			});
 
 			return (
-				<Panel variant="inset" padding="md" className="mt-4">
+				<Panel
+					variant="inset"
+					padding="md"
+					className="suite-dashboard-calendar-selected-panel"
+				>
 					<Stack gap={2}>
 						<Text size="sm" weight="semibold">
 							{dateLabel}
@@ -186,11 +190,19 @@ export function CalendarWidget({
 									return (
 										<div
 											key={task.id}
-											className={`text-sm ${task.completed ? "line-through text-text-muted" : "text-primary"}`}
+											className={cn(
+												"suite-dashboard-calendar-task-row",
+												task.completed &&
+													"suite-dashboard-calendar-task-row-complete",
+											)}
 										>
 											📋 {task.name}
 											{project && (
-												<Text size="xs" color="muted" className="ml-1">
+												<Text
+													size="xs"
+													color="muted"
+													className="suite-dashboard-calendar-task-project"
+												>
 													({project.name})
 												</Text>
 											)}
@@ -202,7 +214,7 @@ export function CalendarWidget({
 										key={project.id}
 										type="button"
 										onClick={() => onNavigateToProject?.(project.id)}
-										className="text-sm text-left text-primary hover:underline"
+										className="suite-dashboard-calendar-project-link"
 									>
 										📁 {project.name} — deadline
 									</button>
@@ -220,7 +232,13 @@ export function CalendarWidget({
 				{/* Header */}
 				<HStack justify="between" align="center">
 					<HStack gap={3} align="center">
-						<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+						<div
+							className={cn(
+								"suite-dashboard-icon-mark",
+								"suite-dashboard-icon-mark-md",
+								"suite-dashboard-calendar-mark",
+							)}
+						>
 							<CalendarIcon size={20} />
 						</div>
 						<Text size="lg" weight="bold">
@@ -253,9 +271,9 @@ export function CalendarWidget({
 				</HStack>
 
 				{/* Weekday headers */}
-				<div className="grid grid-cols-7 gap-1">
+				<div className="suite-dashboard-calendar-weekdays-grid">
 					{WEEKDAYS.map((day, i) => (
-						<div key={i} className="h-8 flex items-center justify-center">
+						<div key={i} className="suite-dashboard-calendar-weekday">
 							<Text size="xs" color="muted" weight="semibold">
 								{day}
 							</Text>
@@ -264,7 +282,7 @@ export function CalendarWidget({
 				</div>
 
 				{/* Calendar grid */}
-				<div className="grid grid-cols-7 gap-1">{calendarDays}</div>
+				<div className="suite-dashboard-calendar-days-grid">{calendarDays}</div>
 
 				{/* Selected date details */}
 				{selectedDateContent}

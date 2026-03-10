@@ -40,6 +40,8 @@ export function BlockLibraryCatalog({
 	onToggleFavorite,
 	onDeleteBlock,
 }: BlockLibraryCatalogProps) {
+	const isGridView = viewMode === "grid";
+
 	if (loading) {
 		return <div className={styles.loadingState}>Loading blocks…</div>;
 	}
@@ -78,9 +80,7 @@ export function BlockLibraryCatalog({
 						<div
 							className={cn(
 								styles.blocksContainer,
-								viewMode === "grid"
-									? styles.blocksContainerGrid
-									: styles.blocksContainerList,
+								isGridView ? styles.blocksContainerGrid : styles.blocksContainerList,
 							)}
 						>
 							{blocks.map((block) => (

@@ -6,6 +6,7 @@ import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 import { useRecentFiles } from "./useRecentFiles";
 
 function formatTimeAgo(timestamp: string) {
@@ -28,12 +29,22 @@ export function RecentFilesWidget() {
 	const { files, loading } = useRecentFiles(8);
 
 	return (
-		<Panel variant="default" padding="lg" className="h-full">
+		<Panel
+			variant="default"
+			padding="lg"
+			className="suite-dashboard-fill-height"
+		>
 			<Stack gap={5}>
 				{/* Header */}
 				<HStack justify="between" align="center">
 					<HStack gap={3} align="center">
-						<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/15 text-warning">
+						<div
+							className={cn(
+								"suite-dashboard-icon-mark",
+								"suite-dashboard-icon-mark-md",
+								"suite-dashboard-recent-files-mark",
+							)}
+						>
 							<Clock size={20} />
 						</div>
 						<Stack gap={0}>
@@ -59,15 +70,22 @@ export function RecentFilesWidget() {
 						{[1, 2, 3].map((i) => (
 							<div
 								key={i}
-								className="h-16 rounded-xl bg-surface-2 animate-pulse"
+								className={cn(
+									"suite-dashboard-widget-skeleton",
+									"suite-dashboard-widget-skeleton-md",
+								)}
 							/>
 						))}
 					</Stack>
 				) : files.length === 0 ? (
-					<Panel variant="inset" padding="lg" className="text-center">
+					<Panel
+						variant="inset"
+						padding="lg"
+						className="suite-dashboard-center-text"
+					>
 						<Stack gap={3} align="center">
-							<div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2">
-								<FolderOpen size={24} className="text-text-muted" />
+							<div className="suite-dashboard-empty-icon-wrap">
+								<FolderOpen size={24} className="suite-dashboard-muted-icon" />
 							</div>
 							<Stack gap={1}>
 								<Text size="sm" weight="medium">
@@ -86,15 +104,15 @@ export function RecentFilesWidget() {
 								key={file.id}
 								type="button"
 								onClick={() => navigate(file.file_path)}
-								className="group flex w-full items-center gap-3 rounded-xl border border-border bg-surface p-3 text-left transition-all hover:bg-surface-2 hover:border-primary/30 hover:-translate-y-0.5"
+								className="suite-dashboard-recent-file-item"
 							>
 								{/* File icon */}
-								<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-text-muted">
+								<div className="suite-dashboard-recent-file-icon-wrap">
 									<FileText size={18} />
 								</div>
 
 								{/* File info */}
-								<Stack gap={0} className="flex-1 min-w-0">
+								<Stack gap={0} className="suite-dashboard-flex-1">
 									<Text size="sm" weight="medium" truncate>
 										{file.file_name}
 									</Text>
@@ -106,14 +124,18 @@ export function RecentFilesWidget() {
 								</Stack>
 
 								{/* Time */}
-								<Text size="xs" color="muted" className="shrink-0">
+								<Text
+									size="xs"
+									color="muted"
+									className="suite-dashboard-recent-file-time"
+								>
 									{formatTimeAgo(file.accessed_at)}
 								</Text>
 
 								{/* Arrow */}
 								<ExternalLink
 									size={12}
-									className="shrink-0 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity"
+									className="suite-dashboard-recent-file-arrow"
 								/>
 							</button>
 						))}

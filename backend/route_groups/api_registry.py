@@ -88,6 +88,7 @@ def register_route_groups(
             limiter=limiter,
             logger=logger,
             autodraft_dotnet_api_url=autodraft_dotnet_api_url,
+            get_manager=get_manager,
         )
     )
     app.register_blueprint(

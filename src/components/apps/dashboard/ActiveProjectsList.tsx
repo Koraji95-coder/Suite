@@ -12,6 +12,7 @@ import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 
 import {
 	formatDateOnly,
@@ -61,7 +62,13 @@ export function ActiveProjectsList({
 				{/* Header */}
 				<HStack justify="between" align="center">
 					<HStack gap={3} align="center">
-						<div className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary/15 text-secondary">
+						<div
+							className={cn(
+								"suite-dashboard-icon-mark",
+								"suite-dashboard-icon-mark-sm",
+								"suite-dashboard-active-projects-mark",
+							)}
+						>
 							<FolderKanban size={18} />
 						</div>
 						<Text size="lg" weight="bold" color="primary">
@@ -89,7 +96,7 @@ export function ActiveProjectsList({
 							{[1, 2, 3].map((item) => (
 								<div
 									key={item}
-									className="h-[104px] rounded-xl border border-border bg-surface-2 animate-pulse"
+									className="suite-dashboard-active-projects-skeleton"
 								/>
 							))}
 						</>
@@ -110,20 +117,25 @@ export function ActiveProjectsList({
 									onClick={() => onNavigateToProject?.(project.id)}
 									onMouseEnter={() => setHoveredProjectId(project.id)}
 									onMouseLeave={() => setHoveredProjectId(null)}
-									className={`
-                    w-full rounded-xl border p-4 text-left transition-all duration-200
-                    ${
-											isHovered
-												? "border-primary/30 bg-surface-2 -translate-y-1 shadow-lg"
-												: "border-border bg-surface hover:bg-surface-2"
-										}
-                  `}
+									className={cn(
+										"suite-dashboard-active-project-card",
+										isHovered &&
+											"suite-dashboard-active-project-card-hovered",
+									)}
 								>
-									<HStack justify="between" align="start">
-										<HStack gap={3} align="start" className="flex-1">
+									<HStack
+										justify="between"
+										align="start"
+										className="suite-dashboard-active-project-row"
+									>
+										<HStack
+											gap={3}
+											align="start"
+											className="suite-dashboard-active-project-content"
+										>
 											{/* Category dot */}
 											<div
-												className="mt-1.5 h-3 w-3 shrink-0 rounded-full"
+												className="suite-dashboard-active-project-dot"
 												style={{
 													backgroundColor: catColor,
 													boxShadow: `0 0 8px ${catColor}50`,
@@ -131,7 +143,7 @@ export function ActiveProjectsList({
 											/>
 
 											{/* Project info */}
-											<Stack gap={2} className="flex-1">
+											<Stack gap={2} className="suite-dashboard-active-project-info">
 												<Text size="sm" weight="semibold">
 													{project.name}
 												</Text>
@@ -153,7 +165,10 @@ export function ActiveProjectsList({
 												{/* Overdue warning */}
 												{taskCount?.hasOverdue && (
 													<HStack gap={2} align="center">
-														<AlertCircle size={12} className="text-danger" />
+														<AlertCircle
+															size={12}
+															className="suite-dashboard-text-danger"
+														/>
 														<Text size="xs" color="danger">
 															Overdue tasks
 														</Text>
@@ -163,7 +178,10 @@ export function ActiveProjectsList({
 												{/* Next due task */}
 												{taskCount?.nextDue && (
 													<HStack gap={2} align="center">
-														<AlertTriangle size={12} className="text-warning" />
+														<AlertTriangle
+															size={12}
+															className="suite-dashboard-text-warning"
+														/>
 														<Text
 															size="xs"
 															style={{
@@ -182,7 +200,7 @@ export function ActiveProjectsList({
 
 										<ChevronRight
 											size={18}
-											className="text-primary/60 shrink-0"
+											className="suite-dashboard-chevron-soft"
 										/>
 									</HStack>
 								</button>

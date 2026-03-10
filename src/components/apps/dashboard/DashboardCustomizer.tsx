@@ -31,6 +31,7 @@ import { Button, IconButton } from "@/components/primitives/Button";
 import { HStack, Stack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 import type { WidgetConfig } from "./useDashboardLayout";
 
 const WIDGET_ICONS: Record<string, typeof BarChart3> = {
@@ -78,15 +79,15 @@ function SortableWidgetRow({
 		<div
 			ref={setNodeRef}
 			style={style}
-			className={`
-        flex items-center gap-3 rounded-lg border p-3
-        ${widget.visible ? "border-border bg-surface" : "border-border/50 bg-surface/50"}
-      `}
+			className={cn(
+				"suite-dashboard-customizer-row",
+				!widget.visible && "suite-dashboard-customizer-row-hidden",
+			)}
 			{...attributes}
 		>
 			<button
 				{...listeners}
-				className="cursor-grab active:cursor-grabbing p-1 rounded text-text-muted hover:text-text"
+				className="suite-dashboard-customizer-handle"
 				aria-label={`Drag to reorder ${widget.label}`}
 			>
 				<GripVertical size={16} />
@@ -94,14 +95,18 @@ function SortableWidgetRow({
 
 			<Icon
 				size={16}
-				className={widget.visible ? "text-primary" : "text-text-muted"}
+				className={
+					widget.visible
+						? "suite-dashboard-customizer-widget-icon-visible"
+						: "suite-dashboard-customizer-widget-icon-hidden"
+				}
 			/>
 
 			<Text
 				size="sm"
 				weight="medium"
 				color={widget.visible ? "default" : "muted"}
-				className="flex-1"
+				className="suite-dashboard-flex-1"
 			>
 				{widget.label}
 			</Text>
@@ -114,7 +119,11 @@ function SortableWidgetRow({
 				variant="ghost"
 				size="sm"
 				onClick={() => onToggle(widget.id)}
-				className={widget.visible ? "text-primary" : "text-text-muted"}
+				className={
+					widget.visible
+						? "suite-dashboard-customizer-toggle-visible"
+						: "suite-dashboard-customizer-toggle-hidden"
+				}
 			/>
 		</div>
 	);

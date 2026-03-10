@@ -114,6 +114,42 @@ class TestApiRouteGroups(unittest.TestCase):
             def get_layers(self):
                 return True, ["A-DEMO-LAYER"], None
 
+            def get_layer_snapshot(self):
+                return (
+                    True,
+                    [
+                        {"name": "A-DEMO-LAYER", "locked": False},
+                        {"name": "A-LOCKED-LAYER", "locked": True},
+                    ],
+                    None,
+                )
+
+            def get_entity_snapshot(self, *, layer_names=None, max_entities=500):
+                layer_lookup = {
+                    str(value).strip().lower()
+                    for value in (layer_names or [])
+                    if str(value).strip()
+                }
+                entities = [
+                    {
+                        "id": "E-1",
+                        "layer": "A-DEMO-LAYER",
+                        "bounds": {"x": 8, "y": 8, "width": 20, "height": 20},
+                    },
+                    {
+                        "id": "E-2",
+                        "layer": "A-LOCKED-LAYER",
+                        "bounds": {"x": 40, "y": 40, "width": 10, "height": 10},
+                    },
+                ]
+                if layer_lookup:
+                    entities = [
+                        entry
+                        for entry in entities
+                        if str(entry.get("layer") or "").strip().lower() in layer_lookup
+                    ]
+                return True, entities[: max(1, int(max_entities or 1))], None
+
             def execute_layer_search(self, _config):
                 return {
                     "success": True,
@@ -404,6 +440,7 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/conduit-route/terminal-labels/sync": ["POST"],
             "/api/conduit-route/obstacles/scan": ["POST"],
             "/api/conduit-route/route/compute": ["POST"],
+            "/api/conduit-route/backcheck": ["POST"],
             "/api/autodraft/backcheck": ["POST"],
             "/api/etap/cleanup/run": ["POST"],
             "/api/autocad/ws-ticket": ["POST"],
@@ -439,6 +476,19 @@ class TestApiRouteGroups(unittest.TestCase):
             json={"filename": "suite_test.yaml", "content": "hello: world\n"},
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_backup_save_normalizes_parent_segments(self) -> None:
+        response = self.client.post(
+            "/api/backup/save",
+            headers={"X-API-Key": "valid-key"},
+            json={"filename": "..\\..\\outside.yaml", "content": "hello: world\n"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        filename = str(payload.get("filename") or "")
+        self.assertNotIn("..", filename)
+        self.assertTrue(filename.endswith(".yaml"))
+        self.assertTrue((self.backup_dir / filename).exists())
 
     def test_batch_preview_requires_auth(self) -> None:
         response = self.client.post("/api/batch-find-replace/preview")
@@ -681,6 +731,8 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(not_json.status_code, 400)
         not_json_payload = not_json.get_json() or {}
         self.assertEqual(not_json_payload.get("error"), "Expected JSON payload.")
+        self.assertEqual(not_json_payload.get("code"), "AUTODRAFT_INVALID_REQUEST")
+        self.assertTrue(str(not_json_payload.get("requestId", "")).startswith("req-"))
 
         invalid_object = self.client.post(
             "/api/autodraft/execute",
@@ -690,6 +742,8 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(invalid_object.status_code, 400)
         invalid_object_payload = invalid_object.get_json() or {}
         self.assertEqual(invalid_object_payload.get("error"), "Invalid JSON payload.")
+        self.assertEqual(invalid_object_payload.get("code"), "AUTODRAFT_INVALID_REQUEST")
+        self.assertTrue(str(invalid_object_payload.get("requestId", "")).startswith("req-"))
 
         response = self.client.post(
             "/api/autodraft/execute",
@@ -700,6 +754,49 @@ class TestApiRouteGroups(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertFalse(payload.get("ok", True))
         self.assertIn("AUTODRAFT_DOTNET_API_URL", str(payload.get("error")))
+        self.assertEqual(payload.get("code"), "AUTODRAFT_EXECUTE_NOT_CONFIGURED")
+        self.assertTrue(str(payload.get("requestId", "")).startswith("req-"))
+
+    def test_autodraft_execute_requires_override_reason_for_failures(self) -> None:
+        failing_action = {
+            "id": "action-1",
+            "rule_id": None,
+            "category": "UNCLASSIFIED",
+            "status": "review",
+            "confidence": 0.2,
+            "markup": {
+                "type": "cloud",
+                "color": "green",
+                "text": "add new conduit",
+                "bounds": {"x": 5, "y": 5, "width": 20, "height": 10},
+            },
+        }
+        blocked = self.client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={"actions": [failing_action], "dry_run": True, "backcheck_fail_count": 0},
+        )
+        self.assertEqual(blocked.status_code, 428)
+        blocked_payload = blocked.get_json() or {}
+        self.assertFalse(blocked_payload.get("ok", True))
+        self.assertIn("backcheck_override_reason", str(blocked_payload.get("error")))
+        self.assertEqual(blocked_payload.get("code"), "AUTODRAFT_BACKCHECK_FAILED")
+        self.assertTrue(str(blocked_payload.get("requestId", "")).startswith("req-"))
+        self.assertEqual(
+            blocked_payload.get("meta", {}).get("backcheck_fail_count"),
+            1,
+        )
+
+        allowed = self.client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "actions": [failing_action],
+                "dry_run": True,
+                "backcheck_override_reason": "Operator reviewed conflicts.",
+            },
+        )
+        self.assertEqual(allowed.status_code, 501)
 
     def test_autodraft_backcheck_payload_shape(self) -> None:
         response = self.client.post(
@@ -741,6 +838,9 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertIsInstance(summary.get("warn_count"), int)
         self.assertIsInstance(summary.get("fail_count"), int)
 
+        cad = payload.get("cad") or {}
+        self.assertEqual(cad.get("source"), "live")
+
         findings = payload.get("findings") or []
         self.assertIsInstance(findings, list)
         self.assertEqual(len(findings), 2)
@@ -748,7 +848,7 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertIn(first_finding.get("status"), {"pass", "warn", "fail"})
         self.assertIsInstance(first_finding.get("suggestions"), list)
 
-    def test_autodraft_backcheck_required_cad_context_error_envelope(self) -> None:
+    def test_autodraft_backcheck_require_cad_context_accepts_live_context(self) -> None:
         response = self.client.post(
             "/api/autodraft/backcheck",
             headers={"X-API-Key": "valid-key"},
@@ -757,11 +857,75 @@ class TestApiRouteGroups(unittest.TestCase):
                 "actions": [],
             },
         )
-        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.status_code, 200)
         payload = response.get_json() or {}
-        self.assertFalse(payload.get("success", True))
-        self.assertEqual(payload.get("code"), "AUTODRAFT_CAD_CONTEXT_UNAVAILABLE")
+        self.assertTrue(payload.get("success"))
         self.assertIn("requestId", payload)
+        cad = payload.get("cad") or {}
+        self.assertEqual(cad.get("source"), "live")
+
+    def test_autodraft_backcheck_uses_live_entity_enrichment(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/backcheck",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "actions": [
+                    {
+                        "id": "action-entity-check",
+                        "rule_id": "delete-green-cloud",
+                        "category": "DELETE",
+                        "confidence": 0.95,
+                        "markup": {
+                            "type": "cloud",
+                            "color": "green",
+                            "text": "delete line",
+                            "layer": "A-DEMO-LAYER",
+                            "bounds": {"x": 9, "y": 9, "width": 6, "height": 6},
+                        },
+                    }
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        cad = payload.get("cad") or {}
+        self.assertGreaterEqual(int(cad.get("entity_count") or 0), 1)
+        findings = payload.get("findings") or []
+        self.assertEqual(len(findings), 1)
+        notes = findings[0].get("notes") or []
+        self.assertFalse(
+            any("no intersecting cad entities" in str(note).strip().lower() for note in notes)
+        )
+
+    def test_autodraft_backcheck_uses_live_locked_layer_enrichment(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/backcheck",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "actions": [
+                    {
+                        "id": "action-locked-layer",
+                        "rule_id": "add-red-cloud",
+                        "category": "ADD",
+                        "confidence": 0.95,
+                        "markup": {
+                            "type": "cloud",
+                            "color": "red",
+                            "text": "add conduit",
+                            "layer": "A-LOCKED-LAYER",
+                            "bounds": {"x": 42, "y": 42, "width": 4, "height": 4},
+                        },
+                    }
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        findings = payload.get("findings") or []
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].get("status"), "fail")
+        notes = findings[0].get("notes") or []
+        self.assertTrue(any("locked" in str(note).strip().lower() for note in notes))
 
     def test_terminal_scan_endpoint_requires_auth(self) -> None:
         response = self.client.post("/api/conduit-route/terminal-scan")
@@ -777,6 +941,63 @@ class TestApiRouteGroups(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 401)
+
+    def test_conduit_route_backcheck_endpoint_requires_auth(self) -> None:
+        response = self.client.post(
+            "/api/conduit-route/backcheck",
+            json={
+                "routes": [
+                    {
+                        "id": "route_1",
+                        "mode": "plan_view",
+                        "path": [{"x": 10, "y": 10}, {"x": 100, "y": 10}],
+                    }
+                ]
+            },
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_conduit_route_backcheck_payload_shape(self) -> None:
+        response = self.client.post(
+            "/api/conduit-route/backcheck",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "obstacleSource": "client",
+                "clearance": 18,
+                "obstacles": [{"id": "OBS-A", "type": "foundation", "x": 45, "y": 5, "w": 20, "h": 20}],
+                "routes": [
+                    {
+                        "id": "route_1",
+                        "ref": "DC-001",
+                        "mode": "plan_view",
+                        "path": [{"x": 10, "y": 10}, {"x": 120, "y": 10}],
+                    },
+                    {
+                        "id": "route_2",
+                        "ref": "DC-002",
+                        "mode": "plan_view",
+                        "path": [{"x": 10, "y": 30}, {"x": 30, "y": 45}, {"x": 120, "y": 45}],
+                    },
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertTrue(str(payload.get("requestId", "")).startswith("req-"))
+        self.assertEqual(payload.get("source"), "python-local-backcheck")
+        summary = payload.get("summary") or {}
+        self.assertEqual(summary.get("total_routes"), 2)
+        self.assertIsInstance(summary.get("fail_count"), int)
+        self.assertIsInstance(summary.get("warn_count"), int)
+        self.assertIsInstance(summary.get("pass_count"), int)
+        findings = payload.get("findings") or []
+        self.assertEqual(len(findings), 2)
+        first_finding = findings[0] or {}
+        self.assertIn(first_finding.get("status"), {"pass", "warn", "fail"})
+        self.assertIn("stats", first_finding)
+        self.assertIn("issues", first_finding)
+        self.assertIn("suggestions", first_finding)
 
     def test_terminal_route_draw_endpoint_requires_auth(self) -> None:
         response = self.client.post(

@@ -27,6 +27,7 @@ import {
 	type AutoDraftPlanResponse,
 	autoDraftService,
 } from "./autodraftService";
+import { agentService } from "@/services/agentService";
 import {
 	detectArcsFromSegments,
 	extendDeadEndSegments,
@@ -80,6 +81,55 @@ const STATUS_BADGE_BY_CATEGORY: Record<
 	DIMENSION: "default",
 };
 
+type CrewReviewProfile = "draftsmith" | "gridsage";
+
+type CrewReviewEntry = {
+	profileId: CrewReviewProfile;
+	status: "running" | "completed" | "failed";
+	response?: string;
+	error?: string;
+};
+
+function extractAgentResponseText(data: Record<string, unknown> | undefined): string {
+	if (!data) return "";
+	const directKeys = ["response", "reply", "output", "message"] as const;
+	for (const key of directKeys) {
+		const value = data[key];
+		if (typeof value === "string" && value.trim()) {
+			return value.trim();
+		}
+	}
+	return JSON.stringify(data);
+}
+
+function buildCrewReviewPrompt(args: {
+	profileId: CrewReviewProfile;
+	backcheck: AutoDraftBackcheckResponse;
+	draftsmithReview?: string;
+}): string {
+	const { profileId, backcheck, draftsmithReview } = args;
+	const header =
+		profileId === "draftsmith"
+			? "Review this AutoDraft backcheck as the CAD drafting specialist."
+			: "Review this AutoDraft backcheck as the electrical engineering QA specialist.";
+	const draftsmithContext = draftsmithReview?.trim()
+		? `Draftsmith review:\n${draftsmithReview}`
+		: "";
+
+	return [
+		header,
+		"Return concise implementation guidance with concrete fix steps and validation checkpoints.",
+		"Focus on actionable items that improve Bluebeam markup interpretation and CAD execution safety.",
+		`Backcheck summary: ${JSON.stringify(backcheck.summary)}`,
+		`CAD status: ${JSON.stringify(backcheck.cad)}`,
+		`Warnings: ${JSON.stringify(backcheck.warnings)}`,
+		`Findings: ${JSON.stringify(backcheck.findings)}`,
+		draftsmithContext,
+	]
+		.filter(Boolean)
+		.join("\n\n");
+}
+
 export function AutoDraftStudioApp() {
 	const [activeTab, setActiveTab] = useState<TabId>("architecture");
 	const [expandedRule, setExpandedRule] = useState<string | null>(null);
@@ -96,9 +146,15 @@ export function AutoDraftStudioApp() {
 	const [backcheckResult, setBackcheckResult] =
 		useState<AutoDraftBackcheckResponse | null>(null);
 	const [backcheckError, setBackcheckError] = useState<string | null>(null);
+	const [executeOverrideReason, setExecuteOverrideReason] = useState("");
+	const [crewReviewEntries, setCrewReviewEntries] = useState<CrewReviewEntry[]>(
+		[],
+	);
+	const [crewReviewError, setCrewReviewError] = useState<string | null>(null);
 	const [loadingPlan, setLoadingPlan] = useState(false);
 	const [loadingExecute, setLoadingExecute] = useState(false);
 	const [loadingBackcheck, setLoadingBackcheck] = useState(false);
+	const [loadingCrewReview, setLoadingCrewReview] = useState(false);
 	const [loadingHealth, setLoadingHealth] = useState(false);
 
 	const translatedGeometryStats = useMemo(() => {
@@ -153,6 +209,9 @@ export function AutoDraftStudioApp() {
 		setExecuteError(null);
 		setBackcheckResult(null);
 		setBackcheckError(null);
+		setExecuteOverrideReason("");
+		setCrewReviewEntries([]);
+		setCrewReviewError(null);
 		try {
 			const planned = await autoDraftService.plan(DEMO_MARKUPS);
 			setPlanResult(planned);
@@ -176,9 +235,23 @@ export function AutoDraftStudioApp() {
 				setExecuteError("No actions available to execute.");
 				return;
 			}
+			const hasFailingBackcheck = (backcheckResult?.summary.fail_count || 0) > 0;
+			const backcheckFailCount = backcheckResult?.summary.fail_count || 0;
+			const overrideReason = executeOverrideReason.trim();
+			if (hasFailingBackcheck && !overrideReason) {
+				setExecuteError(
+					"Backcheck contains failing actions. Enter an override reason to run execute.",
+				);
+				return;
+			}
 
 			const executed = await autoDraftService.execute(plan.actions, {
 				dryRun: true,
+				backcheckRequestId: backcheckResult?.requestId || undefined,
+				backcheckOverrideReason: hasFailingBackcheck
+					? overrideReason || undefined
+					: undefined,
+				backcheckFailCount,
 			});
 			setExecuteResult(executed);
 		} catch (error) {
@@ -196,6 +269,9 @@ export function AutoDraftStudioApp() {
 		setLoadingBackcheck(true);
 		setBackcheckResult(null);
 		setBackcheckError(null);
+		setExecuteOverrideReason("");
+		setCrewReviewEntries([]);
+		setCrewReviewError(null);
 		try {
 			const plan = planResult ?? (await autoDraftService.plan(DEMO_MARKUPS));
 			if (!planResult) {
@@ -215,6 +291,84 @@ export function AutoDraftStudioApp() {
 			setBackcheckError(message);
 		} finally {
 			setLoadingBackcheck(false);
+		}
+	};
+
+	const runCadCrewReview = async () => {
+		if (!backcheckResult) {
+			setCrewReviewError("Run backcheck first before requesting CAD crew review.");
+			return;
+		}
+
+		setLoadingCrewReview(true);
+		setCrewReviewError(null);
+		setCrewReviewEntries([]);
+
+		const entries: CrewReviewEntry[] = [];
+		try {
+			entries.push({ profileId: "draftsmith", status: "running" });
+			setCrewReviewEntries([...entries]);
+			const draftsmithResult = await agentService.sendMessage(
+				buildCrewReviewPrompt({
+					profileId: "draftsmith",
+					backcheck: backcheckResult,
+				}),
+				{
+					profileId: "draftsmith",
+					promptMode: "template",
+					templateLabel: "AutoDraft backcheck review",
+				},
+			);
+			if (!draftsmithResult.success) {
+				entries[0] = {
+					profileId: "draftsmith",
+					status: "failed",
+					error: draftsmithResult.error || "Draftsmith review failed.",
+				};
+				setCrewReviewEntries([...entries]);
+				setCrewReviewError(entries[0].error || "Draftsmith review failed.");
+				return;
+			}
+			const draftsmithText = extractAgentResponseText(draftsmithResult.data);
+			entries[0] = {
+				profileId: "draftsmith",
+				status: "completed",
+				response: draftsmithText,
+			};
+			entries.push({ profileId: "gridsage", status: "running" });
+			setCrewReviewEntries([...entries]);
+
+			const gridsageResult = await agentService.sendMessage(
+				buildCrewReviewPrompt({
+					profileId: "gridsage",
+					backcheck: backcheckResult,
+					draftsmithReview: draftsmithText,
+				}),
+				{
+					profileId: "gridsage",
+					promptMode: "template",
+					templateLabel: "AutoDraft electrical QA review",
+				},
+			);
+			if (!gridsageResult.success) {
+				entries[1] = {
+					profileId: "gridsage",
+					status: "failed",
+					error: gridsageResult.error || "GridSage review failed.",
+				};
+				setCrewReviewEntries([...entries]);
+				setCrewReviewError(entries[1].error || "GridSage review failed.");
+				return;
+			}
+
+			entries[1] = {
+				profileId: "gridsage",
+				status: "completed",
+				response: extractAgentResponseText(gridsageResult.data),
+			};
+			setCrewReviewEntries([...entries]);
+		} finally {
+			setLoadingCrewReview(false);
 		}
 	};
 
@@ -529,6 +683,14 @@ export function AutoDraftStudioApp() {
 						<Button
 							variant="outline"
 							size="sm"
+							onClick={() => void runCadCrewReview()}
+							loading={loadingCrewReview}
+						>
+							Run CAD crew review
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
 							onClick={() => void runDemoExecuteDryRun()}
 							loading={loadingExecute}
 						>
@@ -591,6 +753,28 @@ export function AutoDraftStudioApp() {
 								{warning}
 							</Text>
 						))}
+						<Text size="xs" color="muted">
+							CAD context source: {backcheckResult.cad.source || "unknown"}
+						</Text>
+						{backcheckResult.summary.fail_count > 0 ? (
+							<div className={styles.overridePanel}>
+								<label
+									htmlFor="autodraft-override-reason"
+									className={styles.overrideLabel}
+								>
+									Override reason (required to execute with fail findings)
+								</label>
+								<textarea
+									id="autodraft-override-reason"
+									name="autodraftOverrideReason"
+									rows={2}
+									className={styles.overrideTextarea}
+									value={executeOverrideReason}
+									onChange={(event) => setExecuteOverrideReason(event.target.value)}
+									placeholder="Explain why execute is safe despite failing checks..."
+								/>
+							</div>
+						) : null}
 						<div className={styles.findingList}>
 							{backcheckResult.findings.map((finding) => (
 								<div key={finding.id} className={styles.findingCard}>
@@ -626,8 +810,51 @@ export function AutoDraftStudioApp() {
 						</div>
 						{backcheckResult.summary.fail_count > 0 ? (
 							<Text size="xs" color="warning">
-								Backcheck found failing actions. Execute remains available in
-								v1, but manual confirmation is strongly recommended.
+								Backcheck found failing actions. Execute now requires an
+								override reason.
+							</Text>
+						) : null}
+						{crewReviewEntries.length > 0 ? (
+							<div className={styles.crewReviewPanel}>
+								<Text size="xs" color="muted">
+									CAD crew review (Draftsmith {"->"} GridSage)
+								</Text>
+								{crewReviewEntries.map((entry) => (
+									<div key={entry.profileId} className={styles.crewReviewCard}>
+										<HStack gap={2} align="center" wrap>
+											<Badge
+												color={
+													entry.status === "completed"
+														? "success"
+														: entry.status === "running"
+															? "warning"
+															: "danger"
+												}
+												variant="soft"
+											>
+												{entry.status}
+											</Badge>
+											<Text size="xs" color="muted">
+												{entry.profileId}
+											</Text>
+										</HStack>
+										{entry.response ? (
+											<pre className={styles.crewReviewResponse}>
+												{entry.response}
+											</pre>
+										) : null}
+										{entry.error ? (
+											<Text size="xs" color="warning">
+												{entry.error}
+											</Text>
+										) : null}
+									</div>
+								))}
+							</div>
+						) : null}
+						{crewReviewError ? (
+							<Text size="xs" color="warning">
+								{crewReviewError}
 							</Text>
 						) : null}
 					</div>

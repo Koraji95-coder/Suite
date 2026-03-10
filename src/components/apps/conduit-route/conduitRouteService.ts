@@ -7,6 +7,8 @@ import {
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import type {
+	ConduitRouteBackcheckRequest,
+	ConduitRouteBackcheckResponse,
 	ConduitObstacleScanRequest,
 	ConduitObstacleScanResponse,
 	ConduitRouteComputeRequest,
@@ -258,6 +260,68 @@ class ConduitRouteService {
 				success: false,
 				code: mapFetchErrorCode(err, "NETWORK_ERROR"),
 				message: mapFetchErrorMessage(err, "Obstacle scan request failed"),
+			};
+		}
+	}
+
+	async backcheckRoutes(
+		request: ConduitRouteBackcheckRequest,
+	): Promise<ConduitRouteBackcheckResponse> {
+		try {
+			const requestId = this.createRequestId();
+			const headers = await this.getHeaders(requestId);
+			const response = await fetchWithTimeout(
+				`${this.baseUrl}/api/conduit-route/backcheck`,
+				{
+					method: "POST",
+					headers,
+					body: JSON.stringify({
+						routes: request.routes,
+						obstacles: request.obstacles ?? [],
+						obstacleSource: request.obstacleSource ?? "client",
+						clearance: request.clearance ?? 18,
+					}),
+					timeoutMs: 45_000,
+					requestName: "Conduit route backcheck request",
+				},
+			);
+
+			const payload = (await response
+				.clone()
+				.json()
+				.catch(() => null)) as ConduitRouteBackcheckResponse | null;
+
+			if (!response.ok) {
+				return {
+					success: false,
+					code: payload?.code || "REQUEST_FAILED",
+					message:
+						payload?.message ||
+						(await this.parseErrorMessage(
+							response,
+							`Route backcheck failed (${response.status})`,
+						)),
+					requestId: payload?.requestId,
+					warnings: payload?.warnings,
+					meta: payload?.meta,
+				};
+			}
+
+			if (payload && typeof payload.success === "boolean") {
+				return payload;
+			}
+
+			return {
+				success: false,
+				code: "INVALID_RESPONSE",
+				message: "Route backcheck returned an unexpected payload.",
+			};
+		} catch (err) {
+			logger.error("Route backcheck request failed", "ConduitRouteService", err);
+			return {
+				success: false,
+				code: mapFetchErrorCode(err, "NETWORK_ERROR"),
+				message: mapFetchErrorMessage(err, "Route backcheck request failed"),
 			};
 		}
 	}

@@ -13,6 +13,7 @@ import { HStack, Stack } from "@/components/primitives/Stack";
 
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 import type { ActivityLogRow } from "@/services/activityService";
 import { getCategoryColor } from "./dashboardUtils";
 
@@ -74,11 +75,21 @@ export function RecentActivityList({
 	isLoading = false,
 }: RecentActivityListProps) {
 	return (
-		<Panel variant="default" padding="lg" className="h-full">
+		<Panel
+			variant="default"
+			padding="lg"
+			className="suite-dashboard-fill-height"
+		>
 			<Stack gap={5}>
 				{/* Header */}
 				<HStack gap={3} align="center">
-					<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15 text-accent">
+					<div
+						className={cn(
+							"suite-dashboard-icon-mark",
+							"suite-dashboard-icon-mark-md",
+							"suite-dashboard-activity-mark",
+						)}
+					>
 						<Activity size={20} />
 					</div>
 					<Stack gap={0}>
@@ -97,15 +108,22 @@ export function RecentActivityList({
 						{[1, 2, 3, 4].map((item) => (
 							<div
 								key={item}
-								className="h-[68px] rounded-xl bg-surface-2 animate-pulse"
+								className={cn(
+									"suite-dashboard-widget-skeleton",
+									"suite-dashboard-widget-skeleton-md",
+								)}
 							/>
 						))}
 					</Stack>
 				) : activities.length === 0 ? (
-					<Panel variant="inset" padding="lg" className="text-center">
+					<Panel
+						variant="inset"
+						padding="lg"
+						className="suite-dashboard-center-text"
+					>
 						<Stack gap={3} align="center">
-							<div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2">
-								<Activity size={24} className="text-text-muted" />
+							<div className="suite-dashboard-empty-icon-wrap">
+								<Activity size={24} className="suite-dashboard-muted-icon" />
 							</div>
 							<Text size="sm" color="muted">
 								No recent activity
@@ -113,9 +131,9 @@ export function RecentActivityList({
 						</Stack>
 					</Panel>
 				) : (
-					<div className="relative">
+					<div className="suite-dashboard-activity-timeline">
 						{/* Timeline line */}
-						<div className="absolute left-5 top-3 bottom-3 w-px bg-linear-to-b from-primary/30 via-border to-transparent" />
+						<div className="suite-dashboard-activity-line" />
 
 						<Stack gap={0}>
 							{activities.map((activity, index) => {
@@ -131,14 +149,14 @@ export function RecentActivityList({
 								return (
 									<div
 										key={activity.id}
-										className={`
-                      relative flex gap-4 pl-10 py-3
-                      ${!isLast ? "border-b border-border/50" : ""}
-                    `}
+										className={cn(
+											"suite-dashboard-activity-item",
+											!isLast && "suite-dashboard-activity-item-bordered",
+										)}
 									>
 										{/* Timeline dot */}
 										<div
-											className="absolute left-3.5 top-5 h-3 w-3 rounded-full border-2 border-surface"
+											className="suite-dashboard-activity-dot"
 											style={{
 												backgroundColor: dotColor,
 												boxShadow: `0 0 8px ${dotColor}50`,
@@ -146,17 +164,17 @@ export function RecentActivityList({
 										/>
 
 										{/* Icon */}
-										<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2">
-											<Icon size={14} className="text-text-muted" />
+										<div className="suite-dashboard-activity-icon-wrap">
+											<Icon size={14} className="suite-dashboard-muted-icon" />
 										</div>
 
 										{/* Content */}
-										<Stack gap={1} className="flex-1 min-w-0">
-											<Text size="sm" className="leading-relaxed">
+										<Stack gap={1} className="suite-dashboard-flex-1">
+											<Text size="sm" className="suite-dashboard-activity-copy">
 												{activity.description}
 											</Text>
 											<HStack gap={2} align="center">
-												<Clock size={10} className="text-text-muted" />
+												<Clock size={10} className="suite-dashboard-muted-icon" />
 												<Text size="xs" color="muted">
 													{formatTimeAgo(activity.timestamp)}
 												</Text>

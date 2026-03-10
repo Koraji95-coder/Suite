@@ -78,6 +78,7 @@ export type AutoDraftBackcheckResponse = {
 	cad: {
 		available: boolean;
 		degraded: boolean;
+		source?: string;
 		entity_count: number;
 		locked_layer_count: number;
 	};
@@ -342,6 +343,7 @@ const normalizeBackcheckPayload = (payload: unknown): AutoDraftBackcheckResponse
 			cad: {
 				available: false,
 				degraded: true,
+				source: "none",
 				entity_count: 0,
 				locked_layer_count: 0,
 			},
@@ -375,6 +377,7 @@ const normalizeBackcheckPayload = (payload: unknown): AutoDraftBackcheckResponse
 		cad: {
 			available: Boolean(cadRaw["available"]),
 			degraded: Boolean(cadRaw["degraded"]),
+			source: toNonEmptyString(cadRaw["source"], "none"),
 			entity_count: toInt(cadRaw["entity_count"], 0),
 			locked_layer_count: toInt(cadRaw["locked_layer_count"], 0),
 		},
@@ -481,13 +484,21 @@ class AutoDraftService {
 
 	async execute(
 		actions: AutoDraftAction[],
-		options?: { dryRun?: boolean },
+		options?: {
+			dryRun?: boolean;
+			backcheckRequestId?: string;
+			backcheckOverrideReason?: string;
+			backcheckFailCount?: number;
+		},
 	): Promise<AutoDraftExecuteResponse> {
 		const payload = await this.requestJson<unknown>("/api/autodraft/execute", {
 			method: "POST",
 			body: JSON.stringify({
 				actions,
 				dry_run: options?.dryRun ?? true,
+				backcheck_request_id: options?.backcheckRequestId,
+				backcheck_override_reason: options?.backcheckOverrideReason,
+				backcheck_fail_count: options?.backcheckFailCount ?? 0,
 			}),
 		});
 		return normalizeExecutePayload(payload);

@@ -100,6 +100,13 @@ function parseCsvEnv(raw: unknown): string[] {
 		);
 }
 
+function parseEnvNumber(raw: unknown, fallback: number): number {
+	if (typeof raw !== "string") return fallback;
+	const parsed = Number.parseFloat(raw.trim());
+	if (!Number.isFinite(parsed)) return fallback;
+	return parsed;
+}
+
 const AUTO_CONNECT_ON_MOUNT = parseEnvBoolean(
 	import.meta.env.VITE_TERMINAL_AUTO_CONNECT,
 	true,
@@ -151,6 +158,19 @@ const ETAP_CLEANUP_COMMANDS: readonly EtapCleanupCommand[] = [
 const CAD_SYNC_MAX_RETRIES = 2;
 const CAD_SYNC_RETRY_BASE_DELAY_MS = 250;
 const CAD_DIAGNOSTIC_HISTORY_MAX = 30;
+const TERMINAL_CAD_BACKCHECK_REQUIRED = parseEnvBoolean(
+	import.meta.env.VITE_TERMINAL_CAD_BACKCHECK_REQUIRED,
+	true,
+);
+const TERMINAL_CAD_BACKCHECK_CLEARANCE = Math.max(
+	0,
+	Math.min(
+	200,
+	Number(
+			parseEnvNumber(import.meta.env.VITE_TERMINAL_CAD_BACKCHECK_CLEARANCE, 18),
+		) || 18,
+	),
+);
 
 function makeCadSessionId(): string {
 	try {
@@ -503,6 +523,26 @@ function resolveCadProviderPath(meta?: {
 	return "unknown";
 }
 
+function backcheckStatusTone(
+	status: TerminalRouteRecord["cadBackcheckStatus"],
+): "default" | "success" | "warning" | "danger" {
+	if (status === "pass") return "success";
+	if (status === "warn" || status === "overridden") return "warning";
+	if (status === "fail" || status === "error") return "danger";
+	return "default";
+}
+
+function backcheckStatusLabel(
+	status: TerminalRouteRecord["cadBackcheckStatus"],
+): string {
+	if (status === "pass") return "Backcheck pass";
+	if (status === "warn") return "Backcheck warn";
+	if (status === "fail") return "Backcheck fail";
+	if (status === "error") return "Backcheck error";
+	if (status === "overridden") return "Backcheck overridden";
+	return "Backcheck pending";
+}
+
 function cadLayerForRoute(route: TerminalRouteRecord): string {
 	if (route.routeType === "jumper") {
 		return "SUITE_WIRE_JUMPER";
@@ -723,6 +763,7 @@ function buildJumperRoutes(
 			cadSyncAttempts: 0,
 			cadLastError: "",
 			cadEntityHandles: [],
+			cadBackcheckStatus: "not_run",
 		});
 	}
 
@@ -768,6 +809,8 @@ export function ConduitTerminalWorkflow() {
 	const [etapCleanupTimeoutMs, setEtapCleanupTimeoutMs] = useState(90000);
 	const [resyncingFailed, setResyncingFailed] = useState(false);
 	const [preflightChecking, setPreflightChecking] = useState(false);
+	const [cadBackcheckOverrideReason, setCadBackcheckOverrideReason] =
+		useState("");
 	const [cadStatus, setCadStatus] = useState<TerminalCadRuntimeStatus | null>(
 		null,
 	);
@@ -829,6 +872,19 @@ export function ConduitTerminalWorkflow() {
 				.length,
 			failed: routes.filter((route) => route.cadSyncStatus === "failed").length,
 			synced: routes.filter((route) => route.cadSyncStatus === "synced").length,
+			backcheckPass: routes.filter((route) => route.cadBackcheckStatus === "pass")
+				.length,
+			backcheckFail: routes.filter((route) => route.cadBackcheckStatus === "fail")
+				.length,
+			backcheckWarn: routes.filter((route) => route.cadBackcheckStatus === "warn")
+				.length,
+			backcheckOverridden: routes.filter(
+				(route) => route.cadBackcheckStatus === "overridden",
+			).length,
+			backcheckPending: routes.filter(
+				(route) =>
+					!route.cadBackcheckStatus || route.cadBackcheckStatus === "not_run",
+			).length,
 		};
 	}, [routes]);
 	const cadProviderConfigured =
@@ -843,6 +899,11 @@ export function ConduitTerminalWorkflow() {
 				? "CAD Drawing Ready"
 				: "CAD Not Ready"
 			: "CAD Unchecked";
+	const cadBackcheckGateLabel = TERMINAL_CAD_BACKCHECK_REQUIRED
+		? routeStats.backcheckFail > 0
+			? "Backcheck Failures Present"
+			: "Backcheck Gate Active"
+		: "Backcheck Gate Disabled";
 
 	useEffect(() => {
 		routesRef.current = routes;
@@ -1331,6 +1392,117 @@ export function ConduitTerminalWorkflow() {
 		return found;
 	};
 
+	const runRouteCadBackcheck = async (
+		route: TerminalRouteRecord,
+	): Promise<{
+		allowed: boolean;
+		status: TerminalRouteRecord["cadBackcheckStatus"];
+		code: string;
+		message: string;
+		requestId: string;
+		warnings: string[];
+		overrideReason: string;
+	}> => {
+		if (!TERMINAL_CAD_BACKCHECK_REQUIRED) {
+			return {
+				allowed: true,
+				status: "not_run",
+				code: "",
+				message: "CAD backcheck gate disabled by configuration.",
+				requestId: "",
+				warnings: [],
+				overrideReason: "",
+			};
+		}
+
+		const response = await conduitRouteService.backcheckRoutes({
+			routes: [
+				{
+					id: route.id,
+					ref: route.ref,
+					mode: "plan_view",
+					path:
+						route.cadPath && route.cadPath.length >= 2 ? route.cadPath : route.path,
+				},
+			],
+			obstacles: overlayObstacles,
+			obstacleSource: overlayObstacles.length > 0 ? "autocad" : "client",
+			clearance: TERMINAL_CAD_BACKCHECK_CLEARANCE,
+		});
+		if (!response.success) {
+			return {
+				allowed: false,
+				status: "error",
+				code: response.code || "BACKCHECK_REQUEST_FAILED",
+				message: response.message || "Route backcheck request failed.",
+				requestId: response.requestId || "",
+				warnings: response.warnings || [],
+				overrideReason: "",
+			};
+		}
+
+		const finding = response.findings?.[0];
+		const status = finding?.status || "pass";
+		const message =
+			finding?.issues?.[0]?.message ||
+			response.message ||
+			"Route backcheck completed.";
+		const warnings = [
+			...(response.warnings || []),
+			...(finding?.issues
+				?.filter((issue) => issue.severity === "warn")
+				.map((issue) => issue.message) || []),
+		];
+		const requestId = response.requestId || "";
+		const overrideReason = cadBackcheckOverrideReason.trim();
+
+		if (status === "fail") {
+			if (!overrideReason) {
+				return {
+					allowed: false,
+					status: "fail",
+					code: "BACKCHECK_FAIL_REQUIRES_OVERRIDE",
+					message:
+						"Backcheck returned fail findings. Provide an override reason before CAD sync.",
+					requestId,
+					warnings,
+					overrideReason: "",
+				};
+			}
+			return {
+				allowed: true,
+				status: "overridden",
+				code: "BACKCHECK_FAIL_OVERRIDDEN",
+				message: "Backcheck fail findings overridden for this CAD sync attempt.",
+				requestId,
+				warnings,
+				overrideReason,
+			};
+		}
+
+		if (status === "warn") {
+			return {
+				allowed: true,
+				status: "warn",
+				code: "BACKCHECK_WARN",
+				message,
+				requestId,
+				warnings,
+				overrideReason: "",
+			};
+		}
+
+		return {
+			allowed: true,
+			status: "pass",
+			code: "BACKCHECK_PASS",
+			message,
+			requestId,
+			warnings,
+			overrideReason: "",
+		};
+	};
+
 	const syncRouteToCad = async (
 		route: TerminalRouteRecord,
 		attempt = 0,
@@ -1385,6 +1557,69 @@ export function ConduitTerminalWorkflow() {
 				providerPath: "client",
 			});
 			return false;
+		}
+
+		if (attempt === 0) {
+			let backcheckGateResult:
+				| Awaited<ReturnType<typeof runRouteCadBackcheck>>
+				| null = null;
+			try {
+				backcheckGateResult = await runRouteCadBackcheck(route);
+			} catch (error) {
+				const message =
+					error instanceof Error
+						? error.message
+						: "Route backcheck request failed unexpectedly.";
+				backcheckGateResult = {
+					allowed: false,
+					status: "error",
+					code: "BACKCHECK_REQUEST_FAILED",
+					message,
+					requestId: "",
+					warnings: [],
+					overrideReason: "",
+				};
+			}
+
+			if (backcheckGateResult.status !== "not_run") {
+				applyRouteSyncPatch(route.id, {
+					cadBackcheckStatus: backcheckGateResult.status,
+					cadBackcheckRequestId: backcheckGateResult.requestId,
+					cadBackcheckMessage: backcheckGateResult.message,
+					cadBackcheckWarnings: backcheckGateResult.warnings,
+					cadBackcheckOverrideReason: backcheckGateResult.overrideReason,
+				});
+				appendCadDiagnostic({
+					operation: "backcheck",
+					success: backcheckGateResult.allowed,
+					routeId: route.id,
+					routeRef: route.ref,
+					code: backcheckGateResult.code,
+					message: backcheckGateResult.message,
+					warnings: backcheckGateResult.warnings,
+					requestId: backcheckGateResult.requestId,
+					providerPath: "backend",
+					providerConfigured: "route-backcheck",
+				});
+			}
+
+			if (!backcheckGateResult.allowed) {
+				applyRouteSyncPatch(route.id, {
+					cadSyncStatus: "failed",
+					cadLastError: backcheckGateResult.message,
+					cadLastCode: backcheckGateResult.code,
+					cadLastMessage: backcheckGateResult.message,
+					cadWarnings: backcheckGateResult.warnings,
+					cadRequestId: backcheckGateResult.requestId,
+					cadBridgeRequestId: "",
+					cadProviderPath: "backend",
+					cadLastOperation: "upsert",
+				});
+				setStatusMessage(
+					`${route.ref} blocked before CAD sync: ${backcheckGateResult.message}`,
+				);
+				return false;
+			}
 		}
 
 		applyRouteSyncPatch(route.id, {
@@ -1783,6 +2018,7 @@ export function ConduitTerminalWorkflow() {
 			cadSyncAttempts: 0,
 			cadLastError: "",
 			cadEntityHandles: [],
+			cadBackcheckStatus: "not_run",
 		};
 
 		routesRef.current = [route, ...routesRef.current];
@@ -1990,6 +2226,48 @@ export function ConduitTerminalWorkflow() {
 								</div>
 								{cadStatus?.error ? <small>{cadStatus.error}</small> : null}
 							</div>
+						</div>
+
+						<div className={styles.controlGroup}>
+							<Text size="xs" color="muted">
+								CAD Backcheck Gate
+							</Text>
+							<div className={styles.preflightCard}>
+								<Badge
+									color={
+										!TERMINAL_CAD_BACKCHECK_REQUIRED
+											? "default"
+											: routeStats.backcheckFail > 0
+												? "danger"
+												: routeStats.backcheckWarn > 0
+													? "warning"
+													: "success"
+									}
+									variant="outline"
+									size="sm"
+								>
+									{cadBackcheckGateLabel}
+								</Badge>
+								<small>
+									{TERMINAL_CAD_BACKCHECK_REQUIRED
+										? `pass/warn/fail: ${routeStats.backcheckPass}/${routeStats.backcheckWarn}/${routeStats.backcheckFail} · pending: ${routeStats.backcheckPending} · overridden: ${routeStats.backcheckOverridden}`
+										: "Backcheck gating is disabled for terminal CAD sync."}
+								</small>
+							</div>
+							<label className={styles.etapField} htmlFor="terminal-cad-backcheck-override">
+								<span>Override reason (required only when fail findings appear)</span>
+								<textarea
+									id="terminal-cad-backcheck-override"
+									name="terminalCadBackcheckOverrideReason"
+									rows={2}
+									className={styles.etapInput}
+									value={cadBackcheckOverrideReason}
+									onChange={(event) =>
+										setCadBackcheckOverrideReason(event.target.value)
+									}
+									placeholder="Document why CAD sync is safe despite fail findings..."
+								/>
+							</label>
 						</div>
 
 						<div className={styles.controlGroup}>
@@ -2582,6 +2860,15 @@ export function ConduitTerminalWorkflow() {
 									<div className={styles.routeMeta}>
 										{formatLength(route.length)} | {route.bendDegrees} deg
 									</div>
+									<div className={styles.routeMeta}>
+										<Badge
+											color={backcheckStatusTone(route.cadBackcheckStatus)}
+											variant="outline"
+											size="sm"
+										>
+											{backcheckStatusLabel(route.cadBackcheckStatus)}
+										</Badge>
+									</div>
 									{route.cadSyncStatus === "failed" && route.cadLastError ? (
 										<div className={styles.routeErrorMeta}>
 											{route.cadLastCode ? `${route.cadLastCode}: ` : ""}
@@ -2623,6 +2910,10 @@ export function ConduitTerminalWorkflow() {
 								<span>CAD Sync</span>
 								<strong>{selectedRoute.cadSyncStatus || "local"}</strong>
 							</div>
+							<div>
+								<span>Backcheck</span>
+								<strong>{backcheckStatusLabel(selectedRoute.cadBackcheckStatus)}</strong>
+							</div>
 							{selectedRoute.cadProviderPath ? (
 								<div>
 									<span>Provider</span>
@@ -2645,6 +2936,18 @@ export function ConduitTerminalWorkflow() {
 								<div className={styles.selectedRouteWide}>
 									<span>CAD Error</span>
 									<strong>{selectedRoute.cadLastError}</strong>
+								</div>
+							) : null}
+							{selectedRoute.cadBackcheckRequestId ? (
+								<div>
+									<span>Backcheck Req</span>
+									<strong>{selectedRoute.cadBackcheckRequestId}</strong>
+								</div>
+							) : null}
+							{selectedRoute.cadBackcheckMessage ? (
+								<div className={styles.selectedRouteWide}>
+									<span>Backcheck Note</span>
+									<strong>{selectedRoute.cadBackcheckMessage}</strong>
 								</div>
 							) : null}
 						</div>

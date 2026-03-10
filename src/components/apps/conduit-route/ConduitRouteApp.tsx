@@ -29,6 +29,7 @@ import {
 	Text,
 } from "@/components/primitives";
 import { cn } from "@/lib/utils";
+import { agentService } from "@/services/agentService";
 import styles from "./ConduitRouteApp.module.css";
 import { ConduitTerminalWorkflow } from "./ConduitTerminalWorkflow";
 import {
@@ -64,6 +65,7 @@ import type {
 	CableSystemType,
 	ConduitObstacleScanMeta,
 	ConduitObstacleSource,
+	ConduitRouteBackcheckResponse,
 	ConduitRouteComputeMeta,
 	ConduitRouteRecord,
 	ConduitRouteTab,
@@ -75,6 +77,15 @@ import type {
 	RoutingMode,
 	SectionPreset,
 } from "./conduitRouteTypes";
+
+type CrewReviewProfile = "draftsmith" | "gridsage";
+
+type CrewReviewEntry = {
+	profileId: CrewReviewProfile;
+	status: "running" | "completed" | "failed";
+	response?: string;
+	error?: string;
+};
 
 function clamp(value: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, value));
@@ -137,6 +148,62 @@ function inferObstacleTypeFromLayer(layerName: string): ObstacleType | null {
 		return "building";
 	if (layer.startsWith("E-CONDUIT") || layer === "E-CONDUIT") return "road";
 	return null;
+}
+
+function extractAgentResponseText(data: Record<string, unknown> | undefined): string {
+	if (!data) return "";
+	const directKeys = ["response", "reply", "output", "message"] as const;
+	for (const key of directKeys) {
+		const value = data[key];
+		if (typeof value === "string" && value.trim()) {
+			return value.trim();
+		}
+	}
+	return JSON.stringify(data);
+}
+
+function buildCadCrewReviewPrompt(args: {
+	profileId: CrewReviewProfile;
+	report: ConduitRouteBackcheckResponse;
+	draftsmithReview?: string;
+}): string {
+	const { profileId, report, draftsmithReview } = args;
+	const findingDigest = (report.findings || []).slice(0, 12).map((finding) => ({
+		route: finding.ref || finding.routeId,
+		status: finding.status,
+		issues: finding.issues.slice(0, 3).map((issue) => ({
+			code: issue.code,
+			severity: issue.severity,
+			message: issue.message,
+		})),
+		stats: {
+			bend_degrees: finding.stats.bend_degrees,
+			collision_count: finding.stats.collision_count,
+			diagonal_segment_count: finding.stats.diagonal_segment_count,
+		},
+	}));
+	const roleInstruction =
+		profileId === "draftsmith"
+			? "You are Draftsmith. Focus on CAD drafting correctness, geometry quality, and buildable route layout."
+			: "You are GridSage. Focus on electrical QA, routing safety, and constructability risks.";
+
+	const outputContract =
+		"Return exactly three sections: 1) Critical Findings, 2) Fix Plan, 3) Validation Checklist.";
+	const draftsmithContext = draftsmithReview?.trim()
+		? `Draftsmith prior review:\n${draftsmithReview}`
+		: "";
+
+	return [
+		roleInstruction,
+		outputContract,
+		"Prioritize concrete route IDs and deterministic steps. Avoid generic advice.",
+		`Backcheck summary: ${JSON.stringify(report.summary || {})}`,
+		`Backcheck warnings: ${JSON.stringify(report.warnings || [])}`,
+		`Finding digest: ${JSON.stringify(findingDigest)}`,
+		draftsmithContext,
+	]
+		.filter(Boolean)
+		.join("\n\n");
 }
 
 function SectionSketch({ preset }: { preset: SectionPreset["id"] }) {
@@ -338,6 +405,14 @@ export function ConduitRouteApp() {
 	const [obstacleSyncing, setObstacleSyncing] = useState(false);
 	const [obstacleScanMeta, setObstacleScanMeta] =
 		useState<ConduitObstacleScanMeta | null>(null);
+	const [routeBackchecking, setRouteBackchecking] = useState(false);
+	const [routeBackcheckReport, setRouteBackcheckReport] =
+		useState<ConduitRouteBackcheckResponse | null>(null);
+	const [crewReviewEntries, setCrewReviewEntries] = useState<CrewReviewEntry[]>(
+		[],
+	);
+	const [crewReviewError, setCrewReviewError] = useState<string | null>(null);
+	const [crewReviewLoading, setCrewReviewLoading] = useState(false);
 	const [availableCadLayers, setAvailableCadLayers] = useState<string[]>([]);
 	const [layerPickerValue, setLayerPickerValue] = useState("");
 	const [layerRulesRefreshing, setLayerRulesRefreshing] = useState(false);
@@ -412,6 +487,61 @@ export function ConduitRouteApp() {
 			warningCount,
 		};
 	}, [routes]);
+	const routeBackcheckSummary = routeBackcheckReport?.summary ?? null;
+	const crewReviewCompletedCount = useMemo(
+		() =>
+			crewReviewEntries.filter((entry) => entry.status === "completed").length,
+		[crewReviewEntries],
+	);
+	const hasCrewReviewFailures = useMemo(
+		() => crewReviewEntries.some((entry) => entry.status === "failed"),
+		[crewReviewEntries],
+	);
+	const cadSyncGate = useMemo(() => {
+		if (!routeBackcheckSummary) {
+			return {
+				color: "warning" as const,
+				label: "Backcheck required",
+				detail: "Run backcheck before issuing CAD sync decisions.",
+			};
+		}
+		if (routeBackcheckSummary.fail_count <= 0) {
+			if (routeBackcheckSummary.warn_count > 0) {
+				return {
+					color: "warning" as const,
+					label: "Ready with warnings",
+					detail:
+						"Fail findings are clear. Review warnings before final CAD publish.",
+				};
+			}
+			return {
+				color: "success" as const,
+				label: "Ready for CAD sync",
+				detail: "No failing findings in current backcheck report.",
+			};
+		}
+		if (hasCrewReviewFailures) {
+			return {
+				color: "danger" as const,
+				label: "Crew review failed",
+				detail: "Resolve agent review errors before proceeding.",
+			};
+		}
+		if (crewReviewCompletedCount < 2) {
+			return {
+				color: "warning" as const,
+				label: "Crew review required",
+				detail:
+					"Backcheck has failing findings. Run Draftsmith and GridSage review.",
+			};
+		}
+		return {
+			color: "danger" as const,
+			label: "Manual decision required",
+			detail:
+				"Fail findings remain after crew review. Apply fixes or document override.",
+		};
+	}, [routeBackcheckSummary, crewReviewCompletedCount, hasCrewReviewFailures]);
 
 	const necResult = useMemo(
 		() => calculateNec(necConductors, necConduit, ambientTempC),
@@ -658,7 +788,7 @@ export function ConduitRouteApp() {
 
 	const handleCanvasClick = (event: React.MouseEvent<SVGSVGElement>) => {
 		const clickPoint = handleCanvasPoint(event);
-		if (routeComputing || obstacleSyncing) {
+		if (routeComputing || obstacleSyncing || routeBackchecking) {
 			return;
 		}
 		if (!startPoint) {
@@ -748,6 +878,9 @@ export function ConduitRouteApp() {
 			};
 
 			setRoutes((current) => [route, ...current]);
+			setRouteBackcheckReport(null);
+			setCrewReviewEntries([]);
+			setCrewReviewError(null);
 			setSelectedRouteId(route.id);
 			setNextRef((current) => ({
 				...current,
@@ -784,6 +917,9 @@ export function ConduitRouteApp() {
 		setHoverPoint(null);
 		setLastComputeMeta(null);
 		setRouteComputing(false);
+		setRouteBackcheckReport(null);
+		setCrewReviewEntries([]);
+		setCrewReviewError(null);
 		setStatusMessage("Route history cleared.");
 	};
 
@@ -793,6 +929,9 @@ export function ConduitRouteApp() {
 			return;
 		}
 		setRoutes((current) => current.slice(1));
+		setRouteBackcheckReport(null);
+		setCrewReviewEntries([]);
+		setCrewReviewError(null);
 		setSelectedRouteId(null);
 		if (routes.length <= 1) {
 			setLastComputeMeta(null);
@@ -802,6 +941,9 @@ export function ConduitRouteApp() {
 
 	const removeRoute = (routeId: string) => {
 		setRoutes((current) => current.filter((route) => route.id !== routeId));
+		setRouteBackcheckReport(null);
+		setCrewReviewEntries([]);
+		setCrewReviewError(null);
 		if (selectedRouteId === routeId) {
 			setSelectedRouteId(null);
 		}
@@ -826,7 +968,9 @@ export function ConduitRouteApp() {
 		}));
 	const bridgeBadgeLabel = isTerminalWorkspace
 		? "Terminal Scan Workflow"
-		: obstacleSyncing
+		: routeBackchecking
+			? "Backcheck Running"
+			: obstacleSyncing
 			? "AutoCAD Bridge Syncing"
 			: obstacleSource === "autocad"
 				? "AutoCAD Bridge Active"
@@ -866,6 +1010,168 @@ export function ConduitRouteApp() {
 		anchor.remove();
 		URL.revokeObjectURL(url);
 		setStatusMessage(`Exported ${scheduleRows.length} schedule row(s) to CSV.`);
+	};
+
+	const runRouteBackcheck = async () => {
+		if (routeBackchecking || routeComputing || obstacleSyncing) {
+			return;
+		}
+		if (routes.length === 0) {
+			setStatusMessage("Create at least one route before running backcheck.");
+			return;
+		}
+
+		setRouteBackchecking(true);
+		setCrewReviewEntries([]);
+		setCrewReviewError(null);
+		setStatusMessage(`Running backcheck for ${routes.length} route(s)...`);
+
+		const response = await conduitRouteService.backcheckRoutes({
+			routes: routes.map((route) => ({
+				id: route.id,
+				ref: route.ref,
+				mode: route.mode,
+				path: route.path,
+			})),
+			obstacles: activeObstacles,
+			obstacleSource,
+			clearance,
+		});
+
+		setRouteBackchecking(false);
+		if (!response.success) {
+			setStatusMessage(response.message || "Route backcheck failed.");
+			return;
+		}
+
+		setRouteBackcheckReport(response);
+		const summary = response.summary;
+		if (summary) {
+			setStatusMessage(
+				`Backcheck complete: ${summary.pass_count} pass, ${summary.warn_count} warn, ${summary.fail_count} fail.`,
+			);
+			return;
+		}
+		setStatusMessage("Backcheck complete.");
+	};
+
+	const runCadCrewReview = async () => {
+		if (!routeBackcheckReport) {
+			setCrewReviewError("Run backcheck first before requesting CAD crew review.");
+			return;
+		}
+		if (
+			crewReviewLoading ||
+			routeBackchecking ||
+			routeComputing ||
+			obstacleSyncing
+		) {
+			return;
+		}
+
+		setCrewReviewLoading(true);
+		setCrewReviewError(null);
+		setCrewReviewEntries([]);
+
+		const entries: CrewReviewEntry[] = [];
+		try {
+			entries.push({ profileId: "draftsmith", status: "running" });
+			setCrewReviewEntries([...entries]);
+			const draftsmithResult = await agentService.sendMessage(
+				buildCadCrewReviewPrompt({
+					profileId: "draftsmith",
+					report: routeBackcheckReport,
+				}),
+				{
+					profileId: "draftsmith",
+					promptMode: "template",
+					templateLabel: "AutoWire backcheck review",
+				},
+			);
+			if (!draftsmithResult.success) {
+				entries[0] = {
+					profileId: "draftsmith",
+					status: "failed",
+					error: draftsmithResult.error || "Draftsmith review failed.",
+				};
+				setCrewReviewEntries([...entries]);
+				setCrewReviewError(entries[0].error || "Draftsmith review failed.");
+				setStatusMessage(entries[0].error || "Draftsmith review failed.");
+				return;
+			}
+
+			const draftsmithText = extractAgentResponseText(draftsmithResult.data);
+			entries[0] = {
+				profileId: "draftsmith",
+				status: "completed",
+				response: draftsmithText,
+			};
+			entries.push({ profileId: "gridsage", status: "running" });
+			setCrewReviewEntries([...entries]);
+
+			const gridsageResult = await agentService.sendMessage(
+				buildCadCrewReviewPrompt({
+					profileId: "gridsage",
+					report: routeBackcheckReport,
+					draftsmithReview: draftsmithText,
+				}),
+				{
+					profileId: "gridsage",
+					promptMode: "template",
+					templateLabel: "AutoWire electrical QA review",
+				},
+			);
+			if (!gridsageResult.success) {
+				entries[1] = {
+					profileId: "gridsage",
+					status: "failed",
+					error: gridsageResult.error || "GridSage review failed.",
+				};
+				setCrewReviewEntries([...entries]);
+				setCrewReviewError(entries[1].error || "GridSage review failed.");
+				setStatusMessage(entries[1].error || "GridSage review failed.");
+				return;
+			}
+
+			entries[1] = {
+				profileId: "gridsage",
+				status: "completed",
+				response: extractAgentResponseText(gridsageResult.data),
+			};
+			setCrewReviewEntries([...entries]);
+			setStatusMessage("CAD crew review complete (Draftsmith -> GridSage).");
+		} finally {
+			setCrewReviewLoading(false);
+		}
+	};
+
+	const exportBackcheckJson = () => {
+		if (!routeBackcheckReport) {
+			setStatusMessage("Run backcheck first to export a report.");
+			return;
+		}
+		const payload = JSON.stringify(
+			{
+				...routeBackcheckReport,
+				crew_review: {
+					entries: crewReviewEntries,
+					error: crewReviewError,
+				},
+			},
+			null,
+			2,
+		);
+		const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement("a");
+		const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+		anchor.href = url;
+		anchor.download = `autowire-backcheck-${stamp}.json`;
+		document.body.append(anchor);
+		anchor.click();
+		anchor.remove();
+		URL.revokeObjectURL(url);
+		setStatusMessage("Exported backcheck report JSON.");
 	};
 
 	const handleLayerPresetChange = (presetId: string) => {
@@ -1110,7 +1416,7 @@ export function ConduitRouteApp() {
 												onClick={() =>
 													void refreshObstacleLayerList({ silent: false })
 												}
-												disabled={routeComputing || obstacleSyncing}
+												disabled={routeComputing || obstacleSyncing || routeBackchecking}
 												loading={layerRulesRefreshing}
 											>
 												Refresh
@@ -1123,7 +1429,7 @@ export function ConduitRouteApp() {
 													handleLayerPresetChange(event.target.value)
 												}
 												className={styles.layerEditorSelect}
-												disabled={routeComputing || obstacleSyncing}
+												disabled={routeComputing || obstacleSyncing || routeBackchecking}
 											 name="conduitrouteapp_select_1125">
 												{AUTOWIRE_OBSTACLE_LAYER_PRESET_OPTIONS.map((preset) => (
 													<option key={preset.id || "manual"} value={preset.id}>
@@ -1164,7 +1470,7 @@ export function ConduitRouteApp() {
 												size="sm"
 												variant="outline"
 												onClick={addObstacleLayerRule}
-												disabled={routeComputing || obstacleSyncing}
+												disabled={routeComputing || obstacleSyncing || routeBackchecking}
 											>
 												Add
 											</Button>
@@ -1177,6 +1483,7 @@ export function ConduitRouteApp() {
 												disabled={
 													routeComputing ||
 													obstacleSyncing ||
+													routeBackchecking ||
 													availableCadLayers.length === 0
 												}
 											>
@@ -1189,6 +1496,7 @@ export function ConduitRouteApp() {
 												disabled={
 													routeComputing ||
 													obstacleSyncing ||
+													routeBackchecking ||
 													obstacleLayerRules.length === 0
 												}
 											>
@@ -1239,7 +1547,7 @@ export function ConduitRouteApp() {
 															onClick={() =>
 																removeObstacleLayerRule(rule.layerName)
 															}
-															disabled={routeComputing || obstacleSyncing}
+															disabled={routeComputing || obstacleSyncing || routeBackchecking}
 														>
 															<X size={12} />
 														</button>
@@ -1261,7 +1569,7 @@ export function ConduitRouteApp() {
 											}
 											onClick={() => void syncAutocadObstacles()}
 											loading={obstacleSyncing}
-											disabled={routeComputing || obstacleSyncing}
+											disabled={routeComputing || obstacleSyncing || routeBackchecking}
 										>
 											Sync AutoCAD
 										</Button>
@@ -1269,7 +1577,7 @@ export function ConduitRouteApp() {
 											size="sm"
 											variant="ghost"
 											onClick={useDemoObstacleLayout}
-											disabled={routeComputing || obstacleSyncing}
+											disabled={routeComputing || obstacleSyncing || routeBackchecking}
 										>
 											Use Demo
 										</Button>
@@ -1282,7 +1590,7 @@ export function ConduitRouteApp() {
 										variant="outline"
 										iconLeft={<Eraser size={14} />}
 										onClick={clearAllRoutes}
-										disabled={routeComputing || obstacleSyncing}
+										disabled={routeComputing || obstacleSyncing || routeBackchecking}
 									>
 										Clear All
 									</Button>
@@ -1291,10 +1599,171 @@ export function ConduitRouteApp() {
 										variant="outline"
 										iconLeft={<X size={14} />}
 										onClick={undoLastRoute}
-										disabled={routeComputing || obstacleSyncing}
+										disabled={routeComputing || obstacleSyncing || routeBackchecking}
 									>
 										Undo
 									</Button>
+								</div>
+								<div className={styles.backcheckPanel}>
+									<div className={styles.backcheckHeader}>
+										<Text size="xs" color="muted">
+											Route Backcheck
+										</Text>
+										<div className={styles.backcheckHeaderBadges}>
+											{routeBackcheckSummary ? (
+												<>
+													<Badge color="success" variant="outline" size="sm">
+														{routeBackcheckSummary.pass_count} pass
+													</Badge>
+													<Badge color="warning" variant="outline" size="sm">
+														{routeBackcheckSummary.warn_count} warn
+													</Badge>
+													<Badge color="danger" variant="outline" size="sm">
+														{routeBackcheckSummary.fail_count} fail
+													</Badge>
+												</>
+											) : (
+												<Badge color="default" variant="outline" size="sm">
+													not run
+												</Badge>
+											)}
+										</div>
+									</div>
+									<div className={styles.gatePanel}>
+										<Badge color={cadSyncGate.color} variant="outline" size="sm">
+											{cadSyncGate.label}
+										</Badge>
+										<Text size="xs" color="muted">
+											{cadSyncGate.detail}
+										</Text>
+									</div>
+									<div className={styles.actionRow}>
+										<Button
+											size="sm"
+											variant="outline"
+											iconLeft={
+												routeBackchecking ? (
+													<LoaderCircle size={14} />
+												) : (
+													<CheckCircle2 size={14} />
+												)
+											}
+											onClick={() => void runRouteBackcheck()}
+											loading={routeBackchecking}
+											disabled={
+												routeBackchecking ||
+												crewReviewLoading ||
+												routeComputing ||
+												obstacleSyncing ||
+												routes.length === 0
+											}
+										>
+											Run Backcheck
+										</Button>
+										<Button
+											size="sm"
+											variant="ghost"
+											iconLeft={<HardDriveDownload size={14} />}
+											onClick={exportBackcheckJson}
+											disabled={!routeBackcheckReport || routeBackchecking}
+										>
+											Export JSON
+										</Button>
+									</div>
+									<div className={styles.actionRow}>
+										<Button
+											size="sm"
+											variant="outline"
+											iconLeft={
+												crewReviewLoading ? (
+													<LoaderCircle size={14} />
+												) : (
+													<CheckCircle2 size={14} />
+												)
+											}
+											onClick={() => void runCadCrewReview()}
+											loading={crewReviewLoading}
+											disabled={!routeBackcheckReport || routeBackchecking || crewReviewLoading}
+										>
+											CAD Crew Review
+										</Button>
+									</div>
+									{routeBackcheckReport?.findings?.length ? (
+										<div className={styles.backcheckFindings}>
+											{routeBackcheckReport.findings.slice(0, 6).map((finding) => (
+												<div key={finding.routeId} className={styles.backcheckFindingRow}>
+													<div className={styles.backcheckFindingHead}>
+														<strong>{finding.ref || finding.routeId}</strong>
+														<Badge
+															color={
+																finding.status === "fail"
+																	? "danger"
+																	: finding.status === "warn"
+																		? "warning"
+																		: "success"
+															}
+															variant="outline"
+															size="sm"
+														>
+															{finding.status}
+														</Badge>
+													</div>
+													<div className={styles.backcheckFindingMeta}>
+														<span>{Math.round(finding.stats.length)} px</span>
+														<span>{finding.stats.bend_degrees}° bends</span>
+														<span>{finding.stats.collision_count} collisions</span>
+													</div>
+													{finding.issues.length > 0 ? (
+														<Text size="xs" color="muted">
+															{finding.issues[0]?.message}
+														</Text>
+													) : null}
+												</div>
+											))}
+										</div>
+									) : null}
+									{crewReviewEntries.length > 0 ? (
+										<div className={styles.crewReviewPanel}>
+											<Text size="xs" color="muted">
+												Draftsmith {"->"} GridSage
+											</Text>
+											{crewReviewEntries.map((entry) => (
+												<div key={entry.profileId} className={styles.crewReviewCard}>
+													<div className={styles.backcheckFindingHead}>
+														<strong>{entry.profileId}</strong>
+														<Badge
+															color={
+																entry.status === "completed"
+																	? "success"
+																	: entry.status === "running"
+																		? "warning"
+																		: "danger"
+															}
+															variant="outline"
+															size="sm"
+														>
+															{entry.status}
+														</Badge>
+													</div>
+													{entry.response ? (
+														<pre className={styles.crewReviewResponse}>
+															{entry.response}
+														</pre>
+													) : null}
+													{entry.error ? (
+														<Text size="xs" color="warning">
+															{entry.error}
+														</Text>
+													) : null}
+												</div>
+											))}
+										</div>
+									) : null}
+									{crewReviewError ? (
+										<Text size="xs" color="warning">
+											{crewReviewError}
+										</Text>
+									) : null}
 								</div>
 							</Stack>
 						</Panel>
@@ -1342,6 +1811,12 @@ export function ConduitRouteApp() {
 											Syncing Obstacles...
 										</Badge>
 									) : null}
+									{routeBackchecking ? (
+										<Badge color="warning" variant="outline" size="sm">
+											<LoaderCircle size={12} />
+											Backchecking...
+										</Badge>
+									) : null}
 									{routeComputing ? (
 										<Badge color="warning" variant="outline" size="sm">
 											<LoaderCircle size={12} />
@@ -1369,7 +1844,7 @@ export function ConduitRouteApp() {
 									viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
 									className={styles.canvas}
 									onMouseMove={(event) => {
-										if (routeComputing || obstacleSyncing) {
+										if (routeComputing || obstacleSyncing || routeBackchecking) {
 											return;
 										}
 										setHoverPoint(handleCanvasPoint(event));
@@ -1599,7 +2074,7 @@ export function ConduitRouteApp() {
 													size="sm"
 													onClick={() => removeRoute(route.id)}
 													iconLeft={<X size={12} />}
-													disabled={routeComputing || obstacleSyncing}
+													disabled={routeComputing || obstacleSyncing || routeBackchecking}
 												>
 													Remove
 												</Button>

@@ -130,6 +130,15 @@ public sealed class AutoDraftExecuteRequest
 
     [JsonPropertyName("dry_run")]
     public bool DryRun { get; init; } = true;
+
+    [JsonPropertyName("backcheck_request_id")]
+    public string? BackcheckRequestId { get; init; }
+
+    [JsonPropertyName("backcheck_override_reason")]
+    public string? BackcheckOverrideReason { get; init; }
+
+    [JsonPropertyName("backcheck_fail_count")]
+    public int BackcheckFailCount { get; init; }
 }
 
 public sealed class AutoDraftExecuteResponse
@@ -196,6 +205,9 @@ public sealed class AutoDraftBackcheckCadStatus
 
     [JsonPropertyName("degraded")]
     public bool Degraded { get; init; }
+
+    [JsonPropertyName("source")]
+    public string Source { get; init; } = "none";
 
     [JsonPropertyName("entity_count")]
     public int EntityCount { get; init; }

@@ -8,6 +8,7 @@ import { Panel } from "@/components/primitives/Panel";
 // Primitives
 import { Heading, Text } from "@/components/primitives/Text";
 import { ActiveProjectsList } from "./ActiveProjectsList";
+import "./dashboard.global.css";
 import { DashboardCustomizer } from "./DashboardCustomizer";
 import styles from "./DashboardOverviewPanel.module.css";
 import { DashboardOverviewWidgetGrid } from "./DashboardOverviewWidgetGrid";

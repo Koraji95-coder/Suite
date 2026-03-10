@@ -1,5 +1,6 @@
 // src/components/LoadingCard.tsx
 import { Panel, Progress, Stack, Text } from "@/components/primitives";
+import "./ui.global.css";
 
 interface LoadingCardProps {
 	title?: string;
@@ -13,12 +14,12 @@ export function LoadingCard({
 	progress,
 }: LoadingCardProps) {
 	return (
-		<Panel variant="default" padding="lg" className="max-w-sm mx-auto">
+		<Panel variant="default" padding="lg" className="suite-ui-loading-card">
 			<Stack gap={4} align="center">
 				{/* Spinner */}
-				<div className="relative w-12 h-12">
-					<div className="absolute inset-0 rounded-full border-2 border-border" />
-					<div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+				<div className="suite-ui-loading-spinner">
+					<div className="suite-ui-loading-ring-base" />
+					<div className="suite-ui-loading-ring-spin" />
 				</div>
 
 				{/* Text */}
@@ -33,7 +34,7 @@ export function LoadingCard({
 
 				{/* Optional progress bar */}
 				{progress !== undefined && (
-					<Progress value={progress} showValue className="w-full" />
+					<Progress value={progress} showValue className="suite-ui-loading-progress" />
 				)}
 			</Stack>
 		</Panel>

@@ -234,6 +234,49 @@ def _derive_request_id(payload: Dict[str, Any]) -> str:
     return autocad_derive_request_id(raw_request_id)
 
 
+def _build_autodraft_error_payload(
+    *,
+    code: str,
+    message: str,
+    request_id: str,
+    meta: Optional[Dict[str, Any]] = None,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    payload = autocad_build_error_payload(
+        code=code,
+        message=message,
+        request_id=request_id,
+        meta=meta,
+        extra=extra or {},
+    )
+    payload.setdefault("ok", False)
+    payload.setdefault("success", False)
+    payload.setdefault("error", message)
+    payload.setdefault("code", code)
+    payload.setdefault("message", message)
+    payload.setdefault("requestId", request_id)
+    return payload
+
+
+def _autodraft_error_response(
+    *,
+    code: str,
+    message: str,
+    request_id: str,
+    status_code: int,
+    meta: Optional[Dict[str, Any]] = None,
+    extra: Optional[Dict[str, Any]] = None,
+):
+    payload = _build_autodraft_error_payload(
+        code=code,
+        message=message,
+        request_id=request_id,
+        meta=meta,
+        extra=extra,
+    )
+    return jsonify(payload), status_code
+
+
 def _normalize_bounds(value: Any) -> Optional[Dict[str, float]]:
     if not isinstance(value, dict):
         return None
@@ -261,6 +304,245 @@ def _bounds_overlap(bounds_a: Dict[str, float], bounds_b: Dict[str, float]) -> b
     by1 = by0 + bounds_b["height"]
 
     return ax0 < bx1 and ax1 > bx0 and ay0 < by1 and ay1 > by0
+
+
+def _normalize_layer_entries(raw_layers: Any) -> List[Dict[str, Any]]:
+    if not isinstance(raw_layers, list):
+        return []
+
+    entries: List[Dict[str, Any]] = []
+    for entry in raw_layers:
+        if isinstance(entry, str):
+            layer_name = entry.strip()
+            if layer_name:
+                entries.append({"name": layer_name, "locked": False})
+            continue
+        if not isinstance(entry, dict):
+            continue
+        layer_name = str(entry.get("name") or "").strip()
+        if not layer_name:
+            continue
+        entries.append({"name": layer_name, "locked": bool(entry.get("locked"))})
+    return entries
+
+
+def _merge_cad_context(
+    *,
+    live_context: Optional[Dict[str, Any]],
+    client_context: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    live_obj = live_context if isinstance(live_context, dict) else {}
+    client_obj = client_context if isinstance(client_context, dict) else {}
+    if not live_obj and not client_obj:
+        return None
+
+    merged: Dict[str, Any] = {}
+
+    live_layers = _normalize_layer_entries(live_obj.get("layers"))
+    client_layers = _normalize_layer_entries(client_obj.get("layers"))
+    layer_lookup: Dict[str, Dict[str, Any]] = {}
+    for layer in [*live_layers, *client_layers]:
+        layer_name = str(layer.get("name") or "").strip()
+        if not layer_name:
+            continue
+        key = layer_name.lower()
+        existing = layer_lookup.get(key)
+        if existing is None:
+            layer_lookup[key] = {"name": layer_name, "locked": bool(layer.get("locked"))}
+            continue
+        existing["locked"] = bool(existing.get("locked")) or bool(layer.get("locked"))
+    if layer_lookup:
+        merged["layers"] = sorted(layer_lookup.values(), key=lambda item: str(item.get("name", "")).lower())
+
+    locked_layers: Set[str] = set()
+    for source in (live_obj, client_obj):
+        raw_locked_layers = source.get("locked_layers")
+        if isinstance(raw_locked_layers, list):
+            for value in raw_locked_layers:
+                if isinstance(value, str) and value.strip():
+                    locked_layers.add(value.strip())
+    if locked_layers:
+        merged["locked_layers"] = sorted(locked_layers, key=lambda value: value.lower())
+
+    live_entities = _extract_entities(live_obj)
+    client_entities = _extract_entities(client_obj)
+    entities: List[Dict[str, Any]] = []
+    seen_entity_keys: Set[str] = set()
+    for index, entity in enumerate([*live_entities, *client_entities]):
+        key_candidates = [
+            str(entity.get("id") or "").strip(),
+            str(entity.get("handle") or "").strip(),
+            str(entity.get("uuid") or "").strip(),
+        ]
+        entity_key = next((value for value in key_candidates if value), f"idx-{index}")
+        if entity_key in seen_entity_keys:
+            continue
+        seen_entity_keys.add(entity_key)
+        entities.append(entity)
+    if entities:
+        merged["entities"] = entities
+
+    drawing_live = live_obj.get("drawing") if isinstance(live_obj.get("drawing"), dict) else None
+    drawing_client = (
+        client_obj.get("drawing")
+        if isinstance(client_obj.get("drawing"), dict)
+        else None
+    )
+    if drawing_live:
+        merged["drawing"] = drawing_live
+    elif drawing_client:
+        merged["drawing"] = drawing_client
+
+    return merged if merged else None
+
+
+def _collect_action_layer_hints(actions: Any) -> List[str]:
+    if not isinstance(actions, list):
+        return []
+    layer_names: List[str] = []
+    seen: Set[str] = set()
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        markup = action.get("markup")
+        if not isinstance(markup, dict):
+            continue
+        layer_name = str(markup.get("layer") or "").strip()
+        if not layer_name:
+            continue
+        key = layer_name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        layer_names.append(layer_name)
+    return layer_names
+
+
+def _collect_live_cad_context(
+    *,
+    get_manager: Optional[Callable[[], Any]],
+    logger: Any,
+    request_id: str,
+    actions: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[Dict[str, Any]]:
+    if not callable(get_manager):
+        return None
+
+    try:
+        manager = get_manager()
+    except Exception:
+        logger.exception(
+            "AutoDraft backcheck CAD context acquire failed stage=get_manager request_id=%s",
+            request_id,
+        )
+        return None
+
+    if manager is None:
+        return None
+
+    context: Dict[str, Any] = {}
+
+    try:
+        status = manager.get_status() if hasattr(manager, "get_status") else None
+        if isinstance(status, dict):
+            drawing_name = str(status.get("drawing_name") or "").strip()
+            if drawing_name:
+                context["drawing"] = {
+                    "name": drawing_name,
+                    "connected": bool(status.get("connected")),
+                    "autocad_running": bool(status.get("autocad_running")),
+                    "drawing_open": bool(status.get("drawing_open")),
+                }
+    except Exception:
+        logger.exception(
+            "AutoDraft backcheck CAD context gather failed stage=get_status request_id=%s",
+            request_id,
+        )
+
+    action_layer_hints = _collect_action_layer_hints(actions)
+
+    try:
+        layers_result: Any = None
+        if hasattr(manager, "get_layer_snapshot"):
+            layers_result = manager.get_layer_snapshot()
+        elif hasattr(manager, "get_layers"):
+            layers_result = manager.get_layers()
+        raw_layers: Any = None
+        if isinstance(layers_result, tuple):
+            if len(layers_result) >= 2 and bool(layers_result[0]):
+                raw_layers = layers_result[1]
+        elif isinstance(layers_result, list):
+            raw_layers = layers_result
+        elif isinstance(layers_result, dict):
+            raw_layers = layers_result.get("layers")
+
+        normalized_layers = _normalize_layer_entries(raw_layers)
+        if normalized_layers:
+            context["layers"] = normalized_layers
+            context["locked_layers"] = [
+                str(entry.get("name") or "")
+                for entry in normalized_layers
+                if bool(entry.get("locked"))
+            ]
+    except Exception:
+        logger.exception(
+            "AutoDraft backcheck CAD context gather failed stage=get_layers request_id=%s",
+            request_id,
+        )
+
+    try:
+        entities_result: Any = None
+        if hasattr(manager, "get_entity_snapshot"):
+            try:
+                entities_result = manager.get_entity_snapshot(
+                    layer_names=action_layer_hints,
+                    max_entities=500,
+                )
+            except TypeError:
+                entities_result = manager.get_entity_snapshot()
+
+        raw_entities: Any = None
+        if isinstance(entities_result, tuple):
+            if len(entities_result) >= 2 and bool(entities_result[0]):
+                raw_entities = entities_result[1]
+        elif isinstance(entities_result, dict):
+            raw_entities = entities_result.get("entities")
+        elif isinstance(entities_result, list):
+            raw_entities = entities_result
+
+        if isinstance(raw_entities, list):
+            normalized_entities: List[Dict[str, Any]] = []
+            for entry in raw_entities:
+                if not isinstance(entry, dict):
+                    continue
+                bounds = _normalize_bounds(entry.get("bounds"))
+                if not bounds:
+                    continue
+                entity_id = str(
+                    entry.get("id")
+                    or entry.get("handle")
+                    or entry.get("uuid")
+                    or f"entity-{len(normalized_entities) + 1}"
+                ).strip()
+                if not entity_id:
+                    entity_id = f"entity-{len(normalized_entities) + 1}"
+                normalized_entry = {
+                    "id": entity_id,
+                    "bounds": bounds,
+                }
+                layer_name = str(entry.get("layer") or "").strip()
+                if layer_name:
+                    normalized_entry["layer"] = layer_name
+                normalized_entities.append(normalized_entry)
+            if normalized_entities:
+                context["entities"] = normalized_entities
+    except Exception:
+        logger.exception(
+            "AutoDraft backcheck CAD context gather failed stage=get_entity_snapshot request_id=%s",
+            request_id,
+        )
+
+    return context if context else None
 
 
 def _extract_locked_layers(cad_context: Dict[str, Any]) -> Set[str]:
@@ -306,6 +588,7 @@ def _build_local_backcheck(
     actions: List[Dict[str, Any]],
     cad_context: Optional[Dict[str, Any]],
     request_id: str,
+    cad_context_source: str = "none",
 ) -> Dict[str, Any]:
     findings: List[Dict[str, Any]] = []
     warnings: List[str] = []
@@ -322,18 +605,40 @@ def _build_local_backcheck(
             "CAD context is unavailable; backcheck degraded to action-level verification."
         )
 
+    action_bounds: Dict[str, Dict[str, float]] = {}
+    action_categories: Dict[str, str] = {}
+    for index, action in enumerate(actions, start=1):
+        action_id = str(action.get("id") or f"action-{index}")
+        markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+        bounds = _normalize_bounds(markup.get("bounds"))
+        if bounds:
+            action_bounds[action_id] = bounds
+        action_categories[action_id] = _normalize_text(action.get("category"))
+
     for index, action in enumerate(actions, start=1):
         action_id = str(action.get("id") or f"action-{index}")
         rule_id = action.get("rule_id")
         category = _normalize_text(action.get("category"))
+        action_status = _normalize_text(action.get("status"))
         confidence_raw = action.get("confidence")
         markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
         markup_bounds = _normalize_bounds(markup.get("bounds"))
+        markup_type = _normalize_text(markup.get("type"))
+        markup_color = _normalize_text(markup.get("color"))
+        layer_name = _normalize_text(markup.get("layer"))
 
         notes: List[str] = []
         suggestions: List[str] = []
         status = _BACKCHECK_PASS
         severity = "low"
+
+        if action_status in {"review", "needs_review"}:
+            status = _BACKCHECK_FAIL
+            severity = "high"
+            notes.append("Action is still marked for review and is not execution-ready.")
+            suggestions.append(
+                "Resolve classification/review state before execution."
+            )
 
         if not isinstance(rule_id, str) or not rule_id.strip():
             status = _BACKCHECK_FAIL
@@ -354,6 +659,13 @@ def _build_local_backcheck(
                 "Review mapped geometry and text intent before execution."
             )
 
+        if not markup_type:
+            if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                status = _BACKCHECK_WARN
+                severity = "medium"
+            notes.append("Markup type is missing.")
+            suggestions.append("Include markup.type to improve rule verification.")
+
         if _cloud_intent_conflicts(markup):
             status = _BACKCHECK_FAIL
             severity = "high"
@@ -362,6 +674,20 @@ def _build_local_backcheck(
                 "Correct cloud color or action wording to remove conflicting intent."
             )
 
+        if markup_type == "cloud":
+            if markup_color == "green" and category not in {"delete"}:
+                if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                    status = _BACKCHECK_WARN
+                    severity = "medium"
+                notes.append("Green cloud is typically delete intent, but category is not DELETE.")
+                suggestions.append("Confirm cloud color/category mapping before execution.")
+            elif markup_color == "red" and category not in {"add"}:
+                if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                    status = _BACKCHECK_WARN
+                    severity = "medium"
+                notes.append("Red cloud is typically add intent, but category is not ADD.")
+                suggestions.append("Confirm cloud color/category mapping before execution.")
+
         if category in {"delete", "add", "swap"} and not markup_bounds:
             if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
                 status = _BACKCHECK_WARN
@@ -369,7 +695,13 @@ def _build_local_backcheck(
             notes.append("Action has no geometry bounds for CAD-aware validation.")
             suggestions.append("Attach markup bounds to enable CAD collision checks.")
 
-        layer_name = _normalize_text(markup.get("layer"))
+        if category in {"delete", "add", "swap"} and not layer_name:
+            if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                status = _BACKCHECK_WARN
+                severity = "medium"
+            notes.append("Layer name is missing for geometry-affecting action.")
+            suggestions.append("Include markup.layer to validate standards and lock state.")
+
         if cad_available and layer_name and layer_name in locked_layers:
             status = _BACKCHECK_FAIL
             severity = "high"
@@ -410,6 +742,27 @@ def _build_local_backcheck(
                     "Verify both swap endpoints are represented in markup bounds."
                 )
 
+        if markup_bounds:
+            conflict_count = 0
+            for other_action_id, other_bounds in action_bounds.items():
+                if other_action_id == action_id:
+                    continue
+                if not _bounds_overlap(markup_bounds, other_bounds):
+                    continue
+                other_category = action_categories.get(other_action_id, "")
+                if {category, other_category} == {"add", "delete"}:
+                    conflict_count += 1
+            if conflict_count > 0:
+                if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                    status = _BACKCHECK_WARN
+                    severity = "medium"
+                notes.append(
+                    f"Action bounds conflict with {conflict_count} opposite-intent action(s)."
+                )
+                suggestions.append(
+                    "Resolve overlap between ADD and DELETE operations before execution."
+                )
+
         findings.append(
             {
                 "id": f"finding-{index}",
@@ -438,6 +791,7 @@ def _build_local_backcheck(
         "cad": {
             "available": cad_available,
             "degraded": not cad_available,
+            "source": cad_context_source,
             "entity_count": len(entities),
             "locked_layer_count": len(locked_layers),
         },
@@ -453,6 +807,7 @@ def create_autodraft_blueprint(
     limiter: Limiter,
     logger: Any,
     autodraft_dotnet_api_url: str,
+    get_manager: Optional[Callable[[], Any]] = None,
 ) -> Blueprint:
     """Create /api/autodraft route group blueprint."""
     bp = Blueprint("autodraft_api", __name__, url_prefix="/api/autodraft")
@@ -511,11 +866,23 @@ def create_autodraft_blueprint(
     @limiter.limit("60 per hour")
     def api_autodraft_plan():
         if not request.is_json:
-            return jsonify({"error": "Expected JSON payload."}), 400
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Expected JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/plan"},
+            )
 
         payload = request.get_json(silent=True) or {}
         if not isinstance(payload, dict):
-            return jsonify({"error": "Invalid JSON payload."}), 400
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Invalid JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/plan"},
+            )
 
         if dotnet_base_url:
             upstream, error, status = _proxy_json(
@@ -546,23 +913,108 @@ def create_autodraft_blueprint(
     @limiter.limit("20 per hour")
     def api_autodraft_execute():
         if not request.is_json:
-            return jsonify({"error": "Expected JSON payload."}), 400
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Expected JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/execute"},
+            )
         payload = request.get_json(silent=True) or {}
         if not isinstance(payload, dict):
-            return jsonify({"error": "Invalid JSON payload."}), 400
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Invalid JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/execute"},
+            )
 
-        if not dotnet_base_url:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": (
-                            "Execution requires .NET API integration. Configure "
-                            "AUTODRAFT_DOTNET_API_URL."
-                        ),
-                    }
+        request_id = _derive_request_id(payload)
+        override_reason = str(payload.get("backcheck_override_reason") or "").strip()
+        raw_actions = payload.get("actions")
+        actions = raw_actions if isinstance(raw_actions, list) else []
+        clean_actions = [item for item in actions if isinstance(item, dict)]
+        client_cad_context = (
+            payload.get("cad_context")
+            if isinstance(payload.get("cad_context"), dict)
+            else None
+        )
+        live_cad_context = _collect_live_cad_context(
+            get_manager=get_manager,
+            logger=logger,
+            request_id=request_id,
+            actions=clean_actions,
+        )
+        cad_context = _merge_cad_context(
+            live_context=live_cad_context,
+            client_context=client_cad_context,
+        )
+        cad_context_source = (
+            "live+client"
+            if live_cad_context and client_cad_context
+            else "live"
+            if live_cad_context
+            else "client"
+            if client_cad_context
+            else "none"
+        )
+        backcheck_result = _build_local_backcheck(
+            actions=clean_actions,
+            cad_context=cad_context,
+            request_id=request_id,
+            cad_context_source=cad_context_source,
+        )
+        summary_obj = (
+            backcheck_result.get("summary")
+            if isinstance(backcheck_result.get("summary"), dict)
+            else {}
+        )
+        try:
+            server_backcheck_fail_count = int(summary_obj.get("fail_count") or 0)
+        except Exception:
+            server_backcheck_fail_count = 0
+
+        client_fail_count_raw = payload.get("backcheck_fail_count")
+        try:
+            client_backcheck_fail_count = int(client_fail_count_raw or 0)
+        except Exception:
+            client_backcheck_fail_count = 0
+        if client_backcheck_fail_count != server_backcheck_fail_count:
+            logger.warning(
+                "AutoDraft execute backcheck fail-count mismatch request_id=%s client=%s server=%s",
+                request_id,
+                client_backcheck_fail_count,
+                server_backcheck_fail_count,
+            )
+
+        if server_backcheck_fail_count > 0 and not override_reason:
+            return _autodraft_error_response(
+                code="AUTODRAFT_BACKCHECK_FAILED",
+                message=(
+                    "Backcheck reported failing actions. Provide "
+                    "`backcheck_override_reason` to continue execute."
                 ),
-                501,
+                request_id=request_id,
+                status_code=428,
+                meta={
+                    "backcheck_fail_count": server_backcheck_fail_count,
+                    "cad_source": cad_context_source,
+                },
+            )
+
+        payload["backcheck_fail_count"] = server_backcheck_fail_count
+        payload.setdefault("requestId", request_id)
+        if not dotnet_base_url:
+            return _autodraft_error_response(
+                code="AUTODRAFT_EXECUTE_NOT_CONFIGURED",
+                message=(
+                    "Execution requires .NET API integration. Configure "
+                    "AUTODRAFT_DOTNET_API_URL."
+                ),
+                request_id=request_id,
+                status_code=501,
+                meta={"endpoint": "/api/autodraft/execute"},
             )
 
         upstream, error, status = _proxy_json(
@@ -573,8 +1025,18 @@ def create_autodraft_blueprint(
             payload=payload,
         )
         if upstream is None:
-            return jsonify({"ok": False, "error": error}), status
+            return _autodraft_error_response(
+                code="AUTODRAFT_UPSTREAM_ERROR",
+                message=str(error or "Upstream execute request failed."),
+                request_id=request_id,
+                status_code=status,
+                meta={
+                    "endpoint": "/api/autodraft/execute",
+                    "upstream_status": status,
+                },
+            )
 
+        upstream.setdefault("requestId", request_id)
         upstream["source"] = "dotnet"
         return jsonify(upstream), status
 
@@ -583,24 +1045,25 @@ def create_autodraft_blueprint(
     @limiter.limit("60 per hour")
     def api_autodraft_backcheck():
         if not request.is_json:
-            payload = autocad_build_error_payload(
+            return _autodraft_error_response(
                 code="AUTODRAFT_INVALID_REQUEST",
                 message="Expected JSON payload.",
-                request_id=autocad_derive_request_id(""),
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/backcheck"},
+                extra={"source": "python-local-backcheck"},
             )
-            payload["ok"] = False
-            return jsonify(payload), 400
 
         payload = request.get_json(silent=True) or {}
         if not isinstance(payload, dict):
-            request_id = autocad_derive_request_id("")
-            response_payload = autocad_build_error_payload(
+            return _autodraft_error_response(
                 code="AUTODRAFT_INVALID_REQUEST",
                 message="Invalid JSON payload.",
-                request_id=request_id,
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/backcheck"},
+                extra={"source": "python-local-backcheck"},
             )
-            response_payload["ok"] = False
-            return jsonify(response_payload), 400
 
         request_id = _derive_request_id(payload)
 
@@ -623,23 +1086,46 @@ def create_autodraft_blueprint(
         raw_actions = payload.get("actions")
         actions = raw_actions if isinstance(raw_actions, list) else []
         clean_actions = [item for item in actions if isinstance(item, dict)]
-        cad_context = payload.get("cad_context") if isinstance(payload.get("cad_context"), dict) else None
+        client_cad_context = (
+            payload.get("cad_context")
+            if isinstance(payload.get("cad_context"), dict)
+            else None
+        )
+        live_cad_context = _collect_live_cad_context(
+            get_manager=get_manager,
+            logger=logger,
+            request_id=request_id,
+            actions=clean_actions,
+        )
+        cad_context = _merge_cad_context(
+            live_context=live_cad_context,
+            client_context=client_cad_context,
+        )
         require_cad_context = bool(payload.get("require_cad_context"))
         has_cad_context = bool(cad_context)
+        cad_context_source = (
+            "live+client"
+            if live_cad_context and client_cad_context
+            else "live"
+            if live_cad_context
+            else "client"
+            if client_cad_context
+            else "none"
+        )
 
         if require_cad_context and not has_cad_context:
-            error_payload = autocad_build_error_payload(
+            error_payload = _build_autodraft_error_payload(
                 code="AUTODRAFT_CAD_CONTEXT_UNAVAILABLE",
                 message=(
-                    "CAD context was required but is not available in this request."
+                    "CAD context was required but unavailable from request payload and live AutoCAD context."
                 ),
                 request_id=request_id,
                 meta={
                     "endpoint": "/api/autodraft/backcheck",
                     "degraded": True,
+                    "cadSource": cad_context_source,
                 },
                 extra={
-                    "ok": False,
                     "source": "python-local-backcheck",
                 },
             )
@@ -649,6 +1135,7 @@ def create_autodraft_blueprint(
             actions=clean_actions,
             cad_context=cad_context,
             request_id=request_id,
+            cad_context_source=cad_context_source,
         )
         return jsonify(result), 200
 

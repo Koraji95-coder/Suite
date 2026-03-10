@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { agentTaskManager } from "./agentTaskManager";
 
 describe("agentTaskManager conversation scope", () => {
@@ -178,5 +178,36 @@ describe("agentTaskManager conversation scope", () => {
 		expect(stored?.messages[0]?.kind).toBe("event");
 		expect(stored?.messages[0]?.eventType).toBe("step_started");
 		expect(stored?.messages[0]?.runId).toBe("run-abc-123");
+	});
+
+	it("recovers from localStorage quota errors with aggressive trimming", () => {
+		const originalSetItem = localStorage.setItem.bind(localStorage);
+		let attempts = 0;
+		const setItemSpy = vi
+			.spyOn(Storage.prototype, "setItem")
+			.mockImplementation((key: string, value: string) => {
+				attempts += 1;
+				if (attempts === 1) {
+					throw new DOMException("Quota exceeded", "QuotaExceededError");
+				}
+				originalSetItem(key, value);
+			});
+
+		const conversation = agentTaskManager.createConversation("team", "Quota");
+		for (let index = 0; index < 240; index += 1) {
+			conversation.messages.push({
+				id: `msg-${index}`,
+				role: "assistant",
+				content: `payload-${index}-${"x".repeat(200)}`,
+				timestamp: new Date().toISOString(),
+			});
+		}
+
+		expect(() => agentTaskManager.saveConversation(conversation)).not.toThrow();
+		const stored = agentTaskManager.getConversations();
+		expect(stored.length).toBeGreaterThan(0);
+		expect(stored[0]?.messages.length).toBeLessThanOrEqual(200);
+
+		setItemSpy.mockRestore();
 	});
 });

@@ -374,8 +374,22 @@ class AutoCADManager:
         Get list of layer names from active drawing.
         Uses fresh late-bound COM connection every call.
         """
-        status = self.get_status()
+        ok, layer_entries, error = self.get_layer_snapshot()
+        if not ok:
+            return (False, [], error)
+        layer_names = [
+            str(entry.get("name") or "").strip()
+            for entry in layer_entries
+            if isinstance(entry, dict)
+        ]
+        return (True, sorted([name for name in layer_names if name]), None)
 
+    def get_layer_snapshot(self) -> Tuple[bool, List[Dict[str, Any]], Optional[str]]:
+        """
+        Read-only layer snapshot for live CAD-aware validations.
+        Returns tuples of (ok, layers, error), where layers include lock state.
+        """
+        status = self.get_status()
         if not status["drawing_open"]:
             return (False, [], status.get("error", "No drawing open"))
 
@@ -388,13 +402,24 @@ class AutoCADManager:
             if doc is None:
                 return (False, [], "Document reference lost")
 
-            layers = []
+            layers: List[Dict[str, Any]] = []
             layer_collection = self.dyn(doc.Layers)
             for i in range(int(layer_collection.Count)):
                 layer = self.dyn(layer_collection.Item(i))
-                layers.append(str(layer.Name))
+                layer_name = str(getattr(layer, "Name", "") or "").strip()
+                if not layer_name:
+                    continue
+                locked = False
+                try:
+                    locked = bool(getattr(layer, "Lock"))
+                except Exception:
+                    try:
+                        locked = bool(getattr(layer, "Locked"))
+                    except Exception:
+                        locked = False
+                layers.append({"name": layer_name, "locked": locked})
 
-            return (True, sorted(layers), None)
+            return (True, layers, None)
 
         except Exception as exc:
             return (False, [], f"COM error: {exc}")
@@ -403,7 +428,110 @@ class AutoCADManager:
                 self.pythoncom.CoUninitialize()
             except Exception as cleanup_exc:
                 self._log_ignored_exception(
-                    stage="get_layers_cleanup",
+                    stage="get_layer_snapshot_cleanup",
+                    reason="CoUninitialize failed",
+                    exc=cleanup_exc,
+                )
+
+    def get_entity_snapshot(
+        self,
+        *,
+        layer_names: Optional[List[str]] = None,
+        max_entities: int = 500,
+    ) -> Tuple[bool, List[Dict[str, Any]], Optional[str]]:
+        """
+        Read-only entity bounds snapshot for backcheck enrichment.
+        """
+        status = self.get_status()
+        if not status["drawing_open"]:
+            return (False, [], status.get("error", "No drawing open"))
+
+        safe_max_entities = max(1, min(5000, int(max_entities or 500)))
+        requested_layer_lookup = {
+            str(layer_name).strip().lower()
+            for layer_name in (layer_names or [])
+            if str(layer_name).strip()
+        }
+
+        try:
+            self.pythoncom.CoInitialize()
+
+            acad = self.connect_autocad()
+            doc = self.dyn(acad.ActiveDocument)
+            ms = self.dyn(doc.ModelSpace) if doc is not None else None
+
+            if doc is None or ms is None:
+                return (False, [], "Cannot access AutoCAD document or modelspace")
+
+            entities: List[Dict[str, Any]] = []
+            modelspace_count = int(ms.Count)
+            for idx in range(modelspace_count):
+                if len(entities) >= safe_max_entities:
+                    break
+                try:
+                    entity = self.dyn(ms.Item(idx))
+                except Exception:
+                    continue
+
+                layer_name = ""
+                try:
+                    layer_name = str(getattr(entity, "Layer", "") or "").strip()
+                except Exception:
+                    layer_name = ""
+                if requested_layer_lookup and layer_name.lower() not in requested_layer_lookup:
+                    continue
+
+                bounds_raw = self.entity_bbox(entity)
+                if not bounds_raw:
+                    continue
+                try:
+                    minx, miny, _minz, maxx, maxy, _maxz = bounds_raw
+                    x = float(minx)
+                    y = float(miny)
+                    width = max(0.0, float(maxx) - float(minx))
+                    height = max(0.0, float(maxy) - float(miny))
+                except Exception:
+                    continue
+                if width <= 0.0 or height <= 0.0:
+                    continue
+
+                handle = ""
+                try:
+                    handle = str(getattr(entity, "Handle", "") or "").strip()
+                except Exception:
+                    handle = ""
+                object_name = ""
+                try:
+                    object_name = str(getattr(entity, "ObjectName", "") or "").strip()
+                except Exception:
+                    object_name = ""
+
+                entity_id = handle or f"entity-{idx + 1}"
+                entities.append(
+                    {
+                        "id": entity_id,
+                        "handle": handle,
+                        "layer": layer_name,
+                        "type": object_name,
+                        "bounds": {
+                            "x": x,
+                            "y": y,
+                            "width": width,
+                            "height": height,
+                        },
+                    }
+                )
+
+            return (True, entities, None)
+
+        except Exception as exc:
+            return (False, [], f"COM error: {exc}")
+        finally:
+            try:
+                self.pythoncom.CoUninitialize()
+            except Exception as cleanup_exc:
+                self._log_ignored_exception(
+                    stage="get_entity_snapshot_cleanup",
                     reason="CoUninitialize failed",
                     exc=cleanup_exc,
                 )

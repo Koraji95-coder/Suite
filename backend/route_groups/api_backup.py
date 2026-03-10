@@ -53,8 +53,11 @@ def create_backup_blueprint(
     def _resolve_backup_path(raw_name: str) -> Path:
         filename = _normalize_backup_filename(raw_name)
         _ensure_backup_storage_dir()
-        resolved = (backup_storage_dir / filename).resolve()
-        if backup_storage_dir not in resolved.parents:
+        storage_root = backup_storage_dir.resolve()
+        resolved = (storage_root / filename).resolve()
+        try:
+            resolved.relative_to(storage_root)
+        except ValueError:
             raise ValueError("Invalid backup path")
         return resolved
 

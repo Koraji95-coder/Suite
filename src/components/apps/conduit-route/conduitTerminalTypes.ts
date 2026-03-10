@@ -157,6 +157,17 @@ export interface TerminalRouteRecord {
 	cadBridgeRequestId?: string;
 	cadProviderPath?: string;
 	cadLastOperation?: "upsert" | "delete" | "reset";
+	cadBackcheckStatus?:
+		| "not_run"
+		| "pass"
+		| "warn"
+		| "fail"
+		| "overridden"
+		| "error";
+	cadBackcheckRequestId?: string;
+	cadBackcheckMessage?: string;
+	cadBackcheckWarnings?: string[];
+	cadBackcheckOverrideReason?: string;
 }
 
 export interface TerminalScanProfile {
@@ -351,7 +362,13 @@ export interface TerminalCadStatusResponse {
 export interface TerminalCadSyncDiagnostic {
 	id: string;
 	at: number;
-	operation: "upsert" | "delete" | "reset" | "preflight" | "etap_cleanup";
+	operation:
+		| "upsert"
+		| "delete"
+		| "reset"
+		| "preflight"
+		| "etap_cleanup"
+		| "backcheck";
 	success: boolean;
 	routeId?: string;
 	routeRef?: string;

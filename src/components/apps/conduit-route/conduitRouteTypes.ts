@@ -171,6 +171,60 @@ export interface ConduitObstacleScanResponse {
 	warnings?: string[];
 }
 
+export interface ConduitRouteBackcheckIssue {
+	code: string;
+	severity: "pass" | "warn" | "fail";
+	message: string;
+	meta?: Record<string, unknown>;
+}
+
+export interface ConduitRouteBackcheckFinding {
+	routeId: string;
+	ref: string;
+	mode: RoutingMode | string;
+	status: "pass" | "warn" | "fail";
+	issues: ConduitRouteBackcheckIssue[];
+	suggestions: string[];
+	stats: {
+		length: number;
+		bend_count: number;
+		bend_degrees: number;
+		point_count: number;
+		segment_count: number;
+		diagonal_segment_count: number;
+		collision_count: number;
+	};
+}
+
+export interface ConduitRouteBackcheckRequest {
+	routes: Array<{
+		id: string;
+		ref?: string;
+		mode?: RoutingMode;
+		path: Point2D[];
+	}>;
+	obstacles?: Obstacle[];
+	obstacleSource?: ConduitObstacleSource;
+	clearance?: number;
+}
+
+export interface ConduitRouteBackcheckResponse {
+	success: boolean;
+	code?: string;
+	message?: string;
+	requestId?: string;
+	source?: string;
+	summary?: {
+		total_routes: number;
+		pass_count: number;
+		warn_count: number;
+		fail_count: number;
+	};
+	findings?: ConduitRouteBackcheckFinding[];
+	warnings?: string[];
+	meta?: Record<string, unknown>;
+}
+
 export interface ConduitRouteRecord {
 	id: string;
 	ref: string;

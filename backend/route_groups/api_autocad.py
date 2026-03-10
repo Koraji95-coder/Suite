@@ -378,6 +378,213 @@ def create_autocad_blueprint(
 
         return merged_layer_names, merged_layer_type_overrides, preset_meta
 
+    def _safe_backcheck_float(value: Any) -> float | None:
+        try:
+            numeric = float(value)
+        except Exception:
+            return None
+        if not math.isfinite(numeric):
+            return None
+        return numeric
+
+    def _normalize_backcheck_obstacles(raw_value: Any) -> list[Dict[str, Any]]:
+        if not isinstance(raw_value, list):
+            return []
+        normalized: list[Dict[str, Any]] = []
+        for index, candidate in enumerate(raw_value):
+            if not isinstance(candidate, dict):
+                continue
+            x = _safe_backcheck_float(candidate.get("x"))
+            y = _safe_backcheck_float(candidate.get("y"))
+            w = _safe_backcheck_float(candidate.get("w"))
+            h = _safe_backcheck_float(candidate.get("h"))
+            if x is None or y is None or w is None or h is None:
+                continue
+            if w <= 0 or h <= 0:
+                continue
+            obstacle_type = str(candidate.get("type") or "foundation").strip().lower()
+            if obstacle_type not in valid_obstacle_types:
+                obstacle_type = "foundation"
+            normalized.append(
+                {
+                    "id": str(candidate.get("id") or f"obstacle_{index + 1}").strip()
+                    or f"obstacle_{index + 1}",
+                    "type": obstacle_type,
+                    "x": x,
+                    "y": y,
+                    "w": w,
+                    "h": h,
+                    "label": str(candidate.get("label") or "").strip(),
+                }
+            )
+        return normalized
+
+    def _point_inside_rect(*, x: float, y: float, rect: Dict[str, Any]) -> bool:
+        left = float(rect.get("x", 0.0))
+        top = float(rect.get("y", 0.0))
+        width = max(0.0, float(rect.get("w", 0.0)))
+        height = max(0.0, float(rect.get("h", 0.0)))
+        return left <= x <= left + width and top <= y <= top + height
+
+    def _segment_intersects_segment(
+        *,
+        a1: tuple[float, float],
+        a2: tuple[float, float],
+        b1: tuple[float, float],
+        b2: tuple[float, float],
+    ) -> bool:
+        def _orientation(p: tuple[float, float], q: tuple[float, float], r: tuple[float, float]) -> int:
+            value = (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
+            if abs(value) < 1e-9:
+                return 0
+            return 1 if value > 0 else 2
+
+        def _on_segment(p: tuple[float, float], q: tuple[float, float], r: tuple[float, float]) -> bool:
+            return (
+                min(p[0], r[0]) - 1e-9 <= q[0] <= max(p[0], r[0]) + 1e-9
+                and min(p[1], r[1]) - 1e-9 <= q[1] <= max(p[1], r[1]) + 1e-9
+            )
+
+        o1 = _orientation(a1, a2, b1)
+        o2 = _orientation(a1, a2, b2)
+        o3 = _orientation(b1, b2, a1)
+        o4 = _orientation(b1, b2, a2)
+
+        if o1 != o2 and o3 != o4:
+            return True
+        if o1 == 0 and _on_segment(a1, b1, a2):
+            return True
+        if o2 == 0 and _on_segment(a1, b2, a2):
+            return True
+        if o3 == 0 and _on_segment(b1, a1, b2):
+            return True
+        if o4 == 0 and _on_segment(b1, a2, b2):
+            return True
+        return False
+
+    def _segment_intersects_rect(
+        *,
+        ax: float,
+        ay: float,
+        bx: float,
+        by: float,
+        rect: Dict[str, Any],
+    ) -> bool:
+        if _point_inside_rect(x=ax, y=ay, rect=rect) or _point_inside_rect(x=bx, y=by, rect=rect):
+            return True
+
+        left = float(rect.get("x", 0.0))
+        top = float(rect.get("y", 0.0))
+        right = left + max(0.0, float(rect.get("w", 0.0)))
+        bottom = top + max(0.0, float(rect.get("h", 0.0)))
+        edges = (
+            ((left, top), (right, top)),
+            ((right, top), (right, bottom)),
+            ((right, bottom), (left, bottom)),
+            ((left, bottom), (left, top)),
+        )
+        a1 = (ax, ay)
+        a2 = (bx, by)
+        for edge_start, edge_end in edges:
+            if _segment_intersects_segment(a1=a1, a2=a2, b1=edge_start, b2=edge_end):
+                return True
+        return False
+
+    def _inflate_backcheck_obstacle(
+        *,
+        obstacle: Dict[str, Any],
+        clearance: float,
+    ) -> Dict[str, float]:
+        return {
+            "x": float(obstacle["x"]) - clearance,
+            "y": float(obstacle["y"]) - clearance,
+            "w": float(obstacle["w"]) + (clearance * 2.0),
+            "h": float(obstacle["h"]) + (clearance * 2.0),
+        }
+
+    def _grid_cell_span_for_rect(
+        *,
+        rect: Dict[str, float],
+        cell_size: float,
+    ) -> tuple[int, int, int, int]:
+        min_x = float(rect["x"])
+        min_y = float(rect["y"])
+        max_x = min_x + max(0.0, float(rect["w"]))
+        max_y = min_y + max(0.0, float(rect["h"]))
+        min_col = int(math.floor(min_x / cell_size))
+        max_col = int(math.floor(max_x / cell_size))
+        min_row = int(math.floor(min_y / cell_size))
+        max_row = int(math.floor(max_y / cell_size))
+        return min_col, max_col, min_row, max_row
+
+    def _build_backcheck_obstacle_index(
+        *,
+        obstacles: list[Dict[str, Any]],
+        clearance: float,
+    ) -> tuple[dict[tuple[int, int], list[Dict[str, Any]]], float, list[Dict[str, Any]]]:
+        if not obstacles:
+            return {}, 128.0, []
+
+        cell_size = max(64.0, min(512.0, clearance * 8.0 if clearance > 0 else 128.0))
+        buckets: dict[tuple[int, int], list[Dict[str, Any]]] = {}
+        indexed_entries: list[Dict[str, Any]] = []
+
+        for obstacle in obstacles:
+            obstacle_id = str(obstacle.get("id") or "").strip() or "obstacle"
+            rect = _inflate_backcheck_obstacle(obstacle=obstacle, clearance=clearance)
+            entry = {"id": obstacle_id, "rect": rect}
+            indexed_entries.append(entry)
+
+            min_col, max_col, min_row, max_row = _grid_cell_span_for_rect(
+                rect=rect,
+                cell_size=cell_size,
+            )
+            for col in range(min_col, max_col + 1):
+                for row in range(min_row, max_row + 1):
+                    key = (col, row)
+                    bucket = buckets.setdefault(key, [])
+                    bucket.append(entry)
+
+        return buckets, cell_size, indexed_entries
+
+    def _segment_backcheck_candidates(
+        *,
+        buckets: dict[tuple[int, int], list[Dict[str, Any]]],
+        cell_size: float,
+        fallback_entries: list[Dict[str, Any]],
+        ax: float,
+        ay: float,
+        bx: float,
+        by: float,
+    ) -> list[Dict[str, Any]]:
+        if not buckets:
+            return fallback_entries
+
+        min_col = int(math.floor(min(ax, bx) / cell_size))
+        max_col = int(math.floor(max(ax, bx) / cell_size))
+        min_row = int(math.floor(min(ay, by) / cell_size))
+        max_row = int(math.floor(max(ay, by) / cell_size))
+
+        col_span = (max_col - min_col) + 1
+        row_span = (max_row - min_row) + 1
+        if col_span <= 0 or row_span <= 0 or (col_span * row_span) > 4096:
+            return fallback_entries
+
+        candidates: list[Dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        for col in range(min_col, max_col + 1):
+            for row in range(min_row, max_row + 1):
+                for entry in buckets.get((col, row), []):
+                    entry_id = str(entry.get("id") or "").strip() or "obstacle"
+                    if entry_id in seen_ids:
+                        continue
+                    seen_ids.add(entry_id)
+                    candidates.append(entry)
+
+        if candidates:
+            return candidates
+        return fallback_entries
+
     def _request_correlation_id() -> str:
         cached = str(getattr(g, "autocad_request_id", "") or "").strip()
         if cached:
@@ -1723,6 +1930,337 @@ def create_autocad_blueprint(
                 request_id=request_id,
                 meta={"stage": "route_compute", "providerConfigured": conduit_provider},
             )
+
+    @bp.route("/conduit-route/backcheck", methods=["POST"])
+    @require_autocad_auth
+    @limiter.limit("1800 per hour")
+    def api_conduit_route_backcheck():
+        """Run read-only quality checks against generated conduit routes."""
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
+        request_id = _request_correlation_id()
+
+        if not request.is_json:
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Expected application/json payload.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "route_backcheck.validation"},
+            )
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="Request payload must be a JSON object.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "route_backcheck.validation"},
+            )
+
+        raw_routes = payload.get("routes")
+        if not isinstance(raw_routes, list) or len(raw_routes) == 0:
+            return _error_response(
+                code="INVALID_REQUEST",
+                message="routes must be a non-empty array.",
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "route_backcheck.validation"},
+            )
+
+        obstacle_source = str(payload.get("obstacleSource") or "client").strip().lower()
+        if obstacle_source not in {"client", "autocad"}:
+            obstacle_source = "client"
+        obstacles = _normalize_backcheck_obstacles(payload.get("obstacles"))
+        clearance_raw = _safe_backcheck_float(payload.get("clearance"))
+        clearance = 18.0 if clearance_raw is None else max(0.0, min(200.0, clearance_raw))
+        warnings: list[str] = []
+        if obstacle_source == "autocad" and len(obstacles) == 0:
+            warnings.append(
+                "AutoCAD obstacle source selected without obstacle payload; collision checks are limited."
+            )
+        obstacle_buckets, obstacle_cell_size, indexed_obstacles = _build_backcheck_obstacle_index(
+            obstacles=obstacles,
+            clearance=clearance,
+        )
+
+        findings: list[Dict[str, Any]] = []
+        for index, raw_route in enumerate(raw_routes):
+            route_id = f"route_{index + 1}"
+            route_ref = route_id
+            route_mode = "plan_view"
+            issues: list[Dict[str, Any]] = []
+            suggestions: list[str] = []
+            metrics = {
+                "length": 0.0,
+                "bend_count": 0,
+                "bend_degrees": 0,
+                "point_count": 0,
+                "segment_count": 0,
+                "diagonal_segment_count": 0,
+                "collision_count": 0,
+            }
+
+            if not isinstance(raw_route, dict):
+                findings.append(
+                    {
+                        "routeId": route_id,
+                        "ref": route_ref,
+                        "mode": route_mode,
+                        "status": "fail",
+                        "issues": [
+                            {
+                                "code": "INVALID_ROUTE_OBJECT",
+                                "severity": "fail",
+                                "message": "Route entry must be a JSON object.",
+                            }
+                        ],
+                        "suggestions": ["Resubmit route with id/ref/mode/path fields."],
+                        "stats": metrics,
+                    }
+                )
+                continue
+
+            route_id = (
+                str(raw_route.get("id") or raw_route.get("routeId") or route_id).strip() or route_id
+            )
+            route_ref = str(raw_route.get("ref") or route_id).strip() or route_id
+            route_mode = str(raw_route.get("mode") or "plan_view").strip().lower() or "plan_view"
+            path_raw = raw_route.get("path")
+            path: list[Dict[str, float]] = []
+            invalid_points = 0
+            if isinstance(path_raw, list):
+                for raw_point in path_raw:
+                    if not isinstance(raw_point, dict):
+                        invalid_points += 1
+                        continue
+                    x = _safe_backcheck_float(raw_point.get("x"))
+                    y = _safe_backcheck_float(raw_point.get("y"))
+                    if x is None or y is None:
+                        invalid_points += 1
+                        continue
+                    path.append({"x": x, "y": y})
+            else:
+                issues.append(
+                    {
+                        "code": "MISSING_PATH",
+                        "severity": "fail",
+                        "message": "Route path must be an array of points.",
+                    }
+                )
+                suggestions.append("Provide a route.path list containing at least two points.")
+
+            if invalid_points > 0:
+                issues.append(
+                    {
+                        "code": "INVALID_PATH_POINTS",
+                        "severity": "warn",
+                        "message": f"{invalid_points} path point(s) were ignored due to invalid coordinates.",
+                    }
+                )
+                suggestions.append("Normalize path points so each includes finite numeric x/y.")
+
+            if len(path) < 2:
+                issues.append(
+                    {
+                        "code": "INSUFFICIENT_PATH_POINTS",
+                        "severity": "fail",
+                        "message": "Route requires at least two valid points for backcheck.",
+                    }
+                )
+                suggestions.append("Recompute route before backcheck.")
+            else:
+                metrics["point_count"] = len(path)
+                metrics["segment_count"] = max(0, len(path) - 1)
+
+                total_length = 0.0
+                bend_count = 0
+                diagonal_segment_count = 0
+                short_segment_count = 0
+                colliding_obstacle_ids: list[str] = []
+                colliding_obstacle_id_set: set[str] = set()
+
+                for path_index in range(1, len(path)):
+                    point_a = path[path_index - 1]
+                    point_b = path[path_index]
+                    dx = point_b["x"] - point_a["x"]
+                    dy = point_b["y"] - point_a["y"]
+                    segment_length = math.hypot(dx, dy)
+                    total_length += segment_length
+                    if segment_length < 1e-3:
+                        short_segment_count += 1
+                    if abs(dx) > 1e-6 and abs(dy) > 1e-6:
+                        diagonal_segment_count += 1
+
+                    segment_obstacles = _segment_backcheck_candidates(
+                        buckets=obstacle_buckets,
+                        cell_size=obstacle_cell_size,
+                        fallback_entries=indexed_obstacles,
+                        ax=point_a["x"],
+                        ay=point_a["y"],
+                        bx=point_b["x"],
+                        by=point_b["y"],
+                    )
+                    for obstacle in segment_obstacles:
+                        inflated = (
+                            obstacle.get("rect")
+                            if isinstance(obstacle.get("rect"), dict)
+                            else None
+                        )
+                        if inflated is None:
+                            continue
+                        intersects = _segment_intersects_rect(
+                            ax=point_a["x"],
+                            ay=point_a["y"],
+                            bx=point_b["x"],
+                            by=point_b["y"],
+                            rect=inflated,
+                        )
+                        if not intersects:
+                            continue
+                        obstacle_id = str(obstacle.get("id") or "").strip() or "obstacle"
+                        if obstacle_id not in colliding_obstacle_id_set:
+                            colliding_obstacle_id_set.add(obstacle_id)
+                            colliding_obstacle_ids.append(obstacle_id)
+
+                for path_index in range(2, len(path)):
+                    previous = path[path_index - 2]
+                    current = path[path_index - 1]
+                    nxt = path[path_index]
+                    dx1 = current["x"] - previous["x"]
+                    dy1 = current["y"] - previous["y"]
+                    dx2 = nxt["x"] - current["x"]
+                    dy2 = nxt["y"] - current["y"]
+                    if abs(dx1) < 1e-6 and abs(dy1) < 1e-6:
+                        continue
+                    if abs(dx2) < 1e-6 and abs(dy2) < 1e-6:
+                        continue
+                    dir1 = (0 if abs(dx1) < 1e-6 else (1 if dx1 > 0 else -1), 0 if abs(dy1) < 1e-6 else (1 if dy1 > 0 else -1))
+                    dir2 = (0 if abs(dx2) < 1e-6 else (1 if dx2 > 0 else -1), 0 if abs(dy2) < 1e-6 else (1 if dy2 > 0 else -1))
+                    if dir1 != dir2:
+                        bend_count += 1
+
+                bend_degrees = bend_count * 90
+                metrics["length"] = round(total_length, 3)
+                metrics["bend_count"] = bend_count
+                metrics["bend_degrees"] = bend_degrees
+                metrics["diagonal_segment_count"] = diagonal_segment_count
+                metrics["collision_count"] = len(colliding_obstacle_ids)
+
+                if bend_degrees > 360:
+                    issues.append(
+                        {
+                            "code": "NEC_BEND_LIMIT_EXCEEDED",
+                            "severity": "fail",
+                            "message": f"Route total bend is {bend_degrees}°, exceeding the 360° pull guidance.",
+                        }
+                    )
+                    suggestions.append("Split the route with a pull point or junction box.")
+                elif bend_degrees > 270:
+                    issues.append(
+                        {
+                            "code": "HIGH_BEND_LOAD",
+                            "severity": "warn",
+                            "message": f"Route total bend is {bend_degrees}°; review pull tension assumptions.",
+                        }
+                    )
+                    suggestions.append("Review this route for pull-point opportunities.")
+
+                if diagonal_segment_count > 0:
+                    issues.append(
+                        {
+                            "code": "DIAGONAL_SEGMENTS_DETECTED",
+                            "severity": "warn",
+                            "message": f"{diagonal_segment_count} segment(s) are diagonal; expected orthogonal drafting path.",
+                        }
+                    )
+                    suggestions.append("Recompute route in orthogonal mode or insert explicit corner points.")
+
+                if short_segment_count > 0:
+                    issues.append(
+                        {
+                            "code": "SHORT_SEGMENTS_DETECTED",
+                            "severity": "warn",
+                            "message": f"{short_segment_count} segment(s) are near zero length and may indicate duplicate points.",
+                        }
+                    )
+                    suggestions.append("Clean duplicate points before issuing CAD sync.")
+
+                if colliding_obstacle_ids:
+                    preview_ids = ", ".join(colliding_obstacle_ids[:4])
+                    if len(colliding_obstacle_ids) > 4:
+                        preview_ids += ", ..."
+                    issues.append(
+                        {
+                            "code": "OBSTACLE_COLLISION_DETECTED",
+                            "severity": "fail",
+                            "message": f"Route intersects {len(colliding_obstacle_ids)} obstacle envelope(s): {preview_ids}",
+                            "meta": {
+                                "obstacle_ids": colliding_obstacle_ids,
+                            },
+                        }
+                    )
+                    suggestions.append("Increase clearance or reroute around detected obstacles.")
+
+            status = "pass"
+            if any(str(issue.get("severity") or "").strip().lower() == "fail" for issue in issues):
+                status = "fail"
+            elif any(str(issue.get("severity") or "").strip().lower() == "warn" for issue in issues):
+                status = "warn"
+
+            findings.append(
+                {
+                    "routeId": route_id,
+                    "ref": route_ref,
+                    "mode": route_mode,
+                    "status": status,
+                    "issues": issues,
+                    "suggestions": list(dict.fromkeys(suggestions)),
+                    "stats": metrics,
+                }
+            )
+
+        summary = {
+            "total_routes": len(findings),
+            "pass_count": sum(1 for finding in findings if finding.get("status") == "pass"),
+            "warn_count": sum(1 for finding in findings if finding.get("status") == "warn"),
+            "fail_count": sum(1 for finding in findings if finding.get("status") == "fail"),
+        }
+        warnings = list(dict.fromkeys(str(entry) for entry in warnings if str(entry).strip()))
+
+        logger.info(
+            "Conduit route backcheck completed (request_id=%s, remote=%s, auth_mode=%s, routes=%s, fails=%s, warns=%s, obstacle_source=%s, obstacle_count=%s)",
+            request_id,
+            remote_addr,
+            auth_mode,
+            summary["total_routes"],
+            summary["fail_count"],
+            summary["warn_count"],
+            obstacle_source,
+            len(obstacles),
+        )
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "code": "",
+                    "message": "Conduit route backcheck completed.",
+                    "requestId": request_id,
+                    "source": "python-local-backcheck",
+                    "summary": summary,
+                    "findings": findings,
+                    "warnings": warnings,
+                    "meta": {
+                        "clearance": clearance,
+                        "obstacleSource": obstacle_source,
+                        "obstacleCount": len(obstacles),
+                    },
+                }
+            ),
+            200,
+        )
 
     @bp.route("/conduit-route/terminal-routes/draw", methods=["POST"])
     @require_autocad_auth

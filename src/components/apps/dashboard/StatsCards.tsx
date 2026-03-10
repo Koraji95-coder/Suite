@@ -13,6 +13,7 @@ import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 
 import { formatBytes } from "./dashboardUtils";
 
@@ -136,9 +137,14 @@ export function StatsCards({
 		secondary: "var(--secondary)",
 		accent: "var(--accent)",
 	};
+	const toneClassMap = {
+		primary: "suite-dashboard-stats-icon-primary",
+		secondary: "suite-dashboard-stats-icon-secondary",
+		accent: "suite-dashboard-stats-icon-accent",
+	} as const;
 
 	return (
-		<div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+		<div className="suite-dashboard-stats-grid">
 			{cards.map(
 				({
 					key,
@@ -155,18 +161,21 @@ export function StatsCards({
 						key={key}
 						variant="default"
 						padding="lg"
-						className="group transition-transform duration-200 hover:-translate-y-1"
+						className="suite-dashboard-stats-card"
 					>
 						<HStack justify="between" align="start">
 							<HStack gap={4} align="start">
 								{/* Icon */}
 								<div
-									className={`rounded-2xl p-3.5 bg-${color}/15`}
+									className={cn(
+										"suite-dashboard-stats-icon-wrap",
+										toneClassMap[color],
+									)}
 									style={{ boxShadow: `0 0 20px ${colorMap[color]}20` }}
 								>
 									<Icon
 										size={24}
-										className={`text-${color}`}
+										className="suite-dashboard-stats-icon"
 										style={{ color: colorMap[color] }}
 									/>
 								</div>
@@ -176,13 +185,13 @@ export function StatsCards({
 									<Text
 										size="xs"
 										color="muted"
-										className="uppercase tracking-widest"
+										className="suite-dashboard-stats-label"
 									>
 										{label}
 									</Text>
 
 									{isLoading ? (
-										<div className="h-9 w-24 animate-pulse rounded-lg bg-surface-2" />
+										<div className="suite-dashboard-stats-value-skeleton" />
 									) : (
 										<Text size="3xl" weight="semibold">
 											{value}
@@ -222,14 +231,14 @@ export function StatsCards({
 							</HStack>
 
 							{/* Sparkline */}
-							<div className="hidden opacity-60 transition-opacity group-hover:opacity-100 sm:block">
+							<div className="suite-dashboard-stats-sparkline">
 								{renderSparkline(sparkline, colorMap[color])}
 							</div>
 						</HStack>
 
 						{/* Bottom accent */}
 						<div
-							className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full opacity-30 group-hover:opacity-60 transition-opacity"
+							className="suite-dashboard-stats-bottom-accent"
 							style={{
 								background: `linear-gradient(90deg, transparent, ${colorMap[color]}, transparent)`,
 							}}

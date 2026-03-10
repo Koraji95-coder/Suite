@@ -8,6 +8,7 @@ import { HStack, Stack } from "@/components/primitives/Stack";
 
 // Primitives
 import { Text } from "@/components/primitives/Text";
+import { cn } from "@/lib/utils";
 import { useCalendarEvents } from "../calendar/hooks/useCalendarEvents";
 import { getUpcomingNext7Days } from "../calendar/upcoming";
 import { getUrgencyLevel } from "../calendar/urgencyUtils";
@@ -16,26 +17,22 @@ const URGENCY_CONFIG = {
 	OVERDUE: {
 		color: "danger",
 		label: "Overdue",
-		bg: "bg-danger/10",
-		border: "border-danger/20",
+		toneClass: "suite-dashboard-upcoming-card-overdue",
 	},
 	CRITICAL: {
 		color: "warning",
 		label: "Due soon",
-		bg: "bg-warning/10",
-		border: "border-warning/20",
+		toneClass: "suite-dashboard-upcoming-card-critical",
 	},
 	WARNING: {
 		color: "info",
 		label: "Upcoming",
-		bg: "bg-info/10",
-		border: "border-info/20",
+		toneClass: "suite-dashboard-upcoming-card-warning",
 	},
 	NORMAL: {
 		color: "success",
 		label: "Scheduled",
-		bg: "bg-success/10",
-		border: "border-success/20",
+		toneClass: "suite-dashboard-upcoming-card-normal",
 	},
 } as const;
 
@@ -45,12 +42,22 @@ export function DashboardUpcomingPanel() {
 	const upcomingPreview = upcoming.slice(0, 5);
 
 	return (
-		<Panel variant="default" padding="lg" className="h-full">
+		<Panel
+			variant="default"
+			padding="lg"
+			className="suite-dashboard-fill-height"
+		>
 			<Stack gap={5}>
 				{/* Header */}
 				<HStack justify="between" align="center">
 					<HStack gap={3} align="center">
-						<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary">
+						<div
+							className={cn(
+								"suite-dashboard-icon-mark",
+								"suite-dashboard-icon-mark-md",
+								"suite-dashboard-calendar-mark",
+							)}
+						>
 							<CalendarDays size={20} />
 						</div>
 						<Stack gap={0}>
@@ -60,7 +67,7 @@ export function DashboardUpcomingPanel() {
 							<Text
 								size="xs"
 								color="muted"
-								className="uppercase tracking-widest"
+								className="suite-dashboard-upcoming-subtitle"
 							>
 								Next 7 days
 							</Text>
@@ -80,15 +87,22 @@ export function DashboardUpcomingPanel() {
 						{[1, 2, 3].map((i) => (
 							<div
 								key={i}
-								className="h-20 rounded-xl bg-surface-2 animate-pulse"
+								className={cn(
+									"suite-dashboard-widget-skeleton",
+									"suite-dashboard-widget-skeleton-lg",
+								)}
 							/>
 						))}
 					</Stack>
 				) : upcoming.length === 0 ? (
-					<Panel variant="inset" padding="lg" className="text-center">
+					<Panel
+						variant="inset"
+						padding="lg"
+						className="suite-dashboard-center-text"
+					>
 						<Stack gap={3} align="center">
-							<div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-2">
-								<Sparkles size={24} className="text-text-muted" />
+							<div className="suite-dashboard-empty-icon-wrap">
+								<Sparkles size={24} className="suite-dashboard-muted-icon" />
 							</div>
 							<Stack gap={1}>
 								<Text size="sm" weight="medium">
@@ -113,15 +127,18 @@ export function DashboardUpcomingPanel() {
 									key={
 										event.id || `${event.title}-${event.start.toISOString()}`
 									}
-									className={`
-                    group flex items-center gap-4 rounded-xl border p-4
-                    transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md
-                    ${config.bg} ${config.border}
-                  `}
+									className={cn(
+										"suite-dashboard-upcoming-card",
+										config.toneClass,
+									)}
 								>
 									{/* Date badge */}
-									<div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl border border-border bg-surface text-center">
-										<Text size="xs" color="muted" className="uppercase">
+									<div className="suite-dashboard-upcoming-date-badge">
+										<Text
+											size="xs"
+											color="muted"
+											className="suite-dashboard-upcoming-day-label"
+										>
 											{dayName}
 										</Text>
 										<Text size="xl" weight="bold">
@@ -130,12 +147,12 @@ export function DashboardUpcomingPanel() {
 									</div>
 
 									{/* Event details */}
-									<Stack gap={1} className="flex-1 min-w-0">
+									<Stack gap={1} className="suite-dashboard-flex-1">
 										<Text size="sm" weight="semibold" truncate>
 											{event.title || "Untitled event"}
 										</Text>
 										<HStack gap={2} align="center">
-											<Clock size={12} className="text-text-muted" />
+											<Clock size={12} className="suite-dashboard-muted-icon" />
 											<Text size="xs" color="muted">
 												{event.allDay
 													? "All day"
@@ -161,7 +178,7 @@ export function DashboardUpcomingPanel() {
 									{/* Arrow */}
 									<ChevronRight
 										size={16}
-										className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity"
+										className="suite-dashboard-upcoming-arrow"
 									/>
 								</div>
 							);

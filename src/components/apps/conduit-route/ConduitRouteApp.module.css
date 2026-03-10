@@ -276,6 +276,99 @@
 	gap: var(--space-2);
 }
 
+.backcheckPanel {
+	display: grid;
+	gap: var(--space-2);
+	padding: 0.58rem;
+	border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, #0a1626 72%, transparent);
+}
+
+.backcheckHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+.backcheckHeaderBadges {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	flex-wrap: wrap;
+}
+
+.gatePanel {
+	display: grid;
+	gap: 0.25rem;
+	padding: 0.42rem 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+	border-radius: var(--radius-1);
+	background: color-mix(in srgb, #111a2c 58%, transparent);
+}
+
+.backcheckFindings {
+	display: grid;
+	gap: 0.4rem;
+	max-height: 220px;
+	overflow: auto;
+	padding-right: 0.12rem;
+}
+
+.backcheckFindingRow {
+	display: grid;
+	gap: 0.22rem;
+	padding: 0.45rem 0.52rem;
+	border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+	border-radius: var(--radius-1);
+	background: color-mix(in srgb, #0f1b2e 62%, transparent);
+}
+
+.backcheckFindingHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-2);
+}
+
+.backcheckFindingMeta {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: var(--space-2);
+	font-size: 0.7rem;
+	color: var(--text-muted);
+}
+
+.crewReviewPanel {
+	display: grid;
+	gap: 0.4rem;
+}
+
+.crewReviewCard {
+	display: grid;
+	gap: 0.3rem;
+	padding: 0.45rem 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+	border-radius: var(--radius-1);
+	background: color-mix(in srgb, #0f1828 62%, transparent);
+}
+
+.crewReviewResponse {
+	margin: 0;
+	max-height: 160px;
+	overflow: auto;
+	padding: 0.45rem 0.5rem;
+	border-radius: var(--radius-1);
+	border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+	background: color-mix(in srgb, #0b1422 72%, transparent);
+	color: color-mix(in srgb, var(--text) 92%, transparent);
+	font-size: 0.68rem;
+	line-height: 1.42;
+	white-space: pre-wrap;
+}
+
 .layerEditorPanel {
 	display: grid;
 	gap: var(--space-2);
@@ -1048,6 +1141,11 @@
 
 	.actionRow {
 		flex-wrap: wrap;
+	}
+
+	.backcheckHeader {
+		flex-direction: column;
+		align-items: flex-start;
 	}
 
 	.layerRuleRow {

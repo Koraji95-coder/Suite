@@ -7,6 +7,10 @@ let shuttingDown = false;
 const autocadPipeName =
 	(process.env.AUTOCAD_DOTNET_PIPE_NAME || "").trim() || "SUITE_AUTOCAD_PIPE";
 const namedPipeServerProject = "dotnet/named-pipe-bridge/NamedPipeServer.csproj";
+const autodraftApiProject = "dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj";
+const autodraftApiAutostartDisabled = /^(0|false|no)$/i.test(
+	String(process.env.SUITE_DEV_AUTOSTART_AUTODRAFT_DOTNET || "").trim(),
+);
 const redisAutostartDisabled = /^(0|false|no)$/i.test(
 	String(process.env.SUITE_DEV_AUTOSTART_REDIS || "").trim(),
 );
@@ -42,6 +46,28 @@ function commandExists(command) {
 			? spawnSync("where", [command], { stdio: "ignore" })
 			: spawnSync("which", [command], { stdio: "ignore" });
 	return probe.status === 0;
+}
+
+function parseHttpEndpoint(urlValue, fallbackPort) {
+	const raw = String(urlValue || "").trim();
+	if (!raw) {
+		return { host: "127.0.0.1", port: fallbackPort };
+	}
+	try {
+		const parsed = new URL(raw);
+		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+			return { host: "127.0.0.1", port: fallbackPort };
+		}
+		const host = parsed.hostname || "127.0.0.1";
+		const defaultPort = parsed.protocol === "https:" ? 443 : 80;
+		const parsedPort = Number.parseInt(parsed.port || `${defaultPort}`, 10);
+		if (!Number.isFinite(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+			return { host, port: fallbackPort };
+		}
+		return { host, port: parsedPort };
+	} catch {
+		return { host: "127.0.0.1", port: fallbackPort };
+	}
 }
 
 function npmInvocation(args = []) {
@@ -314,6 +340,47 @@ async function ensureRedis(label = "redis") {
 	process.exit(1);
 }
 
+async function ensureAutoDraftApi(env, label = "autodraft-dotnet") {
+	if (autodraftApiAutostartDisabled) {
+		console.log(
+			"[dev-full] AutoDraft .NET API autostart disabled via SUITE_DEV_AUTOSTART_AUTODRAFT_DOTNET.",
+		);
+		return;
+	}
+
+	const targetUrl =
+		String(env.AUTODRAFT_DOTNET_API_URL || "").trim() || "http://127.0.0.1:5275";
+	const endpoint = parseHttpEndpoint(targetUrl, 5275);
+
+	if (await isPortOpen(endpoint.host, endpoint.port)) {
+		console.log(
+			`[dev-full] AutoDraft .NET API already reachable at ${endpoint.host}:${endpoint.port}.`,
+		);
+		return;
+	}
+
+	console.log(
+		`[dev-full] Starting AutoDraft .NET API (${autodraftApiProject}) at ${endpoint.host}:${endpoint.port}...`,
+	);
+	run(label, "dotnet", ["run", "--project", autodraftApiProject], { env });
+
+	for (let attempt = 0; attempt < 120; attempt += 1) {
+		if (await isPortOpen(endpoint.host, endpoint.port, 1000)) {
+			console.log(
+				`[dev-full] AutoDraft .NET API is ready at ${endpoint.host}:${endpoint.port}.`,
+			);
+			return;
+		}
+		if (shuttingDown) return;
+		await wait(500);
+	}
+
+	console.error(
+		`[dev-full] AutoDraft .NET API did not become reachable at ${endpoint.host}:${endpoint.port}.`,
+	);
+	process.exit(1);
+}
+
 function shutdown(exitCode = 0) {
 	for (const child of children) {
 		if (!child.killed) {
@@ -353,6 +420,7 @@ async function main() {
 
 	ensureRequiredPortsAvailable();
 	await ensureRedis("redis");
+	await ensureAutoDraftApi(sharedEnv);
 
 	run(
 		"pipe-bridge",

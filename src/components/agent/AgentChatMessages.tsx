@@ -39,13 +39,15 @@ export function AgentChatMessages({
 	baseAvatarState = "idle",
 }: AgentChatMessagesProps) {
 	const bottomRef = useRef<HTMLDivElement>(null);
+	const messageCount = messages.length;
 	const latestMessage = messages[messages.length - 1];
 	const showThinking = isThinking && latestMessage?.role !== "assistant";
 
 	// Scroll to bottom when messages change
 	useEffect(() => {
+		if (messageCount === 0 && !showThinking) return;
 		bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-	});
+	}, [messageCount, showThinking]);
 
 	return (
 		<div className={styles.root}>

@@ -55,6 +55,7 @@ import {
 	isAgentProfileScope,
 } from "./agentChannelScope";
 import { type AgentMarkState, resolveAgentMarkState } from "./agentMarkState";
+import { normalizeAgentResponseText } from "./agentResponseNormalizer";
 import {
 	sanitizeActivityItems,
 	sanitizeTaskItems,
@@ -273,7 +274,7 @@ function deriveActivityDetail(item: AgentActivityItem): {
 	} else if (eventType.includes("awaiting_review")) {
 		text = reviewNote || response;
 	} else if (eventType.includes("agent_message")) {
-		text = response;
+		text = normalizeAgentResponseText(response);
 	}
 
 	if (!text && metaParts.length === 0) return null;
@@ -294,8 +295,9 @@ function normalizeAssistantReply(data: Record<string, unknown> | undefined): {
 	}
 	const responseText = String(data.response ?? "").trim();
 	if (responseText) {
+		const normalizedText = normalizeAgentResponseText(responseText);
 		return {
-			text: responseText,
+			text: normalizedText || responseText,
 			incomplete: Boolean(data.incomplete),
 			warning: String(data.warning || "").trim(),
 		};
@@ -316,7 +318,9 @@ function eventBodyFromPayload(
 	const detail = payloadText(payload, ["error", "detail", "reason"]);
 	if (detail && normalizedType.includes("fail")) return detail;
 	const response = payloadText(payload, ["response", "output", "result"]);
-	if (response && normalizedType === "agent_message") return response;
+	if (response && normalizedType === "agent_message") {
+		return normalizeAgentResponseText(response);
+	}
 
 	const stage = payloadText(payload, ["stage"]);
 	const modelUsed = payloadText(payload, ["modelUsed", "model", "model_used"]);

@@ -3155,26 +3155,24 @@ def _sanitize_auto_calibration_payload(value: Dict[str, Any]) -> Dict[str, Any]:
     return payload
 
 
-def _auto_calibrate_transform(
+def _run_auto_calibration_pass(
     *,
     markups: List[Dict[str, Any]],
     cad_context: Dict[str, Any],
-    calibration_seed: Optional[Dict[str, Any]] = None,
-    roi: Optional[Dict[str, float]] = None,
+    seed_scale: Optional[float] = None,
+    pdf_roi: Optional[Dict[str, float]] = None,
+    cad_roi: Optional[Dict[str, float]] = None,
+    quality_notes: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    seed_obj = calibration_seed if isinstance(calibration_seed, dict) else {}
-    seed_scale = _safe_float(seed_obj.get("scale_hint"))
-    quality_notes: List[str] = []
-    if roi:
-        quality_notes.append("ROI refinement active for auto-calibration.")
+    notes = [str(note).strip() for note in (quality_notes or []) if str(note).strip()]
 
     pdf_anchor_points, pdf_bounds_list = _collect_markup_calibration_anchors(
         markups,
-        roi=roi,
+        roi=pdf_roi,
     )
     cad_anchor_points, cad_bounds_list = _collect_cad_calibration_anchors(
         cad_context,
-        roi=roi,
+        roi=cad_roi,
     )
     if len(pdf_anchor_points) < 2:
         return _build_auto_calibration_payload(
@@ -3183,23 +3181,27 @@ def _auto_calibrate_transform(
             status="needs_manual",
             confidence=0.0,
             method="insufficient-pdf-anchors",
-            quality_notes=[
+            quality_notes=notes
+            + [
                 "Auto-calibration requires at least two PDF anchors from prepared markups.",
             ],
         )
     if len(cad_anchor_points) < 2:
+        cad_notes = list(notes)
+        cad_notes.append(
+            "Auto-calibration requires at least two CAD anchor points from live context."
+        )
+        if cad_roi:
+            cad_notes.append(
+                "Selected ROI did not provide enough CAD anchors; widen ROI or retry full-sheet auto mode."
+            )
         return _build_auto_calibration_payload(
             available=False,
             used=False,
             status="needs_manual",
             confidence=0.0,
             method="insufficient-cad-anchors",
-            quality_notes=[
-                "Auto-calibration requires at least two CAD anchor points from live context.",
-                "Selected ROI did not provide enough CAD anchors; widen ROI or retry full-sheet auto mode."
-                if roi
-                else "",
-            ],
+            quality_notes=cad_notes,
         )
 
     pdf_bounds = _bounds_from_points(pdf_anchor_points)
@@ -3211,7 +3213,7 @@ def _auto_calibrate_transform(
             status="failed",
             confidence=0.0,
             method="anchor-bounds-failed",
-            quality_notes=["Failed to resolve calibration bounds from anchor sets."],
+            quality_notes=notes + ["Failed to resolve calibration bounds from anchor sets."],
         )
 
     pdf_pair = _farthest_point_pair(pdf_anchor_points)
@@ -3222,7 +3224,7 @@ def _auto_calibrate_transform(
             status="needs_manual",
             confidence=0.0,
             method="insufficient-pdf-pair",
-            quality_notes=["Could not derive a stable PDF point pair for calibration."],
+            quality_notes=notes + ["Could not derive a stable PDF point pair for calibration."],
         )
 
     extents_scale_x = max(1e-6, float(cad_bounds["width"])) / max(1e-6, float(pdf_bounds["width"]))
@@ -3230,10 +3232,10 @@ def _auto_calibrate_transform(
     extents_scale = (extents_scale_x + extents_scale_y) / 2.0
     if seed_scale is not None and seed_scale > 0:
         scale = seed_scale
-        quality_notes.append("Used PDF measurement seed as primary scale hint.")
+        _append_unique_note(notes, "Used PDF measurement seed as primary scale hint.")
     else:
         scale = extents_scale
-        quality_notes.append("Derived scale from PDF/CAD extents.")
+        _append_unique_note(notes, "Derived scale from PDF/CAD extents.")
 
     pdf_center = _resolve_bounds_center(pdf_bounds)
     cad_center = _resolve_bounds_center(cad_bounds)
@@ -3279,7 +3281,7 @@ def _auto_calibrate_transform(
             "y": float(coarse_transform["translation"]["y"]) + median_offset_y,
         },
     }
-    quality_notes.append("Applied anchor-based translation refinement.")
+    _append_unique_note(notes, "Applied anchor-based translation refinement.")
 
     refined_distances: List[float] = []
     matched_anchor_count = 0
@@ -3314,11 +3316,12 @@ def _auto_calibrate_transform(
         or match_ratio < _AUTO_CALIBRATION_READY_MIN_MATCH_RATIO
     ):
         status = "needs_manual"
-        quality_notes.append(
-            "Auto-calibration confidence is below threshold; refine ROI or use manual two-point calibration."
+        _append_unique_note(
+            notes,
+            "Auto-calibration confidence is below threshold; refine ROI or use manual two-point calibration.",
         )
     else:
-        quality_notes.append("Auto-calibration confidence passed threshold.")
+        _append_unique_note(notes, "Auto-calibration confidence passed threshold.")
 
     suggested_pdf_pair = list(pdf_pair)
     suggested_cad_pair = [
@@ -3331,6 +3334,10 @@ def _auto_calibrate_transform(
         method_parts.append("seed")
     method_parts.append("extents")
     method_parts.append("anchor-refine")
+    if pdf_roi:
+        method_parts.append("pdf-roi")
+    if cad_roi:
+        method_parts.append("cad-roi")
     method = "+".join(method_parts)
 
     return _build_auto_calibration_payload(
@@ -3339,7 +3346,7 @@ def _auto_calibrate_transform(
         status=status,
         confidence=confidence,
         method=method,
-        quality_notes=quality_notes,
+        quality_notes=notes,
         suggested_pdf_points=suggested_pdf_pair,
         suggested_cad_points=suggested_cad_pair,
         matched_anchor_count=matched_anchor_count,
@@ -3347,6 +3354,107 @@ def _auto_calibrate_transform(
         residual_error=residual_error if math.isfinite(residual_error) else None,
         transform=fine_transform,
     )
+
+
+def _auto_calibrate_transform(
+    *,
+    markups: List[Dict[str, Any]],
+    cad_context: Dict[str, Any],
+    calibration_seed: Optional[Dict[str, Any]] = None,
+    roi: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    seed_obj = calibration_seed if isinstance(calibration_seed, dict) else {}
+    seed_scale = _safe_float(seed_obj.get("scale_hint"))
+    if not roi:
+        return _run_auto_calibration_pass(
+            markups=markups,
+            cad_context=cad_context,
+            seed_scale=seed_scale,
+        )
+
+    prepass = _run_auto_calibration_pass(
+        markups=markups,
+        cad_context=cad_context,
+        seed_scale=seed_scale,
+        quality_notes=[
+            "Full-sheet calibration prepass used to localize ROI in CAD space.",
+        ],
+    )
+    prepass_transform = (
+        prepass.get("transform") if isinstance(prepass.get("transform"), dict) else None
+    )
+    if not prepass_transform:
+        prepass_notes = (
+            prepass.get("quality_notes")
+            if isinstance(prepass.get("quality_notes"), list)
+            else []
+        )
+        _append_unique_note(
+            prepass_notes,
+            "ROI refinement could not localize CAD space because full-sheet auto-calibration did not produce a transform.",
+        )
+        prepass["quality_notes"] = prepass_notes
+        return prepass
+
+    cad_roi = _expand_bounds(
+        _transform_bounds_to_cad(roi, prepass_transform),
+        padding=max(6.0, _bounds_diagonal(roi) * 0.06),
+    )
+    roi_refined = _run_auto_calibration_pass(
+        markups=markups,
+        cad_context=cad_context,
+        seed_scale=seed_scale,
+        pdf_roi=roi,
+        cad_roi=cad_roi,
+        quality_notes=[
+            "ROI refinement active for auto-calibration.",
+            "Full-sheet calibration prepass used to localize ROI in CAD space.",
+        ],
+    )
+
+    roi_status = _normalize_text(roi_refined.get("status"))
+    prepass_status = _normalize_text(prepass.get("status"))
+    if roi_status == "ready":
+        return roi_refined
+    if prepass_status == "ready":
+        prepass_notes = (
+            prepass.get("quality_notes")
+            if isinstance(prepass.get("quality_notes"), list)
+            else []
+        )
+        _append_unique_note(
+            prepass_notes,
+            "ROI refinement did not improve calibration confidence; using full-sheet auto-calibration.",
+        )
+        prepass["quality_notes"] = prepass_notes
+        return prepass
+
+    roi_confidence = _safe_float(roi_refined.get("confidence")) or 0.0
+    prepass_confidence = _safe_float(prepass.get("confidence")) or 0.0
+    if roi_confidence >= prepass_confidence:
+        roi_notes = (
+            roi_refined.get("quality_notes")
+            if isinstance(roi_refined.get("quality_notes"), list)
+            else []
+        )
+        _append_unique_note(
+            roi_notes,
+            "Full-sheet calibration prepass localized ROI in CAD space, but manual refinement is still required.",
+        )
+        roi_refined["quality_notes"] = roi_notes
+        return roi_refined
+
+    prepass_notes = (
+        prepass.get("quality_notes")
+        if isinstance(prepass.get("quality_notes"), list)
+        else []
+    )
+    _append_unique_note(
+        prepass_notes,
+        "ROI refinement was attempted but full-sheet auto-calibration remained the more reliable candidate.",
+    )
+    prepass["quality_notes"] = prepass_notes
+    return prepass
 
 
 def _geometry_tolerance_for_profile(profile: str) -> float:

@@ -1005,6 +1005,83 @@ class TestApiRouteGroups(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertEqual(payload.get("code"), "AUTODRAFT_CALIBRATION_MANUAL_REQUIRED")
 
+    def test_autodraft_compare_auto_calibration_uses_full_sheet_prepass_for_roi(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/compare",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "engine": "python",
+                "roi": {"x": 80.0, "y": 0.0, "width": 40.0, "height": 120.0},
+                "markups": [
+                    {
+                        "id": "markup-1",
+                        "type": "text",
+                        "color": "red",
+                        "text": "FA",
+                        "bounds": {"x": 0.0, "y": 0.0, "width": 10.0, "height": 10.0},
+                    },
+                    {
+                        "id": "markup-2",
+                        "type": "text",
+                        "color": "red",
+                        "text": "FB",
+                        "bounds": {"x": 0.0, "y": 90.0, "width": 10.0, "height": 10.0},
+                    },
+                    {
+                        "id": "markup-3",
+                        "type": "text",
+                        "color": "red",
+                        "text": "FC",
+                        "bounds": {"x": 90.0, "y": 0.0, "width": 10.0, "height": 10.0},
+                    },
+                    {
+                        "id": "markup-4",
+                        "type": "text",
+                        "color": "red",
+                        "text": "FD",
+                        "bounds": {"x": 90.0, "y": 90.0, "width": 10.0, "height": 10.0},
+                    },
+                ],
+                "cad_context": {
+                    "drawing": {"name": "sample.dwg"},
+                    "layers": [{"name": "A-DEMO-LAYER", "locked": False}],
+                    "entities": [
+                        {
+                            "id": "E-FA",
+                            "layer": "A-DEMO-LAYER",
+                            "text": "FA",
+                            "bounds": {"x": 1000.0, "y": 2000.0, "width": 10.0, "height": 10.0},
+                        },
+                        {
+                            "id": "E-FB",
+                            "layer": "A-DEMO-LAYER",
+                            "text": "FB",
+                            "bounds": {"x": 1000.0, "y": 2090.0, "width": 10.0, "height": 10.0},
+                        },
+                        {
+                            "id": "E-FC",
+                            "layer": "A-DEMO-LAYER",
+                            "text": "FC",
+                            "bounds": {"x": 1090.0, "y": 2000.0, "width": 10.0, "height": 10.0},
+                        },
+                        {
+                            "id": "E-FD",
+                            "layer": "A-DEMO-LAYER",
+                            "text": "FD",
+                            "bounds": {"x": 1090.0, "y": 2090.0, "width": 10.0, "height": 10.0},
+                        },
+                    ],
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        auto_calibration = payload.get("auto_calibration") or {}
+        self.assertEqual(auto_calibration.get("status"), "ready")
+        notes = auto_calibration.get("quality_notes") or []
+        self.assertTrue(any("prepass" in str(note).lower() for note in notes))
+
     def test_autodraft_compare_auto_falls_back_to_python_when_dotnet_unavailable(self) -> None:
         response = self.client.post(
             "/api/autodraft/compare",

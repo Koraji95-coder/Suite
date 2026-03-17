@@ -338,6 +338,21 @@ export function AutoDraftComparePanel() {
 			.join(" | ");
 		return `Color extraction: known ${knownColors}/${prepareResult.markups.length} | sources ${sourceSummary || "none"}`;
 	}, [prepareResult]);
+	const prepareTextFallbackSummary = useMemo(() => {
+		const extraction = prepareResult?.pdf_metadata.page.text_extraction;
+		if (!extraction) return null;
+		if (
+			!extraction.used &&
+			extraction.embedded_line_count <= 0 &&
+			extraction.ocr_line_count <= 0
+		) {
+			return null;
+		}
+		if (!extraction.used) {
+			return `Text fallback scanned but not used | embedded lines ${extraction.embedded_line_count} | OCR lines ${extraction.ocr_line_count}`;
+		}
+		return `Text fallback: ${extraction.source} | selected ${extraction.selected_line_count} of ${Math.max(extraction.candidate_count, extraction.selected_line_count)} candidates | embedded lines ${extraction.embedded_line_count} | OCR lines ${extraction.ocr_line_count}`;
+	}, [prepareResult]);
 
 	const prepareStatus = useMemo<PreviewStatus | null>(() => {
 		if (loadingPdf) {
@@ -1909,6 +1924,11 @@ export function AutoDraftComparePanel() {
 						unsupported{" "}
 						{prepareResult.pdf_metadata.page.annotation_counts.unsupported}
 					</Text>
+					{prepareTextFallbackSummary ? (
+						<Text size="xs" color="muted">
+							{prepareTextFallbackSummary}
+						</Text>
+					) : null}
 					{prepareColorSourcesSummary ? (
 						<Text size="xs" color="muted">
 							{prepareColorSourcesSummary}

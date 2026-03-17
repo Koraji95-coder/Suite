@@ -1339,6 +1339,205 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(annotation_counts.get("total"), 1)
         self.assertEqual(annotation_counts.get("supported"), 1)
 
+    def test_autodraft_compare_prepare_uses_ocr_text_fallback_for_flattened_bluebeam_pdf(self) -> None:
+        from PIL import Image as PILImage
+
+        class _FakePage(dict):
+            def __init__(self):
+                super().__init__()
+
+                class _Box:
+                    width = 400
+                    height = 200
+
+                self.mediabox = _Box()
+
+        class _FakeReader:
+            def __init__(self, _stream):
+                self.pages = [_FakePage()]
+                self.metadata = {
+                    "/Producer": "Bluebeam Revu x64",
+                    "/Creator": "Bluebeam Revu",
+                }
+
+        def _fake_render(pdf_path, *, page_index, output_dir, prefix="page"):
+            self.assertEqual(page_index, 0)
+            image_path = Path(output_dir) / f"{prefix}.png"
+            image = PILImage.new("RGB", (400, 200), "white")
+            for x_value in range(40, 241):
+                for y_value in range(20, 56):
+                    image.putpixel((x_value, y_value), (235, 40, 40))
+            image.save(image_path)
+            return {
+                "path": str(image_path),
+                "image_width": 400,
+                "image_height": 200,
+                "source": "pdftoppm",
+            }
+
+        with (
+            patch("backend.route_groups.api_autodraft._PYPDF_AVAILABLE", True),
+            patch("backend.route_groups.api_autodraft._PdfReader", _FakeReader),
+            patch("backend.route_groups.api_autodraft.pdf_render_available", return_value=True),
+            patch("backend.route_groups.api_autodraft.pdf_ocr_available", return_value=True),
+            patch(
+                "backend.route_groups.api_autodraft.extract_embedded_text_page_lines",
+                return_value={
+                    "page_width": 400.0,
+                    "page_height": 200.0,
+                    "lines": [],
+                    "source": "embedded_text",
+                },
+            ),
+            patch(
+                "backend.route_groups.api_autodraft.render_pdf_page_to_png",
+                side_effect=_fake_render,
+            ),
+            patch(
+                "backend.route_groups.api_autodraft.extract_ocr_page_lines_from_image",
+                return_value={
+                    "source": "ocr",
+                    "lines": [
+                        {
+                            "text": "Install new panel",
+                            "bounds": {"x": 40.0, "y": 145.0, "width": 201.0, "height": 36.0},
+                            "pixel_bounds": {"left": 40, "top": 20, "width": 201, "height": 36},
+                            "ocr_confidence": 93.2,
+                        }
+                    ],
+                },
+            ),
+        ):
+            response = self.client.post(
+                "/api/autodraft/compare/prepare",
+                headers={"X-API-Key": "valid-key"},
+                data={
+                    "page_index": "0",
+                    "pdf": (io.BytesIO(b"%PDF-1.7"), "flattened.pdf"),
+                },
+                content_type="multipart/form-data",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        markups = payload.get("markups") or []
+        self.assertEqual(len(markups), 1)
+        first = markups[0] or {}
+        self.assertEqual(first.get("type"), "text")
+        self.assertEqual(first.get("color"), "red")
+        meta = first.get("meta") or {}
+        self.assertEqual(meta.get("subtype"), "ocr_text_line")
+        self.assertEqual(meta.get("extraction_source"), "ocr")
+        self.assertEqual(meta.get("color_source"), "render_sample")
+        recognition = first.get("recognition") or {}
+        self.assertEqual(recognition.get("feature_source"), "pdf_text_fallback")
+        self.assertTrue(recognition.get("needs_review"))
+        page_metadata = (payload.get("pdf_metadata") or {}).get("page") or {}
+        annotation_counts = page_metadata.get("annotation_counts") or {}
+        self.assertEqual(annotation_counts.get("supported"), 0)
+        text_extraction = page_metadata.get("text_extraction") or {}
+        self.assertTrue(text_extraction.get("used"))
+        self.assertEqual(text_extraction.get("source"), "ocr")
+        self.assertEqual(text_extraction.get("selected_line_count"), 1)
+        warnings = payload.get("warnings") or []
+        self.assertTrue(any("OCR fallback recovered text-only markup candidates" in item for item in warnings))
+
+    def test_autodraft_compare_prepare_fallback_filters_title_block_metadata_lines(self) -> None:
+        from PIL import Image as PILImage
+
+        class _FakePage(dict):
+            def __init__(self):
+                super().__init__()
+
+                class _Box:
+                    width = 400
+                    height = 200
+
+                self.mediabox = _Box()
+
+        class _FakeReader:
+            def __init__(self, _stream):
+                self.pages = [_FakePage()]
+                self.metadata = {
+                    "/Producer": "Bluebeam Revu x64",
+                    "/Creator": "Bluebeam Revu",
+                }
+
+        def _fake_render(pdf_path, *, page_index, output_dir, prefix="page"):
+            self.assertEqual(page_index, 0)
+            image_path = Path(output_dir) / f"{prefix}.png"
+            image = PILImage.new("RGB", (400, 200), "white")
+            for x_value in range(30, 181):
+                for y_value in range(24, 52):
+                    image.putpixel((x_value, y_value), (35, 180, 60))
+            for x_value in range(250, 371):
+                for y_value in range(160, 184):
+                    image.putpixel((x_value, y_value), (30, 30, 30))
+            image.save(image_path)
+            return {
+                "path": str(image_path),
+                "image_width": 400,
+                "image_height": 200,
+                "source": "pdftoppm",
+            }
+
+        with (
+            patch("backend.route_groups.api_autodraft._PYPDF_AVAILABLE", True),
+            patch("backend.route_groups.api_autodraft._PdfReader", _FakeReader),
+            patch("backend.route_groups.api_autodraft.pdf_render_available", return_value=True),
+            patch("backend.route_groups.api_autodraft.pdf_ocr_available", return_value=True),
+            patch(
+                "backend.route_groups.api_autodraft.extract_embedded_text_page_lines",
+                return_value={
+                    "page_width": 400.0,
+                    "page_height": 200.0,
+                    "lines": [],
+                    "source": "embedded_text",
+                },
+            ),
+            patch(
+                "backend.route_groups.api_autodraft.render_pdf_page_to_png",
+                side_effect=_fake_render,
+            ),
+            patch(
+                "backend.route_groups.api_autodraft.extract_ocr_page_lines_from_image",
+                return_value={
+                    "source": "ocr",
+                    "lines": [
+                        {
+                            "text": "delete feeder",
+                            "bounds": {"x": 30.0, "y": 148.0, "width": 150.0, "height": 28.0},
+                            "pixel_bounds": {"left": 30, "top": 24, "width": 150, "height": 28},
+                        },
+                        {
+                            "text": "REVISION A",
+                            "bounds": {"x": 250.0, "y": 16.0, "width": 120.0, "height": 24.0},
+                            "pixel_bounds": {"left": 250, "top": 160, "width": 120, "height": 24},
+                        },
+                    ],
+                },
+            ),
+        ):
+            response = self.client.post(
+                "/api/autodraft/compare/prepare",
+                headers={"X-API-Key": "valid-key"},
+                data={
+                    "page_index": "0",
+                    "pdf": (io.BytesIO(b"%PDF-1.7"), "flattened.pdf"),
+                },
+                content_type="multipart/form-data",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        markups = payload.get("markups") or []
+        self.assertEqual(len(markups), 1)
+        self.assertEqual((markups[0] or {}).get("text"), "delete feeder")
+        text_extraction = (((payload.get("pdf_metadata") or {}).get("page") or {}).get("text_extraction") or {})
+        self.assertTrue(text_extraction.get("used"))
+        self.assertEqual(text_extraction.get("source"), "ocr")
+
     def test_terminal_scan_endpoint_requires_auth(self) -> None:
         response = self.client.post("/api/conduit-route/terminal-scan")
         self.assertEqual(response.status_code, 401)

@@ -77,6 +77,10 @@ packaging==26.0
     # via limits
 pandas==3.0.1
     # via -r backend/requirements-api.in
+pillow==11.3.0
+    # via
+    #   -r backend/requirements-api.in
+    #   pytesseract
 psutil==7.2.2
     # via -r backend/requirements-api.in
 pyasn1==0.6.2
@@ -90,6 +94,8 @@ pyjwt[crypto]==2.11.0
 pyopenssl==25.3.0
     # via webauthn
 pypdf==6.8.0
+    # via -r backend/requirements-api.in
+pytesseract==0.3.13
     # via -r backend/requirements-api.in
 python-dateutil==2.9.0.post0
     # via pandas

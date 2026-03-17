@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import threading
+import tempfile
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -29,11 +30,27 @@ except Exception:
     _PdfReader = None
     _PYPDF_AVAILABLE = False
 
+try:
+    from PIL import Image
+
+    _PIL_AVAILABLE = True
+except Exception:
+    Image = None
+    _PIL_AVAILABLE = False
+
 from .api_autocad_error_helpers import (
     build_error_payload as autocad_build_error_payload,
     derive_request_id as autocad_derive_request_id,
 )
 from .api_local_learning_runtime import get_local_learning_runtime
+from .pdf_text_extraction import (
+    extract_embedded_text_page_lines,
+    extract_ocr_page_lines_from_image,
+    pdf_bounds_to_pixel_bounds,
+    pdf_ocr_available,
+    pdf_render_available,
+    render_pdf_page_to_png,
+)
 
 DEFAULT_RULES: List[Dict[str, Any]] = [
     {
@@ -196,6 +213,15 @@ _AGENT_PRE_REVIEW_DEFAULT_PROFILE = "draftsmith"
 _AGENT_PRE_REVIEW_DEFAULT_TIMEOUT_MS = 30000
 _AGENT_PRE_REVIEW_DEFAULT_MAX_CASES = 20
 _SEE_DWG_REFERENCE_PATTERN = re.compile(r"\bsee\s+dwg\b", re.IGNORECASE)
+_TITLE_BLOCK_TEXT_PATTERN = re.compile(
+    r"\b(revision|rev(?:ision)?|drawing\s+no|dwg\s+no|sheet\s+no|title|scale|date|checked|approved)\b",
+    re.IGNORECASE,
+)
+_DIMENSION_ONLY_PATTERN = re.compile(
+    r"^\s*[-+]?\d+(?:\.\d+)?(?:['\"]|mm|cm|m|in|ft)?\s*$",
+    re.IGNORECASE,
+)
+_PREPARE_TEXT_FALLBACK_MAX_MARKUPS = 32
 
 _ANNOT_TEXT_SUBTYPES = {
     "/Text",
@@ -1236,6 +1262,7 @@ def _extract_pdf_compare_markups(
     annotation_supported = 0
     annotation_unsupported = 0
     annotation_subtype_counts: Dict[str, int] = {}
+    prepare_feature_source = "pdf_annotations"
 
     raw_annots = page.get("/Annots")
     annotation_entries: Optional[List[Any]] = None
@@ -1333,6 +1360,58 @@ def _extract_pdf_compare_markups(
             "No /Annots array was found on this page. If markups were flattened, annotation extraction returns 0."
         )
 
+    pdf_metadata = _extract_pdf_prepare_metadata(
+        reader=reader,
+        page=page,
+        page_index=page_index,
+        page_width=page_width,
+        page_height=page_height,
+        annotation_total=annotation_total,
+        annotation_supported=annotation_supported,
+        annotation_unsupported=annotation_unsupported,
+        annotation_subtype_counts=annotation_subtype_counts,
+    )
+    text_extraction = {
+        "used": False,
+        "source": "none",
+        "feature_source": "pdf_annotations",
+        "render_available": pdf_render_available(),
+        "ocr_available": pdf_ocr_available(),
+        "embedded_line_count": 0,
+        "ocr_line_count": 0,
+        "candidate_count": 0,
+        "selected_line_count": 0,
+        "skipped_without_bounds": 0,
+        "selected_black_text_count": 0,
+    }
+    if annotation_supported <= 0:
+        text_fallback = _extract_prepare_text_fallback_markups(
+            pdf_stream=pdf_stream,
+            page_index=page_index,
+            page_width=page_width,
+            page_height=page_height,
+            pdf_metadata=pdf_metadata,
+        )
+        if isinstance(text_fallback.get("diagnostics"), dict):
+            text_extraction.update(text_fallback.get("diagnostics") or {})
+        warnings.extend(
+            [
+                item
+                for item in (text_fallback.get("warnings") or [])
+                if isinstance(item, str) and item.strip()
+            ]
+        )
+        fallback_markups = (
+            text_fallback.get("markups") if isinstance(text_fallback.get("markups"), list) else []
+        )
+        if fallback_markups:
+            markups = [entry for entry in fallback_markups if isinstance(entry, dict)]
+            prepare_feature_source = str(text_extraction.get("feature_source") or "pdf_text_fallback")
+
+    page_metadata = pdf_metadata.get("page") if isinstance(pdf_metadata.get("page"), dict) else None
+    if isinstance(page_metadata, dict):
+        page_metadata["text_extraction"] = text_extraction
+
     calibration_seed = _extract_measurement_seed(page)
     payload = {
         "ok": True,
@@ -1345,22 +1424,12 @@ def _extract_pdf_compare_markups(
         },
         "calibration_seed": calibration_seed,
         "auto_calibration": _build_prepare_auto_calibration_payload(calibration_seed),
-        "pdf_metadata": _extract_pdf_prepare_metadata(
-            reader=reader,
-            page=page,
-            page_index=page_index,
-            page_width=page_width,
-            page_height=page_height,
-            annotation_total=annotation_total,
-            annotation_supported=annotation_supported,
-            annotation_unsupported=annotation_unsupported,
-            annotation_subtype_counts=annotation_subtype_counts,
-        ),
+        "pdf_metadata": pdf_metadata,
         "warnings": warnings,
         "markups": markups,
         "recognition": _compare_recognition_summary(
             markups,
-            feature_source="pdf_annotations",
+            feature_source=prepare_feature_source,
             agent_hints_applied=False,
         ),
     }
@@ -1519,6 +1588,455 @@ def _bounds_center_payload(bounds: Dict[str, float]) -> Dict[str, float]:
     }
 
 
+def _render_sample_to_color_name(rgb: Tuple[float, float, float]) -> str:
+    r, g, b = rgb
+    brightness = (r + g + b) / 3.0
+    spread = max(r, g, b) - min(r, g, b)
+    if brightness < 0.38 and spread < 0.18:
+        return "black"
+    if brightness > 0.97 and spread < 0.04:
+        return "white"
+    if r > 0.62 and g > 0.62 and b < 0.55:
+        return "yellow"
+    if r > g + 0.12 and r > b + 0.12:
+        return "red"
+    if g > r + 0.1 and g > b + 0.1:
+        return "green"
+    if b > r + 0.1 and b > g + 0.1:
+        return "blue"
+    return "unknown"
+
+
+def _sample_rendered_line_color(
+    image: Any,
+    pixel_bounds: Optional[Dict[str, int]],
+) -> Tuple[str, Optional[Tuple[float, float, float]], Optional[str], str]:
+    if image is None or not pixel_bounds:
+        return "unknown", None, None, "unknown"
+    try:
+        image_width, image_height = image.size
+    except Exception:
+        return "unknown", None, None, "unknown"
+
+    left = max(0, int(pixel_bounds.get("left") or 0))
+    top = max(0, int(pixel_bounds.get("top") or 0))
+    width = max(1, int(pixel_bounds.get("width") or 0))
+    height = max(1, int(pixel_bounds.get("height") or 0))
+    right = min(image_width, left + width)
+    bottom = min(image_height, top + height)
+    if right <= left or bottom <= top:
+        return "unknown", None, None, "unknown"
+
+    crop = image.crop((left, top, right, bottom)).convert("RGB")
+    if crop.width > 64 or crop.height > 32:
+        crop.thumbnail((64, 32))
+
+    counts = {
+        "black": 0,
+        "red": 0,
+        "green": 0,
+        "blue": 0,
+        "yellow": 0,
+    }
+    ink_pixels: List[Tuple[float, float, float]] = []
+    for raw_red, raw_green, raw_blue in crop.getdata():
+        if min(raw_red, raw_green, raw_blue) >= 245:
+            continue
+        rgb = (raw_red / 255.0, raw_green / 255.0, raw_blue / 255.0)
+        if max(rgb) > 0.98 and (max(rgb) - min(rgb)) < 0.04:
+            continue
+        ink_pixels.append(rgb)
+        category = _render_sample_to_color_name(rgb)
+        if category in counts:
+            counts[category] += 1
+
+    if not ink_pixels:
+        return "unknown", None, None, "unknown"
+
+    average_rgb = (
+        sum(entry[0] for entry in ink_pixels) / len(ink_pixels),
+        sum(entry[1] for entry in ink_pixels) / len(ink_pixels),
+        sum(entry[2] for entry in ink_pixels) / len(ink_pixels),
+    )
+    dominant_color = max(counts.items(), key=lambda entry: entry[1])[0]
+    if counts[dominant_color] <= 0:
+        dominant_color = _render_sample_to_color_name(average_rgb)
+    return dominant_color, average_rgb, _rgb_to_hex(average_rgb), "render_sample"
+
+
+def _score_prepare_text_fallback_line(
+    *,
+    text: str,
+    bounds: Dict[str, float],
+    color_name: str,
+    source: str,
+    bluebeam_detected: bool,
+    page_width: float,
+    page_height: float,
+) -> Tuple[float, float, List[str]]:
+    score = 0.0
+    reasons: List[str] = []
+    alpha_count = sum(1 for char in text if char.isalpha())
+    digit_count = sum(1 for char in text if char.isdigit())
+    semantic_category, semantic_reason = _infer_semantic_category(
+        {"type": "text", "color": color_name, "text": text}
+    )
+
+    if len(text) >= 3:
+        score += 0.08
+    if alpha_count >= 2:
+        score += 0.08
+    if bluebeam_detected:
+        score += 0.12
+        reasons.append("bluebeam_metadata")
+    if source == "embedded_text":
+        score += 0.06
+        reasons.append("embedded_text_layer")
+    elif source == "ocr":
+        score += 0.04
+        reasons.append("ocr_text_layer")
+
+    if color_name in {"red", "green", "blue", "yellow"}:
+        score += 0.46
+        reasons.append(f"fallback_color:{color_name}")
+    elif color_name == "black":
+        score += 0.08
+        reasons.append("fallback_color:black")
+    else:
+        score -= 0.14
+        reasons.append("fallback_color:unknown")
+
+    if semantic_category:
+        score += 0.24
+        reasons.append(f"semantic:{semantic_reason}")
+    if _SEE_DWG_REFERENCE_PATTERN.search(text):
+        score += 0.08
+        reasons.append("see_dwg_reference")
+
+    line_height = float(bounds.get("height") or 0.0)
+    line_width = float(bounds.get("width") or 0.0)
+    if 4.0 <= line_height <= max(18.0, page_height * 0.12):
+        score += 0.04
+    if line_width <= max(1.0, page_width * 0.8):
+        score += 0.02
+
+    lower_band = float(bounds.get("y") or 0.0) <= page_height * 0.22
+    if lower_band and _TITLE_BLOCK_TEXT_PATTERN.search(text):
+        score -= 0.42
+        reasons.append("title_block_metadata_pattern")
+    if _DIMENSION_ONLY_PATTERN.fullmatch(text):
+        score -= 0.32
+        reasons.append("dimension_like")
+    if digit_count > max(2, alpha_count * 3) and alpha_count == 0:
+        score -= 0.18
+        reasons.append("numeric_heavy")
+
+    threshold = 0.48
+    if color_name == "black":
+        threshold = 0.66
+    elif color_name not in {"red", "green", "blue", "yellow"}:
+        threshold = 0.74
+
+    return round(score, 4), threshold, reasons
+
+
+def _build_prepare_text_fallback_markups_from_lines(
+    *,
+    lines: List[Dict[str, Any]],
+    source: str,
+    page_index: int,
+    page_width: float,
+    page_height: float,
+    bluebeam_detected: bool,
+    image: Any,
+    image_width: int,
+    image_height: int,
+) -> Dict[str, Any]:
+    markups: List[Dict[str, Any]] = []
+    skipped_without_bounds = 0
+    selected_black_text_count = 0
+    candidate_count = 0
+
+    for index, line in enumerate(lines, start=1):
+        text_value = str(line.get("text") or "").strip()
+        bounds = _normalize_bounds(line.get("bounds"))
+        if not text_value:
+            continue
+        if not bounds:
+            skipped_without_bounds += 1
+            continue
+
+        pixel_bounds = (
+            line.get("pixel_bounds") if isinstance(line.get("pixel_bounds"), dict) else None
+        )
+        if pixel_bounds is None and image is not None:
+            pixel_bounds = pdf_bounds_to_pixel_bounds(
+                bounds,
+                page_width=page_width,
+                page_height=page_height,
+                image_width=image_width,
+                image_height=image_height,
+                padding=3,
+            )
+
+        color_name, rgb, color_hex, color_source = _sample_rendered_line_color(
+            image,
+            pixel_bounds,
+        )
+        score, threshold, score_reasons = _score_prepare_text_fallback_line(
+            text=text_value,
+            bounds=bounds,
+            color_name=color_name,
+            source=source,
+            bluebeam_detected=bluebeam_detected,
+            page_width=page_width,
+            page_height=page_height,
+        )
+        if score < threshold:
+            continue
+
+        candidate_count += 1
+        markup_payload: Dict[str, Any] = {
+            "id": f"{source}-text-{index}",
+            "type": "text",
+            "color": color_name,
+            "text": text_value,
+            "bounds": bounds,
+            "meta": {
+                "subtype": "ocr_text_line" if source == "ocr" else "embedded_text_line",
+                "intent": None,
+                "subject": None,
+                "color_source": color_source,
+                "color_hex": color_hex,
+                "color_rgb": None,
+                "page_index": page_index,
+                "page_bounds": dict(bounds),
+                "page_position": _bounds_center_payload(bounds),
+                "extraction_source": source,
+                "candidate_score": score,
+                "ocr_text": text_value if source == "ocr" else None,
+            },
+        }
+        if rgb:
+            rgb_payload = {"r": rgb[0], "g": rgb[1], "b": rgb[2]}
+            markup_payload["meta"]["rgb"] = rgb_payload
+            markup_payload["meta"]["color_rgb"] = rgb_payload
+
+        recognition = _build_markup_recognition(
+            markup_payload,
+            feature_source="pdf_text_fallback",
+        )
+        recognition["confidence"] = round(
+            min(float(recognition.get("confidence") or 0.0), score),
+            4,
+        )
+        recognition["reason_codes"] = list(
+            dict.fromkeys(
+                list(recognition.get("reason_codes") or [])
+                + ["prepare_text_fallback", f"text_source:{source}"]
+                + score_reasons
+            )
+        )
+        if source == "ocr" or color_name in {"black", "unknown"}:
+            recognition["needs_review"] = True
+            recognition["accepted"] = False
+        markup_payload["recognition"] = recognition
+        if color_name == "black":
+            selected_black_text_count += 1
+        markups.append(markup_payload)
+
+    markups.sort(
+        key=lambda entry: float(
+            ((entry.get("meta") if isinstance(entry.get("meta"), dict) else {}).get("candidate_score") or 0.0)
+        ),
+        reverse=True,
+    )
+
+    return {
+        "markups": markups[:_PREPARE_TEXT_FALLBACK_MAX_MARKUPS],
+        "candidate_count": candidate_count,
+        "skipped_without_bounds": skipped_without_bounds,
+        "selected_black_text_count": selected_black_text_count,
+        "truncated": max(0, len(markups) - _PREPARE_TEXT_FALLBACK_MAX_MARKUPS),
+    }
+
+
+def _extract_prepare_text_fallback_markups(
+    *,
+    pdf_stream: Any,
+    page_index: int,
+    page_width: float,
+    page_height: float,
+    pdf_metadata: Dict[str, Any],
+) -> Dict[str, Any]:
+    diagnostics: Dict[str, Any] = {
+        "used": False,
+        "source": "none",
+        "feature_source": "pdf_annotations",
+        "render_available": pdf_render_available(),
+        "ocr_available": pdf_ocr_available(),
+        "embedded_line_count": 0,
+        "ocr_line_count": 0,
+        "candidate_count": 0,
+        "selected_line_count": 0,
+        "skipped_without_bounds": 0,
+        "selected_black_text_count": 0,
+    }
+    warnings: List[str] = []
+    bluebeam_detected = bool(pdf_metadata.get("bluebeam_detected"))
+
+    try:
+        if hasattr(pdf_stream, "seek"):
+            pdf_stream.seek(0)
+    except Exception:
+        pass
+
+    with tempfile.TemporaryDirectory(prefix="autodraft_prepare_") as temp_dir:
+        pdf_path = os.path.join(temp_dir, "prepare.pdf")
+        try:
+            raw_bytes = pdf_stream.read() if hasattr(pdf_stream, "read") else pdf_stream
+            if isinstance(raw_bytes, str):
+                raw_bytes = raw_bytes.encode("utf-8")
+            if not isinstance(raw_bytes, (bytes, bytearray)):
+                return {"markups": [], "warnings": warnings, "diagnostics": diagnostics}
+            with open(pdf_path, "wb") as handle:
+                handle.write(raw_bytes)
+        except Exception:
+            warnings.append("Text fallback extraction could not stage the uploaded PDF for OCR/text recovery.")
+            return {"markups": [], "warnings": warnings, "diagnostics": diagnostics}
+
+        embedded_payload = extract_embedded_text_page_lines(
+            pdf_path,
+            page_index=page_index,
+        )
+        embedded_lines = (
+            embedded_payload.get("lines") if isinstance(embedded_payload.get("lines"), list) else []
+        )
+        diagnostics["embedded_line_count"] = len(embedded_lines)
+
+        render_payload = render_pdf_page_to_png(
+            pdf_path,
+            page_index=page_index,
+            output_dir=temp_dir,
+            prefix="prepare-page",
+        )
+        image = None
+        image_width = int(render_payload.get("image_width") or 0)
+        image_height = int(render_payload.get("image_height") or 0)
+        image_path = str(render_payload.get("path") or "").strip()
+        if image_path and _PIL_AVAILABLE and Image is not None and os.path.isfile(image_path):
+            image = Image.open(image_path)
+
+        try:
+            embedded_result = _build_prepare_text_fallback_markups_from_lines(
+                lines=list(embedded_lines),
+                source="embedded_text",
+                page_index=page_index,
+                page_width=page_width,
+                page_height=page_height,
+                bluebeam_detected=bluebeam_detected,
+                image=image,
+                image_width=image_width,
+                image_height=image_height,
+            )
+            if embedded_result["markups"]:
+                diagnostics.update(
+                    {
+                        "used": True,
+                        "source": "embedded_text",
+                        "feature_source": "pdf_text_fallback",
+                        "candidate_count": int(embedded_result.get("candidate_count") or 0),
+                        "selected_line_count": len(embedded_result["markups"]),
+                        "skipped_without_bounds": int(
+                            embedded_result.get("skipped_without_bounds") or 0
+                        ),
+                        "selected_black_text_count": int(
+                            embedded_result.get("selected_black_text_count") or 0
+                        ),
+                    }
+                )
+                warnings.append(
+                    "No supported annotations were detected. Embedded text fallback recovered text-only markup candidates; clouds/arrows still require native annotations or review."
+                )
+                if int(embedded_result.get("truncated") or 0) > 0:
+                    warnings.append(
+                        f"Embedded text fallback was truncated to {_PREPARE_TEXT_FALLBACK_MAX_MARKUPS} candidates."
+                    )
+                return {
+                    "markups": embedded_result["markups"],
+                    "warnings": warnings,
+                    "diagnostics": diagnostics,
+                }
+
+            ocr_payload = (
+                extract_ocr_page_lines_from_image(
+                    image_path,
+                    page_width=page_width,
+                    page_height=page_height,
+                )
+                if image_path
+                else {"lines": [], "source": "ocr_unavailable"}
+            )
+            ocr_lines = (
+                ocr_payload.get("lines") if isinstance(ocr_payload.get("lines"), list) else []
+            )
+            diagnostics["ocr_line_count"] = len(ocr_lines)
+            ocr_result = _build_prepare_text_fallback_markups_from_lines(
+                lines=list(ocr_lines),
+                source="ocr",
+                page_index=page_index,
+                page_width=page_width,
+                page_height=page_height,
+                bluebeam_detected=bluebeam_detected,
+                image=image,
+                image_width=image_width,
+                image_height=image_height,
+            )
+            if ocr_result["markups"]:
+                diagnostics.update(
+                    {
+                        "used": True,
+                        "source": "ocr",
+                        "feature_source": "pdf_text_fallback",
+                        "candidate_count": int(ocr_result.get("candidate_count") or 0),
+                        "selected_line_count": len(ocr_result["markups"]),
+                        "skipped_without_bounds": int(ocr_result.get("skipped_without_bounds") or 0),
+                        "selected_black_text_count": int(
+                            ocr_result.get("selected_black_text_count") or 0
+                        ),
+                    }
+                )
+                warnings.append(
+                    "No supported annotations were detected. OCR fallback recovered text-only markup candidates from flattened PDF content; review before trusting geometry actions."
+                )
+                if int(ocr_result.get("truncated") or 0) > 0:
+                    warnings.append(
+                        f"OCR fallback was truncated to {_PREPARE_TEXT_FALLBACK_MAX_MARKUPS} candidates."
+                    )
+                return {
+                    "markups": ocr_result["markups"],
+                    "warnings": warnings,
+                    "diagnostics": diagnostics,
+                }
+        finally:
+            if image is not None:
+                image.close()
+
+    if diagnostics["embedded_line_count"] > 0:
+        warnings.append(
+            "No supported annotations were detected, and text fallback could not isolate likely markup text lines with usable bounds."
+        )
+    elif not diagnostics["ocr_available"]:
+        warnings.append(
+            "No supported annotations were detected, and OCR fallback is unavailable on this backend runtime."
+        )
+    else:
+        warnings.append(
+            "No supported annotations or OCR-derived text candidates were detected on this page."
+        )
+    return {"markups": [], "warnings": warnings, "diagnostics": diagnostics}
+
+
 def _markup_learning_features(markup: Dict[str, Any]) -> Dict[str, Any]:
     meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
     bounds = _normalize_bounds(markup.get("bounds"))
@@ -1632,6 +2150,13 @@ def _compare_recognition_summary(
         for recognition in recognitions
         if isinstance(recognition, dict)
     ]
+    recognition_sources = sorted(
+        {
+            str(recognition.get("source") or "").strip()
+            for recognition in recognitions
+            if isinstance(recognition, dict) and str(recognition.get("source") or "").strip()
+        }
+    )
     model_versions = sorted(
         {
             str(recognition.get("model_version") or "").strip()
@@ -1642,7 +2167,7 @@ def _compare_recognition_summary(
     summary_reason_codes = ["markup_compare_ready"]
     if agent_hints_applied:
         summary_reason_codes.append("agent_hints_applied")
-    if model_versions:
+    if "local_model" in recognition_sources:
         summary_reason_codes.append("local_models_available")
     return {
         "model_version": model_versions[0] if len(model_versions) == 1 else ",".join(model_versions) or "deterministic-v1",
@@ -1651,7 +2176,13 @@ def _compare_recognition_summary(
             / max(1, len([value for value in confidence_values if value is not None])),
             4,
         ),
-        "source": "local_model" if model_versions else "deterministic",
+        "source": (
+            "local_model"
+            if "local_model" in recognition_sources
+            else recognition_sources[0]
+            if recognition_sources
+            else "deterministic"
+        ),
         "feature_source": feature_source,
         "reason_codes": summary_reason_codes,
         "needs_review": any(

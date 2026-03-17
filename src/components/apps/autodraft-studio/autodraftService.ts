@@ -265,6 +265,19 @@ export type AutoDraftComparePrepareResponse = {
 				unsupported: number;
 				by_subtype: Record<string, number>;
 			};
+			text_extraction?: {
+				used: boolean;
+				source: string;
+				feature_source: string;
+				render_available: boolean;
+				ocr_available: boolean;
+				embedded_line_count: number;
+				ocr_line_count: number;
+				candidate_count: number;
+				selected_line_count: number;
+				skipped_without_bounds: number;
+				selected_black_text_count: number;
+			};
 		};
 	};
 	markups: AutoDraftPreparedMarkup[];
@@ -1108,6 +1121,9 @@ const normalizeComparePreparePayload = (
 	const annotationCountsRaw = isRecord(pdfPageRaw.annotation_counts)
 		? pdfPageRaw.annotation_counts
 		: {};
+	const textExtractionRaw = isRecord(pdfPageRaw.text_extraction)
+		? pdfPageRaw.text_extraction
+		: null;
 	const bySubtypeRaw = isRecord(annotationCountsRaw.by_subtype)
 		? annotationCountsRaw.by_subtype
 		: {};
@@ -1278,6 +1294,36 @@ const normalizeComparePreparePayload = (
 					unsupported: toInt(annotationCountsRaw.unsupported, 0),
 					by_subtype: bySubtype,
 				},
+				text_extraction: textExtractionRaw
+					? {
+							used: Boolean(textExtractionRaw.used),
+							source: toNonEmptyString(textExtractionRaw.source, "none"),
+							feature_source: toNonEmptyString(
+								textExtractionRaw.feature_source,
+								"pdf_annotations",
+							),
+							render_available: Boolean(textExtractionRaw.render_available),
+							ocr_available: Boolean(textExtractionRaw.ocr_available),
+							embedded_line_count: toInt(
+								textExtractionRaw.embedded_line_count,
+								0,
+							),
+							ocr_line_count: toInt(textExtractionRaw.ocr_line_count, 0),
+							candidate_count: toInt(textExtractionRaw.candidate_count, 0),
+							selected_line_count: toInt(
+								textExtractionRaw.selected_line_count,
+								0,
+							),
+							skipped_without_bounds: toInt(
+								textExtractionRaw.skipped_without_bounds,
+								0,
+							),
+							selected_black_text_count: toInt(
+								textExtractionRaw.selected_black_text_count,
+								0,
+							),
+						}
+					: undefined,
 			},
 		},
 		markups,

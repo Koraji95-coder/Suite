@@ -56,6 +56,19 @@ describe("autoDraftService compare endpoints", () => {
 								unsupported: 0,
 								by_subtype: {},
 							},
+							text_extraction: {
+								used: true,
+								source: "ocr",
+								feature_source: "pdf_text_fallback",
+								render_available: true,
+								ocr_available: true,
+								embedded_line_count: 0,
+								ocr_line_count: 1,
+								candidate_count: 1,
+								selected_line_count: 1,
+								skipped_without_bounds: 0,
+								selected_black_text_count: 0,
+							},
 						},
 					},
 					markups: [],
@@ -80,6 +93,8 @@ describe("autoDraftService compare endpoints", () => {
 		expect(formData.get("pdf")).toBeInstanceOf(File);
 		expect(response.pdf_metadata.bluebeam_detected).toBe(true);
 		expect(response.pdf_metadata.document.producer).toBe("Bluebeam Revu x64");
+		expect(response.pdf_metadata.page.text_extraction?.source).toBe("ocr");
+		expect(response.pdf_metadata.page.text_extraction?.used).toBe(true);
 	});
 
 	it("runCompare posts normalized compare payload", async () => {

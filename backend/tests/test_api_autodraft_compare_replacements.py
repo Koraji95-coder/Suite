@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from backend.route_groups.api_autodraft import (
     _REPLACEMENT_STATUS_AMBIGUOUS,
@@ -14,9 +15,11 @@ from backend.route_groups.api_autodraft import (
     _infer_action_replacement,
     _load_replacement_metric_scores,
     _normalize_feedback_items,
+    _replacement_learning_features,
     _persist_feedback_items,
     _resolve_replacement_weights,
 )
+from backend.route_groups.api_local_learning_runtime import LocalModelPrediction
 
 
 class TestAutoDraftCompareReplacements(unittest.TestCase):
@@ -169,6 +172,90 @@ class TestAutoDraftCompareReplacements(unittest.TestCase):
         score_components = first.get("score_components") or {}
         self.assertIn("agent_boost", score_components)
         self.assertLessEqual(float(score_components.get("agent_boost") or 0.0), 0.12)
+
+    def test_infer_action_replacement_uses_local_model_to_rerank_candidates(self) -> None:
+        action = {
+            "id": "action-red-1",
+            "markup": {
+                "id": "annot-8",
+                "type": "text",
+                "color": "red",
+                "text": "TS416",
+                "bounds": {"x": 900.0, "y": 960.0, "width": 40.0, "height": 20.0},
+            },
+        }
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.predict_replacement",
+            side_effect=lambda *, features: LocalModelPrediction(
+                label="not_selected"
+                if float(features.get("distance") or 0.0) < 10.0
+                else "selected",
+                confidence=0.92
+                if float(features.get("distance") or 0.0) < 10.0
+                else 0.94,
+                model_version="20260317T020000Z",
+                feature_source="replacement_numeric_features",
+                source="local_model",
+                reason_codes=["local_model_prediction"],
+            ),
+        ):
+            replacement = _infer_action_replacement(
+                action=action,
+                text_entities=[
+                    {
+                        "id": "E-TS410",
+                        "text": "TS410",
+                        "bounds": {"x": 914.0, "y": 968.0, "width": 24.0, "height": 14.0},
+                    },
+                    {
+                        "id": "E-TS402",
+                        "text": "TS402",
+                        "bounds": {"x": 920.0, "y": 964.0, "width": 24.0, "height": 14.0},
+                    },
+                ],
+                weights=self.weights,
+                db_path=self.db_path,
+            )
+        self.assertIsNotNone(replacement)
+        replacement_obj = replacement or {}
+        self.assertEqual(replacement_obj.get("target_entity_id"), "E-TS402")
+        self.assertEqual(replacement_obj.get("old_text"), "TS402")
+        candidates = replacement_obj.get("candidates") or []
+        self.assertEqual((candidates[0] or {}).get("entity_id"), "E-TS402")
+        first_candidate = candidates[0] or {}
+        selection_model = first_candidate.get("selection_model") or {}
+        self.assertEqual(selection_model.get("label"), "selected")
+        self.assertTrue(selection_model.get("applied"))
+        self.assertEqual(selection_model.get("model_version"), "20260317T020000Z")
+        score_components = first_candidate.get("score_components") or {}
+        self.assertGreater(float(score_components.get("model_adjustment") or 0.0), 0.0)
+        self.assertIn("pre_model_score", score_components)
+
+    def test_replacement_learning_features_use_pre_model_score_when_present(self) -> None:
+        features = _replacement_learning_features(
+            payload={
+                "new_text": "TS416",
+                "markup": self._build_action()["markup"],
+                "candidates": [{"entity_id": "E-TS410"}],
+            },
+            candidate={
+                "entity_id": "E-TS410",
+                "text": "TS410",
+                "score": 0.67,
+                "distance": 8.0,
+                "pointer_hit": True,
+                "overlap": False,
+                "pair_hit_count": 0,
+                "score_components": {
+                    "base_score": 0.55,
+                    "pre_model_score": 0.67,
+                    "model_adjustment": 0.09,
+                    "final_score": 0.76,
+                },
+            },
+        )
+        self.assertAlmostEqual(float(features.get("base_score") or 0.0), 0.55, places=6)
+        self.assertAlmostEqual(float(features.get("final_score") or 0.0), 0.67, places=6)
 
     def test_feedback_store_export_import_round_trip(self) -> None:
         stored = _persist_feedback_items(

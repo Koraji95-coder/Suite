@@ -217,6 +217,9 @@ _REPLACEMENT_TUNING_DEFAULT = {
     "search_radius_multiplier": 2.5,
     "min_search_radius": 24.0,
 }
+_REPLACEMENT_MODEL_MIN_CONFIDENCE = 0.58
+_REPLACEMENT_MODEL_MAX_BOOST = 0.14
+_REPLACEMENT_MODEL_MAX_PENALTY = 0.12
 _SHADOW_ADVISOR_PROFILE = "draftsmith"
 _SHADOW_ADVISOR_MAX_CASES = 20
 _SHADOW_ADVISOR_TOKEN_CACHE_LOCK = threading.Lock()
@@ -3711,6 +3714,67 @@ def _is_replacement_markup_candidate(action: Dict[str, Any]) -> bool:
     return color_name == "red" and markup_type == "text" and bool(markup_text)
 
 
+def _resolve_replacement_model_adjustment(prediction: Any) -> float:
+    if prediction is None:
+        return 0.0
+    confidence = _clamp_value(
+        _safe_float(getattr(prediction, "confidence", None)) or 0.0,
+        minimum=0.0,
+        maximum=1.0,
+    )
+    if confidence < _REPLACEMENT_MODEL_MIN_CONFIDENCE:
+        return 0.0
+    normalized = (
+        (confidence - _REPLACEMENT_MODEL_MIN_CONFIDENCE)
+        / max(1e-6, 1.0 - _REPLACEMENT_MODEL_MIN_CONFIDENCE)
+    )
+    label = _normalize_text(getattr(prediction, "label", None))
+    if label == "selected":
+        return round(
+            _REPLACEMENT_MODEL_MAX_BOOST * normalized,
+            4,
+        )
+    if label == "not_selected":
+        return round(
+            -1.0 * _REPLACEMENT_MODEL_MAX_PENALTY * normalized,
+            4,
+        )
+    return 0.0
+
+
+def _build_replacement_selection_model_metadata(
+    *,
+    prediction: Any,
+    adjustment: float,
+) -> Optional[Dict[str, Any]]:
+    if prediction is None:
+        return None
+    reason_codes = [
+        value.strip()
+        for value in (getattr(prediction, "reason_codes", None) or [])
+        if isinstance(value, str) and value.strip()
+    ]
+    return {
+        "label": str(getattr(prediction, "label", "") or "").strip() or "unknown",
+        "confidence": round(
+            _clamp_value(
+                _safe_float(getattr(prediction, "confidence", None)) or 0.0,
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            4,
+        ),
+        "model_version": str(getattr(prediction, "model_version", "") or "").strip()
+        or "unknown",
+        "feature_source": str(getattr(prediction, "feature_source", "") or "").strip()
+        or "replacement_numeric_features",
+        "source": str(getattr(prediction, "source", "") or "").strip() or "local_model",
+        "reason_codes": reason_codes,
+        "applied": abs(float(adjustment or 0.0)) > 1e-6,
+        "adjustment": round(float(adjustment or 0.0), 4),
+    }
+
+
 def _infer_action_replacement(
     *,
     action: Dict[str, Any],
@@ -3799,8 +3863,7 @@ def _infer_action_replacement(
             minimum=0.0,
             maximum=_AGENT_PRE_REVIEW_MAX_BOOST,
         )
-        score = base_score + agent_boost
-        score = _clamp_value(score, minimum=0.0, maximum=1.0)
+        score = _clamp_value(base_score + agent_boost, minimum=0.0, maximum=1.0)
         score_components = {
             "pointer": round(pointer_component, 4),
             "overlap": round(overlap_component, 4),
@@ -3809,6 +3872,7 @@ def _infer_action_replacement(
             "same_text_penalty": round(same_text_penalty, 4),
             "base_score": round(base_score, 4),
             "agent_boost": round(agent_boost, 4),
+            "pre_model_score": round(score, 4),
             "final_score": round(score, 4),
         }
         candidate_obj = {
@@ -3833,6 +3897,53 @@ def _infer_action_replacement(
         )
     )
     top_candidates = candidates[:_REPLACEMENT_MAX_CANDIDATES]
+    if top_candidates:
+        model_payload = {
+            "markup": markup,
+            "new_text": new_text,
+            "candidates": top_candidates,
+        }
+        for candidate in top_candidates:
+            score_components = (
+                dict(candidate.get("score_components") or {})
+                if isinstance(candidate.get("score_components"), dict)
+                else {}
+            )
+            pre_model_score = (
+                _safe_float(score_components.get("pre_model_score"))
+                or _safe_float(candidate.get("score"))
+                or 0.0
+            )
+            prediction = _LOCAL_LEARNING_RUNTIME.predict_replacement(
+                features=_replacement_learning_features(
+                    payload=model_payload,
+                    candidate=candidate,
+                )
+            )
+            model_adjustment = _resolve_replacement_model_adjustment(prediction)
+            final_score = _clamp_value(
+                pre_model_score + model_adjustment,
+                minimum=0.0,
+                maximum=1.0,
+            )
+            score_components["pre_model_score"] = round(pre_model_score, 4)
+            score_components["model_adjustment"] = round(model_adjustment, 4)
+            score_components["final_score"] = round(final_score, 4)
+            candidate["score_components"] = score_components
+            candidate["score"] = round(final_score, 4)
+            selection_model = _build_replacement_selection_model_metadata(
+                prediction=prediction,
+                adjustment=model_adjustment,
+            )
+            if selection_model:
+                candidate["selection_model"] = selection_model
+        top_candidates.sort(
+            key=lambda item: (
+                -float(item.get("score") or 0.0),
+                float(item.get("distance") or 0.0),
+                str(item.get("entity_id") or ""),
+            )
+        )
 
     if not top_candidates:
         return {
@@ -5389,6 +5500,7 @@ def _replacement_learning_features(
         else {}
     )
     candidates = payload.get("candidates") if isinstance(payload.get("candidates"), list) else []
+    pre_model_score = _safe_float(score_components.get("pre_model_score"))
     return {
         "distance": _safe_float(candidate.get("distance")) or 0.0,
         "pointer_hit": 1.0 if bool(candidate.get("pointer_hit")) else 0.0,
@@ -5402,7 +5514,11 @@ def _replacement_learning_features(
         "same_type": 1.0 if _normalize_text(markup.get("type")) == "text" else 0.0,
         "cad_entity_count": float(len(candidates)),
         "base_score": _safe_float(score_components.get("base_score")) or _safe_float(candidate.get("score")) or 0.0,
-        "final_score": _safe_float(score_components.get("final_score")) or _safe_float(candidate.get("score")) or 0.0,
+        "final_score": pre_model_score
+        if pre_model_score is not None
+        else _safe_float(score_components.get("final_score"))
+        or _safe_float(candidate.get("score"))
+        or 0.0,
         "markup_width": float(bounds.get("width")) if bounds else 0.0,
         "markup_height": float(bounds.get("height")) if bounds else 0.0,
     }

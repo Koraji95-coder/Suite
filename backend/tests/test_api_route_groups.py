@@ -1286,6 +1286,77 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertIn("replacement", findings[0] or {})
 
+    def test_autodraft_compare_uses_local_replacement_model_to_rerank_targets(self) -> None:
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.predict_replacement",
+            side_effect=lambda *, features: LocalModelPrediction(
+                label="not_selected"
+                if float(features.get("distance") or 0.0) < 10.0
+                else "selected",
+                confidence=0.92
+                if float(features.get("distance") or 0.0) < 10.0
+                else 0.94,
+                model_version="20260317T020000Z",
+                feature_source="replacement_numeric_features",
+                source="local_model",
+                reason_codes=["local_model_prediction"],
+            ),
+        ):
+            response = self.client.post(
+                "/api/autodraft/compare",
+                headers={"X-API-Key": "valid-key"},
+                json={
+                    "engine": "python",
+                    "manual_override": True,
+                    "markups": [
+                        {
+                            "id": "annot-8",
+                            "type": "text",
+                            "color": "red",
+                            "text": "TS416",
+                            "bounds": {"x": 900.0, "y": 960.0, "width": 40.0, "height": 20.0},
+                        }
+                    ],
+                    "pdf_points": [{"x": 10, "y": 10}, {"x": 30, "y": 10}],
+                    "cad_points": [{"x": 100, "y": 100}, {"x": 140, "y": 100}],
+                    "cad_context": {
+                        "drawing": {"name": "sample.dwg"},
+                        "layers": [{"name": "A-DEMO-LAYER", "locked": False}],
+                        "entities": [
+                            {
+                                "id": "E-TS410",
+                                "layer": "A-DEMO-LAYER",
+                                "text": "TS410",
+                                "bounds": {"x": 914.0, "y": 968.0, "width": 24.0, "height": 14.0},
+                            },
+                            {
+                                "id": "E-TS402",
+                                "layer": "A-DEMO-LAYER",
+                                "text": "TS402",
+                                "bounds": {"x": 920.0, "y": 964.0, "width": 24.0, "height": 14.0},
+                            },
+                        ],
+                    },
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        review_queue = payload.get("review_queue") or []
+        self.assertGreaterEqual(len(review_queue), 1)
+        first_review = review_queue[0] or {}
+        self.assertEqual(first_review.get("selected_entity_id"), "E-TS402")
+        self.assertEqual(first_review.get("selected_old_text"), "TS402")
+        candidates = first_review.get("candidates") or []
+        self.assertEqual((candidates[0] or {}).get("entity_id"), "E-TS402")
+        selection_model = (candidates[0] or {}).get("selection_model") or {}
+        self.assertEqual(selection_model.get("label"), "selected")
+        self.assertEqual(selection_model.get("model_version"), "20260317T020000Z")
+        score_components = (candidates[0] or {}).get("score_components") or {}
+        self.assertGreater(float(score_components.get("model_adjustment") or 0.0), 0.0)
+        replacement = (((payload.get("plan") or {}).get("actions") or [])[0] or {}).get("replacement") or {}
+        self.assertEqual(replacement.get("target_entity_id"), "E-TS402")
+
     def test_autodraft_compare_skips_replacement_for_red_see_dwg_reference(self) -> None:
         response = self.client.post(
             "/api/autodraft/compare",

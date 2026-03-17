@@ -2871,20 +2871,23 @@ export function AutoDraftComparePanel() {
 																		)
 																	}
 																/>
-																<span>
-																	{candidate.text} ({candidate.entity_id}) |
-																	score {candidate.score.toFixed(2)} | d{" "}
-																	{candidate.distance.toFixed(1)}
-																	{candidate.score_components &&
-																	typeof candidate.score_components.agent_boost ===
-																		"number"
-																		? ` | boost +${candidate.score_components.agent_boost.toFixed(2)}`
-																		: ""}
-																</span>
-															</label>
-														);
-													})}
-												</fieldset>
+														<span>
+															{candidate.text} ({candidate.entity_id}) |
+															score {candidate.score.toFixed(2)} | d{" "}
+															{candidate.distance.toFixed(1)}
+															{candidate.score_components &&
+															typeof candidate.score_components.agent_boost ===
+																"number"
+																? ` | boost +${candidate.score_components.agent_boost.toFixed(2)}`
+																: ""}
+															{candidate.selection_model
+																? ` | model ${candidate.selection_model.label} @ ${candidate.selection_model.confidence.toFixed(2)}${candidate.selection_model.applied ? ` ${candidate.selection_model.adjustment >= 0 ? "+" : ""}${candidate.selection_model.adjustment.toFixed(2)}` : ""}`
+																: ""}
+														</span>
+													</label>
+												);
+											})}
+										</fieldset>
 											) : (
 												<Text size="xs" color="warning">
 													No nearby CAD text candidates were found.

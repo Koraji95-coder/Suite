@@ -1291,6 +1291,23 @@ describe("AutoDraftComparePanel", () => {
 							pointer_hit: true,
 							overlap: false,
 							pair_hit_count: 0,
+							score_components: {
+								base_score: 0.59,
+								agent_boost: 0,
+								pre_model_score: 0.61,
+								model_adjustment: 0,
+								final_score: 0.61,
+							},
+							selection_model: {
+								label: "selected",
+								confidence: 0.57,
+								modelVersion: "20260317T020000Z",
+								featureSource: "replacement_numeric_features",
+								source: "local_model",
+								reasonCodes: ["local_model_prediction"],
+								applied: false,
+								adjustment: 0,
+							},
 						},
 						{
 							entity_id: "E-TS402",
@@ -1300,6 +1317,23 @@ describe("AutoDraftComparePanel", () => {
 							pointer_hit: true,
 							overlap: false,
 							pair_hit_count: 0,
+							score_components: {
+								base_score: 0.47,
+								agent_boost: 0,
+								pre_model_score: 0.47,
+								model_adjustment: 0.11,
+								final_score: 0.58,
+							},
+							selection_model: {
+								label: "selected",
+								confidence: 0.91,
+								modelVersion: "20260317T020000Z",
+								featureSource: "replacement_numeric_features",
+								source: "local_model",
+								reasonCodes: ["local_model_prediction"],
+								applied: true,
+								adjustment: 0.11,
+							},
 						},
 					],
 				},
@@ -1383,6 +1417,7 @@ describe("AutoDraftComparePanel", () => {
 		).toBeCloseTo(2.5, 6);
 		expect(screen.getByText(/Replacement review queue \(1\)/i)).toBeTruthy();
 		expect(screen.getByText(/Shadow suggestion:/i)).toBeTruthy();
+		expect(screen.getByText(/model selected @ 0.91 \+0.11/i)).toBeTruthy();
 
 		fireEvent.click(
 			screen.getByLabelText(/TS402 \(E-TS402\) \| score 0.58 \| d 9.2/i),

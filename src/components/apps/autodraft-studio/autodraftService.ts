@@ -82,7 +82,20 @@ export type AutoDraftReplacementScoreComponents = {
 	same_text_penalty?: number;
 	base_score?: number;
 	agent_boost?: number;
+	pre_model_score?: number;
+	model_adjustment?: number;
 	final_score?: number;
+};
+
+export type AutoDraftReplacementSelectionModel = {
+	label: string;
+	confidence: number;
+	modelVersion: string;
+	featureSource: string;
+	source: string;
+	reasonCodes: string[];
+	applied: boolean;
+	adjustment: number;
 };
 
 export type AutoDraftReplacementCandidate = {
@@ -94,6 +107,7 @@ export type AutoDraftReplacementCandidate = {
 	overlap: boolean;
 	pair_hit_count: number;
 	score_components?: AutoDraftReplacementScoreComponents;
+	selection_model?: AutoDraftReplacementSelectionModel;
 };
 
 export type AutoDraftReplacementMetadata = {
@@ -799,11 +813,51 @@ const normalizeReplacementCandidate = (
 						Number.isFinite(scoreComponentsRaw.agent_boost)
 							? scoreComponentsRaw.agent_boost
 							: undefined,
+					pre_model_score:
+						typeof scoreComponentsRaw.pre_model_score === "number" &&
+						Number.isFinite(scoreComponentsRaw.pre_model_score)
+							? scoreComponentsRaw.pre_model_score
+							: undefined,
+					model_adjustment:
+						typeof scoreComponentsRaw.model_adjustment === "number" &&
+						Number.isFinite(scoreComponentsRaw.model_adjustment)
+							? scoreComponentsRaw.model_adjustment
+							: undefined,
 					final_score:
 						typeof scoreComponentsRaw.final_score === "number" &&
 						Number.isFinite(scoreComponentsRaw.final_score)
 							? scoreComponentsRaw.final_score
 							: undefined,
+				}
+			: undefined;
+	const selectionModelRaw = isRecord(value.selection_model)
+		? value.selection_model
+		: null;
+	const selectionModel: AutoDraftReplacementSelectionModel | undefined =
+		selectionModelRaw
+			? {
+					label: toNonEmptyString(selectionModelRaw.label, "unknown"),
+					confidence: toConfidence(selectionModelRaw.confidence, 0),
+					modelVersion: toNonEmptyString(
+						selectionModelRaw.model_version,
+						"unknown",
+					),
+					featureSource: toNonEmptyString(
+						selectionModelRaw.feature_source,
+						"replacement_numeric_features",
+					),
+					source: toNonEmptyString(selectionModelRaw.source, "local_model"),
+					reasonCodes: Array.isArray(selectionModelRaw.reason_codes)
+						? selectionModelRaw.reason_codes
+								.map((item) => (typeof item === "string" ? item.trim() : ""))
+								.filter((item) => item.length > 0)
+						: [],
+					applied: Boolean(selectionModelRaw.applied),
+					adjustment:
+						typeof selectionModelRaw.adjustment === "number" &&
+						Number.isFinite(selectionModelRaw.adjustment)
+							? selectionModelRaw.adjustment
+							: 0,
 				}
 			: undefined;
 	return {
@@ -815,6 +869,7 @@ const normalizeReplacementCandidate = (
 		overlap: Boolean(value.overlap),
 		pair_hit_count: pairHitCount,
 		score_components: scoreComponents,
+		selection_model: selectionModel,
 	};
 };
 

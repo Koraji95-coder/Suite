@@ -624,7 +624,19 @@ describe("autoDraftService compare endpoints", () => {
 									score_components: {
 										base_score: 0.59,
 										agent_boost: 0.12,
+										pre_model_score: 0.62,
+										model_adjustment: 0.09,
 										final_score: 0.71,
+									},
+									selection_model: {
+										label: "selected",
+										confidence: 0.89,
+										model_version: "20260317T020000Z",
+										feature_source: "replacement_numeric_features",
+										source: "local_model",
+										reason_codes: ["local_model_prediction"],
+										applied: true,
+										adjustment: 0.09,
 									},
 								},
 							],
@@ -721,6 +733,16 @@ describe("autoDraftService compare endpoints", () => {
 			compareResult.review_queue[0]?.candidates[0]?.score_components
 				?.agent_boost,
 		).toBe(0.12);
+		expect(
+			compareResult.review_queue[0]?.candidates[0]?.score_components
+				?.model_adjustment,
+		).toBe(0.09);
+		expect(
+			compareResult.review_queue[0]?.candidates[0]?.selection_model?.modelVersion,
+		).toBe("20260317T020000Z");
+		expect(
+			compareResult.review_queue[0]?.candidates[0]?.selection_model?.applied,
+		).toBe(true);
 		expect(compareResult.plan.actions[0]?.replacement?.old_text).toBe("TS410");
 		expect(
 			compareResult.backcheck.findings[0]?.replacement?.target_entity_id,

@@ -478,6 +478,7 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/autodraft/compare": ["POST"],
             "/api/autodraft/compare/feedback": ["POST"],
             "/api/autodraft/compare/feedback/export": ["GET"],
+            "/api/autodraft/compare/reviewed-run/export": ["POST"],
             "/api/autodraft/compare/feedback/import": ["POST"],
             "/api/etap/cleanup/run": ["POST"],
             "/api/autocad/ws-ticket": ["POST"],
@@ -1502,6 +1503,106 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(import_payload.get("mode"), "replace")
         imported = import_payload.get("imported") or {}
         self.assertGreaterEqual(int(imported.get("events") or 0), 1)
+
+    def test_autodraft_reviewed_run_export_uses_saved_feedback(self) -> None:
+        submit_response = self.client.post(
+            "/api/autodraft/compare/feedback",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-reviewed-run-1",
+                "items": [
+                    {
+                        "request_id": "req-reviewed-run-1",
+                        "action_id": "action-red-1",
+                        "review_status": "corrected",
+                        "new_text": "TS416",
+                        "selected_old_text": "TS410",
+                        "selected_entity_id": "E-TS410",
+                        "confidence": 0.71,
+                        "note": "Validated against modelspace text.",
+                        "candidates": [
+                            {
+                                "entity_id": "E-TS410",
+                                "text": "TS410",
+                                "score": 0.71,
+                                "distance": 8.0,
+                                "pointer_hit": True,
+                                "overlap": False,
+                                "pair_hit_count": 0,
+                            }
+                        ],
+                        "selected_candidate": {
+                            "entity_id": "E-TS410",
+                            "text": "TS410",
+                            "score": 0.71,
+                            "distance": 8.0,
+                            "pointer_hit": True,
+                            "overlap": False,
+                            "pair_hit_count": 0,
+                        },
+                    },
+                    {
+                        "request_id": "req-reviewed-run-1",
+                        "action_id": "action-note-1",
+                        "review_status": "approved",
+                        "feedback_type": "markup_learning",
+                        "new_text": "VERIFY FEEDER TAG",
+                        "markup_id": "annot-note-1",
+                        "markup": {
+                            "id": "annot-note-1",
+                            "type": "text",
+                            "color": "blue",
+                            "text": "VERIFY FEEDER TAG",
+                            "bounds": {"x": 20, "y": 30, "width": 60, "height": 18},
+                        },
+                        "predicted_category": "NOTE",
+                    },
+                ],
+            },
+        )
+        self.assertEqual(submit_response.status_code, 200)
+
+        export_response = self.client.post(
+            "/api/autodraft/compare/reviewed-run/export",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-reviewed-run-export",
+                "compare": {
+                    "requestId": "req-reviewed-run-1",
+                    "plan": {"actions": [{"id": "action-red-1"}, {"id": "action-note-1"}]},
+                    "review_queue": [{"id": "review-action-red-1"}],
+                    "markup_review_queue": [{"id": "markup-review-action-note-1"}],
+                },
+                "prepare": {
+                    "requestId": "req-prepare-reviewed-run-1",
+                    "markups": [
+                        {"id": "annot-note-1"},
+                        {"id": "annot-red-1"},
+                    ],
+                },
+                "label": "sample-reviewed-run.pdf",
+            },
+        )
+        self.assertEqual(export_response.status_code, 200)
+        export_payload = export_response.get_json() or {}
+        self.assertTrue(export_payload.get("success"))
+        bundle = export_payload.get("bundle") or {}
+        self.assertEqual(bundle.get("schema"), "autodraft_reviewed_run.v1")
+        self.assertEqual(bundle.get("request_id"), "req-reviewed-run-1")
+        self.assertEqual(bundle.get("label"), "sample-reviewed-run.pdf")
+        feedback = bundle.get("feedback") or {}
+        self.assertEqual(feedback.get("event_count"), 2)
+        items = feedback.get("items") or []
+        self.assertEqual(len(items), 2)
+        summary = bundle.get("summary") or {}
+        self.assertEqual(summary.get("prepare_markup_count"), 2)
+        self.assertEqual(summary.get("compare_action_count"), 2)
+        learning_examples = bundle.get("learning_examples") or {}
+        self.assertGreaterEqual(len(learning_examples.get("autodraft_markup") or []), 1)
+        self.assertGreaterEqual(
+            len(learning_examples.get("autodraft_replacement") or []),
+            1,
+        )
 
     def test_autodraft_compare_prepare_requires_pdf_upload(self) -> None:
         response = self.client.post(

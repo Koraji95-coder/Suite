@@ -3368,6 +3368,9 @@ def _env_flag(name: str, *, default: bool = False) -> bool:
     return raw_value in {"1", "true", "yes", "on"}
 
 
+_REVIEWED_RUN_SCHEMA = "autodraft_reviewed_run.v1"
+
+
 def _resolve_compare_feedback_db_path() -> str:
     configured = str(os.environ.get("AUTODRAFT_COMPARE_FEEDBACK_DB_PATH", "") or "").strip()
     if not configured:
@@ -5831,6 +5834,131 @@ def _export_feedback_data(
     }
 
 
+def _export_feedback_events_for_request(
+    *,
+    db_path: str,
+    request_id: str,
+) -> List[Dict[str, Any]]:
+    normalized_request_id = str(request_id or "").strip()
+    if not normalized_request_id:
+        return []
+    exported = _export_feedback_data(db_path=db_path)
+    events = exported.get("events") if isinstance(exported.get("events"), list) else []
+    return [
+        dict(entry)
+        for entry in events
+        if isinstance(entry, dict)
+        and str(entry.get("request_id") or "").strip() == normalized_request_id
+    ]
+
+
+def _feedback_items_from_exported_events(
+    *,
+    events: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    raw_items: List[Dict[str, Any]] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        payload = dict(event.get("payload") or {}) if isinstance(event.get("payload"), dict) else {}
+        merged = dict(payload)
+        for key in (
+            "feedback_type",
+            "request_id",
+            "action_id",
+            "review_status",
+            "new_text",
+            "selected_old_text",
+            "selected_entity_id",
+            "confidence",
+            "note",
+            "candidates",
+            "selected_candidate",
+            "agent_suggestion",
+            "accepted_agent_suggestion",
+            "created_utc",
+        ):
+            if key not in merged and key in event:
+                merged[key] = event.get(key)
+        raw_items.append(merged)
+    return raw_items
+
+
+def _build_reviewed_run_bundle(
+    *,
+    request_id: str,
+    prepare_payload: Dict[str, Any],
+    compare_payload: Dict[str, Any],
+    feedback_items: List[Dict[str, Any]],
+    normalized_feedback_items: List[Dict[str, Any]],
+    feedback_events: List[Dict[str, Any]],
+    label: str,
+    notes: str,
+) -> Dict[str, Any]:
+    latest_event_utc = ""
+    for event in feedback_events:
+        if not isinstance(event, dict):
+            continue
+        created_utc = str(event.get("created_utc") or "").strip()
+        if created_utc and created_utc > latest_event_utc:
+            latest_event_utc = created_utc
+
+    learning_examples = _build_feedback_learning_examples(items=normalized_feedback_items)
+    feedback_count = len(normalized_feedback_items)
+    prepare_markups = (
+        prepare_payload.get("markups")
+        if isinstance(prepare_payload.get("markups"), list)
+        else []
+    )
+    compare_actions = (
+        ((compare_payload.get("plan") or {}).get("actions") or [])
+        if isinstance(compare_payload.get("plan"), dict)
+        else []
+    )
+    markup_review_queue = (
+        compare_payload.get("markup_review_queue")
+        if isinstance(compare_payload.get("markup_review_queue"), list)
+        else []
+    )
+    replacement_review_queue = (
+        compare_payload.get("review_queue")
+        if isinstance(compare_payload.get("review_queue"), list)
+        else []
+    )
+    created_fragment = re.sub(r"[^0-9A-Za-z]+", "", latest_event_utc or _utc_now_iso())[-14:]
+    bundle_id = f"{request_id}:{feedback_count}:{created_fragment or 'capture'}"
+    learning_counts = {
+        domain: len(examples)
+        for domain, examples in learning_examples.items()
+        if isinstance(examples, list)
+    }
+    return {
+        "schema": _REVIEWED_RUN_SCHEMA,
+        "bundle_id": bundle_id,
+        "request_id": request_id,
+        "captured_utc": _utc_now_iso(),
+        "source": "autodraft-reviewed-run",
+        "label": label or None,
+        "notes": notes or None,
+        "prepare": dict(prepare_payload),
+        "compare": dict(compare_payload),
+        "feedback": {
+            "items": feedback_items,
+            "event_count": feedback_count,
+            "latest_event_utc": latest_event_utc or None,
+        },
+        "learning_examples": learning_examples,
+        "summary": {
+            "prepare_markup_count": len(prepare_markups),
+            "compare_action_count": len(compare_actions),
+            "markup_review_count": len(markup_review_queue),
+            "replacement_review_count": len(replacement_review_queue),
+            "feedback_item_count": feedback_count,
+            "learning_example_counts": learning_counts,
+        },
+    }
+
+
 def _import_feedback_data(
     *,
     db_path: str,
@@ -7423,6 +7551,88 @@ def create_autodraft_blueprint(
                     "requestId": request_id,
                     "source": "autodraft-compare-feedback",
                     **exported,
+                }
+            ),
+            200,
+        )
+
+    @bp.route("/compare/reviewed-run/export", methods=["POST"])
+    @require_api_key
+    @limiter.limit("30 per hour")
+    def api_autodraft_compare_reviewed_run_export():
+        if not request.is_json:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Expected JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/reviewed-run/export"},
+            )
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Invalid JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/reviewed-run/export"},
+            )
+        request_id = _derive_request_id(payload)
+        prepare_payload = payload.get("prepare") if isinstance(payload.get("prepare"), dict) else {}
+        compare_payload = payload.get("compare") if isinstance(payload.get("compare"), dict) else {}
+        compare_request_id = (
+            str(compare_payload.get("requestId") or payload.get("compareRequestId") or "").strip()
+            or str(payload.get("requestId") or "").strip()
+        )
+        if not compare_request_id:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="A compare requestId is required to export a reviewed run bundle.",
+                request_id=request_id,
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/reviewed-run/export"},
+            )
+
+        db_path = _resolve_compare_feedback_db_path()
+        feedback_events = _export_feedback_events_for_request(
+            db_path=db_path,
+            request_id=compare_request_id,
+        )
+        feedback_items = _feedback_items_from_exported_events(events=feedback_events)
+        normalized_feedback_items = _normalize_feedback_items({"items": feedback_items})
+        if not normalized_feedback_items:
+            return _autodraft_error_response(
+                code="AUTODRAFT_REVIEWED_RUN_EMPTY",
+                message=(
+                    "No saved review feedback was found for this compare request. "
+                    "Save at least one markup or replacement review before exporting a reviewed run."
+                ),
+                request_id=request_id,
+                status_code=400,
+                meta={
+                    "endpoint": "/api/autodraft/compare/reviewed-run/export",
+                    "compare_request_id": compare_request_id,
+                },
+            )
+
+        bundle = _build_reviewed_run_bundle(
+            request_id=compare_request_id,
+            prepare_payload=prepare_payload,
+            compare_payload=compare_payload,
+            feedback_items=feedback_items,
+            normalized_feedback_items=normalized_feedback_items,
+            feedback_events=feedback_events,
+            label=str(payload.get("label") or "").strip(),
+            notes=str(payload.get("notes") or "").strip(),
+        )
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "success": True,
+                    "requestId": request_id,
+                    "source": "autodraft-reviewed-run",
+                    "bundle": bundle,
                 }
             ),
             200,

@@ -26,8 +26,11 @@ vi.mock("./autodraftService", async () => {
 			runCompare: vi.fn(),
 			submitCompareFeedback: vi.fn(),
 			exportCompareFeedback: vi.fn(),
+			exportReviewedRunBundle: vi.fn(),
 			importCompareFeedback: vi.fn(),
 			trainLearningModels: vi.fn(),
+			listLearningModels: vi.fn(),
+			listLearningEvaluations: vi.fn(),
 		},
 	};
 });
@@ -153,6 +156,20 @@ describe("AutoDraftComparePanel", () => {
 		getDocumentMock.mockReturnValue({
 			promise: Promise.resolve(mockPdfDoc),
 		});
+		vi.mocked(autoDraftService.exportReviewedRunBundle).mockResolvedValue({
+			schema: "autodraft_reviewed_run.v1",
+			bundleId: "req-compare:1:20260317T020000Z",
+			requestId: "req-compare",
+			capturedUtc: "2026-03-17T02:00:00Z",
+			source: "autodraft-reviewed-run",
+			summary: {},
+			feedback: { items: [], eventCount: 0 },
+			learningExamples: {},
+			prepare: {},
+			compare: {},
+		});
+		vi.mocked(autoDraftService.listLearningModels).mockResolvedValue([]);
+		vi.mocked(autoDraftService.listLearningEvaluations).mockResolvedValue([]);
 		vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
 			() => ({}) as never,
 		);
@@ -1141,6 +1158,273 @@ describe("AutoDraftComparePanel", () => {
 		expect(trainMock).toHaveBeenCalledWith({ domain: "autodraft_markup" });
 		expect(
 			screen.getByText(/Markup model trained \| 20260316T000000Z \| samples 8 \| acc 0.75 \| f1 0.72/i),
+		).toBeTruthy();
+	});
+
+	it("shows replacement learning status and trains the replacement model", async () => {
+		const prepareMock = vi.mocked(autoDraftService.prepareCompare);
+		const compareMock = vi.mocked(autoDraftService.runCompare);
+		const trainMock = vi.mocked(autoDraftService.trainLearningModels);
+		const listModelsMock = vi.mocked(autoDraftService.listLearningModels);
+		const listEvaluationsMock = vi.mocked(
+			autoDraftService.listLearningEvaluations,
+		);
+		prepareMock.mockResolvedValue(createPrepareResponse(1));
+		listModelsMock.mockResolvedValue([
+			{
+				domain: "autodraft_replacement",
+				version: "20260317T020000Z",
+				artifactPath: "models/autodraft_replacement/20260317T020000Z.joblib",
+				metrics: { accuracy: 0.82, macro_f1: 0.79 },
+				metadata: { example_count: 14 },
+				active: true,
+				createdUtc: "2026-03-17T02:00:00Z",
+			},
+		]);
+		listEvaluationsMock.mockResolvedValue([
+			{
+				domain: "autodraft_replacement",
+				version: "20260317T020000Z",
+				metrics: { accuracy: 0.82, macro_f1: 0.79 },
+				confusion: {},
+				promoted: true,
+				sampleCount: 14,
+				createdUtc: "2026-03-17T02:01:00Z",
+			},
+		]);
+		trainMock.mockResolvedValue({
+			requestId: "req-train-replacement",
+			results: [
+				{
+					ok: true,
+					domain: "autodraft_replacement",
+					version: "20260317T030000Z",
+					sample_count: 16,
+					metrics: { accuracy: 0.85, macro_f1: 0.83 },
+				},
+			],
+		});
+		compareMock.mockResolvedValue({
+			ok: true,
+			success: true,
+			requestId: "req-compare-replacement",
+			source: "python-compare",
+			mode: "cad-aware",
+			tolerance_profile: "medium",
+			engine: { requested: "auto", used: "python", used_fallback: false },
+			calibration: {
+				pdf_points: [
+					{ x: 10, y: 10 },
+					{ x: 20, y: 10 },
+				],
+				cad_points: [
+					{ x: 100, y: 100 },
+					{ x: 110, y: 100 },
+				],
+				scale: 1,
+				rotation_deg: 0,
+				translation: { x: 90, y: 90 },
+			},
+			plan: {
+				source: "python-local-rules",
+				summary: {
+					total_markups: 1,
+					actions_proposed: 1,
+					classified: 1,
+					needs_review: 1,
+				},
+				actions: [
+					{
+						id: "action-red-2",
+						rule_id: "semantic-color-red",
+						category: "ADD",
+						action: "Replace old device tag with new tag.",
+						confidence: 0.74,
+						status: "review",
+						markup: {
+							id: "annot-10",
+							type: "text",
+							color: "red",
+							text: "TS500",
+						},
+						replacement: {
+							new_text: "TS500",
+							old_text: "TS410",
+							target_entity_id: "E-TS410",
+							confidence: 0.62,
+							status: "ambiguous",
+							candidates: [
+								{
+									entity_id: "E-TS410",
+									text: "TS410",
+									score: 0.62,
+									distance: 7.1,
+									pointer_hit: true,
+									overlap: false,
+									pair_hit_count: 0,
+								},
+							],
+						},
+					},
+				],
+			},
+			backcheck: {
+				ok: true,
+				success: true,
+				requestId: "req-compare-replacement",
+				source: "python-local-backcheck",
+				mode: "cad-aware",
+				cad: {
+					available: true,
+					degraded: false,
+					source: "live",
+					entity_count: 1,
+					locked_layer_count: 0,
+				},
+				summary: {
+					total_actions: 1,
+					pass_count: 0,
+					warn_count: 1,
+					fail_count: 0,
+				},
+				warnings: [],
+				findings: [
+					{
+						id: "finding-1",
+						action_id: "action-red-2",
+						status: "warn",
+						severity: "medium",
+						category: "add",
+						notes: ["Replacement review required."],
+						suggestions: ["Confirm old text target before execution."],
+					},
+				],
+			},
+			summary: {
+				status: "warn",
+				total_markups: 1,
+				total_actions: 1,
+				pass_count: 0,
+				warn_count: 1,
+				fail_count: 0,
+				cad_context_available: true,
+			},
+			markup_review_queue: [],
+			review_queue: [
+				{
+					id: "review-action-red-2",
+					request_id: "req-compare-replacement",
+					action_id: "action-red-2",
+					status: "ambiguous",
+					confidence: 0.62,
+					new_text: "TS500",
+					selected_old_text: "TS410",
+					selected_entity_id: "E-TS410",
+					message: "Replacement mapping is ambiguous.",
+					candidates: [
+						{
+							entity_id: "E-TS410",
+							text: "TS410",
+							score: 0.62,
+							distance: 7.1,
+							pointer_hit: true,
+							overlap: false,
+							pair_hit_count: 0,
+							score_components: {
+								base_score: 0.55,
+								agent_boost: 0,
+								pre_model_score: 0.55,
+								model_adjustment: 0.07,
+								final_score: 0.62,
+							},
+							selection_model: {
+								label: "selected",
+								confidence: 0.82,
+								modelVersion: "20260317T020000Z",
+								featureSource: "replacement_numeric_features",
+								source: "local_model",
+								reasonCodes: ["local_model_prediction"],
+								applied: true,
+								adjustment: 0.07,
+							},
+						},
+					],
+				},
+			],
+			shadow_advisor: {
+				enabled: true,
+				available: true,
+				profile: "draftsmith",
+				reviews: [],
+			},
+		});
+
+		const { container } = render(<AutoDraftComparePanel />);
+		const fileInput = screen.getByLabelText("Bluebeam PDF") as HTMLInputElement;
+		const pdfFile = new File(["%PDF-1.7"], "sheet.pdf", {
+			type: "application/pdf",
+		});
+		fireEvent.change(fileInput, {
+			target: { files: [pdfFile] },
+		});
+
+		await waitFor(() => {
+			expect(mockPdfDoc.getPage).toHaveBeenCalled();
+		});
+		const canvas = container.querySelector("canvas");
+		expect(canvas).toBeTruthy();
+		if (!canvas) return;
+		vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+			x: 0,
+			y: 0,
+			left: 0,
+			top: 0,
+			right: 100,
+			bottom: 200,
+			width: 100,
+			height: 200,
+			toJSON: () => ({}),
+		} as DOMRect);
+
+		fireEvent.click(screen.getByRole("button", { name: "Prepare markups" }));
+		await waitFor(() => {
+			expect(prepareMock).toHaveBeenCalled();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Run compare" }));
+		await waitFor(() => {
+			expect(compareMock).toHaveBeenCalled();
+		});
+		await waitFor(() => {
+			expect(listModelsMock).toHaveBeenCalledWith("autodraft_replacement");
+		});
+		expect(listEvaluationsMock).toHaveBeenCalledWith({
+			domain: "autodraft_replacement",
+			limit: 1,
+		});
+		expect(
+			screen.getByText(
+				/Active replacement model \| 20260317T020000Z \| samples 14 \| acc 0.82 \| f1 0.79/i,
+			),
+		).toBeTruthy();
+		expect(
+			screen.getByText(
+				/Latest replacement eval \| 20260317T020000Z \| promoted \| samples 14 \| acc 0.82 \| f1 0.79/i,
+			),
+		).toBeTruthy();
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Train replacement model" }),
+		);
+		await waitFor(() => {
+			expect(trainMock).toHaveBeenCalledWith({
+				domain: "autodraft_replacement",
+			});
+		});
+		expect(
+			screen.getByText(
+				/Replacement model trained \| 20260317T030000Z \| samples 16 \| acc 0.85 \| f1 0.83/i,
+			),
 		).toBeTruthy();
 	});
 

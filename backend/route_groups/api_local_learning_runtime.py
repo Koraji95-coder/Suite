@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -141,8 +142,16 @@ class LocalLearningRuntime:
         connection.row_factory = sqlite3.Row
         return connection
 
+    @contextmanager
+    def _open_connection(self):
+        connection = self._connect()
+        try:
+            yield connection
+        finally:
+            connection.close()
+
     def _ensure_schema(self) -> None:
-        with self._connect() as connection:
+        with self._open_connection() as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS learning_examples (
@@ -194,6 +203,15 @@ class LocalLearningRuntime:
                     promoted INTEGER NOT NULL DEFAULT 0,
                     sample_count INTEGER NOT NULL DEFAULT 0,
                     created_utc TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS learning_bundle_imports (
+                    bundle_id TEXT PRIMARY KEY,
+                    imported_utc TEXT NOT NULL,
+                    summary_json TEXT NOT NULL DEFAULT '{}'
                 )
                 """
             )
@@ -251,7 +269,7 @@ class LocalLearningRuntime:
         normalized_domain = self._validate_domain(domain)
         now_iso = _utc_now_iso()
         inserted = 0
-        with self._connect() as connection:
+        with self._open_connection() as connection:
             for example in examples:
                 if not isinstance(example, dict):
                     continue
@@ -309,7 +327,7 @@ class LocalLearningRuntime:
             query += " WHERE domain = ?"
             params.append(normalized_domain)
         query += " ORDER BY domain ASC, active DESC, created_utc DESC"
-        with self._connect() as connection:
+        with self._open_connection() as connection:
             rows = connection.execute(query, params).fetchall()
         models: List[Dict[str, Any]] = []
         for row in rows:
@@ -344,7 +362,7 @@ class LocalLearningRuntime:
             params.append(normalized_domain)
         query += " ORDER BY created_utc DESC, id DESC LIMIT ?"
         params.append(safe_limit)
-        with self._connect() as connection:
+        with self._open_connection() as connection:
             rows = connection.execute(query, params).fetchall()
         evaluations: List[Dict[str, Any]] = []
         for row in rows:
@@ -363,7 +381,7 @@ class LocalLearningRuntime:
 
     def _load_examples(self, domain: str) -> List[Dict[str, Any]]:
         normalized_domain = self._validate_domain(domain)
-        with self._connect() as connection:
+        with self._open_connection() as connection:
             rows = connection.execute(
                 """
                 SELECT id, label, text_value, features_json, metadata_json, source, created_utc
@@ -387,6 +405,48 @@ class LocalLearningRuntime:
                 }
             )
         return examples
+
+    def has_imported_bundle(self, bundle_id: str) -> bool:
+        normalized_bundle_id = _normalize_text(bundle_id)
+        if not normalized_bundle_id:
+            return False
+        with self._open_connection() as connection:
+            row = connection.execute(
+                """
+                SELECT bundle_id
+                FROM learning_bundle_imports
+                WHERE bundle_id = ?
+                LIMIT 1
+                """,
+                (normalized_bundle_id,),
+            ).fetchone()
+        return row is not None
+
+    def record_imported_bundle(
+        self,
+        *,
+        bundle_id: str,
+        summary: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        normalized_bundle_id = _normalize_text(bundle_id)
+        if not normalized_bundle_id:
+            return
+        with self._open_connection() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO learning_bundle_imports (
+                    bundle_id,
+                    imported_utc,
+                    summary_json
+                ) VALUES (?, ?, ?)
+                """,
+                (
+                    normalized_bundle_id,
+                    _utc_now_iso(),
+                    _safe_json_dumps(summary if isinstance(summary, dict) else {}),
+                ),
+            )
+            connection.commit()
 
     def _active_model_row(
         self,
@@ -594,7 +654,7 @@ class LocalLearningRuntime:
         bundle["example_count"] = len(examples)
         joblib.dump(bundle, artifact_path)
 
-        with self._connect() as connection:
+        with self._open_connection() as connection:
             active_row = self._active_model_row(connection, domain=normalized_domain)
             active_metrics = (
                 _safe_json_loads(active_row["metrics_json"], {})
@@ -696,6 +756,112 @@ class LocalLearningRuntime:
                 )
         return results
 
+    def benchmark_examples(
+        self,
+        *,
+        domain: str,
+        examples: Sequence[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
+
+        normalized_domain = self._validate_domain(domain)
+        bundle = self._load_active_model_bundle(domain=normalized_domain)
+        if not bundle:
+            return {
+                "ok": False,
+                "domain": normalized_domain,
+                "sample_count": len(examples),
+                "predicted_count": 0,
+                "missing_prediction_count": len(examples),
+                "message": "No active model is available for this domain.",
+            }
+
+        actual_labels: List[str] = []
+        predicted_labels: List[str] = []
+        missing_prediction_count = 0
+        sample_count = 0
+
+        for example in examples:
+            if not isinstance(example, dict):
+                continue
+            sample_count += 1
+            prediction: Optional[LocalModelPrediction]
+            actual_label = ""
+            if normalized_domain in _TEXT_CLASSIFIER_DOMAINS:
+                actual_label = str(example.get("label") or "").strip()
+                if not actual_label:
+                    missing_prediction_count += 1
+                    continue
+                prediction = self.predict_text_domain(
+                    domain=normalized_domain,
+                    text=str(example.get("text") or ""),
+                    features=(
+                        dict(example.get("features"))
+                        if isinstance(example.get("features"), dict)
+                        else {}
+                    ),
+                )
+            else:
+                actual_label = (
+                    "selected"
+                    if _coerce_bool_label(example.get("label")) == 1
+                    else "not_selected"
+                )
+                prediction = self.predict_replacement(
+                    features=(
+                        dict(example.get("features"))
+                        if isinstance(example.get("features"), dict)
+                        else {}
+                    )
+                )
+            if prediction is None or not str(prediction.label or "").strip():
+                missing_prediction_count += 1
+                continue
+            actual_labels.append(actual_label)
+            predicted_labels.append(str(prediction.label).strip())
+
+        if not actual_labels:
+            return {
+                "ok": False,
+                "domain": normalized_domain,
+                "model_version": str(bundle.get("version") or "unknown"),
+                "sample_count": sample_count,
+                "predicted_count": 0,
+                "missing_prediction_count": missing_prediction_count,
+                "message": "No benchmark predictions were produced.",
+            }
+
+        labels = sorted(set(actual_labels) | set(predicted_labels))
+        metrics = {
+            "accuracy": round(float(accuracy_score(actual_labels, predicted_labels)), 4),
+            "macro_f1": round(
+                float(f1_score(actual_labels, predicted_labels, average="macro")),
+                4,
+            ),
+            "coverage": round(
+                float(len(predicted_labels) / max(sample_count, 1)),
+                4,
+            ),
+        }
+        confusion = {
+            "labels": labels,
+            "matrix": confusion_matrix(
+                actual_labels,
+                predicted_labels,
+                labels=labels,
+            ).tolist(),
+        }
+        return {
+            "ok": True,
+            "domain": normalized_domain,
+            "model_version": str(bundle.get("version") or "unknown"),
+            "sample_count": sample_count,
+            "predicted_count": len(predicted_labels),
+            "missing_prediction_count": missing_prediction_count,
+            "metrics": metrics,
+            "confusion": confusion,
+        }
+
     def _model_cache_pop(self, domain: str) -> None:
         key = self._validate_domain(domain)
         cache = getattr(self, "_model_cache", None)
@@ -724,7 +890,7 @@ class LocalLearningRuntime:
             cached = self._model_cache.get(normalized_domain)
             if isinstance(cached, dict):
                 return cached
-            with self._connect() as connection:
+            with self._open_connection() as connection:
                 row = self._active_model_row(connection, domain=normalized_domain)
             if row is None:
                 return None

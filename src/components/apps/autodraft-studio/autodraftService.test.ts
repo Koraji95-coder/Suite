@@ -800,6 +800,50 @@ describe("autoDraftService compare endpoints", () => {
 					JSON.stringify({
 						ok: true,
 						success: true,
+						requestId: "req-reviewed-run-export",
+						source: "autodraft-reviewed-run",
+						bundle: {
+							schema: "autodraft_reviewed_run.v1",
+							bundle_id: "req-compare-1:2:20260317T020100Z",
+							request_id: "req-compare-1",
+							captured_utc: "2026-03-17T02:01:00Z",
+							source: "autodraft-reviewed-run",
+							label: "sample-reviewed-run.pdf",
+							summary: {
+								prepare_markup_count: 2,
+								compare_action_count: 2,
+							},
+							feedback: {
+								items: [
+									{
+										request_id: "req-compare-1",
+										action_id: "action-red-1",
+										review_status: "corrected",
+									},
+								],
+								event_count: 1,
+								latest_event_utc: "2026-03-17T02:00:00Z",
+							},
+							learning_examples: {
+								autodraft_replacement: [
+									{
+										label: "selected",
+										text: "TS416",
+									},
+								],
+							},
+							prepare: { requestId: "req-prepare-1" },
+							compare: { requestId: "req-compare-1" },
+						},
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						ok: true,
+						success: true,
 						requestId: "req-train",
 						source: "autodraft-learning",
 						results: [
@@ -833,6 +877,129 @@ describe("autoDraftService compare endpoints", () => {
 			pairs: [],
 			metrics: [],
 		});
+		const reviewedRunBundle = await autoDraftService.exportReviewedRunBundle({
+			prepare: {
+				ok: true,
+				success: true,
+				requestId: "req-prepare-1",
+				source: "python-compare-prepare",
+				page: { index: 0, total_pages: 1, width: 612, height: 792 },
+				calibration_seed: { available: false, source: "none", notes: [] },
+				auto_calibration: {
+					available: true,
+					used: false,
+					status: "needs_manual",
+					confidence: 0,
+					method: "none",
+					quality_notes: [],
+					suggested_pdf_points: [],
+					suggested_cad_points: [],
+				},
+				warnings: [],
+				pdf_metadata: {
+					bluebeam_detected: false,
+					detection_reasons: [],
+					document: {
+						title: null,
+						author: null,
+						subject: null,
+						creator: null,
+						producer: null,
+						keywords: null,
+						created_utc: null,
+						modified_utc: null,
+						custom: {},
+					},
+					page: {
+						index: 0,
+						rotation_deg: 0,
+						user_unit: null,
+						media_box: { width: 612, height: 792 },
+						crop_box: null,
+						annotation_counts: {
+							total: 0,
+							supported: 0,
+							unsupported: 0,
+							by_subtype: {},
+						},
+						text_extraction: {
+							used: false,
+							source: "none",
+							feature_source: "pdf_annotations",
+							render_available: false,
+							ocr_available: false,
+							embedded_line_count: 0,
+							ocr_line_count: 0,
+							candidate_count: 0,
+							selected_line_count: 0,
+							skipped_without_bounds: 0,
+							selected_black_text_count: 0,
+						},
+					},
+				},
+				markups: [],
+			},
+			compare: {
+				ok: true,
+				success: true,
+				requestId: "req-compare-1",
+				source: "python-compare",
+				mode: "cad-aware",
+				tolerance_profile: "medium",
+				engine: { requested: "python", used: "python", used_fallback: false },
+				calibration: {
+					pdf_points: [],
+					cad_points: [],
+					scale: 1,
+					rotation_deg: 0,
+					translation: { x: 0, y: 0 },
+				},
+				plan: {
+					source: "python-local-rules",
+					summary: {
+						total_markups: 0,
+						actions_proposed: 0,
+						classified: 0,
+						needs_review: 0,
+					},
+					actions: [],
+				},
+				backcheck: {
+					ok: true,
+					success: true,
+					requestId: "req-compare-1",
+					source: "python-local-backcheck",
+					mode: "cad-aware",
+					cad: {
+						available: false,
+						degraded: false,
+						source: "none",
+						entity_count: 0,
+						locked_layer_count: 0,
+					},
+					summary: {
+						total_actions: 0,
+						pass_count: 0,
+						warn_count: 0,
+						fail_count: 0,
+					},
+					warnings: [],
+					findings: [],
+				},
+				summary: {
+					status: "pass",
+					total_markups: 0,
+					total_actions: 0,
+					pass_count: 0,
+					warn_count: 0,
+					fail_count: 0,
+					cad_context_available: false,
+				},
+				markup_review_queue: [],
+				review_queue: [],
+			},
+			label: "sample-reviewed-run.pdf",
+		});
 		await autoDraftService.trainLearningModels({
 			domain: "autodraft_markup",
 		});
@@ -847,7 +1014,85 @@ describe("autoDraftService compare endpoints", () => {
 			"/api/autodraft/compare/feedback/import",
 		);
 		expect(fetchSpy.mock.calls[3]?.[0]).toContain(
+			"/api/autodraft/compare/reviewed-run/export",
+		);
+		expect(fetchSpy.mock.calls[4]?.[0]).toContain(
 			"/api/autodraft/learning/train",
 		);
+		expect(reviewedRunBundle.schema).toBe("autodraft_reviewed_run.v1");
+		expect(reviewedRunBundle.bundleId).toBe("req-compare-1:2:20260317T020100Z");
+		expect(reviewedRunBundle.feedback.eventCount).toBe(1);
+		expect(reviewedRunBundle.learningExamples.autodraft_replacement).toHaveLength(1);
+	});
+
+	it("lists replacement learning models and evaluations with domain filters", async () => {
+		const fetchSpy = vi.spyOn(globalThis, "fetch");
+		fetchSpy
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						ok: true,
+						success: true,
+						requestId: "req-models",
+						source: "autodraft-learning",
+						models: [
+							{
+								domain: "autodraft_replacement",
+								version: "20260317T020000Z",
+								artifact_path:
+									"models/autodraft_replacement/20260317T020000Z.joblib",
+								metrics: { accuracy: 0.82, macro_f1: 0.79 },
+								metadata: { example_count: 14 },
+								active: true,
+								created_utc: "2026-03-17T02:00:00Z",
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						ok: true,
+						success: true,
+						requestId: "req-evaluations",
+						source: "autodraft-learning",
+						evaluations: [
+							{
+								domain: "autodraft_replacement",
+								version: "20260317T020000Z",
+								metrics: { accuracy: 0.82, macro_f1: 0.79 },
+								confusion: {},
+								promoted: true,
+								sample_count: 14,
+								created_utc: "2026-03-17T02:01:00Z",
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
+			);
+
+		const models = await autoDraftService.listLearningModels(
+			"autodraft_replacement",
+		);
+		const evaluations = await autoDraftService.listLearningEvaluations({
+			domain: "autodraft_replacement",
+			limit: 1,
+		});
+
+		expect(fetchSpy.mock.calls[0]?.[0]).toContain(
+			"/api/autodraft/learning/models?domain=autodraft_replacement",
+		);
+		expect(fetchSpy.mock.calls[1]?.[0]).toContain(
+			"/api/autodraft/learning/evaluations?domain=autodraft_replacement&limit=1",
+		);
+		expect(models[0]?.version).toBe("20260317T020000Z");
+		expect(models[0]?.active).toBe(true);
+		expect(models[0]?.metadata.example_count).toBe(14);
+		expect(evaluations[0]?.version).toBe("20260317T020000Z");
+		expect(evaluations[0]?.promoted).toBe(true);
+		expect(evaluations[0]?.sampleCount).toBe(14);
 	});
 });

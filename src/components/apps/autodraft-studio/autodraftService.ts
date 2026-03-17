@@ -459,6 +459,25 @@ export type AutoDraftLearningEvaluation = {
 	createdUtc: string;
 };
 
+export type AutoDraftReviewedRunBundle = {
+	schema: string;
+	bundleId: string;
+	requestId: string;
+	capturedUtc: string;
+	source: string;
+	label?: string;
+	notes?: string;
+	summary: Record<string, unknown>;
+	feedback: {
+		items: Record<string, unknown>[];
+		eventCount: number;
+		latestEventUtc?: string;
+	};
+	learningExamples: Record<string, Record<string, unknown>[]>;
+	prepare: Record<string, unknown>;
+	compare: Record<string, unknown>;
+};
+
 const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_REPLACEMENT_TUNING: AutoDraftReplacementTuning = {
 	unresolved_confidence_threshold: 0.36,
@@ -1886,6 +1905,45 @@ const normalizeLearningEvaluation = (
 	};
 };
 
+const normalizeReviewedRunBundle = (
+	payload: unknown,
+): AutoDraftReviewedRunBundle | null => {
+	if (!isRecord(payload)) return null;
+	const feedbackRaw = isRecord(payload.feedback) ? payload.feedback : {};
+	const learningExamplesRaw = isRecord(payload.learning_examples)
+		? payload.learning_examples
+		: {};
+	const learningExamples: Record<string, Record<string, unknown>[]> = {};
+	for (const [domain, value] of Object.entries(learningExamplesRaw)) {
+		if (!Array.isArray(value)) continue;
+		learningExamples[domain] = value.filter((entry): entry is Record<string, unknown> =>
+			isRecord(entry),
+		);
+	}
+	return {
+		schema: toNonEmptyString(payload.schema),
+		bundleId: toNonEmptyString(payload.bundle_id),
+		requestId: toNonEmptyString(payload.request_id),
+		capturedUtc: toNonEmptyString(payload.captured_utc),
+		source: toNonEmptyString(payload.source, "autodraft-reviewed-run"),
+		label: toNonEmptyString(payload.label) || undefined,
+		notes: toNonEmptyString(payload.notes) || undefined,
+		summary: isRecord(payload.summary) ? payload.summary : {},
+		feedback: {
+			items: Array.isArray(feedbackRaw.items)
+				? feedbackRaw.items.filter((entry): entry is Record<string, unknown> =>
+						isRecord(entry),
+					)
+				: [],
+			eventCount: toInt(feedbackRaw.event_count, 0),
+			latestEventUtc: toNonEmptyString(feedbackRaw.latest_event_utc) || undefined,
+		},
+		learningExamples,
+		prepare: isRecord(payload.prepare) ? payload.prepare : {},
+		compare: isRecord(payload.compare) ? payload.compare : {},
+	};
+};
+
 class AutoDraftService {
 	private readonly baseUrl: string;
 	private readonly apiKey: string;
@@ -2125,6 +2183,36 @@ class AutoDraftService {
 			pairs: Array.isArray(payload.pairs) ? payload.pairs : [],
 			metrics: Array.isArray(payload.metrics) ? payload.metrics : [],
 		};
+	}
+
+	async exportReviewedRunBundle(args: {
+		prepare: AutoDraftComparePrepareResponse;
+		compare: AutoDraftCompareResponse;
+		label?: string;
+		notes?: string;
+	}): Promise<AutoDraftReviewedRunBundle> {
+		const payload = await this.requestJson<unknown>(
+			"/api/autodraft/compare/reviewed-run/export",
+			{
+				method: "POST",
+				body: JSON.stringify({
+					requestId: args.compare.requestId,
+					prepare: args.prepare,
+					compare: args.compare,
+					label: args.label,
+					notes: args.notes,
+				}),
+			},
+			DEFAULT_TIMEOUT_MS * 2,
+		);
+		if (!isRecord(payload)) {
+			throw new Error("Invalid reviewed run export response.");
+		}
+		const bundle = normalizeReviewedRunBundle(payload.bundle);
+		if (!bundle) {
+			throw new Error("Reviewed run bundle payload was invalid.");
+		}
+		return bundle;
 	}
 
 	async importCompareFeedback(args: {

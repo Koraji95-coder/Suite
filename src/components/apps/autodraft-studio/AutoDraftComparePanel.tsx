@@ -29,6 +29,8 @@ import {
 	type AutoDraftComparePrepareResponse,
 	type AutoDraftCompareRoi,
 	type AutoDraftCompareResponse,
+	type AutoDraftLearningEvaluation,
+	type AutoDraftLearningModel,
 	type AutoDraftReplacementTuning,
 	type AutoDraftToleranceProfile,
 	autoDraftService,
@@ -102,6 +104,13 @@ type PreviewStatus = {
 	message: string;
 };
 
+type LearningSummaryState = {
+	loading: boolean;
+	model: AutoDraftLearningModel | null;
+	evaluation: AutoDraftLearningEvaluation | null;
+	error: string | null;
+};
+
 type PanOffset = {
 	x: number;
 	y: number;
@@ -120,6 +129,12 @@ const PDF_PREVIEW_MIN_ZOOM = 0.4;
 const PDF_PREVIEW_MAX_ZOOM = 4.0;
 const PDF_PREVIEW_ZOOM_STEP = 1.15;
 const PREVIEW_PAN_THRESHOLD_PX = 6;
+const EMPTY_LEARNING_SUMMARY: LearningSummaryState = {
+	loading: false,
+	model: null,
+	evaluation: null,
+	error: null,
+};
 
 function isRecordValue(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -245,15 +260,46 @@ function buildMarkupReviewDraftDefaults(args: {
 function summarizeMarkupTrainingResult(
 	results: Array<Record<string, unknown>>,
 ): { color: "success" | "warning"; message: string } {
+	return summarizeDomainTrainingResult(results, {
+		domain: "autodraft_markup",
+		label: "Markup",
+	});
+}
+
+function toFiniteNumber(value: unknown): number | null {
+	if (typeof value === "number" && Number.isFinite(value)) return value;
+	if (typeof value === "string") {
+		const parsed = Number(value);
+		if (Number.isFinite(parsed)) return parsed;
+	}
+	return null;
+}
+
+function formatLearningMetricTokens(metrics: Record<string, unknown>): string[] {
+	const accuracy = toFiniteNumber(metrics.accuracy);
+	const macroF1 = toFiniteNumber(metrics.macro_f1);
+	const tokens: string[] = [];
+	if (accuracy !== null) tokens.push(`acc ${accuracy.toFixed(2)}`);
+	if (macroF1 !== null) tokens.push(`f1 ${macroF1.toFixed(2)}`);
+	return tokens;
+}
+
+function summarizeDomainTrainingResult(
+	results: Array<Record<string, unknown>>,
+	args: {
+		domain: string;
+		label: string;
+	},
+): { color: "success" | "warning"; message: string } {
+	const { domain, label } = args;
 	const result =
 		results.find(
-			(entry) =>
-				toTrimmedString(entry.domain).toLowerCase() === "autodraft_markup",
+			(entry) => toTrimmedString(entry.domain).toLowerCase() === domain,
 		) || results[0];
 	if (!result) {
 		return {
 			color: "warning",
-			message: "Markup model training returned no results.",
+			message: `${label} model training returned no results.`,
 		};
 	}
 	const ok = Boolean(result.ok);
@@ -262,32 +308,61 @@ function summarizeMarkupTrainingResult(
 			color: "warning",
 			message:
 				toTrimmedString(result.message) ||
-				"Markup model training did not complete successfully.",
+				`${label} model training did not complete successfully.`,
 		};
 	}
 	const version = toTrimmedString(result.version);
-	const sampleCount =
-		typeof result.sample_count === "number" && Number.isFinite(result.sample_count)
-			? result.sample_count
-			: null;
+	const sampleCount = toFiniteNumber(result.sample_count);
 	const metrics = isRecordValue(result.metrics) ? result.metrics : null;
-	const accuracy =
-		metrics && typeof metrics.accuracy === "number" && Number.isFinite(metrics.accuracy)
-			? metrics.accuracy
-			: null;
-	const macroF1 =
-		metrics && typeof metrics.macro_f1 === "number" && Number.isFinite(metrics.macro_f1)
-			? metrics.macro_f1
-			: null;
-	const tokens = ["Markup model trained"];
+	const tokens = [`${label} model trained`];
 	if (version) tokens.push(version);
 	if (sampleCount !== null) tokens.push(`samples ${sampleCount}`);
-	if (accuracy !== null) tokens.push(`acc ${accuracy.toFixed(2)}`);
-	if (macroF1 !== null) tokens.push(`f1 ${macroF1.toFixed(2)}`);
+	if (metrics) {
+		tokens.push(...formatLearningMetricTokens(metrics));
+	}
 	return {
 		color: "success",
 		message: tokens.join(" | "),
 	};
+}
+
+function summarizeReplacementTrainingResult(
+	results: Array<Record<string, unknown>>,
+): { color: "success" | "warning"; message: string } {
+	return summarizeDomainTrainingResult(results, {
+		domain: "autodraft_replacement",
+		label: "Replacement",
+	});
+}
+
+function describeLearningModel(
+	label: string,
+	model: AutoDraftLearningModel | null,
+): string {
+	if (!model) {
+		return `No active ${label.toLowerCase()} model yet.`;
+	}
+	const sampleCount = toFiniteNumber(model.metadata.example_count);
+	const tokens = [`Active ${label} model`, model.version];
+	if (sampleCount !== null) tokens.push(`samples ${sampleCount}`);
+	tokens.push(...formatLearningMetricTokens(model.metrics));
+	return tokens.join(" | ");
+}
+
+function describeLearningEvaluation(
+	label: string,
+	evaluation: AutoDraftLearningEvaluation | null,
+): string {
+	if (!evaluation) {
+		return `No ${label.toLowerCase()} evaluation history yet.`;
+	}
+	const tokens = [`Latest ${label} eval`, evaluation.version];
+	tokens.push(evaluation.promoted ? "promoted" : "held");
+	if (evaluation.sampleCount > 0) {
+		tokens.push(`samples ${evaluation.sampleCount}`);
+	}
+	tokens.push(...formatLearningMetricTokens(evaluation.metrics));
+	return tokens.join(" | ");
 }
 
 function mapCanvasClientPointToPdf(args: {
@@ -362,6 +437,16 @@ export function AutoDraftComparePanel() {
 		color: "muted" | "warning" | "success";
 		message: string;
 	} | null>(null);
+	const [markupTrainingState, setMarkupTrainingState] = useState<{
+		color: "muted" | "warning" | "success";
+		message: string;
+	} | null>(null);
+	const [replacementTrainingState, setReplacementTrainingState] = useState<{
+		color: "muted" | "warning" | "success";
+		message: string;
+	} | null>(null);
+	const [replacementLearningSummary, setReplacementLearningSummary] =
+		useState<LearningSummaryState>(EMPTY_LEARNING_SUMMARY);
 	const [reviewSelectionByActionId, setReviewSelectionByActionId] = useState<
 		Record<string, string>
 	>({});
@@ -1608,16 +1693,16 @@ export function AutoDraftComparePanel() {
 
 	const trainMarkupModel = useCallback(async () => {
 		try {
-			setFeedbackTransferState({
+			setMarkupTrainingState({
 				color: "muted",
 				message: "Training local markup model...",
 			});
 			const payload = await autoDraftService.trainLearningModels({
 				domain: "autodraft_markup",
 			});
-			setFeedbackTransferState(summarizeMarkupTrainingResult(payload.results));
+			setMarkupTrainingState(summarizeMarkupTrainingResult(payload.results));
 		} catch (error) {
-			setFeedbackTransferState({
+			setMarkupTrainingState({
 				color: "warning",
 				message:
 					error instanceof Error && error.message.trim().length > 0
@@ -1626,6 +1711,65 @@ export function AutoDraftComparePanel() {
 			});
 		}
 	}, []);
+
+	const refreshReplacementLearningStatus = useCallback(async () => {
+		setReplacementLearningSummary((prev) => ({
+			...prev,
+			loading: true,
+			error: null,
+		}));
+		try {
+			const [modelsRaw, evaluationsRaw] = await Promise.all([
+				autoDraftService.listLearningModels("autodraft_replacement"),
+				autoDraftService.listLearningEvaluations({
+					domain: "autodraft_replacement",
+					limit: 1,
+				}),
+			]);
+			const models = Array.isArray(modelsRaw) ? modelsRaw : [];
+			const evaluations = Array.isArray(evaluationsRaw) ? evaluationsRaw : [];
+			setReplacementLearningSummary({
+				loading: false,
+				error: null,
+				model: models.find((entry) => entry.active) || models[0] || null,
+				evaluation: evaluations[0] || null,
+			});
+		} catch (error) {
+			setReplacementLearningSummary({
+				loading: false,
+				model: null,
+				evaluation: null,
+				error:
+					error instanceof Error && error.message.trim().length > 0
+						? error.message
+						: "Failed to load replacement learning status.",
+			});
+		}
+	}, []);
+
+	const trainReplacementModel = useCallback(async () => {
+		try {
+			setReplacementTrainingState({
+				color: "muted",
+				message: "Training local replacement model...",
+			});
+			const payload = await autoDraftService.trainLearningModels({
+				domain: "autodraft_replacement",
+			});
+			setReplacementTrainingState(
+				summarizeReplacementTrainingResult(payload.results),
+			);
+			await refreshReplacementLearningStatus();
+		} catch (error) {
+			setReplacementTrainingState({
+				color: "warning",
+				message:
+					error instanceof Error && error.message.trim().length > 0
+						? error.message
+						: "Failed to train local replacement model.",
+			});
+		}
+	}, [refreshReplacementLearningStatus]);
 
 	const exportFeedbackMemory = useCallback(async () => {
 		try {
@@ -1660,6 +1804,45 @@ export function AutoDraftComparePanel() {
 			});
 		}
 	}, []);
+
+	const exportReviewedRun = useCallback(async () => {
+		if (!prepareResult || !compareResult) return;
+		try {
+			setFeedbackTransferState({
+				color: "muted",
+				message: "Exporting reviewed run bundle...",
+			});
+			const bundle = await autoDraftService.exportReviewedRunBundle({
+				prepare: prepareResult,
+				compare: compareResult,
+				label: pdfFile?.name || compareResult.requestId,
+			});
+			const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+			const blob = new Blob([JSON.stringify(bundle, null, 2)], {
+				type: "application/json",
+			});
+			const url = URL.createObjectURL(blob);
+			const anchor = document.createElement("a");
+			anchor.href = url;
+			anchor.download = `autodraft-reviewed-run-${stamp}.json`;
+			document.body.appendChild(anchor);
+			anchor.click();
+			document.body.removeChild(anchor);
+			URL.revokeObjectURL(url);
+			setFeedbackTransferState({
+				color: "success",
+				message: `Exported reviewed run bundle (${bundle.feedback.eventCount} feedback item${bundle.feedback.eventCount === 1 ? "" : "s"}).`,
+			});
+		} catch (error) {
+			setFeedbackTransferState({
+				color: "warning",
+				message:
+					error instanceof Error && error.message.trim().length > 0
+						? error.message
+						: "Failed to export reviewed run bundle.",
+			});
+		}
+	}, [compareResult, pdfFile, prepareResult]);
 
 	const triggerFeedbackImport = useCallback(() => {
 		feedbackImportInputRef.current?.click();
@@ -1735,6 +1918,14 @@ export function AutoDraftComparePanel() {
 		document.body.removeChild(anchor);
 		URL.revokeObjectURL(url);
 	}, [prepareResult]);
+
+	useEffect(() => {
+		if (!compareResult) {
+			setReplacementLearningSummary(EMPTY_LEARNING_SUMMARY);
+			return;
+		}
+		void refreshReplacementLearningStatus();
+	}, [compareResult?.requestId, refreshReplacementLearningStatus]);
 
 	return (
 		<div className={styles.comparePanel}>
@@ -2446,9 +2637,23 @@ export function AutoDraftComparePanel() {
 					</div>
 
 					<div className={styles.compareReviewPanel}>
-						<Text size="xs" color="muted">
-							Markup review queue ({markupReviewQueue.length})
-						</Text>
+						<HStack gap={2} align="center" justify="between" wrap>
+							<Text size="xs" color="muted">
+								Markup review queue ({markupReviewQueue.length})
+							</Text>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={trainMarkupModel}
+							>
+								Train markup model
+							</Button>
+						</HStack>
+						{markupTrainingState ? (
+							<Text size="xs" color={markupTrainingState.color}>
+								{markupTrainingState.message}
+							</Text>
+						) : null}
 						{markupReviewQueue.length === 0 ? (
 							<Text size="xs" color="muted">
 								No low-confidence markup review items for this compare run.
@@ -2711,6 +2916,13 @@ export function AutoDraftComparePanel() {
 								<Button
 									variant="ghost"
 									size="sm"
+									onClick={exportReviewedRun}
+								>
+									Export reviewed run
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
 									onClick={triggerFeedbackImport}
 								>
 									Import feedback
@@ -2718,9 +2930,20 @@ export function AutoDraftComparePanel() {
 								<Button
 									variant="ghost"
 									size="sm"
-									onClick={trainMarkupModel}
+									onClick={() => {
+										void refreshReplacementLearningStatus();
+									}}
+									disabled={replacementLearningSummary.loading}
 								>
-									Train markup model
+									Refresh replacement status
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={trainReplacementModel}
+									disabled={replacementLearningSummary.loading}
+								>
+									Train replacement model
 								</Button>
 								<input
 									ref={feedbackImportInputRef}
@@ -2738,6 +2961,35 @@ export function AutoDraftComparePanel() {
 								{feedbackTransferState.message}
 							</Text>
 						) : null}
+						{replacementTrainingState ? (
+							<Text size="xs" color={replacementTrainingState.color}>
+								{replacementTrainingState.message}
+							</Text>
+						) : null}
+						{replacementLearningSummary.loading ? (
+							<Text size="xs" color="muted">
+								Loading replacement learning status...
+							</Text>
+						) : replacementLearningSummary.error ? (
+							<Text size="xs" color="warning">
+								{replacementLearningSummary.error}
+							</Text>
+						) : (
+							<Stack gap={1}>
+								<Text size="xs" color="muted">
+									{describeLearningModel(
+										"replacement",
+										replacementLearningSummary.model,
+									)}
+								</Text>
+								<Text size="xs" color="muted">
+									{describeLearningEvaluation(
+										"replacement",
+										replacementLearningSummary.evaluation,
+									)}
+								</Text>
+							</Stack>
+						)}
 						{compareResult.shadow_advisor ? (
 							<Stack gap={1}>
 								<Text

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import math
 import os
@@ -114,6 +115,7 @@ _DEFAULT_COLOR_TO_CATEGORY: Dict[str, str] = {
     "blue": "NOTE",
     "green": "DELETE",
     "red": "ADD",
+    "yellow": "NOTE",
 }
 
 _ADD_INTENT_PATTERN = re.compile(r"\b(add|install|insert|provide|new)\b", re.IGNORECASE)
@@ -140,6 +142,11 @@ _CSS_RGB_COLOR_PATTERN = re.compile(
     r"rgb\(\s*([0-9]{1,3}%?)\s*,\s*([0-9]{1,3}%?)\s*,\s*([0-9]{1,3}%?)\s*\)",
     re.IGNORECASE,
 )
+_HTML_BREAK_PATTERN = re.compile(
+    r"<\s*(?:br|/p|/div|/li|/tr|/td|/h[1-6])\b[^>]*>",
+    re.IGNORECASE,
+)
+_HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
 
 _BACKCHECK_PASS = "pass"
 _BACKCHECK_WARN = "warn"
@@ -230,16 +237,74 @@ _ANNOT_TEXT_SUBTYPES = {
     "/Underline",
     "/StrikeOut",
 }
+_ANNOT_NOTE_TEXT_SUBTYPES = {
+    "/Text",
+    "/FreeText",
+}
+_ANNOT_HIGHLIGHT_SUBTYPES = {
+    "/Highlight",
+    "/Underline",
+    "/StrikeOut",
+}
 _ANNOT_LINE_SUBTYPES = {
     "/Line",
 }
-_ANNOT_CLOUD_SUBTYPES = {
+_ANNOT_RECTANGLE_SUBTYPES = {
     "/Square",
     "/Circle",
+}
+_ANNOT_GEOMETRIC_SUBTYPES = {
     "/Polygon",
     "/PolyLine",
     "/Ink",
 }
+_ANNOT_CLOUD_SUBTYPES = {
+    *_ANNOT_RECTANGLE_SUBTYPES,
+    *_ANNOT_GEOMETRIC_SUBTYPES,
+}
+_ANNOT_NOTE_ANCHOR_SUBTYPES = {
+    *_ANNOT_RECTANGLE_SUBTYPES,
+    *_ANNOT_GEOMETRIC_SUBTYPES,
+    "/Line",
+}
+_GENERIC_SUBJECT_VALUES = {
+    "text",
+    "text box",
+    "textbox",
+    "rectangle",
+    "square",
+    "circle",
+    "polygon",
+    "polyline",
+    "line",
+    "highlight",
+    "markup",
+}
+_ANNOT_CLOUD_HINT_PATTERN = re.compile(r"\b(cloud|revision cloud|delta)\b", re.IGNORECASE)
+_ANNOT_ARROW_HINT_PATTERN = re.compile(
+    r"\b(arrow|leader|callout|pointer)\b",
+    re.IGNORECASE,
+)
+_ANNOT_RECTANGLE_HINT_PATTERN = re.compile(
+    r"\b(rectangle|square|box|circle|detail)\b",
+    re.IGNORECASE,
+)
+_ANNOT_CALLOUT_HINT_PATTERN = re.compile(
+    r"\b(callout|leader|note)\b",
+    re.IGNORECASE,
+)
+_ARROW_LINE_ENDING_TOKENS = {
+    "openarrow",
+    "closedarrow",
+    "ropenarrow",
+    "rclosedarrow",
+    "butt",
+    "slash",
+}
+_TITLE_BLOCK_SUBJECT_HINT_PATTERN = re.compile(
+    r"\b(title|revision|sheet|drawing|dwg)\b",
+    re.IGNORECASE,
+)
 
 def _read_json_error(response: requests.Response) -> str:
     try:
@@ -293,6 +358,165 @@ def _normalize_text(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
+def _normalize_display_text(value: Any, max_length: int = 500) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        text = str(value)
+    except Exception:
+        return None
+    if not text:
+        return None
+    text = html.unescape(text)
+    text = _HTML_BREAK_PATTERN.sub(" ", text)
+    text = _HTML_TAG_PATTERN.sub(" ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return None
+    if len(text) > max_length:
+        return f"{text[: max_length - 3].rstrip()}..."
+    return text
+
+
+def _extract_annotation_text_candidates(annotation: Any) -> List[Tuple[str, str]]:
+    if not hasattr(annotation, "get"):
+        return []
+    candidates: List[Tuple[str, str]] = []
+    seen: Set[str] = set()
+    for source, key in (
+        ("contents", "/Contents"),
+        ("richtext", "/RC"),
+        ("overlay_text", "/OverlayText"),
+    ):
+        text = _normalize_display_text(annotation.get(key))
+        if not text:
+            continue
+        normalized = _normalize_text(text)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        candidates.append((source, text))
+
+    subject_text = _normalize_display_text(annotation.get("/Subj"))
+    subject_normalized = _normalize_text(subject_text)
+    if (
+        subject_text
+        and subject_normalized
+        and subject_normalized not in seen
+        and subject_normalized not in _GENERIC_SUBJECT_VALUES
+    ):
+        candidates.append(("subject", subject_text))
+    return candidates
+
+
+def _collect_markup_semantic_text(markup: Dict[str, Any]) -> str:
+    values: List[str] = []
+    seen: Set[str] = set()
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    for value in (
+        markup.get("text"),
+        meta.get("subject") if isinstance(meta, dict) else None,
+        meta.get("intent") if isinstance(meta, dict) else None,
+        meta.get("overlay_text") if isinstance(meta, dict) else None,
+    ):
+        normalized = _normalize_display_text(value, max_length=800)
+        token = _normalize_text(normalized)
+        if not normalized or not token or token in seen:
+            continue
+        seen.add(token)
+        values.append(normalized)
+    return " ".join(values).strip()
+
+
+def _infer_page_position_zone(
+    bounds: Dict[str, float],
+    *,
+    page_width: float,
+    page_height: float,
+) -> str:
+    if page_width <= 0 or page_height <= 0:
+        return "unknown"
+    center = _bounds_center_payload(bounds)
+    x_ratio = _clamp_value(float(center["x"]) / page_width, minimum=0.0, maximum=1.0)
+    y_ratio = _clamp_value(float(center["y"]) / page_height, minimum=0.0, maximum=1.0)
+    if x_ratio >= 0.66 and y_ratio <= 0.34:
+        return "bottom-right"
+    if x_ratio <= 0.34 and y_ratio <= 0.34:
+        return "bottom-left"
+    if x_ratio >= 0.66 and y_ratio >= 0.66:
+        return "top-right"
+    if x_ratio <= 0.34 and y_ratio >= 0.66:
+        return "top-left"
+    if y_ratio <= 0.2:
+        return "bottom"
+    if y_ratio >= 0.8:
+        return "top"
+    if x_ratio <= 0.2:
+        return "left"
+    if x_ratio >= 0.8:
+        return "right"
+    return "center"
+
+
+def _infer_bounds_aspect(bounds: Dict[str, float]) -> str:
+    width = _safe_float(bounds.get("width"))
+    height = _safe_float(bounds.get("height"))
+    if width is None or height is None or width <= 0 or height <= 0:
+        return "unknown"
+    ratio = width / max(height, 0.0001)
+    if ratio >= 1.7:
+        return "wide"
+    if ratio <= 0.65:
+        return "tall"
+    if 0.8 <= ratio <= 1.25:
+        return "square"
+    return "normal"
+
+
+def _enrich_markups_for_local_plan(markups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    counts_by_type: Dict[str, int] = {}
+    counts_by_type_color: Dict[Tuple[str, str], int] = {}
+    for markup in markups:
+        markup_type = _normalize_text(markup.get("type")) or "unknown"
+        markup_color = _normalize_text(markup.get("color")) or "unknown"
+        counts_by_type[markup_type] = counts_by_type.get(markup_type, 0) + 1
+        counts_by_type_color[(markup_type, markup_color)] = (
+            counts_by_type_color.get((markup_type, markup_color), 0) + 1
+        )
+
+    enriched: List[Dict[str, Any]] = []
+    for markup in markups:
+        normalized_markup = dict(markup)
+        meta = dict(markup.get("meta") or {}) if isinstance(markup.get("meta"), dict) else {}
+        markup_type = _normalize_text(markup.get("type")) or "unknown"
+        markup_color = _normalize_text(markup.get("color")) or "unknown"
+        meta["rule_group_count_same_type"] = counts_by_type.get(markup_type, 1)
+        meta["rule_group_count_same_type_color"] = counts_by_type_color.get(
+            (markup_type, markup_color),
+            1,
+        )
+        bounds = _normalize_bounds(markup.get("bounds"))
+        page_width = _safe_float(meta.get("page_width"))
+        page_height = _safe_float(meta.get("page_height"))
+        if bounds:
+            if not str(meta.get("aspect") or "").strip():
+                meta["aspect"] = _infer_bounds_aspect(bounds)
+            if (
+                page_width is not None
+                and page_height is not None
+                and not str(meta.get("page_zone") or "").strip()
+            ):
+                meta["page_zone"] = _infer_page_position_zone(
+                    bounds,
+                    page_width=page_width,
+                    page_height=page_height,
+                )
+        if meta:
+            normalized_markup["meta"] = meta
+        enriched.append(normalized_markup)
+    return enriched
+
+
 def _rule_matches(rule: Dict[str, Any], markup: Dict[str, Any]) -> bool:
     trigger = rule.get("trigger")
     if not isinstance(trigger, dict):
@@ -300,7 +524,8 @@ def _rule_matches(rule: Dict[str, Any], markup: Dict[str, Any]) -> bool:
 
     markup_type = _normalize_text(markup.get("type"))
     markup_color = _normalize_text(markup.get("color"))
-    markup_text = _normalize_text(markup.get("text"))
+    markup_text = _normalize_text(_collect_markup_semantic_text(markup) or markup.get("text"))
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
 
     trigger_type = _normalize_text(trigger.get("type"))
     if trigger_type and trigger_type != markup_type:
@@ -313,6 +538,29 @@ def _rule_matches(rule: Dict[str, Any], markup: Dict[str, Any]) -> bool:
     contains = _normalize_text(trigger.get("text_contains"))
     if contains and contains not in markup_text:
         return False
+
+    trigger_position = _normalize_text(trigger.get("position"))
+    if trigger_position:
+        page_zone = _normalize_text(meta.get("page_zone"))
+        if trigger_position != page_zone:
+            return False
+
+    trigger_aspect = _normalize_text(trigger.get("aspect"))
+    if trigger_aspect:
+        aspect = _normalize_text(meta.get("aspect"))
+        if trigger_aspect != aspect:
+            return False
+
+    trigger_count = _safe_float(trigger.get("count"))
+    if trigger_count is not None:
+        if trigger_color and trigger_color != "any":
+            actual_count = int(
+                _safe_float(meta.get("rule_group_count_same_type_color")) or 0
+            )
+        else:
+            actual_count = int(_safe_float(meta.get("rule_group_count_same_type")) or 0)
+        if actual_count != int(round(trigger_count)):
+            return False
 
     return True
 
@@ -360,22 +608,40 @@ def _extract_paired_annotation_ids(markup: Dict[str, Any]) -> List[str]:
     return output
 
 
-def _is_blue_note_candidate(markup: Dict[str, Any]) -> bool:
-    if _normalize_text(markup.get("color")) != "blue":
-        return False
+def _is_note_text_candidate(markup: Dict[str, Any]) -> bool:
     if _normalize_text(markup.get("type")) != "text":
         return False
     meta = markup.get("meta")
     subtype = _normalize_text(meta.get("subtype")) if isinstance(meta, dict) else ""
-    return subtype in {"", "/freetext", "/text", "freetext", "text"}
+    if subtype not in {"", "/freetext", "/text", "freetext", "text"}:
+        return False
+    markup_color = _normalize_text(markup.get("color"))
+    if markup_color == "blue":
+        return True
+    if isinstance(meta, dict) and _normalize_point_list(meta.get("callout_points")):
+        return True
+    semantic_text = _normalize_text(_collect_markup_semantic_text(markup))
+    return bool(_ANNOT_CALLOUT_HINT_PATTERN.search(semantic_text))
+
+
+def _is_note_anchor_candidate(markup: Dict[str, Any]) -> bool:
+    meta = markup.get("meta")
+    subtype = _normalize_text(meta.get("subtype")) if isinstance(meta, dict) else ""
+    markup_type = _normalize_text(markup.get("type"))
+    if markup_type in {"rectangle", "cloud", "arrow"}:
+        return True
+    return subtype in {
+        token.lower()
+        for token in _ANNOT_NOTE_ANCHOR_SUBTYPES
+    }
+
+
+def _is_blue_note_candidate(markup: Dict[str, Any]) -> bool:
+    return _normalize_text(markup.get("color")) == "blue" and _is_note_text_candidate(markup)
 
 
 def _is_blue_rectangle_anchor(markup: Dict[str, Any]) -> bool:
-    if _normalize_text(markup.get("color")) != "blue":
-        return False
-    meta = markup.get("meta")
-    subtype = _normalize_text(meta.get("subtype")) if isinstance(meta, dict) else ""
-    return subtype in {"/square", "square"}
+    return _normalize_text(markup.get("color")) == "blue" and _is_note_anchor_candidate(markup)
 
 
 def _bounds_center(bounds: Dict[str, float]) -> Dict[str, float]:
@@ -431,10 +697,68 @@ def _extract_callout_target_point(markup: Dict[str, Any]) -> Optional[Dict[str, 
     return points[-1]
 
 
+def _point_within_bounds(
+    point: Dict[str, float],
+    bounds: Dict[str, float],
+    *,
+    padding: float = 0.0,
+) -> bool:
+    left = float(bounds["x"]) - padding
+    right = float(bounds["x"]) + float(bounds["width"]) + padding
+    bottom = float(bounds["y"]) - padding
+    top = float(bounds["y"]) + float(bounds["height"]) + padding
+    return left <= float(point["x"]) <= right and bottom <= float(point["y"]) <= top
+
+
+def _score_note_anchor_pair(
+    *,
+    note_markup: Dict[str, Any],
+    note_bounds: Dict[str, float],
+    callout_target: Dict[str, float],
+    anchor_markup: Dict[str, Any],
+    anchor_bounds: Dict[str, float],
+) -> Optional[Tuple[float, str]]:
+    note_color = _normalize_text(note_markup.get("color"))
+    anchor_color = _normalize_text(anchor_markup.get("color"))
+    if (
+        note_color
+        and anchor_color
+        and note_color != "unknown"
+        and anchor_color != "unknown"
+        and note_color != anchor_color
+    ):
+        return None
+
+    anchor_center = _bounds_center(anchor_bounds)
+    distance = _distance_points(callout_target, anchor_center)
+    max_distance = max(
+        10.0,
+        _bounds_diagonal(note_bounds) * 2.6,
+        _bounds_diagonal(anchor_bounds) * 1.9,
+    )
+    callout_padding = max(6.0, _bounds_diagonal(anchor_bounds) * 0.18)
+    callout_hits_anchor = _point_within_bounds(
+        callout_target,
+        anchor_bounds,
+        padding=callout_padding,
+    )
+    if distance > max_distance and not callout_hits_anchor:
+        return None
+
+    score = distance
+    pairing_method = "proximity"
+    if callout_hits_anchor:
+        score -= max(8.0, _bounds_diagonal(anchor_bounds) * 0.4)
+        pairing_method = "callout_target"
+    if _bounds_overlap(_expand_bounds(note_bounds, 6.0), _expand_bounds(anchor_bounds, 6.0)):
+        score -= 2.5
+    return score, pairing_method
+
+
 def _pair_blue_note_markups(markups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     anchor_entries: List[Tuple[int, Dict[str, Any], Dict[str, float]]] = []
     for index, markup in enumerate(markups):
-        if not _is_blue_rectangle_anchor(markup):
+        if not _is_note_anchor_candidate(markup):
             continue
         bounds = _normalize_bounds(markup.get("bounds"))
         if not bounds:
@@ -445,32 +769,41 @@ def _pair_blue_note_markups(markups: List[Dict[str, Any]]) -> List[Dict[str, Any
     note_to_anchor: Dict[int, int] = {}
 
     for note_index, note_markup in enumerate(markups):
-        if not _is_blue_note_candidate(note_markup):
+        if not _is_note_text_candidate(note_markup):
             continue
         note_bounds = _normalize_bounds(note_markup.get("bounds"))
         if not note_bounds:
             continue
         note_center = _bounds_center(note_bounds)
         callout_target = _extract_callout_target_point(note_markup) or note_center
-        note_diag = math.sqrt((note_bounds["width"] ** 2) + (note_bounds["height"] ** 2))
-        max_distance = max(8.0, note_diag * 2.5)
 
         best_anchor_index: Optional[int] = None
-        best_distance: Optional[float] = None
+        best_score: Optional[float] = None
+        best_pairing_method = "proximity"
         for anchor_index, _anchor_markup, anchor_bounds in anchor_entries:
             if anchor_index in used_anchor_indices:
                 continue
-            anchor_center = _bounds_center(anchor_bounds)
-            distance = _distance_points(callout_target, anchor_center)
-            if distance > max_distance:
+            score_result = _score_note_anchor_pair(
+                note_markup=note_markup,
+                note_bounds=note_bounds,
+                callout_target=callout_target,
+                anchor_markup=_anchor_markup,
+                anchor_bounds=anchor_bounds,
+            )
+            if score_result is None:
                 continue
-            if best_distance is None or distance < best_distance:
-                best_distance = distance
+            score, pairing_method = score_result
+            if best_score is None or score < best_score:
+                best_score = score
                 best_anchor_index = anchor_index
+                best_pairing_method = pairing_method
         if best_anchor_index is None:
             continue
         note_to_anchor[note_index] = best_anchor_index
         used_anchor_indices.add(best_anchor_index)
+        note_meta = note_markup.get("meta") if isinstance(note_markup.get("meta"), dict) else {}
+        if isinstance(note_meta, dict):
+            note_meta["pairing_method"] = best_pairing_method
 
     if not note_to_anchor:
         return markups
@@ -494,11 +827,24 @@ def _pair_blue_note_markups(markups: List[Dict[str, Any]]) -> List[Dict[str, Any
         combined_meta: Dict[str, Any] = {}
         if isinstance(markup.get("meta"), dict):
             combined_meta.update(markup.get("meta") or {})
+        anchor_meta = anchor_markup.get("meta") if isinstance(anchor_markup.get("meta"), dict) else {}
         note_id = str(markup.get("id") or "").strip()
         anchor_id = str(anchor_markup.get("id") or "").strip()
-        paired_ids = [item for item in [note_id, anchor_id] if item]
+        paired_ids = [
+            value
+            for value in (
+                list(combined_meta.get("paired_annotation_ids") or [])
+                + [note_id, anchor_id]
+            )
+            if isinstance(value, str) and value.strip()
+        ]
         if paired_ids:
-            combined_meta["paired_annotation_ids"] = paired_ids
+            combined_meta["paired_annotation_ids"] = list(dict.fromkeys(paired_ids))
+        if isinstance(anchor_meta, dict):
+            combined_meta["paired_anchor_subtype"] = anchor_meta.get("subtype")
+        combined_meta["paired_anchor_type"] = anchor_markup.get("type")
+        combined_meta["paired_anchor_color"] = anchor_markup.get("color")
+        combined_meta["pairing_method"] = combined_meta.get("pairing_method") or "proximity"
         if combined_meta:
             combined["meta"] = combined_meta
         paired_markups.append(combined)
@@ -517,15 +863,47 @@ def _is_red_reference_add_markup(markup: Dict[str, Any]) -> bool:
 
 
 def _infer_semantic_category(markup: Dict[str, Any]) -> Tuple[Optional[str], str]:
-    markup_text = str(markup.get("text") or "")
+    markup_text = _collect_markup_semantic_text(markup) or str(markup.get("text") or "")
     markup_color = _normalize_text(markup.get("color"))
     markup_type = _normalize_text(markup.get("type"))
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    page_zone = _normalize_text(meta.get("page_zone")) if isinstance(meta, dict) else ""
+    aspect = _normalize_text(meta.get("aspect")) if isinstance(meta, dict) else ""
+    paired_annotation_ids = _extract_paired_annotation_ids(markup)
+    fill_color = _normalize_text(meta.get("fill_color")) if isinstance(meta, dict) else ""
     has_add_intent = bool(_ADD_INTENT_PATTERN.search(markup_text))
     has_delete_intent = bool(_DELETE_INTENT_PATTERN.search(markup_text))
     has_note_intent = bool(_NOTE_INTENT_PATTERN.search(markup_text))
     is_red_text_replacement = (
         markup_color == "red" and markup_type == "text" and bool(markup_text.strip())
     )
+    recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
+    recognition_label = _normalize_text(recognition.get("label"))
+    recognition_confidence = _safe_float(recognition.get("confidence")) or 0.0
+    recognition_category = {
+        "delete": "DELETE",
+        "remove": "DELETE",
+        "add": "ADD",
+        "insert": "ADD",
+        "note": "NOTE",
+        "title_block": "TITLE_BLOCK",
+        "titleblock": "TITLE_BLOCK",
+    }.get(recognition_label)
+
+    if recognition_category and recognition_confidence >= 0.72 and not bool(
+        recognition.get("needs_review")
+    ):
+        return recognition_category, f"recognition-{recognition_label}"
+
+    if markup_type == "rectangle" and page_zone == "bottom-right" and aspect == "wide":
+        if _TITLE_BLOCK_TEXT_PATTERN.search(markup_text) or _TITLE_BLOCK_SUBJECT_HINT_PATTERN.search(
+            markup_text
+        ):
+            return "TITLE_BLOCK", "title-block-rectangle-pattern"
+    if markup_type == "text" and page_zone == "bottom-right" and _TITLE_BLOCK_TEXT_PATTERN.search(
+        markup_text
+    ):
+        return "TITLE_BLOCK", "title-block-text-pattern"
 
     if has_add_intent and has_delete_intent:
         return None, "keyword-conflict"
@@ -537,8 +915,12 @@ def _infer_semantic_category(markup: Dict[str, Any]) -> Tuple[Optional[str], str
         return "ADD", "keyword-see-dwg-reference"
     if is_red_text_replacement:
         return "ADD", "color-red-replacement"
+    if paired_annotation_ids and markup_type == "text" and markup_color == "blue":
+        return "NOTE", "paired-note-anchor"
     if has_note_intent:
         return "NOTE", "keyword-note"
+    if fill_color == "yellow" and markup_type in {"text", "rectangle"}:
+        return "NOTE", "fill-color-yellow"
     color_category = _DEFAULT_COLOR_TO_CATEGORY.get(markup_color)
     if color_category:
         return color_category, f"color-{markup_color}"
@@ -546,7 +928,7 @@ def _infer_semantic_category(markup: Dict[str, Any]) -> Tuple[Optional[str], str
 
 
 def _build_local_plan(markups: List[Dict[str, Any]]) -> Dict[str, Any]:
-    effective_markups = _pair_blue_note_markups(markups)
+    effective_markups = _enrich_markups_for_local_plan(_pair_blue_note_markups(markups))
     actions: List[Dict[str, Any]] = []
     for idx, markup in enumerate(effective_markups, start=1):
         paired_annotation_ids = _extract_paired_annotation_ids(markup)
@@ -583,12 +965,16 @@ def _build_local_plan(markups: List[Dict[str, Any]]) -> Dict[str, Any]:
                         "DELETE": "Remove geometry associated with markup bounds.",
                         "ADD": "Add or verify geometry referenced by markup.",
                         "NOTE": "Review and acknowledge note intent before execution.",
+                        "TITLE_BLOCK": "Extract metadata only; skip geometry conversion.",
                     }.get(inferred_category, "Manual review required.")
-                    inferred_confidence = (
-                        0.76
-                        if inferred_reason.startswith("keyword-")
-                        else 0.64
-                    )
+                    if inferred_reason.startswith("recognition-"):
+                        inferred_confidence = 0.82
+                    elif inferred_reason.startswith("keyword-"):
+                        inferred_confidence = 0.76
+                    elif inferred_reason.startswith("title-block-"):
+                        inferred_confidence = 0.74
+                    else:
+                        inferred_confidence = 0.64
                     action_item = {
                         "id": f"action-{idx}",
                         "rule_id": f"semantic-{inferred_reason}",
@@ -949,17 +1335,60 @@ def _parse_css_color_rgb(value: Any) -> Optional[Tuple[float, float, float]]:
 def _extract_annotation_color(
     annotation: Any,
 ) -> Tuple[str, Optional[Tuple[float, float, float]], Optional[str], str]:
-    candidates: List[Tuple[str, Optional[Tuple[float, float, float]]]] = [
+    color_details = _extract_annotation_color_details(annotation)
+    return (
+        str(color_details.get("color") or "unknown"),
+        color_details.get("rgb"),
+        color_details.get("color_hex"),
+        str(color_details.get("color_source") or "unknown"),
+    )
+
+
+def _extract_annotation_color_details(annotation: Any) -> Dict[str, Any]:
+    stroke_candidates: List[Tuple[str, Optional[Tuple[float, float, float]]]] = [
         ("C", _parse_annotation_array_color(annotation.get("/C"))),
         ("DA", _parse_pdf_default_appearance_color(annotation.get("/DA"))),
         ("DS", _parse_css_color_rgb(annotation.get("/DS"))),
         ("RC", _parse_css_color_rgb(annotation.get("/RC"))),
     ]
-    for source, rgb in candidates:
+    fill_candidates: List[Tuple[str, Optional[Tuple[float, float, float]]]] = [
+        ("IC", _parse_annotation_array_color(annotation.get("/IC"))),
+    ]
+
+    stroke_source = "unknown"
+    stroke_rgb: Optional[Tuple[float, float, float]] = None
+    for source, rgb in stroke_candidates:
         if rgb is None:
             continue
-        return _rgb_triplet_to_color_name(rgb), rgb, _rgb_to_hex(rgb), source
-    return "unknown", None, None, "unknown"
+        stroke_source = source
+        stroke_rgb = rgb
+        break
+
+    fill_source = "unknown"
+    fill_rgb: Optional[Tuple[float, float, float]] = None
+    for source, rgb in fill_candidates:
+        if rgb is None:
+            continue
+        fill_source = source
+        fill_rgb = rgb
+        break
+
+    primary_rgb = stroke_rgb or fill_rgb
+    primary_source = stroke_source if stroke_rgb is not None else fill_source
+    return {
+        "color": _rgb_triplet_to_color_name(primary_rgb) if primary_rgb is not None else "unknown",
+        "rgb": primary_rgb,
+        "color_hex": _rgb_to_hex(primary_rgb) if primary_rgb is not None else None,
+        "color_source": primary_source if primary_rgb is not None else "unknown",
+        "stroke_color": _rgb_triplet_to_color_name(stroke_rgb) if stroke_rgb is not None else "unknown",
+        "stroke_rgb": stroke_rgb,
+        "stroke_color_hex": _rgb_to_hex(stroke_rgb) if stroke_rgb is not None else None,
+        "stroke_color_source": stroke_source if stroke_rgb is not None else "unknown",
+        "fill_color": _rgb_triplet_to_color_name(fill_rgb) if fill_rgb is not None else "unknown",
+        "fill_rgb": fill_rgb,
+        "fill_color_hex": _rgb_to_hex(fill_rgb) if fill_rgb is not None else None,
+        "fill_color_source": fill_source if fill_rgb is not None else "unknown",
+    }
 
 
 def _normalize_annotation_callout_points(value: Any) -> Optional[List[Dict[str, float]]]:
@@ -991,19 +1420,138 @@ def _normalize_annotation_callout_points(value: Any) -> Optional[List[Dict[str, 
     return points
 
 
-def _classify_annotation_markup_type(*, subtype: str, intent: str, subject: str) -> Optional[str]:
+def _normalize_annotation_line_points(value: Any) -> Optional[List[Dict[str, float]]]:
+    points = _normalize_annotation_callout_points(value)
+    if not points or len(points) < 2:
+        return None
+    return points[:2]
+
+
+def _normalize_annotation_vertices(value: Any) -> Optional[List[Dict[str, float]]]:
+    return _normalize_annotation_callout_points(value)
+
+
+def _normalize_annotation_ink_strokes(value: Any) -> Optional[List[List[Dict[str, float]]]]:
+    if value is None:
+        return None
+    raw_strokes: List[Any]
+    if isinstance(value, (list, tuple)):
+        raw_strokes = list(value)
+    elif hasattr(value, "__iter__") and not isinstance(value, (str, bytes, dict)):
+        try:
+            raw_strokes = list(value)
+        except Exception:
+            return None
+    else:
+        return None
+    strokes: List[List[Dict[str, float]]] = []
+    for raw_stroke in raw_strokes:
+        points = _normalize_annotation_callout_points(raw_stroke)
+        if points:
+            strokes.append(points)
+    return strokes or None
+
+
+def _normalize_annotation_line_endings(value: Any) -> List[str]:
+    if value is None:
+        return []
+    raw_values: List[Any]
+    if isinstance(value, (list, tuple)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+    endings: List[str] = []
+    for raw in raw_values:
+        token = _normalize_text(raw).lstrip("/")
+        if not token:
+            continue
+        endings.append(token)
+    return list(dict.fromkeys(endings))
+
+
+def _extract_annotation_geometry(annotation: Any) -> Dict[str, Any]:
+    rect_bounds = _normalize_annotation_bounds(annotation.get("/Rect"))
+    callout_points = _normalize_annotation_callout_points(annotation.get("/CL"))
+    line_points = _normalize_annotation_line_points(annotation.get("/L"))
+    vertices = _normalize_annotation_vertices(annotation.get("/Vertices"))
+    ink_strokes = _normalize_annotation_ink_strokes(annotation.get("/InkList"))
+    line_endings = _normalize_annotation_line_endings(annotation.get("/LE"))
+
+    geometry_points: List[Dict[str, float]] = []
+    if callout_points:
+        geometry_points.extend(callout_points)
+    if line_points:
+        geometry_points.extend(line_points)
+    if vertices:
+        geometry_points.extend(vertices)
+    if ink_strokes:
+        for stroke in ink_strokes:
+            geometry_points.extend(stroke)
+    geometry_bounds = _bounds_from_points(geometry_points) if geometry_points else None
+
+    bounds_source = "rect"
+    bounds = rect_bounds
+    if bounds is None and geometry_bounds is not None:
+        bounds = geometry_bounds
+        bounds_source = "geometry"
+    elif bounds is None:
+        bounds_source = "unknown"
+
+    return {
+        "bounds": bounds,
+        "bounds_source": bounds_source,
+        "geometry_bounds": geometry_bounds,
+        "callout_points": callout_points,
+        "line_points": line_points,
+        "vertices": vertices,
+        "ink_strokes": ink_strokes,
+        "line_endings": line_endings,
+        "geometry_point_count": len(geometry_points),
+    }
+
+
+def _classify_annotation_markup_type(
+    *,
+    subtype: str,
+    intent: str,
+    subject: str,
+    text: str,
+    line_endings: List[str],
+    has_callout: bool,
+    has_vertices: bool,
+    has_fill: bool,
+) -> Optional[str]:
+    semantic_text = " ".join(
+        entry
+        for entry in [intent, subject, _normalize_text(text)]
+        if entry
+    )
     if subtype in _ANNOT_TEXT_SUBTYPES:
         return "text"
     if subtype in _ANNOT_LINE_SUBTYPES:
         return "arrow"
-    if subtype in _ANNOT_CLOUD_SUBTYPES:
-        if "arrow" in intent or "arrow" in subject:
+    if subtype in _ANNOT_RECTANGLE_SUBTYPES:
+        if _ANNOT_CLOUD_HINT_PATTERN.search(semantic_text):
+            return "cloud"
+        if has_fill and not _ANNOT_RECTANGLE_HINT_PATTERN.search(semantic_text):
+            return "rectangle"
+        return "rectangle"
+    if subtype in _ANNOT_GEOMETRIC_SUBTYPES:
+        if any(token in _ARROW_LINE_ENDING_TOKENS for token in line_endings):
             return "arrow"
+        if _ANNOT_ARROW_HINT_PATTERN.search(semantic_text):
+            return "arrow"
+        if _ANNOT_CLOUD_HINT_PATTERN.search(semantic_text) or has_vertices:
+            return "cloud"
         return "cloud"
-    if "cloud" in intent or "cloud" in subject:
+    if _ANNOT_CLOUD_HINT_PATTERN.search(semantic_text):
         return "cloud"
-    if "arrow" in intent or "arrow" in subject:
+    if _ANNOT_ARROW_HINT_PATTERN.search(semantic_text) or any(
+        token in _ARROW_LINE_ENDING_TOKENS for token in line_endings
+    ):
         return "arrow"
+    if has_callout:
+        return "text"
     return None
 
 
@@ -1285,6 +1833,7 @@ def _extract_pdf_compare_markups(
     annotation_supported = 0
     annotation_unsupported = 0
     annotation_subtype_counts: Dict[str, int] = {}
+    annotation_type_counts: Dict[str, int] = {}
     prepare_feature_source = "pdf_annotations"
 
     raw_annots = page.get("/Annots")
@@ -1318,31 +1867,50 @@ def _extract_pdf_compare_markups(
             subtype = str(annot_obj.get("/Subtype") or "").strip()
             subtype_key = subtype or "unknown"
             annotation_subtype_counts[subtype_key] = annotation_subtype_counts.get(subtype_key, 0) + 1
-            intent = _normalize_text(annot_obj.get("/IT"))
-            subject = _normalize_text(annot_obj.get("/Subj"))
+            intent_text = _normalize_display_text(annot_obj.get("/IT"), max_length=120)
+            intent = _normalize_text(intent_text)
+            subject_text = _normalize_display_text(annot_obj.get("/Subj"), max_length=220)
+            subject = _normalize_text(subject_text)
+            overlay_text = _normalize_display_text(annot_obj.get("/OverlayText"))
+            annotation_name = _normalize_display_text(annot_obj.get("/NM"), max_length=120)
+            author_text = _normalize_display_text(annot_obj.get("/T"), max_length=120)
+            text_candidates = _extract_annotation_text_candidates(annot_obj)
+            text = text_candidates[0][1] if text_candidates else ""
+            text_source = text_candidates[0][0] if text_candidates else "none"
+            color_details = _extract_annotation_color_details(annot_obj)
+            geometry = _extract_annotation_geometry(annot_obj)
             markup_type = _classify_annotation_markup_type(
                 subtype=subtype,
                 intent=intent,
                 subject=subject,
+                text=text,
+                line_endings=list(geometry.get("line_endings") or []),
+                has_callout=bool(geometry.get("callout_points")),
+                has_vertices=bool(geometry.get("vertices")) or bool(geometry.get("ink_strokes")),
+                has_fill=_normalize_text(color_details.get("fill_color")) not in {"", "unknown"},
             )
             if not markup_type:
                 annotation_unsupported += 1
                 warnings.append(f"Annotation #{idx} skipped: unsupported subtype {subtype or 'unknown'}.")
                 continue
 
-            bounds = _normalize_annotation_bounds(annot_obj.get("/Rect"))
+            bounds = geometry.get("bounds")
             if not bounds:
                 annotation_unsupported += 1
                 warnings.append(f"Annotation #{idx} skipped: missing/invalid annotation bounds.")
                 continue
 
-            color_name, rgb, color_hex, color_source = _extract_annotation_color(annot_obj)
-            text = str(annot_obj.get("/Contents") or "").strip()
-            if not text:
-                text = str(annot_obj.get("/RC") or "").strip()
-            if not text:
-                text = str(annot_obj.get("/Subj") or "").strip()
-            callout_points = _normalize_annotation_callout_points(annot_obj.get("/CL"))
+            color_name = str(color_details.get("color") or "unknown")
+            rgb = color_details.get("rgb")
+            color_hex = color_details.get("color_hex")
+            color_source = str(color_details.get("color_source") or "unknown")
+            callout_points = geometry.get("callout_points")
+            page_zone = _infer_page_position_zone(
+                bounds,
+                page_width=page_width,
+                page_height=page_height,
+            )
+            aspect = _infer_bounds_aspect(bounds)
 
             markup_payload: Dict[str, Any] = {
                 "id": f"annot-{idx}",
@@ -1352,14 +1920,35 @@ def _extract_pdf_compare_markups(
                 "bounds": bounds,
                 "meta": {
                     "subtype": subtype or "unknown",
-                    "intent": intent or None,
-                    "subject": subject or None,
+                    "intent": intent_text or None,
+                    "subject": subject_text or None,
+                    "overlay_text": overlay_text or None,
+                    "annotation_name": annotation_name or None,
+                    "author": author_text or None,
+                    "text_source": text_source,
+                    "text_sources": [source for source, _value in text_candidates],
                     "color_source": color_source,
                     "color_hex": color_hex,
                     "color_rgb": None,
+                    "stroke_color": color_details.get("stroke_color"),
+                    "stroke_color_source": color_details.get("stroke_color_source"),
+                    "stroke_color_hex": color_details.get("stroke_color_hex"),
+                    "stroke_color_rgb": None,
+                    "fill_color": color_details.get("fill_color"),
+                    "fill_color_source": color_details.get("fill_color_source"),
+                    "fill_color_hex": color_details.get("fill_color_hex"),
+                    "fill_color_rgb": None,
                     "page_index": page_index,
+                    "page_width": page_width,
+                    "page_height": page_height,
                     "page_bounds": dict(bounds),
                     "page_position": _bounds_center_payload(bounds),
+                    "page_zone": page_zone,
+                    "aspect": aspect,
+                    "bounds_source": geometry.get("bounds_source"),
+                    "geometry_bounds": geometry.get("geometry_bounds"),
+                    "geometry_point_count": geometry.get("geometry_point_count"),
+                    "line_endings": list(geometry.get("line_endings") or []),
                 },
             }
             if rgb:
@@ -1370,14 +1959,35 @@ def _extract_pdf_compare_markups(
                 }
                 markup_payload["meta"]["rgb"] = rgb_payload
                 markup_payload["meta"]["color_rgb"] = rgb_payload
+            stroke_rgb = color_details.get("stroke_rgb")
+            if stroke_rgb:
+                markup_payload["meta"]["stroke_color_rgb"] = {
+                    "r": stroke_rgb[0],
+                    "g": stroke_rgb[1],
+                    "b": stroke_rgb[2],
+                }
+            fill_rgb = color_details.get("fill_rgb")
+            if fill_rgb:
+                markup_payload["meta"]["fill_color_rgb"] = {
+                    "r": fill_rgb[0],
+                    "g": fill_rgb[1],
+                    "b": fill_rgb[2],
+                }
             if callout_points:
                 markup_payload["meta"]["callout_points"] = callout_points
+            if geometry.get("line_points"):
+                markup_payload["meta"]["line_points"] = geometry.get("line_points")
+            if geometry.get("vertices"):
+                markup_payload["meta"]["vertices"] = geometry.get("vertices")
+            if geometry.get("ink_strokes"):
+                markup_payload["meta"]["ink_strokes"] = geometry.get("ink_strokes")
             markup_payload["recognition"] = _build_markup_recognition(
                 markup_payload,
                 feature_source="pdf_annotations",
             )
             markups.append(markup_payload)
             annotation_supported += 1
+            annotation_type_counts[markup_type] = annotation_type_counts.get(markup_type, 0) + 1
     else:
         warnings.append(
             "No /Annots array was found on this page. If markups were flattened, annotation extraction returns 0."
@@ -1433,6 +2043,13 @@ def _extract_pdf_compare_markups(
 
     page_metadata = pdf_metadata.get("page") if isinstance(pdf_metadata.get("page"), dict) else None
     if isinstance(page_metadata, dict):
+        annotation_counts = (
+            page_metadata.get("annotation_counts")
+            if isinstance(page_metadata.get("annotation_counts"), dict)
+            else None
+        )
+        if isinstance(annotation_counts, dict):
+            annotation_counts["by_type"] = annotation_type_counts
         page_metadata["text_extraction"] = text_extraction
 
     calibration_seed = _extract_measurement_seed(page)
@@ -2066,13 +2683,34 @@ def _markup_learning_features(markup: Dict[str, Any]) -> Dict[str, Any]:
     page_position = (
         meta.get("page_position") if isinstance(meta.get("page_position"), dict) else {}
     )
+    line_endings = [
+        _normalize_text(entry).lstrip("/")
+        for entry in (meta.get("line_endings") or [])
+        if isinstance(entry, str) and _normalize_text(entry).lstrip("/")
+    ]
+    line_points = _normalize_point_list(meta.get("line_points"))
+    vertices = _normalize_point_list(meta.get("vertices"))
+    ink_strokes_raw = meta.get("ink_strokes") if isinstance(meta.get("ink_strokes"), list) else []
+    ink_stroke_count = 0
+    for stroke in ink_strokes_raw:
+        if isinstance(stroke, list):
+            ink_stroke_count += len(_normalize_point_list(stroke))
     return {
         "type": _normalize_text(markup.get("type")) or "unknown",
         "color": _normalize_text(markup.get("color")) or "unknown",
         "subtype": _normalize_text(meta.get("subtype")) or "unknown",
         "intent": _normalize_text(meta.get("intent")) or "unknown",
         "subject": _normalize_text(meta.get("subject")) or "unknown",
+        "text_source": _normalize_text(meta.get("text_source")) or "unknown",
+        "page_zone": _normalize_text(meta.get("page_zone")) or "unknown",
+        "aspect": _normalize_text(meta.get("aspect")) or "unknown",
+        "bounds_source": _normalize_text(meta.get("bounds_source")) or "unknown",
+        "fill_color": _normalize_text(meta.get("fill_color")) or "unknown",
+        "line_ending": line_endings[0] if line_endings else "unknown",
         "has_callout": bool(_normalize_point_list(meta.get("callout_points"))),
+        "has_line_points": bool(line_points),
+        "has_fill_color": _normalize_text(meta.get("fill_color")) not in {"", "unknown"},
+        "vertex_count_bucket": min(12, len(vertices) + ink_stroke_count),
         "paired_anchor_count": len(
             [
                 entry
@@ -2080,6 +2718,7 @@ def _markup_learning_features(markup: Dict[str, Any]) -> Dict[str, Any]:
                 if isinstance(entry, str) and entry.strip()
             ]
         ),
+        "pairing_method": _normalize_text(meta.get("pairing_method")) or "none",
         "page_index": int(_safe_float(meta.get("page_index")) or 0),
         "width_bucket": int(round((bounds.get("width") or 0.0) / 24.0)) if bounds else 0,
         "height_bucket": int(round((bounds.get("height") or 0.0) / 24.0)) if bounds else 0,
@@ -2094,6 +2733,7 @@ def _heuristic_markup_recognition_confidence(markup: Dict[str, Any]) -> float:
     markup_type = _normalize_text(markup.get("type"))
     text_value = str(markup.get("text") or "").strip()
     meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    features = _markup_learning_features(markup)
     if color_value and color_value != "unknown":
         score += 0.18
     if markup_type and markup_type != "unknown":
@@ -2104,6 +2744,16 @@ def _heuristic_markup_recognition_confidence(markup: Dict[str, Any]) -> float:
         score += 0.06
     if _normalize_point_list(meta.get("callout_points")):
         score += 0.04
+    if bool(features.get("has_fill_color")):
+        score += 0.04
+    if bool(features.get("has_line_points")):
+        score += 0.03
+    if int(features.get("vertex_count_bucket") or 0) > 0:
+        score += 0.03
+    if str(features.get("page_zone") or "unknown") != "unknown":
+        score += 0.02
+    if str(features.get("text_source") or "unknown") not in {"", "unknown", "none"}:
+        score += 0.02
     return round(_clamp_value(score, minimum=0.0, maximum=0.98), 4)
 
 
@@ -2117,15 +2767,29 @@ def _build_markup_recognition(
         f"color:{features.get('color') or 'unknown'}",
         f"type:{features.get('type') or 'unknown'}",
         f"subtype:{features.get('subtype') or 'unknown'}",
+        f"text_source:{features.get('text_source') or 'unknown'}",
+        f"page_zone:{features.get('page_zone') or 'unknown'}",
+        f"aspect:{features.get('aspect') or 'unknown'}",
+        f"bounds_source:{features.get('bounds_source') or 'unknown'}",
     ]
     if bool(features.get("has_callout")):
         reason_codes.append("callout_points_detected")
+    if bool(features.get("has_fill_color")):
+        reason_codes.append(f"fill_color:{features.get('fill_color') or 'unknown'}")
+    if bool(features.get("has_line_points")):
+        reason_codes.append("line_points_detected")
+    if int(features.get("vertex_count_bucket") or 0) > 0:
+        reason_codes.append("geometry_vertices_detected")
+    if str(features.get("line_ending") or "unknown") != "unknown":
+        reason_codes.append(f"line_ending:{features.get('line_ending')}")
     if int(features.get("paired_anchor_count") or 0) > 0:
         reason_codes.append("paired_anchor_ids_detected")
+    if str(features.get("pairing_method") or "none") != "none":
+        reason_codes.append(f"pairing_method:{features.get('pairing_method')}")
 
     prediction = _LOCAL_LEARNING_RUNTIME.predict_text_domain(
         domain="autodraft_markup",
-        text=str(markup.get("text") or ""),
+        text=_collect_markup_semantic_text(markup) or str(markup.get("text") or ""),
         features=features,
     )
     if prediction is not None:

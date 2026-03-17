@@ -1420,6 +1420,145 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(annotation_counts.get("total"), 1)
         self.assertEqual(annotation_counts.get("supported"), 1)
 
+    def test_autodraft_compare_prepare_uses_native_geometry_bounds_and_rich_text(self) -> None:
+        class _FakeAnnotRef:
+            def __init__(self, obj):
+                self._obj = obj
+
+            def get_object(self):
+                return self._obj
+
+        class _FakePage(dict):
+            def __init__(self):
+                super().__init__()
+                self["/Annots"] = (
+                    _FakeAnnotRef(
+                        {
+                            "/Subtype": "/Line",
+                            "/L": [10, 20, 120, 50],
+                            "/LE": ["/OpenArrow", "/None"],
+                            "/C": [1.0, 0.0, 0.0],
+                            "/RC": "<body><p>Install <b>new panel</b></p></body>",
+                        }
+                    ),
+                )
+
+                class _Box:
+                    width = 400
+                    height = 200
+
+                self.mediabox = _Box()
+
+        class _FakeReader:
+            def __init__(self, _stream):
+                self.pages = [_FakePage()]
+                self.metadata = {
+                    "/Producer": "Bluebeam Revu x64",
+                    "/Creator": "Bluebeam Revu",
+                }
+
+        with (
+            patch("backend.route_groups.api_autodraft._PYPDF_AVAILABLE", True),
+            patch("backend.route_groups.api_autodraft._PdfReader", _FakeReader),
+        ):
+            response = self.client.post(
+                "/api/autodraft/compare/prepare",
+                headers={"X-API-Key": "valid-key"},
+                data={
+                    "page_index": "0",
+                    "pdf": (io.BytesIO(b"%PDF-1.7"), "sample.pdf"),
+                },
+                content_type="multipart/form-data",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        markups = payload.get("markups") or []
+        self.assertEqual(len(markups), 1)
+        first = markups[0] or {}
+        self.assertEqual(first.get("type"), "arrow")
+        self.assertEqual(first.get("text"), "Install new panel")
+        self.assertEqual(first.get("color"), "red")
+        bounds = first.get("bounds") or {}
+        self.assertEqual(bounds.get("x"), 10.0)
+        self.assertEqual(bounds.get("width"), 110.0)
+        meta = first.get("meta") or {}
+        self.assertEqual(meta.get("bounds_source"), "geometry")
+        self.assertEqual(meta.get("text_source"), "richtext")
+        self.assertEqual(meta.get("line_endings"), ["openarrow", "none"])
+        self.assertEqual(meta.get("page_zone"), "bottom-left")
+        self.assertEqual(meta.get("aspect"), "wide")
+        annotation_counts = (((payload.get("pdf_metadata") or {}).get("page") or {}).get("annotation_counts") or {})
+        self.assertEqual((annotation_counts.get("by_type") or {}).get("arrow"), 1)
+
+    def test_autodraft_compare_prepare_preserves_fill_color_and_native_position_metadata(self) -> None:
+        class _FakeAnnotRef:
+            def __init__(self, obj):
+                self._obj = obj
+
+            def get_object(self):
+                return self._obj
+
+        class _FakePage(dict):
+            def __init__(self):
+                super().__init__()
+                self["/Annots"] = (
+                    _FakeAnnotRef(
+                        {
+                            "/Subtype": "/Square",
+                            "/Rect": [250, 10, 390, 40],
+                            "/IC": [1.0, 1.0, 0.0],
+                            "/Contents": "Revision A",
+                            "/Subj": "Revision",
+                        }
+                    ),
+                )
+
+                class _Box:
+                    width = 400
+                    height = 200
+
+                self.mediabox = _Box()
+
+        class _FakeReader:
+            def __init__(self, _stream):
+                self.pages = [_FakePage()]
+                self.metadata = {
+                    "/Producer": "Bluebeam Revu x64",
+                    "/Creator": "Bluebeam Revu",
+                }
+
+        with (
+            patch("backend.route_groups.api_autodraft._PYPDF_AVAILABLE", True),
+            patch("backend.route_groups.api_autodraft._PdfReader", _FakeReader),
+        ):
+            response = self.client.post(
+                "/api/autodraft/compare/prepare",
+                headers={"X-API-Key": "valid-key"},
+                data={
+                    "page_index": "0",
+                    "pdf": (io.BytesIO(b"%PDF-1.7"), "sample.pdf"),
+                },
+                content_type="multipart/form-data",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        markups = payload.get("markups") or []
+        self.assertEqual(len(markups), 1)
+        first = markups[0] or {}
+        self.assertEqual(first.get("type"), "rectangle")
+        self.assertEqual(first.get("color"), "yellow")
+        meta = first.get("meta") or {}
+        self.assertEqual(meta.get("fill_color"), "yellow")
+        self.assertEqual(meta.get("fill_color_source"), "IC")
+        self.assertEqual(meta.get("page_zone"), "bottom-right")
+        self.assertEqual(meta.get("aspect"), "wide")
+        recognition = first.get("recognition") or {}
+        self.assertIn("fill_color:yellow", recognition.get("reason_codes") or [])
+        annotation_counts = (((payload.get("pdf_metadata") or {}).get("page") or {}).get("annotation_counts") or {})
+        self.assertEqual((annotation_counts.get("by_type") or {}).get("rectangle"), 1)
+
     def test_autodraft_compare_prepare_uses_ocr_text_fallback_for_flattened_bluebeam_pdf(self) -> None:
         from PIL import Image as PILImage
 

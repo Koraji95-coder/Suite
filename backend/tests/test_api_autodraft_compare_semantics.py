@@ -74,6 +74,18 @@ class TestAutoDraftCompareSemantics(unittest.TestCase):
         self.assertIsNone(color_hex)
         self.assertEqual(color_source, "unknown")
 
+    def test_extract_annotation_color_uses_ic_fill_fallback(self) -> None:
+        color_name, rgb, color_hex, color_source = _extract_annotation_color(
+            {
+                "/C": [],
+                "/IC": [1.0, 1.0, 0.0],
+            }
+        )
+        self.assertEqual(color_name, "yellow")
+        self.assertEqual(color_source, "IC")
+        self.assertEqual(color_hex, "#FFFF00")
+        self.assertEqual(rgb, (1.0, 1.0, 0.0))
+
     def test_build_local_plan_pairs_blue_note_with_blue_rectangle(self) -> None:
         plan = _build_local_plan(
             [
@@ -105,6 +117,83 @@ class TestAutoDraftCompareSemantics(unittest.TestCase):
         self.assertEqual(first.get("status"), "proposed")
         paired_ids = first.get("paired_annotation_ids") or []
         self.assertEqual(paired_ids, ["annot-note", "annot-rect"])
+
+    def test_build_local_plan_pairs_red_callout_note_with_same_color_anchor(self) -> None:
+        plan = _build_local_plan(
+            [
+                {
+                    "id": "annot-note",
+                    "type": "text",
+                    "color": "red",
+                    "text": "Install new disconnect",
+                    "bounds": {"x": 60.0, "y": 60.0, "width": 120.0, "height": 42.0},
+                    "meta": {
+                        "subtype": "/FreeText",
+                        "callout_points": [{"x": 200.0, "y": 92.0}],
+                    },
+                },
+                {
+                    "id": "annot-anchor",
+                    "type": "rectangle",
+                    "color": "red",
+                    "text": "",
+                    "bounds": {"x": 188.0, "y": 82.0, "width": 40.0, "height": 28.0},
+                    "meta": {"subtype": "/Square"},
+                },
+            ]
+        )
+        actions = plan.get("actions") or []
+        self.assertEqual(len(actions), 1)
+        first = actions[0] or {}
+        self.assertEqual(first.get("category"), "ADD")
+        self.assertEqual(first.get("paired_annotation_ids"), ["annot-note", "annot-anchor"])
+
+    def test_build_local_plan_matches_title_block_rectangle_rule(self) -> None:
+        plan = _build_local_plan(
+            [
+                {
+                    "id": "annot-title-block",
+                    "type": "rectangle",
+                    "color": "black",
+                    "text": "Drawing No. E-101",
+                    "bounds": {"x": 250.0, "y": 10.0, "width": 135.0, "height": 28.0},
+                    "meta": {
+                        "subtype": "/Square",
+                        "page_width": 400.0,
+                        "page_height": 200.0,
+                    },
+                }
+            ]
+        )
+        actions = plan.get("actions") or []
+        self.assertEqual(len(actions), 1)
+        first = actions[0] or {}
+        self.assertEqual(first.get("rule_id"), "title-block-rect")
+        self.assertEqual(first.get("category"), "TITLE_BLOCK")
+
+    def test_build_local_plan_matches_two_blue_arrows_to_swap_rule(self) -> None:
+        plan = _build_local_plan(
+            [
+                {
+                    "id": "annot-arrow-a",
+                    "type": "arrow",
+                    "color": "blue",
+                    "text": "",
+                    "bounds": {"x": 20.0, "y": 20.0, "width": 40.0, "height": 12.0},
+                },
+                {
+                    "id": "annot-arrow-b",
+                    "type": "arrow",
+                    "color": "blue",
+                    "text": "",
+                    "bounds": {"x": 100.0, "y": 50.0, "width": 40.0, "height": 12.0},
+                },
+            ]
+        )
+        actions = plan.get("actions") or []
+        self.assertEqual(len(actions), 2)
+        self.assertTrue(all((action or {}).get("rule_id") == "swap-blue-arrows" for action in actions))
+        self.assertTrue(all((action or {}).get("category") == "SWAP" for action in actions))
 
     def test_build_local_plan_applies_color_defaults_and_keyword_override(self) -> None:
         plan = _build_local_plan(

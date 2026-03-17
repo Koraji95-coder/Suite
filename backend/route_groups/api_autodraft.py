@@ -690,6 +690,29 @@ def _normalize_bounds(value: Any) -> Optional[Dict[str, float]]:
     return {"x": x, "y": y, "width": width, "height": height}
 
 
+def _recompute_plan_summary(plan_obj: Dict[str, Any]) -> None:
+    actions = plan_obj.get("actions")
+    if not isinstance(actions, list):
+        actions = []
+    classified = 0
+    needs_review = 0
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        rule_id = str(action.get("rule_id") or "").strip()
+        if rule_id:
+            classified += 1
+        action_status = _normalize_text(action.get("status"))
+        if action_status in {"review", "needs_review"} or not rule_id:
+            needs_review += 1
+    plan_obj["summary"] = {
+        "total_markups": len(actions),
+        "actions_proposed": len(actions),
+        "classified": classified,
+        "needs_review": needs_review,
+    }
+
+
 def _bounds_overlap(bounds_a: Dict[str, float], bounds_b: Dict[str, float]) -> bool:
     ax0 = bounds_a["x"]
     ay0 = bounds_a["y"]
@@ -3230,8 +3253,181 @@ def _normalize_compare_result_semantics(compare_result: Dict[str, Any]) -> None:
             finding["notes"] = notes
 
     _recompute_backcheck_summary(backcheck_obj)
+    _recompute_plan_summary(plan_obj)
     compare_result["backcheck"] = backcheck_obj
     _recompute_compare_summary(compare_result)
+
+
+def _markup_needs_compare_review(markup: Dict[str, Any]) -> bool:
+    recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    feature_source = _normalize_text(
+        recognition.get("input_feature_source") or recognition.get("feature_source")
+    )
+    extraction_source = _normalize_text(meta.get("extraction_source"))
+    if bool(recognition.get("needs_review")):
+        return True
+    if "pdf_text_fallback" in feature_source:
+        return True
+    if extraction_source in {"ocr", "embedded_text"}:
+        return True
+    return False
+
+
+def _build_markup_review_message(markup: Dict[str, Any]) -> str:
+    recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    extraction_source = _normalize_text(meta.get("extraction_source"))
+    feature_source = _normalize_text(
+        recognition.get("input_feature_source") or recognition.get("feature_source")
+    )
+    if extraction_source == "ocr":
+        return "OCR-derived fallback markup requires operator review before geometry execution."
+    if extraction_source == "embedded_text":
+        return "Embedded-text fallback markup requires operator review before geometry execution."
+    if "pdf_text_fallback" in feature_source:
+        return "Text-fallback markup requires operator review before geometry execution."
+    return "Low-confidence markup recognition requires operator review before execution."
+
+
+def _apply_markup_review_requirements(
+    *,
+    compare_result: Dict[str, Any],
+    request_id: str,
+    source_markups: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    plan_obj = compare_result.get("plan")
+    if not isinstance(plan_obj, dict):
+        compare_result["markup_review_queue"] = []
+        return []
+
+    actions = plan_obj.get("actions")
+    if not isinstance(actions, list):
+        compare_result["markup_review_queue"] = []
+        return []
+
+    markup_lookup: Dict[str, Dict[str, Any]] = {}
+    for markup in source_markups:
+        if not isinstance(markup, dict):
+            continue
+        markup_id = str(markup.get("id") or "").strip()
+        if markup_id:
+            markup_lookup[markup_id] = markup
+
+    backcheck_obj = (
+        compare_result.get("backcheck")
+        if isinstance(compare_result.get("backcheck"), dict)
+        else {}
+    )
+    findings = backcheck_obj.get("findings") if isinstance(backcheck_obj.get("findings"), list) else []
+    findings_by_action_id: Dict[str, Dict[str, Any]] = {}
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        action_id = str(finding.get("action_id") or "").strip()
+        if action_id:
+            findings_by_action_id[action_id] = finding
+
+    review_items: List[Dict[str, Any]] = []
+    flagged_count = 0
+    for index, action in enumerate(actions, start=1):
+        if not isinstance(action, dict):
+            continue
+        action_id = str(action.get("id") or f"action-{index}").strip()
+        markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+        markup_id = str(markup.get("id") or "").strip()
+        source_markup = markup_lookup.get(markup_id)
+        if isinstance(source_markup, dict):
+            if not isinstance(markup.get("recognition"), dict) and isinstance(
+                source_markup.get("recognition"),
+                dict,
+            ):
+                markup["recognition"] = dict(source_markup.get("recognition") or {})
+            if not isinstance(markup.get("meta"), dict) and isinstance(source_markup.get("meta"), dict):
+                markup["meta"] = dict(source_markup.get("meta") or {})
+            if not isinstance(markup.get("bounds"), dict) and isinstance(source_markup.get("bounds"), dict):
+                markup["bounds"] = dict(source_markup.get("bounds") or {})
+            if not str(markup.get("text") or "").strip():
+                markup["text"] = str(source_markup.get("text") or "").strip()
+            if not str(markup.get("color") or "").strip():
+                markup["color"] = str(source_markup.get("color") or "").strip()
+            if not str(markup.get("type") or "").strip():
+                markup["type"] = str(source_markup.get("type") or "").strip()
+            action["markup"] = markup
+
+        if not _markup_needs_compare_review(markup):
+            continue
+
+        recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
+        reason_codes = [
+            value.strip()
+            for value in (recognition.get("reason_codes") or [])
+            if isinstance(value, str) and value.strip()
+        ]
+        confidence = _safe_float(recognition.get("confidence"))
+        flagged_count += 1
+        action["status"] = "needs_review"
+        action["review_type"] = "markup"
+        if confidence is not None:
+            action["confidence"] = min(float(action.get("confidence") or 1.0), confidence)
+        if reason_codes:
+            action["review_reason_codes"] = list(dict.fromkeys(reason_codes))
+
+        finding = findings_by_action_id.get(action_id)
+        if isinstance(finding, dict):
+            finding["status"] = _BACKCHECK_FAIL
+            finding["severity"] = "high"
+            notes = finding.get("notes") if isinstance(finding.get("notes"), list) else []
+            suggestions = (
+                finding.get("suggestions") if isinstance(finding.get("suggestions"), list) else []
+            )
+            _append_unique_note(notes, _build_markup_review_message(markup))
+            _append_unique_note(
+                notes,
+                "This action came from low-confidence markup recognition and is not execution-ready.",
+            )
+            _append_unique_note(
+                suggestions,
+                "Confirm markup text, color, and intent before execution.",
+            )
+            _append_unique_note(
+                suggestions,
+                "Capture compare feedback after review so the local model can learn this case.",
+            )
+            finding["notes"] = notes
+            finding["suggestions"] = suggestions
+
+        review_items.append(
+            {
+                "id": f"markup-review-{action_id or len(review_items) + 1}",
+                "request_id": request_id,
+                "action_id": action_id,
+                "status": "needs_review",
+                "confidence": round(confidence if confidence is not None else 0.0, 4),
+                "message": _build_markup_review_message(markup),
+                "markup_id": markup_id or None,
+                "markup": markup,
+                "recognition": recognition if recognition else None,
+                "predicted_category": str(action.get("category") or "").strip() or None,
+                "predicted_action": str(action.get("action") or "").strip() or None,
+                "reason_codes": reason_codes,
+            }
+        )
+
+    if flagged_count > 0:
+        warnings = backcheck_obj.get("warnings") if isinstance(backcheck_obj.get("warnings"), list) else []
+        _append_unique_note(
+            warnings,
+            f"Markup recognition flagged {flagged_count} action(s) for operator review.",
+        )
+        backcheck_obj["warnings"] = warnings
+
+    _recompute_backcheck_summary(backcheck_obj)
+    _recompute_plan_summary(plan_obj)
+    compare_result["backcheck"] = backcheck_obj
+    compare_result["markup_review_queue"] = review_items
+    _recompute_compare_summary(compare_result)
+    return review_items
 
 
 def _extract_json_object_from_text(value: str) -> Optional[Dict[str, Any]]:
@@ -5914,7 +6110,16 @@ def create_autodraft_blueprint(
                 next_markup["meta"] = meta_obj
             if isinstance(markup.get("recognition"), dict):
                 recognition_obj = dict(markup.get("recognition") or {})
-                recognition_obj["feature_source"] = "prepared_markups+cad_context"
+                original_feature_source = str(
+                    recognition_obj.get("feature_source") or ""
+                ).strip()
+                if original_feature_source:
+                    recognition_obj["input_feature_source"] = original_feature_source
+                    recognition_obj["feature_source"] = (
+                        f"{original_feature_source}+cad_context"
+                    )
+                else:
+                    recognition_obj["feature_source"] = "prepared_markups+cad_context"
                 next_markup["recognition"] = recognition_obj
             transformed_markups.append(next_markup)
 
@@ -6052,6 +6257,11 @@ def create_autodraft_blueprint(
             )
             engine_used = _COMPARE_ENGINE_PYTHON
         _normalize_compare_result_semantics(compare_result)
+        markup_review_queue = _apply_markup_review_requirements(
+            compare_result=compare_result,
+            request_id=request_id,
+            source_markups=effective_transformed_markups,
+        )
 
         review_queue: List[Dict[str, Any]] = []
         agent_pre_review_result: Dict[str, Any] = {
@@ -6156,6 +6366,7 @@ def create_autodraft_blueprint(
             "transformed_count": len(effective_transformed_markups),
         }
         compare_result["replacement_tuning"] = replacement_tuning
+        compare_result["markup_review_queue"] = markup_review_queue
         compare_result["review_queue"] = review_queue
         compare_result["agent_pre_review"] = agent_pre_review_result
         compare_result["shadow_advisor"] = shadow_result

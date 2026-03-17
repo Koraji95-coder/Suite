@@ -1057,6 +1057,87 @@ class TestApiRouteGroups(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertEqual(payload.get("code"), "AUTODRAFT_COMPARE_NOT_CONFIGURED")
 
+    def test_autodraft_compare_flags_ocr_fallback_markup_for_review(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/compare",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "engine": "python",
+                "calibration_mode": "manual",
+                "markups": [
+                    {
+                        "id": "ocr-text-1",
+                        "type": "text",
+                        "color": "blue",
+                        "text": "verify feeder tag",
+                        "bounds": {"x": 10, "y": 10, "width": 30, "height": 10},
+                        "meta": {
+                            "extraction_source": "ocr",
+                            "color_source": "render_sample",
+                            "page_position": {"x": 25, "y": 15},
+                        },
+                        "recognition": {
+                            "label": "note",
+                            "model_version": "deterministic-v1",
+                            "confidence": 0.58,
+                            "source": "ocr",
+                            "feature_source": "pdf_text_fallback",
+                            "reason_codes": [
+                                "prepare_text_fallback",
+                                "text_source:ocr",
+                            ],
+                            "needs_review": True,
+                            "accepted": False,
+                            "override_reason": None,
+                        },
+                    }
+                ],
+                "pdf_points": [{"x": 0, "y": 0}, {"x": 10, "y": 0}],
+                "cad_points": [{"x": 0, "y": 0}, {"x": 10, "y": 0}],
+                "cad_context": {
+                    "drawing": {"name": "sample.dwg"},
+                    "layers": [{"name": "A-DEMO-LAYER", "locked": False}],
+                    "entities": [
+                        {
+                            "id": "E-TEXT-1",
+                            "layer": "A-DEMO-LAYER",
+                            "text": "VERIFY FEEDER",
+                            "bounds": {"x": 8, "y": 8, "width": 36, "height": 14},
+                        }
+                    ],
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        plan = payload.get("plan") or {}
+        summary = plan.get("summary") or {}
+        self.assertEqual(summary.get("needs_review"), 1)
+        actions = plan.get("actions") or []
+        self.assertEqual(len(actions), 1)
+        first_action = actions[0] or {}
+        self.assertEqual(first_action.get("status"), "needs_review")
+        self.assertEqual(first_action.get("review_type"), "markup")
+        self.assertAlmostEqual(float(first_action.get("confidence") or 0.0), 0.58, places=6)
+
+        markup_review_queue = payload.get("markup_review_queue") or []
+        self.assertEqual(len(markup_review_queue), 1)
+        first_review = markup_review_queue[0] or {}
+        self.assertEqual(first_review.get("action_id"), "action-1")
+        self.assertEqual(first_review.get("status"), "needs_review")
+        self.assertIn("operator review", str(first_review.get("message") or "").lower())
+
+        self.assertEqual(payload.get("review_queue") or [], [])
+        findings = ((payload.get("backcheck") or {}).get("findings") or [])
+        self.assertEqual(len(findings), 1)
+        finding = findings[0] or {}
+        self.assertEqual(finding.get("status"), "fail")
+        finding_notes = [str(item) for item in (finding.get("notes") or [])]
+        self.assertTrue(
+            any("low-confidence markup recognition" in item.lower() for item in finding_notes)
+        )
+
     def test_autodraft_compare_infers_red_callout_replacement_metadata(self) -> None:
         response = self.client.post(
             "/api/autodraft/compare",

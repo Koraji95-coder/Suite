@@ -304,6 +304,177 @@ describe("autoDraftService compare endpoints", () => {
 		).toBe(0.36);
 	});
 
+	it("runCompare normalizes markup review queue metadata", async () => {
+		vi.spyOn(globalThis, "fetch").mockResolvedValue(
+			new Response(
+				JSON.stringify({
+					ok: true,
+					success: true,
+					requestId: "req-ocr",
+					source: "python-compare",
+					mode: "cad-aware",
+					tolerance_profile: "medium",
+					engine: { requested: "python", used: "python", used_fallback: false },
+					calibration: {
+						pdf_points: [
+							{ x: 0, y: 0 },
+							{ x: 10, y: 0 },
+						],
+						cad_points: [
+							{ x: 0, y: 0 },
+							{ x: 10, y: 0 },
+						],
+						scale: 1,
+						rotation_deg: 0,
+						translation: { x: 0, y: 0 },
+					},
+					plan: {
+						source: "python-local-rules",
+						summary: {
+							total_markups: 1,
+							actions_proposed: 1,
+							classified: 1,
+							needs_review: 1,
+						},
+						actions: [
+							{
+								id: "action-1",
+								rule_id: "note-blue-text",
+								category: "NOTE",
+								action: "Review and acknowledge note intent before execution.",
+								confidence: 0.58,
+								status: "needs_review",
+								markup: {
+									id: "ocr-1",
+									type: "text",
+									color: "blue",
+									text: "verify feeder tag",
+								},
+							},
+						],
+					},
+					backcheck: {
+						ok: true,
+						success: true,
+						requestId: "req-ocr",
+						source: "python-local-backcheck",
+						mode: "cad-aware",
+						cad: {
+							available: true,
+							degraded: false,
+							source: "client",
+							entity_count: 1,
+							locked_layer_count: 0,
+						},
+						summary: {
+							total_actions: 1,
+							pass_count: 0,
+							warn_count: 0,
+							fail_count: 1,
+						},
+						warnings: [
+							"Markup recognition flagged 1 action(s) for operator review.",
+						],
+						findings: [
+							{
+								id: "finding-1",
+								action_id: "action-1",
+								status: "fail",
+								severity: "high",
+								category: "note",
+								notes: [
+									"This action came from low-confidence markup recognition and is not execution-ready.",
+								],
+								suggestions: [
+									"Confirm markup text, color, and intent before execution.",
+								],
+							},
+						],
+					},
+					summary: {
+						status: "fail",
+						total_markups: 1,
+						total_actions: 1,
+						pass_count: 0,
+						warn_count: 0,
+						fail_count: 1,
+						cad_context_available: true,
+					},
+					markup_review_queue: [
+						{
+							id: "markup-review-action-1",
+							request_id: "req-ocr",
+							action_id: "action-1",
+							status: "needs_review",
+							confidence: 0.58,
+							message:
+								"OCR-derived fallback markup requires operator review before geometry execution.",
+							markup_id: "ocr-1",
+							markup: {
+								id: "ocr-1",
+								type: "text",
+								color: "blue",
+								text: "verify feeder tag",
+							},
+							recognition: {
+								model_version: "deterministic-v1",
+								confidence: 0.58,
+								source: "ocr",
+								feature_source: "pdf_text_fallback+cad_context",
+								reason_codes: ["prepare_text_fallback", "text_source:ocr"],
+								needs_review: true,
+								accepted: false,
+								override_reason: null,
+							},
+							predicted_category: "NOTE",
+							predicted_action:
+								"Review and acknowledge note intent before execution.",
+							reason_codes: ["prepare_text_fallback", "text_source:ocr"],
+						},
+					],
+					review_queue: [],
+				}),
+				{
+					status: 200,
+					headers: { "content-type": "application/json" },
+				},
+			),
+		);
+
+		const compareResult = await autoDraftService.runCompare({
+			engine: "python",
+			toleranceProfile: "medium",
+			calibrationMode: "manual",
+			markups: [
+				{
+					id: "ocr-1",
+					type: "text",
+					color: "blue",
+					text: "verify feeder tag",
+					bounds: { x: 10, y: 10, width: 30, height: 10 },
+				},
+			],
+			pdfPoints: [
+				{ x: 0, y: 0 },
+				{ x: 10, y: 0 },
+			],
+			cadPoints: [
+				{ x: 0, y: 0 },
+				{ x: 10, y: 0 },
+			],
+		});
+
+		expect(compareResult.markup_review_queue).toHaveLength(1);
+		expect(compareResult.markup_review_queue[0]?.action_id).toBe("action-1");
+		expect(compareResult.markup_review_queue[0]?.recognition?.featureSource).toBe(
+			"pdf_text_fallback+cad_context",
+		);
+		expect(compareResult.markup_review_queue[0]?.reason_codes).toEqual([
+			"prepare_text_fallback",
+			"text_source:ocr",
+		]);
+	});
+
 	it("runCompare normalizes replacement review queue and shadow advisor metadata", async () => {
 		vi.spyOn(globalThis, "fetch").mockResolvedValue(
 			new Response(

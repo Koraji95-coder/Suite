@@ -304,6 +304,10 @@ export function AutoDraftComparePanel() {
 		() => (compareResult ? compareResult.review_queue : []),
 		[compareResult],
 	);
+	const markupReviewQueue = useMemo(
+		() => (compareResult ? compareResult.markup_review_queue : []),
+		[compareResult],
+	);
 	const shadowReviewByActionId = useMemo(() => {
 		const lookup = new Map<
 			string,
@@ -2095,6 +2099,77 @@ export function AutoDraftComparePanel() {
 								</div>
 							);
 						})}
+					</div>
+
+					<div className={styles.compareReviewPanel}>
+						<Text size="xs" color="muted">
+							Markup review queue ({markupReviewQueue.length})
+						</Text>
+						{markupReviewQueue.length === 0 ? (
+							<Text size="xs" color="muted">
+								No low-confidence OCR/text-fallback markup review items for this compare run.
+							</Text>
+						) : (
+							<div className={styles.compareReviewList}>
+								{markupReviewQueue.map((item) => {
+									const action = compareActionById.get(item.action_id);
+									const markup =
+										item.markup && isRecordValue(item.markup)
+											? item.markup
+											: action?.markup && isRecordValue(action.markup)
+												? action.markup
+												: null;
+									const markupColorDiagnostic = markup
+										? formatMarkupColorDiagnostic(markup)
+										: null;
+									return (
+										<div key={item.id} className={styles.compareReviewCard}>
+											<HStack gap={2} align="center" justify="between" wrap>
+												<Text size="xs" weight="semibold">
+													{item.action_id}
+												</Text>
+												<Badge variant="soft" color="warning">
+													{item.status}
+												</Badge>
+											</HStack>
+											<Text size="xs" color="muted">
+												{item.message}
+											</Text>
+											<Text size="xs" color="muted">
+												{item.predicted_category
+													? `Predicted ${item.predicted_category}`
+													: "Predicted category unavailable"}
+												{item.predicted_action
+													? ` | ${item.predicted_action}`
+													: ""}
+											</Text>
+											<Text size="xs" color="muted">
+												Confidence {item.confidence.toFixed(2)}
+												{markup && typeof markup.text === "string" && markup.text.trim().length > 0
+													? ` | text ${markup.text}`
+													: ""}
+											</Text>
+											{markupColorDiagnostic ? (
+												<Text size="xs" color="muted">
+													Markup color: {markupColorDiagnostic}
+												</Text>
+											) : null}
+											{item.recognition ? (
+												<Text size="xs" color="muted">
+													Recognition: {item.recognition.source} | feature{" "}
+													{item.recognition.featureSource}
+												</Text>
+											) : null}
+											{item.reason_codes.length > 0 ? (
+												<Text size="xs" color="muted">
+													Reasons: {item.reason_codes.join(", ")}
+												</Text>
+											) : null}
+										</div>
+									);
+								})}
+							</div>
+						)}
 					</div>
 
 					<div className={styles.compareReviewPanel}>

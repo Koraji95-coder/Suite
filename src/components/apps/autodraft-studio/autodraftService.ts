@@ -139,6 +139,21 @@ export type AutoDraftCompareReviewItem = {
 	};
 };
 
+export type AutoDraftMarkupReviewItem = {
+	id: string;
+	request_id: string;
+	action_id: string;
+	status: "needs_review" | string;
+	confidence: number;
+	message: string;
+	markup_id?: string | null;
+	markup?: MarkupInput;
+	recognition?: AutoDraftRecognitionMetadata;
+	predicted_category?: string | null;
+	predicted_action?: string | null;
+	reason_codes: string[];
+};
+
 export type AutoDraftBackcheckResponse = {
 	ok: boolean;
 	success: boolean;
@@ -323,6 +338,7 @@ export type AutoDraftCompareResponse = {
 		cad_context_available: boolean;
 	};
 	replacement_tuning?: AutoDraftReplacementTuning;
+	markup_review_queue: AutoDraftMarkupReviewItem[];
 	review_queue: AutoDraftCompareReviewItem[];
 	agent_pre_review?: {
 		enabled: boolean;
@@ -1421,6 +1437,44 @@ const normalizeCompareReviewItem = (
 	};
 };
 
+const normalizeMarkupReviewItem = (
+	value: unknown,
+	index: number,
+): AutoDraftMarkupReviewItem | null => {
+	if (!isRecord(value)) return null;
+	const actionId = toNonEmptyString(value.action_id);
+	if (!actionId) return null;
+	const reasonCodes = Array.isArray(value.reason_codes)
+		? value.reason_codes.filter(
+				(entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
+			)
+		: [];
+	return {
+		id: toNonEmptyString(value.id, `markup-review-${index + 1}`),
+		request_id: toNonEmptyString(value.request_id),
+		action_id: actionId,
+		status: toNonEmptyString(value.status, "needs_review"),
+		confidence: toConfidence(value.confidence, 0),
+		message: toNonEmptyString(
+			value.message,
+			"Low-confidence markup recognition requires operator review.",
+		),
+		markup_id:
+			typeof value.markup_id === "string" ? value.markup_id : undefined,
+		markup: isRecord(value.markup) ? value.markup : undefined,
+		recognition: normalizeRecognitionMetadata(value.recognition),
+		predicted_category:
+			typeof value.predicted_category === "string"
+				? value.predicted_category
+				: null,
+		predicted_action:
+			typeof value.predicted_action === "string"
+				? value.predicted_action
+				: null,
+		reason_codes: reasonCodes,
+	};
+};
+
 const normalizeShadowAdvisor = (
 	value: unknown,
 ): AutoDraftCompareResponse["shadow_advisor"] => {
@@ -1554,6 +1608,7 @@ const normalizeComparePayload = (
 				cad_context_available: false,
 			},
 			replacement_tuning: { ...DEFAULT_REPLACEMENT_TUNING },
+			markup_review_queue: [],
 			review_queue: [],
 			agent_pre_review: {
 				enabled: false,
@@ -1592,6 +1647,12 @@ const normalizeComparePayload = (
 	const reviewQueue = reviewQueueRaw
 		.map((entry, index) => normalizeCompareReviewItem(entry, index))
 		.filter((entry): entry is AutoDraftCompareReviewItem => entry !== null);
+	const markupReviewQueueRaw = Array.isArray(payload.markup_review_queue)
+		? payload.markup_review_queue
+		: [];
+	const markupReviewQueue = markupReviewQueueRaw
+		.map((entry, index) => normalizeMarkupReviewItem(entry, index))
+		.filter((entry): entry is AutoDraftMarkupReviewItem => entry !== null);
 
 	const requestedEngine = toNonEmptyString(engineRaw.requested, "auto");
 	const usedEngine = toNonEmptyString(engineRaw.used, "python");
@@ -1675,6 +1736,7 @@ const normalizeComparePayload = (
 			cad_context_available: Boolean(summaryRaw.cad_context_available),
 		},
 		replacement_tuning: normalizeReplacementTuning(payload.replacement_tuning),
+		markup_review_queue: markupReviewQueue,
 		review_queue: reviewQueue,
 		agent_pre_review: normalizeAgentPreReview(payload.agent_pre_review),
 		shadow_advisor: normalizeShadowAdvisor(payload.shadow_advisor),

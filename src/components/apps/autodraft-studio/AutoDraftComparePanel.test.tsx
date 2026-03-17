@@ -446,6 +446,7 @@ describe("AutoDraftComparePanel", () => {
 				fail_count: 0,
 				cad_context_available: true,
 			},
+			markup_review_queue: [],
 			review_queue: [],
 			shadow_advisor: {
 				enabled: false,
@@ -601,6 +602,7 @@ describe("AutoDraftComparePanel", () => {
 				fail_count: 0,
 				cad_context_available: true,
 			},
+			markup_review_queue: [],
 			review_queue: [],
 			shadow_advisor: {
 				enabled: true,
@@ -668,6 +670,215 @@ describe("AutoDraftComparePanel", () => {
 		expect(
 			screen.getByText(/Paired annotations: annot-3, annot-2/i),
 		).toBeTruthy();
+	});
+
+	it("renders markup review queue for OCR/text-fallback compare results", async () => {
+		const prepareMock = vi.mocked(autoDraftService.prepareCompare);
+		const compareMock = vi.mocked(autoDraftService.runCompare);
+		prepareMock.mockResolvedValue(createPrepareResponse(1));
+		compareMock.mockResolvedValue({
+			ok: true,
+			success: true,
+			requestId: "req-compare-ocr",
+			source: "python-compare",
+			mode: "cad-aware",
+			tolerance_profile: "medium",
+			engine: { requested: "python", used: "python", used_fallback: false },
+			calibration: {
+				pdf_points: [
+					{ x: 10, y: 10 },
+					{ x: 20, y: 10 },
+				],
+				cad_points: [
+					{ x: 100, y: 100 },
+					{ x: 110, y: 100 },
+				],
+				scale: 1,
+				rotation_deg: 0,
+				translation: { x: 90, y: 90 },
+			},
+			plan: {
+				source: "python-local-rules",
+				summary: {
+					total_markups: 1,
+					actions_proposed: 1,
+					classified: 1,
+					needs_review: 1,
+				},
+				actions: [
+					{
+						id: "action-ocr-1",
+						rule_id: "note-blue-text",
+						category: "NOTE",
+						action: "Review and acknowledge note intent before execution.",
+						confidence: 0.58,
+						status: "needs_review",
+						markup: {
+							id: "ocr-text-1",
+							type: "text",
+							color: "blue",
+							text: "verify feeder tag",
+							meta: {
+								color_source: "render_sample",
+								color_hex: "#0000FF",
+								extraction_source: "ocr",
+							},
+						},
+					},
+				],
+			},
+			backcheck: {
+				ok: true,
+				success: true,
+				requestId: "req-compare-ocr",
+				source: "python-local-backcheck",
+				mode: "cad-aware",
+				cad: {
+					available: true,
+					degraded: false,
+					source: "client",
+					entity_count: 1,
+					locked_layer_count: 0,
+				},
+				summary: {
+					total_actions: 1,
+					pass_count: 0,
+					warn_count: 0,
+					fail_count: 1,
+				},
+				warnings: ["Markup recognition flagged 1 action(s) for operator review."],
+				findings: [
+					{
+						id: "finding-1",
+						action_id: "action-ocr-1",
+						status: "fail",
+						severity: "high",
+						category: "note",
+						notes: [
+							"OCR-derived fallback markup requires operator review before geometry execution.",
+						],
+						suggestions: [
+							"Confirm markup text, color, and intent before execution.",
+						],
+					},
+				],
+			},
+			summary: {
+				status: "fail",
+				total_markups: 1,
+				total_actions: 1,
+				pass_count: 0,
+				warn_count: 0,
+				fail_count: 1,
+				cad_context_available: true,
+			},
+			markup_review_queue: [
+				{
+					id: "markup-review-action-ocr-1",
+					request_id: "req-compare-ocr",
+					action_id: "action-ocr-1",
+					status: "needs_review",
+					confidence: 0.58,
+					message:
+						"OCR-derived fallback markup requires operator review before geometry execution.",
+					markup_id: "ocr-text-1",
+					markup: {
+						id: "ocr-text-1",
+						type: "text",
+						color: "blue",
+						text: "verify feeder tag",
+						meta: {
+							color_source: "render_sample",
+							color_hex: "#0000FF",
+							extraction_source: "ocr",
+						},
+					},
+					recognition: {
+						modelVersion: "deterministic-v1",
+						confidence: 0.58,
+						source: "ocr",
+						featureSource: "pdf_text_fallback+cad_context",
+						reasonCodes: ["prepare_text_fallback", "text_source:ocr"],
+						needsReview: true,
+						accepted: false,
+						overrideReason: null,
+					},
+					predicted_category: "NOTE",
+					predicted_action:
+						"Review and acknowledge note intent before execution.",
+					reason_codes: ["prepare_text_fallback", "text_source:ocr"],
+				},
+			],
+			review_queue: [],
+			shadow_advisor: {
+				enabled: true,
+				available: true,
+				profile: "draftsmith",
+				reviews: [],
+			},
+		});
+
+		const { container } = render(<AutoDraftComparePanel />);
+		const fileInput = screen.getByLabelText("Bluebeam PDF") as HTMLInputElement;
+		const pdfFile = new File(["%PDF-1.7"], "sheet.pdf", {
+			type: "application/pdf",
+		});
+		fireEvent.change(fileInput, {
+			target: { files: [pdfFile] },
+		});
+
+		await waitFor(() => {
+			expect(mockPdfDoc.getPage).toHaveBeenCalled();
+		});
+
+		const canvas = container.querySelector("canvas");
+		expect(canvas).toBeTruthy();
+		if (!canvas) return;
+
+		vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+			x: 0,
+			y: 0,
+			left: 0,
+			top: 0,
+			right: 100,
+			bottom: 200,
+			width: 100,
+			height: 200,
+			toJSON: () => ({}),
+		} as DOMRect);
+
+		fireEvent.click(screen.getByRole("button", { name: "Prepare markups" }));
+		await waitFor(() => {
+			expect(prepareMock).toHaveBeenCalled();
+		});
+
+		fireEvent.click(canvas, { clientX: 10, clientY: 20 });
+		fireEvent.click(canvas, { clientX: 20, clientY: 40 });
+		fireEvent.change(screen.getByLabelText("P1 X"), {
+			target: { value: "100" },
+		});
+		fireEvent.change(screen.getByLabelText("P1 Y"), {
+			target: { value: "100" },
+		});
+		fireEvent.change(screen.getByLabelText("P2 X"), {
+			target: { value: "110" },
+		});
+		fireEvent.change(screen.getByLabelText("P2 Y"), {
+			target: { value: "100" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Run compare" }));
+
+		await waitFor(() => {
+			expect(compareMock).toHaveBeenCalled();
+		});
+		expect(screen.getByText(/Markup review queue \(1\)/i)).toBeTruthy();
+		expect(
+			screen.getAllByText(
+				/OCR-derived fallback markup requires operator review before geometry execution\./i,
+			).length,
+		).toBeGreaterThanOrEqual(1);
+		expect(screen.getByText(/Recognition: ocr \| feature pdf_text_fallback\+cad_context/i)).toBeTruthy();
+		expect(screen.getByText(/Reasons: prepare_text_fallback, text_source:ocr/i)).toBeTruthy();
 	});
 
 	it("renders replacement review cards and submits correction feedback", async () => {
@@ -796,6 +1007,7 @@ describe("AutoDraftComparePanel", () => {
 				fail_count: 0,
 				cad_context_available: true,
 			},
+			markup_review_queue: [],
 			review_queue: [
 				{
 					id: "review-action-red-1",

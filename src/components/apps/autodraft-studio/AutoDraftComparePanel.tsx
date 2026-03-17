@@ -2314,6 +2314,24 @@ export function AutoDraftComparePanel() {
 							{compareResult.auto_calibration.confidence.toFixed(2)}
 						</Text>
 					) : null}
+					{compareResult.recognition ? (
+						<Text
+							size="xs"
+							color={
+								compareResult.recognition.source === "local_model"
+									? "primary"
+									: "muted"
+							}
+						>
+							Recognition: {compareResult.recognition.source} | model{" "}
+							{compareResult.recognition.modelVersion} | confidence{" "}
+							{compareResult.recognition.confidence.toFixed(2)} | feature{" "}
+							{compareResult.recognition.featureSource} |{" "}
+							{compareResult.recognition.needsReview
+								? "review required"
+								: "accepted"}
+						</Text>
+					) : null}
 					{compareResult.roi ? (
 						<Text size="xs" color="muted">
 							ROI used: x {compareResult.roi.x.toFixed(1)}, y{" "}

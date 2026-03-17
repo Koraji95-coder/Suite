@@ -12,6 +12,7 @@ from flask import Flask, g, jsonify, request
 from flask_limiter import Limiter
 
 from backend.route_groups import register_route_groups
+from backend.route_groups.api_local_learning_runtime import LocalModelPrediction
 
 
 class TestApiRouteGroups(unittest.TestCase):
@@ -1137,6 +1138,72 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertTrue(
             any("low-confidence markup recognition" in item.lower() for item in finding_notes)
         )
+
+    def test_autodraft_compare_uses_local_markup_model_for_native_annotation_classification(self) -> None:
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.predict_text_domain",
+            return_value=LocalModelPrediction(
+                label="ADD",
+                confidence=0.88,
+                model_version="20260317T010000Z",
+                feature_source="text+structured_tokens",
+                source="local_model",
+                reason_codes=["local_model_prediction"],
+            ),
+        ):
+            response = self.client.post(
+                "/api/autodraft/compare",
+                headers={"X-API-Key": "valid-key"},
+                json={
+                    "engine": "python",
+                    "calibration_mode": "manual",
+                    "markups": [
+                        {
+                            "id": "annot-native-model-1",
+                            "type": "text",
+                            "color": "black",
+                            "text": "TS416",
+                            "bounds": {"x": 10, "y": 10, "width": 30, "height": 10},
+                            "meta": {
+                                "subtype": "/FreeText",
+                                "page_position": {"x": 25, "y": 15},
+                            },
+                        }
+                    ],
+                    "pdf_points": [{"x": 0, "y": 0}, {"x": 10, "y": 0}],
+                    "cad_points": [{"x": 0, "y": 0}, {"x": 10, "y": 0}],
+                    "cad_context": {
+                        "drawing": {"name": "sample.dwg"},
+                        "layers": [{"name": "A-DEMO-LAYER", "locked": False}],
+                        "entities": [
+                            {
+                                "id": "E-TEXT-1",
+                                "layer": "A-DEMO-LAYER",
+                                "text": "EXISTING",
+                                "bounds": {"x": 80, "y": 80, "width": 20, "height": 8},
+                            }
+                        ],
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        actions = ((payload.get("plan") or {}).get("actions") or [])
+        self.assertEqual(len(actions), 1)
+        first_action = actions[0] or {}
+        self.assertEqual(first_action.get("rule_id"), "semantic-recognition-local_model-add")
+        self.assertEqual(first_action.get("category"), "ADD")
+        self.assertEqual(first_action.get("status"), "proposed")
+        self.assertAlmostEqual(float(first_action.get("confidence") or 0.0), 0.88, places=6)
+        markup = first_action.get("markup") or {}
+        recognition = markup.get("recognition") or {}
+        self.assertEqual(recognition.get("source"), "local_model")
+        self.assertEqual(recognition.get("model_version"), "20260317T010000Z")
+        summary_recognition = payload.get("recognition") or {}
+        self.assertEqual(summary_recognition.get("source"), "local_model")
+        self.assertEqual(summary_recognition.get("model_version"), "20260317T010000Z")
 
     def test_autodraft_compare_infers_red_callout_replacement_metadata(self) -> None:
         response = self.client.post(

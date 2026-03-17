@@ -117,6 +117,19 @@ _DEFAULT_COLOR_TO_CATEGORY: Dict[str, str] = {
     "red": "ADD",
     "yellow": "NOTE",
 }
+_RECOGNITION_LABEL_TO_CATEGORY: Dict[str, str] = {
+    "delete": "DELETE",
+    "remove": "DELETE",
+    "add": "ADD",
+    "insert": "ADD",
+    "note": "NOTE",
+    "title_block": "TITLE_BLOCK",
+    "titleblock": "TITLE_BLOCK",
+}
+_LOCAL_MODEL_RECOGNITION_MIN_CONFIDENCE = 0.66
+_LOCAL_MODEL_RECOGNITION_LOW_SIGNAL_OVERRIDE_CONFIDENCE = 0.80
+_RECOGNITION_FALLBACK_MIN_CONFIDENCE = 0.72
+_LOW_SIGNAL_DEFAULT_RULE_IDS = {"note-blue-text"}
 
 _ADD_INTENT_PATTERN = re.compile(r"\b(add|install|insert|provide|new)\b", re.IGNORECASE)
 _DELETE_INTENT_PATTERN = re.compile(
@@ -862,6 +875,104 @@ def _is_red_reference_add_markup(markup: Dict[str, Any]) -> bool:
     )
 
 
+def _resolve_markup_recognition_candidate(
+    markup: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
+    recognition_label = _normalize_text(recognition.get("label"))
+    recognition_category = _RECOGNITION_LABEL_TO_CATEGORY.get(recognition_label)
+    if not recognition_category:
+        return None
+    recognition_source = _normalize_text(recognition.get("source")) or "recognition"
+    recognition_confidence = _safe_float(recognition.get("confidence")) or 0.0
+    min_confidence = (
+        _LOCAL_MODEL_RECOGNITION_MIN_CONFIDENCE
+        if recognition_source == "local_model"
+        else _RECOGNITION_FALLBACK_MIN_CONFIDENCE
+    )
+    low_signal_override_confidence = (
+        _LOCAL_MODEL_RECOGNITION_LOW_SIGNAL_OVERRIDE_CONFIDENCE
+        if recognition_source == "local_model"
+        else min_confidence
+    )
+    return {
+        "category": recognition_category,
+        "label": recognition_label,
+        "source": recognition_source,
+        "confidence": recognition_confidence,
+        "reason": f"recognition-{recognition_source}-{recognition_label}",
+        "min_confidence": min_confidence,
+        "low_signal_override_confidence": low_signal_override_confidence,
+        "needs_review": bool(recognition.get("needs_review")),
+    }
+
+
+def _semantic_confidence_for_inferred_reason(markup: Dict[str, Any], reason: str) -> float:
+    if str(reason or "").startswith("recognition-"):
+        recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
+        recognition_confidence = _safe_float(recognition.get("confidence"))
+        if recognition_confidence is not None:
+            return round(
+                _clamp_value(recognition_confidence, minimum=0.0, maximum=1.0),
+                4,
+            )
+        return 0.74
+    if str(reason or "").startswith("keyword-"):
+        return 0.76
+    if str(reason or "").startswith("title-block-"):
+        return 0.74
+    return 0.64
+
+
+def _semantic_status_for_inferred_reason(markup: Dict[str, Any], reason: str) -> str:
+    if str(reason or "").startswith("recognition-"):
+        recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
+        if bool(recognition.get("needs_review")):
+            return "needs_review"
+    return "proposed"
+
+
+def _build_semantic_action_item(
+    *,
+    action_id: str,
+    markup: Dict[str, Any],
+    category: str,
+    reason: str,
+) -> Dict[str, Any]:
+    return {
+        "id": action_id,
+        "rule_id": f"semantic-{reason}",
+        "category": category,
+        "action": _semantic_action_message_for_category(category),
+        "confidence": _semantic_confidence_for_inferred_reason(markup, reason),
+        "markup": markup,
+        "status": _semantic_status_for_inferred_reason(markup, reason),
+    }
+
+
+def _resolve_low_signal_rule_override(
+    markup: Dict[str, Any],
+    selected_rule: Dict[str, Any],
+) -> Optional[Tuple[str, str]]:
+    selected_rule_id = str(selected_rule.get("id") or "").strip()
+    selected_category = str(selected_rule.get("category") or "").strip()
+    if selected_rule_id not in _LOW_SIGNAL_DEFAULT_RULE_IDS or not selected_category:
+        return None
+    recognition_candidate = _resolve_markup_recognition_candidate(markup)
+    if not recognition_candidate:
+        return None
+    if recognition_candidate["category"] == selected_category:
+        return None
+    if float(recognition_candidate["confidence"] or 0.0) < float(
+        recognition_candidate["low_signal_override_confidence"] or 0.0
+    ):
+        return None
+    return (
+        str(recognition_candidate["category"]),
+        str(recognition_candidate["reason"]),
+    )
+
+
 def _infer_semantic_category(markup: Dict[str, Any]) -> Tuple[Optional[str], str]:
     markup_text = _collect_markup_semantic_text(markup) or str(markup.get("text") or "")
     markup_color = _normalize_text(markup.get("color"))
@@ -877,23 +988,7 @@ def _infer_semantic_category(markup: Dict[str, Any]) -> Tuple[Optional[str], str
     is_red_text_replacement = (
         markup_color == "red" and markup_type == "text" and bool(markup_text.strip())
     )
-    recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
-    recognition_label = _normalize_text(recognition.get("label"))
-    recognition_confidence = _safe_float(recognition.get("confidence")) or 0.0
-    recognition_category = {
-        "delete": "DELETE",
-        "remove": "DELETE",
-        "add": "ADD",
-        "insert": "ADD",
-        "note": "NOTE",
-        "title_block": "TITLE_BLOCK",
-        "titleblock": "TITLE_BLOCK",
-    }.get(recognition_label)
-
-    if recognition_category and recognition_confidence >= 0.72 and not bool(
-        recognition.get("needs_review")
-    ):
-        return recognition_category, f"recognition-{recognition_label}"
+    recognition_candidate = _resolve_markup_recognition_candidate(markup)
 
     if markup_type == "rectangle" and page_zone == "bottom-right" and aspect == "wide":
         if _TITLE_BLOCK_TEXT_PATTERN.search(markup_text) or _TITLE_BLOCK_SUBJECT_HINT_PATTERN.search(
@@ -921,6 +1016,17 @@ def _infer_semantic_category(markup: Dict[str, Any]) -> Tuple[Optional[str], str
         return "NOTE", "keyword-note"
     if fill_color == "yellow" and markup_type in {"text", "rectangle"}:
         return "NOTE", "fill-color-yellow"
+
+    if (
+        recognition_candidate
+        and float(recognition_candidate["confidence"] or 0.0)
+        >= float(recognition_candidate["min_confidence"] or 0.0)
+    ):
+        return (
+            str(recognition_candidate["category"]),
+            str(recognition_candidate["reason"]),
+        )
+
     color_category = _DEFAULT_COLOR_TO_CATEGORY.get(markup_color)
     if color_category:
         return color_category, f"color-{markup_color}"
@@ -929,6 +1035,14 @@ def _infer_semantic_category(markup: Dict[str, Any]) -> Tuple[Optional[str], str
 
 def _build_local_plan(markups: List[Dict[str, Any]]) -> Dict[str, Any]:
     effective_markups = _enrich_markups_for_local_plan(_pair_blue_note_markups(markups))
+    for markup in effective_markups:
+        if not isinstance(markup, dict):
+            continue
+        if not isinstance(markup.get("recognition"), dict):
+            markup["recognition"] = _build_markup_recognition(
+                markup,
+                feature_source="local_plan_markups",
+            )
     actions: List[Dict[str, Any]] = []
     for idx, markup in enumerate(effective_markups, start=1):
         paired_annotation_ids = _extract_paired_annotation_ids(markup)
@@ -949,41 +1063,34 @@ def _build_local_plan(markups: List[Dict[str, Any]]) -> Dict[str, Any]:
             )
 
             if selected_rule:
-                action_item = {
-                    "id": f"action-{idx}",
-                    "rule_id": selected_rule["id"],
-                    "category": selected_rule["category"],
-                    "action": selected_rule["action"],
-                    "confidence": selected_rule["confidence"],
-                    "markup": markup,
-                    "status": "proposed",
-                }
-            else:
-                inferred_category, inferred_reason = _infer_semantic_category(markup)
-                if inferred_category:
-                    inferred_action = {
-                        "DELETE": "Remove geometry associated with markup bounds.",
-                        "ADD": "Add or verify geometry referenced by markup.",
-                        "NOTE": "Review and acknowledge note intent before execution.",
-                        "TITLE_BLOCK": "Extract metadata only; skip geometry conversion.",
-                    }.get(inferred_category, "Manual review required.")
-                    if inferred_reason.startswith("recognition-"):
-                        inferred_confidence = 0.82
-                    elif inferred_reason.startswith("keyword-"):
-                        inferred_confidence = 0.76
-                    elif inferred_reason.startswith("title-block-"):
-                        inferred_confidence = 0.74
-                    else:
-                        inferred_confidence = 0.64
+                override = _resolve_low_signal_rule_override(markup, selected_rule)
+                if override:
+                    override_category, override_reason = override
+                    action_item = _build_semantic_action_item(
+                        action_id=f"action-{idx}",
+                        markup=markup,
+                        category=override_category,
+                        reason=override_reason,
+                    )
+                else:
                     action_item = {
                         "id": f"action-{idx}",
-                        "rule_id": f"semantic-{inferred_reason}",
-                        "category": inferred_category,
-                        "action": inferred_action,
-                        "confidence": inferred_confidence,
+                        "rule_id": selected_rule["id"],
+                        "category": selected_rule["category"],
+                        "action": selected_rule["action"],
+                        "confidence": selected_rule["confidence"],
                         "markup": markup,
                         "status": "proposed",
                     }
+            else:
+                inferred_category, inferred_reason = _infer_semantic_category(markup)
+                if inferred_category:
+                    action_item = _build_semantic_action_item(
+                        action_id=f"action-{idx}",
+                        markup=markup,
+                        category=inferred_category,
+                        reason=inferred_reason,
+                    )
                 else:
                     action_item = {
                         "id": f"action-{idx}",
@@ -3922,11 +4029,17 @@ def _normalize_compare_result_semantics(compare_result: Dict[str, Any]) -> None:
         action["rule_id"] = str(action.get("rule_id") or f"semantic-{inferred_reason}")
         action["action"] = _semantic_action_message_for_category(inferred_category)
         confidence = _safe_float(action.get("confidence")) or 0.0
-        inferred_confidence = 0.76 if inferred_reason.startswith("keyword-") else 0.64
+        inferred_confidence = _semantic_confidence_for_inferred_reason(
+            markup,
+            inferred_reason,
+        )
         if confidence < inferred_confidence:
             action["confidence"] = inferred_confidence
         if _normalize_text(action.get("status")) in {"", "review"}:
-            action["status"] = "proposed"
+            action["status"] = _semantic_status_for_inferred_reason(
+                markup,
+                inferred_reason,
+            )
 
     backcheck_obj = (
         compare_result.get("backcheck")

@@ -604,6 +604,15 @@ describe("AutoDraftComparePanel", () => {
 				fail_count: 0,
 				cad_context_available: true,
 			},
+			recognition: {
+				modelVersion: "20260317T010000Z",
+				confidence: 0.87,
+				source: "local_model",
+				featureSource: "prepared_markups+cad_context",
+				reasonCodes: ["markup_compare_ready", "local_models_available"],
+				needsReview: false,
+				accepted: true,
+			},
 			markup_review_queue: [],
 			review_queue: [],
 			shadow_advisor: {
@@ -667,6 +676,11 @@ describe("AutoDraftComparePanel", () => {
 		await waitFor(() => {
 			expect(compareMock).toHaveBeenCalled();
 		});
+		expect(
+			screen.getByText(
+				/Recognition: local_model \| model 20260317T010000Z \| confidence 0.87 \| feature prepared_markups\+cad_context \| accepted/i,
+			),
+		).toBeTruthy();
 		expect(screen.getByText(/Markup color:/i)).toBeTruthy();
 		expect(screen.getByText(/#0000FF/i)).toBeTruthy();
 		expect(

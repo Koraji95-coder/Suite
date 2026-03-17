@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
+from backend.route_groups.api_local_learning_runtime import LocalModelPrediction
 from backend.route_groups.api_autodraft import (
     _build_local_backcheck,
     _build_local_plan,
@@ -225,6 +227,135 @@ class TestAutoDraftCompareSemantics(unittest.TestCase):
         self.assertEqual((actions[0] or {}).get("category"), "ADD")
         self.assertEqual((actions[1] or {}).get("category"), "DELETE")
         self.assertEqual((actions[2] or {}).get("category"), "DELETE")
+
+    def test_build_local_plan_uses_local_model_for_ambiguous_native_markup(self) -> None:
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.predict_text_domain",
+            return_value=LocalModelPrediction(
+                label="ADD",
+                confidence=0.73,
+                model_version="20260317T010000Z",
+                feature_source="text+structured_tokens",
+                source="local_model",
+                reason_codes=["local_model_prediction"],
+            ),
+        ):
+            plan = _build_local_plan(
+                [
+                    {
+                        "id": "annot-model-add",
+                        "type": "text",
+                        "color": "black",
+                        "text": "TS416",
+                        "bounds": {"x": 10.0, "y": 10.0, "width": 20.0, "height": 5.0},
+                        "meta": {"subtype": "/FreeText"},
+                    }
+                ]
+            )
+        actions = plan.get("actions") or []
+        self.assertEqual(len(actions), 1)
+        first = actions[0] or {}
+        self.assertEqual(first.get("rule_id"), "semantic-recognition-local_model-add")
+        self.assertEqual(first.get("category"), "ADD")
+        self.assertEqual(first.get("status"), "proposed")
+        self.assertAlmostEqual(float(first.get("confidence") or 0.0), 0.73, places=6)
+
+    def test_build_local_plan_local_model_overrides_low_signal_blue_note_rule(self) -> None:
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.predict_text_domain",
+            return_value=LocalModelPrediction(
+                label="ADD",
+                confidence=0.91,
+                model_version="20260317T010000Z",
+                feature_source="text+structured_tokens",
+                source="local_model",
+                reason_codes=["local_model_prediction"],
+            ),
+        ):
+            plan = _build_local_plan(
+                [
+                    {
+                        "id": "annot-blue-text",
+                        "type": "text",
+                        "color": "blue",
+                        "text": "TS416",
+                        "bounds": {"x": 10.0, "y": 10.0, "width": 20.0, "height": 5.0},
+                        "meta": {"subtype": "/FreeText"},
+                    }
+                ]
+            )
+        actions = plan.get("actions") or []
+        self.assertEqual(len(actions), 1)
+        first = actions[0] or {}
+        self.assertEqual(first.get("rule_id"), "semantic-recognition-local_model-add")
+        self.assertEqual(first.get("category"), "ADD")
+        self.assertEqual(first.get("status"), "proposed")
+        self.assertAlmostEqual(float(first.get("confidence") or 0.0), 0.91, places=6)
+
+    def test_build_local_plan_keeps_title_block_rule_over_local_model(self) -> None:
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.predict_text_domain",
+            return_value=LocalModelPrediction(
+                label="ADD",
+                confidence=0.95,
+                model_version="20260317T010000Z",
+                feature_source="text+structured_tokens",
+                source="local_model",
+                reason_codes=["local_model_prediction"],
+            ),
+        ):
+            plan = _build_local_plan(
+                [
+                    {
+                        "id": "annot-title-block",
+                        "type": "rectangle",
+                        "color": "black",
+                        "text": "Drawing No. E-101",
+                        "bounds": {"x": 250.0, "y": 10.0, "width": 135.0, "height": 28.0},
+                        "meta": {
+                            "subtype": "/Square",
+                            "page_width": 400.0,
+                            "page_height": 200.0,
+                        },
+                    }
+                ]
+            )
+        actions = plan.get("actions") or []
+        self.assertEqual(len(actions), 1)
+        first = actions[0] or {}
+        self.assertEqual(first.get("rule_id"), "title-block-rect")
+        self.assertEqual(first.get("category"), "TITLE_BLOCK")
+
+    def test_build_local_plan_model_guidance_still_requires_review_when_recognition_does(self) -> None:
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.predict_text_domain",
+            return_value=LocalModelPrediction(
+                label="ADD",
+                confidence=0.94,
+                model_version="20260317T010000Z",
+                feature_source="text+structured_tokens",
+                source="local_model",
+                reason_codes=["local_model_prediction"],
+            ),
+        ):
+            plan = _build_local_plan(
+                [
+                    {
+                        "id": "annot-unknown-color",
+                        "type": "text",
+                        "color": "unknown",
+                        "text": "TS416",
+                        "bounds": {"x": 10.0, "y": 10.0, "width": 20.0, "height": 5.0},
+                        "meta": {"subtype": "/FreeText"},
+                    }
+                ]
+            )
+        actions = plan.get("actions") or []
+        self.assertEqual(len(actions), 1)
+        first = actions[0] or {}
+        self.assertEqual(first.get("rule_id"), "semantic-recognition-local_model-add")
+        self.assertEqual(first.get("category"), "ADD")
+        self.assertEqual(first.get("status"), "needs_review")
 
     def test_backcheck_note_unfulfilled_is_warn_and_keeps_pair_ids(self) -> None:
         backcheck = _build_local_backcheck(

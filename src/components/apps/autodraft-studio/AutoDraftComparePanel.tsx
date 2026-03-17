@@ -49,6 +49,13 @@ type ReplacementTuningInput = {
 	searchRadiusMultiplier: string;
 };
 
+type MarkupReviewDraft = {
+	category: string;
+	markupClass: string;
+	color: string;
+	text: string;
+};
+
 const DEFAULT_CAD_POINTS: CadPointInput[] = [
 	{ x: "", y: "" },
 	{ x: "", y: "" },
@@ -59,6 +66,31 @@ const DEFAULT_REPLACEMENT_TUNING: ReplacementTuningInput = {
 	searchRadiusMultiplier: "2.5",
 };
 const DEFAULT_CALIBRATION_MODE: AutoDraftCalibrationMode = "auto";
+const MARKUP_REVIEW_CATEGORY_OPTIONS = [
+	"",
+	"ADD",
+	"DELETE",
+	"NOTE",
+	"TITLE_BLOCK",
+	"UNCLASSIFIED",
+];
+const MARKUP_REVIEW_CLASS_OPTIONS = [
+	"",
+	"text",
+	"arrow",
+	"cloud",
+	"rectangle",
+	"unknown",
+];
+const MARKUP_REVIEW_COLOR_OPTIONS = [
+	"",
+	"red",
+	"green",
+	"blue",
+	"yellow",
+	"black",
+	"unknown",
+];
 
 type PointProjection = {
 	leftPercent: number;
@@ -152,6 +184,112 @@ function toSafeIdToken(value: string): string {
 	return normalized || "item";
 }
 
+function toTrimmedString(value: unknown): string {
+	return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeMarkupReviewCategory(value: unknown): string {
+	const normalized = toTrimmedString(value).toUpperCase().replace(/[\s-]+/g, "_");
+	return MARKUP_REVIEW_CATEGORY_OPTIONS.includes(normalized) ? normalized : "";
+}
+
+function normalizeMarkupReviewClass(value: unknown): string {
+	const normalized = toTrimmedString(value).toLowerCase();
+	return MARKUP_REVIEW_CLASS_OPTIONS.includes(normalized) ? normalized : "";
+}
+
+function normalizeMarkupReviewColor(value: unknown): string {
+	const normalized = toTrimmedString(value).toLowerCase();
+	return MARKUP_REVIEW_COLOR_OPTIONS.includes(normalized) ? normalized : "";
+}
+
+function getMarkupReviewMarkup(
+	item: AutoDraftCompareResponse["markup_review_queue"][number],
+	action: AutoDraftCompareResponse["plan"]["actions"][number] | undefined,
+): Record<string, unknown> | null {
+	if (item.markup && isRecordValue(item.markup)) {
+		return item.markup;
+	}
+	if (action?.markup && isRecordValue(action.markup)) {
+		return action.markup;
+	}
+	return null;
+}
+
+function buildMarkupReviewDraftDefaults(args: {
+	item: AutoDraftCompareResponse["markup_review_queue"][number];
+	action?: AutoDraftCompareResponse["plan"]["actions"][number];
+	storedDraft?: Partial<MarkupReviewDraft>;
+}): MarkupReviewDraft {
+	const { item, action, storedDraft } = args;
+	const markup = getMarkupReviewMarkup(item, action);
+	return {
+		category:
+			toTrimmedString(storedDraft?.category) ||
+			normalizeMarkupReviewCategory(item.predicted_category || action?.category || ""),
+		markupClass:
+			toTrimmedString(storedDraft?.markupClass) ||
+			normalizeMarkupReviewClass(markup?.type),
+		color:
+			toTrimmedString(storedDraft?.color) ||
+			normalizeMarkupReviewColor(markup?.color),
+		text:
+			typeof storedDraft?.text === "string"
+				? storedDraft.text
+				: typeof markup?.text === "string"
+					? markup.text
+					: "",
+	};
+}
+
+function summarizeMarkupTrainingResult(
+	results: Array<Record<string, unknown>>,
+): { color: "success" | "warning"; message: string } {
+	const result =
+		results.find(
+			(entry) =>
+				toTrimmedString(entry.domain).toLowerCase() === "autodraft_markup",
+		) || results[0];
+	if (!result) {
+		return {
+			color: "warning",
+			message: "Markup model training returned no results.",
+		};
+	}
+	const ok = Boolean(result.ok);
+	if (!ok) {
+		return {
+			color: "warning",
+			message:
+				toTrimmedString(result.message) ||
+				"Markup model training did not complete successfully.",
+		};
+	}
+	const version = toTrimmedString(result.version);
+	const sampleCount =
+		typeof result.sample_count === "number" && Number.isFinite(result.sample_count)
+			? result.sample_count
+			: null;
+	const metrics = isRecordValue(result.metrics) ? result.metrics : null;
+	const accuracy =
+		metrics && typeof metrics.accuracy === "number" && Number.isFinite(metrics.accuracy)
+			? metrics.accuracy
+			: null;
+	const macroF1 =
+		metrics && typeof metrics.macro_f1 === "number" && Number.isFinite(metrics.macro_f1)
+			? metrics.macro_f1
+			: null;
+	const tokens = ["Markup model trained"];
+	if (version) tokens.push(version);
+	if (sampleCount !== null) tokens.push(`samples ${sampleCount}`);
+	if (accuracy !== null) tokens.push(`acc ${accuracy.toFixed(2)}`);
+	if (macroF1 !== null) tokens.push(`f1 ${macroF1.toFixed(2)}`);
+	return {
+		color: "success",
+		message: tokens.join(" | "),
+	};
+}
+
 function mapCanvasClientPointToPdf(args: {
 	clientX: number;
 	clientY: number;
@@ -229,6 +367,9 @@ export function AutoDraftComparePanel() {
 	>({});
 	const [reviewNoteByActionId, setReviewNoteByActionId] = useState<
 		Record<string, string>
+	>({});
+	const [markupReviewDraftByActionId, setMarkupReviewDraftByActionId] = useState<
+		Record<string, MarkupReviewDraft>
 	>({});
 	const [pdfPoints, setPdfPoints] = useState<AutoDraftComparePoint[]>([]);
 	const [cadPoints, setCadPoints] =
@@ -1092,6 +1233,7 @@ export function AutoDraftComparePanel() {
 		setFeedbackMessageByActionId({});
 		setReviewSelectionByActionId({});
 		setReviewNoteByActionId({});
+		setMarkupReviewDraftByActionId({});
 		setFeedbackTransferState(null);
 		try {
 			const nextResult = await autoDraftService.prepareCompare(
@@ -1155,6 +1297,7 @@ export function AutoDraftComparePanel() {
 		setFeedbackMessageByActionId({});
 		setReviewSelectionByActionId({});
 		setReviewNoteByActionId({});
+		setMarkupReviewDraftByActionId({});
 		setFeedbackTransferState(null);
 		try {
 			const result = await autoDraftService.runCompare({
@@ -1210,6 +1353,22 @@ export function AutoDraftComparePanel() {
 			[actionId]: note,
 		}));
 	}, []);
+
+	const setMarkupReviewDraft = useCallback(
+		(actionId: string, patch: Partial<MarkupReviewDraft>) => {
+			setMarkupReviewDraftByActionId((prev) => ({
+				...prev,
+				[actionId]: {
+					category: prev[actionId]?.category ?? "",
+					markupClass: prev[actionId]?.markupClass ?? "",
+					color: prev[actionId]?.color ?? "",
+					text: prev[actionId]?.text ?? "",
+					...patch,
+				},
+			}));
+		},
+		[],
+	);
 
 	const submitReviewFeedback = useCallback(
 		async (
@@ -1300,6 +1459,173 @@ export function AutoDraftComparePanel() {
 		},
 		[compareResult, reviewNoteByActionId, reviewSelectionByActionId],
 	);
+
+	const submitMarkupReviewFeedback = useCallback(
+		async (
+			item: AutoDraftCompareResponse["markup_review_queue"][number],
+			mode: "approve" | "unresolved",
+		) => {
+			if (!compareResult) return;
+			const actionId = String(item.action_id || "").trim();
+			if (!actionId) return;
+			const action = compareActionById.get(actionId);
+			const markup = getMarkupReviewMarkup(item, action);
+			if (!markup) return;
+			const defaults = buildMarkupReviewDraftDefaults({
+				item,
+				action,
+				storedDraft: markupReviewDraftByActionId[actionId],
+			});
+			const predictedCategory = normalizeMarkupReviewCategory(
+				item.predicted_category || action?.category || defaults.category,
+			);
+			const predictedMarkupClass = normalizeMarkupReviewClass(markup.type);
+			const predictedColor = normalizeMarkupReviewColor(markup.color);
+			const predictedText =
+				typeof markup.text === "string" ? markup.text.trim() : "";
+			const nextCategory = normalizeMarkupReviewCategory(defaults.category);
+			const nextMarkupClass = normalizeMarkupReviewClass(defaults.markupClass);
+			const nextColor = normalizeMarkupReviewColor(defaults.color);
+			const nextText = defaults.text.trim();
+			const hasCorrections =
+				nextCategory !== predictedCategory ||
+				nextMarkupClass !== predictedMarkupClass ||
+				nextColor !== predictedColor ||
+				nextText !== predictedText;
+			const reviewStatus =
+				mode === "unresolved"
+					? "unresolved"
+					: hasCorrections
+						? "corrected"
+						: "approved";
+			const markupMeta = isRecordValue(markup.meta) ? markup.meta : null;
+			const markupMetaPairedAnnotationIds =
+				markupMeta && Array.isArray(markupMeta.paired_annotation_ids)
+					? markupMeta.paired_annotation_ids.filter(
+							(entry): entry is string =>
+								typeof entry === "string" && entry.trim().length > 0,
+						)
+					: [];
+			const pairedAnnotationIds = Array.isArray(action?.paired_annotation_ids)
+				? action.paired_annotation_ids.filter(
+						(entry): entry is string =>
+							typeof entry === "string" && entry.trim().length > 0,
+					)
+				: markupMetaPairedAnnotationIds;
+			const note = reviewNoteByActionId[actionId] || "";
+
+			setFeedbackStateByActionId((prev) => ({ ...prev, [actionId]: "saving" }));
+			setFeedbackMessageByActionId((prev) => ({ ...prev, [actionId]: "" }));
+
+			try {
+				await autoDraftService.submitCompareFeedback({
+					requestId: compareResult.requestId,
+					items: [
+						{
+							request_id: item.request_id || compareResult.requestId,
+							action_id: actionId,
+							review_status: reviewStatus,
+							feedback_type: "markup_learning",
+							new_text: nextText || predictedText,
+							note,
+							markup_id:
+								item.markup_id ||
+								(typeof markup.id === "string" ? markup.id : undefined),
+							markup,
+							predicted_category: predictedCategory || undefined,
+							predicted_action:
+								item.predicted_action || action?.action || undefined,
+							corrected_intent:
+								mode === "unresolved" ||
+								!nextCategory ||
+								nextCategory === predictedCategory
+									? undefined
+									: nextCategory,
+							corrected_markup_class:
+								mode === "unresolved" ||
+								!nextMarkupClass ||
+								nextMarkupClass === predictedMarkupClass
+									? undefined
+									: nextMarkupClass,
+							corrected_color:
+								mode === "unresolved" ||
+								!nextColor ||
+								nextColor === predictedColor
+									? undefined
+									: nextColor,
+							corrected_text:
+								mode === "unresolved" || nextText === predictedText
+									? undefined
+									: nextText,
+							ocr_text:
+								markupMeta &&
+								typeof markupMeta.ocr_text === "string" &&
+								markupMeta.ocr_text.trim().length > 0
+									? markupMeta.ocr_text
+									: undefined,
+							paired_annotation_ids:
+								pairedAnnotationIds.length > 0 ? pairedAnnotationIds : undefined,
+							recognition: item.recognition,
+							override_reason: note || undefined,
+						},
+					],
+				});
+
+				setFeedbackStateByActionId((prev) => ({
+					...prev,
+					[actionId]: "saved",
+				}));
+				setFeedbackMessageByActionId((prev) => ({
+					...prev,
+					[actionId]:
+						reviewStatus === "corrected"
+							? "Markup correction saved."
+							: reviewStatus === "approved"
+								? "Markup review approved and saved."
+								: "Markup marked unresolved and saved.",
+				}));
+			} catch (error) {
+				setFeedbackStateByActionId((prev) => ({
+					...prev,
+					[actionId]: "error",
+				}));
+				setFeedbackMessageByActionId((prev) => ({
+					...prev,
+					[actionId]:
+						error instanceof Error && error.message.trim().length > 0
+							? error.message
+							: "Failed to save markup review feedback.",
+				}));
+			}
+		},
+		[
+			compareActionById,
+			compareResult,
+			markupReviewDraftByActionId,
+			reviewNoteByActionId,
+		],
+	);
+
+	const trainMarkupModel = useCallback(async () => {
+		try {
+			setFeedbackTransferState({
+				color: "muted",
+				message: "Training local markup model...",
+			});
+			const payload = await autoDraftService.trainLearningModels({
+				domain: "autodraft_markup",
+			});
+			setFeedbackTransferState(summarizeMarkupTrainingResult(payload.results));
+		} catch (error) {
+			setFeedbackTransferState({
+				color: "warning",
+				message:
+					error instanceof Error && error.message.trim().length > 0
+						? error.message
+						: "Failed to train local markup model.",
+			});
+		}
+	}, []);
 
 	const exportFeedbackMemory = useCallback(async () => {
 		try {
@@ -2107,26 +2433,53 @@ export function AutoDraftComparePanel() {
 						</Text>
 						{markupReviewQueue.length === 0 ? (
 							<Text size="xs" color="muted">
-								No low-confidence OCR/text-fallback markup review items for this compare run.
+								No low-confidence markup review items for this compare run.
 							</Text>
 						) : (
 							<div className={styles.compareReviewList}>
 								{markupReviewQueue.map((item) => {
 									const action = compareActionById.get(item.action_id);
-									const markup =
-										item.markup && isRecordValue(item.markup)
-											? item.markup
-											: action?.markup && isRecordValue(action.markup)
-												? action.markup
-												: null;
+									const actionId = String(item.action_id || "").trim();
+									const safeActionId = toSafeIdToken(actionId || item.id);
+									const feedbackState =
+										feedbackStateByActionId[actionId] || "idle";
+									const feedbackMessage =
+										feedbackMessageByActionId[actionId] || "";
+									const markup = getMarkupReviewMarkup(item, action);
 									const markupColorDiagnostic = markup
 										? formatMarkupColorDiagnostic(markup)
 										: null;
+									const markupDraft = buildMarkupReviewDraftDefaults({
+										item,
+										action,
+										storedDraft: markupReviewDraftByActionId[actionId],
+									});
+									const predictedCategory = normalizeMarkupReviewCategory(
+										item.predicted_category || action?.category || "",
+									);
+									const predictedMarkupClass = normalizeMarkupReviewClass(
+										markup?.type,
+									);
+									const predictedColor = normalizeMarkupReviewColor(
+										markup?.color,
+									);
+									const predictedText =
+										typeof markup?.text === "string" ? markup.text.trim() : "";
+									const hasMarkupCorrections =
+										markupDraft.category !== predictedCategory ||
+										markupDraft.markupClass !== predictedMarkupClass ||
+										markupDraft.color !== predictedColor ||
+										markupDraft.text.trim() !== predictedText;
+									const noteInputId = `autodraft-markup-review-note-${safeActionId}`;
+									const categoryInputId = `autodraft-markup-review-category-${safeActionId}`;
+									const classInputId = `autodraft-markup-review-class-${safeActionId}`;
+									const colorInputId = `autodraft-markup-review-color-${safeActionId}`;
+									const textInputId = `autodraft-markup-review-text-${safeActionId}`;
 									return (
 										<div key={item.id} className={styles.compareReviewCard}>
 											<HStack gap={2} align="center" justify="between" wrap>
 												<Text size="xs" weight="semibold">
-													{item.action_id}
+													{actionId}
 												</Text>
 												<Badge variant="soft" color="warning">
 													{item.status}
@@ -2149,6 +2502,12 @@ export function AutoDraftComparePanel() {
 													? ` | text ${markup.text}`
 													: ""}
 											</Text>
+											<Text size="xs" color="muted">
+												Current review values:
+												{` category ${markupDraft.category || predictedCategory || "unknown"}`}
+												{` | class ${markupDraft.markupClass || predictedMarkupClass || "unknown"}`}
+												{` | color ${markupDraft.color || predictedColor || "unknown"}`}
+											</Text>
 											{markupColorDiagnostic ? (
 												<Text size="xs" color="muted">
 													Markup color: {markupColorDiagnostic}
@@ -2163,6 +2522,152 @@ export function AutoDraftComparePanel() {
 											{item.reason_codes.length > 0 ? (
 												<Text size="xs" color="muted">
 													Reasons: {item.reason_codes.join(", ")}
+												</Text>
+											) : null}
+											<div className={styles.compareReviewGrid}>
+												<label
+													htmlFor={categoryInputId}
+													className={styles.compareFieldInline}
+												>
+													<span>Category</span>
+													<select
+														id={categoryInputId}
+														name={`autodraftMarkupReviewCategory-${safeActionId}`}
+														value={markupDraft.category}
+														onChange={(event) =>
+															setMarkupReviewDraft(actionId, {
+																category: normalizeMarkupReviewCategory(
+																	event.target.value,
+																),
+															})
+														}
+													>
+														{MARKUP_REVIEW_CATEGORY_OPTIONS.map((option) => (
+															<option key={option || "default"} value={option}>
+																{option || "Use predicted"}
+															</option>
+														))}
+													</select>
+												</label>
+												<label
+													htmlFor={classInputId}
+													className={styles.compareFieldInline}
+												>
+													<span>Markup class</span>
+													<select
+														id={classInputId}
+														name={`autodraftMarkupReviewClass-${safeActionId}`}
+														value={markupDraft.markupClass}
+														onChange={(event) =>
+															setMarkupReviewDraft(actionId, {
+																markupClass: normalizeMarkupReviewClass(
+																	event.target.value,
+																),
+															})
+														}
+													>
+														{MARKUP_REVIEW_CLASS_OPTIONS.map((option) => (
+															<option key={option || "default"} value={option}>
+																{option || "Use detected"}
+															</option>
+														))}
+													</select>
+												</label>
+												<label
+													htmlFor={colorInputId}
+													className={styles.compareFieldInline}
+												>
+													<span>Color</span>
+													<select
+														id={colorInputId}
+														name={`autodraftMarkupReviewColor-${safeActionId}`}
+														value={markupDraft.color}
+														onChange={(event) =>
+															setMarkupReviewDraft(actionId, {
+																color: normalizeMarkupReviewColor(
+																	event.target.value,
+																),
+															})
+														}
+													>
+														{MARKUP_REVIEW_COLOR_OPTIONS.map((option) => (
+															<option key={option || "default"} value={option}>
+																{option || "Use detected"}
+															</option>
+														))}
+													</select>
+												</label>
+												<label
+													htmlFor={textInputId}
+													className={styles.compareFieldInline}
+												>
+													<span>Corrected text</span>
+													<input
+														id={textInputId}
+														name={`autodraftMarkupReviewText-${safeActionId}`}
+														type="text"
+														value={markupDraft.text}
+														onChange={(event) =>
+															setMarkupReviewDraft(actionId, {
+																text: event.target.value,
+															})
+														}
+													/>
+												</label>
+											</div>
+											<label
+												htmlFor={noteInputId}
+												className={styles.compareFieldInline}
+											>
+												<span>Review note</span>
+												<textarea
+													id={noteInputId}
+													name={`autodraftMarkupReviewNote-${safeActionId}`}
+													className={styles.compareReviewNoteInput}
+													rows={2}
+													value={reviewNoteByActionId[actionId] || ""}
+													onChange={(event) =>
+														setReviewNote(actionId, event.target.value)
+													}
+												/>
+											</label>
+											<HStack gap={1} align="center" wrap>
+												<Button
+													variant="primary"
+													size="sm"
+													onClick={() =>
+														submitMarkupReviewFeedback(item, "approve")
+													}
+													disabled={feedbackState === "saving"}
+												>
+													{hasMarkupCorrections
+														? "Save markup correction"
+														: "Approve markup"}
+												</Button>
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() =>
+														submitMarkupReviewFeedback(item, "unresolved")
+													}
+													disabled={feedbackState === "saving"}
+												>
+													Mark unresolved
+												</Button>
+											</HStack>
+											{feedbackState === "saving" ? (
+												<Text size="xs" color="muted">
+													Saving feedback...
+												</Text>
+											) : null}
+											{feedbackMessage ? (
+												<Text
+													size="xs"
+													color={
+														feedbackState === "error" ? "warning" : "success"
+													}
+												>
+													{feedbackMessage}
 												</Text>
 											) : null}
 										</div>
@@ -2191,6 +2696,13 @@ export function AutoDraftComparePanel() {
 									onClick={triggerFeedbackImport}
 								>
 									Import feedback
+								</Button>
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={trainMarkupModel}
+								>
+									Train markup model
 								</Button>
 								<input
 									ref={feedbackImportInputRef}

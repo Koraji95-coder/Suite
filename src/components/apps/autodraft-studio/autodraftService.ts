@@ -413,6 +413,8 @@ export type AutoDraftCompareFeedbackItemInput = {
 	feedback_type?: "replacement_review" | "markup_learning" | string;
 	markup_id?: string;
 	markup?: MarkupInput;
+	predicted_category?: string;
+	predicted_action?: string;
 	corrected_markup_class?: string;
 	corrected_intent?: string;
 	corrected_color?: string;

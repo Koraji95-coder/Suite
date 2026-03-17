@@ -8,10 +8,12 @@ from backend.route_groups.api_autodraft import (
     _REPLACEMENT_STATUS_AMBIGUOUS,
     _REPLACEMENT_STATUS_RESOLVED,
     _REPLACEMENT_STATUS_UNRESOLVED,
+    _build_feedback_learning_examples,
     _export_feedback_data,
     _import_feedback_data,
     _infer_action_replacement,
     _load_replacement_metric_scores,
+    _normalize_feedback_items,
     _persist_feedback_items,
     _resolve_replacement_weights,
 )
@@ -227,6 +229,42 @@ class TestAutoDraftCompareReplacements(unittest.TestCase):
         scores = _load_replacement_metric_scores(self.db_path)
         self.assertIn("pointer_hit", scores)
         self.assertIn("overlap", scores)
+
+    def test_build_feedback_learning_examples_uses_native_markup_review_labels(self) -> None:
+        items = _normalize_feedback_items(
+            {
+                "items": [
+                    {
+                        "request_id": "req-compare-1",
+                        "action_id": "action-note-1",
+                        "review_status": "approved",
+                        "feedback_type": "markup_learning",
+                        "new_text": "VERIFY FEEDER TAG",
+                        "markup_id": "annot-note-1",
+                        "markup": {
+                            "id": "annot-note-1",
+                            "type": "text",
+                            "color": "blue",
+                            "text": "VERIFY FEEDER TAG",
+                            "bounds": {"x": 20, "y": 30, "width": 60, "height": 18},
+                            "meta": {
+                                "subtype": "/FreeText",
+                                "page_position": {"x": 50, "y": 39},
+                            },
+                        },
+                        "predicted_category": "NOTE",
+                    }
+                ]
+            }
+        )
+        examples = _build_feedback_learning_examples(items=items)
+        markup_examples = examples.get("autodraft_markup") or []
+        self.assertEqual(len(markup_examples), 1)
+        first = markup_examples[0] or {}
+        self.assertEqual(first.get("label"), "NOTE")
+        self.assertEqual(first.get("text"), "VERIFY FEEDER TAG")
+        metadata = first.get("metadata") or {}
+        self.assertEqual(metadata.get("predicted_category"), "NOTE")
 
 
 if __name__ == "__main__":

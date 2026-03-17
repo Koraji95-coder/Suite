@@ -263,7 +263,9 @@
 
 .compareField input,
 .compareField select,
-.compareFieldInline input {
+.compareFieldInline input,
+.compareFieldInline select,
+.compareFieldInline textarea {
 	width: 100%;
 	padding: 0.45rem 0.55rem;
 	border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
@@ -435,6 +437,12 @@
 	border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
 	border-radius: var(--radius-2);
 	background: color-mix(in srgb, var(--surface-2) 74%, transparent);
+}
+
+.compareReviewGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+	gap: var(--space-2);
 }
 
 .compareReviewCandidates {

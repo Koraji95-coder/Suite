@@ -3354,6 +3354,44 @@ def _normalize_learning_text(value: Any) -> str:
     return text
 
 
+_MARKUP_LEARNING_LABEL_MAP: Dict[str, str] = {
+    "add": "ADD",
+    "insert": "ADD",
+    "delete": "DELETE",
+    "remove": "DELETE",
+    "note": "NOTE",
+    "title_block": "TITLE_BLOCK",
+    "titleblock": "TITLE_BLOCK",
+}
+
+
+def _normalize_markup_learning_label(value: Any) -> str:
+    token = _normalize_text(value).replace("-", "_").replace(" ", "_")
+    return _MARKUP_LEARNING_LABEL_MAP.get(token, "")
+
+
+def _build_markup_learning_markup(
+    *,
+    markup: Dict[str, Any],
+    corrected_markup_class: str,
+    corrected_color: str,
+    paired_annotation_ids: List[str],
+) -> Dict[str, Any]:
+    normalized_markup = dict(markup)
+    meta = dict(markup.get("meta") or {}) if isinstance(markup.get("meta"), dict) else {}
+    if corrected_markup_class:
+        normalized_markup["type"] = corrected_markup_class
+        meta["corrected_markup_class"] = corrected_markup_class
+    if corrected_color:
+        normalized_markup["color"] = corrected_color
+        meta["corrected_color"] = corrected_color
+    if paired_annotation_ids:
+        meta["paired_annotation_ids"] = list(dict.fromkeys(paired_annotation_ids))
+    if meta:
+        normalized_markup["meta"] = meta
+    return normalized_markup
+
+
 def _safe_json_dumps(value: Any) -> str:
     try:
         return json.dumps(value, ensure_ascii=True)
@@ -5157,6 +5195,8 @@ def _normalize_feedback_items(raw_payload: Dict[str, Any]) -> List[Dict[str, Any
             for key in (
                 "markup_id",
                 "markup",
+                "predicted_category",
+                "predicted_action",
                 "corrected_markup_class",
                 "corrected_intent",
                 "corrected_color",
@@ -5264,35 +5304,63 @@ def _build_feedback_learning_examples(
     for item in items:
         payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
         markup = payload.get("markup") if isinstance(payload.get("markup"), dict) else {}
+        review_status = _normalize_text(item.get("review_status"))
         corrected_intent = _normalize_text(payload.get("corrected_intent"))
         corrected_markup_class = _normalize_text(payload.get("corrected_markup_class"))
         corrected_color = _normalize_text(payload.get("corrected_color"))
         corrected_text = str(payload.get("corrected_text") or "").strip()
         ocr_text = str(payload.get("ocr_text") or "").strip()
-        markup_label = corrected_intent or corrected_markup_class
+        predicted_category = str(payload.get("predicted_category") or "").strip()
+        action_category = str(payload.get("action_category") or payload.get("category") or "").strip()
+        markup_label = ""
+        if review_status in {"approved", "corrected"}:
+            markup_label = _normalize_markup_learning_label(corrected_intent)
+            if not markup_label:
+                markup_label = _normalize_markup_learning_label(
+                    predicted_category
+                ) or _normalize_markup_learning_label(action_category)
         if markup_label:
-            features = _markup_learning_features(markup)
+            paired_annotation_ids = [
+                value.strip()
+                for value in (payload.get("paired_annotation_ids") or [])
+                if isinstance(value, str) and value.strip()
+            ]
+            learning_markup = _build_markup_learning_markup(
+                markup=markup,
+                corrected_markup_class=corrected_markup_class,
+                corrected_color=corrected_color,
+                paired_annotation_ids=paired_annotation_ids,
+            )
+            features = _markup_learning_features(learning_markup)
+            if corrected_markup_class:
+                features["corrected_markup_class"] = corrected_markup_class
             if corrected_color:
                 features["corrected_color"] = corrected_color
+            if review_status:
+                features["review_status"] = review_status
             markup_examples.append(
                 {
                     "label": markup_label,
-                    "text": corrected_text or ocr_text or str(markup.get("text") or ""),
+                    "text": corrected_text or ocr_text or str(learning_markup.get("text") or ""),
                     "features": features,
                     "metadata": {
                         "feedback_type": item.get("feedback_type"),
                         "request_id": item.get("request_id"),
                         "action_id": item.get("action_id"),
                         "markup_id": item.get("markup_id") or payload.get("markup_id"),
+                        "review_status": review_status or None,
+                        "predicted_category": predicted_category or None,
+                        "action_category": action_category or None,
+                        "corrected_markup_class": corrected_markup_class or None,
+                        "corrected_text": corrected_text or None,
                         "corrected_color": corrected_color or None,
-                        "paired_annotation_ids": payload.get("paired_annotation_ids") or [],
+                        "paired_annotation_ids": paired_annotation_ids,
                         "override_reason": payload.get("override_reason"),
                     },
                     "source": "compare_feedback",
                 }
             )
 
-        review_status = _normalize_text(item.get("review_status"))
         selected_entity_id = _normalize_text(item.get("selected_entity_id"))
         selected_old_text = _normalize_learning_text(item.get("selected_old_text"))
         candidates = item.get("candidates") if isinstance(item.get("candidates"), list) else []
@@ -7070,7 +7138,7 @@ def create_autodraft_blueprint(
                 message=(
                     "At least one compare feedback item is required. Replacement review items need "
                     "action_id + review_status, and markup-learning items can carry corrected "
-                    "intent/color/OCR fields."
+                    "intent/class/color/text fields."
                 ),
                 request_id=request_id,
                 status_code=400,

@@ -1295,6 +1295,35 @@ class TestApiRouteGroups(unittest.TestCase):
                             "overlap": False,
                             "pair_hit_count": 0,
                         },
+                    },
+                    {
+                        "request_id": "req-compare-1",
+                        "action_id": "action-note-1",
+                        "review_status": "approved",
+                        "feedback_type": "markup_learning",
+                        "new_text": "VERIFY FEEDER TAG",
+                        "markup_id": "annot-note-1",
+                        "markup": {
+                            "id": "annot-note-1",
+                            "type": "text",
+                            "color": "blue",
+                            "text": "VERIFY FEEDER TAG",
+                            "bounds": {"x": 20, "y": 30, "width": 60, "height": 18},
+                            "meta": {
+                                "subtype": "/FreeText",
+                                "page_position": {"x": 50, "y": 39},
+                            },
+                        },
+                        "predicted_category": "NOTE",
+                        "recognition": {
+                            "model_version": "deterministic-v1",
+                            "confidence": 0.58,
+                            "source": "deterministic",
+                            "feature_source": "pdf_annotations+cad_context",
+                            "reason_codes": ["color:blue"],
+                            "needs_review": True,
+                            "accepted": False,
+                        },
                     }
                 ],
             },
@@ -1302,7 +1331,9 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(submit_response.status_code, 200)
         submit_payload = submit_response.get_json() or {}
         self.assertTrue(submit_payload.get("success"))
-        self.assertEqual(submit_payload.get("stored"), 1)
+        self.assertEqual(submit_payload.get("stored"), 2)
+        learning = submit_payload.get("learning") or {}
+        self.assertGreaterEqual(int(learning.get("autodraft_markup") or 0), 1)
 
         export_response = self.client.get(
             "/api/autodraft/compare/feedback/export",

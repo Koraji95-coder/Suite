@@ -27,6 +27,7 @@ vi.mock("./autodraftService", async () => {
 			submitCompareFeedback: vi.fn(),
 			exportCompareFeedback: vi.fn(),
 			importCompareFeedback: vi.fn(),
+			trainLearningModels: vi.fn(),
 		},
 	};
 });
@@ -146,6 +147,7 @@ describe("AutoDraftComparePanel", () => {
 	let mockPdfDoc: MockPdfDoc;
 
 	beforeEach(() => {
+		vi.clearAllMocks();
 		getDocumentMock.mockReset();
 		mockPdfDoc = createMockPdfDoc(2);
 		getDocumentMock.mockReturnValue({
@@ -879,6 +881,253 @@ describe("AutoDraftComparePanel", () => {
 		).toBeGreaterThanOrEqual(1);
 		expect(screen.getByText(/Recognition: ocr \| feature pdf_text_fallback\+cad_context/i)).toBeTruthy();
 		expect(screen.getByText(/Reasons: prepare_text_fallback, text_source:ocr/i)).toBeTruthy();
+	});
+
+	it("submits native markup review corrections and trains the markup model", async () => {
+		const prepareMock = vi.mocked(autoDraftService.prepareCompare);
+		const compareMock = vi.mocked(autoDraftService.runCompare);
+		const feedbackMock = vi.mocked(autoDraftService.submitCompareFeedback);
+		const trainMock = vi.mocked(autoDraftService.trainLearningModels);
+		prepareMock.mockResolvedValue(createPrepareResponse(1));
+		feedbackMock.mockResolvedValue({
+			ok: true,
+			success: true,
+			requestId: "req-feedback-markup",
+			source: "autodraft-compare-feedback",
+			stored: 1,
+			learning: { autodraft_markup: 1 },
+		});
+		trainMock.mockResolvedValue({
+			requestId: "req-train",
+			results: [
+				{
+					ok: true,
+					domain: "autodraft_markup",
+					version: "20260316T000000Z",
+					sample_count: 8,
+					metrics: { accuracy: 0.75, macro_f1: 0.72 },
+				},
+			],
+		});
+		compareMock.mockResolvedValue({
+			ok: true,
+			success: true,
+			requestId: "req-compare-native",
+			source: "python-compare",
+			mode: "cad-aware",
+			tolerance_profile: "medium",
+			engine: { requested: "auto", used: "python", used_fallback: false },
+			calibration: {
+				pdf_points: [
+					{ x: 10, y: 10 },
+					{ x: 20, y: 10 },
+				],
+				cad_points: [
+					{ x: 100, y: 100 },
+					{ x: 110, y: 100 },
+				],
+				scale: 1,
+				rotation_deg: 0,
+				translation: { x: 90, y: 90 },
+			},
+			plan: {
+				source: "python-local-rules",
+				summary: {
+					total_markups: 1,
+					actions_proposed: 1,
+					classified: 1,
+					needs_review: 1,
+				},
+				actions: [
+					{
+						id: "action-native-1",
+						rule_id: "semantic-color-blue",
+						category: "NOTE",
+						action: "Review and acknowledge note intent before execution.",
+						confidence: 0.55,
+						status: "needs_review",
+						markup: {
+							id: "annot-native-1",
+							type: "text",
+							color: "blue",
+							text: "verify feeder tag",
+							meta: {
+								subtype: "/FreeText",
+								color_source: "C",
+							},
+						},
+					},
+				],
+			},
+			backcheck: {
+				ok: true,
+				success: true,
+				requestId: "req-compare-native",
+				source: "python-local-backcheck",
+				mode: "cad-aware",
+				cad: {
+					available: true,
+					degraded: false,
+					source: "live",
+					entity_count: 1,
+					locked_layer_count: 0,
+				},
+				summary: {
+					total_actions: 1,
+					pass_count: 0,
+					warn_count: 0,
+					fail_count: 1,
+				},
+				warnings: ["Markup recognition flagged 1 action(s) for operator review."],
+				findings: [
+					{
+						id: "finding-1",
+						action_id: "action-native-1",
+						status: "fail",
+						severity: "high",
+						category: "note",
+						notes: [
+							"Low-confidence markup recognition requires operator review before execution.",
+						],
+						suggestions: [
+							"Confirm markup text, color, and intent before execution.",
+						],
+					},
+				],
+			},
+			summary: {
+				status: "fail",
+				total_markups: 1,
+				total_actions: 1,
+				pass_count: 0,
+				warn_count: 0,
+				fail_count: 1,
+				cad_context_available: true,
+			},
+			markup_review_queue: [
+				{
+					id: "markup-review-action-native-1",
+					request_id: "req-compare-native",
+					action_id: "action-native-1",
+					status: "needs_review",
+					confidence: 0.55,
+					message:
+						"Low-confidence markup recognition requires operator review before execution.",
+					markup_id: "annot-native-1",
+					markup: {
+						id: "annot-native-1",
+						type: "text",
+						color: "blue",
+						text: "verify feeder tag",
+						meta: {
+							subtype: "/FreeText",
+							color_source: "C",
+						},
+					},
+					recognition: {
+						modelVersion: "deterministic-v1",
+						confidence: 0.55,
+						source: "deterministic",
+						featureSource: "pdf_annotations+cad_context",
+						reasonCodes: ["color:blue", "type:text"],
+						needsReview: true,
+						accepted: false,
+						overrideReason: null,
+					},
+					predicted_category: "NOTE",
+					predicted_action:
+						"Review and acknowledge note intent before execution.",
+					reason_codes: ["color:blue", "type:text"],
+				},
+			],
+			review_queue: [],
+			shadow_advisor: {
+				enabled: true,
+				available: true,
+				profile: "draftsmith",
+				reviews: [],
+			},
+		});
+
+		const { container } = render(<AutoDraftComparePanel />);
+		const fileInput = screen.getByLabelText("Bluebeam PDF") as HTMLInputElement;
+		const pdfFile = new File(["%PDF-1.7"], "sheet.pdf", {
+			type: "application/pdf",
+		});
+		fireEvent.change(fileInput, {
+			target: { files: [pdfFile] },
+		});
+
+		await waitFor(() => {
+			expect(mockPdfDoc.getPage).toHaveBeenCalled();
+		});
+		const canvas = container.querySelector("canvas");
+		expect(canvas).toBeTruthy();
+		if (!canvas) return;
+		vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+			x: 0,
+			y: 0,
+			left: 0,
+			top: 0,
+			right: 100,
+			bottom: 200,
+			width: 100,
+			height: 200,
+			toJSON: () => ({}),
+		} as DOMRect);
+
+		fireEvent.click(screen.getByRole("button", { name: "Prepare markups" }));
+		await waitFor(() => {
+			expect(prepareMock).toHaveBeenCalled();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Run compare" }));
+		await waitFor(() => {
+			expect(compareMock).toHaveBeenCalled();
+		});
+
+		fireEvent.change(screen.getByLabelText("Category"), {
+			target: { value: "ADD" },
+		});
+		fireEvent.change(screen.getByLabelText("Markup class"), {
+			target: { value: "arrow" },
+		});
+		fireEvent.change(screen.getByLabelText("Color"), {
+			target: { value: "red" },
+		});
+		fireEvent.change(screen.getByLabelText("Corrected text"), {
+			target: { value: "install feeder tag" },
+		});
+		fireEvent.change(screen.getByLabelText("Review note"), {
+			target: { value: "Native note actually indicates a feeder add." },
+		});
+		fireEvent.click(
+			screen.getByRole("button", { name: "Save markup correction" }),
+		);
+
+		await waitFor(() => {
+			expect(feedbackMock).toHaveBeenCalledTimes(1);
+		});
+		const feedbackPayload = feedbackMock.mock.calls[0]?.[0];
+		expect(feedbackPayload?.requestId).toBe("req-compare-native");
+		expect(feedbackPayload?.items[0]?.feedback_type).toBe("markup_learning");
+		expect(feedbackPayload?.items[0]?.review_status).toBe("corrected");
+		expect(feedbackPayload?.items[0]?.predicted_category).toBe("NOTE");
+		expect(feedbackPayload?.items[0]?.corrected_intent).toBe("ADD");
+		expect(feedbackPayload?.items[0]?.corrected_markup_class).toBe("arrow");
+		expect(feedbackPayload?.items[0]?.corrected_color).toBe("red");
+		expect(feedbackPayload?.items[0]?.corrected_text).toBe("install feeder tag");
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Train markup model" }),
+		);
+		await waitFor(() => {
+			expect(trainMock).toHaveBeenCalledTimes(1);
+		});
+		expect(trainMock).toHaveBeenCalledWith({ domain: "autodraft_markup" });
+		expect(
+			screen.getByText(/Markup model trained \| 20260316T000000Z \| samples 8 \| acc 0.75 \| f1 0.72/i),
+		).toBeTruthy();
 	});
 
 	it("renders replacement review cards and submits correction feedback", async () => {

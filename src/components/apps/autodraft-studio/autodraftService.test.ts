@@ -772,6 +772,24 @@ describe("autoDraftService compare endpoints", () => {
 					}),
 					{ status: 200, headers: { "content-type": "application/json" } },
 				),
+			)
+			.mockResolvedValueOnce(
+				new Response(
+					JSON.stringify({
+						ok: true,
+						success: true,
+						requestId: "req-train",
+						source: "autodraft-learning",
+						results: [
+							{
+								ok: true,
+								domain: "autodraft_markup",
+								version: "20260316T000000Z",
+							},
+						],
+					}),
+					{ status: 200, headers: { "content-type": "application/json" } },
+				),
 			);
 
 		await autoDraftService.submitCompareFeedback({
@@ -793,6 +811,9 @@ describe("autoDraftService compare endpoints", () => {
 			pairs: [],
 			metrics: [],
 		});
+		await autoDraftService.trainLearningModels({
+			domain: "autodraft_markup",
+		});
 
 		expect(fetchSpy.mock.calls[0]?.[0]).toContain(
 			"/api/autodraft/compare/feedback",
@@ -802,6 +823,9 @@ describe("autoDraftService compare endpoints", () => {
 		);
 		expect(fetchSpy.mock.calls[2]?.[0]).toContain(
 			"/api/autodraft/compare/feedback/import",
+		);
+		expect(fetchSpy.mock.calls[3]?.[0]).toContain(
+			"/api/autodraft/learning/train",
 		);
 	});
 });

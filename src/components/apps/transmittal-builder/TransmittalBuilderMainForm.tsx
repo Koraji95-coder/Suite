@@ -19,6 +19,9 @@ interface TransmittalBuilderMainFormProps {
 	profileOptionsError: string | null;
 	templateLoading: boolean;
 	templateError: string | null;
+	pdfAnalysisLoading: boolean;
+	pdfAnalysisError: string | null;
+	pdfAnalysisWarnings: string[];
 	isInvalid: (key: string) => boolean;
 	updateDraft: (
 		key: keyof DraftState,
@@ -28,9 +31,20 @@ interface TransmittalBuilderMainFormProps {
 	handleTemplateFiles: (selected: File[]) => void;
 	handleIndexFiles: (selected: File[]) => void;
 	handlePdfFiles: (selected: File[]) => void;
+	analyzePdfFiles: () => void;
 	handleCidFiles: (selected: File[]) => void;
 	handleScanCid: () => void;
 	handleUseExampleTemplate: () => void;
+	handleStandardDocumentChange: (
+		id: string,
+		field:
+			| "drawingNumber"
+			| "title"
+			| "revision"
+			| "accepted"
+			| "overrideReason",
+		value: string | boolean,
+	) => void;
 	updateCidDocument: (
 		id: string,
 		field: "description" | "revision",
@@ -55,15 +69,20 @@ export function TransmittalBuilderMainForm({
 	profileOptionsError,
 	templateLoading,
 	templateError,
+	pdfAnalysisLoading,
+	pdfAnalysisError,
+	pdfAnalysisWarnings,
 	isInvalid,
 	updateDraft,
 	handlePeChange,
 	handleTemplateFiles,
 	handleIndexFiles,
 	handlePdfFiles,
+	analyzePdfFiles,
 	handleCidFiles,
 	handleScanCid,
 	handleUseExampleTemplate,
+	handleStandardDocumentChange,
 	updateCidDocument,
 	removeCidDocument,
 	handleContactChange,
@@ -78,14 +97,19 @@ export function TransmittalBuilderMainForm({
 				files={files}
 				templateLoading={templateLoading}
 				templateError={templateError}
+				pdfAnalysisLoading={pdfAnalysisLoading}
+				pdfAnalysisError={pdfAnalysisError}
+				pdfAnalysisWarnings={pdfAnalysisWarnings}
 				isInvalid={isInvalid}
 				updateDraft={updateDraft}
 				handleTemplateFiles={handleTemplateFiles}
 				handleIndexFiles={handleIndexFiles}
 				handlePdfFiles={handlePdfFiles}
+				handleAnalyzePdfs={analyzePdfFiles}
 				handleCidFiles={handleCidFiles}
 				handleScanCid={handleScanCid}
 				handleUseExampleTemplate={handleUseExampleTemplate}
+				handleStandardDocumentChange={handleStandardDocumentChange}
 				updateCidDocument={updateCidDocument}
 				removeCidDocument={removeCidDocument}
 			/>

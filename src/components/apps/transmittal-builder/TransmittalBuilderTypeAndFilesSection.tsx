@@ -27,6 +27,9 @@ interface TransmittalBuilderTypeAndFilesSectionProps {
 	files: FileState;
 	templateLoading: boolean;
 	templateError: string | null;
+	pdfAnalysisLoading: boolean;
+	pdfAnalysisError: string | null;
+	pdfAnalysisWarnings: string[];
 	isInvalid: (key: string) => boolean;
 	updateDraft: (
 		key: keyof DraftState,
@@ -35,9 +38,20 @@ interface TransmittalBuilderTypeAndFilesSectionProps {
 	handleTemplateFiles: (selected: File[]) => void;
 	handleIndexFiles: (selected: File[]) => void;
 	handlePdfFiles: (selected: File[]) => void;
+	handleAnalyzePdfs: () => void;
 	handleCidFiles: (selected: File[]) => void;
 	handleScanCid: () => void;
 	handleUseExampleTemplate: () => void;
+	handleStandardDocumentChange: (
+		id: string,
+		field:
+			| "drawingNumber"
+			| "title"
+			| "revision"
+			| "accepted"
+			| "overrideReason",
+		value: string | boolean,
+	) => void;
 	updateCidDocument: (
 		id: string,
 		field: "description" | "revision",
@@ -51,17 +65,29 @@ export function TransmittalBuilderTypeAndFilesSection({
 	files,
 	templateLoading,
 	templateError,
+	pdfAnalysisLoading,
+	pdfAnalysisError,
+	pdfAnalysisWarnings,
 	isInvalid,
 	updateDraft,
 	handleTemplateFiles,
 	handleIndexFiles,
 	handlePdfFiles,
+	handleAnalyzePdfs,
 	handleCidFiles,
 	handleScanCid,
 	handleUseExampleTemplate,
+	handleStandardDocumentChange,
 	updateCidDocument,
 	removeCidDocument,
 }: TransmittalBuilderTypeAndFilesSectionProps) {
+	const pendingReviewCount = draft.standardDocuments.filter(
+		(doc) => doc.needsReview && !doc.accepted,
+	).length;
+	const reviewedCount = draft.standardDocuments.filter(
+		(doc) => doc.needsReview && doc.accepted,
+	).length;
+
 	return (
 		<>
 			<TransmittalSection title="Transmittal Type">
@@ -130,9 +156,33 @@ export function TransmittalBuilderTypeAndFilesSection({
 								multiple
 								files={files.pdfs}
 								onFilesSelected={handlePdfFiles}
-								helpText="Select all PDF sheets for this package."
+								helpText="Select all PDF sheets. If no Excel index is uploaded, title blocks are analyzed locally and reviewed before a temporary index is generated."
 								invalid={isInvalid("pdfs")}
+								action={
+									files.pdfs.length > 0 || pdfAnalysisLoading
+										? {
+												label: pdfAnalysisLoading
+													? "Analyzing..."
+													: "Re-analyze",
+												onClick: handleAnalyzePdfs,
+												disabled:
+													pdfAnalysisLoading || files.pdfs.length === 0,
+											}
+										: undefined
+								}
 							/>
+							{pdfAnalysisError ? (
+								<div className={styles.errorText}>{pdfAnalysisError}</div>
+							) : null}
+							{pdfAnalysisWarnings.length > 0 ? (
+								<div className={styles.warningList}>
+									{pdfAnalysisWarnings.map((warning) => (
+										<div key={warning} className={styles.warningText}>
+											{warning}
+										</div>
+									))}
+								</div>
+							) : null}
 						</div>
 					) : (
 						<div className={styles.cidFiles}>
@@ -158,6 +208,192 @@ export function TransmittalBuilderTypeAndFilesSection({
 					)}
 				</div>
 			</TransmittalSection>
+
+			{draft.transmittalType === "standard" && (
+				<TransmittalSection title="PDF Document Review">
+					<div className={styles.sectionBody}>
+						{files.pdfs.length === 0 ? (
+							<div className={styles.emptyState}>
+								Select PDF sheets to analyze title block data.
+							</div>
+						) : draft.standardDocuments.length === 0 ? (
+							<div className={styles.emptyState}>
+								{pdfAnalysisLoading
+									? "Analyzing PDF title blocks..."
+									: "No PDF analysis rows are available yet."}
+							</div>
+						) : (
+							<>
+								<div className={styles.analysisStatus}>
+									<div className={styles.analysisStat}>
+										<span className={styles.analysisStatLabel}>Rows</span>
+										<span>{draft.standardDocuments.length}</span>
+									</div>
+									<div className={styles.analysisStat}>
+										<span className={styles.analysisStatLabel}>Pending</span>
+										<span>{pendingReviewCount}</span>
+									</div>
+									<div className={styles.analysisStat}>
+										<span className={styles.analysisStatLabel}>Reviewed</span>
+										<span>{reviewedCount}</span>
+									</div>
+								</div>
+								<div className={styles.standardDocTable}>
+									<div className={styles.standardDocHeader}>
+										<span>File</span>
+										<span>Drawing No.</span>
+										<span>Title</span>
+										<span>Revision</span>
+										<span>Recognition</span>
+										<span>Accepted</span>
+										<span>Review note</span>
+									</div>
+									{draft.standardDocuments.map((doc) => {
+										const confidencePercent = Math.max(
+											0,
+											Math.min(100, Math.round(doc.confidence * 100)),
+										);
+										return (
+											<div
+												key={doc.id}
+												className={cn(
+													styles.standardDocRow,
+													doc.needsReview &&
+														!doc.accepted &&
+														styles.standardDocRowNeedsReview,
+												)}
+											>
+												<div className={styles.standardDocFile}>
+													<div
+														className={styles.standardDocFileName}
+														title={doc.fileName}
+													>
+														{doc.fileName}
+													</div>
+													<div className={styles.standardDocMeta}>
+														{doc.modelVersion
+															? `model ${doc.modelVersion}`
+															: "deterministic-v1"}
+													</div>
+												</div>
+												<Input
+													aria-label={`Drawing number for ${doc.fileName}`}
+													value={doc.drawingNumber}
+													onChange={(event) =>
+														handleStandardDocumentChange(
+															doc.id,
+															"drawingNumber",
+															event.target.value,
+														)
+													}
+													className={cn(
+														isInvalid("standardDocuments") &&
+															doc.needsReview &&
+															!doc.accepted &&
+															styles.invalidField,
+													)}
+												/>
+												<Input
+													aria-label={`Title for ${doc.fileName}`}
+													value={doc.title}
+													onChange={(event) =>
+														handleStandardDocumentChange(
+															doc.id,
+															"title",
+															event.target.value,
+														)
+													}
+													className={cn(
+														isInvalid("standardDocuments") &&
+															doc.needsReview &&
+															!doc.accepted &&
+															styles.invalidField,
+													)}
+												/>
+												<Input
+													aria-label={`Revision for ${doc.fileName}`}
+													value={doc.revision}
+													onChange={(event) =>
+														handleStandardDocumentChange(
+															doc.id,
+															"revision",
+															event.target.value,
+														)
+													}
+													className={cn(
+														isInvalid("standardDocuments") &&
+															doc.needsReview &&
+															!doc.accepted &&
+															styles.invalidField,
+													)}
+												/>
+												<div className={styles.standardDocSignal}>
+													<span
+														className={cn(
+															styles.confidencePill,
+															doc.needsReview
+																? styles.confidencePillWarning
+																: styles.confidencePillSuccess,
+														)}
+													>
+														{confidencePercent}%
+													</span>
+													<span className={styles.standardDocMeta}>
+														{doc.source || "manual"}
+													</span>
+												</div>
+												<label
+													className={styles.acceptToggle}
+													htmlFor={`standard-doc-accept-${doc.id}`}
+												>
+													<input
+														id={`standard-doc-accept-${doc.id}`}
+														name={`standard_doc_accept_${doc.id}`}
+														type="checkbox"
+														checked={doc.accepted}
+														onChange={(event) =>
+															handleStandardDocumentChange(
+																doc.id,
+																"accepted",
+																event.target.checked,
+															)
+														}
+													/>
+													<span>
+														{doc.needsReview ? "Reviewed" : "Accepted"}
+													</span>
+												</label>
+												<Input
+													aria-label={`Review note for ${doc.fileName}`}
+													value={doc.overrideReason}
+													onChange={(event) =>
+														handleStandardDocumentChange(
+															doc.id,
+															"overrideReason",
+															event.target.value,
+														)
+													}
+													placeholder={
+														doc.needsReview
+															? "Why this row is accepted"
+															: "Optional note"
+													}
+													className={cn(
+														isInvalid("standardDocuments") &&
+															doc.needsReview &&
+															!doc.accepted &&
+															styles.invalidField,
+													)}
+												/>
+											</div>
+										);
+									})}
+								</div>
+							</>
+						)}
+					</div>
+				</TransmittalSection>
+			)}
 
 			{draft.transmittalType === "cid" && (
 				<TransmittalSection title="CID Document Index">

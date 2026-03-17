@@ -46,6 +46,20 @@ export type CidDocument = {
 	revision: string;
 };
 
+export type StandardDocument = {
+	id: string;
+	fileName: string;
+	drawingNumber: string;
+	title: string;
+	revision: string;
+	confidence: number;
+	source: string;
+	needsReview: boolean;
+	accepted: boolean;
+	overrideReason: string;
+	modelVersion?: string;
+};
+
 export type OptionKey =
 	| "trans_pdf"
 	| "trans_cad"
@@ -81,6 +95,7 @@ export type DraftState = {
 	contacts: Contact[];
 	options: OptionsState;
 	cidDocuments: CidDocument[];
+	standardDocuments: StandardDocument[];
 };
 
 export type FileState = {
@@ -116,12 +131,24 @@ export type TransmittalPayload = {
 		template?: string;
 		index?: string;
 		pdfs?: string[];
-		cid?: string[];
+	cid?: string[];
 	};
 	cid_index_data?: Array<{
 		filename: string;
 		description: string;
 		revision: string;
+	}>;
+	pdf_document_data?: Array<{
+		file_name: string;
+		drawing_number: string;
+		title: string;
+		revision: string;
+		confidence: number;
+		source: string;
+		needs_review: boolean;
+		accepted: boolean;
+		override_reason: string;
+		model_version?: string;
 	}>;
 	generated_at: string;
 };
@@ -301,6 +328,7 @@ export const buildDefaultDraft = ({
 		],
 		options: { ...DEFAULT_OPTIONS },
 		cidDocuments: [],
+		standardDocuments: [],
 	};
 };
 
@@ -338,6 +366,57 @@ export const buildCidDocuments = (
 				fileName: file.name,
 				description: parseCidFilename(file.name),
 				revision: "-",
+			}
+		);
+	});
+};
+
+export const buildStandardDocuments = (
+	files: File[],
+	current: StandardDocument[],
+	analysisRows?: Array<{
+		file_name?: string;
+		drawing_number?: string;
+		title?: string;
+		revision?: string;
+		confidence?: number;
+		source?: string;
+		needs_review?: boolean;
+		accepted?: boolean;
+		override_reason?: string | null;
+		recognition?: {
+			model_version?: string;
+		};
+	}>,
+): StandardDocument[] => {
+	const analysisByFileName = new Map(
+		(analysisRows ?? [])
+			.filter((row) => row && safeTrim(row.file_name))
+			.map((row) => [safeTrim(row.file_name), row]),
+	);
+	return files.map((file) => {
+		const existing = current.find((doc) => doc.fileName === file.name);
+		const analysis = analysisByFileName.get(file.name);
+		return (
+			existing ?? {
+				id: createId(),
+				fileName: file.name,
+				drawingNumber: safeTrim(analysis?.drawing_number),
+				title: safeTrim(analysis?.title),
+				revision: safeTrim(analysis?.revision),
+				confidence:
+					typeof analysis?.confidence === "number" &&
+					Number.isFinite(analysis.confidence)
+						? analysis.confidence
+						: 0,
+				source: safeTrim(analysis?.source) || "manual",
+				needsReview: Boolean(analysis?.needs_review),
+				accepted:
+					typeof analysis?.accepted === "boolean"
+						? analysis.accepted
+						: !Boolean(analysis?.needs_review),
+				overrideReason: safeTrim(analysis?.override_reason),
+				modelVersion: safeTrim(analysis?.recognition?.model_version),
 			}
 		);
 	});
@@ -397,13 +476,27 @@ export const validateDraft = (draft: DraftState, files: FileState) => {
 	}
 
 	if (draft.transmittalType === "standard") {
-		if (!files.index) {
-			fields.index = true;
-			errors.push("Drawing index file is required.");
-		}
 		if (files.pdfs.length === 0) {
 			fields.pdfs = true;
 			errors.push("Select at least one PDF document.");
+		}
+		const requiresGeneratedIndex = !files.index;
+		if (requiresGeneratedIndex) {
+			if (draft.standardDocuments.length === 0) {
+				fields.standardDocuments = true;
+				errors.push(
+					"Analyze PDF documents or upload a drawing index before generating.",
+				);
+			}
+			const pendingReview = draft.standardDocuments.filter(
+				(doc) => doc.needsReview && !doc.accepted,
+			);
+			if (pendingReview.length > 0) {
+				fields.standardDocuments = true;
+				errors.push(
+					"Review or accept all low-confidence PDF document rows before generating without an index.",
+				);
+			}
 		}
 	} else {
 		if (files.cid.length === 0) {
@@ -487,6 +580,21 @@ export const buildPayload = (
 							revision: doc.revision === "-" ? "" : doc.revision,
 						}))
 				: undefined,
+		pdf_document_data:
+			draft.transmittalType === "standard"
+				? draft.standardDocuments.map((doc) => ({
+						file_name: doc.fileName,
+						drawing_number: safeTrim(doc.drawingNumber),
+						title: safeTrim(doc.title),
+						revision: safeTrim(doc.revision),
+						confidence: doc.confidence,
+						source: safeTrim(doc.source) || "manual",
+						needs_review: doc.needsReview,
+						accepted: doc.accepted,
+						override_reason: safeTrim(doc.overrideReason),
+						model_version: safeTrim(doc.modelVersion) || undefined,
+					}))
+				: undefined,
 		generated_at: new Date().toISOString(),
 	};
 };
@@ -520,6 +628,25 @@ export const loadDraft = () => {
 						revision: doc.revision ?? "-",
 					}))
 				: base.cidDocuments,
+			standardDocuments: Array.isArray(parsed.standardDocuments)
+				? parsed.standardDocuments.map((doc) => ({
+						id: doc.id ?? createId(),
+						fileName: doc.fileName ?? "",
+						drawingNumber: doc.drawingNumber ?? "",
+						title: doc.title ?? "",
+						revision: doc.revision ?? "",
+						confidence:
+							typeof doc.confidence === "number" &&
+							Number.isFinite(doc.confidence)
+								? doc.confidence
+								: 0,
+						source: doc.source ?? "manual",
+						needsReview: Boolean(doc.needsReview),
+						accepted: Boolean(doc.accepted),
+						overrideReason: doc.overrideReason ?? "",
+						modelVersion: doc.modelVersion ?? "",
+					}))
+				: base.standardDocuments,
 		};
 	} catch {
 		return buildDefaultDraft();
@@ -570,6 +697,9 @@ export const buildFormData = (
 	formData.append("contacts", JSON.stringify(payload.contacts));
 	if (payload.cid_index_data) {
 		formData.append("cid_index_data", JSON.stringify(payload.cid_index_data));
+	}
+	if (payload.pdf_document_data) {
+		formData.append("pdf_document_data", JSON.stringify(payload.pdf_document_data));
 	}
 
 	if (files.template) {

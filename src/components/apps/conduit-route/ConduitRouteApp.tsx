@@ -66,6 +66,7 @@ import type {
 	ConduitObstacleScanMeta,
 	ConduitObstacleSource,
 	ConduitRouteBackcheckResponse,
+	ConduitRouteComputeData,
 	ConduitRouteComputeMeta,
 	ConduitRouteRecord,
 	ConduitRouteTab,
@@ -464,7 +465,7 @@ export function ConduitRouteApp() {
 
 	const previewPath = useMemo(() => {
 		if (!startPoint || !hoverPoint) {
-			return [];
+			return { path: [] as Point2D[], valid: true, fallbackUsed: false };
 		}
 		return routePath(startPoint, hoverPoint, costGrid, mode);
 	}, [startPoint, hoverPoint, costGrid, mode]);
@@ -807,13 +808,8 @@ export function ConduitRouteApp() {
 		setStatusMessage("Computing route via backend...");
 
 		void (async () => {
-			let path = routePath(lockedStart, clickPoint, costGrid, mode);
-			let bends = bendCount(path);
-			let length = pathLength(path);
-			let tag =
-				mode === "cable_tag" ? routeTagPosition(path, `${ref} Z01`) : null;
-			let usedFallback = false;
 			let computeMeta: ConduitRouteComputeMeta | null = null;
+			let responseData: ConduitRouteComputeData | null = null;
 
 			try {
 				const response = await conduitRouteService.computeRoute({
@@ -840,25 +836,56 @@ export function ConduitRouteApp() {
 					tagText: tagText || undefined,
 				});
 
-				computeMeta = response.meta ?? null;
-				if (response.success && response.data) {
-					path = response.data.path;
-					bends = response.data.bendCount;
-					length = response.data.length;
-					tag = response.data.tag;
-					if (
-						obstacleSource === "autocad" &&
-						Array.isArray(response.data.resolvedObstacles) &&
-						response.data.resolvedObstacles.length > 0
-					) {
-						setActiveObstacles(response.data.resolvedObstacles);
-					}
-				} else {
-					usedFallback = true;
+				computeMeta = {
+					...(response.meta ?? {}),
+					routeValid:
+						response.success && response.data
+							? response.meta?.routeValid ?? true
+							: false,
+				};
+				setLastComputeMeta(computeMeta);
+
+				if (!response.success || !response.data) {
+					setHoverPoint(null);
+					setStartPoint(lockedStart);
+					setRouteComputing(false);
+					setStatusMessage(
+						response.message ||
+							`${ref} could not be routed. The dashed line is only a sketch; adjust the destination or obstacle scope.`,
+					);
+					return;
+				}
+
+				responseData = response.data;
+
+				if (
+					obstacleSource === "autocad" &&
+					Array.isArray(response.data.resolvedObstacles) &&
+					response.data.resolvedObstacles.length > 0
+				) {
+					setActiveObstacles(response.data.resolvedObstacles);
 				}
 			} catch {
-				usedFallback = true;
+				setLastComputeMeta({
+					routeValid: false,
+					fallbackUsed: false,
+					source: "frontend",
+				});
+				setHoverPoint(null);
+				setStartPoint(lockedStart);
+				setStatusMessage(
+					`${ref} could not be routed because the compute request failed. Adjust the route or retry the backend request.`,
+				);
+				setRouteComputing(false);
+				return;
 			}
+
+			const path = responseData?.path ?? [];
+			const bends = responseData?.bendCount ?? bendCount(path);
+			const length = responseData?.length ?? pathLength(path);
+			const tag =
+				responseData?.tag ??
+				(mode === "cable_tag" ? routeTagPosition(path, `${ref} Z01`) : null);
 
 			const route: ConduitRouteRecord = {
 				id: routeId,
@@ -893,9 +920,7 @@ export function ConduitRouteApp() {
 
 			if (route.bendDegrees > 360) {
 				setStatusMessage(
-					usedFallback
-						? `${route.ref} routed (local fallback) with ${route.bendDegrees}° bends. Add a pull point before construction release.`
-						: `${route.ref} routed with ${route.bendDegrees}° total bends. Add a pull point before construction release.`,
+					`${route.ref} routed with ${route.bendDegrees} deg bends. Add a pull point before construction release.`,
 				);
 				return;
 			}
@@ -903,9 +928,7 @@ export function ConduitRouteApp() {
 			const computeMs = computeMeta?.computeMs ?? computeMeta?.requestMs;
 			const timing = computeMs ? ` in ${computeMs} ms` : "";
 			setStatusMessage(
-				usedFallback
-					? `${route.ref} routed via local fallback: ${formatLength(length)} with ${bends} bends (${route.bendDegrees}°).`
-					: `${route.ref} routed${timing}: ${formatLength(length)} with ${bends} bends (${route.bendDegrees}°).`,
+				`${route.ref} routed${timing}: ${formatLength(length)} with ${bends} bends (${route.bendDegrees} deg).`,
 			);
 		})();
 	};
@@ -1823,17 +1846,22 @@ export function ConduitRouteApp() {
 											Computing...
 										</Badge>
 									) : null}
-									{lastComputeMeta?.computeMs ? (
+									{lastComputeMeta &&
+									(lastComputeMeta.computeMs ||
+										lastComputeMeta.requestMs ||
+										lastComputeMeta.routeValid === false) ? (
 										<Badge
 											color={
-												lastComputeMeta.fallbackUsed ? "warning" : "success"
+												lastComputeMeta.routeValid === false
+													? "danger"
+													: "success"
 											}
 											variant="outline"
 											size="sm"
 										>
-											{lastComputeMeta.fallbackUsed
-												? "Local Fallback"
-												: `${lastComputeMeta.computeMs} ms`}
+											{lastComputeMeta.routeValid === false
+												? "Blocked"
+												: `${lastComputeMeta.computeMs ?? lastComputeMeta.requestMs} ms`}
 										</Badge>
 									) : null}
 								</div>
@@ -1970,10 +1998,13 @@ export function ConduitRouteApp() {
 										</g>
 									) : null}
 
-									{previewPath.length > 1 ? (
+									{previewPath.path.length > 1 ? (
 										<path
-											d={toRoundedPathSvg(previewPath)}
-											className={styles.previewStroke}
+											d={toRoundedPathSvg(previewPath.path)}
+											className={cn(
+												styles.previewStroke,
+												!previewPath.valid && styles.previewSketch,
+											)}
 										/>
 									) : null}
 

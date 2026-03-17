@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import io
 import logging
 import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from flask import Flask, g, jsonify, request
 from flask_limiter import Limiter
@@ -21,6 +23,18 @@ class TestApiRouteGroups(unittest.TestCase):
         self.backup_dir = Path(self.temp_dir.name)
         self.template_path = self.backup_dir / "template.docx"
         self.template_path.write_bytes(b"test-template")
+        self.previous_feedback_db = os.environ.get("AUTODRAFT_COMPARE_FEEDBACK_DB")
+        self.previous_shadow_advisor = os.environ.get(
+            "AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED"
+        )
+        self.previous_agent_pre_review = os.environ.get(
+            "AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_ENABLED"
+        )
+        os.environ["AUTODRAFT_COMPARE_FEEDBACK_DB"] = str(
+            self.backup_dir / "compare-feedback.sqlite3"
+        )
+        os.environ["AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED"] = "false"
+        os.environ["AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_ENABLED"] = "false"
 
         self.limiter = Limiter(
             app=self.app,
@@ -382,6 +396,22 @@ class TestApiRouteGroups(unittest.TestCase):
         self.client = self.app.test_client()
 
     def tearDown(self) -> None:
+        if self.previous_feedback_db is None:
+            os.environ.pop("AUTODRAFT_COMPARE_FEEDBACK_DB", None)
+        else:
+            os.environ["AUTODRAFT_COMPARE_FEEDBACK_DB"] = self.previous_feedback_db
+        if self.previous_shadow_advisor is None:
+            os.environ.pop("AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED", None)
+        else:
+            os.environ["AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED"] = (
+                self.previous_shadow_advisor
+            )
+        if self.previous_agent_pre_review is None:
+            os.environ.pop("AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_ENABLED", None)
+        else:
+            os.environ["AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_ENABLED"] = (
+                self.previous_agent_pre_review
+            )
         self.temp_dir.cleanup()
 
     def test_expected_routes_registered(self) -> None:
@@ -428,6 +458,7 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/dashboard/load/<job_id>": ["GET"],
             "/api/transmittal/profiles": ["GET"],
             "/api/transmittal/template": ["GET"],
+            "/api/transmittal/analyze-pdfs": ["POST"],
             "/api/transmittal/render": ["POST"],
             "/api/status": ["GET"],
             "/api/layers": ["GET"],
@@ -442,6 +473,11 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/conduit-route/route/compute": ["POST"],
             "/api/conduit-route/backcheck": ["POST"],
             "/api/autodraft/backcheck": ["POST"],
+            "/api/autodraft/compare/prepare": ["POST"],
+            "/api/autodraft/compare": ["POST"],
+            "/api/autodraft/compare/feedback": ["POST"],
+            "/api/autodraft/compare/feedback/export": ["GET"],
+            "/api/autodraft/compare/feedback/import": ["POST"],
             "/api/etap/cleanup/run": ["POST"],
             "/api/autocad/ws-ticket": ["POST"],
             "/api/watchdog/config": ["PUT"],
@@ -522,6 +558,19 @@ class TestApiRouteGroups(unittest.TestCase):
             headers={"X-API-Key": "valid-key"},
         )
         self.assertEqual(response.status_code, 503)
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        self.assertFalse(payload.get("success", True))
+
+    def test_transmittal_analyze_pdfs_requires_api_key(self) -> None:
+        response = self.client.post("/api/transmittal/analyze-pdfs")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.post(
+            "/api/transmittal/analyze-pdfs",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(response.status_code, 400)
         payload = response.get_json()
         self.assertIsInstance(payload, dict)
         self.assertFalse(payload.get("success", True))
@@ -926,6 +975,369 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(findings[0].get("status"), "fail")
         notes = findings[0].get("notes") or []
         self.assertTrue(any("locked" in str(note).strip().lower() for note in notes))
+
+    def test_autodraft_compare_requires_api_key(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/compare",
+            json={},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_autodraft_compare_validation_requires_calibration_points(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/compare",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "markups": [
+                    {
+                        "id": "markup-1",
+                        "type": "cloud",
+                        "color": "green",
+                        "text": "delete",
+                        "bounds": {"x": 10, "y": 10, "width": 15, "height": 10},
+                    }
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 422)
+        payload = response.get_json() or {}
+        self.assertEqual(payload.get("code"), "AUTODRAFT_CALIBRATION_MANUAL_REQUIRED")
+
+    def test_autodraft_compare_auto_falls_back_to_python_when_dotnet_unavailable(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/compare",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "engine": "auto",
+                "tolerance_profile": "medium",
+                "manual_override": True,
+                "markups": [
+                    {
+                        "id": "markup-1",
+                        "type": "cloud",
+                        "color": "green",
+                        "text": "delete feeder",
+                        "bounds": {"x": 10, "y": 10, "width": 20, "height": 10},
+                    }
+                ],
+                "pdf_points": [{"x": 10, "y": 10}, {"x": 30, "y": 10}],
+                "cad_points": [{"x": 100, "y": 100}, {"x": 140, "y": 100}],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        engine = payload.get("engine") or {}
+        self.assertEqual(engine.get("requested"), "auto")
+        self.assertEqual(engine.get("used"), "python")
+        self.assertTrue(payload.get("ok"))
+        self.assertIn("summary", payload)
+        self.assertIn("backcheck", payload)
+
+    def test_autodraft_compare_dotnet_strict_requires_config(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/compare",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "engine": "dotnet",
+                "manual_override": True,
+                "markups": [
+                    {
+                        "id": "markup-1",
+                        "type": "cloud",
+                        "color": "green",
+                        "text": "delete feeder",
+                        "bounds": {"x": 10, "y": 10, "width": 20, "height": 10},
+                    }
+                ],
+                "pdf_points": [{"x": 10, "y": 10}, {"x": 30, "y": 10}],
+                "cad_points": [{"x": 100, "y": 100}, {"x": 140, "y": 100}],
+            },
+        )
+        self.assertEqual(response.status_code, 503)
+        payload = response.get_json() or {}
+        self.assertEqual(payload.get("code"), "AUTODRAFT_COMPARE_NOT_CONFIGURED")
+
+    def test_autodraft_compare_infers_red_callout_replacement_metadata(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/compare",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "engine": "python",
+                "tolerance_profile": "medium",
+                "manual_override": True,
+                "markups": [
+                    {
+                        "id": "annot-8",
+                        "type": "text",
+                        "color": "red",
+                        "text": "TS416",
+                        "bounds": {"x": 880, "y": 900, "width": 80, "height": 150},
+                        "meta": {
+                            "callout_points": [
+                                {"x": 900.0, "y": 1035.0},
+                                {"x": 945.0, "y": 1004.0},
+                                {"x": 945.0, "y": 975.0},
+                            ]
+                        },
+                    }
+                ],
+                "replacement_tuning": {
+                    "unresolved_confidence_threshold": 0.4,
+                    "ambiguity_margin_threshold": 0.1,
+                    "search_radius_multiplier": 2.8,
+                },
+                "pdf_points": [{"x": 10, "y": 10}, {"x": 30, "y": 10}],
+                "cad_points": [{"x": 100, "y": 100}, {"x": 140, "y": 100}],
+                "cad_context": {
+                    "drawing": {"name": "sample.dwg"},
+                    "layers": [{"name": "A-DEMO-LAYER", "locked": False}],
+                    "entities": [
+                        {
+                            "id": "E-TS410",
+                            "layer": "A-DEMO-LAYER",
+                            "text": "TS410",
+                            "bounds": {"x": 936, "y": 968, "width": 24, "height": 14},
+                        },
+                        {
+                            "id": "E-TS402",
+                            "layer": "A-DEMO-LAYER",
+                            "text": "TS402",
+                            "bounds": {"x": 1010, "y": 910, "width": 24, "height": 14},
+                        },
+                    ],
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        tuning = payload.get("replacement_tuning") or {}
+        self.assertAlmostEqual(float(tuning.get("unresolved_confidence_threshold") or 0), 0.4, places=6)
+        self.assertAlmostEqual(float(tuning.get("ambiguity_margin_threshold") or 0), 0.1, places=6)
+        self.assertAlmostEqual(float(tuning.get("search_radius_multiplier") or 0), 2.8, places=6)
+        review_queue = payload.get("review_queue") or []
+        self.assertGreaterEqual(len(review_queue), 1)
+        first_review = review_queue[0] or {}
+        self.assertEqual(first_review.get("new_text"), "TS416")
+        self.assertIn(first_review.get("status"), {"resolved", "ambiguous", "unresolved"})
+        self.assertGreaterEqual(len(first_review.get("candidates") or []), 1)
+
+        plan = payload.get("plan") or {}
+        actions = plan.get("actions") or []
+        self.assertEqual(len(actions), 1)
+        replacement = (actions[0] or {}).get("replacement") or {}
+        self.assertEqual(replacement.get("new_text"), "TS416")
+        self.assertIn(
+            replacement.get("status"),
+            {"resolved", "ambiguous", "unresolved"},
+        )
+        self.assertIn("target_entity_id", replacement)
+        self.assertIn("candidates", replacement)
+
+        findings = ((payload.get("backcheck") or {}).get("findings") or [])
+        self.assertEqual(len(findings), 1)
+        self.assertIn("replacement", findings[0] or {})
+
+    def test_autodraft_compare_skips_replacement_for_red_see_dwg_reference(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/compare",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "engine": "python",
+                "manual_override": True,
+                "markups": [
+                    {
+                        "id": "annot-ref-1",
+                        "type": "text",
+                        "color": "red",
+                        "text": "52-203 SEE DWG. E6-0105",
+                        "bounds": {"x": 820, "y": 620, "width": 64, "height": 70},
+                    }
+                ],
+                "pdf_points": [{"x": 10, "y": 10}, {"x": 30, "y": 10}],
+                "cad_points": [{"x": 100, "y": 100}, {"x": 140, "y": 100}],
+                "cad_context": {
+                    "drawing": {"name": "sample.dwg"},
+                    "layers": [{"name": "A-DEMO-LAYER", "locked": False}],
+                    "entities": [
+                        {
+                            "id": "E-TEXT-1",
+                            "layer": "A-DEMO-LAYER",
+                            "text": "TS410",
+                            "bounds": {"x": 936, "y": 968, "width": 24, "height": 14},
+                        },
+                    ],
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("review_queue") or [], [])
+        actions = ((payload.get("plan") or {}).get("actions") or [])
+        self.assertEqual(len(actions), 1)
+        self.assertNotIn("replacement", actions[0] or {})
+
+    def test_autodraft_compare_feedback_round_trip(self) -> None:
+        submit_response = self.client.post(
+            "/api/autodraft/compare/feedback",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-compare-1",
+                "items": [
+                    {
+                        "request_id": "req-compare-1",
+                        "action_id": "action-red-1",
+                        "review_status": "corrected",
+                        "new_text": "TS416",
+                        "selected_old_text": "TS410",
+                        "selected_entity_id": "E-TS410",
+                        "confidence": 0.71,
+                        "note": "Validated against modelspace text.",
+                        "candidates": [
+                            {
+                                "entity_id": "E-TS410",
+                                "text": "TS410",
+                                "score": 0.71,
+                                "distance": 8.0,
+                                "pointer_hit": True,
+                                "overlap": False,
+                                "pair_hit_count": 0,
+                            }
+                        ],
+                        "selected_candidate": {
+                            "entity_id": "E-TS410",
+                            "text": "TS410",
+                            "score": 0.71,
+                            "distance": 8.0,
+                            "pointer_hit": True,
+                            "overlap": False,
+                            "pair_hit_count": 0,
+                        },
+                    }
+                ],
+            },
+        )
+        self.assertEqual(submit_response.status_code, 200)
+        submit_payload = submit_response.get_json() or {}
+        self.assertTrue(submit_payload.get("success"))
+        self.assertEqual(submit_payload.get("stored"), 1)
+
+        export_response = self.client.get(
+            "/api/autodraft/compare/feedback/export",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(export_response.status_code, 200)
+        export_payload = export_response.get_json() or {}
+        events = export_payload.get("events") or []
+        pairs = export_payload.get("pairs") or []
+        metrics = export_payload.get("metrics") or []
+        self.assertGreaterEqual(len(events), 1)
+        self.assertGreaterEqual(len(pairs), 1)
+        self.assertGreaterEqual(len(metrics), 1)
+
+        import_response = self.client.post(
+            "/api/autodraft/compare/feedback/import",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "mode": "replace",
+                "events": events,
+                "pairs": pairs,
+                "metrics": metrics,
+            },
+        )
+        self.assertEqual(import_response.status_code, 200)
+        import_payload = import_response.get_json() or {}
+        self.assertTrue(import_payload.get("success"))
+        self.assertEqual(import_payload.get("mode"), "replace")
+        imported = import_payload.get("imported") or {}
+        self.assertGreaterEqual(int(imported.get("events") or 0), 1)
+
+    def test_autodraft_compare_prepare_requires_pdf_upload(self) -> None:
+        response = self.client.post(
+            "/api/autodraft/compare/prepare",
+            headers={"X-API-Key": "valid-key"},
+            data={"page_index": "0"},
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json() or {}
+        self.assertEqual(payload.get("code"), "AUTODRAFT_INVALID_REQUEST")
+
+    def test_autodraft_compare_prepare_extracts_markups(self) -> None:
+        class _FakeAnnotRef:
+            def __init__(self, obj):
+                self._obj = obj
+
+            def get_object(self):
+                return self._obj
+
+        class _FakePage(dict):
+            def __init__(self):
+                super().__init__()
+                self["/Annots"] = (
+                    _FakeAnnotRef(
+                        {
+                            "/Subtype": "/FreeText",
+                            "/Rect": [10, 20, 60, 45],
+                            "/C": [0.0, 0.0, 1.0],
+                            "/Contents": "Install note",
+                        }
+                    ),
+                )
+                self["/Measure"] = {"/R": "1 in = 12 in"}
+
+                class _Box:
+                    width = 612
+                    height = 792
+
+                self.mediabox = _Box()
+
+        class _FakeReader:
+            def __init__(self, _stream):
+                self.pages = [_FakePage()]
+                self.metadata = {
+                    "/Producer": "Bluebeam Revu x64",
+                    "/Creator": "Bluebeam Revu",
+                    "/Title": "Rev markup",
+                }
+
+        with (
+            patch("backend.route_groups.api_autodraft._PYPDF_AVAILABLE", True),
+            patch("backend.route_groups.api_autodraft._PdfReader", _FakeReader),
+        ):
+            response = self.client.post(
+                "/api/autodraft/compare/prepare",
+                headers={"X-API-Key": "valid-key"},
+                data={
+                    "page_index": "0",
+                    "pdf": (io.BytesIO(b"%PDF-1.7"), "sample.pdf"),
+                },
+                content_type="multipart/form-data",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        markups = payload.get("markups") or []
+        self.assertEqual(len(markups), 1)
+        first = markups[0]
+        self.assertEqual(first.get("type"), "text")
+        self.assertEqual(first.get("color"), "blue")
+        meta = first.get("meta") or {}
+        self.assertEqual(meta.get("color_source"), "C")
+        self.assertEqual(meta.get("color_hex"), "#0000FF")
+        self.assertEqual((meta.get("color_rgb") or {}).get("b"), 1.0)
+        self.assertIn("bounds", first)
+        seed = payload.get("calibration_seed") or {}
+        self.assertTrue(seed.get("available"))
+        pdf_metadata = payload.get("pdf_metadata") or {}
+        self.assertTrue(pdf_metadata.get("bluebeam_detected"))
+        doc_metadata = pdf_metadata.get("document") or {}
+        self.assertEqual(doc_metadata.get("producer"), "Bluebeam Revu x64")
+        page_metadata = pdf_metadata.get("page") or {}
+        annotation_counts = page_metadata.get("annotation_counts") or {}
+        self.assertEqual(annotation_counts.get("total"), 1)
+        self.assertEqual(annotation_counts.get("supported"), 1)
 
     def test_terminal_scan_endpoint_requires_auth(self) -> None:
         response = self.client.post("/api/conduit-route/terminal-scan")

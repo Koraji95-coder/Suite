@@ -18,6 +18,7 @@ from backend.route_groups.api_transmittal_render import (
 class TestApiTransmittalRender(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
+        self.render_calls = []
         app = Flask(__name__)
         app.config["TESTING"] = True
 
@@ -53,13 +54,22 @@ class TestApiTransmittalRender(unittest.TestCase):
         def render_transmittal(
             _template_path: str,
             _docs_dir: str,
-            _index_path: str,
-            _fields: dict,
-            _checks: dict,
-            _contacts: list,
+            index_path: str,
+            fields: dict,
+            checks: dict,
+            contacts: list,
             out_path: str,
-            _unused,
+            selected_files,
         ) -> None:
+            self.render_calls.append(
+                {
+                    "index_path": index_path,
+                    "fields": fields,
+                    "checks": checks,
+                    "contacts": contacts,
+                    "selected_files": selected_files,
+                }
+            )
             Path(out_path).write_text("rendered", encoding="utf-8")
 
         app.register_blueprint(
@@ -130,6 +140,74 @@ class TestApiTransmittalRender(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertFalse(payload.get("success", True))
         self.assertIn("PDF conversion helper unavailable", str(payload.get("message")))
+
+    def test_render_standard_allows_reviewed_pdf_document_data_without_index(self) -> None:
+        response = self.client.post(
+            "/api/transmittal/render",
+            headers={"X-API-Key": "valid-key"},
+            data={
+                "template": (io.BytesIO(b"template"), "template.docx"),
+                "documents": (io.BytesIO(b"doc"), "drawing1.pdf"),
+                "fields": json.dumps({"job_num": "23001", "from_profile_id": "valid-profile"}),
+                "pdf_document_data": json.dumps(
+                    [
+                        {
+                            "file_name": "drawing1.pdf",
+                            "drawing_number": "E1-100",
+                            "title": "Floor Plan",
+                            "revision": "2",
+                            "confidence": 0.91,
+                            "source": "embedded_text",
+                            "needs_review": False,
+                            "accepted": True,
+                            "override_reason": "",
+                        }
+                    ]
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        self.assertEqual(len(self.render_calls), 1)
+        call = self.render_calls[0]
+        self.assertTrue(str(call["index_path"]).endswith("index.generated.xlsx"))
+        self.assertIsInstance(call["selected_files"], list)
+        self.assertEqual(len(call["selected_files"]), 1)
+        self.assertIn("E1-100", Path(call["selected_files"][0]).name)
+
+    def test_render_standard_rejects_unreviewed_pdf_document_data_without_index(self) -> None:
+        response = self.client.post(
+            "/api/transmittal/render",
+            headers={"X-API-Key": "valid-key"},
+            data={
+                "template": (io.BytesIO(b"template"), "template.docx"),
+                "documents": (io.BytesIO(b"doc"), "drawing1.pdf"),
+                "fields": json.dumps({"job_num": "23001", "from_profile_id": "valid-profile"}),
+                "pdf_document_data": json.dumps(
+                    [
+                        {
+                            "file_name": "drawing1.pdf",
+                            "drawing_number": "E1-100",
+                            "title": "Floor Plan",
+                            "revision": "2",
+                            "confidence": 0.42,
+                            "source": "ocr",
+                            "needs_review": True,
+                            "accepted": False,
+                            "override_reason": "",
+                        }
+                    ]
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+        self.assertIn("requires review before render", str(payload.get("message")))
 
 
 if __name__ == "__main__":

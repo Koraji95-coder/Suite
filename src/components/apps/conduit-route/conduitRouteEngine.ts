@@ -13,6 +13,12 @@ interface GridPoint {
 	y: number;
 }
 
+export interface RoutePathResult {
+	path: Point2D[];
+	valid: boolean;
+	fallbackUsed: boolean;
+}
+
 function clamp(value: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, value));
 }
@@ -142,7 +148,7 @@ export function routePath(
 	end: Point2D,
 	costGrid: CostGrid,
 	mode: RoutingMode,
-): Point2D[] {
+): RoutePathResult {
 	const { cols, rows, step, grid } = costGrid;
 	const startCell = toGridPoint(start, step, cols, rows);
 	const endCell = toGridPoint(end, step, cols, rows);
@@ -205,7 +211,11 @@ export function routePath(
 			}
 			path[0] = start;
 			path[path.length - 1] = end;
-			return simplifyPath(path);
+			return {
+				path: simplifyPath(path),
+				valid: true,
+				fallbackUsed: false,
+			};
 		}
 
 		for (const { dx, dy } of dirs) {
@@ -262,7 +272,11 @@ export function routePath(
 	}
 
 	const midpointX = (start.x + end.x) / 2;
-	return [start, { x: midpointX, y: start.y }, { x: midpointX, y: end.y }, end];
+	return {
+		path: [start, { x: midpointX, y: start.y }, { x: midpointX, y: end.y }, end],
+		valid: false,
+		fallbackUsed: true,
+	};
 }
 
 export function simplifyPath(path: Point2D[]): Point2D[] {

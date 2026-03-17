@@ -28,6 +28,25 @@
 - Runtime routing is strict single-model per profile (no cross-profile fallback retries).
 - Keep compatibility fields (`model_fallbacks`, `fallback_models`) present in contracts as empty arrays until explicit breaking cleanup.
 
+## Local Learning Guardrail
+
+- Keep learning data, SQLite state, JSONL exports, and promoted model artifacts local-only.
+- Active local learning domains are `autodraft_markup`, `autodraft_replacement`, and `transmittal_titleblock`.
+- Do not mix AutoWire route data into the AutoDraft or transmittal learning domains.
+- Agent hints are advisory features only; they must not silently override deterministic extraction or promoted local model output.
+
+## AutoDraft And AutoWire Boundary
+
+- Keep AutoDraft recognition/replacement logic separate from AutoWire routing logic.
+- Shared code between the systems should stay limited to generic helpers such as geometry, OCR/text extraction, model-artifact handling, and observability utilities.
+- AutoWire remains deterministic in this repo tranche: preview or sketch paths must not be treated as valid issued routes.
+
+## Transmittal OCR Review Gate
+
+- Use embedded PDF text extraction first and local OCR fallback only when embedded text is weak or absent.
+- If no Excel index is uploaded, standard transmittal render requires reviewed `pdf_document_data` so temporary index generation stays review-first.
+- Low-confidence title-block rows must be accepted or corrected before render.
+
 ## MCP/Handoff Guardrail
 
 - When using `suite_repo_mcp`, prefer observability-safe tools/prompts and preserve this repo's guardrails.

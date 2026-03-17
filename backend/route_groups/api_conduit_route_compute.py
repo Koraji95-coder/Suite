@@ -291,6 +291,7 @@ def _route_path(
                 "iterations": iterations,
                 "visitedNodes": len(closed),
                 "fallbackUsed": False,
+                "routeValid": True,
             }
 
         for dx, dy in directions:
@@ -329,18 +330,12 @@ def _route_path(
                 (tentative_g + float(h), heap_counter, nx, ny, tentative_g, cx, cy),
             )
 
-    midpoint_x = (start["x"] + end["x"]) / 2
-    fallback_path = [
-        dict(start),
-        {"x": midpoint_x, "y": start["y"]},
-        {"x": midpoint_x, "y": end["y"]},
-        dict(end),
-    ]
     return {
-        "path": _simplify_path(fallback_path),
+        "path": [],
         "iterations": iterations,
         "visitedNodes": len(closed),
-        "fallbackUsed": True,
+        "fallbackUsed": False,
+        "routeValid": False,
     }
 
 
@@ -464,17 +459,19 @@ def compute_conduit_route(payload: Dict[str, Any]) -> Dict[str, Any]:
     elapsed_ms = int((time.time() - started_at) * 1000)
 
     path = route["path"]
-    if len(path) < 2:
+    route_valid = bool(route.get("routeValid", len(path) >= 2))
+    if not route_valid or len(path) < 2:
         return {
             "success": False,
-            "code": "ROUTE_COMPUTE_FAILED",
-            "message": "Route engine returned an empty path.",
+            "code": "ROUTE_BLOCKED",
+            "message": "No valid route was found for the requested points and obstacle constraints.",
             "warnings": warnings,
             "meta": {
                 "computeMs": elapsed_ms,
                 "iterations": route.get("iterations", 0),
                 "visitedNodes": route.get("visitedNodes", 0),
                 "fallbackUsed": bool(route.get("fallbackUsed")),
+                "routeValid": False,
             },
         }
 
@@ -500,6 +497,7 @@ def compute_conduit_route(payload: Dict[str, Any]) -> Dict[str, Any]:
             "iterations": route.get("iterations", 0),
             "visitedNodes": route.get("visitedNodes", 0),
             "fallbackUsed": bool(route.get("fallbackUsed")),
+            "routeValid": True,
             "gridCols": cols,
             "gridRows": rows,
             "gridStep": grid_step,

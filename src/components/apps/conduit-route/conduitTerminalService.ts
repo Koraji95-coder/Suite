@@ -20,6 +20,40 @@ import type {
 
 type TerminalLabelSyncMode = "legacy" | "bridge" | "auto";
 
+export function resolveTerminalLabelSyncEndpointPath(options?: {
+	mode?: TerminalLabelSyncMode;
+	providerConfigured?: string;
+	dotnetSenderReady?: boolean;
+}): string {
+	const rawMode =
+		typeof options?.mode === "string" ? options.mode.trim().toLowerCase() : "";
+	const mode: TerminalLabelSyncMode =
+		rawMode === "bridge" || rawMode === "auto" ? rawMode : "legacy";
+	if (mode === "bridge") {
+		return "/api/conduit-route/bridge/terminal-labels/sync";
+	}
+	if (mode === "legacy") {
+		return "/api/conduit-route/terminal-labels/sync";
+	}
+
+	const providerConfigured =
+		typeof options?.providerConfigured === "string"
+			? options.providerConfigured.trim().toLowerCase()
+			: "";
+	const dotnetSenderReady =
+		typeof options?.dotnetSenderReady === "boolean"
+			? options.dotnetSenderReady
+			: true;
+	if (
+		dotnetSenderReady &&
+		(providerConfigured === "dotnet" ||
+			providerConfigured === "dotnet_fallback_com")
+	) {
+		return "/api/conduit-route/bridge/terminal-labels/sync";
+	}
+	return "/api/conduit-route/terminal-labels/sync";
+}
+
 class ConduitTerminalService {
 	private baseUrl: string;
 	private apiKey: string;
@@ -49,28 +83,13 @@ class ConduitTerminalService {
 		providerConfigured?: string;
 		dotnetSenderReady?: boolean;
 	}): string {
-		const mode = this.normalizeTerminalLabelSyncMode(
-			options?.mode ?? this.terminalLabelSyncMode,
-		);
-		if (mode === "bridge") {
-			return "/api/conduit-route/bridge/terminal-labels/sync";
-		}
-		if (mode === "legacy") {
-			return "/api/conduit-route/terminal-labels/sync";
-		}
-
-		const providerConfigured =
-			typeof options?.providerConfigured === "string"
-				? options.providerConfigured.trim().toLowerCase()
-				: "";
-		const dotnetSenderReady =
-			typeof options?.dotnetSenderReady === "boolean"
-				? options.dotnetSenderReady
-				: true;
-		if (providerConfigured === "dotnet" && dotnetSenderReady) {
-			return "/api/conduit-route/bridge/terminal-labels/sync";
-		}
-		return "/api/conduit-route/terminal-labels/sync";
+		return resolveTerminalLabelSyncEndpointPath({
+			mode: this.normalizeTerminalLabelSyncMode(
+				options?.mode ?? this.terminalLabelSyncMode,
+			),
+			providerConfigured: options?.providerConfigured,
+			dotnetSenderReady: options?.dotnetSenderReady,
+		});
 	}
 
 	private createRequestId(): string {

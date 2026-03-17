@@ -64,7 +64,7 @@ class TestApiConduitRouteCompute(unittest.TestCase):
         self.assertEqual(result["data"]["tag"]["text"], "AC-001 Z01")
         self.assertIn("position", result["data"]["tag"])
 
-    def test_compute_route_falls_back_when_grid_is_fully_blocked(self) -> None:
+    def test_compute_route_rejects_when_grid_is_fully_blocked(self) -> None:
         payload = {
             "start": {"x": 20, "y": 20},
             "end": {"x": 940, "y": 520},
@@ -88,9 +88,10 @@ class TestApiConduitRouteCompute(unittest.TestCase):
 
         result = compute_conduit_route(payload)
 
-        self.assertTrue(result["success"])
-        self.assertTrue(result["meta"]["fallbackUsed"])
-        self.assertEqual(len(result["data"]["path"]), 4)
+        self.assertFalse(result["success"])
+        self.assertEqual(result["code"], "ROUTE_BLOCKED")
+        self.assertFalse(result["meta"]["routeValid"])
+        self.assertFalse(result["meta"]["fallbackUsed"])
 
 
 if __name__ == "__main__":

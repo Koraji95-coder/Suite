@@ -47,3 +47,4 @@ test-results/
 # Local SQLite runtime ledgers
 backend/*.sqlite3
 backend/*.sqlite3-*
+backend/.learning/

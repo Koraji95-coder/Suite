@@ -177,15 +177,15 @@ export function TransmittalBuilderRightRail({
 							{draft.projectName || "Untitled project"}
 						</div>
 						<div className={styles.muted}>
-							{draft.projectNumber || "R3P-"} ·{" "}
-							{draft.transmittalNumber || "XMTL-"} · {draft.date || "--"}
+							{draft.projectNumber || "R3P-"} |{" "}
+							{draft.transmittalNumber || "XMTL-"} | {draft.date || "--"}
 						</div>
 					</div>
 
 					<div>
 						<div className={styles.muted}>From</div>
-						<div className={styles.text}>{draft.fromName || "—"}</div>
-						<div className={styles.muted}>{draft.fromTitle || "—"}</div>
+						<div className={styles.text}>{draft.fromName || "-"}</div>
+						<div className={styles.muted}>{draft.fromTitle || "-"}</div>
 					</div>
 
 					<div>
@@ -197,7 +197,7 @@ export function TransmittalBuilderRightRail({
 						<div className={styles.muted}>Files</div>
 						<div className={styles.text}>Template: {fileSummary.template}</div>
 						<div className={styles.muted}>
-							Index: {fileSummary.index} · {fileSummary.documents}
+							Index: {fileSummary.index} | {fileSummary.documents}
 						</div>
 					</div>
 

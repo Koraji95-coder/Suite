@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import {
 	AGENT_PAIRING_STATE_EVENT,
 	type AgentActivityItem,
+	type AgentProfileCatalogItem,
 	type AgentReviewAction,
 	type AgentTaskItem,
 	type AgentTaskPriority,
@@ -63,6 +64,7 @@ import {
 import {
 	AGENT_PROFILE_IDS,
 	AGENT_PROFILES,
+	type AgentProfile,
 	type AgentProfileId,
 	DEFAULT_AGENT_PROFILE,
 } from "./agentProfiles";
@@ -123,6 +125,12 @@ const IDLE_STEP_EVENT_TYPES = new Set([
 	"run_failed",
 	"run_cancelled",
 ]);
+
+type WorkflowThinkingEntry = {
+	activeProfiles: AgentProfileId[];
+	lastProfileId: AgentProfileId;
+	updatedAt: number;
+};
 
 const PRIORITY_ORDER: Record<AgentTaskPriority, number> = {
 	critical: 0,
@@ -198,6 +206,36 @@ function runConversationTitle(runId: string): string {
 	const normalized = String(runId || "").trim();
 	if (!normalized) return "Run";
 	return `Run ${shortRunId(normalized)}`;
+}
+
+function normalizeKnownProfileId(value: string | undefined): AgentProfileId | null {
+	const normalized = String(value || "")
+		.trim()
+		.toLowerCase();
+	if (!normalized || !(normalized in AGENT_PROFILES)) return null;
+	return normalized as AgentProfileId;
+}
+
+function mergeRuntimeProfiles(
+	runtimeProfiles: AgentProfileCatalogItem[],
+): Record<AgentProfileId, AgentProfile> {
+	const next = { ...AGENT_PROFILES };
+	for (const runtimeProfile of runtimeProfiles) {
+		const profileId = normalizeKnownProfileId(runtimeProfile.id);
+		if (!profileId) continue;
+		next[profileId] = {
+			...next[profileId],
+			name: runtimeProfile.name || next[profileId].name,
+			tagline: runtimeProfile.tagline || next[profileId].tagline,
+			focus: runtimeProfile.focus || next[profileId].focus,
+			memoryNamespace:
+				runtimeProfile.memory_namespace || next[profileId].memoryNamespace,
+			modelPrimary:
+				runtimeProfile.model_primary || next[profileId].modelPrimary,
+			modelFallbacks: [],
+		};
+	}
+	return next;
 }
 
 function addToBoundedSet(
@@ -370,9 +408,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		useState(0);
 	const [directThinkingProfileId, setDirectThinkingProfileId] =
 		useState<AgentProfileId>(DEFAULT_AGENT_PROFILE);
-	const [workflowThinkingRunId, setWorkflowThinkingRunId] = useState("");
-	const [workflowThinkingProfileId, setWorkflowThinkingProfileId] =
-		useState<AgentProfileId>(DEFAULT_AGENT_PROFILE);
+	const [workflowThinkingByRunId, setWorkflowThinkingByRunId] = useState<
+		Record<string, WorkflowThinkingEntry>
+	>({});
 	const [liveStreamText, setLiveStreamText] = useState("");
 
 	const [taskItems, setTaskItems] = useState<AgentTaskItem[]>([]);
@@ -397,10 +435,12 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const [profileSuccessUntil, setProfileSuccessUntil] = useState<
 		Partial<Record<AgentProfileId, number>>
 	>({});
+	const [runtimeProfiles, setRuntimeProfiles] = useState<
+		AgentProfileCatalogItem[]
+	>([]);
 	const seenActivityIdsRef = useRef<Set<string>>(new Set());
 	const eventMirrorKeysRef = useRef<Set<string>>(new Set());
 	const activityBridgeReadyRef = useRef(false);
-	const workflowThinkingRunRef = useRef("");
 	const mountedRef = useRef(true);
 	const workflowRefreshEpochRef = useRef(0);
 	const workflowRefreshInFlightRef = useRef<Promise<void> | null>(null);
@@ -417,12 +457,39 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	}, []);
 
 	useEffect(() => {
-		workflowThinkingRunRef.current = workflowThinkingRunId;
-	}, [workflowThinkingRunId]);
-
-	useEffect(() => {
 		workflowErrorRef.current = workflowError;
 	}, [workflowError]);
+
+	useEffect(() => {
+		if (!agentService.usesBroker()) return;
+		let active = true;
+
+		const loadRuntimeProfiles = async () => {
+			const result = await agentService.fetchProfileCatalog();
+			if (!active || !result.success) return;
+			setRuntimeProfiles(result.profiles);
+		};
+		const handleRuntimeProfileRefresh = () => {
+			void loadRuntimeProfiles();
+		};
+
+		handleRuntimeProfileRefresh();
+		if (typeof window !== "undefined") {
+			window.addEventListener(
+				AGENT_PAIRING_STATE_EVENT,
+				handleRuntimeProfileRefresh,
+			);
+		}
+		return () => {
+			active = false;
+			if (typeof window !== "undefined") {
+				window.removeEventListener(
+					AGENT_PAIRING_STATE_EVENT,
+					handleRuntimeProfileRefresh,
+				);
+			}
+		};
+	}, [paired]);
 
 	useEffect(() => {
 		if (isAgentProfileScope(channelScope) && channelScope !== profileId) {
@@ -458,10 +525,14 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			null,
 		[conversations, activeConvId],
 	);
+	const resolvedProfiles = useMemo(
+		() => mergeRuntimeProfiles(runtimeProfiles),
+		[runtimeProfiles],
+	);
 	const scopeProfileId: AgentProfileId = isAgentProfileScope(channelScope)
 		? channelScope
 		: profileId;
-	const scopeProfile = AGENT_PROFILES[scopeProfileId];
+	const scopeProfile = resolvedProfiles[scopeProfileId];
 	const profile =
 		channelScope === "team"
 			? {
@@ -590,28 +661,56 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			const normalizedRunId = String(runId || "").trim();
 			const normalizedEventType = String(eventType || "").trim().toLowerCase();
 			if (!normalizedRunId || !normalizedEventType) return;
+			const normalizedProfile = normalizeKnownProfileId(profileIdCandidate);
 			if (ACTIVE_STEP_EVENT_TYPES.has(normalizedEventType)) {
-				const normalizedProfile = String(profileIdCandidate || "")
-					.trim()
-					.toLowerCase();
-				if (normalizedProfile && normalizedProfile in AGENT_PROFILES) {
-					setWorkflowThinkingProfileId(normalizedProfile as AgentProfileId);
-				}
-				setWorkflowThinkingRunId(normalizedRunId);
+				setWorkflowThinkingByRunId((current) => {
+					const existing = current[normalizedRunId];
+					const nextActiveProfiles = new Set(existing?.activeProfiles ?? []);
+					nextActiveProfiles.add(normalizedProfile ?? DEFAULT_AGENT_PROFILE);
+					return {
+						...current,
+						[normalizedRunId]: {
+							activeProfiles: Array.from(nextActiveProfiles),
+							lastProfileId: normalizedProfile ?? DEFAULT_AGENT_PROFILE,
+							updatedAt: Date.now(),
+						},
+					};
+				});
 				return;
 			}
-			if (
-				IDLE_STEP_EVENT_TYPES.has(normalizedEventType) &&
-				workflowThinkingRunRef.current === normalizedRunId
-			) {
-				setWorkflowThinkingRunId("");
+			if (TERMINAL_RUN_EVENT_TYPES.has(normalizedEventType)) {
+				setWorkflowThinkingByRunId((current) => {
+					if (!(normalizedRunId in current)) return current;
+					const next = { ...current };
+					delete next[normalizedRunId];
+					return next;
+				});
 				return;
 			}
-			if (
-				TERMINAL_RUN_EVENT_TYPES.has(normalizedEventType) &&
-				workflowThinkingRunRef.current === normalizedRunId
-			) {
-				setWorkflowThinkingRunId("");
+			if (IDLE_STEP_EVENT_TYPES.has(normalizedEventType)) {
+				setWorkflowThinkingByRunId((current) => {
+					const existing = current[normalizedRunId];
+					if (!existing || !normalizedProfile) return current;
+					const nextActiveProfiles = existing.activeProfiles.filter(
+						(profile) => profile !== normalizedProfile,
+					);
+					if (nextActiveProfiles.length === 0) {
+						const next = { ...current };
+						delete next[normalizedRunId];
+						return next;
+					}
+					return {
+						...current,
+						[normalizedRunId]: {
+							activeProfiles: nextActiveProfiles,
+							lastProfileId:
+								nextActiveProfiles.includes(existing.lastProfileId)
+									? existing.lastProfileId
+									: nextActiveProfiles[nextActiveProfiles.length - 1],
+							updatedAt: Date.now(),
+						},
+					};
+				});
 			}
 		},
 		[],
@@ -1248,13 +1347,11 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					},
 				);
 				openGeneralRunConversation(pendingRunId, { focus: true });
-				setWorkflowThinkingRunId(pendingRunId);
-				const pendingProfile = String(task?.assigneeProfile || "")
-					.trim()
-					.toLowerCase();
-				if (pendingProfile && pendingProfile in AGENT_PROFILES) {
-					setWorkflowThinkingProfileId(pendingProfile as AgentProfileId);
-				}
+				applyWorkflowThinkingEvent(
+					pendingRunId,
+					"task_running",
+					String(task?.assigneeProfile || "").trim(),
+				);
 			}
 			try {
 				const result = await agentService.reviewAgentTask(
@@ -1321,6 +1418,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			scopeProfileId,
 			appendRunEventToConversation,
 			openGeneralRunConversation,
+			applyWorkflowThinkingEvent,
 		],
 	);
 
@@ -1356,10 +1454,14 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				},
 			);
 			refreshConversations();
-			setWorkflowThinkingRunId(runId);
-			setWorkflowThinkingProfileId("koro");
+			applyWorkflowThinkingEvent(runId, "run_started", "koro");
 		},
-		[appendRunEventToConversation, openGeneralRunConversation, refreshConversations],
+		[
+			appendRunEventToConversation,
+			openGeneralRunConversation,
+			refreshConversations,
+			applyWorkflowThinkingEvent,
+		],
 	);
 
 	const handleOrchestrationRunEvent = useCallback(
@@ -1395,12 +1497,34 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			if (!runId) return;
 			const status = String(payload.status || "").trim().toLowerCase();
 			if (status === "running" || status === "queued" || status === "cancel_requested") {
-				setWorkflowThinkingRunId(runId);
+				setWorkflowThinkingByRunId((current) => {
+					const existing = current[runId];
+					if (existing) {
+						return {
+							...current,
+							[runId]: {
+								...existing,
+								updatedAt: Date.now(),
+							},
+						};
+					}
+					return {
+						...current,
+						[runId]: {
+							activeProfiles: [DEFAULT_AGENT_PROFILE],
+							lastProfileId: DEFAULT_AGENT_PROFILE,
+							updatedAt: Date.now(),
+						},
+					};
+				});
 				return;
 			}
-			if (workflowThinkingRunRef.current === runId) {
-				setWorkflowThinkingRunId("");
-			}
+			setWorkflowThinkingByRunId((current) => {
+				if (!(runId in current)) return current;
+				const next = { ...current };
+				delete next[runId];
+				return next;
+			});
 		},
 		[],
 	);
@@ -1408,9 +1532,13 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const handleOrchestrationRunCleared = useCallback(
 		(payload: { runId: string }) => {
 			const runId = String(payload.runId || "").trim();
-			if (runId && workflowThinkingRunRef.current === runId) {
-				setWorkflowThinkingRunId("");
-			}
+			if (!runId) return;
+			setWorkflowThinkingByRunId((current) => {
+				if (!(runId in current)) return current;
+				const next = { ...current };
+				delete next[runId];
+				return next;
+			});
 		},
 		[],
 	);
@@ -1436,17 +1564,27 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		setActiveConvId(visibleConversations[0]?.id ?? null);
 	}, [visibleConversations, activeConvId]);
 
-	const workflowThinkingActive = Boolean(workflowThinkingRunId);
 	const activeConversationRunId = String(activeConv?.runId || "").trim();
+	const activeWorkflowRuns = useMemo(
+		() =>
+			Object.entries(workflowThinkingByRunId)
+				.sort((left, right) => right[1].updatedAt - left[1].updatedAt)
+				.map(([runId, entry]) => ({ runId, entry })),
+		[workflowThinkingByRunId],
+	);
+	const visibleWorkflowRunId =
+		activeConversationRunId && workflowThinkingByRunId[activeConversationRunId]
+			? activeConversationRunId
+			: activeWorkflowRuns[0]?.runId ?? "";
+	const visibleWorkflowThinkingEntry = visibleWorkflowRunId
+		? workflowThinkingByRunId[visibleWorkflowRunId]
+		: null;
 	const showWorkflowThinking =
-		workflowThinkingActive &&
-		channelScope === GENERAL_SCOPE_ID &&
-		(!activeConversationRunId ||
-			activeConversationRunId === workflowThinkingRunId);
+		channelScope === GENERAL_SCOPE_ID && Boolean(visibleWorkflowThinkingEntry);
 	const isThinking = directThinking || showWorkflowThinking;
 	const thinkingProfileId = directThinking
 		? directThinkingProfileId
-		: workflowThinkingProfileId;
+		: visibleWorkflowThinkingEntry?.lastProfileId ?? DEFAULT_AGENT_PROFILE;
 	const thinkingContent = directThinking ? liveStreamText : "";
 	const now = Date.now();
 	const hasRunningQueue = queueTasks.some((task) =>
@@ -1566,7 +1704,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						</button>
 						{profileRoster.map((entry) => {
 							const activeFilter = channelScope === entry.profileId;
-							const profileData = AGENT_PROFILES[entry.profileId];
+							const profileData = resolvedProfiles[entry.profileId];
 							return (
 								<button
 									key={entry.profileId}
@@ -1697,7 +1835,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 								<option value="all">all profiles</option>
 								{AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((id) => (
 									<option key={id} value={id}>
-										{AGENT_PROFILES[id].name}
+										{resolvedProfiles[id].name}
 									</option>
 								))}
 							</select>
@@ -2140,7 +2278,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 								<option value="all">all profiles</option>
 								{AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((id) => (
 									<option key={id} value={id}>
-										{AGENT_PROFILES[id].name}
+										{resolvedProfiles[id].name}
 									</option>
 								))}
 							</select>

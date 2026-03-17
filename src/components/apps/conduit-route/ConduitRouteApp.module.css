@@ -590,6 +590,12 @@
 	opacity: 0.8;
 }
 
+.previewSketch {
+	stroke: color-mix(in srgb, var(--warning) 80%, #f8fafc 20%);
+	stroke-dasharray: 4 7;
+	opacity: 0.94;
+}
+
 .nodeDot {
 	stroke: color-mix(in srgb, #ffffff 35%, transparent);
 	stroke-width: 1.1;

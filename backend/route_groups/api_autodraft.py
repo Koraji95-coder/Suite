@@ -1,16 +1,39 @@
 from __future__ import annotations
 
+import json
+import math
+import os
+import re
+import sqlite3
+import threading
 import time
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import requests
 from flask import Blueprint, jsonify, request
 from flask_limiter import Limiter
 
+try:
+    import redis  # type: ignore[import-not-found]
+except Exception:
+    redis = None
+
+try:
+    from pypdf import PdfReader as _PdfReader
+
+    _PYPDF_AVAILABLE = True
+except Exception:
+    _PdfReader = None
+    _PYPDF_AVAILABLE = False
+
 from .api_autocad_error_helpers import (
     build_error_payload as autocad_build_error_payload,
     derive_request_id as autocad_derive_request_id,
 )
+from .api_local_learning_runtime import get_local_learning_runtime
 
 DEFAULT_RULES: List[Dict[str, Any]] = [
     {
@@ -70,10 +93,127 @@ _CLOUD_COLOR_TO_CATEGORY: Dict[str, str] = {
     "green": "DELETE",
     "red": "ADD",
 }
+_DEFAULT_COLOR_TO_CATEGORY: Dict[str, str] = {
+    "blue": "NOTE",
+    "green": "DELETE",
+    "red": "ADD",
+}
+
+_ADD_INTENT_PATTERN = re.compile(r"\b(add|install|insert|provide|new)\b", re.IGNORECASE)
+_DELETE_INTENT_PATTERN = re.compile(
+    r"\b(delete|remove|demolish|omit)\b",
+    re.IGNORECASE,
+)
+_NOTE_INTENT_PATTERN = re.compile(
+    r"\b(note|review|verify|confirm|check|coord(?:inate)?|see\s+dwg)\b",
+    re.IGNORECASE,
+)
+
+_PDF_DA_RGB_PATTERN = re.compile(
+    r"([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+rg\b",
+    re.IGNORECASE,
+)
+_PDF_DA_GRAY_PATTERN = re.compile(r"([-+]?\d*\.?\d+)\s+g\b", re.IGNORECASE)
+_PDF_DA_CMYK_PATTERN = re.compile(
+    r"([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+([-+]?\d*\.?\d+)\s+k\b",
+    re.IGNORECASE,
+)
+_CSS_HEX_COLOR_PATTERN = re.compile(r"#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b")
+_CSS_RGB_COLOR_PATTERN = re.compile(
+    r"rgb\(\s*([0-9]{1,3}%?)\s*,\s*([0-9]{1,3}%?)\s*,\s*([0-9]{1,3}%?)\s*\)",
+    re.IGNORECASE,
+)
 
 _BACKCHECK_PASS = "pass"
 _BACKCHECK_WARN = "warn"
 _BACKCHECK_FAIL = "fail"
+
+_COMPARE_ENGINE_AUTO = "auto"
+_COMPARE_ENGINE_PYTHON = "python"
+_COMPARE_ENGINE_DOTNET = "dotnet"
+_COMPARE_SUPPORTED_ENGINES = {
+    _COMPARE_ENGINE_AUTO,
+    _COMPARE_ENGINE_PYTHON,
+    _COMPARE_ENGINE_DOTNET,
+}
+_COMPARE_CALIBRATION_MODE_AUTO = "auto"
+_COMPARE_CALIBRATION_MODE_MANUAL = "manual"
+_COMPARE_CALIBRATION_MODES = {
+    _COMPARE_CALIBRATION_MODE_AUTO,
+    _COMPARE_CALIBRATION_MODE_MANUAL,
+}
+_COMPARE_AGENT_REVIEW_MODE_OFF = "off"
+_COMPARE_AGENT_REVIEW_MODE_PRE = "pre"
+_COMPARE_AGENT_REVIEW_MODES = {
+    _COMPARE_AGENT_REVIEW_MODE_OFF,
+    _COMPARE_AGENT_REVIEW_MODE_PRE,
+}
+
+_AUTO_CALIBRATION_READY_MIN_CONFIDENCE = 0.56
+_AUTO_CALIBRATION_READY_MIN_MATCH_RATIO = 0.45
+
+_COMPARE_TOLERANCE_PROFILE_STRICT = "strict"
+_COMPARE_TOLERANCE_PROFILE_MEDIUM = "medium"
+_COMPARE_TOLERANCE_PROFILE_LOOSE = "loose"
+_COMPARE_TOLERANCE_PROFILES = {
+    _COMPARE_TOLERANCE_PROFILE_STRICT,
+    _COMPARE_TOLERANCE_PROFILE_MEDIUM,
+    _COMPARE_TOLERANCE_PROFILE_LOOSE,
+}
+
+_REPLACEMENT_STATUS_RESOLVED = "resolved"
+_REPLACEMENT_STATUS_AMBIGUOUS = "ambiguous"
+_REPLACEMENT_STATUS_UNRESOLVED = "unresolved"
+_REPLACEMENT_WARN_STATUSES = {
+    _REPLACEMENT_STATUS_AMBIGUOUS,
+    _REPLACEMENT_STATUS_UNRESOLVED,
+}
+_REPLACEMENT_REVIEW_ACTIONS = {
+    "approved",
+    "corrected",
+    "unresolved",
+}
+_REPLACEMENT_MAX_CANDIDATES = 5
+_REPLACEMENT_TUNING_DEFAULT = {
+    "unresolved_confidence_threshold": 0.36,
+    "ambiguity_margin_threshold": 0.08,
+    "search_radius_multiplier": 2.5,
+    "min_search_radius": 24.0,
+}
+_SHADOW_ADVISOR_PROFILE = "draftsmith"
+_SHADOW_ADVISOR_MAX_CASES = 20
+_SHADOW_ADVISOR_TOKEN_CACHE_LOCK = threading.Lock()
+_SHADOW_ADVISOR_TOKEN_CACHE: Dict[str, Any] = {
+    "token": None,
+    "expires_at": 0.0,
+    "source": "none",
+}
+_COMPARE_FEEDBACK_DB_LOCK = threading.Lock()
+_LOCAL_LEARNING_RUNTIME = get_local_learning_runtime()
+_AGENT_PRE_REVIEW_MAX_BOOST = 0.12
+_AGENT_PRE_REVIEW_MAX_CANDIDATE_BOOSTS_PER_ACTION = 5
+_AGENT_PRE_REVIEW_DEFAULT_PROFILE = "draftsmith"
+_AGENT_PRE_REVIEW_DEFAULT_TIMEOUT_MS = 30000
+_AGENT_PRE_REVIEW_DEFAULT_MAX_CASES = 20
+_SEE_DWG_REFERENCE_PATTERN = re.compile(r"\bsee\s+dwg\b", re.IGNORECASE)
+
+_ANNOT_TEXT_SUBTYPES = {
+    "/Text",
+    "/FreeText",
+    "/Highlight",
+    "/Underline",
+    "/StrikeOut",
+}
+_ANNOT_LINE_SUBTYPES = {
+    "/Line",
+}
+_ANNOT_CLOUD_SUBTYPES = {
+    "/Square",
+    "/Circle",
+    "/Polygon",
+    "/PolyLine",
+    "/Ink",
+}
 
 def _read_json_error(response: requests.Response) -> str:
     try:
@@ -174,9 +314,216 @@ def _cloud_intent_conflicts(markup: Dict[str, Any]) -> bool:
     return False
 
 
+def _extract_paired_annotation_ids(markup: Dict[str, Any]) -> List[str]:
+    meta = markup.get("meta")
+    if not isinstance(meta, dict):
+        return []
+    raw_ids = meta.get("paired_annotation_ids")
+    if not isinstance(raw_ids, list):
+        return []
+    output: List[str] = []
+    seen: Set[str] = set()
+    for value in raw_ids:
+        if not isinstance(value, str):
+            continue
+        item = value.strip()
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        output.append(item)
+    return output
+
+
+def _is_blue_note_candidate(markup: Dict[str, Any]) -> bool:
+    if _normalize_text(markup.get("color")) != "blue":
+        return False
+    if _normalize_text(markup.get("type")) != "text":
+        return False
+    meta = markup.get("meta")
+    subtype = _normalize_text(meta.get("subtype")) if isinstance(meta, dict) else ""
+    return subtype in {"", "/freetext", "/text", "freetext", "text"}
+
+
+def _is_blue_rectangle_anchor(markup: Dict[str, Any]) -> bool:
+    if _normalize_text(markup.get("color")) != "blue":
+        return False
+    meta = markup.get("meta")
+    subtype = _normalize_text(meta.get("subtype")) if isinstance(meta, dict) else ""
+    return subtype in {"/square", "square"}
+
+
+def _bounds_center(bounds: Dict[str, float]) -> Dict[str, float]:
+    return {
+        "x": float(bounds["x"]) + (float(bounds["width"]) / 2.0),
+        "y": float(bounds["y"]) + (float(bounds["height"]) / 2.0),
+    }
+
+
+def _distance_points(point_a: Dict[str, float], point_b: Dict[str, float]) -> float:
+    dx = float(point_a["x"]) - float(point_b["x"])
+    dy = float(point_a["y"]) - float(point_b["y"])
+    return math.sqrt((dx * dx) + (dy * dy))
+
+
+def _bounds_union(bounds_a: Dict[str, float], bounds_b: Dict[str, float]) -> Dict[str, float]:
+    left = min(float(bounds_a["x"]), float(bounds_b["x"]))
+    bottom = min(float(bounds_a["y"]), float(bounds_b["y"]))
+    right = max(
+        float(bounds_a["x"]) + float(bounds_a["width"]),
+        float(bounds_b["x"]) + float(bounds_b["width"]),
+    )
+    top = max(
+        float(bounds_a["y"]) + float(bounds_a["height"]),
+        float(bounds_b["y"]) + float(bounds_b["height"]),
+    )
+    return {
+        "x": left,
+        "y": bottom,
+        "width": max(0.0001, right - left),
+        "height": max(0.0001, top - bottom),
+    }
+
+
+def _extract_callout_target_point(markup: Dict[str, Any]) -> Optional[Dict[str, float]]:
+    meta = markup.get("meta")
+    if not isinstance(meta, dict):
+        return None
+    raw_points = meta.get("callout_points")
+    if not isinstance(raw_points, list):
+        return None
+    points: List[Dict[str, float]] = []
+    for point in raw_points:
+        if not isinstance(point, dict):
+            continue
+        x = _safe_float(point.get("x"))
+        y = _safe_float(point.get("y"))
+        if x is None or y is None:
+            continue
+        points.append({"x": x, "y": y})
+    if not points:
+        return None
+    return points[-1]
+
+
+def _pair_blue_note_markups(markups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    anchor_entries: List[Tuple[int, Dict[str, Any], Dict[str, float]]] = []
+    for index, markup in enumerate(markups):
+        if not _is_blue_rectangle_anchor(markup):
+            continue
+        bounds = _normalize_bounds(markup.get("bounds"))
+        if not bounds:
+            continue
+        anchor_entries.append((index, markup, bounds))
+
+    used_anchor_indices: Set[int] = set()
+    note_to_anchor: Dict[int, int] = {}
+
+    for note_index, note_markup in enumerate(markups):
+        if not _is_blue_note_candidate(note_markup):
+            continue
+        note_bounds = _normalize_bounds(note_markup.get("bounds"))
+        if not note_bounds:
+            continue
+        note_center = _bounds_center(note_bounds)
+        callout_target = _extract_callout_target_point(note_markup) or note_center
+        note_diag = math.sqrt((note_bounds["width"] ** 2) + (note_bounds["height"] ** 2))
+        max_distance = max(8.0, note_diag * 2.5)
+
+        best_anchor_index: Optional[int] = None
+        best_distance: Optional[float] = None
+        for anchor_index, _anchor_markup, anchor_bounds in anchor_entries:
+            if anchor_index in used_anchor_indices:
+                continue
+            anchor_center = _bounds_center(anchor_bounds)
+            distance = _distance_points(callout_target, anchor_center)
+            if distance > max_distance:
+                continue
+            if best_distance is None or distance < best_distance:
+                best_distance = distance
+                best_anchor_index = anchor_index
+        if best_anchor_index is None:
+            continue
+        note_to_anchor[note_index] = best_anchor_index
+        used_anchor_indices.add(best_anchor_index)
+
+    if not note_to_anchor:
+        return markups
+
+    paired_markups: List[Dict[str, Any]] = []
+    skipped_anchor_indices = set(note_to_anchor.values())
+    for index, markup in enumerate(markups):
+        if index in skipped_anchor_indices:
+            continue
+        anchor_index = note_to_anchor.get(index)
+        if anchor_index is None:
+            paired_markups.append(markup)
+            continue
+        anchor_markup = markups[anchor_index]
+        note_bounds = _normalize_bounds(markup.get("bounds"))
+        anchor_bounds = _normalize_bounds(anchor_markup.get("bounds"))
+        combined = dict(markup)
+        if note_bounds and anchor_bounds:
+            combined["bounds"] = _bounds_union(note_bounds, anchor_bounds)
+
+        combined_meta: Dict[str, Any] = {}
+        if isinstance(markup.get("meta"), dict):
+            combined_meta.update(markup.get("meta") or {})
+        note_id = str(markup.get("id") or "").strip()
+        anchor_id = str(anchor_markup.get("id") or "").strip()
+        paired_ids = [item for item in [note_id, anchor_id] if item]
+        if paired_ids:
+            combined_meta["paired_annotation_ids"] = paired_ids
+        if combined_meta:
+            combined["meta"] = combined_meta
+        paired_markups.append(combined)
+    return paired_markups
+
+
+def _is_red_reference_add_markup(markup: Dict[str, Any]) -> bool:
+    markup_text = str(markup.get("text") or "").strip()
+    if not markup_text:
+        return False
+    return (
+        _normalize_text(markup.get("color")) == "red"
+        and _normalize_text(markup.get("type")) == "text"
+        and bool(_SEE_DWG_REFERENCE_PATTERN.search(markup_text))
+    )
+
+
+def _infer_semantic_category(markup: Dict[str, Any]) -> Tuple[Optional[str], str]:
+    markup_text = str(markup.get("text") or "")
+    markup_color = _normalize_text(markup.get("color"))
+    markup_type = _normalize_text(markup.get("type"))
+    has_add_intent = bool(_ADD_INTENT_PATTERN.search(markup_text))
+    has_delete_intent = bool(_DELETE_INTENT_PATTERN.search(markup_text))
+    has_note_intent = bool(_NOTE_INTENT_PATTERN.search(markup_text))
+    is_red_text_replacement = (
+        markup_color == "red" and markup_type == "text" and bool(markup_text.strip())
+    )
+
+    if has_add_intent and has_delete_intent:
+        return None, "keyword-conflict"
+    if has_delete_intent:
+        return "DELETE", "keyword-delete"
+    if has_add_intent:
+        return "ADD", "keyword-add"
+    if _is_red_reference_add_markup(markup):
+        return "ADD", "keyword-see-dwg-reference"
+    if is_red_text_replacement:
+        return "ADD", "color-red-replacement"
+    if has_note_intent:
+        return "NOTE", "keyword-note"
+    color_category = _DEFAULT_COLOR_TO_CATEGORY.get(markup_color)
+    if color_category:
+        return color_category, f"color-{markup_color}"
+    return None, "no-semantic-match"
+
+
 def _build_local_plan(markups: List[Dict[str, Any]]) -> Dict[str, Any]:
+    effective_markups = _pair_blue_note_markups(markups)
     actions: List[Dict[str, Any]] = []
-    for idx, markup in enumerate(markups, start=1):
+    for idx, markup in enumerate(effective_markups, start=1):
+        paired_annotation_ids = _extract_paired_annotation_ids(markup)
         if _cloud_intent_conflicts(markup):
             action_item = {
                 "id": f"action-{idx}",
@@ -204,20 +551,45 @@ def _build_local_plan(markups: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "status": "proposed",
                 }
             else:
-                action_item = {
-                    "id": f"action-{idx}",
-                    "rule_id": None,
-                    "category": "UNCLASSIFIED",
-                    "action": "Manual review required.",
-                    "confidence": 0.0,
-                    "markup": markup,
-                    "status": "review",
-                }
+                inferred_category, inferred_reason = _infer_semantic_category(markup)
+                if inferred_category:
+                    inferred_action = {
+                        "DELETE": "Remove geometry associated with markup bounds.",
+                        "ADD": "Add or verify geometry referenced by markup.",
+                        "NOTE": "Review and acknowledge note intent before execution.",
+                    }.get(inferred_category, "Manual review required.")
+                    inferred_confidence = (
+                        0.76
+                        if inferred_reason.startswith("keyword-")
+                        else 0.64
+                    )
+                    action_item = {
+                        "id": f"action-{idx}",
+                        "rule_id": f"semantic-{inferred_reason}",
+                        "category": inferred_category,
+                        "action": inferred_action,
+                        "confidence": inferred_confidence,
+                        "markup": markup,
+                        "status": "proposed",
+                    }
+                else:
+                    action_item = {
+                        "id": f"action-{idx}",
+                        "rule_id": None,
+                        "category": "UNCLASSIFIED",
+                        "action": "Manual review required.",
+                        "confidence": 0.0,
+                        "markup": markup,
+                        "status": "review",
+                    }
+
+        if paired_annotation_ids:
+            action_item["paired_annotation_ids"] = paired_annotation_ids
 
         actions.append(action_item)
 
     summary = {
-        "total_markups": len(markups),
+        "total_markups": len(effective_markups),
         "actions_proposed": len(actions),
         "classified": sum(1 for item in actions if item["rule_id"]),
         "needs_review": sum(1 for item in actions if not item["rule_id"]),
@@ -304,6 +676,3627 @@ def _bounds_overlap(bounds_a: Dict[str, float], bounds_b: Dict[str, float]) -> b
     by1 = by0 + bounds_b["height"]
 
     return ax0 < bx1 and ax1 > bx0 and ay0 < by1 and ay1 > by0
+
+
+def _expand_bounds(bounds: Dict[str, float], padding: float) -> Dict[str, float]:
+    if padding <= 0:
+        return dict(bounds)
+    return {
+        "x": float(bounds["x"]) - padding,
+        "y": float(bounds["y"]) - padding,
+        "width": max(0.0001, float(bounds["width"]) + (padding * 2.0)),
+        "height": max(0.0001, float(bounds["height"]) + (padding * 2.0)),
+    }
+
+
+def _bounds_intersection(
+    bounds_a: Dict[str, float], bounds_b: Dict[str, float]
+) -> Optional[Dict[str, float]]:
+    left = max(float(bounds_a["x"]), float(bounds_b["x"]))
+    bottom = max(float(bounds_a["y"]), float(bounds_b["y"]))
+    right = min(
+        float(bounds_a["x"]) + float(bounds_a["width"]),
+        float(bounds_b["x"]) + float(bounds_b["width"]),
+    )
+    top = min(
+        float(bounds_a["y"]) + float(bounds_a["height"]),
+        float(bounds_b["y"]) + float(bounds_b["height"]),
+    )
+    if right <= left or top <= bottom:
+        return None
+    return {
+        "x": left,
+        "y": bottom,
+        "width": max(0.0001, right - left),
+        "height": max(0.0001, top - bottom),
+    }
+
+
+def _bounds_from_points(points: List[Dict[str, float]]) -> Optional[Dict[str, float]]:
+    if not points:
+        return None
+    xs = [float(point["x"]) for point in points]
+    ys = [float(point["y"]) for point in points]
+    left = min(xs)
+    right = max(xs)
+    bottom = min(ys)
+    top = max(ys)
+    return {
+        "x": left,
+        "y": bottom,
+        "width": max(0.0001, right - left),
+        "height": max(0.0001, top - bottom),
+    }
+
+
+def _bounds_diagonal(bounds: Dict[str, float]) -> float:
+    return math.hypot(float(bounds["width"]), float(bounds["height"]))
+
+
+def _normalize_compare_roi(value: Any) -> Optional[Dict[str, float]]:
+    return _normalize_bounds(value)
+
+
+def _safe_float(value: Any) -> Optional[float]:
+    try:
+        parsed = float(value)
+    except Exception:
+        return None
+    if not math.isfinite(parsed):
+        return None
+    return parsed
+
+
+def _rgb_triplet_to_color_name(rgb: Tuple[float, float, float]) -> str:
+    r, g, b = rgb
+    if max(r, g, b) < 0.05:
+        return "black"
+    if abs(r - g) < 0.08 and abs(g - b) < 0.08 and max(r, g, b) > 0.7:
+        return "white"
+    if r > g + 0.12 and r > b + 0.12:
+        return "red"
+    if g > r + 0.12 and g > b + 0.12:
+        return "green"
+    if b > r + 0.12 and b > g + 0.12:
+        return "blue"
+    if r > 0.7 and g > 0.7 and b < 0.45:
+        return "yellow"
+    return "unknown"
+
+
+def _clamp_unit(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _rgb_to_hex(rgb: Tuple[float, float, float]) -> str:
+    red = int(round(_clamp_unit(rgb[0]) * 255))
+    green = int(round(_clamp_unit(rgb[1]) * 255))
+    blue = int(round(_clamp_unit(rgb[2]) * 255))
+    return f"#{red:02X}{green:02X}{blue:02X}"
+
+
+def _parse_rgb_channels(raw_values: List[Any], expected: int) -> Optional[List[float]]:
+    if len(raw_values) < expected:
+        return None
+    parsed: List[float] = []
+    for value in raw_values[:expected]:
+        numeric = _safe_float(value)
+        if numeric is None:
+            return None
+        parsed.append(_clamp_unit(numeric))
+    return parsed
+
+
+def _parse_cmyk_to_rgb(values: List[float]) -> Tuple[float, float, float]:
+    c = _clamp_unit(values[0])
+    m = _clamp_unit(values[1])
+    y = _clamp_unit(values[2])
+    k = _clamp_unit(values[3])
+    return (
+        1.0 - min(1.0, c + k),
+        1.0 - min(1.0, m + k),
+        1.0 - min(1.0, y + k),
+    )
+
+
+def _parse_annotation_array_color(value: Any) -> Optional[Tuple[float, float, float]]:
+    if value is None:
+        return None
+    raw_values: List[Any]
+    if isinstance(value, (list, tuple)):
+        raw_values = list(value)
+    elif hasattr(value, "__iter__") and not isinstance(value, (str, bytes, dict)):
+        try:
+            raw_values = list(value)
+        except Exception:
+            return None
+    else:
+        return None
+
+    if not raw_values:
+        return None
+    cmyk_values = _parse_rgb_channels(raw_values, 4)
+    if cmyk_values is not None:
+        return _parse_cmyk_to_rgb(cmyk_values)
+    rgb_values = _parse_rgb_channels(raw_values, 3)
+    if rgb_values is not None:
+        return (rgb_values[0], rgb_values[1], rgb_values[2])
+    gray_values = _parse_rgb_channels(raw_values, 1)
+    if gray_values is not None:
+        gray = gray_values[0]
+        return (gray, gray, gray)
+    return None
+
+
+def _parse_pdf_default_appearance_color(value: Any) -> Optional[Tuple[float, float, float]]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    cmyk_matches = list(_PDF_DA_CMYK_PATTERN.finditer(text))
+    if cmyk_matches:
+        last = cmyk_matches[-1]
+        channels = _parse_rgb_channels([last.group(i) for i in range(1, 5)], 4)
+        if channels is not None:
+            return _parse_cmyk_to_rgb(channels)
+    rgb_matches = list(_PDF_DA_RGB_PATTERN.finditer(text))
+    if rgb_matches:
+        last = rgb_matches[-1]
+        channels = _parse_rgb_channels([last.group(i) for i in range(1, 4)], 3)
+        if channels is not None:
+            return (channels[0], channels[1], channels[2])
+    gray_matches = list(_PDF_DA_GRAY_PATTERN.finditer(text))
+    if gray_matches:
+        last = gray_matches[-1]
+        channels = _parse_rgb_channels([last.group(1)], 1)
+        if channels is not None:
+            gray = channels[0]
+            return (gray, gray, gray)
+    return None
+
+
+def _parse_css_channel_value(raw_value: str) -> Optional[float]:
+    value = raw_value.strip()
+    if not value:
+        return None
+    if value.endswith("%"):
+        numeric = _safe_float(value[:-1])
+        if numeric is None:
+            return None
+        return _clamp_unit(numeric / 100.0)
+    numeric = _safe_float(value)
+    if numeric is None:
+        return None
+    return _clamp_unit(numeric / 255.0)
+
+
+def _parse_css_color_rgb(value: Any) -> Optional[Tuple[float, float, float]]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    hex_match = _CSS_HEX_COLOR_PATTERN.search(text)
+    if hex_match:
+        hex_value = hex_match.group(1)
+        if len(hex_value) == 3:
+            hex_value = "".join(char * 2 for char in hex_value)
+        try:
+            red = int(hex_value[0:2], 16) / 255.0
+            green = int(hex_value[2:4], 16) / 255.0
+            blue = int(hex_value[4:6], 16) / 255.0
+            return (_clamp_unit(red), _clamp_unit(green), _clamp_unit(blue))
+        except Exception:
+            return None
+
+    rgb_match = _CSS_RGB_COLOR_PATTERN.search(text)
+    if not rgb_match:
+        return None
+    red = _parse_css_channel_value(rgb_match.group(1))
+    green = _parse_css_channel_value(rgb_match.group(2))
+    blue = _parse_css_channel_value(rgb_match.group(3))
+    if red is None or green is None or blue is None:
+        return None
+    return (red, green, blue)
+
+
+def _extract_annotation_color(
+    annotation: Any,
+) -> Tuple[str, Optional[Tuple[float, float, float]], Optional[str], str]:
+    candidates: List[Tuple[str, Optional[Tuple[float, float, float]]]] = [
+        ("C", _parse_annotation_array_color(annotation.get("/C"))),
+        ("DA", _parse_pdf_default_appearance_color(annotation.get("/DA"))),
+        ("DS", _parse_css_color_rgb(annotation.get("/DS"))),
+        ("RC", _parse_css_color_rgb(annotation.get("/RC"))),
+    ]
+    for source, rgb in candidates:
+        if rgb is None:
+            continue
+        return _rgb_triplet_to_color_name(rgb), rgb, _rgb_to_hex(rgb), source
+    return "unknown", None, None, "unknown"
+
+
+def _normalize_annotation_callout_points(value: Any) -> Optional[List[Dict[str, float]]]:
+    if value is None:
+        return None
+    raw_values: List[Any]
+    if isinstance(value, (list, tuple)):
+        raw_values = list(value)
+    elif hasattr(value, "__iter__") and not isinstance(value, (str, bytes, dict)):
+        try:
+            raw_values = list(value)
+        except Exception:
+            return None
+    else:
+        return None
+
+    if len(raw_values) < 2:
+        return None
+    points: List[Dict[str, float]] = []
+    limit = len(raw_values) - (len(raw_values) % 2)
+    for index in range(0, limit, 2):
+        x = _safe_float(raw_values[index])
+        y = _safe_float(raw_values[index + 1])
+        if x is None or y is None:
+            continue
+        points.append({"x": x, "y": y})
+    if not points:
+        return None
+    return points
+
+
+def _classify_annotation_markup_type(*, subtype: str, intent: str, subject: str) -> Optional[str]:
+    if subtype in _ANNOT_TEXT_SUBTYPES:
+        return "text"
+    if subtype in _ANNOT_LINE_SUBTYPES:
+        return "arrow"
+    if subtype in _ANNOT_CLOUD_SUBTYPES:
+        if "arrow" in intent or "arrow" in subject:
+            return "arrow"
+        return "cloud"
+    if "cloud" in intent or "cloud" in subject:
+        return "cloud"
+    if "arrow" in intent or "arrow" in subject:
+        return "arrow"
+    return None
+
+
+def _normalize_annotation_bounds(rect_raw: Any) -> Optional[Dict[str, float]]:
+    if not isinstance(rect_raw, (list, tuple)) or len(rect_raw) < 4:
+        return None
+    x0 = _safe_float(rect_raw[0])
+    y0 = _safe_float(rect_raw[1])
+    x1 = _safe_float(rect_raw[2])
+    y1 = _safe_float(rect_raw[3])
+    if x0 is None or y0 is None or x1 is None or y1 is None:
+        return None
+    left = min(x0, x1)
+    right = max(x0, x1)
+    bottom = min(y0, y1)
+    top = max(y0, y1)
+    width = right - left
+    height = top - bottom
+    if width <= 0 or height <= 0:
+        return None
+    return {"x": left, "y": bottom, "width": width, "height": height}
+
+
+def _to_pdf_meta_text(value: Any, max_length: int = 220) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        text = str(value).strip()
+    except Exception:
+        return None
+    if not text:
+        return None
+    if len(text) > max_length:
+        return f"{text[: max_length - 3]}..."
+    return text
+
+
+def _extract_pdf_prepare_metadata(
+    *,
+    reader: Any,
+    page: Any,
+    page_index: int,
+    page_width: float,
+    page_height: float,
+    annotation_total: int,
+    annotation_supported: int,
+    annotation_unsupported: int,
+    annotation_subtype_counts: Dict[str, int],
+) -> Dict[str, Any]:
+    metadata_raw = getattr(reader, "metadata", None)
+    metadata_map: Dict[str, Any] = {}
+    if hasattr(metadata_raw, "items"):
+        try:
+            for raw_key, raw_value in metadata_raw.items():
+                key = _to_pdf_meta_text(raw_key, 64)
+                if not key:
+                    continue
+                metadata_map[key] = raw_value
+        except Exception:
+            metadata_map = {}
+
+    def meta_text(*keys: str) -> Optional[str]:
+        for key in keys:
+            if key in metadata_map:
+                normalized = _to_pdf_meta_text(metadata_map.get(key))
+                if normalized:
+                    return normalized
+        return None
+
+    xmp_raw = getattr(reader, "xmp_metadata", None)
+    xmp_creator = _to_pdf_meta_text(getattr(xmp_raw, "xmp_creator_tool", None))
+    xmp_producer = _to_pdf_meta_text(getattr(xmp_raw, "pdf_producer", None))
+    xmp_text = _to_pdf_meta_text(xmp_raw, 5000)
+
+    title = meta_text("/Title", "Title")
+    author = meta_text("/Author", "Author")
+    subject = meta_text("/Subject", "Subject")
+    creator = meta_text("/Creator", "Creator") or xmp_creator
+    producer = meta_text("/Producer", "Producer") or xmp_producer
+    keywords = meta_text("/Keywords", "Keywords")
+    created_utc = meta_text("/CreationDate", "CreationDate")
+    modified_utc = meta_text("/ModDate", "ModDate")
+
+    custom: Dict[str, str] = {}
+    for raw_key, raw_value in metadata_map.items():
+        key = _to_pdf_meta_text(raw_key, 64)
+        value = _to_pdf_meta_text(raw_value)
+        if not key or not value:
+            continue
+        if key in {
+            "/Title",
+            "Title",
+            "/Author",
+            "Author",
+            "/Subject",
+            "Subject",
+            "/Creator",
+            "Creator",
+            "/Producer",
+            "Producer",
+            "/Keywords",
+            "Keywords",
+            "/CreationDate",
+            "CreationDate",
+            "/ModDate",
+            "ModDate",
+        }:
+            continue
+        if len(custom) >= 20:
+            break
+        custom[key] = value
+
+    bluebeam_reasons: List[str] = []
+    producer_text = (producer or "").lower()
+    creator_text = (creator or "").lower()
+    if "bluebeam" in producer_text:
+        bluebeam_reasons.append("producer")
+    if "bluebeam" in creator_text:
+        bluebeam_reasons.append("creator")
+    if not bluebeam_reasons:
+        for value in custom.values():
+            if "bluebeam" in value.lower():
+                bluebeam_reasons.append("custom-metadata")
+                break
+    if not bluebeam_reasons and xmp_text and "bluebeam" in xmp_text.lower():
+        bluebeam_reasons.append("xmp-metadata")
+
+    page_rotation = _safe_float(page.get("/Rotate")) if isinstance(page, dict) else None
+    page_user_unit = _safe_float(page.get("/UserUnit")) if isinstance(page, dict) else None
+    crop_box = _normalize_annotation_bounds(page.get("/CropBox")) if isinstance(page, dict) else None
+
+    return {
+        "bluebeam_detected": len(bluebeam_reasons) > 0,
+        "detection_reasons": bluebeam_reasons,
+        "document": {
+            "title": title,
+            "author": author,
+            "subject": subject,
+            "creator": creator,
+            "producer": producer,
+            "keywords": keywords,
+            "created_utc": created_utc,
+            "modified_utc": modified_utc,
+            "custom": custom,
+        },
+        "page": {
+            "index": page_index,
+            "rotation_deg": page_rotation if page_rotation is not None else 0.0,
+            "user_unit": page_user_unit,
+            "media_box": {"width": page_width, "height": page_height},
+            "crop_box": crop_box,
+            "annotation_counts": {
+                "total": annotation_total,
+                "supported": annotation_supported,
+                "unsupported": annotation_unsupported,
+                "by_subtype": annotation_subtype_counts,
+            },
+        },
+    }
+
+
+def _extract_measurement_seed(page_obj: Any) -> Dict[str, Any]:
+    seed: Dict[str, Any] = {
+        "available": False,
+        "source": "none",
+        "scale_hint": None,
+        "rotation_hint_deg": None,
+        "ratio_text": None,
+        "notes": [],
+    }
+    measure_candidates: List[Any] = []
+    if isinstance(page_obj, dict):
+        page_measure = page_obj.get("/Measure")
+        if page_measure is not None:
+            measure_candidates.append(page_measure)
+        raw_viewports = page_obj.get("/VP")
+        if isinstance(raw_viewports, list):
+            for viewport_obj in raw_viewports:
+                viewport = viewport_obj.get_object() if hasattr(viewport_obj, "get_object") else viewport_obj
+                if not isinstance(viewport, dict):
+                    continue
+                viewport_measure = viewport.get("/Measure")
+                if viewport_measure is not None:
+                    measure_candidates.append(viewport_measure)
+
+    normalized_candidates: List[Dict[str, Any]] = []
+    for candidate in measure_candidates:
+        measure_obj = candidate.get_object() if hasattr(candidate, "get_object") else candidate
+        if isinstance(measure_obj, dict):
+            normalized_candidates.append(measure_obj)
+
+    if not normalized_candidates:
+        return seed
+
+    seed["available"] = True
+    seed["source"] = "pdf-measure"
+
+    first = normalized_candidates[0]
+    ratio_text = str(first.get("/R") or "").strip()
+    if ratio_text:
+        seed["ratio_text"] = ratio_text
+        ratio_numbers = [float(entry) for entry in re.findall(r"[-+]?\d+(?:\.\d+)?", ratio_text)]
+        if len(ratio_numbers) >= 2 and ratio_numbers[0] != 0:
+            try:
+                seed["scale_hint"] = abs(ratio_numbers[1] / ratio_numbers[0])
+            except Exception:
+                pass
+
+    if seed["scale_hint"] is None:
+        raw_x = first.get("/X")
+        if isinstance(raw_x, list) and raw_x:
+            first_x = raw_x[0]
+            first_x_obj = first_x.get_object() if hasattr(first_x, "get_object") else first_x
+            if isinstance(first_x_obj, dict):
+                conversion = _safe_float(first_x_obj.get("/C"))
+                if conversion is not None and conversion > 0:
+                    seed["scale_hint"] = conversion
+
+    if seed["scale_hint"] is None:
+        seed["notes"].append("PDF measurement metadata found but no numeric scale hint was parsed.")
+    else:
+        seed["notes"].append("Scale hint parsed from PDF measurement metadata; confirm with two-point calibration.")
+
+    return seed
+
+
+def _build_prepare_auto_calibration_payload(seed: Dict[str, Any]) -> Dict[str, Any]:
+    seed_obj = seed if isinstance(seed, dict) else {}
+    notes: List[str] = []
+    if bool(seed_obj.get("available")):
+        notes.append(
+            "Auto-calibration can use PDF measurement seed, but live CAD anchors are required at compare time."
+        )
+    else:
+        notes.append("No PDF measurement seed detected; auto-calibration will rely on extents and anchor matching.")
+    return _build_auto_calibration_payload(
+        available=True,
+        used=False,
+        status="needs_manual",
+        confidence=0.0,
+        method="prepare-seed-scan",
+        quality_notes=notes,
+        suggested_pdf_points=[],
+        suggested_cad_points=[],
+    )
+
+
+def _extract_pdf_compare_markups(
+    *,
+    pdf_stream: Any,
+    page_index: int,
+) -> Tuple[Optional[Dict[str, Any]], Optional[str], int]:
+    if not _PYPDF_AVAILABLE or _PdfReader is None:
+        return None, "pypdf is not installed on backend runtime.", 503
+
+    try:
+        reader = _PdfReader(pdf_stream)
+    except Exception as exc:
+        return None, f"Failed to read PDF: {str(exc)}", 400
+
+    total_pages = len(reader.pages)
+    if total_pages <= 0:
+        return None, "PDF file has no pages.", 400
+    if page_index < 0 or page_index >= total_pages:
+        return None, f"page_index is out of range (0..{total_pages - 1}).", 400
+
+    page = reader.pages[page_index]
+    media_box = getattr(page, "mediabox", None)
+    page_width = _safe_float(getattr(media_box, "width", None))
+    page_height = _safe_float(getattr(media_box, "height", None))
+    if page_width is None:
+        page_width = 0.0
+    if page_height is None:
+        page_height = 0.0
+
+    warnings: List[str] = []
+    markups: List[Dict[str, Any]] = []
+    annotation_total = 0
+    annotation_supported = 0
+    annotation_unsupported = 0
+    annotation_subtype_counts: Dict[str, int] = {}
+
+    raw_annots = page.get("/Annots")
+    annotation_entries: Optional[List[Any]] = None
+    if raw_annots is not None and hasattr(raw_annots, "get_object"):
+        try:
+            raw_annots = raw_annots.get_object()
+        except Exception:
+            raw_annots = None
+    if isinstance(raw_annots, list):
+        annotation_entries = raw_annots
+    elif isinstance(raw_annots, tuple):
+        annotation_entries = list(raw_annots)
+    elif raw_annots is not None and not isinstance(raw_annots, (str, bytes, dict)):
+        try:
+            annotation_entries = list(raw_annots)
+        except TypeError:
+            annotation_entries = None
+
+    if annotation_entries is not None:
+        for idx, annot_ref in enumerate(annotation_entries, start=1):
+            annotation_total += 1
+            annot_obj = annot_ref.get_object() if hasattr(annot_ref, "get_object") else annot_ref
+            if not isinstance(annot_obj, dict):
+                annotation_unsupported += 1
+                subtype_key = "unknown"
+                annotation_subtype_counts[subtype_key] = annotation_subtype_counts.get(subtype_key, 0) + 1
+                warnings.append(f"Annotation #{idx} skipped: unsupported object.")
+                continue
+
+            subtype = str(annot_obj.get("/Subtype") or "").strip()
+            subtype_key = subtype or "unknown"
+            annotation_subtype_counts[subtype_key] = annotation_subtype_counts.get(subtype_key, 0) + 1
+            intent = _normalize_text(annot_obj.get("/IT"))
+            subject = _normalize_text(annot_obj.get("/Subj"))
+            markup_type = _classify_annotation_markup_type(
+                subtype=subtype,
+                intent=intent,
+                subject=subject,
+            )
+            if not markup_type:
+                annotation_unsupported += 1
+                warnings.append(f"Annotation #{idx} skipped: unsupported subtype {subtype or 'unknown'}.")
+                continue
+
+            bounds = _normalize_annotation_bounds(annot_obj.get("/Rect"))
+            if not bounds:
+                annotation_unsupported += 1
+                warnings.append(f"Annotation #{idx} skipped: missing/invalid annotation bounds.")
+                continue
+
+            color_name, rgb, color_hex, color_source = _extract_annotation_color(annot_obj)
+            text = str(annot_obj.get("/Contents") or "").strip()
+            if not text:
+                text = str(annot_obj.get("/RC") or "").strip()
+            if not text:
+                text = str(annot_obj.get("/Subj") or "").strip()
+            callout_points = _normalize_annotation_callout_points(annot_obj.get("/CL"))
+
+            markup_payload: Dict[str, Any] = {
+                "id": f"annot-{idx}",
+                "type": markup_type,
+                "color": color_name,
+                "text": text,
+                "bounds": bounds,
+                "meta": {
+                    "subtype": subtype or "unknown",
+                    "intent": intent or None,
+                    "subject": subject or None,
+                    "color_source": color_source,
+                    "color_hex": color_hex,
+                    "color_rgb": None,
+                    "page_index": page_index,
+                    "page_bounds": dict(bounds),
+                    "page_position": _bounds_center_payload(bounds),
+                },
+            }
+            if rgb:
+                rgb_payload = {
+                    "r": rgb[0],
+                    "g": rgb[1],
+                    "b": rgb[2],
+                }
+                markup_payload["meta"]["rgb"] = rgb_payload
+                markup_payload["meta"]["color_rgb"] = rgb_payload
+            if callout_points:
+                markup_payload["meta"]["callout_points"] = callout_points
+            markup_payload["recognition"] = _build_markup_recognition(
+                markup_payload,
+                feature_source="pdf_annotations",
+            )
+            markups.append(markup_payload)
+            annotation_supported += 1
+    else:
+        warnings.append(
+            "No /Annots array was found on this page. If markups were flattened, annotation extraction returns 0."
+        )
+
+    calibration_seed = _extract_measurement_seed(page)
+    payload = {
+        "ok": True,
+        "success": True,
+        "page": {
+            "index": page_index,
+            "total_pages": total_pages,
+            "width": page_width,
+            "height": page_height,
+        },
+        "calibration_seed": calibration_seed,
+        "auto_calibration": _build_prepare_auto_calibration_payload(calibration_seed),
+        "pdf_metadata": _extract_pdf_prepare_metadata(
+            reader=reader,
+            page=page,
+            page_index=page_index,
+            page_width=page_width,
+            page_height=page_height,
+            annotation_total=annotation_total,
+            annotation_supported=annotation_supported,
+            annotation_unsupported=annotation_unsupported,
+            annotation_subtype_counts=annotation_subtype_counts,
+        ),
+        "warnings": warnings,
+        "markups": markups,
+        "recognition": _compare_recognition_summary(
+            markups,
+            feature_source="pdf_annotations",
+            agent_hints_applied=False,
+        ),
+    }
+    return payload, None, 200
+
+
+def _normalize_point_pair_list(value: Any) -> Optional[List[Dict[str, float]]]:
+    if not isinstance(value, list) or len(value) != 2:
+        return None
+    output: List[Dict[str, float]] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            return None
+        x = _safe_float(entry.get("x"))
+        y = _safe_float(entry.get("y"))
+        if x is None or y is None:
+            return None
+        output.append({"x": x, "y": y})
+    return output
+
+
+def _normalize_point_list(value: Any) -> List[Dict[str, float]]:
+    if not isinstance(value, list):
+        return []
+    points: List[Dict[str, float]] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        x = _safe_float(entry.get("x"))
+        y = _safe_float(entry.get("y"))
+        if x is None or y is None:
+            continue
+        points.append({"x": x, "y": y})
+    return points
+
+
+def _build_similarity_transform(
+    *,
+    pdf_points: List[Dict[str, float]],
+    cad_points: List[Dict[str, float]],
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    if len(pdf_points) != 2 or len(cad_points) != 2:
+        return None, "Exactly two PDF points and two CAD points are required."
+
+    p1 = pdf_points[0]
+    p2 = pdf_points[1]
+    c1 = cad_points[0]
+    c2 = cad_points[1]
+
+    pvx = p2["x"] - p1["x"]
+    pvy = p2["y"] - p1["y"]
+    cvx = c2["x"] - c1["x"]
+    cvy = c2["y"] - c1["y"]
+    pdf_distance = math.hypot(pvx, pvy)
+    cad_distance = math.hypot(cvx, cvy)
+    if pdf_distance <= 1e-6 or cad_distance <= 1e-6:
+        return None, "Calibration points must not be identical."
+
+    scale = cad_distance / pdf_distance
+    pdf_angle = math.atan2(pvy, pvx)
+    cad_angle = math.atan2(cvy, cvx)
+    rotation = cad_angle - pdf_angle
+    cos_t = math.cos(rotation)
+    sin_t = math.sin(rotation)
+
+    tx = c1["x"] - (scale * ((cos_t * p1["x"]) - (sin_t * p1["y"])))
+    ty = c1["y"] - (scale * ((sin_t * p1["x"]) + (cos_t * p1["y"])))
+
+    return (
+        {
+            "scale": scale,
+            "rotation_rad": rotation,
+            "rotation_deg": math.degrees(rotation),
+            "translation": {"x": tx, "y": ty},
+            "pdf_points": pdf_points,
+            "cad_points": cad_points,
+        },
+        None,
+    )
+
+
+def _transform_point_to_cad(point: Dict[str, float], transform: Dict[str, Any]) -> Dict[str, float]:
+    scale = float(transform.get("scale") or 1.0)
+    rotation_rad = float(transform.get("rotation_rad") or 0.0)
+    translation = transform.get("translation") if isinstance(transform.get("translation"), dict) else {}
+    tx = _safe_float(translation.get("x")) or 0.0
+    ty = _safe_float(translation.get("y")) or 0.0
+    cos_t = math.cos(rotation_rad)
+    sin_t = math.sin(rotation_rad)
+
+    px = float(point["x"])
+    py = float(point["y"])
+    return {
+        "x": (scale * ((cos_t * px) - (sin_t * py))) + tx,
+        "y": (scale * ((sin_t * px) + (cos_t * py))) + ty,
+    }
+
+
+def _transform_bounds_to_cad(bounds: Dict[str, float], transform: Dict[str, Any]) -> Dict[str, float]:
+    x0 = float(bounds["x"])
+    y0 = float(bounds["y"])
+    x1 = x0 + float(bounds["width"])
+    y1 = y0 + float(bounds["height"])
+
+    transformed_points = [
+        _transform_point_to_cad({"x": x0, "y": y0}, transform),
+        _transform_point_to_cad({"x": x1, "y": y0}, transform),
+        _transform_point_to_cad({"x": x1, "y": y1}, transform),
+        _transform_point_to_cad({"x": x0, "y": y1}, transform),
+    ]
+    xs = [point["x"] for point in transformed_points]
+    ys = [point["y"] for point in transformed_points]
+    left = min(xs)
+    right = max(xs)
+    bottom = min(ys)
+    top = max(ys)
+    return {
+        "x": left,
+        "y": bottom,
+        "width": max(0.0001, right - left),
+        "height": max(0.0001, top - bottom),
+    }
+
+
+def _normalize_compare_markups(markups_raw: Any) -> List[Dict[str, Any]]:
+    if not isinstance(markups_raw, list):
+        return []
+    normalized: List[Dict[str, Any]] = []
+    for index, entry in enumerate(markups_raw, start=1):
+        if not isinstance(entry, dict):
+            continue
+        normalized_entry: Dict[str, Any] = {
+            "id": str(entry.get("id") or f"markup-{index}"),
+            "type": _normalize_text(entry.get("type")) or "unknown",
+            "color": _normalize_text(entry.get("color")) or "unknown",
+            "text": str(entry.get("text") or "").strip(),
+            "meta": entry.get("meta") if isinstance(entry.get("meta"), dict) else {},
+        }
+        bounds = _normalize_bounds(entry.get("bounds"))
+        if bounds:
+            normalized_entry["bounds"] = bounds
+        if isinstance(entry.get("layer"), str):
+            layer_name = str(entry.get("layer") or "").strip()
+            if layer_name:
+                normalized_entry["layer"] = layer_name
+        if isinstance(entry.get("recognition"), dict):
+            normalized_entry["recognition"] = dict(entry.get("recognition") or {})
+        normalized.append(normalized_entry)
+    return normalized
+
+
+def _bounds_center_payload(bounds: Dict[str, float]) -> Dict[str, float]:
+    return {
+        "x": float(bounds["x"]) + (float(bounds["width"]) / 2.0),
+        "y": float(bounds["y"]) + (float(bounds["height"]) / 2.0),
+    }
+
+
+def _markup_learning_features(markup: Dict[str, Any]) -> Dict[str, Any]:
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    bounds = _normalize_bounds(markup.get("bounds"))
+    page_position = (
+        meta.get("page_position") if isinstance(meta.get("page_position"), dict) else {}
+    )
+    return {
+        "type": _normalize_text(markup.get("type")) or "unknown",
+        "color": _normalize_text(markup.get("color")) or "unknown",
+        "subtype": _normalize_text(meta.get("subtype")) or "unknown",
+        "intent": _normalize_text(meta.get("intent")) or "unknown",
+        "subject": _normalize_text(meta.get("subject")) or "unknown",
+        "has_callout": bool(_normalize_point_list(meta.get("callout_points"))),
+        "paired_anchor_count": len(
+            [
+                entry
+                for entry in (meta.get("paired_annotation_ids") or [])
+                if isinstance(entry, str) and entry.strip()
+            ]
+        ),
+        "page_index": int(_safe_float(meta.get("page_index")) or 0),
+        "width_bucket": int(round((bounds.get("width") or 0.0) / 24.0)) if bounds else 0,
+        "height_bucket": int(round((bounds.get("height") or 0.0) / 24.0)) if bounds else 0,
+        "page_x_bucket": int(round((_safe_float(page_position.get("x")) or 0.0) / 48.0)),
+        "page_y_bucket": int(round((_safe_float(page_position.get("y")) or 0.0) / 48.0)),
+    }
+
+
+def _heuristic_markup_recognition_confidence(markup: Dict[str, Any]) -> float:
+    score = 0.42
+    color_value = _normalize_text(markup.get("color"))
+    markup_type = _normalize_text(markup.get("type"))
+    text_value = str(markup.get("text") or "").strip()
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    if color_value and color_value != "unknown":
+        score += 0.18
+    if markup_type and markup_type != "unknown":
+        score += 0.12
+    if text_value:
+        score += 0.08
+    if _normalize_text(meta.get("subtype")) not in {"", "unknown"}:
+        score += 0.06
+    if _normalize_point_list(meta.get("callout_points")):
+        score += 0.04
+    return round(_clamp_value(score, minimum=0.0, maximum=0.98), 4)
+
+
+def _build_markup_recognition(
+    markup: Dict[str, Any],
+    *,
+    feature_source: str,
+) -> Dict[str, Any]:
+    features = _markup_learning_features(markup)
+    reason_codes: List[str] = [
+        f"color:{features.get('color') or 'unknown'}",
+        f"type:{features.get('type') or 'unknown'}",
+        f"subtype:{features.get('subtype') or 'unknown'}",
+    ]
+    if bool(features.get("has_callout")):
+        reason_codes.append("callout_points_detected")
+    if int(features.get("paired_anchor_count") or 0) > 0:
+        reason_codes.append("paired_anchor_ids_detected")
+
+    prediction = _LOCAL_LEARNING_RUNTIME.predict_text_domain(
+        domain="autodraft_markup",
+        text=str(markup.get("text") or ""),
+        features=features,
+    )
+    if prediction is not None:
+        confidence = round(
+            _clamp_value(prediction.confidence, minimum=0.0, maximum=1.0),
+            4,
+        )
+        reason_codes.extend(prediction.reason_codes)
+        reason_codes.append(f"predicted_label:{prediction.label}")
+        source = prediction.source
+        model_version = prediction.model_version
+    else:
+        confidence = _heuristic_markup_recognition_confidence(markup)
+        source = "deterministic"
+        model_version = "deterministic-v1"
+        reason_codes.append("deterministic_markup_features")
+
+    needs_review = confidence < 0.62 or _normalize_text(markup.get("color")) == "unknown"
+    return {
+        "label": prediction.label if prediction is not None else "",
+        "model_version": model_version,
+        "confidence": confidence,
+        "source": source,
+        "feature_source": feature_source,
+        "reason_codes": list(dict.fromkeys(reason_codes)),
+        "needs_review": needs_review,
+        "accepted": not needs_review,
+        "override_reason": None,
+    }
+
+
+def _compare_recognition_summary(
+    markups: List[Dict[str, Any]],
+    *,
+    feature_source: str,
+    agent_hints_applied: bool,
+) -> Dict[str, Any]:
+    recognitions = [
+        markup.get("recognition")
+        for markup in markups
+        if isinstance(markup, dict) and isinstance(markup.get("recognition"), dict)
+    ]
+    confidence_values = [
+        _safe_float(recognition.get("confidence"))
+        for recognition in recognitions
+        if isinstance(recognition, dict)
+    ]
+    model_versions = sorted(
+        {
+            str(recognition.get("model_version") or "").strip()
+            for recognition in recognitions
+            if isinstance(recognition, dict) and str(recognition.get("model_version") or "").strip()
+        }
+    )
+    summary_reason_codes = ["markup_compare_ready"]
+    if agent_hints_applied:
+        summary_reason_codes.append("agent_hints_applied")
+    if model_versions:
+        summary_reason_codes.append("local_models_available")
+    return {
+        "model_version": model_versions[0] if len(model_versions) == 1 else ",".join(model_versions) or "deterministic-v1",
+        "confidence": round(
+            sum(value for value in confidence_values if value is not None)
+            / max(1, len([value for value in confidence_values if value is not None])),
+            4,
+        ),
+        "source": "local_model" if model_versions else "deterministic",
+        "feature_source": feature_source,
+        "reason_codes": summary_reason_codes,
+        "needs_review": any(
+            bool(recognition.get("needs_review"))
+            for recognition in recognitions
+            if isinstance(recognition, dict)
+        ),
+        "accepted": not any(
+            bool(recognition.get("needs_review"))
+            for recognition in recognitions
+            if isinstance(recognition, dict)
+        ),
+        "override_reason": None,
+        "agent_hints_applied": bool(agent_hints_applied),
+    }
+
+
+def _normalize_tolerance_profile(value: Any) -> str:
+    profile = _normalize_text(value)
+    if profile not in _COMPARE_TOLERANCE_PROFILES:
+        return _COMPARE_TOLERANCE_PROFILE_MEDIUM
+    return profile
+
+
+def _normalize_calibration_mode(value: Any) -> str:
+    mode = _normalize_text(value)
+    if mode in _COMPARE_CALIBRATION_MODES:
+        return mode
+    return _COMPARE_CALIBRATION_MODE_AUTO
+
+
+def _normalize_agent_review_mode(value: Any) -> str:
+    mode = _normalize_text(value)
+    if mode in _COMPARE_AGENT_REVIEW_MODES:
+        return mode
+    return _COMPARE_AGENT_REVIEW_MODE_PRE
+
+
+def _normalize_boolean(value: Any, *, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    raw_text = str(value or "").strip().lower()
+    if not raw_text:
+        return default
+    return raw_text in {"1", "true", "yes", "on"}
+
+
+def _copy_bounds(bounds: Dict[str, float]) -> Dict[str, float]:
+    return {
+        "x": float(bounds["x"]),
+        "y": float(bounds["y"]),
+        "width": float(bounds["width"]),
+        "height": float(bounds["height"]),
+    }
+
+
+def _collect_markup_calibration_anchors(
+    markups: List[Dict[str, Any]],
+    *,
+    roi: Optional[Dict[str, float]] = None,
+) -> Tuple[List[Dict[str, float]], List[Dict[str, float]]]:
+    anchors: List[Dict[str, float]] = []
+    markup_bounds: List[Dict[str, float]] = []
+    for markup in markups:
+        if not isinstance(markup, dict):
+            continue
+        bounds = _normalize_bounds(markup.get("bounds"))
+        if not bounds:
+            continue
+        if roi and not _bounds_overlap(bounds, roi):
+            continue
+        markup_bounds.append(bounds)
+        callout_target = _extract_callout_target_point(markup)
+        if callout_target:
+            anchors.append(callout_target)
+        anchors.append(_resolve_bounds_center(bounds))
+    return anchors, markup_bounds
+
+
+def _collect_cad_calibration_anchors(
+    cad_context: Dict[str, Any],
+    *,
+    roi: Optional[Dict[str, float]] = None,
+) -> Tuple[List[Dict[str, float]], List[Dict[str, float]]]:
+    text_anchors: List[Dict[str, float]] = []
+    geometry_anchors: List[Dict[str, float]] = []
+    geometry_bounds: List[Dict[str, float]] = []
+    for entity in _extract_entities(cad_context):
+        bounds = _normalize_bounds(entity.get("bounds"))
+        if not bounds:
+            continue
+        if roi and not _bounds_overlap(bounds, roi):
+            continue
+        geometry_bounds.append(bounds)
+        center = _resolve_bounds_center(bounds)
+        geometry_anchors.append(center)
+        if str(entity.get("text") or "").strip():
+            text_anchors.append(center)
+    selected = text_anchors if text_anchors else geometry_anchors
+    return selected, geometry_bounds
+
+
+def _nearest_point(
+    target: Dict[str, float], points: List[Dict[str, float]]
+) -> Tuple[Optional[Dict[str, float]], float]:
+    best_point: Optional[Dict[str, float]] = None
+    best_distance = float("inf")
+    for point in points:
+        distance = _distance_between_points(target, point)
+        if distance < best_distance:
+            best_distance = distance
+            best_point = point
+    if best_point is None:
+        return None, float("inf")
+    return best_point, best_distance
+
+
+def _farthest_point_pair(
+    points: List[Dict[str, float]],
+) -> Optional[Tuple[Dict[str, float], Dict[str, float]]]:
+    if len(points) < 2:
+        return None
+    best_pair: Optional[Tuple[Dict[str, float], Dict[str, float]]] = None
+    best_distance = -1.0
+    for idx, point_a in enumerate(points):
+        for point_b in points[idx + 1 :]:
+            distance = _distance_between_points(point_a, point_b)
+            if distance > best_distance:
+                best_distance = distance
+                best_pair = (point_a, point_b)
+    return best_pair
+
+
+def _build_auto_calibration_payload(
+    *,
+    status: str,
+    confidence: float,
+    method: str,
+    quality_notes: List[str],
+    available: bool = True,
+    used: bool = False,
+    suggested_pdf_points: Optional[List[Dict[str, float]]] = None,
+    suggested_cad_points: Optional[List[Dict[str, float]]] = None,
+    matched_anchor_count: int = 0,
+    anchor_count: int = 0,
+    residual_error: Optional[float] = None,
+    transform: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "available": bool(available),
+        "used": bool(used),
+        "status": str(status or "needs_manual"),
+        "confidence": round(_clamp_value(float(confidence or 0.0), minimum=0.0, maximum=1.0), 4),
+        "method": str(method or "none"),
+        "quality_notes": [str(note).strip() for note in quality_notes if str(note).strip()],
+        "matched_anchor_count": max(0, int(matched_anchor_count or 0)),
+        "anchor_count": max(0, int(anchor_count or 0)),
+        "suggested_pdf_points": suggested_pdf_points if isinstance(suggested_pdf_points, list) else [],
+        "suggested_cad_points": suggested_cad_points if isinstance(suggested_cad_points, list) else [],
+    }
+    if residual_error is not None and math.isfinite(float(residual_error)):
+        payload["residual_error"] = round(float(residual_error), 4)
+    if isinstance(transform, dict):
+        payload["transform"] = transform
+    return payload
+
+
+def _sanitize_auto_calibration_payload(value: Dict[str, Any]) -> Dict[str, Any]:
+    payload = dict(value or {})
+    payload.pop("transform", None)
+    return payload
+
+
+def _auto_calibrate_transform(
+    *,
+    markups: List[Dict[str, Any]],
+    cad_context: Dict[str, Any],
+    calibration_seed: Optional[Dict[str, Any]] = None,
+    roi: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    seed_obj = calibration_seed if isinstance(calibration_seed, dict) else {}
+    seed_scale = _safe_float(seed_obj.get("scale_hint"))
+    quality_notes: List[str] = []
+    if roi:
+        quality_notes.append("ROI refinement active for auto-calibration.")
+
+    pdf_anchor_points, pdf_bounds_list = _collect_markup_calibration_anchors(
+        markups,
+        roi=roi,
+    )
+    cad_anchor_points, cad_bounds_list = _collect_cad_calibration_anchors(
+        cad_context,
+        roi=roi,
+    )
+    if len(pdf_anchor_points) < 2:
+        return _build_auto_calibration_payload(
+            available=False,
+            used=False,
+            status="needs_manual",
+            confidence=0.0,
+            method="insufficient-pdf-anchors",
+            quality_notes=[
+                "Auto-calibration requires at least two PDF anchors from prepared markups.",
+            ],
+        )
+    if len(cad_anchor_points) < 2:
+        return _build_auto_calibration_payload(
+            available=False,
+            used=False,
+            status="needs_manual",
+            confidence=0.0,
+            method="insufficient-cad-anchors",
+            quality_notes=[
+                "Auto-calibration requires at least two CAD anchor points from live context.",
+                "Selected ROI did not provide enough CAD anchors; widen ROI or retry full-sheet auto mode."
+                if roi
+                else "",
+            ],
+        )
+
+    pdf_bounds = _bounds_from_points(pdf_anchor_points)
+    cad_bounds = _bounds_from_points(cad_anchor_points)
+    if not pdf_bounds or not cad_bounds:
+        return _build_auto_calibration_payload(
+            available=False,
+            used=False,
+            status="failed",
+            confidence=0.0,
+            method="anchor-bounds-failed",
+            quality_notes=["Failed to resolve calibration bounds from anchor sets."],
+        )
+
+    pdf_pair = _farthest_point_pair(pdf_anchor_points)
+    if not pdf_pair:
+        return _build_auto_calibration_payload(
+            available=False,
+            used=False,
+            status="needs_manual",
+            confidence=0.0,
+            method="insufficient-pdf-pair",
+            quality_notes=["Could not derive a stable PDF point pair for calibration."],
+        )
+
+    extents_scale_x = max(1e-6, float(cad_bounds["width"])) / max(1e-6, float(pdf_bounds["width"]))
+    extents_scale_y = max(1e-6, float(cad_bounds["height"])) / max(1e-6, float(pdf_bounds["height"]))
+    extents_scale = (extents_scale_x + extents_scale_y) / 2.0
+    if seed_scale is not None and seed_scale > 0:
+        scale = seed_scale
+        quality_notes.append("Used PDF measurement seed as primary scale hint.")
+    else:
+        scale = extents_scale
+        quality_notes.append("Derived scale from PDF/CAD extents.")
+
+    pdf_center = _resolve_bounds_center(pdf_bounds)
+    cad_center = _resolve_bounds_center(cad_bounds)
+    coarse_transform = {
+        "scale": scale,
+        "rotation_rad": 0.0,
+        "rotation_deg": 0.0,
+        "translation": {
+            "x": cad_center["x"] - (scale * pdf_center["x"]),
+            "y": cad_center["y"] - (scale * pdf_center["y"]),
+        },
+    }
+
+    offsets: List[Dict[str, float]] = []
+    transformed_anchor_points: List[Dict[str, float]] = []
+    nearest_distances: List[float] = []
+    for pdf_anchor in pdf_anchor_points:
+        transformed = _transform_point_to_cad(pdf_anchor, coarse_transform)
+        transformed_anchor_points.append(transformed)
+        nearest, distance = _nearest_point(transformed, cad_anchor_points)
+        nearest_distances.append(distance)
+        if nearest:
+            offsets.append(
+                {
+                    "x": nearest["x"] - transformed["x"],
+                    "y": nearest["y"] - transformed["y"],
+                }
+            )
+
+    median_offset_x = 0.0
+    median_offset_y = 0.0
+    if offsets:
+        xs = sorted(entry["x"] for entry in offsets)
+        ys = sorted(entry["y"] for entry in offsets)
+        median_offset_x = xs[len(xs) // 2]
+        median_offset_y = ys[len(ys) // 2]
+    fine_transform = {
+        "scale": float(coarse_transform["scale"]),
+        "rotation_rad": 0.0,
+        "rotation_deg": 0.0,
+        "translation": {
+            "x": float(coarse_transform["translation"]["x"]) + median_offset_x,
+            "y": float(coarse_transform["translation"]["y"]) + median_offset_y,
+        },
+    }
+    quality_notes.append("Applied anchor-based translation refinement.")
+
+    refined_distances: List[float] = []
+    matched_anchor_count = 0
+    cad_diag = max(1.0, _bounds_diagonal(cad_bounds))
+    match_radius = max(8.0, cad_diag * 0.06)
+    for pdf_anchor in pdf_anchor_points:
+        transformed = _transform_point_to_cad(pdf_anchor, fine_transform)
+        _nearest, distance = _nearest_point(transformed, cad_anchor_points)
+        refined_distances.append(distance)
+        if distance <= match_radius:
+            matched_anchor_count += 1
+    residual_error = (
+        sum(refined_distances) / len(refined_distances)
+        if refined_distances
+        else float("inf")
+    )
+    normalized_error = min(1.0, residual_error / max(match_radius, 1.0))
+    match_ratio = matched_anchor_count / max(1, len(pdf_anchor_points))
+    scale_consistency = 1.0 - min(
+        1.0,
+        abs(extents_scale_x - extents_scale_y) / max(abs(scale) if scale else 1.0, 1e-6),
+    )
+    confidence = _clamp_value(
+        (0.45 * match_ratio) + (0.35 * (1.0 - normalized_error)) + (0.20 * scale_consistency),
+        minimum=0.0,
+        maximum=1.0,
+    )
+
+    status = "ready"
+    if (
+        confidence < _AUTO_CALIBRATION_READY_MIN_CONFIDENCE
+        or match_ratio < _AUTO_CALIBRATION_READY_MIN_MATCH_RATIO
+    ):
+        status = "needs_manual"
+        quality_notes.append(
+            "Auto-calibration confidence is below threshold; refine ROI or use manual two-point calibration."
+        )
+    else:
+        quality_notes.append("Auto-calibration confidence passed threshold.")
+
+    suggested_pdf_pair = list(pdf_pair)
+    suggested_cad_pair = [
+        _transform_point_to_cad(suggested_pdf_pair[0], fine_transform),
+        _transform_point_to_cad(suggested_pdf_pair[1], fine_transform),
+    ]
+
+    method_parts = []
+    if seed_scale is not None and seed_scale > 0:
+        method_parts.append("seed")
+    method_parts.append("extents")
+    method_parts.append("anchor-refine")
+    method = "+".join(method_parts)
+
+    return _build_auto_calibration_payload(
+        available=True,
+        used=status == "ready",
+        status=status,
+        confidence=confidence,
+        method=method,
+        quality_notes=quality_notes,
+        suggested_pdf_points=suggested_pdf_pair,
+        suggested_cad_points=suggested_cad_pair,
+        matched_anchor_count=matched_anchor_count,
+        anchor_count=len(pdf_anchor_points),
+        residual_error=residual_error if math.isfinite(residual_error) else None,
+        transform=fine_transform,
+    )
+
+
+def _geometry_tolerance_for_profile(profile: str) -> float:
+    if profile == _COMPARE_TOLERANCE_PROFILE_STRICT:
+        return 0.0
+    if profile == _COMPARE_TOLERANCE_PROFILE_LOOSE:
+        return 8.0
+    return 4.0
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _env_flag(name: str, *, default: bool = False) -> bool:
+    raw_value = str(os.environ.get(name, "") or "").strip().lower()
+    if not raw_value:
+        return default
+    return raw_value in {"1", "true", "yes", "on"}
+
+
+def _resolve_compare_feedback_db_path() -> str:
+    configured = str(os.environ.get("AUTODRAFT_COMPARE_FEEDBACK_DB_PATH", "") or "").strip()
+    if not configured:
+        configured = str(os.environ.get("AUTODRAFT_COMPARE_FEEDBACK_DB", "") or "").strip()
+    if configured:
+        candidate = Path(configured)
+    else:
+        candidate = (Path(__file__).resolve().parents[1] / "autodraft-compare-feedback.sqlite3")
+    return str(candidate.resolve())
+
+
+def _connect_compare_feedback_db(db_path: str) -> sqlite3.Connection:
+    resolved_path = Path(db_path).resolve()
+    resolved_path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(str(resolved_path), timeout=8)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+@contextmanager
+def _open_compare_feedback_db(db_path: str):
+    connection = _connect_compare_feedback_db(db_path)
+    try:
+        yield connection
+    finally:
+        connection.close()
+
+
+def _ensure_compare_feedback_schema(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS feedback_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_utc TEXT NOT NULL,
+            feedback_type TEXT NOT NULL DEFAULT 'replacement_review',
+            request_id TEXT,
+            action_id TEXT,
+            review_status TEXT NOT NULL,
+            new_text TEXT,
+            selected_old_text TEXT,
+            selected_entity_id TEXT,
+            confidence REAL,
+            note TEXT,
+            candidates_json TEXT,
+            selected_candidate_json TEXT,
+            agent_suggestion_json TEXT,
+            accepted_agent_suggestion INTEGER NOT NULL DEFAULT 0,
+            payload_json TEXT
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS replacement_pairs (
+            new_text_norm TEXT NOT NULL,
+            old_text_norm TEXT NOT NULL,
+            hit_count INTEGER NOT NULL DEFAULT 0,
+            last_selected_utc TEXT NOT NULL,
+            PRIMARY KEY (new_text_norm, old_text_norm)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS replacement_metrics (
+            metric_key TEXT PRIMARY KEY,
+            score REAL NOT NULL DEFAULT 0,
+            updated_utc TEXT NOT NULL
+        )
+        """
+    )
+    existing_columns = {
+        str(row[1] or "").strip().lower()
+        for row in connection.execute("PRAGMA table_info(feedback_events)").fetchall()
+    }
+    if "agent_suggestion_json" not in existing_columns:
+        connection.execute("ALTER TABLE feedback_events ADD COLUMN agent_suggestion_json TEXT")
+    if "accepted_agent_suggestion" not in existing_columns:
+        connection.execute(
+            "ALTER TABLE feedback_events ADD COLUMN accepted_agent_suggestion INTEGER NOT NULL DEFAULT 0"
+        )
+    if "feedback_type" not in existing_columns:
+        connection.execute(
+            "ALTER TABLE feedback_events ADD COLUMN feedback_type TEXT NOT NULL DEFAULT 'replacement_review'"
+        )
+    if "payload_json" not in existing_columns:
+        connection.execute("ALTER TABLE feedback_events ADD COLUMN payload_json TEXT")
+    connection.commit()
+
+
+def _normalize_learning_text(value: Any) -> str:
+    text = str(value or "").strip().upper()
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def _safe_json_dumps(value: Any) -> str:
+    try:
+        return json.dumps(value, ensure_ascii=True)
+    except Exception:
+        return "[]"
+
+
+def _safe_json_loads(raw: str) -> Any:
+    try:
+        return json.loads(str(raw or ""))
+    except Exception:
+        return None
+
+
+def _clamp_value(value: float, *, minimum: float, maximum: float) -> float:
+    return max(minimum, min(maximum, value))
+
+
+def _normalize_replacement_tuning(value: Any) -> Dict[str, float]:
+    defaults = dict(_REPLACEMENT_TUNING_DEFAULT)
+    if not isinstance(value, dict):
+        return defaults
+
+    unresolved_threshold = _safe_float(value.get("unresolved_confidence_threshold"))
+    ambiguity_margin = _safe_float(value.get("ambiguity_margin_threshold"))
+    radius_multiplier = _safe_float(value.get("search_radius_multiplier"))
+    min_search_radius = _safe_float(value.get("min_search_radius"))
+
+    if unresolved_threshold is not None:
+        defaults["unresolved_confidence_threshold"] = _clamp_value(
+            unresolved_threshold,
+            minimum=0.0,
+            maximum=1.0,
+        )
+    if ambiguity_margin is not None:
+        defaults["ambiguity_margin_threshold"] = _clamp_value(
+            ambiguity_margin,
+            minimum=0.0,
+            maximum=1.0,
+        )
+    if radius_multiplier is not None:
+        defaults["search_radius_multiplier"] = _clamp_value(
+            radius_multiplier,
+            minimum=0.5,
+            maximum=8.0,
+        )
+    if min_search_radius is not None:
+        defaults["min_search_radius"] = _clamp_value(
+            min_search_radius,
+            minimum=4.0,
+            maximum=200.0,
+        )
+    return defaults
+
+
+def _load_replacement_metric_scores(db_path: str) -> Dict[str, float]:
+    with _COMPARE_FEEDBACK_DB_LOCK:
+        with _open_compare_feedback_db(db_path) as connection:
+            _ensure_compare_feedback_schema(connection)
+            rows = connection.execute(
+                "SELECT metric_key, score FROM replacement_metrics"
+            ).fetchall()
+    scores: Dict[str, float] = {}
+    for row in rows:
+        key = str(row["metric_key"] or "").strip()
+        if not key:
+            continue
+        try:
+            scores[key] = float(row["score"] or 0.0)
+        except Exception:
+            scores[key] = 0.0
+    return scores
+
+
+def _load_replacement_pair_hits(
+    *,
+    db_path: str,
+    new_text_norm: str,
+) -> Dict[str, int]:
+    if not new_text_norm:
+        return {}
+    with _COMPARE_FEEDBACK_DB_LOCK:
+        with _open_compare_feedback_db(db_path) as connection:
+            _ensure_compare_feedback_schema(connection)
+            rows = connection.execute(
+                """
+                SELECT old_text_norm, hit_count
+                FROM replacement_pairs
+                WHERE new_text_norm = ?
+                """,
+                (new_text_norm,),
+            ).fetchall()
+    result: Dict[str, int] = {}
+    for row in rows:
+        key = str(row["old_text_norm"] or "").strip()
+        if not key:
+            continue
+        try:
+            result[key] = max(0, int(row["hit_count"] or 0))
+        except Exception:
+            result[key] = 0
+    return result
+
+
+def _resolve_replacement_weights(metric_scores: Dict[str, float]) -> Dict[str, float]:
+    pointer_score = float(metric_scores.get("pointer_hit", 0.0))
+    overlap_score = float(metric_scores.get("overlap", 0.0))
+
+    pointer_weight = _clamp_value(
+        0.52 + (pointer_score * 0.01),
+        minimum=0.32,
+        maximum=0.66,
+    )
+    overlap_weight = _clamp_value(
+        0.20 + (overlap_score * 0.008),
+        minimum=0.10,
+        maximum=0.34,
+    )
+    distance_weight = _clamp_value(
+        1.0 - pointer_weight - overlap_weight,
+        minimum=0.08,
+        maximum=0.36,
+    )
+    normalization = pointer_weight + overlap_weight + distance_weight
+    if normalization <= 1e-6:
+        return {"pointer": 0.52, "overlap": 0.20, "distance": 0.28}
+    return {
+        "pointer": pointer_weight / normalization,
+        "overlap": overlap_weight / normalization,
+        "distance": distance_weight / normalization,
+    }
+
+
+def _extract_text_entities(cad_context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    entities = _extract_entities(cad_context)
+    text_entities: List[Dict[str, Any]] = []
+    for entry in entities:
+        text_value = str(entry.get("text") or "").strip()
+        if not text_value:
+            continue
+        bounds = _normalize_bounds(entry.get("bounds"))
+        if not bounds:
+            continue
+        entity_id = str(
+            entry.get("id") or entry.get("handle") or entry.get("uuid") or ""
+        ).strip()
+        if not entity_id:
+            continue
+        text_entities.append(
+            {
+                "id": entity_id,
+                "text": text_value,
+                "text_norm": _normalize_learning_text(text_value),
+                "bounds": bounds,
+            }
+        )
+    return text_entities
+
+
+def _bounds_contains_point(bounds: Dict[str, float], point: Dict[str, float]) -> bool:
+    x = float(point["x"])
+    y = float(point["y"])
+    left = float(bounds["x"])
+    bottom = float(bounds["y"])
+    right = left + float(bounds["width"])
+    top = bottom + float(bounds["height"])
+    return left <= x <= right and bottom <= y <= top
+
+
+def _resolve_bounds_center(bounds: Dict[str, float]) -> Dict[str, float]:
+    return {
+        "x": float(bounds["x"]) + (float(bounds["width"]) / 2.0),
+        "y": float(bounds["y"]) + (float(bounds["height"]) / 2.0),
+    }
+
+
+def _distance_between_points(point_a: Dict[str, float], point_b: Dict[str, float]) -> float:
+    return math.hypot(
+        float(point_a["x"]) - float(point_b["x"]),
+        float(point_a["y"]) - float(point_b["y"]),
+    )
+
+
+def _resolve_replacement_target_point(
+    *,
+    markup: Dict[str, Any],
+    bounds: Optional[Dict[str, float]],
+) -> Tuple[Optional[Dict[str, float]], str]:
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    callout_points = (
+        _normalize_point_list(meta.get("callout_points")) if isinstance(meta, dict) else []
+    )
+    if callout_points:
+        return callout_points[-1], "callout-tail"
+
+    if bounds:
+        return _resolve_bounds_center(bounds), "bounds-center"
+    return None, "unavailable"
+
+
+def _is_replacement_markup_candidate(action: Dict[str, Any]) -> bool:
+    markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+    if not isinstance(markup, dict):
+        return False
+    if _is_red_reference_add_markup(markup):
+        return False
+    color_name = _normalize_text(markup.get("color"))
+    markup_type = _normalize_text(markup.get("type"))
+    markup_text = str(markup.get("text") or "").strip()
+    return color_name == "red" and markup_type == "text" and bool(markup_text)
+
+
+def _infer_action_replacement(
+    *,
+    action: Dict[str, Any],
+    text_entities: List[Dict[str, Any]],
+    weights: Dict[str, float],
+    db_path: str,
+    tuning: Optional[Dict[str, float]] = None,
+    agent_hint: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+    if not isinstance(markup, dict):
+        return None
+    new_text = str(markup.get("text") or "").strip()
+    if not new_text:
+        return None
+    markup_bounds = _normalize_bounds(markup.get("bounds"))
+    target_point, target_source = _resolve_replacement_target_point(
+        markup=markup,
+        bounds=markup_bounds,
+    )
+
+    if markup_bounds:
+        markup_diag = math.hypot(markup_bounds["width"], markup_bounds["height"])
+    else:
+        markup_diag = 0.0
+    effective_tuning = _normalize_replacement_tuning(tuning)
+    search_radius = max(
+        float(effective_tuning.get("min_search_radius") or 24.0),
+        markup_diag * float(effective_tuning.get("search_radius_multiplier") or 2.5),
+    )
+    new_text_norm = _normalize_learning_text(new_text)
+    pair_hits = _load_replacement_pair_hits(db_path=db_path, new_text_norm=new_text_norm)
+    hint_obj = agent_hint if isinstance(agent_hint, dict) else {}
+    hint_boosts = (
+        hint_obj.get("candidate_boosts")
+        if isinstance(hint_obj.get("candidate_boosts"), dict)
+        else {}
+    )
+    hint_rationale = str(hint_obj.get("rationale") or "").strip()
+
+    candidates: List[Dict[str, Any]] = []
+    for entity in text_entities:
+        entity_text = str(entity.get("text") or "").strip()
+        entity_norm = _normalize_learning_text(entity_text)
+        entity_bounds = entity.get("bounds") if isinstance(entity.get("bounds"), dict) else None
+        if not entity_bounds:
+            continue
+        candidate_entity_id = str(entity.get("id") or "").strip()
+        if not candidate_entity_id:
+            continue
+        entity_center = _resolve_bounds_center(entity_bounds)
+        overlap = bool(markup_bounds and _bounds_overlap(markup_bounds, entity_bounds))
+        pointer_hit = bool(target_point and _bounds_contains_point(entity_bounds, target_point))
+        distance = (
+            _distance_between_points(target_point, entity_center)
+            if target_point is not None
+            else _distance_between_points(_resolve_bounds_center(markup_bounds), entity_center)
+            if markup_bounds is not None
+            else 0.0
+        )
+        distance_score = _clamp_value(
+            1.0 - (distance / search_radius),
+            minimum=0.0,
+            maximum=1.0,
+        )
+        overlap_score = 1.0 if overlap else 0.0
+        pointer_score = 1.0 if pointer_hit else 0.0
+
+        pair_hit_count = int(pair_hits.get(entity_norm, 0))
+        pair_boost = min(0.25, pair_hit_count * 0.05)
+        same_text_penalty = 0.45 if entity_norm and entity_norm == new_text_norm else 0.0
+        distance_component = distance_score * float(weights.get("distance", 0.28))
+        pointer_component = pointer_score * float(weights.get("pointer", 0.52))
+        overlap_component = overlap_score * float(weights.get("overlap", 0.20))
+        base_score = (
+            pointer_component
+            + overlap_component
+            + distance_component
+            + pair_boost
+            - same_text_penalty
+        )
+        base_score = _clamp_value(base_score, minimum=0.0, maximum=1.0)
+        raw_agent_boost = _safe_float(hint_boosts.get(candidate_entity_id))
+        agent_boost = _clamp_value(
+            raw_agent_boost or 0.0,
+            minimum=0.0,
+            maximum=_AGENT_PRE_REVIEW_MAX_BOOST,
+        )
+        score = base_score + agent_boost
+        score = _clamp_value(score, minimum=0.0, maximum=1.0)
+        score_components = {
+            "pointer": round(pointer_component, 4),
+            "overlap": round(overlap_component, 4),
+            "distance": round(distance_component, 4),
+            "pair_boost": round(pair_boost, 4),
+            "same_text_penalty": round(same_text_penalty, 4),
+            "base_score": round(base_score, 4),
+            "agent_boost": round(agent_boost, 4),
+            "final_score": round(score, 4),
+        }
+        candidate_obj = {
+            "entity_id": candidate_entity_id,
+            "text": entity_text,
+            "score": round(score, 4),
+            "distance": round(float(distance), 4),
+            "pointer_hit": pointer_hit,
+            "overlap": overlap,
+            "pair_hit_count": pair_hit_count,
+            "score_components": score_components,
+        }
+        if hint_rationale:
+            candidate_obj["agent_rationale"] = hint_rationale
+        candidates.append(candidate_obj)
+
+    candidates.sort(
+        key=lambda item: (
+            -float(item.get("score") or 0.0),
+            float(item.get("distance") or 0.0),
+            str(item.get("entity_id") or ""),
+        )
+    )
+    top_candidates = candidates[:_REPLACEMENT_MAX_CANDIDATES]
+
+    if not top_candidates:
+        return {
+            "new_text": new_text,
+            "old_text": None,
+            "target_entity_id": None,
+            "confidence": 0.0,
+            "status": _REPLACEMENT_STATUS_UNRESOLVED,
+            "target_source": target_source,
+            "candidates": [],
+        }
+
+    top = top_candidates[0]
+    confidence = float(top.get("score") or 0.0)
+    second_confidence = (
+        float(top_candidates[1].get("score") or 0.0) if len(top_candidates) > 1 else 0.0
+    )
+    ambiguity_margin = confidence - second_confidence
+
+    status = _REPLACEMENT_STATUS_RESOLVED
+    unresolved_threshold = float(
+        effective_tuning.get("unresolved_confidence_threshold") or 0.36
+    )
+    ambiguity_margin_threshold = float(
+        effective_tuning.get("ambiguity_margin_threshold") or 0.08
+    )
+    if confidence < unresolved_threshold:
+        status = _REPLACEMENT_STATUS_UNRESOLVED
+    elif ambiguity_margin <= ambiguity_margin_threshold:
+        status = _REPLACEMENT_STATUS_AMBIGUOUS
+
+    old_text = str(top.get("text") or "").strip()
+    target_entity_id = str(top.get("entity_id") or "").strip()
+    if status == _REPLACEMENT_STATUS_UNRESOLVED:
+        old_text = old_text or None
+        target_entity_id = target_entity_id or None
+
+    return {
+        "new_text": new_text,
+        "old_text": old_text or None,
+        "target_entity_id": target_entity_id or None,
+        "confidence": round(confidence, 4),
+        "status": status,
+        "target_source": target_source,
+        "candidates": top_candidates,
+    }
+
+
+def _promote_finding_to_warn(finding: Dict[str, Any]) -> None:
+    status = _normalize_text(finding.get("status"))
+    if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+        finding["status"] = _BACKCHECK_WARN
+        finding["severity"] = "medium"
+
+
+def _append_unique_note(collection: List[str], value: str) -> None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return
+    if normalized in collection:
+        return
+    collection.append(normalized)
+
+
+def _recompute_backcheck_summary(backcheck_obj: Dict[str, Any]) -> None:
+    findings = backcheck_obj.get("findings")
+    if not isinstance(findings, list):
+        findings = []
+    pass_count = 0
+    warn_count = 0
+    fail_count = 0
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        status = _normalize_text(finding.get("status"))
+        if status == _BACKCHECK_FAIL:
+            fail_count += 1
+        elif status == _BACKCHECK_WARN:
+            warn_count += 1
+        else:
+            pass_count += 1
+    backcheck_obj["summary"] = {
+        "total_actions": pass_count + warn_count + fail_count,
+        "pass_count": pass_count,
+        "warn_count": warn_count,
+        "fail_count": fail_count,
+    }
+
+
+def _recompute_compare_summary(compare_result: Dict[str, Any]) -> None:
+    backcheck_obj = (
+        compare_result.get("backcheck")
+        if isinstance(compare_result.get("backcheck"), dict)
+        else {}
+    )
+    summary_obj = (
+        backcheck_obj.get("summary")
+        if isinstance(backcheck_obj.get("summary"), dict)
+        else {}
+    )
+    pass_count = int(summary_obj.get("pass_count") or 0)
+    warn_count = int(summary_obj.get("warn_count") or 0)
+    fail_count = int(summary_obj.get("fail_count") or 0)
+
+    status = _BACKCHECK_PASS
+    if fail_count > 0:
+        status = _BACKCHECK_FAIL
+    elif warn_count > 0:
+        status = _BACKCHECK_WARN
+
+    plan_obj = compare_result.get("plan") if isinstance(compare_result.get("plan"), dict) else {}
+    plan_actions = plan_obj.get("actions") if isinstance(plan_obj.get("actions"), list) else []
+    summary_existing = (
+        compare_result.get("summary")
+        if isinstance(compare_result.get("summary"), dict)
+        else {}
+    )
+    total_markups = int(summary_existing.get("total_markups") or len(plan_actions))
+    cad_context_available = bool(summary_existing.get("cad_context_available"))
+    compare_result["summary"] = {
+        "status": status,
+        "total_markups": total_markups,
+        "total_actions": len(plan_actions),
+        "pass_count": pass_count,
+        "warn_count": warn_count,
+        "fail_count": fail_count,
+        "cad_context_available": cad_context_available,
+    }
+
+
+def _filter_cad_context_by_bounds(
+    cad_context: Dict[str, Any],
+    *,
+    bounds: Optional[Dict[str, float]],
+) -> Tuple[Dict[str, Any], int]:
+    cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
+    if not bounds:
+        return dict(cad_context_obj), int(
+            len(cad_context_obj.get("entities"))
+            if isinstance(cad_context_obj.get("entities"), list)
+            else 0
+        )
+    entities = _extract_entities(cad_context_obj)
+    filtered_entities: List[Dict[str, Any]] = []
+    for entity in entities:
+        entity_bounds = _normalize_bounds(entity.get("bounds"))
+        if not entity_bounds:
+            continue
+        if _bounds_overlap(entity_bounds, bounds):
+            filtered_entities.append(entity)
+    next_context = dict(cad_context_obj)
+    next_context["entities"] = filtered_entities
+    next_context["roi_filter"] = {
+        "x": float(bounds["x"]),
+        "y": float(bounds["y"]),
+        "width": float(bounds["width"]),
+        "height": float(bounds["height"]),
+    }
+    return next_context, len(filtered_entities)
+
+
+def _semantic_action_message_for_category(category: str) -> str:
+    if category == "DELETE":
+        return "Remove geometry associated with markup bounds."
+    if category == "ADD":
+        return "Add or verify geometry referenced by markup."
+    if category == "NOTE":
+        return "Review and acknowledge note intent before execution."
+    return "Manual review required."
+
+
+def _normalize_compare_result_semantics(compare_result: Dict[str, Any]) -> None:
+    plan_obj = compare_result.get("plan")
+    if not isinstance(plan_obj, dict):
+        return
+    actions = plan_obj.get("actions")
+    if not isinstance(actions, list):
+        return
+    action_lookup: Dict[str, Dict[str, Any]] = {}
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        action_id = str(action.get("id") or "").strip()
+        if action_id:
+            action_lookup[action_id] = action
+        current_category = _normalize_text(action.get("category"))
+        if current_category and current_category != "unclassified":
+            continue
+        markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+        inferred_category, inferred_reason = _infer_semantic_category(markup)
+        if not inferred_category:
+            continue
+        action["category"] = inferred_category
+        action["rule_id"] = str(action.get("rule_id") or f"semantic-{inferred_reason}")
+        action["action"] = _semantic_action_message_for_category(inferred_category)
+        confidence = _safe_float(action.get("confidence")) or 0.0
+        inferred_confidence = 0.76 if inferred_reason.startswith("keyword-") else 0.64
+        if confidence < inferred_confidence:
+            action["confidence"] = inferred_confidence
+        if _normalize_text(action.get("status")) in {"", "review"}:
+            action["status"] = "proposed"
+
+    backcheck_obj = (
+        compare_result.get("backcheck")
+        if isinstance(compare_result.get("backcheck"), dict)
+        else {}
+    )
+    findings = backcheck_obj.get("findings") if isinstance(backcheck_obj.get("findings"), list) else []
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        action_id = str(finding.get("action_id") or "").strip()
+        action = action_lookup.get(action_id)
+        if not isinstance(action, dict):
+            continue
+        action_category = _normalize_text(action.get("category"))
+        if not action_category or action_category == "unclassified":
+            continue
+        finding["category"] = action_category
+        if _normalize_text(finding.get("status")) == _BACKCHECK_FAIL:
+            _promote_finding_to_warn(finding)
+            notes = finding.get("notes") if isinstance(finding.get("notes"), list) else []
+            _append_unique_note(
+                notes,
+                "Category normalized by Flask compare wrapper for engine parity.",
+            )
+            finding["notes"] = notes
+
+    _recompute_backcheck_summary(backcheck_obj)
+    compare_result["backcheck"] = backcheck_obj
+    _recompute_compare_summary(compare_result)
+
+
+def _extract_json_object_from_text(value: str) -> Optional[Dict[str, Any]]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    parsed = _safe_json_loads(text)
+    if isinstance(parsed, dict):
+        return parsed
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    subset = text[start : end + 1]
+    parsed_subset = _safe_json_loads(subset)
+    if isinstance(parsed_subset, dict):
+        return parsed_subset
+    return None
+
+
+def _extract_shadow_text(payload: Dict[str, Any]) -> str:
+    for key in ("response", "message", "text", "output"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    data_obj = payload.get("data")
+    if isinstance(data_obj, dict):
+        for key in ("response", "message", "text", "output"):
+            value = data_obj.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return ""
+
+
+def _normalize_shadow_reviews(value: Any) -> List[Dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    reviews: List[Dict[str, Any]] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            continue
+        action_id = str(entry.get("action_id") or "").strip()
+        if not action_id:
+            continue
+        confidence = _safe_float(entry.get("confidence"))
+        reviews.append(
+            {
+                "action_id": action_id,
+                "suggested_old_text": str(entry.get("suggested_old_text") or "").strip() or None,
+                "suggested_entity_id": str(entry.get("suggested_entity_id") or "").strip() or None,
+                "confidence": round(confidence, 4) if confidence is not None else None,
+                "rationale": str(entry.get("rationale") or "").strip() or None,
+            }
+        )
+    return reviews
+
+
+def _resolve_shadow_service_token_ttl_seconds() -> int:
+    raw_value = str(
+        os.environ.get("AUTODRAFT_COMPARE_SHADOW_SERVICE_TOKEN_TTL_SECONDS", "") or ""
+    ).strip()
+    try:
+        parsed = int(raw_value)
+    except Exception:
+        parsed = 7 * 24 * 60 * 60
+    return max(120, min(30 * 24 * 60 * 60, parsed))
+
+
+def _resolve_shadow_service_token_cache_key() -> str:
+    return (
+        str(
+            os.environ.get("AUTODRAFT_COMPARE_SHADOW_SERVICE_TOKEN_REDIS_KEY", "")
+            or ""
+        ).strip()
+        or "suite:autodraft:shadow:token"
+    )
+
+
+def _resolve_shadow_token_redis_url() -> str:
+    explicit = str(
+        os.environ.get("AUTODRAFT_COMPARE_SHADOW_TOKEN_REDIS_URL", "") or ""
+    ).strip()
+    if explicit:
+        return explicit
+    fallback_keys = (
+        "AGENT_SESSION_REDIS_URL",
+        "REDIS_URL",
+        "API_LIMITER_STORAGE_URI",
+    )
+    for key in fallback_keys:
+        candidate = str(os.environ.get(key, "") or "").strip()
+        if candidate.lower().startswith(("redis://", "rediss://")):
+            return candidate
+    return ""
+
+
+def _load_shadow_service_token_from_redis(
+    *,
+    redis_url: str,
+    key: str,
+) -> Optional[Dict[str, Any]]:
+    if redis is None or not redis_url:
+        return None
+    try:
+        client = redis.Redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
+        raw_value = client.get(key)
+        if raw_value is None:
+            return None
+        parsed = _safe_json_loads(
+            raw_value.decode("utf-8", errors="replace")
+            if isinstance(raw_value, bytes)
+            else str(raw_value)
+        )
+        if not isinstance(parsed, dict):
+            return None
+        token = str(parsed.get("token") or "").strip()
+        expires_at = _safe_float(parsed.get("expires_at"))
+        if not token or expires_at is None or expires_at <= (time.time() + 20):
+            return None
+        return {
+            "token": token,
+            "expires_at": float(expires_at),
+            "source": "redis_cache",
+        }
+    except Exception:
+        return None
+
+
+def _save_shadow_service_token_to_redis(
+    *,
+    redis_url: str,
+    key: str,
+    token: str,
+    expires_at: float,
+) -> None:
+    if redis is None or not redis_url:
+        return
+    ttl_seconds = max(1, int(expires_at - time.time()))
+    if ttl_seconds <= 0:
+        return
+    try:
+        client = redis.Redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
+        client.set(
+            key,
+            json.dumps(
+                {"token": token, "expires_at": float(expires_at)},
+                ensure_ascii=True,
+            ),
+            ex=ttl_seconds,
+        )
+    except Exception:
+        return
+
+
+def _clear_shadow_service_token_from_redis(*, redis_url: str, key: str) -> None:
+    if redis is None or not redis_url:
+        return
+    try:
+        client = redis.Redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
+        client.delete(key)
+    except Exception:
+        return
+
+
+def _request_shadow_pairing_code(
+    *,
+    gateway_url: str,
+    webhook_secret: str,
+    timeout_seconds: int,
+) -> Tuple[Optional[str], Optional[str]]:
+    headers: Dict[str, str] = {}
+    if webhook_secret:
+        headers["X-Webhook-Secret"] = webhook_secret
+    try:
+        response = requests.post(
+            f"{gateway_url}/pairing-code",
+            headers=headers if headers else None,
+            timeout=timeout_seconds,
+        )
+    except Exception as exc:
+        return None, str(exc)
+    if not response.ok:
+        return None, _read_json_error(response)
+    payload = _safe_json_loads(response.text)
+    if not isinstance(payload, dict):
+        return None, "Pairing code response was not valid JSON."
+    pairing_code = str(payload.get("pairing_code") or "").strip()
+    if not re.fullmatch(r"\d{6}", pairing_code):
+        return None, "Pairing code response did not include a valid one-time code."
+    return pairing_code, None
+
+
+def _pair_shadow_service_token(
+    *,
+    gateway_url: str,
+    pairing_code: str,
+    timeout_seconds: int,
+) -> Tuple[Optional[str], Optional[str]]:
+    try:
+        response = requests.post(
+            f"{gateway_url}/pair",
+            headers={"X-Pairing-Code": pairing_code},
+            timeout=timeout_seconds,
+        )
+    except Exception as exc:
+        return None, str(exc)
+    if not response.ok:
+        return None, _read_json_error(response)
+    payload = _safe_json_loads(response.text)
+    if not isinstance(payload, dict):
+        return None, "Shadow pair response was not valid JSON."
+    token = str(payload.get("token") or "").strip()
+    if not token:
+        return None, "Shadow pair response did not include bearer token."
+    return token, None
+
+
+def _clear_shadow_service_token_cache() -> None:
+    redis_url = _resolve_shadow_token_redis_url()
+    redis_key = _resolve_shadow_service_token_cache_key()
+    with _SHADOW_ADVISOR_TOKEN_CACHE_LOCK:
+        _SHADOW_ADVISOR_TOKEN_CACHE["token"] = None
+        _SHADOW_ADVISOR_TOKEN_CACHE["expires_at"] = 0.0
+        _SHADOW_ADVISOR_TOKEN_CACHE["source"] = "cleared"
+    _clear_shadow_service_token_from_redis(redis_url=redis_url, key=redis_key)
+
+
+def _get_shadow_service_token(
+    *,
+    gateway_url: str,
+    webhook_secret: str,
+    timeout_seconds: int,
+) -> Tuple[Optional[str], str, Optional[str]]:
+    now = time.time()
+    with _SHADOW_ADVISOR_TOKEN_CACHE_LOCK:
+        token = str(_SHADOW_ADVISOR_TOKEN_CACHE.get("token") or "").strip()
+        expires_at = _safe_float(_SHADOW_ADVISOR_TOKEN_CACHE.get("expires_at")) or 0.0
+        source = str(_SHADOW_ADVISOR_TOKEN_CACHE.get("source") or "memory")
+        if token and expires_at > (now + 20):
+            return token, source or "memory_cache", None
+
+    redis_url = _resolve_shadow_token_redis_url()
+    redis_key = _resolve_shadow_service_token_cache_key()
+    cached = _load_shadow_service_token_from_redis(redis_url=redis_url, key=redis_key)
+    if isinstance(cached, dict):
+        cached_token = str(cached.get("token") or "").strip()
+        cached_expires = _safe_float(cached.get("expires_at")) or 0.0
+        if cached_token and cached_expires > (now + 20):
+            with _SHADOW_ADVISOR_TOKEN_CACHE_LOCK:
+                _SHADOW_ADVISOR_TOKEN_CACHE["token"] = cached_token
+                _SHADOW_ADVISOR_TOKEN_CACHE["expires_at"] = cached_expires
+                _SHADOW_ADVISOR_TOKEN_CACHE["source"] = "redis_cache"
+            return cached_token, "redis_cache", None
+
+    pairing_code, pairing_error = _request_shadow_pairing_code(
+        gateway_url=gateway_url,
+        webhook_secret=webhook_secret,
+        timeout_seconds=timeout_seconds,
+    )
+    if not pairing_code:
+        return None, "none", pairing_error or "Unable to request pairing code."
+
+    token, pair_error = _pair_shadow_service_token(
+        gateway_url=gateway_url,
+        pairing_code=pairing_code,
+        timeout_seconds=timeout_seconds,
+    )
+    if not token:
+        return None, "none", pair_error or "Unable to pair shadow advisor token."
+
+    ttl_seconds = _resolve_shadow_service_token_ttl_seconds()
+    expires_at = now + float(ttl_seconds)
+    with _SHADOW_ADVISOR_TOKEN_CACHE_LOCK:
+        _SHADOW_ADVISOR_TOKEN_CACHE["token"] = token
+        _SHADOW_ADVISOR_TOKEN_CACHE["expires_at"] = expires_at
+        _SHADOW_ADVISOR_TOKEN_CACHE["source"] = "fresh_pair"
+
+    _save_shadow_service_token_to_redis(
+        redis_url=redis_url,
+        key=redis_key,
+        token=token,
+        expires_at=expires_at,
+    )
+    return token, "fresh_pair", None
+
+
+def _resolve_agent_pre_review_profile() -> str:
+    configured = str(
+        os.environ.get("AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_PROFILE", "") or ""
+    ).strip()
+    return configured or _AGENT_PRE_REVIEW_DEFAULT_PROFILE
+
+
+def _resolve_agent_pre_review_timeout_seconds() -> int:
+    raw_value = str(
+        os.environ.get("AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_TIMEOUT_MS", "")
+        or ""
+    ).strip()
+    fallback_ms = _AGENT_PRE_REVIEW_DEFAULT_TIMEOUT_MS
+    try:
+        parsed_ms = int(raw_value) if raw_value else fallback_ms
+    except Exception:
+        parsed_ms = fallback_ms
+    return max(1, min(60, parsed_ms // 1000 or 1))
+
+
+def _resolve_agent_pre_review_max_cases() -> int:
+    raw_value = str(
+        os.environ.get("AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_MAX_CASES", "")
+        or ""
+    ).strip()
+    try:
+        parsed = int(raw_value) if raw_value else _AGENT_PRE_REVIEW_DEFAULT_MAX_CASES
+    except Exception:
+        parsed = _AGENT_PRE_REVIEW_DEFAULT_MAX_CASES
+    return max(1, min(100, parsed))
+
+
+def _resolve_profile_primary_model(profile_id: str) -> str:
+    normalized_profile = _normalize_text(profile_id)
+    if not normalized_profile:
+        return ""
+    env_key = f"AGENT_MODEL_{normalized_profile.upper()}_PRIMARY"
+    configured = str(os.environ.get(env_key, "") or "").strip()
+    if configured:
+        return configured
+    defaults = {
+        "koro": "qwen3:14b",
+        "devstral": "devstral-small-2:latest",
+        "sentinel": "gemma3:12b",
+        "forge": "qwen2.5-coder:14b",
+        "draftsmith": "joshuaokolo/C3Dv0:latest",
+        "gridsage": "ALIENTELLIGENCE/electricalengineerv2:latest",
+    }
+    return defaults.get(normalized_profile, "")
+
+
+def _extract_gateway_model_ids(payload: Any) -> Set[str]:
+    ids: Set[str] = set()
+    if isinstance(payload, dict):
+        data_list = payload.get("data") if isinstance(payload.get("data"), list) else []
+        model_list = (
+            payload.get("models") if isinstance(payload.get("models"), list) else []
+        )
+        for entry in [*data_list, *model_list]:
+            if not isinstance(entry, dict):
+                continue
+            for key in ("id", "model", "name"):
+                value = str(entry.get(key) or "").strip()
+                if value:
+                    ids.add(value)
+    elif isinstance(payload, list):
+        for entry in payload:
+            if isinstance(entry, str) and entry.strip():
+                ids.add(entry.strip())
+            elif isinstance(entry, dict):
+                for key in ("id", "model", "name"):
+                    value = str(entry.get(key) or "").strip()
+                    if value:
+                        ids.add(value)
+    return ids
+
+
+def _preflight_agent_pre_review_model(
+    *,
+    gateway_url: str,
+    headers: Dict[str, str],
+    profile_id: str,
+    timeout_seconds: int,
+) -> Dict[str, Any]:
+    expected_model = _resolve_profile_primary_model(profile_id)
+    preflight: Dict[str, Any] = {
+        "checked": False,
+        "available": False,
+        "expected_model": expected_model or None,
+        "reason": "not_checked",
+    }
+    if not expected_model:
+        preflight["checked"] = True
+        preflight["available"] = False
+        preflight["reason"] = f"No configured primary model for profile `{profile_id}`."
+        return preflight
+    try:
+        response = requests.get(
+            f"{gateway_url}/v1/models",
+            headers=headers if headers else None,
+            timeout=max(1, min(timeout_seconds, 10)),
+        )
+    except Exception as exc:
+        preflight["checked"] = True
+        preflight["available"] = False
+        preflight["reason"] = f"Model preflight failed: {exc}"
+        return preflight
+
+    preflight["checked"] = True
+    if not response.ok:
+        preflight["available"] = False
+        preflight["reason"] = _read_json_error(response)
+        return preflight
+    payload = _safe_json_loads(response.text)
+    model_ids = _extract_gateway_model_ids(payload)
+    if expected_model in model_ids:
+        preflight["available"] = True
+        preflight["reason"] = "model_available"
+    else:
+        preflight["available"] = False
+        preflight["reason"] = (
+            f"Expected model `{expected_model}` was not listed by gateway `/v1/models`."
+        )
+    return preflight
+
+
+def _normalize_agent_pre_review_hints(raw_value: Any) -> Dict[str, Dict[str, Any]]:
+    if not isinstance(raw_value, list):
+        return {}
+    hints: Dict[str, Dict[str, Any]] = {}
+    for raw_hint in raw_value:
+        if not isinstance(raw_hint, dict):
+            continue
+        action_id = str(raw_hint.get("action_id") or "").strip()
+        if not action_id:
+            continue
+        boosts: Dict[str, float] = {}
+        raw_boosts = raw_hint.get("candidate_boosts")
+        if isinstance(raw_boosts, dict):
+            for entity_id_raw, boost_raw in raw_boosts.items():
+                entity_id = str(entity_id_raw or "").strip()
+                boost = _safe_float(boost_raw)
+                if not entity_id or boost is None or boost <= 0:
+                    continue
+                boosts[entity_id] = _clamp_value(
+                    boost,
+                    minimum=0.0,
+                    maximum=_AGENT_PRE_REVIEW_MAX_BOOST,
+                )
+        elif isinstance(raw_boosts, list):
+            for entry in raw_boosts:
+                if not isinstance(entry, dict):
+                    continue
+                entity_id = str(entry.get("entity_id") or "").strip()
+                boost = _safe_float(entry.get("boost"))
+                if not entity_id or boost is None or boost <= 0:
+                    continue
+                boosts[entity_id] = _clamp_value(
+                    boost,
+                    minimum=0.0,
+                    maximum=_AGENT_PRE_REVIEW_MAX_BOOST,
+                )
+        if len(boosts) > _AGENT_PRE_REVIEW_MAX_CANDIDATE_BOOSTS_PER_ACTION:
+            sorted_boosts = sorted(
+                boosts.items(),
+                key=lambda item: (-float(item[1]), str(item[0])),
+            )
+            boosts = dict(sorted_boosts[:_AGENT_PRE_REVIEW_MAX_CANDIDATE_BOOSTS_PER_ACTION])
+
+        intent_hint = str(raw_hint.get("intent_hint") or "").strip().upper() or None
+        if intent_hint and intent_hint not in {"ADD", "DELETE", "NOTE", "UNCLASSIFIED"}:
+            intent_hint = None
+        roi_hint = _normalize_bounds(raw_hint.get("roi_hint"))
+        rationale = str(raw_hint.get("rationale") or "").strip()
+        hints[action_id] = {
+            "candidate_boosts": boosts,
+            "intent_hint": intent_hint,
+            "roi_hint": _copy_bounds(roi_hint) if roi_hint else None,
+            "rationale": rationale or None,
+        }
+    return hints
+
+
+def _run_agent_pre_review(
+    *,
+    request_id: str,
+    review_cases: List[Dict[str, Any]],
+    review_mode: str,
+    logger: Any,
+) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]]]:
+    profile_id = _resolve_agent_pre_review_profile()
+    enabled_env = _env_flag("AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_ENABLED", default=True)
+    enabled = enabled_env and review_mode == _COMPARE_AGENT_REVIEW_MODE_PRE
+    result: Dict[str, Any] = {
+        "enabled": enabled,
+        "attempted": False,
+        "available": False,
+        "used": False,
+        "profile": profile_id,
+        "latency_ms": None,
+        "hints_count": 0,
+        "error": None,
+        "auth": {
+            "mode": "service_token",
+            "token_source": "none",
+            "refresh_attempted": False,
+        },
+        "preflight": {
+            "checked": False,
+            "available": False,
+            "expected_model": _resolve_profile_primary_model(profile_id) or None,
+            "reason": "not_checked",
+        },
+    }
+    if not enabled:
+        result["error"] = (
+            "Agent pre-review disabled by request."
+            if review_mode == _COMPARE_AGENT_REVIEW_MODE_OFF
+            else "Agent pre-review disabled by AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_ENABLED."
+        )
+        return result, {}
+    if not review_cases:
+        result["available"] = True
+        return result, {}
+
+    gateway_url = str(os.environ.get("AGENT_GATEWAY_URL", "") or "").strip().rstrip("/")
+    if not gateway_url:
+        result["error"] = "AGENT_GATEWAY_URL is not configured."
+        return result, {}
+
+    timeout_seconds = _resolve_agent_pre_review_timeout_seconds()
+    max_cases = _resolve_agent_pre_review_max_cases()
+    result["attempted"] = True
+    headers = {"Content-Type": "application/json"}
+    webhook_secret = str(os.environ.get("AGENT_WEBHOOK_SECRET", "") or "").strip()
+    if webhook_secret:
+        headers["X-Webhook-Secret"] = webhook_secret
+
+    token, token_source, token_error = _get_shadow_service_token(
+        gateway_url=gateway_url,
+        webhook_secret=webhook_secret,
+        timeout_seconds=timeout_seconds,
+    )
+    result["auth"] = {
+        "mode": "service_token",
+        "token_source": token_source,
+        "refresh_attempted": False,
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    elif token_error:
+        result["error"] = f"Agent pre-review token unavailable: {token_error}"
+        return result, {}
+
+    preflight = _preflight_agent_pre_review_model(
+        gateway_url=gateway_url,
+        headers=headers,
+        profile_id=profile_id,
+        timeout_seconds=timeout_seconds,
+    )
+    result["preflight"] = preflight
+    if preflight.get("checked") and not bool(preflight.get("available")):
+        result["error"] = str(preflight.get("reason") or "Agent model preflight failed.")
+        return result, {}
+
+    started_at = time.perf_counter()
+    prompt_payload = {
+        "task": "autodraft_compare_pre_review",
+        "request_id": request_id,
+        "instructions": (
+            "Return strict JSON only. You are advisory only and must not override deterministic rules. "
+            "Suggest bounded candidate boosts for likely replacement targets. "
+            "Do not suggest replacing red SEE DWG reference notes."
+        ),
+        "cases": review_cases[:max_cases],
+        "response_schema": {
+            "hints": [
+                {
+                    "action_id": "string",
+                    "candidate_boosts": [
+                        {
+                            "entity_id": "string",
+                            "boost": "number 0..0.12",
+                        }
+                    ],
+                    "intent_hint": "ADD|DELETE|NOTE|UNCLASSIFIED|null",
+                    "roi_hint": {
+                        "x": "number",
+                        "y": "number",
+                        "width": "number",
+                        "height": "number",
+                    },
+                    "rationale": "string",
+                }
+            ]
+        },
+    }
+    try:
+        response = requests.post(
+            f"{gateway_url}/webhook",
+            headers=headers,
+            json={
+                "profile_id": profile_id,
+                "message": json.dumps(prompt_payload, ensure_ascii=True),
+            },
+            timeout=timeout_seconds,
+        )
+    except Exception as exc:
+        result["error"] = str(exc)
+        result["latency_ms"] = round((time.perf_counter() - started_at) * 1000.0, 2)
+        return result, {}
+    result["latency_ms"] = round((time.perf_counter() - started_at) * 1000.0, 2)
+
+    if response.status_code in {401, 403}:
+        _clear_shadow_service_token_cache()
+        refreshed_token, refreshed_source, refreshed_error = _get_shadow_service_token(
+            gateway_url=gateway_url,
+            webhook_secret=webhook_secret,
+            timeout_seconds=timeout_seconds,
+        )
+        result["auth"] = {
+            "mode": "service_token",
+            "token_source": refreshed_source,
+            "refresh_attempted": True,
+        }
+        if not refreshed_token:
+            result["error"] = (
+                "Agent pre-review auth refresh failed: "
+                f"{refreshed_error or _read_json_error(response)}"
+            )
+            return result, {}
+        retry_headers = dict(headers)
+        retry_headers["Authorization"] = f"Bearer {refreshed_token}"
+        try:
+            response = requests.post(
+                f"{gateway_url}/webhook",
+                headers=retry_headers,
+                json={
+                    "profile_id": profile_id,
+                    "message": json.dumps(prompt_payload, ensure_ascii=True),
+                },
+                timeout=timeout_seconds,
+            )
+        except Exception as exc:
+            result["error"] = str(exc)
+            return result, {}
+
+    if not response.ok:
+        result["error"] = _read_json_error(response)
+        return result, {}
+
+    payload = _safe_json_loads(response.text)
+    if not isinstance(payload, dict):
+        result["error"] = "Agent pre-review response was not JSON."
+        return result, {}
+    raw_hints: Any = payload.get("hints")
+    if not isinstance(raw_hints, list):
+        shadow_text = _extract_shadow_text(payload)
+        extracted = _extract_json_object_from_text(shadow_text) if shadow_text else None
+        if isinstance(extracted, dict):
+            raw_hints = extracted.get("hints")
+    hints_map = _normalize_agent_pre_review_hints(raw_hints)
+    result["available"] = True
+    result["used"] = bool(hints_map)
+    result["hints_count"] = len(hints_map)
+    if not hints_map:
+        result["error"] = "Agent pre-review returned no structured hints."
+        if logger is not None and hasattr(logger, "info"):
+            logger.info(
+                "AutoDraft compare pre-review returned empty hints request_id=%s",
+                request_id,
+            )
+    return result, hints_map
+
+
+def _run_shadow_advisor(
+    *,
+    request_id: str,
+    review_cases: List[Dict[str, Any]],
+    logger: Any,
+) -> Dict[str, Any]:
+    enabled = _env_flag("AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED", default=True)
+    result: Dict[str, Any] = {
+        "enabled": enabled,
+        "available": False,
+        "profile": _SHADOW_ADVISOR_PROFILE,
+        "reviews": [],
+        "error": None,
+        "auth": {
+            "mode": "service_token",
+            "token_source": "none",
+            "refresh_attempted": False,
+        },
+    }
+    if not enabled:
+        result["error"] = "Shadow advisor disabled by AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED."
+        return result
+    if not review_cases:
+        result["available"] = True
+        return result
+
+    gateway_url = str(os.environ.get("AGENT_GATEWAY_URL", "") or "").strip().rstrip("/")
+    if not gateway_url:
+        result["error"] = "AGENT_GATEWAY_URL is not configured."
+        return result
+
+    timeout_ms_raw = str(os.environ.get("AUTODRAFT_COMPARE_SHADOW_TIMEOUT_MS", "8000") or "").strip()
+    try:
+        timeout_seconds = max(1, min(30, int(timeout_ms_raw) // 1000 or 8))
+    except Exception:
+        timeout_seconds = 8
+
+    prompt_payload = {
+        "task": "autodraft_compare_shadow_review",
+        "request_id": request_id,
+        "instructions": (
+            "For each case, return one best suggestion in strict JSON. "
+            "Do not include prose outside JSON."
+        ),
+        "cases": review_cases[:_SHADOW_ADVISOR_MAX_CASES],
+        "response_schema": {
+            "reviews": [
+                {
+                    "action_id": "string",
+                    "suggested_old_text": "string|null",
+                    "suggested_entity_id": "string|null",
+                    "confidence": "number 0..1",
+                    "rationale": "string",
+                }
+            ]
+        },
+    }
+    headers = {"Content-Type": "application/json"}
+    webhook_secret = str(os.environ.get("AGENT_WEBHOOK_SECRET", "") or "").strip()
+    if webhook_secret:
+        headers["X-Webhook-Secret"] = webhook_secret
+    gateway_token, token_source, token_error = _get_shadow_service_token(
+        gateway_url=gateway_url,
+        webhook_secret=webhook_secret,
+        timeout_seconds=timeout_seconds,
+    )
+    result["auth"] = {
+        "mode": "service_token",
+        "token_source": token_source,
+        "refresh_attempted": False,
+    }
+    if gateway_token:
+        headers["Authorization"] = f"Bearer {gateway_token}"
+    elif token_error:
+        result["error"] = f"Shadow advisor token unavailable: {token_error}"
+        return result
+
+    try:
+        response = requests.post(
+            f"{gateway_url}/webhook",
+            headers=headers,
+            json={
+                "profile_id": _SHADOW_ADVISOR_PROFILE,
+                "message": json.dumps(prompt_payload, ensure_ascii=True),
+            },
+            timeout=timeout_seconds,
+        )
+    except Exception as exc:
+        result["error"] = str(exc)
+        return result
+
+    if response.status_code in {401, 403}:
+        _clear_shadow_service_token_cache()
+        refreshed_token, refreshed_source, refreshed_error = _get_shadow_service_token(
+            gateway_url=gateway_url,
+            webhook_secret=webhook_secret,
+            timeout_seconds=timeout_seconds,
+        )
+        result["auth"] = {
+            "mode": "service_token",
+            "token_source": refreshed_source,
+            "refresh_attempted": True,
+        }
+        if not refreshed_token:
+            result["error"] = (
+                f"Shadow advisor auth refresh failed: {refreshed_error or _read_json_error(response)}"
+            )
+            return result
+        retry_headers = dict(headers)
+        retry_headers["Authorization"] = f"Bearer {refreshed_token}"
+        try:
+            response = requests.post(
+                f"{gateway_url}/webhook",
+                headers=retry_headers,
+                json={
+                    "profile_id": _SHADOW_ADVISOR_PROFILE,
+                    "message": json.dumps(prompt_payload, ensure_ascii=True),
+                },
+                timeout=timeout_seconds,
+            )
+        except Exception as exc:
+            result["error"] = str(exc)
+            return result
+
+    if not response.ok:
+        result["error"] = _read_json_error(response)
+        return result
+
+    payload = _safe_json_loads(response.text)
+    if not isinstance(payload, dict):
+        result["error"] = "Shadow advisor response was not JSON."
+        return result
+
+    reviews_raw: Any = payload.get("reviews")
+    if not isinstance(reviews_raw, list):
+        shadow_text = _extract_shadow_text(payload)
+        extracted = _extract_json_object_from_text(shadow_text) if shadow_text else None
+        if isinstance(extracted, dict):
+            reviews_raw = extracted.get("reviews")
+
+    reviews = _normalize_shadow_reviews(reviews_raw)
+    result["available"] = True
+    result["reviews"] = reviews
+    if not reviews:
+        result["error"] = "Shadow advisor returned no structured review suggestions."
+    return result
+
+
+def _build_replacement_review_message(replacement: Dict[str, Any]) -> str:
+    new_text = str(replacement.get("new_text") or "").strip()
+    old_text = str(replacement.get("old_text") or "").strip()
+    status = _normalize_text(replacement.get("status"))
+    if status == _REPLACEMENT_STATUS_RESOLVED and old_text:
+        return f"Detected replacement candidate: '{old_text}' -> '{new_text}'."
+    if status == _REPLACEMENT_STATUS_AMBIGUOUS:
+        return (
+            f"Replacement for '{new_text}' is ambiguous; multiple nearby CAD text candidates were found."
+        )
+    return f"Could not confidently determine the existing CAD text replaced by '{new_text}'."
+
+
+def _build_agent_pre_review_cases(
+    *,
+    actions: List[Dict[str, Any]],
+    baseline_replacements: Dict[str, Dict[str, Any]],
+    max_cases: int,
+) -> List[Dict[str, Any]]:
+    cases: List[Dict[str, Any]] = []
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        action_id = str(action.get("id") or "").strip()
+        if not action_id:
+            continue
+        replacement = baseline_replacements.get(action_id)
+        if not isinstance(replacement, dict):
+            continue
+        markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+        markup_bounds = _normalize_bounds(markup.get("bounds"))
+        candidates = replacement.get("candidates") if isinstance(replacement.get("candidates"), list) else []
+        cases.append(
+            {
+                "action_id": action_id,
+                "new_text": str(replacement.get("new_text") or ""),
+                "status": str(replacement.get("status") or ""),
+                "confidence": float(_safe_float(replacement.get("confidence")) or 0.0),
+                "markup": {
+                    "id": str(markup.get("id") or "").strip() or None,
+                    "type": str(markup.get("type") or "").strip() or "unknown",
+                    "color": str(markup.get("color") or "").strip() or "unknown",
+                    "text": str(markup.get("text") or "").strip(),
+                    "bounds": _copy_bounds(markup_bounds) if markup_bounds else None,
+                },
+                "candidates": candidates[:_REPLACEMENT_MAX_CANDIDATES],
+            }
+        )
+        if len(cases) >= max_cases:
+            break
+    return cases
+
+
+def _enrich_compare_result_with_replacements(
+    *,
+    compare_result: Dict[str, Any],
+    cad_context: Dict[str, Any],
+    request_id: str,
+    tuning: Optional[Dict[str, float]] = None,
+    review_mode: str = _COMPARE_AGENT_REVIEW_MODE_PRE,
+    logger: Any = None,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    plan_obj = compare_result.get("plan")
+    if not isinstance(plan_obj, dict):
+        return [], {
+            "enabled": False,
+            "attempted": False,
+            "available": False,
+            "used": False,
+            "profile": _resolve_agent_pre_review_profile(),
+            "latency_ms": None,
+            "hints_count": 0,
+            "error": "Plan payload unavailable for pre-review.",
+            "auth": {
+                "mode": "service_token",
+                "token_source": "none",
+                "refresh_attempted": False,
+            },
+            "preflight": {
+                "checked": False,
+                "available": False,
+                "expected_model": _resolve_profile_primary_model(_resolve_agent_pre_review_profile()) or None,
+                "reason": "not_checked",
+            },
+        }
+    actions = plan_obj.get("actions")
+    if not isinstance(actions, list):
+        return [], {
+            "enabled": False,
+            "attempted": False,
+            "available": False,
+            "used": False,
+            "profile": _resolve_agent_pre_review_profile(),
+            "latency_ms": None,
+            "hints_count": 0,
+            "error": "Action payload unavailable for pre-review.",
+            "auth": {
+                "mode": "service_token",
+                "token_source": "none",
+                "refresh_attempted": False,
+            },
+            "preflight": {
+                "checked": False,
+                "available": False,
+                "expected_model": _resolve_profile_primary_model(_resolve_agent_pre_review_profile()) or None,
+                "reason": "not_checked",
+            },
+        }
+
+    backcheck_obj = (
+        compare_result.get("backcheck")
+        if isinstance(compare_result.get("backcheck"), dict)
+        else {}
+    )
+    findings = backcheck_obj.get("findings") if isinstance(backcheck_obj.get("findings"), list) else []
+    finding_by_action_id: Dict[str, Dict[str, Any]] = {}
+    for entry in findings:
+        if not isinstance(entry, dict):
+            continue
+        action_id = str(entry.get("action_id") or "").strip()
+        if action_id:
+            finding_by_action_id[action_id] = entry
+
+    db_path = _resolve_compare_feedback_db_path()
+    metric_scores = _load_replacement_metric_scores(db_path)
+    weights = _resolve_replacement_weights(metric_scores)
+    text_entities = _extract_text_entities(cad_context)
+
+    replacement_actions = [
+        action
+        for action in actions
+        if isinstance(action, dict) and _is_replacement_markup_candidate(action)
+    ]
+    baseline_replacements: Dict[str, Dict[str, Any]] = {}
+    for action in replacement_actions:
+        action_id = str(action.get("id") or "").strip()
+        if not action_id:
+            continue
+        baseline = _infer_action_replacement(
+            action=action,
+            text_entities=text_entities,
+            weights=weights,
+            db_path=db_path,
+            tuning=tuning,
+            agent_hint=None,
+        )
+        if isinstance(baseline, dict):
+            baseline_replacements[action_id] = baseline
+
+    pre_review_cases = _build_agent_pre_review_cases(
+        actions=replacement_actions,
+        baseline_replacements=baseline_replacements,
+        max_cases=_resolve_agent_pre_review_max_cases(),
+    )
+    pre_review_result, hint_map = _run_agent_pre_review(
+        request_id=request_id,
+        review_cases=pre_review_cases,
+        review_mode=review_mode,
+        logger=logger,
+    )
+
+    review_queue: List[Dict[str, Any]] = []
+    warned_count = 0
+    for action in replacement_actions:
+        action_id = str(action.get("id") or "").strip()
+        if not action_id:
+            continue
+        action_hint = hint_map.get(action_id)
+        replacement = _infer_action_replacement(
+            action=action,
+            text_entities=text_entities,
+            weights=weights,
+            db_path=db_path,
+            tuning=tuning,
+            agent_hint=action_hint,
+        )
+        if not replacement:
+            continue
+        action["replacement"] = replacement
+
+        finding = finding_by_action_id.get(action_id)
+        if isinstance(finding, dict):
+            finding["replacement"] = replacement
+            if _normalize_text(replacement.get("status")) in _REPLACEMENT_WARN_STATUSES:
+                _promote_finding_to_warn(finding)
+                notes = finding.get("notes") if isinstance(finding.get("notes"), list) else []
+                suggestions = (
+                    finding.get("suggestions")
+                    if isinstance(finding.get("suggestions"), list)
+                    else []
+                )
+                _append_unique_note(
+                    notes,
+                    _build_replacement_review_message(replacement),
+                )
+                _append_unique_note(
+                    suggestions,
+                    "Review replacement target and confirm old->new text mapping before execution.",
+                )
+                finding["notes"] = notes
+                finding["suggestions"] = suggestions
+                warned_count += 1
+
+        review_queue.append(
+            {
+                "id": f"review-{action_id or len(review_queue) + 1}",
+                "request_id": request_id,
+                "action_id": action_id,
+                "status": replacement.get("status"),
+                "confidence": replacement.get("confidence"),
+                "new_text": replacement.get("new_text"),
+                "selected_old_text": replacement.get("old_text"),
+                "selected_entity_id": replacement.get("target_entity_id"),
+                "message": _build_replacement_review_message(replacement),
+                "candidates": replacement.get("candidates")
+                if isinstance(replacement.get("candidates"), list)
+                else [],
+                "agent_hint": action_hint if isinstance(action_hint, dict) else None,
+                "shadow": None,
+            }
+        )
+
+    if warned_count > 0:
+        warnings = backcheck_obj.get("warnings") if isinstance(backcheck_obj.get("warnings"), list) else []
+        _append_unique_note(
+            warnings,
+            f"Replacement inference flagged {warned_count} action(s) for operator review.",
+        )
+        backcheck_obj["warnings"] = warnings
+
+    _recompute_backcheck_summary(backcheck_obj)
+    compare_result["backcheck"] = backcheck_obj
+    _recompute_compare_summary(compare_result)
+    compare_result["review_queue"] = review_queue
+    return review_queue, pre_review_result
+
+
+def _normalize_feedback_items(raw_payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    raw_items = raw_payload.get("items")
+    if isinstance(raw_items, list):
+        iterable = raw_items
+    else:
+        iterable = [raw_payload]
+
+    items: List[Dict[str, Any]] = []
+    for entry in iterable:
+        if not isinstance(entry, dict):
+            continue
+        action_id = str(entry.get("action_id") or "").strip()
+        review_status = _normalize_text(entry.get("review_status"))
+        feedback_type = _normalize_text(entry.get("feedback_type")) or "replacement_review"
+        has_markup_learning_fields = any(
+            key in entry
+            for key in (
+                "markup_id",
+                "markup",
+                "corrected_markup_class",
+                "corrected_intent",
+                "corrected_color",
+                "paired_annotation_ids",
+                "ocr_text",
+                "corrected_text",
+                "recognition",
+                "override_reason",
+            )
+        )
+        is_replacement_review = bool(action_id) and review_status in _REPLACEMENT_REVIEW_ACTIONS
+        if not is_replacement_review and not has_markup_learning_fields:
+            continue
+        candidates = entry.get("candidates") if isinstance(entry.get("candidates"), list) else []
+        selected_candidate = (
+            entry.get("selected_candidate")
+            if isinstance(entry.get("selected_candidate"), dict)
+            else {}
+        )
+        agent_suggestion = (
+            entry.get("agent_suggestion")
+            if isinstance(entry.get("agent_suggestion"), dict)
+            else {}
+        )
+        accepted_agent_suggestion = _normalize_boolean(
+            entry.get("accepted_agent_suggestion"),
+            default=False,
+        )
+        item = {
+            "feedback_type": feedback_type if has_markup_learning_fields else "replacement_review",
+            "request_id": str(entry.get("request_id") or raw_payload.get("requestId") or "").strip(),
+            "action_id": action_id,
+            "review_status": review_status if review_status in _REPLACEMENT_REVIEW_ACTIONS else "unresolved",
+            "new_text": str(entry.get("new_text") or "").strip(),
+            "selected_old_text": str(entry.get("selected_old_text") or "").strip(),
+            "selected_entity_id": str(entry.get("selected_entity_id") or "").strip(),
+            "confidence": _safe_float(entry.get("confidence")),
+            "note": str(entry.get("note") or "").strip(),
+            "candidates": candidates,
+            "selected_candidate": selected_candidate,
+            "agent_suggestion": agent_suggestion,
+            "accepted_agent_suggestion": accepted_agent_suggestion,
+            "markup_id": str(entry.get("markup_id") or "").strip(),
+            "payload": dict(entry),
+        }
+        items.append(item)
+    return items
+
+
+def _text_similarity_ratio(left: Any, right: Any) -> float:
+    import difflib
+
+    left_text = _normalize_learning_text(left)
+    right_text = _normalize_learning_text(right)
+    if not left_text or not right_text:
+        return 0.0
+    return round(
+        _clamp_value(
+            difflib.SequenceMatcher(None, left_text, right_text).ratio(),
+            minimum=0.0,
+            maximum=1.0,
+        ),
+        4,
+    )
+
+
+def _replacement_learning_features(
+    *,
+    payload: Dict[str, Any],
+    candidate: Dict[str, Any],
+) -> Dict[str, Any]:
+    markup = payload.get("markup") if isinstance(payload.get("markup"), dict) else {}
+    bounds = _normalize_bounds(markup.get("bounds"))
+    score_components = (
+        candidate.get("score_components")
+        if isinstance(candidate.get("score_components"), dict)
+        else {}
+    )
+    candidates = payload.get("candidates") if isinstance(payload.get("candidates"), list) else []
+    return {
+        "distance": _safe_float(candidate.get("distance")) or 0.0,
+        "pointer_hit": 1.0 if bool(candidate.get("pointer_hit")) else 0.0,
+        "overlap": 1.0 if bool(candidate.get("overlap")) else 0.0,
+        "pair_hit_count": _safe_float(candidate.get("pair_hit_count")) or 0.0,
+        "text_similarity": _text_similarity_ratio(
+            payload.get("new_text"),
+            candidate.get("text"),
+        ),
+        "same_color": 1.0 if _normalize_text(markup.get("color")) != "unknown" else 0.0,
+        "same_type": 1.0 if _normalize_text(markup.get("type")) == "text" else 0.0,
+        "cad_entity_count": float(len(candidates)),
+        "base_score": _safe_float(score_components.get("base_score")) or _safe_float(candidate.get("score")) or 0.0,
+        "final_score": _safe_float(score_components.get("final_score")) or _safe_float(candidate.get("score")) or 0.0,
+        "markup_width": float(bounds.get("width")) if bounds else 0.0,
+        "markup_height": float(bounds.get("height")) if bounds else 0.0,
+    }
+
+
+def _build_feedback_learning_examples(
+    *,
+    items: List[Dict[str, Any]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    markup_examples: List[Dict[str, Any]] = []
+    replacement_examples: List[Dict[str, Any]] = []
+    for item in items:
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+        markup = payload.get("markup") if isinstance(payload.get("markup"), dict) else {}
+        corrected_intent = _normalize_text(payload.get("corrected_intent"))
+        corrected_markup_class = _normalize_text(payload.get("corrected_markup_class"))
+        corrected_color = _normalize_text(payload.get("corrected_color"))
+        corrected_text = str(payload.get("corrected_text") or "").strip()
+        ocr_text = str(payload.get("ocr_text") or "").strip()
+        markup_label = corrected_intent or corrected_markup_class
+        if markup_label:
+            features = _markup_learning_features(markup)
+            if corrected_color:
+                features["corrected_color"] = corrected_color
+            markup_examples.append(
+                {
+                    "label": markup_label,
+                    "text": corrected_text or ocr_text or str(markup.get("text") or ""),
+                    "features": features,
+                    "metadata": {
+                        "feedback_type": item.get("feedback_type"),
+                        "request_id": item.get("request_id"),
+                        "action_id": item.get("action_id"),
+                        "markup_id": item.get("markup_id") or payload.get("markup_id"),
+                        "corrected_color": corrected_color or None,
+                        "paired_annotation_ids": payload.get("paired_annotation_ids") or [],
+                        "override_reason": payload.get("override_reason"),
+                    },
+                    "source": "compare_feedback",
+                }
+            )
+
+        review_status = _normalize_text(item.get("review_status"))
+        selected_entity_id = _normalize_text(item.get("selected_entity_id"))
+        selected_old_text = _normalize_learning_text(item.get("selected_old_text"))
+        candidates = item.get("candidates") if isinstance(item.get("candidates"), list) else []
+        if review_status not in {"approved", "corrected"} or not candidates:
+            continue
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            candidate_entity_id = _normalize_text(candidate.get("entity_id"))
+            candidate_text_norm = _normalize_learning_text(candidate.get("text"))
+            is_selected = bool(
+                (selected_entity_id and candidate_entity_id == selected_entity_id)
+                or (selected_old_text and candidate_text_norm == selected_old_text)
+            )
+            replacement_examples.append(
+                {
+                    "label": "selected" if is_selected else "not_selected",
+                    "text": str(payload.get("new_text") or item.get("new_text") or ""),
+                    "features": _replacement_learning_features(
+                        payload={
+                            **payload,
+                            "new_text": payload.get("new_text") or item.get("new_text"),
+                            "candidates": candidates,
+                        },
+                        candidate=candidate,
+                    ),
+                    "metadata": {
+                        "request_id": item.get("request_id"),
+                        "action_id": item.get("action_id"),
+                        "entity_id": candidate.get("entity_id"),
+                        "selected": is_selected,
+                    },
+                    "source": "compare_feedback",
+                }
+            )
+    return {
+        "autodraft_markup": markup_examples,
+        "autodraft_replacement": replacement_examples,
+    }
+
+
+def _persist_feedback_items(
+    *,
+    db_path: str,
+    items: List[Dict[str, Any]],
+) -> int:
+    if not items:
+        return 0
+    inserted = 0
+    now_iso = _utc_now_iso()
+    with _COMPARE_FEEDBACK_DB_LOCK:
+        with _open_compare_feedback_db(db_path) as connection:
+            _ensure_compare_feedback_schema(connection)
+            for item in items:
+                connection.execute(
+                    """
+                    INSERT INTO feedback_events (
+                        created_utc,
+                        feedback_type,
+                        request_id,
+                        action_id,
+                        review_status,
+                        new_text,
+                        selected_old_text,
+                        selected_entity_id,
+                        confidence,
+                        note,
+                        candidates_json,
+                        selected_candidate_json,
+                        agent_suggestion_json,
+                        accepted_agent_suggestion,
+                        payload_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        now_iso,
+                        item.get("feedback_type") or "replacement_review",
+                        item.get("request_id") or None,
+                        item.get("action_id") or None,
+                        item.get("review_status") or "unresolved",
+                        item.get("new_text") or None,
+                        item.get("selected_old_text") or None,
+                        item.get("selected_entity_id") or None,
+                        float(item.get("confidence") or 0.0),
+                        item.get("note") or None,
+                        _safe_json_dumps(item.get("candidates") or []),
+                        _safe_json_dumps(item.get("selected_candidate") or {}),
+                        _safe_json_dumps(item.get("agent_suggestion") or {}),
+                        1 if bool(item.get("accepted_agent_suggestion")) else 0,
+                        _safe_json_dumps(item.get("payload") or {}),
+                    ),
+                )
+                inserted += 1
+
+                review_status = str(item.get("review_status") or "").strip().lower()
+                new_text_norm = _normalize_learning_text(item.get("new_text"))
+                old_text_norm = _normalize_learning_text(item.get("selected_old_text"))
+                if review_status in {"approved", "corrected"} and new_text_norm and old_text_norm:
+                    connection.execute(
+                        """
+                        INSERT INTO replacement_pairs (
+                            new_text_norm,
+                            old_text_norm,
+                            hit_count,
+                            last_selected_utc
+                        ) VALUES (?, ?, 1, ?)
+                        ON CONFLICT(new_text_norm, old_text_norm)
+                        DO UPDATE SET
+                            hit_count = replacement_pairs.hit_count + 1,
+                            last_selected_utc = excluded.last_selected_utc
+                        """,
+                        (new_text_norm, old_text_norm, now_iso),
+                    )
+
+                selected_candidate = (
+                    item.get("selected_candidate")
+                    if isinstance(item.get("selected_candidate"), dict)
+                    else {}
+                )
+                if review_status in {"approved", "corrected"}:
+                    pointer_hit = bool(selected_candidate.get("pointer_hit"))
+                    overlap = bool(selected_candidate.get("overlap"))
+                    metric_deltas = {
+                        "pointer_hit": 1.0 if pointer_hit else -0.25,
+                        "overlap": 1.0 if overlap else -0.25,
+                    }
+                    for metric_key, delta in metric_deltas.items():
+                        connection.execute(
+                            """
+                            INSERT INTO replacement_metrics (metric_key, score, updated_utc)
+                            VALUES (?, ?, ?)
+                            ON CONFLICT(metric_key)
+                            DO UPDATE SET
+                                score = replacement_metrics.score + excluded.score,
+                                updated_utc = excluded.updated_utc
+                            """,
+                            (metric_key, float(delta), now_iso),
+                        )
+            connection.commit()
+    return inserted
+
+
+def _export_feedback_data(
+    *,
+    db_path: str,
+) -> Dict[str, Any]:
+    with _COMPARE_FEEDBACK_DB_LOCK:
+        with _open_compare_feedback_db(db_path) as connection:
+            _ensure_compare_feedback_schema(connection)
+            event_rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    created_utc,
+                    feedback_type,
+                    request_id,
+                    action_id,
+                    review_status,
+                    new_text,
+                    selected_old_text,
+                    selected_entity_id,
+                    confidence,
+                    note,
+                    candidates_json,
+                    selected_candidate_json,
+                    agent_suggestion_json,
+                    accepted_agent_suggestion,
+                    payload_json
+                FROM feedback_events
+                ORDER BY id ASC
+                """
+            ).fetchall()
+            pair_rows = connection.execute(
+                """
+                SELECT new_text_norm, old_text_norm, hit_count, last_selected_utc
+                FROM replacement_pairs
+                ORDER BY new_text_norm ASC, old_text_norm ASC
+                """
+            ).fetchall()
+            metric_rows = connection.execute(
+                """
+                SELECT metric_key, score, updated_utc
+                FROM replacement_metrics
+                ORDER BY metric_key ASC
+                """
+            ).fetchall()
+
+    events: List[Dict[str, Any]] = []
+    for row in event_rows:
+        events.append(
+            {
+                "id": int(row["id"]),
+                "created_utc": str(row["created_utc"] or ""),
+                "feedback_type": str(row["feedback_type"] or "replacement_review"),
+                "request_id": str(row["request_id"] or ""),
+                "action_id": str(row["action_id"] or ""),
+                "review_status": str(row["review_status"] or ""),
+                "new_text": str(row["new_text"] or ""),
+                "selected_old_text": str(row["selected_old_text"] or ""),
+                "selected_entity_id": str(row["selected_entity_id"] or ""),
+                "confidence": float(row["confidence"] or 0.0),
+                "note": str(row["note"] or ""),
+                "candidates": _safe_json_loads(str(row["candidates_json"] or "[]")) or [],
+                "selected_candidate": _safe_json_loads(
+                    str(row["selected_candidate_json"] or "{}")
+                )
+                or {},
+                "agent_suggestion": _safe_json_loads(
+                    str(row["agent_suggestion_json"] or "{}")
+                )
+                or {},
+                "accepted_agent_suggestion": bool(
+                    int(_safe_float(row["accepted_agent_suggestion"]) or 0)
+                ),
+                "payload": _safe_json_loads(str(row["payload_json"] or "{}")) or {},
+            }
+        )
+    pairs = [
+        {
+            "new_text_norm": str(row["new_text_norm"] or ""),
+            "old_text_norm": str(row["old_text_norm"] or ""),
+            "hit_count": int(row["hit_count"] or 0),
+            "last_selected_utc": str(row["last_selected_utc"] or ""),
+        }
+        for row in pair_rows
+    ]
+    metrics = [
+        {
+            "metric_key": str(row["metric_key"] or ""),
+            "score": float(row["score"] or 0.0),
+            "updated_utc": str(row["updated_utc"] or ""),
+        }
+        for row in metric_rows
+    ]
+    return {
+        "events": events,
+        "pairs": pairs,
+        "metrics": metrics,
+    }
+
+
+def _import_feedback_data(
+    *,
+    db_path: str,
+    payload: Dict[str, Any],
+    mode: str,
+) -> Dict[str, int]:
+    raw_events = payload.get("events") if isinstance(payload.get("events"), list) else []
+    raw_pairs = payload.get("pairs") if isinstance(payload.get("pairs"), list) else []
+    raw_metrics = payload.get("metrics") if isinstance(payload.get("metrics"), list) else []
+    imported_events = 0
+    imported_pairs = 0
+    imported_metrics = 0
+    now_iso = _utc_now_iso()
+    with _COMPARE_FEEDBACK_DB_LOCK:
+        with _open_compare_feedback_db(db_path) as connection:
+            _ensure_compare_feedback_schema(connection)
+            if mode == "replace":
+                connection.execute("DELETE FROM feedback_events")
+                connection.execute("DELETE FROM replacement_pairs")
+                connection.execute("DELETE FROM replacement_metrics")
+
+            for entry in raw_events:
+                if not isinstance(entry, dict):
+                    continue
+                review_status = _normalize_text(entry.get("review_status"))
+                action_id = str(entry.get("action_id") or "").strip()
+                feedback_type = _normalize_text(entry.get("feedback_type")) or "replacement_review"
+                payload_json = entry.get("payload") if isinstance(entry.get("payload"), dict) else entry
+                has_markup_learning_fields = any(
+                    key in entry
+                    for key in (
+                        "markup_id",
+                        "markup",
+                        "corrected_markup_class",
+                        "corrected_intent",
+                        "corrected_color",
+                        "paired_annotation_ids",
+                        "ocr_text",
+                        "corrected_text",
+                        "recognition",
+                        "override_reason",
+                        "payload",
+                    )
+                )
+                if (
+                    (not action_id or review_status not in _REPLACEMENT_REVIEW_ACTIONS)
+                    and not has_markup_learning_fields
+                ):
+                    continue
+                connection.execute(
+                    """
+                    INSERT INTO feedback_events (
+                        created_utc,
+                        feedback_type,
+                        request_id,
+                        action_id,
+                        review_status,
+                        new_text,
+                        selected_old_text,
+                        selected_entity_id,
+                        confidence,
+                        note,
+                        candidates_json,
+                        selected_candidate_json,
+                        agent_suggestion_json,
+                        accepted_agent_suggestion,
+                        payload_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(entry.get("created_utc") or now_iso),
+                        feedback_type,
+                        str(entry.get("request_id") or "").strip() or None,
+                        action_id or None,
+                        review_status if review_status in _REPLACEMENT_REVIEW_ACTIONS else "unresolved",
+                        str(entry.get("new_text") or "").strip() or None,
+                        str(entry.get("selected_old_text") or "").strip() or None,
+                        str(entry.get("selected_entity_id") or "").strip() or None,
+                        float(_safe_float(entry.get("confidence")) or 0.0),
+                        str(entry.get("note") or "").strip() or None,
+                        _safe_json_dumps(entry.get("candidates") or []),
+                        _safe_json_dumps(entry.get("selected_candidate") or {}),
+                        _safe_json_dumps(entry.get("agent_suggestion") or {}),
+                        1
+                        if _normalize_boolean(
+                            entry.get("accepted_agent_suggestion"),
+                            default=False,
+                        )
+                        else 0,
+                        _safe_json_dumps(payload_json or {}),
+                    ),
+                )
+                imported_events += 1
+
+            for entry in raw_pairs:
+                if not isinstance(entry, dict):
+                    continue
+                new_text_norm = _normalize_learning_text(entry.get("new_text_norm"))
+                old_text_norm = _normalize_learning_text(entry.get("old_text_norm"))
+                hit_count = max(0, int(_safe_float(entry.get("hit_count")) or 0))
+                if not new_text_norm or not old_text_norm or hit_count <= 0:
+                    continue
+                connection.execute(
+                    """
+                    INSERT INTO replacement_pairs (
+                        new_text_norm,
+                        old_text_norm,
+                        hit_count,
+                        last_selected_utc
+                    ) VALUES (?, ?, ?, ?)
+                    ON CONFLICT(new_text_norm, old_text_norm)
+                    DO UPDATE SET
+                        hit_count = MAX(replacement_pairs.hit_count, excluded.hit_count),
+                        last_selected_utc = excluded.last_selected_utc
+                    """,
+                    (
+                        new_text_norm,
+                        old_text_norm,
+                        hit_count,
+                        str(entry.get("last_selected_utc") or now_iso),
+                    ),
+                )
+                imported_pairs += 1
+
+            for entry in raw_metrics:
+                if not isinstance(entry, dict):
+                    continue
+                metric_key = str(entry.get("metric_key") or "").strip()
+                score = _safe_float(entry.get("score"))
+                if not metric_key or score is None:
+                    continue
+                connection.execute(
+                    """
+                    INSERT INTO replacement_metrics (metric_key, score, updated_utc)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(metric_key)
+                    DO UPDATE SET
+                        score = excluded.score,
+                        updated_utc = excluded.updated_utc
+                    """,
+                    (
+                        metric_key,
+                        float(score),
+                        str(entry.get("updated_utc") or now_iso),
+                    ),
+                )
+                imported_metrics += 1
+
+            connection.commit()
+    return {
+        "events": imported_events,
+        "pairs": imported_pairs,
+        "metrics": imported_metrics,
+    }
 
 
 def _normalize_layer_entries(raw_layers: Any) -> List[Dict[str, Any]]:
@@ -424,6 +4417,7 @@ def _collect_live_cad_context(
     logger: Any,
     request_id: str,
     actions: Optional[List[Dict[str, Any]]] = None,
+    max_entities: int = 500,
 ) -> Optional[Dict[str, Any]]:
     if not callable(get_manager):
         return None
@@ -496,7 +4490,7 @@ def _collect_live_cad_context(
             try:
                 entities_result = manager.get_entity_snapshot(
                     layer_names=action_layer_hints,
-                    max_entities=500,
+                    max_entities=max(50, min(5000, int(max_entities or 500))),
                 )
             except TypeError:
                 entities_result = manager.get_entity_snapshot()
@@ -533,6 +4527,13 @@ def _collect_live_cad_context(
                 layer_name = str(entry.get("layer") or "").strip()
                 if layer_name:
                     normalized_entry["layer"] = layer_name
+                entity_type = str(entry.get("type") or entry.get("object_name") or "").strip()
+                if entity_type:
+                    normalized_entry["type"] = entity_type
+                entity_text = str(entry.get("text") or "").strip()
+                if entity_text:
+                    normalized_entry["text"] = entity_text
+                    normalized_entry["text_norm"] = _normalize_learning_text(entity_text)
                 normalized_entities.append(normalized_entry)
             if normalized_entities:
                 context["entities"] = normalized_entities
@@ -575,6 +4576,17 @@ def _extract_entities(cad_context: Dict[str, Any]) -> List[Dict[str, Any]]:
     return [entry for entry in raw_entities if isinstance(entry, dict)]
 
 
+def _cad_context_is_available(cad_context: Optional[Dict[str, Any]]) -> bool:
+    cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
+    if not cad_context_obj:
+        return False
+    return bool(
+        _extract_locked_layers(cad_context_obj)
+        or _extract_entities(cad_context_obj)
+        or cad_context_obj.get("drawing")
+    )
+
+
 def _finding_status_rank(status: str) -> int:
     if status == _BACKCHECK_FAIL:
         return 3
@@ -589,16 +4601,19 @@ def _build_local_backcheck(
     cad_context: Optional[Dict[str, Any]],
     request_id: str,
     cad_context_source: str = "none",
+    geometry_tolerance: float = 0.0,
 ) -> Dict[str, Any]:
     findings: List[Dict[str, Any]] = []
     warnings: List[str] = []
 
     cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
+    try:
+        geometry_tolerance_value = max(0.0, float(geometry_tolerance))
+    except Exception:
+        geometry_tolerance_value = 0.0
     locked_layers = _extract_locked_layers(cad_context_obj)
     entities = _extract_entities(cad_context_obj)
-    cad_available = bool(cad_context_obj) and (
-        bool(locked_layers) or bool(entities) or bool(cad_context_obj.get("drawing"))
-    )
+    cad_available = _cad_context_is_available(cad_context_obj)
 
     if not cad_available:
         warnings.append(
@@ -626,6 +4641,11 @@ def _build_local_backcheck(
         markup_type = _normalize_text(markup.get("type"))
         markup_color = _normalize_text(markup.get("color"))
         layer_name = _normalize_text(markup.get("layer"))
+        paired_annotation_ids = [
+            value.strip()
+            for value in (action.get("paired_annotation_ids") or [])
+            if isinstance(value, str) and value.strip()
+        ]
 
         notes: List[str] = []
         suggestions: List[str] = []
@@ -711,10 +4731,11 @@ def _build_local_backcheck(
             )
 
         if cad_available and markup_bounds:
+            effective_markup_bounds = _expand_bounds(markup_bounds, geometry_tolerance_value)
             overlapping_count = 0
             for entity in entities:
                 entity_bounds = _normalize_bounds(entity.get("bounds"))
-                if entity_bounds and _bounds_overlap(markup_bounds, entity_bounds):
+                if entity_bounds and _bounds_overlap(effective_markup_bounds, entity_bounds):
                     overlapping_count += 1
 
             if category == "delete" and overlapping_count == 0:
@@ -742,12 +4763,35 @@ def _build_local_backcheck(
                     "Verify both swap endpoints are represented in markup bounds."
                 )
 
+        if cad_available and category == "note":
+            if not markup_bounds:
+                if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                    status = _BACKCHECK_WARN
+                    severity = "medium"
+                notes.append("NOTE action has no bounds for presence validation.")
+                suggestions.append("Provide markup bounds to validate note placement context.")
+            else:
+                effective_note_bounds = _expand_bounds(markup_bounds, geometry_tolerance_value)
+                note_overlap_count = 0
+                for entity in entities:
+                    entity_bounds = _normalize_bounds(entity.get("bounds"))
+                    if entity_bounds and _bounds_overlap(effective_note_bounds, entity_bounds):
+                        note_overlap_count += 1
+                if note_overlap_count == 0:
+                    if _finding_status_rank(_BACKCHECK_WARN) > _finding_status_rank(status):
+                        status = _BACKCHECK_WARN
+                        severity = "medium"
+                    notes.append("NOTE action has no nearby CAD entity context.")
+                    suggestions.append("Confirm note location against nearby CAD entities.")
+
         if markup_bounds:
+            effective_markup_bounds = _expand_bounds(markup_bounds, geometry_tolerance_value)
             conflict_count = 0
             for other_action_id, other_bounds in action_bounds.items():
                 if other_action_id == action_id:
                     continue
-                if not _bounds_overlap(markup_bounds, other_bounds):
+                effective_other_bounds = _expand_bounds(other_bounds, geometry_tolerance_value)
+                if not _bounds_overlap(effective_markup_bounds, effective_other_bounds):
                     continue
                 other_category = action_categories.get(other_action_id, "")
                 if {category, other_category} == {"add", "delete"}:
@@ -763,17 +4807,18 @@ def _build_local_backcheck(
                     "Resolve overlap between ADD and DELETE operations before execution."
                 )
 
-        findings.append(
-            {
-                "id": f"finding-{index}",
-                "action_id": action_id,
-                "status": status,
-                "severity": severity,
-                "category": category or "unclassified",
-                "notes": notes,
-                "suggestions": sorted(set(suggestions)),
-            }
-        )
+        finding = {
+            "id": f"finding-{index}",
+            "action_id": action_id,
+            "status": status,
+            "severity": severity,
+            "category": category or "unclassified",
+            "notes": notes,
+            "suggestions": sorted(set(suggestions)),
+        }
+        if paired_annotation_ids:
+            finding["paired_annotation_ids"] = paired_annotation_ids
+        findings.append(finding)
 
     summary = {
         "total_actions": len(findings),
@@ -801,6 +4846,85 @@ def _build_local_backcheck(
     }
 
 
+def _normalize_compare_engine(value: Any) -> str:
+    engine = _normalize_text(value)
+    if engine in _COMPARE_SUPPORTED_ENGINES:
+        return engine
+    return _COMPARE_ENGINE_AUTO
+
+
+def _build_compare_summary(
+    *,
+    markups: List[Dict[str, Any]],
+    plan: Dict[str, Any],
+    backcheck: Dict[str, Any],
+    cad_available: bool,
+) -> Dict[str, Any]:
+    summary_obj = backcheck.get("summary") if isinstance(backcheck.get("summary"), dict) else {}
+    pass_count = int(summary_obj.get("pass_count") or 0)
+    warn_count = int(summary_obj.get("warn_count") or 0)
+    fail_count = int(summary_obj.get("fail_count") or 0)
+    actions_obj = plan.get("actions") if isinstance(plan.get("actions"), list) else []
+
+    status = _BACKCHECK_PASS
+    if fail_count > 0:
+        status = _BACKCHECK_FAIL
+    elif warn_count > 0:
+        status = _BACKCHECK_WARN
+
+    return {
+        "status": status,
+        "total_markups": len(markups),
+        "total_actions": len(actions_obj),
+        "pass_count": pass_count,
+        "warn_count": warn_count,
+        "fail_count": fail_count,
+        "cad_context_available": cad_available,
+    }
+
+
+def _build_local_compare_report(
+    *,
+    markups: List[Dict[str, Any]],
+    cad_context: Dict[str, Any],
+    request_id: str,
+    cad_context_source: str,
+    tolerance_profile: str,
+) -> Dict[str, Any]:
+    plan = _build_local_plan(markups)
+    plan["ok"] = True
+    plan["source"] = "python-local-rules"
+    actions = [entry for entry in (plan.get("actions") or []) if isinstance(entry, dict)]
+    backcheck = _build_local_backcheck(
+        actions=actions,
+        cad_context=cad_context,
+        request_id=request_id,
+        cad_context_source=cad_context_source,
+        geometry_tolerance=_geometry_tolerance_for_profile(tolerance_profile),
+    )
+    summary = _build_compare_summary(
+        markups=markups,
+        plan=plan,
+        backcheck=backcheck,
+        cad_available=_cad_context_is_available(cad_context),
+    )
+    return {
+        "ok": True,
+        "success": True,
+        "requestId": request_id,
+        "source": "python-compare",
+        "mode": "cad-aware",
+        "tolerance_profile": tolerance_profile,
+        "plan": {
+            "source": str(plan.get("source") or "python-local-rules"),
+            "summary": plan.get("summary") if isinstance(plan.get("summary"), dict) else {},
+            "actions": actions,
+        },
+        "backcheck": backcheck,
+        "summary": summary,
+    }
+
+
 def create_autodraft_blueprint(
     *,
     require_api_key: Callable,
@@ -812,6 +4936,42 @@ def create_autodraft_blueprint(
     """Create /api/autodraft route group blueprint."""
     bp = Blueprint("autodraft_api", __name__, url_prefix="/api/autodraft")
     dotnet_base_url = (autodraft_dotnet_api_url or "").strip().rstrip("/")
+
+    def _resolve_cad_context_for_request(
+        *,
+        payload: Dict[str, Any],
+        request_id: str,
+        actions: Optional[List[Dict[str, Any]]] = None,
+        max_entities: int = 500,
+    ) -> Tuple[Optional[Dict[str, Any]], str]:
+        client_cad_context = (
+            payload.get("cad_context")
+            if isinstance(payload.get("cad_context"), dict)
+            else None
+        )
+        live_cad_context = _collect_live_cad_context(
+            get_manager=get_manager,
+            logger=logger,
+            request_id=request_id,
+            actions=actions,
+            max_entities=max_entities,
+        )
+        cad_context = _merge_cad_context(
+            live_context=live_cad_context,
+            client_context=client_cad_context,
+        )
+        cad_context_source = (
+            "live+client"
+            if live_cad_context and client_cad_context
+            else "live"
+            if live_cad_context
+            else "client"
+            if client_cad_context
+            else "none"
+        )
+        if isinstance(cad_context, dict):
+            cad_context["source"] = cad_context_source
+        return cad_context, cad_context_source
 
     @bp.route("/health", methods=["GET"])
     @require_api_key
@@ -907,6 +5067,852 @@ def create_autodraft_blueprint(
         plan["ok"] = True
         plan["source"] = "python-local-rules"
         return jsonify(plan), 200
+
+    @bp.route("/compare/prepare", methods=["POST"])
+    @require_api_key
+    @limiter.limit("30 per hour")
+    def api_autodraft_compare_prepare():
+        request_id = _derive_request_id(
+            {
+                "requestId": request.form.get("requestId")
+                or request.form.get("request_id")
+                or request.args.get("requestId")
+                or request.args.get("request_id"),
+            }
+        )
+        uploaded_pdf = request.files.get("pdf")
+        if uploaded_pdf is None:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="PDF file is required (`pdf`).",
+                request_id=request_id,
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/prepare"},
+            )
+
+        page_index_raw = request.form.get("page_index", "0")
+        try:
+            page_index = int(page_index_raw)
+        except Exception:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="page_index must be an integer.",
+                request_id=request_id,
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/prepare"},
+            )
+        if page_index < 0:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="page_index must be >= 0.",
+                request_id=request_id,
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/prepare"},
+            )
+
+        try:
+            if hasattr(uploaded_pdf, "stream") and hasattr(uploaded_pdf.stream, "seek"):
+                uploaded_pdf.stream.seek(0)
+        except Exception:
+            pass
+
+        prepared_payload, error, status_code = _extract_pdf_compare_markups(
+            pdf_stream=getattr(uploaded_pdf, "stream", uploaded_pdf),
+            page_index=page_index,
+        )
+        if prepared_payload is None:
+            error_code = (
+                "AUTODRAFT_COMPARE_PREPARE_UNAVAILABLE"
+                if status_code >= 500
+                else "AUTODRAFT_INVALID_REQUEST"
+            )
+            return _autodraft_error_response(
+                code=error_code,
+                message=str(error or "Compare prepare failed."),
+                request_id=request_id,
+                status_code=status_code,
+                meta={"endpoint": "/api/autodraft/compare/prepare"},
+            )
+
+        prepared_payload["requestId"] = request_id
+        prepared_payload["source"] = "python-compare-prepare"
+        return jsonify(prepared_payload), status_code
+
+    @bp.route("/compare", methods=["POST"])
+    @require_api_key
+    @limiter.limit("30 per hour")
+    def api_autodraft_compare():
+        if not request.is_json:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Expected JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare"},
+            )
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Invalid JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare"},
+            )
+
+        request_id = _derive_request_id(payload)
+        engine_requested = _normalize_compare_engine(payload.get("engine"))
+        tolerance_profile = _normalize_tolerance_profile(payload.get("tolerance_profile"))
+        calibration_mode = _normalize_calibration_mode(payload.get("calibration_mode"))
+        agent_review_mode = _normalize_agent_review_mode(payload.get("agent_review_mode"))
+        manual_override = _normalize_boolean(payload.get("manual_override"), default=False)
+        roi_bounds_pdf = _normalize_compare_roi(payload.get("roi"))
+        calibration_seed = (
+            payload.get("calibration_seed")
+            if isinstance(payload.get("calibration_seed"), dict)
+            else {}
+        )
+        replacement_tuning = _normalize_replacement_tuning(
+            payload.get("replacement_tuning")
+        )
+
+        markups = _normalize_compare_markups(payload.get("markups"))
+        if not markups:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="At least one normalized markup is required.",
+                request_id=request_id,
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare"},
+            )
+
+        cad_context, cad_context_source = _resolve_cad_context_for_request(
+            payload=payload,
+            request_id=request_id,
+            actions=[],
+            max_entities=2000,
+        )
+        if not _cad_context_is_available(cad_context):
+            return _autodraft_error_response(
+                code="AUTODRAFT_CAD_CONTEXT_UNAVAILABLE",
+                message=(
+                    "CAD context is required for compare but was unavailable from "
+                    "request payload and live AutoCAD context."
+                ),
+                request_id=request_id,
+                status_code=503,
+                meta={
+                    "endpoint": "/api/autodraft/compare",
+                    "cadSource": cad_context_source,
+                    "degraded": True,
+                },
+            )
+        cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
+
+        pdf_points = _normalize_point_pair_list(payload.get("pdf_points"))
+        cad_points = _normalize_point_pair_list(payload.get("cad_points"))
+        transform: Optional[Dict[str, Any]] = None
+        auto_calibration = _build_auto_calibration_payload(
+            available=True,
+            used=False,
+            status="needs_manual",
+            confidence=0.0,
+            method="none",
+            quality_notes=[],
+            suggested_pdf_points=pdf_points or [],
+            suggested_cad_points=cad_points or [],
+        )
+        manual_points_available = pdf_points is not None and cad_points is not None
+        manual_transform_requested = calibration_mode == _COMPARE_CALIBRATION_MODE_MANUAL
+        if manual_transform_requested:
+            if pdf_points is None or cad_points is None:
+                return _autodraft_error_response(
+                    code="AUTODRAFT_INVALID_REQUEST",
+                    message="Exactly two PDF points and two CAD points are required for manual calibration.",
+                    request_id=request_id,
+                    status_code=400,
+                    meta={"endpoint": "/api/autodraft/compare"},
+                )
+            transform, transform_error = _build_similarity_transform(
+                pdf_points=pdf_points,
+                cad_points=cad_points,
+            )
+            if transform is None:
+                return _autodraft_error_response(
+                    code="AUTODRAFT_INVALID_REQUEST",
+                    message=str(transform_error or "Calibration transform failed."),
+                    request_id=request_id,
+                    status_code=400,
+                    meta={"endpoint": "/api/autodraft/compare"},
+                )
+            auto_calibration = _build_auto_calibration_payload(
+                available=True,
+                used=False,
+                status="ready",
+                confidence=1.0,
+                method="manual-two-point",
+                quality_notes=["Manual two-point calibration was used."],
+                suggested_pdf_points=pdf_points,
+                suggested_cad_points=cad_points,
+                transform=transform,
+            )
+        else:
+            auto_calibration = _auto_calibrate_transform(
+                markups=markups,
+                cad_context=cad_context_obj,
+                calibration_seed=calibration_seed,
+                roi=roi_bounds_pdf,
+            )
+            transform_candidate = (
+                auto_calibration.get("transform")
+                if isinstance(auto_calibration.get("transform"), dict)
+                else None
+            )
+            auto_status = _normalize_text(auto_calibration.get("status"))
+            if auto_status != "ready" or not transform_candidate:
+                if manual_override and manual_points_available:
+                    manual_transform, manual_transform_error = _build_similarity_transform(
+                        pdf_points=pdf_points or [],
+                        cad_points=cad_points or [],
+                    )
+                    if manual_transform is not None:
+                        transform = manual_transform
+                        auto_notes = (
+                            auto_calibration.get("quality_notes")
+                            if isinstance(auto_calibration.get("quality_notes"), list)
+                            else []
+                        )
+                        _append_unique_note(
+                            auto_notes,
+                            "Auto-calibration was not ready; manual points supplied in request were used as fallback.",
+                        )
+                        auto_calibration = _build_auto_calibration_payload(
+                            available=True,
+                            used=True,
+                            status="ready",
+                            confidence=_safe_float(auto_calibration.get("confidence")) or 0.0,
+                            method="auto-fallback-manual-two-point",
+                            quality_notes=auto_notes,
+                            suggested_pdf_points=pdf_points or [],
+                            suggested_cad_points=cad_points or [],
+                            matched_anchor_count=max(
+                                0,
+                                int(
+                                    _safe_float(auto_calibration.get("matched_anchor_count"))
+                                    or 0.0
+                                ),
+                            ),
+                            anchor_count=max(
+                                0,
+                                int(
+                                    _safe_float(auto_calibration.get("anchor_count"))
+                                    or 0.0
+                                ),
+                            ),
+                            residual_error=_safe_float(auto_calibration.get("residual_error")),
+                            transform=manual_transform,
+                        )
+                    else:
+                        logger.warning(
+                            "AutoDraft compare manual fallback transform failed in auto mode: %s",
+                            manual_transform_error,
+                        )
+                if transform is None:
+                    return _autodraft_error_response(
+                        code="AUTODRAFT_CALIBRATION_MANUAL_REQUIRED",
+                        message=(
+                            "Auto-calibration needs manual refinement. Capture two PDF points and two CAD points, "
+                            "or refine ROI and retry auto mode."
+                        ),
+                        request_id=request_id,
+                        status_code=422,
+                        meta={
+                            "endpoint": "/api/autodraft/compare",
+                            "auto_calibration": _sanitize_auto_calibration_payload(
+                                auto_calibration
+                            ),
+                            "manual_override_requested": bool(manual_override),
+                        },
+                    )
+            if transform is None:
+                transform = transform_candidate
+                if pdf_points is None:
+                    pdf_points = [
+                        entry
+                        for entry in (auto_calibration.get("suggested_pdf_points") or [])
+                        if isinstance(entry, dict)
+                    ]
+                if cad_points is None:
+                    cad_points = [
+                        entry
+                        for entry in (auto_calibration.get("suggested_cad_points") or [])
+                        if isinstance(entry, dict)
+                    ]
+
+        if transform is None:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Calibration transform failed.",
+                request_id=request_id,
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare"},
+            )
+
+        transformed_markups: List[Dict[str, Any]] = []
+        for markup in markups:
+            next_markup = dict(markup)
+            bounds = _normalize_bounds(markup.get("bounds"))
+            if bounds:
+                next_markup["bounds"] = _transform_bounds_to_cad(bounds, transform)
+            raw_meta = markup.get("meta")
+            if isinstance(raw_meta, dict):
+                meta_obj = dict(raw_meta)
+                callout_points = _normalize_point_list(meta_obj.get("callout_points"))
+                if callout_points:
+                    meta_obj["callout_points"] = [
+                        _transform_point_to_cad(point, transform) for point in callout_points
+                    ]
+                page_position = (
+                    meta_obj.get("page_position")
+                    if isinstance(meta_obj.get("page_position"), dict)
+                    else None
+                )
+                if isinstance(page_position, dict):
+                    transformed_page_position = _transform_point_to_cad(page_position, transform)
+                    meta_obj["cad_position"] = transformed_page_position
+                next_markup["meta"] = meta_obj
+            if isinstance(markup.get("recognition"), dict):
+                recognition_obj = dict(markup.get("recognition") or {})
+                recognition_obj["feature_source"] = "prepared_markups+cad_context"
+                next_markup["recognition"] = recognition_obj
+            transformed_markups.append(next_markup)
+
+        cad_context_for_compare = cad_context_obj
+        cad_roi_bounds: Optional[Dict[str, float]] = None
+        if roi_bounds_pdf:
+            cad_roi_bounds = _transform_bounds_to_cad(roi_bounds_pdf, transform)
+            filtered_context, filtered_entity_count = _filter_cad_context_by_bounds(
+                cad_context_for_compare,
+                bounds=cad_roi_bounds,
+            )
+            if filtered_entity_count <= 0:
+                return _autodraft_error_response(
+                    code="AUTODRAFT_ROI_EMPTY",
+                    message=(
+                        "Selected ROI did not intersect any CAD entities after calibration. "
+                        "Refine ROI or retry without ROI filtering."
+                    ),
+                    request_id=request_id,
+                    status_code=422,
+                    meta={
+                        "endpoint": "/api/autodraft/compare",
+                        "auto_calibration": _sanitize_auto_calibration_payload(
+                            auto_calibration
+                        ),
+                        "cad_roi": cad_roi_bounds,
+                        "localized_roi_failure": {
+                            "pdf_roi": roi_bounds_pdf,
+                            "cad_roi": cad_roi_bounds,
+                            "reason": "no_cad_entities_in_roi",
+                        },
+                    },
+                )
+            cad_context_for_compare = filtered_context
+            auto_notes = (
+                auto_calibration.get("quality_notes")
+                if isinstance(auto_calibration.get("quality_notes"), list)
+                else []
+            )
+            _append_unique_note(
+                auto_notes,
+                f"ROI filter active; compare used {filtered_entity_count} CAD entities in selected area.",
+            )
+            auto_calibration["quality_notes"] = auto_notes
+
+        layer_entries = _normalize_layer_entries(
+            cad_context_for_compare.get("layers")
+            if isinstance(cad_context_for_compare, dict)
+            else None
+        )
+        default_layer_name = ""
+        for entry in layer_entries:
+            if not bool(entry.get("locked")):
+                default_layer_name = str(entry.get("name") or "").strip()
+                if default_layer_name:
+                    break
+        if not default_layer_name and layer_entries:
+            default_layer_name = str(layer_entries[0].get("name") or "").strip()
+        if default_layer_name:
+            for markup in transformed_markups:
+                markup_type = _normalize_text(markup.get("type"))
+                if markup_type in {"cloud", "arrow"} and not str(markup.get("layer") or "").strip():
+                    markup["layer"] = default_layer_name
+        effective_transformed_markups = _pair_blue_note_markups(transformed_markups)
+        for markup in effective_transformed_markups:
+            if not isinstance(markup, dict):
+                continue
+            if not isinstance(markup.get("recognition"), dict):
+                markup["recognition"] = _build_markup_recognition(
+                    markup,
+                    feature_source="prepared_markups+cad_context",
+                )
+
+        engine_used = _COMPARE_ENGINE_PYTHON
+        used_fallback = False
+        compare_payload_for_engine: Dict[str, Any] = {
+            "markups": effective_transformed_markups,
+            "cad_context": cad_context_for_compare,
+            "tolerance_profile": tolerance_profile,
+            "replacement_tuning": replacement_tuning,
+            "calibration_mode": calibration_mode,
+            "agent_review_mode": agent_review_mode,
+            "roi": _copy_bounds(roi_bounds_pdf) if roi_bounds_pdf else None,
+            "auto_calibration": _sanitize_auto_calibration_payload(auto_calibration),
+            "requestId": request_id,
+        }
+
+        compare_result: Optional[Dict[str, Any]] = None
+        if engine_requested in {_COMPARE_ENGINE_AUTO, _COMPARE_ENGINE_DOTNET}:
+            if not dotnet_base_url:
+                if engine_requested == _COMPARE_ENGINE_DOTNET:
+                    return _autodraft_error_response(
+                        code="AUTODRAFT_COMPARE_NOT_CONFIGURED",
+                        message=(
+                            "Compare engine `dotnet` requires AUTODRAFT_DOTNET_API_URL."
+                        ),
+                        request_id=request_id,
+                        status_code=503,
+                        meta={"endpoint": "/api/autodraft/compare"},
+                    )
+            else:
+                upstream, error, status = _proxy_json(
+                    base_url=dotnet_base_url,
+                    method="POST",
+                    path="/api/autodraft/compare",
+                    timeout_seconds=30,
+                    payload=compare_payload_for_engine,
+                )
+                if upstream is not None:
+                    engine_used = _COMPARE_ENGINE_DOTNET
+                    compare_result = upstream
+                elif engine_requested == _COMPARE_ENGINE_DOTNET:
+                    return _autodraft_error_response(
+                        code="AUTODRAFT_UPSTREAM_ERROR",
+                        message=str(error or "Upstream compare request failed."),
+                        request_id=request_id,
+                        status_code=status,
+                        meta={
+                            "endpoint": "/api/autodraft/compare",
+                            "upstream_status": status,
+                            "engine": "dotnet",
+                        },
+                    )
+                else:
+                    used_fallback = True
+                    logger.warning("AutoDraft compare dotnet fallback to python: %s", error)
+
+        if compare_result is None:
+            compare_result = _build_local_compare_report(
+                markups=effective_transformed_markups,
+                cad_context=cad_context_for_compare,
+                request_id=request_id,
+                cad_context_source=cad_context_source,
+                tolerance_profile=tolerance_profile,
+            )
+            engine_used = _COMPARE_ENGINE_PYTHON
+        _normalize_compare_result_semantics(compare_result)
+
+        review_queue: List[Dict[str, Any]] = []
+        agent_pre_review_result: Dict[str, Any] = {
+            "enabled": False,
+            "attempted": False,
+            "available": False,
+            "used": False,
+            "profile": _resolve_agent_pre_review_profile(),
+            "latency_ms": None,
+            "hints_count": 0,
+            "error": "Replacement pre-review was not executed.",
+            "auth": {
+                "mode": "service_token",
+                "token_source": "none",
+                "refresh_attempted": False,
+            },
+            "preflight": {
+                "checked": False,
+                "available": False,
+                "expected_model": _resolve_profile_primary_model(_resolve_agent_pre_review_profile()) or None,
+                "reason": "not_checked",
+            },
+        }
+        if isinstance(cad_context_for_compare, dict):
+            review_queue, agent_pre_review_result = _enrich_compare_result_with_replacements(
+                compare_result=compare_result,
+                cad_context=cad_context_for_compare,
+                request_id=request_id,
+                tuning=replacement_tuning,
+                review_mode=agent_review_mode,
+                logger=logger,
+            )
+
+        shadow_result: Dict[str, Any] = {
+            "enabled": False,
+            "available": False,
+            "profile": _SHADOW_ADVISOR_PROFILE,
+            "reviews": [],
+            "error": None,
+        }
+        if review_queue:
+            shadow_result = _run_shadow_advisor(
+                request_id=request_id,
+                review_cases=review_queue,
+                logger=logger,
+            )
+            reviews = (
+                shadow_result.get("reviews")
+                if isinstance(shadow_result.get("reviews"), list)
+                else []
+            )
+            reviews_by_action_id = {
+                str(entry.get("action_id") or "").strip(): entry
+                for entry in reviews
+                if isinstance(entry, dict) and str(entry.get("action_id") or "").strip()
+            }
+            for item in review_queue:
+                action_id = str(item.get("action_id") or "").strip()
+                if action_id in reviews_by_action_id:
+                    item["shadow"] = reviews_by_action_id[action_id]
+
+            if shadow_result.get("error"):
+                backcheck_obj = (
+                    compare_result.get("backcheck")
+                    if isinstance(compare_result.get("backcheck"), dict)
+                    else {}
+                )
+                warnings = (
+                    backcheck_obj.get("warnings")
+                    if isinstance(backcheck_obj.get("warnings"), list)
+                    else []
+                )
+                _append_unique_note(
+                    warnings,
+                    f"Shadow advisor unavailable: {shadow_result.get('error')}",
+                )
+                backcheck_obj["warnings"] = warnings
+                compare_result["backcheck"] = backcheck_obj
+
+        compare_result["requestId"] = request_id
+        compare_result["engine"] = {
+            "requested": engine_requested,
+            "used": engine_used,
+            "used_fallback": used_fallback,
+        }
+        compare_result["calibration"] = {
+            "pdf_points": pdf_points if isinstance(pdf_points, list) else [],
+            "cad_points": cad_points if isinstance(cad_points, list) else [],
+            "scale": transform.get("scale"),
+            "rotation_deg": transform.get("rotation_deg"),
+            "translation": transform.get("translation"),
+        }
+        compare_result["calibration_mode"] = calibration_mode
+        compare_result["auto_calibration"] = _sanitize_auto_calibration_payload(auto_calibration)
+        if roi_bounds_pdf:
+            compare_result["roi"] = _copy_bounds(roi_bounds_pdf)
+        if cad_roi_bounds:
+            compare_result["cad_roi"] = _copy_bounds(cad_roi_bounds)
+        compare_result["tolerance_profile"] = tolerance_profile
+        compare_result["markups"] = {
+            "input_count": len(markups),
+            "transformed_count": len(effective_transformed_markups),
+        }
+        compare_result["replacement_tuning"] = replacement_tuning
+        compare_result["review_queue"] = review_queue
+        compare_result["agent_pre_review"] = agent_pre_review_result
+        compare_result["shadow_advisor"] = shadow_result
+        compare_result["recognition"] = _compare_recognition_summary(
+            effective_transformed_markups,
+            feature_source="prepared_markups+cad_context",
+            agent_hints_applied=bool(agent_pre_review_result.get("used")),
+        )
+        return jsonify(compare_result), 200
+
+    @bp.route("/compare/feedback", methods=["POST"])
+    @require_api_key
+    @limiter.limit("120 per hour")
+    def api_autodraft_compare_feedback():
+        if not request.is_json:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Expected JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/feedback"},
+            )
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Invalid JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/feedback"},
+            )
+        request_id = _derive_request_id(payload)
+        items = _normalize_feedback_items(payload)
+        if not items:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message=(
+                    "At least one compare feedback item is required. Replacement review items need "
+                    "action_id + review_status, and markup-learning items can carry corrected "
+                    "intent/color/OCR fields."
+                ),
+                request_id=request_id,
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/feedback"},
+            )
+
+        db_path = _resolve_compare_feedback_db_path()
+        stored_count = _persist_feedback_items(db_path=db_path, items=items)
+        metric_scores = _load_replacement_metric_scores(db_path)
+        learning_examples = _build_feedback_learning_examples(items=items)
+        learning_counts: Dict[str, int] = {}
+        for domain, examples in learning_examples.items():
+            if not examples:
+                continue
+            try:
+                learning_counts[domain] = _LOCAL_LEARNING_RUNTIME.record_examples(
+                    domain=domain,
+                    examples=examples,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "AutoDraft compare feedback learning capture failed (domain=%s): %s",
+                    domain,
+                    exc,
+                )
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "success": True,
+                    "requestId": request_id,
+                    "source": "autodraft-compare-feedback",
+                    "stored": stored_count,
+                    "metrics": metric_scores,
+                    "learning": learning_counts,
+                }
+            ),
+            200,
+        )
+
+    @bp.route("/compare/feedback/export", methods=["GET"])
+    @require_api_key
+    @limiter.limit("30 per hour")
+    def api_autodraft_compare_feedback_export():
+        request_id = _derive_request_id({})
+        db_path = _resolve_compare_feedback_db_path()
+        exported = _export_feedback_data(db_path=db_path)
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "success": True,
+                    "requestId": request_id,
+                    "source": "autodraft-compare-feedback",
+                    **exported,
+                }
+            ),
+            200,
+        )
+
+    @bp.route("/compare/feedback/import", methods=["POST"])
+    @require_api_key
+    @limiter.limit("20 per hour")
+    def api_autodraft_compare_feedback_import():
+        if not request.is_json:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Expected JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/feedback/import"},
+            )
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Invalid JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/compare/feedback/import"},
+            )
+        request_id = _derive_request_id(payload)
+        mode = _normalize_text(payload.get("mode"))
+        import_mode = "replace" if mode == "replace" else "merge"
+        db_path = _resolve_compare_feedback_db_path()
+        counts = _import_feedback_data(
+            db_path=db_path,
+            payload=payload,
+            mode=import_mode,
+        )
+        metric_scores = _load_replacement_metric_scores(db_path)
+        import_items = _normalize_feedback_items(
+            {"items": payload.get("events") if isinstance(payload.get("events"), list) else []}
+        )
+        learning_counts: Dict[str, int] = {}
+        learning_examples = _build_feedback_learning_examples(items=import_items)
+        for domain, examples in learning_examples.items():
+            if not examples:
+                continue
+            try:
+                learning_counts[domain] = _LOCAL_LEARNING_RUNTIME.record_examples(
+                    domain=domain,
+                    examples=examples,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "AutoDraft feedback import learning capture failed (domain=%s): %s",
+                    domain,
+                    exc,
+                )
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "success": True,
+                    "requestId": request_id,
+                    "source": "autodraft-compare-feedback",
+                    "mode": import_mode,
+                    "imported": counts,
+                    "metrics": metric_scores,
+                    "learning": learning_counts,
+                }
+            ),
+            200,
+        )
+
+    @bp.route("/learning/train", methods=["POST"])
+    @require_api_key
+    @limiter.limit("20 per hour")
+    def api_autodraft_learning_train():
+        if not request.is_json:
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Expected JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/learning/train"},
+            )
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            return _autodraft_error_response(
+                code="AUTODRAFT_INVALID_REQUEST",
+                message="Invalid JSON payload.",
+                request_id=_derive_request_id({}),
+                status_code=400,
+                meta={"endpoint": "/api/autodraft/learning/train"},
+            )
+        request_id = _derive_request_id(payload)
+        raw_domains = payload.get("domains")
+        if isinstance(raw_domains, list):
+            domains = [str(entry or "").strip() for entry in raw_domains if str(entry or "").strip()]
+        else:
+            single_domain = str(payload.get("domain") or "").strip()
+            domains = [single_domain] if single_domain else list(
+                (
+                    "autodraft_markup",
+                    "autodraft_replacement",
+                    "transmittal_titleblock",
+                )
+            )
+        try:
+            results = _LOCAL_LEARNING_RUNTIME.train_domains(domains=domains)
+        except Exception as exc:
+            return _autodraft_error_response(
+                code="AUTODRAFT_LEARNING_TRAIN_FAILED",
+                message=f"Local learning train failed: {str(exc)}",
+                request_id=request_id,
+                status_code=500,
+                meta={"endpoint": "/api/autodraft/learning/train"},
+            )
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "success": True,
+                    "requestId": request_id,
+                    "source": "autodraft-learning",
+                    "results": results,
+                }
+            ),
+            200,
+        )
+
+    @bp.route("/learning/models", methods=["GET"])
+    @require_api_key
+    @limiter.limit("120 per hour")
+    def api_autodraft_learning_models():
+        request_id = _derive_request_id({})
+        domain = str(request.args.get("domain") or "").strip() or None
+        try:
+            models = _LOCAL_LEARNING_RUNTIME.list_models(domain=domain)
+        except Exception as exc:
+            return _autodraft_error_response(
+                code="AUTODRAFT_LEARNING_MODELS_FAILED",
+                message=f"Failed to list local learning models: {str(exc)}",
+                request_id=request_id,
+                status_code=500,
+                meta={"endpoint": "/api/autodraft/learning/models"},
+            )
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "success": True,
+                    "requestId": request_id,
+                    "source": "autodraft-learning",
+                    "models": models,
+                }
+            ),
+            200,
+        )
+
+    @bp.route("/learning/evaluations", methods=["GET"])
+    @require_api_key
+    @limiter.limit("120 per hour")
+    def api_autodraft_learning_evaluations():
+        request_id = _derive_request_id({})
+        domain = str(request.args.get("domain") or "").strip() or None
+        limit_raw = request.args.get("limit", "20")
+        try:
+            limit = int(limit_raw)
+        except Exception:
+            limit = 20
+        try:
+            evaluations = _LOCAL_LEARNING_RUNTIME.list_evaluations(
+                domain=domain,
+                limit=limit,
+            )
+        except Exception as exc:
+            return _autodraft_error_response(
+                code="AUTODRAFT_LEARNING_EVALUATIONS_FAILED",
+                message=f"Failed to list local learning evaluations: {str(exc)}",
+                request_id=request_id,
+                status_code=500,
+                meta={"endpoint": "/api/autodraft/learning/evaluations"},
+            )
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "success": True,
+                    "requestId": request_id,
+                    "source": "autodraft-learning",
+                    "evaluations": evaluations,
+                }
+            ),
+            200,
+        )
 
     @bp.route("/execute", methods=["POST"])
     @require_api_key

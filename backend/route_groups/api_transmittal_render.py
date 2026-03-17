@@ -10,6 +10,11 @@ from typing import Any, Callable, Dict
 from flask import Blueprint, jsonify, request, send_file
 from flask_limiter import Limiter
 
+from .api_transmittal_pdf_analysis import (
+    build_temporary_index_workbook,
+    materialize_documents_for_render,
+)
+
 
 def create_transmittal_render_blueprint(
     *,
@@ -69,6 +74,9 @@ def create_transmittal_render_blueprint(
             cid_index_data = _parse_json_field("cid_index_data", []) or []
             if not isinstance(cid_index_data, list):
                 cid_index_data = []
+            pdf_document_data = _parse_json_field("pdf_document_data", []) or []
+            if not isinstance(pdf_document_data, list):
+                pdf_document_data = []
 
             profile_options = _load_transmittal_profiles_payload()
             available_profiles = profile_options.get("profiles", [])
@@ -190,11 +198,6 @@ def create_transmittal_render_blueprint(
                 if render_transmittal is None:
                     return jsonify({"success": False, "message": "Transmittal renderer is unavailable on server."}), 503
 
-                index_file = request.files.get("index")
-                if not index_file:
-                    return jsonify({"success": False, "message": "Drawing index (Excel) file is required"}), 400
-                index_path = _save_upload(index_file, work_dir, "index.xlsx")
-
                 document_files = request.files.getlist("documents")
                 if not document_files:
                     return (
@@ -209,8 +212,62 @@ def create_transmittal_render_blueprint(
 
                 docs_dir = os.path.join(work_dir, "documents")
                 os.makedirs(docs_dir, exist_ok=True)
+                saved_document_paths: list[str] = []
                 for f in document_files:
-                    _save_upload(f, docs_dir)
+                    saved_document_paths.append(_save_upload(f, docs_dir))
+
+                index_file = request.files.get("index")
+                render_selected_files = None
+                if index_file:
+                    index_path = _save_upload(index_file, work_dir, "index.xlsx")
+                elif pdf_document_data:
+                    unresolved_rows = [
+                        row
+                        for row in pdf_document_data
+                        if isinstance(row, dict)
+                        and bool(row.get("needs_review"))
+                        and not bool(row.get("accepted"))
+                    ]
+                    if unresolved_rows:
+                        return (
+                            jsonify(
+                                {
+                                    "success": False,
+                                    "message": (
+                                        "PDF document analysis requires review before render. "
+                                        "Resolve or accept all low-confidence rows first."
+                                    ),
+                                }
+                            ),
+                            400,
+                        )
+                    index_path = build_temporary_index_workbook(
+                        output_path=os.path.join(work_dir, "index.generated.xlsx"),
+                        document_rows=[
+                            row for row in pdf_document_data if isinstance(row, dict)
+                        ],
+                    )
+                    render_selected_files = materialize_documents_for_render(
+                        source_paths=saved_document_paths,
+                        document_rows=[
+                            row for row in pdf_document_data if isinstance(row, dict)
+                        ],
+                        output_dir=os.path.join(work_dir, "documents_resolved"),
+                        project_number=project_num,
+                    )
+                else:
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "message": (
+                                    "Drawing index (Excel) file is required unless reviewed "
+                                    "pdf_document_data is provided."
+                                ),
+                            }
+                        ),
+                        400,
+                    )
 
                 output_stem = f"Transmittal_{project_num}_{timestamp}"
                 output_name = f"{output_stem}.docx"
@@ -224,7 +281,7 @@ def create_transmittal_render_blueprint(
                     merged_checks,
                     normalized_contacts,
                     out_path,
-                    None,
+                    render_selected_files,
                 )
 
             pdf_path = None

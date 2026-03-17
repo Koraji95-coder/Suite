@@ -23,6 +23,10 @@ describe("AgentChatPanel defensive rendering", () => {
 
 	it("renders safely with malformed task/activity payload rows", async () => {
 		vi.spyOn(agentService, "usesBroker").mockReturnValue(true);
+		vi.spyOn(agentService, "fetchProfileCatalog").mockResolvedValue({
+			success: true,
+			profiles: [],
+		});
 		vi.spyOn(agentService, "listAgentTasks").mockResolvedValue({
 			success: true,
 			tasks: [
@@ -64,6 +68,45 @@ describe("AgentChatPanel defensive rendering", () => {
 		await waitFor(() => {
 			expect(screen.getByText(/Task queue/i)).toBeTruthy();
 			expect(screen.getByTestId("orchestration-panel")).toBeTruthy();
+		});
+	});
+
+	it("hydrates broker profile model labels from backend metadata", async () => {
+		localStorage.setItem("agent-channel-scope", "devstral");
+		localStorage.setItem("agent-active-profile", "devstral");
+
+		vi.spyOn(agentService, "usesBroker").mockReturnValue(true);
+		vi.spyOn(agentService, "fetchProfileCatalog").mockResolvedValue({
+			success: true,
+			profiles: [
+				{
+					id: "devstral",
+					name: "Devstral",
+					tagline: "Code and automation specialist",
+					focus: "Implementation",
+					memory_namespace: "devstral",
+					model_primary: "backend-devstral-model",
+					model_fallbacks: [],
+				},
+			],
+		});
+		vi.spyOn(agentService, "listAgentTasks").mockResolvedValue({
+			success: true,
+			tasks: [],
+		});
+		vi.spyOn(agentService, "getAgentActivity").mockResolvedValue({
+			success: true,
+			activity: [],
+		});
+
+		render(
+			<MemoryRouter>
+				<AgentChatPanel healthy paired />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText("Model backend-devstral-model")).toBeTruthy();
 		});
 	});
 });

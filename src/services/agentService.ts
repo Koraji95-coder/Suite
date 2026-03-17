@@ -26,6 +26,7 @@
  */
 
 import {
+	AGENT_PROFILE_IDS,
 	type AgentProfileId,
 	DEFAULT_AGENT_PROFILE,
 	getAgentModelCandidates,
@@ -104,6 +105,16 @@ export interface AgentRunSnapshot {
 	stages: Record<string, unknown>;
 	finalOutput?: string;
 	finalError?: string;
+}
+
+export interface AgentProfileCatalogItem {
+	id: AgentProfileId;
+	name: string;
+	tagline: string;
+	focus: string;
+	memory_namespace: string;
+	model_primary: string;
+	model_fallbacks: string[];
 }
 
 export type AgentTaskStatus =
@@ -2136,6 +2147,90 @@ class AgentService {
 				"AgentService",
 			);
 			return false;
+		}
+	}
+
+	async fetchProfileCatalog(): Promise<{
+		success: boolean;
+		profiles: AgentProfileCatalogItem[];
+		error?: string;
+	}> {
+		if (!this.useBroker) {
+			return { success: false, profiles: [] };
+		}
+
+		const accessToken = await this.getSupabaseAccessToken();
+		if (!accessToken) {
+			return {
+				success: false,
+				profiles: [],
+				error: "Supabase session required for brokered profile routing metadata.",
+			};
+		}
+
+		try {
+			const response = await fetchWithTimeout(`${this.brokerUrl}/profiles`, {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${accessToken}`,
+				},
+				credentials: "include",
+				timeoutMs: 15_000,
+				requestName: "Agent broker profile catalog request",
+			});
+
+			const payload = (await response.json().catch(() => ({}))) as Record<
+				string,
+				unknown
+			>;
+			if (!response.ok) {
+				return {
+					success: false,
+					profiles: [],
+					error:
+						String(payload.error || "").trim() ||
+						"Unable to load agent profile metadata.",
+				};
+			}
+
+			const profiles: AgentProfileCatalogItem[] = Array.isArray(payload.profiles)
+				? payload.profiles.reduce<AgentProfileCatalogItem[]>((acc, entry) => {
+						if (!entry || typeof entry !== "object") return acc;
+						const record = entry as Record<string, unknown>;
+						const id = String(record.id || "")
+							.trim()
+							.toLowerCase();
+						if (
+							!id ||
+							!AGENT_PROFILE_IDS.includes(id as AgentProfileId)
+						) {
+							return acc;
+						}
+						acc.push({
+							id: id as AgentProfileId,
+							name: String(record.name || "").trim(),
+							tagline: String(record.tagline || "").trim(),
+							focus: String(record.focus || "").trim(),
+							memory_namespace: String(
+								record.memory_namespace || "",
+							).trim(),
+							model_primary: String(record.model_primary || "").trim(),
+							model_fallbacks: [],
+						});
+						return acc;
+					}, [])
+				: [];
+
+			return { success: true, profiles };
+		} catch (error) {
+			return {
+				success: false,
+				profiles: [],
+				error: mapFetchErrorMessage(
+					error,
+					"Unable to load agent profile metadata.",
+				),
+			};
 		}
 	}
 

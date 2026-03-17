@@ -5,6 +5,7 @@ import {
 	buildCidDocuments,
 	buildDefaultDraft,
 	buildFormData,
+	buildStandardDocuments,
 	type Contact,
 	createId,
 	type DraftState,
@@ -58,10 +59,14 @@ export function useTransmittalBuilderState() {
 	const [outputFormat, setOutputFormat] = useState<OutputFormat>("both");
 	const [templateLoading, setTemplateLoading] = useState(false);
 	const [templateError, setTemplateError] = useState<string | null>(null);
+	const [pdfAnalysisLoading, setPdfAnalysisLoading] = useState(false);
+	const [pdfAnalysisError, setPdfAnalysisError] = useState<string | null>(null);
+	const [pdfAnalysisWarnings, setPdfAnalysisWarnings] = useState<string[]>([]);
 	const [profileOptionsError, setProfileOptionsError] = useState<string | null>(
 		null,
 	);
 	const saveTimer = useRef<number | null>(null);
+	const pdfAnalysisRunIdRef = useRef(0);
 
 	const validation = useMemo(() => validateDraft(draft, files), [draft, files]);
 
@@ -173,9 +178,76 @@ export function useTransmittalBuilderState() {
 		setFiles((prev) => ({ ...prev, index: selected[0] ?? null }));
 	};
 
-	const handlePdfFiles = (selected: File[]) => {
-		setFiles((prev) => ({ ...prev, pdfs: selected }));
-	};
+	const analyzePdfFiles = useCallback(
+		async (selected: File[]) => {
+			const analysisRunId = pdfAnalysisRunIdRef.current + 1;
+			pdfAnalysisRunIdRef.current = analysisRunId;
+
+			if (selected.length === 0) {
+				setPdfAnalysisLoading(false);
+				setPdfAnalysisError(null);
+				setPdfAnalysisWarnings([]);
+				setDraft((prev) => ({ ...prev, standardDocuments: [] }));
+				return;
+			}
+
+			setPdfAnalysisLoading(true);
+			setPdfAnalysisError(null);
+			setPdfAnalysisWarnings([]);
+
+			if (!transmittalService.hasApiKey()) {
+				setDraft((prev) => ({
+					...prev,
+					standardDocuments: buildStandardDocuments(selected, []),
+				}));
+				setPdfAnalysisLoading(false);
+				setPdfAnalysisError(
+					"PDF analysis is unavailable until the transmittal API key is configured. You can still review rows manually or upload an index.",
+				);
+				return;
+			}
+
+			try {
+				const result = await transmittalService.analyzePdfs(selected);
+				if (pdfAnalysisRunIdRef.current !== analysisRunId) return;
+				setDraft((prev) => ({
+					...prev,
+					standardDocuments: buildStandardDocuments(
+						selected,
+						[],
+						result.documents,
+					),
+				}));
+				setPdfAnalysisWarnings(result.warnings);
+				setPdfAnalysisError(null);
+			} catch (error) {
+				if (pdfAnalysisRunIdRef.current !== analysisRunId) return;
+				setDraft((prev) => ({
+					...prev,
+					standardDocuments: buildStandardDocuments(selected, []),
+				}));
+				setPdfAnalysisWarnings([]);
+				setPdfAnalysisError(
+					error instanceof Error
+						? error.message
+						: "Unable to analyze the selected PDF documents.",
+				);
+			} finally {
+				if (pdfAnalysisRunIdRef.current === analysisRunId) {
+					setPdfAnalysisLoading(false);
+				}
+			}
+		},
+		[],
+	);
+
+	const handlePdfFiles = useCallback(
+		(selected: File[]) => {
+			setFiles((prev) => ({ ...prev, pdfs: selected }));
+			void analyzePdfFiles(selected);
+		},
+		[analyzePdfFiles],
+	);
 
 	const handleCidFiles = (selected: File[]) => {
 		setFiles((prev) => ({ ...prev, cid: selected }));
@@ -191,6 +263,44 @@ export function useTransmittalBuilderState() {
 			cidDocuments: buildCidDocuments(files.cid, prev.cidDocuments),
 		}));
 	};
+
+	const handleStandardDocumentChange = useCallback(
+		(
+			id: string,
+			field:
+				| "drawingNumber"
+				| "title"
+				| "revision"
+				| "accepted"
+				| "overrideReason",
+			value: string | boolean,
+		) => {
+			setDraft((prev) => ({
+				...prev,
+				standardDocuments: prev.standardDocuments.map((doc) => {
+					if (doc.id !== id) return doc;
+					const next = { ...doc };
+					if (field === "accepted") {
+						next.accepted = Boolean(value);
+						return next;
+					}
+					if (field === "overrideReason") {
+						next.overrideReason = String(value ?? "");
+						if (next.overrideReason.trim()) {
+							next.accepted = true;
+							next.source = "manual_review";
+						}
+						return next;
+					}
+					next[field] = String(value ?? "");
+					next.accepted = true;
+					next.source = "manual_review";
+					return next;
+				}),
+			}));
+		},
+		[],
+	);
 
 	const handleContactChange = (
 		id: string,
@@ -277,6 +387,9 @@ export function useTransmittalBuilderState() {
 		setSubmitAttempted(false);
 		setLastSavedAt(null);
 		setGenerationState({ state: "idle" });
+		setPdfAnalysisLoading(false);
+		setPdfAnalysisError(null);
+		setPdfAnalysisWarnings([]);
 		if (typeof window !== "undefined") {
 			window.localStorage.removeItem(AUTOSAVE_KEY);
 		}
@@ -427,10 +540,25 @@ export function useTransmittalBuilderState() {
 	);
 	const fileSummary = useMemo(() => {
 		if (draft.transmittalType === "standard") {
+			const reviewedCount = draft.standardDocuments.filter(
+				(doc) => doc.needsReview && doc.accepted,
+			).length;
+			const pendingCount = draft.standardDocuments.filter(
+				(doc) => doc.needsReview && !doc.accepted,
+			).length;
 			return {
 				template: files.template?.name || "Not selected",
-				index: files.index?.name || "Not selected",
-				documents: `${files.pdfs.length} PDFs`,
+				index: files.index?.name
+					? files.index.name
+					: draft.standardDocuments.length > 0
+						? `Auto-generated from ${draft.standardDocuments.length} PDF row(s)`
+						: "Not selected",
+				documents:
+					pendingCount > 0
+						? `${files.pdfs.length} PDFs (${pendingCount} review pending)`
+						: reviewedCount > 0
+							? `${files.pdfs.length} PDFs (${reviewedCount} reviewed)`
+							: `${files.pdfs.length} PDFs`,
 			};
 		}
 		return {
@@ -438,7 +566,7 @@ export function useTransmittalBuilderState() {
 			index: "—",
 			documents: `${files.cid.length} CID files`,
 		};
-	}, [draft.transmittalType, files]);
+	}, [draft.standardDocuments, draft.transmittalType, files]);
 
 	return {
 		draft,
@@ -448,6 +576,9 @@ export function useTransmittalBuilderState() {
 		profileOptionsError,
 		templateLoading,
 		templateError,
+		pdfAnalysisLoading,
+		pdfAnalysisError,
+		pdfAnalysisWarnings,
 		outputFormat,
 		generationState,
 		outputs,
@@ -463,8 +594,10 @@ export function useTransmittalBuilderState() {
 		handleTemplateFiles,
 		handleIndexFiles,
 		handlePdfFiles,
+		analyzePdfFiles: () => analyzePdfFiles(files.pdfs),
 		handleCidFiles,
 		handleScanCid,
+		handleStandardDocumentChange,
 		handleContactChange,
 		addContact,
 		removeContact,

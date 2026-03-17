@@ -114,6 +114,7 @@ export interface ConduitRouteComputeMeta {
 	iterations?: number;
 	visitedNodes?: number;
 	fallbackUsed?: boolean;
+	routeValid?: boolean;
 	gridCols?: number;
 	gridRows?: number;
 	gridStep?: number;

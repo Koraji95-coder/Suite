@@ -36,6 +36,7 @@ public sealed class MockAutoDraftBackchecker : IAutoDraftBackchecker
         cancellationToken.ThrowIfCancellationRequested();
         var actions = request.Actions ?? [];
         var cadSnapshot = ParseCadContext(request.CadContext);
+        var tolerancePadding = TolerancePaddingForProfile(request.ToleranceProfile);
 
         var actionBounds = new Dictionary<string, BoundsSnapshot>(StringComparer.OrdinalIgnoreCase);
         var actionCategories = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -154,8 +155,9 @@ public sealed class MockAutoDraftBackchecker : IAutoDraftBackchecker
 
             if (cadSnapshot.Available && markupBounds is not null)
             {
+                var effectiveMarkupBounds = ExpandBounds(markupBounds, tolerancePadding);
                 var overlappingCount = cadSnapshot.Entities.Count(
-                    entity => BoundsOverlap(markupBounds, entity.Bounds)
+                    entity => BoundsOverlap(effectiveMarkupBounds, entity.Bounds)
                 );
 
                 if (category == "delete" && overlappingCount == 0)
@@ -178,8 +180,32 @@ public sealed class MockAutoDraftBackchecker : IAutoDraftBackchecker
                 }
             }
 
+            if (cadSnapshot.Available && category == "note")
+            {
+                if (markupBounds is null)
+                {
+                    PromoteToWarn(ref status, ref severity);
+                    notes.Add("NOTE action has no bounds for presence validation.");
+                    suggestions.Add("Provide markup bounds to validate note placement context.");
+                }
+                else
+                {
+                    var effectiveNoteBounds = ExpandBounds(markupBounds, tolerancePadding);
+                    var noteOverlapCount = cadSnapshot.Entities.Count(
+                        entity => BoundsOverlap(effectiveNoteBounds, entity.Bounds)
+                    );
+                    if (noteOverlapCount == 0)
+                    {
+                        PromoteToWarn(ref status, ref severity);
+                        notes.Add("NOTE action has no nearby CAD entity context.");
+                        suggestions.Add("Confirm note location against nearby CAD entities.");
+                    }
+                }
+            }
+
             if (markupBounds is not null)
             {
+                var effectiveMarkupBounds = ExpandBounds(markupBounds, tolerancePadding);
                 var conflictCount = 0;
                 foreach (var (otherActionId, otherBounds) in actionBounds)
                 {
@@ -187,7 +213,8 @@ public sealed class MockAutoDraftBackchecker : IAutoDraftBackchecker
                     {
                         continue;
                     }
-                    if (!BoundsOverlap(markupBounds, otherBounds))
+                    var effectiveOtherBounds = ExpandBounds(otherBounds, tolerancePadding);
+                    if (!BoundsOverlap(effectiveMarkupBounds, effectiveOtherBounds))
                     {
                         continue;
                     }
@@ -389,6 +416,31 @@ public sealed class MockAutoDraftBackchecker : IAutoDraftBackchecker
     private static bool BoundsOverlap(BoundsSnapshot a, BoundsSnapshot b)
     {
         return a.X < b.Right && a.Right > b.X && a.Y < b.Bottom && a.Bottom > b.Y;
+    }
+
+    private static BoundsSnapshot ExpandBounds(BoundsSnapshot bounds, double padding)
+    {
+        if (padding <= 0)
+        {
+            return bounds;
+        }
+        return new BoundsSnapshot(
+            bounds.X - padding,
+            bounds.Y - padding,
+            Math.Max(0.0001, bounds.Width + (padding * 2.0)),
+            Math.Max(0.0001, bounds.Height + (padding * 2.0))
+        );
+    }
+
+    private static double TolerancePaddingForProfile(string? profile)
+    {
+        var normalized = (profile ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "strict" => 0.0,
+            "loose" => 8.0,
+            _ => 4.0,
+        };
     }
 
     private static CadContextSnapshot ParseCadContext(Dictionary<string, JsonElement>? cadContext)

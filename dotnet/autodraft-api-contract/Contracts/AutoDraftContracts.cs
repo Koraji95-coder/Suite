@@ -179,6 +179,9 @@ public sealed class AutoDraftBackcheckRequest
     [JsonPropertyName("require_cad_context")]
     public bool RequireCadContext { get; init; }
 
+    [JsonPropertyName("tolerance_profile")]
+    public string ToleranceProfile { get; init; } = "strict";
+
     [JsonPropertyName("requestId")]
     public string? RequestId { get; init; }
 }
@@ -268,6 +271,87 @@ public sealed class AutoDraftBackcheckResponse
 
     [JsonPropertyName("findings")]
     public IReadOnlyList<AutoDraftBackcheckFinding> Findings { get; init; } = [];
+}
+
+public sealed class AutoDraftCompareRequest
+{
+    [JsonPropertyName("markups")]
+    public List<MarkupInput> Markups { get; init; } = [];
+
+    [JsonPropertyName("cad_context")]
+    public Dictionary<string, JsonElement>? CadContext { get; init; }
+
+    [JsonPropertyName("tolerance_profile")]
+    public string ToleranceProfile { get; init; } = "medium";
+
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; init; }
+}
+
+public sealed class AutoDraftComparePlan
+{
+    [JsonPropertyName("source")]
+    public required string Source { get; init; }
+
+    [JsonPropertyName("summary")]
+    public required AutoDraftPlanSummary Summary { get; init; }
+
+    [JsonPropertyName("actions")]
+    public IReadOnlyList<AutoDraftActionItem> Actions { get; init; } = [];
+}
+
+public sealed class AutoDraftCompareSummary
+{
+    [JsonPropertyName("status")]
+    public required string Status { get; init; }
+
+    [JsonPropertyName("total_markups")]
+    public int TotalMarkups { get; init; }
+
+    [JsonPropertyName("total_actions")]
+    public int TotalActions { get; init; }
+
+    [JsonPropertyName("pass_count")]
+    public int PassCount { get; init; }
+
+    [JsonPropertyName("warn_count")]
+    public int WarnCount { get; init; }
+
+    [JsonPropertyName("fail_count")]
+    public int FailCount { get; init; }
+
+    [JsonPropertyName("cad_context_available")]
+    public bool CadContextAvailable { get; init; }
+}
+
+public sealed class AutoDraftCompareResponse
+{
+    [JsonPropertyName("ok")]
+    public bool Ok { get; init; }
+
+    [JsonPropertyName("success")]
+    public bool Success { get; init; }
+
+    [JsonPropertyName("requestId")]
+    public required string RequestId { get; init; }
+
+    [JsonPropertyName("source")]
+    public required string Source { get; init; }
+
+    [JsonPropertyName("mode")]
+    public required string Mode { get; init; }
+
+    [JsonPropertyName("tolerance_profile")]
+    public required string ToleranceProfile { get; init; }
+
+    [JsonPropertyName("plan")]
+    public required AutoDraftComparePlan Plan { get; init; }
+
+    [JsonPropertyName("backcheck")]
+    public required AutoDraftBackcheckResponse Backcheck { get; init; }
+
+    [JsonPropertyName("summary")]
+    public required AutoDraftCompareSummary Summary { get; init; }
 }
 
 public sealed class AutoDraftRulesResponse

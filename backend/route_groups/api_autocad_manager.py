@@ -465,6 +465,50 @@ class AutoCADManager:
 
             entities: List[Dict[str, Any]] = []
             modelspace_count = int(ms.Count)
+
+            def _extract_entity_text(entity_obj: Any, entity_type_name: str) -> str:
+                text_value = ""
+                type_name = str(entity_type_name or "").strip().lower()
+                if type_name in {"acdbtext", "acdbmtext", "acdbattribute", "acdbattributedefinition"}:
+                    for attr_name in ("TextString", "Text", "Contents", "MTextAttributeContent"):
+                        try:
+                            raw_value = getattr(entity_obj, attr_name)
+                        except Exception:
+                            continue
+                        text_value = str(raw_value or "").strip()
+                        if text_value:
+                            return text_value
+                if type_name == "acdbblockreference":
+                    try:
+                        raw_attrs = entity_obj.GetAttributes()
+                    except Exception:
+                        raw_attrs = None
+                    if raw_attrs is None:
+                        return ""
+                    attr_entries: List[Any]
+                    if isinstance(raw_attrs, (list, tuple)):
+                        attr_entries = list(raw_attrs)
+                    elif hasattr(raw_attrs, "__iter__"):
+                        try:
+                            attr_entries = list(raw_attrs)
+                        except Exception:
+                            attr_entries = []
+                    else:
+                        attr_entries = []
+                    values: List[str] = []
+                    for entry in attr_entries:
+                        if entry is None:
+                            continue
+                        try:
+                            value = str(getattr(entry, "TextString", "") or "").strip()
+                        except Exception:
+                            value = ""
+                        if value:
+                            values.append(value)
+                    if values:
+                        return " | ".join(values)
+                return text_value
+
             for idx in range(modelspace_count):
                 if len(entities) >= safe_max_entities:
                     break
@@ -505,22 +549,24 @@ class AutoCADManager:
                     object_name = str(getattr(entity, "ObjectName", "") or "").strip()
                 except Exception:
                     object_name = ""
+                entity_text = _extract_entity_text(entity, object_name)
 
                 entity_id = handle or f"entity-{idx + 1}"
-                entities.append(
-                    {
-                        "id": entity_id,
-                        "handle": handle,
-                        "layer": layer_name,
-                        "type": object_name,
-                        "bounds": {
-                            "x": x,
-                            "y": y,
-                            "width": width,
-                            "height": height,
-                        },
-                    }
-                )
+                entity_payload = {
+                    "id": entity_id,
+                    "handle": handle,
+                    "layer": layer_name,
+                    "type": object_name,
+                    "bounds": {
+                        "x": x,
+                        "y": y,
+                        "width": width,
+                        "height": height,
+                    },
+                }
+                if entity_text:
+                    entity_payload["text"] = entity_text
+                entities.append(entity_payload)
 
             return (True, entities, None)
 

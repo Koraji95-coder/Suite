@@ -2,18 +2,48 @@ import net from "node:net";
 import { spawn, spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 
+function parseBoolEnv(rawValue, fallback = false) {
+	if (rawValue === undefined || rawValue === null) return fallback;
+	const normalized = String(rawValue).trim().toLowerCase();
+	if (!normalized) return fallback;
+	if (["1", "true", "yes", "on"].includes(normalized)) return true;
+	if (["0", "false", "no", "off"].includes(normalized)) return false;
+	return fallback;
+}
+
 const children = [];
 let shuttingDown = false;
 const autocadPipeName =
 	(process.env.AUTOCAD_DOTNET_PIPE_NAME || "").trim() || "SUITE_AUTOCAD_PIPE";
 const namedPipeServerProject = "dotnet/named-pipe-bridge/NamedPipeServer.csproj";
 const autodraftApiProject = "dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj";
-const autodraftApiAutostartDisabled = /^(0|false|no)$/i.test(
-	String(process.env.SUITE_DEV_AUTOSTART_AUTODRAFT_DOTNET || "").trim(),
+const autodraftApiAutostartDisabled = !parseBoolEnv(
+	process.env.SUITE_DEV_AUTOSTART_AUTODRAFT_DOTNET,
+	true,
 );
-const redisAutostartDisabled = /^(0|false|no)$/i.test(
-	String(process.env.SUITE_DEV_AUTOSTART_REDIS || "").trim(),
+const redisAutostartDisabled = !parseBoolEnv(
+	process.env.SUITE_DEV_AUTOSTART_REDIS,
+	true,
 );
+const limiterRequireSharedStorage = parseBoolEnv(
+	process.env.API_REQUIRE_SHARED_LIMITER_STORAGE,
+	false,
+);
+const limiterDevDegradeOnRedisFailure = parseBoolEnv(
+	process.env.API_LIMITER_DEV_DEGRADE_ON_REDIS_FAILURE,
+	true,
+);
+const limiterMode =
+	(
+		(String(process.env.API_ENV || "").trim() ||
+			String(process.env.FLASK_ENV || "").trim()) ||
+		""
+	)
+		.toLowerCase()
+		.trim();
+const limiterStrictMode =
+	limiterRequireSharedStorage || limiterMode === "production" || limiterMode === "prod";
+const redisWindowsService = (process.env.SUITE_REDIS_WINDOWS_SERVICE || "").trim() || "Memurai";
 const gatewayPort = Number.parseInt(
 	(process.env.AGENT_GATEWAY_PORT || "").trim() || "3000",
 	10,
@@ -213,6 +243,136 @@ function isPortOpen(host, port, timeoutMs = 800) {
 	});
 }
 
+function isLoopbackHost(host) {
+	const normalized = String(host || "").trim().toLowerCase();
+	return (
+		normalized === "127.0.0.1" ||
+		normalized === "localhost" ||
+		normalized === "::1"
+	);
+}
+
+async function waitForPortReady(host, port, attempts = 20, timeoutMs = 500, delayMs = 250) {
+	for (let attempt = 0; attempt < attempts; attempt += 1) {
+		if (await isPortOpen(host, port, timeoutMs)) {
+			return true;
+		}
+		if (shuttingDown) return false;
+		if (attempt < attempts - 1) {
+			await wait(delayMs);
+		}
+	}
+	return false;
+}
+
+function splitWindowsServiceCandidates(rawValue) {
+	return String(rawValue || "")
+		.split(/[;,]/)
+		.map((entry) => entry.trim())
+		.filter(Boolean);
+}
+
+function isWindowsServiceAutostartDisabled(rawValue) {
+	const normalized = String(rawValue || "").trim().toLowerCase();
+	return ["off", "none", "disabled", "skip", "false", "0"].includes(normalized);
+}
+
+function discoverWindowsRedisServiceCandidates() {
+	if (process.platform !== "win32") return [];
+	if (!commandExists("powershell")) return [];
+	const probe = spawnSync(
+		"powershell",
+		[
+			"-NoProfile",
+			"-Command",
+			"Get-Service | Where-Object { $_.Name -match 'memurai|redis' -or $_.DisplayName -match 'memurai|redis' } | Select-Object -ExpandProperty Name",
+		],
+		{ encoding: "utf8" },
+	);
+	if (probe.status !== 0) return [];
+	return String(probe.stdout || "")
+		.split(/\r?\n/)
+		.map((entry) => entry.trim())
+		.filter(Boolean);
+}
+
+function resolveWindowsRedisServiceCandidates() {
+	const configuredRaw = String(redisWindowsService || "").trim();
+	if (isWindowsServiceAutostartDisabled(configuredRaw)) {
+		return [];
+	}
+
+	const configured = splitWindowsServiceCandidates(configuredRaw || "Memurai").filter(
+		(entry) => entry.toLowerCase() !== "auto",
+	);
+	const discovered = discoverWindowsRedisServiceCandidates();
+	const defaults = ["Memurai", "memurai", "Redis", "redis"];
+	const deduped = [];
+	const seen = new Set();
+
+	for (const candidate of [...configured, ...discovered, ...defaults]) {
+		const normalized = String(candidate || "").trim();
+		if (!normalized) continue;
+		const key = normalized.toLowerCase();
+		if (seen.has(key)) continue;
+		seen.add(key);
+		deduped.push(normalized);
+	}
+	return deduped;
+}
+
+function startWindowsService(serviceName) {
+	if (process.platform !== "win32") {
+		return { ok: false, reason: "not_windows" };
+	}
+	const service = String(serviceName || "").trim();
+	if (!service) {
+		return { ok: false, reason: "service_name_empty" };
+	}
+	const query = spawnSync("sc", ["query", service], { encoding: "utf8" });
+	if (query.status !== 0) {
+		return {
+			ok: false,
+			reason: `service_not_found:${service}`,
+			detail: String(query.stderr || query.stdout || "").trim(),
+		};
+	}
+	const start = spawnSync("sc", ["start", service], { encoding: "utf8" });
+	const startText = `${String(start.stdout || "")}\n${String(start.stderr || "")}`;
+	const normalizedText = startText.toUpperCase();
+	if (
+		start.status === 0 ||
+		normalizedText.includes("ALREADY RUNNING") ||
+		normalizedText.includes("FAILED 1056")
+	) {
+		return { ok: true, reason: `windows_service:${service}` };
+	}
+	return {
+		ok: false,
+		reason: `service_start_failed:${service}`,
+		detail: startText.trim(),
+	};
+}
+
+function limiterModeSummary() {
+	return `strict_mode=${limiterStrictMode}, dev_degrade=${limiterDevDegradeOnRedisFailure}`;
+}
+
+function resolveRedisUnavailableStatus(detail) {
+	const message = `${detail} (${limiterModeSummary()})`;
+	if (!limiterStrictMode && limiterDevDegradeOnRedisFailure) {
+		console.warn(`[dev-full] RATE LIMITER DEGRADED: ${message}`);
+		return {
+			mode: "degraded",
+			available: false,
+			storageUri: "memory://",
+			reason: message,
+		};
+	}
+	console.error(`[dev-full] Redis is required: ${message}`);
+	process.exit(1);
+}
+
 function forwardOutput(stream, label, write) {
 	if (!stream) return;
 	const rl = createInterface({ input: stream });
@@ -254,24 +414,92 @@ function run(name, command, args = [], options = {}) {
 }
 
 async function ensureRedis(label = "redis") {
-	if (redisAutostartDisabled) {
-		console.log("[dev-full] Redis autostart disabled via SUITE_DEV_AUTOSTART_REDIS.");
-		return;
-	}
-
 	const endpoint = parseRedisEndpoint(limiterStorageUri);
 	if (!endpoint) {
 		console.log(
 			`[dev-full] Skipping Redis autostart because limiter URI is not redis:// (${limiterStorageUri}).`,
 		);
-		return;
+		return {
+			mode: "non_redis_storage",
+			available: true,
+			storageUri: limiterStorageUri,
+			reason: "limiter_storage_uri_not_redis",
+		};
 	}
 
+	const endpointLabel = `${endpoint.host}:${endpoint.port}`;
 	if (await isPortOpen(endpoint.host, endpoint.port)) {
-		console.log(
-			`[dev-full] Redis already reachable at ${endpoint.host}:${endpoint.port}.`,
+		console.log(`[dev-full] Redis already reachable at ${endpointLabel}.`);
+		return {
+			mode: "redis",
+			available: true,
+			storageUri: limiterStorageUri,
+			reason: "redis_already_reachable",
+		};
+	}
+
+	if (redisAutostartDisabled) {
+		console.log("[dev-full] Redis autostart disabled via SUITE_DEV_AUTOSTART_REDIS.");
+		return resolveRedisUnavailableStatus(
+			`Redis endpoint ${endpointLabel} is unreachable and autostart is disabled`,
 		);
-		return;
+	}
+
+	if (process.platform === "win32" && isLoopbackHost(endpoint.host)) {
+		const serviceCandidates = resolveWindowsRedisServiceCandidates();
+		if (serviceCandidates.length === 0) {
+			console.log(
+				`[dev-full] Windows service startup skipped (SUITE_REDIS_WINDOWS_SERVICE=${redisWindowsService || "<empty>"}).`,
+			);
+		} else {
+			console.log(
+				`[dev-full] Attempting Redis startup via Windows service candidate(s): ${serviceCandidates.join(", ")}...`,
+			);
+			const serviceFailures = [];
+			for (const candidate of serviceCandidates) {
+				const serviceStart = startWindowsService(candidate);
+				if (!serviceStart.ok) {
+					serviceFailures.push({
+						service: candidate,
+						reason: serviceStart.reason,
+						detail: serviceStart.detail || "",
+					});
+					continue;
+				}
+				if (await waitForPortReady(endpoint.host, endpoint.port, 20, 500, 250)) {
+					console.log(
+						`[dev-full] Redis is ready at ${endpointLabel} via Windows service '${candidate}'.`,
+					);
+					return {
+						mode: "redis",
+						available: true,
+						storageUri: limiterStorageUri,
+						reason: serviceStart.reason,
+					};
+				}
+				serviceFailures.push({
+					service: candidate,
+					reason: "service_started_port_not_ready",
+					detail: "",
+				});
+			}
+
+			if (serviceFailures.length > 0) {
+				const summary = serviceFailures
+					.slice(0, 4)
+					.map((entry) => `${entry.service}:${entry.reason}`)
+					.join(", ");
+				console.log(
+					`[dev-full] Windows service startup unavailable (${summary}${serviceFailures.length > 4 ? ", ..." : ""}); trying fallback providers.`,
+				);
+				const withDetail = serviceFailures.find((entry) => entry.detail);
+				if (withDetail) {
+					console.log(
+						`[dev-full] Service detail (${withDetail.service}): ${withDetail.detail}`,
+					);
+				}
+			}
+		}
 	}
 
 	const redisBin =
@@ -314,30 +542,27 @@ async function ensureRedis(label = "redis") {
 	}
 
 	if (!command) {
-		console.error(
-			"[dev-full] Unable to autostart Redis. Install redis-server or Docker, or set SUITE_DEV_AUTOSTART_REDIS=false.",
+		return resolveRedisUnavailableStatus(
+			"Unable to autostart Redis (tried Windows service, redis-server binary, and Docker)",
 		);
-		process.exit(1);
 	}
 
-	console.log(
-		`[dev-full] Starting Redis via ${reason} at ${endpoint.host}:${endpoint.port}...`,
-	);
+	console.log(`[dev-full] Starting Redis via ${reason} at ${endpointLabel}...`);
 	run(label, command, args);
 
-	for (let attempt = 0; attempt < 20; attempt += 1) {
-		if (await isPortOpen(endpoint.host, endpoint.port, 500)) {
-			console.log(`[dev-full] Redis is ready at ${endpoint.host}:${endpoint.port}.`);
-			return;
-		}
-		if (shuttingDown) return;
-		await wait(250);
+	if (await waitForPortReady(endpoint.host, endpoint.port, 20, 500, 250)) {
+		console.log(`[dev-full] Redis is ready at ${endpointLabel}.`);
+		return {
+			mode: "redis",
+			available: true,
+			storageUri: limiterStorageUri,
+			reason: reason || "redis_started",
+		};
 	}
 
-	console.error(
-		`[dev-full] Redis did not become reachable at ${endpoint.host}:${endpoint.port}.`,
+	return resolveRedisUnavailableStatus(
+		`Redis did not become reachable at ${endpointLabel}`,
 	);
-	process.exit(1);
 }
 
 async function ensureAutoDraftApi(env, label = "autodraft-dotnet") {
@@ -410,16 +635,16 @@ async function main() {
 	if (!sharedEnv.API_DEV_SERVER_THREADED) {
 		sharedEnv.API_DEV_SERVER_THREADED = "true";
 	}
-	if (
-		!redisAutostartDisabled &&
-		!sharedEnv.API_LIMITER_STORAGE_URI &&
-		!sharedEnv.REDIS_URL
-	) {
+	if (!sharedEnv.API_LIMITER_STORAGE_URI && !sharedEnv.REDIS_URL) {
 		sharedEnv.API_LIMITER_STORAGE_URI = limiterStorageUri;
 	}
 
+	console.log(`[dev-full] Limiter mode: ${limiterModeSummary()}.`);
 	ensureRequiredPortsAvailable();
-	await ensureRedis("redis");
+	const redisStatus = await ensureRedis("redis");
+	console.log(
+		`[dev-full] Redis mode: ${redisStatus.mode} (storage=${redisStatus.storageUri}, reason=${redisStatus.reason}).`,
+	);
 	await ensureAutoDraftApi(sharedEnv);
 
 	run(

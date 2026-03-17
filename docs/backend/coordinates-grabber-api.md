@@ -81,6 +81,8 @@ WebSocket stream for real-time backend/AutoCAD connection status.
 
 ### `GET /health`
 Simple health check endpoint.
+Includes limiter runtime metadata under `limiter`:
+`storage`, `degraded`, and `reason`.
 
 ### `GET /api/transmittal/profiles`
 Returns allowed transmittal sender profiles and firm numbers from backend config.
@@ -139,6 +141,11 @@ Downloads the bundled transmittal template DOCX.
 - `API_MAX_CONTENT_LENGTH` (optional): max request body bytes (default `104857600`)
 - `API_RATE_LIMIT_DAY` (optional): global day limit (default `200 per day`)
 - `API_RATE_LIMIT_HOUR` (optional): global hour limit (default `50 per hour`)
+- `API_LIMITER_STORAGE_URI` (optional): primary limiter storage URI (prefer Redis-compatible backend)
+- `REDIS_URL` (optional): fallback alias for limiter storage URI
+- `API_LIMITER_DEV_DEGRADE_ON_REDIS_FAILURE` (optional): allow dev fallback to `memory://` when Redis is unreachable (default `true`)
+- `API_LIMITER_REDIS_PROBE_TIMEOUT_MS` (optional): Redis probe timeout at startup (default `800`)
+- `API_REQUIRE_SHARED_LIMITER_STORAGE` (optional): enforce strict shared storage outside production mode (default `false` in `.env.example`)
 
 ## Agent Broker (Optional)
 
@@ -189,6 +196,11 @@ Broker env vars (backend-only):
 - `AGENT_GATEWAY_URL` (default `http://127.0.0.1:3000`)
 - `AGENT_WEBHOOK_SECRET`
 - `AGENT_SESSION_TTL_SECONDS`
+- `AGENT_SESSION_REDIS_ENABLED` (default `true`; enable Redis-backed broker session persistence)
+- `AGENT_SESSION_REDIS_REQUIRED` (default `false`; fail startup when Redis session store is unavailable)
+- `AGENT_SESSION_REDIS_URL` (optional; explicit Redis URL for session store)
+- `AGENT_SESSION_REDIS_KEY_PREFIX` (default `suite:agent:session:`)
+- `AGENT_SESSION_REDIS_TIMEOUT_MS` (default `800`)
 - `AGENT_PAIRING_CHALLENGE_TTL_SECONDS`
 - `AGENT_PAIRING_CHALLENGE_MAX_ENTRIES`
 - `AGENT_PAIRING_REDIRECT_PATH`
@@ -199,6 +211,11 @@ Broker env vars (backend-only):
 - `AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS`
 - `AGENT_PAIRING_CONFIRM_FAILURE_MAX_ATTEMPTS`
 - `AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS`
+
+`GET /health` includes additive diagnostics for both limiter and agent session storage:
+
+- `limiter.storage`, `limiter.degraded`, `limiter.reason`
+- `agent_session_store.mode`, `agent_session_store.reason` (+ Redis metadata when active)
 
 Passkey helper env vars (backend-only):
 

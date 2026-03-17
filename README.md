@@ -119,7 +119,7 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
 
 Optional but recommended:
 
-- Redis (rate-limit/session backing; `dev:full` can autostart in many setups)
+- Redis-compatible runtime for limiter state (Memurai on Windows is recommended)
 
 ## 1) Install Dependencies
 
@@ -170,11 +170,38 @@ This orchestrates:
 - gateway (`npm run gateway:dev`)
 - AutoDraft .NET API (`dotnet run --project dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj`)
 - named-pipe bridge (`dotnet run --project dotnet/named-pipe-bridge/NamedPipeServer.csproj`)
-- Redis autostart when configured
+- Redis startup (`SUITE_REDIS_WINDOWS_SERVICE`/Memurai on Windows, then `redis-server`, then Docker fallback)
 
 To disable AutoDraft .NET API autostart in full mode:
 
 - `SUITE_DEV_AUTOSTART_AUTODRAFT_DOTNET=false`
+
+### Redis + limiter startup behavior
+
+- Limiter URI precedence stays: `API_LIMITER_STORAGE_URI`, then `REDIS_URL`.
+- `dev:full` Windows Redis service startup now tries discovered candidates (Memurai/Redis service names) before binary/Docker fallback.
+  - Override candidates with `SUITE_REDIS_WINDOWS_SERVICE` (comma-separated values supported, for example `Memurai,Redis`).
+  - Set `SUITE_REDIS_WINDOWS_SERVICE=off` to skip Windows service startup attempts.
+- Strict shared-storage mode is enabled when either:
+  - `API_REQUIRE_SHARED_LIMITER_STORAGE=true`, or
+  - `API_ENV`/`FLASK_ENV` is `production` or `prod`.
+- In non-strict mode with `API_LIMITER_DEV_DEGRADE_ON_REDIS_FAILURE=true`, backend degrades to `memory://` when Redis is unreachable and logs a high-visibility warning.
+- In strict mode, unreachable Redis fails backend startup immediately.
+- `/health` now includes limiter runtime metadata under `limiter.storage`, `limiter.degraded`, and `limiter.reason`.
+- Agent pairing/session storage can use Redis for restart persistence:
+  - `AGENT_SESSION_REDIS_ENABLED=true` (default)
+  - `AGENT_SESSION_REDIS_URL` (optional override; otherwise uses limiter/`REDIS_URL` Redis URI)
+  - `AGENT_SESSION_TTL_SECONDS` (set `604800` for a 7-day session window)
+- `/health` includes agent session store status under `agent_session_store.mode` and `agent_session_store.reason`.
+
+Windows Memurai checks:
+
+```bash
+sc query Memurai
+sc start Memurai
+```
+
+If the browser reports CORS/preflight failures, verify backend startup logs first. A limiter bootstrap failure can return backend `500` before request handlers execute, which often appears as a CORS error in the browser.
 
 ### Manual startup (when debugging specific layers)
 
@@ -259,6 +286,15 @@ dotnet run --project dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj
 - `POST /api/autodraft/plan`
 - `POST /api/autodraft/backcheck`
 - `POST /api/autodraft/execute`
+- `POST /api/autodraft/compare/prepare`
+- `POST /api/autodraft/compare`
+
+Compare v1 notes:
+
+- `compare/prepare` extracts Bluebeam annotations from a selected PDF page.
+- `compare` is QA-only (no CAD writes) and defaults to auto-calibration.
+- Manual two-point calibration is still available via `calibration_mode=manual` or `manual_override=true`.
+- Agent pre-review (`draftsmith`) can provide bounded advisory boosts before deterministic replacement scoring.
 
 ### Auth and pairing
 

@@ -60,6 +60,10 @@ from werkzeug.utils import secure_filename
 import requests
 import jwt
 from jwt import PyJWKClient
+try:
+    import redis
+except Exception:
+    redis = None  # type: ignore[assignment]
 from route_groups import register_route_groups
 from route_groups.api_passkey_store_access import (
     fetch_active_passkey_by_credential_id as passkey_store_fetch_active_passkey_by_credential_id,
@@ -147,10 +151,13 @@ from route_groups.api_http_hardening import (
     configure_cors as http_hardening_configure_cors_helper,
     default_allowed_origins as http_hardening_default_allowed_origins_helper,
     resolve_limiter_default_limits as http_hardening_resolve_limiter_default_limits_helper,
-    resolve_limiter_storage_uri as http_hardening_resolve_limiter_storage_uri_helper,
+    resolve_limiter_storage_runtime as http_hardening_resolve_limiter_storage_runtime_helper,
 )
 from route_groups.api_server_state import (
     create_server_state as server_state_create_helper,
+)
+from route_groups.api_redis_json_store import (
+    RedisJsonTtlStore,
 )
 from route_groups.api_bootstrap_runtime import (
     create_bootstrap_runtime as bootstrap_create_runtime_helper,
@@ -335,9 +342,21 @@ http_hardening_configure_cors_helper(
 )
 
 # ── Rate Limiting ────────────────────────────────────────────────
-LIMITER_STORAGE_URI = http_hardening_resolve_limiter_storage_uri_helper(
+LIMITER_STORAGE_RUNTIME = http_hardening_resolve_limiter_storage_runtime_helper(
     os_module=os,
     logger=logger,
+)
+LIMITER_STORAGE_URI = str(LIMITER_STORAGE_RUNTIME["storage_uri"])
+app.config["LIMITER_RUNTIME_STATUS"] = {
+    "storage": LIMITER_STORAGE_URI,
+    "degraded": bool(LIMITER_STORAGE_RUNTIME.get("degraded", False)),
+    "reason": str(LIMITER_STORAGE_RUNTIME.get("reason") or ""),
+}
+logger.info(
+    "Rate limiter storage resolved (storage=%s, degraded=%s, reason=%s)",
+    LIMITER_STORAGE_URI,
+    app.config["LIMITER_RUNTIME_STATUS"]["degraded"],
+    app.config["LIMITER_RUNTIME_STATUS"]["reason"],
 )
 limiter = Limiter(
     app=app,
@@ -624,7 +643,101 @@ AGENT_ORCHESTRATION_VERBOSE_LOGS = _parse_bool_env(
     False,
 )
 
-AGENT_SESSIONS = server_state.agent_sessions
+def _looks_like_redis_storage_uri(value: str) -> bool:
+    normalized = str(value or "").strip().lower()
+    return normalized.startswith("redis://") or normalized.startswith("rediss://")
+
+
+def _resolve_agent_session_redis_url() -> str:
+    explicit = (os.environ.get("AGENT_SESSION_REDIS_URL") or "").strip()
+    if explicit:
+        return explicit
+    if _looks_like_redis_storage_uri(LIMITER_STORAGE_URI):
+        return LIMITER_STORAGE_URI
+    redis_url = (os.environ.get("REDIS_URL") or "").strip()
+    if _looks_like_redis_storage_uri(redis_url):
+        return redis_url
+    return ""
+
+
+AGENT_SESSION_REDIS_ENABLED = _parse_bool_env("AGENT_SESSION_REDIS_ENABLED", True)
+AGENT_SESSION_REDIS_REQUIRED = _parse_bool_env("AGENT_SESSION_REDIS_REQUIRED", False)
+AGENT_SESSION_REDIS_URL = _resolve_agent_session_redis_url()
+AGENT_SESSION_REDIS_KEY_PREFIX = (
+    (os.environ.get("AGENT_SESSION_REDIS_KEY_PREFIX") or "suite:agent:session:").strip()
+    or "suite:agent:session:"
+)
+AGENT_SESSION_REDIS_TIMEOUT_MS = _parse_int_env(
+    "AGENT_SESSION_REDIS_TIMEOUT_MS",
+    800,
+    minimum=100,
+)
+
+AGENT_SESSIONS: Any = server_state.agent_sessions
+AGENT_SESSION_STORE_STATUS: Dict[str, Any] = {
+    "mode": "memory",
+    "reason": "in_memory_default",
+}
+if AGENT_SESSION_REDIS_ENABLED:
+    if not AGENT_SESSION_REDIS_URL:
+        message = (
+            "AGENT_SESSION_REDIS_ENABLED=true but no Redis URL was resolved. "
+            "Set AGENT_SESSION_REDIS_URL (or REDIS_URL/API_LIMITER_STORAGE_URI) to enable persistent session storage."
+        )
+        if AGENT_SESSION_REDIS_REQUIRED:
+            raise RuntimeError(message)
+        logger.warning("%s Falling back to in-memory agent sessions.", message)
+        AGENT_SESSION_STORE_STATUS["reason"] = "redis_url_missing"
+    elif redis is None:
+        message = (
+            "redis package is unavailable; cannot enable AGENT_SESSION_REDIS_* persistent session storage."
+        )
+        if AGENT_SESSION_REDIS_REQUIRED:
+            raise RuntimeError(message)
+        logger.warning("%s Falling back to in-memory agent sessions.", message)
+        AGENT_SESSION_STORE_STATUS["reason"] = "redis_package_unavailable"
+    else:
+        timeout_seconds = max(AGENT_SESSION_REDIS_TIMEOUT_MS / 1000.0, 0.1)
+        try:
+            session_redis_client = redis.Redis.from_url(
+                AGENT_SESSION_REDIS_URL,
+                socket_connect_timeout=timeout_seconds,
+                socket_timeout=timeout_seconds,
+            )
+            session_redis_client.ping()
+            AGENT_SESSIONS = RedisJsonTtlStore(
+                redis_client=session_redis_client,
+                key_prefix=AGENT_SESSION_REDIS_KEY_PREFIX,
+                now_fn=time.time,
+            )
+            AGENT_SESSION_STORE_STATUS = {
+                "mode": "redis",
+                "reason": "redis_connected",
+                "redis_url": AGENT_SESSION_REDIS_URL,
+                "key_prefix": AGENT_SESSION_REDIS_KEY_PREFIX,
+            }
+            logger.info(
+                "Agent session storage using Redis (url=%s, key_prefix=%s).",
+                AGENT_SESSION_REDIS_URL,
+                AGENT_SESSION_REDIS_KEY_PREFIX,
+            )
+        except Exception as exc:
+            message = (
+                "Unable to connect to Redis for AGENT_SESSION_REDIS_URL=%s (%s)."
+                % (AGENT_SESSION_REDIS_URL, exc)
+            )
+            if AGENT_SESSION_REDIS_REQUIRED:
+                raise RuntimeError(message) from exc
+            logger.warning(
+                "%s Falling back to in-memory agent sessions.",
+                message,
+            )
+            AGENT_SESSION_STORE_STATUS["reason"] = "redis_unreachable_fallback_memory"
+else:
+    AGENT_SESSION_STORE_STATUS["reason"] = "redis_disabled"
+
+app.config["AGENT_SESSION_STORE_STATUS"] = AGENT_SESSION_STORE_STATUS
+
 AGENT_PAIRING_CHALLENGES = server_state.agent_pairing_challenges
 AGENT_PAIRING_CHALLENGE_LOCK = server_state.agent_pairing_challenge_lock
 AGENT_PAIRING_CHALLENGE_TTL_SECONDS = _parse_int_env(

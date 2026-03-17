@@ -81,6 +81,8 @@ def create_agent_runtime(
     logger: Any,
 ) -> AgentRuntime:
     def purge_expired_agent_sessions() -> None:
+        if bool(getattr(agent_sessions_store, "supports_native_ttl", False)):
+            return
         now = now_fn()
         expired = [
             sid

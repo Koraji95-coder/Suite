@@ -11,6 +11,7 @@ builder.Services.Configure<AutoDraftOptions>(
 builder.Services.AddSingleton<IAutoDraftPlanner, RuleBasedAutoDraftPlanner>();
 builder.Services.AddSingleton<IAutoDraftExecutor, MockAutoDraftExecutor>();
 builder.Services.AddSingleton<IAutoDraftBackchecker, MockAutoDraftBackchecker>();
+builder.Services.AddSingleton<IAutoDraftComparer, RuleBasedAutoDraftComparer>();
 
 var app = builder.Build();
 
@@ -26,6 +27,7 @@ app.MapGet("/", () =>
                 "POST /api/autodraft/plan",
                 "POST /api/autodraft/execute",
                 "POST /api/autodraft/backcheck",
+                "POST /api/autodraft/compare",
             },
         }
     )
@@ -85,6 +87,15 @@ app.MapPost(
         IAutoDraftBackchecker backchecker,
         CancellationToken cancellationToken
     ) => Results.Ok(backchecker.Backcheck(request, cancellationToken))
+);
+
+app.MapPost(
+    "/api/autodraft/compare",
+    (
+        AutoDraftCompareRequest request,
+        IAutoDraftComparer comparer,
+        CancellationToken cancellationToken
+    ) => Results.Ok(comparer.Compare(request, cancellationToken))
 );
 
 app.Run();

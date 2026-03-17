@@ -64,6 +64,10 @@ def _jsonify(payload: Dict[str, Any]) -> _JsonResponse:
     return _JsonResponse(payload)
 
 
+class _TtlNativeSessionStore(dict):
+    supports_native_ttl = True
+
+
 def _build_runtime(
     *,
     now_stub: _NowStub,
@@ -143,6 +147,22 @@ class TestApiAgentRuntime(unittest.TestCase):
         self.assertFalse(runtime.is_admin_user({"app_metadata": {"role": "member"}}))
         self.assertTrue(runtime.is_agent_task_allowed("chat", {"app_metadata": {"role": "member"}}))
         self.assertFalse(runtime.is_agent_task_allowed("build", {"app_metadata": {"role": "member"}}))
+
+    def test_purge_session_is_noop_for_native_ttl_store(self) -> None:
+        now_stub = _NowStub(100.0)
+        session_store = _TtlNativeSessionStore(
+            {"expired": {"expires_at": 10.0}, "active": {"expires_at": 999.0}}
+        )
+        runtime = _build_runtime(
+            now_stub=now_stub,
+            requests_stub=_RequestsStub([]),
+            session_store=session_store,
+        )
+
+        runtime.purge_expired_agent_sessions()
+        # Native TTL stores are responsible for their own expiry lifecycle.
+        self.assertIn("expired", session_store)
+        self.assertIn("active", session_store)
 
     def test_pairing_challenge_create_consume(self) -> None:
         now_stub = _NowStub(1000.0)

@@ -66,9 +66,29 @@ Build an AutoDraft pipeline that:
 - `POST /api/autodraft/plan`
 - `POST /api/autodraft/execute`
 - `POST /api/autodraft/backcheck`
+- `POST /api/autodraft/compare/prepare`
+- `POST /api/autodraft/compare`
 
 These endpoints support staged rollout: local fallback logic now, .NET-backed
 execution when the external API is available.
+
+## Compare Workflow (v1)
+
+- `POST /api/autodraft/compare/prepare` accepts a Bluebeam PDF upload and selected page index.
+- Prepare extracts annotation markups (`/Annots`) and returns normalized markup payloads plus optional measurement seed hints.
+- `POST /api/autodraft/compare` requires prepared markups and accepts:
+  - compare engine (`auto|python|dotnet`) and tolerance profile (`strict|medium|loose`),
+  - default `calibration_mode=auto` (manual two-point calibration only when requested),
+  - optional `agent_review_mode=pre|off` for advisory pre-review behavior.
+- Compare is QA-only in v1:
+  - no CAD writes,
+  - deterministic plan + backcheck output,
+  - strict add/delete mismatch findings with pass/warn/fail summary,
+  - bounded advisory agent boosts that never override deterministic policy.
+- Engine routing:
+  - `auto` prefers .NET and falls back to Python if unavailable,
+  - `dotnet` is strict (no fallback),
+  - `python` forces local compare engine.
 
 ## .NET Contract Project
 

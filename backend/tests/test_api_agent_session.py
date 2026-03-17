@@ -11,6 +11,50 @@ from backend.route_groups.api_agent_session import (
 
 
 class TestApiAgentSession(unittest.TestCase):
+    def test_helpers_support_mapping_like_session_store(self) -> None:
+        class _StoreStub:
+            supports_native_ttl = True
+
+            def __init__(self) -> None:
+                self.values = {}
+
+            def __setitem__(self, key, value) -> None:
+                self.values[key] = value
+
+            def get(self, key, default=None):
+                return self.values.get(key, default)
+
+            def pop(self, key, default=None):
+                return self.values.pop(key, default)
+
+        sessions = _StoreStub()
+        request_obj = SimpleNamespace(cookies={"suite_agent_session": "sid-1"})
+        create_agent_session(
+            "token-1",
+            "user-1",
+            purge_expired_agent_sessions_fn=lambda: None,
+            token_urlsafe_fn=lambda _n: "sid-1",
+            now_fn=lambda: 1000.0,
+            agent_session_ttl_seconds=3600,
+            agent_sessions_store=sessions,
+        )
+
+        session = get_agent_session(
+            purge_expired_agent_sessions_fn=lambda: None,
+            request_obj=request_obj,
+            agent_session_cookie="suite_agent_session",
+            now_fn=lambda: 1001.0,
+            agent_sessions_store=sessions,
+        )
+        self.assertEqual(session["token"], "token-1")
+
+        clear_agent_session_for_request(
+            request_obj=request_obj,
+            agent_session_cookie="suite_agent_session",
+            agent_sessions_store=sessions,
+        )
+        self.assertEqual(sessions.values, {})
+
     def test_create_agent_session_stores_session(self) -> None:
         sessions = {}
         purge_calls = {"count": 0}

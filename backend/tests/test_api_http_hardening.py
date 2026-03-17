@@ -7,6 +7,7 @@ from backend.route_groups.api_http_hardening import (
     configure_cors,
     default_allowed_origins,
     resolve_limiter_default_limits,
+    resolve_limiter_storage_runtime,
     resolve_limiter_storage_uri,
 )
 
@@ -92,6 +93,7 @@ class TestApiHttpHardening(unittest.TestCase):
             resolve_limiter_storage_uri(
                 os_module=_OSStub({"API_LIMITER_STORAGE_URI": "redis://cache:6379/1"}),
                 logger=logger,
+                redis_probe_fn=lambda _uri, _timeout_ms: True,
             ),
             "redis://cache:6379/1",
         )
@@ -99,6 +101,7 @@ class TestApiHttpHardening(unittest.TestCase):
             resolve_limiter_storage_uri(
                 os_module=_OSStub({"REDIS_URL": "redis://cache:6379/2"}),
                 logger=logger,
+                redis_probe_fn=lambda _uri, _timeout_ms: True,
             ),
             "redis://cache:6379/2",
         )
@@ -124,6 +127,72 @@ class TestApiHttpHardening(unittest.TestCase):
                 os_module=_OSStub({"API_REQUIRE_SHARED_LIMITER_STORAGE": "true"}),
                 logger=_LoggerStub(),
             )
+
+    def test_resolve_limiter_storage_runtime_degrades_when_redis_unreachable(self) -> None:
+        logger = _LoggerStub()
+        runtime = resolve_limiter_storage_runtime(
+            os_module=_OSStub(
+                {
+                    "API_LIMITER_STORAGE_URI": "redis://cache:6379/1",
+                    "API_LIMITER_DEV_DEGRADE_ON_REDIS_FAILURE": "true",
+                }
+            ),
+            logger=logger,
+            redis_probe_fn=lambda _uri, _timeout_ms: False,
+        )
+        self.assertEqual(runtime["storage_uri"], "memory://")
+        self.assertTrue(runtime["degraded"])
+        self.assertEqual(runtime["reason"], "redis_unreachable_dev_degrade")
+        self.assertGreaterEqual(len(logger.warnings), 1)
+
+    def test_resolve_limiter_storage_runtime_strict_mode_wins_over_degrade(self) -> None:
+        with self.assertRaises(RuntimeError):
+            resolve_limiter_storage_runtime(
+                os_module=_OSStub(
+                    {
+                        "API_LIMITER_STORAGE_URI": "redis://cache:6379/1",
+                        "API_REQUIRE_SHARED_LIMITER_STORAGE": "true",
+                        "API_LIMITER_DEV_DEGRADE_ON_REDIS_FAILURE": "true",
+                    }
+                ),
+                logger=_LoggerStub(),
+                redis_probe_fn=lambda _uri, _timeout_ms: False,
+            )
+
+    def test_resolve_limiter_storage_runtime_raises_when_degrade_disabled(self) -> None:
+        with self.assertRaises(RuntimeError):
+            resolve_limiter_storage_runtime(
+                os_module=_OSStub(
+                    {
+                        "API_LIMITER_STORAGE_URI": "redis://cache:6379/1",
+                        "API_LIMITER_DEV_DEGRADE_ON_REDIS_FAILURE": "false",
+                    }
+                ),
+                logger=_LoggerStub(),
+                redis_probe_fn=lambda _uri, _timeout_ms: False,
+            )
+
+    def test_resolve_limiter_storage_runtime_uses_configured_probe_timeout(self) -> None:
+        probe_calls = []
+
+        def _probe(uri: str, timeout_ms: int) -> bool:
+            probe_calls.append((uri, timeout_ms))
+            return True
+
+        runtime = resolve_limiter_storage_runtime(
+            os_module=_OSStub(
+                {
+                    "API_LIMITER_STORAGE_URI": "redis://cache:6379/1",
+                    "API_LIMITER_REDIS_PROBE_TIMEOUT_MS": "1234",
+                }
+            ),
+            logger=_LoggerStub(),
+            redis_probe_fn=_probe,
+        )
+        self.assertEqual(runtime["storage_uri"], "redis://cache:6379/1")
+        self.assertFalse(runtime["degraded"])
+        self.assertEqual(len(probe_calls), 1)
+        self.assertEqual(probe_calls[0][1], 1234)
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ import {
 	extendDeadEndSegments,
 	type Segment,
 } from "./engine/pdfToCadGeometry";
+import { AutoDraftComparePanel } from "./AutoDraftComparePanel";
 
 type TabId = "architecture" | "rules" | "pipeline" | "training";
 
@@ -657,6 +658,8 @@ export function AutoDraftStudioApp() {
 					})}
 				</Stack>
 			)}
+
+			<AutoDraftComparePanel />
 
 			<Panel variant="inset" padding="md" className={styles.demoPanel}>
 				<HStack gap={2} align="center" justify="between">

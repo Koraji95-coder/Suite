@@ -1,4 +1,4 @@
-import { ChevronRight, Filter, Home, Plus, Search } from "lucide-react";
+import { ChevronRight, Home, Plus, Search, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PanelInfoDialog } from "../../../data/PanelInfoDialog";
 import { projectsInfo } from "../../../data/panelInfo";
@@ -14,6 +14,7 @@ interface ProjectManagerHeaderProps {
 	activeProjects: number;
 	archivedProjects: number;
 	totalProjects: number;
+	visibleProjectCount: number;
 	onCreateProject: () => void;
 	onGoWorkspace: () => void;
 	onGoProjects: () => void;
@@ -28,6 +29,7 @@ export function ProjectManagerHeader({
 	activeProjects,
 	archivedProjects,
 	totalProjects,
+	visibleProjectCount,
 	onCreateProject,
 	onGoWorkspace,
 	onGoProjects,
@@ -38,6 +40,14 @@ export function ProjectManagerHeader({
 		"on-hold",
 		"archived",
 	];
+	const currentFilterLabel =
+		statusFilter === "all"
+			? "All tracked projects"
+			: statusFilter === "archived"
+				? "Archived projects"
+				: statusFilter === "on-hold"
+					? "On-hold projects"
+					: "Active projects";
 
 	return (
 		<section className={styles.root}>
@@ -65,9 +75,14 @@ export function ProjectManagerHeader({
 							<span className={styles.crumbCurrent}>{currentCrumb}</span>
 						</div>
 						<div>
+							<p className={styles.eyebrow}>Workspace operations</p>
 							<h2 className={styles.title}>Project Manager</h2>
 							<p className={styles.subtitle}>
 								Track workstreams, deadlines, and deliverables in one place.
+							</p>
+							<p className={styles.summary}>
+								{currentFilterLabel} with {visibleProjectCount} visible in the
+								current queue.
 							</p>
 						</div>
 					</div>
@@ -76,10 +91,6 @@ export function ProjectManagerHeader({
 						<button onClick={onCreateProject} className={styles.createButton}>
 							<Plus className={styles.iconSm} />
 							<span>New Project</span>
-						</button>
-						<button type="button" className={styles.filtersButton}>
-							<Filter className={styles.iconSm} />
-							Filters
 						</button>
 						<PanelInfoDialog
 							title={projectsInfo.title}
@@ -90,21 +101,27 @@ export function ProjectManagerHeader({
 				</div>
 
 				<div className={styles.bottomRow}>
-					<div className={styles.statusChips}>
-						{statusOptions.map((status) => (
-							<button
-								key={status}
-								type="button"
-								onClick={() => onStatusFilterChange(status)}
-								className={cn(
-									styles.statusChip,
-									statusFilter === status && styles.statusChipActive,
-								)}
-							>
-								{status.charAt(0).toUpperCase() +
-									status.slice(1).replace("-", " ")}
-							</button>
-						))}
+					<div className={styles.statusSection}>
+						<div className={styles.sectionLabel}>
+							<Target className={styles.iconSm} />
+							<span>Queue focus</span>
+						</div>
+						<div className={styles.statusChips}>
+							{statusOptions.map((status) => (
+								<button
+									key={status}
+									type="button"
+									onClick={() => onStatusFilterChange(status)}
+									className={cn(
+										styles.statusChip,
+										statusFilter === status && styles.statusChipActive,
+									)}
+								>
+									{status.charAt(0).toUpperCase() +
+										status.slice(1).replace("-", " ")}
+								</button>
+							))}
+						</div>
 					</div>
 
 					<div className={styles.meta}>
@@ -119,14 +136,25 @@ export function ProjectManagerHeader({
 							name="projectmanagerheader_input_113"
 							/>
 						</div>
-						<div className={styles.stats}>
-							<span className={styles.statBadge}>{activeProjects} active</span>
-							<span className={styles.statBadge}>
-								{archivedProjects} archived
-							</span>
-							<span className={cn(styles.statBadge, styles.statBadgeHighlight)}>
-								{totalProjects} total
-							</span>
+						<div className={styles.statsGrid}>
+							<div className={styles.statCard}>
+								<span className={styles.statLabel}>Visible</span>
+								<strong className={styles.statValue}>{visibleProjectCount}</strong>
+							</div>
+							<div className={styles.statCard}>
+								<span className={styles.statLabel}>Active</span>
+								<strong className={styles.statValue}>{activeProjects}</strong>
+							</div>
+							<div className={styles.statCard}>
+								<span className={styles.statLabel}>Archived</span>
+								<strong className={styles.statValue}>{archivedProjects}</strong>
+							</div>
+							<div
+								className={cn(styles.statCard, styles.statCardHighlight)}
+							>
+								<span className={styles.statLabel}>Total</span>
+								<strong className={styles.statValue}>{totalProjects}</strong>
+							</div>
 						</div>
 					</div>
 				</div>

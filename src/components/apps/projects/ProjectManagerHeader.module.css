@@ -1,12 +1,24 @@
 .root {
 	border: 1px solid var(--line-soft);
 	border-radius: var(--radius-3);
-	background: linear-gradient(
-		160deg,
-		color-mix(in srgb, var(--panel-soft) 85%, transparent),
-		color-mix(in srgb, var(--panel-strong) 70%, transparent)
-	);
+	background:
+		radial-gradient(
+			140% 100% at 100% 0%,
+			color-mix(in srgb, var(--primary) 12%, transparent),
+			transparent 60%
+		),
+		radial-gradient(
+			110% 100% at 0% 100%,
+			color-mix(in srgb, var(--accent) 10%, transparent),
+			transparent 65%
+		),
+		linear-gradient(
+			160deg,
+			color-mix(in srgb, var(--panel-soft) 90%, transparent),
+			color-mix(in srgb, var(--panel-strong) 72%, transparent)
+		);
 	padding: clamp(1rem, 2vw, 2rem);
+	box-shadow: var(--agent-shadow-soft);
 }
 
 .stack {
@@ -25,6 +37,15 @@
 .intro {
 	display: grid;
 	gap: var(--space-3);
+}
+
+.eyebrow {
+	margin: 0;
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	color: var(--primary);
 }
 
 .crumbs {
@@ -78,6 +99,14 @@
 	color: var(--text-muted);
 }
 
+.summary {
+	margin: 0.55rem 0 0;
+	font-size: 0.84rem;
+	line-height: 1.5;
+	color: color-mix(in srgb, var(--text) 84%, transparent);
+	max-width: 64ch;
+}
+
 .actions {
 	display: inline-flex;
 	flex-wrap: wrap;
@@ -103,31 +132,28 @@
 	filter: brightness(1.08);
 }
 
-.filtersButton {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4rem;
-	border: 1px solid var(--line-soft);
-	border-radius: var(--radius-2);
-	background: var(--surface-2);
-	color: var(--text-muted);
-	padding: 0.62rem 0.85rem;
-	font-size: 0.78rem;
-	font-weight: 700;
-	cursor: pointer;
-}
-
-.filtersButton:hover {
-	background: var(--surface);
-	color: var(--text);
-}
-
 .bottomRow {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--space-4);
-	align-items: center;
+	align-items: flex-start;
 	justify-content: space-between;
+}
+
+.statusSection {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.sectionLabel {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
 }
 
 .statusChips {
@@ -159,13 +185,12 @@
 }
 
 .meta {
-	display: flex;
-	flex-wrap: wrap;
-	flex: 1;
+	display: grid;
+	grid-template-columns: minmax(0, 23rem) minmax(0, 1fr);
+	flex: 1 1 34rem;
 	min-width: min(100%, 20rem);
 	gap: var(--space-3);
-	justify-content: flex-end;
-	align-items: center;
+	align-items: end;
 }
 
 .searchWrap {
@@ -200,26 +225,43 @@
 	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
-.stats {
-	display: inline-flex;
-	flex-wrap: wrap;
-	gap: 0.5rem;
+.statsGrid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.55rem;
 }
 
-.statBadge {
-	border: 1px solid var(--line-soft);
-	background: var(--surface);
-	color: var(--text-muted);
-	padding: 0.38rem 0.64rem;
+.statCard {
+	display: grid;
+	gap: 0.18rem;
+	padding: 0.68rem 0.75rem;
 	border-radius: var(--radius-2);
-	font-size: 0.74rem;
-	font-weight: 600;
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface) 82%, transparent);
 }
 
-.statBadgeHighlight {
-	border-color: var(--line-accent);
-	background: color-mix(in srgb, var(--primary) 16%, transparent);
-	color: var(--primary);
+.statCardHighlight {
+	border-color: color-mix(in srgb, var(--primary) 34%, var(--line-soft));
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--primary) 12%, transparent),
+			color-mix(in srgb, var(--surface) 88%, transparent)
+		);
+}
+
+.statLabel {
+	font-size: 0.66rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.statValue {
+	font-size: 1.05rem;
+	letter-spacing: -0.02em;
+	color: var(--text);
 }
 
 .iconSm {
@@ -229,9 +271,12 @@
 
 @media (max-width: 860px) {
 	.meta {
-		justify-content: stretch;
+		grid-template-columns: 1fr;
 	}
 	.searchWrap {
 		width: 100%;
+	}
+	.statsGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }

@@ -102,6 +102,27 @@ export function ProjectManager({
 		onCalendarMonthChange,
 	});
 
+	const visibleProjects = projects.filter((project) => {
+		if (statusFilter !== "all") {
+			if (statusFilter === "archived") {
+				if (project.status !== "completed") return false;
+			} else {
+				if (project.status === "completed") return false;
+				if (project.status !== statusFilter) return false;
+			}
+		}
+
+		if (projectSearch.trim()) {
+			const query = projectSearch.trim().toLowerCase();
+			return (
+				project.name.toLowerCase().includes(query) ||
+				project.description?.toLowerCase().includes(query)
+			);
+		}
+
+		return true;
+	});
+
 	return (
 		<div className={styles.root}>
 			<ProjectManagerHeader
@@ -113,6 +134,7 @@ export function ProjectManager({
 				activeProjects={activeProjects}
 				archivedProjects={archivedProjects}
 				totalProjects={totalProjects}
+				visibleProjectCount={visibleProjects.length}
 				onCreateProject={() => {
 					setEditingProject(null);
 					resetProjectForm();
@@ -151,7 +173,21 @@ export function ProjectManager({
 			/>
 
 			<div className={styles.contentGrid}>
-				<div className={styles.listPane}>
+				<div className={styles.listPaneShell}>
+					<div className={styles.listPaneHeader}>
+						<div>
+							<p className={styles.listPaneEyebrow}>Project queue</p>
+							<h3 className={styles.listPaneTitle}>Active portfolio</h3>
+							<p className={styles.listPaneCopy}>
+								Select a project to open its command center, telemetry, files,
+								and task lane.
+							</p>
+						</div>
+						<span className={styles.listPaneBadge}>
+							{visibleProjects.length} visible
+						</span>
+					</div>
+					<div className={styles.listPane}>
 					<ProjectList
 						projects={projects}
 						selectedProject={selectedProject}
@@ -163,7 +199,9 @@ export function ProjectManager({
 						onFilterChange={(f) => setStatusFilter(f as StatusFilter)}
 						searchQuery={projectSearch}
 						onSearchChange={setProjectSearch}
+						showControls={false}
 					/>
+					</div>
 				</div>
 
 				<div className={styles.detailColumn}>
@@ -209,7 +247,8 @@ export function ProjectManager({
 								Select a project to view details
 							</p>
 							<p className={styles.emptyCopy}>
-								Pick one from the list to open tasks, files, and schedules.
+								Pick one from the queue to open tasks, files, telemetry, and
+								project operations.
 							</p>
 						</div>
 					)}

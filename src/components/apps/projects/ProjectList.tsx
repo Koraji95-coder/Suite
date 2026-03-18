@@ -22,6 +22,7 @@ interface ProjectListProps {
 	onFilterChange?: (filter: StatusFilter) => void;
 	searchQuery?: string;
 	onSearchChange?: (query: string) => void;
+	showControls?: boolean;
 }
 
 export function ProjectList({
@@ -35,6 +36,7 @@ export function ProjectList({
 	onFilterChange,
 	searchQuery: externalSearch,
 	onSearchChange,
+	showControls = true,
 }: ProjectListProps) {
 	const [internalSearch, setInternalSearch] = useState("");
 
@@ -88,9 +90,9 @@ export function ProjectList({
 
 	return (
 		<div className={styles.root}>
-			<h3 className={styles.title}>Projects</h3>
+			{showControls ? <h3 className={styles.title}>Projects</h3> : null}
 
-			{onFilterChange && (
+			{showControls && onFilterChange && (
 				<div className={styles.filterRow}>
 					{(["active", "all", "on-hold", "archived"] as StatusFilter[]).map(
 						(s) => (
@@ -110,17 +112,19 @@ export function ProjectList({
 				</div>
 			)}
 
-			<div className={styles.searchWrap}>
-				<Search className={styles.searchIcon} />
-				<input
-					type="text"
-					value={searchQuery}
-					onChange={(e) => handleSearchChange(e.target.value)}
-					placeholder="Search projects..."
-					className={styles.searchInput}
-				name="projectlist_input_100"
-				/>
-			</div>
+			{showControls ? (
+				<div className={styles.searchWrap}>
+					<Search className={styles.searchIcon} />
+					<input
+						type="text"
+						value={searchQuery}
+						onChange={(e) => handleSearchChange(e.target.value)}
+						placeholder="Search projects..."
+						className={styles.searchInput}
+						name="projectlist_input_100"
+					/>
+				</div>
+			) : null}
 
 			<div className={styles.scrollArea}>
 				{categorizedProjects.map((group) => (

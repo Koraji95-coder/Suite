@@ -9,11 +9,28 @@
 	margin-bottom: 0.9rem;
 }
 
+.eyebrow {
+	margin: 0 0 0.18rem;
+	font-size: 0.66rem;
+	font-weight: 700;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--primary);
+}
+
 .title {
 	margin: 0;
 	font-size: clamp(1.1rem, 1.6vw, 1.35rem);
 	font-weight: 700;
 	color: var(--text);
+}
+
+.subcopy {
+	margin: 0.45rem 0 0;
+	font-size: 0.84rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+	max-width: 46ch;
 }
 
 .fields {

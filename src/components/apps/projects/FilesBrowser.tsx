@@ -1,4 +1,4 @@
-import { Download, Search, Upload } from "lucide-react";
+import { Download, FolderOpen, Search, Upload } from "lucide-react";
 import styles from "./FilesBrowser.module.css";
 import { ProjectFile } from "./projectmanagertypes";
 import { formatDateOnly, getFileIcon } from "./projectmanagerutils";
@@ -25,11 +25,51 @@ export function FilesBrowser({
 			f.name.toLowerCase().includes(filter.toLowerCase()) ||
 			f.mime_type.toLowerCase().includes(filter.toLowerCase()),
 	);
+	const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+	const latestUploadedAt =
+		files.length > 0
+			? files.reduce((latest, file) =>
+					file.uploaded_at > latest.uploaded_at ? file : latest,
+				).uploaded_at
+			: null;
+	const formatSizeSummary = (bytes: number) => {
+		if (bytes <= 0) return "0 KB";
+		if (bytes >= 1024 * 1024) {
+			return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+		}
+		return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+	};
 
 	return (
 		<div className={styles.root}>
 			<div className={styles.header}>
-				<h4 className={styles.title}>File Storage</h4>
+				<div className={styles.headerCopy}>
+					<div className={styles.titleRow}>
+						<div className={styles.iconShell}>
+							<FolderOpen className={styles.headerIcon} />
+						</div>
+						<div>
+							<p className={styles.eyebrow}>Project files</p>
+							<h4 className={styles.title}>File storage</h4>
+						</div>
+					</div>
+					<p className={styles.description}>
+						Track deliverables, search uploaded files, and keep project records
+						available from one lane for {projectName}.
+					</p>
+					<div className={styles.signalRow}>
+						<span className={styles.signalChip}>{files.length} total files</span>
+						<span className={styles.signalChip}>
+							{formatSizeSummary(totalBytes)} stored
+						</span>
+						<span className={styles.signalChip}>
+							{latestUploadedAt
+								? `Latest ${formatDateOnly(latestUploadedAt)}`
+								: "No uploads yet"}
+						</span>
+					</div>
+				</div>
+
 				<div className={styles.controls}>
 					<div className={styles.searchWrap}>
 						<Search className={styles.searchIcon} />
@@ -39,7 +79,7 @@ export function FilesBrowser({
 							onChange={(e) => onFilterChange(e.target.value)}
 							placeholder="Search files..."
 							className={styles.searchInput}
-						name="filesbrowser_input_36"
+							name="filesbrowser_input_36"
 						/>
 					</div>
 					<label className={styles.uploadButton}>
@@ -49,7 +89,7 @@ export function FilesBrowser({
 							type="file"
 							onChange={onUpload}
 							className={styles.hiddenInput}
-						name="filesbrowser_input_47"
+							name="filesbrowser_input_47"
 						/>
 					</label>
 				</div>
@@ -58,7 +98,14 @@ export function FilesBrowser({
 			<div className={styles.list}>
 				{filteredFiles.length === 0 ? (
 					<div className={styles.emptyState}>
-						{filter ? "No files match your search" : "No files uploaded yet"}
+						<p className={styles.emptyTitle}>
+							{filter ? "No files match your search" : "No files uploaded yet"}
+						</p>
+						<p className={styles.emptyCopy}>
+							{filter
+								? `Clear "${filter}" or upload a new file to extend the project record.`
+								: "Upload drawings, specs, or package files to start building the project archive."}
+						</p>
 					</div>
 				) : (
 					filteredFiles.map((file) => (

@@ -31,9 +31,14 @@ export function ProjectFormModal({
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
 			<DialogContent className={styles.dialogContent}>
 				<DialogHeader className={styles.header}>
+					<p className={styles.eyebrow}>Project lane</p>
 					<DialogTitle className={styles.title}>
 						{isEditing ? "Edit Project" : "Create New Project"}
 					</DialogTitle>
+					<p className={styles.subcopy}>
+						Define the workspace metadata, timeline, and operating category used
+						by the project command center.
+					</p>
 				</DialogHeader>
 				<div className={styles.fields}>
 					<div>

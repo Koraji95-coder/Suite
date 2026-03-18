@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
@@ -35,13 +36,18 @@ export function ProjectManagerDeleteDialogs({
 				onOpenChange={(open) => !open && onCancelProjectDelete()}
 			>
 				<DialogContent className={styles.dialogShell}>
-					<DialogHeader>
+					<DialogHeader className={styles.header}>
+						<div className={styles.iconShell}>
+							<AlertTriangle className={styles.icon} />
+						</div>
+						<p className={styles.eyebrow}>Destructive action</p>
 						<DialogTitle>Delete project?</DialogTitle>
 					</DialogHeader>
 					<p className={styles.copy}>
 						Delete "{pendingProjectName}"? This will permanently remove its
 						tasks, files, and related records.
 					</p>
+					<div className={styles.targetCard}>{pendingProjectName}</div>
 					<DialogFooter className={styles.footer}>
 						<button
 							onClick={onCancelProjectDelete}
@@ -65,12 +71,17 @@ export function ProjectManagerDeleteDialogs({
 				onOpenChange={(open) => !open && onCancelTaskDelete()}
 			>
 				<DialogContent className={styles.dialogShell}>
-					<DialogHeader>
+					<DialogHeader className={styles.header}>
+						<div className={styles.iconShell}>
+							<AlertTriangle className={styles.icon} />
+						</div>
+						<p className={styles.eyebrow}>Destructive action</p>
 						<DialogTitle>Delete task?</DialogTitle>
 					</DialogHeader>
 					<p className={styles.copy}>
 						Delete "{pendingTaskName}"? This will also delete all subtasks.
 					</p>
+					<div className={styles.targetCard}>{pendingTaskName}</div>
 					<DialogFooter className={styles.footer}>
 						<button
 							onClick={onCancelTaskDelete}

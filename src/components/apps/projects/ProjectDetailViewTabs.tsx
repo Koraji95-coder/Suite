@@ -21,17 +21,26 @@ export function ProjectDetailViewTabs({
 }: ProjectDetailViewTabsProps) {
 	return (
 		<div className={styles.root}>
-			{tabs.map(({ mode, label, icon: Icon }) => (
-				<button
-					key={mode}
-					type="button"
-					onClick={() => onViewModeChange(mode)}
-					className={cn(styles.tab, viewMode === mode && styles.tabActive)}
-				>
-					<Icon className={styles.icon} />
-					<span>{label}</span>
-				</button>
-			))}
+			<div className={styles.header}>
+				<p className={styles.eyebrow}>Workspace lanes</p>
+				<p className={styles.copy}>
+					Switch between tasks, calendar, files, and grid design views.
+				</p>
+			</div>
+			<div className={styles.tabRow}>
+				{tabs.map(({ mode, label, icon: Icon }) => (
+					<button
+						key={mode}
+						type="button"
+						onClick={() => onViewModeChange(mode)}
+						aria-pressed={viewMode === mode}
+						className={cn(styles.tab, viewMode === mode && styles.tabActive)}
+					>
+						<Icon className={styles.icon} />
+						<span>{label}</span>
+					</button>
+				))}
+			</div>
 		</div>
 	);
 }

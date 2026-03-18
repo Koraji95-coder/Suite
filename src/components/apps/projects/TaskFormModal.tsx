@@ -25,9 +25,16 @@ export function TaskFormModal({
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
 			<DialogContent className={styles.dialogContent}>
 				<DialogHeader className={styles.header}>
+					<p className={styles.eyebrow}>
+						{isSubtask ? "Subtask lane" : "Task lane"}
+					</p>
 					<DialogTitle className={styles.title}>
 						{isEditing ? "Edit Task" : isSubtask ? "Add Subtask" : "Add Task"}
 					</DialogTitle>
+					<p className={styles.subcopy}>
+						Use tasks to define execution work, ownership, and due dates inside
+						the project workspace.
+					</p>
 				</DialogHeader>
 				<div className={styles.fields}>
 					<div>

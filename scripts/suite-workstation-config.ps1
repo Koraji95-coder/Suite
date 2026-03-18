@@ -215,6 +215,7 @@ function Get-SuiteWorkstationMcpEnv {
     $autocadTaskName = "SuiteWatchdogAutoCADCollector-$($WorkstationProfile.WorkstationId)"
 
     return [ordered]@{
+        SUITE_MCP_ENV_STAMPED_BY = "scripts/sync-suite-workstation-profile.ps1"
         SUITE_WORKSTATION_ID = $WorkstationProfile.WorkstationId
         SUITE_WORKSTATION_LABEL = $WorkstationProfile.WorkstationLabel
         SUITE_WORKSTATION_ROLE = $WorkstationProfile.WorkstationRole

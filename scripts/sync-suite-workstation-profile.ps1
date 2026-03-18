@@ -63,6 +63,7 @@ if ($Json) {
 }
 else {
     Write-Host "Synced Suite workstation profile into $CodexConfigPath"
+    Write-Host "Supported MCP env stamping path: scripts/sync-suite-workstation-profile.ps1"
     Write-Host "Profile source: $($resolvedProfile.ProfileSource)"
     Write-Host "Profile path: $($resolvedProfile.ProfilePath)"
     Write-Host (

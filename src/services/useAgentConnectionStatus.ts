@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-	AGENT_PAIRING_STATE_EVENT,
-	agentService,
-} from "@/services/agentService";
+import { agentService } from "@/services/agentService";
+import { AGENT_PAIRING_STATE_EVENT } from "@/services/agent/types";
 
 export const AGENT_POLL_VISIBLE_MS = 30_000;
 export const AGENT_POLL_HIDDEN_MS = 90_000;

@@ -167,6 +167,24 @@ create table if not exists public.activity_log (
 	user_id uuid not null references auth.users (id) on delete cascade
 );
 
+create table if not exists public.work_ledger_entries (
+	id uuid primary key default gen_random_uuid(),
+	title text not null,
+	summary text not null default '',
+	source_kind text not null default 'manual',
+	commit_refs text[] not null default '{}',
+	project_id uuid null references public.projects (id) on delete set null,
+	app_area text null,
+	architecture_paths text[] not null default '{}',
+	hotspot_ids text[] not null default '{}',
+	publish_state text not null default 'draft',
+	external_reference text null,
+	external_url text null,
+	user_id uuid not null references auth.users (id) on delete cascade,
+	created_at timestamptz not null default timezone('utc', now()),
+	updated_at timestamptz not null default timezone('utc', now())
+);
+
 create table if not exists public.calendar_events (
 	id uuid primary key default gen_random_uuid(),
 	project_id uuid null references public.projects (id) on delete cascade,
@@ -405,6 +423,10 @@ create index if not exists idx_files_project_id on public.files (project_id);
 
 create index if not exists idx_activity_log_user_id on public.activity_log (user_id);
 create index if not exists idx_activity_log_timestamp on public.activity_log (timestamp desc);
+create index if not exists idx_work_ledger_entries_user_id on public.work_ledger_entries (user_id);
+create index if not exists idx_work_ledger_entries_project_id on public.work_ledger_entries (project_id);
+create index if not exists idx_work_ledger_entries_publish_state on public.work_ledger_entries (publish_state);
+create index if not exists idx_work_ledger_entries_updated_at on public.work_ledger_entries (updated_at desc);
 
 create index if not exists idx_calendar_events_user_id on public.calendar_events (user_id);
 create index if not exists idx_calendar_events_project_id on public.calendar_events (project_id);
@@ -499,6 +521,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_ground_grid_designs_updated_at on public.ground_grid_designs;
 create trigger set_ground_grid_designs_updated_at
 before update on public.ground_grid_designs
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_work_ledger_entries_updated_at on public.work_ledger_entries;
+create trigger set_work_ledger_entries_updated_at
+before update on public.work_ledger_entries
 for each row execute function public.set_updated_at();
 
 create or replace function public.upsert_user_setting(

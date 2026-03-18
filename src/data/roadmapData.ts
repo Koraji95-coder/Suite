@@ -70,7 +70,7 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 		period: "January -- March 2026",
 		theme: "Foundation Launch",
 		summary:
-			"Suite v3.0 ships with the core engineering workspace: project management, AutoCAD-integrated ground grid tooling, transmittal generation, drawing list management, and the Koro Agent gateway.",
+			"Suite v3.0 ships with the core engineering workspace: project management, AutoCAD-integrated ground grid tooling, transmittal generation, drawing list management, and a profile-routed agent workspace backed by the ZeroClaw gateway.",
 		milestones: [
 			{
 				title: "Project Manager with full lifecycle",
@@ -108,9 +108,9 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 				category: "core",
 			},
 			{
-				title: "Koro Agent pairing via ZeroClaw",
+				title: "Profile-routed agent workspace via ZeroClaw",
 				description:
-					"6-digit pairing code flow, direct and brokered transport modes, task execution console, agent health monitoring, and predefined task templates.",
+					"Profile-driven agent routing, pairing verification, direct and brokered transport modes, run-ledger orchestration, agent health monitoring, and predefined task templates.",
 				status: "completed",
 				category: "ai",
 			},
@@ -124,7 +124,7 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 			{
 				title: "Dashboard and workspace shell",
 				description:
-					"Overview panel with project stats, calendar widget, recent activity feed, recent files, and upcoming deadlines. Five-theme color system.",
+					"Unified dark command-center dashboard with shared filters across Watchdog telemetry, architecture hotspots, work ledger history, agent memory, and project operations.",
 				status: "completed",
 				category: "core",
 			},
@@ -202,7 +202,7 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 		period: "July -- September 2026",
 		theme: "Collaboration & Productivity",
 		summary:
-			"Introduce team workspaces and shared projects, bring the File Manager online with real storage, and expand agent capabilities for documentation and research.",
+			"Introduce team workspaces and shared projects, bring the File Manager online with real storage, and expand the command-center stack with stronger collaboration, reporting, and agent-assisted documentation.",
 		milestones: [
 			{
 				title: "Team workspaces and shared projects",
@@ -228,14 +228,14 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 			{
 				title: "Email notification system",
 				description:
-					"SMTP configuration in settings, project deadline alerts, task assignment notifications, and digest emails for weekly activity summaries.",
+					"Project deadline alerts, task assignment notifications, and digest emails for weekly activity summaries with account-level delivery controls.",
 				status: "planned",
 				category: "infrastructure",
 			},
 			{
 				title: "Agent documentation and regulation analysis",
 				description:
-					"Koro Agent can generate calculation sheets, project reports, and analyze regulatory requirements. Research standards and return structured findings.",
+					"Profile-routed agents generate calculation sheets, project reports, and regulatory analysis packets with structured findings and traceable run outputs.",
 				status: "planned",
 				category: "ai",
 			},
@@ -254,7 +254,7 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 		period: "October -- December 2026",
 		theme: "Automation & Workflows",
 		summary:
-			"Ship the automation engine for scheduled calculations and reports, upgrade the ground grid tool to IEEE 80 compliance, and launch the AI configuration panel.",
+			"Ship the automation engine for scheduled calculations and reports, upgrade the ground grid tool to IEEE 80 compliance, and deepen workspace-level agent controls without reintroducing placeholder settings surfaces.",
 		milestones: [
 			{
 				title: "Automation Workflows engine",
@@ -280,7 +280,7 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 			{
 				title: "Agent-driven project scaffolding",
 				description:
-					"Koro Agent generates project structures from templates. Auto-populate task lists, drawing conventions, and standard deliverable sets based on project type.",
+					"Profile-routed agents generate project structures from templates. Auto-populate task lists, drawing conventions, and standard deliverable sets based on project type.",
 				status: "planned",
 				category: "ai",
 			},
@@ -306,12 +306,12 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 		period: "January -- March 2027",
 		theme: "Analytics & Reporting",
 		summary:
-			"Launch project analytics dashboards with burndown charts, expand the formula bank, and open a developer access portal for API consumers.",
+			"Launch command-center analytics modules with burndown charts, expand the formula bank, and open a developer access portal for API consumers.",
 		milestones: [
 			{
 				title: "Project analytics dashboard",
 				description:
-					"Burndown charts, velocity tracking, task completion trends, and bottleneck detection across all projects with time-range filtering.",
+					"Command-center analytics modules for burndown charts, velocity tracking, task completion trends, and bottleneck detection across all projects with time-range filtering.",
 				status: "future",
 				category: "core",
 			},
@@ -398,7 +398,7 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 			{
 				title: "Agent plugin marketplace",
 				description:
-					"Community-contributed tool plugins for the Koro Agent. Install, configure, and manage plugins from a curated marketplace.",
+					"Community-contributed tool plugins for the agent workspace. Install, configure, and manage plugins from a curated marketplace.",
 				status: "future",
 				category: "ai",
 			},
@@ -429,7 +429,7 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 			{
 				title: "Multi-agent coordination",
 				description:
-					"Parallel task execution across multiple Koro Agent instances. Agent-to-agent delegation, result aggregation, and coordinated workflows.",
+					"Parallel task execution across multiple profile-routed agent runs with delegation, result aggregation, and coordinated workflows.",
 				status: "future",
 				category: "ai",
 			},

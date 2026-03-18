@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentActivityItem, AgentTaskItem } from "@/services/agentService";
+import type { AgentActivityItem, AgentTaskItem } from "@/services/agent/types";
 import type { AgentConversation } from "@/services/agentTaskManager";
 import {
 	buildProfileRoster,

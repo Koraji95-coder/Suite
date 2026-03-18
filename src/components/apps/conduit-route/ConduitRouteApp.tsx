@@ -29,7 +29,6 @@ import {
 	Text,
 } from "@/components/primitives";
 import { cn } from "@/lib/utils";
-import { agentService } from "@/services/agentService";
 import styles from "./ConduitRouteApp.module.css";
 import { ConduitRouteSectionSketch } from "./ConduitRouteSectionSketch";
 import { ConduitTerminalWorkflow } from "./ConduitTerminalWorkflow";
@@ -39,56 +38,36 @@ import {
 	DEFAULT_WIRE_FUNCTIONS,
 	EQUIPMENT_NODES,
 	OBSTACLE_STYLE,
-	OBSTACLES,
 	ROUTE_TABS,
 	ROUTING_MODES,
 	SECTION_PRESETS,
 	WIRE_COLORS,
 } from "./conduitRouteData";
 import { AUTOWIRE_OBSTACLE_LAYER_PRESET_OPTIONS } from "./autowirePresets";
-import {
-	bendCount,
-	pathLength,
-	routeTagPosition,
-	toRoundedPathSvg,
-} from "./conduitRouteEngine";
+import { toRoundedPathSvg } from "./conduitRouteEngine";
 import {
 	CONDUCTOR_AREAS,
 	CONDUIT_AREAS,
 	calculateNec,
 	DEFAULT_CONDUCTORS,
 } from "./conduitRouteNec";
-import { conduitRouteService } from "./conduitRouteService";
 import type {
 	CableSystemType,
-	ConduitObstacleScanMeta,
-	ConduitObstacleSource,
-	ConduitRouteBackcheckResponse,
-	ConduitRouteComputeData,
-	ConduitRouteComputeMeta,
-	ConduitRouteRecord,
 	ConduitRouteTab,
 	NecConductorInput,
-	Obstacle,
-	ObstacleLayerRule,
 	ObstacleType,
-	Point2D,
 	RoutingMode,
 	SectionPreset,
 } from "./conduitRouteTypes";
 import {
-	type CrewReviewEntry,
-	buildCadCrewReviewPrompt,
-	clamp,
 	colorVariantByPercent,
 	createConduitRouteViewModel,
-	extractAgentResponseText,
 	formatLength,
 	getModeBadgeTone,
-	inferObstacleTypeFromLayer,
-	makeRouteId,
-	toCsvValue,
 } from "./conduitRouteViewModel";
+import { useConduitCadReviewController } from "./useConduitCadReviewController";
+import { useConduitObstacleController } from "./useConduitObstacleController";
+import { useConduitRouteCanvasController } from "./useConduitRouteCanvasController";
 
 export function ConduitRouteApp() {
 	const [workspace, setWorkspace] = useState<"yard" | "terminal">("yard");
@@ -99,41 +78,9 @@ export function ConduitRouteApp() {
 		DEFAULT_WIRE_FUNCTIONS.DC,
 	);
 	const [clearance, setClearance] = useState(18);
-	const [startPoint, setStartPoint] = useState<Point2D | null>(null);
-	const [hoverPoint, setHoverPoint] = useState<Point2D | null>(null);
-	const [routes, setRoutes] = useState<ConduitRouteRecord[]>([]);
-	const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
-	const [nextRef, setNextRef] = useState<Record<CableSystemType, number>>({
-		AC: 1,
-		DC: 1,
-	});
 	const [statusMessage, setStatusMessage] = useState(
 		"Ready. Click in the canvas to place a route start point.",
 	);
-	const [routeComputing, setRouteComputing] = useState(false);
-	const [lastComputeMeta, setLastComputeMeta] =
-		useState<ConduitRouteComputeMeta | null>(null);
-	const [activeObstacles, setActiveObstacles] = useState<Obstacle[]>(OBSTACLES);
-	const [obstacleSource, setObstacleSource] =
-		useState<ConduitObstacleSource>("client");
-	const [obstacleSyncing, setObstacleSyncing] = useState(false);
-	const [obstacleScanMeta, setObstacleScanMeta] =
-		useState<ConduitObstacleScanMeta | null>(null);
-	const [routeBackchecking, setRouteBackchecking] = useState(false);
-	const [routeBackcheckReport, setRouteBackcheckReport] =
-		useState<ConduitRouteBackcheckResponse | null>(null);
-	const [crewReviewEntries, setCrewReviewEntries] = useState<CrewReviewEntry[]>(
-		[],
-	);
-	const [crewReviewError, setCrewReviewError] = useState<string | null>(null);
-	const [crewReviewLoading, setCrewReviewLoading] = useState(false);
-	const [availableCadLayers, setAvailableCadLayers] = useState<string[]>([]);
-	const [layerPickerValue, setLayerPickerValue] = useState("");
-	const [layerRulesRefreshing, setLayerRulesRefreshing] = useState(false);
-	const [obstacleLayerRules, setObstacleLayerRules] = useState<
-		ObstacleLayerRule[]
-	>([]);
-	const [obstacleLayerPreset, setObstacleLayerPreset] = useState<string>("");
 
 	const [necConductors, setNecConductors] =
 		useState<NecConductorInput[]>(DEFAULT_CONDUCTORS);
@@ -148,15 +95,94 @@ export function ConduitRouteApp() {
 			setWireFunction(DEFAULT_WIRE_FUNCTIONS[cableType]);
 		}
 	}, [cableType, wireFunction]);
+	const necResult = useMemo(
+		() => calculateNec(necConductors, necConduit, ambientTempC),
+		[necConductors, necConduit, ambientTempC],
+	);
+	const activeColorForRoute =
+		WIRE_COLORS[cableType][wireFunction] ??
+		WIRE_COLORS[cableType][DEFAULT_WIRE_FUNCTIONS[cableType]];
+
 	const {
-		activeColor,
+		activeObstacles,
+		addObstacleLayerRule,
+		autoIdentifyObstacleLayers,
+		availableCadLayers,
+		clearObstacleLayerRules,
+		handleLayerPresetChange,
+		layerPickerValue,
+		layerRulesRefreshing,
+		obstacleLayerNames,
+		obstacleLayerPreset,
+		obstacleLayerRules,
+		obstacleLayerTypeOverrides,
+		obstacleScanMeta,
+		obstacleSource,
+		obstacleSyncing,
+		refreshObstacleLayerList,
+		removeObstacleLayerRule,
+		setLayerPickerValue,
+		setObstacleLayerRules,
+		syncAutocadObstacles,
+		useDemoObstacleLayout,
+	} = useConduitObstacleController({
+		workspace,
+		setStatusMessage,
+	});
+
+	const {
+		clearCadReviewState,
+		crewReviewEntries,
+		crewReviewError,
+		crewReviewLoading,
+		exportBackcheckJson,
+		routeBackcheckReport,
+		routeBackchecking,
+		runCadCrewReview,
+		runRouteBackcheck,
+	} = useConduitCadReviewController({
+		setStatusMessage,
+	});
+
+	const {
+		clearAllRoutes,
+		exportScheduleCsv,
+		handleCanvasClick,
+		handleCanvasHover,
+		hoverPoint,
+		lastComputeMeta,
+		removeRoute,
+		routeComputing,
+		routes,
+		scheduleRows,
+		selectedRouteId,
+		setHoverPoint,
+		setSelectedRouteId,
+		startPoint,
+		undoLastRoute,
+	} = useConduitRouteCanvasController({
+		mode,
+		cableType,
+		wireFunction,
+		clearance,
+		activeColor: activeColorForRoute,
+		activeObstacles,
+		obstacleSource,
+		obstacleLayerNames,
+		obstacleLayerTypeOverrides,
+		obstacleLayerPreset,
+		obstacleSyncing,
+		routeBackchecking,
+		setStatusMessage,
+		onRouteMutation: clearCadReviewState,
+	});
+
+	const {
 		availableWireFunctions,
 		cadSyncGate,
 		heroSubtitle,
 		heroTitle,
 		isTerminalWorkspace,
-		obstacleLayerNames,
-		obstacleLayerTypeOverrides,
 		previewPath,
 		routeBackcheckSummary,
 		routeStats,
@@ -198,440 +224,6 @@ export function ConduitRouteApp() {
 			workspace,
 		],
 	);
-
-	const necResult = useMemo(
-		() => calculateNec(necConductors, necConduit, ambientTempC),
-		[necConductors, necConduit, ambientTempC],
-	);
-
-	const refreshObstacleLayerList = async (
-		options: { silent?: boolean } = {},
-	) => {
-		const silent = options.silent ?? false;
-		setLayerRulesRefreshing(true);
-		const layers = await conduitRouteService.listLayers();
-		setLayerRulesRefreshing(false);
-		setAvailableCadLayers(layers);
-		if (!layerPickerValue && layers.length > 0) {
-			setLayerPickerValue(layers[0]);
-		}
-		if (!silent) {
-			setStatusMessage(
-				layers.length > 0
-					? `Loaded ${layers.length} drawing layer(s).`
-					: "No layers returned from the active drawing.",
-			);
-		}
-		return layers;
-	};
-
-	const addObstacleLayerRule = () => {
-		const candidate = layerPickerValue.trim();
-		if (!candidate) {
-			setStatusMessage("Select or type a layer name before adding.");
-			return;
-		}
-		const normalizedCandidate = candidate.toLowerCase();
-		const alreadySelected = obstacleLayerRules.some(
-			(rule) => rule.layerName.toLowerCase() === normalizedCandidate,
-		);
-		if (alreadySelected) {
-			setStatusMessage(
-				`Layer '${candidate}' is already in the obstacle editor.`,
-			);
-			return;
-		}
-		setObstacleLayerRules((prev) => [
-			...prev,
-			{
-				layerName: candidate,
-				obstacleType: inferObstacleTypeFromLayer(candidate) ?? "foundation",
-			},
-		]);
-		setStatusMessage(`Added obstacle layer rule for '${candidate}'.`);
-	};
-
-	const removeObstacleLayerRule = (layerName: string) => {
-		setObstacleLayerRules((prev) =>
-			prev.filter((rule) => rule.layerName !== layerName),
-		);
-	};
-
-	const clearObstacleLayerRules = () => {
-		setObstacleLayerRules([]);
-		setStatusMessage("Cleared obstacle layer rules.");
-	};
-
-	const autoIdentifyObstacleLayers = () => {
-		if (availableCadLayers.length === 0) {
-			setStatusMessage("Refresh layers first, then run auto-identify.");
-			return;
-		}
-		const existingLayerSet = new Set(
-			obstacleLayerRules.map((rule) => rule.layerName.toLowerCase()),
-		);
-		const additions: ObstacleLayerRule[] = [];
-		for (const layerName of availableCadLayers) {
-			const inferredType = inferObstacleTypeFromLayer(layerName);
-			if (!inferredType) {
-				continue;
-			}
-			if (existingLayerSet.has(layerName.toLowerCase())) {
-				continue;
-			}
-			existingLayerSet.add(layerName.toLowerCase());
-			additions.push({ layerName, obstacleType: inferredType });
-		}
-		if (additions.length === 0) {
-			setStatusMessage("No new obstacle layers matched auto-identify rules.");
-			return;
-		}
-		setObstacleLayerRules((prev) => [...prev, ...additions]);
-		setStatusMessage(`Auto-identified ${additions.length} obstacle layer(s).`);
-	};
-
-	const syncAutocadObstacles = async (options: { silent?: boolean } = {}) => {
-		if (obstacleSyncing) {
-			return;
-		}
-		const silent = options.silent ?? false;
-		setObstacleSyncing(true);
-		if (!silent) {
-			setStatusMessage("Syncing obstacles from AutoCAD drawing...");
-		}
-
-		const response = await conduitRouteService.scanObstacles({
-			selectionOnly: false,
-			includeModelspace: true,
-			maxEntities: 50000,
-			canvasWidth: CANVAS_WIDTH,
-			canvasHeight: CANVAS_HEIGHT,
-			layerNames: obstacleLayerNames,
-			layerTypeOverrides: obstacleLayerTypeOverrides,
-			layerPreset: obstacleLayerPreset,
-		});
-		setObstacleSyncing(false);
-
-		if (response.success && response.data) {
-			const obstacleCount = response.data.obstacles.length;
-			setActiveObstacles(response.data.obstacles);
-			setObstacleSource("autocad");
-			setObstacleScanMeta(response.meta ?? null);
-			setStatusMessage(
-				response.message ||
-					`AutoCAD obstacle sync complete. ${obstacleCount} obstacle(s) loaded.`,
-			);
-			return;
-		}
-
-		if (!silent) {
-			setStatusMessage(
-				response.message ||
-					"AutoCAD obstacle sync failed. Continuing with current obstacle map.",
-			);
-		}
-	};
-
-	const useDemoObstacleLayout = () => {
-		setActiveObstacles(OBSTACLES);
-		setObstacleSource("client");
-		setObstacleScanMeta(null);
-		setStatusMessage("Switched to demo obstacle layout.");
-	};
-
-	useEffect(() => {
-		if (workspace !== "yard") {
-			return;
-		}
-		if (availableCadLayers.length > 0) {
-			return;
-		}
-
-		let cancelled = false;
-		setLayerRulesRefreshing(true);
-		void conduitRouteService
-			.listLayers()
-			.then((layers) => {
-				if (cancelled) {
-					return;
-				}
-				setAvailableCadLayers(layers);
-				if (!layerPickerValue && layers.length > 0) {
-					setLayerPickerValue(layers[0]);
-				}
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setLayerRulesRefreshing(false);
-				}
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [workspace, availableCadLayers.length, layerPickerValue]);
-
-	useEffect(() => {
-		if (workspace !== "yard") {
-			return;
-		}
-		if (obstacleSource === "autocad") {
-			return;
-		}
-
-		let cancelled = false;
-		setObstacleSyncing(true);
-		void conduitRouteService
-			.scanObstacles({
-				selectionOnly: false,
-				includeModelspace: true,
-				maxEntities: 50000,
-				canvasWidth: CANVAS_WIDTH,
-				canvasHeight: CANVAS_HEIGHT,
-				layerNames: obstacleLayerNames,
-				layerTypeOverrides: obstacleLayerTypeOverrides,
-				layerPreset: obstacleLayerPreset,
-			})
-			.then((response) => {
-				if (cancelled || !response.success || !response.data) {
-					return;
-				}
-				setActiveObstacles(response.data.obstacles);
-				setObstacleSource("autocad");
-				setObstacleScanMeta(response.meta ?? null);
-				setStatusMessage(
-					response.message ||
-						`AutoCAD obstacle sync complete. ${response.data.obstacles.length} obstacle(s) loaded.`,
-				);
-			})
-			.finally(() => {
-				if (!cancelled) {
-					setObstacleSyncing(false);
-				}
-			});
-
-		return () => {
-			cancelled = true;
-		};
-	}, [
-		workspace,
-		obstacleSource,
-		obstacleLayerNames,
-		obstacleLayerTypeOverrides,
-		obstacleLayerPreset,
-	]);
-
-	const handleCanvasPoint = (
-		event: React.MouseEvent<SVGSVGElement>,
-	): Point2D => {
-		const rect = event.currentTarget.getBoundingClientRect();
-		const x = clamp(event.clientX - rect.left, 0, CANVAS_WIDTH);
-		const y = clamp(event.clientY - rect.top, 0, CANVAS_HEIGHT);
-		return { x, y };
-	};
-
-	const handleCanvasClick = (event: React.MouseEvent<SVGSVGElement>) => {
-		const clickPoint = handleCanvasPoint(event);
-		if (routeComputing || obstacleSyncing || routeBackchecking) {
-			return;
-		}
-		if (!startPoint) {
-			setStartPoint(clickPoint);
-			setStatusMessage("Start point locked. Click destination point to route.");
-			return;
-		}
-
-		const lockedStart = startPoint;
-		const ref = `${cableType}-${String(nextRef[cableType]).padStart(3, "0")}`;
-		const routeId = makeRouteId();
-		const tagText = mode === "cable_tag" ? `${ref} Z01` : "";
-
-		setRouteComputing(true);
-		setHoverPoint(null);
-		setStatusMessage("Computing route via backend...");
-
-		void (async () => {
-			let computeMeta: ConduitRouteComputeMeta | null = null;
-			let responseData: ConduitRouteComputeData | null = null;
-
-			try {
-				const response = await conduitRouteService.computeRoute({
-					start: lockedStart,
-					end: clickPoint,
-					mode,
-					clearance,
-					obstacles: activeObstacles,
-					obstacleSource,
-					obstacleScan:
-						obstacleSource === "autocad"
-							? {
-									selectionOnly: false,
-									includeModelspace: true,
-									maxEntities: 50000,
-									layerNames: obstacleLayerNames,
-									layerTypeOverrides: obstacleLayerTypeOverrides,
-									layerPreset: obstacleLayerPreset,
-								}
-							: undefined,
-					canvasWidth: CANVAS_WIDTH,
-					canvasHeight: CANVAS_HEIGHT,
-					gridStep: 8,
-					tagText: tagText || undefined,
-				});
-
-				computeMeta = {
-					...(response.meta ?? {}),
-					routeValid:
-						response.success && response.data
-							? response.meta?.routeValid ?? true
-							: false,
-				};
-				setLastComputeMeta(computeMeta);
-
-				if (!response.success || !response.data) {
-					setHoverPoint(null);
-					setStartPoint(lockedStart);
-					setRouteComputing(false);
-					setStatusMessage(
-						response.message ||
-							`${ref} could not be routed. The dashed line is only a sketch; adjust the destination or obstacle scope.`,
-					);
-					return;
-				}
-
-				responseData = response.data;
-
-				if (
-					obstacleSource === "autocad" &&
-					Array.isArray(response.data.resolvedObstacles) &&
-					response.data.resolvedObstacles.length > 0
-				) {
-					setActiveObstacles(response.data.resolvedObstacles);
-				}
-			} catch {
-				setLastComputeMeta({
-					routeValid: false,
-					fallbackUsed: false,
-					source: "frontend",
-				});
-				setHoverPoint(null);
-				setStartPoint(lockedStart);
-				setStatusMessage(
-					`${ref} could not be routed because the compute request failed. Adjust the route or retry the backend request.`,
-				);
-				setRouteComputing(false);
-				return;
-			}
-
-			const path = responseData?.path ?? [];
-			const bends = responseData?.bendCount ?? bendCount(path);
-			const length = responseData?.length ?? pathLength(path);
-			const tag =
-				responseData?.tag ??
-				(mode === "cable_tag" ? routeTagPosition(path, `${ref} Z01`) : null);
-
-			const route: ConduitRouteRecord = {
-				id: routeId,
-				ref,
-				mode,
-				cableType,
-				wireFunction,
-				color: activeColor,
-				start: lockedStart,
-				end: clickPoint,
-				path,
-				length,
-				bendCount: bends,
-				bendDegrees: bends * 90,
-				tag,
-				createdAt: Date.now(),
-			};
-
-			setRoutes((current) => [route, ...current]);
-			setRouteBackcheckReport(null);
-			setCrewReviewEntries([]);
-			setCrewReviewError(null);
-			setSelectedRouteId(route.id);
-			setNextRef((current) => ({
-				...current,
-				[cableType]: current[cableType] + 1,
-			}));
-			setLastComputeMeta(computeMeta);
-			setStartPoint(null);
-			setHoverPoint(null);
-			setRouteComputing(false);
-
-			if (route.bendDegrees > 360) {
-				setStatusMessage(
-					`${route.ref} routed with ${route.bendDegrees} deg bends. Add a pull point before construction release.`,
-				);
-				return;
-			}
-
-			const computeMs = computeMeta?.computeMs ?? computeMeta?.requestMs;
-			const timing = computeMs ? ` in ${computeMs} ms` : "";
-			setStatusMessage(
-				`${route.ref} routed${timing}: ${formatLength(length)} with ${bends} bends (${route.bendDegrees} deg).`,
-			);
-		})();
-	};
-
-	const clearAllRoutes = () => {
-		setRoutes([]);
-		setSelectedRouteId(null);
-		setStartPoint(null);
-		setHoverPoint(null);
-		setLastComputeMeta(null);
-		setRouteComputing(false);
-		setRouteBackcheckReport(null);
-		setCrewReviewEntries([]);
-		setCrewReviewError(null);
-		setStatusMessage("Route history cleared.");
-	};
-
-	const undoLastRoute = () => {
-		if (routes.length === 0) {
-			setStatusMessage("Nothing to undo.");
-			return;
-		}
-		setRoutes((current) => current.slice(1));
-		setRouteBackcheckReport(null);
-		setCrewReviewEntries([]);
-		setCrewReviewError(null);
-		setSelectedRouteId(null);
-		if (routes.length <= 1) {
-			setLastComputeMeta(null);
-		}
-		setStatusMessage("Removed latest route.");
-	};
-
-	const removeRoute = (routeId: string) => {
-		setRoutes((current) => current.filter((route) => route.id !== routeId));
-		setRouteBackcheckReport(null);
-		setCrewReviewEntries([]);
-		setCrewReviewError(null);
-		if (selectedRouteId === routeId) {
-			setSelectedRouteId(null);
-		}
-		if (routes.length <= 1) {
-			setLastComputeMeta(null);
-		}
-		setStatusMessage("Route removed.");
-	};
-
-	const scheduleRows = routes
-		.slice()
-		.sort((a, b) => b.createdAt - a.createdAt)
-		.map((route) => ({
-			id: route.id,
-			ref: route.ref,
-			type: route.cableType,
-			fn: route.wireFunction,
-			color: route.color.code,
-			from: `${Math.round(route.start.x)},${Math.round(route.start.y)}`,
-			to: `${Math.round(route.end.x)},${Math.round(route.end.y)}`,
-			length: Math.round(route.length),
-		}));
 	const bridgeBadgeLabel = isTerminalWorkspace
 		? "Terminal Scan Workflow"
 		: routeBackchecking
@@ -642,215 +234,21 @@ export function ConduitRouteApp() {
 				? "AutoCAD Bridge Active"
 				: "AutoCAD Bridge Ready";
 
-	const exportScheduleCsv = () => {
-		if (scheduleRows.length === 0) {
-			setStatusMessage("No schedule rows available to export.");
-			return;
-		}
-
-		const header = ["Ref", "Type", "Fn", "Color", "From", "To", "LengthPx"];
-		const lines = [header.join(",")];
-		for (const row of scheduleRows) {
-			lines.push(
-				[
-					toCsvValue(row.ref),
-					toCsvValue(row.type),
-					toCsvValue(row.fn),
-					toCsvValue(row.color),
-					toCsvValue(row.from),
-					toCsvValue(row.to),
-					toCsvValue(row.length),
-				].join(","),
-			);
-		}
-
-		const csvText = lines.join("\r\n");
-		const blob = new Blob([csvText], { type: "text/csv;charset=utf-8" });
-		const url = URL.createObjectURL(blob);
-		const anchor = document.createElement("a");
-		const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-		anchor.href = url;
-		anchor.download = `conduit-route-schedule-${stamp}.csv`;
-		document.body.append(anchor);
-		anchor.click();
-		anchor.remove();
-		URL.revokeObjectURL(url);
-		setStatusMessage(`Exported ${scheduleRows.length} schedule row(s) to CSV.`);
+	const handleClearAllRoutes = () => {
+		clearCadReviewState();
+		clearAllRoutes();
 	};
 
-	const runRouteBackcheck = async () => {
-		if (routeBackchecking || routeComputing || obstacleSyncing) {
-			return;
-		}
-		if (routes.length === 0) {
-			setStatusMessage("Create at least one route before running backcheck.");
-			return;
-		}
-
-		setRouteBackchecking(true);
-		setCrewReviewEntries([]);
-		setCrewReviewError(null);
-		setStatusMessage(`Running backcheck for ${routes.length} route(s)...`);
-
-		const response = await conduitRouteService.backcheckRoutes({
-			routes: routes.map((route) => ({
-				id: route.id,
-				ref: route.ref,
-				mode: route.mode,
-				path: route.path,
-			})),
-			obstacles: activeObstacles,
-			obstacleSource,
-			clearance,
-		});
-
-		setRouteBackchecking(false);
-		if (!response.success) {
-			setStatusMessage(response.message || "Route backcheck failed.");
-			return;
-		}
-
-		setRouteBackcheckReport(response);
-		const summary = response.summary;
-		if (summary) {
-			setStatusMessage(
-				`Backcheck complete: ${summary.pass_count} pass, ${summary.warn_count} warn, ${summary.fail_count} fail.`,
-			);
-			return;
-		}
-		setStatusMessage("Backcheck complete.");
+	const handleUndoLastRoute = () => {
+		clearCadReviewState();
+		undoLastRoute();
 	};
 
-	const runCadCrewReview = async () => {
-		if (!routeBackcheckReport) {
-			setCrewReviewError("Run backcheck first before requesting CAD crew review.");
-			return;
-		}
-		if (
-			crewReviewLoading ||
-			routeBackchecking ||
-			routeComputing ||
-			obstacleSyncing
-		) {
-			return;
-		}
-
-		setCrewReviewLoading(true);
-		setCrewReviewError(null);
-		setCrewReviewEntries([]);
-
-		const entries: CrewReviewEntry[] = [];
-		try {
-			entries.push({ profileId: "draftsmith", status: "running" });
-			setCrewReviewEntries([...entries]);
-			const draftsmithResult = await agentService.sendMessage(
-				buildCadCrewReviewPrompt({
-					profileId: "draftsmith",
-					report: routeBackcheckReport,
-				}),
-				{
-					profileId: "draftsmith",
-					promptMode: "template",
-					templateLabel: "AutoWire backcheck review",
-				},
-			);
-			if (!draftsmithResult.success) {
-				entries[0] = {
-					profileId: "draftsmith",
-					status: "failed",
-					error: draftsmithResult.error || "Draftsmith review failed.",
-				};
-				setCrewReviewEntries([...entries]);
-				setCrewReviewError(entries[0].error || "Draftsmith review failed.");
-				setStatusMessage(entries[0].error || "Draftsmith review failed.");
-				return;
-			}
-
-			const draftsmithText = extractAgentResponseText(draftsmithResult.data);
-			entries[0] = {
-				profileId: "draftsmith",
-				status: "completed",
-				response: draftsmithText,
-			};
-			entries.push({ profileId: "gridsage", status: "running" });
-			setCrewReviewEntries([...entries]);
-
-			const gridsageResult = await agentService.sendMessage(
-				buildCadCrewReviewPrompt({
-					profileId: "gridsage",
-					report: routeBackcheckReport,
-					draftsmithReview: draftsmithText,
-				}),
-				{
-					profileId: "gridsage",
-					promptMode: "template",
-					templateLabel: "AutoWire electrical QA review",
-				},
-			);
-			if (!gridsageResult.success) {
-				entries[1] = {
-					profileId: "gridsage",
-					status: "failed",
-					error: gridsageResult.error || "GridSage review failed.",
-				};
-				setCrewReviewEntries([...entries]);
-				setCrewReviewError(entries[1].error || "GridSage review failed.");
-				setStatusMessage(entries[1].error || "GridSage review failed.");
-				return;
-			}
-
-			entries[1] = {
-				profileId: "gridsage",
-				status: "completed",
-				response: extractAgentResponseText(gridsageResult.data),
-			};
-			setCrewReviewEntries([...entries]);
-			setStatusMessage("CAD crew review complete (Draftsmith -> GridSage).");
-		} finally {
-			setCrewReviewLoading(false);
-		}
+	const handleRemoveRoute = (routeId: string) => {
+		clearCadReviewState();
+		removeRoute(routeId);
 	};
 
-	const exportBackcheckJson = () => {
-		if (!routeBackcheckReport) {
-			setStatusMessage("Run backcheck first to export a report.");
-			return;
-		}
-		const payload = JSON.stringify(
-			{
-				...routeBackcheckReport,
-				crew_review: {
-					entries: crewReviewEntries,
-					error: crewReviewError,
-				},
-			},
-			null,
-			2,
-		);
-		const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
-		const url = URL.createObjectURL(blob);
-		const anchor = document.createElement("a");
-		const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-		anchor.href = url;
-		anchor.download = `autowire-backcheck-${stamp}.json`;
-		document.body.append(anchor);
-		anchor.click();
-		anchor.remove();
-		URL.revokeObjectURL(url);
-		setStatusMessage("Exported backcheck report JSON.");
-	};
-
-	const handleLayerPresetChange = (presetId: string) => {
-		setObstacleLayerPreset(presetId);
-		const selected = AUTOWIRE_OBSTACLE_LAYER_PRESET_OPTIONS.find(
-			(entry) => entry.id === presetId,
-		);
-		setStatusMessage(
-			presetId
-				? `Obstacle layer preset set to '${selected?.label ?? presetId}'.`
-				: "Obstacle layer preset set to manual rules.",
-		);
-	};
 
 	return (
 		<div className={styles.root}>
@@ -1255,7 +653,7 @@ export function ConduitRouteApp() {
 										size="sm"
 										variant="outline"
 										iconLeft={<Eraser size={14} />}
-										onClick={clearAllRoutes}
+										onClick={handleClearAllRoutes}
 										disabled={routeComputing || obstacleSyncing || routeBackchecking}
 									>
 										Clear All
@@ -1264,7 +662,7 @@ export function ConduitRouteApp() {
 										size="sm"
 										variant="outline"
 										iconLeft={<X size={14} />}
-										onClick={undoLastRoute}
+										onClick={handleUndoLastRoute}
 										disabled={routeComputing || obstacleSyncing || routeBackchecking}
 									>
 										Undo
@@ -1314,7 +712,16 @@ export function ConduitRouteApp() {
 													<CheckCircle2 size={14} />
 												)
 											}
-											onClick={() => void runRouteBackcheck()}
+											onClick={() =>
+												void runRouteBackcheck({
+													routes,
+													activeObstacles,
+													obstacleSource,
+													clearance,
+													routeComputing,
+													obstacleSyncing,
+												})
+											}
 											loading={routeBackchecking}
 											disabled={
 												routeBackchecking ||
@@ -1347,7 +754,12 @@ export function ConduitRouteApp() {
 													<CheckCircle2 size={14} />
 												)
 											}
-											onClick={() => void runCadCrewReview()}
+											onClick={() =>
+												void runCadCrewReview({
+													routeComputing,
+													obstacleSyncing,
+												})
+											}
 											loading={crewReviewLoading}
 											disabled={!routeBackcheckReport || routeBackchecking || crewReviewLoading}
 										>
@@ -1514,12 +926,7 @@ export function ConduitRouteApp() {
 								<svg
 									viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
 									className={styles.canvas}
-									onMouseMove={(event) => {
-										if (routeComputing || obstacleSyncing || routeBackchecking) {
-											return;
-										}
-										setHoverPoint(handleCanvasPoint(event));
-									}}
+									onMouseMove={handleCanvasHover}
 									onMouseLeave={() => setHoverPoint(null)}
 									onClick={handleCanvasClick}
 								>
@@ -1746,7 +1153,7 @@ export function ConduitRouteApp() {
 												<Button
 													variant="ghost"
 													size="sm"
-													onClick={() => removeRoute(route.id)}
+													onClick={() => handleRemoveRoute(route.id)}
 													iconLeft={<X size={12} />}
 													disabled={routeComputing || obstacleSyncing || routeBackchecking}
 												>

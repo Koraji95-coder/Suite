@@ -18,7 +18,7 @@ import type {
 	AgentReviewAction,
 	AgentTaskItem,
 	AgentTaskPriority,
-} from "@/services/agentService";
+} from "@/services/agent/types";
 import { AgentPixelMark } from "./AgentPixelMark";
 import styles from "./AgentChatPanel.module.css";
 import type { AgentChannelScope } from "./agentChannelScope";

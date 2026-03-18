@@ -206,6 +206,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("repo.check_watchdog_autocad_plugin", tool_names)
         self.assertIn("repo.check_watchdog_autocad_readiness", tool_names)
         self.assertIn("repo.check_watchdog_backend_startup", tool_names)
+        self.assertIn("repo.check_suite_workstation", tool_names)
         self.assertIn("repo.verify_agent_routing_guardrails", tool_names)
 
     def test_tool_call_repo_search_returns_text(self) -> None:
@@ -437,6 +438,41 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
             text,
         )
         self.assertIn("SuiteWatchdogCadTracker.bundle", text)
+
+    def test_tool_check_suite_workstation_returns_normalized_payload(self) -> None:
+        with _McpServerProcess(
+            env={
+                "SUITE_WORKSTATION_ID": "suite-main",
+                "SUITE_WORKSTATION_LABEL": "Dustin main workstation",
+                "SUITE_WORKSTATION_ROLE": "primary",
+                "SUITE_MCP_ENV_STAMPED_BY": "scripts/sync-suite-workstation-profile.ps1",
+                "COMPUTERNAME": "MAIN-WS",
+            }
+        ) as server:
+            server.initialize()
+            response = server.request(
+                "tools/call",
+                {
+                    "name": "repo.check_suite_workstation",
+                    "arguments": {},
+                },
+                timeout=20.0,
+            )
+
+        result = response.get("result", {})
+        content = result.get("content", [])
+        self.assertTrue(content)
+        text = str(content[0].get("text") if isinstance(content[0], dict) else "")
+        payload = json.loads(text)
+        self.assertIn("ok", payload)
+        self.assertIn("workstation", payload)
+        self.assertIn("backend", payload)
+        self.assertIn("filesystemCollector", payload)
+        self.assertIn("autocadCollector", payload)
+        self.assertIn("autocadPlugin", payload)
+        self.assertIn("autocadReadiness", payload)
+        self.assertIn("issues", payload)
+        self.assertIn("recommendedActions", payload)
 
     @unittest.skipUnless(os.name == "nt", "Startup check tools are only available on Windows.")
     def test_tool_check_watchdog_autocad_collector_startup_reports_missing_script(self) -> None:

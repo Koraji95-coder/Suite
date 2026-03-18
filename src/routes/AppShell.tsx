@@ -3,6 +3,7 @@ import {
 	AppWindow,
 	BookOpen,
 	CalendarDays,
+	ClipboardList,
 	Clock3,
 	Compass,
 	FolderOpen,
@@ -43,6 +44,7 @@ const primaryNavItems = [
 	{ to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
 	{ to: "/app/projects", label: "Projects", icon: FolderOpen },
 	{ to: "/app/calendar", label: "Calendar", icon: CalendarDays },
+	{ to: "/app/changelog", label: "Changelog", icon: ClipboardList },
 	{ to: "/app/apps", label: "Apps", icon: AppWindow },
 	{ to: "/app/knowledge", label: "Knowledge", icon: BookOpen },
 	{ to: "/app/agent", label: "Koro Agent", icon: Sparkles },
@@ -66,6 +68,12 @@ const sectionMeta = [
 		label: "Calendar",
 		subtitle: "Scheduling, commitments, and upcoming delivery timing.",
 		icon: CalendarDays,
+	},
+	{
+		match: "/app/changelog",
+		label: "Changelog",
+		subtitle: "Canonical work ledger, linked checkpoints, and publish-ready notes.",
+		icon: ClipboardList,
 	},
 	{
 		match: "/app/apps",

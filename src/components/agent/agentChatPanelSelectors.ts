@@ -4,7 +4,7 @@ import type {
 	AgentTaskItem,
 	AgentTaskPriority,
 	AgentTaskStatus,
-} from "@/services/agentService";
+} from "@/services/agent/types";
 import type { AgentConversation } from "@/services/agentTaskManager";
 import { normalizeAgentResponseText } from "./agentResponseNormalizer";
 import {

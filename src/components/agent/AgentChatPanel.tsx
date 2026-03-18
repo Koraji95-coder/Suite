@@ -19,6 +19,8 @@ import {
 	type AgentProfileCatalogItem,
 	type AgentReviewAction,
 	type AgentTaskItem,
+} from "@/services/agent/types";
+import {
 	agentService,
 } from "@/services/agentService";
 import {

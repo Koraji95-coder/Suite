@@ -27,6 +27,7 @@ const AgentPairingCallbackPage = lazy(
 );
 const AppDashboardPage = lazy(() => import("./routes/AppDashboardPage"));
 const CalendarRoutePage = lazy(() => import("./routes/CalendarRoutePage"));
+const ChangelogRoutePage = lazy(() => import("./routes/ChangelogRoutePage"));
 const CommandCenterPage = lazy(() => import("./routes/CommandCenterPage"));
 const GroundGridRoutePage = lazy(
 	() =>
@@ -132,6 +133,10 @@ export default function App() {
 									<Route
 										path="calendar"
 										element={withRouteSuspense(<CalendarRoutePage />)}
+									/>
+									<Route
+										path="changelog"
+										element={withRouteSuspense(<ChangelogRoutePage />)}
 									/>
 									<Route
 										path="apps"

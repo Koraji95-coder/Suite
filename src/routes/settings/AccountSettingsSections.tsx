@@ -14,13 +14,13 @@ import {
 	ShieldCheck,
 	User,
 } from "lucide-react";
-import type { AgentPairingAction } from "@/services/agentService";
 import { Badge } from "@/components/primitives/Badge";
 import { Button, IconButton } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
+import type { AgentPairingAction } from "@/services/agent/types";
 import { SectionHeader, StatusTile } from "./accountSettingsShared";
 import type { StatusDescriptor } from "./accountSettingsUtils";
 import styles from "./AccountSettings.module.css";

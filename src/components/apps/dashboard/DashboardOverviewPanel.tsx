@@ -18,6 +18,10 @@ import {
 import { loadMemories } from "@/lib/agent-memory/service";
 import type { Memory } from "@/lib/agent-memory/types";
 import {
+	type WorkLedgerRow,
+	workLedgerService,
+} from "@/services/workLedgerService";
+import {
 	type WatchdogCollector,
 	type WatchdogCollectorEvent,
 	type WatchdogOverviewResponse,
@@ -30,6 +34,7 @@ import {
 	DashboardMemorySection,
 	DashboardOverviewStatsGrid,
 	DashboardProjectOperationsSection,
+	DashboardWorkLedgerSection,
 	DashboardWatchdogSection,
 } from "./DashboardOverviewSections";
 import { buildDashboardWatchdogViewModel } from "./dashboardWatchdogSelectors";
@@ -42,7 +47,12 @@ interface DashboardOverviewPanelProps {
 
 type DomainFilter = "all" | ArchitectureDomainId;
 type AgentFilter = "all" | AgentProfileId;
-type DashboardFocus = "watchdog" | "architecture" | "memory" | "projects";
+type DashboardFocus =
+	| "watchdog"
+	| "architecture"
+	| "ledger"
+	| "memory"
+	| "projects";
 
 const TIME_WINDOW_OPTIONS = [
 	{ value: "4", label: "4 hours" },
@@ -57,6 +67,7 @@ const FOCUS_PILL_OPTIONS: ReadonlyArray<{ value: FocusPillOption; label: string 
 	{ value: "all", label: "Unified view" },
 	{ value: "watchdog", label: "Watchdog" },
 	{ value: "architecture", label: "Architecture" },
+	{ value: "ledger", label: "Work ledger" },
 	{ value: "memory", label: "Agent memory" },
 	{ value: "projects", label: "Project ops" },
 ];
@@ -84,6 +95,7 @@ function parseDashboardFocus(value: string | null): DashboardFocus | null {
 	switch (value) {
 		case "watchdog":
 		case "architecture":
+		case "ledger":
 		case "memory":
 		case "projects":
 			return value;
@@ -117,12 +129,15 @@ export function DashboardOverviewPanel({
 	>([]);
 	const [collectors, setCollectors] = useState<WatchdogCollector[]>([]);
 	const [memories, setMemories] = useState<Memory[]>([]);
+	const [workLedgerEntries, setWorkLedgerEntries] = useState<WorkLedgerRow[]>([]);
 	const [watchdogError, setWatchdogError] = useState<string | null>(null);
 	const [memoryError, setMemoryError] = useState<string | null>(null);
+	const [workLedgerError, setWorkLedgerError] = useState<string | null>(null);
 	const [telemetryLoading, setTelemetryLoading] = useState(true);
 	const [refreshKey, setRefreshKey] = useState(0);
 	const watchdogSectionRef = useRef<HTMLDivElement | null>(null);
 	const architectureSectionRef = useRef<HTMLDivElement | null>(null);
+	const ledgerSectionRef = useRef<HTMLDivElement | null>(null);
 	const memorySectionRef = useRef<HTMLDivElement | null>(null);
 	const projectSectionRef = useRef<HTMLDivElement | null>(null);
 
@@ -159,11 +174,13 @@ export function DashboardOverviewPanel({
 
 	useEffect(() => {
 		let cancelled = false;
+		const refreshCycle = refreshKey;
 
 		const run = async () => {
 			setTelemetryLoading(true);
 			setWatchdogError(null);
 			setMemoryError(null);
+			setWorkLedgerError(null);
 
 			const projectId =
 				selectedProjectId !== "all" ? selectedProjectId : undefined;
@@ -176,6 +193,7 @@ export function DashboardOverviewPanel({
 				sessionsResult,
 				collectorsResult,
 				memoriesResult,
+				workLedgerResult,
 			] = await Promise.allSettled([
 				watchdogService.getOverview({
 					projectId,
@@ -195,9 +213,13 @@ export function DashboardOverviewPanel({
 				}),
 				watchdogService.listCollectors(),
 				loadMemories(),
+				workLedgerService.fetchEntries({
+					projectId,
+					limit: 16,
+				}),
 			]);
 
-			if (cancelled) return;
+			if (cancelled || refreshCycle !== refreshKey) return;
 
 			if (overviewResult.status === "fulfilled") {
 				setWatchdogOverview(overviewResult.value);
@@ -235,6 +257,20 @@ export function DashboardOverviewPanel({
 				);
 			}
 
+			if (workLedgerResult.status === "fulfilled") {
+				setWorkLedgerEntries(workLedgerResult.value.data ?? []);
+				if (workLedgerResult.value.error) {
+					setWorkLedgerError(String(workLedgerResult.value.error.message || ""));
+				}
+			} else {
+				setWorkLedgerEntries([]);
+				setWorkLedgerError(
+					workLedgerResult.reason instanceof Error
+						? workLedgerResult.reason.message
+						: "Work ledger is unavailable.",
+				);
+			}
+
 			setTelemetryLoading(false);
 		};
 
@@ -248,6 +284,7 @@ export function DashboardOverviewPanel({
 		const focusMap = {
 			watchdog: watchdogSectionRef,
 			architecture: architectureSectionRef,
+			ledger: ledgerSectionRef,
 			memory: memorySectionRef,
 			projects: projectSectionRef,
 		};
@@ -374,6 +411,39 @@ export function DashboardOverviewPanel({
 		[query, selectedDomain],
 	);
 
+	const filteredWorkLedgerEntries = useMemo(
+		() =>
+			workLedgerEntries
+				.filter((entry) => {
+					if (
+						selectedProjectId !== "all" &&
+						entry.project_id !== selectedProjectId
+					) {
+						return false;
+					}
+					if (
+						selectedDomain !== "all" &&
+						!entry.architecture_paths.some((pathValue) =>
+							includesDomainPath(pathValue, selectedDomain),
+						)
+					) {
+						return false;
+					}
+					return matchesQuery(query, [
+						entry.title,
+						entry.summary,
+						entry.source_kind,
+						entry.app_area,
+						entry.project_id,
+						...entry.commit_refs,
+						...entry.architecture_paths,
+						...entry.hotspot_ids,
+					]);
+				})
+				.slice(0, 6),
+		[query, selectedDomain, selectedProjectId, workLedgerEntries],
+	);
+
 	const openTasks = Array.from(projectTaskCounts.values()).reduce(
 		(total, counts) => total + Math.max(counts.total - counts.completed, 0),
 		0,
@@ -429,6 +499,10 @@ export function DashboardOverviewPanel({
 		selectedFocus === "architecture"
 			? `${styles.secondaryPanel} ${styles.focusedPanel}`
 			: styles.secondaryPanel;
+	const ledgerPanelClassName =
+		selectedFocus === "ledger"
+			? `${styles.secondaryPanel} ${styles.focusedPanel}`
+			: styles.secondaryPanel;
 	const memoryPanelClassName =
 		selectedFocus === "memory"
 			? `${styles.secondaryPanel} ${styles.focusedPanel}`
@@ -440,6 +514,32 @@ export function DashboardOverviewPanel({
 	const selectedWindowLabel =
 		TIME_WINDOW_OPTIONS.find((option) => option.value === selectedWindowHours)
 			?.label ?? `${selectedWindowHours} hours`;
+
+	const openChangelog = () => {
+		const next = new URLSearchParams();
+		if (selectedProjectId !== "all") {
+			next.set("project", selectedProjectId);
+		}
+		if (query) {
+			next.set("query", searchValue);
+		}
+		if (selectedDomain !== "all") {
+			const domain = ARCHITECTURE_DOMAINS.find(
+				(item) => item.id === selectedDomain,
+			);
+			const firstRoot = domain?.repoRoots[0];
+			if (firstRoot) {
+				next.set("path", firstRoot);
+			}
+		}
+		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
+	};
+
+	const openWorkLedgerPath = (pathValue: string) => {
+		const normalizedPath = String(pathValue || "").trim();
+		if (!normalizedPath) return;
+		navigate(`/app/apps/graph?path=${encodeURIComponent(normalizedPath)}`);
+	};
 
 	return (
 		<div className={styles.root}>
@@ -696,6 +796,15 @@ export function DashboardOverviewPanel({
 						filteredHotspots={filteredHotspots}
 						filteredFixCandidates={filteredFixCandidates}
 						onDeepDive={() => navigate("/app/apps/graph")}
+					/>
+
+					<DashboardWorkLedgerSection
+						panelRef={ledgerSectionRef}
+						className={ledgerPanelClassName}
+						entries={filteredWorkLedgerEntries}
+						error={workLedgerError}
+						onOpenChangelog={openChangelog}
+						onOpenEntryPath={openWorkLedgerPath}
 					/>
 
 					<DashboardMemorySection

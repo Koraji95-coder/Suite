@@ -75,6 +75,8 @@ function getWorkstationContext() {
 		platform: process.platform,
 		repoRoot: REPO_ROOT,
 		source,
+		envStampedBy:
+			String(process.env.SUITE_MCP_ENV_STAMPED_BY || "").trim() || null,
 	};
 }
 
@@ -97,6 +99,9 @@ function formatWorkstationContext() {
 	lines.push(`- Platform: ${context.platform}`);
 	lines.push(`- Repo Root: ${toPosix(context.repoRoot)}`);
 	lines.push(`- Source: ${context.source}`);
+	if (context.envStampedBy) {
+		lines.push(`- MCP Env Stamp: ${context.envStampedBy}`);
+	}
 	lines.push("");
 	lines.push("## Watchdog Collector Startup");
 	lines.push(`- Collector ID: ${filesystemStartup.collectorId}`);
@@ -157,6 +162,7 @@ function formatWorkstationContext() {
 	lines.push("- `SUITE_WATCHDOG_AUTOCAD_PLUGIN_CHECK_SCRIPT`");
 	lines.push("- `SUITE_WATCHDOG_AUTOCAD_READINESS_CHECK_SCRIPT`");
 	lines.push("- `SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT`");
+	lines.push("- `SUITE_MCP_ENV_STAMPED_BY`");
 	return lines.join("\n");
 }
 
@@ -1961,6 +1967,478 @@ async function toolCheckWatchdogAutocadReadiness(args = {}) {
 	);
 }
 
+async function runPowerShellJsonCheck({ scriptPath, args = [], timeoutMs = 30_000 }) {
+	const checkScriptCandidate = path.normalize(scriptPath);
+	const checkScriptAbs = path.isAbsolute(checkScriptCandidate)
+		? checkScriptCandidate
+		: resolveRepoPath(checkScriptCandidate);
+
+	if (!(await exists(checkScriptAbs))) {
+		return {
+			ok: false,
+			error: `Check script was not found: ${toPosix(checkScriptAbs)}`,
+			output: "",
+			data: null,
+			command: null,
+		};
+	}
+
+	const psArgs = [
+		"-NoProfile",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-File",
+		checkScriptAbs,
+		...args,
+		"-Json",
+	];
+	const result = await runProcess("PowerShell.exe", psArgs, { timeoutMs });
+	const output = (result.stdout || result.stderr || "").trim();
+	if (!result.ok) {
+		return {
+			ok: false,
+			error: [
+				`Command: ${result.command}`,
+				`Exit: ${result.code ?? "unknown"}`,
+				output || "Check failed with no output.",
+			].join("\n"),
+			output,
+			data: null,
+			command: result.command,
+		};
+	}
+
+	let data = null;
+	try {
+		data = JSON.parse(output);
+	} catch (error) {
+		return {
+			ok: false,
+			error: `Check output was not valid JSON: ${String(error?.message || error)}`,
+			output,
+			data: null,
+			command: result.command,
+		};
+	}
+
+	return {
+		ok: true,
+		error: null,
+		output,
+		data,
+		command: result.command,
+	};
+}
+
+function appendIssue(issues, recommendedActions, component, severity, message, action = null) {
+	issues.push({ component, severity, message });
+	if (action && !recommendedActions.includes(action)) {
+		recommendedActions.push(action);
+	}
+}
+
+async function toolCheckSuiteWorkstation(args = {}) {
+	const workstation = getWorkstationContext();
+	const codexConfigPath = path.join(os.homedir(), ".codex", "config.toml");
+	const issues = [];
+	const recommendedActions = [];
+
+	const payload = {
+		ok: false,
+		workstation: {
+			id: workstation.workstationId,
+			label: workstation.workstationLabel,
+			role: workstation.workstationRole,
+			computerName: workstation.computerName,
+			platform: workstation.platform,
+			source: workstation.source,
+			envStampedBy: workstation.envStampedBy,
+		},
+		backend: {
+			ok: false,
+			healthy: false,
+			available: false,
+			error: "Not checked.",
+		},
+		filesystemCollector: {
+			ok: false,
+			healthy: false,
+			available: false,
+			error: "Not checked.",
+		},
+		autocadCollector: {
+			ok: false,
+			healthy: false,
+			available: false,
+			error: "Not checked.",
+		},
+		autocadPlugin: {
+			ok: false,
+			healthy: false,
+			available: false,
+			error: "Not checked.",
+		},
+		autocadReadiness: {
+			ok: false,
+			healthy: false,
+			available: false,
+			error: "Not checked.",
+		},
+		issues,
+		recommendedActions,
+	};
+
+	if (
+		!workstation.envStampedBy ||
+		!String(workstation.envStampedBy).includes("sync-suite-workstation-profile.ps1")
+	) {
+		appendIssue(
+			issues,
+			recommendedActions,
+			"workstation",
+			"warning",
+			"MCP environment does not appear to be stamped by scripts/sync-suite-workstation-profile.ps1.",
+			"Run `npm run workstation:sync` (or `scripts/sync-suite-workstation-profile.ps1`) and restart Codex.",
+		);
+	}
+
+	if (process.platform !== "win32") {
+		appendIssue(
+			issues,
+			recommendedActions,
+			"workstation",
+			"warning",
+			"Watchdog startup and AutoCAD checks are only available on Windows workstations.",
+			"Run this tool from the target Windows workstation for startup/readiness validation.",
+		);
+		payload.backend.error = "Unavailable on non-Windows workstation.";
+		payload.filesystemCollector.error = "Unavailable on non-Windows workstation.";
+		payload.autocadCollector.error = "Unavailable on non-Windows workstation.";
+		payload.autocadPlugin.error = "Unavailable on non-Windows workstation.";
+		payload.autocadReadiness.error = "Unavailable on non-Windows workstation.";
+		payload.ok = false;
+		return createTextResult(JSON.stringify(payload, null, 2));
+	}
+
+	const backendContext = getWatchdogBackendStartupContext(workstation);
+	const filesystemContext = getWatchdogStartupContext(workstation);
+	const autocadContext = getWatchdogAutocadStartupContext(workstation);
+	const autocadPluginContext = getWatchdogAutocadPluginContext();
+	const startIfMissing = args && args.start_if_missing === true;
+
+	const backendResult = await runPowerShellJsonCheck({
+		scriptPath: backendContext.checkScript,
+		args: [
+			"-CodexConfigPath",
+			codexConfigPath,
+			"-WorkstationId",
+			backendContext.workstationId,
+			...(startIfMissing ? ["-StartIfMissing"] : []),
+		],
+	});
+	if (!backendResult.ok || !backendResult.data) {
+		payload.backend = {
+			ok: false,
+			healthy: false,
+			available: true,
+			error: backendResult.error || "Backend startup check failed.",
+		};
+		appendIssue(
+			issues,
+			recommendedActions,
+			"backend",
+			"error",
+			payload.backend.error,
+			"Run `npm run watchdog:backend:startup:check` and fix backend startup issues.",
+		);
+	} else {
+		const running = Boolean(backendResult.data.Running);
+		payload.backend = {
+			ok: running,
+			healthy: running,
+			available: true,
+			workstationId: backendResult.data.Workstation || backendContext.workstationId,
+			running,
+			processId: backendResult.data.ProcessId ?? null,
+			commandLine: backendResult.data.CommandLine ?? null,
+			startAttempted: Boolean(backendResult.data.StartAttempted),
+			error: backendResult.data.Error || null,
+		};
+		if (!payload.backend.healthy) {
+			appendIssue(
+				issues,
+				recommendedActions,
+				"backend",
+				"error",
+				payload.backend.error || "Backend process is not running.",
+				"Run `npm run watchdog:backend:startup:check -- -StartIfMissing`.",
+			);
+		}
+	}
+
+	const filesystemResult = await runPowerShellJsonCheck({
+		scriptPath: filesystemContext.checkScript,
+		args: [
+			"-ConfigPath",
+			path.normalize(filesystemContext.configPath),
+			"-CodexConfigPath",
+			codexConfigPath,
+			"-TaskName",
+			filesystemContext.taskName,
+			"-CheckTaskName",
+			filesystemContext.checkTaskName,
+			"-RunKeyName",
+			filesystemContext.runKeyName,
+			"-MutexName",
+			filesystemContext.mutexName,
+			...(startIfMissing ? ["-StartIfMissing"] : []),
+		],
+	});
+	if (!filesystemResult.ok || !filesystemResult.data) {
+		payload.filesystemCollector = {
+			ok: false,
+			healthy: false,
+			available: true,
+			error: filesystemResult.error || "Filesystem collector startup check failed.",
+		};
+		appendIssue(
+			issues,
+			recommendedActions,
+			"filesystemCollector",
+			"error",
+			payload.filesystemCollector.error,
+			"Run `npm run watchdog:startup:check` and resolve filesystem collector startup/configuration.",
+		);
+	} else {
+		const data = filesystemResult.data;
+		payload.filesystemCollector = {
+			ok: Boolean(data.healthy),
+			healthy: Boolean(data.healthy),
+			available: true,
+			workstationId: data.workstationId || workstation.workstationId,
+			collectorId: data.collectorId || filesystemContext.collectorId,
+			configPath: data.configPath || filesystemContext.configPath,
+			startupMode: data.startupMode || "none",
+			daemonRunning: Boolean(data.daemonRunning),
+			configExists: Boolean(data.configExists),
+			configMatchesWorkstation: Boolean(data.configMatchesWorkstation),
+			startedNow: Boolean(data.startedNow),
+			warnings: Array.isArray(data.warnings) ? data.warnings : [],
+			errors: Array.isArray(data.errors) ? data.errors : [],
+		};
+		if (!payload.filesystemCollector.healthy) {
+			appendIssue(
+				issues,
+				recommendedActions,
+				"filesystemCollector",
+				"error",
+				"Filesystem collector startup is not healthy.",
+				"Run `npm run watchdog:startup:check -- -StartIfMissing` and verify collector config/workstation mapping.",
+			);
+		}
+		for (const warning of payload.filesystemCollector.warnings) {
+			appendIssue(
+				issues,
+				recommendedActions,
+				"filesystemCollector",
+				"warning",
+				String(warning),
+			);
+		}
+		for (const error of payload.filesystemCollector.errors) {
+			appendIssue(
+				issues,
+				recommendedActions,
+				"filesystemCollector",
+				"error",
+				String(error),
+			);
+		}
+	}
+
+	const autocadCollectorResult = await runPowerShellJsonCheck({
+		scriptPath: autocadContext.checkScript,
+		args: [
+			"-ConfigPath",
+			path.normalize(autocadContext.configPath),
+			"-CodexConfigPath",
+			codexConfigPath,
+			"-TaskName",
+			autocadContext.taskName,
+			"-CheckTaskName",
+			autocadContext.checkTaskName,
+			"-RunKeyName",
+			autocadContext.runKeyName,
+			"-MutexName",
+			autocadContext.mutexName,
+			...(startIfMissing ? ["-StartIfMissing"] : []),
+		],
+	});
+	if (!autocadCollectorResult.ok || !autocadCollectorResult.data) {
+		payload.autocadCollector = {
+			ok: false,
+			healthy: false,
+			available: true,
+			error: autocadCollectorResult.error || "AutoCAD collector startup check failed.",
+		};
+		appendIssue(
+			issues,
+			recommendedActions,
+			"autocadCollector",
+			"error",
+			payload.autocadCollector.error,
+			"Run `npm run watchdog:startup:autocad:check` and resolve AutoCAD collector startup/configuration.",
+		);
+	} else {
+		const data = autocadCollectorResult.data;
+		payload.autocadCollector = {
+			ok: Boolean(data.healthy),
+			healthy: Boolean(data.healthy),
+			available: true,
+			workstationId: data.workstationId || workstation.workstationId,
+			collectorId: data.collectorId || autocadContext.collectorId,
+			configPath: data.configPath || autocadContext.configPath,
+			startupMode: data.startupMode || "none",
+			daemonRunning: Boolean(data.daemonRunning),
+			configExists: Boolean(data.configExists),
+			configMatchesWorkstation: Boolean(data.configMatchesWorkstation),
+			startedNow: Boolean(data.startedNow),
+			warnings: Array.isArray(data.warnings) ? data.warnings : [],
+			errors: Array.isArray(data.errors) ? data.errors : [],
+		};
+		if (!payload.autocadCollector.healthy) {
+			appendIssue(
+				issues,
+				recommendedActions,
+				"autocadCollector",
+				"error",
+				"AutoCAD collector startup is not healthy.",
+				"Run `npm run watchdog:startup:autocad:check -- -StartIfMissing` and verify AutoCAD collector config/workstation mapping.",
+			);
+		}
+		for (const warning of payload.autocadCollector.warnings) {
+			appendIssue(issues, recommendedActions, "autocadCollector", "warning", String(warning));
+		}
+		for (const error of payload.autocadCollector.errors) {
+			appendIssue(issues, recommendedActions, "autocadCollector", "error", String(error));
+		}
+	}
+
+	const autocadPluginResult = await runPowerShellJsonCheck({
+		scriptPath: autocadPluginContext.checkScript,
+		args: ["-BundleRoot", path.normalize(autocadPluginContext.bundleRoot)],
+	});
+	if (!autocadPluginResult.ok || !autocadPluginResult.data) {
+		payload.autocadPlugin = {
+			ok: false,
+			healthy: false,
+			available: true,
+			error: autocadPluginResult.error || "AutoCAD plugin check failed.",
+		};
+		appendIssue(
+			issues,
+			recommendedActions,
+			"autocadPlugin",
+			"error",
+			payload.autocadPlugin.error,
+			"Run `npm run watchdog:autocad:plugin:check` and reinstall/fix the plugin bundle.",
+		);
+	} else {
+		const data = autocadPluginResult.data;
+		const pluginOk = Boolean(data.ok);
+		payload.autocadPlugin = {
+			ok: pluginOk,
+			healthy: pluginOk,
+			available: true,
+			bundleRoot: data.bundleRoot || autocadPluginContext.bundleRoot,
+			packageContentsExists: Boolean(data.packageContentsExists),
+			dllExists: Boolean(data.dllExists),
+			loadOnAutoCadStartup: Boolean(data.loadOnAutoCadStartup),
+			commands: Array.isArray(data.commands) ? data.commands : [],
+			errors: Array.isArray(data.errors) ? data.errors : [],
+		};
+		if (!payload.autocadPlugin.healthy) {
+			appendIssue(
+				issues,
+				recommendedActions,
+				"autocadPlugin",
+				"error",
+				"AutoCAD plugin installation or autoload configuration is not healthy.",
+				"Run `npm run watchdog:autocad:plugin:check` and ensure the plugin bundle is installed under `%APPDATA%\\Autodesk\\ApplicationPlugins`.",
+			);
+		}
+		for (const error of payload.autocadPlugin.errors) {
+			appendIssue(issues, recommendedActions, "autocadPlugin", "error", String(error));
+		}
+	}
+
+	const readinessResult = await runPowerShellJsonCheck({
+		scriptPath: autocadPluginContext.readinessScript,
+		args: [
+			"-ConfigPath",
+			path.normalize(autocadContext.configPath),
+			"-BundleRoot",
+			path.normalize(autocadPluginContext.bundleRoot),
+			"-CodexConfigPath",
+			codexConfigPath,
+			...(startIfMissing ? ["-StartIfMissing"] : []),
+		],
+	});
+	if (!readinessResult.ok || !readinessResult.data) {
+		payload.autocadReadiness = {
+			ok: false,
+			healthy: false,
+			available: true,
+			error: readinessResult.error || "AutoCAD readiness doctor failed.",
+		};
+		appendIssue(
+			issues,
+			recommendedActions,
+			"autocadReadiness",
+			"error",
+			payload.autocadReadiness.error,
+			"Run `npm run watchdog:autocad:doctor` and resolve tracker-state/plugin/collector freshness issues.",
+		);
+	} else {
+		const data = readinessResult.data;
+		const status = String(data.status || "").trim() || "unknown";
+		const readyForTelemetry = Boolean(data?.summary?.readyForTelemetry);
+		payload.autocadReadiness = {
+			ok: readyForTelemetry,
+			healthy: readyForTelemetry,
+			available: true,
+			status,
+			workstationId: data.workstationId || workstation.workstationId,
+			summary: data.summary || {},
+			backend: data.backend || {},
+			backendStartup: data.backendStartup || {},
+			trackerState: data.trackerState || {},
+			collectorState: data.collectorState || {},
+		};
+		if (!payload.autocadReadiness.healthy) {
+			appendIssue(
+				issues,
+				recommendedActions,
+				"autocadReadiness",
+				status === "awaiting_autocad" ? "warning" : "error",
+				`AutoCAD readiness status is '${status}'.`,
+				"Run `npm run watchdog:autocad:doctor` and follow readiness output until status is `ready`.",
+			);
+		}
+	}
+
+	const fatalIssueCount = issues.filter((entry) => entry.severity === "error").length;
+	payload.ok =
+		fatalIssueCount === 0 &&
+		payload.backend.healthy &&
+		payload.filesystemCollector.healthy &&
+		payload.autocadCollector.healthy &&
+		payload.autocadPlugin.healthy &&
+		payload.autocadReadiness.healthy;
+
+	return createTextResult(JSON.stringify(payload, null, 2), !payload.ok);
+}
+
 const PROMPTS = {
 	"repo.pr_description": {
 		description: "Generate a structured PR description for this repo.",
@@ -2538,6 +3016,22 @@ const TOOLS = [
 			},
 		},
 		handler: toolCheckWatchdogBackendStartup,
+	},
+	{
+		name: "repo.check_suite_workstation",
+		description:
+			"Run a combined workstation doctor for backend, filesystem collector, AutoCAD collector, plugin, and readiness checks.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				start_if_missing: {
+					type: "boolean",
+					description:
+						"When true, attempt to start backend/collector processes when startup checks detect they are not running.",
+				},
+			},
+		},
+		handler: toolCheckSuiteWorkstation,
 	},
 	{
 		name: "repo.verify_agent_routing_guardrails",

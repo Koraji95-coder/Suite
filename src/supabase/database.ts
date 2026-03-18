@@ -324,6 +324,60 @@ export type Database = {
 				}
 			>;
 
+			work_ledger_entries: DatabaseTable<
+				{
+					id: string;
+					title: string;
+					summary: string;
+					source_kind: string;
+					commit_refs: string[];
+					project_id: string | null;
+					app_area: string | null;
+					architecture_paths: string[];
+					hotspot_ids: string[];
+					publish_state: string;
+					external_reference: string | null;
+					external_url: string | null;
+					user_id: string;
+					created_at: string;
+					updated_at: string;
+				},
+				{
+					id?: string;
+					title: string;
+					summary?: string;
+					source_kind?: string;
+					commit_refs?: string[];
+					project_id?: string | null;
+					app_area?: string | null;
+					architecture_paths?: string[];
+					hotspot_ids?: string[];
+					publish_state?: string;
+					external_reference?: string | null;
+					external_url?: string | null;
+					user_id?: string;
+					created_at?: string;
+					updated_at?: string;
+				},
+				{
+					id?: string;
+					title?: string;
+					summary?: string;
+					source_kind?: string;
+					commit_refs?: string[];
+					project_id?: string | null;
+					app_area?: string | null;
+					architecture_paths?: string[];
+					hotspot_ids?: string[];
+					publish_state?: string;
+					external_reference?: string | null;
+					external_url?: string | null;
+					user_id?: string;
+					created_at?: string;
+					updated_at?: string;
+				}
+			>;
+
 			calendar_events: DatabaseTable<
 				{
 					id: string;

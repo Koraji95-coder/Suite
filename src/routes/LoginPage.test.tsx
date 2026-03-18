@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import LoginPage from "./LoginPage";
 
 type AuthState = {
@@ -115,6 +115,7 @@ vi.mock("../components/agent/AgentPixelMark", () => ({
 
 describe("LoginPage", () => {
 	beforeEach(() => {
+		vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "");
 		authState.user = null;
 		authState.loading = false;
 		authState.signIn = mockSignIn as unknown as AuthState["signIn"];
@@ -125,6 +126,10 @@ describe("LoginPage", () => {
 		mockLoadDashboardOverviewFromBackend.mockImplementation(
 			async (_onProgress) => undefined,
 		);
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
 	});
 
 	it("renders email-link form by default and transitions to sent state after submit", async () => {

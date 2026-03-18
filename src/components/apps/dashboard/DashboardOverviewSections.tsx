@@ -2,6 +2,7 @@ import {
 	Activity,
 	ArrowUpRight,
 	BrainCircuit,
+	ClipboardList,
 	FolderKanban,
 	GitBranch,
 	HardDrive,
@@ -25,6 +26,7 @@ import {
 	summarizeWatchdogTarget,
 } from "@/lib/watchdogTelemetry";
 import type { ActivityLogRow } from "@/services/activityService";
+import type { WorkLedgerRow } from "@/services/workLedgerService";
 import type {
 	WatchdogCollector,
 	WatchdogCollectorEvent,
@@ -628,6 +630,106 @@ export function DashboardArchitectureSection({
 					))}
 				</div>
 			</div>
+		</Panel>
+	);
+}
+
+interface DashboardWorkLedgerSectionProps {
+	panelRef: RefObject<HTMLDivElement | null>;
+	className: string;
+	entries: WorkLedgerRow[];
+	error: string | null;
+	onOpenChangelog: () => void;
+	onOpenEntryPath: (pathValue: string) => void;
+}
+
+export function DashboardWorkLedgerSection({
+	panelRef,
+	className,
+	entries,
+	error,
+	onOpenChangelog,
+	onOpenEntryPath,
+}: DashboardWorkLedgerSectionProps) {
+	return (
+		<Panel
+			variant="default"
+			padding="lg"
+			className={className}
+			ref={panelRef}
+			data-focus-target="ledger"
+		>
+			<div className={styles.panelHeader}>
+				<div>
+					<Text size="sm" weight="semibold">
+						Work Ledger
+					</Text>
+					<Text size="xs" color="muted">
+						Canonical changelog entries linked to repo areas and publish-ready notes.
+					</Text>
+				</div>
+				<Button
+					variant="ghost"
+					size="sm"
+					onClick={onOpenChangelog}
+					iconRight={<ArrowUpRight size={14} />}
+				>
+					Open ledger
+				</Button>
+			</div>
+
+			{error ? (
+				<div className={styles.emptyState}>{error}</div>
+			) : (
+				<div className={styles.rowList}>
+					{entries.length === 0 ? (
+						<div className={styles.emptyStateCompact}>
+							No work ledger entries matched the current filters.
+						</div>
+					) : (
+						entries.slice(0, 6).map((entry) => {
+							const firstPath = entry.architecture_paths[0] || "";
+							return (
+								<div key={entry.id} className={styles.dataRow}>
+									<div>
+										<div className={styles.dataRowTitle}>{entry.title}</div>
+										<div className={styles.dataRowMeta}>
+											{entry.source_kind} • {entry.publish_state}
+											{entry.app_area ? ` • ${entry.app_area}` : ""}
+										</div>
+										<div className={styles.dataRowMeta}>{entry.summary}</div>
+									</div>
+									<div className={styles.dataRowAside}>
+										<Badge
+											color={
+												entry.publish_state === "published"
+													? "success"
+													: entry.publish_state === "ready"
+														? "accent"
+														: "primary"
+											}
+											variant="soft"
+										>
+											{entry.publish_state}
+										</Badge>
+										{firstPath ? (
+											<button
+												type="button"
+												className={styles.sessionActionButton}
+												onClick={() => onOpenEntryPath(firstPath)}
+											>
+												Path
+											</button>
+										) : (
+											<ClipboardList size={14} />
+										)}
+									</div>
+								</div>
+							);
+						})
+					)}
+				</div>
+			)}
 		</Panel>
 	);
 }

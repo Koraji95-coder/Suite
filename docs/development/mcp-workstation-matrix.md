@@ -2,7 +2,7 @@
 
 Canonical workstation profile data lives in `tools/suite-repo-mcp/workstation-profiles.json`.
 
-Use the profile sync script to rewrite the local `suite_repo_mcp` block in `~/.codex/config.toml`:
+Use the profile sync script to rewrite the local `suite_repo_mcp` block in `%USERPROFILE%\.codex\config.toml`:
 
 ```powershell
 PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1
@@ -16,6 +16,8 @@ PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-works
 ```
 
 Restart Codex after any MCP config change.
+
+`scripts/sync-suite-workstation-profile.ps1` is the only supported path for stamping `mcp_servers.suite_repo_mcp.env`. Avoid manual edits to the MCP env block.
 
 ## Profiles
 
@@ -46,3 +48,17 @@ If a machine is not listed in the matrix, the sync helper falls back to:
 - AutoCAD mutex: `Local\SuiteWatchdogAutoCADCollectorDaemon-{slug(workstationId)}`
 
 The sync helper also stamps the repo-local watchdog check scripts and the AutoCAD plugin bundle root into `mcp_servers.suite_repo_mcp.env`.
+
+## Combined Workstation Doctor
+
+Use `repo.check_suite_workstation` to run backend/filesystem collector/AutoCAD collector/plugin/readiness checks in one call. The payload is normalized as:
+
+- `ok`
+- `workstation`
+- `backend`
+- `filesystemCollector`
+- `autocadCollector`
+- `autocadPlugin`
+- `autocadReadiness`
+- `issues[]`
+- `recommendedActions[]`

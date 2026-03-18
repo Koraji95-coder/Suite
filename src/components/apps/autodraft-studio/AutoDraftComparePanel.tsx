@@ -49,6 +49,27 @@ import {
 	summarizeReplacementTrainingResult,
 } from "./autoDraftCompareHelpers";
 import {
+	buildCompareExecutionPayload,
+	validateComparePreflight,
+	validatePreparePreflight,
+} from "./autoDraftCompareExecutionController";
+import {
+	buildJsonDownloadPackage,
+	parseCompareFeedbackImportPayload,
+} from "./autoDraftCompareLearningAdapters";
+import {
+	buildMarkupReviewDraftDefaults,
+	buildMarkupReviewSubmission,
+	getMarkupReviewMarkup,
+	isRecordValue,
+	MARKUP_REVIEW_CATEGORY_OPTIONS,
+	MARKUP_REVIEW_CLASS_OPTIONS,
+	MARKUP_REVIEW_COLOR_OPTIONS,
+	normalizeMarkupReviewCategory,
+	normalizeMarkupReviewClass,
+	normalizeMarkupReviewColor,
+} from "./autoDraftCompareReviewController";
+import {
 	buildCompareActionById,
 	buildMarkupReviewQueue,
 	buildPrepareColorSourcesSummary,
@@ -57,6 +78,15 @@ import {
 	buildReviewQueue,
 	buildShadowReviewByActionId,
 } from "./autoDraftCompareSelectors";
+import {
+	buildPanForZoomAroundPoint,
+	buildRoiFromPointPair,
+	clampZoom,
+	mapCanvasClientPointToPdf,
+	mapPdfPointToCanvasPercent,
+	type PanOffset,
+	type PointProjection,
+} from "./autoDraftCompareViewportController";
 
 if (!GlobalWorkerOptions.workerSrc) {
 	GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -70,42 +100,6 @@ type MarkupReviewDraft = {
 };
 
 const DEFAULT_CALIBRATION_MODE: AutoDraftCalibrationMode = "auto";
-const MARKUP_REVIEW_CATEGORY_OPTIONS = [
-	"",
-	"ADD",
-	"DELETE",
-	"NOTE",
-	"TITLE_BLOCK",
-	"UNCLASSIFIED",
-];
-const MARKUP_REVIEW_CLASS_OPTIONS = [
-	"",
-	"text",
-	"arrow",
-	"cloud",
-	"rectangle",
-	"unknown",
-];
-const MARKUP_REVIEW_COLOR_OPTIONS = [
-	"",
-	"red",
-	"green",
-	"blue",
-	"yellow",
-	"black",
-	"unknown",
-];
-
-type PointProjection = {
-	leftPercent: number;
-	topPercent: number;
-};
-
-type PanOffset = {
-	x: number;
-	y: number;
-};
-
 type PreviewDragState = {
 	startX: number;
 	startY: number;
@@ -115,14 +109,8 @@ type PreviewDragState = {
 };
 
 const PDF_PREVIEW_BASE_SCALE = 1.2;
-const PDF_PREVIEW_MIN_ZOOM = 0.4;
-const PDF_PREVIEW_MAX_ZOOM = 4.0;
 const PDF_PREVIEW_ZOOM_STEP = 1.15;
 const PREVIEW_PAN_THRESHOLD_PX = 6;
-
-function isRecordValue(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function formatMarkupColorDiagnostic(
 	markup: Record<string, unknown>,
@@ -131,7 +119,12 @@ function formatMarkupColorDiagnostic(
 		typeof markup.color === "string" && markup.color.trim().length > 0
 			? markup.color.trim()
 			: "";
-	const meta = isRecordValue(markup.meta) ? markup.meta : null;
+	const meta =
+		typeof markup.meta === "object" &&
+		markup.meta !== null &&
+		!Array.isArray(markup.meta)
+			? (markup.meta as Record<string, unknown>)
+			: null;
 	const colorHex =
 		meta &&
 		typeof meta.color_hex === "string" &&
@@ -151,143 +144,12 @@ function formatMarkupColorDiagnostic(
 	return tokens.join(" | ");
 }
 
-function clampPercent(value: number): number {
-	if (value < 0) return 0;
-	if (value > 100) return 100;
-	return value;
-}
-
-function clampZoom(value: number): number {
-	if (!Number.isFinite(value)) return 1;
-	if (value < PDF_PREVIEW_MIN_ZOOM) return PDF_PREVIEW_MIN_ZOOM;
-	if (value > PDF_PREVIEW_MAX_ZOOM) return PDF_PREVIEW_MAX_ZOOM;
-	return value;
-}
-
-function buildRoiFromPointPair(
-	start: AutoDraftComparePoint,
-	end: AutoDraftComparePoint,
-): AutoDraftCompareRoi {
-	const x = Math.min(start.x, end.x);
-	const y = Math.min(start.y, end.y);
-	const width = Math.max(0.0001, Math.abs(end.x - start.x));
-	const height = Math.max(0.0001, Math.abs(end.y - start.y));
-	return { x, y, width, height };
-}
-
 function toSafeIdToken(value: string): string {
 	const normalized = value
 		.toLowerCase()
 		.replace(/[^a-z0-9_-]+/g, "-")
 		.replace(/^-+|-+$/g, "");
 	return normalized || "item";
-}
-
-function toTrimmedString(value: unknown): string {
-	return typeof value === "string" ? value.trim() : "";
-}
-
-function normalizeMarkupReviewCategory(value: unknown): string {
-	const normalized = toTrimmedString(value).toUpperCase().replace(/[\s-]+/g, "_");
-	return MARKUP_REVIEW_CATEGORY_OPTIONS.includes(normalized) ? normalized : "";
-}
-
-function normalizeMarkupReviewClass(value: unknown): string {
-	const normalized = toTrimmedString(value).toLowerCase();
-	return MARKUP_REVIEW_CLASS_OPTIONS.includes(normalized) ? normalized : "";
-}
-
-function normalizeMarkupReviewColor(value: unknown): string {
-	const normalized = toTrimmedString(value).toLowerCase();
-	return MARKUP_REVIEW_COLOR_OPTIONS.includes(normalized) ? normalized : "";
-}
-
-function getMarkupReviewMarkup(
-	item: AutoDraftCompareResponse["markup_review_queue"][number],
-	action: AutoDraftCompareResponse["plan"]["actions"][number] | undefined,
-): Record<string, unknown> | null {
-	if (item.markup && isRecordValue(item.markup)) {
-		return item.markup;
-	}
-	if (action?.markup && isRecordValue(action.markup)) {
-		return action.markup;
-	}
-	return null;
-}
-
-function buildMarkupReviewDraftDefaults(args: {
-	item: AutoDraftCompareResponse["markup_review_queue"][number];
-	action?: AutoDraftCompareResponse["plan"]["actions"][number];
-	storedDraft?: Partial<MarkupReviewDraft>;
-}): MarkupReviewDraft {
-	const { item, action, storedDraft } = args;
-	const markup = getMarkupReviewMarkup(item, action);
-	return {
-		category:
-			toTrimmedString(storedDraft?.category) ||
-			normalizeMarkupReviewCategory(item.predicted_category || action?.category || ""),
-		markupClass:
-			toTrimmedString(storedDraft?.markupClass) ||
-			normalizeMarkupReviewClass(markup?.type),
-		color:
-			toTrimmedString(storedDraft?.color) ||
-			normalizeMarkupReviewColor(markup?.color),
-		text:
-			typeof storedDraft?.text === "string"
-				? storedDraft.text
-				: typeof markup?.text === "string"
-					? markup.text
-					: "",
-	};
-}
-
-function mapCanvasClientPointToPdf(args: {
-	clientX: number;
-	clientY: number;
-	rect: Pick<DOMRect, "left" | "top" | "width" | "height">;
-	canvasWidth: number;
-	canvasHeight: number;
-	viewport: Pick<PageViewport, "convertToPdfPoint">;
-}): AutoDraftComparePoint | null {
-	const { clientX, clientY, rect, canvasWidth, canvasHeight, viewport } = args;
-	if (
-		canvasWidth <= 0 ||
-		canvasHeight <= 0 ||
-		rect.width <= 0 ||
-		rect.height <= 0
-	) {
-		return null;
-	}
-	const renderX = (clientX - rect.left) * (canvasWidth / rect.width);
-	const renderY = (clientY - rect.top) * (canvasHeight / rect.height);
-	const [pdfX, pdfY] = viewport.convertToPdfPoint(renderX, renderY);
-	if (!Number.isFinite(pdfX) || !Number.isFinite(pdfY)) {
-		return null;
-	}
-	return { x: pdfX, y: pdfY };
-}
-
-function mapPdfPointToCanvasPercent(args: {
-	pdfPoint: AutoDraftComparePoint;
-	canvasWidth: number;
-	canvasHeight: number;
-	viewport: Pick<PageViewport, "convertToViewportPoint">;
-}): PointProjection | null {
-	const { pdfPoint, canvasWidth, canvasHeight, viewport } = args;
-	if (canvasWidth <= 0 || canvasHeight <= 0) {
-		return null;
-	}
-	const [viewportX, viewportY] = viewport.convertToViewportPoint(
-		pdfPoint.x,
-		pdfPoint.y,
-	);
-	if (!Number.isFinite(viewportX) || !Number.isFinite(viewportY)) {
-		return null;
-	}
-	return {
-		leftPercent: clampPercent((viewportX / canvasWidth) * 100),
-		topPercent: clampPercent((viewportY / canvasHeight) * 100),
-	};
 }
 
 export function AutoDraftComparePanel() {
@@ -451,43 +313,30 @@ export function AutoDraftComparePanel() {
 	const setZoomAroundViewportPoint = useCallback(
 		(nextZoomRaw: number, anchor: { x: number; y: number } | null) => {
 			const viewportElement = previewViewportRef.current;
-			const currentZoom = zoom;
 			if (
 				!viewportElement ||
-				!Number.isFinite(currentZoom) ||
-				currentZoom <= 0
+				!Number.isFinite(zoom) ||
+				zoom <= 0
 			) {
 				setZoom(clampZoom(nextZoomRaw));
 				return;
 			}
 
-			const nextZoom = clampZoom(nextZoomRaw);
-			if (Math.abs(nextZoom - currentZoom) < 0.0001) return;
-
-			if (!anchor) {
-				const center = {
-					x: viewportElement.clientWidth / 2,
-					y: viewportElement.clientHeight / 2,
-				};
-				const worldX = (center.x - pan.x) / currentZoom;
-				const worldY = (center.y - pan.y) / currentZoom;
-				setPan({
-					x: center.x - worldX * nextZoom,
-					y: center.y - worldY * nextZoom,
-				});
-				setZoom(nextZoom);
-				return;
-			}
-
-			const worldX = (anchor.x - pan.x) / currentZoom;
-			const worldY = (anchor.y - pan.y) / currentZoom;
-			setPan({
-				x: anchor.x - worldX * nextZoom,
-				y: anchor.y - worldY * nextZoom,
+			const resolved = buildPanForZoomAroundPoint({
+				currentZoom: zoom,
+				nextZoomRaw,
+				pan,
+				anchor,
+				viewportSize: {
+					width: viewportElement.clientWidth,
+					height: viewportElement.clientHeight,
+				},
 			});
-			setZoom(nextZoom);
+			if (!resolved) return;
+			setPan(resolved.nextPan);
+			setZoom(resolved.nextZoom);
 		},
-		[pan.x, pan.y, zoom],
+		[pan, zoom],
 	);
 
 	const zoomIn = useCallback(() => {
@@ -1073,12 +922,18 @@ export function AutoDraftComparePanel() {
 	);
 
 	const runPrepare = useCallback(async () => {
-		if (!pdfFile) {
-			setPrepareError("Choose a PDF file first.");
+		const preflightError = validatePreparePreflight({
+			hasPdfFile: Boolean(pdfFile),
+			pageCount,
+			pageIndex,
+		});
+		if (preflightError) {
+			setPrepareError(preflightError);
 			return;
 		}
-		if (pageCount > 0 && (pageIndex < 0 || pageIndex >= pageCount)) {
-			setPrepareError(`Page number must be between 1 and ${pageCount}.`);
+		const selectedPdfFile = pdfFile;
+		if (!selectedPdfFile) {
+			setPrepareError("Choose a PDF file first.");
 			return;
 		}
 		setLoadingPrepare(true);
@@ -1093,7 +948,7 @@ export function AutoDraftComparePanel() {
 		setFeedbackTransferState(null);
 		try {
 			const nextResult = await autoDraftService.prepareCompare(
-				pdfFile,
+				selectedPdfFile,
 				pageIndex,
 			);
 			setPrepareResult(nextResult);
@@ -1110,40 +965,16 @@ export function AutoDraftComparePanel() {
 	}, [pdfFile, pageCount, pageIndex]);
 
 	const runCompare = useCallback(async () => {
-		if (!prepareResult) {
-			setCompareError("Run prepare first.");
-			return;
-		}
-		const hasCompletePdfPoints = pdfPoints.length === 2;
-		const shouldUseManualPoints = calibrationMode === "manual";
-		let parsedCadPoints: AutoDraftComparePoint[] | null = null;
-
-		if (shouldUseManualPoints) {
-			if (!hasCompletePdfPoints) {
-				setCompareError("Manual calibration needs exactly two PDF points.");
-				return;
-			}
-			parsedCadPoints = parseCadPoints();
-			if (!parsedCadPoints) {
-				setCompareError(
-					"Enter valid CAD X/Y values for both calibration points.",
-				);
-				return;
-			}
-		} else if (manualOverride && hasCompletePdfPoints) {
-			parsedCadPoints = parseCadPoints();
-			if (!parsedCadPoints) {
-				setCompareError(
-					"Manual fallback is enabled, but the CAD X/Y values for both points are invalid.",
-				);
-				return;
-			}
-		}
-		const parsedReplacementTuning = parseReplacementTuning();
-		if (!parsedReplacementTuning) {
-			setCompareError(
-				"Replacement tuning values are invalid. Check thresholds and multiplier ranges.",
-			);
+		const preflight = validateComparePreflight({
+			prepareResult,
+			pdfPoints,
+			calibrationMode,
+			manualOverride,
+			parseCadPoints,
+			parseReplacementTuning,
+		});
+		if (!preflight.ok) {
+			setCompareError(preflight.error || "Compare request failed preflight.");
 			return;
 		}
 
@@ -1156,19 +987,27 @@ export function AutoDraftComparePanel() {
 		setMarkupReviewDraftByActionId({});
 		setFeedbackTransferState(null);
 		try {
-			const result = await autoDraftService.runCompare({
-				engine,
-				toleranceProfile: tolerance,
-				calibrationMode,
-				agentReviewMode: "pre",
-				manualOverride,
-				markups: prepareResult.markups,
-				pdfPoints: parsedCadPoints ? pdfPoints : undefined,
-				cadPoints: parsedCadPoints ?? undefined,
-				roi: roiBounds || undefined,
-				calibrationSeed: prepareResult.calibration_seed,
-				replacementTuning: parsedReplacementTuning,
-			});
+			const readyPrepareResult = prepareResult;
+			if (!readyPrepareResult) {
+				setCompareError("Run prepare first.");
+				return;
+			}
+			const result = await autoDraftService.runCompare(
+				buildCompareExecutionPayload({
+					engine,
+					tolerance,
+					calibrationMode,
+					manualOverride,
+					prepareResult: readyPrepareResult,
+					pdfPoints,
+					cadPoints: preflight.cadPoints,
+					roiBounds,
+					replacementTuning: preflight.replacementTuning as Record<
+						string,
+						unknown
+					>,
+				}),
+			);
 			setCompareResult(result);
 		} catch (error) {
 			setCompareResult(null);
@@ -1321,53 +1160,19 @@ export function AutoDraftComparePanel() {
 			mode: "approve" | "unresolved",
 		) => {
 			if (!compareResult) return;
-			const actionId = String(item.action_id || "").trim();
-			if (!actionId) return;
-			const action = compareActionById.get(actionId);
-			const markup = getMarkupReviewMarkup(item, action);
-			if (!markup) return;
-			const defaults = buildMarkupReviewDraftDefaults({
+			const rawActionId = String(item.action_id || "").trim();
+			if (!rawActionId) return;
+			const action = compareActionById.get(rawActionId);
+			const submission = buildMarkupReviewSubmission({
 				item,
 				action,
-				storedDraft: markupReviewDraftByActionId[actionId],
+				compareRequestId: compareResult.requestId,
+				storedDraft: markupReviewDraftByActionId[rawActionId],
+				note: reviewNoteByActionId[rawActionId] || "",
+				mode,
 			});
-			const predictedCategory = normalizeMarkupReviewCategory(
-				item.predicted_category || action?.category || defaults.category,
-			);
-			const predictedMarkupClass = normalizeMarkupReviewClass(markup.type);
-			const predictedColor = normalizeMarkupReviewColor(markup.color);
-			const predictedText =
-				typeof markup.text === "string" ? markup.text.trim() : "";
-			const nextCategory = normalizeMarkupReviewCategory(defaults.category);
-			const nextMarkupClass = normalizeMarkupReviewClass(defaults.markupClass);
-			const nextColor = normalizeMarkupReviewColor(defaults.color);
-			const nextText = defaults.text.trim();
-			const hasCorrections =
-				nextCategory !== predictedCategory ||
-				nextMarkupClass !== predictedMarkupClass ||
-				nextColor !== predictedColor ||
-				nextText !== predictedText;
-			const reviewStatus =
-				mode === "unresolved"
-					? "unresolved"
-					: hasCorrections
-						? "corrected"
-						: "approved";
-			const markupMeta = isRecordValue(markup.meta) ? markup.meta : null;
-			const markupMetaPairedAnnotationIds =
-				markupMeta && Array.isArray(markupMeta.paired_annotation_ids)
-					? markupMeta.paired_annotation_ids.filter(
-							(entry): entry is string =>
-								typeof entry === "string" && entry.trim().length > 0,
-						)
-					: [];
-			const pairedAnnotationIds = Array.isArray(action?.paired_annotation_ids)
-				? action.paired_annotation_ids.filter(
-						(entry): entry is string =>
-							typeof entry === "string" && entry.trim().length > 0,
-					)
-				: markupMetaPairedAnnotationIds;
-			const note = reviewNoteByActionId[actionId] || "";
+			if (!submission) return;
+			const actionId = submission.actionId;
 
 			setFeedbackStateByActionId((prev) => ({ ...prev, [actionId]: "saving" }));
 			setFeedbackMessageByActionId((prev) => ({ ...prev, [actionId]: "" }));
@@ -1375,55 +1180,7 @@ export function AutoDraftComparePanel() {
 			try {
 				await autoDraftService.submitCompareFeedback({
 					requestId: compareResult.requestId,
-					items: [
-						{
-							request_id: item.request_id || compareResult.requestId,
-							action_id: actionId,
-							review_status: reviewStatus,
-							feedback_type: "markup_learning",
-							new_text: nextText || predictedText,
-							note,
-							markup_id:
-								item.markup_id ||
-								(typeof markup.id === "string" ? markup.id : undefined),
-							markup,
-							predicted_category: predictedCategory || undefined,
-							predicted_action:
-								item.predicted_action || action?.action || undefined,
-							corrected_intent:
-								mode === "unresolved" ||
-								!nextCategory ||
-								nextCategory === predictedCategory
-									? undefined
-									: nextCategory,
-							corrected_markup_class:
-								mode === "unresolved" ||
-								!nextMarkupClass ||
-								nextMarkupClass === predictedMarkupClass
-									? undefined
-									: nextMarkupClass,
-							corrected_color:
-								mode === "unresolved" ||
-								!nextColor ||
-								nextColor === predictedColor
-									? undefined
-									: nextColor,
-							corrected_text:
-								mode === "unresolved" || nextText === predictedText
-									? undefined
-									: nextText,
-							ocr_text:
-								markupMeta &&
-								typeof markupMeta.ocr_text === "string" &&
-								markupMeta.ocr_text.trim().length > 0
-									? markupMeta.ocr_text
-									: undefined,
-							paired_annotation_ids:
-								pairedAnnotationIds.length > 0 ? pairedAnnotationIds : undefined,
-							recognition: item.recognition,
-							override_reason: note || undefined,
-						},
-					],
+					items: [submission.payload],
 				});
 
 				setFeedbackStateByActionId((prev) => ({
@@ -1432,12 +1189,7 @@ export function AutoDraftComparePanel() {
 				}));
 				setFeedbackMessageByActionId((prev) => ({
 					...prev,
-					[actionId]:
-						reviewStatus === "corrected"
-							? "Markup correction saved."
-							: reviewStatus === "approved"
-								? "Markup review approved and saved."
-								: "Markup marked unresolved and saved.",
+					[actionId]: submission.successMessage,
 				}));
 			} catch (error) {
 				setFeedbackStateByActionId((prev) => ({
@@ -1549,13 +1301,17 @@ export function AutoDraftComparePanel() {
 			});
 			const payload = await autoDraftService.exportCompareFeedback();
 			const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-			const blob = new Blob([JSON.stringify(payload, null, 2)], {
+			const pack = buildJsonDownloadPackage(
+				payload,
+				`autodraft-compare-feedback-${stamp}.json`,
+			);
+			const blob = new Blob([pack.text], {
 				type: "application/json",
 			});
 			const url = URL.createObjectURL(blob);
 			const anchor = document.createElement("a");
 			anchor.href = url;
-			anchor.download = `autodraft-compare-feedback-${stamp}.json`;
+			anchor.download = pack.filename;
 			document.body.appendChild(anchor);
 			anchor.click();
 			document.body.removeChild(anchor);
@@ -1588,13 +1344,17 @@ export function AutoDraftComparePanel() {
 				label: pdfFile?.name || compareResult.requestId,
 			});
 			const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-			const blob = new Blob([JSON.stringify(bundle, null, 2)], {
+			const pack = buildJsonDownloadPackage(
+				bundle,
+				`autodraft-reviewed-run-${stamp}.json`,
+			);
+			const blob = new Blob([pack.text], {
 				type: "application/json",
 			});
 			const url = URL.createObjectURL(blob);
 			const anchor = document.createElement("a");
 			anchor.href = url;
-			anchor.download = `autodraft-reviewed-run-${stamp}.json`;
+			anchor.download = pack.filename;
 			document.body.appendChild(anchor);
 			anchor.click();
 			document.body.removeChild(anchor);
@@ -1630,14 +1390,10 @@ export function AutoDraftComparePanel() {
 				});
 				const text = await file.text();
 				const parsed = JSON.parse(text) as Record<string, unknown>;
-				const events = Array.isArray(parsed.events) ? parsed.events : [];
-				const pairs = Array.isArray(parsed.pairs) ? parsed.pairs : [];
-				const metrics = Array.isArray(parsed.metrics) ? parsed.metrics : [];
+				const importPayload = parseCompareFeedbackImportPayload(parsed);
 				const result = await autoDraftService.importCompareFeedback({
 					mode: "merge",
-					events,
-					pairs,
-					metrics,
+					...importPayload,
 				});
 				const imported = result.imported;
 				setFeedbackTransferState({
@@ -1662,12 +1418,15 @@ export function AutoDraftComparePanel() {
 	const exportCompare = useCallback(() => {
 		if (!compareResult) return;
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-		const payload = JSON.stringify(compareResult, null, 2);
-		const blob = new Blob([payload], { type: "application/json" });
+		const pack = buildJsonDownloadPackage(
+			compareResult,
+			`autodraft-compare-${stamp}.json`,
+		);
+		const blob = new Blob([pack.text], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const anchor = document.createElement("a");
 		anchor.href = url;
-		anchor.download = `autodraft-compare-${stamp}.json`;
+		anchor.download = pack.filename;
 		document.body.appendChild(anchor);
 		anchor.click();
 		document.body.removeChild(anchor);
@@ -1677,12 +1436,15 @@ export function AutoDraftComparePanel() {
 	const exportPrepare = useCallback(() => {
 		if (!prepareResult) return;
 		const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-		const payload = JSON.stringify(prepareResult, null, 2);
-		const blob = new Blob([payload], { type: "application/json" });
+		const pack = buildJsonDownloadPackage(
+			prepareResult,
+			`autodraft-prepare-${stamp}.json`,
+		);
+		const blob = new Blob([pack.text], { type: "application/json" });
 		const url = URL.createObjectURL(blob);
 		const anchor = document.createElement("a");
 		anchor.href = url;
-		anchor.download = `autodraft-prepare-${stamp}.json`;
+		anchor.download = pack.filename;
 		document.body.appendChild(anchor);
 		anchor.click();
 		document.body.removeChild(anchor);

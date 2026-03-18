@@ -54,6 +54,7 @@ PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-works
 
 The canonical workstation profile source lives in `tools/suite-repo-mcp/workstation-profiles.json`.
 Human-facing matrix notes live in `docs/development/mcp-workstation-matrix.md`.
+This sync script is the only supported path for stamping `mcp_servers.suite_repo_mcp.env`.
 
 To preview the generated MCP block without writing `~/.codex/config.toml`:
 
@@ -75,6 +76,7 @@ Then restart Codex.
 - The server only operates inside this repo root (`/workspaces/Suite`).
 - Tooling is aligned to your stack (`Biome`, `TypeScript`, `Flask`, `Supabase SQL`).
 - Optional workstation identity env vars are supported: `SUITE_WORKSTATION_ID`, `SUITE_WORKSTATION_LABEL`, `SUITE_WORKSTATION_ROLE`.
+- `repo.check_suite_workstation` provides a combined workstation doctor payload (`ok/workstation/backend/filesystemCollector/autocadCollector/autocadPlugin/autocadReadiness/issues/recommendedActions`).
 - The sync helper also stamps explicit Watchdog filesystem, AutoCAD, plugin, readiness, and backend startup metadata into `mcp_servers.suite_repo_mcp.env`.
 - No Git push/commit automation is included.
 - `repo.generate_route` intentionally does not auto-edit `src/App.tsx`; it returns a registration hint.

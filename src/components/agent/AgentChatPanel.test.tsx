@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { agentService } from "@/services/agentService";
-import type { AgentActivityItem, AgentTaskItem } from "@/services/agentService";
+import type { AgentActivityItem, AgentTaskItem } from "@/services/agent/types";
 import { agentTaskManager } from "@/services/agentTaskManager";
 import { AgentChatPanel } from "./AgentChatPanel";
 

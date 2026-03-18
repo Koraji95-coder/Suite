@@ -14,7 +14,8 @@ import {
 	extractAgentPairingParamsFromLocation,
 } from "@/auth/agentPairingParams";
 import { cn } from "@/lib/utils";
-import { type AgentPairingAction, agentService } from "@/services/agentService";
+import { agentService } from "@/services/agentService";
+import type { AgentPairingAction } from "@/services/agent/types";
 import styles from "./AgentPairingCallbackPage.module.css";
 
 type PairingPhase =

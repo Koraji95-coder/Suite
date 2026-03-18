@@ -3,7 +3,7 @@ import type {
 	AgentTaskItem,
 	AgentTaskPriority,
 	AgentTaskStatus,
-} from "@/services/agentService";
+} from "@/services/agent/types";
 
 const VALID_TASK_STATUSES = new Set<AgentTaskStatus>([
 	"queued",

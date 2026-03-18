@@ -48,7 +48,7 @@ This is a restart/handoff doc summarizing what has already been completed and wh
 
 ### MCP / Workstation Settings TODO
 
-Current local MCP server config is in `C:\Users\DustinWard\.codex\config.toml` under `mcp_servers.suite_repo_mcp.env`.
+Current local MCP server config is in `%USERPROFILE%\.codex\config.toml` under `mcp_servers.suite_repo_mcp.env`.
 
 Current live workstation assumptions:
 
@@ -57,25 +57,22 @@ Current live workstation assumptions:
 - workstation role: `active`
 - current explicit MCP env includes workstation identity plus filesystem collector, AutoCAD collector, plugin, readiness, and backend startup metadata
 - `tools/suite-repo-mcp/workstation-profiles.json` is the versioned workstation profile source-of-truth
-- `scripts/sync-suite-workstation-profile.ps1` rewrites the local `suite_repo_mcp` block without requiring a full mirror restore
+- `scripts/sync-suite-workstation-profile.ps1` is the only supported path to stamp `mcp_servers.suite_repo_mcp.env`
 - `scripts/restore-suite-local-state.ps1` now reuses the shared workstation profile sync helper
 - local watchdog startup/install state on `DUSTINWARD` is expected to use HKCU `Run` fallback when scheduled-task registration is denied
 - AutoCAD readiness can still report `awaiting_autocad` until `tracker-state.json` is emitted on this workstation
 
-Next MCP-setting cleanup tasks:
+MCP workstation prep closeout status:
 
-1. Add a single combined workstation doctor tool to MCP.
-   - It should report backend, filesystem collector, AutoCAD collector, AutoCAD plugin, and tracker-state health in one call.
+1. Combined workstation doctor is available in MCP.
+   - `repo.check_suite_workstation` reports backend, filesystem collector, AutoCAD collector, AutoCAD plugin, and AutoCAD readiness in one normalized payload.
 
-2. Move workstation naming rules into a documented convention.
-   - Lock down collector ids, Run-key names, Scheduled Task names, mutex names, and config-file names so they derive deterministically from workstation id.
+2. Deterministic workstation naming rules are documented in `docs/development/mcp-workstation-matrix.md`.
 
-3. Add restart-required notes for MCP config changes.
+3. Restart-required note is unchanged.
    - Any change to `config.toml` still requires restarting the developer window/Codex session.
-   - This should be stated explicitly in the MCP handoff docs.
 
-4. Add a repo-level guard/check for missing workstation MCP values.
-   - Validate that required startup/check paths exist locally for the current workstation before opening a working session.
+4. The combined doctor reports MCP env stamping drift and startup/readiness issues with recommended actions.
 
 5. Decide whether Dropbox mirror state should be represented in MCP config or stay outside MCP.
    - Current recommendation: keep Dropbox sync operational state outside MCP and keep MCP limited to local tooling and diagnostics.
@@ -196,23 +193,30 @@ Recent milestone commits:
    - Passkey enroll/signin success + failure paths.
    - Pair/unpair challenge expiry, retry throttles, invalid confirm behavior.
 
-## P1 - Continue frontend hotspot cleanup
+## P1 - Continue service/state decomposition
 
-Stage 1 ops-surface splits are in place, and first-pass hotspot seams are now live for login, agent chat, AutoDraft compare, and conduit routing. The next frontend work should stay focused on the largest remaining responsibility collisions:
+The next refactor work should stay focused on the largest remaining responsibility collisions, in this order:
 
-- `src/services/agentService.ts` (~2703 lines)
-  - Split by capability: pairing/catalog, direct transport, orchestration runs, and event-stream parsing.
-- `src/components/apps/conduit-route/ConduitTerminalWorkflow.tsx` (~2688 lines)
-  - Keep pulling CAD preflight/backcheck/sync actions and render sections out of the shell.
-- `src/components/apps/autodraft-studio/AutoDraftComparePanel.tsx` (~2687 lines)
-  - Extract the remaining viewport/canvas controller and review/export sections.
-- `src/components/apps/autodraft-studio/autodraftService.ts` (~2209 lines)
-  - Split compare, learning, and export adapters.
-- `src/components/apps/conduit-route/ConduitRouteApp.tsx` (~1983 lines)
-  - Continue section extraction for obstacle editing, route canvas, crew review, NEC, and section previews.
-- `src/components/apps/ground-grid-generator/useGridGeneratorState.ts` (~916 lines)
-- `src/components/apps/coordinatesgrabber/useCoordinatesGrabberState.ts` (~770 lines)
-- `src/components/apps/transmittal-builder/transmittalBuilderModels.ts` (~593 lines)
+1. `src/services/agentService.ts`
+   - Keep `agentService` as the public facade, but continue moving internals into capability modules for pairing/catalog, transport plumbing, orchestration runs, run-event streaming, and task/review/activity APIs.
+2. `src/components/apps/ground-grid-generator/useGridGeneratorState.ts`
+   - Keep shrinking the root hook until it only coordinates shared cross-panel state; placement, persistence, import/export, and editing history belong in dedicated controllers.
+3. `src/components/apps/coordinatesgrabber/useCoordinatesGrabberState.ts`
+   - Keep moving validation, execution history, backend status, and websocket lifecycle concerns out of the main state hook.
+4. `src/components/apps/conduit-route/ConduitRouteApp.tsx` and `src/components/apps/conduit-route/ConduitTerminalWorkflow.tsx`
+   - Continue pulling CAD preflight/backcheck/sync, obstacle editing, route-canvas interaction, crew review, and terminal workflow logic out of the route shells.
+5. `src/components/apps/autodraft-studio/AutoDraftComparePanel.tsx` and `src/components/apps/autodraft-studio/autodraftService.ts`
+   - Continue extracting compare preparation/execution, review queue state, viewport/canvas interaction, and learning/export adapters until the studio shell is orchestration-only.
+6. Secondary oversized models/hooks
+   - `src/components/apps/transmittal-builder/transmittalBuilderModels.ts`
+   - remaining project manager state shells
+   - any route/service file that architecture hotspots continue to flag after the above splits land
+
+New canonical changelog/history work now lives in the Suite work ledger:
+
+- Route: `/app/changelog`
+- Dashboard module: Work Ledger
+- Publish path: Suite stays canonical; Worktale-style payloads are generated outbound from ledger entries
 
 Frontend refactor target remains the same: thin route/app shells, feature-scoped controller hooks, pure selectors/formatters, and focused presentational sections.
 

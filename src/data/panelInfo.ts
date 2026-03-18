@@ -3,32 +3,32 @@ export const dashboardInfo = {
 	colorScheme: "teal" as const,
 	sections: [
 		{
-			title: "Overview",
+			title: "Command Center Overview",
 			content:
-				"The Dashboard provides a comprehensive view of your active projects, recent activities, calendar events, and storage usage. It serves as the central hub for monitoring all your electrical engineering work.",
+				"The Dashboard is the Suite command center. It combines Watchdog telemetry, architecture hotspots, work ledger history, agent memory, and project operations behind one shared filter model.",
 		},
 		{
-			title: "Key Features",
+			title: "Command Modules",
 			content: [
-				"Active Projects widget showing deadline status and completion progress",
-				"Calendar integration displaying project deadlines and task due dates",
-				"Recent activity feed tracking all system actions",
-				"Storage usage monitoring with real-time updates",
-				"Quick navigation to any project from the dashboard",
+				"Operations and Watchdog telemetry showing collector health, live sessions, and recent events",
+				"Architecture hotspot view highlighting heavy files, module boundaries, and extraction targets",
+				"Work ledger history tied to commits, repo paths, hotspot ids, and project scopes",
+				"Agent memory view combining shared knowledge and profile-specific context",
+				"Project operations summary with direct drill-down into Project Manager",
 			],
 		},
 		{
-			title: "Customization",
+			title: "Using Shared Filters",
 			content: [
-				"Click on any project card to view detailed information",
-				"Calendar dates with deadlines are highlighted in red",
-				"Activity feed updates automatically as you work",
-				"Storage metrics refresh when files are uploaded or deleted",
+				"Filter by project, repo area, collector, agent profile, and time range",
+				"Use focus pills to jump directly to Watchdog, architecture, work ledger, agent memory, or project operations",
+				"Open Graph Explorer for deeper repo inspection without leaving the same architecture data model",
+				"Use project deep links to move from Project Manager into the command center with the correct filters applied",
 			],
 			tips: [
-				"Use the calendar to quickly identify upcoming deadlines",
-				"Click the clock in the header to see current system time",
-				"Activity feed helps track what you worked on recently",
+				"Use `focus=watchdog` or `focus=ledger` links when you need to land on a specific command module",
+				"Watchdog telemetry is canonical on the dashboard; project pages only show scoped summaries",
+				"Ledger entries can link directly into Graph Explorer paths for repo-aware changelog review",
 			],
 		},
 	],

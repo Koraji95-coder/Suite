@@ -9,10 +9,10 @@ import {
 	type PasskeyCapability,
 } from "@/auth/passkeyCapabilityApi";
 import {
-	type AgentPairingAction,
 	AgentPairingRequestError,
 	agentService,
 } from "@/services/agentService";
+import type { AgentPairingAction } from "@/services/agent/types";
 import {
 	logAuthMethodTelemetry,
 	logSecurityEvent,

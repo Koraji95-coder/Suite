@@ -8,6 +8,7 @@ const mockListEvents = vi.hoisted(() => vi.fn());
 const mockListSessions = vi.hoisted(() => vi.fn());
 const mockListCollectors = vi.hoisted(() => vi.fn());
 const mockLoadMemories = vi.hoisted(() => vi.fn());
+const mockFetchWorkLedgerEntries = vi.hoisted(() => vi.fn());
 const mockUseDashboardOverviewData = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/watchdogService", () => ({
@@ -21,6 +22,12 @@ vi.mock("@/services/watchdogService", () => ({
 
 vi.mock("@/lib/agent-memory/service", () => ({
 	loadMemories: mockLoadMemories,
+}));
+
+vi.mock("@/services/workLedgerService", () => ({
+	workLedgerService: {
+		fetchEntries: mockFetchWorkLedgerEntries,
+	},
 }));
 
 vi.mock("./useDashboardOverviewData", () => ({
@@ -203,6 +210,28 @@ describe("DashboardOverviewPanel", () => {
 				agent_profile_id: "koro",
 			},
 		]);
+		mockFetchWorkLedgerEntries.mockResolvedValue({
+			data: [
+				{
+					id: "ledger-1",
+					title: "Refactor agent service facade",
+					summary: "Split orchestration and catalog concerns behind stable facade calls.",
+					source_kind: "git_checkpoint",
+					commit_refs: ["efc4560"],
+					project_id: "project-1",
+					app_area: "agent",
+					architecture_paths: ["src/services/agentService.ts"],
+					hotspot_ids: [],
+					publish_state: "ready",
+					external_reference: null,
+					external_url: null,
+					user_id: "local",
+					created_at: "2026-03-18T00:00:00.000Z",
+					updated_at: "2026-03-18T00:00:00.000Z",
+				},
+			],
+			error: null,
+		});
 	});
 
 	afterEach(() => {
@@ -254,6 +283,8 @@ describe("DashboardOverviewPanel", () => {
 		expect(screen.getByText("Session timeline")).toBeTruthy();
 		expect(screen.getByText("Seq 1")).toBeTruthy();
 		expect(screen.getByText("Telemetry hotspots")).toBeTruthy();
+		expect(screen.getByText("Work Ledger")).toBeTruthy();
+		expect(screen.getByText("Refactor agent service facade")).toBeTruthy();
 		expect(screen.getAllByText("Drawing1.dwg").length).toBeGreaterThan(0);
 	});
 });

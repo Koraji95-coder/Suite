@@ -26,7 +26,6 @@
  */
 
 import {
-	AGENT_PROFILE_IDS,
 	type AgentProfileId,
 	DEFAULT_AGENT_PROFILE,
 	getAgentModelCandidates,
@@ -47,173 +46,67 @@ import {
 } from "../settings/userSettings";
 import { supabase } from "../supabase/client";
 import { isSupabaseConfigured } from "../supabase/utils";
+import { buildPromptForProfile } from "./agentPromptPacks";
+import { fetchAgentProfileCatalog, healthCheckAgent } from "./agent/catalog";
 import {
-	type AgentPromptMode,
-	buildPromptForProfile,
-} from "./agentPromptPacks";
+	cancelBrokerOrchestrationRun,
+	createBrokerOrchestrationRun,
+	getBrokerAgentActivity,
+	getBrokerAgentTask,
+	getBrokerOrchestrationRun,
+	listBrokerAgentTasks,
+	reviewBrokerAgentTask,
+	subscribeBrokerRunEvents,
+} from "./agent/orchestration";
+import {
+	confirmPairingVerificationViaBroker,
+	requestPairingCodeByEmailViaBroker,
+	requestPairingVerificationLinkViaBroker,
+} from "./agent/pairingVerification";
+import {
+	AGENT_PAIRING_STATE_EVENT,
+	type AgentActivityItem,
+	type AgentBrokerErrorDetails,
+	type AgentPairingAction,
+	type AgentPairingRefreshResult,
+	type AgentPairingState,
+	type AgentPairingThrottleSource,
+	type AgentPairingVerificationOptions,
+	type AgentProfileCatalogItem,
+	type AgentResponse,
+	type AgentReviewAction,
+	type AgentRunCreateRequest,
+	type AgentRunEventStream,
+	type AgentRunEventStreamHandlers,
+	type AgentRunSnapshot,
+	type AgentSendOptions,
+	type AgentTask,
+	type AgentTaskItem,
+	type AgentTaskPriority,
+	type AgentTaskStatus,
+	type PythonToolRequest,
+} from "./agent/types";
 import { logSecurityEvent } from "./securityEventService";
-
-export interface AgentResponse {
-	success: boolean;
-	data?: Record<string, unknown>;
-	error?: string;
-	taskId?: string;
-	status?: "pending" | "running" | "complete" | "failed";
-	executionTime?: number;
-}
-
-export interface AgentTask {
-	task: string;
-	params?: Record<string, unknown>;
-	timeout?: number;
-	profileId?: AgentProfileId;
-}
-
-export interface AgentSendOptions {
-	profileId?: AgentProfileId;
-	promptMode?: AgentPromptMode;
-	templateLabel?: string;
-	onStreamUpdate?: (partialResponse: string) => void;
-}
-
-export interface AgentRunCreateRequest {
-	objective: string;
-	profiles?: AgentProfileId[];
-	synthesisProfile?: AgentProfileId;
-	context?: Record<string, unknown>;
-	timeoutMs?: number;
-}
-
-export interface AgentRunEvent {
-	id: number;
-	eventType: string;
-	runId?: string;
-	stage: string;
-	profileId: string;
-	requestId: string;
-	message: string;
-	payload?: Record<string, unknown>;
-	createdAt?: string;
-}
-
-export interface AgentRunSnapshot {
-	runId: string;
-	status: string;
-	requestId: string;
-	steps: Array<Record<string, unknown>>;
-	messages: Array<Record<string, unknown>>;
-	stages: Record<string, unknown>;
-	finalOutput?: string;
-	finalError?: string;
-}
-
-export interface AgentProfileCatalogItem {
-	id: AgentProfileId;
-	name: string;
-	tagline: string;
-	focus: string;
-	memory_namespace: string;
-	model_primary: string;
-	model_fallbacks: string[];
-}
-
-export type AgentTaskStatus =
-	| "queued"
-	| "running"
-	| "awaiting_review"
-	| "approved"
-	| "rework_requested"
-	| "deferred";
-
-export type AgentTaskPriority = "critical" | "high" | "medium" | "low";
-export type AgentReviewAction = "approve" | "rework" | "defer";
-
-export interface AgentTaskItem {
-	taskId: string;
-	runId: string;
-	userId: string;
-	assigneeProfile: string;
-	stage: string;
-	title: string;
-	description: string;
-	priority: AgentTaskPriority;
-	status: AgentTaskStatus;
-	reviewAction?: string;
-	reviewerId?: string;
-	reviewerNote?: string;
-	requestId?: string;
-	createdAt?: string;
-	updatedAt?: string;
-	startedAt?: string;
-	finishedAt?: string;
-}
-
-export interface AgentActivityItem {
-	activityId: string;
-	source: "run" | "task" | "review";
-	eventType: string;
-	runId: string;
-	taskId?: string;
-	profileId?: string;
-	status?: string;
-	priority?: string;
-	stage?: string;
-	requestId: string;
-	message: string;
-	payload?: Record<string, unknown>;
-	createdAt?: string;
-}
-
-export interface AgentRunEventStreamHandlers {
-	onEvent: (event: AgentRunEvent) => void;
-	onOpen?: () => void;
-	onError?: (message: string) => void;
-	onClosed?: () => void;
-	lastEventId?: number;
-}
-
-export interface AgentRunEventStream {
-	close: () => void;
-}
-
-export type AgentPairingAction = "pair" | "unpair";
-export interface AgentPairingVerificationOptions {
-	redirectTo?: string;
-	redirectPath?:
-		| "/login"
-		| "/agent/pairing-callback"
-		| "/app/agent/pairing-callback"
-		| "/app/agent"
-		| "/app/settings";
-}
-
-export type AgentPairingRefreshFailureKind =
-	| "none"
-	| "session-required"
-	| "unauthorized"
-	| "provider-timeout"
-	| "rate-limited"
-	| "server-error"
-	| "network"
-	| "bad-response";
-
-export interface AgentPairingRefreshResult {
-	paired: boolean;
-	ok: boolean;
-	transient: boolean;
-	terminal: boolean;
-	status: number;
-	code: string;
-	message: string;
-	retryAfterSeconds: number;
-	kind: AgentPairingRefreshFailureKind;
-}
-
-export type PythonToolRequest = Record<string, unknown> & {
-	script: string;
-	args: Record<string, unknown>;
-	cwd?: string;
-};
+export { AGENT_PAIRING_STATE_EVENT, AgentPairingRequestError } from "./agent/types";
+export type {
+	AgentActivityItem,
+	AgentPairingAction,
+	AgentPairingRefreshResult,
+	AgentPairingVerificationOptions,
+	AgentProfileCatalogItem,
+	AgentResponse,
+	AgentReviewAction,
+	AgentRunCreateRequest,
+	AgentRunEventStream,
+	AgentRunEventStreamHandlers,
+	AgentRunSnapshot,
+	AgentSendOptions,
+	AgentTask,
+	AgentTaskItem,
+	AgentTaskPriority,
+	AgentTaskStatus,
+	PythonToolRequest,
+} from "./agent/types";
 
 const AGENT_PAIRING_SETTING_KEY = "agent_pairing_state_v1";
 const DEFAULT_RESTORE_WINDOW_HOURS = 24;
@@ -255,46 +148,6 @@ const MAX_AGENT_HEALTH_TIMEOUT_MS = 30_000;
 const DEFAULT_AGENT_STREAM_MAX_MS = 20 * 60 * 1000;
 const MIN_AGENT_STREAM_MAX_MS = 30_000;
 const MAX_AGENT_STREAM_MAX_MS = 60 * 60 * 1000;
-export const AGENT_PAIRING_STATE_EVENT = "suite:agent-pairing-state-changed";
-
-interface AgentPairingState {
-	version: 1;
-	endpoint: string;
-	device: string;
-	token: string;
-	pairedAt: string;
-	updatedAt: string;
-}
-
-type AgentPairingThrottleSource =
-	| "local-abuse"
-	| "supabase"
-	| "none"
-	| "unknown";
-
-interface AgentBrokerErrorDetails {
-	message: string;
-	status: number;
-	retryAfterSeconds: number;
-	reason: string;
-	throttleSource: AgentPairingThrottleSource;
-}
-
-export class AgentPairingRequestError extends Error {
-	readonly status: number;
-	readonly retryAfterSeconds: number;
-	readonly reason: string;
-	readonly throttleSource: AgentPairingThrottleSource;
-
-	constructor(details: AgentBrokerErrorDetails) {
-		super(details.message);
-		this.name = "AgentPairingRequestError";
-		this.status = details.status;
-		this.retryAfterSeconds = details.retryAfterSeconds;
-		this.reason = details.reason;
-		this.throttleSource = details.throttleSource;
-	}
-}
 
 class AgentService {
 	private baseUrl: string;
@@ -701,193 +554,74 @@ class AgentService {
 		pairingCode?: string,
 		options?: AgentPairingVerificationOptions,
 	): Promise<void> {
-		if (!this.useBroker) {
-			throw new Error(
-				"Pairing verification email flow is only available in broker transport mode.",
-			);
-		}
-
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			throw new Error("Supabase session required for brokered pairing.");
-		}
-
-		const payload: Record<string, string> = { action };
-		if (action === "pair") {
-			const code = (pairingCode || "").trim();
-			if (code) {
-				payload.pairing_code = code;
-			}
-		}
-		const redirectTo = (options?.redirectTo || "").trim();
-		if (redirectTo) {
-			payload.redirect_to = redirectTo;
-		}
-		const redirectPath = (options?.redirectPath || "").trim();
-		if (redirectPath) {
-			payload.redirect_path = redirectPath;
-		}
-
-		const response = await fetchWithTimeout(
-			`${this.brokerUrl}/pairing-challenge`,
+		return requestPairingVerificationLinkViaBroker(
 			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${accessToken}`,
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				pairingConfirmInFlight: this.pairingConfirmInFlight,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+				readPairingBrokerError: (response, fallback) =>
+					this.readPairingBrokerError(response, fallback),
+				getBrokerPaired: () => this.brokerPaired,
+				setBrokerPaired: (paired) => {
+					this.brokerPaired = paired;
 				},
-				credentials: "include",
-				body: JSON.stringify(payload),
-				timeoutMs: 20_000,
-				requestName: "Agent pairing challenge request",
+				emitPairingStateChanged: () => this.emitPairingStateChanged(),
+				clearPersistedPairingForActiveUser: () =>
+					this.clearPersistedPairingForActiveUser(),
 			},
+			action,
+			pairingCode,
+			options,
 		);
-
-		if (!response.ok) {
-			const details = await this.readPairingBrokerError(
-				response,
-				"Unable to send verification email for pairing action.",
-			);
-			throw new AgentPairingRequestError(details);
-		}
 	}
 
 	async requestPairingCodeByEmail(
 		options?: AgentPairingVerificationOptions,
 	): Promise<void> {
-		if (!this.useBroker) {
-			throw new Error(
-				"Email pairing-code request is only available in broker transport mode.",
-			);
-		}
-
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			throw new Error("Supabase session required for brokered pairing.");
-		}
-
-		const payload: Record<string, string> = {};
-		const redirectTo = (options?.redirectTo || "").trim();
-		if (redirectTo) {
-			payload.redirect_to = redirectTo;
-		}
-		const redirectPath = (options?.redirectPath || "").trim();
-		if (redirectPath) {
-			payload.redirect_path = redirectPath;
-		}
-
-		const response = await fetchWithTimeout(
-			`${this.brokerUrl}/pairing-code/request`,
+		return requestPairingCodeByEmailViaBroker(
 			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${accessToken}`,
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				pairingConfirmInFlight: this.pairingConfirmInFlight,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+				readPairingBrokerError: (response, fallback) =>
+					this.readPairingBrokerError(response, fallback),
+				getBrokerPaired: () => this.brokerPaired,
+				setBrokerPaired: (paired) => {
+					this.brokerPaired = paired;
 				},
-				credentials: "include",
-				body: JSON.stringify(payload),
-				timeoutMs: 20_000,
-				requestName: "Agent pairing code email request",
+				emitPairingStateChanged: () => this.emitPairingStateChanged(),
+				clearPersistedPairingForActiveUser: () =>
+					this.clearPersistedPairingForActiveUser(),
 			},
+			options,
 		);
-
-		if (!response.ok) {
-			const details = await this.readPairingBrokerError(
-				response,
-				"Unable to request pairing code email.",
-			);
-			throw new AgentPairingRequestError(details);
-		}
 	}
 
 	async confirmPairingVerification(
 		action: AgentPairingAction,
 		challengeId: string,
 	): Promise<boolean> {
-		if (!this.useBroker) {
-			throw new Error(
-				"Pairing verification email flow is only available in broker transport mode.",
-			);
-		}
-
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			throw new Error("Supabase session required for brokered pairing.");
-		}
-
-		const normalizedChallengeId = challengeId.trim();
-		if (!normalizedChallengeId) {
-			throw new Error("challenge_id is required");
-		}
-		const requestKey = `${action}:${normalizedChallengeId}`;
-		const activeRequest = this.pairingConfirmInFlight.get(requestKey);
-		if (activeRequest) {
-			return activeRequest;
-		}
-
-		const inFlight = (async (): Promise<boolean> => {
-			const response = await fetchWithTimeout(
-				`${this.brokerUrl}/pairing-confirm`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${accessToken}`,
-					},
-					credentials: "include",
-					body: JSON.stringify({ challenge_id: normalizedChallengeId }),
-					timeoutMs: 20_000,
-					requestName: "Agent pairing confirm request",
+		return confirmPairingVerificationViaBroker(
+			{
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				pairingConfirmInFlight: this.pairingConfirmInFlight,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+				readPairingBrokerError: (response, fallback) =>
+					this.readPairingBrokerError(response, fallback),
+				getBrokerPaired: () => this.brokerPaired,
+				setBrokerPaired: (paired) => {
+					this.brokerPaired = paired;
 				},
-			);
-
-			if (!response.ok) {
-				const details = await this.readPairingBrokerError(
-					response,
-					"Unable to verify pairing action.",
-				);
-				throw new AgentPairingRequestError(details);
-			}
-
-			const data = (await response.json()) as
-				| { paired?: boolean; action?: AgentPairingAction }
-				| undefined;
-			if (data?.action && data.action !== action) {
-				throw new Error(
-					`Verification action mismatch. Expected ${action}, received ${data.action}.`,
-				);
-			}
-			this.brokerPaired = Boolean(data?.paired);
-
-			if (action === "pair") {
-				await logSecurityEvent(
-					"agent_pair_success",
-					"Agent pair action verified and completed via email challenge.",
-				);
-				this.emitPairingStateChanged();
-			}
-
-			if (action === "unpair") {
-				secureTokenStorage.clearToken();
-				await this.clearPersistedPairingForActiveUser();
-				await logSecurityEvent(
-					"agent_unpair",
-					"Agent unpair action verified and completed via email challenge.",
-				);
-				this.emitPairingStateChanged();
-			}
-
-			return this.brokerPaired;
-		})();
-
-		this.pairingConfirmInFlight.set(requestKey, inFlight);
-		try {
-			return await inFlight;
-		} finally {
-			if (this.pairingConfirmInFlight.get(requestKey) === inFlight) {
-				this.pairingConfirmInFlight.delete(requestKey);
-			}
-		}
+				emitPairingStateChanged: () => this.emitPairingStateChanged(),
+				clearPersistedPairingForActiveUser: () =>
+					this.clearPersistedPairingForActiveUser(),
+			},
+			action,
+			challengeId,
+		);
 	}
 
 	private isTaskAllowedForCurrentUser(taskName: string): boolean {
@@ -2093,61 +1827,18 @@ class AgentService {
 	 * Check if agent is running and healthy
 	 */
 	async healthCheck(): Promise<boolean> {
-		const healthEndpoint = this.useBroker ? this.brokerUrl : this.baseUrl;
-		const timeoutMs = this.resolveHealthCheckTimeoutMs();
-		try {
-			if (this.useBroker) {
-				const accessToken = await this.getSupabaseAccessToken();
-				if (!accessToken) {
-					this.lastHealthError =
-						"Supabase session required for brokered agent access.";
-					return false;
-				}
-
-				const response = await fetchWithTimeout(`${this.brokerUrl}/health`, {
-					method: "GET",
-					headers: {
-						Authorization: `Bearer ${accessToken}`,
-					},
-					credentials: "include",
-					timeoutMs,
-					requestName: "Agent broker health check",
-				});
-
-				const isHealthy = response.ok;
-				this.lastHealthError = isHealthy
-					? null
-					: `Gateway responded with status ${response.status}`;
-				logger.debug(
-					`Agent health check: ${isHealthy ? "healthy" : "unhealthy"}`,
-					"AgentService",
-				);
-				return isHealthy;
-			}
-
-			const response = await fetchWithTimeout(`${this.baseUrl}/health`, {
-				method: "GET",
-				timeoutMs,
-				requestName: "Agent gateway health check",
-			});
-			const isHealthy = response.ok;
-			this.lastHealthError = isHealthy
-				? null
-				: `Gateway responded with status ${response.status}`;
-			logger.debug(
-				`Agent health check: ${isHealthy ? "healthy" : "unhealthy"}`,
-				"AgentService",
-			);
-			return isHealthy;
-		} catch (error) {
-			const message = mapFetchErrorMessage(error, "Unknown connection error");
-			this.lastHealthError = message;
-			logger.warn(
-				`Agent health check unavailable at ${healthEndpoint}: ${message}`,
-				"AgentService",
-			);
-			return false;
-		}
+		return healthCheckAgent(
+			{
+				useBroker: this.useBroker,
+				baseUrl: this.baseUrl,
+				brokerUrl: this.brokerUrl,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+				setLastHealthError: (message) => {
+					this.lastHealthError = message;
+				},
+			},
+			this.resolveHealthCheckTimeoutMs(),
+		);
 	}
 
 	async fetchProfileCatalog(): Promise<{
@@ -2155,83 +1846,11 @@ class AgentService {
 		profiles: AgentProfileCatalogItem[];
 		error?: string;
 	}> {
-		if (!this.useBroker) {
-			return { success: false, profiles: [] };
-		}
-
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			return {
-				success: false,
-				profiles: [],
-				error: "Supabase session required for brokered profile routing metadata.",
-			};
-		}
-
-		try {
-			const response = await fetchWithTimeout(`${this.brokerUrl}/profiles`, {
-				method: "GET",
-				headers: {
-					Authorization: `Bearer ${accessToken}`,
-				},
-				credentials: "include",
-				timeoutMs: 15_000,
-				requestName: "Agent broker profile catalog request",
-			});
-
-			const payload = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			if (!response.ok) {
-				return {
-					success: false,
-					profiles: [],
-					error:
-						String(payload.error || "").trim() ||
-						"Unable to load agent profile metadata.",
-				};
-			}
-
-			const profiles: AgentProfileCatalogItem[] = Array.isArray(payload.profiles)
-				? payload.profiles.reduce<AgentProfileCatalogItem[]>((acc, entry) => {
-						if (!entry || typeof entry !== "object") return acc;
-						const record = entry as Record<string, unknown>;
-						const id = String(record.id || "")
-							.trim()
-							.toLowerCase();
-						if (
-							!id ||
-							!AGENT_PROFILE_IDS.includes(id as AgentProfileId)
-						) {
-							return acc;
-						}
-						acc.push({
-							id: id as AgentProfileId,
-							name: String(record.name || "").trim(),
-							tagline: String(record.tagline || "").trim(),
-							focus: String(record.focus || "").trim(),
-							memory_namespace: String(
-								record.memory_namespace || "",
-							).trim(),
-							model_primary: String(record.model_primary || "").trim(),
-							model_fallbacks: [],
-						});
-						return acc;
-					}, [])
-				: [];
-
-			return { success: true, profiles };
-		} catch (error) {
-			return {
-				success: false,
-				profiles: [],
-				error: mapFetchErrorMessage(
-					error,
-					"Unable to load agent profile metadata.",
-				),
-			};
-		}
+		return fetchAgentProfileCatalog({
+			useBroker: this.useBroker,
+			brokerUrl: this.brokerUrl,
+			getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+		});
 	}
 
 	async createOrchestrationRun(input: AgentRunCreateRequest): Promise<{
@@ -2241,70 +1860,14 @@ class AgentService {
 		requestId?: string;
 		error?: string;
 	}> {
-		if (!this.useBroker) {
-			return {
-				success: false,
-				error:
-					"Agent orchestration runs require broker transport mode (VITE_AGENT_TRANSPORT=backend).",
-			};
-		}
-
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			return {
-				success: false,
-				error: "Supabase session required for orchestration runs.",
-			};
-		}
-
-		try {
-			const response = await fetchWithTimeout(`${this.brokerUrl}/runs`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${accessToken}`,
-				},
-				credentials: "include",
-				body: JSON.stringify({
-					objective: input.objective,
-					profiles: input.profiles,
-					synthesisProfile: input.synthesisProfile,
-					context: input.context ?? {},
-					timeoutMs: input.timeoutMs,
-				}),
-				timeoutMs: 20_000,
-				requestName: "Agent orchestration run create request",
-			});
-
-			const data = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			if (!response.ok) {
-				return {
-					success: false,
-					requestId: String(data.requestId || ""),
-					error:
-						String(data.error || "").trim() ||
-						"Unable to create orchestration run.",
-				};
-			}
-
-			return {
-				success: Boolean(data.success),
-				runId: String(data.runId || ""),
-				status: String(data.status || ""),
-				requestId: String(data.requestId || ""),
-			};
-		} catch (error) {
-			return {
-				success: false,
-				error: mapFetchErrorMessage(
-					error,
-					"Unable to create orchestration run.",
-				),
-			};
-		}
+		return createBrokerOrchestrationRun(
+			{
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			},
+			input,
+		);
 	}
 
 	async getOrchestrationRun(runId: string): Promise<{
@@ -2313,61 +1876,14 @@ class AgentService {
 		requestId?: string;
 		error?: string;
 	}> {
-		if (!this.useBroker) {
-			return {
-				success: false,
-				error:
-					"Agent orchestration runs require broker transport mode (VITE_AGENT_TRANSPORT=backend).",
-			};
-		}
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			return {
-				success: false,
-				error: "Supabase session required for orchestration runs.",
-			};
-		}
-
-		try {
-			const response = await fetchWithTimeout(
-				`${this.brokerUrl}/runs/${encodeURIComponent(runId)}`,
-				{
-					method: "GET",
-					headers: { Authorization: `Bearer ${accessToken}` },
-					credentials: "include",
-					timeoutMs: 20_000,
-					requestName: "Agent orchestration run get request",
-				},
-			);
-
-			const data = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			if (!response.ok) {
-				return {
-					success: false,
-					requestId: String(data.requestId || ""),
-					error:
-						String(data.error || "").trim() ||
-						"Unable to fetch orchestration run.",
-				};
-			}
-
-			return {
-				success: Boolean(data.success),
-				run: (data.run || undefined) as AgentRunSnapshot | undefined,
-				requestId: String(data.requestId || ""),
-			};
-		} catch (error) {
-			return {
-				success: false,
-				error: mapFetchErrorMessage(
-					error,
-					"Unable to fetch orchestration run.",
-				),
-			};
-		}
+		return getBrokerOrchestrationRun(
+			{
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			},
+			runId,
+		);
 	}
 
 	async cancelOrchestrationRun(runId: string): Promise<{
@@ -2376,61 +1892,14 @@ class AgentService {
 		requestId?: string;
 		error?: string;
 	}> {
-		if (!this.useBroker) {
-			return {
-				success: false,
-				error:
-					"Agent orchestration runs require broker transport mode (VITE_AGENT_TRANSPORT=backend).",
-			};
-		}
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			return {
-				success: false,
-				error: "Supabase session required for orchestration runs.",
-			};
-		}
-
-		try {
-			const response = await fetchWithTimeout(
-				`${this.brokerUrl}/runs/${encodeURIComponent(runId)}/cancel`,
-				{
-					method: "POST",
-					headers: { Authorization: `Bearer ${accessToken}` },
-					credentials: "include",
-					timeoutMs: 20_000,
-					requestName: "Agent orchestration run cancel request",
-				},
-			);
-
-			const data = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			if (!response.ok) {
-				return {
-					success: false,
-					requestId: String(data.requestId || ""),
-					error:
-						String(data.error || "").trim() ||
-						"Unable to cancel orchestration run.",
-				};
-			}
-
-			return {
-				success: Boolean(data.success),
-				status: String(data.status || ""),
-				requestId: String(data.requestId || ""),
-			};
-		} catch (error) {
-			return {
-				success: false,
-				error: mapFetchErrorMessage(
-					error,
-					"Unable to cancel orchestration run.",
-				),
-			};
-		}
+		return cancelBrokerOrchestrationRun(
+			{
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			},
+			runId,
+		);
 	}
 
 	async listAgentTasks(filters?: {
@@ -2445,98 +1914,14 @@ class AgentService {
 		requestId?: string;
 		error?: string;
 	}> {
-		if (!this.useBroker) {
-			return {
-				success: false,
-				tasks: [],
-				error:
-					"Agent task workflows require broker transport mode (VITE_AGENT_TRANSPORT=backend).",
-			};
-		}
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			return {
-				success: false,
-				tasks: [],
-				error: "Supabase session required for agent task workflows.",
-			};
-		}
-
-		try {
-			const search = new URLSearchParams();
-			if (filters?.status) {
-				const values = Array.isArray(filters.status)
-					? filters.status
-					: [filters.status];
-				const normalized = values
-					.map((value) => String(value || "").trim())
-					.filter(Boolean);
-				if (normalized.length) {
-					search.set("status", normalized.join(","));
-				}
-			}
-			if (filters?.priority) {
-				search.set("priority", String(filters.priority));
-			}
-			if (filters?.assigneeProfile) {
-				search.set("assigneeProfile", String(filters.assigneeProfile).trim());
-			}
-			if (filters?.runId) {
-				search.set("runId", String(filters.runId).trim());
-			}
-			if (
-				typeof filters?.limit === "number" &&
-				Number.isFinite(filters.limit)
-			) {
-				search.set("limit", String(Math.max(1, Math.trunc(filters.limit))));
-			}
-			const url = `${this.brokerUrl}/tasks${search.toString() ? `?${search.toString()}` : ""}`;
-
-			const response = await fetchWithTimeout(url, {
-				method: "GET",
-				headers: { Authorization: `Bearer ${accessToken}` },
-				credentials: "include",
-				timeoutMs: 20_000,
-				requestName: "Agent task list request",
-			});
-			if (!response.ok) {
-				const message =
-					response.status === 429
-						? "Agent task queue is temporarily rate-limited. Please wait and retry."
-						: await parseResponseErrorMessage(
-								response,
-								"Unable to list agent tasks.",
-							);
-				const data = (await response.json().catch(() => ({}))) as Record<
-					string,
-					unknown
-				>;
-				return {
-					success: false,
-					tasks: [],
-					requestId: String(data.requestId || ""),
-					error: message,
-				};
-			}
-			const data = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			const tasks = Array.isArray(data.tasks)
-				? (data.tasks as AgentTaskItem[])
-				: [];
-			return {
-				success: Boolean(data.success),
-				tasks,
-				requestId: String(data.requestId || ""),
-			};
-		} catch (error) {
-			return {
-				success: false,
-				tasks: [],
-				error: mapFetchErrorMessage(error, "Unable to list agent tasks."),
-			};
-		}
+		return listBrokerAgentTasks(
+			{
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			},
+			filters,
+		);
 	}
 
 	async getAgentTask(taskId: string): Promise<{
@@ -2545,55 +1930,14 @@ class AgentService {
 		requestId?: string;
 		error?: string;
 	}> {
-		if (!this.useBroker) {
-			return {
-				success: false,
-				error:
-					"Agent task workflows require broker transport mode (VITE_AGENT_TRANSPORT=backend).",
-			};
-		}
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			return {
-				success: false,
-				error: "Supabase session required for agent task workflows.",
-			};
-		}
-
-		try {
-			const response = await fetchWithTimeout(
-				`${this.brokerUrl}/tasks/${encodeURIComponent(taskId)}`,
-				{
-					method: "GET",
-					headers: { Authorization: `Bearer ${accessToken}` },
-					credentials: "include",
-					timeoutMs: 20_000,
-					requestName: "Agent task detail request",
-				},
-			);
-			const data = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			if (!response.ok) {
-				return {
-					success: false,
-					requestId: String(data.requestId || ""),
-					error:
-						String(data.error || "").trim() || "Unable to fetch agent task.",
-				};
-			}
-			return {
-				success: Boolean(data.success),
-				task: (data.task || undefined) as AgentTaskItem | undefined,
-				requestId: String(data.requestId || ""),
-			};
-		} catch (error) {
-			return {
-				success: false,
-				error: mapFetchErrorMessage(error, "Unable to fetch agent task."),
-			};
-		}
+		return getBrokerAgentTask(
+			{
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			},
+			taskId,
+		);
 	}
 
 	async reviewAgentTask(
@@ -2606,62 +1950,16 @@ class AgentService {
 		requestId?: string;
 		error?: string;
 	}> {
-		if (!this.useBroker) {
-			return {
-				success: false,
-				error:
-					"Agent task workflows require broker transport mode (VITE_AGENT_TRANSPORT=backend).",
-			};
-		}
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			return {
-				success: false,
-				error: "Supabase session required for agent task workflows.",
-			};
-		}
-
-		try {
-			const response = await fetchWithTimeout(
-				`${this.brokerUrl}/tasks/${encodeURIComponent(taskId)}/review`,
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${accessToken}`,
-					},
-					credentials: "include",
-					body: JSON.stringify({
-						action,
-						note: String(note || "").trim(),
-					}),
-					timeoutMs: 20_000,
-					requestName: "Agent task review request",
-				},
-			);
-			const data = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			if (!response.ok) {
-				return {
-					success: false,
-					requestId: String(data.requestId || ""),
-					error:
-						String(data.error || "").trim() || "Unable to review agent task.",
-				};
-			}
-			return {
-				success: Boolean(data.success),
-				task: (data.task || undefined) as AgentTaskItem | undefined,
-				requestId: String(data.requestId || ""),
-			};
-		} catch (error) {
-			return {
-				success: false,
-				error: mapFetchErrorMessage(error, "Unable to review agent task."),
-			};
-		}
+		return reviewBrokerAgentTask(
+			{
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			},
+			taskId,
+			action,
+			note,
+		);
 	}
 
 	async getAgentActivity(options?: {
@@ -2673,274 +1971,29 @@ class AgentService {
 		requestId?: string;
 		error?: string;
 	}> {
-		if (!this.useBroker) {
-			return {
-				success: false,
-				activity: [],
-				error:
-					"Agent activity requires broker transport mode (VITE_AGENT_TRANSPORT=backend).",
-			};
-		}
-		const accessToken = await this.getSupabaseAccessToken();
-		if (!accessToken) {
-			return {
-				success: false,
-				activity: [],
-				error: "Supabase session required for agent activity.",
-			};
-		}
-
-		try {
-			const search = new URLSearchParams();
-			if (options?.runId) {
-				search.set("runId", String(options.runId).trim());
-			}
-			if (
-				typeof options?.limit === "number" &&
-				Number.isFinite(options.limit)
-			) {
-				search.set("limit", String(Math.max(1, Math.trunc(options.limit))));
-			}
-			const url = `${this.brokerUrl}/activity${search.toString() ? `?${search.toString()}` : ""}`;
-			const response = await fetchWithTimeout(url, {
-				method: "GET",
-				headers: { Authorization: `Bearer ${accessToken}` },
-				credentials: "include",
-				timeoutMs: 20_000,
-				requestName: "Agent activity request",
-			});
-			if (!response.ok) {
-				const message =
-					response.status === 429
-						? "Agent activity feed is temporarily rate-limited. Please wait and retry."
-						: await parseResponseErrorMessage(
-								response,
-								"Unable to load activity.",
-							);
-				const data = (await response.json().catch(() => ({}))) as Record<
-					string,
-					unknown
-				>;
-				return {
-					success: false,
-					activity: [],
-					requestId: String(data.requestId || ""),
-					error: message,
-				};
-			}
-			const data = (await response.json().catch(() => ({}))) as Record<
-				string,
-				unknown
-			>;
-			const activity = Array.isArray(data.activity)
-				? (data.activity as AgentActivityItem[])
-				: [];
-			return {
-				success: Boolean(data.success),
-				activity,
-				requestId: String(data.requestId || ""),
-			};
-		} catch (error) {
-			return {
-				success: false,
-				activity: [],
-				error: mapFetchErrorMessage(error, "Unable to load activity."),
-			};
-		}
+		return getBrokerAgentActivity(
+			{
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			},
+			options,
+		);
 	}
 
 	subscribeOrchestrationRunEvents(
 		runId: string,
 		handlers: AgentRunEventStreamHandlers,
 	): AgentRunEventStream {
-		const abortController = new AbortController();
-		let closed = false;
-		let closedNotified = false;
-
-		const notifyClosed = () => {
-			if (closedNotified) return;
-			closedNotified = true;
-			handlers.onClosed?.();
-		};
-
-		const close = () => {
-			if (closed) return;
-			closed = true;
-			abortController.abort();
-			notifyClosed();
-		};
-
-		if (!this.useBroker) {
-			handlers.onError?.(
-				"Agent orchestration event streaming requires broker transport mode (VITE_AGENT_TRANSPORT=backend).",
-			);
-			notifyClosed();
-			return { close };
-		}
-
-		const normalizedRunId = String(runId || "").trim();
-		if (!normalizedRunId) {
-			handlers.onError?.("Run id is required to stream orchestration events.");
-			notifyClosed();
-			return { close };
-		}
-
-		const parseEventBlock = (block: string): AgentRunEvent | null => {
-			const lines = block.split("\n");
-			let eventType = "message";
-			let rawId = "";
-			const dataLines: string[] = [];
-
-			for (const line of lines) {
-				if (!line || line.startsWith(":")) continue;
-				const separator = line.indexOf(":");
-				const field =
-					separator >= 0 ? line.slice(0, separator).trim() : line.trim();
-				const value =
-					separator >= 0 ? line.slice(separator + 1).trimStart() : "";
-
-				if (field === "event") {
-					eventType = value || eventType;
-					continue;
-				}
-				if (field === "id") {
-					rawId = value;
-					continue;
-				}
-				if (field === "data") {
-					dataLines.push(value);
-				}
-			}
-
-			if (dataLines.length === 0) return null;
-			const dataText = dataLines.join("\n").trim();
-			if (!dataText) return null;
-
-			let parsed: Record<string, unknown> = {};
-			try {
-				const decoded = JSON.parse(dataText) as unknown;
-				if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-					parsed = decoded as Record<string, unknown>;
-				}
-			} catch {
-				parsed = {};
-			}
-
-			const payloadCandidate = parsed.payload;
-			const payload =
-				payloadCandidate &&
-				typeof payloadCandidate === "object" &&
-				!Array.isArray(payloadCandidate)
-					? (payloadCandidate as Record<string, unknown>)
-					: {};
-
-			const numericIdFromPayload = Number(parsed.id ?? 0);
-			const numericIdFromHeader = Number(rawId || 0);
-			const numericId = Number.isFinite(numericIdFromPayload)
-				? numericIdFromPayload
-				: Number.isFinite(numericIdFromHeader)
-					? numericIdFromHeader
-					: 0;
-
-			return {
-				id: numericId > 0 ? numericId : 0,
-				eventType: String(parsed.eventType ?? eventType ?? "message"),
-				runId: String(parsed.runId ?? ""),
-				stage: String(parsed.stage ?? ""),
-				profileId: String(parsed.profileId ?? ""),
-				requestId: String(parsed.requestId ?? ""),
-				message: String(parsed.message ?? ""),
-				payload,
-				createdAt: String(parsed.createdAt ?? ""),
-			};
-		};
-
-		void (async () => {
-			try {
-				const accessToken = await this.getSupabaseAccessToken();
-				if (!accessToken) {
-					handlers.onError?.(
-						"Supabase session required for orchestration event streaming.",
-					);
-					return;
-				}
-
-				const lastEventId = Math.max(0, Number(handlers.lastEventId || 0));
-				const search = new URLSearchParams();
-				if (lastEventId > 0) {
-					search.set("lastEventId", String(lastEventId));
-				}
-				const url = `${this.brokerUrl}/runs/${encodeURIComponent(normalizedRunId)}/events${
-					search.toString() ? `?${search.toString()}` : ""
-				}`;
-
-				const response = await fetch(url, {
-					method: "GET",
-					headers: {
-						Authorization: `Bearer ${accessToken}`,
-						Accept: "text/event-stream",
-					},
-					credentials: "include",
-					signal: abortController.signal,
-				});
-
-				if (!response.ok) {
-					const body = await response.text().catch(() => "");
-					handlers.onError?.(
-						body.trim() ||
-							`Unable to subscribe to orchestration events (status ${response.status}).`,
-					);
-					return;
-				}
-
-				if (!response.body) {
-					handlers.onError?.(
-						"Streaming transport unavailable in this browser environment.",
-					);
-					return;
-				}
-
-				handlers.onOpen?.();
-
-				const reader = response.body.getReader();
-				const decoder = new TextDecoder();
-				let buffer = "";
-
-				while (!closed) {
-					const read = await reader.read();
-					if (read.done) break;
-					buffer += decoder
-						.decode(read.value, { stream: true })
-						.replace(/\r\n/g, "\n")
-						.replace(/\r/g, "\n");
-
-					let separatorIndex = buffer.indexOf("\n\n");
-					while (separatorIndex !== -1) {
-						const block = buffer.slice(0, separatorIndex).trim();
-						buffer = buffer.slice(separatorIndex + 2);
-						separatorIndex = buffer.indexOf("\n\n");
-
-						if (!block) continue;
-						const event = parseEventBlock(block);
-						if (event) {
-							handlers.onEvent(event);
-						}
-					}
-				}
-			} catch (error) {
-				if (abortController.signal.aborted) return;
-				handlers.onError?.(
-					mapFetchErrorMessage(
-						error,
-						"Orchestration event stream disconnected unexpectedly.",
-					),
-				);
-			} finally {
-				notifyClosed();
-			}
-		})();
-
-		return { close };
+		return subscribeBrokerRunEvents(
+			{
+				useBroker: this.useBroker,
+				brokerUrl: this.brokerUrl,
+				getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			},
+			runId,
+			handlers,
+		);
 	}
 }
 

@@ -61,6 +61,16 @@ const TIME_WINDOW_OPTIONS = [
 	{ value: "168", label: "7 days" },
 ] as const;
 
+type FocusPillOption = DashboardFocus | "all";
+
+const FOCUS_PILL_OPTIONS: ReadonlyArray<{ value: FocusPillOption; label: string }> = [
+	{ value: "all", label: "Unified view" },
+	{ value: "watchdog", label: "Watchdog" },
+	{ value: "architecture", label: "Architecture" },
+	{ value: "memory", label: "Agent memory" },
+	{ value: "projects", label: "Project ops" },
+];
+
 function matchesQuery(query: string, values: Array<string | undefined | null>) {
 	if (!query) return true;
 	return values.some((value) =>
@@ -595,124 +605,171 @@ export function DashboardOverviewPanel({
 				</div>
 			</section>
 
-			<section className={styles.filters}>
-				<div className={styles.filterField}>
-					<label htmlFor="dashboard-project-filter" className={styles.filterLabel}>
-						Project
-					</label>
-					<select
-						id="dashboard-project-filter"
-						value={selectedProjectId}
-						onChange={(event) => updateFilter("project", event.target.value)}
-						className={styles.select}
-						name="dashboard_project_filter"
-					>
-						<option value="all">All projects</option>
-						{projects.map((project) => (
-							<option key={project.id} value={project.id}>
-								{project.name}
-							</option>
-						))}
-					</select>
-				</div>
+			<div className={styles.commandFrame}>
+				<section className={styles.filterPanel}>
+					<div className={styles.filterHeader}>
+						<div>
+							<Text size="xs" weight="semibold">
+								Focus filters
+							</Text>
+							<Text size="xs" color="muted">
+								Search across telemetry, architecture, memory, and project data.
+							</Text>
+						</div>
+						<Button
+							variant="ghost"
+							size="xs"
+							onClick={() => setRefreshKey((value) => value + 1)}
+							iconLeft={<RefreshCw size={12} />}
+						>
+							Resync
+						</Button>
+					</div>
 
-				<div className={styles.filterField}>
-					<label htmlFor="dashboard-domain-filter" className={styles.filterLabel}>
-						Repo area
-					</label>
-					<select
-						id="dashboard-domain-filter"
-						value={selectedDomain}
-						onChange={(event) => updateFilter("domain", event.target.value)}
-						className={styles.select}
-						name="dashboard_domain_filter"
-					>
-						<option value="all">All domains</option>
-						{ARCHITECTURE_DOMAINS.map((domain) => (
-							<option key={domain.id} value={domain.id}>
-								{domain.label}
-							</option>
-						))}
-					</select>
-				</div>
+					<section className={styles.filters}>
+						<div className={styles.filterField}>
+							<label htmlFor="dashboard-project-filter" className={styles.filterLabel}>
+								Project
+							</label>
+							<select
+								id="dashboard-project-filter"
+								value={selectedProjectId}
+								onChange={(event) => updateFilter("project", event.target.value)}
+								className={styles.select}
+								name="dashboard_project_filter"
+							>
+								<option value="all">All projects</option>
+								{projects.map((project) => (
+									<option key={project.id} value={project.id}>
+										{project.name}
+									</option>
+								))}
+							</select>
+						</div>
 
-				<div className={styles.filterField}>
-					<label htmlFor="dashboard-agent-filter" className={styles.filterLabel}>
-						Agent
-					</label>
-					<select
-						id="dashboard-agent-filter"
-						value={selectedAgent}
-						onChange={(event) => updateFilter("agent", event.target.value)}
-						className={styles.select}
-						name="dashboard_agent_filter"
-					>
-						<option value="all">All agents</option>
-						{AGENT_PROFILE_IDS.map((profileId) => (
-							<option key={profileId} value={profileId}>
-								{AGENT_PROFILES[profileId].name}
-							</option>
-						))}
-					</select>
-				</div>
+						<div className={styles.filterField}>
+							<label htmlFor="dashboard-domain-filter" className={styles.filterLabel}>
+								Repo area
+							</label>
+							<select
+								id="dashboard-domain-filter"
+								value={selectedDomain}
+								onChange={(event) => updateFilter("domain", event.target.value)}
+								className={styles.select}
+								name="dashboard_domain_filter"
+							>
+								<option value="all">All domains</option>
+								{ARCHITECTURE_DOMAINS.map((domain) => (
+									<option key={domain.id} value={domain.id}>
+										{domain.label}
+									</option>
+								))}
+							</select>
+						</div>
 
-				<div className={styles.filterField}>
-					<label htmlFor="dashboard-collector-filter" className={styles.filterLabel}>
-						Collector
-					</label>
-					<select
-						id="dashboard-collector-filter"
-						value={selectedCollectorId}
-						onChange={(event) => updateFilter("collector", event.target.value)}
-						className={styles.select}
-						name="dashboard_collector_filter"
-					>
-						<option value="all">All collectors</option>
-						{filteredCollectorOptions.map((collector) => (
-							<option key={collector.collectorId} value={collector.collectorId}>
-								{collector.name}
-							</option>
-						))}
-					</select>
-				</div>
+						<div className={styles.filterField}>
+							<label htmlFor="dashboard-agent-filter" className={styles.filterLabel}>
+								Agent
+							</label>
+							<select
+								id="dashboard-agent-filter"
+								value={selectedAgent}
+								onChange={(event) => updateFilter("agent", event.target.value)}
+								className={styles.select}
+								name="dashboard_agent_filter"
+							>
+								<option value="all">All agents</option>
+								{AGENT_PROFILE_IDS.map((profileId) => (
+									<option key={profileId} value={profileId}>
+										{AGENT_PROFILES[profileId].name}
+									</option>
+								))}
+							</select>
+						</div>
 
-				<div className={styles.filterField}>
-					<label htmlFor="dashboard-window-filter" className={styles.filterLabel}>
-						Time range
-					</label>
-					<select
-						id="dashboard-window-filter"
-						value={selectedWindowHours}
-						onChange={(event) => updateFilter("window", event.target.value)}
-						className={styles.select}
-						name="dashboard_window_filter"
-					>
-						{TIME_WINDOW_OPTIONS.map((option) => (
-							<option key={option.value} value={option.value}>
-								{option.label}
-							</option>
-						))}
-					</select>
-				</div>
+						<div className={styles.filterField}>
+							<label htmlFor="dashboard-collector-filter" className={styles.filterLabel}>
+								Collector
+							</label>
+							<select
+								id="dashboard-collector-filter"
+								value={selectedCollectorId}
+								onChange={(event) => updateFilter("collector", event.target.value)}
+								className={styles.select}
+								name="dashboard_collector_filter"
+							>
+								<option value="all">All collectors</option>
+								{filteredCollectorOptions.map((collector) => (
+									<option key={collector.collectorId} value={collector.collectorId}>
+										{collector.name}
+									</option>
+								))}
+							</select>
+						</div>
 
-				<div className={styles.filterFieldWide}>
-					<label htmlFor="dashboard-query-filter" className={styles.filterLabel}>
-						Search
-					</label>
-					<input
-						id="dashboard-query-filter"
-						type="search"
-						value={searchValue}
-						onChange={(event) => updateFilter("query", event.target.value)}
-						placeholder="Search projects, files, memories, and actions..."
-						className={styles.searchInput}
-						name="dashboard_query_filter"
-					/>
-				</div>
-			</section>
+						<div className={styles.filterField}>
+							<label htmlFor="dashboard-window-filter" className={styles.filterLabel}>
+								Time range
+							</label>
+							<select
+								id="dashboard-window-filter"
+								value={selectedWindowHours}
+								onChange={(event) => updateFilter("window", event.target.value)}
+								className={styles.select}
+								name="dashboard_window_filter"
+							>
+								{TIME_WINDOW_OPTIONS.map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+						</div>
 
-			<section className={styles.statsGrid}>
-				<Panel variant="default" padding="md" className={styles.statCard}>
+						<div className={styles.filterFieldWide}>
+							<label htmlFor="dashboard-query-filter" className={styles.filterLabel}>
+								Search
+							</label>
+							<input
+								id="dashboard-query-filter"
+								type="search"
+								value={searchValue}
+								onChange={(event) => updateFilter("query", event.target.value)}
+								placeholder="Search projects, files, memories, and actions..."
+								className={styles.searchInput}
+								name="dashboard_query_filter"
+							/>
+						</div>
+					</section>
+
+					<div className={styles.focusPills}>
+						{FOCUS_PILL_OPTIONS.map((option) => {
+							const isActive =
+								(option.value === "all" && !selectedFocus) ||
+								(option.value !== "all" && selectedFocus === option.value);
+							return (
+								<button
+									key={option.value}
+									type="button"
+									className={`${styles.focusPill} ${
+										isActive ? styles.focusPillActive : ""
+									}`}
+									onClick={() =>
+										updateFilter(
+											"focus",
+											option.value === "all" ? "" : option.value,
+										)
+									}
+								>
+									{option.label}
+								</button>
+							);
+						})}
+					</div>
+				</section>
+
+				<section className={styles.statsGrid}>
+					<Panel variant="default" padding="md" className={styles.statCard}>
 					<div className={styles.statIcon}>
 						<FolderKanban size={16} />
 					</div>
@@ -760,7 +817,7 @@ export function DashboardOverviewPanel({
 				</Panel>
 			</section>
 
-			<div className={styles.commandGrid}>
+			<div className={styles.moduleGrid}>
 				<Panel
 					variant="default"
 					padding="lg"
@@ -1491,5 +1548,6 @@ export function DashboardOverviewPanel({
 				</Panel>
 			</div>
 		</div>
+	</div>
 	);
 }

@@ -26,24 +26,15 @@
  */
 
 import {
-	type AgentProfileId,
 	DEFAULT_AGENT_PROFILE,
-	getAgentModelCandidates,
 } from "../components/agent/agentProfiles";
 import { isDevAdminEmail } from "../lib/devAccess";
 import {
 	fetchWithTimeout,
-	isFetchRequestError,
-	mapFetchErrorMessage,
 	parseResponseErrorMessage,
 } from "../lib/fetchWithTimeout";
 import { logger } from "../lib/logger";
 import { secureTokenStorage } from "../lib/secureTokenStorage";
-import {
-	deleteSetting,
-	loadSetting,
-	saveSetting,
-} from "../settings/userSettings";
 import { supabase } from "../supabase/client";
 import { isSupabaseConfigured } from "../supabase/utils";
 import { buildPromptForProfile } from "./agentPromptPacks";
@@ -59,17 +50,26 @@ import {
 	subscribeBrokerRunEvents,
 } from "./agent/orchestration";
 import {
+	clearPersistedDirectPairingForUser,
+	persistDirectPairingForUser,
+	refreshBrokerPairingStatusDetailed,
+	restoreDirectPairingForUser,
+} from "./agent/pairingSession";
+import {
 	confirmPairingVerificationViaBroker,
 	requestPairingCodeByEmailViaBroker,
 	requestPairingVerificationLinkViaBroker,
 } from "./agent/pairingVerification";
+import {
+	cancelActiveDirectChatRequest,
+	makeAgentRequest,
+} from "./agent/requestTransport";
 import {
 	AGENT_PAIRING_STATE_EVENT,
 	type AgentActivityItem,
 	type AgentBrokerErrorDetails,
 	type AgentPairingAction,
 	type AgentPairingRefreshResult,
-	type AgentPairingState,
 	type AgentPairingThrottleSource,
 	type AgentPairingVerificationOptions,
 	type AgentProfileCatalogItem,
@@ -108,36 +108,6 @@ export type {
 	PythonToolRequest,
 } from "./agent/types";
 
-const AGENT_PAIRING_SETTING_KEY = "agent_pairing_state_v1";
-const DEFAULT_RESTORE_WINDOW_HOURS = 24;
-const MAX_RESTORE_WINDOW_HOURS = 24 * 30;
-const NO_EXPIRY_ENV_TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
-
-function isTrueEnvValue(rawValue: string | undefined): boolean {
-	return NO_EXPIRY_ENV_TRUE_VALUES.has(
-		String(rawValue || "")
-			.trim()
-			.toLowerCase(),
-	);
-}
-
-function resolvePairingRestoreWindowMs(): number {
-	const rawValue = Number(
-		String(
-			import.meta.env.VITE_AGENT_PAIRING_RESTORE_WINDOW_HOURS || "",
-		).trim(),
-	);
-	const normalizedHours =
-		Number.isFinite(rawValue) && rawValue > 0
-			? Math.min(MAX_RESTORE_WINDOW_HOURS, Math.max(1, Math.trunc(rawValue)))
-			: DEFAULT_RESTORE_WINDOW_HOURS;
-	return normalizedHours * 60 * 60 * 1000;
-}
-
-const MAX_RESTORE_AGE_MS = resolvePairingRestoreWindowMs();
-const PAIRING_RESTORE_NO_EXPIRY = isTrueEnvValue(
-	import.meta.env.VITE_AGENT_PAIRING_RESTORE_NO_EXPIRY,
-);
 const AGENT_SESSION_RETRY_AFTER_MAX_SECONDS = 120;
 const SUPABASE_SESSION_LOOKUP_TIMEOUT_MS = 8_000;
 const DEFAULT_AGENT_CONNECT_TIMEOUT_MS = 30_000;
@@ -351,32 +321,6 @@ class AgentService {
 		return parseResponseErrorMessage(response, fallback);
 	}
 
-	private formatAgentGatewayFailureMessage(
-		status: number,
-		details: string,
-	): string {
-		const message = String(details || "").trim();
-		if (message && !/internal server error/i.test(message)) {
-			if (status >= 500 && /llm request failed/i.test(message)) {
-				return (
-					"Agent model request failed in the gateway. " +
-					"Try another agent/profile or restart the gateway/provider runtime."
-				);
-			}
-			return message;
-		}
-		if (status >= 500) {
-			return (
-				"Agent request failed in the gateway/provider runtime. " +
-				"Try another profile or restart gateway/provider services."
-			);
-		}
-		if (status === 429) {
-			return "Agent request is rate-limited. Please retry in a few seconds.";
-		}
-		return message || `Agent request failed (status ${status}).`;
-	}
-
 	private parsePositiveInteger(value: unknown): number {
 		if (typeof value === "number" && Number.isFinite(value)) {
 			return Math.max(0, Math.trunc(value));
@@ -454,6 +398,66 @@ class AgentService {
 	private emitPairingStateChanged(): void {
 		if (typeof window === "undefined") return;
 		window.dispatchEvent(new CustomEvent(AGENT_PAIRING_STATE_EVENT));
+	}
+
+	private getDirectPairingContext() {
+		return {
+			useBroker: this.useBroker,
+			baseUrl: this.baseUrl,
+			activeUserId: this.activeUserId,
+			checkPairing: () => this.checkPairing(),
+		};
+	}
+
+	private getBrokerPairingRefreshContext() {
+		return {
+			useBroker: this.useBroker,
+			brokerUrl: this.brokerUrl,
+			getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			getBrokerPaired: () => this.brokerPaired,
+			setBrokerPaired: (paired: boolean) => {
+				this.brokerPaired = paired;
+			},
+			getPairingRefreshInFlight: () => this.pairingRefreshInFlight,
+			setPairingRefreshInFlight: (
+				promise: Promise<AgentPairingRefreshResult> | null,
+			) => {
+				this.pairingRefreshInFlight = promise;
+			},
+			readSessionBrokerError: (response: Response) =>
+				this.readSessionBrokerError(response),
+		};
+	}
+
+	private getRequestTransportContext() {
+		return {
+			useBroker: this.useBroker,
+			baseUrl: this.baseUrl,
+			brokerUrl: this.brokerUrl,
+			getSupabaseAccessToken: () => this.getSupabaseAccessToken(),
+			refreshPairingStatus: () => this.refreshPairingStatus(),
+			checkPairing: () => this.checkPairing(),
+			getToken: () => this.getToken(),
+			unpair: () => this.unpair(),
+			shouldRequireWebhookSecret: () => this.shouldRequireWebhookSecret(),
+			resolveDirectConnectTimeoutMs: (taskTimeout?: number) =>
+				this.resolveDirectConnectTimeoutMs(taskTimeout),
+			resolveDirectStreamMaxMs: () => this.resolveDirectStreamMaxMs(),
+			getActiveDirectChatAbortController: () =>
+				this.activeDirectChatAbortController,
+			setActiveDirectChatAbortController: (
+				controller: AbortController | null,
+			) => {
+				this.activeDirectChatAbortController = controller;
+			},
+			getActiveDirectChatCancelledByUser: () =>
+				this.activeDirectChatCancelledByUser,
+			setActiveDirectChatCancelledByUser: (cancelled: boolean) => {
+				this.activeDirectChatCancelledByUser = cancelled;
+			},
+			isTaskAllowedForCurrentUser: (taskName: string) =>
+				this.isTaskAllowedForCurrentUser(taskName),
+		};
 	}
 
 	private normalizePairingThrottleSource(
@@ -656,108 +660,15 @@ class AgentService {
 			return { restored: false, reason: "no-server-session" };
 		}
 
-		if (!this.activeUserId) {
-			await logSecurityEvent(
-				"agent_restore_failed",
-				"Agent restore skipped: no active user.",
-			);
-			return { restored: false, reason: "no-active-user" };
-		}
-
-		if (this.checkPairing()) {
-			return { restored: true, reason: "already-paired" };
-		}
-
-		const saved = await loadSetting<AgentPairingState | null>(
-			AGENT_PAIRING_SETTING_KEY,
-			null,
-			null,
-		);
-
-		if (!saved) {
-			await logSecurityEvent(
-				"agent_restore_failed",
-				"Agent restore skipped: no saved pairing.",
-			);
-			return { restored: false, reason: "no-saved-pairing" };
-		}
-
-		if (
-			saved.version !== 1 ||
-			saved.endpoint !== this.baseUrl ||
-			saved.device !== secureTokenStorage.getDeviceFingerprint() ||
-			typeof saved.token !== "string"
-		) {
-			await this.clearPersistedPairingForActiveUser();
-			await logSecurityEvent(
-				"agent_restore_failed",
-				"Agent restore failed: saved pairing did not match device or endpoint.",
-			);
-			return { restored: false, reason: "invalid-saved-pairing" };
-		}
-
-		if (!PAIRING_RESTORE_NO_EXPIRY) {
-			const updatedAt = Date.parse(saved.updatedAt);
-			if (
-				!Number.isFinite(updatedAt) ||
-				Date.now() - updatedAt > MAX_RESTORE_AGE_MS
-			) {
-				await this.clearPersistedPairingForActiveUser();
-				await logSecurityEvent(
-					"agent_restore_failed",
-					"Agent restore failed: trusted pairing window expired.",
-				);
-				return { restored: false, reason: "restore-window-expired" };
-			}
-		}
-
-		const imported = secureTokenStorage.importOpaqueToken(saved.token);
-		if (!imported) {
-			await this.clearPersistedPairingForActiveUser();
-			await logSecurityEvent(
-				"agent_restore_failed",
-				"Agent restore failed: saved token expired or invalid.",
-			);
-			return { restored: false, reason: "expired-or-invalid-token" };
-		}
-
-		await logSecurityEvent(
-			"agent_restore_success",
-			"Agent pairing restored for trusted device.",
-		);
-
-		return { restored: true, reason: "restored" };
+		return restoreDirectPairingForUser(this.getDirectPairingContext());
 	}
 
 	private async persistPairingForActiveUser(): Promise<void> {
-		if (this.useBroker) return;
-		if (!this.activeUserId) return;
-
-		const token = secureTokenStorage.exportOpaqueToken();
-		if (!token) return;
-
-		const timestamp = new Date().toISOString();
-		const payload: AgentPairingState = {
-			version: 1,
-			endpoint: this.baseUrl,
-			device: secureTokenStorage.getDeviceFingerprint(),
-			token,
-			pairedAt: timestamp,
-			updatedAt: timestamp,
-		};
-
-		const result = await saveSetting(AGENT_PAIRING_SETTING_KEY, payload, null);
-		if (!result.success) {
-			logger.warn("Failed to persist agent pairing state", "AgentService", {
-				error: result.error,
-			});
-		}
+		await persistDirectPairingForUser(this.getDirectPairingContext());
 	}
 
 	private async clearPersistedPairingForActiveUser(): Promise<void> {
-		if (this.useBroker) return;
-		if (!this.activeUserId) return;
-		await deleteSetting(AGENT_PAIRING_SETTING_KEY, null);
+		await clearPersistedDirectPairingForUser(this.getDirectPairingContext());
 	}
 
 	/**
@@ -881,142 +792,9 @@ class AgentService {
 			};
 		}
 
-		if (this.pairingRefreshInFlight) {
-			return this.pairingRefreshInFlight;
-		}
-
-		const inFlight = (async (): Promise<AgentPairingRefreshResult> => {
-			const accessToken = await this.getSupabaseAccessToken();
-			if (!accessToken) {
-				this.brokerPaired = false;
-				return {
-					paired: false,
-					ok: false,
-					transient: false,
-					terminal: true,
-					status: 401,
-					code: "AUTH_REQUIRED",
-					message: "Supabase session required for brokered agent access.",
-					retryAfterSeconds: 0,
-					kind: "session-required",
-				};
-			}
-
-			try {
-				const response = await fetchWithTimeout(`${this.brokerUrl}/session`, {
-					method: "GET",
-					headers: {
-						Authorization: `Bearer ${accessToken}`,
-					},
-					credentials: "include",
-					timeoutMs: 15_000,
-					requestName: "Agent broker pairing session request",
-				});
-
-				if (response.ok) {
-					const data = (await response.json()) as { paired?: boolean } | null;
-					this.brokerPaired = Boolean(data?.paired);
-					return {
-						paired: this.brokerPaired,
-						ok: true,
-						transient: false,
-						terminal: false,
-						status: response.status,
-						code: "OK",
-						message: "",
-						retryAfterSeconds: 0,
-						kind: "none",
-					};
-				}
-
-				const errorPayload = await this.readSessionBrokerError(response);
-				const isUnauthorized =
-					response.status === 401 || response.status === 403;
-				const isProviderTimeout =
-					response.status === 503 &&
-					(errorPayload.code === "AUTH_PROVIDER_TIMEOUT" ||
-						errorPayload.retryable);
-				const isRateLimited = response.status === 429;
-				const isTransient =
-					isRateLimited || isProviderTimeout || response.status >= 500;
-
-				if (isUnauthorized) {
-					this.brokerPaired = false;
-					return {
-						paired: false,
-						ok: false,
-						transient: false,
-						terminal: true,
-						status: response.status,
-						code: errorPayload.code || "AUTH_INVALID",
-						message:
-							errorPayload.message || "Invalid or expired Supabase token.",
-						retryAfterSeconds: 0,
-						kind: "unauthorized",
-					};
-				}
-
-				if (!isTransient) {
-					this.brokerPaired = false;
-				}
-
-				const code = errorPayload.code
-					? errorPayload.code
-					: isRateLimited
-						? "AGENT_SESSION_RATE_LIMITED"
-						: isProviderTimeout
-							? "AUTH_PROVIDER_TIMEOUT"
-							: response.status >= 500
-								? "AGENT_SESSION_SERVER_ERROR"
-								: "AGENT_SESSION_INVALID";
-
-				return {
-					paired: isTransient ? this.brokerPaired : false,
-					ok: false,
-					transient: isTransient,
-					terminal: !isTransient,
-					status: response.status,
-					code,
-					message: errorPayload.message,
-					retryAfterSeconds: errorPayload.retryAfterSeconds,
-					kind: isRateLimited
-						? "rate-limited"
-						: isProviderTimeout
-							? "provider-timeout"
-							: response.status >= 500
-								? "server-error"
-								: "bad-response",
-				};
-			} catch (error) {
-				logger.warn(
-					"Failed to refresh broker pairing status; keeping prior state.",
-					"AgentService",
-					{
-						error,
-					},
-				);
-				return {
-					paired: this.brokerPaired,
-					ok: false,
-					transient: true,
-					terminal: false,
-					status: 0,
-					code: "AGENT_SESSION_NETWORK_ERROR",
-					message: "Unable to refresh pairing status right now.",
-					retryAfterSeconds: 0,
-					kind: "network",
-				};
-			}
-		})();
-
-		this.pairingRefreshInFlight = inFlight;
-		try {
-			return await inFlight;
-		} finally {
-			if (this.pairingRefreshInFlight === inFlight) {
-				this.pairingRefreshInFlight = null;
-			}
-		}
+		return refreshBrokerPairingStatusDetailed(
+			this.getBrokerPairingRefreshContext(),
+		);
 	}
 
 	/**
@@ -1105,12 +883,7 @@ class AgentService {
 	}
 
 	cancelActiveRequest(): boolean {
-		if (!this.activeDirectChatAbortController) {
-			return false;
-		}
-		this.activeDirectChatCancelledByUser = true;
-		this.activeDirectChatAbortController.abort();
-		return true;
+		return cancelActiveDirectChatRequest(this.getRequestTransportContext());
 	}
 
 	/**
@@ -1284,543 +1057,11 @@ class AgentService {
 			`Generate a ${specs.type} document based on: ${JSON.stringify(specs.data)}`,
 		);
 	}
-
-	private async makeDirectChatStreamRequest(args: {
-		task: AgentTask;
-		profileId: AgentProfileId;
-		modelCandidates: string[];
-		headers: Record<string, string>;
-		startTime: number;
-		options?: AgentSendOptions;
-	}): Promise<AgentResponse> {
-		const { task, profileId, modelCandidates, headers, startTime, options } =
-			args;
-		const connectTimeoutMs = this.resolveDirectConnectTimeoutMs(task.timeout);
-		const streamMaxMs = this.resolveDirectStreamMaxMs();
-		const model = modelCandidates[0] || "";
-		const chatMessage =
-			typeof task.params?.message === "string" && task.params.message.trim()
-				? task.params.message
-				: JSON.stringify(task);
-		const payload: Record<string, unknown> = {
-			message: chatMessage,
-			profile_id: profileId,
-			stream: true,
-		};
-		if (model) {
-			payload.model = model;
-		}
-
-		const abortController = new AbortController();
-		this.activeDirectChatCancelledByUser = false;
-		this.activeDirectChatAbortController = abortController;
-		let streamTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
-		let streamTimedOut = false;
-		let streamedResponse = "";
-		let streamModel = model;
-		let streamError = "";
-		let streamDone = false;
-
-		const applyStreamPayload = (payloadValue: string) => {
-			const trimmed = payloadValue.trim();
-			if (!trimmed) return;
-			if (trimmed === "[DONE]") {
-				streamDone = true;
-				return;
-			}
-
-			try {
-				const decoded = JSON.parse(trimmed) as {
-					delta?: string;
-					response?: string;
-					model?: string;
-					error?: string;
-				} | null;
-				if (!decoded || typeof decoded !== "object") {
-					return;
-				}
-				if (typeof decoded.model === "string" && decoded.model.trim()) {
-					streamModel = decoded.model.trim();
-				}
-				if (typeof decoded.error === "string" && decoded.error.trim()) {
-					streamError = decoded.error.trim();
-				}
-				const delta =
-					typeof decoded.delta === "string"
-						? decoded.delta
-						: typeof decoded.response === "string"
-							? decoded.response
-							: "";
-				if (delta) {
-					streamedResponse += delta;
-					options?.onStreamUpdate?.(streamedResponse);
-				}
-			} catch {
-				streamedResponse += trimmed;
-				options?.onStreamUpdate?.(streamedResponse);
-			}
-		};
-
-		try {
-			const response = await fetchWithTimeout(`${this.baseUrl}/webhook`, {
-				method: "POST",
-				headers,
-				body: JSON.stringify(payload),
-				timeoutMs: connectTimeoutMs,
-				signal: abortController.signal,
-				requestName: "Agent gateway webhook connect",
-			});
-
-			if (!response.ok) {
-				const rawDetails = await this.readBrokerError(
-					response,
-					`Agent request failed (${response.status})`,
-				);
-				const failureMessage = this.formatAgentGatewayFailureMessage(
-					response.status,
-					rawDetails,
-				);
-				if (response.status === 401 || response.status === 403) {
-					const responseBody = await response.text().catch(() => "");
-					const mentionsSecret = /secret/i.test(responseBody);
-
-					if (mentionsSecret) {
-						await logSecurityEvent(
-							"agent_webhook_secret_rejected",
-							"Agent rejected webhook secret; check VITE_AGENT_WEBHOOK_SECRET and gateway secret configuration.",
-						);
-						throw new Error(
-							"Webhook secret rejected by gateway. Verify VITE_AGENT_WEBHOOK_SECRET matches the gateway configuration.",
-						);
-					}
-
-					await this.unpair();
-					await logSecurityEvent(
-						"agent_request_unauthorized",
-						"Agent request returned unauthorized; pairing was revoked.",
-					);
-				}
-				throw new Error(failureMessage);
-			}
-
-			const contentType = String(response.headers.get("content-type") || "")
-				.trim()
-				.toLowerCase();
-			if (!contentType.includes("text/event-stream") || !response.body) {
-				let data: Record<string, unknown>;
-				try {
-					data = (await response.json()) as Record<string, unknown>;
-				} catch {
-					const text = await response.text().catch(() => "");
-					data = {
-						model: streamModel || model || "",
-						response: text,
-					};
-				}
-				const executionTime = Date.now() - startTime;
-				return {
-					success: true,
-					data,
-					executionTime,
-				};
-			}
-
-			streamTimeoutHandle = setTimeout(() => {
-				streamTimedOut = true;
-				abortController.abort();
-			}, streamMaxMs);
-
-			const reader = response.body.getReader();
-			const decoder = new TextDecoder();
-			let buffer = "";
-
-			while (true) {
-				const read = await reader.read();
-				if (read.done) break;
-
-				buffer += decoder
-					.decode(read.value, { stream: true })
-					.replace(/\r\n/g, "\n")
-					.replace(/\r/g, "\n");
-
-				let separatorIndex = buffer.indexOf("\n\n");
-				while (separatorIndex !== -1) {
-					const block = buffer.slice(0, separatorIndex);
-					buffer = buffer.slice(separatorIndex + 2);
-					separatorIndex = buffer.indexOf("\n\n");
-
-					if (!block.trim()) continue;
-					for (const line of block.split("\n")) {
-						if (!line || line.startsWith(":")) continue;
-						if (!line.startsWith("data:")) continue;
-						const dataValue = line.slice(5).trimStart();
-						applyStreamPayload(dataValue);
-					}
-				}
-			}
-
-			const trailing = decoder.decode().trim();
-			if (trailing) {
-				for (const line of trailing.split("\n")) {
-					if (!line || line.startsWith(":")) continue;
-					if (!line.startsWith("data:")) continue;
-					applyStreamPayload(line.slice(5).trimStart());
-				}
-			}
-
-			const executionTime = Date.now() - startTime;
-			if (streamError && !streamedResponse.trim()) {
-				return {
-					success: false,
-					error: streamError,
-					executionTime,
-				};
-			}
-
-			if (streamError && streamedResponse.trim()) {
-				return {
-					success: true,
-					data: {
-						model: streamModel || model || "",
-						response: streamedResponse,
-						incomplete: true,
-						finish_reason: "error",
-						warning: streamError,
-					},
-					executionTime,
-				};
-			}
-
-			if (!streamDone && !streamedResponse.trim()) {
-				return {
-					success: false,
-					error: "Agent stream ended before returning a response.",
-					executionTime,
-				};
-			}
-
-			return {
-				success: true,
-				data: {
-					model: streamModel || model || "",
-					response: streamedResponse,
-				},
-				executionTime,
-			};
-		} catch (error) {
-			const executionTime = Date.now() - startTime;
-			if (isFetchRequestError(error) && error.kind === "aborted") {
-				if (streamTimedOut) {
-					if (streamedResponse.trim()) {
-						return {
-							success: true,
-							data: {
-								model: streamModel || model || "",
-								response: streamedResponse,
-								incomplete: true,
-								finish_reason: "timeout",
-								warning: `Stream exceeded ${Math.round(streamMaxMs / 1000)} seconds and was stopped.`,
-							},
-							executionTime,
-						};
-					}
-					return {
-						success: false,
-						error: `Agent stream timed out after ${Math.round(streamMaxMs / 1000)} seconds.`,
-						executionTime,
-					};
-				}
-
-				if (this.activeDirectChatCancelledByUser) {
-					if (streamedResponse.trim()) {
-						return {
-							success: true,
-							data: {
-								model: streamModel || model || "",
-								response: streamedResponse,
-								incomplete: true,
-								finish_reason: "cancelled",
-								warning: "Request cancelled by user.",
-							},
-							executionTime,
-						};
-					}
-					return {
-						success: false,
-						error: "Request cancelled before the agent produced a response.",
-						executionTime,
-					};
-				}
-			}
-			return {
-				success: false,
-				error: mapFetchErrorMessage(error, "Unknown error"),
-				executionTime,
-			};
-		} finally {
-			if (streamTimeoutHandle) {
-				clearTimeout(streamTimeoutHandle);
-			}
-			if (this.activeDirectChatAbortController === abortController) {
-				this.activeDirectChatAbortController = null;
-				this.activeDirectChatCancelledByUser = false;
-			}
-		}
-	}
-
-	/**
-	 * Core request method
-	 */
 	private async makeRequest(
 		task: AgentTask,
 		options?: AgentSendOptions,
 	): Promise<AgentResponse> {
-		if (!this.isTaskAllowedForCurrentUser(task.task)) {
-			await logSecurityEvent(
-				"agent_task_blocked_non_admin",
-				`Non-admin task blocked: ${task.task}`,
-			);
-			return {
-				success: false,
-				error:
-					"This agent action is admin-only. Contact an administrator for elevated agent permissions.",
-			};
-		}
-
-		const startTime = Date.now();
-		const profileId = task.profileId || DEFAULT_AGENT_PROFILE;
-		const modelCandidates = getAgentModelCandidates(profileId);
-
-		if (!this.checkPairing()) {
-			if (this.useBroker) {
-				const refreshed = await this.refreshPairingStatus();
-				if (!refreshed) {
-					logger.warn("Attempted request without pairing", "AgentService");
-					return {
-						success: false,
-						error: "Not paired with agent. Please pair first.",
-					};
-				}
-			} else {
-				logger.warn("Attempted request without pairing", "AgentService");
-				return {
-					success: false,
-					error: "Not paired with agent. Please pair first.",
-				};
-			}
-		}
-
-		if (this.useBroker) {
-			const accessToken = await this.getSupabaseAccessToken();
-			if (!accessToken) {
-				return {
-					success: false,
-					error:
-						"Supabase session required for brokered agent access. Please sign in.",
-				};
-			}
-
-			const configuredTimeout = Number(import.meta.env.VITE_AGENT_TIMEOUT);
-			const timeout =
-				task.timeout ??
-				(Number.isFinite(configuredTimeout) && configuredTimeout > 0
-					? Math.max(configuredTimeout, 90_000)
-					: 90_000);
-
-			try {
-				const response = await fetchWithTimeout(`${this.brokerUrl}/webhook`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${accessToken}`,
-					},
-					credentials: "include",
-					body: JSON.stringify({
-						message: JSON.stringify(task),
-						profile_id: profileId,
-						model: modelCandidates[0],
-					}),
-					timeoutMs: timeout,
-					requestName: "Agent broker webhook request",
-				});
-
-				if (!response.ok) {
-					const rawDetails = await this.readBrokerError(
-						response,
-						`Agent request failed (${response.status})`,
-					);
-					const failureMessage = this.formatAgentGatewayFailureMessage(
-						response.status,
-						rawDetails,
-					);
-					if (response.status === 401 || response.status === 403) {
-						await this.unpair();
-						await logSecurityEvent(
-							"agent_request_unauthorized",
-							"Agent request returned unauthorized; pairing was revoked.",
-						);
-					}
-					logger.error("Agent request failed", "AgentService", {
-						status: response.status,
-						statusText: response.statusText,
-						task: task.task,
-						profileId,
-						message: failureMessage,
-					});
-					throw new Error(failureMessage);
-				}
-
-				const data = await response.json();
-				const executionTime = Date.now() - startTime;
-
-				logger.info(
-					`Agent request completed in ${executionTime}ms`,
-					"AgentService",
-					{ task: task.task },
-				);
-
-				return {
-					success: true,
-					data: data,
-					executionTime: executionTime,
-				};
-			} catch (error) {
-				const executionTime = Date.now() - startTime;
-				logger.error("Agent request error", "AgentService", error);
-				return {
-					success: false,
-					error: mapFetchErrorMessage(error, "Unknown error"),
-					executionTime,
-				};
-			}
-		}
-
-		const token = this.getToken();
-		if (!token) {
-			logger.error("Token validation failed", "AgentService");
-			return {
-				success: false,
-				error: "Invalid token. Please pair again.",
-			};
-		}
-
-		try {
-			logger.debug(`Making agent request: ${task.task}`, "AgentService");
-
-			// ZeroClaw gateway: POST /webhook
-			// Required: Authorization: Bearer <token>
-			// Optional: X-Webhook-Secret (if configured on agent side)
-			const headers: Record<string, string> = {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${token}`,
-			};
-
-			const webhookSecret = import.meta.env.VITE_AGENT_WEBHOOK_SECRET;
-			const requireWebhookSecret = this.shouldRequireWebhookSecret();
-
-			if (requireWebhookSecret && !webhookSecret) {
-				return {
-					success: false,
-					error:
-						"Agent webhook secret is required but not configured. Set VITE_AGENT_WEBHOOK_SECRET in your environment.",
-				};
-			}
-
-			if (webhookSecret) {
-				headers["X-Webhook-Secret"] = webhookSecret;
-			}
-
-			if (task.task === "chat") {
-				return await this.makeDirectChatStreamRequest({
-					task,
-					profileId,
-					modelCandidates,
-					headers,
-					startTime,
-					options,
-				});
-			}
-
-			const timeout = this.resolveDirectConnectTimeoutMs(task.timeout);
-			const model = modelCandidates[0] || "";
-			const payload: Record<string, unknown> = {
-				message: JSON.stringify(task),
-				profile_id: profileId,
-			};
-			if (model) {
-				payload.model = model;
-			}
-
-			const response = await fetchWithTimeout(`${this.baseUrl}/webhook`, {
-				method: "POST",
-				headers,
-				body: JSON.stringify(payload),
-				timeoutMs: timeout,
-				requestName: "Agent gateway webhook request",
-			});
-
-			if (!response.ok) {
-				const rawDetails = await this.readBrokerError(
-					response,
-					`Agent request failed (${response.status})`,
-				);
-				const failureMessage = this.formatAgentGatewayFailureMessage(
-					response.status,
-					rawDetails,
-				);
-				if (response.status === 401 || response.status === 403) {
-					const responseBody = await response.text().catch(() => "");
-					const mentionsSecret = /secret/i.test(responseBody);
-
-					if (mentionsSecret) {
-						await logSecurityEvent(
-							"agent_webhook_secret_rejected",
-							"Agent rejected webhook secret; check VITE_AGENT_WEBHOOK_SECRET and gateway secret configuration.",
-						);
-						throw new Error(
-							"Webhook secret rejected by gateway. Verify VITE_AGENT_WEBHOOK_SECRET matches the gateway configuration.",
-						);
-					}
-
-					await this.unpair();
-					await logSecurityEvent(
-						"agent_request_unauthorized",
-						"Agent request returned unauthorized; pairing was revoked.",
-					);
-				}
-				logger.error("Agent request failed", "AgentService", {
-					status: response.status,
-					statusText: response.statusText,
-					task: task.task,
-					profileId,
-					message: failureMessage,
-				});
-				throw new Error(failureMessage);
-			}
-
-			const data = await response.json();
-			const executionTime = Date.now() - startTime;
-
-			logger.info(
-				`Agent request completed in ${executionTime}ms`,
-				"AgentService",
-				{ task: task.task },
-			);
-
-			return {
-				success: true,
-				data: data,
-				executionTime: executionTime,
-			};
-		} catch (error) {
-			const executionTime = Date.now() - startTime;
-			logger.error("Agent request error", "AgentService", error);
-			return {
-				success: false,
-				error: mapFetchErrorMessage(error, "Unknown error"),
-				executionTime,
-			};
-		}
+		return makeAgentRequest(this.getRequestTransportContext(), task, options);
 	}
 
 	/**

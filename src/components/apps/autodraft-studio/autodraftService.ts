@@ -1,8 +1,25 @@
-import {
-	fetchWithTimeout,
-	parseResponseErrorMessage,
-} from "@/lib/fetchWithTimeout";
 import { logger } from "@/lib/logger";
+import { createAutoDraftApiClient } from "./autodraftApiClient";
+import {
+	requestAutoDraftExportCompareFeedback,
+	requestAutoDraftExportReviewedRunBundle,
+	requestAutoDraftImportCompareFeedback,
+	requestAutoDraftPrepareCompare,
+	requestAutoDraftRunCompare,
+	requestAutoDraftSubmitCompareFeedback,
+} from "./autodraftCompareRequests";
+import {
+	requestAutoDraftBackcheck,
+	requestAutoDraftExecute,
+	requestAutoDraftHealth,
+	requestAutoDraftPlan,
+	requestAutoDraftRules,
+} from "./autodraftCoreRequests";
+import {
+	requestAutoDraftLearningEvaluations,
+	requestAutoDraftLearningModels,
+	requestAutoDraftTrainLearning,
+} from "./autodraftLearningRequests";
 import { type AutoDraftRule, RULE_LIBRARY } from "./autodraftData";
 
 export type AutoDraftHealth = {
@@ -1948,61 +1965,23 @@ const normalizeReviewedRunBundle = (
 class AutoDraftService {
 	private readonly baseUrl: string;
 	private readonly apiKey: string;
+	private readonly apiClient: ReturnType<typeof createAutoDraftApiClient>;
 
 	constructor() {
 		this.baseUrl = (
 			import.meta.env.VITE_COORDINATES_BACKEND_URL || "http://localhost:5000"
 		).replace(/\/+$/, "");
 		this.apiKey = import.meta.env.VITE_API_KEY || "";
-	}
-
-	private getHeaders(
-		extra: HeadersInit = {},
-		options?: { jsonContentType?: boolean },
-	): HeadersInit {
-		const headers: HeadersInit = {
-			"X-API-Key": this.apiKey,
-			...extra,
-		};
-		if (options?.jsonContentType === false) {
-			return headers;
-		}
-		return {
-			"Content-Type": "application/json",
-			...headers,
-		};
-	}
-
-	private async parseError(response: Response): Promise<string> {
-		return parseResponseErrorMessage(
-			response,
-			`Request failed (${response.status})`,
-		);
-	}
-
-	private async requestJson<T>(
-		path: string,
-		init: RequestInit = {},
-		timeoutMs = DEFAULT_TIMEOUT_MS,
-		options?: { jsonContentType?: boolean },
-	): Promise<T> {
-		const response = await fetchWithTimeout(`${this.baseUrl}${path}`, {
-			...init,
-			headers: this.getHeaders(init.headers || {}, options),
-			timeoutMs,
-			requestName: `AutoDraft request (${path})`,
+		this.apiClient = createAutoDraftApiClient({
+			baseUrl: this.baseUrl,
+			apiKey: this.apiKey,
+			defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
 		});
-		if (!response.ok) {
-			throw new Error(await this.parseError(response));
-		}
-		return (await response.json()) as T;
 	}
 
 	async health(): Promise<AutoDraftHealth> {
 		try {
-			const payload = await this.requestJson<unknown>("/api/autodraft/health", {
-				method: "GET",
-			});
+			const payload = await requestAutoDraftHealth(this.apiClient);
 			return normalizeHealthPayload(payload);
 		} catch (error) {
 			logger.warn("AutoDraft health failed", "AutoDraftService", { error });
@@ -2012,9 +1991,7 @@ class AutoDraftService {
 
 	async listRules(): Promise<AutoDraftRule[]> {
 		try {
-			const payload = await this.requestJson<unknown>("/api/autodraft/rules", {
-				method: "GET",
-			});
+			const payload = await requestAutoDraftRules(this.apiClient);
 			const rulesRaw =
 				isRecord(payload) && Array.isArray(payload.rules) ? payload.rules : [];
 			const rules = rulesRaw
@@ -2042,10 +2019,7 @@ class AutoDraftService {
 	}
 
 	async plan(markups: MarkupInput[]): Promise<AutoDraftPlanResponse> {
-		const payload = await this.requestJson<unknown>("/api/autodraft/plan", {
-			method: "POST",
-			body: JSON.stringify({ markups }),
-		});
+		const payload = await requestAutoDraftPlan(this.apiClient, markups);
 		return normalizePlanPayload(payload);
 	}
 
@@ -2058,16 +2032,11 @@ class AutoDraftService {
 			backcheckFailCount?: number;
 		},
 	): Promise<AutoDraftExecuteResponse> {
-		const payload = await this.requestJson<unknown>("/api/autodraft/execute", {
-			method: "POST",
-			body: JSON.stringify({
-				actions,
-				dry_run: options?.dryRun ?? true,
-				backcheck_request_id: options?.backcheckRequestId,
-				backcheck_override_reason: options?.backcheckOverrideReason,
-				backcheck_fail_count: options?.backcheckFailCount ?? 0,
-			}),
-		});
+		const payload = await requestAutoDraftExecute(
+			this.apiClient,
+			actions,
+			options,
+		);
 		return normalizeExecutePayload(payload);
 	}
 
@@ -2078,16 +2047,10 @@ class AutoDraftService {
 			requireCadContext?: boolean;
 		},
 	): Promise<AutoDraftBackcheckResponse> {
-		const payload = await this.requestJson<unknown>(
-			"/api/autodraft/backcheck",
-			{
-				method: "POST",
-				body: JSON.stringify({
-					actions,
-					cad_context: options?.cadContext,
-					require_cad_context: options?.requireCadContext ?? false,
-				}),
-			},
+		const payload = await requestAutoDraftBackcheck(
+			this.apiClient,
+			actions,
+			options,
 		);
 		return normalizeBackcheckPayload(payload);
 	}
@@ -2096,19 +2059,11 @@ class AutoDraftService {
 		file: File,
 		pageIndex: number,
 	): Promise<AutoDraftComparePrepareResponse> {
-		const formData = new FormData();
-		formData.append("pdf", file);
-		formData.append("page_index", String(Math.max(0, Math.round(pageIndex))));
-
-		const payload = await this.requestJson<unknown>(
-			"/api/autodraft/compare/prepare",
-			{
-				method: "POST",
-				body: formData,
-			},
-			DEFAULT_TIMEOUT_MS,
-			{ jsonContentType: false },
-		);
+		const payload = await requestAutoDraftPrepareCompare(this.apiClient, {
+			file,
+			pageIndex,
+			timeoutMs: DEFAULT_TIMEOUT_MS,
+		});
 		return normalizeComparePreparePayload(payload);
 	}
 
@@ -2126,27 +2081,10 @@ class AutoDraftService {
 		cadContext?: Record<string, unknown>;
 		replacementTuning?: Partial<AutoDraftReplacementTuning>;
 	}): Promise<AutoDraftCompareResponse> {
-		const payload = await this.requestJson<unknown>(
-			"/api/autodraft/compare",
-			{
-				method: "POST",
-				body: JSON.stringify({
-					engine: args.engine,
-					tolerance_profile: args.toleranceProfile,
-					calibration_mode: args.calibrationMode ?? "auto",
-					agent_review_mode: args.agentReviewMode ?? "pre",
-					manual_override: args.manualOverride ?? false,
-					markups: args.markups,
-					pdf_points: args.pdfPoints ?? [],
-					cad_points: args.cadPoints ?? [],
-					roi: args.roi,
-					calibration_seed: args.calibrationSeed,
-					cad_context: args.cadContext,
-					replacement_tuning: args.replacementTuning,
-				}),
-			},
-			DEFAULT_COMPARE_TIMEOUT_MS,
-		);
+		const payload = await requestAutoDraftRunCompare(this.apiClient, {
+			...args,
+			timeoutMs: DEFAULT_COMPARE_TIMEOUT_MS,
+		});
 		return normalizeComparePayload(payload);
 	}
 
@@ -2154,15 +2092,9 @@ class AutoDraftService {
 		requestId?: string;
 		items: AutoDraftCompareFeedbackItemInput[];
 	}): Promise<AutoDraftCompareFeedbackResponse> {
-		const payload = await this.requestJson<unknown>(
-			"/api/autodraft/compare/feedback",
-			{
-				method: "POST",
-				body: JSON.stringify({
-					requestId: args.requestId,
-					items: args.items,
-				}),
-			},
+		const payload = await requestAutoDraftSubmitCompareFeedback(
+			this.apiClient,
+			args,
 		);
 		return normalizeCompareFeedbackResponse(payload);
 	}
@@ -2173,12 +2105,7 @@ class AutoDraftService {
 		pairs: unknown[];
 		metrics: unknown[];
 	}> {
-		const payload = await this.requestJson<unknown>(
-			"/api/autodraft/compare/feedback/export",
-			{
-				method: "GET",
-			},
-		);
+		const payload = await requestAutoDraftExportCompareFeedback(this.apiClient);
 		if (!isRecord(payload)) {
 			return { requestId: "", events: [], pairs: [], metrics: [] };
 		}
@@ -2196,19 +2123,12 @@ class AutoDraftService {
 		label?: string;
 		notes?: string;
 	}): Promise<AutoDraftReviewedRunBundle> {
-		const payload = await this.requestJson<unknown>(
-			"/api/autodraft/compare/reviewed-run/export",
+		const payload = await requestAutoDraftExportReviewedRunBundle(
+			this.apiClient,
 			{
-				method: "POST",
-				body: JSON.stringify({
-					requestId: args.compare.requestId,
-					prepare: args.prepare,
-					compare: args.compare,
-					label: args.label,
-					notes: args.notes,
-				}),
+				...args,
+				timeoutMs: DEFAULT_TIMEOUT_MS * 2,
 			},
-			DEFAULT_TIMEOUT_MS * 2,
 		);
 		if (!isRecord(payload)) {
 			throw new Error("Invalid reviewed run export response.");
@@ -2226,17 +2146,9 @@ class AutoDraftService {
 		pairs?: unknown[];
 		metrics?: unknown[];
 	}): Promise<AutoDraftCompareFeedbackResponse> {
-		const payload = await this.requestJson<unknown>(
-			"/api/autodraft/compare/feedback/import",
-			{
-				method: "POST",
-				body: JSON.stringify({
-					mode: args.mode ?? "merge",
-					events: args.events ?? [],
-					pairs: args.pairs ?? [],
-					metrics: args.metrics ?? [],
-				}),
-			},
+		const payload = await requestAutoDraftImportCompareFeedback(
+			this.apiClient,
+			args,
 		);
 		return normalizeCompareFeedbackResponse(payload);
 	}
@@ -2248,17 +2160,10 @@ class AutoDraftService {
 		requestId: string;
 		results: Array<Record<string, unknown>>;
 	}> {
-		const payload = await this.requestJson<unknown>(
-			"/api/autodraft/learning/train",
-			{
-				method: "POST",
-				body: JSON.stringify({
-					domain: args?.domain,
-					domains: args?.domains,
-				}),
-			},
-			DEFAULT_TIMEOUT_MS * 3,
-		);
+		const payload = await requestAutoDraftTrainLearning(this.apiClient, {
+			...args,
+			timeoutMs: DEFAULT_TIMEOUT_MS * 3,
+		});
 		if (!isRecord(payload)) {
 			return { requestId: "", results: [] };
 		}
@@ -2269,13 +2174,7 @@ class AutoDraftService {
 	}
 
 	async listLearningModels(domain?: string): Promise<AutoDraftLearningModel[]> {
-		const suffix = domain ? `?domain=${encodeURIComponent(domain)}` : "";
-		const payload = await this.requestJson<unknown>(
-			`/api/autodraft/learning/models${suffix}`,
-			{
-				method: "GET",
-			},
-		);
+		const payload = await requestAutoDraftLearningModels(this.apiClient, domain);
 		if (!isRecord(payload)) return [];
 		const modelsRaw = Array.isArray(payload.models) ? payload.models : [];
 		return modelsRaw
@@ -2287,17 +2186,9 @@ class AutoDraftService {
 		domain?: string;
 		limit?: number;
 	}): Promise<AutoDraftLearningEvaluation[]> {
-		const params = new URLSearchParams();
-		if (args?.domain) params.set("domain", args.domain);
-		if (typeof args?.limit === "number" && Number.isFinite(args.limit)) {
-			params.set("limit", String(Math.max(1, Math.trunc(args.limit))));
-		}
-		const suffix = params.toString() ? `?${params.toString()}` : "";
-		const payload = await this.requestJson<unknown>(
-			`/api/autodraft/learning/evaluations${suffix}`,
-			{
-				method: "GET",
-			},
+		const payload = await requestAutoDraftLearningEvaluations(
+			this.apiClient,
+			args,
 		);
 		if (!isRecord(payload)) return [];
 		const evaluationsRaw = Array.isArray(payload.evaluations)

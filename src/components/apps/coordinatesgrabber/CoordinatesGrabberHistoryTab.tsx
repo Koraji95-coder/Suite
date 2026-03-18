@@ -1,4 +1,5 @@
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
+import type { ColorScheme } from "@/lib/palette";
+import styles from "./CoordinatesGrabberHistoryTab.module.css";
 import type { CoordinatesGrabberState } from "./CoordinatesGrabberModels";
 
 interface CoordinatesGrabberHistoryTabProps {
@@ -8,55 +9,15 @@ interface CoordinatesGrabberHistoryTabProps {
 
 export function CoordinatesGrabberHistoryTab({
 	state,
-	palette,
+	palette: _palette,
 }: CoordinatesGrabberHistoryTabProps) {
 	return (
-		<div
-			style={{
-				flex: 1,
-				overflow: "auto",
-				display: "flex",
-				flexDirection: "column",
-			}}
-		>
-			<div
-				style={{
-					display: "flex",
-					flexDirection: "column",
-					gap: "12px",
-					padding: "12px",
-				}}
-			>
+		<div className={styles.root}>
+			<div className={styles.stack}>
 				{state.performanceMetrics && (
-					<div
-						style={{
-							padding: "12px",
-							borderRadius: "8px",
-							background: hexToRgba(palette.primary, 0.1),
-							border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-						}}
-					>
-						<h3
-							style={{
-								margin: "0 0 8px 0",
-								fontSize: "13px",
-								fontWeight: "600",
-								color: palette.text,
-								textTransform: "uppercase",
-								letterSpacing: "0.5px",
-							}}
-						>
-							Latest Metrics
-						</h3>
-						<div
-							style={{
-								display: "grid",
-								gridTemplateColumns: "1fr 1fr",
-								gap: "8px",
-								fontSize: "12px",
-								color: palette.textMuted,
-							}}
-						>
+					<div className={styles.metrics}>
+						<h3 className={styles.metricsTitle}>Latest Metrics</h3>
+						<div className={styles.metricsGrid}>
 							<div>
 								Points:{" "}
 								<strong>{state.performanceMetrics.pointsCreated}</strong>
@@ -83,91 +44,36 @@ export function CoordinatesGrabberHistoryTab({
 				)}
 
 				{state.executionHistory.length === 0 ? (
-					<p
-						style={{
-							color: palette.textMuted,
-							fontSize: "12px",
-							textAlign: "center",
-							margin: "20px 0",
-						}}
-					>
+					<p className={styles.empty}>
 						No execution history yet. Start extraction to see results here.
 					</p>
 				) : (
 					state.executionHistory.map((entry, idx) => (
 						<div
 							key={idx}
-							style={{
-								padding: "12px",
-								borderRadius: "8px",
-								background: entry.success
-									? hexToRgba("#51cf66", 0.05)
-									: hexToRgba("#ff6b6b", 0.05),
-								border: `1px solid ${
-									entry.success
-										? hexToRgba("#51cf66", 0.2)
-										: hexToRgba("#ff6b6b", 0.2)
-								}`,
-							}}
+							className={
+								entry.success
+									? `${styles.entry} ${styles.entrySuccess}`
+									: `${styles.entry} ${styles.entryFail}`
+							}
 						>
-							<div
-								style={{
-									display: "flex",
-									alignItems: "center",
-									gap: "8px",
-									marginBottom: "8px",
-								}}
-							>
-								<span
-									style={{
-										fontSize: "14px",
-										color: entry.success ? "#51cf66" : "#ff6b6b",
-									}}
-								>
+							<div className={styles.entryHeader}>
+								<span className={styles.entryStatus}>
 									{entry.success ? "OK" : "FAIL"}
 								</span>
-								<span
-									style={{
-										color: palette.text,
-										fontSize: "12px",
-										fontWeight: "600",
-									}}
-								>
+								<span className={styles.entryName}>
 									{entry.config.layerName || entry.config.mode}
 								</span>
-								<span
-									style={{
-										color: palette.textMuted,
-										fontSize: "11px",
-										marginLeft: "auto",
-									}}
-								>
+								<span className={styles.entryTime}>
 									{new Date(entry.timestamp).toLocaleTimeString()}
 								</span>
 							</div>
-							<div
-								style={{
-									display: "grid",
-									gridTemplateColumns: "1fr 1fr",
-									gap: "8px",
-									fontSize: "11px",
-									color: palette.textMuted,
-								}}
-							>
+							<div className={styles.entryMeta}>
 								<div>Extracted: {entry.pointsCreated || "-"}</div>
 								<div>Duration: {entry.duration.toFixed(2)}s</div>
 							</div>
 							{entry.message && !entry.success && (
-								<div
-									style={{
-										marginTop: "8px",
-										fontSize: "11px",
-										color: "#ff6b6b",
-										fontStyle: "italic",
-									}}
-								>
-									{entry.message}
-								</div>
+								<div className={styles.errorMessage}>{entry.message}</div>
 							)}
 						</div>
 					))

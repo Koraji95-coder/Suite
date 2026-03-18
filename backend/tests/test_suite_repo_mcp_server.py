@@ -201,6 +201,11 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("repo.search", tool_names)
         self.assertIn("repo.generate_route", tool_names)
         self.assertIn("repo.get_workstation_context", tool_names)
+        self.assertIn("repo.check_watchdog_collector_startup", tool_names)
+        self.assertIn("repo.check_watchdog_autocad_collector_startup", tool_names)
+        self.assertIn("repo.check_watchdog_autocad_plugin", tool_names)
+        self.assertIn("repo.check_watchdog_autocad_readiness", tool_names)
+        self.assertIn("repo.check_watchdog_backend_startup", tool_names)
         self.assertIn("repo.verify_agent_routing_guardrails", tool_names)
 
     def test_tool_call_repo_search_returns_text(self) -> None:
@@ -267,6 +272,11 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("AutoCAD reliability contract", text)
         self.assertIn("npm run gateway:dev", text)
         self.assertIn("SUITE_GATEWAY_USE_FULL_CLI=1", text)
+        self.assertIn("repo.check_watchdog_collector_startup", text)
+        self.assertIn("repo.check_watchdog_autocad_collector_startup", text)
+        self.assertIn("repo.check_watchdog_autocad_plugin", text)
+        self.assertIn("repo.check_watchdog_autocad_readiness", text)
+        self.assertIn("repo.check_watchdog_backend_startup", text)
 
     def test_prompt_get_returns_workstation_context(self) -> None:
         with _McpServerProcess(
@@ -295,6 +305,40 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("Role: secondary", text)
         self.assertIn("Computer Name: TEST-WS", text)
         self.assertIn("Source: mcp_env", text)
+        self.assertIn("Collector ID: watchdog-fs-suite-secondary", text)
+        self.assertIn(
+            "Startup Task: SuiteWatchdogFilesystemCollector-suite-secondary",
+            text,
+        )
+        self.assertIn(
+            "Startup Check Task: SuiteWatchdogFilesystemCollectorCheck-suite-secondary",
+            text,
+        )
+        self.assertIn(
+            "scripts/check-watchdog-filesystem-collector-startup.ps1",
+            text,
+        )
+        self.assertIn("Collector ID: autocad-suite-secondary", text)
+        self.assertIn(
+            "Startup Task: SuiteWatchdogAutoCADCollector-suite-secondary",
+            text,
+        )
+        self.assertIn(
+            "scripts/check-watchdog-autocad-collector-startup.ps1",
+            text,
+        )
+        self.assertIn(
+            "SuiteWatchdogCadTracker.bundle",
+            text,
+        )
+        self.assertIn(
+            "scripts/check-watchdog-autocad-plugin.ps1",
+            text,
+        )
+        self.assertIn(
+            "scripts/check-watchdog-autocad-readiness.ps1",
+            text,
+        )
 
     def test_prompt_get_returns_agent_handoff_gateway_block(self) -> None:
         with _McpServerProcess() as server:
@@ -382,6 +426,114 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("Role: primary", text)
         self.assertIn("Computer Name: MAIN-WS", text)
         self.assertIn("Source: mcp_env", text)
+        self.assertIn("Collector ID: watchdog-fs-suite-main", text)
+        self.assertIn(
+            "Startup Task: SuiteWatchdogFilesystemCollector-suite-main",
+            text,
+        )
+        self.assertIn("Collector ID: autocad-suite-main", text)
+        self.assertIn(
+            "Startup Task: SuiteWatchdogAutoCADCollector-suite-main",
+            text,
+        )
+        self.assertIn("SuiteWatchdogCadTracker.bundle", text)
+
+    @unittest.skipUnless(os.name == "nt", "Startup check tools are only available on Windows.")
+    def test_tool_check_watchdog_autocad_collector_startup_reports_missing_script(self) -> None:
+        with _McpServerProcess(
+            env={
+                "SUITE_WORKSTATION_ID": "suite-main",
+                "SUITE_WATCHDOG_AUTOCAD_STARTUP_CHECK_SCRIPT": "scripts/does-not-exist-autocad.ps1",
+            }
+        ) as server:
+            server.initialize()
+            response = server.request(
+                "tools/call",
+                {
+                    "name": "repo.check_watchdog_autocad_collector_startup",
+                    "arguments": {},
+                },
+                timeout=10.0,
+            )
+
+        result = response.get("result", {})
+        self.assertTrue(bool(result.get("isError")))
+        content = result.get("content", [])
+        self.assertTrue(content)
+        text = str(content[0].get("text") if isinstance(content[0], dict) else "")
+        self.assertIn("does-not-exist-autocad.ps1", text)
+
+    @unittest.skipUnless(os.name == "nt", "AutoCAD plugin checks are only available on Windows.")
+    def test_tool_check_watchdog_autocad_plugin_reports_missing_script(self) -> None:
+        with _McpServerProcess(
+            env={
+                "SUITE_WATCHDOG_AUTOCAD_PLUGIN_CHECK_SCRIPT": "scripts/does-not-exist-autocad-plugin.ps1",
+            }
+        ) as server:
+            server.initialize()
+            response = server.request(
+                "tools/call",
+                {
+                    "name": "repo.check_watchdog_autocad_plugin",
+                    "arguments": {},
+                },
+                timeout=10.0,
+            )
+
+        result = response.get("result", {})
+        self.assertTrue(bool(result.get("isError")))
+        content = result.get("content", [])
+        self.assertTrue(content)
+        text = str(content[0].get("text") if isinstance(content[0], dict) else "")
+        self.assertIn("does-not-exist-autocad-plugin.ps1", text)
+
+    @unittest.skipUnless(os.name == "nt", "AutoCAD readiness checks are only available on Windows.")
+    def test_tool_check_watchdog_autocad_readiness_reports_missing_script(self) -> None:
+        with _McpServerProcess(
+            env={
+                "SUITE_WATCHDOG_AUTOCAD_READINESS_CHECK_SCRIPT": "scripts/does-not-exist-autocad-readiness.ps1",
+            }
+        ) as server:
+            server.initialize()
+            response = server.request(
+                "tools/call",
+                {
+                    "name": "repo.check_watchdog_autocad_readiness",
+                    "arguments": {},
+                },
+                timeout=10.0,
+            )
+
+        result = response.get("result", {})
+        self.assertTrue(bool(result.get("isError")))
+        content = result.get("content", [])
+        self.assertTrue(content)
+        text = str(content[0].get("text") if isinstance(content[0], dict) else "")
+        self.assertIn("does-not-exist-autocad-readiness.ps1", text)
+
+    @unittest.skipUnless(os.name == "nt", "Backend startup checks are only available on Windows.")
+    def test_tool_check_watchdog_backend_startup_reports_missing_script(self) -> None:
+        with _McpServerProcess(
+            env={
+                "SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT": "scripts/does-not-exist-backend-startup.ps1",
+            }
+        ) as server:
+            server.initialize()
+            response = server.request(
+                "tools/call",
+                {
+                    "name": "repo.check_watchdog_backend_startup",
+                    "arguments": {},
+                },
+                timeout=10.0,
+            )
+
+        result = response.get("result", {})
+        self.assertTrue(bool(result.get("isError")))
+        content = result.get("content", [])
+        self.assertTrue(content)
+        text = str(content[0].get("text") if isinstance(content[0], dict) else "")
+        self.assertIn("does-not-exist-backend-startup.ps1", text)
 
     def test_unknown_tool_returns_jsonrpc_error(self) -> None:
         with _McpServerProcess() as server:

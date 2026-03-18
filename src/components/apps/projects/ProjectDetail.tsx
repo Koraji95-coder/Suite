@@ -11,6 +11,7 @@ import { FilesBrowser } from "./FilesBrowser";
 import styles from "./ProjectDetail.module.css";
 import { ProjectDetailGroundGridsView } from "./ProjectDetailGroundGridsView";
 import { ProjectDetailHeader } from "./ProjectDetailHeader";
+import { ProjectTelemetryPanel } from "./ProjectTelemetryPanel";
 import { ProjectDetailViewTabs } from "./ProjectDetailViewTabs";
 import {
 	type CalendarEvent,
@@ -22,6 +23,7 @@ import {
 } from "./projectmanagertypes";
 import { TaskList } from "./TaskList";
 import { useProjectDetailGridDesigns } from "./useProjectDetailGridDesigns";
+import { useProjectWatchdogTelemetry } from "./useProjectWatchdogTelemetry";
 
 interface ProjectDetailProps {
 	project: Project;
@@ -84,15 +86,19 @@ export function ProjectDetail({
 }: ProjectDetailProps) {
 	const { createLinkedDesign, gridDesigns, openGridDesign } =
 		useProjectDetailGridDesigns(project);
+	const telemetry = useProjectWatchdogTelemetry(project.id);
 
 	return (
 		<div className={styles.root}>
 			<ProjectDetailHeader
 				project={project}
 				tasks={tasks}
+				telemetry={telemetry}
 				onToggleArchive={onToggleArchive}
 				onExportMarkdown={onExportMarkdown}
 			/>
+
+			<ProjectTelemetryPanel projectId={project.id} telemetry={telemetry} />
 
 			<ProjectDetailViewTabs
 				viewMode={viewMode}

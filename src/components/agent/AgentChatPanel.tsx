@@ -489,7 +489,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				);
 			}
 		};
-	}, [paired]);
+	}, []);
 
 	useEffect(() => {
 		if (isAgentProfileScope(channelScope) && channelScope !== profileId) {

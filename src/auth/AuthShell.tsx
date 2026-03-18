@@ -95,27 +95,9 @@ export default function AuthShell({
           ───────────────────────────────────────────────────────────────── */}
 					{!hidePanel && (
 						<section className={styles.leftPanel}>
-							{/* Background gradient */}
-							<div
-								className={styles.leftPanelGradient}
-								style={{
-									background: `
-                    radial-gradient(ellipse 80% 60% at 50% 40%, color-mix(in oklab, var(--primary) 12%, transparent), transparent),
-                    radial-gradient(ellipse 60% 50% at 20% 80%, color-mix(in oklab, var(--accent) 8%, transparent), transparent),
-                    var(--surface)
-                  `,
-								}}
-							/>
+							<div className={styles.leftPanelGradient} />
 
-							{/* Dot pattern */}
-							<div
-								className={styles.leftPanelPattern}
-								style={{
-									backgroundImage:
-										"radial-gradient(circle, var(--text-muted) 1px, transparent 1px)",
-									backgroundSize: "20px 20px",
-								}}
-							/>
+							<div className={styles.leftPanelPattern} />
 
 							{/* Content */}
 							<div className={styles.leftPanelContent}>
@@ -169,7 +151,11 @@ export default function AuthShell({
 								>
 									{FLOATING_MARKS.map((m) => (
 										<div key={m.id} className={styles.agentBadge}>
-											<AgentPixelMark profileId={m.id} size={14} detailLevel="hero" />
+											<AgentPixelMark
+												profileId={m.id}
+												size={14}
+												detailLevel="hero"
+											/>
 											<Text
 												size="xs"
 												color="muted"
@@ -187,22 +173,15 @@ export default function AuthShell({
 					{/* ─────────────────────────────────────────────────────────────────
               RIGHT PANEL (Form content)
           ───────────────────────────────────────────────────────────────── */}
-					<section
-						className={cn(
-							styles.rightPanel,
-							!hidePanel && styles.rightPanelWithLeft,
-							cardClassName,
-						)}
-						style={cardStyle}
-					>
-						{/* Top accent line */}
-						<div
-							className={styles.topAccent}
-							style={{
-								background:
-									"linear-gradient(90deg, var(--primary), var(--accent), var(--primary))",
-							}}
-						/>
+						<section
+							className={cn(
+								styles.rightPanel,
+								!hidePanel && styles.rightPanelWithLeft,
+								cardClassName,
+							)}
+							style={cardStyle}
+						>
+							<div className={styles.topAccent} />
 
 						{/* Content */}
 						<div className={styles.rightPanelBody}>{children}</div>

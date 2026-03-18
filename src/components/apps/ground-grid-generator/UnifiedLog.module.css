@@ -1,0 +1,193 @@
+.root {
+	display: flex;
+	height: 100%;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 1rem;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.headerMeta {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.title {
+	font-size: 0.85rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.entryCount {
+	margin-left: 0.5rem;
+	font-size: 0.7rem;
+	font-weight: 500;
+	color: var(--text-muted);
+}
+
+.wsStatus {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.25rem 0.55rem;
+	border-radius: 999px;
+	border: 1px solid transparent;
+	font-size: 0.625rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.wsStatusLive {
+	border-color: color-mix(in srgb, var(--success) 34%, transparent);
+	background: color-mix(in srgb, var(--success) 10%, transparent);
+	color: var(--success);
+}
+
+.wsStatusOffline {
+	border-color: color-mix(in srgb, var(--warning) 28%, transparent);
+	background: color-mix(in srgb, var(--warning) 10%, transparent);
+	color: var(--warning);
+}
+
+.wsIndicator {
+	width: 0.4rem;
+	height: 0.4rem;
+	border-radius: 999px;
+}
+
+.wsIndicatorLive {
+	background: var(--success);
+}
+
+.wsIndicatorOffline {
+	background: var(--warning);
+}
+
+.clearButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	padding: 0.3rem 0.65rem;
+	border-radius: 0.45rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.clearButton:hover {
+	color: var(--text);
+	background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+
+.legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	font-size: 0.625rem;
+	color: var(--text-muted);
+}
+
+.legendItem {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.legendSwatch {
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 0.16rem;
+}
+
+.sourceGrabber {
+	background: var(--info);
+	color: var(--info);
+}
+
+.sourceGenerator {
+	background: var(--accent);
+	color: var(--accent);
+}
+
+.sourceSystem {
+	background: var(--secondary);
+	color: var(--secondary);
+}
+
+.logViewport {
+	flex: 1;
+	overflow: auto;
+	border-radius: 0.6rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 10%, transparent);
+	background: color-mix(in srgb, var(--bg) 56%, transparent);
+	padding: 0.75rem;
+	font-family: "Consolas", "Monaco", "Courier New", monospace;
+	font-size: 0.7rem;
+}
+
+.emptyState {
+	padding: 2.5rem 1rem;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+.logRow {
+	display: flex;
+	gap: 0.5rem;
+	padding: 0.18rem 0;
+}
+
+.timestamp {
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.sourceBadge {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+	padding: 0.06rem 0.3rem;
+	border-radius: 0.22rem;
+	background: color-mix(in srgb, currentColor 15%, transparent);
+	font-size: 0.55rem;
+	font-weight: 800;
+	letter-spacing: 0.06em;
+	line-height: 1rem;
+}
+
+.message {
+	min-width: 0;
+	flex: 1;
+}
+
+.messageDefault {
+	color: var(--text-muted);
+}
+
+.messageProcessing {
+	color: var(--primary);
+}
+
+.messageWarning {
+	color: var(--warning);
+}
+
+.messageSuccess {
+	color: var(--success);
+}
+
+.messageError {
+	color: var(--danger);
+}

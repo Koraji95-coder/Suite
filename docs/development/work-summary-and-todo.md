@@ -5,6 +5,75 @@ Branch: `main`
 
 This is a restart/handoff doc summarizing what has already been completed and what to do next.
 
+## March 18, 2026 Checkpoint
+
+### What Landed In This Tranche
+
+- Unified dark-theme reset is live across the main app.
+- Theme picker and AI Config settings surface were removed; Settings is now account-focused.
+- Dashboard is now the primary command-center surface for Watchdog, architecture, agent memory, and project telemetry.
+- Watchdog is now backed by durable ledger storage under `backend/watchdog/` instead of only in-memory heartbeat state.
+- Filesystem collector is live with workstation-aware startup/install/check scripts.
+- AutoCAD collector is live with:
+  - tracker plugin project under `dotnet/watchdog-cad-tracker/`
+  - plugin install/check scripts
+  - readiness doctor
+  - live `tracker-state.json` export ingestion
+- Command Center no longer carries the old Watchdog UI path.
+- Legacy widget-era dashboard files that were no longer referenced were removed.
+- Project detail now surfaces Watchdog telemetry summaries and dashboard deep links.
+
+### Current Baseline
+
+- `npm run check`
+- `npm run test:unit`
+- `python -m unittest backend.tests.test_api_watchdog_service backend.tests.test_api_route_groups backend.tests.test_watchdog_filesystem_collector backend.tests.test_watchdog_autocad_state_collector backend.tests.test_suite_repo_mcp_server`
+- `dotnet test dotnet/autodraft-api-contract.Tests/AutoDraft.ApiContract.Tests.csproj -v minimal`
+- `npm run watchdog:autocad:doctor`
+
+### MCP / Workstation Settings TODO
+
+Current local MCP server config is in `C:\Users\koraj\.codex\config.toml` under `mcp_servers.suite_repo_mcp.env`.
+
+Current live workstation assumptions:
+
+- workstation id: `DUSTIN-HOME`
+- workstation label: `Dustin Home workstation`
+- workstation role: `home`
+- filesystem collector startup/check metadata is configured
+- AutoCAD collector startup/check metadata is configured
+- AutoCAD plugin bundle/check metadata is configured
+- AutoCAD readiness doctor metadata is configured
+
+Next MCP-setting cleanup tasks:
+
+1. Move workstation-specific MCP env values into one versioned source-of-truth file in the repo.
+   - Goal: avoid hand-editing `C:\Users\koraj\.codex\config.toml` for every workstation change.
+   - Candidate shape: `docs/development/mcp-workstation-matrix.md` plus a small sync script.
+
+2. Add a generated workstation profile sync script.
+   - Input: workstation id (`DUSTIN-HOME`, office workstation, laptop, etc.).
+   - Output: patch/update the corresponding `suite_repo_mcp.env` block in local Codex config.
+
+3. Add backend startup metadata to MCP env on every workstation.
+   - The backend startup check now exists; make sure every workstation profile carries the matching env keys and check scripts.
+
+4. Add a single combined workstation doctor tool to MCP.
+   - It should report backend, filesystem collector, AutoCAD collector, AutoCAD plugin, and tracker-state health in one call.
+
+5. Move workstation naming rules into a documented convention.
+   - Lock down collector ids, Run-key names, Scheduled Task names, mutex names, and config-file names so they derive deterministically from workstation id.
+
+6. Add restart-required notes for MCP config changes.
+   - Any change to `config.toml` still requires restarting the developer window/Codex session.
+   - This should be stated explicitly in the MCP handoff docs.
+
+7. Add a repo-level guard/check for missing workstation MCP values.
+   - Validate that required startup/check paths exist locally for the current workstation before opening a working session.
+
+8. Decide whether Dropbox mirror state should be represented in MCP config or stay outside MCP.
+   - Current recommendation: keep Dropbox sync operational state outside MCP and keep MCP limited to local tooling and diagnostics.
+
 ## 1) What Is Already Done
 
 ### Repo hygiene and safety

@@ -13,6 +13,26 @@
 	font-weight: 600;
 }
 
+.statusBadgeCompleted {
+	color: color-mix(in srgb, var(--success) 86%, white 14%);
+	background: color-mix(in srgb, var(--success) 20%, transparent);
+}
+
+.statusBadgeInProgress {
+	color: color-mix(in srgb, var(--primary) 80%, white 20%);
+	background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.statusBadgePlanned {
+	color: color-mix(in srgb, var(--accent) 80%, white 20%);
+	background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.statusBadgeFuture {
+	color: color-mix(in srgb, var(--text-muted) 80%, white 20%);
+	background: color-mix(in srgb, var(--secondary) 22%, transparent);
+}
+
 .categoryTag {
 	border-radius: 0.45rem;
 	padding: 0.13rem 0.44rem;
@@ -34,12 +54,48 @@
 	overflow: hidden;
 	border-radius: 999px;
 	background: var(--surface-2);
+	appearance: none;
 }
 
-.progressFill {
-	height: 100%;
+.progressTrack::-webkit-progress-bar {
+	background: var(--surface-2);
+	border-radius: 999px;
+}
+
+.progressTrack::-webkit-progress-value {
+	background: var(--primary);
 	border-radius: 999px;
 	transition: width 500ms ease;
+}
+
+.progressTrack::-moz-progress-bar {
+	background: var(--primary);
+	border-radius: 999px;
+	transition: width 500ms ease;
+}
+
+.progressTrackCompleted::-webkit-progress-value {
+	background: var(--success);
+}
+
+.progressTrackCompleted::-moz-progress-bar {
+	background: var(--success);
+}
+
+.progressTrackActive::-webkit-progress-value {
+	background: var(--primary);
+}
+
+.progressTrackActive::-moz-progress-bar {
+	background: var(--primary);
+}
+
+.progressTrackPlanned::-webkit-progress-value {
+	background: var(--accent);
+}
+
+.progressTrackPlanned::-moz-progress-bar {
+	background: var(--accent);
 }
 
 .progressCount {
@@ -58,6 +114,19 @@
 	left: 1.25rem;
 	width: 1px;
 	height: 100%;
+	background: var(--border);
+}
+
+.timelineLineCompleted {
+	background: var(--success);
+}
+
+.timelineLineActive {
+	background: var(--primary);
+}
+
+.timelineLinePlanned {
+	background: var(--border);
 }
 
 .quarterInner {
@@ -76,6 +145,20 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: 999px;
+	box-shadow: 0 0 0 3px var(--bg-base);
+	background: var(--surface-2);
+}
+
+.quarterMarkerCompleted {
+	background: var(--success);
+}
+
+.quarterMarkerActive {
+	background: var(--primary);
+}
+
+.quarterMarkerPlanned {
+	background: var(--surface-2);
 }
 
 .quarterCard {
@@ -222,6 +305,22 @@
 	font-variant-numeric: tabular-nums;
 }
 
+.statValueCompleted {
+	color: color-mix(in srgb, var(--success) 84%, white 16%);
+}
+
+.statValueInProgress {
+	color: color-mix(in srgb, var(--primary) 82%, white 18%);
+}
+
+.statValuePlanned {
+	color: color-mix(in srgb, var(--accent) 80%, white 20%);
+}
+
+.statValueFuture {
+	color: var(--text-muted);
+}
+
 .statLabel {
 	margin-top: 0.2rem;
 	font-size: 0.72rem;
@@ -257,12 +356,24 @@
 	overflow: hidden;
 	border-radius: 999px;
 	background: var(--surface-2);
+	appearance: none;
 }
 
-.overallFill {
-	height: 100%;
+.overallTrack::-webkit-progress-bar {
+	background: var(--surface-2);
 	border-radius: 999px;
+}
+
+.overallTrack::-webkit-progress-value {
 	background: var(--success);
+	border-radius: 999px;
+	transition: width 500ms ease;
+}
+
+.overallTrack::-moz-progress-bar {
+	background: var(--success);
+	border-radius: 999px;
+	transition: width 500ms ease;
 }
 
 .overallValue {

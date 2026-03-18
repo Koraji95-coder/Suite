@@ -1,0 +1,33 @@
+# autodraftService.ts — Two surgical patches
+# Apply these to your existing file. No other lines change.
+
+# ============================================================
+# PATCH 1: isRuleCategory — use Object.hasOwn instead of `in`
+# Location: line 528-531
+# ============================================================
+
+# OLD:
+# const isRuleCategory = (value: unknown): value is AutoDraftRule["category"] => {
+# 	if (typeof value !== "string") return false;
+# 	return value.toUpperCase() in FALLBACK_RULE_BY_CATEGORY;
+# };
+
+# NEW:
+const isRuleCategory = (value: unknown): value is AutoDraftRule["category"] => {
+	if (typeof value !== "string") return false;
+	return Object.hasOwn(FALLBACK_RULE_BY_CATEGORY, value.toUpperCase());
+};
+
+
+# ============================================================
+# PATCH 2: normalizeMarkupReviewItem — markup_id type alignment
+# Location: line 1539-1540
+# ============================================================
+
+# OLD:
+# markup_id:
+# 	typeof value.markup_id === "string" ? value.markup_id : undefined,
+
+# NEW (matches declared type string | null):
+		markup_id:
+			typeof value.markup_id === "string" ? value.markup_id : null,

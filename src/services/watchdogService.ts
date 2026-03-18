@@ -56,6 +56,203 @@ export interface WatchdogPickRootResponse {
 	path: string | null;
 }
 
+export interface WatchdogCollector {
+	collectorId: string;
+	name: string;
+	collectorType: string;
+	workstationId: string;
+	capabilities: string[];
+	metadata: Record<string, unknown>;
+	status: string;
+	createdAt: number;
+	updatedAt: number;
+	lastHeartbeatAt: number;
+	lastEventAt: number;
+	eventCount: number;
+	lastSequence: number;
+}
+
+export interface WatchdogCollectorRegistrationRequest {
+	collectorId?: string;
+	name?: string;
+	collectorType?: string;
+	workstationId?: string;
+	capabilities?: string[];
+	metadata?: Record<string, unknown>;
+	status?: string;
+}
+
+export interface WatchdogCollectorHeartbeatRequest {
+	collectorId: string;
+	status?: string;
+	sequence?: number;
+	metadata?: Record<string, unknown>;
+}
+
+export interface WatchdogCollectorEventPayload {
+	eventKey?: string;
+	eventType: string;
+	sourceType?: string;
+	timestamp?: number;
+	projectId?: string | null;
+	sessionId?: string | null;
+	path?: string | null;
+	drawingPath?: string | null;
+	workstationId?: string | null;
+	sizeBytes?: number;
+	mtimeMs?: number;
+	durationMs?: number;
+	metadata?: Record<string, unknown>;
+}
+
+export interface WatchdogCollectorEventsRequest {
+	collectorId: string;
+	events: WatchdogCollectorEventPayload[];
+}
+
+export interface WatchdogCollectorResponse {
+	ok: boolean;
+	collector: WatchdogCollector;
+}
+
+export interface WatchdogCollectorEventsResponse {
+	ok: boolean;
+	accepted: number;
+	rejected: number;
+	duplicates?: number;
+	collector: WatchdogCollector;
+	nextEventId: number;
+}
+
+export interface WatchdogCollectorsListResponse {
+	ok: boolean;
+	collectors: WatchdogCollector[];
+	count: number;
+}
+
+export interface WatchdogCollectorEvent {
+	eventId: number;
+	collectorId: string;
+	collectorType: string;
+	workstationId: string;
+	eventKey?: string;
+	eventType: string;
+	sourceType: string;
+	timestamp: number;
+	projectId?: string | null;
+	sessionId?: string | null;
+	path?: string | null;
+	drawingPath?: string | null;
+	sizeBytes?: number;
+	mtimeMs?: number;
+	durationMs?: number;
+	metadata: Record<string, unknown>;
+}
+
+export interface WatchdogEventsResponse {
+	ok: boolean;
+	events: WatchdogCollectorEvent[];
+	count: number;
+	afterEventId: number;
+	lastEventId: number;
+	nextEventId: number;
+}
+
+export interface WatchdogOverviewProjectCount {
+	projectId: string;
+	eventCount: number;
+}
+
+export interface WatchdogTrendBucket {
+	bucketStartMs: number;
+	eventCount: number;
+}
+
+export interface WatchdogProjectRule {
+	projectId: string;
+	roots: string[];
+	includeGlobs: string[];
+	excludeGlobs: string[];
+	drawingPatterns: string[];
+	metadata: Record<string, unknown>;
+	updatedAt: number;
+}
+
+export interface WatchdogProjectRuleResponse {
+	ok: boolean;
+	rule: WatchdogProjectRule;
+}
+
+export interface WatchdogOverviewResponse {
+	ok: boolean;
+	generatedAt: number;
+	timeWindowMs: number;
+	projectId?: string | null;
+	collectors: {
+		total: number;
+		online: number;
+		offline: number;
+	};
+	events: {
+		retained: number;
+		inWindow: number;
+		latestEventAt: number;
+		byType: Record<string, number>;
+		bySourceType: Record<string, number>;
+		latest: WatchdogCollectorEvent[];
+	};
+	projects: {
+		top: WatchdogOverviewProjectCount[];
+	};
+	trendBuckets: WatchdogTrendBucket[];
+}
+
+export interface WatchdogSessionSummary {
+	sessionId: string;
+	collectorId: string;
+	collectorType: string;
+	workstationId: string;
+	projectId?: string | null;
+	drawingPath?: string | null;
+	status: "live" | "paused" | "completed";
+	active: boolean;
+	startedAt: number;
+	endedAt?: number | null;
+	latestEventAt: number;
+	lastActivityAt?: number | null;
+	lastEventType?: string | null;
+	eventCount: number;
+	commandCount: number;
+	idleCount: number;
+	activationCount: number;
+	durationMs: number;
+	sourceAvailable: boolean;
+	pendingCount: number;
+	trackerUpdatedAt?: number | null;
+}
+
+export interface WatchdogSessionsResponse {
+	ok: boolean;
+	generatedAt: number;
+	timeWindowMs: number;
+	projectId?: string | null;
+	collectorId?: string | null;
+	count: number;
+	sessions: WatchdogSessionSummary[];
+}
+
+function buildQueryString(
+	query: Record<string, string | number | boolean | null | undefined>,
+): string {
+	const params = new URLSearchParams();
+	for (const [key, value] of Object.entries(query)) {
+		if (value === undefined || value === null || value === "") continue;
+		params.set(key, String(value));
+	}
+	const serialized = params.toString();
+	return serialized ? `?${serialized}` : "";
+}
+
 class WatchdogService {
 	private baseUrl: string;
 	private apiKey: string;
@@ -142,9 +339,7 @@ class WatchdogService {
 
 			return (await response.json()) as T;
 		} catch (error) {
-			throw new Error(
-				mapFetchErrorMessage(error, "Watchdog request failed."),
-			);
+			throw new Error(mapFetchErrorMessage(error, "Watchdog request failed."));
 		}
 	}
 
@@ -181,6 +376,177 @@ class WatchdogService {
 					initialPath: initialPath ?? null,
 				},
 				timeoutMs: 120_000,
+			},
+		);
+	}
+
+	async registerCollector(
+		payload: WatchdogCollectorRegistrationRequest,
+	): Promise<WatchdogCollectorResponse> {
+		return this.requestJson<WatchdogCollectorResponse>(
+			"/api/watchdog/collectors/register",
+			{
+				method: "POST",
+				body: payload,
+			},
+		);
+	}
+
+	async collectorHeartbeat(
+		payload: WatchdogCollectorHeartbeatRequest,
+	): Promise<WatchdogCollectorResponse> {
+		return this.requestJson<WatchdogCollectorResponse>(
+			"/api/watchdog/collectors/heartbeat",
+			{
+				method: "POST",
+				body: payload,
+			},
+		);
+	}
+
+	async ingestCollectorEvents(
+		payload: WatchdogCollectorEventsRequest,
+	): Promise<WatchdogCollectorEventsResponse> {
+		return this.requestJson<WatchdogCollectorEventsResponse>(
+			"/api/watchdog/collectors/events",
+			{
+				method: "POST",
+				body: payload,
+				timeoutMs: 30_000,
+			},
+		);
+	}
+
+	async listCollectors(): Promise<WatchdogCollectorsListResponse> {
+		return this.requestJson<WatchdogCollectorsListResponse>(
+			"/api/watchdog/collectors",
+		);
+	}
+
+	async listEvents(options?: {
+		limit?: number;
+		afterEventId?: number;
+		collectorId?: string;
+		projectId?: string;
+		eventType?: string;
+		sinceMs?: number;
+		untilMs?: number;
+	}): Promise<WatchdogEventsResponse> {
+		const query = buildQueryString({
+			limit: options?.limit,
+			afterEventId: options?.afterEventId,
+			collectorId: options?.collectorId,
+			projectId: options?.projectId,
+			eventType: options?.eventType,
+			sinceMs: options?.sinceMs,
+			untilMs: options?.untilMs,
+		});
+		return this.requestJson<WatchdogEventsResponse>(`/api/watchdog/events${query}`);
+	}
+
+	async getOverview(options?: {
+		projectId?: string;
+		timeWindowMs?: number;
+	}): Promise<WatchdogOverviewResponse> {
+		const query = buildQueryString({
+			projectId: options?.projectId,
+			timeWindowMs: options?.timeWindowMs,
+		});
+		return this.requestJson<WatchdogOverviewResponse>(
+			`/api/watchdog/overview${query}`,
+		);
+	}
+
+	async getProjectOverview(
+		projectId: string,
+		options?: { timeWindowMs?: number },
+	): Promise<WatchdogOverviewResponse> {
+		const query = buildQueryString({
+			timeWindowMs: options?.timeWindowMs,
+		});
+		return this.requestJson<WatchdogOverviewResponse>(
+			`/api/watchdog/projects/${encodeURIComponent(projectId)}/overview${query}`,
+		);
+	}
+
+	async listSessions(options?: {
+		limit?: number;
+		collectorId?: string;
+		projectId?: string;
+		timeWindowMs?: number;
+		activeOnly?: boolean;
+	}): Promise<WatchdogSessionsResponse> {
+		const query = buildQueryString({
+			limit: options?.limit,
+			collectorId: options?.collectorId,
+			projectId: options?.projectId,
+			timeWindowMs: options?.timeWindowMs,
+			activeOnly: options?.activeOnly,
+		});
+		return this.requestJson<WatchdogSessionsResponse>(
+			`/api/watchdog/sessions${query}`,
+		);
+	}
+
+	async getProjectSessions(
+		projectId: string,
+		options?: {
+			limit?: number;
+			collectorId?: string;
+			timeWindowMs?: number;
+			activeOnly?: boolean;
+		},
+	): Promise<WatchdogSessionsResponse> {
+		const query = buildQueryString({
+			limit: options?.limit,
+			collectorId: options?.collectorId,
+			timeWindowMs: options?.timeWindowMs,
+			activeOnly: options?.activeOnly,
+		});
+		return this.requestJson<WatchdogSessionsResponse>(
+			`/api/watchdog/projects/${encodeURIComponent(projectId)}/sessions${query}`,
+		);
+	}
+
+	async getProjectEvents(
+		projectId: string,
+		options?: {
+			limit?: number;
+			afterEventId?: number;
+			collectorId?: string;
+			eventType?: string;
+			sinceMs?: number;
+			untilMs?: number;
+		},
+	): Promise<WatchdogEventsResponse> {
+		const query = buildQueryString({
+			limit: options?.limit,
+			afterEventId: options?.afterEventId,
+			collectorId: options?.collectorId,
+			eventType: options?.eventType,
+			sinceMs: options?.sinceMs,
+			untilMs: options?.untilMs,
+		});
+		return this.requestJson<WatchdogEventsResponse>(
+			`/api/watchdog/projects/${encodeURIComponent(projectId)}/events${query}`,
+		);
+	}
+
+	async getProjectRule(projectId: string): Promise<WatchdogProjectRuleResponse> {
+		return this.requestJson<WatchdogProjectRuleResponse>(
+			`/api/watchdog/projects/${encodeURIComponent(projectId)}/rules`,
+		);
+	}
+
+	async putProjectRule(
+		projectId: string,
+		rule: Omit<WatchdogProjectRule, "projectId" | "updatedAt">,
+	): Promise<WatchdogProjectRuleResponse> {
+		return this.requestJson<WatchdogProjectRuleResponse>(
+			`/api/watchdog/projects/${encodeURIComponent(projectId)}/rules`,
+			{
+				method: "PUT",
+				body: rule,
 			},
 		);
 	}

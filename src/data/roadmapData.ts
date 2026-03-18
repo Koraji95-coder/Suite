@@ -292,9 +292,9 @@ export const ROADMAP_QUARTERS: Quarter[] = [
 				category: "infrastructure",
 			},
 			{
-				title: "AI Configuration panel in Settings",
+				title: "Agent workspace controls",
 				description:
-					"Configure model provider (OpenAI, Anthropic, Ollama), prompt system instructions, response format preferences, and token usage tracking.",
+					"Add real account-level controls for local providers, usage diagnostics, and workspace-specific agent defaults without bringing back placeholder settings tabs.",
 				status: "future",
 				category: "ai",
 			},

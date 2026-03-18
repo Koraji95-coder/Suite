@@ -37,18 +37,34 @@
 		transparent
 	);
 
-	--agent-accent-warm: color-mix(in srgb, var(--tertiary) 80%, #ffad55 20%);
+	--agent-accent-warm: color-mix(
+		in srgb,
+		var(--accent) 70%,
+		var(--tertiary) 30%
+	);
 	--agent-accent-warm-soft: color-mix(
 		in srgb,
 		var(--agent-accent-warm) 22%,
 		transparent
 	);
-	--agent-accent-cool: color-mix(in srgb, var(--primary) 68%, var(--accent) 32%);
+	--agent-accent-cool: color-mix(in srgb, var(--primary) 84%, #7f95d8 16%);
 	--agent-accent-cool-soft: color-mix(in srgb, var(--primary) 20%, transparent);
 
-	--agent-ambient-start: color-mix(in srgb, var(--bg) 84%, var(--agent-accent-cool) 16%);
-	--agent-ambient-mid: color-mix(in srgb, var(--surface) 88%, var(--agent-accent-warm) 12%);
-	--agent-ambient-end: color-mix(in srgb, var(--bg) 84%, var(--agent-accent-warm) 16%);
+	--agent-ambient-start: color-mix(
+		in srgb,
+		var(--bg) 84%,
+		var(--agent-accent-cool) 16%
+	);
+	--agent-ambient-mid: color-mix(
+		in srgb,
+		var(--surface) 88%,
+		var(--agent-accent-warm) 12%
+	);
+	--agent-ambient-end: color-mix(
+		in srgb,
+		var(--bg) 84%,
+		var(--agent-accent-warm) 16%
+	);
 	--agent-text-strong: color-mix(in srgb, var(--text) 96%, #fff 4%);
 	--agent-text-soft: color-mix(in srgb, var(--text-muted) 84%, transparent);
 
@@ -62,31 +78,4 @@
 	--nexus-shell-border: color-mix(in srgb, var(--border) 82%, transparent);
 	--nexus-shell-glow: color-mix(in srgb, var(--primary) 22%, transparent);
 	--nexus-shell-muted: color-mix(in srgb, var(--surface-2) 76%, transparent);
-}
-
-:root[data-theme="nexusCore"] {
-	--agent-accent-warm: #f2b94e;
-	--agent-accent-cool: #15e7d5;
-	--agent-ambient-start: color-mix(in srgb, #040a15 86%, #15e7d5 14%);
-	--agent-ambient-mid: color-mix(in srgb, #0a1326 88%, #4f8cff 12%);
-	--agent-ambient-end: color-mix(in srgb, #040a15 84%, #f2b94e 16%);
-	--nexus-shell-glow: rgb(21 231 213 / 22%);
-}
-
-:root[data-theme="nexusEmber"] {
-	--agent-accent-warm: #ff9a45;
-	--agent-accent-cool: #ffcf88;
-	--agent-ambient-start: color-mix(in srgb, #110a06 86%, #ff9a45 14%);
-	--agent-ambient-mid: color-mix(in srgb, #1b110b 86%, #ffd38f 14%);
-	--agent-ambient-end: color-mix(in srgb, #110a06 84%, #ff7b38 16%);
-	--nexus-shell-glow: rgb(255 138 66 / 24%);
-}
-
-:root[data-theme="nexusOrchid"] {
-	--agent-accent-warm: #69b4ff;
-	--agent-accent-cool: #b06dff;
-	--agent-ambient-start: color-mix(in srgb, #07071a 86%, #8a7dff 14%);
-	--agent-ambient-mid: color-mix(in srgb, #12122a 86%, #b06dff 14%);
-	--agent-ambient-end: color-mix(in srgb, #07071a 84%, #69b4ff 16%);
-	--nexus-shell-glow: rgb(138 125 255 / 24%);
 }

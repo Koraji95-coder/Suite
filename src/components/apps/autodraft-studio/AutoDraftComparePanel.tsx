@@ -1418,7 +1418,6 @@ export function AutoDraftComparePanel() {
 		tolerance,
 		calibrationMode,
 		manualOverride,
-		cadPoints,
 		roiBounds,
 	]);
 
@@ -1925,7 +1924,7 @@ export function AutoDraftComparePanel() {
 			return;
 		}
 		void refreshReplacementLearningStatus();
-	}, [compareResult?.requestId, refreshReplacementLearningStatus]);
+	}, [compareResult, refreshReplacementLearningStatus]);
 
 	return (
 		<div className={styles.comparePanel}>

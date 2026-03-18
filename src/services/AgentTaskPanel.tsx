@@ -1,4 +1,11 @@
-import { ChevronRight, History, RotateCcw, Trash2 } from "lucide-react";
+import {
+	ChevronRight,
+	History,
+	RotateCcw,
+	Target,
+	Trash2,
+	Zap,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import {
 	Dialog,
@@ -8,7 +15,7 @@ import {
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
 import { useToast } from "@/components/notification-system/ToastProvider";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import {
 	agentTaskManager,
 	type ExecutedTask,
@@ -22,15 +29,29 @@ interface AgentTaskPanelProps {
 	isExecuting?: boolean;
 }
 
+type AgentTaskTab = "quick" | "custom" | "history";
+
+const TAB_META: Array<{
+	id: AgentTaskTab;
+	label: string;
+	icon: typeof Zap;
+}> = [
+	{ id: "quick", label: "Quick Tasks", icon: Zap },
+	{ id: "custom", label: "Custom", icon: Target },
+	{ id: "history", label: "History", icon: History },
+];
+
+function formatTaskTimestamp(timestamp: string): string {
+	const date = new Date(timestamp);
+	return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+}
+
 export function AgentTaskPanel({
 	onExecuteTask,
 	isExecuting = false,
 }: AgentTaskPanelProps) {
-	const { palette } = useTheme();
 	const { showToast } = useToast();
-	const [activeTab, setActiveTab] = useState<"quick" | "custom" | "history">(
-		"quick",
-	);
+	const [activeTab, setActiveTab] = useState<AgentTaskTab>("quick");
 	const [customPrompt, setCustomPrompt] = useState("");
 	const [taskHistory, setTaskHistory] = useState<ExecutedTask[]>([]);
 	const [selectedPredefinedTask, setSelectedPredefinedTask] = useState<
@@ -42,13 +63,16 @@ export function AgentTaskPanel({
 		setTaskHistory(agentTaskManager.getTaskHistory());
 	}, []);
 
+	const refreshHistorySoon = () => {
+		window.setTimeout(() => {
+			setTaskHistory(agentTaskManager.getTaskHistory());
+		}, 1000);
+	};
+
 	const handleExecutePredefinedTask = (task: PredefinedTask) => {
 		setSelectedPredefinedTask(task.id);
 		onExecuteTask(task.prompt, task.name);
-		// Update history after execution
-		setTimeout(() => {
-			setTaskHistory(agentTaskManager.getTaskHistory());
-		}, 1000);
+		refreshHistorySoon();
 	};
 
 	const handleExecuteCustomTask = () => {
@@ -56,21 +80,12 @@ export function AgentTaskPanel({
 		onExecuteTask(customPrompt, "Custom Task");
 		setCustomPrompt("");
 		setSelectedPredefinedTask(null);
-		// Update history after execution
-		setTimeout(() => {
-			setTaskHistory(agentTaskManager.getTaskHistory());
-		}, 1000);
+		refreshHistorySoon();
 	};
 
 	const handleRerunTask = (task: ExecutedTask) => {
 		onExecuteTask(task.prompt, task.name);
-		setTimeout(() => {
-			setTaskHistory(agentTaskManager.getTaskHistory());
-		}, 1000);
-	};
-
-	const handleClearHistory = () => {
-		setConfirmClearHistory(true);
+		refreshHistorySoon();
 	};
 
 	const confirmClearTaskHistory = () => {
@@ -80,360 +95,146 @@ export function AgentTaskPanel({
 		showToast("success", "Task history cleared.");
 	};
 
-	const tabButtonStyle = (isActive: boolean) => ({
-		padding: "8px 16px",
-		border: "none",
-		background: isActive ? hexToRgba(palette.primary, 0.1) : "transparent",
-		color: isActive ? palette.primary : palette.text,
-		cursor: "pointer",
-		fontSize: "14px",
-		fontWeight: isActive ? 600 : 400,
-		borderBottom: isActive
-			? `2px solid ${palette.primary}`
-			: "2px solid transparent",
-		transition: "all 0.2s ease",
-	});
-
 	return (
 		<>
-			<div
-				style={{
-					display: "flex",
-					flexDirection: "column",
-					height: "100%",
-					background: hexToRgba(palette.surfaceLight, 0.5),
-					borderRadius: "8px",
-					overflow: "hidden",
-				}}
-			>
-				{/* Tab Navigation */}
-				<div
-					style={{
-						display: "flex",
-						borderBottom: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-						background: palette.background,
-					}}
-				>
-					<button
-						onClick={() => setActiveTab("quick")}
-						style={tabButtonStyle(activeTab === "quick")}
-					>
-						⚡ Quick Tasks
-					</button>
-					<button
-						onClick={() => setActiveTab("custom")}
-						style={tabButtonStyle(activeTab === "custom")}
-					>
-						🎯 Custom
-					</button>
-					<button
-						onClick={() => setActiveTab("history")}
-						style={tabButtonStyle(activeTab === "history")}
-					>
-						<History
-							size={16}
-							style={{ display: "inline", marginRight: "4px" }}
-						/>
-						History
-					</button>
+			<div className={styles.root}>
+				<div className={styles.tabs} role="tablist" aria-label="Agent tasks">
+					{TAB_META.map((tab) => {
+						const Icon = tab.icon;
+						return (
+							<button
+								key={tab.id}
+								type="button"
+								role="tab"
+								aria-selected={activeTab === tab.id}
+								className={cn(
+									styles.tabButton,
+									activeTab === tab.id && styles.tabButtonActive,
+								)}
+								onClick={() => setActiveTab(tab.id)}
+							>
+								<Icon size={14} className={styles.tabIcon} />
+								<span>{tab.label}</span>
+							</button>
+						);
+					})}
 				</div>
 
-				{/* Tab Content */}
-				<div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
-					{/* Quick Tasks Tab */}
+				<div className={styles.content}>
 					{activeTab === "quick" && (
-						<div
-							style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-						>
-							{PREDEFINED_TASKS.filter((t) => t.id !== "custom-task").map(
+						<div className={styles.stack}>
+							{PREDEFINED_TASKS.filter((task) => task.id !== "custom-task").map(
 								(task) => (
 									<button
 										key={task.id}
+										type="button"
 										onClick={() => handleExecutePredefinedTask(task)}
 										disabled={isExecuting}
-										style={{
-											padding: "12px 16px",
-											background:
-												selectedPredefinedTask === task.id
-													? hexToRgba(palette.primary, 0.2)
-													: hexToRgba(palette.primary, 0.05),
-											border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-											borderRadius: "6px",
-											cursor: isExecuting ? "not-allowed" : "pointer",
-											textAlign: "left",
-											opacity: isExecuting ? 0.6 : 1,
-											transition: "all 0.2s ease",
-											fontSize: "14px",
-										}}
-										onMouseEnter={(e) => {
-											if (!isExecuting) {
-												e.currentTarget.style.background = hexToRgba(
-													palette.primary,
-													0.15,
-												);
-											}
-										}}
-										onMouseLeave={(e) => {
-											e.currentTarget.style.background =
-												selectedPredefinedTask === task.id
-													? hexToRgba(palette.primary, 0.2)
-													: hexToRgba(palette.primary, 0.05);
-										}}
+										className={cn(
+											styles.taskButton,
+											selectedPredefinedTask === task.id &&
+												styles.taskButtonActive,
+											isExecuting && styles.taskButtonDisabled,
+										)}
 									>
-										<div
-											style={{
-												display: "flex",
-												alignItems: "center",
-												gap: "8px",
-											}}
-										>
-											<span>{task.icon}</span>
-											<div style={{ flex: 1 }}>
-												<div
-													style={{ fontWeight: 600, color: palette.primary }}
-												>
-													{task.name}
-												</div>
-												<div
-													style={{
-														fontSize: "12px",
-														color: palette.textMuted,
-														marginTop: "2px",
-													}}
-												>
-													{task.description}
-												</div>
+										<div className={styles.taskIcon}>{task.icon}</div>
+										<div className={styles.taskBody}>
+											<div className={styles.taskName}>{task.name}</div>
+											<div className={styles.taskDescription}>
+												{task.description}
 											</div>
-											<ChevronRight size={16} />
 										</div>
+										<ChevronRight size={16} className={styles.taskChevron} />
 									</button>
 								),
 							)}
 						</div>
 					)}
 
-					{/* Custom Task Tab */}
 					{activeTab === "custom" && (
-						<div
-							style={{
-								display: "flex",
-								flexDirection: "column",
-								gap: "12px",
-								height: "100%",
-							}}
-						>
-							<div>
-								<label
-									style={{
-										fontSize: "12px",
-										color: palette.textMuted,
-										fontWeight: 600,
-									}}
-								>
-									Enter Custom Task Prompt
-								</label>
-								<textarea
-									value={customPrompt}
-									onChange={(e) => setCustomPrompt(e.target.value)}
-									placeholder="Describe the task you want the agent to perform..."
-									disabled={isExecuting}
-									style={{
-										width: "100%",
-										minHeight: "120px",
-										padding: "12px",
-										marginTop: "8px",
-										border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-										borderRadius: "6px",
-										background: palette.background,
-										color: palette.text,
-										fontFamily: "inherit",
-										fontSize: "14px",
-										resize: "none",
-										opacity: isExecuting ? 0.6 : 1,
-									}}
-								/>
-							</div>
+						<div className={styles.customPanel}>
+							<label htmlFor="agent-task-custom-prompt" className={styles.fieldLabel}>
+								Enter custom task prompt
+							</label>
+							<textarea
+								id="agent-task-custom-prompt"
+								value={customPrompt}
+								onChange={(event) => setCustomPrompt(event.target.value)}
+								placeholder="Describe the task you want the agent to perform..."
+								disabled={isExecuting}
+								className={cn(
+									styles.textarea,
+									isExecuting && styles.textareaDisabled,
+								)}
+							/>
 							<button
+								type="button"
 								onClick={handleExecuteCustomTask}
 								disabled={!customPrompt.trim() || isExecuting}
-								style={{
-									padding: "12px 16px",
-									background: palette.primary,
-									color: palette.background,
-									border: "none",
-									borderRadius: "6px",
-									cursor:
-										customPrompt.trim() && !isExecuting
-											? "pointer"
-											: "not-allowed",
-									fontWeight: 600,
-									opacity: !customPrompt.trim() || isExecuting ? 0.5 : 1,
-									transition: "opacity 0.2s ease",
-								}}
+								className={styles.primaryButton}
 							>
 								{isExecuting ? "Running..." : "Run Task"}
 							</button>
 						</div>
 					)}
 
-					{/* History Tab */}
 					{activeTab === "history" && (
-						<div
-							style={{
-								display: "flex",
-								flexDirection: "column",
-								gap: "12px",
-								height: "100%",
-							}}
-						>
+						<div className={styles.historyPanel}>
 							{taskHistory.length === 0 ? (
-								<div
-									style={{
-										color: palette.textMuted,
-										fontSize: "14px",
-										textAlign: "center",
-										paddingTop: "20px",
-									}}
-								>
+								<div className={styles.emptyState}>
 									No task history yet. Run a task to see it here.
 								</div>
 							) : (
 								<>
-									<div
-										style={{
-											display: "flex",
-											justifyContent: "space-between",
-											alignItems: "center",
-										}}
-									>
-										<span
-											style={{ fontSize: "12px", color: palette.textMuted }}
-										>
+									<div className={styles.historyToolbar}>
+										<span className={styles.historyCount}>
 											{taskHistory.length} task
 											{taskHistory.length !== 1 ? "s" : ""}
 										</span>
 										<button
-											onClick={handleClearHistory}
-											style={{
-												background: "transparent",
-												border: "none",
-												color: palette.textMuted,
-												cursor: "pointer",
-												fontSize: "12px",
-												padding: "4px 8px",
-												display: "flex",
-												alignItems: "center",
-												gap: "4px",
-											}}
+											type="button"
+											onClick={() => setConfirmClearHistory(true)}
+											className={styles.clearHistoryButton}
 										>
 											<Trash2 size={14} />
 											Clear
 										</button>
 									</div>
 
-									<div
-										style={{
-											flex: 1,
-											overflowY: "auto",
-											display: "flex",
-											flexDirection: "column",
-											gap: "8px",
-										}}
-									>
+									<div className={styles.historyList}>
 										{taskHistory.map((task) => (
-											<div
-												key={task.id}
-												style={{
-													padding: "12px",
-													background: hexToRgba(palette.primary, 0.05),
-													border: `1px solid ${hexToRgba(palette.primary, 0.1)}`,
-													borderRadius: "6px",
-													fontSize: "13px",
-												}}
-											>
-												<div
-													style={{
-														display: "flex",
-														justifyContent: "space-between",
-														alignItems: "start",
-														marginBottom: "8px",
-													}}
-												>
-													<div style={{ flex: 1 }}>
-														<div
-															style={{
-																fontWeight: 600,
-																color: palette.primary,
-															}}
-														>
-															{task.name}
-														</div>
-														<div
-															style={{
-																fontSize: "11px",
-																color: palette.textMuted,
-																marginTop: "2px",
-															}}
-														>
-															{new Date(task.executedAt).toLocaleDateString()}{" "}
-															{new Date(task.executedAt).toLocaleTimeString()}
+											<div key={task.id} className={styles.historyItem}>
+												<div className={styles.historyItemHeader}>
+													<div className={styles.historyInfo}>
+														<div className={styles.historyName}>{task.name}</div>
+														<div className={styles.historyTimestamp}>
+															{formatTaskTimestamp(task.executedAt)}
 														</div>
 													</div>
 													<div
-														style={{
-															fontSize: "11px",
-															padding: "2px 8px",
-															borderRadius: "3px",
-															background:
-																task.status === "complete"
-																	? hexToRgba("#22c55e", 0.1)
-																	: hexToRgba("#ef4444", 0.1),
-															color:
-																task.status === "complete"
-																	? "#22c55e"
-																	: "#ef4444",
-														}}
+														className={cn(
+															styles.historyStatus,
+															task.status === "complete"
+																? styles.historyStatusComplete
+																: styles.historyStatusError,
+														)}
 													>
 														{task.status}
 													</div>
 												</div>
 
 												{task.result && (
-													<div
-														style={{
-															fontSize: "12px",
-															color: palette.textMuted,
-															marginBottom: "8px",
-															maxHeight: "60px",
-															overflowY: "auto",
-															padding: "8px",
-															background: hexToRgba(palette.background, 0.5),
-															borderRadius: "4px",
-														}}
-													>
-														{task.result.substring(0, 150)}...
+													<div className={styles.resultPreview}>
+														{task.result.slice(0, 150)}
+														{task.result.length > 150 ? "..." : ""}
 													</div>
 												)}
 
 												<button
+													type="button"
 													onClick={() => handleRerunTask(task)}
 													disabled={isExecuting}
-													style={{
-														width: "100%",
-														padding: "6px 12px",
-														background: "transparent",
-														border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-														borderRadius: "4px",
-														color: palette.primary,
-														cursor: isExecuting ? "not-allowed" : "pointer",
-														fontSize: "12px",
-														fontWeight: 500,
-														display: "flex",
-														alignItems: "center",
-														justifyContent: "center",
-														gap: "4px",
-														opacity: isExecuting ? 0.5 : 1,
-													}}
+													className={styles.rerunButton}
 												>
 													<RotateCcw size={12} />
 													Re-run
@@ -447,6 +248,7 @@ export function AgentTaskPanel({
 					)}
 				</div>
 			</div>
+
 			<Dialog open={confirmClearHistory} onOpenChange={setConfirmClearHistory}>
 				<DialogContent className={styles.confirmDialogContent}>
 					<DialogHeader>
@@ -457,12 +259,14 @@ export function AgentTaskPanel({
 					</p>
 					<DialogFooter className={styles.confirmFooter}>
 						<button
+							type="button"
 							onClick={() => setConfirmClearHistory(false)}
 							className={styles.cancelButton}
 						>
 							Cancel
 						</button>
 						<button
+							type="button"
 							onClick={confirmClearTaskHistory}
 							className={styles.clearButton}
 						>

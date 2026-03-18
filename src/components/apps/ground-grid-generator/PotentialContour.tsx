@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useTheme } from "@/lib/palette";
+import { useResolvedAppearance } from "@/lib/appearance/useResolvedAppearance";
 import { GridCanvasEmptyState } from "./GridCanvasEmptyState";
 import styles from "./PotentialContour.module.css";
 import {
@@ -26,7 +26,7 @@ export function PotentialContour({
 	soilResistivity,
 	faultCurrent,
 }: PotentialContourProps) {
-	const { palette } = useTheme();
+	const appearance = useResolvedAppearance();
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [hoveredValue, setHoveredValue] =
@@ -118,7 +118,7 @@ export function PotentialContour({
 		<div ref={containerRef} className={styles.root}>
 			<canvas
 				ref={canvasRef}
-				style={{ width: "100%", height: "100%", borderRadius: 8 }}
+				className={styles.canvas}
 				onMouseMove={handleMouseMove}
 				onMouseLeave={() => setHoveredValue(null)}
 			/>
@@ -126,10 +126,10 @@ export function PotentialContour({
 				hoveredValue={hoveredValue}
 				minVal={minVal}
 				maxVal={maxVal}
-				backgroundColor={palette.background}
-				primaryColor={palette.primary}
-				textColor={palette.text}
-				mutedTextColor={palette.textMuted}
+				backgroundColor={appearance.background}
+				primaryColor={appearance.primary}
+				textColor={appearance.text}
+				mutedTextColor={appearance.textMuted}
 			/>
 		</div>
 	);

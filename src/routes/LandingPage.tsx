@@ -22,22 +22,9 @@ import {
 import { Badge } from "../components/primitives/Badge";
 import { Button } from "../components/primitives/Button";
 import { Panel } from "../components/primitives/Panel";
-import { HStack, Stack } from "../components/primitives/Stack";
+import { HStack } from "../components/primitives/Stack";
 import { Text } from "../components/primitives/Text";
-import { COLOR_SCHEMES, useTheme } from "../lib/palette";
 import styles from "./LandingPage.module.css";
-
-const VISIBLE_THEMES = [
-	"midnight",
-	"graphite",
-	"slate",
-	"ember",
-	"copper",
-	"forest",
-	"ocean",
-	"violet",
-	"rose",
-] as const;
 
 const FEATURES = [
 	{
@@ -111,7 +98,6 @@ function useScrollAnimation(threshold = 0.1) {
 }
 
 export default function LandingPage() {
-	const { schemeKey, setScheme } = useTheme();
 	const [mounted, setMounted] = useState(false);
 	const [scrolled, setScrolled] = useState(false);
 	const location = useLocation();
@@ -231,8 +217,8 @@ export default function LandingPage() {
 
 							<Text color="muted" size="md" className={styles.heroCopy}>
 								{APP_TAGLINE}. Manage projects, coordinate timelines, generate
-								documents, and run AI-powered agents — all from a single
-								themeable workspace.
+								documents, and run AI-powered agents — all from a single unified
+								workspace.
 							</Text>
 
 							<HStack gap={3} wrap className={styles.heroFeatureBadges}>
@@ -275,7 +261,11 @@ export default function LandingPage() {
 											className={styles.heroSecondaryAgent}
 											style={{ animationDelay: `${600 + i * 100}ms` }}
 										>
-											<AgentPixelMark profileId={id} size={28} detailLevel="hero" />
+											<AgentPixelMark
+												profileId={id}
+												size={28}
+												detailLevel="hero"
+											/>
 										</div>
 									))}
 								</HStack>
@@ -385,63 +375,6 @@ export default function LandingPage() {
 								);
 							})}
 						</div>
-					</Panel>
-
-					<Panel
-						variant="default"
-						padding="md"
-						className={cn(
-							styles.themePanel,
-							agentsAnim.isVisible
-								? styles.themePanelVisible
-								: styles.themePanelHidden,
-						)}
-					>
-						<Text size="sm" weight="semibold" block>
-							Theme
-						</Text>
-						<Text size="xs" color="muted" className={styles.themeCopy} block>
-							Pick a visual mode. All colors update instantly.
-						</Text>
-
-						<Stack gap={2} className={styles.themeButtons}>
-							{VISIBLE_THEMES.map((key) => {
-								const scheme = COLOR_SCHEMES[key];
-								if (!scheme) return null;
-
-								const isActive = schemeKey === key;
-
-								return (
-									<button
-										key={key}
-										type="button"
-										onClick={() => setScheme(key)}
-										className={cn(
-											styles.themeButton,
-											isActive
-												? styles.themeButtonActive
-												: styles.themeButtonInactive,
-										)}
-									>
-										<span
-											className={cn(
-												styles.themeDot,
-												isActive && styles.themeDotActive,
-											)}
-											style={{ background: scheme.primary }}
-										/>
-										<Text
-											size="sm"
-											weight="medium"
-											color={isActive ? "default" : "muted"}
-										>
-											{scheme.name}
-										</Text>
-										{isActive && <span className={styles.themeActiveMarker} />}
-									</button>
-								);
-							})}
-						</Stack>
 					</Panel>
 				</section>
 

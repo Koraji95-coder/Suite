@@ -1,4 +1,4 @@
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
+import type { ColorScheme } from "@/lib/palette";
 import styles from "./CoordinatesGrabberHeader.module.css";
 
 interface CoordinatesGrabberHeaderProps {
@@ -6,61 +6,21 @@ interface CoordinatesGrabberHeaderProps {
 }
 
 export function CoordinatesGrabberHeader({
-	palette,
+	palette: _palette,
 }: CoordinatesGrabberHeaderProps) {
 	return (
-		<div
-			className={styles.root}
-			style={{ borderBottomColor: hexToRgba(palette.primary, 0.1) }}
-		>
+		<div className={styles.root}>
 			<div>
-				<h1
-					style={{
-						margin: "0 0 4px 0",
-						fontSize: "20px",
-						fontWeight: "600",
-						color: palette.text,
-					}}
-				>
-					Coordinates Grabber
-				</h1>
-				<p
-					style={{
-						margin: "0",
-						fontSize: "12px",
-						color: palette.textMuted,
-					}}
-				>
+				<h1 className={styles.title}>Coordinates Grabber</h1>
+				<p className={styles.subtitle}>
 					Extract coordinate points from CAD drawings
 				</p>
 			</div>
 			<div className={styles.actions}>
-				<div
-					title="Coming soon: Presets"
-					style={{
-						padding: "6px 8px",
-						borderRadius: "4px",
-						border: `1px dashed ${hexToRgba(palette.primary, 0.3)}`,
-						background: hexToRgba(palette.primary, 0.05),
-						color: palette.textMuted,
-						fontSize: "11px",
-						cursor: "not-allowed",
-						opacity: 0.5,
-					}}
-				>
+				<div title="Coming soon: Presets" className={styles.presetChip}>
 					Presets (coming soon)
 				</div>
-				<div
-					style={{
-						fontSize: "24px",
-						fontWeight: "700",
-						color: palette.primary,
-						opacity: 0.7,
-						marginLeft: "6px",
-					}}
-				>
-					📍
-				</div>
+				<div className={styles.pinMark}>📍</div>
 			</div>
 		</div>
 	);

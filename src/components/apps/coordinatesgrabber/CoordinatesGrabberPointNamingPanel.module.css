@@ -1,0 +1,38 @@
+.root {
+	padding: 0.75rem;
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--surface) 76%, transparent);
+	border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.title {
+	margin: 0 0 0.75rem;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	color: var(--text);
+	text-transform: uppercase;
+	letter-spacing: 0.03125rem;
+}
+
+.grid {
+	display: grid;
+	gap: 0.5rem;
+	grid-template-columns: repeat(auto-fit, minmax(8.75rem, 1fr));
+}
+
+.label {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.input {
+	margin-top: 0.25rem;
+	width: 100%;
+	padding: 0.5rem;
+	border-radius: 0.25rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+	background: color-mix(in srgb, var(--bg) 86%, transparent);
+	color: var(--text);
+	font-size: 0.75rem;
+	box-sizing: border-box;
+}

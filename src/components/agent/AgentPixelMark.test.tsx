@@ -1,6 +1,5 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AGENT_MARKS } from "./agentMarkPatterns";
 import { AgentPixelMark } from "./AgentPixelMark";
 
 async function advance(ms: number): Promise<void> {
@@ -81,20 +80,19 @@ describe("AgentPixelMark", () => {
 		}
 	});
 
-	it("renders base grid when state frames are missing", () => {
-		const originalFrames = AGENT_MARKS.koro.stateFrames;
-		AGENT_MARKS.koro.stateFrames = {};
-		try {
-			const idle = render(<AgentPixelMark profileId="koro" state="idle" size={40} />);
-			const warning = render(
-				<AgentPixelMark profileId="koro" state="warning" size={40} />,
-			);
-			const idleRectCount = idle.container.querySelectorAll("rect").length;
-			const warningRectCount = warning.container.querySelectorAll("rect").length;
-			expect(warningRectCount).toBe(idleRectCount);
-		} finally {
-			AGENT_MARKS.koro.stateFrames = originalFrames;
-		}
+	it("renders crest vectors for idle and warning states", () => {
+		const idle = render(<AgentPixelMark profileId="koro" state="idle" size={40} />);
+		const warning = render(
+			<AgentPixelMark profileId="koro" state="warning" size={40} />,
+		);
+		expect(
+			idle.container.querySelector("[data-agent-layer='crest']"),
+		).not.toBeNull();
+		expect(
+			warning.container.querySelector("[data-agent-layer='crest']"),
+		).not.toBeNull();
+		expect(idle.container.querySelectorAll("path").length).toBeGreaterThan(0);
+		expect(warning.container.querySelectorAll("path").length).toBeGreaterThan(0);
 	});
 
 	it("keeps legacy expression/pulse/breathe compatibility", () => {

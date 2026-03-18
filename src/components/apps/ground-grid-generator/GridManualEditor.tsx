@@ -1,5 +1,6 @@
 import { type CSSProperties, useRef } from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { useResolvedAppearance } from "@/lib/appearance/useResolvedAppearance";
+import { hexToRgba } from "@/lib/palette";
 import { GridManualEditorCanvas } from "./GridManualEditorCanvas";
 import type { GridManualEditorProps } from "./GridManualEditorModels";
 import { GridManualEditorSuggestionDialog } from "./GridManualEditorSuggestionDialog";
@@ -15,7 +16,7 @@ export function GridManualEditor({
 	onConductorsChange,
 	onPlacementsChange,
 }: GridManualEditorProps) {
-	const { palette } = useTheme();
+	const appearance = useResolvedAppearance();
 	const svgRef = useRef<SVGSVGElement>(null);
 	const {
 		addConductorByCoord,
@@ -67,10 +68,10 @@ export function GridManualEditor({
 		padding: "5px 10px",
 		fontSize: 11,
 		fontWeight: 600,
-		border: `1px solid ${hexToRgba(palette.primary, active ? 0.4 : 0.15)}`,
+		border: `1px solid ${hexToRgba(appearance.primary, active ? 0.4 : 0.15)}`,
 		borderRadius: 5,
-		background: active ? hexToRgba(palette.primary, 0.15) : "transparent",
-		color: active ? palette.text : palette.textMuted,
+		background: active ? hexToRgba(appearance.primary, 0.15) : "transparent",
+		color: active ? appearance.text : appearance.textMuted,
 		cursor: "pointer",
 		display: "flex",
 		alignItems: "center",
@@ -84,10 +85,10 @@ export function GridManualEditor({
 		padding: "4px 6px",
 		fontSize: 11,
 		fontFamily: "monospace",
-		background: hexToRgba(palette.surfaceLight, 0.3),
-		border: `1px solid ${hexToRgba(palette.primary, 0.15)}`,
+		background: hexToRgba(appearance.surfaceElevated, 0.3),
+		border: `1px solid ${hexToRgba(appearance.primary, 0.15)}`,
 		borderRadius: 4,
-		color: palette.text,
+		color: appearance.text,
 		outline: "none",
 	};
 
@@ -96,19 +97,19 @@ export function GridManualEditor({
 		gap: 4,
 		alignItems: "center",
 		fontSize: 10,
-		color: palette.textMuted,
+		color: appearance.textMuted,
 		padding: "4px 8px",
 		borderRadius: 5,
-		background: hexToRgba(palette.surfaceLight, 0.15),
-		border: `1px solid ${hexToRgba(palette.primary, 0.08)}`,
+		background: hexToRgba(appearance.surfaceElevated, 0.15),
+		border: `1px solid ${hexToRgba(appearance.primary, 0.08)}`,
 		minWidth: 0,
 	};
 
 	const tableRowStyle = (selected: boolean): CSSProperties => ({
 		cursor: "pointer",
-		background: selected ? hexToRgba(palette.primary, 0.15) : "transparent",
+		background: selected ? hexToRgba(appearance.primary, 0.15) : "transparent",
 		borderLeft: selected
-			? `2px solid ${palette.primary}`
+			? `2px solid ${appearance.primary}`
 			: "2px solid transparent",
 	});
 
@@ -131,7 +132,7 @@ export function GridManualEditor({
 				showConductorInput={showConductorInput}
 				coordInput={coordInput}
 				lineInput={lineInput}
-				mutedTextColor={palette.textMuted}
+				mutedTextColor={appearance.textMuted}
 				onChangeMode={setEditorMode}
 				onZoomIn={handleZoomIn}
 				onZoomOut={handleZoomOut}
@@ -160,9 +161,9 @@ export function GridManualEditor({
 				selectedTeeKey={selectedTeeKey}
 				selectedCrossKey={selectedCrossKey}
 				conductorStart={conductorStart}
-				primaryColor={palette.primary}
-				backgroundColor={palette.background}
-				mutedTextColor={palette.textMuted}
+				primaryColor={appearance.primary}
+				backgroundColor={appearance.background}
+				mutedTextColor={appearance.textMuted}
 				onSvgClick={handleSvgClick}
 				onWheel={handleWheel}
 				onSelectRod={handleSelectRod}
@@ -180,9 +181,9 @@ export function GridManualEditor({
 				selectedConductor={selectedConductor}
 				selectedTeeKey={selectedTeeKey}
 				selectedCrossKey={selectedCrossKey}
-				textColor={palette.text}
-				mutedTextColor={palette.textMuted}
-				primaryColor={palette.primary}
+				textColor={appearance.text}
+				mutedTextColor={appearance.textMuted}
+				primaryColor={appearance.primary}
 				onSelectRod={handleSelectRod}
 				onSelectConductor={handleSelectConductor}
 				onSelectTee={handleSelectTee}
@@ -193,7 +194,7 @@ export function GridManualEditor({
 			<GridManualEditorSuggestionDialog
 				suggestion={suggestion}
 				suggestionCoords={suggestionCoords}
-				mutedTextColor={palette.textMuted}
+				mutedTextColor={appearance.textMuted}
 				inputStyle={inputStyle}
 				btnStyle={btnStyle}
 				onSuggestionCoordsChange={setSuggestionCoords}

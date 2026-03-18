@@ -165,7 +165,7 @@ const normalizeAnalysisDocument = (
 		accepted:
 			typeof record.accepted === "boolean"
 				? record.accepted
-				: !Boolean(record.needs_review),
+				: !record.needs_review,
 		override_reason: safeText(record.override_reason),
 		recognition: normalizeRecognition(record.recognition),
 		fields,

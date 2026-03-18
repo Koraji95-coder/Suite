@@ -8,6 +8,22 @@ const outputPath = path.join(
 	repoRoot,
 	"src/data/architectureSnapshot.generated.ts",
 );
+const SNAPSHOT_INPUT_ROOTS = [
+	"src/routes",
+	"src/components/apps",
+	"src/auth",
+	"src/services",
+	"backend",
+	"dotnet",
+	"src/supabase",
+	"supabase",
+	"backend/supabase",
+	"zeroclaw-main/src",
+	"docs",
+	"scripts",
+	".env.example",
+	"package.json",
+];
 
 const DOMAIN_ROOTS = [
 	{
@@ -193,6 +209,12 @@ async function statSafe(absPath) {
 	}
 }
 
+function shouldTrackSnapshotInput(absPath) {
+	const base = path.basename(absPath);
+	if (base === ".env.example" || base === "package.json") return true;
+	return TEXT_EXTENSIONS.has(path.extname(absPath).toLowerCase());
+}
+
 async function readTextLineCount(absPath) {
 	const ext = path.extname(absPath).toLowerCase();
 	if (!TEXT_EXTENSIONS.has(ext)) return 0;
@@ -255,6 +277,56 @@ async function walkFiles(absRoot) {
 	}
 
 	return files;
+}
+
+async function newestMtimeForPath(absPath) {
+	const stat = await statSafe(absPath);
+	if (!stat) return 0;
+	if (stat.isFile()) {
+		return shouldTrackSnapshotInput(absPath) ? stat.mtimeMs : 0;
+	}
+	if (!stat.isDirectory()) return 0;
+
+	let newest = 0;
+	const stack = [absPath];
+	while (stack.length) {
+		const current = stack.pop();
+		if (!current) continue;
+		let entries = [];
+		try {
+			entries = await fs.readdir(current, { withFileTypes: true });
+		} catch {
+			continue;
+		}
+
+		for (const entry of entries) {
+			if (entry.name.startsWith(".") && entry.name !== ".env.example") continue;
+			if (entry.isDirectory() && SKIP_DIRS.has(entry.name)) continue;
+
+			const childAbs = path.join(current, entry.name);
+			if (entry.isDirectory()) {
+				stack.push(childAbs);
+				continue;
+			}
+			if (!entry.isFile() || !shouldTrackSnapshotInput(childAbs)) continue;
+
+			const childStat = await statSafe(childAbs);
+			if (childStat?.isFile()) {
+				newest = Math.max(newest, childStat.mtimeMs);
+			}
+		}
+	}
+
+	return newest;
+}
+
+async function newestSnapshotInputMtimeMs() {
+	let newest = 0;
+	for (const relPath of SNAPSHOT_INPUT_ROOTS) {
+		const absPath = path.join(repoRoot, relPath);
+		newest = Math.max(newest, await newestMtimeForPath(absPath));
+	}
+	return newest;
 }
 
 async function countFilesAndLines(absPath) {
@@ -498,6 +570,10 @@ export const ARCHITECTURE_SNAPSHOT = ${toTsLiteral(payload)} as const;
 			`Warning: unable to auto-format ${relativeOutput}. Run \`npx biome check --write ${relativeOutput}\` manually.`,
 		);
 	}
+
+	const newestInputMtime = await newestSnapshotInputMtimeMs();
+	const touchedAt = new Date(Math.max(Date.now(), newestInputMtime + 1000));
+	await fs.utimes(outputPath, touchedAt, touchedAt);
 
 	console.log(`Architecture snapshot generated at ${relativeOutput}`);
 	console.log(

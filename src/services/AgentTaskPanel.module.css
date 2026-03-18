@@ -1,3 +1,319 @@
+.root {
+	display: flex;
+	height: 100%;
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid color-mix(in srgb, var(--primary) 10%, var(--border));
+	border-radius: 0.75rem;
+	background:
+		radial-gradient(
+			120% 100% at 100% 0%,
+			color-mix(in srgb, var(--primary) 8%, transparent),
+			transparent 65%
+		),
+		color-mix(in srgb, var(--surface-2) 78%, transparent);
+}
+
+.tabs {
+	display: flex;
+	border-bottom: 1px solid color-mix(in srgb, var(--primary) 12%, transparent);
+	background: color-mix(in srgb, var(--bg) 72%, transparent);
+}
+
+.tabButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.42rem;
+	padding: 0.75rem 1rem;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 0.85rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		color 160ms ease,
+		background-color 160ms ease,
+		border-color 160ms ease;
+}
+
+.tabButton:hover {
+	color: var(--text);
+	background: color-mix(in srgb, var(--surface) 56%, transparent);
+}
+
+.tabButtonActive {
+	color: var(--primary);
+	border-bottom-color: var(--primary);
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.tabIcon {
+	flex-shrink: 0;
+}
+
+.content {
+	flex: 1;
+	overflow: auto;
+	padding: 1rem;
+}
+
+.stack,
+.customPanel,
+.historyPanel,
+.historyList {
+	display: flex;
+	flex-direction: column;
+}
+
+.stack,
+.customPanel,
+.historyPanel {
+	gap: 0.8rem;
+}
+
+.taskButton {
+	display: flex;
+	align-items: center;
+	gap: 0.8rem;
+	width: 100%;
+	padding: 0.9rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+	border-radius: 0.7rem;
+	background: color-mix(in srgb, var(--primary) 5%, transparent);
+	color: var(--text);
+	text-align: left;
+	cursor: pointer;
+	transition:
+		transform 160ms ease,
+		border-color 160ms ease,
+		background-color 160ms ease;
+}
+
+.taskButton:hover {
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.taskButtonActive {
+	border-color: color-mix(in srgb, var(--primary) 38%, transparent);
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.taskButtonDisabled {
+	opacity: 0.62;
+	cursor: not-allowed;
+	transform: none;
+}
+
+.taskIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	flex-shrink: 0;
+	border-radius: 0.65rem;
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+	font-size: 1rem;
+}
+
+.taskBody {
+	flex: 1;
+	min-width: 0;
+}
+
+.taskName {
+	font-size: 0.9rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.taskDescription {
+	margin-top: 0.18rem;
+	font-size: 0.76rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.taskChevron {
+	flex-shrink: 0;
+	color: var(--text-muted);
+}
+
+.fieldLabel {
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.textarea {
+	min-height: 7.5rem;
+	width: 100%;
+	padding: 0.8rem 0.9rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+	border-radius: 0.7rem;
+	background: color-mix(in srgb, var(--bg) 74%, transparent);
+	color: var(--text);
+	font: inherit;
+	resize: vertical;
+}
+
+.textareaDisabled {
+	opacity: 0.6;
+}
+
+.primaryButton,
+.rerunButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	border-radius: 0.65rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition:
+		background-color 160ms ease,
+		border-color 160ms ease,
+		opacity 160ms ease;
+}
+
+.primaryButton {
+	padding: 0.8rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 42%, transparent);
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, var(--primary) 90%, white 10%),
+		color-mix(in srgb, var(--info) 72%, var(--primary))
+	);
+	color: var(--primary-contrast);
+}
+
+.primaryButton:disabled,
+.rerunButton:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.historyToolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.historyCount {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+
+.clearHistoryButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: 0.72rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.clearHistoryButton:hover {
+	color: var(--danger);
+}
+
+.historyList {
+	gap: 0.75rem;
+}
+
+.historyItem {
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+	padding: 0.9rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 12%, transparent);
+	border-radius: 0.75rem;
+	background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.historyItemHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.historyInfo {
+	min-width: 0;
+}
+
+.historyName {
+	font-size: 0.88rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.historyTimestamp {
+	margin-top: 0.2rem;
+	font-size: 0.68rem;
+	color: var(--text-muted);
+}
+
+.historyStatus {
+	flex-shrink: 0;
+	padding: 0.2rem 0.55rem;
+	border-radius: 999px;
+	font-size: 0.62rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.historyStatusComplete {
+	background: color-mix(in srgb, var(--success) 14%, transparent);
+	color: var(--success);
+}
+
+.historyStatusError {
+	background: color-mix(in srgb, var(--danger) 14%, transparent);
+	color: var(--danger);
+}
+
+.resultPreview {
+	padding: 0.7rem 0.8rem;
+	border-radius: 0.6rem;
+	background: color-mix(in srgb, var(--bg) 68%, transparent);
+	color: var(--text-muted);
+	font-size: 0.74rem;
+	line-height: 1.45;
+}
+
+.rerunButton {
+	width: 100%;
+	padding: 0.55rem 0.8rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+	background: transparent;
+	color: var(--primary);
+}
+
+.rerunButton:hover {
+	background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.emptyState {
+	padding: 1.5rem 1rem;
+	border: 1px dashed color-mix(in srgb, var(--primary) 16%, transparent);
+	border-radius: 0.75rem;
+	color: var(--text-muted);
+	font-size: 0.8rem;
+	text-align: center;
+}
+
 .confirmDialogContent {
 	max-width: 24rem;
 	border: 1px solid var(--border);

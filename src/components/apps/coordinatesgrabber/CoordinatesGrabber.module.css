@@ -1,4 +1,11 @@
 .root {
+	--cg-bg: var(--bg);
+	--cg-surface: var(--surface);
+	--cg-text: var(--text);
+	--cg-muted: var(--text-muted);
+	--cg-primary: var(--primary);
+	--cg-border: color-mix(in srgb, var(--primary) 18%, transparent);
+
 	display: flex;
 	height: 100%;
 	flex-direction: column;

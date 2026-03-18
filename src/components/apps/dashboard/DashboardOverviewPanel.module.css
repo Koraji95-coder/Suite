@@ -3,55 +3,487 @@
 	gap: var(--space-6);
 }
 
-.headerRow {
+.masthead {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
+	align-items: flex-start;
 	justify-content: space-between;
-	gap: var(--space-4);
+	gap: var(--space-5);
+	padding: clamp(1.2rem, 2vw, 1.8rem);
+	border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+	border-radius: var(--radius-4);
+	background:
+		radial-gradient(
+			120% 100% at 100% 0%,
+			color-mix(in srgb, var(--primary) 16%, transparent),
+			transparent 58%
+		),
+		radial-gradient(
+			90% 100% at 0% 100%,
+			color-mix(in srgb, var(--accent) 10%, transparent),
+			transparent 60%
+		),
+		color-mix(in srgb, var(--surface) 88%, transparent);
+	box-shadow: var(--agent-shadow-soft);
 }
 
-.headerIdentity {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-3);
+.mastheadBody {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-4);
+	min-width: 0;
 }
 
 .heroMark {
 	display: grid;
 	place-items: center;
-	width: 3rem;
-	height: 3rem;
+	flex-shrink: 0;
+	width: 3.25rem;
+	height: 3.25rem;
 	border-radius: var(--radius-3);
 	background:
 		linear-gradient(
 			145deg,
 			color-mix(in srgb, var(--primary) 24%, transparent),
-			color-mix(in srgb, var(--accent) 16%, transparent)
+			color-mix(in srgb, var(--accent) 20%, transparent)
 		),
-		var(--surface);
-	border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+		var(--surface-2);
+	border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
 	color: var(--primary);
 }
 
-.titleRow {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	flex-wrap: wrap;
+.heroCopy {
+	min-width: 0;
+}
+
+.kicker {
+	margin-bottom: 0.7rem;
 }
 
 .title {
 	margin: 0;
+	max-width: 24ch;
 }
 
 .subtitle {
-	color: var(--text-muted);
 	display: block;
-	margin-top: 0.35rem;
+	max-width: 70ch;
+	margin-top: 0.55rem;
+	line-height: 1.6;
 }
 
-.customizerPanel {
-	border-color: color-mix(in srgb, var(--warning) 34%, var(--border));
-	background: color-mix(in srgb, var(--warning) 7%, transparent);
+.mastheadActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+}
+
+.filters {
+	display: grid;
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	gap: 0.8rem;
+}
+
+.filterField,
+.filterFieldWide {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.filterFieldWide {
+	grid-column: span 2;
+}
+
+.filterLabel {
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.select,
+.searchInput {
+	width: 100%;
+	padding: 0.72rem 0.8rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--surface) 90%, transparent);
+	color: var(--text);
+	font: inherit;
+}
+
+.searchInput::placeholder {
+	color: color-mix(in srgb, var(--text-muted) 74%, transparent);
+}
+
+.statsGrid {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 0.8rem;
+}
+
+.statCard {
+	display: grid;
+	gap: 0.45rem;
+	min-height: 7rem;
+}
+
+.statIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 0.75rem;
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+	color: var(--primary);
+}
+
+.statValue {
+	font-size: clamp(1.2rem, 1vw + 1rem, 1.8rem);
+	font-weight: 800;
+	letter-spacing: -0.03em;
+	color: var(--agent-text-strong);
+}
+
+.statLabel {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.commandGrid {
+	display: grid;
+	grid-template-columns: 1.55fr 1fr;
+	gap: var(--space-5);
+	align-items: start;
+}
+
+.primaryPanel,
+.secondaryPanel {
+	display: grid;
+	gap: 1rem;
+}
+
+.focusedPanel {
+	border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+	box-shadow:
+		0 0 0 1px color-mix(in srgb, var(--primary) 26%, transparent),
+		var(--agent-shadow-soft);
+	scroll-margin-top: calc(var(--space-6) + 0.5rem);
+}
+
+.panelHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.watchdogMeta,
+.panelSubgrid,
+.domainGrid,
+.memoryStats,
+.sessionGrid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.watchdogMeta {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metaLabel {
+	display: block;
+	margin-bottom: 0.25rem;
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.trendChart {
+	display: grid;
+	grid-template-columns: repeat(24, minmax(0, 1fr));
+	gap: 0.35rem;
+	height: 10rem;
+	align-items: end;
+}
+
+.trendBarWrap {
+	display: flex;
+	align-items: end;
+	height: 100%;
+}
+
+.trendBar {
+	width: 100%;
+	border-radius: 999px 999px 0 0;
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--accent) 88%, white 12%),
+		color-mix(in srgb, var(--primary) 80%, transparent)
+	);
+	box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.panelSubgrid {
+	grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.sessionGrid {
+	grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.subpanel,
+.sectionBlock {
+	display: grid;
+	gap: 0.65rem;
+}
+
+.subpanelLabel {
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.rowList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+}
+
+.dataRow,
+.projectRow,
+.memoryRow,
+.domainCard,
+.memoryStatCard,
+.sessionCard {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.dataRow,
+.projectRow,
+.memoryRow {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.85rem 0.9rem;
+}
+
+.dataRowTitle {
+	font-size: 0.85rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.dataRowMeta {
+	margin-top: 0.2rem;
+	font-size: 0.73rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.dataRowAside,
+.projectRowAside {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	flex-shrink: 0;
+	color: var(--text-muted);
+	font-size: 0.7rem;
+}
+
+.domainGrid {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.domainCard {
+	padding: 0.9rem;
+}
+
+.sessionCard {
+	display: grid;
+	gap: 0.65rem;
+	padding: 0.9rem;
+}
+
+.sessionCardHead {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.75rem;
+	align-items: flex-start;
+}
+
+.sessionBadges {
+	display: inline-flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.35rem;
+}
+
+.sessionDrawing {
+	font-size: 0.82rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.sessionMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	font-size: 0.7rem;
+	color: var(--text-muted);
+}
+
+.domainTitle {
+	font-size: 0.85rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.domainSummary {
+	margin-top: 0.3rem;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.domainMeta {
+	margin-top: 0.6rem;
+	font-size: 0.68rem;
+	color: var(--secondary);
+}
+
+.memoryStats {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.memoryStatCard {
+	padding: 0.9rem;
+}
+
+.memoryStatValue {
+	font-size: 1.3rem;
+	font-weight: 800;
+	color: var(--text);
+}
+
+.memoryStatLabel {
+	margin-top: 0.2rem;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+
+.memoryAvatar {
+	flex-shrink: 0;
+}
+
+.sharedMemoryBadge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+	color: var(--primary);
+}
+
+.memoryBody {
+	min-width: 0;
+	flex: 1;
+}
+
+.memoryMeta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.memoryType,
+.memoryTime {
+	font-size: 0.68rem;
+	color: var(--text-muted);
+}
+
+.memoryContent {
+	margin-top: 0.4rem;
+	font-size: 0.78rem;
+	line-height: 1.55;
+	color: var(--text);
+}
+
+.projectRow {
+	width: 100%;
+	text-align: left;
+	cursor: pointer;
+}
+
+.projectRow:hover {
+	border-color: color-mix(in srgb, var(--primary) 20%, var(--border));
+}
+
+.emptyState,
+.emptyStateCompact {
+	border: 1px dashed var(--line-soft);
+	border-radius: var(--radius-2);
+	color: var(--text-muted);
+	text-align: center;
+}
+
+.emptyState {
+	padding: 1.2rem;
+}
+
+.emptyStateCompact {
+	padding: 0.9rem;
+	font-size: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+	.filters {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.filterFieldWide {
+		grid-column: span 2;
+	}
+
+	.statsGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.commandGrid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 720px) {
+	.mastheadBody {
+		flex-direction: column;
+	}
+
+	.filters,
+	.statsGrid,
+	.watchdogMeta,
+	.panelSubgrid,
+	.domainGrid,
+	.memoryStats,
+	.sessionGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.filterFieldWide {
+		grid-column: span 1;
+	}
+
+	.trendChart {
+		grid-template-columns: repeat(12, minmax(0, 1fr));
+	}
 }

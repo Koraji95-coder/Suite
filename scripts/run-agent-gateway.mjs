@@ -114,7 +114,14 @@ function dedupe(values = []) {
 }
 
 function collectExpectedProfileModels() {
-	const profileKeys = ["KORO", "DEVSTRAL", "SENTINEL", "FORGE", "DRAFTSMITH"];
+	const profileKeys = [
+		"KORO",
+		"DEVSTRAL",
+		"SENTINEL",
+		"FORGE",
+		"DRAFTSMITH",
+		"GRIDSAGE",
+	];
 	const expected = [];
 	for (const key of profileKeys) {
 		const primary =

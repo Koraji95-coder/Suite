@@ -1,13 +1,25 @@
 // src/components/agent/AgentPixelMark.tsx
-import { memo, type CSSProperties, useEffect, useMemo, useState } from "react";
+import {
+	memo,
+	type CSSProperties,
+	type ReactElement,
+	useEffect,
+	useId,
+	useMemo,
+	useState,
+} from "react";
 import { cn } from "@/lib/utils";
 import styles from "./AgentPixelMark.module.css";
-import { AGENT_MARKS, type MarkExpression } from "./agentMarkPatterns";
-import type { AgentProfileId } from "./agentProfiles";
 import {
-	type AgentMarkState,
-	mapLegacyMarkState,
-} from "./agentMarkState";
+	CREST_CORE_PATH,
+	CREST_SHELL_PATH,
+	CREST_STATE_PHASES,
+	CREST_VARIANTS,
+	type CrestVectorElement,
+} from "./agentCrestDefinitions";
+import type { MarkExpression } from "./agentMarkPatterns";
+import type { AgentProfileId } from "./agentProfiles";
+import { type AgentMarkState, mapLegacyMarkState } from "./agentMarkState";
 
 interface AgentPixelMarkProps {
 	profileId: AgentProfileId;
@@ -33,71 +45,75 @@ function resolveDetailLevel(
 	return "micro";
 }
 
-function pickDominantCellIndex(
-	grid: number[][],
-	startRow: number,
-	startCol: number,
-	rowStride: number,
-	colStride: number,
-): number {
-	const counts = new Map<number, number>();
-	for (let row = startRow; row < startRow + rowStride; row++) {
-		const sourceRow = grid[row];
-		if (!sourceRow) continue;
-		for (let col = startCol; col < startCol + colStride; col++) {
-			const idx = sourceRow[col] ?? 0;
-			if (idx <= 0) continue;
-			counts.set(idx, (counts.get(idx) ?? 0) + 1);
-		}
-	}
-	if (counts.size === 0) return 0;
-
-	let selected = 0;
-	let selectedCount = 0;
-	for (const [idx, count] of counts.entries()) {
-		if (count > selectedCount || (count === selectedCount && idx > selected)) {
-			selected = idx;
-			selectedCount = count;
-		}
-	}
-	return selected;
-}
-
-function reduceGridForDetail(
-	grid: number[][],
-	detail: "micro" | "standard" | "hero",
-): number[][] {
-	if (!Array.isArray(grid) || grid.length === 0) return [];
-	if (detail === "hero") {
-		return grid.map((row) => [...row]);
-	}
-	const rows = grid.length;
-	const cols = grid[0]?.length ?? 0;
-	if (rows === 0 || cols === 0) return [];
-
-	const targetMax = detail === "standard" ? 32 : 16;
-	const rowStride = Math.max(1, Math.floor(rows / targetMax));
-	const colStride = Math.max(1, Math.floor(cols / targetMax));
-	const outRows = Math.max(1, Math.ceil(rows / rowStride));
-	const outCols = Math.max(1, Math.ceil(cols / colStride));
-
-	const reduced = Array.from({ length: outRows }, () =>
-		Array<number>(outCols).fill(0),
-	);
-	for (let outRow = 0; outRow < outRows; outRow++) {
-		const sourceRow = outRow * rowStride;
-		for (let outCol = 0; outCol < outCols; outCol++) {
-			const sourceCol = outCol * colStride;
-			reduced[outRow][outCol] = pickDominantCellIndex(
-				grid,
-				sourceRow,
-				sourceCol,
-				rowStride,
-				colStride,
+function renderVectorElement(
+	element: CrestVectorElement,
+	key: string,
+): ReactElement {
+	switch (element.type) {
+		case "path":
+			return (
+				<path
+					key={key}
+					d={element.d}
+					fill={element.fill}
+					stroke={element.stroke}
+					strokeWidth={element.strokeWidth}
+					opacity={element.opacity}
+					strokeLinecap={element.strokeLinecap}
+					strokeLinejoin={element.strokeLinejoin}
+				/>
 			);
-		}
+		case "circle":
+			return (
+				<circle
+					key={key}
+					cx={element.cx}
+					cy={element.cy}
+					r={element.r}
+					fill={element.fill}
+					stroke={element.stroke}
+					strokeWidth={element.strokeWidth}
+					opacity={element.opacity}
+					strokeLinecap={element.strokeLinecap}
+					strokeLinejoin={element.strokeLinejoin}
+				/>
+			);
+		case "rect":
+			return (
+				<rect
+					key={key}
+					x={element.x}
+					y={element.y}
+					width={element.width}
+					height={element.height}
+					rx={element.rx}
+					fill={element.fill}
+					stroke={element.stroke}
+					strokeWidth={element.strokeWidth}
+					opacity={element.opacity}
+					strokeLinecap={element.strokeLinecap}
+					strokeLinejoin={element.strokeLinejoin}
+				/>
+			);
+		case "line":
+			return (
+				<line
+					key={key}
+					x1={element.x1}
+					y1={element.y1}
+					x2={element.x2}
+					y2={element.y2}
+					fill={element.fill}
+					stroke={element.stroke}
+					strokeWidth={element.strokeWidth}
+					opacity={element.opacity}
+					strokeLinecap={element.strokeLinecap}
+					strokeLinejoin={element.strokeLinejoin}
+				/>
+			);
+		default:
+			return <g key={key} />;
 	}
-	return reduced;
 }
 
 function AgentPixelMarkInner({
@@ -111,7 +127,9 @@ function AgentPixelMarkInner({
 	pulse = false,
 	breathe = false,
 }: AgentPixelMarkProps) {
-	const mark = AGENT_MARKS[profileId];
+	const crest = CREST_VARIANTS[profileId];
+	const gradientId = useId();
+	const safeGradientId = useMemo(() => gradientId.replace(/[:]/g, ""), [gradientId]);
 	const [frameIndex, setFrameIndex] = useState(0);
 	const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -132,24 +150,15 @@ function AgentPixelMarkInner({
 		motionPreset === "reduced" || prefersReducedMotion;
 	const effectiveState = state ?? mapLegacyMarkState({ expression, pulse, breathe });
 
-	const framesForState = useMemo(() => {
-		const frames = mark.stateFrames?.[effectiveState];
-		if (frames?.length) return frames;
-		if (effectiveState === "focus" && mark.focusOverlay) return [mark.focusOverlay];
-		if (
-			(effectiveState === "thinking" ||
-				effectiveState === "speaking" ||
-				effectiveState === "running") &&
-			mark.activeOverlay
-		) {
-			return [mark.activeOverlay];
-		}
-		return [];
-	}, [mark, effectiveState]);
+	const framesForState = CREST_STATE_PHASES[effectiveState] ?? [0];
 
 	const normalizedFrameIndex =
 		framesForState.length > 0 ? frameIndex % framesForState.length : 0;
-	const activeFrame = framesForState[normalizedFrameIndex] ?? null;
+	const phaseStep = framesForState[normalizedFrameIndex] ?? 0;
+	const phaseRatio =
+		framesForState.length > 1
+			? phaseStep / (framesForState.length - 1)
+			: 0;
 	const effectiveDetail = resolveDetailLevel(size, detailLevel);
 
 	const cadenceMs = useMemo(() => {
@@ -184,68 +193,7 @@ function AgentPixelMarkInner({
 		};
 	}, [shouldAnimateFrames, framesForState.length, cadenceMs]);
 
-	const sourceGrid = useMemo(() => {
-		const rows = mark.grid.length;
-		const cols = mark.grid[0]?.length ?? 0;
-		const grid = Array.from({ length: rows }, (_, row) =>
-			Array.from({ length: cols }, (_, col) => {
-				let idx = mark.grid[row]?.[col] ?? 0;
-				const overlayIdx = activeFrame?.[row]?.[col] ?? 0;
-				if (overlayIdx > 0) {
-					idx = overlayIdx;
-				} else if (
-					!activeFrame &&
-					effectiveState === "thinking" &&
-					mark.activeOverlay
-				) {
-					const fallbackOverlay = mark.activeOverlay[row]?.[col] ?? 0;
-					if (fallbackOverlay > 0) idx = fallbackOverlay;
-				}
-				return idx;
-			}),
-		);
-		return grid;
-	}, [mark, activeFrame, effectiveState]);
-
-	const renderGrid = useMemo(
-		() => reduceGridForDetail(sourceGrid, effectiveDetail),
-		[sourceGrid, effectiveDetail],
-	);
-	const rows = renderGrid.length;
-	const cols = renderGrid[0]?.length ?? 0;
-	const scaleBase = size / Math.max(1, Math.max(rows, cols));
-	const cellSize = scaleBase >= 1 ? Math.max(1, Math.floor(scaleBase)) : scaleBase;
-	const svgW = cols * cellSize;
-	const svgH = rows * cellSize;
-
-	const rects = useMemo(() => {
-		const result: Array<{
-			x: number;
-			y: number;
-			color: string;
-			opacity: number;
-		}> = [];
-
-		for (let r = 0; r < rows; r++) {
-			for (let c = 0; c < cols; c++) {
-				const idx = renderGrid[r]?.[c] ?? 0;
-				if (idx === 0) continue;
-
-				const color = mark.colors[idx] ?? mark.colors[1];
-				const opacity = effectiveState === "focus" ? 0.9 : 1;
-
-				result.push({
-					x: c * cellSize,
-					y: r * cellSize,
-					color,
-					opacity,
-				});
-			}
-		}
-		return result;
-	}, [mark, rows, cols, cellSize, renderGrid, effectiveState]);
-
-	const glowColor = useMemo(() => {
+	const stateColor = useMemo(() => {
 		switch (effectiveState) {
 			case "error":
 				return "var(--danger)";
@@ -254,10 +202,31 @@ function AgentPixelMarkInner({
 				return "var(--warning)";
 			case "success":
 				return "var(--success)";
+			case "focus":
+				return "var(--info)";
 			default:
-				return mark.colors[4] ?? mark.colors[3] ?? mark.colors[2];
+				return crest.palette.glow;
 		}
-	}, [effectiveState, mark.colors]);
+	}, [effectiveState, crest.palette.glow]);
+
+	const crestVars = useMemo(
+		() =>
+			({
+				"--crest-shell": crest.palette.shell,
+				"--crest-shell-deep": crest.palette.shellDeep,
+				"--crest-core": crest.palette.core,
+				"--crest-line": crest.palette.line,
+				"--crest-ink": crest.palette.ink,
+				"--crest-accent": crest.palette.accent,
+				"--crest-glow": stateColor,
+			}) as CSSProperties,
+		[crest, stateColor],
+	);
+
+	const activityStrokeWidth =
+		effectiveState === "running" || effectiveState === "speaking" ? 2.2 : 1.8;
+	const sweepRotation = -92 + phaseRatio * 214;
+	const sweepDashOffset = Math.round((1 - phaseRatio) * 82);
 	const showGlow =
 		size >= 28 && effectiveState !== "idle" && effectiveState !== "waiting";
 	const showPulseRing =
@@ -270,7 +239,11 @@ function AgentPixelMarkInner({
 			effectiveState === "warning");
 	const showBreathe =
 		!reducedMotion && size >= 40 && (breathe || effectiveState === "focus");
+	const showStateSweep = size >= 26 && effectiveState !== "idle";
 	const motionMode = reducedMotion ? "reduced" : "balanced";
+	const symbolElements =
+		effectiveDetail === "micro" ? crest.microSymbol : crest.symbol;
+	const showEngraving = effectiveDetail !== "micro";
 
 	return (
 		<div
@@ -281,55 +254,108 @@ function AgentPixelMarkInner({
 			data-agent-motion={motionMode}
 			data-agent-detail={effectiveDetail}
 		>
-			{/* Pulse ring */}
 			{showPulseRing && (
 				<div
 					data-agent-layer="pulse"
 					className={styles.pulseRing}
-					style={
-						{
-							"--agent-glow": glowColor,
-						} as CSSProperties
-					}
+					style={{ "--agent-glow": stateColor } as CSSProperties}
 				/>
 			)}
 
-			{/* Circular halo; no square backing tile */}
 			{showGlow && !reducedMotion && (
 				<div
 					data-agent-layer="halo"
 					className={styles.halo}
-					style={
-						{
-							"--agent-glow": glowColor,
-						} as CSSProperties
-					}
+					style={{ "--agent-glow": stateColor } as CSSProperties}
 				/>
 			)}
 
-			{/* Breathing wrapper */}
-			<div className={cn(styles.spriteWrap, showBreathe && styles.breathe)}>
+			<div
+				className={cn(styles.crestWrap, showBreathe && styles.breathe)}
+				style={crestVars}
+			>
 				<svg
-					width={svgW}
-					height={svgH}
-					viewBox={`0 0 ${svgW} ${svgH}`}
-					className={styles.spriteSvg}
-					shapeRendering="crispEdges"
+					width={size}
+					height={size}
+					viewBox="0 0 72 72"
+					className={styles.crestSvg}
 					aria-hidden="true"
+					data-agent-layer="crest"
+					data-agent-vector="true"
 				>
-					<g className={styles.spritePixels}>
-						{rects.map((rect) => (
-							<rect
-								key={`${rect.x}-${rect.y}`}
-								x={rect.x}
-								y={rect.y}
-								width={cellSize}
-								height={cellSize}
-								fill={rect.color}
-								opacity={rect.opacity}
-								rx={0}
+					<defs>
+						<linearGradient id={`agent-shell-${safeGradientId}`} x1="20%" y1="8%" x2="82%" y2="88%">
+							<stop offset="0%" stopColor="var(--crest-shell)" />
+							<stop offset="100%" stopColor="var(--crest-shell-deep)" />
+						</linearGradient>
+						<radialGradient id={`agent-core-${safeGradientId}`} cx="42%" cy="24%" r="80%">
+							<stop
+								offset="0%"
+								stopColor="color-mix(in srgb, var(--crest-core) 88%, white 12%)"
 							/>
-						))}
+							<stop offset="100%" stopColor="var(--crest-core)" />
+						</radialGradient>
+					</defs>
+
+					<g className={styles.crestShell}>
+						<path
+							d={CREST_SHELL_PATH}
+							fill={`url(#agent-shell-${safeGradientId})`}
+							stroke="var(--crest-line)"
+							strokeWidth={1.15}
+							opacity={0.96}
+						/>
+						<path
+							d={CREST_CORE_PATH}
+							fill={`url(#agent-core-${safeGradientId})`}
+							stroke="color-mix(in srgb, var(--crest-line) 62%, transparent)"
+							strokeWidth={0.95}
+							opacity={0.92}
+						/>
+					</g>
+
+					<g className={styles.symbolLayer}>
+						{symbolElements.map((element, index) =>
+							renderVectorElement(element, `symbol-${profileId}-${index}`),
+						)}
+					</g>
+
+					{showEngraving && (
+						<g
+							className={cn(
+								styles.engravingLayer,
+								effectiveDetail === "hero" && styles.engravingLayerHero,
+							)}
+						>
+							{crest.engraving.map((element, index) =>
+								renderVectorElement(element, `engraving-${profileId}-${index}`),
+							)}
+						</g>
+					)}
+
+					<g className={styles.stateLayer}>
+						<circle
+							cx={36}
+							cy={36}
+							r={28}
+							fill="none"
+							stroke="color-mix(in srgb, var(--crest-glow) 28%, transparent)"
+							strokeWidth={1.1}
+							opacity={showStateSweep ? 0.72 : 0}
+						/>
+						<circle
+							cx={36}
+							cy={36}
+							r={28}
+							fill="none"
+							stroke="var(--crest-glow)"
+							strokeWidth={activityStrokeWidth}
+							strokeLinecap="round"
+							strokeDasharray="26 150"
+							strokeDashoffset={sweepDashOffset}
+							opacity={showStateSweep ? 0.88 : 0}
+							transform={`rotate(${sweepRotation} 36 36)`}
+						/>
 					</g>
 				</svg>
 			</div>

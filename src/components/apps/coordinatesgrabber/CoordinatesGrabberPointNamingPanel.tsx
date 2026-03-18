@@ -1,11 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { ColorScheme } from "@/lib/palette";
-import {
-	configCardStyle,
-	configInputStyle,
-	configTitleStyle,
-} from "./CoordinatesGrabberConfigStyles";
 import type { CoordinatesGrabberState } from "./CoordinatesGrabberModels";
+import styles from "./CoordinatesGrabberPointNamingPanel.module.css";
 
 interface CoordinatesGrabberPointNamingPanelProps {
 	state: CoordinatesGrabberState;
@@ -16,23 +12,14 @@ interface CoordinatesGrabberPointNamingPanelProps {
 export function CoordinatesGrabberPointNamingPanel({
 	state,
 	setState,
-	palette,
+	palette: _palette,
 }: CoordinatesGrabberPointNamingPanelProps) {
 	return (
-		<div style={configCardStyle(palette)}>
-			<h3 style={configTitleStyle(palette)}>Point Naming</h3>
-			<div
-				style={{
-					display: "grid",
-					gap: "8px",
-					gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-				}}
-			>
+		<div className={styles.root}>
+			<h3 className={styles.title}>Point Naming</h3>
+			<div className={styles.grid}>
 				<div>
-					<label
-						htmlFor="coords-point-prefix"
-						style={{ fontSize: "12px", color: palette.textMuted }}
-					>
+					<label htmlFor="coords-point-prefix" className={styles.label}>
 						Prefix:
 					</label>
 					<input
@@ -46,14 +33,11 @@ export function CoordinatesGrabberPointNamingPanel({
 								pointPrefix: e.target.value,
 							}))
 						}
-						style={configInputStyle(palette)}
+						className={styles.input}
 					/>
 				</div>
 				<div>
-					<label
-						htmlFor="coords-point-start-number"
-						style={{ fontSize: "12px", color: palette.textMuted }}
-					>
+					<label htmlFor="coords-point-start-number" className={styles.label}>
 						Start #:
 					</label>
 					<input
@@ -68,14 +52,11 @@ export function CoordinatesGrabberPointNamingPanel({
 							}))
 						}
 						min="1"
-						style={configInputStyle(palette)}
+						className={styles.input}
 					/>
 				</div>
 				<div>
-					<label
-						htmlFor="coords-point-decimals"
-						style={{ fontSize: "12px", color: palette.textMuted }}
-					>
+					<label htmlFor="coords-point-decimals" className={styles.label}>
 						Decimals:
 					</label>
 					<input
@@ -91,7 +72,7 @@ export function CoordinatesGrabberPointNamingPanel({
 						}
 						min="0"
 						max="12"
-						style={configInputStyle(palette)}
+						className={styles.input}
 					/>
 				</div>
 			</div>

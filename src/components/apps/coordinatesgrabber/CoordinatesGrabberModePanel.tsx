@@ -1,9 +1,7 @@
 import type { ColorScheme } from "@/lib/palette";
-import {
-	configCardStyle,
-	configTitleStyle,
-} from "./CoordinatesGrabberConfigStyles";
+import { cn } from "@/lib/utils";
 import type { CoordinatesGrabberState } from "./CoordinatesGrabberModels";
+import styles from "./CoordinatesGrabberModePanel.module.css";
 
 interface CoordinatesGrabberModePanelProps {
 	mode: CoordinatesGrabberState["mode"];
@@ -13,7 +11,7 @@ interface CoordinatesGrabberModePanelProps {
 
 export function CoordinatesGrabberModePanel({
 	mode,
-	palette,
+	palette: _palette,
 	onModeChange,
 }: CoordinatesGrabberModePanelProps) {
 	const modeOptions: Array<{
@@ -23,24 +21,27 @@ export function CoordinatesGrabberModePanel({
 	}> = [
 		{ value: "layer_search", label: "Layer Search", enabled: true },
 		{ value: "blocks", label: "Block Centers (coming soon)", enabled: false },
-		{ value: "polylines", label: "Polyline Vertices (coming soon)", enabled: false },
+		{
+			value: "polylines",
+			label: "Polyline Vertices (coming soon)",
+			enabled: false,
+		},
 	];
 
 	return (
-		<div style={configCardStyle(palette)}>
-			<h3 style={configTitleStyle(palette)}>Extraction Mode</h3>
-			<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+		<div className={styles.root}>
+			<h3 className={styles.title}>Extraction Mode</h3>
+			<div className={styles.list}>
 				{modeOptions.map((entryMode) => (
 					<label
 						key={entryMode.value}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: "8px",
-							cursor: entryMode.enabled ? "pointer" : "not-allowed",
-							fontSize: "13px",
-							opacity: entryMode.enabled ? 1 : 0.65,
-						}}
+						className={cn(
+							styles.row,
+							!entryMode.enabled && styles.rowDisabled,
+							mode === entryMode.value &&
+								entryMode.enabled &&
+								styles.rowSelected,
+						)}
 					>
 						<input
 							type="radio"
@@ -49,18 +50,9 @@ export function CoordinatesGrabberModePanel({
 							checked={mode === entryMode.value}
 							onChange={() => onModeChange(entryMode.value)}
 							disabled={!entryMode.enabled}
-							style={{ cursor: "pointer" }}
+							className={styles.radio}
 						/>
-						<span
-							style={{
-								color:
-									mode === entryMode.value && entryMode.enabled
-										? palette.primary
-										: palette.text,
-							}}
-						>
-							{entryMode.label}
-						</span>
+						<span className={styles.label}>{entryMode.label}</span>
 					</label>
 				))}
 			</div>

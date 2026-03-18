@@ -2,17 +2,17 @@
 	display: flex;
 	gap: 0.5rem;
 	overflow-x: auto;
-	border-bottom-width: 1px;
-	border-bottom-style: solid;
+	border-bottom: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
 	padding-bottom: 0.25rem;
 }
 
 .tab {
 	white-space: nowrap;
-	border-bottom-width: 2px;
-	border-bottom-style: solid;
+	border-bottom: 2px solid transparent;
 	padding: 0.5rem 0.75rem;
 	font-size: 0.875rem;
+	font-weight: 400;
+	color: var(--text-muted);
 	transition:
 		color 160ms ease,
 		border-color 160ms ease;
@@ -20,4 +20,10 @@
 	border-left: none;
 	border-right: none;
 	border-top: none;
+}
+
+.tabActive {
+	border-bottom-color: var(--primary);
+	color: var(--primary);
+	font-weight: 600;
 }

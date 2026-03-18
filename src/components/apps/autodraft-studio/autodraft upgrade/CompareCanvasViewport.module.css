@@ -1,0 +1,86 @@
+/* src/components/apps/autodraft/AutoDraftComparePanel/CompareCanvasViewport.module.css */
+/* Extracted from AutoDraftStudioApp.module.css — canvas-related classes only */
+
+.viewport {
+	position: relative;
+	width: 100%;
+	height: clamp(18rem, 52vh, 36rem);
+	overflow: hidden;
+	overscroll-behavior: contain;
+	border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+	border-radius: var(--radius-2);
+	background: #fff;
+	touch-action: none;
+	cursor: grab;
+}
+
+.viewportDragging {
+	cursor: grabbing;
+}
+
+.stage {
+	position: absolute;
+	left: 0;
+	top: 0;
+	will-change: transform;
+}
+
+.canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	user-select: none;
+	-webkit-user-drag: none;
+	cursor: crosshair;
+}
+
+.markerLayer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.roiOverlay {
+	position: absolute;
+	display: block;
+	border: 1px dashed color-mix(in srgb, var(--primary) 82%, #ffffff 18%);
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.pointMarker {
+	position: absolute;
+	transform: translate(-50%, -50%);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.35rem;
+	height: 1.35rem;
+	padding: 0 0.35rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 72%, #0b1220 28%);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--primary) 84%, #0b1220 16%);
+	color: var(--primary-contrast);
+	font-size: 0.68rem;
+	font-weight: 700;
+	line-height: 1;
+	box-shadow: 0 0 0 1px color-mix(in srgb, #0b1220 66%, transparent);
+}
+
+.pointMarkerLatest {
+	border-color: color-mix(in srgb, #ffffff 60%, var(--primary) 40%);
+	box-shadow:
+		0 0 0 1px color-mix(in srgb, #0b1220 66%, transparent),
+		0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.errorMessage {
+	display: grid;
+	place-items: center;
+	width: 100%;
+	height: 100%;
+	padding: var(--space-3);
+	color: var(--text-muted);
+	font-size: 0.82rem;
+	text-align: center;
+}

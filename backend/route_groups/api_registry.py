@@ -26,6 +26,7 @@ def register_route_groups(
     *,
     require_api_key: Callable,
     require_autocad_auth: Callable,
+    require_watchdog_collector_auth: Callable,
     is_valid_api_key: Callable[[Optional[str]], bool],
     limiter: Limiter,
     logger: Any,
@@ -193,6 +194,7 @@ def register_route_groups(
     app.register_blueprint(
         create_watchdog_blueprint(
             require_autocad_auth=require_autocad_auth,
+            require_watchdog_collector_auth=require_watchdog_collector_auth,
             limiter=limiter,
             logger=logger,
         )

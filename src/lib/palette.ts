@@ -1,27 +1,12 @@
 // src/lib/palette.ts
-/**
- * palette.ts -- Centralized color theme system
- *
- * Provides:
- *   - ColorScheme type and built-in schemes
- *   - ThemeProvider / useTheme()
- *   - Helper functions: hexToRgba, getContrastText,
- *     glassCardStyle, glassCardInnerStyle, GLASS_SPECULAR_GRADIENT
- *
- * Theme animation:
- *   - Adds `html.theme-animating` briefly during setScheme to avoid global perf costs.
- */
 import React, {
 	createContext,
 	useCallback,
 	useContext,
 	useEffect,
 	useMemo,
-	useRef,
-	useState,
 } from "react";
 
-// --- Color Scheme Type ---
 export interface ColorScheme {
 	name: string;
 	description: string;
@@ -37,205 +22,24 @@ export interface ColorScheme {
 	glow: string;
 }
 
+export const DEFAULT_SCHEME_KEY = "suiteDark";
+
 export const COLOR_SCHEMES: Record<string, ColorScheme> = {
-	// ═══════════════════════════════════════════════════════════════════════════
-	// NEUTRAL / PROFESSIONAL
-	// ═══════════════════════════════════════════════════════════════════════════
-
-	midnight: {
-		name: "Midnight",
-		description: "Deep navy with cyan accents — focused and modern",
-		background: "#0a0f1a",
-		surface: "#111827",
-		surfaceLight: "#1f2937",
-		primary: "#22d3ee",
-		secondary: "#64748b",
-		tertiary: "#f59e0b",
-		accent: "#818cf8",
-		text: "#f1f5f9",
-		textMuted: "#94a3b8",
-		glow: "rgba(34, 211, 238, 0.15)",
-	},
-
-	graphite: {
-		name: "Graphite",
-		description: "Warm neutral gray with teal highlights",
-		background: "#0e1117",
-		surface: "#161b22",
-		surfaceLight: "#21262d",
-		primary: "#2dd4bf",
-		secondary: "#6b7280",
-		tertiary: "#f59e0b",
-		accent: "#60a5fa",
-		text: "#f0f6fc",
-		textMuted: "#8b949e",
-		glow: "rgba(45, 212, 191, 0.15)",
-	},
-
-	slate: {
-		name: "Slate",
-		description: "Cool blue-gray with bright blue accent",
-		background: "#0f172a",
-		surface: "#1e293b",
-		surfaceLight: "#334155",
-		primary: "#3b82f6",
-		secondary: "#64748b",
-		tertiary: "#f59e0b",
-		accent: "#22d3ee",
-		text: "#f8fafc",
-		textMuted: "#94a3b8",
-		glow: "rgba(59, 130, 246, 0.15)",
-	},
-
-	nexusCore: {
-		name: "Nexus Core",
-		description: "Deep navy command center with teal-cyan highlights",
-		background: "#040a15",
-		surface: "#0a1326",
-		surfaceLight: "#0f1d37",
-		primary: "#15e7d5",
-		secondary: "#4f6c8d",
-		tertiary: "#f2b94e",
-		accent: "#4f8cff",
-		text: "#eaf5ff",
-		textMuted: "#8aa5c7",
-		glow: "rgba(21, 231, 213, 0.18)",
-	},
-
-	nexusEmber: {
-		name: "Nexus Ember",
-		description: "Warm graphite command center with ember-amber accents",
-		background: "#110a06",
-		surface: "#1b110b",
-		surfaceLight: "#2a1a11",
-		primary: "#ff8a42",
-		secondary: "#b09078",
-		tertiary: "#ffba52",
-		accent: "#ffd18a",
-		text: "#fff4ea",
-		textMuted: "#cda98d",
-		glow: "rgba(255, 138, 66, 0.18)",
-	},
-
-	nexusOrchid: {
-		name: "Nexus Orchid",
-		description: "Midnight indigo command center with orchid-blue glow",
-		background: "#07071a",
-		surface: "#12122a",
-		surfaceLight: "#1b1d3d",
-		primary: "#8a7dff",
-		secondary: "#7681a8",
-		tertiary: "#69b4ff",
-		accent: "#b06dff",
-		text: "#f4f3ff",
-		textMuted: "#a9a5dc",
-		glow: "rgba(138, 125, 255, 0.18)",
-	},
-
-	// ═══════════════════════════════════════════════════════════════════════════
-	// WARM TONES
-	// ═══════════════════════════════════════════════════════════════════════════
-
-	ember: {
-		name: "Ember",
-		description: "Warm charcoal with orange-coral accent",
-		background: "#18120e",
-		surface: "#231a14",
-		surfaceLight: "#2f241c",
-		primary: "#f97316",
-		secondary: "#a8a29e",
-		tertiary: "#22c55e",
-		accent: "#fbbf24",
-		text: "#fafaf9",
-		textMuted: "#a8a29e",
-		glow: "rgba(249, 115, 22, 0.15)",
-	},
-
-	copper: {
-		name: "Copper",
-		description: "Dark bronze with warm metallic highlights",
-		background: "#0f1116",
-		surface: "#171a22",
-		surfaceLight: "#222633",
-		primary: "#fb923c",
-		secondary: "#78716c",
-		tertiary: "#60a5fa",
-		accent: "#fbbf24",
-		text: "#f4f7ff",
-		textMuted: "#a5aec2",
-		glow: "rgba(251, 146, 60, 0.16)",
-	},
-
-	// ═══════════════════════════════════════════════════════════════════════════
-	// COOL / NATURE TONES
-	// ═══════════════════════════════════════════════════════════════════════════
-
-	forest: {
-		name: "Forest",
-		description: "Deep green with lime accent — fresh and focused",
-		background: "#071310",
-		surface: "#0c1f1a",
-		surfaceLight: "#132e26",
-		primary: "#4ade80",
-		secondary: "#6b7280",
-		tertiary: "#60a5fa",
-		accent: "#22d3ee",
-		text: "#ecfdf5",
-		textMuted: "#86efac",
-		glow: "rgba(74, 222, 128, 0.12)",
-	},
-
-	ocean: {
-		name: "Ocean",
-		description: "Deep sea blue with bright cyan — calm and clear",
-		background: "#0a1628",
-		surface: "#0f2744",
-		surfaceLight: "#163556",
-		primary: "#06b6d4",
-		secondary: "#64748b",
-		tertiary: "#fbbf24",
-		accent: "#22c55e",
-		text: "#e0f2fe",
-		textMuted: "#7dd3fc",
-		glow: "rgba(6, 182, 212, 0.15)",
-	},
-
-	// ═══════════════════════════════════════════════════════════════════════════
-	// ACCENT / CREATIVE
-	// ═══════════════════════════════════════════════════════════════════════════
-
-	violet: {
-		name: "Violet",
-		description: "Deep purple with soft lavender — creative and rich",
-		background: "#0d0a1a",
-		surface: "#1a1528",
-		surfaceLight: "#271f3d",
-		primary: "#a78bfa",
-		secondary: "#64748b",
-		tertiary: "#f472b6",
-		accent: "#818cf8",
-		text: "#f5f3ff",
-		textMuted: "#a5b4fc",
-		glow: "rgba(167, 139, 250, 0.15)",
-	},
-
-	rose: {
-		name: "Rose",
-		description: "Deep gray with pink-coral accent — warm and inviting",
-		background: "#12080a",
-		surface: "#1c1012",
-		surfaceLight: "#2a181c",
-		primary: "#fb7185",
-		secondary: "#78716c",
-		tertiary: "#60a5fa",
-		accent: "#f472b6",
-		text: "#fff1f2",
-		textMuted: "#fda4af",
-		glow: "rgba(251, 113, 133, 0.15)",
+	[DEFAULT_SCHEME_KEY]: {
+		name: "Suite Dark",
+		description: "Unified graphite command theme",
+		background: "#0b0f17",
+		surface: "#141b26",
+		surfaceLight: "#1c2533",
+		primary: "#4f7cff",
+		secondary: "#72829a",
+		tertiary: "#c46d52",
+		accent: "#d2a24c",
+		text: "#e8edf6",
+		textMuted: "#93a1b7",
+		glow: "rgba(79, 124, 255, 0.2)",
 	},
 };
-
-export const DEFAULT_SCHEME_KEY = "midnight";
 
 // --- Helpers (pure functions) ---
 export function hexToRgba(hex: string, alpha: number): string {
@@ -289,9 +93,6 @@ function lightenHex(hex: string, percent: number): string {
 	return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
-/**
- * ✅ RESTORED EXPORTS (so PanelInfoDialog.tsx and others keep working)
- */
 export function glassCardStyle(
 	palette: ColorScheme,
 	tint: string = palette.primary,
@@ -349,26 +150,6 @@ export function useTheme() {
 	return useContext(ThemeContext);
 }
 
-const STORAGE_KEY = "app-theme-scheme";
-const LEGACY_BLOCKFLOW_STORAGE_KEY = "blockflow-theme";
-
-/**
- * Legacy mapping:
- * If older builds stored "v5/ember/noir/aurora", map them to modern keys.
- */
-const LEGACY_THEME_TO_SCHEME: Record<string, string> = {
-	v5: "graphiteCyan",
-	ember: "desertDusk",
-	noir: "graphiteCyan",
-	aurora: "oceanDepths",
-};
-
-function normalizeSchemeKey(raw: string | null | undefined): string | null {
-	if (!raw) return null;
-	if (COLOR_SCHEMES[raw]) return raw;
-	return LEGACY_THEME_TO_SCHEME[raw] ?? null;
-}
-
 interface ThemeProviderProps {
 	children: React.ReactNode;
 	defaultScheme?: string;
@@ -418,10 +199,10 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 	// ═══════════════════════════════════════════════════════════════════════════
 	// STATUS COLORS
 	// ═══════════════════════════════════════════════════════════════════════════
-	rootStyle.setProperty("--success", "#22c55e");
-	rootStyle.setProperty("--warning", "#f59e0b");
-	rootStyle.setProperty("--danger", "#ef4444");
-	rootStyle.setProperty("--info", "#3b82f6");
+	rootStyle.setProperty("--success", "#4ea972");
+	rootStyle.setProperty("--warning", "#d2a24c");
+	rootStyle.setProperty("--danger", "#cf6a5b");
+	rootStyle.setProperty("--info", "#6f8dff");
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// EFFECTS
@@ -440,68 +221,30 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 	rootStyle.setProperty("--shadow-lg", "0 8px 30px rgba(0,0,0,0.4)");
 }
 
-function startThemeAnimation(durationMs = 220) {
-	const el = document.documentElement;
-	el.classList.add("theme-animating");
-	window.setTimeout(() => el.classList.remove("theme-animating"), durationMs);
-}
-
 export function ThemeProvider({ children, defaultScheme }: ThemeProviderProps) {
-	const [schemeKey, setSchemeKey] = useState<string>(() => {
-		try {
-			const stored = normalizeSchemeKey(localStorage.getItem(STORAGE_KEY));
-			if (stored) return stored;
-
-			const legacy = normalizeSchemeKey(
-				localStorage.getItem(LEGACY_BLOCKFLOW_STORAGE_KEY),
-			);
-			if (legacy) return legacy;
-		} catch {
-			/* noop */
-		}
-		return normalizeSchemeKey(defaultScheme) || DEFAULT_SCHEME_KEY;
-	});
-
+	const resolvedScheme =
+		defaultScheme && COLOR_SCHEMES[defaultScheme]
+			? defaultScheme
+			: DEFAULT_SCHEME_KEY;
+	const palette = COLOR_SCHEMES[resolvedScheme];
 	const schemeKeys = useMemo(() => Object.keys(COLOR_SCHEMES), []);
 
-	const schemeKeyRef = useRef(schemeKey);
-	useEffect(() => {
-		schemeKeyRef.current = schemeKey;
-	}, [schemeKey]);
-
-	const setScheme = useCallback((key: string) => {
-		if (!COLOR_SCHEMES[key]) return;
-		if (key === schemeKeyRef.current) return;
-
-		startThemeAnimation();
-		setSchemeKey(key);
-
-		try {
-			localStorage.setItem(STORAGE_KEY, key);
-		} catch {
-			/* noop */
-		}
+	const setScheme = useCallback((_key: string) => {
+		// Intentionally no-op: Suite now uses one unified fixed theme.
 	}, []);
 
 	useEffect(() => {
-		const p = COLOR_SCHEMES[schemeKey];
-		applyThemeTokens(p, schemeKey);
-
-		try {
-			localStorage.setItem(STORAGE_KEY, schemeKey);
-		} catch {
-			/* noop */
-		}
-	}, [schemeKey]);
+		applyThemeTokens(palette, resolvedScheme);
+	}, [palette, resolvedScheme]);
 
 	const value = useMemo<ThemeContextValue>(
 		() => ({
-			palette: COLOR_SCHEMES[schemeKey],
-			schemeKey,
+			palette,
+			schemeKey: resolvedScheme,
 			setScheme,
 			schemeKeys,
 		}),
-		[schemeKey, setScheme, schemeKeys],
+		[palette, resolvedScheme, setScheme, schemeKeys],
 	);
 
 	return React.createElement(ThemeContext.Provider, { value }, children);

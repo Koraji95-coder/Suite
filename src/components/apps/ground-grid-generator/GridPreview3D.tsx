@@ -1,6 +1,5 @@
 import { Pause, Play } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import { GridCanvasEmptyState } from "./GridCanvasEmptyState";
 import styles from "./GridPreview3D.module.css";
 import { createGridPreview3DEngine } from "./GridPreview3DEngine";
@@ -18,7 +17,6 @@ export function GridPreview3D({
 	conductors,
 	placements,
 }: GridPreview3DProps) {
-	const { palette } = useTheme();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -67,22 +65,12 @@ export function GridPreview3D({
 				type="button"
 				onClick={togglePause}
 				className={styles.pauseButton}
-				style={{
-					background: hexToRgba(palette.background, 0.8),
-					borderColor: hexToRgba(palette.primary, 0.2),
-				}}
 			>
 				{paused ? <Play size={11} /> : <Pause size={11} />}
 				{paused ? "Play" : "Pause"}
 			</button>
 
-			<div
-				className={styles.hint}
-				style={{
-					color: hexToRgba(palette.textMuted, 0.6),
-					background: hexToRgba(palette.background, 0.7),
-				}}
-			>
+			<div className={styles.hint}>
 				Drag to orbit{paused ? "" : " / Auto-rotating"}
 			</div>
 		</div>

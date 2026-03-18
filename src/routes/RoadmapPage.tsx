@@ -28,13 +28,44 @@ const STATUS_ICONS: Record<MilestoneStatus, ReactNode> = {
 	future: <Compass className={styles.statusIcon} />,
 };
 
+type QuarterTone = "completed" | "active" | "planned";
+
+const STATUS_BADGE_CLASS: Record<MilestoneStatus, string> = {
+	completed: styles.statusBadgeCompleted,
+	"in-progress": styles.statusBadgeInProgress,
+	planned: styles.statusBadgePlanned,
+	future: styles.statusBadgeFuture,
+};
+
+const QUARTER_TONE_LINE_CLASS: Record<QuarterTone, string> = {
+	completed: styles.timelineLineCompleted,
+	active: styles.timelineLineActive,
+	planned: styles.timelineLinePlanned,
+};
+
+const QUARTER_TONE_MARKER_CLASS: Record<QuarterTone, string> = {
+	completed: styles.quarterMarkerCompleted,
+	active: styles.quarterMarkerActive,
+	planned: styles.quarterMarkerPlanned,
+};
+
+const QUARTER_PROGRESS_CLASS: Record<QuarterTone, string> = {
+	completed: styles.progressTrackCompleted,
+	active: styles.progressTrackActive,
+	planned: styles.progressTrackPlanned,
+};
+
+const STAT_VALUE_CLASS: Record<MilestoneStatus, string> = {
+	completed: styles.statValueCompleted,
+	"in-progress": styles.statValueInProgress,
+	planned: styles.statValuePlanned,
+	future: styles.statValueFuture,
+};
+
 function StatusBadge({ status }: { status: MilestoneStatus }) {
 	const meta = STATUS_META[status];
 	return (
-		<span
-			className={styles.statusBadge}
-			style={{ color: meta.color, background: meta.bg }}
-		>
+		<span className={cn(styles.statusBadge, STATUS_BADGE_CLASS[status])}>
 			{STATUS_ICONS[status]}
 			{meta.label}
 		</span>
@@ -47,7 +78,13 @@ function CategoryTag({ category }: { category: MilestoneCategory }) {
 	);
 }
 
-function QuarterProgress({ quarter }: { quarter: Quarter }) {
+function QuarterProgress({
+	quarter,
+	tone,
+}: {
+	quarter: Quarter;
+	tone: QuarterTone;
+}) {
 	const total = quarter.milestones.length;
 	const completed = quarter.milestones.filter(
 		(m) => m.status === "completed",
@@ -55,26 +92,16 @@ function QuarterProgress({ quarter }: { quarter: Quarter }) {
 	const inProgress = quarter.milestones.filter(
 		(m) => m.status === "in-progress",
 	).length;
-	const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 	const activePct =
 		total > 0 ? Math.round(((completed + inProgress * 0.5) / total) * 100) : 0;
 
 	return (
 		<div className={styles.progressRow}>
-			<div className={styles.progressTrack}>
-				<div
-					className={styles.progressFill}
-					style={{
-						width: `${activePct}%`,
-						background:
-							pct === 100
-								? "var(--success)"
-								: inProgress > 0
-									? "var(--primary)"
-									: "var(--accent)",
-					}}
-				/>
-			</div>
+			<progress
+				className={cn(styles.progressTrack, QUARTER_PROGRESS_CLASS[tone])}
+				max={100}
+				value={activePct}
+			/>
 			<span className={styles.progressCount}>
 				{completed}/{total}
 			</span>
@@ -87,32 +114,16 @@ function QuarterSection({ quarter }: { quarter: Quarter }) {
 		(m) => m.status === "completed",
 	);
 	const hasActive = quarter.milestones.some((m) => m.status === "in-progress");
+	const tone: QuarterTone = allCompleted ? "completed" : hasActive ? "active" : "planned";
 	const [open, setOpen] = useState(hasActive || !allCompleted);
 
 	return (
 		<div className={styles.quarterRoot}>
-			<div
-				className={styles.timelineLine}
-				style={{
-					background: allCompleted
-						? "var(--success)"
-						: hasActive
-							? "var(--primary)"
-							: "var(--border)",
-				}}
-			/>
+			<div className={cn(styles.timelineLine, QUARTER_TONE_LINE_CLASS[tone])} />
 
 			<div className={styles.quarterInner}>
 				<div
-					className={styles.quarterMarker}
-					style={{
-						background: allCompleted
-							? "var(--success)"
-							: hasActive
-								? "var(--primary)"
-								: "var(--surface-2)",
-						boxShadow: "0 0 0 3px var(--bg-base)",
-					}}
+					className={cn(styles.quarterMarker, QUARTER_TONE_MARKER_CLASS[tone])}
 				/>
 
 				<button
@@ -128,7 +139,7 @@ function QuarterSection({ quarter }: { quarter: Quarter }) {
 						<p className={styles.quarterPeriod}>{quarter.period}</p>
 						<p className={styles.quarterSummary}>{quarter.summary}</p>
 						<div className={styles.quarterProgress}>
-							<QuarterProgress quarter={quarter} />
+							<QuarterProgress quarter={quarter} tone={tone} />
 						</div>
 					</div>
 					<div className={styles.chevronWrap}>
@@ -188,7 +199,7 @@ function StatsBar() {
 				const meta = STATUS_META[status];
 				return (
 					<div key={status} className={styles.statCard}>
-						<div className={styles.statValue} style={{ color: meta.color }}>
+						<div className={cn(styles.statValue, STAT_VALUE_CLASS[status])}>
 							{counts[status]}
 						</div>
 						<div className={styles.statLabel}>{meta.label}</div>
@@ -197,18 +208,15 @@ function StatsBar() {
 			})}
 			<div className={styles.overallCard}>
 				<span className={styles.overallLabel}>Overall progress</span>
-				<div className={styles.overallMetric}>
-					<div className={styles.overallTrack}>
-						<div
-							className={styles.overallFill}
-							style={{
-								width: `${Math.round((counts.completed / total) * 100)}%`,
-							}}
+					<div className={styles.overallMetric}>
+						<progress
+							className={styles.overallTrack}
+							max={100}
+							value={Math.round((counts.completed / total) * 100)}
 						/>
-					</div>
-					<span className={styles.overallValue}>
-						{Math.round((counts.completed / total) * 100)}%
-					</span>
+						<span className={styles.overallValue}>
+							{Math.round((counts.completed / total) * 100)}%
+						</span>
 				</div>
 			</div>
 		</div>

@@ -1,7 +1,7 @@
 import { Loader } from "lucide-react";
 import { ProgressBar } from "@/data/ProgressBar";
 import type { ColorScheme } from "@/lib/palette";
-import { configCardStyle } from "./CoordinatesGrabberConfigStyles";
+import { cn } from "@/lib/utils";
 import type { CoordinatesGrabberState } from "./CoordinatesGrabberModels";
 import styles from "./CoordinatesGrabberRunPanel.module.css";
 
@@ -17,7 +17,7 @@ interface CoordinatesGrabberRunPanelProps {
 
 export function CoordinatesGrabberRunPanel({
 	state,
-	palette,
+	palette: _palette,
 	progress,
 	progressStage,
 	backendConnected,
@@ -52,59 +52,27 @@ export function CoordinatesGrabberRunPanel({
 	};
 
 	return (
-		<div style={{ ...configCardStyle(palette), gridColumn: "1 / -1" }}>
+		<div className={styles.root}>
 			{state.isRunning && (
-				<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-					<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-						<Loader
-							size={14}
-							className={styles.spinner}
-							style={{ color: palette.primary }}
-						/>
-						<span
-							style={{
-								fontSize: "12px",
-								color: palette.textMuted,
-								fontWeight: 500,
-							}}
-						>
+				<div className={styles.progressWrap}>
+					<div className={styles.progressHeader}>
+						<Loader size={14} className={styles.spinner} />
+						<span className={styles.progressLabel}>
 							{getStageLabel(progressStage, progress)}
 						</span>
 					</div>
 					<ProgressBar progress={progress} />
 				</div>
 			)}
-			<div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+			<div className={styles.actions}>
 				<button
 					onClick={() => void handleLayerSearch()}
 					disabled={state.isRunning || !backendConnected}
-					style={{
-						flex: 1,
-						minWidth: "180px",
-						padding: "10px 16px",
-						borderRadius: "6px",
-						border: "none",
-						background: backendConnected ? palette.primary : palette.textMuted,
-						color: backendConnected
-							? palette.background
-							: "rgba(255,255,255,0.5)",
-						fontWeight: "600",
-						fontSize: "13px",
-						cursor:
-							backendConnected && !state.isRunning ? "pointer" : "not-allowed",
-						opacity: state.isRunning ? 0.6 : 1,
-						transition: "opacity 0.2s",
-					}}
-					onMouseEnter={(e) => {
-						if (!state.isRunning && backendConnected) {
-							(e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
-						}
-					}}
-					onMouseLeave={(e) => {
-						if (!state.isRunning && backendConnected) {
-							(e.currentTarget as HTMLButtonElement).style.opacity = "1";
-						}
-					}}
+					className={cn(
+						styles.primaryAction,
+						(state.isRunning || !backendConnected) &&
+							styles.primaryActionDisabled,
+					)}
 				>
 					{state.isRunning ? "Extracting..." : "Start Extraction"}
 				</button>
@@ -112,16 +80,10 @@ export function CoordinatesGrabberRunPanel({
 					<button
 						onClick={() => void handleSelectionRefresh()}
 						disabled={!backendConnected}
-						style={{
-							padding: "10px 16px",
-							borderRadius: "6px",
-							border: `1px solid ${palette.primary}`,
-							background: "transparent",
-							color: backendConnected ? palette.primary : palette.textMuted,
-							fontWeight: "600",
-							fontSize: "13px",
-							cursor: backendConnected ? "pointer" : "not-allowed",
-						}}
+						className={cn(
+							styles.secondaryAction,
+							!backendConnected && styles.secondaryActionDisabled,
+						)}
 					>
 						Refresh
 					</button>

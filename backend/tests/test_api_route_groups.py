@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -25,6 +26,7 @@ class TestApiRouteGroups(unittest.TestCase):
         self.template_path = self.backup_dir / "template.docx"
         self.template_path.write_bytes(b"test-template")
         self.previous_feedback_db = os.environ.get("AUTODRAFT_COMPARE_FEEDBACK_DB")
+        self.previous_watchdog_ledger_path = os.environ.get("WATCHDOG_LEDGER_PATH")
         self.previous_shadow_advisor = os.environ.get(
             "AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED"
         )
@@ -33,6 +35,9 @@ class TestApiRouteGroups(unittest.TestCase):
         )
         os.environ["AUTODRAFT_COMPARE_FEEDBACK_DB"] = str(
             self.backup_dir / "compare-feedback.sqlite3"
+        )
+        os.environ["WATCHDOG_LEDGER_PATH"] = str(
+            self.backup_dir / "watchdog.sqlite3"
         )
         os.environ["AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED"] = "false"
         os.environ["AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_ENABLED"] = "false"
@@ -55,6 +60,15 @@ class TestApiRouteGroups(unittest.TestCase):
             return wrapped
 
         def require_autocad_auth(f):
+            def wrapped(*args, **kwargs):
+                if request.headers.get("X-API-Key") != "valid-key":
+                    return jsonify({"error": "Invalid API key", "code": "AUTH_INVALID"}), 401
+                return f(*args, **kwargs)
+
+            wrapped.__name__ = getattr(f, "__name__", "wrapped")
+            return wrapped
+
+        def require_watchdog_collector_auth(f):
             def wrapped(*args, **kwargs):
                 if request.headers.get("X-API-Key") != "valid-key":
                     return jsonify({"error": "Invalid API key", "code": "AUTH_INVALID"}), 401
@@ -339,6 +353,7 @@ class TestApiRouteGroups(unittest.TestCase):
             self.app,
             require_api_key=require_api_key,
             require_autocad_auth=require_autocad_auth,
+            require_watchdog_collector_auth=require_watchdog_collector_auth,
             is_valid_api_key=is_valid_api_key,
             limiter=self.limiter,
             logger=logging.getLogger("test"),
@@ -401,6 +416,10 @@ class TestApiRouteGroups(unittest.TestCase):
             os.environ.pop("AUTODRAFT_COMPARE_FEEDBACK_DB", None)
         else:
             os.environ["AUTODRAFT_COMPARE_FEEDBACK_DB"] = self.previous_feedback_db
+        if self.previous_watchdog_ledger_path is None:
+            os.environ.pop("WATCHDOG_LEDGER_PATH", None)
+        else:
+            os.environ["WATCHDOG_LEDGER_PATH"] = self.previous_watchdog_ledger_path
         if self.previous_shadow_advisor is None:
             os.environ.pop("AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED", None)
         else:
@@ -486,6 +505,17 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/watchdog/heartbeat": ["POST"],
             "/api/watchdog/pick-root": ["POST"],
             "/api/watchdog/status": ["GET"],
+            "/api/watchdog/collectors/register": ["POST"],
+            "/api/watchdog/collectors/heartbeat": ["POST"],
+            "/api/watchdog/collectors/events": ["POST"],
+            "/api/watchdog/collectors": ["GET"],
+            "/api/watchdog/events": ["GET"],
+            "/api/watchdog/overview": ["GET"],
+            "/api/watchdog/sessions": ["GET"],
+            "/api/watchdog/projects/<project_id>/overview": ["GET"],
+            "/api/watchdog/projects/<project_id>/events": ["GET"],
+            "/api/watchdog/projects/<project_id>/sessions": ["GET"],
+            "/api/watchdog/projects/<project_id>/rules": ["GET", "PUT"],
             "/health": ["GET"],
         }
 
@@ -2228,6 +2258,36 @@ class TestApiRouteGroups(unittest.TestCase):
         response = self.client.post("/api/watchdog/pick-root")
         self.assertEqual(response.status_code, 401)
 
+        response = self.client.post("/api/watchdog/collectors/register", json={})
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.post("/api/watchdog/collectors/heartbeat", json={})
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.post("/api/watchdog/collectors/events", json={})
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.get("/api/watchdog/collectors")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.get("/api/watchdog/events")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.get("/api/watchdog/overview")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.get("/api/watchdog/projects/project-1/overview")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.get("/api/watchdog/projects/project-1/events")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.get("/api/watchdog/projects/project-1/rules")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.put("/api/watchdog/projects/project-1/rules", json={})
+        self.assertEqual(response.status_code, 401)
+
     def test_watchdog_config_validation_and_heartbeat_events(self) -> None:
         bad_response = self.client.put(
             "/api/watchdog/config",
@@ -2349,6 +2409,208 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertTrue(
             any("paused" in str(warning).lower() for warning in warnings),
         )
+
+    def test_watchdog_collector_event_routes(self) -> None:
+        now_ms = int(time.time() * 1000)
+        register_response = self.client.post(
+            "/api/watchdog/collectors/register",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "collectorId": "collector-a",
+                "name": "Desktop Collector",
+                "collectorType": "filesystem",
+                "workstationId": "DUSTIN-HOME",
+                "capabilities": ["filesystem", "cad"],
+            },
+        )
+        self.assertEqual(register_response.status_code, 200)
+        register_payload = register_response.get_json() or {}
+        self.assertTrue(register_payload.get("ok"))
+        self.assertEqual(
+            (register_payload.get("collector") or {}).get("collectorId"),
+            "collector-a",
+        )
+
+        heartbeat_response = self.client.post(
+            "/api/watchdog/collectors/heartbeat",
+            headers={"X-API-Key": "valid-key"},
+            json={"collectorId": "collector-a", "status": "online", "sequence": 7},
+        )
+        self.assertEqual(heartbeat_response.status_code, 200)
+        heartbeat_payload = heartbeat_response.get_json() or {}
+        self.assertEqual(
+            (heartbeat_payload.get("collector") or {}).get("lastSequence"),
+            7,
+        )
+
+        ingest_response = self.client.post(
+            "/api/watchdog/collectors/events",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "collectorId": "collector-a",
+                "events": [
+                    {
+                        "eventType": "file_modified",
+                        "projectId": "project-1",
+                        "path": os.path.join(self.temp_dir.name, "watchdog_collector_file.txt"),
+                        "timestamp": now_ms - 3000,
+                    },
+                    {
+                        "eventType": "drawing_opened",
+                        "projectId": "project-1",
+                        "drawingPath": os.path.join(self.temp_dir.name, "sheet-1.dwg"),
+                        "timestamp": now_ms - 1000,
+                        "sessionId": "session-1",
+                    },
+                ],
+            },
+        )
+        self.assertEqual(ingest_response.status_code, 200)
+        ingest_payload = ingest_response.get_json() or {}
+        self.assertEqual(ingest_payload.get("accepted"), 2)
+        self.assertEqual(ingest_payload.get("rejected"), 0)
+
+        list_collectors_response = self.client.get(
+            "/api/watchdog/collectors",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(list_collectors_response.status_code, 200)
+        list_collectors_payload = list_collectors_response.get_json() or {}
+        self.assertGreaterEqual(int(list_collectors_payload.get("count") or 0), 1)
+
+        list_events_response = self.client.get(
+            "/api/watchdog/events",
+            headers={"X-API-Key": "valid-key"},
+            query_string={"projectId": "project-1", "limit": 10},
+        )
+        self.assertEqual(list_events_response.status_code, 200)
+        list_events_payload = list_events_response.get_json() or {}
+        self.assertEqual(int(list_events_payload.get("count") or 0), 2)
+
+        overview_response = self.client.get(
+            "/api/watchdog/overview",
+            headers={"X-API-Key": "valid-key"},
+            query_string={"projectId": "project-1", "timeWindowMs": 7 * 24 * 60 * 60 * 1000},
+        )
+        self.assertEqual(overview_response.status_code, 200)
+        overview_payload = overview_response.get_json() or {}
+        self.assertTrue(overview_payload.get("ok"))
+        self.assertEqual((overview_payload.get("collectors") or {}).get("total"), 1)
+        self.assertEqual((overview_payload.get("events") or {}).get("inWindow"), 2)
+
+        project_overview_response = self.client.get(
+            "/api/watchdog/projects/project-1/overview",
+            headers={"X-API-Key": "valid-key"},
+            query_string={"timeWindowMs": 7 * 24 * 60 * 60 * 1000},
+        )
+        self.assertEqual(project_overview_response.status_code, 200)
+        project_overview_payload = project_overview_response.get_json() or {}
+        self.assertEqual(project_overview_payload.get("projectId"), "project-1")
+
+        project_events_response = self.client.get(
+            "/api/watchdog/projects/project-1/events",
+            headers={"X-API-Key": "valid-key"},
+            query_string={"limit": 10},
+        )
+        self.assertEqual(project_events_response.status_code, 200)
+        project_events_payload = project_events_response.get_json() or {}
+        self.assertEqual(int(project_events_payload.get("count") or 0), 2)
+
+        sessions_response = self.client.get(
+            "/api/watchdog/sessions",
+            headers={"X-API-Key": "valid-key"},
+            query_string={"projectId": "project-1", "timeWindowMs": 7 * 24 * 60 * 60 * 1000},
+        )
+        self.assertEqual(sessions_response.status_code, 200)
+        sessions_payload = sessions_response.get_json() or {}
+        self.assertEqual(int(sessions_payload.get("count") or 0), 1)
+        self.assertEqual(
+            ((sessions_payload.get("sessions") or [{}])[0]).get("eventCount"),
+            1,
+        )
+
+        project_sessions_response = self.client.get(
+            "/api/watchdog/projects/project-1/sessions",
+            headers={"X-API-Key": "valid-key"},
+            query_string={"timeWindowMs": 7 * 24 * 60 * 60 * 1000},
+        )
+        self.assertEqual(project_sessions_response.status_code, 200)
+        project_sessions_payload = project_sessions_response.get_json() or {}
+        self.assertEqual(project_sessions_payload.get("projectId"), "project-1")
+        self.assertEqual(int(project_sessions_payload.get("count") or 0), 1)
+
+    def test_watchdog_project_rules_attribute_events(self) -> None:
+        project_root = os.path.join(self.temp_dir.name, "project-alpha")
+        os.makedirs(project_root, exist_ok=True)
+
+        put_response = self.client.put(
+            "/api/watchdog/projects/project-alpha/rules",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "roots": [project_root],
+                "includeGlobs": ["*.dwg", "*.pdf"],
+                "excludeGlobs": [],
+                "drawingPatterns": ["*.dwg"],
+            },
+        )
+        self.assertEqual(put_response.status_code, 200)
+        put_payload = put_response.get_json() or {}
+        self.assertEqual((put_payload.get("rule") or {}).get("projectId"), "project-alpha")
+
+        get_response = self.client.get(
+            "/api/watchdog/projects/project-alpha/rules",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(get_response.status_code, 200)
+        get_payload = get_response.get_json() or {}
+        self.assertEqual((get_payload.get("rule") or {}).get("roots"), [project_root])
+
+        register_response = self.client.post(
+            "/api/watchdog/collectors/register",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "collectorId": "collector-a",
+                "name": "Desktop Collector",
+                "collectorType": "filesystem",
+                "workstationId": "DUSTIN-HOME",
+            },
+        )
+        self.assertEqual(register_response.status_code, 200)
+
+        now_ms = int(time.time() * 1000)
+        ingest_response = self.client.post(
+            "/api/watchdog/collectors/events",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "collectorId": "collector-a",
+                "events": [
+                    {
+                        "eventKey": "evt-1",
+                        "eventType": "drawing_opened",
+                        "drawingPath": os.path.join(project_root, "sheet-1.dwg"),
+                        "timestamp": now_ms - 1000,
+                    },
+                    {
+                        "eventKey": "evt-2",
+                        "eventType": "file_modified",
+                        "path": os.path.join(project_root, "submittal.pdf"),
+                        "timestamp": now_ms - 500,
+                    },
+                ],
+            },
+        )
+        self.assertEqual(ingest_response.status_code, 200)
+        ingest_payload = ingest_response.get_json() or {}
+        self.assertEqual(ingest_payload.get("accepted"), 2)
+
+        project_events_response = self.client.get(
+            "/api/watchdog/projects/project-alpha/events",
+            headers={"X-API-Key": "valid-key"},
+            query_string={"limit": 10},
+        )
+        self.assertEqual(project_events_response.status_code, 200)
+        project_events_payload = project_events_response.get_json() or {}
+        self.assertEqual(int(project_events_payload.get("count") or 0), 2)
 
 
 if __name__ == "__main__":

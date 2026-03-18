@@ -80,6 +80,9 @@ function getWorkstationContext() {
 
 function formatWorkstationContext() {
 	const context = getWorkstationContext();
+	const filesystemStartup = getWatchdogStartupContext(context);
+	const autocadStartup = getWatchdogAutocadStartupContext(context);
+	const autocadPlugin = getWatchdogAutocadPluginContext();
 	const lines = ["## Workstation Context", ""];
 	lines.push(`- Workstation ID: ${context.workstationId}`);
 	if (context.workstationLabel) {
@@ -95,11 +98,252 @@ function formatWorkstationContext() {
 	lines.push(`- Repo Root: ${toPosix(context.repoRoot)}`);
 	lines.push(`- Source: ${context.source}`);
 	lines.push("");
+	lines.push("## Watchdog Collector Startup");
+	lines.push(`- Collector ID: ${filesystemStartup.collectorId}`);
+	lines.push(`- Config Path: ${filesystemStartup.configPath}`);
+	lines.push(`- Startup Task: ${filesystemStartup.taskName}`);
+	lines.push(`- Startup Check Task: ${filesystemStartup.checkTaskName}`);
+	lines.push(`- Run Key Name: ${filesystemStartup.runKeyName}`);
+	lines.push(`- Mutex Name: ${filesystemStartup.mutexName}`);
+	lines.push(`- Startup Check Script: ${filesystemStartup.checkScript}`);
+	lines.push(
+		"- MCP Tool: `repo.check_watchdog_collector_startup`",
+	);
+	lines.push("");
+	lines.push("### AutoCAD State Collector Startup");
+	lines.push(`- Collector ID: ${autocadStartup.collectorId}`);
+	lines.push(`- Config Path: ${autocadStartup.configPath}`);
+	lines.push(`- State JSON Path: ${autocadStartup.stateJsonPath}`);
+	lines.push(`- Buffer Dir: ${autocadStartup.bufferDir}`);
+	lines.push(`- Startup Task: ${autocadStartup.taskName}`);
+	lines.push(`- Startup Check Task: ${autocadStartup.checkTaskName}`);
+	lines.push(`- Run Key Name: ${autocadStartup.runKeyName}`);
+	lines.push(`- Mutex Name: ${autocadStartup.mutexName}`);
+	lines.push(`- Startup Check Script: ${autocadStartup.checkScript}`);
+	lines.push(
+		"- MCP Tool: `repo.check_watchdog_autocad_collector_startup`",
+	);
+	lines.push("");
+	lines.push("### AutoCAD Plugin");
+	lines.push(`- Bundle Root: ${autocadPlugin.bundleRoot}`);
+	lines.push(`- Plugin Check Script: ${autocadPlugin.checkScript}`);
+	lines.push("- MCP Tool: `repo.check_watchdog_autocad_plugin`");
+	lines.push("");
+	lines.push("### AutoCAD Readiness");
+	lines.push(`- Readiness Check Script: ${autocadPlugin.readinessScript}`);
+	lines.push("- MCP Tool: `repo.check_watchdog_autocad_readiness`");
+	lines.push("");
 	lines.push("Supported MCP env overrides:");
 	lines.push("- `SUITE_WORKSTATION_ID`");
 	lines.push("- `SUITE_WORKSTATION_LABEL`");
 	lines.push("- `SUITE_WORKSTATION_ROLE`");
+	lines.push("- `SUITE_WATCHDOG_COLLECTOR_ID`");
+	lines.push("- `SUITE_WATCHDOG_COLLECTOR_CONFIG`");
+	lines.push("- `SUITE_WATCHDOG_STARTUP_TASK_NAME`");
+	lines.push("- `SUITE_WATCHDOG_STARTUP_CHECK_TASK_NAME`");
+	lines.push("- `SUITE_WATCHDOG_STARTUP_RUN_KEY_NAME`");
+	lines.push("- `SUITE_WATCHDOG_STARTUP_MUTEX_NAME`");
+	lines.push("- `SUITE_WATCHDOG_STARTUP_CHECK_SCRIPT`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_COLLECTOR_ID`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_COLLECTOR_CONFIG`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_STATE_PATH`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_BUFFER_DIR`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_STARTUP_TASK_NAME`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_STARTUP_CHECK_TASK_NAME`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_STARTUP_RUN_KEY_NAME`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_STARTUP_MUTEX_NAME`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_STARTUP_CHECK_SCRIPT`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_PLUGIN_BUNDLE_ROOT`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_PLUGIN_CHECK_SCRIPT`");
+	lines.push("- `SUITE_WATCHDOG_AUTOCAD_READINESS_CHECK_SCRIPT`");
+	lines.push("- `SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT`");
 	return lines.join("\n");
+}
+
+function getLocalAppDataRoot() {
+	const localAppData = String(process.env.LOCALAPPDATA || "").trim();
+	if (localAppData) return localAppData;
+	return path.join(os.homedir(), "AppData", "Local");
+}
+
+function defaultWatchdogCollectorId(workstationId) {
+	const slug = slugify(workstationId || "workstation");
+	return `watchdog-fs-${slug || "workstation"}`;
+}
+
+function getWatchdogStartupContext(workstationContext = getWorkstationContext()) {
+	const workstationId = workstationContext.workstationId || "unknown";
+	const collectorId =
+		String(process.env.SUITE_WATCHDOG_COLLECTOR_ID || "").trim() ||
+		defaultWatchdogCollectorId(workstationId);
+	const configPath =
+		String(process.env.SUITE_WATCHDOG_COLLECTOR_CONFIG || "").trim() ||
+		path.join(
+			getLocalAppDataRoot(),
+			"Suite",
+			"watchdog-collector",
+			"config",
+			`${workstationId}.json`,
+		);
+	const taskName =
+		String(process.env.SUITE_WATCHDOG_STARTUP_TASK_NAME || "").trim() ||
+		`SuiteWatchdogFilesystemCollector-${workstationId}`;
+	const checkTaskName =
+		String(process.env.SUITE_WATCHDOG_STARTUP_CHECK_TASK_NAME || "").trim() ||
+		`SuiteWatchdogFilesystemCollectorCheck-${workstationId}`;
+	const runKeyName =
+		String(process.env.SUITE_WATCHDOG_STARTUP_RUN_KEY_NAME || "").trim() ||
+		taskName;
+	const mutexName =
+		String(process.env.SUITE_WATCHDOG_STARTUP_MUTEX_NAME || "").trim() ||
+		`Local\\SuiteWatchdogFilesystemCollectorDaemon-${
+			slugify(workstationId) || "workstation"
+		}`;
+	const checkScript =
+		String(process.env.SUITE_WATCHDOG_STARTUP_CHECK_SCRIPT || "").trim() ||
+		path.join(
+			REPO_ROOT,
+			"scripts",
+			"check-watchdog-filesystem-collector-startup.ps1",
+		);
+	return {
+		collectorId,
+		configPath: toPosix(configPath),
+		taskName,
+		checkTaskName,
+		runKeyName,
+		mutexName,
+		checkScript: toPosix(checkScript),
+	};
+}
+
+function getWatchdogBackendStartupContext(workstationContext = getWorkstationContext()) {
+	const workstationId = workstationContext.workstationId || "unknown";
+	const checkScript =
+		String(process.env.SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT || "").trim() ||
+		path.join(
+			REPO_ROOT,
+			"scripts",
+			"check-watchdog-backend-startup.ps1",
+		);
+	return {
+		workstationId,
+		checkScript: toPosix(checkScript),
+	};
+}
+
+function getAutocadAppDataRoamingRoot() {
+	const autocadAppData = String(process.env.APPDATA || "").trim();
+	if (autocadAppData) return autocadAppData;
+	return path.join(os.homedir(), "AppData", "Roaming");
+}
+
+function defaultWatchdogAutocadCollectorId(workstationId) {
+	const slug = slugify(workstationId || "workstation");
+	return `autocad-${slug || "workstation"}`;
+}
+
+function defaultAutocadConfigPath(workstationId) {
+	return path.join(
+		getLocalAppDataRoot(),
+		"Suite",
+		"watchdog-autocad-collector",
+		"config",
+		`${workstationId}-autocad.json`,
+	);
+}
+
+function defaultAutocadStatePath() {
+	return path.join(
+		getAutocadAppDataRoamingRoot(),
+		"CadCommandCenter",
+		"tracker-state.json",
+	);
+}
+
+function defaultAutocadBufferDir(collectorId) {
+	return path.join(
+		getLocalAppDataRoot(),
+		"Suite",
+		"watchdog-autocad-collector",
+		collectorId,
+	);
+}
+
+function defaultAutocadPluginBundleRoot() {
+	return path.join(
+		getAutocadAppDataRoamingRoot(),
+		"Autodesk",
+		"ApplicationPlugins",
+		"SuiteWatchdogCadTracker.bundle",
+	);
+}
+
+function getWatchdogAutocadStartupContext(workstationContext = getWorkstationContext()) {
+	const workstationId = workstationContext.workstationId || "unknown";
+	const slug = slugify(workstationId) || "workstation";
+	const collectorId =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_COLLECTOR_ID || "").trim() ||
+		String(process.env.WATCHDOG_AUTOCAD_COLLECTOR_ID || "").trim() ||
+		defaultWatchdogAutocadCollectorId(workstationId);
+	const configPath =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_COLLECTOR_CONFIG || "").trim() ||
+		defaultAutocadConfigPath(workstationId);
+	const taskName =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_STARTUP_TASK_NAME || "").trim() ||
+		`SuiteWatchdogAutoCADCollector-${workstationId}`;
+	const checkTaskName =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_STARTUP_CHECK_TASK_NAME || "").trim() ||
+		`SuiteWatchdogAutoCADCollectorCheck-${workstationId}`;
+	const runKeyName =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_STARTUP_RUN_KEY_NAME || "").trim() ||
+		taskName;
+	const mutexName =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_STARTUP_MUTEX_NAME || "").trim() ||
+		`Local\\SuiteWatchdogAutoCADCollectorDaemon-${slug}`;
+	const checkScript =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_STARTUP_CHECK_SCRIPT || "").trim() ||
+		path.join(
+			REPO_ROOT,
+			"scripts",
+			"check-watchdog-autocad-collector-startup.ps1",
+		);
+	const stateJsonPath =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_STATE_PATH || "").trim() ||
+		String(process.env.WATCHDOG_AUTOCAD_STATE_PATH || "").trim() ||
+		defaultAutocadStatePath();
+	const bufferDir =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_BUFFER_DIR || "").trim() ||
+		String(process.env.WATCHDOG_AUTOCAD_BUFFER_DIR || "").trim() ||
+		defaultAutocadBufferDir(collectorId);
+	return {
+		collectorId,
+		configPath: toPosix(configPath),
+		stateJsonPath: toPosix(stateJsonPath),
+		bufferDir: toPosix(bufferDir),
+		taskName,
+		checkTaskName,
+		runKeyName,
+		mutexName,
+		checkScript: toPosix(checkScript),
+	};
+}
+
+function getWatchdogAutocadPluginContext() {
+	const bundleRoot =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_PLUGIN_BUNDLE_ROOT || "").trim() ||
+		defaultAutocadPluginBundleRoot();
+	const checkScript =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_PLUGIN_CHECK_SCRIPT || "").trim() ||
+		path.join(REPO_ROOT, "scripts", "check-watchdog-autocad-plugin.ps1");
+	const readinessScript =
+		String(process.env.SUITE_WATCHDOG_AUTOCAD_READINESS_CHECK_SCRIPT || "").trim() ||
+		path.join(REPO_ROOT, "scripts", "check-watchdog-autocad-readiness.ps1");
+	return {
+		bundleRoot: toPosix(bundleRoot),
+		checkScript: toPosix(checkScript),
+		readinessScript: toPosix(readinessScript),
+	};
 }
 
 function escapeRegExp(value) {
@@ -1274,6 +1518,71 @@ function parseFrontendAgentProfileModelMap(sourceText, profileIds) {
 	return map;
 }
 
+async function toolCheckWatchdogBackendStartup(args = {}) {
+	if (process.platform !== "win32") {
+		return createTextResult(
+			"Watchdog backend startup checks are only available on Windows workstations.",
+		);
+	}
+
+	const startup = getWatchdogBackendStartupContext();
+	const codexConfigPath = path.join(os.homedir(), ".codex", "config.toml");
+	const checkScriptCandidate = path.normalize(startup.checkScript);
+	const checkScriptAbs = path.isAbsolute(checkScriptCandidate)
+		? checkScriptCandidate
+		: resolveRepoPath(checkScriptCandidate);
+
+	if (!(await exists(checkScriptAbs))) {
+		return createTextResult(
+			`Startup check script was not found: ${toPosix(checkScriptAbs)}`,
+			true,
+		);
+	}
+
+	const psArgs = [
+		"-NoProfile",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-File",
+		checkScriptAbs,
+		"-CodexConfigPath",
+		codexConfigPath,
+		"-WorkstationId",
+		startup.workstationId,
+		"-Json",
+	];
+	if (args && args.start_if_missing === true) {
+		psArgs.push("-StartIfMissing");
+	}
+
+	const result = await runProcess("PowerShell.exe", psArgs, {
+		timeoutMs: 30_000,
+	});
+	const output = (result.stdout || result.stderr || "").trim();
+	if (!result.ok) {
+		return createTextResult(
+			[
+				`Command: ${result.command}`,
+				`Exit: ${result.code ?? "unknown"}`,
+				output || "Backend startup check failed with no output.",
+			].join("\n"),
+			true,
+		);
+	}
+
+	return createTextResult(
+		output ||
+			JSON.stringify(
+				{
+					ok: true,
+					workstationId: startup.workstationId,
+				},
+				null,
+				2,
+			),
+	);
+}
+
 async function toolVerifyAgentRoutingGuardrails() {
 	const guardrailsAbs = resolveRepoPath("AGENTS.md");
 	const frontendAbs = resolveRepoPath("src/components/agent/agentProfiles.ts");
@@ -1371,6 +1680,285 @@ async function toolVerifyAgentRoutingGuardrails() {
 
 async function toolGetWorkstationContext() {
 	return createTextResult(formatWorkstationContext());
+}
+
+async function toolCheckWatchdogCollectorStartup(args = {}) {
+	if (process.platform !== "win32") {
+		return createTextResult(
+			"Watchdog collector startup checks are only available on Windows workstations.",
+		);
+	}
+
+	const startup = getWatchdogStartupContext();
+	const codexConfigPath = path.join(os.homedir(), ".codex", "config.toml");
+	const checkScriptCandidate = path.normalize(startup.checkScript);
+	const configPath = path.normalize(startup.configPath);
+	const checkScriptAbs = path.isAbsolute(checkScriptCandidate)
+		? checkScriptCandidate
+		: resolveRepoPath(checkScriptCandidate);
+
+	if (!(await exists(checkScriptAbs))) {
+		return createTextResult(
+			`Startup check script was not found: ${toPosix(checkScriptAbs)}`,
+			true,
+		);
+	}
+
+	const psArgs = [
+		"-NoProfile",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-File",
+		checkScriptAbs,
+		"-ConfigPath",
+		configPath,
+		"-CodexConfigPath",
+		codexConfigPath,
+		"-TaskName",
+		startup.taskName,
+		"-CheckTaskName",
+		startup.checkTaskName,
+		"-RunKeyName",
+		startup.runKeyName,
+		"-MutexName",
+		startup.mutexName,
+		"-Json",
+	];
+	if (args && args.start_if_missing === true) {
+		psArgs.push("-StartIfMissing");
+	}
+
+	const result = await runProcess("PowerShell.exe", psArgs, {
+		timeoutMs: 30_000,
+	});
+	const output = (result.stdout || result.stderr || "").trim();
+	if (!result.ok) {
+		return createTextResult(
+			[
+				`Command: ${result.command}`,
+				`Exit: ${result.code ?? "unknown"}`,
+				output || "Startup check failed with no output.",
+			].join("\n"),
+			true,
+		);
+	}
+
+	return createTextResult(
+		output ||
+			JSON.stringify(
+				{
+					ok: true,
+					workstationId: getWorkstationContext().workstationId,
+				},
+				null,
+				2,
+			),
+	);
+}
+
+async function toolCheckWatchdogAutocadCollectorStartup(args = {}) {
+	if (process.platform !== "win32") {
+		return createTextResult(
+			"Watchdog AutoCAD collector startup checks are only available on Windows workstations.",
+		);
+	}
+
+	const startup = getWatchdogAutocadStartupContext();
+	const codexConfigPath = path.join(os.homedir(), ".codex", "config.toml");
+	const checkScriptCandidate = path.normalize(startup.checkScript);
+	const configPath = path.normalize(startup.configPath);
+	const checkScriptAbs = path.isAbsolute(checkScriptCandidate)
+		? checkScriptCandidate
+		: resolveRepoPath(checkScriptCandidate);
+
+	if (!(await exists(checkScriptAbs))) {
+		return createTextResult(
+			`Startup check script was not found: ${toPosix(checkScriptAbs)}`,
+			true,
+		);
+	}
+
+	const psArgs = [
+		"-NoProfile",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-File",
+		checkScriptAbs,
+		"-ConfigPath",
+		configPath,
+		"-CodexConfigPath",
+		codexConfigPath,
+		"-TaskName",
+		startup.taskName,
+		"-CheckTaskName",
+		startup.checkTaskName,
+		"-RunKeyName",
+		startup.runKeyName,
+		"-MutexName",
+		startup.mutexName,
+		"-Json",
+	];
+	if (args && args.start_if_missing === true) {
+		psArgs.push("-StartIfMissing");
+	}
+
+	const result = await runProcess("PowerShell.exe", psArgs, {
+		timeoutMs: 30_000,
+	});
+	const output = (result.stdout || result.stderr || "").trim();
+	if (!result.ok) {
+		return createTextResult(
+			[
+				`Command: ${result.command}`,
+				`Exit: ${result.code ?? "unknown"}`,
+				output || "Startup check failed with no output.",
+			].join("\n"),
+			true,
+		);
+	}
+
+	return createTextResult(
+		output ||
+			JSON.stringify(
+				{
+					ok: true,
+					workstationId: getWorkstationContext().workstationId,
+					stateJsonPath: startup.stateJsonPath,
+				},
+				null,
+				2,
+			),
+	);
+}
+
+async function toolCheckWatchdogAutocadPlugin() {
+	if (process.platform !== "win32") {
+		return createTextResult(
+			"Watchdog AutoCAD plugin checks are only available on Windows workstations.",
+		);
+	}
+
+	const plugin = getWatchdogAutocadPluginContext();
+	const checkScriptCandidate = path.normalize(plugin.checkScript);
+	const bundleRoot = path.normalize(plugin.bundleRoot);
+	const checkScriptAbs = path.isAbsolute(checkScriptCandidate)
+		? checkScriptCandidate
+		: resolveRepoPath(checkScriptCandidate);
+
+	if (!(await exists(checkScriptAbs))) {
+		return createTextResult(
+			`AutoCAD plugin check script was not found: ${toPosix(checkScriptAbs)}`,
+			true,
+		);
+	}
+
+	const result = await runProcess(
+		"PowerShell.exe",
+		[
+			"-NoProfile",
+			"-ExecutionPolicy",
+			"Bypass",
+			"-File",
+			checkScriptAbs,
+			"-BundleRoot",
+			bundleRoot,
+			"-Json",
+		],
+		{ timeoutMs: 30_000 },
+	);
+	const output = (result.stdout || result.stderr || "").trim();
+	if (!result.ok) {
+		return createTextResult(
+			[
+				`Command: ${result.command}`,
+				`Exit: ${result.code ?? "unknown"}`,
+				output || "AutoCAD plugin check failed with no output.",
+			].join("\n"),
+			true,
+		);
+	}
+
+	return createTextResult(
+		output ||
+			JSON.stringify(
+				{
+					ok: true,
+					bundleRoot: plugin.bundleRoot,
+				},
+				null,
+				2,
+			),
+	);
+}
+
+async function toolCheckWatchdogAutocadReadiness(args = {}) {
+	if (process.platform !== "win32") {
+		return createTextResult(
+			"Watchdog AutoCAD readiness checks are only available on Windows workstations.",
+		);
+	}
+
+	const startup = getWatchdogAutocadStartupContext();
+	const plugin = getWatchdogAutocadPluginContext();
+	const codexConfigPath = path.join(os.homedir(), ".codex", "config.toml");
+	const checkScriptCandidate = path.normalize(plugin.readinessScript);
+	const configPath = path.normalize(startup.configPath);
+	const bundleRoot = path.normalize(plugin.bundleRoot);
+	const checkScriptAbs = path.isAbsolute(checkScriptCandidate)
+		? checkScriptCandidate
+		: resolveRepoPath(checkScriptCandidate);
+
+	if (!(await exists(checkScriptAbs))) {
+		return createTextResult(
+			`AutoCAD readiness check script was not found: ${toPosix(checkScriptAbs)}`,
+			true,
+		);
+	}
+
+	const psArgs = [
+		"-NoProfile",
+		"-ExecutionPolicy",
+		"Bypass",
+		"-File",
+		checkScriptAbs,
+		"-ConfigPath",
+		configPath,
+		"-BundleRoot",
+		bundleRoot,
+		"-CodexConfigPath",
+		codexConfigPath,
+		"-Json",
+	];
+	if (args && args.start_if_missing === true) {
+		psArgs.push("-StartIfMissing");
+	}
+
+	const result = await runProcess("PowerShell.exe", psArgs, {
+		timeoutMs: 30_000,
+	});
+	const output = (result.stdout || result.stderr || "").trim();
+	if (!result.ok) {
+		return createTextResult(
+			[
+				`Command: ${result.command}`,
+				`Exit: ${result.code ?? "unknown"}`,
+				output || "AutoCAD readiness check failed with no output.",
+			].join("\n"),
+			true,
+		);
+	}
+
+	return createTextResult(
+		output ||
+			JSON.stringify(
+				{
+					ok: true,
+					workstationId: getWorkstationContext().workstationId,
+				},
+				null,
+				2,
+			),
+	);
 }
 
 const PROMPTS = {
@@ -1483,15 +2071,23 @@ Notes: ${notes}
    - use \`SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev\` only for explicit diagnostics
    - if full CLI compile fails with rustc stack overflow / 0xc0000005 / ICE, capture versions + failure signature once, classify as compiler/toolchain instability, stop workaround iteration, and continue on the default gateway path
    - escalate upstream only after a minimal reproducible diagnostic capture is available
-7. Local Ollama startup gate (required before conversation/run creation):
+7. Watchdog collector startup gate:
+   - workstation identity comes from \`.codex/config.toml\` or MCP workstation env overrides
+   - use \`repo.check_watchdog_collector_startup\`, \`repo.check_watchdog_autocad_collector_startup\`, \`repo.check_watchdog_autocad_plugin\`, and \`repo.check_watchdog_autocad_readiness\` before relying on local collector telemetry when startup state is relevant
+   - if the reported workstation/config mismatch is non-empty, fix workstation-specific startup config before proceeding
+   - if startup is unhealthy and recoverable, rerun with \`start_if_missing=true\`
+8. Local Ollama startup gate (required before conversation/run creation):
    - run \`npm run gateway:dev\`
    - confirm startup logs show \`provider=ollama\` and \`mode=local\`
    - confirm Ollama preflight reports all required profile models are available
    - if any required model is missing, stop and pull missing models before starting single-agent chat or orchestration
    - default required models (unless overridden by \`AGENT_MODEL_*\` / \`VITE_AGENT_MODEL_*\`): \`qwen3:14b\`, \`gemma3:12b\`, \`devstral-small-2:latest\`, \`qwen2.5-coder:14b\`, \`joshuaokolo/C3Dv0:latest\`, \`ALIENTELLIGENCE/electricalengineerv2:latest\`
-8. Adjacent auth-noise guidance:
+9. Adjacent auth-noise guidance:
    - Supabase "issued in the future" warning spam is handled by docs/security/supabase-clock-skew-runbook.md
    - do not treat clock-skew warning noise as a reason to reopen gateway workaround loops
+10. Watchdog backend startup gate:
+   - use \`repo.check_watchdog_backend_startup\` before relying on local AutoCAD telemetry, and rerun with \`start_if_missing=true\` when the server is missing
+   - keep the backend service running via the standard \`python backend/api_server.py\` command and confirm it responds to \`/health\` before streaming telemetry
 `,
 	},
 	"repo.workstation_context": {
@@ -1868,6 +2464,80 @@ const TOOLS = [
 			properties: {},
 		},
 		handler: toolGetWorkstationContext,
+	},
+	{
+		name: "repo.check_watchdog_collector_startup",
+		description:
+			"Check workstation-specific Watchdog filesystem collector startup state and optionally start it if missing.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				start_if_missing: {
+					type: "boolean",
+					description:
+						"When true, attempt to start the collector if the check finds it is not running.",
+				},
+			},
+		},
+		handler: toolCheckWatchdogCollectorStartup,
+	},
+	{
+		name: "repo.check_watchdog_autocad_collector_startup",
+		description:
+			"Check workstation-specific Watchdog AutoCAD state collector startup state and optionally start it if missing.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				start_if_missing: {
+					type: "boolean",
+					description:
+						"When true, attempt to start the collector if the check finds it is not running.",
+				},
+			},
+		},
+		handler: toolCheckWatchdogAutocadCollectorStartup,
+	},
+	{
+		name: "repo.check_watchdog_autocad_plugin",
+		description:
+			"Check whether the workstation-local Watchdog AutoCAD plugin bundle is installed and configured to autoload.",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		handler: toolCheckWatchdogAutocadPlugin,
+	},
+	{
+		name: "repo.check_watchdog_autocad_readiness",
+		description:
+			"Run the workstation-local Watchdog AutoCAD readiness doctor, combining startup, plugin, tracker-state, and collector-state checks.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				start_if_missing: {
+					type: "boolean",
+					description:
+						"When true, attempt to start the AutoCAD collector daemon if the readiness check finds it is not running.",
+				},
+			},
+		},
+		handler: toolCheckWatchdogAutocadReadiness,
+	},
+	{
+		name: "repo.check_watchdog_backend_startup",
+		description:
+			"Check the workstation-local backend API server startup state and optionally start it if missing.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				start_if_missing: {
+					type: "boolean",
+					description:
+						"When true, attempt to start the Flask backend if it is not already running.",
+				},
+			},
+		},
+		handler: toolCheckWatchdogBackendStartup,
 	},
 	{
 		name: "repo.verify_agent_routing_guardrails",

@@ -10,7 +10,6 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import { Progress } from "@/components/primitives/Progress";
-import { useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import styles from "./CoordinatesGrabber.module.css";
 import { CoordinateYamlViewer } from "./CoordinateYamlViewer";
@@ -84,7 +83,6 @@ function StepCard({
 }
 
 export function CoordinatesGrabber() {
-	const { palette } = useTheme();
 	const {
 		addLog,
 		availableLayers,
@@ -167,17 +165,8 @@ export function CoordinatesGrabber() {
 			? "-- Select a layer --"
 			: "No layers found. Type a layer name or refresh.";
 
-	const heroStyle = {
-		"--cg-bg": palette.background,
-		"--cg-surface": palette.surface,
-		"--cg-text": palette.text,
-		"--cg-muted": palette.textMuted,
-		"--cg-primary": palette.primary,
-		"--cg-border": `color-mix(in srgb, ${palette.primary} 18%, transparent)`,
-	} as React.CSSProperties;
-
 	return (
-		<div className={styles.root} style={heroStyle}>
+		<div className={styles.root}>
 			<section className={styles.hero}>
 				<div className={styles.heroGlow} />
 				<div className={styles.heroMain}>

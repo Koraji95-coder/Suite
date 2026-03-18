@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTheme } from "@/lib/palette";
+import { useResolvedAppearance } from "@/lib/appearance/useResolvedAppearance";
 import { GridCanvasEmptyState } from "./GridCanvasEmptyState";
 import styles from "./GridPreview.module.css";
 import { GridPreviewOverlay } from "./GridPreviewOverlay";
@@ -40,7 +40,7 @@ export function GridPreview({
 	layerVisibility,
 	callouts,
 }: GridPreviewProps) {
-	const { palette } = useTheme();
+	const appearance = useResolvedAppearance();
 	const svgRef = useRef<SVGSVGElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -255,7 +255,7 @@ export function GridPreview({
 				svgRef={svgRef}
 				effectiveViewBox={effectiveViewBox}
 				isPanning={isPanning}
-				backgroundColor={palette.background}
+				backgroundColor={appearance.background}
 				rods={layerVisibility.rods ? rodsWithoutTestWells : []}
 				conductors={layerVisibility.conductors ? conductors : []}
 				tees={layerVisibility.tees ? tees : []}
@@ -270,9 +270,9 @@ export function GridPreview({
 			/>
 
 			<GridPreviewOverlay
-				backgroundColor={palette.background}
-				primaryColor={palette.primary}
-				textMutedColor={palette.textMuted}
+				backgroundColor={appearance.background}
+				primaryColor={appearance.primary}
+				textMutedColor={appearance.textMuted}
 				rodCount={rods.length}
 				testWellCount={testWells.length}
 				conductorCount={conductors.length}

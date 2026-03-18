@@ -64,6 +64,11 @@ try:
     import redis
 except Exception:
     redis = None  # type: ignore[assignment]
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from route_groups import register_route_groups
 from route_groups.api_passkey_store_access import (
     fetch_active_passkey_by_credential_id as passkey_store_fetch_active_passkey_by_credential_id,
@@ -1693,9 +1698,12 @@ def require_api_key(f):
     return security_runtime.require_api_key(f)
 
 
-def require_autocad_auth(f):
-    """Decorator for AutoCAD routes: bearer-token auth first, optional API-key fallback."""
-
+def _decorate_autocad_auth_route(
+    f,
+    *,
+    allow_api_key_fallback: bool,
+    auth_label: str,
+):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         remote_addr = _get_request_ip()
@@ -1705,7 +1713,8 @@ def require_autocad_auth(f):
 
         if auth_header and not auth_header.lower().startswith("bearer "):
             logger.warning(
-                "AutoCAD auth rejected (invalid authorization scheme) %s %s from %s",
+                "%s auth rejected (invalid authorization scheme) %s %s from %s",
+                auth_label,
                 method,
                 path,
                 remote_addr,
@@ -1720,7 +1729,8 @@ def require_autocad_auth(f):
                 g.autocad_auth_mode = "bearer"
                 user_id = str(_get_supabase_user_id(user) or "unknown")
                 logger.info(
-                    "AutoCAD auth success via bearer %s %s from %s (user_id=%s)",
+                    "%s auth success via bearer %s %s from %s (user_id=%s)",
+                    auth_label,
                     method,
                     path,
                     remote_addr,
@@ -1729,27 +1739,30 @@ def require_autocad_auth(f):
                 return f(*args, **kwargs)
 
             logger.warning(
-                "AutoCAD bearer token rejected %s %s from %s",
+                "%s bearer token rejected %s %s from %s",
+                auth_label,
                 method,
                 path,
                 remote_addr,
             )
-            if not AUTOCAD_ALLOW_API_KEY_FALLBACK:
+            if not allow_api_key_fallback:
                 return jsonify({"error": "Invalid bearer token", "code": "AUTH_INVALID"}), 401
 
         provided_key = str(request.headers.get("X-API-Key") or "").strip()
-        if AUTOCAD_ALLOW_API_KEY_FALLBACK and provided_key:
+        if allow_api_key_fallback and provided_key:
             if is_valid_api_key(provided_key):
                 g.autocad_auth_mode = "api_key"
                 logger.info(
-                    "AutoCAD auth success via API key fallback %s %s from %s",
+                    "%s auth success via API key fallback %s %s from %s",
+                    auth_label,
                     method,
                     path,
                     remote_addr,
                 )
                 return f(*args, **kwargs)
             logger.warning(
-                "AutoCAD API-key fallback rejected %s %s from %s",
+                "%s API-key fallback rejected %s %s from %s",
+                auth_label,
                 method,
                 path,
                 remote_addr,
@@ -1758,19 +1771,40 @@ def require_autocad_auth(f):
 
         auth_required_message = (
             "Authorization bearer token required"
-            if not AUTOCAD_ALLOW_API_KEY_FALLBACK
+            if not allow_api_key_fallback
             else "Authorization bearer token or API key required"
         )
         logger.warning(
-            "AutoCAD auth missing credentials %s %s from %s (api_key_fallback=%s)",
+            "%s auth missing credentials %s %s from %s (api_key_fallback=%s)",
+            auth_label,
             method,
             path,
             remote_addr,
-            AUTOCAD_ALLOW_API_KEY_FALLBACK,
+            allow_api_key_fallback,
         )
         return jsonify({"error": auth_required_message, "code": "AUTH_REQUIRED"}), 401
 
     return decorated_function
+
+
+def require_autocad_auth(f):
+    """Decorator for AutoCAD routes: bearer-token auth first, optional API-key fallback."""
+
+    return _decorate_autocad_auth_route(
+        f,
+        allow_api_key_fallback=AUTOCAD_ALLOW_API_KEY_FALLBACK,
+        auth_label="AutoCAD",
+    )
+
+
+def require_watchdog_collector_auth(f):
+    """Decorator for non-interactive watchdog collectors."""
+
+    return _decorate_autocad_auth_route(
+        f,
+        allow_api_key_fallback=True,
+        auth_label="Watchdog collector",
+    )
 
 
 # ── Input Validation ─────────────────────────────────────────────
@@ -1864,6 +1898,7 @@ register_route_groups(
     app,
     require_api_key=require_api_key,
     require_autocad_auth=require_autocad_auth,
+    require_watchdog_collector_auth=require_watchdog_collector_auth,
     is_valid_api_key=is_valid_api_key,
     limiter=limiter,
     logger=logger,

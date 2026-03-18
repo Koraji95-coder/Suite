@@ -1,4 +1,5 @@
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
+import type { ColorScheme } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import type { CoordinatesGrabberState } from "./CoordinatesGrabberModels";
 import styles from "./CoordinatesGrabberTabs.module.css";
 
@@ -10,27 +11,18 @@ interface CoordinatesGrabberTabsProps {
 }
 
 export function CoordinatesGrabberTabs({
-	palette,
+	palette: _palette,
 	activeTab,
 	historyCount,
 	onTabChange,
 }: CoordinatesGrabberTabsProps) {
 	return (
-		<div
-			className={styles.root}
-			style={{ borderBottomColor: hexToRgba(palette.primary, 0.1) }}
-		>
+		<div className={styles.root}>
 			{(["config", "export", "history", "yaml"] as const).map((tab) => (
 				<button
 					key={tab}
 					onClick={() => onTabChange(tab)}
-					className={styles.tab}
-					style={{
-						borderBottomColor:
-							activeTab === tab ? palette.primary : "transparent",
-						color: activeTab === tab ? palette.primary : palette.textMuted,
-						fontWeight: activeTab === tab ? 600 : 400,
-					}}
+					className={cn(styles.tab, activeTab === tab && styles.tabActive)}
 				>
 					{tab === "config" && "Config"}
 					{tab === "export" && "Export"}

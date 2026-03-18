@@ -3,15 +3,15 @@
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CSS CUSTOM PROPERTIES
-   These are set dynamically by ThemeProvider based on selected color scheme.
-   Values below are fallbacks (graphiteCyan theme).
+   These are set by ThemeProvider using the fixed Suite Dark palette.
+   Values below are canonical fallbacks.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
 	/* Backgrounds */
-	--bg: #0e1117;
-	--bg-subtle: #0e1117;
-	--surface: #161b22;
-	--surface-2: #21262d;
+	--bg: #0b0f17;
+	--bg-subtle: #0b0f17;
+	--surface: #141b26;
+	--surface-2: #1c2533;
 	/* Compatibility aliases for canonical class suggestions */
 	--background: var(--bg);
 	--bg-base: var(--bg);
@@ -19,30 +19,30 @@
 	--bg-heavy: var(--surface-2);
 
 	/* Borders */
-	--border: rgba(255, 255, 255, 0.08);
-	--border-subtle: rgba(255, 255, 255, 0.04);
-	--border-strong: rgba(255, 255, 255, 0.14);
+	--border: rgba(232, 237, 246, 0.1);
+	--border-subtle: rgba(232, 237, 246, 0.05);
+	--border-strong: rgba(232, 237, 246, 0.18);
 
 	/* Text */
-	--text: #f0f6fc;
-	--text-muted: #8b949e;
+	--text: #e8edf6;
+	--text-muted: #93a1b7;
 
 	/* Brand Colors */
-	--primary: #2dd4bf;
-	--primary-hover: #5eead4;
-	--primary-contrast: #042f2e;
-	--accent: #60a5fa;
-	--secondary: #64748b;
-	--tertiary: var(--secondary);
+	--primary: #4f7cff;
+	--primary-hover: #7094ff;
+	--primary-contrast: #f4f7ff;
+	--accent: #d2a24c;
+	--secondary: #72829a;
+	--tertiary: #c46d52;
 
 	/* Status Colors */
-	--success: #22c55e;
-	--warning: #f59e0b;
-	--danger: #ef4444;
-	--info: #3b82f6;
+	--success: #4ea972;
+	--warning: #d2a24c;
+	--danger: #cf6a5b;
+	--info: #6f8dff;
 
 	/* Effects */
-	--glow: rgba(45, 212, 191, 0.15);
+	--glow: rgba(79, 124, 255, 0.2);
 	--focus-ring: color-mix(in oklab, var(--primary) 25%, transparent);
 	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
 	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);

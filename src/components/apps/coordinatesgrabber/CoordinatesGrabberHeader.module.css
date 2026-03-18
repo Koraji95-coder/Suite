@@ -2,9 +2,21 @@
 	display: flex;
 	flex-direction: column;
 	gap: 0.75rem;
-	border-bottom-width: 1px;
-	border-bottom-style: solid;
+	border-bottom: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
 	padding-bottom: 0.75rem;
+}
+
+.title {
+	margin: 0 0 0.25rem;
+	font-size: 1.25rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.subtitle {
+	margin: 0;
+	font-size: 0.75rem;
+	color: var(--text-muted);
 }
 
 .actions {
@@ -12,6 +24,25 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0.25rem;
+}
+
+.presetChip {
+	padding: 0.375rem 0.5rem;
+	border-radius: 0.25rem;
+	border: 1px dashed color-mix(in srgb, var(--primary) 36%, transparent);
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+	color: var(--text-muted);
+	font-size: 0.6875rem;
+	cursor: not-allowed;
+	opacity: 0.58;
+}
+
+.pinMark {
+	margin-left: 0.375rem;
+	font-size: 1.5rem;
+	font-weight: 700;
+	color: var(--primary);
+	opacity: 0.74;
 }
 
 @media (min-width: 640px) {

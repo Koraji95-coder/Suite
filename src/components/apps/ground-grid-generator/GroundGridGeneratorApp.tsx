@@ -9,7 +9,6 @@ import {
 	useState,
 } from "react";
 import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
-import { hexToRgba, useTheme } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { CoordinatesGrabber } from "../coordinatesgrabber/CoordinatesGrabber";
 import { GridGeneratorPanel } from "./GridGeneratorPanel";
@@ -36,7 +35,6 @@ function ScrollableTabs({
 	onTabChange: (id: TabId) => void;
 	logs: { length: number };
 }) {
-	const { palette } = useTheme();
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const isMiddleDragging = useRef(false);
 	const dragStartX = useRef(0);
@@ -72,9 +70,6 @@ function ScrollableTabs({
 			ref={scrollRef}
 			onMouseDown={handleMiddleDown}
 			className={styles.tabsScroller}
-			style={{
-				scrollbarColor: `${hexToRgba(palette.primary, 0.25)} transparent`,
-			}}
 		>
 			{tabs.map((tab) => {
 				const isActive = tab.id === activeTab;
@@ -140,7 +135,6 @@ function StatusPill({
 }
 
 function GroundGridGeneratorInner() {
-	const { palette } = useTheme();
 	const { backendConnected, logs } = useGroundGrid();
 
 	const [wsLive, setWsLive] = useState(() =>
@@ -197,10 +191,6 @@ function GroundGridGeneratorInner() {
 			{/* Header */}
 			<div
 				className={styles.header}
-				style={{
-					borderColor: hexToRgba(palette.primary, 0.12),
-					background: hexToRgba(palette.surface, 0.85),
-				}}
 			>
 				<div className={styles.headerRow}>
 					<div className={styles.iconWrap}>

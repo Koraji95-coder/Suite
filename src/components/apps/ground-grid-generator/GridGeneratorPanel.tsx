@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
-import { hexToRgba, useTheme } from "@/lib/palette";
+import { useResolvedAppearance } from "@/lib/appearance/useResolvedAppearance";
+import { hexToRgba } from "@/lib/palette";
 import { GridGeneratorDataColumn } from "./GridGeneratorDataColumn";
 import styles from "./GridGeneratorPanel.module.css";
 import { GridGeneratorPreviewColumn } from "./GridGeneratorPreviewColumn";
@@ -8,7 +9,7 @@ import { GridGeneratorTopBar } from "./GridGeneratorTopBar";
 import { useGridGeneratorState } from "./useGridGeneratorState";
 
 export function GridGeneratorPanel() {
-	const { palette } = useTheme();
+	const appearance = useResolvedAppearance();
 	const [searchParams] = useSearchParams();
 	const designIdParam = searchParams.get("design");
 	const {
@@ -70,12 +71,12 @@ export function GridGeneratorPanel() {
 		padding: "6px 12px",
 		fontSize: 12,
 		fontWeight: 600,
-		border: `1px solid ${hexToRgba(palette.primary, active ? 0.4 : 0.2)}`,
+		border: `1px solid ${hexToRgba(appearance.primary, active ? 0.4 : 0.2)}`,
 		borderRadius: 6,
 		background: active
-			? hexToRgba(palette.primary, 0.15)
-			: hexToRgba(palette.surfaceLight, 0.4),
-		color: active ? palette.text : palette.textMuted,
+			? hexToRgba(appearance.primary, 0.15)
+			: hexToRgba(appearance.surfaceElevated, 0.4),
+		color: active ? appearance.text : appearance.textMuted,
 		cursor: "pointer",
 		display: "flex",
 		alignItems: "center",
@@ -93,9 +94,9 @@ export function GridGeneratorPanel() {
 				projects={projects}
 				linkedProjectId={linkedProjectId}
 				linkedProject={linkedProject}
-				palettePrimary={palette.primary}
-				paletteSurfaceLight={palette.surfaceLight}
-				paletteText={palette.text}
+				palettePrimary={appearance.primary}
+				paletteSurfaceLight={appearance.surfaceElevated}
+				paletteText={appearance.text}
 				btnStyle={btnStyle}
 				onNewDesign={newDesign}
 				onDesignSelect={handleDesignSelect}
@@ -119,10 +120,10 @@ export function GridGeneratorPanel() {
 						rods={rods}
 						conductors={conductors}
 						placements={placements}
-						palettePrimary={palette.primary}
-						paletteSurfaceLight={palette.surfaceLight}
-						paletteText={palette.text}
-						paletteTextMuted={palette.textMuted}
+						palettePrimary={appearance.primary}
+						paletteSurfaceLight={appearance.surfaceElevated}
+						paletteText={appearance.text}
+						paletteTextMuted={appearance.textMuted}
 						btnStyle={btnStyle}
 						onDragStateChange={setIsDragging}
 						onFileDrop={handleFileDrop}
@@ -150,10 +151,10 @@ export function GridGeneratorPanel() {
 						conductors={conductors}
 						placements={placements}
 						plotDiffPreview={plotDiffPreview}
-						palettePrimary={palette.primary}
-						paletteSurfaceLight={palette.surfaceLight}
-						paletteText={palette.text}
-						paletteTextMuted={palette.textMuted}
+						palettePrimary={appearance.primary}
+						paletteSurfaceLight={appearance.surfaceElevated}
+						paletteText={appearance.text}
+						paletteTextMuted={appearance.textMuted}
 						btnStyle={btnStyle}
 						onRunGeneration={runGeneration}
 						onUndo={handleUndo}

@@ -414,7 +414,7 @@ export const buildStandardDocuments = (
 				accepted:
 					typeof analysis?.accepted === "boolean"
 						? analysis.accepted
-						: !Boolean(analysis?.needs_review),
+						: !analysis?.needs_review,
 				overrideReason: safeTrim(analysis?.override_reason),
 				modelVersion: safeTrim(analysis?.recognition?.model_version),
 			}

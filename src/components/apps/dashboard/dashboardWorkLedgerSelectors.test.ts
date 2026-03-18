@@ -15,6 +15,7 @@ describe("buildDashboardWorkLedgerViewModel", () => {
 					app_area: "agent",
 					architecture_paths: ["src/services/agentService.ts"],
 					hotspot_ids: [],
+					lifecycle_state: "active",
 					publish_state: "ready",
 					published_at: null,
 					external_reference: null,
@@ -33,6 +34,7 @@ describe("buildDashboardWorkLedgerViewModel", () => {
 					app_area: "dashboard",
 					architecture_paths: [],
 					hotspot_ids: ["architecture:agent-service"],
+					lifecycle_state: "completed",
 					publish_state: "published",
 					published_at: "2026-03-18T03:00:00.000Z",
 					external_reference: "worktale:note:job-1",
@@ -88,11 +90,17 @@ describe("buildDashboardWorkLedgerViewModel", () => {
 
 		expect(viewModel.readyCount).toBe(1);
 		expect(viewModel.publishedCount).toBe(1);
+		expect(viewModel.plannedCount).toBe(0);
+		expect(viewModel.activeCount).toBe(1);
+		expect(viewModel.completedCount).toBe(1);
+		expect(viewModel.archivedCount).toBe(0);
 		expect(viewModel.blockerCount).toBe(0);
 		expect(viewModel.hotspotLinkedCount).toBe(2);
 		expect(viewModel.readinessLabel).toBe("Worktale ready");
 		expect(viewModel.readinessTone).toBe("success");
 		expect(viewModel.latestReadyEntry?.id).toBe("entry-ready");
+		expect(viewModel.latestActiveEntry?.id).toBe("entry-ready");
+		expect(viewModel.latestCompletedEntry?.id).toBe("entry-published");
 		expect(viewModel.latestPublishedEntry?.id).toBe("entry-published");
 		expect(viewModel.latestSuccessfulReceipt?.job.id).toBe("job-1");
 		expect(viewModel.latestFailedReceipt).toBeNull();
@@ -111,6 +119,7 @@ describe("buildDashboardWorkLedgerViewModel", () => {
 					app_area: "agent",
 					architecture_paths: [],
 					hotspot_ids: [],
+					lifecycle_state: "active",
 					publish_state: "ready",
 					published_at: null,
 					external_reference: null,
@@ -148,9 +157,24 @@ describe("buildDashboardWorkLedgerViewModel", () => {
 		});
 
 		expect(viewModel.blockerCount).toBe(1);
+		expect(viewModel.activeCount).toBe(1);
 		expect(viewModel.readinessLabel).toBe("Publish blockers");
 		expect(viewModel.readinessTone).toBe("danger");
 		expect(viewModel.readinessDetail).toContain("missing git email");
 		expect(viewModel.latestFailedReceipt?.job.id).toBe("job-failed");
+	});
+
+	it("classifies backend route readiness failures for dashboard messaging", () => {
+		const viewModel = buildDashboardWorkLedgerViewModel({
+			entries: [],
+			jobsByEntry: {},
+			readiness: null,
+			readinessError:
+				"Work Ledger publisher routes are unavailable. Restart the backend from this repo checkout.",
+		});
+
+		expect(viewModel.readinessLabel).toBe("Backend route unavailable");
+		expect(viewModel.readinessTone).toBe("danger");
+		expect(viewModel.readinessDetail).toContain("older route set");
 	});
 });

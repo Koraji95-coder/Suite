@@ -46,6 +46,16 @@
 	background: color-mix(in srgb, var(--warning) 10%, var(--surface));
 }
 
+.statusTonePrimary {
+	border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
+	background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.statusToneAccent {
+	border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+	background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
 .statusToneMuted {
 	border-color: var(--line-soft);
 	background: var(--surface-2);
@@ -89,6 +99,16 @@
 .statusIconWarning {
 	border-color: color-mix(in srgb, var(--warning) 22%, var(--border));
 	background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+}
+
+.statusIconPrimary {
+	border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
+	background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.statusIconAccent {
+	border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+	background: color-mix(in srgb, var(--accent) 10%, var(--surface));
 }
 
 .statusIconMuted {
@@ -140,6 +160,14 @@
 
 .statusDotWarning {
 	background: var(--warning);
+}
+
+.statusDotPrimary {
+	background: var(--primary);
+}
+
+.statusDotAccent {
+	background: var(--accent);
 }
 
 .statusDotMuted {

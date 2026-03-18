@@ -157,7 +157,7 @@ export const sidebarNavItems: SidebarNavItem[] = [
 		isCategory: true,
 	},
 	{ divider: true },
-	{ id: "agent", icon: Bot, label: "Koro Agent", color: "purple" },
+	{ id: "agent", icon: Bot, label: "Agents", color: "purple" },
 	{ divider: true },
 	{
 		id: "test-preview",

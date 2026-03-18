@@ -1,5 +1,9 @@
 import { logger } from "@/lib/logger";
-import { fetchWithTimeout, mapFetchErrorMessage } from "@/lib/fetchWithTimeout";
+import {
+	FetchRequestError,
+	fetchWithTimeout,
+	mapFetchErrorMessage,
+} from "@/lib/fetchWithTimeout";
 import { supabase } from "@/supabase/client";
 
 export interface WatchdogConfig {
@@ -258,8 +262,12 @@ class WatchdogService {
 	private apiKey: string;
 
 	constructor() {
-		this.baseUrl =
-			import.meta.env.VITE_COORDINATES_BACKEND_URL || "http://localhost:5000";
+		this.baseUrl = (
+			import.meta.env.VITE_WATCHDOG_BASE_URL ||
+			""
+		)
+			.trim()
+			.replace(/\/+$/, "");
 		this.apiKey = import.meta.env.VITE_API_KEY || "";
 	}
 
@@ -339,6 +347,18 @@ class WatchdogService {
 
 			return (await response.json()) as T;
 		} catch (error) {
+			if (error instanceof FetchRequestError && error.kind === "http") {
+				if (error.status === 404) {
+					throw new Error(
+						"Watchdog route is unavailable. Restart the backend so it matches the current repo routes.",
+					);
+				}
+				if (error.status === 401 || error.status === 403) {
+					throw new Error(
+						"Watchdog request was rejected. Sign in again or verify backend auth state.",
+					);
+				}
+			}
 			throw new Error(mapFetchErrorMessage(error, "Watchdog request failed."));
 		}
 	}

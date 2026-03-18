@@ -1,6 +1,6 @@
 import { logger } from "@/lib/logger";
 import type { WorkLedgerFilters, WorkLedgerInput, WorkLedgerRow } from "./types";
-import { normalizeSearch, sanitizeArray } from "./helpers";
+import { normalizeLifecycleState, normalizeSearch, sanitizeArray } from "./helpers";
 
 const LOCAL_STORAGE_KEY = "suite:work-ledger:local";
 
@@ -45,6 +45,7 @@ export function buildLocalEntry(input: WorkLedgerInput, userId: string | null): 
 		app_area: String(input.appArea || "").trim() || null,
 		architecture_paths: sanitizeArray(input.architecturePaths),
 		hotspot_ids: sanitizeArray(input.hotspotIds),
+		lifecycle_state: input.lifecycleState ?? "completed",
 		publish_state: input.publishState ?? "draft",
 		published_at: null,
 		external_reference: String(input.externalReference || "").trim() || null,
@@ -65,6 +66,14 @@ export function filterEntries(entries: WorkLedgerRow[], filters?: WorkLedgerFilt
 		)
 		.filter((entry) =>
 			!filters?.appArea ? true : entry.app_area === filters.appArea,
+		)
+		.filter((entry) =>
+			!filters?.lifecycleState || filters.lifecycleState === "all"
+				? true
+				: normalizeLifecycleState(
+						entry.lifecycle_state,
+						entry.publish_state,
+					) === filters.lifecycleState,
 		)
 		.filter((entry) =>
 			!filters?.publishState || filters.publishState === "all"

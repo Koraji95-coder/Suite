@@ -360,6 +360,160 @@
 	gap: 0.35rem;
 }
 
+.diagnosticsToggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	border: 1px solid color-mix(in srgb, var(--line-soft) 88%, transparent);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--surface) 88%, transparent);
+	color: var(--text);
+	padding: 0.34rem 0.52rem;
+	font-size: 0.72rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.diagnosticsToggle:hover {
+	background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+}
+
+.diagnosticsToggleBadge {
+	margin-inline-start: 0.05rem;
+}
+
+.diagnosticsOverlay {
+	position: fixed;
+	inset: 0;
+	z-index: 60;
+}
+
+.diagnosticsBackdrop {
+	position: absolute;
+	inset: 0;
+	background: color-mix(in srgb, black 62%, transparent);
+	backdrop-filter: blur(4px);
+}
+
+.diagnosticsDrawer {
+	position: absolute;
+	inset-block: 0;
+	right: 0;
+	display: flex;
+	width: min(32rem, 92vw);
+	flex-direction: column;
+	border-left: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+	background:
+		radial-gradient(
+			130% 120% at 100% 0%,
+			color-mix(in srgb, var(--accent) 10%, transparent),
+			transparent 62%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface) 94%, transparent),
+			color-mix(in srgb, var(--surface-2) 86%, transparent)
+		);
+	box-shadow: -24px 0 40px -28px rgba(0, 0, 0, 0.72);
+}
+
+.diagnosticsHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.95rem 1rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+}
+
+.diagnosticsHeaderActions {
+	display: inline-flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+
+.diagnosticsClose {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: 0.65rem;
+	background: transparent;
+	color: var(--text-muted);
+	padding: 0.4rem;
+	cursor: pointer;
+}
+
+.diagnosticsClose:hover {
+	background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+	color: var(--text);
+}
+
+.diagnosticsBody {
+	display: grid;
+	gap: 0.75rem;
+	padding: 0.9rem 1rem 1rem;
+	overflow-y: auto;
+}
+
+.diagnosticsCard {
+	display: grid;
+	gap: 0.7rem;
+}
+
+.diagnosticsCardHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.diagnosticsList {
+	display: grid;
+	gap: 0.55rem;
+}
+
+.diagnosticsItem {
+	display: grid;
+	gap: 0.3rem;
+	padding: 0.7rem 0.75rem;
+	border: 1px solid color-mix(in srgb, var(--line-soft) 84%, transparent);
+	border-radius: 0.8rem;
+	background: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+
+.diagnosticsItemHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.6rem;
+}
+
+.diagnosticsItemMessage {
+	font-size: 0.79rem;
+	line-height: 1.5;
+	color: color-mix(in srgb, var(--text) 88%, transparent);
+}
+
+.diagnosticsItemMeta {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.diagnosticsEmpty {
+	border: 1px dashed color-mix(in srgb, var(--line-soft) 88%, transparent);
+	border-radius: 0.8rem;
+	padding: 0.8rem;
+	font-size: 0.8rem;
+	color: var(--text-muted);
+}
+
 .workspaceContent {
 	min-height: 0;
 }
@@ -482,5 +636,9 @@
 
 	.workspaceHeaderMeta {
 		justify-content: flex-start;
+	}
+
+	.diagnosticsDrawer {
+		width: min(100vw, 100%);
 	}
 }

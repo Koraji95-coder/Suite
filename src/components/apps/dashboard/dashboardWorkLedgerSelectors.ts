@@ -10,6 +10,10 @@ export interface DashboardWorkLedgerReceipt {
 }
 
 export interface DashboardWorkLedgerViewModel {
+	plannedCount: number;
+	activeCount: number;
+	completedCount: number;
+	archivedCount: number;
 	readyCount: number;
 	publishedCount: number;
 	blockerCount: number;
@@ -18,6 +22,8 @@ export interface DashboardWorkLedgerViewModel {
 	readinessTone: "success" | "warning" | "danger" | "primary";
 	readinessDetail: string;
 	latestReadyEntry: WorkLedgerRow | null;
+	latestActiveEntry: WorkLedgerRow | null;
+	latestCompletedEntry: WorkLedgerRow | null;
 	latestPublishedEntry: WorkLedgerRow | null;
 	latestFailedReceipt: DashboardWorkLedgerReceipt | null;
 	latestSuccessfulReceipt: DashboardWorkLedgerReceipt | null;
@@ -59,6 +65,12 @@ export function buildDashboardWorkLedgerViewModel({
 	const readyEntries = entries
 		.filter((entry) => entry.publish_state === "ready")
 		.sort(compareEntries);
+	const activeEntries = entries
+		.filter((entry) => entry.lifecycle_state === "active")
+		.sort(compareEntries);
+	const completedEntries = entries
+		.filter((entry) => entry.lifecycle_state === "completed")
+		.sort(compareEntries);
 	const publishedEntries = entries
 		.filter((entry) => entry.publish_state === "published")
 		.sort(compareEntries);
@@ -87,6 +99,7 @@ export function buildDashboardWorkLedgerViewModel({
 	let readinessTone: DashboardWorkLedgerViewModel["readinessTone"] = "warning";
 	let readinessDetail =
 		readinessError || "Sign in and bootstrap Worktale to publish ledger stories.";
+	const readinessErrorMessage = String(readinessError || "").toLowerCase();
 
 	if (readiness?.ready) {
 		readinessLabel = "Worktale ready";
@@ -98,6 +111,20 @@ export function buildDashboardWorkLedgerViewModel({
 		readinessDetail =
 			readiness.issues[0] ||
 			"Worktale needs bootstrap or local CLI setup before publishing.";
+	} else if (readinessErrorMessage.includes("routes are unavailable")) {
+		readinessLabel = "Backend route unavailable";
+		readinessTone = "danger";
+		readinessDetail =
+			"Backend is running an older route set. Restart API from the current repo checkout.";
+	} else if (readinessErrorMessage.includes("backend is unreachable")) {
+		readinessLabel = "Backend offline";
+		readinessTone = "danger";
+		readinessDetail =
+			"Work Ledger backend is unreachable. Check API startup and /api proxy target.";
+	} else if (readinessErrorMessage.includes("sign in")) {
+		readinessLabel = "Auth required";
+		readinessTone = "warning";
+		readinessDetail = "Sign in to load Work Ledger publisher readiness.";
 	}
 
 	if (latestFailedReceipt) {
@@ -110,6 +137,12 @@ export function buildDashboardWorkLedgerViewModel({
 	}
 
 	return {
+		plannedCount: entries.filter((entry) => entry.lifecycle_state === "planned")
+			.length,
+		activeCount: activeEntries.length,
+		completedCount: completedEntries.length,
+		archivedCount: entries.filter((entry) => entry.lifecycle_state === "archived")
+			.length,
 		readyCount: readyEntries.length,
 		publishedCount: publishedEntries.length,
 		blockerCount: latestFailedReceipt ? 1 : 0,
@@ -118,6 +151,8 @@ export function buildDashboardWorkLedgerViewModel({
 		readinessTone,
 		readinessDetail,
 		latestReadyEntry: readyEntries[0] ?? null,
+		latestActiveEntry: activeEntries[0] ?? null,
+		latestCompletedEntry: completedEntries[0] ?? null,
 		latestPublishedEntry: publishedEntries[0] ?? null,
 		latestFailedReceipt,
 		latestSuccessfulReceipt,

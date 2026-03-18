@@ -63,15 +63,18 @@ describe("workLedgerService", () => {
 			appArea: "ground-grid-generator",
 			architecturePaths: ["src/components/apps/ground-grid-generator/useGridGeneratorState.ts"],
 			hotspotIds: ["ground-grid-generator/useGridGeneratorState.ts"],
+			lifecycleState: "planned",
 			publishState: "draft",
 		});
 
 		expect(created).not.toBeNull();
+		expect(created?.lifecycle_state).toBe("planned");
 		expect(created?.publish_state).toBe("draft");
 
 		const filtered = await workLedgerService.fetchEntries({
 			projectId: "project-1",
 			pathQuery: "ground-grid-generator",
+			lifecycleState: "planned",
 			publishState: "draft",
 			search: "placement",
 			limit: 10,
@@ -109,6 +112,7 @@ describe("workLedgerService", () => {
 			app_area: "agent",
 			architecture_paths: ["src/services/agentService.ts"],
 			hotspot_ids: ["agentService"],
+			lifecycle_state: "active",
 			publish_state: "ready",
 			published_at: null,
 			external_reference: "worktale draft",
@@ -125,6 +129,7 @@ describe("workLedgerService", () => {
 		expect(payload.json).toMatchObject({
 			id: "ledger-1",
 			sourceKind: "git_checkpoint",
+			lifecycleState: "active",
 			publishState: "ready",
 			appArea: "agent",
 		});
@@ -176,6 +181,7 @@ describe("workLedgerService", () => {
 						app_area: null,
 						architecture_paths: [],
 						hotspot_ids: [],
+						lifecycle_state: "completed",
 						publish_state: "published",
 						published_at: "2026-03-18T03:00:00.000Z",
 						external_reference: "worktale:note:job-1",
@@ -281,5 +287,31 @@ describe("workLedgerService", () => {
 		expect(openArtifact.error).toBeNull();
 		expect(openArtifact.data?.artifactDir).toBe("C:\\artifacts\\job-1");
 		expect(mockFetch).toHaveBeenCalledTimes(4);
+	});
+
+	it("returns a friendly readiness error when publisher routes are unavailable", async () => {
+		mockGetUser.mockResolvedValue({
+			data: { user: { id: "user-1" } },
+			error: null,
+		});
+		mockGetSession.mockResolvedValue({
+			data: { session: { access_token: "token-1" } },
+			error: null,
+		});
+		mockFetch.mockResolvedValue({
+			ok: false,
+			status: 404,
+			json: async () => ({
+				ok: false,
+				error: "Not Found",
+				code: "NOT_FOUND",
+			}),
+		});
+
+		const readiness = await workLedgerService.fetchWorktaleReadiness();
+		expect(readiness.data).toBeNull();
+		expect(readiness.error?.message).toContain(
+			"publisher routes are unavailable",
+		);
 	});
 });

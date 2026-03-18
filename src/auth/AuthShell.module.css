@@ -191,7 +191,7 @@
 
 .floatMark {
 	position: absolute;
-	animation: float 6s ease-in-out infinite;
+	animation: float 10s ease-in-out infinite;
 }
 
 .floatSpacer {
@@ -238,7 +238,7 @@
 }
 
 .agentBadgeRow {
-	margin-top: 1.3rem;
+	margin-top: 0.45rem;
 }
 
 .agentBadge {

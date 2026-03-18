@@ -36,6 +36,7 @@ class _RequestsStub:
                 "app_area": "dashboard",
                 "architecture_paths": ["src/routes/ChangelogRoutePage.tsx"],
                 "hotspot_ids": ["dashboard/changelog"],
+                "lifecycle_state": "active",
                 "publish_state": "ready",
                 "published_at": None,
                 "external_reference": None,
@@ -54,6 +55,7 @@ class _RequestsStub:
                 "app_area": None,
                 "architecture_paths": [],
                 "hotspot_ids": [],
+                "lifecycle_state": "planned",
                 "publish_state": "draft",
                 "published_at": None,
                 "external_reference": None,
@@ -277,6 +279,10 @@ class TestApiWorkLedger(unittest.TestCase):
         self.assertEqual(
             ((publish_payload.get("entry") or {}).get("publish_state")),
             "published",
+        )
+        self.assertEqual(
+            ((publish_payload.get("entry") or {}).get("lifecycle_state")),
+            "completed",
         )
         self.assertEqual(
             ((publish_payload.get("job") or {}).get("status")),

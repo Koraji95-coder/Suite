@@ -5,7 +5,13 @@ import { Text } from "@/components/primitives/Text";
 import { cn } from "@/lib/utils";
 import styles from "./AccountSettings.module.css";
 
-export type StatusTone = "success" | "danger" | "warning" | "muted";
+export type StatusTone =
+	| "success"
+	| "danger"
+	| "warning"
+	| "muted"
+	| "primary"
+	| "accent";
 
 export function SectionHeader({
 	icon: Icon,
@@ -70,6 +76,18 @@ export function StatusTile({
 			glow: styles.statusDotWarning,
 			icon: styles.statusIconWarning,
 			dot: styles.statusDotWarning,
+		},
+		primary: {
+			tile: styles.statusTonePrimary,
+			glow: styles.statusDotPrimary,
+			icon: styles.statusIconPrimary,
+			dot: styles.statusDotPrimary,
+		},
+		accent: {
+			tile: styles.statusToneAccent,
+			glow: styles.statusDotAccent,
+			icon: styles.statusIconAccent,
+			dot: styles.statusDotAccent,
 		},
 		muted: {
 			tile: styles.statusToneMuted,

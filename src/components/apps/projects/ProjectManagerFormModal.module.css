@@ -118,6 +118,10 @@
 	background: var(--warning);
 }
 
+.colorSwatchOther {
+	background: var(--secondary);
+}
+
 .colorSwatchGeneric {
 	background: var(--secondary);
 }

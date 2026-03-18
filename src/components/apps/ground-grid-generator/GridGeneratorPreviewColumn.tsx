@@ -4,7 +4,6 @@ import {
 	FileText,
 	Lock,
 	LockOpen,
-	Loader,
 	Monitor,
 	PenTool,
 	Play,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type CSSProperties, type ComponentType } from "react";
 import { hexToRgba } from "@/lib/palette";
+import { Progress } from "@/components/primitives/Progress";
 import type { PlotDiffPreview, PreviewMode } from "./GridGeneratorPanelModels";
 import styles from "./GridGeneratorPreviewColumn.module.css";
 import { GridManualEditor } from "./GridManualEditor";
@@ -168,11 +168,23 @@ export function GridGeneratorPreviewColumn({
 					}}
 				>
 					{generating ? (
-						<Loader size={14} className={styles.spinner} />
+						<>
+							<Progress
+								value={100}
+								size="sm"
+								indeterminate
+								animated
+								color="accent"
+								className={styles.toolbarProgress}
+							/>
+							Generating grid…
+						</>
 					) : (
-						<Play size={14} />
+						<>
+							<Play size={14} />
+							Generate Grid
+						</>
 					)}
-					Generate Grid
 				</button>
 
 				<button
@@ -413,14 +425,26 @@ export function GridGeneratorPreviewColumn({
 					<>
 						{!gridPreview3DError && !GridPreview3DComponent && (
 							<div className={styles.lazyPanelState}>
-								<Loader size={14} className={styles.spinner} />
+								<Progress
+									value={34}
+									indeterminate
+									animated
+									size="sm"
+									color="accent"
+									className={styles.lazyPanelProgress}
+								/>
 								Loading 3D preview module...
 							</div>
 						)}
 						{gridPreview3DError && (
 							<div className={`${styles.lazyPanelState} ${styles.lazyPanelStateError}`}>
 								<div>3D preview module failed to load.</div>
-								<div className={styles.lazyPanelDetail}>{gridPreview3DError}</div>
+								<div className={styles.lazyPanelDetail}>
+									{gridPreview3DError}
+									<span className={styles.lazyPanelHelper}>
+										Reload the grid or open the log tab for details before retrying.
+									</span>
+								</div>
 								<button
 									type="button"
 									className={styles.lazyPanelRetry}

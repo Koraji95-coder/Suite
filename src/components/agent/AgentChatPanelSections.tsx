@@ -581,7 +581,7 @@ export function AgentChatRightRail({
 			<div className={styles.railCard}>
 				<div className={styles.railHeaderRow}>
 					<Text size="xs" weight="semibold" className={styles.railEyebrow}>
-						Unified activity
+						Recent run activity
 					</Text>
 				</div>
 				<div className={styles.filterGrid}>

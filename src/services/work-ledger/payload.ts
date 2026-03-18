@@ -1,12 +1,18 @@
 import type { WorkLedgerRow, WorktalePublishPayload } from "./types";
+import { normalizeLifecycleState } from "./helpers";
 
 export function buildWorktalePublishPayload(entry: WorkLedgerRow): WorktalePublishPayload {
+	const lifecycleState = normalizeLifecycleState(
+		entry.lifecycle_state,
+		entry.publish_state,
+	);
 	const lines = [
 		`# ${entry.title}`,
 		"",
 		entry.summary,
 		"",
 		`- Source: ${entry.source_kind}`,
+		`- Lifecycle state: ${lifecycleState}`,
 		`- Publish state: ${entry.publish_state}`,
 	];
 
@@ -46,6 +52,7 @@ export function buildWorktalePublishPayload(entry: WorkLedgerRow): WorktalePubli
 			appArea: entry.app_area,
 			architecturePaths: entry.architecture_paths,
 			hotspotIds: entry.hotspot_ids,
+			lifecycleState,
 			publishState: entry.publish_state,
 			publishedAt: entry.published_at,
 			externalReference: entry.external_reference,

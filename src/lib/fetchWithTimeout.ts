@@ -1,3 +1,5 @@
+import { recordAppDiagnostic } from "@/lib/appDiagnostics";
+
 export type FetchErrorKind = "timeout" | "network" | "http" | "aborted" | "unknown";
 
 export class FetchRequestError extends Error {
@@ -29,6 +31,19 @@ export type FetchWithTimeoutInit = RequestInit & {
 };
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+function describeRequestTarget(input: RequestInfo | URL): string {
+	if (typeof input === "string") {
+		return input;
+	}
+	if (input instanceof URL) {
+		return input.toString();
+	}
+	if (typeof Request !== "undefined" && input instanceof Request) {
+		return input.url;
+	}
+	return "unknown-request";
+}
 
 function timeoutMessage(requestName: string, timeoutMs: number): string {
 	return (
@@ -143,6 +158,13 @@ export async function fetchWithTimeout(
 		}
 		const fallback = `${requestName} failed (${response.status})`;
 		const message = await parseResponseErrorMessage(response, fallback);
+		recordAppDiagnostic({
+			source: "fetch",
+			severity: response.status >= 500 ? "error" : "warning",
+			title: `${requestName} HTTP ${response.status}`,
+			message,
+			context: describeRequestTarget(input),
+		});
 		throw new FetchRequestError({
 			kind: "http",
 			message,
@@ -154,6 +176,13 @@ export async function fetchWithTimeout(
 		}
 		if (error instanceof Error && error.name === "AbortError") {
 			if (timedOut) {
+				recordAppDiagnostic({
+					source: "fetch",
+					severity: "error",
+					title: `${requestName} timed out`,
+					message: timeoutMessage(requestName, timeoutMs),
+					context: describeRequestTarget(input),
+				});
 				throw new FetchRequestError({
 					kind: "timeout",
 					message: timeoutMessage(requestName, timeoutMs),
@@ -175,6 +204,14 @@ export async function fetchWithTimeout(
 			});
 		}
 		if (error instanceof TypeError) {
+			recordAppDiagnostic({
+				source: "fetch",
+				severity: "error",
+				title: `${requestName} network error`,
+				message: `${requestName} failed due to a network error. Check backend connectivity and retry.`,
+				context: describeRequestTarget(input),
+				details: error.message,
+			});
 			throw new FetchRequestError({
 				kind: "network",
 				message: `${requestName} failed due to a network error. Check backend connectivity and retry.`,
@@ -182,6 +219,13 @@ export async function fetchWithTimeout(
 			});
 		}
 		if (error instanceof Error) {
+			recordAppDiagnostic({
+				source: "fetch",
+				severity: "error",
+				title: `${requestName} failed`,
+				message: error.message || `${requestName} failed unexpectedly.`,
+				context: describeRequestTarget(input),
+			});
 			throw new FetchRequestError({
 				kind: "unknown",
 				message: error.message || `${requestName} failed unexpectedly.`,

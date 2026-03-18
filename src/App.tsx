@@ -16,7 +16,6 @@ import LandingPage from "./routes/LandingPage";
 import LoginPage from "./routes/LoginPage";
 import PrivacyPage from "./routes/PrivacyPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
-import RoadmapPage from "./routes/RoadmapPage";
 import RouteLoadingFallback from "./routes/RouteLoadingFallback";
 import SignupPage from "./routes/SignupPage";
 
@@ -102,7 +101,7 @@ export default function App() {
 							<Route path="/login" element={<LoginPage />} />
 							<Route path="/signup" element={<SignupPage />} />
 							<Route path="/privacy" element={<PrivacyPage />} />
-							<Route path="/roadmap" element={<RoadmapPage />} />
+							<Route path="/roadmap" element={<Navigate to="/app/changelog" replace />} />
 							<Route
 								path="/agent/pairing-callback"
 								element={withRouteSuspense(<AgentPairingCallbackPage />)}

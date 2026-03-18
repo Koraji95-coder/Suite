@@ -5,6 +5,8 @@ param(
     [string]$WorkstationId,
     [string]$WorkstationLabel,
     [string]$WorkstationRole,
+    [string]$GitUserName,
+    [string]$GitUserEmail,
     [switch]$PrintToml,
     [switch]$Json
 )
@@ -27,7 +29,9 @@ $resolvedProfile = Resolve-SuiteWorkstationProfile `
     -ResolvedRepoRoot $resolvedRepoRoot `
     -ExplicitWorkstationId $WorkstationId `
     -ExplicitWorkstationLabel $WorkstationLabel `
-    -ExplicitWorkstationRole $WorkstationRole
+    -ExplicitWorkstationRole $WorkstationRole `
+    -ExplicitGitUserName $GitUserName `
+    -ExplicitGitUserEmail $GitUserEmail
 $envValues = Get-SuiteWorkstationMcpEnv `
     -ResolvedRepoRoot $resolvedRepoRoot `
     -WorkstationProfile $resolvedProfile
@@ -44,6 +48,15 @@ Update-SuiteCodexConfig `
     -ResolvedRepoRoot $resolvedRepoRoot `
     -WorkstationProfile $resolvedProfile
 
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    if (-not [string]::IsNullOrWhiteSpace($resolvedProfile.GitUserName)) {
+        & git -C $resolvedRepoRoot config user.name $resolvedProfile.GitUserName | Out-Null
+    }
+    if (-not [string]::IsNullOrWhiteSpace($resolvedProfile.GitUserEmail)) {
+        & git -C $resolvedRepoRoot config user.email $resolvedProfile.GitUserEmail | Out-Null
+    }
+}
+
 $result = [ordered]@{
     ok = $true
     repoRoot = $resolvedRepoRoot
@@ -55,6 +68,8 @@ $result = [ordered]@{
     workstationId = $resolvedProfile.WorkstationId
     workstationLabel = $resolvedProfile.WorkstationLabel
     workstationRole = $resolvedProfile.WorkstationRole
+    gitUserName = $resolvedProfile.GitUserName
+    gitUserEmail = $resolvedProfile.GitUserEmail
     env = $envValues
 }
 
@@ -70,5 +85,8 @@ else {
         "Workstation identity: " +
         "$($resolvedProfile.WorkstationId) | $($resolvedProfile.WorkstationLabel) | $($resolvedProfile.WorkstationRole)"
     )
+    if (-not [string]::IsNullOrWhiteSpace($resolvedProfile.GitUserEmail)) {
+        Write-Host "Git identity synced for this repo: $($resolvedProfile.GitUserName) <$($resolvedProfile.GitUserEmail)>"
+    }
     Write-Host "Restart Codex after sync so MCP/workstation settings reload."
 }

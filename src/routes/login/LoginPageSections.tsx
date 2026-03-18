@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import AuthEnvDebugCard from "../../auth/AuthEnvDebugCard";
 import AuthShell from "../../auth/AuthShell";
 import CaptchaChallenge from "../../auth/CaptchaChallenge";
-import { AgentOrbitLoader } from "../../components/agent/AgentOrbitLoader";
 import { AgentPixelMark } from "../../components/agent/AgentPixelMark";
 import { AGENT_PROFILE_IDS } from "../../components/agent/agentProfiles";
 import { Badge } from "../../components/primitives/Badge";
@@ -67,7 +66,6 @@ export function LoginSessionState({
 	redirecting,
 	redirectMessage,
 	redirectProgress,
-	shouldPreloadDashboard,
 }: LoginSessionStateProps) {
 	return (
 		<>
@@ -93,23 +91,12 @@ export function LoginSessionState({
 			</div>
 
 			<Stack gap={3}>
-				{redirecting && shouldPreloadDashboard ? (
-					<div className={styles.dashboardLoaderWrap}>
-						<AgentOrbitLoader size="sm" />
-					</div>
-				) : null}
-				{redirecting ? (
-					<Progress
-						value={Math.max(8, redirectProgress)}
-						color="primary"
-						size="md"
-						animated
-					/>
-				) : (
-					<div className={styles.loadingTrack}>
-						<div className={styles.loadingFill} />
-					</div>
-				)}
+				<Progress
+					value={Math.max(8, redirectProgress)}
+					color="primary"
+					size="md"
+					animated
+				/>
 
 				<Text
 					size="xs"
@@ -167,7 +154,7 @@ export function LoginSentState({ email, onSendAnother }: LoginSentStateProps) {
 
 				<div className={styles.footerLinks}>
 					<Link to="/signup" className={styles.primaryLink}>
-						Need an account? Get started
+						Create an account
 					</Link>
 					<Link to="/privacy" className={styles.mutedLink}>
 						Privacy
@@ -302,7 +289,7 @@ export function LoginForm({
 						<Text size="sm" color="muted">
 							No account yet?{" "}
 							<Link to="/signup" className={styles.primaryLink}>
-								Get started
+								Create one
 							</Link>
 						</Text>
 						<Link to="/privacy" className={styles.mutedLink}>

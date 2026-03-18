@@ -1,5 +1,4 @@
 import { FolderKanban } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { ProjectDetail } from "./ProjectDetail";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectList } from "./ProjectList";
@@ -26,7 +25,6 @@ export function ProjectManager({
 	calendarMonth: externalMonth,
 	onCalendarMonthChange,
 }: ProjectManagerProps = {}) {
-	const navigate = useNavigate();
 	const {
 		projects,
 		selectedProject,
@@ -92,7 +90,6 @@ export function ProjectManager({
 		totalProjects,
 		archivedProjects,
 		activeProjects,
-		currentCrumb,
 		pendingProjectName,
 		pendingTaskName,
 	} = useProjectManagerState({
@@ -112,7 +109,6 @@ export function ProjectManager({
 	return (
 		<div className={styles.root}>
 			<ProjectManagerHeader
-				currentCrumb={currentCrumb}
 				statusFilter={statusFilter}
 				onStatusFilterChange={setStatusFilter}
 				projectSearch={projectSearch}
@@ -126,8 +122,6 @@ export function ProjectManager({
 					resetProjectForm();
 					setShowProjectModal(true);
 				}}
-				onGoWorkspace={() => navigate("/app/dashboard")}
-				onGoProjects={() => navigate("/app/projects")}
 			/>
 
 			<ProjectFormModal
@@ -169,9 +163,6 @@ export function ProjectManager({
 								and task lane.
 							</p>
 						</div>
-						<span className={styles.listPaneBadge}>
-							{visibleProjects.length} visible
-						</span>
 					</div>
 					<div className={styles.listPane}>
 					<ProjectList

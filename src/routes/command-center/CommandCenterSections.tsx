@@ -60,7 +60,7 @@ export function CommandCenterAccessPanel({
 						<Text size="sm" weight="semibold">
 							{import.meta.env.DEV
 								? "Admin Access Required"
-								: "Command Center Disabled"}
+								: "Command Center (limited access)"}
 						</Text>
 						<Text size="sm" color="muted">
 							{import.meta.env.DEV ? (
@@ -72,8 +72,9 @@ export function CommandCenterAccessPanel({
 								</>
 							) : (
 								<>
-									Command Center is currently set to run in development only and
-									is disabled in production builds.
+									Command Center access is scoped to allowlisted operations
+									profiles for now. Share your email with the admin team to get
+									invited.
 								</>
 							)}
 						</Text>

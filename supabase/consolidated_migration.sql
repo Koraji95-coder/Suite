@@ -177,6 +177,7 @@ create table if not exists public.work_ledger_entries (
 	app_area text null,
 	architecture_paths text[] not null default '{}',
 	hotspot_ids text[] not null default '{}',
+	lifecycle_state text not null default 'completed',
 	publish_state text not null default 'draft',
 	published_at timestamptz null,
 	external_reference text null,
@@ -188,6 +189,9 @@ create table if not exists public.work_ledger_entries (
 
 alter table if exists public.work_ledger_entries
 	add column if not exists published_at timestamptz null;
+
+alter table if exists public.work_ledger_entries
+	add column if not exists lifecycle_state text not null default 'completed';
 
 create table if not exists public.work_ledger_publish_jobs (
 	id uuid primary key default gen_random_uuid(),

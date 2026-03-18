@@ -2,6 +2,7 @@
  * Centralized logging system for the Suite application
  * Replaces scattered console.log/warn/error calls with structured logging
  */
+import { recordAppDiagnostic } from "@/lib/appDiagnostics";
 
 export enum LogLevel {
 	DEBUG = "DEBUG",
@@ -106,6 +107,19 @@ class Logger {
 			if (level === LogLevel.WARN || level === LogLevel.ERROR) {
 				console[level === LogLevel.WARN ? "warn" : "error"](formattedMessage);
 			}
+		}
+
+		if (level === LogLevel.WARN || level === LogLevel.ERROR) {
+			recordAppDiagnostic({
+				source: "logger",
+				severity: level === LogLevel.ERROR ? "error" : "warning",
+				title: context ? `${context} ${level.toLowerCase()}` : level,
+				message,
+				context,
+				details:
+					error?.stack ||
+					(typeof data === "string" ? data : data ? JSON.stringify(data) : undefined),
+			});
 		}
 	}
 

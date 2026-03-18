@@ -246,7 +246,7 @@ export function AccountAgentPairingSection({
 				<SectionHeader
 					icon={Bot}
 					title="Agent pairing"
-					description="Trust this browser session with ZeroClaw agent access."
+					description="Trust this browser session with profile-driven agent coordination."
 					tone="primary"
 				/>
 
@@ -277,9 +277,9 @@ export function AccountAgentPairingSection({
 						>
 							Pairing status: {agentPaired ? "Paired" : "Not paired"}
 						</Badge>
-						<Badge size="sm" variant="outline" color="default">
-							Mode: {usesBroker ? "Brokered verification" : "Direct gateway"}
-						</Badge>
+					<Badge size="sm" variant="soft" color="accent">
+						Verification mode: {usesBroker ? "Brokered" : "Direct"}
+					</Badge>
 					</HStack>
 					<Text size="xs" color="muted">
 						{usesBroker

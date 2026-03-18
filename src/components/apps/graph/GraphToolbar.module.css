@@ -11,7 +11,22 @@
 .segment {
 	display: flex;
 	flex-wrap: wrap;
+	align-items: center;
 	gap: 0.25rem;
+}
+
+.scopeLabel {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding-right: 0.35rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text-muted);
+}
+
+.scopeIcon {
+	color: var(--accent);
 }
 
 .buttonBase {
@@ -37,15 +52,6 @@
 	border-color: var(--primary);
 	background: color-mix(in srgb, var(--primary) 20%, transparent);
 	color: var(--primary);
-}
-
-.iconButton {
-	display: inline-flex;
-	align-items: center;
-}
-
-.buttonIcon {
-	margin-right: 0.25rem;
 }
 
 .divider {

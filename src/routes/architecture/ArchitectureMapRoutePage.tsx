@@ -1,12 +1,15 @@
-import { ArchitectureMapPanel } from "@/components/architecture/ArchitectureMapPanel";
+import { Link } from "react-router-dom";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import { ArchitectureMapPanel } from "@/components/architecture/ArchitectureMapPanel";
 import { Badge } from "@/components/primitives/Badge";
+import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
 import { Text } from "@/components/primitives/Text";
-import { ARCHITECTURE_AUTOGEN, ARCHITECTURE_FIX_CANDIDATES } from "@/data/architectureModel";
 import {
+	ARCHITECTURE_AUTOGEN,
 	ARCHITECTURE_DEPENDENCIES,
 	ARCHITECTURE_DOMAINS,
+	ARCHITECTURE_FIX_CANDIDATES,
 	ARCHITECTURE_MODULES_BY_DOMAIN,
 } from "@/data/architectureModel";
 import styles from "./ArchitectureMapRoutePage.module.css";
@@ -28,11 +31,12 @@ export default function ArchitectureMapRoutePage() {
 					<div className={styles.routeHeroHeader}>
 						<div>
 							<Text size="sm" weight="semibold">
-								Architecture Command Surface
+								Architecture Deep Dive (Primary)
 							</Text>
 							<Text size="xs" color="muted" className={styles.routeHeroText}>
 								Domain boundaries, dependency pressure, and staged refactor
-								checkpoints in one map-first workspace.
+								checkpoints in one map-first workspace. Use Graph Explorer as an
+								alternate node-link view.
 							</Text>
 						</div>
 						<div className={styles.routeHeroBadges}>
@@ -42,6 +46,11 @@ export default function ArchitectureMapRoutePage() {
 							<Badge color="accent" variant="soft">
 								Command-center linked
 							</Badge>
+							<Link to="/app/apps/graph?source=architecture">
+								<Button size="sm" variant="secondary">
+									Open Graph Explorer
+								</Button>
+							</Link>
 						</div>
 					</div>
 					<div className={styles.routeStatRow}>

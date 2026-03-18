@@ -1,10 +1,14 @@
-import type { WorkLedgerPublishState } from "@/services/workLedgerService";
+import type {
+	WorkLedgerLifecycleState,
+	WorkLedgerPublishState,
+} from "@/services/workLedgerService";
 
 export interface WorkLedgerNavigationFilters {
 	projectId?: string | null;
 	query?: string | null;
 	path?: string | null;
 	hotspot?: string | null;
+	lifecycleState?: WorkLedgerLifecycleState | "all" | null;
 	publishState?: WorkLedgerPublishState | "all" | null;
 }
 
@@ -26,6 +30,7 @@ export function buildChangelogSearchParams(
 	setIfPresent(params, "query", filters.query);
 	setIfPresent(params, "path", filters.path);
 	setIfPresent(params, "hotspot", filters.hotspot);
+	setIfPresent(params, "lifecycleState", filters.lifecycleState ?? null);
 	setIfPresent(params, "publishState", filters.publishState ?? null);
 	setIfPresent(params, "focus", "ledger");
 	return params;
@@ -39,6 +44,7 @@ export function buildDashboardLedgerSearchParams(
 	setIfPresent(params, "query", filters.query);
 	setIfPresent(params, "path", filters.path);
 	setIfPresent(params, "hotspot", filters.hotspot);
+	setIfPresent(params, "lifecycleState", filters.lifecycleState ?? null);
 	setIfPresent(params, "publishState", filters.publishState ?? null);
 	setIfPresent(params, "focus", "ledger");
 	return params;

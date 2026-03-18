@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { deleteMemory, loadMemories } from "@/lib/agent-memory/service";
 import type { Memory } from "@/lib/agent-memory/types";
 import { adaptArchitecture } from "./adapters/architectureAdapter";
@@ -7,7 +7,7 @@ import { Graph2D } from "./Graph2D";
 import { GraphInspector } from "./GraphInspector";
 import { GraphToolbar } from "./GraphToolbar";
 import styles from "./GraphVisualization.module.css";
-import type { GraphData, GraphNode, SourceFilter, ViewMode } from "./types";
+import type { GraphData, GraphNode, SourceFilter } from "./types";
 
 function mergeGraphData(...sources: GraphData[]): GraphData {
 	const nodes: GraphNode[] = [];
@@ -19,34 +19,88 @@ function mergeGraphData(...sources: GraphData[]): GraphData {
 	return { nodes, links };
 }
 
-export function GraphVisualization() {
-	const [viewMode, setViewMode] = useState<ViewMode>("2d");
-	const [sourceFilter, setSourceFilter] =
+interface GraphVisualizationProps {
+	sourceFilter?: SourceFilter;
+	onSourceFilterChange?: (filter: SourceFilter) => void;
+	searchQuery?: string;
+	onSearchQueryChange?: (query: string) => void;
+}
+
+export function GraphVisualization({
+	sourceFilter,
+	onSourceFilterChange,
+	searchQuery,
+	onSearchQueryChange,
+}: GraphVisualizationProps = {}) {
+	const [internalSourceFilter, setInternalSourceFilter] =
 		useState<SourceFilter>("architecture");
-	const [searchQuery, setSearchQuery] = useState("");
+	const [internalSearchQuery, setInternalSearchQuery] = useState("");
 	const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 	const [memories, setMemories] = useState<Memory[]>([]);
 	const [loaded, setLoaded] = useState(false);
+	const [memoryLoadError, setMemoryLoadError] = useState<string | null>(null);
 
-	React.useEffect(() => {
-		loadMemories().then((m) => {
-			setMemories(m);
-			setLoaded(true);
-		});
+	const effectiveSourceFilter = sourceFilter ?? internalSourceFilter;
+	const effectiveSearchQuery = searchQuery ?? internalSearchQuery;
+
+	const handleSourceFilterChange = useCallback(
+		(filter: SourceFilter) => {
+			if (sourceFilter === undefined) {
+				setInternalSourceFilter(filter);
+			}
+			onSourceFilterChange?.(filter);
+		},
+		[onSourceFilterChange, sourceFilter],
+	);
+
+	const handleSearchQueryChange = useCallback(
+		(nextValue: string) => {
+			if (searchQuery === undefined) {
+				setInternalSearchQuery(nextValue);
+			}
+			onSearchQueryChange?.(nextValue);
+		},
+		[onSearchQueryChange, searchQuery],
+	);
+
+	useEffect(() => {
+		let cancelled = false;
+		void loadMemories()
+			.then((m) => {
+				if (cancelled) return;
+				setMemories(m);
+				setMemoryLoadError(null);
+			})
+			.catch((error) => {
+				if (cancelled) return;
+				setMemories([]);
+				setMemoryLoadError(
+					error instanceof Error
+						? error.message
+						: "Unable to load agent memory graph data.",
+				);
+			})
+			.finally(() => {
+				if (cancelled) return;
+				setLoaded(true);
+			});
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	const archData = useMemo(() => adaptArchitecture(), []);
 	const memData = useMemo(() => adaptMemories(memories), [memories]);
 
 	const graphData = useMemo(() => {
-		if (sourceFilter === "architecture") return archData;
-		if (sourceFilter === "memory") return memData;
+		if (effectiveSourceFilter === "architecture") return archData;
+		if (effectiveSourceFilter === "memory") return memData;
 		return mergeGraphData(archData, memData);
-	}, [sourceFilter, archData, memData]);
+	}, [effectiveSourceFilter, archData, memData]);
 
 	const filtered = useMemo(() => {
-		if (!searchQuery.trim()) return graphData;
-		const q = searchQuery.toLowerCase();
+		if (!effectiveSearchQuery.trim()) return graphData;
+		const q = effectiveSearchQuery.toLowerCase();
 		const matchIds = new Set(
 			graphData.nodes
 				.filter(
@@ -62,7 +116,7 @@ export function GraphVisualization() {
 				(l) => matchIds.has(l.source) || matchIds.has(l.target),
 			),
 		};
-	}, [graphData, searchQuery]);
+	}, [effectiveSearchQuery, graphData]);
 
 	const handleDeleteMemory = useCallback(
 		async (id: string) => {
@@ -75,25 +129,36 @@ export function GraphVisualization() {
 		[selectedNode],
 	);
 
-	const handleAddMemory = useCallback(() => {
-		// placeholder
-	}, []);
+	useEffect(() => {
+		if (!selectedNode) return;
+		const stillVisible = filtered.nodes.some(
+			(node) => node.id === selectedNode.id,
+		);
+		if (!stillVisible) {
+			setSelectedNode(null);
+		}
+	}, [filtered.nodes, selectedNode]);
 
 	return (
 		<div className={styles.root}>
 			<GraphToolbar
-				viewMode={viewMode}
-				onViewModeChange={setViewMode}
-				sourceFilter={sourceFilter}
-				onSourceFilterChange={setSourceFilter}
-				searchQuery={searchQuery}
-				onSearchChange={setSearchQuery}
-				onAddMemory={handleAddMemory}
+				sourceFilter={effectiveSourceFilter}
+				onSourceFilterChange={handleSourceFilterChange}
+				searchQuery={effectiveSearchQuery}
+				onSearchChange={handleSearchQueryChange}
 			/>
 			<div className={styles.body}>
 				<div className={styles.graphPane}>
 					{!loaded ? (
 						<div className={styles.loadingState}>Loading graph data...</div>
+					) : memoryLoadError && effectiveSourceFilter !== "architecture" ? (
+						<div className={styles.loadingState}>
+							Agent memory graph is unavailable: {memoryLoadError}
+						</div>
+					) : filtered.nodes.length === 0 ? (
+						<div className={styles.loadingState}>
+							No graph nodes match this source scope and search filter.
+						</div>
 					) : (
 						<Graph2D
 							data={filtered}

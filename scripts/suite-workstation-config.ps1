@@ -126,7 +126,9 @@ function Resolve-SuiteWorkstationProfile {
         [Parameter(Mandatory = $true)][string]$ResolvedRepoRoot,
         [string]$ExplicitWorkstationId,
         [string]$ExplicitWorkstationLabel,
-        [string]$ExplicitWorkstationRole
+        [string]$ExplicitWorkstationRole,
+        [string]$ExplicitGitUserName,
+        [string]$ExplicitGitUserEmail
     )
 
     $profileSet = Get-SuiteWorkstationProfiles -ResolvedRepoRoot $ResolvedRepoRoot
@@ -189,6 +191,18 @@ function Resolve-SuiteWorkstationProfile {
         WorkstationId = $resolvedWorkstationId.Trim()
         WorkstationLabel = $resolvedWorkstationLabel.Trim()
         WorkstationRole = $resolvedWorkstationRole.Trim()
+        GitUserName = if ([string]::IsNullOrWhiteSpace($ExplicitGitUserName)) {
+            [string]$baseProfile.gitUserName
+        }
+        else {
+            $ExplicitGitUserName.Trim()
+        }
+        GitUserEmail = if ([string]::IsNullOrWhiteSpace($ExplicitGitUserEmail)) {
+            [string]$baseProfile.gitUserEmail
+        }
+        else {
+            $ExplicitGitUserEmail.Trim()
+        }
         ComputerName = $resolvedComputerName
         ProfileSource = if ($null -ne $match) { "matrix" } else { "fallback" }
         ProfilePath = $profileSet.Path

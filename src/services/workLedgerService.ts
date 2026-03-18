@@ -6,6 +6,7 @@ export type {
 	WorkLedgerInput,
 	WorkLedgerInsert,
 	WorkLedgerPublishJobRow,
+	WorkLedgerLifecycleState,
 	WorkLedgerPublishResult,
 	WorkLedgerPublishState,
 	WorkLedgerOpenArtifactFolderResult,
@@ -33,8 +34,15 @@ import {
 	readLocalEntries,
 	writeLocalEntries,
 } from "./work-ledger/local";
-import { getCurrentUserId, requestWorkLedgerApi } from "./work-ledger/api";
-import { sanitizeArray } from "./work-ledger/helpers";
+import {
+	getCurrentUserId,
+	requestWorkLedgerApi,
+	WorkLedgerApiError,
+} from "./work-ledger/api";
+import {
+	normalizeLifecycleState,
+	sanitizeArray,
+} from "./work-ledger/helpers";
 import {
 	startRealtimeEntryListener,
 	stopRealtimeIfIdle,
@@ -47,6 +55,56 @@ const listeners = new Set<WorkLedgerListener>();
 
 function emit(entry: WorkLedgerRow) {
 	listeners.forEach((listener) => listener(entry));
+}
+
+function normalizeWorkLedgerEntry(entry: WorkLedgerRow): WorkLedgerRow {
+	return {
+		...entry,
+		lifecycle_state: normalizeLifecycleState(
+			entry.lifecycle_state,
+			entry.publish_state,
+		),
+	};
+}
+
+function normalizeWorkLedgerEntries(entries: WorkLedgerRow[]): WorkLedgerRow[] {
+	return entries.map(normalizeWorkLedgerEntry);
+}
+
+function isMissingWorkLedgerSchema(error: unknown): boolean {
+	const message = String((error as { message?: unknown })?.message || "")
+		.toLowerCase()
+		.trim();
+	return (
+		message.includes("work_ledger_entries") &&
+		(message.includes("does not exist") ||
+			message.includes("not found") ||
+			message.includes("could not find"))
+	);
+}
+
+function classifyPublisherError(error: unknown): Error {
+	if (error instanceof WorkLedgerApiError) {
+		if (error.status === 404) {
+			return new Error(
+				"Work Ledger publisher routes are unavailable. Restart the backend from this repo checkout.",
+			);
+		}
+		if (error.status === 401 || error.status === 403) {
+			return new Error("Sign in again to access Work Ledger publisher routes.");
+		}
+		return new Error(error.message || "Work Ledger publisher request failed.");
+	}
+	const rawMessage = String((error as { message?: unknown })?.message || "").trim();
+	if (
+		rawMessage.toLowerCase().includes("failed to fetch") ||
+		rawMessage.toLowerCase().includes("networkerror")
+	) {
+		return new Error(
+			"Work Ledger backend is unreachable. Start backend and verify Vite /api proxy target.",
+		);
+	}
+	return new Error(rawMessage || "Work Ledger publisher request failed.");
 }
 
 export const buildWorktalePublishPayload: (
@@ -67,7 +125,7 @@ export const workLedgerService = {
 		const userId = await getCurrentUserId();
 		if (!userId) {
 			return {
-				data: filterEntries(readLocalEntries(), filters),
+				data: filterEntries(normalizeWorkLedgerEntries(readLocalEntries()), filters),
 				error: null,
 			};
 		}
@@ -87,6 +145,9 @@ export const workLedgerService = {
 				if (filters?.appArea) {
 					query = query.eq("app_area", filters.appArea);
 				}
+				if (filters?.lifecycleState && filters.lifecycleState !== "all") {
+					query = query.eq("lifecycle_state", filters.lifecycleState);
+				}
 				if (filters?.publishState && filters.publishState !== "all") {
 					query = query.eq("publish_state", filters.publishState);
 				}
@@ -95,9 +156,34 @@ export const workLedgerService = {
 			"WorkLedgerService",
 		);
 
+		const localFallback = filterEntries(
+			normalizeWorkLedgerEntries(readLocalEntries()),
+			filters,
+		);
+		const remoteRows = normalizeWorkLedgerEntries(
+			(result.data ?? []) as WorkLedgerRow[],
+		);
+
+		if (result.error) {
+			if (isMissingWorkLedgerSchema(result.error)) {
+				return {
+					data: localFallback,
+					error: new Error(
+						"Supabase schema is missing `work_ledger_entries`. Apply consolidated migration to enable hosted Work Ledger storage.",
+					),
+				};
+			}
+			return {
+				data: localFallback.length > 0 ? localFallback : filterEntries(remoteRows, filters),
+				error: new Error(
+					String(result.error.message || "Work ledger query failed."),
+				),
+			};
+		}
+
 		return {
-			data: filterEntries((result.data ?? []) as WorkLedgerRow[], filters),
-			error: result.error,
+			data: filterEntries(remoteRows, filters),
+			error: null,
 		};
 	},
 
@@ -107,8 +193,9 @@ export const workLedgerService = {
 			const localEntry = buildLocalEntry(input, null);
 			const current = readLocalEntries();
 			writeLocalEntries([localEntry, ...current]);
-			emit(localEntry);
-			return localEntry;
+			const normalized = normalizeWorkLedgerEntry(localEntry);
+			emit(normalized);
+			return normalized;
 		}
 
 		const payload: WorkLedgerInsert = {
@@ -120,6 +207,7 @@ export const workLedgerService = {
 			app_area: String(input.appArea || "").trim() || null,
 			architecture_paths: sanitizeArray(input.architecturePaths),
 			hotspot_ids: sanitizeArray(input.hotspotIds),
+			lifecycle_state: input.lifecycleState ?? "completed",
 			publish_state: input.publishState ?? "draft",
 			external_reference: String(input.externalReference || "").trim() || null,
 			external_url: String(input.externalUrl || "").trim() || null,
@@ -137,14 +225,15 @@ export const workLedgerService = {
 		);
 
 		if (result.data) {
-			const entry = result.data as WorkLedgerRow;
+			const entry = normalizeWorkLedgerEntry(result.data as WorkLedgerRow);
 			emit(entry);
 			return entry;
 		}
 
 		const fallback = buildLocalEntry(input, userId);
-		emit(fallback);
-		return fallback;
+		const normalized = normalizeWorkLedgerEntry(fallback);
+		emit(normalized);
+		return normalized;
 	},
 
 	async updateEntry(
@@ -179,6 +268,13 @@ export const workLedgerService = {
 							hotspot_ids: patch.hotspotIds
 								? sanitizeArray(patch.hotspotIds)
 								: entry.hotspot_ids,
+							lifecycle_state:
+								patch.lifecycleState === undefined
+									? normalizeLifecycleState(
+											entry.lifecycle_state,
+											entry.publish_state,
+										)
+									: patch.lifecycleState,
 							publish_state: patch.publishState ?? entry.publish_state,
 							published_at: entry.published_at,
 							external_reference:
@@ -195,8 +291,12 @@ export const workLedgerService = {
 			);
 			writeLocalEntries(next);
 			const updated = next.find((entry) => entry.id === normalizedId) ?? null;
-			if (updated) emit(updated);
-			return updated;
+			if (updated) {
+				const normalized = normalizeWorkLedgerEntry(updated);
+				emit(normalized);
+				return normalized;
+			}
+			return null;
 		}
 
 		const payload: WorkLedgerUpdate = {
@@ -213,6 +313,7 @@ export const workLedgerService = {
 				? sanitizeArray(patch.architecturePaths)
 				: undefined,
 			hotspot_ids: patch.hotspotIds ? sanitizeArray(patch.hotspotIds) : undefined,
+			lifecycle_state: patch.lifecycleState,
 			publish_state: patch.publishState,
 			external_reference:
 				patch.externalReference === undefined
@@ -237,7 +338,7 @@ export const workLedgerService = {
 		);
 
 		if (result.data) {
-			const entry = result.data as WorkLedgerRow;
+			const entry = normalizeWorkLedgerEntry(result.data as WorkLedgerRow);
 			emit(entry);
 			return entry;
 		}
@@ -268,7 +369,7 @@ export const workLedgerService = {
 		} catch (error) {
 			return {
 				data: null,
-				error: error instanceof Error ? error : new Error(String(error)),
+				error: classifyPublisherError(error),
 			};
 		}
 	},
@@ -296,7 +397,7 @@ export const workLedgerService = {
 		} catch (error) {
 			return {
 				data: null,
-				error: error instanceof Error ? error : new Error(String(error)),
+				error: classifyPublisherError(error),
 			};
 		}
 	},
@@ -324,14 +425,18 @@ export const workLedgerService = {
 				`/api/work-ledger/entries/${encodeURIComponent(normalizedId)}/publish/worktale`,
 				{ method: "POST" },
 			)) as WorkLedgerPublishResult;
+			const normalizedPayload = {
+				...payload,
+				entry: normalizeWorkLedgerEntry(payload.entry),
+			};
 			return {
-				data: payload,
+				data: normalizedPayload,
 				error: null,
 			};
 		} catch (error) {
 			return {
 				data: null,
-				error: error instanceof Error ? error : new Error(String(error)),
+				error: classifyPublisherError(error),
 			};
 		}
 	},
@@ -372,7 +477,7 @@ export const workLedgerService = {
 		} catch (error) {
 			return {
 				data: [],
-				error: error instanceof Error ? error : new Error(String(error)),
+				error: classifyPublisherError(error),
 			};
 		}
 	},
@@ -413,7 +518,7 @@ export const workLedgerService = {
 		} catch (error) {
 			return {
 				data: null,
-				error: error instanceof Error ? error : new Error(String(error)),
+				error: classifyPublisherError(error),
 			};
 		}
 	},

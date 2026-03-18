@@ -3,6 +3,18 @@ import { supabase } from "@/supabase/client";
 
 let warnedMissingUser = false;
 
+export class WorkLedgerApiError extends Error {
+	status: number;
+	code: string;
+
+	constructor(message: string, status: number, code: string) {
+		super(message);
+		this.name = "WorkLedgerApiError";
+		this.status = status;
+		this.code = code;
+	}
+}
+
 export async function getCurrentUserId(): Promise<string | null> {
 	const {
 		data: { user },
@@ -32,7 +44,9 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
 	}
 }
 
-async function parseApiError(response: Response): Promise<string> {
+async function parseApiError(
+	response: Response,
+): Promise<{ message: string; code: string }> {
 	try {
 		const payload = (await response.json()) as unknown;
 		if (payload && typeof payload === "object") {
@@ -41,13 +55,24 @@ async function parseApiError(response: Response): Promise<string> {
 					(payload as Record<string, unknown>).message ||
 					"",
 			).trim();
-			if (value) return value;
+			const codeValue = String(
+				(payload as Record<string, unknown>).code || "",
+			).trim();
+			if (value) {
+				return {
+					message: value,
+					code: codeValue || `HTTP_${response.status}`,
+				};
+			}
 		}
 	} catch {
 		// No-op; fallback to raw response text.
 	}
 	const text = await response.text().catch(() => "");
-	return text || `HTTP ${response.status}`;
+	return {
+		message: text || `HTTP ${response.status}`,
+		code: `HTTP_${response.status}`,
+	};
 }
 
 export async function requestWorkLedgerApi(
@@ -68,7 +93,8 @@ export async function requestWorkLedgerApi(
 		credentials: "include",
 	});
 	if (!response.ok) {
-		throw new Error(await parseApiError(response));
+		const parsed = await parseApiError(response);
+		throw new WorkLedgerApiError(parsed.message, response.status, parsed.code);
 	}
 	return (await response.json()) as unknown;
 }

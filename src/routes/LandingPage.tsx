@@ -3,17 +3,16 @@
 import {
 	Activity,
 	ArrowRight,
-	Bot,
 	CalendarDays,
 	FolderOpen,
 	Layers,
-	ShieldCheck,
 	Sparkles,
 	Workflow,
 	Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/auth/useAuth";
 import { buildAgentPairingSearchFromLocation } from "@/auth/agentPairingParams";
 import { cn } from "@/lib/utils";
 import { APP_NAME, APP_TAGLINE } from "../appMeta";
@@ -38,10 +37,10 @@ const FEATURES = [
 		to: "/app/projects",
 	},
 	{
-		icon: Bot,
-		title: "Koro Agent",
+		icon: Sparkles,
+		title: "Agents",
 		description:
-			"AI-powered task orchestration. Plan, generate, and review with contextual agents.",
+			"Profile-driven orchestration for drafting, QA, and operations decisions.",
 		to: "/app/agent",
 	},
 	{
@@ -66,11 +65,11 @@ const FEATURES = [
 		to: "/app/knowledge",
 	},
 	{
-		icon: Sparkles,
-		title: "Multi-Agent System",
+		icon: Activity,
+		title: "Operational telemetry",
 		description:
-			"Five specialized agents — Koro, Devstral, Sentinel, Forge, and Draftsmith — each built for distinct tasks.",
-		to: "/app/agent",
+			"Collector health, CAD sessions, and event activity aligned with project delivery.",
+		to: "/app/dashboard",
 	},
 ] as const;
 const AGENT_IDS = AGENT_PROFILE_IDS;
@@ -86,9 +85,9 @@ const COMMAND_SIGNALS = [
 		value: "Projects, tasks, deadlines",
 	},
 	{
-		icon: ShieldCheck,
-		label: "Secure access",
-		value: "Passwordless and verified",
+		icon: Sparkles,
+		label: "Agent coordination",
+		value: "Profile-driven execution",
 	},
 ] as const;
 
@@ -119,7 +118,7 @@ function useScrollAnimation(threshold = 0.1) {
 
 export default function LandingPage() {
 	const [mounted, setMounted] = useState(false);
-	const [scrolled, setScrolled] = useState(false);
+	const { user } = useAuth();
 	const location = useLocation();
 	const navigate = useNavigate();
 
@@ -149,58 +148,27 @@ export default function LandingPage() {
 		return () => cancelAnimationFrame(id);
 	}, []);
 
-	useEffect(() => {
-		const handleScroll = () => {
-			setScrolled(window.scrollY > 20);
-		};
-		window.addEventListener("scroll", handleScroll, { passive: true });
-		return () => window.removeEventListener("scroll", handleScroll);
-	}, []);
-
 	return (
 		<div className={styles.root}>
 			<div className={styles.ambientTop} aria-hidden="true" />
 			<div className={styles.ambientBottom} aria-hidden="true" />
 
-			<nav
-				className={cn(
-					styles.nav,
-					scrolled ? styles.navScrolled : styles.navTop,
-				)}
-			>
+			<nav className={styles.nav}>
 				<div className={styles.navContainer}>
 					<Link to="/" className={styles.brandLink}>
-						<div
-							className={cn(
-								styles.brandMarkScale,
-								scrolled ? styles.brandMarkSmall : styles.brandMarkNormal,
-							)}
-						>
-							<AgentPixelMark
-								profileId="koro"
-								size={scrolled ? 24 : 28}
-								detailLevel="hero"
-								expression="neutral"
-							/>
-						</div>
+						<AgentPixelMark
+							profileId="koro"
+							size={24}
+							detailLevel="hero"
+							expression="neutral"
+						/>
 						<span className={styles.brandLabel}>{APP_NAME}</span>
 					</Link>
 
 					<HStack gap={2} align="center">
-						<Link to="/roadmap" className={styles.navAuxLink}>
-							Roadmap
-						</Link>
-						<Link to="/privacy" className={styles.navAuxLink}>
-							Privacy
-						</Link>
 						<Link to="/login">
-							<Button variant="secondary" size="sm">
-								Sign in
-							</Button>
-						</Link>
-						<Link to="/signup">
 							<Button variant="primary" size="sm">
-								Get started
+								Sign in
 							</Button>
 						</Link>
 					</HStack>
@@ -230,7 +198,7 @@ export default function LandingPage() {
 								className={styles.heroBadge}
 							>
 								<span className={styles.heroBadgeDot} />
-								Command-center workspace
+								Engineering operations workspace
 							</Badge>
 
 							<h1 className={styles.heroTitle}>
@@ -262,24 +230,10 @@ export default function LandingPage() {
 								))}
 							</div>
 
-							<HStack gap={3} wrap className={styles.heroFeatureBadges}>
-								<Badge color="success" variant="outline" dot pulse>
-									Passwordless sign-in
-								</Badge>
-								<Badge color="primary" variant="outline" dot>
-									Email link verification
-								</Badge>
-							</HStack>
-
 							<HStack gap={3} wrap className={styles.heroCtaRow}>
-								<Link to="/signup">
+								<Link to={user ? "/app/dashboard" : "/login"}>
 									<Button variant="primary" size="sm">
-										Start in Suite
-									</Button>
-								</Link>
-								<Link to="/login">
-									<Button variant="secondary" size="sm">
-										Sign in
+										{user ? "Open Suite" : "Sign in"}
 									</Button>
 								</Link>
 							</HStack>
@@ -310,7 +264,9 @@ export default function LandingPage() {
 									className={styles.heroSecondaryRow}
 									justify="center"
 								>
-									{AGENT_IDS.filter((id) => id !== "koro").map((id, i) => (
+									{AGENT_IDS.filter((id) => id !== "koro")
+										.slice(0, 2)
+										.map((id, i) => (
 										<div
 											key={id}
 											className={styles.heroSecondaryAgent}
@@ -322,7 +278,7 @@ export default function LandingPage() {
 												detailLevel="hero"
 											/>
 										</div>
-									))}
+										))}
 								</HStack>
 
 								<div className={styles.heroAgentCaption}>
@@ -383,7 +339,7 @@ export default function LandingPage() {
 				<section ref={agentsAnim.ref} className={styles.agentsSection}>
 					<div className={styles.sectionHeading}>
 						<Text as="h2" size="lg" weight="semibold" block>
-							Agent command layer
+							Agent operations layer
 						</Text>
 						<Text size="sm" color="muted" className={styles.sectionCopy} block>
 							Specialized profiles operate independently and coordinate through
@@ -402,15 +358,15 @@ export default function LandingPage() {
 					>
 						<Badge color="accent" variant="soft" className={styles.agentsBadge}>
 							<span className={styles.agentsBadgeDot} />
-							Multi-agent system
+							Profile-driven agents
 						</Badge>
 
 						<Text as="h2" size="xl" weight="semibold" block>
-							Five agents, built for distinct tasks
+							Six profiles, built for distinct tasks
 						</Text>
 						<Text color="muted" size="sm" className={styles.agentsCopy} block>
-							Each agent has its own memory namespace, personality, and
-							specialization. Switch between them or let Koro orchestrate.
+							Each profile has its own memory scope and specialization. Run one
+							at a time or coordinate across profiles when needed.
 						</Text>
 
 						<div className={styles.agentGrid}>
@@ -475,9 +431,6 @@ export default function LandingPage() {
 					<HStack gap={4} className={styles.footerLinks}>
 						<Link to="/privacy" className={styles.footerLink}>
 							Privacy
-						</Link>
-						<Link to="/roadmap" className={styles.footerLink}>
-							Roadmap
 						</Link>
 					</HStack>
 				</footer>

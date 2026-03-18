@@ -14,6 +14,11 @@
 	flex-wrap: wrap;
 }
 
+.toolbarProgress {
+	width: 100%;
+	margin-top: 0.25rem;
+}
+
 .previewTabs {
 	display: flex;
 	gap: 0.25rem;
@@ -82,8 +87,7 @@
 	border-radius: 0.625rem;
 	border: 1px solid color-mix(in srgb, var(--gg-primary, var(--primary)) 15%, transparent);
 	background: color-mix(in srgb, var(--gg-surface-light, var(--surface)) 15%, transparent);
-	flex: 1;
-	min-height: 25rem;
+	height: clamp(20rem, 54vh, 38rem);
 	overflow: hidden;
 }
 
@@ -209,6 +213,10 @@
 	font-size: 12px;
 }
 
+.lazyPanelProgress {
+	width: min(280px, 72%);
+}
+
 .lazyPanelStateError {
 	color: #b91c1c;
 }
@@ -219,6 +227,13 @@
 	font-family: monospace;
 	font-size: 11px;
 	opacity: 0.85;
+}
+
+.lazyPanelHelper {
+	display: block;
+	font-size: 10px;
+	color: var(--text-muted);
+	margin-top: 0.25rem;
 }
 
 .lazyPanelRetry {

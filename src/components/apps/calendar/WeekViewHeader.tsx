@@ -8,18 +8,31 @@ interface WeekViewHeaderProps {
 	onDateSelect?: (date: Date) => void;
 }
 
+function getTimezoneBadgeLabel(now: Date): string {
+	const offsetLabel = format(now, "O");
+	const timeZoneName = Intl.DateTimeFormat(undefined, {
+		timeZoneName: "short",
+	})
+		.formatToParts(now)
+		.find((part) => part.type === "timeZoneName")
+		?.value;
+	return timeZoneName
+		? `Local (${timeZoneName} • ${offsetLabel})`
+		: `Local (${offsetLabel})`;
+}
+
 export function WeekViewHeader({
 	days,
 	selectedDate,
 	onDateSelect,
 }: WeekViewHeaderProps) {
+	const timezoneLabel = getTimezoneBadgeLabel(new Date());
+
 	return (
 		<div className={styles.root}>
 			{/* Timezone label */}
 			<div className={styles.timezoneCell}>
-				<span className={styles.timezoneDesktop}>
-					{format(new Date(), "O")}
-				</span>
+				<span className={styles.timezoneDesktop}>{timezoneLabel}</span>
 			</div>
 
 			{days.map((day) => {

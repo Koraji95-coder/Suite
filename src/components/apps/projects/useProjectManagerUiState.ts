@@ -15,7 +15,7 @@ const DEFAULT_PROJECT_FORM: ProjectFormData = {
 	deadline: "",
 	priority: "medium",
 	status: "active",
-	category: "",
+	category: "Other",
 };
 
 const DEFAULT_TASK_FORM: TaskFormData = {

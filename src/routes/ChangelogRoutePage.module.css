@@ -152,6 +152,19 @@
 	gap: 0.9rem;
 }
 
+.lifecycleSection {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.lifecycleSectionHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.6rem;
+	padding: 0 0.15rem;
+}
+
 .entryHeader {
 	display: flex;
 	align-items: flex-start;

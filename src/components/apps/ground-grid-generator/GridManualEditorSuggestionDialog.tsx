@@ -1,8 +1,10 @@
 import { Check, X } from "lucide-react";
+import { useId } from "react";
 import type { CSSProperties } from "react";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -34,6 +36,7 @@ export function GridManualEditorSuggestionDialog({
 	onCancel,
 	onConfirm,
 }: GridManualEditorSuggestionDialogProps) {
+	const descriptionId = useId();
 	const updateCoords = (partial: Partial<SuggestionCoords>) => {
 		onSuggestionCoordsChange({ ...suggestionCoords, ...partial });
 	};
@@ -43,7 +46,10 @@ export function GridManualEditorSuggestionDialog({
 			open={Boolean(suggestion)}
 			onOpenChange={(open) => !open && onCancel()}
 		>
-			<DialogContent className={styles.content}>
+			<DialogContent
+				className={styles.content}
+				aria-describedby={`${descriptionId}-description`}
+			>
 				<DialogHeader>
 					<DialogTitle>
 						{suggestion?.type === "add-rod"
@@ -52,8 +58,11 @@ export function GridManualEditorSuggestionDialog({
 								? "Place Conductor"
 								: suggestion?.type === "add-tee"
 									? "Place Tee"
-									: "Place Cross"}
+							: "Place Cross"}
 					</DialogTitle>
+					<DialogDescription id={`${descriptionId}-description`}>
+						Enter the coordinates or endpoints for the suggested geometry and confirm.
+					</DialogDescription>
 				</DialogHeader>
 				<div className={styles.fieldColumn}>
 					<div className={styles.fieldRow}>

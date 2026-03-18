@@ -45,6 +45,19 @@ import {
 } from "./dashboardOverviewFormatters";
 import styles from "./DashboardOverviewPanel.module.css";
 
+function formatGeneratedAt(value: string): string {
+	const timestamp = Date.parse(value);
+	if (!Number.isFinite(timestamp)) {
+		return "Unknown";
+	}
+	return new Date(timestamp).toLocaleString([], {
+		month: "short",
+		day: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
+	});
+}
+
 interface DashboardOverviewStatsGridProps {
 	projectsCount: number;
 	openTasks: number;
@@ -495,7 +508,7 @@ export function DashboardWatchdogSection({
 
 						<div className={styles.subpanel}>
 							<Text size="xs" color="muted" className={styles.subpanelLabel}>
-								Top telemetry projects
+								High-activity projects
 							</Text>
 							<div className={styles.rowList}>
 								{telemetryHotspotProjects.length === 0 ? (
@@ -538,7 +551,10 @@ interface DashboardArchitectureSectionProps {
 	filteredDomains: ArchitectureDomain[];
 	filteredHotspots: Array<{ path: string; lines: number }>;
 	filteredFixCandidates: ArchitectureFixCandidate[];
+	includeAdvancedModules: boolean;
+	snapshotGeneratedAt: string;
 	onDeepDive: () => void;
+	onToggleAdvancedModules: () => void;
 }
 
 export function DashboardArchitectureSection({
@@ -547,7 +563,10 @@ export function DashboardArchitectureSection({
 	filteredDomains,
 	filteredHotspots,
 	filteredFixCandidates,
+	includeAdvancedModules,
+	snapshotGeneratedAt,
 	onDeepDive,
+	onToggleAdvancedModules,
 }: DashboardArchitectureSectionProps) {
 	return (
 		<Panel
@@ -563,17 +582,39 @@ export function DashboardArchitectureSection({
 						Repository Architecture
 					</Text>
 					<Text size="xs" color="muted">
-						Hotspots, domains, and refactor checkpoints from the repo scan.
+						Hotspots, domains, and generated checkpoint candidates from the latest repo scan.
 					</Text>
 				</div>
-				<Button
-					variant="ghost"
-					size="sm"
-					onClick={onDeepDive}
-					iconRight={<ArrowUpRight size={14} />}
-				>
-					Deep dive
-				</Button>
+				<div className={styles.architectureActions}>
+					<button
+						type="button"
+						className={styles.sessionActionButton}
+						onClick={onToggleAdvancedModules}
+					>
+						{includeAdvancedModules
+							? "Hide external modules"
+							: "Include external modules"}
+					</button>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={onDeepDive}
+						iconRight={<ArrowUpRight size={14} />}
+					>
+						Deep dive
+					</Button>
+				</div>
+			</div>
+
+			<div className={styles.architectureSummary}>
+				<Badge color="accent" variant="soft" size="sm">
+					Generated {formatGeneratedAt(snapshotGeneratedAt)}
+				</Badge>
+				<Badge color="default" variant="outline" size="sm">
+					{includeAdvancedModules
+						? "Advanced modules included"
+						: "Advanced modules hidden"}
+				</Badge>
 			</div>
 
 			<div className={styles.domainGrid}>
@@ -591,25 +632,31 @@ export function DashboardArchitectureSection({
 					Largest hotspots
 				</Text>
 				<div className={styles.rowList}>
-					{filteredHotspots.map((hotspot) => (
-						<div key={hotspot.path} className={styles.dataRow}>
-							<div>
-								<div className={styles.dataRowTitle}>{hotspot.path}</div>
-								<div className={styles.dataRowMeta}>
-									{hotspot.lines.toLocaleString()} lines
+					{filteredHotspots.length === 0 ? (
+						<div className={styles.emptyStateCompact}>
+							No hotspots matched the current filters.
+						</div>
+					) : (
+						filteredHotspots.map((hotspot) => (
+							<div key={hotspot.path} className={styles.dataRow}>
+								<div>
+									<div className={styles.dataRowTitle}>{hotspot.path}</div>
+									<div className={styles.dataRowMeta}>
+										{hotspot.lines.toLocaleString()} lines
+									</div>
+								</div>
+								<div className={styles.dataRowAside}>
+									<GitBranch size={14} />
 								</div>
 							</div>
-							<div className={styles.dataRowAside}>
-								<GitBranch size={14} />
-							</div>
-						</div>
-					))}
+						))
+					)}
 				</div>
 			</div>
 
 			<div className={styles.sectionBlock}>
 				<Text size="xs" color="muted" className={styles.subpanelLabel}>
-					Refactor checkpoints
+					Generated checkpoint candidates
 				</Text>
 				<div className={styles.rowList}>
 					{filteredFixCandidates.map((candidate) => (
@@ -669,7 +716,7 @@ export function DashboardWorkLedgerSection({
 						Work Ledger
 					</Text>
 					<Text size="xs" color="muted">
-						Canonical changelog entries linked to repo areas and publish-ready notes.
+						Private roadmap plus changelog milestones linked to repo areas and publish receipts.
 					</Text>
 				</div>
 				<Button
@@ -700,11 +747,35 @@ export function DashboardWorkLedgerSection({
 								{viewModel.readinessDetail}
 							</div>
 						</div>
-						<div className={styles.ledgerKpiGrid}>
-							<div className={styles.ledgerKpiCard}>
-								<div className={styles.ledgerKpiValue}>{viewModel.readyCount}</div>
-								<div className={styles.ledgerKpiLabel}>Ready</div>
+					<div className={styles.ledgerKpiGrid}>
+						<div className={styles.ledgerKpiCard}>
+							<div className={styles.ledgerKpiValue}>
+								{viewModel.plannedCount}
 							</div>
+							<div className={styles.ledgerKpiLabel}>Planned</div>
+						</div>
+						<div className={styles.ledgerKpiCard}>
+							<div className={styles.ledgerKpiValue}>
+								{viewModel.activeCount}
+							</div>
+							<div className={styles.ledgerKpiLabel}>In progress</div>
+						</div>
+						<div className={styles.ledgerKpiCard}>
+							<div className={styles.ledgerKpiValue}>
+								{viewModel.completedCount}
+							</div>
+							<div className={styles.ledgerKpiLabel}>Completed</div>
+						</div>
+						<div className={styles.ledgerKpiCard}>
+							<div className={styles.ledgerKpiValue}>
+								{viewModel.archivedCount}
+							</div>
+							<div className={styles.ledgerKpiLabel}>Archived</div>
+						</div>
+						<div className={styles.ledgerKpiCard}>
+							<div className={styles.ledgerKpiValue}>{viewModel.readyCount}</div>
+							<div className={styles.ledgerKpiLabel}>Ready</div>
+						</div>
 							<div className={styles.ledgerKpiCard}>
 								<div className={styles.ledgerKpiValue}>
 									{viewModel.publishedCount}
@@ -757,6 +828,58 @@ export function DashboardWorkLedgerSection({
 									</div>
 								</div>
 							) : null}
+							{viewModel.latestActiveEntry ? (
+								<div className={styles.dataRow}>
+									<div>
+										<div className={styles.dataRowTitle}>
+											In progress: {viewModel.latestActiveEntry.title}
+										</div>
+										<div className={styles.dataRowMeta}>
+											{viewModel.latestActiveEntry.summary}
+										</div>
+									</div>
+									<div className={styles.dataRowAside}>
+										<Badge color="primary" variant="soft">
+											active
+										</Badge>
+										<button
+											type="button"
+											className={styles.sessionActionButton}
+											onClick={() =>
+												onOpenHotspotEntry(viewModel.latestActiveEntry!)
+											}
+										>
+											Open entry
+										</button>
+									</div>
+								</div>
+							) : null}
+							{viewModel.latestCompletedEntry ? (
+								<div className={styles.dataRow}>
+									<div>
+										<div className={styles.dataRowTitle}>
+											Completed: {viewModel.latestCompletedEntry.title}
+										</div>
+										<div className={styles.dataRowMeta}>
+											{viewModel.latestCompletedEntry.summary}
+										</div>
+									</div>
+									<div className={styles.dataRowAside}>
+										<Badge color="success" variant="soft">
+											completed
+										</Badge>
+										<button
+											type="button"
+											className={styles.sessionActionButton}
+											onClick={() =>
+												onOpenHotspotEntry(viewModel.latestCompletedEntry!)
+											}
+										>
+											Open entry
+										</button>
+									</div>
+								</div>
+							) : null}
 							{viewModel.latestPublishedEntry ? (
 								<div className={styles.dataRow}>
 									<div>
@@ -783,9 +906,12 @@ export function DashboardWorkLedgerSection({
 									</div>
 								</div>
 							) : null}
-							{!viewModel.latestReadyEntry && !viewModel.latestPublishedEntry ? (
+							{!viewModel.latestReadyEntry &&
+							!viewModel.latestActiveEntry &&
+							!viewModel.latestCompletedEntry &&
+							!viewModel.latestPublishedEntry ? (
 								<div className={styles.emptyStateCompact}>
-									No ready or published milestones matched the current filters.
+									No roadmap or changelog milestones matched the current filters.
 								</div>
 							) : null}
 						</div>
@@ -1140,7 +1266,7 @@ export function DashboardProjectOperationsSection({
 
 					<div className={styles.sectionBlock}>
 						<Text size="xs" color="muted" className={styles.subpanelLabel}>
-							Telemetry hotspots
+							High-activity projects
 						</Text>
 						<div className={styles.rowList}>
 							{telemetryHotspotProjects.length === 0 ? (

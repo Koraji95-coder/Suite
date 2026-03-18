@@ -4,13 +4,17 @@
       "id": "DUSTINWARD",
       "label": "Dustin workstation",
       "role": "active",
-      "computerNames": ["DUSTINWARD"]
+      "computerNames": ["DUSTINWARD"],
+      "gitUserName": "koraji95-coder",
+      "gitUserEmail": "dustinwardelectricalengineer@outlook.com"
     },
     {
       "id": "DUSTIN-HOME",
       "label": "Dustin Home station",
       "role": "home",
-      "computerNames": ["DUSTIN-HOME"]
+      "computerNames": ["DUSTIN-HOME"],
+      "gitUserName": "koraji95-coder",
+      "gitUserEmail": "dustinwardelectricalengineer@outlook.com"
     }
   ]
 }

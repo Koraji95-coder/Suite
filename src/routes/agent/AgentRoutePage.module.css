@@ -235,6 +235,49 @@
 	height: clamp(42rem, 86dvh, 92rem);
 }
 
+.loadingPanel {
+	display: grid;
+	gap: 0.8rem;
+	align-content: center;
+	justify-items: start;
+	min-height: 34rem;
+	padding: 1.4rem;
+	border: 1px solid color-mix(in srgb, var(--nexus-shell-border) 82%, transparent);
+	border-radius: 1rem;
+	background:
+		radial-gradient(
+			120% 100% at 100% 0%,
+			color-mix(in srgb, var(--accent) 8%, transparent),
+			transparent 58%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 84%, transparent)
+		);
+}
+
+.loadingLabel {
+	margin: 0;
+	font-size: 0.76rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.loadingProgress {
+	width: min(24rem, 100%);
+}
+
+.loadingCopy {
+	margin: 0;
+	max-width: 36rem;
+	font-size: 0.84rem;
+	line-height: 1.5;
+	color: color-mix(in srgb, var(--text) 82%, transparent);
+}
+
 @media (max-width: 70rem) {
 	.metricsGrid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));

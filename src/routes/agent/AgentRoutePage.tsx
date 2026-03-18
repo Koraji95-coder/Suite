@@ -1,4 +1,4 @@
-import { RefreshCw, Settings2 } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
@@ -6,6 +6,7 @@ import { buildAgentPairingSearchFromLocation } from "@/auth/agentPairingParams";
 import { AgentChatPanel } from "@/components/agent/AgentChatPanel";
 import { AgentPanelBoundary } from "@/components/agent/AgentPanelBoundary";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import { Progress } from "@/components/primitives/Progress";
 import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 import { agentService } from "@/services/agentService";
@@ -34,6 +35,7 @@ export default function AgentRoutePage() {
 	const {
 		healthy,
 		paired,
+		loading,
 		error: connectionError,
 		refreshNow: refreshConnectionState,
 	} =
@@ -41,9 +43,9 @@ export default function AgentRoutePage() {
 			userId: user?.id ?? null,
 		});
 	const showGatewayRestartHint = shouldShowGatewayRestartHint(connectionError);
-	const statusLabel = healthy === null ? "Checking bridge" : healthy ? "Online" : "Offline";
+	const statusLabel = loading || healthy === null ? "Checking" : healthy ? "Online" : "Offline";
 	const statusSummary =
-		healthy === null
+		loading || healthy === null
 			? "Verifying gateway reachability and broker link."
 			: healthy
 				? "Gateway and broker transport are reachable."
@@ -82,8 +84,8 @@ export default function AgentRoutePage() {
 
 	return (
 		<PageFrame
-			title="Agent"
-			description="Profile-based AI orchestration and automation"
+			title="Agents"
+			description="Profile-driven agents, orchestration, and automation"
 			maxWidth="full"
 			padded={false}
 		>
@@ -91,7 +93,7 @@ export default function AgentRoutePage() {
 				<div className={styles.surfaceHeader}>
 					<div>
 						<p className={styles.eyebrow}>Command surface</p>
-						<h2 className={styles.surfaceTitle}>Agent operations center</h2>
+						<h2 className={styles.surfaceTitle}>Agent operations</h2>
 						<p className={styles.surfaceCopy}>
 							Manage route health, pairing state, and live orchestration in one
 							control lane.
@@ -100,7 +102,7 @@ export default function AgentRoutePage() {
 					<div className={styles.surfaceChips}>
 						<span className={styles.surfaceChip}>{statusLabel}</span>
 						<span className={styles.surfaceChip}>
-							{paired ? "Paired session" : "Pairing required"}
+							{paired ? "Paired" : "Pairing required"}
 						</span>
 					</div>
 				</div>
@@ -129,12 +131,16 @@ export default function AgentRoutePage() {
 							<span
 								className={cn(
 									styles.statusDot,
-									healthy === null && styles.statusUnknown,
+									(loading || healthy === null) && styles.statusUnknown,
 									healthy === true && styles.statusOnline,
 									healthy === false && styles.statusOffline,
 								)}
 							/>
-							{healthy === null ? "Checking" : healthy ? "Online" : "Offline"}
+							{loading || healthy === null
+								? "Checking"
+								: healthy
+									? "Online"
+									: "Offline"}
 						</span>
 						<span className={styles.separator} />
 						<span className={styles.statusItem}>
@@ -163,14 +169,6 @@ export default function AgentRoutePage() {
 							Refresh state
 						</button>
 
-						<button
-							type="button"
-							onClick={() => navigate("/app/settings")}
-							className={cn(styles.button, styles.buttonPrimary)}
-						>
-							<Settings2 className={styles.buttonIcon} />
-							Manage Pairing
-						</button>
 					</div>
 				</div>
 				{connectionError ? (
@@ -187,7 +185,25 @@ export default function AgentRoutePage() {
 
 			<div className={styles.chatWrap}>
 				<AgentPanelBoundary onResetPanelCache={handleResetPanelCache}>
-					<AgentChatPanel healthy={healthy === true} paired={paired} />
+					{loading || healthy === null ? (
+						<section className={styles.loadingPanel}>
+							<p className={styles.loadingLabel}>Checking agent gateway state</p>
+							<Progress
+								value={36}
+								indeterminate
+								animated
+								size="sm"
+								color="accent"
+								className={styles.loadingProgress}
+							/>
+							<p className={styles.loadingCopy}>
+								Holding the orchestration surface until the current session and
+								gateway state are known.
+							</p>
+						</section>
+					) : (
+						<AgentChatPanel healthy={healthy} paired={paired} />
+					)}
 				</AgentPanelBoundary>
 			</div>
 		</PageFrame>

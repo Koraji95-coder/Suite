@@ -226,6 +226,7 @@ describe("DashboardOverviewPanel", () => {
 					app_area: "agent",
 					architecture_paths: ["src/services/agentService.ts"],
 					hotspot_ids: [],
+					lifecycle_state: "completed",
 					publish_state: "ready",
 					published_at: null,
 					external_reference: "worktale:note:job-1",
@@ -332,7 +333,7 @@ describe("DashboardOverviewPanel", () => {
 		expect(screen.getByText("Live AutoCAD sessions")).toBeTruthy();
 		expect(screen.getByText("Session timeline")).toBeTruthy();
 		expect(screen.getByText("Seq 1")).toBeTruthy();
-		expect(screen.getByText("Telemetry hotspots")).toBeTruthy();
+		expect(screen.getAllByText("High-activity projects").length).toBeGreaterThan(0);
 		expect(screen.getByText("Work Ledger")).toBeTruthy();
 		expect(
 			screen.getAllByText("Refactor agent service facade").length,
@@ -361,7 +362,9 @@ describe("DashboardOverviewPanel", () => {
 			expect(screen.getByText("Worktale unavailable")).toBeTruthy();
 		});
 		expect(
-			screen.getByText("Sign in to use Worktale publishing."),
+			screen.getByText(
+				"This surface requires an authenticated session before it can load.",
+			),
 		).toBeTruthy();
 	});
 });

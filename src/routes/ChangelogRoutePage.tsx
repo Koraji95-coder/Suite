@@ -23,6 +23,7 @@ import {
 	buildWorktalePublishPayload,
 	type WorkLedgerFilters,
 	type WorkLedgerInput,
+	type WorkLedgerLifecycleState,
 	type WorkLedgerPublishJobRow,
 	type WorkLedgerPublishState,
 	type WorkLedgerRow,
@@ -42,6 +43,25 @@ const PUBLISH_STATE_OPTIONS: Array<WorkLedgerPublishState | "all"> = [
 	"ready",
 	"published",
 ];
+const LIFECYCLE_STATE_OPTIONS: Array<WorkLedgerLifecycleState | "all"> = [
+	"all",
+	"planned",
+	"active",
+	"completed",
+	"archived",
+];
+const LIFECYCLE_STATE_ORDER: WorkLedgerLifecycleState[] = [
+	"planned",
+	"active",
+	"completed",
+	"archived",
+];
+const LIFECYCLE_STATE_LABELS: Record<WorkLedgerLifecycleState, string> = {
+	planned: "Planned",
+	active: "In progress",
+	completed: "Completed",
+	archived: "Archived",
+};
 
 function stateTone(state: string): "primary" | "accent" | "success" {
 	switch (state) {
@@ -49,6 +69,21 @@ function stateTone(state: string): "primary" | "accent" | "success" {
 			return "success";
 		case "ready":
 			return "accent";
+		default:
+			return "primary";
+	}
+}
+
+function lifecycleTone(
+	state: WorkLedgerLifecycleState | string | null | undefined,
+): "primary" | "accent" | "success" | "default" {
+	switch (state) {
+		case "planned":
+			return "accent";
+		case "completed":
+			return "success";
+		case "archived":
+			return "default";
 		default:
 			return "primary";
 	}
@@ -105,6 +140,7 @@ export default function ChangelogRoutePage() {
 		appArea: "",
 		architecturePaths: [],
 		hotspotIds: [],
+		lifecycleState: "active",
 		publishState: "draft",
 		externalReference: "",
 		externalUrl: "",
@@ -118,6 +154,11 @@ export default function ChangelogRoutePage() {
 				searchParams.get("hotspot") ||
 				undefined,
 			search: searchParams.get("query") || "",
+			lifecycleState:
+				(searchParams.get("lifecycleState") as
+					| WorkLedgerLifecycleState
+					| "all"
+					| null) || "all",
 			publishState:
 				(searchParams.get("publishState") as WorkLedgerPublishState | "all" | null) ||
 				"all",
@@ -180,12 +221,43 @@ export default function ChangelogRoutePage() {
 	const counts = useMemo(
 		() => ({
 			total: entries.length,
+			planned: entries.filter((entry) => entry.lifecycle_state === "planned").length,
+			active: entries.filter((entry) => entry.lifecycle_state === "active").length,
+			completed: entries.filter((entry) => entry.lifecycle_state === "completed")
+				.length,
+			archived: entries.filter((entry) => entry.lifecycle_state === "archived")
+				.length,
 			draft: entries.filter((entry) => entry.publish_state === "draft").length,
 			ready: entries.filter((entry) => entry.publish_state === "ready").length,
 			published: entries.filter((entry) => entry.publish_state === "published").length,
 		}),
 		[entries],
 	);
+	const groupedEntries = useMemo(() => {
+		const byLifecycle = new Map<WorkLedgerLifecycleState, WorkLedgerRow[]>(
+			LIFECYCLE_STATE_ORDER.map((state) => [state, []]),
+		);
+		for (const entry of entries) {
+			const lifecycleState = (entry.lifecycle_state ??
+				"active") as WorkLedgerLifecycleState;
+			const target = byLifecycle.get(lifecycleState);
+			if (target) target.push(entry);
+		}
+		const selectedLifecycle = filters.lifecycleState ?? "all";
+		const order =
+			selectedLifecycle === "all"
+				? LIFECYCLE_STATE_ORDER
+				: [selectedLifecycle as WorkLedgerLifecycleState];
+		return order
+			.map((lifecycleState) => ({
+				lifecycleState,
+				title: LIFECYCLE_STATE_LABELS[lifecycleState],
+				entries: byLifecycle.get(lifecycleState) ?? [],
+			}))
+			.filter((group) =>
+				selectedLifecycle === "all" ? group.entries.length > 0 : true,
+			);
+	}, [entries, filters.lifecycleState]);
 
 	const updateSearchParam = (key: string, value: string | null) => {
 		const next = new URLSearchParams(searchParams);
@@ -306,6 +378,7 @@ export default function ChangelogRoutePage() {
 				appArea: form.appArea ?? "",
 				architecturePaths: form.architecturePaths ?? [],
 				hotspotIds: form.hotspotIds ?? [],
+				lifecycleState: "active",
 				publishState: "draft",
 				externalReference: "",
 				externalUrl: "",
@@ -333,6 +406,10 @@ export default function ChangelogRoutePage() {
 				(searchParams.get("publishState") as WorkLedgerPublishState | "all" | null) ||
 				"all",
 		});
+		const lifecycleState = searchParams.get("lifecycleState");
+		if (lifecycleState && lifecycleState !== "all") {
+			next.set("lifecycleState", lifecycleState);
+		}
 		navigate(`/app/dashboard${next.toString() ? `?${next.toString()}` : ""}`);
 	};
 
@@ -509,6 +586,26 @@ export default function ChangelogRoutePage() {
 						</label>
 
 						<label className={styles.field}>
+							<span className={styles.label}>Lifecycle</span>
+							<select
+								className={styles.select}
+								value={form.lifecycleState ?? "active"}
+								onChange={(event) =>
+									setForm((prev) => ({
+										...prev,
+										lifecycleState:
+											event.target.value as WorkLedgerLifecycleState,
+									}))
+								}
+							>
+								<option value="planned">planned</option>
+								<option value="active">active</option>
+								<option value="completed">completed</option>
+								<option value="archived">archived</option>
+							</select>
+						</label>
+
+						<label className={styles.field}>
 							<span className={styles.label}>Publish state</span>
 							<select
 								className={styles.select}
@@ -624,6 +721,22 @@ export default function ChangelogRoutePage() {
 							<div className={styles.statLabel}>Visible entries</div>
 						</div>
 						<div className={styles.statCard}>
+							<div className={styles.statValue}>{counts.planned}</div>
+							<div className={styles.statLabel}>Planned</div>
+						</div>
+						<div className={styles.statCard}>
+							<div className={styles.statValue}>{counts.active}</div>
+							<div className={styles.statLabel}>In progress</div>
+						</div>
+						<div className={styles.statCard}>
+							<div className={styles.statValue}>{counts.completed}</div>
+							<div className={styles.statLabel}>Completed</div>
+						</div>
+						<div className={styles.statCard}>
+							<div className={styles.statValue}>{counts.archived}</div>
+							<div className={styles.statLabel}>Archived</div>
+						</div>
+						<div className={styles.statCard}>
 							<div className={styles.statValue}>{counts.draft}</div>
 							<div className={styles.statLabel}>Draft</div>
 						</div>
@@ -659,6 +772,22 @@ export default function ChangelogRoutePage() {
 							/>
 						</label>
 						<label className={styles.field}>
+							<span className={styles.label}>Lifecycle</span>
+							<select
+								className={styles.select}
+								value={filters.lifecycleState ?? "all"}
+								onChange={(event) =>
+									updateSearchParam("lifecycleState", event.target.value || null)
+								}
+							>
+								{LIFECYCLE_STATE_OPTIONS.map((option) => (
+									<option key={option} value={option}>
+										{option}
+									</option>
+								))}
+							</select>
+						</label>
+						<label className={styles.field}>
 							<span className={styles.label}>Publish state</span>
 							<select
 								className={styles.select}
@@ -687,11 +816,34 @@ export default function ChangelogRoutePage() {
 							No work ledger entries matched the current filters.
 						</div>
 					) : (
-						entries.map((entry) => {
+						groupedEntries.map((group) => (
+							<section
+								key={group.lifecycleState}
+								className={styles.lifecycleSection}
+							>
+								<div className={styles.lifecycleSectionHeader}>
+									<Text size="xs" weight="semibold">
+										{group.title}
+									</Text>
+									<Badge
+										color={lifecycleTone(group.lifecycleState)}
+										variant="soft"
+									>
+										{group.entries.length}
+									</Badge>
+								</div>
+								{group.entries.map((entry) => {
 							const publishPayload = buildWorktalePublishPayload(entry);
 							const publishJobs = publishJobsByEntry[entry.id] ?? [];
 							const latestJob = publishJobs[0] ?? null;
-							return (
+							const lifecycleState =
+								entry.lifecycle_state ?? "active";
+							const canPublishFromLifecycle =
+								lifecycleState !== "planned" && lifecycleState !== "archived";
+							const publishBlockedReason = !canPublishFromLifecycle
+								? "Only active or completed entries can be marked ready or published."
+								: null;
+									return (
 								<Panel
 									key={entry.id}
 									variant="default"
@@ -704,6 +856,12 @@ export default function ChangelogRoutePage() {
 												{entry.title}
 											</Text>
 											<div className={styles.entryMeta}>
+												<Badge
+													color={lifecycleTone(lifecycleState)}
+													variant="soft"
+												>
+													{lifecycleState}
+												</Badge>
 												<Badge
 													color={stateTone(entry.publish_state)}
 													variant="soft"
@@ -737,6 +895,7 @@ export default function ChangelogRoutePage() {
 													variant="ghost"
 													size="sm"
 													onClick={() => void updateEntryState(entry, "ready")}
+													disabled={!canPublishFromLifecycle}
 												>
 													Mark ready
 												</Button>
@@ -747,7 +906,10 @@ export default function ChangelogRoutePage() {
 													variant="ghost"
 													size="sm"
 													onClick={() => void handlePublishToWorktale(entry)}
-													disabled={publishEntryId === entry.id}
+													disabled={
+														publishEntryId === entry.id ||
+														!canPublishFromLifecycle
+													}
 													iconRight={<CloudUpload size={14} />}
 												>
 													{publishEntryId === entry.id
@@ -769,6 +931,11 @@ export default function ChangelogRoutePage() {
 											) : null}
 										</div>
 									</div>
+									{publishBlockedReason ? (
+										<div className={styles.publishErrorText}>
+											{publishBlockedReason}
+										</div>
+									) : null}
 
 									<div className={styles.entrySummary}>{entry.summary}</div>
 
@@ -866,8 +1033,10 @@ export default function ChangelogRoutePage() {
 										</div>
 									) : null}
 								</Panel>
-							);
-						})
+									);
+								})}
+							</section>
+						))
 					)}
 				</div>
 			</div>

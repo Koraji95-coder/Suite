@@ -59,32 +59,9 @@
 	color: var(--text-muted);
 }
 
-.crumbButton {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.35rem;
-	padding: 0.2rem 0.35rem;
-	border: 0;
-	border-radius: var(--radius-1);
-	color: inherit;
-	background: transparent;
-	cursor: pointer;
-}
-
-.crumbButton:hover {
-	color: var(--text);
-	background: color-mix(in srgb, var(--surface-2) 60%, transparent);
-}
-
 .crumbCurrent {
 	color: var(--text);
 	font-weight: 600;
-}
-
-.chevron {
-	width: 0.8rem;
-	height: 0.8rem;
-	opacity: 0.5;
 }
 
 .title {
@@ -112,6 +89,18 @@
 	flex-wrap: wrap;
 	gap: var(--space-3);
 	align-items: center;
+}
+
+.queueBadge {
+	font-size: 0.78rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	padding: 0.2rem 0.6rem;
+	border-radius: var(--radius-2);
+	border: 1px solid color-mix(in srgb, var(--line-soft) 80%, transparent);
+	background: color-mix(in srgb, var(--surface) 90%, transparent);
 }
 
 .createButton {
@@ -227,7 +216,7 @@
 
 .statsGrid {
 	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: 0.55rem;
 }
 

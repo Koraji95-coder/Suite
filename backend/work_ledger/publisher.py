@@ -25,6 +25,15 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _normalize_lifecycle_state(entry: Dict[str, Any]) -> str:
+    value = str(entry.get("lifecycle_state") or "").strip().lower()
+    if value in {"planned", "active", "completed", "archived"}:
+        return value
+    if str(entry.get("publish_state") or "").strip().lower() == "published":
+        return "completed"
+    return "active"
+
+
 class WorkLedgerPublisher:
     def __init__(
         self,
@@ -40,12 +49,14 @@ class WorkLedgerPublisher:
         self.logger = logger
 
     def _build_markdown(self, entry: Dict[str, Any], *, workstation_id: str) -> str:
+        lifecycle_state = _normalize_lifecycle_state(entry)
         lines = [
             f"# {str(entry.get('title') or '').strip()}",
             "",
             str(entry.get("summary") or "").strip(),
             "",
             f"- Source: {str(entry.get('source_kind') or 'manual')}",
+            f"- Lifecycle state: {lifecycle_state}",
             f"- Publish state: {str(entry.get('publish_state') or 'draft')}",
             f"- Workstation: {workstation_id}",
             f"- Published at: {_utc_now_iso()}",
@@ -160,6 +171,7 @@ class WorkLedgerPublisher:
             "appArea": str(entry.get("app_area") or "") or None,
             "architecturePaths": _sanitize_lines(entry.get("architecture_paths")),
             "hotspotIds": _sanitize_lines(entry.get("hotspot_ids")),
+            "lifecycleState": _normalize_lifecycle_state(entry),
             "publishState": "published",
             "publisher": "worktale",
             "workstationId": workstation_id,

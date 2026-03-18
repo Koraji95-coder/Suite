@@ -62,6 +62,7 @@ export const PROJECT_CATEGORIES = [
 	{ key: "Substation", color: "#38bdf8" },
 	{ key: "Standards", color: "#ec4899" },
 	{ key: "School", color: "#f59e0b" },
+	{ key: "Other", color: "#94a3b8" },
 ] as const;
 
 /** Convenience type for a single category entry. */

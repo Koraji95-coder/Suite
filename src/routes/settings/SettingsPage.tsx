@@ -1,6 +1,5 @@
-import { Settings as SettingsIcon, Shield } from "lucide-react";
+import { Settings as SettingsIcon } from "lucide-react";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
-import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Heading, Text } from "@/components/primitives/Text";
 import AccountSettings from "./AccountSettings";
@@ -25,22 +24,6 @@ export default function SettingsPage() {
 				</div>
 
 				<Stack gap={4}>
-					<Panel variant="default" padding="md">
-						<HStack gap={2} align="center">
-							<div className={styles.tabIconActive}>
-								<Shield size={14} />
-							</div>
-							<Stack gap={0}>
-								<Text size="lg" weight="semibold">
-									Account
-								</Text>
-								<Text size="sm" color="muted">
-									Profile, passkeys, sessions, and account actions.
-								</Text>
-							</Stack>
-						</HStack>
-					</Panel>
-
 					<AccountSettings />
 				</Stack>
 			</div>

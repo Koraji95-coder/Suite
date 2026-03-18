@@ -68,10 +68,10 @@ export default function AccountSettings() {
 		<Stack gap={4}>
 			<div>
 				<Text size="lg" weight="semibold">
-					Account
+					Identity and trust
 				</Text>
 				<Text size="sm" color="muted">
-					Authentication, identity, and trusted device controls.
+					Authentication, profile, and trusted device controls for this workspace.
 				</Text>
 			</div>
 

@@ -62,6 +62,9 @@ interface EventDialogFieldsProps {
 	setError: (value: string | null) => void;
 }
 
+const NO_PROJECT_VALUE = "__none_project__";
+const NO_TASK_VALUE = "__none_task__";
+
 export function EventDialogFields({
 	projectOptions,
 	filteredTaskOptions,
@@ -93,15 +96,18 @@ export function EventDialogFields({
 	setTaskId,
 	setError,
 }: EventDialogFieldsProps) {
+	const projectSelectValue = projectId ?? NO_PROJECT_VALUE;
+	const taskSelectValue = taskId ?? NO_TASK_VALUE;
+
 	return (
 		<div className={styles.root}>
 			<div className={styles.fieldGroup}>
 				<div className={styles.fieldStack}>
 					<Label htmlFor="project">Project</Label>
 					<Select
-						value={projectId ?? ""}
+						value={projectSelectValue}
 						onValueChange={(value) => {
-							setProjectId(value || null);
+							setProjectId(value === NO_PROJECT_VALUE ? null : value);
 							setTaskId(null);
 						}}
 					>
@@ -109,7 +115,7 @@ export function EventDialogFields({
 							<SelectValue placeholder="No project" />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value="">No project</SelectItem>
+							<SelectItem value={NO_PROJECT_VALUE}>No project</SelectItem>
 							{projectOptions.map((project) => (
 								<SelectItem key={project.id} value={project.id}>
 									{project.name}
@@ -122,14 +128,16 @@ export function EventDialogFields({
 				<div className={styles.fieldStack}>
 					<Label htmlFor="task">Task</Label>
 					<Select
-						value={taskId ?? ""}
-						onValueChange={(value) => setTaskId(value || null)}
+						value={taskSelectValue}
+						onValueChange={(value) =>
+							setTaskId(value === NO_TASK_VALUE ? null : value)
+						}
 					>
 						<SelectTrigger id="task" className={styles.fullWidth}>
 							<SelectValue placeholder="No task" />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value="">No task</SelectItem>
+							<SelectItem value={NO_TASK_VALUE}>No task</SelectItem>
 							{filteredTaskOptions.map((task) => (
 								<SelectItem key={task.id} value={task.id}>
 									{task.name}

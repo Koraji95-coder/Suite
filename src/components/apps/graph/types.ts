@@ -20,8 +20,6 @@ export interface GraphData {
 	links: GraphLink[];
 }
 
-export type ViewMode = "2d" | "3d";
-
 export type SourceFilter = "architecture" | "memory" | "both";
 
 /** Returns a CSS custom-property reference for the given group. */

@@ -3,11 +3,9 @@ import {
 	Expand,
 	Minimize2,
 	Plus,
-	Settings2,
 	Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/primitives/Badge";
 import { IconButton } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
@@ -132,7 +130,6 @@ type WorkflowThinkingEntry = {
 };
 
 export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
-	const navigate = useNavigate();
 	const [profileId, setProfileId] = useState<AgentProfileId>(() => {
 		try {
 			const stored = localStorage.getItem(ACTIVE_AGENT_STORAGE_KEY);
@@ -1408,14 +1405,6 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 							variant="ghost"
 							size="sm"
 							onClick={() => setFocusMode((value) => !value)}
-							className={styles.headerIconButton}
-						/>
-						<IconButton
-							icon={<Settings2 size={16} />}
-							aria-label="Agent settings"
-							variant="ghost"
-							size="sm"
-							onClick={() => navigate("/app/settings")}
 							className={styles.headerIconButton}
 						/>
 					</div>

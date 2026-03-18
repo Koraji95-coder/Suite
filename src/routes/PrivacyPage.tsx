@@ -1,15 +1,6 @@
 // src/routes/PrivacyPage.tsx
 
-import {
-	ArrowRight,
-	ExternalLink,
-	Eye,
-	Lock,
-	Mail,
-	Server,
-	Shield,
-	Trash2,
-} from "lucide-react";
+import { ArrowRight, ExternalLink, Eye, Lock, Mail, Server, Shield, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { APP_NAME } from "@/appMeta";
 import { cn } from "@/lib/utils";
@@ -216,11 +207,6 @@ export default function PrivacyPage() {
             FOOTER LINKS
         ───────────────────────────────────────────────────────────────── */}
 				<HStack gap={4} justify="center" className={styles.footerLinks}>
-					<Link to="/roadmap" className={styles.footerLink}>
-						Roadmap
-						<ExternalLink size={10} />
-					</Link>
-					<span className={styles.footerDivider}>·</span>
 					<Link to="/" className={styles.footerLink}>
 						Home
 						<ExternalLink size={10} />

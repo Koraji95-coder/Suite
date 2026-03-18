@@ -229,6 +229,7 @@ class WorkLedgerStore:
                 "limit": "1",
             },
             payload={
+                "lifecycle_state": "completed",
                 "publish_state": "published",
                 "published_at": published_at,
                 "external_reference": external_reference,

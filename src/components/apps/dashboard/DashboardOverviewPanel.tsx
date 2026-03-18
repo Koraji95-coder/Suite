@@ -1,4 +1,4 @@
-import { ArrowUpRight, LayoutDashboard, RefreshCw } from "lucide-react";
+import { ArrowUpRight, LayoutDashboard } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -19,6 +19,7 @@ import { loadMemories } from "@/lib/agent-memory/service";
 import type { Memory } from "@/lib/agent-memory/types";
 import { buildChangelogSearchParams } from "@/lib/workLedgerNavigation";
 import {
+	type WorkLedgerLifecycleState,
 	type WorkLedgerPublishJobRow,
 	type WorkLedgerPublishState,
 	type WorkLedgerRow,
@@ -59,10 +60,31 @@ type DashboardFocus =
 	| "memory"
 	| "projects";
 
+type DashboardStatusCard = {
+	key: string;
+	label: string;
+	tone: "success" | "warning" | "danger" | "primary";
+	detail: string;
+};
+
 function normalizeLedgerPublishState(
 	value: string | null,
 ): WorkLedgerPublishState | "all" {
 	if (value === "draft" || value === "ready" || value === "published") {
+		return value;
+	}
+	return "all";
+}
+
+function normalizeLedgerLifecycleState(
+	value: string | null,
+): WorkLedgerLifecycleState | "all" {
+	if (
+		value === "planned" ||
+		value === "active" ||
+		value === "completed" ||
+		value === "archived"
+	) {
 		return value;
 	}
 	return "all";
@@ -78,7 +100,7 @@ const TIME_WINDOW_OPTIONS = [
 type FocusPillOption = DashboardFocus | "all";
 
 const FOCUS_PILL_OPTIONS: ReadonlyArray<{ value: FocusPillOption; label: string }> = [
-	{ value: "all", label: "Unified view" },
+	{ value: "all", label: "Overview" },
 	{ value: "watchdog", label: "Watchdog" },
 	{ value: "architecture", label: "Architecture" },
 	{ value: "ledger", label: "Work ledger" },
@@ -118,6 +140,93 @@ function parseDashboardFocus(value: string | null): DashboardFocus | null {
 	}
 }
 
+function isExternalAdvancedPath(pathValue: string): boolean {
+	const normalizedPath = String(pathValue || "")
+		.toLowerCase()
+		.replace(/\\/g, "/");
+	return normalizedPath.startsWith("zeroclaw-main/");
+}
+
+function classifyStatusCard(
+	key: string,
+	label: string,
+	errorMessage: string | null,
+	connectedDetail: string,
+	loadingDetail?: string,
+	isLoading?: boolean,
+): DashboardStatusCard {
+	if (errorMessage) {
+		const normalizedMessage = errorMessage.toLowerCase();
+		if (
+			normalizedMessage.includes("missing `work_ledger_entries`") ||
+			normalizedMessage.includes("table is missing")
+		) {
+			return {
+				key,
+				label,
+				tone: "warning",
+				detail:
+					"Hosted schema is behind the repo. Apply the latest Supabase migration or use the local fallback.",
+			};
+		}
+		if (
+			normalizedMessage.includes("route") &&
+			normalizedMessage.includes("unavailable")
+		) {
+			return {
+				key,
+				label,
+				tone: "danger",
+				detail:
+					"Running backend is behind the repo route set. Restart the API from this checkout.",
+			};
+		}
+		if (
+			normalizedMessage.includes("unreachable") ||
+			normalizedMessage.includes("failed to fetch") ||
+			normalizedMessage.includes("cors")
+		) {
+			return {
+				key,
+				label,
+				tone: "danger",
+				detail:
+					"Frontend cannot reach the current backend target. Check Vite proxy and backend startup.",
+			};
+		}
+		if (normalizedMessage.includes("sign in")) {
+			return {
+				key,
+				label,
+				tone: "warning",
+				detail: "This surface requires an authenticated session before it can load.",
+			};
+		}
+		return {
+			key,
+			label,
+			tone: "warning",
+			detail: errorMessage,
+		};
+	}
+
+	if (isLoading && loadingDetail) {
+		return {
+			key,
+			label,
+			tone: "primary",
+			detail: loadingDetail,
+		};
+	}
+
+	return {
+		key,
+		label,
+		tone: "success",
+		detail: connectedDetail,
+	};
+}
+
 export function DashboardOverviewPanel({
 	onNavigateToProject,
 	onNavigateToProjectsHub,
@@ -155,7 +264,6 @@ export function DashboardOverviewPanel({
 	const [worktaleReadinessError, setWorktaleReadinessError] =
 		useState<string | null>(null);
 	const [telemetryLoading, setTelemetryLoading] = useState(true);
-	const [refreshKey, setRefreshKey] = useState(0);
 	const watchdogSectionRef = useRef<HTMLDivElement | null>(null);
 	const architectureSectionRef = useRef<HTMLDivElement | null>(null);
 	const ledgerSectionRef = useRef<HTMLDivElement | null>(null);
@@ -166,10 +274,14 @@ export function DashboardOverviewPanel({
 	const selectedDomain = (searchParams.get("domain") || "all") as DomainFilter;
 	const selectedAgent = (searchParams.get("agent") || "all") as AgentFilter;
 	const selectedCollectorId = searchParams.get("collector") || "all";
+	const selectedIncludeAdvanced = searchParams.get("includeAdvanced") === "1";
 	const selectedWindowHours = searchParams.get("window") || "24";
 	const selectedFocus = parseDashboardFocus(searchParams.get("focus"));
 	const selectedLedgerPublishState = normalizeLedgerPublishState(
 		searchParams.get("publishState"),
+	);
+	const selectedLedgerLifecycleState = normalizeLedgerLifecycleState(
+		searchParams.get("lifecycleState"),
 	);
 	const searchValue = searchParams.get("query") || "";
 	const query = searchValue.trim().toLowerCase();
@@ -198,7 +310,6 @@ export function DashboardOverviewPanel({
 
 	useEffect(() => {
 		let cancelled = false;
-		const refreshCycle = refreshKey;
 
 		const run = async () => {
 			setTelemetryLoading(true);
@@ -240,12 +351,13 @@ export function DashboardOverviewPanel({
 				loadMemories(),
 				workLedgerService.fetchEntries({
 					projectId,
+					lifecycleState: selectedLedgerLifecycleState,
 					limit: 16,
 				}),
 				workLedgerService.fetchWorktaleReadiness(),
 			]);
 
-			if (cancelled || refreshCycle !== refreshKey) return;
+			if (cancelled) return;
 
 			if (overviewResult.status === "fulfilled") {
 				setWatchdogOverview(overviewResult.value);
@@ -332,7 +444,7 @@ export function DashboardOverviewPanel({
 						result: await workLedgerService.listPublishJobs(entry.id, 1),
 					})),
 				);
-				if (cancelled || refreshCycle !== refreshKey) return;
+				if (cancelled) return;
 				setWorkLedgerJobsByEntry(
 					publishJobResults.reduce<Record<string, WorkLedgerPublishJobRow[]>>(
 						(acc, item) => {
@@ -355,7 +467,12 @@ export function DashboardOverviewPanel({
 		return () => {
 			cancelled = true;
 		};
-	}, [refreshKey, selectedCollectorId, selectedProjectId, selectedWindowMs]);
+	}, [
+		selectedCollectorId,
+		selectedLedgerLifecycleState,
+		selectedProjectId,
+		selectedWindowMs,
+	]);
 
 	useEffect(() => {
 		const focusMap = {
@@ -463,15 +580,25 @@ export function DashboardOverviewPanel({
 	const filteredHotspots = useMemo(
 		() =>
 			ARCHITECTURE_AUTOGEN.hotspots
+				.filter(
+					(hotspot) =>
+						selectedIncludeAdvanced || !isExternalAdvancedPath(hotspot.path),
+				)
 				.filter((hotspot) => includesDomainPath(hotspot.path, selectedDomain))
 				.filter((hotspot) => matchesQuery(query, [hotspot.path]))
 				.slice(0, 6),
-		[query, selectedDomain],
+		[query, selectedDomain, selectedIncludeAdvanced],
 	);
 
 	const filteredFixCandidates = useMemo(
 		() =>
 			ARCHITECTURE_FIX_CANDIDATES.filter((candidate) => {
+				if (
+					!selectedIncludeAdvanced &&
+					candidate.paths.every((pathValue) => isExternalAdvancedPath(pathValue))
+				) {
+					return false;
+				}
 				if (selectedDomain === "all") return true;
 				return candidate.paths.some((pathValue) =>
 					includesDomainPath(pathValue, selectedDomain),
@@ -485,7 +612,7 @@ export function DashboardOverviewPanel({
 					]),
 				)
 				.slice(0, 4),
-		[query, selectedDomain],
+		[query, selectedDomain, selectedIncludeAdvanced],
 	);
 
 	const filteredWorkLedgerEntries = useMemo(
@@ -512,6 +639,12 @@ export function DashboardOverviewPanel({
 					) {
 						return false;
 					}
+					if (
+						selectedLedgerLifecycleState !== "all" &&
+						entry.lifecycle_state !== selectedLedgerLifecycleState
+					) {
+						return false;
+					}
 					return matchesQuery(query, [
 						entry.title,
 						entry.summary,
@@ -527,6 +660,7 @@ export function DashboardOverviewPanel({
 		[
 			query,
 			selectedDomain,
+			selectedLedgerLifecycleState,
 			selectedLedgerPublishState,
 			selectedProjectId,
 			workLedgerEntries,
@@ -619,6 +753,66 @@ export function DashboardOverviewPanel({
 		TIME_WINDOW_OPTIONS.find((option) => option.value === selectedWindowHours)
 			?.label ?? `${selectedWindowHours} hours`;
 
+	const statusCards = useMemo<DashboardStatusCard[]>(
+		() => {
+			const publisherStatusCard = worktaleReadinessError
+				? classifyStatusCard(
+						"publisher",
+						"Worktale publisher",
+						worktaleReadinessError,
+						"Publisher tooling is ready on this workstation.",
+					)
+				: worktaleReadiness?.ready
+					? {
+							key: "publisher",
+							label: "Worktale publisher",
+							tone: "success" as const,
+							detail: "Publisher tooling is ready on this workstation.",
+						}
+					: worktaleReadiness
+						? {
+								key: "publisher",
+								label: "Worktale publisher",
+								tone: "warning" as const,
+								detail:
+									worktaleReadiness.issues[0] ||
+									"Publisher setup is available but still needs bootstrap.",
+							}
+						: {
+								key: "publisher",
+								label: "Worktale publisher",
+								tone: "primary" as const,
+								detail:
+									"Publisher readiness will load after auth and backend routes are available.",
+							};
+
+			return [
+				classifyStatusCard(
+					"watchdog",
+					"Watchdog routes",
+					watchdogError,
+					"Collector sessions, events, and project telemetry are loading from the current backend.",
+					"Refreshing collector sessions and event summaries.",
+					telemetryLoading,
+				),
+				classifyStatusCard(
+					"ledger",
+					"Work Ledger storage",
+					workLedgerError,
+					"Ledger rows are available for roadmap and changelog summaries.",
+				),
+				publisherStatusCard,
+			];
+		},
+		[
+			telemetryLoading,
+			watchdogError,
+			workLedgerError,
+			worktaleReadiness,
+			worktaleReadinessError,
+		],
+	);
+
 	const openChangelog = () => {
 		let rootPath: string | null = null;
 		if (selectedDomain !== "all") {
@@ -631,6 +825,7 @@ export function DashboardOverviewPanel({
 			projectId: selectedProjectId !== "all" ? selectedProjectId : null,
 			query: query ? searchValue : null,
 			path: rootPath,
+			lifecycleState: selectedLedgerLifecycleState,
 			publishState: selectedLedgerPublishState,
 		});
 		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
@@ -640,6 +835,7 @@ export function DashboardOverviewPanel({
 		const next = buildChangelogSearchParams({
 			projectId: entry.project_id,
 			query: entry.external_reference || entry.title,
+			lifecycleState: entry.lifecycle_state,
 			publishState:
 				entry.publish_state === "published" ? "published" : "ready",
 		});
@@ -654,6 +850,7 @@ export function DashboardOverviewPanel({
 			query: entry.title,
 			path: entry.architecture_paths[0] || null,
 			hotspot: entry.hotspot_ids[0] || null,
+			lifecycleState: entry.lifecycle_state,
 			publishState,
 		});
 		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
@@ -668,10 +865,10 @@ export function DashboardOverviewPanel({
 					</div>
 					<div className={styles.heroCopy}>
 						<Badge color="primary" variant="soft" className={styles.kicker}>
-							Command Center
+							Operations overview
 						</Badge>
 						<Heading level={1} className={styles.title}>
-							One dashboard for operations, repo health, and agent context
+							One workspace for operations, repo health, and agent context
 						</Heading>
 						<Text size="sm" color="muted" className={styles.subtitle}>
 							Watchdog telemetry, architecture hotspots, long-term agent memory,
@@ -696,18 +893,32 @@ export function DashboardOverviewPanel({
 					>
 						Project Manager
 					</Button>
-					<Button
-						variant="primary"
-						size="sm"
-						onClick={() => setRefreshKey((value) => value + 1)}
-						iconLeft={<RefreshCw size={14} />}
-					>
-						Refresh
-					</Button>
 				</div>
 			</section>
 
 			<div className={styles.commandFrame}>
+				<section className={styles.statusStrip}>
+					{statusCards.map((card) => (
+						<div key={card.key} className={styles.statusCard}>
+							<div className={styles.statusCardHeader}>
+								<Text size="xs" weight="semibold">
+									{card.label}
+								</Text>
+								<Badge color={card.tone} variant="soft" size="sm">
+									{card.tone === "success"
+										? "ok"
+										: card.tone === "primary"
+											? "loading"
+											: card.tone}
+								</Badge>
+							</div>
+							<Text size="xs" color="muted" className={styles.statusCardDetail}>
+								{card.detail}
+							</Text>
+						</div>
+					))}
+				</section>
+
 				<section className={styles.filterPanel}>
 					<div className={styles.filterHeader}>
 						<div>
@@ -715,17 +926,9 @@ export function DashboardOverviewPanel({
 								Focus filters
 							</Text>
 							<Text size="xs" color="muted">
-								Search across telemetry, architecture, memory, and project data.
+								Filter one command surface instead of jumping across separate pages.
 							</Text>
 						</div>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setRefreshKey((value) => value + 1)}
-							iconLeft={<RefreshCw size={12} />}
-						>
-							Resync
-						</Button>
 					</div>
 
 					<section className={styles.filters}>
@@ -913,7 +1116,15 @@ export function DashboardOverviewPanel({
 						filteredDomains={filteredDomains}
 						filteredHotspots={filteredHotspots}
 						filteredFixCandidates={filteredFixCandidates}
+						includeAdvancedModules={selectedIncludeAdvanced}
+						snapshotGeneratedAt={ARCHITECTURE_AUTOGEN.generatedAt}
 						onDeepDive={() => navigate("/app/apps/graph")}
+						onToggleAdvancedModules={() =>
+							updateFilter(
+								"includeAdvanced",
+								selectedIncludeAdvanced ? "" : "1",
+							)
+						}
 					/>
 
 					<DashboardWorkLedgerSection

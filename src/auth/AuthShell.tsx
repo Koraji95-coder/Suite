@@ -3,6 +3,7 @@ import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { APP_NAME, APP_TAGLINE } from "@/appMeta";
 import { AgentPixelMark } from "@/components/agent/AgentPixelMark";
+import { AGENT_PROFILES } from "@/components/agent/agentProfiles";
 import type { AgentProfileId } from "@/components/agent/agentProfiles";
 import { Button } from "@/components/primitives/Button";
 import { HStack } from "@/components/primitives/Stack";
@@ -25,16 +26,15 @@ const FLOATING_MARKS: {
 	left: string;
 	delay: string;
 }[] = [
-	{ id: "koro", size: 72, top: "20%", left: "50%", delay: "0s" },
-	{ id: "devstral", size: 36, top: "54%", left: "20%", delay: "0.5s" },
-	{ id: "sentinel", size: 32, top: "38%", left: "80%", delay: "1.1s" },
-	{ id: "forge", size: 28, top: "72%", left: "64%", delay: "1.7s" },
+	{ id: "koro", size: 68, top: "22%", left: "50%", delay: "0s" },
+	{ id: "devstral", size: 34, top: "56%", left: "24%", delay: "0.45s" },
+	{ id: "forge", size: 28, top: "72%", left: "68%", delay: "0.95s" },
 ];
 
 const ACCESS_SIGNALS = [
 	{ label: "Session", value: "Passwordless link flow" },
 	{ label: "Protection", value: "Verified redirect + guardrails" },
-	{ label: "Profiles", value: "Agent-ready workspace context" },
+	{ label: "Profiles", value: "Profile-based operations context" },
 ] as const;
 
 export default function AuthShell({
@@ -93,7 +93,7 @@ export default function AuthShell({
 							<div className={styles.leftPanelPattern} />
 
 							<div className={styles.leftPanelContent}>
-								<div className={styles.leftEyebrow}>Agent-ready access</div>
+								<div className={styles.leftEyebrow}>Operations access</div>
 
 								<div className={styles.floatArea}>
 									{FLOATING_MARKS.map((mark) => (
@@ -138,16 +138,6 @@ export default function AuthShell({
 									))}
 								</div>
 
-								<HStack gap={3} className={styles.agentBadgeRow} wrap justify="center">
-									{FLOATING_MARKS.map((mark) => (
-										<div key={mark.id} className={styles.agentBadge}>
-											<AgentPixelMark profileId={mark.id} size={14} detailLevel="hero" />
-											<Text size="xs" color="muted" className={styles.agentName}>
-												{mark.id}
-											</Text>
-										</div>
-									))}
-								</HStack>
 							</div>
 						</section>
 					)}
@@ -162,9 +152,21 @@ export default function AuthShell({
 					>
 						<div className={styles.topAccent} />
 						<div className={styles.rightPanelHeader}>
-							<Text size="xs" color="muted">
-								Workspace authentication
-							</Text>
+							<div>
+								<Text size="xs" color="muted">
+									Workspace authentication
+								</Text>
+								<HStack gap={2} className={styles.agentBadgeRow} wrap>
+									{FLOATING_MARKS.map((mark) => (
+										<div key={mark.id} className={styles.agentBadge}>
+											<AgentPixelMark profileId={mark.id} size={12} detailLevel="hero" />
+											<Text size="xs" color="muted" className={styles.agentName}>
+												{AGENT_PROFILES[mark.id].name}
+											</Text>
+										</div>
+									))}
+								</HStack>
+							</div>
 						</div>
 						<div className={styles.rightPanelBody}>{children}</div>
 					</section>

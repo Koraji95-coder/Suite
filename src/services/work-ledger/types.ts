@@ -1,11 +1,20 @@
 import type { Database } from "@/supabase/database";
 
-export type WorkLedgerRow =
-	Database["public"]["Tables"]["work_ledger_entries"]["Row"];
-export type WorkLedgerInsert =
+type WorkLedgerBaseRow = Database["public"]["Tables"]["work_ledger_entries"]["Row"];
+type WorkLedgerBaseInsert =
 	Database["public"]["Tables"]["work_ledger_entries"]["Insert"];
-export type WorkLedgerUpdate =
+type WorkLedgerBaseUpdate =
 	Database["public"]["Tables"]["work_ledger_entries"]["Update"];
+
+export type WorkLedgerRow = WorkLedgerBaseRow & {
+	lifecycle_state?: WorkLedgerLifecycleState | null;
+};
+export type WorkLedgerInsert = WorkLedgerBaseInsert & {
+	lifecycle_state?: WorkLedgerLifecycleState | null;
+};
+export type WorkLedgerUpdate = WorkLedgerBaseUpdate & {
+	lifecycle_state?: WorkLedgerLifecycleState | null;
+};
 export type WorkLedgerPublishJobRow =
 	Database["public"]["Tables"]["work_ledger_publish_jobs"]["Row"];
 
@@ -18,6 +27,11 @@ export type WorkLedgerSourceKind =
 	| "project";
 
 export type WorkLedgerPublishState = "draft" | "ready" | "published";
+export type WorkLedgerLifecycleState =
+	| "planned"
+	| "active"
+	| "completed"
+	| "archived";
 
 export interface WorkLedgerInput {
 	title: string;
@@ -28,6 +42,7 @@ export interface WorkLedgerInput {
 	appArea?: string | null;
 	architecturePaths?: string[];
 	hotspotIds?: string[];
+	lifecycleState?: WorkLedgerLifecycleState;
 	publishState?: WorkLedgerPublishState;
 	externalReference?: string | null;
 	externalUrl?: string | null;
@@ -36,6 +51,7 @@ export interface WorkLedgerInput {
 export interface WorkLedgerFilters {
 	projectId?: string | null;
 	appArea?: string | null;
+	lifecycleState?: WorkLedgerLifecycleState | "all";
 	publishState?: WorkLedgerPublishState | "all";
 	pathQuery?: string;
 	search?: string;

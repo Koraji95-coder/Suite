@@ -25,6 +25,11 @@ export function ProjectFormModal({
 	setFormData,
 	isEditing,
 }: ProjectFormModalProps) {
+	const safeCategory = PROJECT_CATEGORIES.some(
+		(category) => category.key === formData.category,
+	)
+		? formData.category
+		: "Other";
 	const categoryTone = normalizeProjectCategory(formData.category || null);
 
 	return (
@@ -119,13 +124,15 @@ export function ProjectFormModal({
 							<select
 								id="project-form-category"
 								name="project_form_category"
-								value={formData.category ?? ""}
+								value={safeCategory}
 								onChange={(e) =>
-									setFormData({ ...formData, category: e.target.value })
+									setFormData({
+										...formData,
+										category: e.target.value || "Other",
+									})
 								}
 								className={styles.select}
 							>
-								<option value="">No Category</option>
 								{PROJECT_CATEGORIES.map((c) => (
 									<option key={c.key} value={c.key}>
 										{c.key}
@@ -166,9 +173,11 @@ export function ProjectFormModal({
 											? styles.colorSwatchSubstation
 											: categoryTone === "standards"
 												? styles.colorSwatchStandards
-												: categoryTone === "school"
-													? styles.colorSwatchSchool
-													: styles.colorSwatchGeneric,
+									: categoryTone === "school"
+										? styles.colorSwatchSchool
+										: categoryTone === "other"
+											? styles.colorSwatchOther
+											: styles.colorSwatchGeneric,
 								].join(" ")}
 							/>
 							<span className={styles.previewHint}>

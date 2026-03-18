@@ -11,8 +11,10 @@ export function buildSessionAuthStatus(
 ): StatusDescriptor {
 	return {
 		value:
-			sessionAuthMethod === "passkey" ? "Passkey session" : "Email link session",
-		tone: sessionAuthMethod === "passkey" ? "success" : "muted",
+			sessionAuthMethod === "passkey"
+				? "Passkey-authenticated"
+				: "Authenticated",
+		tone: sessionAuthMethod === "passkey" ? "success" : "primary",
 	};
 }
 
@@ -20,9 +22,8 @@ export function buildPasskeyAuthStatus(
 	sessionAuthMethod: string | null | undefined,
 ): StatusDescriptor {
 	return {
-		value:
-			sessionAuthMethod === "passkey" ? "WebAuthn verified" : "WebAuthn ready",
-		tone: sessionAuthMethod === "passkey" ? "success" : "muted",
+		value: sessionAuthMethod === "passkey" ? "Verified" : "Ready",
+		tone: sessionAuthMethod === "passkey" ? "success" : "accent",
 	};
 }
 
@@ -63,7 +64,7 @@ export function buildAgentGatewayStatus(
 	agentHealthy: boolean | null,
 ): StatusDescriptor {
 	if (agentHealthy === null) {
-		return { value: "Checking", tone: "muted" };
+		return { value: "Checking", tone: "primary" };
 	}
 	return agentHealthy
 		? { value: "Online", tone: "success" }
@@ -79,6 +80,6 @@ export function buildAgentPairingStatus(agentPaired: boolean): StatusDescriptor 
 export function buildAgentModeStatus(usesBroker: boolean): StatusDescriptor {
 	return {
 		value: usesBroker ? "Brokered verification" : "Direct gateway",
-		tone: "muted",
+		tone: usesBroker ? "accent" : "primary",
 	};
 }

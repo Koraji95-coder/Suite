@@ -2,13 +2,14 @@ import { PROJECT_CATEGORIES } from "./projectmanagertypes";
 
 export const categoryColor = (cat: string | null | undefined): string =>
 	PROJECT_CATEGORIES.find((c) => c.key === (cat === "QAQC" ? "Standards" : cat))
-		?.color ?? "#a855f7";
+		?.color ?? "#94a3b8";
 
 export type ProjectCategoryTone =
 	| "coding"
 	| "substation"
 	| "standards"
 	| "school"
+	| "other"
 	| "generic";
 
 export const normalizeProjectCategory = (
@@ -25,6 +26,8 @@ export const normalizeProjectCategory = (
 			return "standards";
 		case "school":
 			return "school";
+		case "other":
+			return "other";
 		default:
 			return "generic";
 	}

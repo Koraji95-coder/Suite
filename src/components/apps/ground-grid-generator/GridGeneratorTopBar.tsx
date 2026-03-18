@@ -1,7 +1,6 @@
 import {
 	Database,
 	FolderKanban,
-	Loader,
 	Plus,
 	Save,
 	Trash2,
@@ -14,6 +13,7 @@ import {
 	SelectTrigger,
 } from "@/components/apps/ui/select";
 import { hexToRgba } from "@/lib/palette";
+import { Progress } from "@/components/primitives/Progress";
 import type { ProjectOption } from "./GridGeneratorPanelModels";
 import styles from "./GridGeneratorTopBar.module.css";
 import type { GridDesign } from "./types";
@@ -114,7 +114,15 @@ export function GridGeneratorTopBar({
 
 			<button onClick={onSaveDesign} disabled={saving} style={btnStyle()}>
 				{saving ? (
-					<Loader size={14} className={styles.spinner} />
+					<Progress
+						className={styles.saveProgress}
+						value={100}
+						size="sm"
+						color="primary"
+						indeterminate
+						animated
+						showValue={false}
+					/>
 				) : (
 					<Save size={14} />
 				)}

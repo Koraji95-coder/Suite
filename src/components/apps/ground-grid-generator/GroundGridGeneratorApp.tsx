@@ -134,14 +134,53 @@ function StatusPill({
 }
 
 function GroundGridGeneratorInner() {
-	const { backendConnected, logs, wsLastUpdate, wsLive } = useGroundGrid();
+	const {
+		backendConnected,
+		logs,
+		wsLastUpdate,
+		wsLive,
+		liveBackendStatus,
+		reconnectBackend,
+	} = useGroundGrid();
 
 	const [activeTab, setActiveTab] = useState<TabId>("generator");
+	const [isReconnecting, setIsReconnecting] = useState(false);
 
 	const wsLiveStamp = useMemo(
 		() => (wsLastUpdate ? new Date(wsLastUpdate).toLocaleTimeString() : "--"),
 		[wsLastUpdate],
 	);
+	const drawingLabel = liveBackendStatus.drawingName
+		? `Drawing: ${liveBackendStatus.drawingName}`
+		: liveBackendStatus.autocadRunning
+			? "Drawing present"
+			: "No drawing open";
+	const autoCadLabel = backendConnected ? drawingLabel : "Offline (start AutoCAD)";
+	const autoCadTitle =
+		liveBackendStatus.error !== null
+			? `Error: ${liveBackendStatus.error}`
+			: liveBackendStatus.drawingName
+				? `Active drawing: ${liveBackendStatus.drawingName}`
+				: "AutoCAD backend status";
+	const wsLabel = wsLive
+		? `Live (${wsLiveStamp})`
+		: wsLastUpdate
+			? `Offline (last ${wsLiveStamp})`
+			: "Offline (awaiting status)";
+	const wsTitle = wsLive
+		? `Last update: ${wsLiveStamp}`
+		: wsLastUpdate
+			? `Last seen: ${wsLiveStamp}`
+			: "Waiting for websocket status updates";
+
+	const handleReconnect = useCallback(async () => {
+		setIsReconnecting(true);
+		try {
+			await reconnectBackend();
+		} finally {
+			setIsReconnecting(false);
+		}
+	}, [reconnectBackend]);
 
 	return (
 		<div className={styles.root}>
@@ -165,16 +204,38 @@ function GroundGridGeneratorInner() {
 						<StatusPill
 							isOk={backendConnected}
 							name="AutoCAD"
-							label={backendConnected ? "Connected" : "Offline"}
+							label={autoCadLabel}
 							icon={<Server size={14} />}
+							title={autoCadTitle}
 						/>
 						<StatusPill
 							isOk={wsLive}
 							name="WebSocket"
-							label={wsLive ? "Live" : "Offline"}
+							label={wsLabel}
 							icon={<Signal size={14} />}
-							title={`Last WebSocket update: ${wsLiveStamp}`}
+							title={wsTitle}
 						/>
+					</div>
+					<div className={styles.statusExtras}>
+						<span className={styles.statusExtraText}>
+							{liveBackendStatus.autocadRunning ? "AutoCAD running" : "AutoCAD idle"} ·{" "}
+							{drawingLabel}
+						</span>
+						<div className={styles.statusExtraActions}>
+							{liveBackendStatus.error ? (
+								<span className={styles.statusError}>
+									{liveBackendStatus.error}
+								</span>
+							) : null}
+							<button
+								type="button"
+								className={styles.reconnectButton}
+								onClick={handleReconnect}
+								disabled={isReconnecting}
+							>
+								{isReconnecting ? "Reconnecting…" : "Reconnect stream"}
+							</button>
+						</div>
 					</div>
 				</div>
 

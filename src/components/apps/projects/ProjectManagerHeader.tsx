@@ -1,12 +1,9 @@
-import { ChevronRight, Home, Plus, Search, Target } from "lucide-react";
+import { Plus, Search, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PanelInfoDialog } from "../../../data/PanelInfoDialog";
-import { projectsInfo } from "../../../data/panelInfo";
 import styles from "./ProjectManagerHeader.module.css";
 import type { StatusFilter } from "./projectmanagertypes";
 
 interface ProjectManagerHeaderProps {
-	currentCrumb: string;
 	statusFilter: StatusFilter;
 	onStatusFilterChange: (status: StatusFilter) => void;
 	projectSearch: string;
@@ -16,12 +13,9 @@ interface ProjectManagerHeaderProps {
 	totalProjects: number;
 	visibleProjectCount: number;
 	onCreateProject: () => void;
-	onGoWorkspace: () => void;
-	onGoProjects: () => void;
 }
 
 export function ProjectManagerHeader({
-	currentCrumb,
 	statusFilter,
 	onStatusFilterChange,
 	projectSearch,
@@ -31,8 +25,6 @@ export function ProjectManagerHeader({
 	totalProjects,
 	visibleProjectCount,
 	onCreateProject,
-	onGoWorkspace,
-	onGoProjects,
 }: ProjectManagerHeaderProps) {
 	const statusOptions: StatusFilter[] = [
 		"active",
@@ -54,26 +46,6 @@ export function ProjectManagerHeader({
 			<div className={styles.stack}>
 				<div className={styles.topRow}>
 					<div className={styles.intro}>
-						<div className={styles.crumbs}>
-							<button
-								type="button"
-								onClick={onGoWorkspace}
-								className={styles.crumbButton}
-							>
-								<Home className={styles.iconSm} />
-								Workspace
-							</button>
-							<ChevronRight className={styles.chevron} />
-							<button
-								type="button"
-								onClick={onGoProjects}
-								className={styles.crumbButton}
-							>
-								Projects
-							</button>
-							<ChevronRight className={styles.chevron} />
-							<span className={styles.crumbCurrent}>{currentCrumb}</span>
-						</div>
 						<div>
 							<p className={styles.eyebrow}>Workspace operations</p>
 							<h2 className={styles.title}>Project Manager</h2>
@@ -81,8 +53,8 @@ export function ProjectManagerHeader({
 								Track workstreams, deadlines, and deliverables in one place.
 							</p>
 							<p className={styles.summary}>
-								{currentFilterLabel} with {visibleProjectCount} visible in the
-								current queue.
+								{currentFilterLabel} with {activeProjects} active and{" "}
+								{archivedProjects} archived projects tracked.
 							</p>
 						</div>
 					</div>
@@ -90,13 +62,13 @@ export function ProjectManagerHeader({
 					<div className={styles.actions}>
 						<button onClick={onCreateProject} className={styles.createButton}>
 							<Plus className={styles.iconSm} />
-							<span>New Project</span>
+							New Project
 						</button>
-						<PanelInfoDialog
-							title={projectsInfo.title}
-							sections={projectsInfo.sections}
-							colorScheme={projectsInfo.colorScheme}
-						/>
+						{visibleProjectCount > 0 ? (
+							<span className={styles.queueBadge}>
+								{visibleProjectCount} in queue
+							</span>
+						) : null}
 					</div>
 				</div>
 
@@ -137,10 +109,6 @@ export function ProjectManagerHeader({
 							/>
 						</div>
 						<div className={styles.statsGrid}>
-							<div className={styles.statCard}>
-								<span className={styles.statLabel}>Visible</span>
-								<strong className={styles.statValue}>{visibleProjectCount}</strong>
-							</div>
 							<div className={styles.statCard}>
 								<span className={styles.statLabel}>Active</span>
 								<strong className={styles.statValue}>{activeProjects}</strong>

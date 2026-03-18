@@ -1,9 +1,31 @@
+import type { LucideIcon } from "lucide-react";
+import {
+	Bot,
+	BookOpen,
+	CalendarDays,
+	CircuitBoard,
+	FolderKanban,
+	Network,
+	Replace,
+	Route,
+	ScanSearch,
+	ShieldCheck,
+	SquareLibrary,
+	Workflow,
+	Wrench,
+} from "lucide-react";
+
+export type AppsCatalogLane = "workspace" | "automation" | "intelligence";
+
 export type AppsCatalogItem = {
 	id: string;
 	title: string;
 	description: string;
 	to?: string;
 	status: "active" | "in-progress" | "coming-soon";
+	icon: LucideIcon;
+	lane: AppsCatalogLane;
+	signal: string;
 };
 
 export const APPS_CATALOG: AppsCatalogItem[] = [
@@ -13,6 +35,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		description: "Manage active and archived project workspaces.",
 		to: "/app/projects",
 		status: "active",
+		icon: FolderKanban,
+		lane: "workspace",
+		signal: "Project ops",
 	},
 	{
 		id: "calendar",
@@ -20,6 +45,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		description: "Schedule events, deadlines, and reminders.",
 		to: "/app/calendar",
 		status: "active",
+		icon: CalendarDays,
+		lane: "workspace",
+		signal: "Scheduling",
 	},
 	{
 		id: "ground-grid",
@@ -28,6 +56,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Coordinates capture backend and interactive generation in one app.",
 		to: "/app/apps/ground-grid-generation",
 		status: "active",
+		icon: Network,
+		lane: "automation",
+		signal: "Field geometry",
 	},
 	{
 		id: "autodraft-studio",
@@ -36,6 +67,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Recognize Bluebeam markups and generate deterministic CAD action plans.",
 		to: "/app/apps/autodraft-studio",
 		status: "active",
+		icon: ScanSearch,
+		lane: "automation",
+		signal: "Markup automation",
 	},
 	{
 		id: "autowire",
@@ -44,6 +78,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Unified conduit/cable routing workspace with terminal workflows, schedule output, and NEC snapshots.",
 		to: "/app/apps/autowire",
 		status: "active",
+		icon: Route,
+		lane: "automation",
+		signal: "Route planning",
 	},
 	{
 		id: "etap-dxf-cleanup",
@@ -52,6 +89,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Trigger ETAPFIX and related AutoCAD cleanup commands through the local bridge.",
 		to: "/app/apps/etap-dxf-cleanup",
 		status: "active",
+		icon: Wrench,
+		lane: "automation",
+		signal: "Cleanup bridge",
 	},
 	{
 		id: "transmittal-builder",
@@ -60,6 +100,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Assemble transmittal packages with contacts and document lists.",
 		to: "/app/apps/transmittal-builder",
 		status: "active",
+		icon: Workflow,
+		lane: "workspace",
+		signal: "Package assembly",
 	},
 	{
 		id: "drawing-list-manager",
@@ -68,6 +111,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Generate, validate, and export structured drawing lists from project files.",
 		to: "/app/apps/drawing-list-manager",
 		status: "active",
+		icon: Replace,
+		lane: "workspace",
+		signal: "Issued sets",
 	},
 	{
 		id: "graph-explorer",
@@ -76,6 +122,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Visualize architecture modules and agent memory graph relationships.",
 		to: "/app/apps/graph",
 		status: "active",
+		icon: CircuitBoard,
+		lane: "intelligence",
+		signal: "Repo graph",
 	},
 	{
 		id: "batch-find-replace",
@@ -84,6 +133,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Run bulk find/replace jobs through the backend bridge with preview support.",
 		to: "/app/apps/batch-find-replace",
 		status: "active",
+		icon: Replace,
+		lane: "automation",
+		signal: "Batch execution",
 	},
 	{
 		id: "standards-checker",
@@ -92,6 +144,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Unified standards validation workflow for engineering deliverables.",
 		to: "/app/apps/standards-checker",
 		status: "active",
+		icon: ShieldCheck,
+		lane: "intelligence",
+		signal: "Standards QA",
 	},
 	{
 		id: "agent",
@@ -100,6 +155,9 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 			"Pair and run profile-based AI workflows with deterministic model routing.",
 		to: "/app/agent",
 		status: "active",
+		icon: Bot,
+		lane: "intelligence",
+		signal: "Agent orchestration",
 	},
 	{
 		id: "knowledge",
@@ -107,11 +165,17 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		description: "Standards, security notes, and implementation docs.",
 		to: "/app/knowledge",
 		status: "active",
+		icon: BookOpen,
+		lane: "intelligence",
+		signal: "Operational memory",
 	},
 	{
 		id: "block-library",
 		title: "Block Library",
 		description: "Central catalog for reusable engineering block assets.",
 		status: "coming-soon",
+		icon: SquareLibrary,
+		lane: "workspace",
+		signal: "Reusable assets",
 	},
 ];

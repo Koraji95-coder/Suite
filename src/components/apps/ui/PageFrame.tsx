@@ -31,23 +31,25 @@ export function PageFrame({
 	return (
 		<div className={cn(styles.root, padded && styles.padded, className)}>
 			<Container size={maxWidth} padded={padded}>
-				{/* Header */}
-				{(title || actions) && (
-					<div className={styles.header}>
-						<Stack gap={1} className={styles.headerText}>
-							{title && <Heading level={1}>{title}</Heading>}
-							{description && (
-								<Text color="muted" size="md">
-									{description}
-								</Text>
-							)}
-						</Stack>
-						{actions && <div className={styles.headerActions}>{actions}</div>}
-					</div>
-				)}
+				<div className={styles.inner}>
+					{(title || actions) && (
+						<div className={styles.header}>
+							<Stack gap={1} className={styles.headerText}>
+								{title && <Heading level={1}>{title}</Heading>}
+								{description && (
+									<Text color="muted" size="md">
+										{description}
+									</Text>
+								)}
+							</Stack>
+							{actions ? (
+								<div className={styles.headerActions}>{actions}</div>
+							) : null}
+						</div>
+					)}
 
-				{/* Content */}
-				{children}
+					<div className={styles.content}>{children}</div>
+				</div>
 			</Container>
 		</div>
 	);

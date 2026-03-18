@@ -5,11 +5,72 @@
 
 .card {
 	display: grid;
-	gap: 0.75rem;
-	border: 1px solid var(--line-soft);
+	gap: 0.9rem;
+	border: 1px solid color-mix(in srgb, var(--line-soft) 92%, transparent);
 	border-radius: var(--radius-4);
-	padding: 1rem;
+	padding: 1rem 1rem 1.05rem;
 	background:
+		radial-gradient(
+			130% 100% at 100% 0%,
+			color-mix(in srgb, var(--primary) 8%, transparent),
+			transparent 64%
+		),
+		linear-gradient(
+			185deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 72%, transparent)
+		),
+		var(--surface);
+	box-shadow: var(--shadow-sm);
+	transition:
+		transform 140ms ease,
+		border-color 140ms ease,
+		box-shadow 140ms ease;
+}
+
+.card:hover {
+	transform: translateY(-2px);
+	border-color: color-mix(in srgb, var(--primary) 32%, var(--line-soft));
+	box-shadow: var(--agent-shadow-soft);
+}
+
+.cardWorkspace {
+	background:
+		radial-gradient(
+			130% 100% at 100% 0%,
+			color-mix(in srgb, var(--primary) 10%, transparent),
+			transparent 64%
+		),
+		linear-gradient(
+			185deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 72%, transparent)
+		),
+		var(--surface);
+}
+
+.cardAutomation {
+	background:
+		radial-gradient(
+			130% 100% at 100% 0%,
+			color-mix(in srgb, var(--accent) 11%, transparent),
+			transparent 64%
+		),
+		linear-gradient(
+			185deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 72%, transparent)
+		),
+		var(--surface);
+}
+
+.cardIntelligence {
+	background:
+		radial-gradient(
+			130% 100% at 100% 0%,
+			color-mix(in srgb, var(--info) 11%, transparent),
+			transparent 64%
+		),
 		linear-gradient(
 			185deg,
 			color-mix(in srgb, var(--surface) 92%, transparent),
@@ -20,27 +81,91 @@
 
 .header {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	justify-content: space-between;
 	gap: 0.75rem;
 }
 
+.identity {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.8rem;
+	min-width: 0;
+}
+
+.iconShell {
+	display: grid;
+	place-items: center;
+	width: 2.65rem;
+	height: 2.65rem;
+	border-radius: var(--radius-3);
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line-soft));
+	background:
+		linear-gradient(
+			145deg,
+			color-mix(in srgb, var(--primary) 18%, transparent),
+			color-mix(in srgb, var(--accent) 12%, transparent)
+		),
+		var(--surface-2);
+	flex-shrink: 0;
+}
+
+.icon {
+	width: 1.15rem;
+	height: 1.15rem;
+	color: var(--text);
+}
+
+.headerCopy {
+	min-width: 0;
+}
+
+.signal {
+	display: inline-flex;
+	margin-bottom: 0.2rem;
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.15em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
 .title {
 	margin: 0;
-	font-size: 1rem;
+	font-size: 1.02rem;
 	font-weight: 700;
 	color: var(--text);
+	letter-spacing: -0.02em;
 }
 
 .status {
 	border: 1px solid var(--line-soft);
 	border-radius: 999px;
-	padding: 0.14rem 0.48rem;
+	padding: 0.16rem 0.52rem;
 	font-size: 10px;
 	font-weight: 700;
-	letter-spacing: 0.08em;
+	letter-spacing: 0.1em;
 	text-transform: uppercase;
 	color: var(--text-muted);
+	background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+}
+
+.statusActive {
+	border-color: color-mix(in srgb, var(--success) 34%, var(--line-soft));
+	color: var(--success);
+	background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.statusInProgress {
+	border-color: color-mix(in srgb, var(--accent) 34%, var(--line-soft));
+	color: var(--accent);
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.statusComingSoon {
+	border-color: color-mix(in srgb, var(--secondary) 36%, var(--line-soft));
+	color: var(--secondary);
+	background: color-mix(in srgb, var(--secondary) 12%, transparent);
 }
 
 .description {
@@ -50,11 +175,30 @@
 	color: var(--text-muted);
 }
 
+.metaRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+}
+
+.metaItem {
+	display: inline-flex;
+	align-items: center;
+	min-height: 1.9rem;
+	padding: 0.26rem 0.55rem;
+	border-radius: 999px;
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-2) 85%, transparent);
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+
 .actionLink,
 .actionDisabled {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	gap: 0.45rem;
 	border-radius: var(--radius-2);
 	border: 1px solid var(--line-soft);
 	padding: 0.62rem 0.85rem;
@@ -74,6 +218,11 @@
 .actionLink:hover {
 	background: var(--surface-2);
 	border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+}
+
+.actionIcon {
+	width: 0.92rem;
+	height: 0.92rem;
 }
 
 .actionDisabled {

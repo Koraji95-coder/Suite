@@ -1,0 +1,13 @@
+.routeFrame {
+	background:
+		radial-gradient(
+			140% 200% at 100% -28%,
+			color-mix(in srgb, var(--primary) 8%, transparent) 0%,
+			transparent 58%
+		),
+		radial-gradient(
+			130% 180% at -12% 120%,
+			color-mix(in srgb, var(--accent) 7%, transparent) 0%,
+			transparent 62%
+		);
+}

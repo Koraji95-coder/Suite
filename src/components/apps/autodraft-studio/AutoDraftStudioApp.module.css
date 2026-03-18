@@ -4,6 +4,20 @@
 	color: var(--text);
 }
 
+.eyebrow {
+	margin: 0;
+	font-size: 0.66rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--primary);
+}
+
+.sectionHeader {
+	display: grid;
+	gap: 0.3rem;
+}
+
 .headerPanel {
 	background:
 		radial-gradient(
@@ -36,6 +50,40 @@
 .statusCard {
 	display: grid;
 	gap: var(--space-2);
+}
+
+.commandStrip {
+	display: grid;
+	grid-template-columns: 1.2fr 1fr;
+	gap: var(--space-3);
+	border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
+	background:
+		radial-gradient(
+			130% 180% at 100% -30%,
+			color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+			transparent 54%
+		),
+		color-mix(in srgb, var(--surface-2) 72%, transparent);
+}
+
+.commandCopy {
+	display: grid;
+	gap: 0.28rem;
+}
+
+.commandStats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-2);
+}
+
+.commandStat {
+	display: grid;
+	gap: 0.2rem;
+	padding: 0.7rem 0.75rem;
+	border: 1px solid color-mix(in srgb, var(--line-soft) 80%, transparent);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--surface) 62%, transparent);
 }
 
 .tabBar {
@@ -74,6 +122,10 @@
 .tabActive {
 	color: var(--primary);
 	border-bottom-color: var(--primary);
+}
+
+.contentShell {
+	padding: 0.2rem 0;
 }
 
 .threeCol {
@@ -202,9 +254,32 @@
 	border-top: 1px solid var(--border);
 }
 
+.compareSection {
+	display: grid;
+	gap: var(--space-2);
+	padding: var(--space-3);
+	border: 1px solid color-mix(in srgb, var(--line-soft) 82%, transparent);
+	border-radius: var(--radius-3);
+	background:
+		radial-gradient(
+			140% 180% at 100% -30%,
+			color-mix(in srgb, var(--primary) 14%, transparent) 0%,
+			transparent 58%
+		),
+		color-mix(in srgb, var(--surface) 68%, transparent);
+}
+
 .demoPanel {
 	display: grid;
 	gap: var(--space-2);
+	border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+	background:
+		radial-gradient(
+			140% 180% at 100% -30%,
+			color-mix(in srgb, var(--accent) 14%, transparent) 0%,
+			transparent 56%
+		),
+		color-mix(in srgb, var(--surface-2) 74%, transparent);
 }
 
 .comparePanel {
@@ -575,6 +650,14 @@
 }
 
 @media (max-width: 1120px) {
+	.commandStrip {
+		grid-template-columns: 1fr;
+	}
+
+	.commandStats {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
 	.statusGrid,
 	.threeCol,
 	.metricsGrid {
@@ -599,6 +682,10 @@
 }
 
 @media (max-width: 760px) {
+	.commandStats {
+		grid-template-columns: 1fr;
+	}
+
 	.headerRow {
 		flex-direction: column;
 	}

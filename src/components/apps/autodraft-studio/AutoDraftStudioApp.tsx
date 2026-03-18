@@ -37,11 +37,31 @@ import { AutoDraftComparePanel } from "./AutoDraftComparePanel";
 
 type TabId = "architecture" | "rules" | "pipeline" | "training";
 
-const TABS: Array<{ id: TabId; label: string; icon: string }> = [
-	{ id: "architecture", label: "Architecture", icon: "\u{25C6}" },
-	{ id: "rules", label: "Rule Library", icon: "\u{2699}" },
-	{ id: "pipeline", label: "Pipeline", icon: "\u{25B8}" },
-	{ id: "training", label: "Training Path", icon: "\u{25CE}" },
+const TABS: Array<{ id: TabId; label: string; icon: string; hint: string }> = [
+	{
+		id: "architecture",
+		label: "Architecture",
+		icon: "\u{25C6}",
+		hint: "Service boundaries, migration lanes, and geometry translation status.",
+	},
+	{
+		id: "rules",
+		label: "Rule Library",
+		icon: "\u{2699}",
+		hint: "Deterministic markup-to-action rules with confidence and triggers.",
+	},
+	{
+		id: "pipeline",
+		label: "Pipeline",
+		icon: "\u{25B8}",
+		hint: "End-to-end workflow from Bluebeam markup extraction to CAD execution.",
+	},
+	{
+		id: "training",
+		label: "Training Path",
+		icon: "\u{25CE}",
+		hint: "Local model evolution path for markup and replacement learning.",
+	},
 ];
 
 const DEMO_MARKUPS = [
@@ -157,6 +177,7 @@ export function AutoDraftStudioApp() {
 	const [loadingBackcheck, setLoadingBackcheck] = useState(false);
 	const [loadingCrewReview, setLoadingCrewReview] = useState(false);
 	const [loadingHealth, setLoadingHealth] = useState(false);
+	const activeTabConfig = TABS.find((tab) => tab.id === activeTab) ?? TABS[0];
 
 	const translatedGeometryStats = useMemo(() => {
 		const arcResult = detectArcsFromSegments(DEMO_SEGMENTS, {
@@ -467,6 +488,44 @@ export function AutoDraftStudioApp() {
 				</div>
 			</Panel>
 
+			<Panel variant="inset" padding="md" className={styles.commandStrip}>
+				<div className={styles.commandCopy}>
+					<p className={styles.eyebrow}>AutoDraft command center</p>
+					<Text size="sm" weight="semibold">
+						{activeTabConfig.label} lane
+					</Text>
+					<Text size="xs" color="muted">
+						{activeTabConfig.hint}
+					</Text>
+				</div>
+				<div className={styles.commandStats}>
+					<div className={styles.commandStat}>
+						<Text size="xs" color="muted">
+							Rules loaded
+						</Text>
+						<Text size="sm" weight="semibold">
+							{rules.length}
+						</Text>
+					</div>
+					<div className={styles.commandStat}>
+						<Text size="xs" color="muted">
+							Pipeline stages
+						</Text>
+						<Text size="sm" weight="semibold">
+							{PIPELINE_STEPS.length}
+						</Text>
+					</div>
+					<div className={styles.commandStat}>
+						<Text size="xs" color="muted">
+							Training phases
+						</Text>
+						<Text size="sm" weight="semibold">
+							{TRAINING_PHASES.length}
+						</Text>
+					</div>
+				</div>
+			</Panel>
+
 			<div className={styles.tabBar} role="tablist" aria-label="AutoDraft tabs">
 				{TABS.map((tab) => (
 					<button
@@ -484,7 +543,7 @@ export function AutoDraftStudioApp() {
 			</div>
 
 			{activeTab === "architecture" && (
-				<Stack gap={4}>
+				<Stack gap={4} className={styles.contentShell}>
 					<div className={styles.threeCol}>
 						{MIGRATION_BREAKDOWN.map((item) => (
 							<Panel
@@ -544,7 +603,7 @@ export function AutoDraftStudioApp() {
 			)}
 
 			{activeTab === "rules" && (
-				<Stack gap={3}>
+				<Stack gap={3} className={styles.contentShell}>
 					{rules.map((rule) => {
 						const open = expandedRule === rule.id;
 						const examples = Array.isArray(rule.examples) ? rule.examples : [];
@@ -599,7 +658,7 @@ export function AutoDraftStudioApp() {
 			)}
 
 			{activeTab === "pipeline" && (
-				<div className={styles.timeline}>
+				<div className={`${styles.timeline} ${styles.contentShell}`}>
 					{PIPELINE_STEPS.map((step) => (
 						<div key={step.step} className={styles.timelineRow}>
 							<div className={styles.timelineBadge}>{step.step}</div>
@@ -627,7 +686,7 @@ export function AutoDraftStudioApp() {
 			)}
 
 			{activeTab === "training" && (
-				<Stack gap={3}>
+				<Stack gap={3} className={styles.contentShell}>
 					{TRAINING_PHASES.map((phase, index) => {
 						const open = expandedPhase === index;
 						return (
@@ -659,48 +718,60 @@ export function AutoDraftStudioApp() {
 				</Stack>
 			)}
 
-			<AutoDraftComparePanel />
+			<section className={styles.compareSection}>
+				<div className={styles.sectionHeader}>
+					<p className={styles.eyebrow}>Compare operations</p>
+					<Text size="sm" color="muted">
+						Run calibrated compare reviews, submit markup feedback, and train
+						local replacement intelligence.
+					</Text>
+				</div>
+				<AutoDraftComparePanel />
+			</section>
 
 			<Panel variant="inset" padding="md" className={styles.demoPanel}>
-				<HStack gap={2} align="center" justify="between">
-					<Text size="sm" weight="semibold">
-						Demo Plan + Execute
-					</Text>
-					<div className={styles.demoActions}>
-						<Button
-							variant="primary"
-							size="sm"
-							onClick={() => void runDemoPlan()}
-							loading={loadingPlan}
-						>
-							Run sample markups
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => void runDemoBackcheck()}
-							loading={loadingBackcheck}
-						>
-							Run backcheck
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => void runCadCrewReview()}
-							loading={loadingCrewReview}
-						>
-							Run CAD crew review
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => void runDemoExecuteDryRun()}
-							loading={loadingExecute}
-						>
-							Execute dry run
-						</Button>
-					</div>
-				</HStack>
+				<div className={styles.sectionHeader}>
+					<p className={styles.eyebrow}>Pipeline simulation</p>
+					<HStack gap={2} align="center" justify="between">
+						<Text size="sm" weight="semibold">
+							Demo Plan + Execute
+						</Text>
+						<div className={styles.demoActions}>
+							<Button
+								variant="primary"
+								size="sm"
+								onClick={() => void runDemoPlan()}
+								loading={loadingPlan}
+							>
+								Run sample markups
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => void runDemoBackcheck()}
+								loading={loadingBackcheck}
+							>
+								Run backcheck
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => void runCadCrewReview()}
+								loading={loadingCrewReview}
+							>
+								Run CAD crew review
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => void runDemoExecuteDryRun()}
+								loading={loadingExecute}
+							>
+								Execute dry run
+							</Button>
+						</div>
+					</HStack>
+				</div>
 				{planResult ? (
 					<div className={styles.planSummary}>
 						<Text size="xs" color="muted">

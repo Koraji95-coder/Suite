@@ -1,0 +1,38 @@
+.toolbar {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.zoomControls {
+	display: flex;
+	gap: 2px;
+	margin-left: auto;
+	align-items: center;
+}
+
+.zoomValue {
+	font-size: 9px;
+	align-self: center;
+	min-width: 30px;
+	text-align: center;
+}
+
+.startHint {
+	font-size: 10px;
+	color: #f59e0b;
+	font-weight: 600;
+	padding: 0 4px;
+}
+
+.inputRowWrap {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.inputLabel {
+	font-weight: 600;
+	min-width: 24px;
+}

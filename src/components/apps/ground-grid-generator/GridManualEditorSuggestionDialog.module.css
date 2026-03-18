@@ -14,3 +14,25 @@
 		justify-content: flex-end;
 	}
 }
+
+.fieldColumn {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.fieldRow {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.fieldLabel {
+	font-size: 11px;
+	width: 24px;
+}
+
+.fieldInput {
+	flex: 1;
+	min-width: 0;
+}

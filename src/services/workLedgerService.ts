@@ -1,397 +1,65 @@
-import type { RealtimeChannel } from "@supabase/supabase-js";
-import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
-import type { Database } from "@/supabase/database";
-import { isSupabaseConfigured, safeSupabaseQuery } from "@/supabase/utils";
+import { safeSupabaseQuery } from "@/supabase/utils";
 
-export type WorkLedgerRow =
-	Database["public"]["Tables"]["work_ledger_entries"]["Row"];
-export type WorkLedgerInsert =
-	Database["public"]["Tables"]["work_ledger_entries"]["Insert"];
-export type WorkLedgerUpdate =
-	Database["public"]["Tables"]["work_ledger_entries"]["Update"];
-export type WorkLedgerPublishJobRow =
-	Database["public"]["Tables"]["work_ledger_publish_jobs"]["Row"];
+export type {
+	WorkLedgerFilters,
+	WorkLedgerInput,
+	WorkLedgerInsert,
+	WorkLedgerPublishJobRow,
+	WorkLedgerPublishResult,
+	WorkLedgerPublishState,
+	WorkLedgerOpenArtifactFolderResult,
+	WorkLedgerRow,
+	WorkLedgerUpdate,
+	WorktalePublishPayload,
+	WorktaleReadinessResponse,
+} from "./work-ledger/types";
 
-export type WorkLedgerSourceKind =
-	| "manual"
-	| "git_checkpoint"
-	| "agent_run"
-	| "watchdog"
-	| "architecture"
-	| "project";
-
-export type WorkLedgerPublishState = "draft" | "ready" | "published";
-
-export interface WorkLedgerInput {
-	title: string;
-	summary: string;
-	sourceKind?: WorkLedgerSourceKind;
-	commitRefs?: string[];
-	projectId?: string | null;
-	appArea?: string | null;
-	architecturePaths?: string[];
-	hotspotIds?: string[];
-	publishState?: WorkLedgerPublishState;
-	externalReference?: string | null;
-	externalUrl?: string | null;
-}
-
-export interface WorkLedgerFilters {
-	projectId?: string | null;
-	appArea?: string | null;
-	publishState?: WorkLedgerPublishState | "all";
-	pathQuery?: string;
-	search?: string;
-	limit?: number;
-}
-
-export interface WorktalePublishPayload {
-	title: string;
-	summary: string;
-	markdown: string;
-	json: Record<string, unknown>;
-}
-
-export interface WorktaleReadinessChecks {
-	cliInstalled: boolean;
-	cliPath: string;
-	repoPath: string;
-	repoExists: boolean;
-	gitRepository: boolean;
-	gitEmailConfigured: boolean;
-	gitEmail: string;
-	bootstrapped: boolean;
-}
-
-export interface WorktaleReadinessResponse {
-	ok: boolean;
-	publisher: "worktale";
-	workstationId: string;
-	ready: boolean;
-	checks: WorktaleReadinessChecks;
-	issues: string[];
-	recommendedActions: string[];
-}
-
-export interface WorkLedgerPublishResult {
-	ok: boolean;
-	entry: WorkLedgerRow;
-	job: WorkLedgerPublishJobRow;
-	artifacts: {
-		artifactDir: string;
-		markdownPath: string;
-		jsonPath: string;
-	};
-	publisher: "worktale";
-	workstationId: string;
-	ready: boolean;
-	checks: WorktaleReadinessChecks;
-	issues: string[];
-	recommendedActions: string[];
-}
-
-export interface WorkLedgerOpenArtifactFolderResult {
-	ok: boolean;
-	entryId: string;
-	jobId: string;
-	artifactDir: string;
-}
+import type {
+	WorkLedgerFilters,
+	WorkLedgerInput,
+	WorkLedgerInsert,
+	WorkLedgerPublishJobRow,
+	WorkLedgerPublishResult,
+	WorkLedgerOpenArtifactFolderResult,
+	WorkLedgerRow,
+	WorkLedgerUpdate,
+	WorktalePublishPayload,
+	WorktaleReadinessResponse,
+} from "./work-ledger/types";
+import {
+	buildLocalEntry,
+	filterEntries,
+	readLocalEntries,
+	writeLocalEntries,
+} from "./work-ledger/local";
+import { getCurrentUserId, requestWorkLedgerApi } from "./work-ledger/api";
+import { sanitizeArray } from "./work-ledger/helpers";
+import {
+	startRealtimeEntryListener,
+	stopRealtimeIfIdle,
+} from "./work-ledger/realtime";
+import { buildWorktalePublishPayload as buildPayload } from "./work-ledger/payload";
 
 type WorkLedgerListener = (entry: WorkLedgerRow) => void;
 
-const LOCAL_STORAGE_KEY = "suite:work-ledger:local";
 const listeners = new Set<WorkLedgerListener>();
-let realtimeChannel: RealtimeChannel | null = null;
-let realtimeUserId: string | null = null;
-let warnedMissingUser = false;
-
-const createId = () =>
-	typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `work-ledger-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 function emit(entry: WorkLedgerRow) {
 	listeners.forEach((listener) => listener(entry));
 }
 
-async function getCurrentUserId(): Promise<string | null> {
-	const {
-		data: { user },
-		error,
-	} = await supabase.auth.getUser();
-	if (error || !user) {
-		if (!warnedMissingUser) {
-			logger.warn("WorkLedgerService", "Missing authenticated user", { error });
-			warnedMissingUser = true;
-		}
-		return null;
-	}
-	warnedMissingUser = false;
-	return user.id;
-}
-
-async function getSupabaseAccessToken(): Promise<string | null> {
-	try {
-		const {
-			data: { session },
-			error,
-		} = await supabase.auth.getSession();
-		if (error || !session?.access_token) return null;
-		return String(session.access_token);
-	} catch {
-		return null;
-	}
-}
-
-async function parseApiError(response: Response): Promise<string> {
-	try {
-		const payload = (await response.json()) as unknown;
-		if (payload && typeof payload === "object") {
-			const value = String(
-				(payload as Record<string, unknown>).error ||
-					(payload as Record<string, unknown>).message ||
-					"",
-			).trim();
-			if (value) return value;
-		}
-	} catch {
-		// No-op; fallback to raw response text.
-	}
-	const text = await response.text().catch(() => "");
-	return text || `HTTP ${response.status}`;
-}
-
-async function requestWorkLedgerApi(
-	path: string,
-	init: RequestInit = {},
-): Promise<unknown> {
-	const accessToken = await getSupabaseAccessToken();
-	const headers = new Headers(init.headers || {});
-	if (!headers.has("Content-Type")) {
-		headers.set("Content-Type", "application/json");
-	}
-	if (accessToken) {
-		headers.set("Authorization", `Bearer ${accessToken}`);
-	}
-	const response = await fetch(path, {
-		...init,
-		headers,
-		credentials: "include",
-	});
-	if (!response.ok) {
-		throw new Error(await parseApiError(response));
-	}
-	return (await response.json()) as unknown;
-}
-
-function sanitizeArray(values: string[] | undefined): string[] {
-	return (values ?? []).map((value) => String(value || "").trim()).filter(Boolean);
-}
-
-function normalizeSearch(value: string | undefined | null) {
-	return String(value || "").trim().toLowerCase();
-}
-
-function readLocalEntries(): WorkLedgerRow[] {
-	if (typeof localStorage === "undefined") return [];
-	try {
-		const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-		if (!raw) return [];
-		const parsed = JSON.parse(raw) as unknown;
-		if (!Array.isArray(parsed)) return [];
-		return parsed.filter((entry) => entry && typeof entry === "object") as WorkLedgerRow[];
-	} catch {
-		return [];
-	}
-}
-
-function writeLocalEntries(entries: WorkLedgerRow[]) {
-	if (typeof localStorage === "undefined") return;
-	try {
-		localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
-	} catch (error) {
-		logger.warn("WorkLedgerService", "Unable to persist local work ledger", {
-			error,
-		});
-	}
-}
-
-function buildLocalEntry(
-	input: WorkLedgerInput,
-	userId: string | null,
-): WorkLedgerRow {
-	const timestamp = new Date().toISOString();
-	return {
-		id: createId(),
-		title: String(input.title || "").trim(),
-		summary: String(input.summary || "").trim(),
-		source_kind: input.sourceKind ?? "manual",
-		commit_refs: sanitizeArray(input.commitRefs),
-		project_id: input.projectId ?? null,
-		app_area: String(input.appArea || "").trim() || null,
-		architecture_paths: sanitizeArray(input.architecturePaths),
-		hotspot_ids: sanitizeArray(input.hotspotIds),
-		publish_state: input.publishState ?? "draft",
-		published_at: null,
-		external_reference: String(input.externalReference || "").trim() || null,
-		external_url: String(input.externalUrl || "").trim() || null,
-		user_id: userId ?? "local",
-		created_at: timestamp,
-		updated_at: timestamp,
-	};
-}
-
-function filterEntries(entries: WorkLedgerRow[], filters?: WorkLedgerFilters) {
-	const search = normalizeSearch(filters?.search);
-	const pathQuery = normalizeSearch(filters?.pathQuery);
-
-	return [...entries]
-		.filter((entry) =>
-			!filters?.projectId ? true : entry.project_id === filters.projectId,
-		)
-		.filter((entry) =>
-			!filters?.appArea ? true : entry.app_area === filters.appArea,
-		)
-		.filter((entry) =>
-			!filters?.publishState || filters.publishState === "all"
-				? true
-				: entry.publish_state === filters.publishState,
-		)
-		.filter((entry) =>
-			!pathQuery
-				? true
-				: entry.architecture_paths.some((pathValue) =>
-						pathValue.toLowerCase().includes(pathQuery),
-					) || entry.hotspot_ids.some((hotspotId) =>
-						hotspotId.toLowerCase().includes(pathQuery),
-					),
-		)
-		.filter((entry) =>
-			!search
-				? true
-				: [entry.title, entry.summary, entry.app_area, entry.external_reference]
-						.map((value) => String(value || "").toLowerCase())
-						.some((value) => value.includes(search)) ||
-					entry.commit_refs.some((value) =>
-						value.toLowerCase().includes(search),
-					) ||
-					entry.architecture_paths.some((value) =>
-						value.toLowerCase().includes(search),
-					) ||
-					entry.hotspot_ids.some((value) =>
-						value.toLowerCase().includes(search),
-					),
-		)
-		.sort((left, right) => right.updated_at.localeCompare(left.updated_at))
-		.slice(0, Math.max(1, filters?.limit ?? 12));
-}
-
-async function startRealtime() {
-	if (!isSupabaseConfigured()) return;
-	const userId = await getCurrentUserId();
-	if (!userId) return;
-
-	if (realtimeChannel && realtimeUserId === userId) return;
-
-	if (realtimeChannel) {
-		supabase.removeChannel(realtimeChannel);
-		realtimeChannel = null;
-	}
-
-	realtimeUserId = userId;
-	realtimeChannel = supabase
-		.channel(`work_ledger_entries:${userId}`)
-		.on(
-			"postgres_changes",
-			{
-				event: "*",
-				schema: "public",
-				table: "work_ledger_entries",
-				filter: `user_id=eq.${userId}`,
-			},
-			(payload) => {
-				if (payload.new && typeof payload.new === "object") {
-					emit(payload.new as WorkLedgerRow);
-				}
-			},
-		)
-		.subscribe((status) => {
-			if (status === "CHANNEL_ERROR") {
-				logger.warn("WorkLedgerService", "Realtime channel error");
-			}
-		});
-}
-
-function stopRealtimeIfIdle() {
-	if (listeners.size > 0 || !realtimeChannel) return;
-	supabase.removeChannel(realtimeChannel);
-	realtimeChannel = null;
-	realtimeUserId = null;
-}
-
-export function buildWorktalePublishPayload(entry: WorkLedgerRow): WorktalePublishPayload {
-	const lines = [
-		`# ${entry.title}`,
-		"",
-		entry.summary,
-		"",
-		`- Source: ${entry.source_kind}`,
-		`- Publish state: ${entry.publish_state}`,
-	];
-
-	if (entry.project_id) {
-		lines.push(`- Project: ${entry.project_id}`);
-	}
-	if (entry.app_area) {
-		lines.push(`- App area: ${entry.app_area}`);
-	}
-	if (entry.commit_refs.length > 0) {
-		lines.push(`- Commits: ${entry.commit_refs.join(", ")}`);
-	}
-	if (entry.architecture_paths.length > 0) {
-		lines.push(`- Paths: ${entry.architecture_paths.join(", ")}`);
-	}
-	if (entry.hotspot_ids.length > 0) {
-		lines.push(`- Hotspots: ${entry.hotspot_ids.join(", ")}`);
-	}
-	if (entry.external_reference) {
-		lines.push(`- External reference: ${entry.external_reference}`);
-	}
-	if (entry.external_url) {
-		lines.push(`- External URL: ${entry.external_url}`);
-	}
-
-	return {
-		title: entry.title,
-		summary: entry.summary,
-		markdown: lines.join("\n"),
-		json: {
-			id: entry.id,
-			title: entry.title,
-			summary: entry.summary,
-			sourceKind: entry.source_kind,
-			commitRefs: entry.commit_refs,
-			projectId: entry.project_id,
-			appArea: entry.app_area,
-			architecturePaths: entry.architecture_paths,
-			hotspotIds: entry.hotspot_ids,
-			publishState: entry.publish_state,
-			publishedAt: entry.published_at,
-			externalReference: entry.external_reference,
-			externalUrl: entry.external_url,
-			updatedAt: entry.updated_at,
-		},
-	};
-}
+export const buildWorktalePublishPayload: (
+	entry: WorkLedgerRow,
+) => WorktalePublishPayload = buildPayload;
 
 export const workLedgerService = {
 	subscribe(listener: WorkLedgerListener) {
 		listeners.add(listener);
-		void startRealtime();
+		void startRealtimeEntryListener(emit, getCurrentUserId);
 		return () => {
 			listeners.delete(listener);
-			stopRealtimeIfIdle();
+			stopRealtimeIfIdle(() => listeners.size > 0);
 		};
 	},
 
@@ -691,7 +359,10 @@ export const workLedgerService = {
 		}
 		try {
 			const payload = (await requestWorkLedgerApi(
-				`/api/work-ledger/entries/${encodeURIComponent(normalizedId)}/publish-jobs?limit=${Math.max(1, Math.min(200, Math.trunc(limit || 12)))}`,
+				`/api/work-ledger/entries/${encodeURIComponent(normalizedId)}/publish-jobs?limit=${Math.max(
+					1,
+					Math.min(200, Math.trunc(limit || 12)),
+				)}`,
 				{ method: "GET" },
 			)) as { jobs?: WorkLedgerPublishJobRow[] };
 			return {
@@ -730,7 +401,9 @@ export const workLedgerService = {
 		}
 		try {
 			const payload = (await requestWorkLedgerApi(
-				`/api/work-ledger/entries/${encodeURIComponent(normalizedEntryId)}/publish-jobs/${encodeURIComponent(normalizedJobId)}/open-artifact-folder`,
+				`/api/work-ledger/entries/${encodeURIComponent(normalizedEntryId)}/publish-jobs/${encodeURIComponent(
+					normalizedJobId,
+				)}/open-artifact-folder`,
 				{ method: "POST" },
 			)) as WorkLedgerOpenArtifactFolderResult;
 			return {

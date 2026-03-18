@@ -8,6 +8,7 @@ import { hexToRgba } from "@/lib/palette";
 import type { EditorMode } from "./GridManualEditorModels";
 import { placementKey } from "./GridManualEditorModels";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
+import styles from "./GridManualEditorCanvas.module.css";
 
 interface GridManualEditorCanvasProps {
 	svgRef: MutableRefObject<SVGSVGElement | null>;
@@ -67,22 +68,16 @@ export function GridManualEditorCanvas({
 
 	return (
 		<div
+			className={styles.canvasWrapper}
 			style={{
-				minHeight: 300,
-				borderRadius: 8,
 				border: `1px solid ${hexToRgba(primaryColor, 0.15)}`,
-				overflow: "hidden",
-				position: "relative",
-				flexShrink: 0,
-				height: 350,
 			}}
 		>
 			<svg
 				ref={svgRef}
 				viewBox={viewBox}
+				className={styles.canvasSvg}
 				style={{
-					width: "100%",
-					height: "100%",
 					background: hexToRgba(backgroundColor, 0.5),
 					cursor: selectionCursor,
 				}}
@@ -108,12 +103,12 @@ export function GridManualEditorCanvas({
 							style={pointerStyle}
 						/>
 						<text
+							className={styles.pointerText}
 							x={(c.x1 + c.x2) / 2}
 							y={(c.y1 + c.y2) / 2 - rodScale * 1}
 							fontSize={rodScale * 0.8}
 							fill={selectedConductor === i ? "#fff" : mutedTextColor}
 							textAnchor="middle"
-							style={{ pointerEvents: "none" }}
 						>
 							{c.label}
 						</text>
@@ -158,12 +153,12 @@ export function GridManualEditorCanvas({
 							strokeWidth={rodScale * 0.15}
 						/>
 						<text
+							className={styles.pointerText}
 							x={r.grid_x}
 							y={r.grid_y - rodScale * 1.4}
 							fontSize={rodScale * 0.8}
 							fill={selectedRod === i ? "#fff" : mutedTextColor}
 							textAnchor="middle"
-							style={{ pointerEvents: "none" }}
 						>
 							{r.label}
 						</text>
@@ -197,12 +192,13 @@ export function GridManualEditorCanvas({
 								rx={rodScale * 0.1}
 							/>
 							<text
+								className={styles.pointerText}
 								x={p.grid_x}
 								y={p.grid_y + rodScale * 0.25}
 								fontSize={rodScale * 0.5}
 								fill={isSelected ? "#fff" : "#3b82f6"}
 								textAnchor="middle"
-								style={{ pointerEvents: "none", fontWeight: 700 }}
+								style={{ fontWeight: 700 }}
 							>
 								T
 							</text>
@@ -237,12 +233,13 @@ export function GridManualEditorCanvas({
 								rx={rodScale * 0.1}
 							/>
 							<text
+								className={styles.pointerText}
 								x={p.grid_x}
 								y={p.grid_y + rodScale * 0.25}
 								fontSize={rodScale * 0.5}
 								fill={isSelected ? "#fff" : "#06b6d4"}
 								textAnchor="middle"
-								style={{ pointerEvents: "none", fontWeight: 700 }}
+								style={{ fontWeight: 700 }}
 							>
 								+
 							</text>

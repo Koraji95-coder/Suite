@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { hexToRgba } from "@/lib/palette";
 import { placementKey } from "./GridManualEditorModels";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
+import styles from "./GridManualEditorTables.module.css";
 
 interface GridManualEditorTablesProps {
 	rods: GridRod[];
@@ -67,32 +68,25 @@ export function GridManualEditorTables({
 	};
 
 	return (
-		<div
-			style={{
-				display: "grid",
-				gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-				gap: 8,
-			}}
-		>
+		<div className={styles.tableGrid}>
 			{rods.length > 0 && (
-				<div style={panelStyle}>
+				<div className={styles.panel} style={panelStyle}>
 					<div
+						className={styles.panelHeader}
 						style={{
-							padding: "4px 8px",
-							fontSize: 10,
-							fontWeight: 700,
 							color: "#22c55e",
 							background: hexToRgba("#22c55e", 0.08),
 						}}
 					>
 						Ground Rods ({rods.length})
 					</div>
-					<div style={{ maxHeight: 120, overflowY: "auto" }}>
-						<table
-							style={{ width: "100%", fontSize: 9, borderCollapse: "collapse" }}
-						>
+					<div className={styles.tableContainer}>
+						<table className={styles.table}>
 							<thead>
-								<tr style={{ color: mutedTextColor }}>
+								<tr
+									className={styles.headerRow}
+									style={{ color: mutedTextColor }}
+								>
 									<th style={headerCellStyle}>Label</th>
 									<th style={headerCellStyle}>X</th>
 									<th style={headerCellStyle}>Y</th>
@@ -108,13 +102,7 @@ export function GridManualEditorTables({
 										}}
 										onClick={() => onSelectRod(i)}
 									>
-										<td
-											style={{
-												padding: "1px 4px",
-												fontWeight: 600,
-												textAlign: "center",
-											}}
-										>
+										<td className={styles.labelCell}>
 											{r.label}
 										</td>
 										<td style={bodyCellStyle}>{r.grid_x}</td>
@@ -128,24 +116,23 @@ export function GridManualEditorTables({
 			)}
 
 			{conductors.length > 0 && (
-				<div style={panelStyle}>
+				<div className={styles.panel} style={panelStyle}>
 					<div
+						className={styles.panelHeader}
 						style={{
-							padding: "4px 8px",
-							fontSize: 10,
-							fontWeight: 700,
 							color: "#f59e0b",
 							background: hexToRgba("#f59e0b", 0.08),
 						}}
 					>
 						Conductors ({conductors.length})
 					</div>
-					<div style={{ maxHeight: 120, overflowY: "auto" }}>
-						<table
-							style={{ width: "100%", fontSize: 9, borderCollapse: "collapse" }}
-						>
+					<div className={styles.tableContainer}>
+						<table className={styles.table}>
 							<thead>
-								<tr style={{ color: mutedTextColor }}>
+								<tr
+									className={styles.headerRow}
+									style={{ color: mutedTextColor }}
+								>
 									<th style={headerCellStyle}>Label</th>
 									<th style={headerCellStyle}>X1</th>
 									<th style={headerCellStyle}>Y1</th>
@@ -163,13 +150,7 @@ export function GridManualEditorTables({
 										}}
 										onClick={() => onSelectConductor(i)}
 									>
-										<td
-											style={{
-												padding: "1px 4px",
-												fontWeight: 600,
-												textAlign: "center",
-											}}
-										>
+										<td className={styles.labelCell}>
 											{c.label}
 										</td>
 										<td style={bodyCellStyle}>{c.x1}</td>
@@ -185,24 +166,23 @@ export function GridManualEditorTables({
 			)}
 
 			{tees.length > 0 && (
-				<div style={panelStyle}>
+				<div className={styles.panel} style={panelStyle}>
 					<div
+						className={styles.panelHeader}
 						style={{
-							padding: "4px 8px",
-							fontSize: 10,
-							fontWeight: 700,
 							color: "#3b82f6",
 							background: hexToRgba("#3b82f6", 0.08),
 						}}
 					>
 						Tees ({tees.length})
 					</div>
-					<div style={{ maxHeight: 120, overflowY: "auto" }}>
-						<table
-							style={{ width: "100%", fontSize: 9, borderCollapse: "collapse" }}
-						>
+					<div className={styles.tableContainer}>
+						<table className={styles.table}>
 							<thead>
-								<tr style={{ color: mutedTextColor }}>
+								<tr
+									className={styles.headerRow}
+									style={{ color: mutedTextColor }}
+								>
 									<th style={headerCellStyle}>#</th>
 									<th style={headerCellStyle}>X</th>
 									<th style={headerCellStyle}>Y</th>
@@ -220,13 +200,7 @@ export function GridManualEditorTables({
 											}}
 											onClick={() => onSelectTee(key)}
 										>
-											<td
-												style={{
-													padding: "1px 4px",
-													fontWeight: 600,
-													textAlign: "center",
-												}}
-											>
+											<td className={styles.labelCell}>
 												T{i + 1}
 											</td>
 											<td style={bodyCellStyle}>{p.grid_x}</td>
@@ -241,24 +215,23 @@ export function GridManualEditorTables({
 			)}
 
 			{crosses.length > 0 && (
-				<div style={panelStyle}>
+				<div className={styles.panel} style={panelStyle}>
 					<div
+						className={styles.panelHeader}
 						style={{
-							padding: "4px 8px",
-							fontSize: 10,
-							fontWeight: 700,
 							color: "#06b6d4",
 							background: hexToRgba("#06b6d4", 0.08),
 						}}
 					>
 						Crosses ({crosses.length})
 					</div>
-					<div style={{ maxHeight: 120, overflowY: "auto" }}>
-						<table
-							style={{ width: "100%", fontSize: 9, borderCollapse: "collapse" }}
-						>
+					<div className={styles.tableContainer}>
+						<table className={styles.table}>
 							<thead>
-								<tr style={{ color: mutedTextColor }}>
+								<tr
+									className={styles.headerRow}
+									style={{ color: mutedTextColor }}
+								>
 									<th style={headerCellStyle}>#</th>
 									<th style={headerCellStyle}>X</th>
 									<th style={headerCellStyle}>Y</th>
@@ -276,13 +249,7 @@ export function GridManualEditorTables({
 											}}
 											onClick={() => onSelectCross(key)}
 										>
-											<td
-												style={{
-													padding: "1px 4px",
-													fontWeight: 600,
-													textAlign: "center",
-												}}
-											>
+											<td className={styles.labelCell}>
 												X{i + 1}
 											</td>
 											<td style={bodyCellStyle}>{p.grid_x}</td>

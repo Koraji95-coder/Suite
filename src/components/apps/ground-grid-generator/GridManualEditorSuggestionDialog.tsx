@@ -55,76 +55,76 @@ export function GridManualEditorSuggestionDialog({
 									: "Place Cross"}
 					</DialogTitle>
 				</DialogHeader>
-				<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-					<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+				<div className={styles.fieldColumn}>
+					<div className={styles.fieldRow}>
 						<label
 							htmlFor="grid-suggestion-x1"
-							style={{ fontSize: 11, color: mutedTextColor, width: 24 }}
+							className={styles.fieldLabel}
+							style={{ color: mutedTextColor }}
 						>
 							{suggestion?.type === "add-conductor" ? "X1" : "X"}
 						</label>
 						<input
+							className={styles.fieldInput}
 							id="grid-suggestion-x1"
 							name="grid_suggestion_x1"
 							value={suggestionCoords.x}
 							onChange={(e) => updateCoords({ x: e.target.value })}
-							style={{ ...inputStyle, flex: 1 }}
+							style={inputStyle}
 							autoFocus
 						/>
 					</div>
-					<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+					<div className={styles.fieldRow}>
 						<label
 							htmlFor="grid-suggestion-y1"
-							style={{ fontSize: 11, color: mutedTextColor, width: 24 }}
+							className={styles.fieldLabel}
+							style={{ color: mutedTextColor }}
 						>
 							{suggestion?.type === "add-conductor" ? "Y1" : "Y"}
 						</label>
 						<input
+							className={styles.fieldInput}
 							id="grid-suggestion-y1"
 							name="grid_suggestion_y1"
 							value={suggestionCoords.y}
 							onChange={(e) => updateCoords({ y: e.target.value })}
-							style={{ ...inputStyle, flex: 1 }}
+							style={inputStyle}
 						/>
 					</div>
 					{suggestion?.type === "add-conductor" && (
 						<>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<div className={styles.fieldRow}>
 								<label
 									htmlFor="grid-suggestion-x2"
-									style={{
-										fontSize: 11,
-										color: mutedTextColor,
-										width: 24,
-									}}
+									className={styles.fieldLabel}
+									style={{ color: mutedTextColor }}
 								>
 									X2
 								</label>
 								<input
+									className={styles.fieldInput}
 									id="grid-suggestion-x2"
 									name="grid_suggestion_x2"
 									value={suggestionCoords.endX}
 									onChange={(e) => updateCoords({ endX: e.target.value })}
-									style={{ ...inputStyle, flex: 1 }}
+									style={inputStyle}
 								/>
 							</div>
-							<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+							<div className={styles.fieldRow}>
 								<label
 									htmlFor="grid-suggestion-y2"
-									style={{
-										fontSize: 11,
-										color: mutedTextColor,
-										width: 24,
-									}}
+									className={styles.fieldLabel}
+									style={{ color: mutedTextColor }}
 								>
 									Y2
 								</label>
 								<input
+									className={styles.fieldInput}
 									id="grid-suggestion-y2"
 									name="grid_suggestion_y2"
 									value={suggestionCoords.endY}
 									onChange={(e) => updateCoords({ endY: e.target.value })}
-									style={{ ...inputStyle, flex: 1 }}
+									style={inputStyle}
 								/>
 							</div>
 						</>

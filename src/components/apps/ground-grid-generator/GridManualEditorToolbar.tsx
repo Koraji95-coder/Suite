@@ -5,6 +5,7 @@ import type {
 	EditorMode,
 	LineInput,
 } from "./GridManualEditorModels";
+import styles from "./GridManualEditorToolbar.module.css";
 
 interface GridManualEditorToolbarProps {
 	mode: EditorMode;
@@ -53,14 +54,7 @@ export function GridManualEditorToolbar({
 }: GridManualEditorToolbarProps) {
 	return (
 		<>
-			<div
-				style={{
-					display: "flex",
-					gap: 6,
-					flexWrap: "wrap",
-					alignItems: "center",
-				}}
-			>
+			<div className={styles.toolbar}>
 				<button
 					onClick={() => onChangeMode("select")}
 					style={btnStyle(mode === "select")}
@@ -103,7 +97,7 @@ export function GridManualEditorToolbar({
 					<Trash2 size={12} /> Delete
 				</button>
 
-				<div style={{ display: "flex", gap: 2, marginLeft: "auto" }}>
+				<div className={styles.zoomControls}>
 					<button onClick={onZoomIn} style={btnStyle(false)} title="Zoom In">
 						<ZoomIn size={12} />
 					</button>
@@ -111,13 +105,8 @@ export function GridManualEditorToolbar({
 						<ZoomOut size={12} />
 					</button>
 					<span
-						style={{
-							fontSize: 9,
-							color: mutedTextColor,
-							alignSelf: "center",
-							minWidth: 30,
-							textAlign: "center",
-						}}
+						className={styles.zoomValue}
+						style={{ color: mutedTextColor }}
 					>
 						{Math.round(zoom * 100)}%
 					</span>
@@ -125,22 +114,15 @@ export function GridManualEditorToolbar({
 			</div>
 
 			{conductorStart && (
-				<div
-					style={{
-						fontSize: 10,
-						color: "#f59e0b",
-						fontWeight: 600,
-						padding: "0 4px",
-					}}
-				>
+				<div className={styles.startHint}>
 					Start: ({conductorStart.x}, {conductorStart.y}) -- click end point
 				</div>
 			)}
 
-			<div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+			<div className={styles.inputRowWrap}>
 				{showRodInput && (
 					<div style={inputRowStyle}>
-						<span style={{ fontWeight: 600, minWidth: 24 }}>Rod:</span>
+						<span className={styles.inputLabel}>Rod:</span>
 						<input
 							placeholder="X"
 							value={coordInput.x}
@@ -173,7 +155,7 @@ export function GridManualEditorToolbar({
 
 				{showConductorInput && (
 					<div style={inputRowStyle}>
-						<span style={{ fontWeight: 600, minWidth: 24 }}>Cond:</span>
+						<span className={styles.inputLabel}>Cond:</span>
 						<input
 							placeholder="X1"
 							value={lineInput.x1}
@@ -181,7 +163,7 @@ export function GridManualEditorToolbar({
 								onLineInputChange({ ...lineInput, x1: e.target.value })
 							}
 							style={inputStyle}
-						name="gridmanualeditortoolbar_input_175"
+							name="gridmanualeditortoolbar_input_175"
 						/>
 						<input
 							placeholder="Y1"
@@ -190,7 +172,7 @@ export function GridManualEditorToolbar({
 								onLineInputChange({ ...lineInput, y1: e.target.value })
 							}
 							style={inputStyle}
-						name="gridmanualeditortoolbar_input_183"
+							name="gridmanualeditortoolbar_input_183"
 						/>
 						<input
 							placeholder="X2"
@@ -199,7 +181,7 @@ export function GridManualEditorToolbar({
 								onLineInputChange({ ...lineInput, x2: e.target.value })
 							}
 							style={inputStyle}
-						name="gridmanualeditortoolbar_input_191"
+							name="gridmanualeditortoolbar_input_191"
 						/>
 						<input
 							placeholder="Y2"
@@ -208,7 +190,7 @@ export function GridManualEditorToolbar({
 								onLineInputChange({ ...lineInput, y2: e.target.value })
 							}
 							style={inputStyle}
-						name="gridmanualeditortoolbar_input_199"
+							name="gridmanualeditortoolbar_input_199"
 						/>
 						<button onClick={onAddConductorByCoord} style={btnStyle(false)}>
 							Add

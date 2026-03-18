@@ -1,0 +1,39 @@
+.tableGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 8px;
+}
+
+.panel {
+	border-radius: 6px;
+	overflow: hidden;
+	border: 1px solid transparent;
+}
+
+.panelHeader {
+	padding: 4px 8px;
+	font-size: 10px;
+	font-weight: 700;
+	text-align: center;
+}
+
+.tableContainer {
+	max-height: 120px;
+	overflow-y: auto;
+}
+
+.table {
+	width: 100%;
+	font-size: 9px;
+	border-collapse: collapse;
+}
+
+.headerRow {
+	color: inherit;
+}
+
+.labelCell {
+	padding: 1px 4px;
+	font-weight: 600;
+	text-align: center;
+}

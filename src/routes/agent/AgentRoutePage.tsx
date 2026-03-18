@@ -41,6 +41,16 @@ export default function AgentRoutePage() {
 			userId: user?.id ?? null,
 		});
 	const showGatewayRestartHint = shouldShowGatewayRestartHint(connectionError);
+	const statusLabel = healthy === null ? "Checking bridge" : healthy ? "Online" : "Offline";
+	const statusSummary =
+		healthy === null
+			? "Verifying gateway reachability and broker link."
+			: healthy
+				? "Gateway and broker transport are reachable."
+				: "Gateway or broker transport is unreachable.";
+	const pairingSummary = paired
+		? "Paired session ready for orchestration and direct chat."
+		: "Pairing required before agent actions can run.";
 
 	useEffect(() => {
 		const pairingSearch = buildAgentPairingSearchFromLocation(
@@ -77,7 +87,42 @@ export default function AgentRoutePage() {
 			maxWidth="full"
 			padded={false}
 		>
-			<div className={styles.statusPanel}>
+			<section className={styles.statusPanel}>
+				<div className={styles.surfaceHeader}>
+					<div>
+						<p className={styles.eyebrow}>Command surface</p>
+						<h2 className={styles.surfaceTitle}>Agent operations center</h2>
+						<p className={styles.surfaceCopy}>
+							Manage route health, pairing state, and live orchestration in one
+							control lane.
+						</p>
+					</div>
+					<div className={styles.surfaceChips}>
+						<span className={styles.surfaceChip}>{statusLabel}</span>
+						<span className={styles.surfaceChip}>
+							{paired ? "Paired session" : "Pairing required"}
+						</span>
+					</div>
+				</div>
+				<div className={styles.metricsGrid}>
+					<article className={styles.metricCard}>
+						<p className={styles.metricLabel}>Gateway state</p>
+						<p className={styles.metricValue}>{statusLabel}</p>
+						<p className={styles.metricCopy}>{statusSummary}</p>
+					</article>
+					<article className={styles.metricCard}>
+						<p className={styles.metricLabel}>Pairing state</p>
+						<p className={styles.metricValue}>
+							{paired ? "Session paired" : "Pending pairing"}
+						</p>
+						<p className={styles.metricCopy}>{pairingSummary}</p>
+					</article>
+					<article className={styles.metricCard}>
+						<p className={styles.metricLabel}>Active endpoint</p>
+						<p className={styles.metricValue}>Bridge target</p>
+						<p className={styles.metricCopy}>{agentService.getEndpoint()}</p>
+					</article>
+				</div>
 				<div className={styles.statusRow}>
 					<div className={styles.statusInfo}>
 						<span className={styles.statusItem}>
@@ -138,7 +183,7 @@ export default function AgentRoutePage() {
 						click Refresh state.
 					</p>
 				) : null}
-			</div>
+			</section>
 
 			<div className={styles.chatWrap}>
 				<AgentPanelBoundary onResetPanelCache={handleResetPanelCache}>

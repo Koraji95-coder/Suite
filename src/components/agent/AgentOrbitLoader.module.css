@@ -33,7 +33,8 @@
 	border: 1px solid color-mix(in srgb, var(--agent-accent-cool) 34%, transparent);
 	display: grid;
 	place-items: center;
-	animation: orbitSpin 8s linear infinite;
+	animation: orbitSpin 7.6s linear infinite;
+	box-shadow: inset 0 0 0 1px rgb(255 255 255 / 4%);
 }
 
 .pulse {
@@ -42,6 +43,7 @@
 	border-radius: 999px;
 	border: 2px dashed color-mix(in srgb, var(--agent-accent-cool) 52%, transparent);
 	animation: orbitSpin 4.2s linear infinite reverse;
+	opacity: 0.86;
 }
 
 .core {

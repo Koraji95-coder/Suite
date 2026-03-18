@@ -8,7 +8,7 @@
 	height: 100%;
 	overflow: hidden;
 	border: 1px solid var(--agent-surface-border);
-	border-radius: 1rem;
+	border-radius: 1.08rem;
 	background:
 		radial-gradient(
 			circle at 26% 12%,
@@ -27,7 +27,9 @@
 			var(--agent-ambient-end)
 		),
 		var(--agent-surface-base);
-	box-shadow: var(--agent-shadow-soft);
+	box-shadow:
+		var(--agent-shadow-soft),
+		inset 0 1px 0 rgb(255 255 255 / 3%);
 }
 
 .panelRootFocus {
@@ -40,10 +42,15 @@
 	flex-direction: column;
 	gap: 0.65rem;
 	min-width: 0;
-	padding: 0.72rem;
+	padding: 0.72rem 0.7rem;
 	overflow-y: auto;
 	overscroll-behavior: contain;
-	background: color-mix(in srgb, var(--agent-surface-base) 72%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--agent-surface-base) 78%, transparent),
+			color-mix(in srgb, var(--agent-surface-base) 66%, transparent)
+		);
 }
 
 .leftRail {
@@ -68,7 +75,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: 0.55rem;
-	padding: 0.64rem;
+	padding: 0.67rem;
 	border: 1px solid
 		color-mix(in srgb, var(--agent-surface-border) 90%, transparent);
 	border-radius: 0.78rem;
@@ -78,6 +85,7 @@
 		transparent
 	);
 	box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+	backdrop-filter: blur(9px);
 }
 
 .railHeaderRow {
@@ -114,11 +122,13 @@
 	transition:
 		border-color var(--agent-motion-fast) ease,
 		background-color var(--agent-motion-fast) ease,
-		transform var(--agent-motion-fast) ease;
+		transform var(--agent-motion-fast) ease,
+		box-shadow var(--agent-motion-fast) ease;
 }
 
 .rosterItem:hover {
 	transform: translateY(-1px);
+	box-shadow: var(--shadow-sm);
 }
 
 .rosterItemActive {
@@ -185,6 +195,9 @@
 	background: transparent;
 	color: var(--text-muted);
 	cursor: pointer;
+	transition:
+		background-color var(--agent-motion-fast) ease,
+		color var(--agent-motion-fast) ease;
 }
 
 .inlineGhostButton:hover {
@@ -209,12 +222,20 @@
 	background: color-mix(in srgb, var(--agent-surface-muted) 72%, transparent);
 	color: var(--text-muted);
 	cursor: pointer;
-	transition: border-color var(--agent-motion-fast) ease;
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease,
+		transform var(--agent-motion-fast) ease;
 }
 
 .priorityBubbleActive {
 	border-color: color-mix(in srgb, var(--agent-accent-warm) 56%, transparent);
 	color: var(--agent-text-strong);
+	background: color-mix(in srgb, var(--agent-accent-warm) 14%, transparent);
+}
+
+.priorityBubble:hover {
+	transform: translateY(-1px);
 }
 
 .priorityLabel {
@@ -244,6 +265,9 @@
 	color: var(--text-muted);
 	text-transform: lowercase;
 	cursor: pointer;
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease;
 }
 
 .statusFilterButtonActive {
@@ -279,6 +303,15 @@
 	color: var(--agent-text-strong);
 	font: inherit;
 	font-size: 0.64rem;
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease;
+}
+
+.filterField select:focus-visible {
+	outline: none;
+	border-color: color-mix(in srgb, var(--agent-accent-cool) 50%, transparent);
+	background: color-mix(in srgb, var(--agent-surface-base) 92%, transparent);
 }
 
 .queueList {
@@ -302,6 +335,10 @@
 	border-radius: 0.62rem;
 	padding: 0.45rem;
 	background: color-mix(in srgb, var(--agent-surface-muted) 68%, transparent);
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease,
+		transform var(--agent-motion-fast) ease;
 }
 
 .queueItemButton {
@@ -309,6 +346,12 @@
 	text-align: left;
 	cursor: pointer;
 	font: inherit;
+}
+
+.queueItemButton:hover {
+	border-color: color-mix(in srgb, var(--agent-accent-cool) 34%, transparent);
+	background: color-mix(in srgb, var(--agent-accent-cool) 10%, transparent);
+	transform: translateY(-1px);
 }
 
 .queueItemHeader {
@@ -344,6 +387,7 @@
 		),
 		color-mix(in srgb, var(--agent-surface-base) 70%, transparent);
 	backdrop-filter: blur(12px);
+	box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--agent-surface-border) 62%, transparent);
 }
 
 .centerHeaderMain {
@@ -436,6 +480,15 @@
 	font-size: 0.7rem;
 	font-weight: 600;
 	cursor: pointer;
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease,
+		transform var(--agent-motion-fast) ease;
+}
+
+.threadNewButton:hover {
+	transform: translateY(-1px);
+	background: color-mix(in srgb, var(--agent-accent-warm) 18%, transparent);
 }
 
 .threadStaticLabel {
@@ -467,6 +520,9 @@
 	border-radius: 0.6rem;
 	background: color-mix(in srgb, var(--agent-surface-muted) 68%, transparent);
 	min-width: 11rem;
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease;
 }
 
 .threadItemActive {
@@ -510,6 +566,7 @@
 	color: var(--text-muted);
 	padding: 0 0.34rem;
 	cursor: pointer;
+	transition: color var(--agent-motion-fast) ease;
 }
 
 .threadDeleteButton:hover {
@@ -565,6 +622,7 @@
 		),
 		color-mix(in srgb, var(--agent-surface-muted) 72%, transparent);
 	overflow: hidden;
+	box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
 }
 
 .networkLines {
@@ -592,6 +650,7 @@
 	padding: 0;
 	background: transparent;
 	cursor: pointer;
+	transition: filter var(--agent-motion-fast) ease;
 }
 
 .networkNodeActive {
@@ -631,6 +690,14 @@
 	border-radius: 0.65rem;
 	padding: 0.44rem;
 	background: color-mix(in srgb, var(--agent-surface-muted) 70%, transparent);
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease;
+}
+
+.reviewItem:hover {
+	border-color: color-mix(in srgb, var(--agent-accent-warm) 34%, transparent);
+	background: color-mix(in srgb, var(--agent-accent-warm) 8%, transparent);
 }
 
 .reviewMetaRow {
@@ -664,6 +731,15 @@
 	font-size: 0.7rem;
 	resize: vertical;
 	min-height: 2.65rem;
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease;
+}
+
+.reviewNoteInput:focus-visible {
+	outline: none;
+	border-color: color-mix(in srgb, var(--agent-accent-cool) 46%, transparent);
+	background: color-mix(in srgb, var(--agent-surface-base) 92%, transparent);
 }
 
 .reviewActions {
@@ -715,6 +791,10 @@
 	border-radius: 0.62rem;
 	padding: 0.42rem;
 	background: color-mix(in srgb, var(--agent-surface-muted) 70%, transparent);
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease,
+		transform var(--agent-motion-fast) ease;
 }
 
 .activityItemButton {
@@ -722,6 +802,12 @@
 	text-align: left;
 	cursor: pointer;
 	font: inherit;
+}
+
+.activityItemButton:hover {
+	border-color: color-mix(in srgb, var(--agent-accent-cool) 34%, transparent);
+	background: color-mix(in srgb, var(--agent-accent-cool) 8%, transparent);
+	transform: translateY(-1px);
 }
 
 .activityItemMeta {

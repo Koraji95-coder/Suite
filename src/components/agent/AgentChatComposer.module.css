@@ -6,6 +6,7 @@
 			color-mix(in srgb, var(--agent-surface-base) 70%, transparent),
 			color-mix(in srgb, var(--agent-surface-base) 95%, transparent)
 		);
+	border-top: 1px solid color-mix(in srgb, var(--agent-surface-border) 56%, transparent);
 }
 
 .modeRow {
@@ -25,6 +26,11 @@
 	font-size: 0.72rem;
 	line-height: 1.3;
 	letter-spacing: 0.02em;
+	cursor: pointer;
+	transition:
+		background-color var(--agent-motion-fast) ease,
+		color var(--agent-motion-fast) ease,
+		transform var(--agent-motion-fast) ease;
 }
 
 .modeButtonActive {
@@ -35,6 +41,11 @@
 .modeButtonIdle {
 	color: var(--text-muted);
 	background: transparent;
+}
+
+.modeButtonIdle:hover {
+	color: var(--text);
+	background: color-mix(in srgb, var(--agent-surface-elevated) 80%, transparent);
 }
 
 .modeButton:disabled {
@@ -71,6 +82,16 @@
 	white-space: nowrap;
 	border-color: color-mix(in srgb, var(--agent-accent-warm) 26%, transparent);
 	background: color-mix(in srgb, var(--agent-surface-elevated) 86%, transparent);
+	transition:
+		border-color var(--agent-motion-fast) ease,
+		background-color var(--agent-motion-fast) ease,
+		transform var(--agent-motion-fast) ease;
+}
+
+.templateButton:hover {
+	border-color: color-mix(in srgb, var(--agent-accent-warm) 40%, transparent);
+	background: color-mix(in srgb, var(--agent-accent-warm) 10%, transparent);
+	transform: translateY(-1px);
 }
 
 .composerCard {
@@ -215,6 +236,12 @@
 	font-size: 0.64rem;
 	font-family:
 		ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+}
+
+@media (max-width: 56rem) {
+	.root {
+		padding-inline: 0.72rem;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {

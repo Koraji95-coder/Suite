@@ -1,27 +1,16 @@
 import {
 	AlertCircle,
-	Check,
-	ClipboardList,
 	Expand,
-	House,
-	Loader2,
 	Minimize2,
-	Network,
 	Plus,
-	RefreshCw,
 	Settings2,
 	Trash2,
-	Undo2,
-	WifiOff,
-	Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/primitives/Badge";
 import { IconButton } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
-import { HStack } from "@/components/primitives/Stack";
-import { Text } from "@/components/primitives/Text";
 import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 import {
@@ -30,8 +19,6 @@ import {
 	type AgentProfileCatalogItem,
 	type AgentReviewAction,
 	type AgentTaskItem,
-	type AgentTaskPriority,
-	type AgentTaskStatus,
 	agentService,
 } from "@/services/agentService";
 import {
@@ -43,6 +30,11 @@ import {
 	type AgentComposerMode,
 } from "./AgentChatComposer";
 import { AgentChatMessages } from "./AgentChatMessages";
+import {
+	AgentChatEmptyState,
+	AgentChatLeftRail,
+	AgentChatRightRail,
+} from "./AgentChatPanelSections";
 import styles from "./AgentChatPanel.module.css";
 import {
 	AgentOrchestrationPanel,
@@ -56,7 +48,6 @@ import {
 	isAgentProfileScope,
 } from "./agentChannelScope";
 import { type AgentMarkState, resolveAgentMarkState } from "./agentMarkState";
-import { normalizeAgentResponseText } from "./agentResponseNormalizer";
 import {
 	sanitizeActivityItems,
 	sanitizeTaskItems,
@@ -64,10 +55,34 @@ import {
 import {
 	AGENT_PROFILE_IDS,
 	AGENT_PROFILES,
-	type AgentProfile,
 	type AgentProfileId,
 	DEFAULT_AGENT_PROFILE,
 } from "./agentProfiles";
+import {
+	type ActivitySourceFilter,
+	type QueuePriorityFilter,
+	type QueueProfileFilter,
+	type QueueRunFilter,
+	type QueueStatusFilter,
+	REVIEW_WARNING_STATUSES,
+	RUNNING_TASK_STATUSES,
+	addToBoundedSet,
+	buildProfileRoster,
+	countQueuePriorities,
+	deriveAvailableRunIds,
+	eventBodyFromPayload,
+	filterActivityItems,
+	filterQueueTasks,
+	mergeRuntimeProfiles,
+	normalizeAssistantReply,
+	normalizeKnownProfileId,
+	payloadText,
+	resolveVisibleConversations,
+	runConversationTitle,
+	shortRunId,
+	selectQueueTasks,
+	selectReviewInboxTasks,
+} from "./agentChatPanelSelectors";
 import { getAgentTaskTemplates } from "./agentTaskTemplates";
 
 interface AgentChatPanelProps {
@@ -75,27 +90,9 @@ interface AgentChatPanelProps {
 	paired: boolean;
 }
 
-const OPEN_QUEUE_STATUSES: AgentTaskStatus[] = [
-	"queued",
-	"running",
-	"awaiting_review",
-	"rework_requested",
-];
-const RUNNING_TASK_STATUSES: AgentTaskStatus[] = ["queued", "running"];
-const REVIEW_WARNING_STATUSES: AgentTaskStatus[] = [
-	"awaiting_review",
-	"rework_requested",
-];
 const SUCCESS_TRANSIENT_MS = 2_200;
 const CHANNEL_SCOPE_STORAGE_KEY = "agent-channel-scope";
 const ACTIVE_AGENT_STORAGE_KEY = "agent-active-profile";
-const STATUS_FILTERS = ["all", ...OPEN_QUEUE_STATUSES] as const;
-type QueueStatusFilter = (typeof STATUS_FILTERS)[number];
-type QueuePriorityFilter = AgentTaskPriority | "all";
-type QueueProfileFilter = AgentProfileId | "all";
-type QueueRunFilter = string | "all";
-type ActivitySourceFilter = AgentActivityItem["source"] | "all";
-const ACTIVITY_DETAIL_PREVIEW_CHARS = 260;
 const GENERAL_SCOPE_ID = "team";
 const DEFAULT_ORCHESTRATION_OBJECTIVE =
 	"Coordinate a reliability review for my active feature. Return concrete implementation steps, high-risk findings, and validation checks.";
@@ -131,247 +128,6 @@ type WorkflowThinkingEntry = {
 	lastProfileId: AgentProfileId;
 	updatedAt: number;
 };
-
-const PRIORITY_ORDER: Record<AgentTaskPriority, number> = {
-	critical: 0,
-	high: 1,
-	medium: 2,
-	low: 3,
-};
-
-function formatTimestamp(value: string | undefined): string {
-	const text = String(value || "").trim();
-	if (!text) return "";
-	const parsed = new Date(text);
-	if (Number.isNaN(parsed.getTime())) return "";
-	return parsed.toLocaleString([], {
-		month: "short",
-		day: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
-	});
-}
-
-function priorityColor(
-	priority: AgentTaskPriority,
-): "danger" | "warning" | "primary" | "default" {
-	switch (priority) {
-		case "critical":
-			return "danger";
-		case "high":
-			return "warning";
-		case "medium":
-			return "primary";
-		default:
-			return "default";
-	}
-}
-
-function statusColor(
-	status: AgentTaskStatus,
-): "success" | "warning" | "danger" | "primary" | "default" {
-	switch (status) {
-		case "approved":
-			return "success";
-		case "deferred":
-			return "danger";
-		case "awaiting_review":
-		case "rework_requested":
-			return "warning";
-		case "running":
-			return "primary";
-		default:
-			return "default";
-	}
-}
-
-function activityTone(
-	item: AgentActivityItem,
-): "success" | "warning" | "danger" | "primary" | "default" {
-	const type = String(item.eventType || "").toLowerCase();
-	if (type.includes("fail") || type.includes("deferred")) return "danger";
-	if (type.includes("review") || type.includes("awaiting")) return "warning";
-	if (type.includes("complete") || type.includes("approved")) return "success";
-	if (type.includes("running") || type.includes("started")) return "primary";
-	return "default";
-}
-
-function shortRunId(runId: string): string {
-	const text = String(runId || "").trim();
-	if (!text) return "";
-	return text.length > 14 ? text.slice(-10) : text;
-}
-
-function runConversationTitle(runId: string): string {
-	const normalized = String(runId || "").trim();
-	if (!normalized) return "Run";
-	return `Run ${shortRunId(normalized)}`;
-}
-
-function normalizeKnownProfileId(value: string | undefined): AgentProfileId | null {
-	const normalized = String(value || "")
-		.trim()
-		.toLowerCase();
-	if (!normalized || !(normalized in AGENT_PROFILES)) return null;
-	return normalized as AgentProfileId;
-}
-
-function mergeRuntimeProfiles(
-	runtimeProfiles: AgentProfileCatalogItem[],
-): Record<AgentProfileId, AgentProfile> {
-	const next = { ...AGENT_PROFILES };
-	for (const runtimeProfile of runtimeProfiles) {
-		const profileId = normalizeKnownProfileId(runtimeProfile.id);
-		if (!profileId) continue;
-		next[profileId] = {
-			...next[profileId],
-			name: runtimeProfile.name || next[profileId].name,
-			tagline: runtimeProfile.tagline || next[profileId].tagline,
-			focus: runtimeProfile.focus || next[profileId].focus,
-			memoryNamespace:
-				runtimeProfile.memory_namespace || next[profileId].memoryNamespace,
-			modelPrimary:
-				runtimeProfile.model_primary || next[profileId].modelPrimary,
-			modelFallbacks: [],
-		};
-	}
-	return next;
-}
-
-function addToBoundedSet(
-	target: Set<string>,
-	value: string,
-	maxSize: number,
-): boolean {
-	const key = String(value || "").trim();
-	if (!key) return false;
-	if (target.has(key)) return true;
-	target.add(key);
-	if (target.size <= maxSize) return false;
-	const overflow = target.size - maxSize;
-	let removed = 0;
-	for (const existing of target) {
-		target.delete(existing);
-		removed += 1;
-		if (removed >= overflow) break;
-	}
-	return false;
-}
-
-function truncateText(value: string | undefined, maxChars: number): string {
-	const text = String(value || "").trim();
-	if (!text) return "";
-	if (text.length <= maxChars) return text;
-	return `${text.slice(0, Math.max(1, maxChars - 3)).trimEnd()}...`;
-}
-
-function payloadText(
-	payload: Record<string, unknown> | undefined,
-	keys: string[],
-): string {
-	if (!payload) return "";
-	for (const key of keys) {
-		const value = payload[key];
-		if (typeof value === "string" && value.trim()) return value.trim();
-		if (typeof value === "number" || typeof value === "boolean") {
-			return String(value);
-		}
-	}
-	return "";
-}
-
-function deriveActivityDetail(item: AgentActivityItem): {
-	text: string;
-	meta: string;
-	isError: boolean;
-} | null {
-	const payload = item.payload;
-	if (!payload) return null;
-
-	const eventType = String(item.eventType || "").toLowerCase();
-	const error = payloadText(payload, ["error", "detail", "reason"]);
-	const response = payloadText(payload, ["response", "output", "result"]);
-	const reviewNote = payloadText(payload, ["reviewNote", "review_note"]);
-	const stage = payloadText(payload, ["stage"]);
-	const modelUsed = payloadText(payload, ["modelUsed", "model", "model_used"]);
-	const latencyCandidate = Number(
-		payload.latencyMs ?? payload.latency_ms ?? Number.NaN,
-	);
-	const latencyMs = Number.isFinite(latencyCandidate)
-		? Math.max(0, Math.trunc(latencyCandidate))
-		: 0;
-
-	const metaParts: string[] = [];
-	if (stage) metaParts.push(`stage ${stage}`);
-	if (modelUsed) metaParts.push(`model ${modelUsed}`);
-	if (latencyMs > 0) metaParts.push(`latency ${latencyMs}ms`);
-
-	let text = "";
-	if (error) {
-		text = error;
-	} else if (eventType.includes("awaiting_review")) {
-		text = reviewNote || response;
-	} else if (eventType.includes("agent_message")) {
-		text = normalizeAgentResponseText(response);
-	}
-
-	if (!text && metaParts.length === 0) return null;
-	return {
-		text: text.trim(),
-		meta: metaParts.join(" | "),
-		isError: Boolean(error),
-	};
-}
-
-function normalizeAssistantReply(data: Record<string, unknown> | undefined): {
-	text: string;
-	incomplete: boolean;
-	warning: string;
-} {
-	if (!data) {
-		return { text: "", incomplete: false, warning: "" };
-	}
-	const responseText = String(data.response ?? "").trim();
-	if (responseText) {
-		const normalizedText = normalizeAgentResponseText(responseText);
-		return {
-			text: normalizedText || responseText,
-			incomplete: Boolean(data.incomplete),
-			warning: String(data.warning || "").trim(),
-		};
-	}
-	return {
-		text: JSON.stringify(data, null, 2),
-		incomplete: Boolean(data.incomplete),
-		warning: String(data.warning || "").trim(),
-	};
-}
-
-function eventBodyFromPayload(
-	eventType: string,
-	payload: Record<string, unknown> | undefined,
-	defaultMessage: string,
-): string {
-	const normalizedType = String(eventType || "").toLowerCase();
-	const detail = payloadText(payload, ["error", "detail", "reason"]);
-	if (detail && normalizedType.includes("fail")) return detail;
-	const response = payloadText(payload, ["response", "output", "result"]);
-	if (response && normalizedType === "agent_message") {
-		return normalizeAgentResponseText(response);
-	}
-
-	const stage = payloadText(payload, ["stage"]);
-	const modelUsed = payloadText(payload, ["modelUsed", "model", "model_used"]);
-	const latency = Number(payload?.latencyMs ?? payload?.latency_ms ?? Number.NaN);
-	const metaParts: string[] = [];
-	if (stage) metaParts.push(`stage ${stage}`);
-	if (modelUsed) metaParts.push(`model ${modelUsed}`);
-	if (Number.isFinite(latency) && latency > 0) {
-		metaParts.push(`${Math.trunc(latency)}ms`);
-	}
-	if (metaParts.length === 0) return defaultMessage;
-	return `${defaultMessage} (${metaParts.join(" | ")})`;
-}
 
 export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const navigate = useNavigate();
@@ -1177,34 +933,12 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		activityItems.length === 0 &&
 		!workflowError;
 
-	const queueTasks = useMemo(
-		() => taskItems.filter((task) => OPEN_QUEUE_STATUSES.includes(task.status)),
-		[taskItems],
-	);
+	const queueTasks = useMemo(() => selectQueueTasks(taskItems), [taskItems]);
 
-	const availableRunIds = useMemo(() => {
-		const stampByRun = new Map<string, string>();
-		for (const task of taskItems) {
-			const runId = String(task.runId || "").trim();
-			if (!runId) continue;
-			const stamp = String(task.updatedAt || task.createdAt || "").trim();
-			if (!stampByRun.has(runId) || stamp > String(stampByRun.get(runId) || "")) {
-				stampByRun.set(runId, stamp);
-			}
-		}
-		for (const activity of activityItems) {
-			const runId = String(activity.runId || "").trim();
-			if (!runId) continue;
-			const stamp = String(activity.createdAt || "").trim();
-			if (!stampByRun.has(runId) || stamp > String(stampByRun.get(runId) || "")) {
-				stampByRun.set(runId, stamp);
-			}
-		}
-		return Array.from(stampByRun.entries())
-			.sort((left, right) => right[1].localeCompare(left[1]))
-			.map(([runId]) => runId)
-			.slice(0, 40);
-	}, [taskItems, activityItems]);
+	const availableRunIds = useMemo(
+		() => deriveAvailableRunIds(taskItems, activityItems),
+		[taskItems, activityItems],
+	);
 
 	useEffect(() => {
 		if (queueRunFilter !== "all" && !availableRunIds.includes(queueRunFilter)) {
@@ -1218,114 +952,53 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		}
 	}, [queueRunFilter, activityRunFilter, availableRunIds]);
 
-	const filteredQueueTasks = useMemo(() => {
-		return [...queueTasks]
-			.filter((task) =>
-				statusFilter === "all" ? true : task.status === statusFilter,
-			)
-			.filter((task) =>
-				priorityFilter === "all" ? true : task.priority === priorityFilter,
-			)
-			.filter((task) =>
-				queueProfileFilter === "all"
-					? true
-					: String(task.assigneeProfile || "").trim().toLowerCase() ===
-						queueProfileFilter,
-			)
-			.filter((task) =>
-				queueRunFilter === "all"
-					? true
-					: String(task.runId || "").trim() === queueRunFilter,
-			)
-			.sort((left, right) => {
-				const priorityDelta =
-					PRIORITY_ORDER[left.priority] - PRIORITY_ORDER[right.priority];
-				if (priorityDelta !== 0) return priorityDelta;
-				return String(right.createdAt || "").localeCompare(
-					String(left.createdAt || ""),
-				);
-			});
-	}, [
-		queueTasks,
-		statusFilter,
-		priorityFilter,
-		queueProfileFilter,
-		queueRunFilter,
-	]);
+	const filteredQueueTasks = useMemo(
+		() =>
+			filterQueueTasks({
+				queueTasks,
+				statusFilter,
+				priorityFilter,
+				queueProfileFilter,
+				queueRunFilter,
+			}),
+		[
+			queueTasks,
+			statusFilter,
+			priorityFilter,
+			queueProfileFilter,
+			queueRunFilter,
+		],
+	);
 
-	const filteredActivityItems = useMemo(() => {
-		return activityItems
-			.filter((item) =>
-				activitySourceFilter === "all" ? true : item.source === activitySourceFilter,
-			)
-			.filter((item) =>
-				activityProfileFilter === "all"
-					? true
-					: String(item.profileId || "").trim().toLowerCase() ===
-						activityProfileFilter,
-			)
-			.filter((item) =>
-				activityRunFilter === "all"
-					? true
-					: String(item.runId || "").trim() === activityRunFilter,
-			);
-	}, [
-		activityItems,
-		activitySourceFilter,
-		activityProfileFilter,
-		activityRunFilter,
-	]);
+	const filteredActivityItems = useMemo(
+		() =>
+			filterActivityItems({
+				activityItems,
+				activitySourceFilter,
+				activityProfileFilter,
+				activityRunFilter,
+			}),
+		[
+			activityItems,
+			activitySourceFilter,
+			activityProfileFilter,
+			activityRunFilter,
+		],
+	);
 
 	const reviewInboxTasks = useMemo(
 		() =>
-			queueTasks
-				.filter((task) => task.status === "awaiting_review")
-				.filter((task) =>
-					queueProfileFilter === "all"
-						? true
-						: String(task.assigneeProfile || "").trim().toLowerCase() ===
-							queueProfileFilter,
-				)
-				.filter((task) =>
-					queueRunFilter === "all"
-						? true
-						: String(task.runId || "").trim() === queueRunFilter,
-				),
+			selectReviewInboxTasks({
+				queueTasks,
+				queueProfileFilter,
+				queueRunFilter,
+			}),
 		[queueTasks, queueProfileFilter, queueRunFilter],
 	);
 
-	const priorityCounts = useMemo(() => {
-		const counts: Record<AgentTaskPriority, number> = {
-			critical: 0,
-			high: 0,
-			medium: 0,
-			low: 0,
-		};
-		for (const task of queueTasks) {
-			counts[task.priority] += 1;
-		}
-		return counts;
-	}, [queueTasks]);
+	const priorityCounts = useMemo(() => countQueuePriorities(queueTasks), [queueTasks]);
 
-	const profileRoster = useMemo(() => {
-		return AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((id) => {
-			const assigned = queueTasks.filter(
-				(task) => task.assigneeProfile === id,
-			);
-			const active = assigned.some((task) =>
-				RUNNING_TASK_STATUSES.includes(task.status),
-			);
-			const warningCount = assigned.filter((task) =>
-				REVIEW_WARNING_STATUSES.includes(task.status),
-			).length;
-			return {
-				profileId: id,
-				assignedCount: assigned.length,
-				active,
-				warningCount,
-			};
-		});
-	}, [queueTasks]);
+	const profileRoster = useMemo(() => buildProfileRoster(queueTasks), [queueTasks]);
 
 	const handleReviewAction = useCallback(
 		async (taskId: string, action: AgentReviewAction) => {
@@ -1543,15 +1216,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		[],
 	);
 
-	const visibleConversations = useMemo(() => {
-		if (channelScope !== "team") return conversations;
-		const runConversations = conversations.filter(
-			(conversation) =>
-				conversation.kind === "run" ||
-				Boolean(String(conversation.runId || "").trim()),
-		);
-		return runConversations.length > 0 ? runConversations : conversations;
-	}, [channelScope, conversations]);
+	const visibleConversations = useMemo(
+		() => resolveVisibleConversations(channelScope, conversations),
+		[channelScope, conversations],
+	);
 	const conversationCount = visibleConversations.length;
 	const activeMessageCount = activeConv?.messages.length ?? 0;
 	useEffect(() => {
@@ -1660,253 +1328,36 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			padding="none"
 			className={cn(styles.panelRoot, focusMode && styles.panelRootFocus)}
 		>
-			<div className={styles.leftRail}>
-				<div className={styles.railCard}>
-					<div className={styles.railHeaderRow}>
-						<Text size="xs" weight="semibold" className={styles.railEyebrow}>
-							Agents
-						</Text>
-						<Badge size="sm" variant="outline" color="default">
-							{profileRoster.filter((item) => item.active).length} active
-						</Badge>
-					</div>
-					<div className={styles.agentRosterList}>
-						<button
-							type="button"
-							onClick={() => applyChannelScope("team")}
-							className={cn(
-								styles.rosterItem,
-								channelScope === "team" && styles.rosterItemActive,
-								styles.teamHomeItem,
-							)}
-						>
-							<div className={styles.rosterIdentity}>
-								<div className={styles.teamHomeIconShell}>
-									<House size={14} />
-								</div>
-								<div>
-									<p className={styles.rosterName}>General</p>
-									<p className={styles.rosterMeta}>
-										Unified live collaboration channel
-									</p>
-								</div>
-							</div>
-							<div className={styles.rosterStats}>
-								<Badge
-									size="sm"
-									variant="soft"
-									color={channelScope === "team" ? "primary" : "default"}
-								>
-									{channelScope === "team" ? "active" : "global"}
-								</Badge>
-								<span>{taskItems.length} tasks</span>
-							</div>
-						</button>
-						{profileRoster.map((entry) => {
-							const activeFilter = channelScope === entry.profileId;
-							const profileData = resolvedProfiles[entry.profileId];
-							return (
-								<button
-									key={entry.profileId}
-									type="button"
-									onClick={() => applyChannelScope(entry.profileId)}
-									className={cn(
-										styles.rosterItem,
-										activeFilter && styles.rosterItemActive,
-									)}
-								>
-									<div className={styles.rosterIdentity}>
-										<AgentPixelMark
-											profileId={entry.profileId}
-											size={30}
-											detailLevel="auto"
-											state={
-												profileStateById[entry.profileId] ??
-												(entry.active ? "running" : "idle")
-											}
-										/>
-										<div>
-											<p className={styles.rosterName}>{profileData.name}</p>
-											<p className={styles.rosterMeta}>{profileData.tagline}</p>
-										</div>
-									</div>
-									<div className={styles.rosterStats}>
-										<Badge
-											size="sm"
-											variant="soft"
-											color={
-												entry.warningCount > 0
-													? "warning"
-													: entry.active
-														? "success"
-														: "default"
-											}
-										>
-											{entry.warningCount > 0
-												? "review"
-												: entry.active
-													? "running"
-													: "idle"}
-										</Badge>
-										<span>{entry.assignedCount} tasks</span>
-									</div>
-								</button>
-							);
-						})}
-					</div>
-				</div>
-
-				<div className={styles.railCard}>
-					<div className={styles.railHeaderRow}>
-						<HStack gap={2} align="center">
-							<ClipboardList size={14} />
-							<Text size="xs" weight="semibold" className={styles.railEyebrow}>
-								Task queue
-							</Text>
-						</HStack>
-						{showQueueRefreshSpinner ? (
-							<Loader2 size={12} className={styles.spin} />
-						) : (
-							<button
-								type="button"
-								onClick={() => void refreshWorkflowData(true)}
-								className={styles.inlineGhostButton}
-							>
-								<RefreshCw size={12} />
-							</button>
-						)}
-					</div>
-
-					<div className={styles.priorityBubbleRow}>
-						{(["critical", "high", "medium", "low"] as AgentTaskPriority[]).map(
-							(priority) => (
-								<button
-									key={priority}
-									type="button"
-									onClick={() =>
-										setPriorityFilter((current) =>
-											current === priority ? "all" : priority,
-										)
-									}
-									className={cn(
-										styles.priorityBubble,
-										priorityFilter === priority && styles.priorityBubbleActive,
-									)}
-								>
-									<span className={styles.priorityLabel}>{priority}</span>
-									<span className={styles.priorityCount}>
-										{priorityCounts[priority]}
-									</span>
-								</button>
-							),
-						)}
-					</div>
-
-					<div className={styles.statusFilterRow}>
-						{STATUS_FILTERS.map((filterValue) => (
-							<button
-								key={filterValue}
-								type="button"
-								onClick={() => setStatusFilter(filterValue)}
-								className={cn(
-									styles.statusFilterButton,
-									statusFilter === filterValue &&
-										styles.statusFilterButtonActive,
-								)}
-							>
-								{filterValue === "all" ? "all" : filterValue.replace("_", " ")}
-							</button>
-						))}
-					</div>
-
-					<div className={styles.filterGrid}>
-						<label className={styles.filterField} htmlFor="queue-profile-filter">
-							<span>profile</span>
-							<select
-								id="queue-profile-filter"
-								name="queue_profile_filter"
-								value={queueProfileFilter}
-								onChange={(event) =>
-									setQueueProfileFilter(
-										event.target.value as QueueProfileFilter,
-									)
-								}
-							>
-								<option value="all">all profiles</option>
-								{AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((id) => (
-									<option key={id} value={id}>
-										{resolvedProfiles[id].name}
-									</option>
-								))}
-							</select>
-						</label>
-						<label className={styles.filterField} htmlFor="queue-run-filter">
-							<span>run</span>
-							<select
-								id="queue-run-filter"
-								name="queue_run_filter"
-								value={queueRunFilter}
-								onChange={(event) => setQueueRunFilter(event.target.value)}
-							>
-								<option value="all">all runs</option>
-								{availableRunIds.map((runId) => (
-									<option key={runId} value={runId}>
-										{runConversationTitle(runId)}
-									</option>
-								))}
-							</select>
-						</label>
-					</div>
-
-					<div className={styles.queueList}>
-						{filteredQueueTasks.length === 0 ? (
-							<div className={styles.emptyQueue}>
-								<Text size="xs" color="muted">
-									No queued tasks match your filters.
-								</Text>
-							</div>
-						) : (
-							filteredQueueTasks.slice(0, 16).map((task) => (
-								<button
-									key={task.taskId}
-									type="button"
-									className={cn(styles.queueItem, styles.queueItemButton)}
-									onClick={() => {
-										if (task.runId) {
-											openGeneralRunConversation(task.runId, { focus: true });
-										}
-									}}
-								>
-									<HStack
-										gap={2}
-										align="center"
-										className={styles.queueItemHeader}
-									>
-										<Badge
-											size="sm"
-											variant="soft"
-											color={priorityColor(task.priority)}
-										>
-											{task.priority}
-										</Badge>
-										<Badge
-											size="sm"
-											variant="outline"
-											color={statusColor(task.status)}
-										>
-											{task.status.replace("_", " ")}
-										</Badge>
-									</HStack>
-									<p className={styles.queueItemTitle}>{task.title}</p>
-									<p className={styles.queueItemMeta}>
-										{task.assigneeProfile} | run {shortRunId(task.runId)}
-									</p>
-								</button>
-							))
-						)}
-					</div>
-				</div>
-			</div>
+			<AgentChatLeftRail
+				channelScope={channelScope}
+				taskItems={taskItems}
+				profileRoster={profileRoster}
+				profileStateById={profileStateById}
+				resolvedProfiles={resolvedProfiles}
+				showQueueRefreshSpinner={showQueueRefreshSpinner}
+				priorityFilter={priorityFilter}
+				priorityCounts={priorityCounts}
+				statusFilter={statusFilter}
+				queueProfileFilter={queueProfileFilter}
+				queueRunFilter={queueRunFilter}
+				availableRunIds={availableRunIds}
+				filteredQueueTasks={filteredQueueTasks}
+				onApplyChannelScope={applyChannelScope}
+				onRefreshQueue={() => {
+					void refreshWorkflowData(true);
+				}}
+				onTogglePriorityFilter={(priority) => {
+					setPriorityFilter((current) =>
+						current === priority ? "all" : priority,
+					);
+				}}
+				onStatusFilterChange={setStatusFilter}
+				onQueueProfileFilterChange={setQueueProfileFilter}
+				onQueueRunFilterChange={setQueueRunFilter}
+				onOpenRunConversation={(runId) => {
+					void openGeneralRunConversation(runId, { focus: true });
+				}}
+			/>
 
 			<div className={styles.centerRail}>
 				<div className={styles.centerHeader}>
@@ -2030,7 +1481,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 							baseAvatarState={assistantBaseState}
 						/>
 					) : (
-						<EmptyState
+						<AgentChatEmptyState
 							profile={profile}
 							profileId={scopeProfileId}
 							templates={templates}
@@ -2078,311 +1529,38 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				</div>
 			</div>
 
-			<div className={styles.rightRail}>
-				<div className={styles.railCard}>
-					<HStack gap={2} align="center" className={styles.railHeaderRow}>
-						<Network size={14} />
-						<Text size="xs" weight="semibold" className={styles.railEyebrow}>
-							Agent network
-						</Text>
-					</HStack>
-					<div className={styles.networkSurface}>
-						<svg
-							className={styles.networkLines}
-							viewBox="0 0 240 180"
-							aria-hidden
-						>
-							<line x1="120" y1="34" x2="58" y2="94" />
-							<line x1="120" y1="34" x2="120" y2="126" />
-							<line x1="120" y1="34" x2="182" y2="94" />
-							<line x1="58" y1="94" x2="182" y2="94" />
-							<line x1="58" y1="94" x2="120" y2="126" />
-							<line x1="182" y1="94" x2="120" y2="126" />
-							<line x1="58" y1="94" x2="36" y2="136" />
-							<line x1="120" y1="126" x2="36" y2="136" />
-							<line x1="182" y1="94" x2="204" y2="136" />
-							<line x1="120" y1="126" x2="204" y2="136" />
-						</svg>
-						{[
-							{ profileId: "koro" as AgentProfileId, x: 120, y: 34 },
-							{ profileId: "devstral" as AgentProfileId, x: 58, y: 94 },
-							{ profileId: "sentinel" as AgentProfileId, x: 182, y: 94 },
-							{ profileId: "forge" as AgentProfileId, x: 120, y: 126 },
-							{ profileId: "gridsage" as AgentProfileId, x: 36, y: 136 },
-							{ profileId: "draftsmith" as AgentProfileId, x: 204, y: 136 },
-						].map((node) => {
-							const queued = taskItems.filter(
-								(task) =>
-									task.assigneeProfile === node.profileId &&
-									OPEN_QUEUE_STATUSES.includes(task.status),
-							).length;
-							const nodeState =
-								profileStateById[node.profileId] ??
-								resolveAgentMarkState({
-									error: !healthy,
-									waiting: healthy && !paired,
-									running: queued > 0,
-								});
-							return (
-								<button
-									key={node.profileId}
-									type="button"
-									onClick={() => applyChannelScope(node.profileId)}
-									className={cn(
-										styles.networkNode,
-										styles.networkNodeButton,
-										channelScope === node.profileId && styles.networkNodeActive,
-									)}
-									style={{ left: `${node.x}px`, top: `${node.y}px` }}
-								>
-									<AgentPixelMark
-										profileId={node.profileId}
-										size={34}
-										detailLevel="auto"
-										state={nodeState}
-									/>
-									{queued > 0 ? (
-										<span className={styles.networkCount}>{queued}</span>
-									) : null}
-								</button>
-							);
-						})}
-					</div>
-				</div>
-
-				<div className={styles.railCard}>
-					<div className={styles.railHeaderRow}>
-						<Text size="xs" weight="semibold" className={styles.railEyebrow}>
-							Review inbox
-						</Text>
-						<Badge size="sm" variant="soft" color="warning">
-							{reviewInboxTasks.length}
-						</Badge>
-					</div>
-
-					<div className={styles.reviewList}>
-						{reviewInboxTasks.length === 0 ? (
-							<div className={styles.emptyQueue}>
-								<Text size="xs" color="muted">
-									No tasks waiting for review.
-								</Text>
-							</div>
-						) : (
-							reviewInboxTasks.slice(0, 8).map((task) => (
-								<div key={task.taskId} className={styles.reviewItem}>
-									<HStack
-										gap={2}
-										align="center"
-										className={styles.reviewMetaRow}
-									>
-										<Badge
-											size="sm"
-											variant="soft"
-											color={priorityColor(task.priority)}
-										>
-											{task.priority}
-										</Badge>
-										<Text size="xs" color="muted">
-											{task.assigneeProfile}
-										</Text>
-									</HStack>
-									<p className={styles.reviewTitle}>{task.title}</p>
-									{task.description ? (
-										<p className={styles.reviewDescription}>
-											{truncateText(task.description, 220)}
-										</p>
-									) : null}
-									<textarea
-										id={`review-note-${task.taskId}`}
-										name={`review_note_${task.taskId}`}
-										value={reviewNotes[task.taskId] || ""}
-										onChange={(event) =>
-											setReviewNotes((current) => ({
-												...current,
-												[task.taskId]: event.target.value,
-											}))
-										}
-										rows={2}
-										placeholder="Optional reviewer note"
-										className={styles.reviewNoteInput}
-									/>
-									<div className={styles.reviewActions}>
-										<button
-											type="button"
-											onClick={() =>
-												void handleReviewAction(task.taskId, "approve")
-											}
-											disabled={reviewBusyTaskId === task.taskId}
-											className={cn(
-												styles.reviewActionButton,
-												styles.reviewApprove,
-											)}
-										>
-											<Check size={12} />
-											Approve
-										</button>
-										<button
-											type="button"
-											onClick={() =>
-												void handleReviewAction(task.taskId, "rework")
-											}
-											disabled={reviewBusyTaskId === task.taskId}
-											className={cn(
-												styles.reviewActionButton,
-												styles.reviewRework,
-											)}
-										>
-											<Undo2 size={12} />
-											Rework
-										</button>
-										<button
-											type="button"
-											onClick={() =>
-												void handleReviewAction(task.taskId, "defer")
-											}
-											disabled={reviewBusyTaskId === task.taskId}
-											className={cn(
-												styles.reviewActionButton,
-												styles.reviewDefer,
-											)}
-										>
-											<WifiOff size={12} />
-											Defer
-										</button>
-									</div>
-								</div>
-							))
-						)}
-					</div>
-				</div>
-
-				<div className={styles.railCard}>
-					<div className={styles.railHeaderRow}>
-						<Text size="xs" weight="semibold" className={styles.railEyebrow}>
-							Unified activity
-						</Text>
-					</div>
-					<div className={styles.filterGrid}>
-						<label className={styles.filterField} htmlFor="activity-profile-filter">
-							<span>profile</span>
-							<select
-								id="activity-profile-filter"
-								name="activity_profile_filter"
-								value={activityProfileFilter}
-								onChange={(event) =>
-									setActivityProfileFilter(
-										event.target.value as QueueProfileFilter,
-									)
-								}
-							>
-								<option value="all">all profiles</option>
-								{AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((id) => (
-									<option key={id} value={id}>
-										{resolvedProfiles[id].name}
-									</option>
-								))}
-							</select>
-						</label>
-						<label className={styles.filterField} htmlFor="activity-run-filter">
-							<span>run</span>
-							<select
-								id="activity-run-filter"
-								name="activity_run_filter"
-								value={activityRunFilter}
-								onChange={(event) => setActivityRunFilter(event.target.value)}
-							>
-								<option value="all">all runs</option>
-								{availableRunIds.map((runId) => (
-									<option key={runId} value={runId}>
-										{runConversationTitle(runId)}
-									</option>
-								))}
-							</select>
-						</label>
-						<label className={styles.filterField} htmlFor="activity-source-filter">
-							<span>source</span>
-							<select
-								id="activity-source-filter"
-								name="activity_source_filter"
-								value={activitySourceFilter}
-								onChange={(event) =>
-									setActivitySourceFilter(
-										event.target.value as ActivitySourceFilter,
-									)
-								}
-							>
-								<option value="all">all sources</option>
-								<option value="run">run</option>
-								<option value="task">task</option>
-								<option value="review">review</option>
-							</select>
-						</label>
-					</div>
-					<div className={styles.activityList}>
-						{filteredActivityItems.length === 0 ? (
-							<div className={styles.emptyQueue}>
-								<Text size="xs" color="muted">
-									No activity yet. Start an orchestration run to generate
-									events.
-								</Text>
-							</div>
-						) : (
-							filteredActivityItems.slice(0, 60).map((item) => (
-								<button
-									key={item.activityId}
-									type="button"
-									className={cn(styles.activityItem, styles.activityItemButton)}
-									onClick={() => {
-										if (item.runId) {
-											openGeneralRunConversation(item.runId, { focus: true });
-										}
-									}}
-								>
-									<div className={styles.activityItemMeta}>
-										<Badge size="sm" variant="soft" color={activityTone(item)}>
-											{item.source}
-										</Badge>
-										<span>{formatTimestamp(item.createdAt)}</span>
-									</div>
-									<p className={styles.activityMessage}>{item.message}</p>
-									<p className={styles.activityContext}>
-										{item.profileId ? `${item.profileId} | ` : ""}
-										{item.eventType}
-										{item.runId ? ` | run ${shortRunId(item.runId)}` : ""}
-									</p>
-									{(() => {
-										const detail = deriveActivityDetail(item);
-										if (!detail) return null;
-										return (
-											<>
-												{detail.meta ? (
-													<p className={styles.activityDetailMeta}>
-														{detail.meta}
-													</p>
-												) : null}
-												{detail.text ? (
-													<p
-														title={detail.text}
-														className={cn(
-															styles.activityDetail,
-															detail.isError && styles.activityDetailError,
-														)}
-													>
-														{truncateText(
-															detail.text,
-															ACTIVITY_DETAIL_PREVIEW_CHARS,
-														)}
-													</p>
-												) : null}
-											</>
-										);
-									})()}
-								</button>
-							))
-						)}
-					</div>
-				</div>
-			</div>
+			<AgentChatRightRail
+				channelScope={channelScope}
+				healthy={healthy}
+				paired={paired}
+				taskItems={taskItems}
+				profileStateById={profileStateById}
+				reviewInboxTasks={reviewInboxTasks}
+				reviewBusyTaskId={reviewBusyTaskId}
+				reviewNotes={reviewNotes}
+				resolvedProfiles={resolvedProfiles}
+				activityProfileFilter={activityProfileFilter}
+				activityRunFilter={activityRunFilter}
+				activitySourceFilter={activitySourceFilter}
+				filteredActivityItems={filteredActivityItems}
+				availableRunIds={availableRunIds}
+				onApplyChannelScope={applyChannelScope}
+				onReviewNoteChange={(taskId, value) => {
+					setReviewNotes((current) => ({
+						...current,
+						[taskId]: value,
+					}));
+				}}
+				onReviewAction={(taskId, action) => {
+					void handleReviewAction(taskId, action);
+				}}
+				onActivityProfileFilterChange={setActivityProfileFilter}
+				onActivityRunFilterChange={setActivityRunFilter}
+				onActivitySourceFilterChange={setActivitySourceFilter}
+				onOpenRunConversation={(runId) => {
+					void openGeneralRunConversation(runId, { focus: true });
+				}}
+			/>
 
 			{workflowError ? (
 				<div className={styles.workflowErrorBanner}>
@@ -2391,80 +1569,5 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				</div>
 			) : null}
 		</Panel>
-	);
-}
-
-function EmptyState({
-	profile,
-	profileId,
-	templates,
-	isReady,
-	avatarState,
-	onTemplateClick,
-}: {
-	profile: { name: string; tagline: string; focus: string };
-	profileId: AgentProfileId;
-	templates: Array<{ label: string; prompt: string }>;
-	isReady: boolean;
-	avatarState: AgentMarkState;
-	onTemplateClick: (prompt: string) => void;
-}) {
-	return (
-		<div className={styles.emptyRoot}>
-			<div className={styles.emptyAmbient} />
-			<div className={styles.emptyContent}>
-				<div className={styles.emptyAvatarWrap}>
-					<AgentPixelMark
-						profileId={profileId}
-						size={176}
-						detailLevel="auto"
-						state={avatarState}
-					/>
-				</div>
-				<h2 className={styles.emptyTitle}>{profile.name}</h2>
-				<p className={styles.emptyTagline}>{profile.tagline}</p>
-				<p className={styles.emptyFocus}>{profile.focus}</p>
-
-				{!isReady ? (
-					<HStack
-						gap={2}
-						align="center"
-						className={cn(styles.statusPill, styles.statusPillWarning)}
-					>
-						<WifiOff size={14} className={styles.warningIcon} />
-						<Text size="sm" color="warning">
-							Waiting for connection...
-						</Text>
-					</HStack>
-				) : (
-					<HStack
-						gap={2}
-						align="center"
-						className={cn(styles.statusPill, styles.statusPillSuccess)}
-					>
-						<div className={styles.readyDot} />
-						<Text size="sm" color="success">
-							Ready to assist
-						</Text>
-					</HStack>
-				)}
-
-				{templates.length > 0 && isReady && (
-					<div className={styles.templateGrid}>
-						{templates.slice(0, 4).map((template) => (
-							<button
-								key={template.label}
-								type="button"
-								onClick={() => onTemplateClick(template.prompt)}
-								className={styles.templateCard}
-							>
-								<Zap size={14} />
-								<span>{template.label}</span>
-							</button>
-						))}
-					</div>
-				)}
-			</div>
-		</div>
 	);
 }

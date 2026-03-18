@@ -44,21 +44,21 @@ Server name (to avoid conflicts): `suite_repo_mcp`
 - Server entry: `tools/suite-repo-mcp/server.mjs`
 - Server package: `tools/suite-repo-mcp/package.json`
 
-## Codex config snippet
+## Codex config sync
 
-Add this to `~/.codex/config.toml`:
+Preferred local setup on the workstation:
 
-```toml
-[mcp_servers.suite_repo_mcp]
-command = "node"
-args = ["/workspaces/Suite/tools/suite-repo-mcp/server.mjs"]
-startup_timeout_sec = 20
-tool_timeout_sec = 180
+```powershell
+PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1
+```
 
-[mcp_servers.suite_repo_mcp.env]
-SUITE_WORKSTATION_ID = "DUSTINWARD"
-SUITE_WORKSTATION_LABEL = "Dustin workstation"
-SUITE_WORKSTATION_ROLE = "active"
+The canonical workstation profile source lives in `tools/suite-repo-mcp/workstation-profiles.json`.
+Human-facing matrix notes live in `docs/development/mcp-workstation-matrix.md`.
+
+To preview the generated MCP block without writing `~/.codex/config.toml`:
+
+```powershell
+PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -PrintToml
 ```
 
 If your Codex build requires RMCP client mode for MCP servers, enable this once:
@@ -75,7 +75,7 @@ Then restart Codex.
 - The server only operates inside this repo root (`/workspaces/Suite`).
 - Tooling is aligned to your stack (`Biome`, `TypeScript`, `Flask`, `Supabase SQL`).
 - Optional workstation identity env vars are supported: `SUITE_WORKSTATION_ID`, `SUITE_WORKSTATION_LABEL`, `SUITE_WORKSTATION_ROLE`.
-- A ready-to-merge home machine example lives at `tools/suite-repo-mcp/examples/dustin-home-workstation.toml`.
+- The sync helper also stamps explicit Watchdog filesystem, AutoCAD, plugin, readiness, and backend startup metadata into `mcp_servers.suite_repo_mcp.env`.
 - No Git push/commit automation is included.
 - `repo.generate_route` intentionally does not auto-edit `src/App.tsx`; it returns a registration hint.
 

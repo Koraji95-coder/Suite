@@ -29,27 +29,38 @@ import {
 	type AutoDraftComparePrepareResponse,
 	type AutoDraftCompareRoi,
 	type AutoDraftCompareResponse,
-	type AutoDraftLearningEvaluation,
-	type AutoDraftLearningModel,
-	type AutoDraftReplacementTuning,
 	type AutoDraftToleranceProfile,
 	autoDraftService,
 } from "./autodraftService";
+import { AutoDraftCompareSetupSection } from "./AutoDraftCompareSetupSection";
+import {
+	type CadPointInput,
+	DEFAULT_CAD_POINTS,
+	DEFAULT_REPLACEMENT_TUNING,
+	EMPTY_LEARNING_SUMMARY,
+	type LearningSummaryState,
+	type ReplacementTuningInput,
+	buildRoiAroundPreparedMarkups,
+	describeLearningEvaluation,
+	describeLearningModel,
+	parseCadPointInputs,
+	parseReplacementTuningInput,
+	summarizeMarkupTrainingResult,
+	summarizeReplacementTrainingResult,
+} from "./autoDraftCompareHelpers";
+import {
+	buildCompareActionById,
+	buildMarkupReviewQueue,
+	buildPrepareColorSourcesSummary,
+	buildPrepareStatus,
+	buildPrepareTextFallbackSummary,
+	buildReviewQueue,
+	buildShadowReviewByActionId,
+} from "./autoDraftCompareSelectors";
 
 if (!GlobalWorkerOptions.workerSrc) {
 	GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 }
-
-type CadPointInput = {
-	x: string;
-	y: string;
-};
-
-type ReplacementTuningInput = {
-	unresolvedConfidenceThreshold: string;
-	ambiguityMarginThreshold: string;
-	searchRadiusMultiplier: string;
-};
 
 type MarkupReviewDraft = {
 	category: string;
@@ -58,15 +69,6 @@ type MarkupReviewDraft = {
 	text: string;
 };
 
-const DEFAULT_CAD_POINTS: CadPointInput[] = [
-	{ x: "", y: "" },
-	{ x: "", y: "" },
-];
-const DEFAULT_REPLACEMENT_TUNING: ReplacementTuningInput = {
-	unresolvedConfidenceThreshold: "0.36",
-	ambiguityMarginThreshold: "0.08",
-	searchRadiusMultiplier: "2.5",
-};
 const DEFAULT_CALIBRATION_MODE: AutoDraftCalibrationMode = "auto";
 const MARKUP_REVIEW_CATEGORY_OPTIONS = [
 	"",
@@ -99,18 +101,6 @@ type PointProjection = {
 	topPercent: number;
 };
 
-type PreviewStatus = {
-	color: "muted" | "warning" | "success";
-	message: string;
-};
-
-type LearningSummaryState = {
-	loading: boolean;
-	model: AutoDraftLearningModel | null;
-	evaluation: AutoDraftLearningEvaluation | null;
-	error: string | null;
-};
-
 type PanOffset = {
 	x: number;
 	y: number;
@@ -129,12 +119,6 @@ const PDF_PREVIEW_MIN_ZOOM = 0.4;
 const PDF_PREVIEW_MAX_ZOOM = 4.0;
 const PDF_PREVIEW_ZOOM_STEP = 1.15;
 const PREVIEW_PAN_THRESHOLD_PX = 6;
-const EMPTY_LEARNING_SUMMARY: LearningSummaryState = {
-	loading: false,
-	model: null,
-	evaluation: null,
-	error: null,
-};
 
 function isRecordValue(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -255,114 +239,6 @@ function buildMarkupReviewDraftDefaults(args: {
 					? markup.text
 					: "",
 	};
-}
-
-function summarizeMarkupTrainingResult(
-	results: Array<Record<string, unknown>>,
-): { color: "success" | "warning"; message: string } {
-	return summarizeDomainTrainingResult(results, {
-		domain: "autodraft_markup",
-		label: "Markup",
-	});
-}
-
-function toFiniteNumber(value: unknown): number | null {
-	if (typeof value === "number" && Number.isFinite(value)) return value;
-	if (typeof value === "string") {
-		const parsed = Number(value);
-		if (Number.isFinite(parsed)) return parsed;
-	}
-	return null;
-}
-
-function formatLearningMetricTokens(metrics: Record<string, unknown>): string[] {
-	const accuracy = toFiniteNumber(metrics.accuracy);
-	const macroF1 = toFiniteNumber(metrics.macro_f1);
-	const tokens: string[] = [];
-	if (accuracy !== null) tokens.push(`acc ${accuracy.toFixed(2)}`);
-	if (macroF1 !== null) tokens.push(`f1 ${macroF1.toFixed(2)}`);
-	return tokens;
-}
-
-function summarizeDomainTrainingResult(
-	results: Array<Record<string, unknown>>,
-	args: {
-		domain: string;
-		label: string;
-	},
-): { color: "success" | "warning"; message: string } {
-	const { domain, label } = args;
-	const result =
-		results.find(
-			(entry) => toTrimmedString(entry.domain).toLowerCase() === domain,
-		) || results[0];
-	if (!result) {
-		return {
-			color: "warning",
-			message: `${label} model training returned no results.`,
-		};
-	}
-	const ok = Boolean(result.ok);
-	if (!ok) {
-		return {
-			color: "warning",
-			message:
-				toTrimmedString(result.message) ||
-				`${label} model training did not complete successfully.`,
-		};
-	}
-	const version = toTrimmedString(result.version);
-	const sampleCount = toFiniteNumber(result.sample_count);
-	const metrics = isRecordValue(result.metrics) ? result.metrics : null;
-	const tokens = [`${label} model trained`];
-	if (version) tokens.push(version);
-	if (sampleCount !== null) tokens.push(`samples ${sampleCount}`);
-	if (metrics) {
-		tokens.push(...formatLearningMetricTokens(metrics));
-	}
-	return {
-		color: "success",
-		message: tokens.join(" | "),
-	};
-}
-
-function summarizeReplacementTrainingResult(
-	results: Array<Record<string, unknown>>,
-): { color: "success" | "warning"; message: string } {
-	return summarizeDomainTrainingResult(results, {
-		domain: "autodraft_replacement",
-		label: "Replacement",
-	});
-}
-
-function describeLearningModel(
-	label: string,
-	model: AutoDraftLearningModel | null,
-): string {
-	if (!model) {
-		return `No active ${label.toLowerCase()} model yet.`;
-	}
-	const sampleCount = toFiniteNumber(model.metadata.example_count);
-	const tokens = [`Active ${label} model`, model.version];
-	if (sampleCount !== null) tokens.push(`samples ${sampleCount}`);
-	tokens.push(...formatLearningMetricTokens(model.metrics));
-	return tokens.join(" | ");
-}
-
-function describeLearningEvaluation(
-	label: string,
-	evaluation: AutoDraftLearningEvaluation | null,
-): string {
-	if (!evaluation) {
-		return `No ${label.toLowerCase()} evaluation history yet.`;
-	}
-	const tokens = [`Latest ${label} eval`, evaluation.version];
-	tokens.push(evaluation.promoted ? "promoted" : "held");
-	if (evaluation.sampleCount > 0) {
-		tokens.push(`samples ${evaluation.sampleCount}`);
-	}
-	tokens.push(...formatLearningMetricTokens(evaluation.metrics));
-	return tokens.join(" | ");
 }
 
 function mapCanvasClientPointToPdf(args: {
@@ -515,108 +391,37 @@ export function AutoDraftComparePanel() {
 						: "Two points captured. Next click rolls forward and replaces P1.";
 	const latestPointIndex = pdfPoints.length > 0 ? pdfPoints.length - 1 : null;
 	const zoomPercentLabel = `${Math.round(zoom * 100)}%`;
-	const compareActionById = useMemo(() => {
-		const lookup = new Map<
-			string,
-			AutoDraftCompareResponse["plan"]["actions"][number]
-		>();
-		if (!compareResult) return lookup;
-		for (const action of compareResult.plan.actions) {
-			lookup.set(action.id, action);
-		}
-		return lookup;
-	}, [compareResult]);
-	const reviewQueue = useMemo(
-		() => (compareResult ? compareResult.review_queue : []),
+	const compareActionById = useMemo(
+		() => buildCompareActionById(compareResult),
 		[compareResult],
 	);
+	const reviewQueue = useMemo(() => buildReviewQueue(compareResult), [compareResult]);
 	const markupReviewQueue = useMemo(
-		() => (compareResult ? compareResult.markup_review_queue : []),
+		() => buildMarkupReviewQueue(compareResult),
 		[compareResult],
 	);
-	const shadowReviewByActionId = useMemo(() => {
-		const lookup = new Map<
-			string,
-			NonNullable<AutoDraftCompareResponse["shadow_advisor"]>["reviews"][number]
-		>();
-		if (!compareResult?.shadow_advisor?.reviews) return lookup;
-		for (const review of compareResult.shadow_advisor.reviews) {
-			lookup.set(review.action_id, review);
-		}
-		return lookup;
-	}, [compareResult]);
-	const prepareColorSourcesSummary = useMemo(() => {
-		if (!prepareResult) return null;
-		const counters = new Map<string, number>();
-		let knownColors = 0;
-		for (const markup of prepareResult.markups) {
-			if (markup.color !== "unknown") {
-				knownColors += 1;
-			}
-			const meta = isRecordValue(markup.meta) ? markup.meta : null;
-			const source =
-				meta &&
-				typeof meta.color_source === "string" &&
-				meta.color_source.trim().length > 0
-					? meta.color_source.trim().toUpperCase()
-					: "UNKNOWN";
-			counters.set(source, (counters.get(source) || 0) + 1);
-		}
-		const sourceSummary = Array.from(counters.entries())
-			.sort((a, b) => a[0].localeCompare(b[0]))
-			.map(([source, count]) => `${source}:${count}`)
-			.join(" | ");
-		return `Color extraction: known ${knownColors}/${prepareResult.markups.length} | sources ${sourceSummary || "none"}`;
-	}, [prepareResult]);
-	const prepareTextFallbackSummary = useMemo(() => {
-		const extraction = prepareResult?.pdf_metadata.page.text_extraction;
-		if (!extraction) return null;
-		if (
-			!extraction.used &&
-			extraction.embedded_line_count <= 0 &&
-			extraction.ocr_line_count <= 0
-		) {
-			return null;
-		}
-		if (!extraction.used) {
-			return `Text fallback scanned but not used | embedded lines ${extraction.embedded_line_count} | OCR lines ${extraction.ocr_line_count}`;
-		}
-		return `Text fallback: ${extraction.source} | selected ${extraction.selected_line_count} of ${Math.max(extraction.candidate_count, extraction.selected_line_count)} candidates | embedded lines ${extraction.embedded_line_count} | OCR lines ${extraction.ocr_line_count}`;
-	}, [prepareResult]);
-
-	const prepareStatus = useMemo<PreviewStatus | null>(() => {
-		if (loadingPdf) {
-			return {
-				color: "muted",
-				message: "Loading PDF preview...",
-			};
-		}
-		if (loadingPrepare) {
-			return {
-				color: "muted",
-				message: "Preparing markups...",
-			};
-		}
-		if (prepareError) {
-			return {
-				color: "warning",
-				message: prepareError,
-			};
-		}
-		if (!prepareResult) {
-			return null;
-		}
-		if (prepareResult.markups.length === 0) {
-			return {
-				color: "warning",
-				message: `Prepared 0 markups from page ${prepareResult.page.index + 1}. No supported annotations were detected.`,
-			};
-		}
-		return {
-			color: "success",
-			message: `Prepared ${prepareResult.markups.length} markups from page ${prepareResult.page.index + 1}.`,
-		};
-	}, [loadingPdf, loadingPrepare, prepareError, prepareResult]);
+	const shadowReviewByActionId = useMemo(
+		() => buildShadowReviewByActionId(compareResult),
+		[compareResult],
+	);
+	const prepareColorSourcesSummary = useMemo(
+		() => buildPrepareColorSourcesSummary(prepareResult),
+		[prepareResult],
+	);
+	const prepareTextFallbackSummary = useMemo(
+		() => buildPrepareTextFallbackSummary(prepareResult),
+		[prepareResult],
+	);
+	const prepareStatus = useMemo(
+		() =>
+			buildPrepareStatus({
+				loadingPdf,
+				loadingPrepare,
+				prepareError,
+				prepareResult,
+			}),
+		[loadingPdf, loadingPrepare, prepareError, prepareResult],
+	);
 
 	const fitPreviewToViewport = useCallback(() => {
 		const viewportElement = previewViewportRef.current;
@@ -1154,52 +959,13 @@ export function AutoDraftComparePanel() {
 	);
 
 	const parseReplacementTuning =
-		useCallback((): AutoDraftReplacementTuning | null => {
-			const unresolvedThreshold = Number(
-				replacementTuning.unresolvedConfidenceThreshold,
-			);
-			const ambiguityMargin = Number(
-				replacementTuning.ambiguityMarginThreshold,
-			);
-			const radiusMultiplier = Number(replacementTuning.searchRadiusMultiplier);
-			if (
-				!Number.isFinite(unresolvedThreshold) ||
-				!Number.isFinite(ambiguityMargin) ||
-				!Number.isFinite(radiusMultiplier)
-			) {
-				return null;
-			}
-			if (
-				unresolvedThreshold < 0 ||
-				unresolvedThreshold > 1 ||
-				ambiguityMargin < 0 ||
-				ambiguityMargin > 1 ||
-				radiusMultiplier < 0.5 ||
-				radiusMultiplier > 8
-			) {
-				return null;
-			}
-			return {
-				unresolved_confidence_threshold: unresolvedThreshold,
-				ambiguity_margin_threshold: ambiguityMargin,
-				search_radius_multiplier: radiusMultiplier,
-				min_search_radius: 24,
-			};
-		}, [replacementTuning]);
+		useCallback(
+			() => parseReplacementTuningInput(replacementTuning),
+			[replacementTuning],
+		);
 
 	const parseCadPoints = useCallback((): AutoDraftComparePoint[] | null => {
-		const parsed = cadPoints.map((entry) => ({
-			x: Number(entry.x),
-			y: Number(entry.y),
-		}));
-		if (
-			parsed.some(
-				(entry) => !Number.isFinite(entry.x) || !Number.isFinite(entry.y),
-			)
-		) {
-			return null;
-		}
-		return parsed;
+		return parseCadPointInputs(cadPoints);
 	}, [cadPoints]);
 
 	const onCalibrationModeChange = useCallback(
@@ -1216,6 +982,48 @@ export function AutoDraftComparePanel() {
 		[],
 	);
 
+	const onPdfFileChange = useCallback((file: File | null) => {
+		setPdfFile(file);
+	}, []);
+
+	const onPageNumberInputChange = useCallback(
+		(rawValue: string) => {
+			const nextPageNumber = Math.max(1, Math.round(Number(rawValue) || 1));
+			if (pageCount > 0) {
+				const nextPageIndex = Math.min(nextPageNumber, pageCount) - 1;
+				setPageIndex((current) => {
+					if (current === nextPageIndex) return current;
+					setPdfPoints([]);
+					return nextPageIndex;
+				});
+				return;
+			}
+			const nextPageIndex = nextPageNumber - 1;
+			setPageIndex((current) => {
+				if (current === nextPageIndex) return current;
+				setPdfPoints([]);
+				return nextPageIndex;
+			});
+		},
+		[pageCount],
+	);
+
+	const onEngineChange = useCallback((value: AutoDraftCompareEngine) => {
+		setEngine(value);
+	}, []);
+
+	const onToleranceChange = useCallback((value: AutoDraftToleranceProfile) => {
+		setTolerance(value);
+	}, []);
+
+	const onManualOverrideChange = useCallback((checked: boolean) => {
+		setManualOverride(checked);
+	}, []);
+
+	const onResetReplacementTuning = useCallback(() => {
+		setReplacementTuning(DEFAULT_REPLACEMENT_TUNING);
+	}, []);
+
 	const clearRoi = useCallback(() => {
 		setRoiBounds(null);
 		setRoiDrawMode(false);
@@ -1223,48 +1031,11 @@ export function AutoDraftComparePanel() {
 	}, []);
 
 	const focusRoiAroundPreparedMarkups = useCallback(() => {
-		if (!prepareResult || prepareResult.markups.length === 0) {
-			return;
-		}
-		let left: number | null = null;
-		let bottom: number | null = null;
-		let right: number | null = null;
-		let top: number | null = null;
-		for (const markup of prepareResult.markups) {
-			const bounds = markup.bounds;
-			if (!bounds) continue;
-			const x = Number(bounds.x);
-			const y = Number(bounds.y);
-			const width = Number(bounds.width);
-			const height = Number(bounds.height);
-			if (
-				!Number.isFinite(x) ||
-				!Number.isFinite(y) ||
-				!Number.isFinite(width) ||
-				!Number.isFinite(height) ||
-				width <= 0 ||
-				height <= 0
-			) {
-				continue;
-			}
-			const nextRight = x + width;
-			const nextTop = y + height;
-			left = left === null ? x : Math.min(left, x);
-			bottom = bottom === null ? y : Math.min(bottom, y);
-			right = right === null ? nextRight : Math.max(right, nextRight);
-			top = top === null ? nextTop : Math.max(top, nextTop);
-		}
-		if (left === null || bottom === null || right === null || top === null) {
-			return;
-		}
+		const nextRoi = buildRoiAroundPreparedMarkups(prepareResult);
+		if (!nextRoi) return;
 		setRoiDrawMode(false);
 		setRoiDrawStart(null);
-		setRoiBounds({
-			x: left,
-			y: bottom,
-			width: Math.max(0.0001, right - left),
-			height: Math.max(0.0001, top - bottom),
-		});
+		setRoiBounds(nextRoi);
 	}, [prepareResult]);
 
 	const onCanvasClick = useCallback(
@@ -1943,228 +1714,29 @@ export function AutoDraftComparePanel() {
 				</Button>
 			</HStack>
 
-			<div className={styles.compareControls}>
-				<label
-					htmlFor="autodraft-compare-pdf-file"
-					className={styles.compareField}
-				>
-					<span>Bluebeam PDF</span>
-					<input
-						id="autodraft-compare-pdf-file"
-						name="autodraftComparePdfFile"
-						type="file"
-						accept="application/pdf,.pdf"
-						onChange={(event) => {
-							const file = event.target.files?.[0] ?? null;
-							setPdfFile(file);
-						}}
-					/>
-				</label>
-				<label
-					htmlFor="autodraft-compare-page-number"
-					className={styles.compareField}
-				>
-					<span>Page number</span>
-					<input
-						id="autodraft-compare-page-number"
-						name="autodraftComparePageNumber"
-						type="number"
-						min={1}
-						max={pageCount > 0 ? pageCount : undefined}
-						value={pageNumber}
-						onChange={(event) => {
-							const nextPageNumber = Math.max(
-								1,
-								Math.round(Number(event.target.value) || 1),
-							);
-							if (pageCount > 0) {
-								const nextPageIndex = Math.min(nextPageNumber, pageCount) - 1;
-								setPageIndex((current) => {
-									if (current === nextPageIndex) return current;
-									setPdfPoints([]);
-									return nextPageIndex;
-								});
-								return;
-							}
-							const nextPageIndex = nextPageNumber - 1;
-							setPageIndex((current) => {
-								if (current === nextPageIndex) return current;
-								setPdfPoints([]);
-								return nextPageIndex;
-							});
-						}}
-					/>
-				</label>
-				<label
-					htmlFor="autodraft-compare-engine"
-					className={styles.compareField}
-				>
-					<span>Engine</span>
-					<select
-						id="autodraft-compare-engine"
-						name="autodraftCompareEngine"
-						value={engine}
-						onChange={(event) =>
-							setEngine(event.target.value as AutoDraftCompareEngine)
-						}
-					>
-						<option value="auto">auto</option>
-						<option value="python">python</option>
-						<option value="dotnet">dotnet</option>
-					</select>
-				</label>
-				<label
-					htmlFor="autodraft-compare-tolerance"
-					className={styles.compareField}
-				>
-					<span>Tolerance</span>
-					<select
-						id="autodraft-compare-tolerance"
-						name="autodraftCompareTolerance"
-						value={tolerance}
-						onChange={(event) =>
-							setTolerance(event.target.value as AutoDraftToleranceProfile)
-						}
-					>
-						<option value="strict">strict</option>
-						<option value="medium">medium</option>
-						<option value="loose">loose</option>
-					</select>
-				</label>
-				<label
-					htmlFor="autodraft-compare-calibration-mode"
-					className={styles.compareField}
-				>
-					<span>Calibration mode</span>
-					<select
-						id="autodraft-compare-calibration-mode"
-						name="autodraftCompareCalibrationMode"
-						value={calibrationMode}
-						onChange={onCalibrationModeChange}
-					>
-						<option value="auto">auto</option>
-						<option value="manual">manual</option>
-					</select>
-				</label>
-				<label
-					htmlFor="autodraft-compare-manual-override"
-					className={`${styles.compareField} ${styles.compareCheckboxField}`}
-				>
-					<input
-						id="autodraft-compare-manual-override"
-						name="autodraftCompareManualOverride"
-						type="checkbox"
-						checked={manualOverride}
-						disabled={calibrationMode === "manual"}
-						onChange={(event) => setManualOverride(event.target.checked)}
-					/>
-					<span>Use manual points only if auto calibration fails</span>
-				</label>
-				<Button
-					variant="primary"
-					size="sm"
-					onClick={runPrepare}
-					disabled={prepareDisabled}
-					loading={loadingPrepare || loadingPdf}
-				>
-					Prepare markups
-				</Button>
-			</div>
-			<div className={styles.compareTuningPanel}>
-				<Text size="xs" color="muted">
-					Replacement tuning (red callouts)
-				</Text>
-				<div className={styles.compareTuningGrid}>
-					<label
-						htmlFor="autodraft-compare-tuning-unresolved-threshold"
-						className={styles.compareField}
-					>
-						<span>Unresolved threshold</span>
-						<input
-							id="autodraft-compare-tuning-unresolved-threshold"
-							name="autodraftCompareTuningUnresolvedThreshold"
-							type="number"
-							step="0.01"
-							min={0}
-							max={1}
-							value={replacementTuning.unresolvedConfidenceThreshold}
-							onChange={(event) =>
-								updateReplacementTuning(
-									"unresolvedConfidenceThreshold",
-									event.target.value,
-								)
-							}
-						/>
-					</label>
-					<label
-						htmlFor="autodraft-compare-tuning-ambiguity-margin"
-						className={styles.compareField}
-					>
-						<span>Ambiguity margin</span>
-						<input
-							id="autodraft-compare-tuning-ambiguity-margin"
-							name="autodraftCompareTuningAmbiguityMargin"
-							type="number"
-							step="0.01"
-							min={0}
-							max={1}
-							value={replacementTuning.ambiguityMarginThreshold}
-							onChange={(event) =>
-								updateReplacementTuning(
-									"ambiguityMarginThreshold",
-									event.target.value,
-								)
-							}
-						/>
-					</label>
-					<label
-						htmlFor="autodraft-compare-tuning-radius-multiplier"
-						className={styles.compareField}
-					>
-						<span>Search radius multiplier</span>
-						<input
-							id="autodraft-compare-tuning-radius-multiplier"
-							name="autodraftCompareTuningRadiusMultiplier"
-							type="number"
-							step="0.1"
-							min={0.5}
-							max={8}
-							value={replacementTuning.searchRadiusMultiplier}
-							onChange={(event) =>
-								updateReplacementTuning(
-									"searchRadiusMultiplier",
-									event.target.value,
-								)
-							}
-						/>
-					</label>
-					<div className={styles.compareTuningActions}>
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setReplacementTuning(DEFAULT_REPLACEMENT_TUNING)}
-						>
-							Reset tuning
-						</Button>
-					</div>
-				</div>
-				<Text size="xs" color="muted" className={styles.compareTuningHint}>
-					Default: unresolved &lt; 0.36, ambiguous margin &lt;= 0.08, radius
-					x2.5.
-				</Text>
-			</div>
-			{prepareStatus ? (
-				<div className={styles.comparePrepareStatus} aria-live="polite">
-					<Text size="xs" color={prepareStatus.color}>
-						{prepareStatus.message}
-					</Text>
-					{prepareResult?.warnings.map((warning, index) => (
-						<Text key={`${warning}:${index}`} size="xs" color="warning">
-							{warning}
-						</Text>
-					))}
-				</div>
-			) : null}
+			<AutoDraftCompareSetupSection
+				pageCount={pageCount}
+				pageNumber={pageNumber}
+				engine={engine}
+				tolerance={tolerance}
+				calibrationMode={calibrationMode}
+				manualOverride={manualOverride}
+				loadingPrepare={loadingPrepare}
+				loadingPdf={loadingPdf}
+				prepareDisabled={prepareDisabled}
+				replacementTuning={replacementTuning}
+				prepareStatus={prepareStatus}
+				prepareWarnings={prepareResult?.warnings || []}
+				onPdfFileChange={onPdfFileChange}
+				onPageNumberInputChange={onPageNumberInputChange}
+				onEngineChange={onEngineChange}
+				onToleranceChange={onToleranceChange}
+				onCalibrationModeChange={onCalibrationModeChange}
+				onManualOverrideChange={onManualOverrideChange}
+				onRunPrepare={runPrepare}
+				onReplacementTuningChange={updateReplacementTuning}
+				onResetReplacementTuning={onResetReplacementTuning}
+			/>
 
 			<div
 				ref={previewGridRef}

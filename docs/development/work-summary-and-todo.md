@@ -1,6 +1,6 @@
 # Suite Work Summary + TODO
 
-Date: March 2, 2026  
+Date: March 18, 2026  
 Branch: `main`
 
 This is a restart/handoff doc summarizing what has already been completed and what to do next.
@@ -19,9 +19,24 @@ This is a restart/handoff doc summarizing what has already been completed and wh
   - plugin install/check scripts
   - readiness doctor
   - live `tracker-state.json` export ingestion
+- Versioned workstation profile sync is live:
+  - `tools/suite-repo-mcp/workstation-profiles.json`
+  - `scripts/sync-suite-workstation-profile.ps1`
+  - `scripts/restore-suite-local-state.ps1` now reapplies workstation-specific MCP env after mirror restore
 - Command Center no longer carries the old Watchdog UI path.
 - Legacy widget-era dashboard files that were no longer referenced were removed.
 - Project detail now surfaces Watchdog telemetry summaries and dashboard deep links.
+- Stage 1 ops-surface cleanup landed:
+  - dashboard sections/selectors/formatters
+  - command-center model/history/tab sections
+  - project-manager UI-state/selectors seam
+  - account-settings sections/hooks/shared primitives
+- First-pass frontend hotspot splits landed for:
+  - `LoginPage`
+  - `AgentChatPanel`
+  - `AutoDraftComparePanel`
+  - `ConduitRouteApp`
+  - `ConduitTerminalWorkflow`
 
 ### Current Baseline
 
@@ -33,46 +48,53 @@ This is a restart/handoff doc summarizing what has already been completed and wh
 
 ### MCP / Workstation Settings TODO
 
-Current local MCP server config is in `C:\Users\koraj\.codex\config.toml` under `mcp_servers.suite_repo_mcp.env`.
+Current local MCP server config is in `C:\Users\DustinWard\.codex\config.toml` under `mcp_servers.suite_repo_mcp.env`.
 
 Current live workstation assumptions:
 
-- workstation id: `DUSTIN-HOME`
-- workstation label: `Dustin Home workstation`
-- workstation role: `home`
-- filesystem collector startup/check metadata is configured
-- AutoCAD collector startup/check metadata is configured
-- AutoCAD plugin bundle/check metadata is configured
-- AutoCAD readiness doctor metadata is configured
+- workstation id: `DUSTINWARD`
+- workstation label: `Dustin workstation`
+- workstation role: `active`
+- current explicit MCP env includes workstation identity plus filesystem collector, AutoCAD collector, plugin, readiness, and backend startup metadata
+- `tools/suite-repo-mcp/workstation-profiles.json` is the versioned workstation profile source-of-truth
+- `scripts/sync-suite-workstation-profile.ps1` rewrites the local `suite_repo_mcp` block without requiring a full mirror restore
+- `scripts/restore-suite-local-state.ps1` now reuses the shared workstation profile sync helper
+- local watchdog startup/install state on `DUSTINWARD` is expected to use HKCU `Run` fallback when scheduled-task registration is denied
+- AutoCAD readiness can still report `awaiting_autocad` until `tracker-state.json` is emitted on this workstation
 
 Next MCP-setting cleanup tasks:
 
-1. Move workstation-specific MCP env values into one versioned source-of-truth file in the repo.
-   - Goal: avoid hand-editing `C:\Users\koraj\.codex\config.toml` for every workstation change.
-   - Candidate shape: `docs/development/mcp-workstation-matrix.md` plus a small sync script.
-
-2. Add a generated workstation profile sync script.
-   - Input: workstation id (`DUSTIN-HOME`, office workstation, laptop, etc.).
-   - Output: patch/update the corresponding `suite_repo_mcp.env` block in local Codex config.
-
-3. Add backend startup metadata to MCP env on every workstation.
-   - The backend startup check now exists; make sure every workstation profile carries the matching env keys and check scripts.
-
-4. Add a single combined workstation doctor tool to MCP.
+1. Add a single combined workstation doctor tool to MCP.
    - It should report backend, filesystem collector, AutoCAD collector, AutoCAD plugin, and tracker-state health in one call.
 
-5. Move workstation naming rules into a documented convention.
+2. Move workstation naming rules into a documented convention.
    - Lock down collector ids, Run-key names, Scheduled Task names, mutex names, and config-file names so they derive deterministically from workstation id.
 
-6. Add restart-required notes for MCP config changes.
+3. Add restart-required notes for MCP config changes.
    - Any change to `config.toml` still requires restarting the developer window/Codex session.
    - This should be stated explicitly in the MCP handoff docs.
 
-7. Add a repo-level guard/check for missing workstation MCP values.
+4. Add a repo-level guard/check for missing workstation MCP values.
    - Validate that required startup/check paths exist locally for the current workstation before opening a working session.
 
-8. Decide whether Dropbox mirror state should be represented in MCP config or stay outside MCP.
+5. Decide whether Dropbox mirror state should be represented in MCP config or stay outside MCP.
    - Current recommendation: keep Dropbox sync operational state outside MCP and keep MCP limited to local tooling and diagnostics.
+
+### Next Workstation Transition Checklist
+
+For the next session on `DUSTIN-HOME`:
+
+1. Pull latest `main`.
+2. Run:
+   - `PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/restore-suite-local-state.ps1 -WorkstationId DUSTIN-HOME`
+3. Restart Codex so the workstation-specific MCP env reloads.
+4. If only the MCP workstation block needs to be rewritten, skip the full restore and run:
+   - `npm run workstation:sync -- -WorkstationId DUSTIN-HOME`
+5. Verify startup/doctor status before doing app work:
+   - `npm run watchdog:startup:check`
+   - `npm run watchdog:startup:autocad:check`
+   - `npm run watchdog:backend:startup:check`
+   - `npm run watchdog:autocad:doctor`
 
 ## 1) What Is Already Done
 
@@ -174,20 +196,25 @@ Recent milestone commits:
    - Passkey enroll/signin success + failure paths.
    - Pair/unpair challenge expiry, retry throttles, invalid confirm behavior.
 
-## P1 - Finish remaining UI scalability hotspots
+## P1 - Continue frontend hotspot cleanup
 
-These files are still larger than ideal and should be split next:
+Stage 1 ops-surface splits are in place, and first-pass hotspot seams are now live for login, agent chat, AutoDraft compare, and conduit routing. The next frontend work should stay focused on the largest remaining responsibility collisions:
 
-- `src/components/apps/projects/useProjectManagerState.ts` (~1093 lines)
-- `src/services/agentService.ts` (~1027 lines)
-- `src/supabase/database.ts` (~845 lines)
-- `src/components/apps/ground-grid-generator/useGridGeneratorState.ts` (~610 lines)
+- `src/services/agentService.ts` (~2703 lines)
+  - Split by capability: pairing/catalog, direct transport, orchestration runs, and event-stream parsing.
+- `src/components/apps/conduit-route/ConduitTerminalWorkflow.tsx` (~2688 lines)
+  - Keep pulling CAD preflight/backcheck/sync actions and render sections out of the shell.
+- `src/components/apps/autodraft-studio/AutoDraftComparePanel.tsx` (~2687 lines)
+  - Extract the remaining viewport/canvas controller and review/export sections.
+- `src/components/apps/autodraft-studio/autodraftService.ts` (~2209 lines)
+  - Split compare, learning, and export adapters.
+- `src/components/apps/conduit-route/ConduitRouteApp.tsx` (~1983 lines)
+  - Continue section extraction for obstacle editing, route canvas, crew review, NEC, and section previews.
+- `src/components/apps/ground-grid-generator/useGridGeneratorState.ts` (~916 lines)
+- `src/components/apps/coordinatesgrabber/useCoordinatesGrabberState.ts` (~770 lines)
 - `src/components/apps/transmittal-builder/transmittalBuilderModels.ts` (~593 lines)
-- `src/routes/LoginPage.tsx` (~507 lines)
-- `src/routes/settings/AccountSettings.tsx` (~499 lines)
-- `src/components/apps/coordinatesgrabber/useCoordinatesGrabberState.ts` (~491 lines)
 
-Refactor target for each: separate pure models/types, API/service wrappers, and UI state hooks to reduce collision risk when adding future panels.
+Frontend refactor target remains the same: thin route/app shells, feature-scoped controller hooks, pure selectors/formatters, and focused presentational sections.
 
 ## P1 - Agent output normalization
 
@@ -226,11 +253,11 @@ Goal: safely select template-defined names/values from `config.yaml` without bri
 
 ## 4) Suggested Next Session Order
 
-1. Finish passkey provider decision + env wiring.
-2. Implement passkey credential management UI.
-3. Run auth/pairing test matrix and capture a go/no-go report.
-4. Continue splitting top remaining UI hotspots in descending file size.
-5. Implement transmittal protected-name selector with schema validation.
+1. On `DUSTIN-HOME`, pull latest `main`, run `scripts/restore-suite-local-state.ps1 -WorkstationId DUSTIN-HOME`, and restart Codex.
+2. Split `src/services/agentService.ts` by capability before doing another large agent UI pass.
+3. Continue conduit workflow section/action-hook extraction.
+4. Continue AutoDraft compare viewport/controller extraction.
+5. Finish secondary state-hook splits (ground grid, coordinates grabber, transmittal models).
 
 ## 5) Fast Resume Commands
 

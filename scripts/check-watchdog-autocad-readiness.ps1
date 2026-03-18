@@ -87,6 +87,24 @@ function Get-DefaultBundleRoot {
     return Join-Path $env:USERPROFILE "AppData\Roaming\Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"
 }
 
+function Get-OptionalObjectPropertyValue {
+    param(
+        [object]$InputObject,
+        [string]$PropertyName
+    )
+
+    if ($null -eq $InputObject) {
+        return $null
+    }
+
+    $property = $InputObject.PSObject.Properties[$PropertyName]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
 function Invoke-JsonScript {
     param(
         [string]$ScriptPath,
@@ -166,9 +184,10 @@ function Get-TrackerStateSummary {
 
     $trackerUpdatedAt = $null
     $trackerUpdatedAgeMs = $null
-    if ($payload.lastUpdated) {
+    $trackerUpdatedValue = Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "lastUpdated"
+    if ($trackerUpdatedValue) {
         try {
-            $trackerUpdatedAt = [DateTimeOffset]::Parse([string]$payload.lastUpdated)
+            $trackerUpdatedAt = [DateTimeOffset]::Parse([string]$trackerUpdatedValue)
             $trackerUpdatedAgeMs = [int][Math]::Round(($now - $trackerUpdatedAt.ToUniversalTime()).TotalMilliseconds)
         }
         catch {
@@ -184,9 +203,12 @@ function Get-TrackerStateSummary {
         $lastWriteAgeMs
     }
 
-    $currentSession = if ($payload.currentSession) { $payload.currentSession } else { $null }
-    $sessionId = if ($currentSession -and $currentSession.sessionId) {
-        [string]$currentSession.sessionId
+    $currentSession = Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "currentSession"
+    $currentSessionIdValue = Get-OptionalObjectPropertyValue -InputObject $currentSession -PropertyName "sessionId"
+    $recentCommands = Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "recentCommands"
+    $sessions = Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "sessions"
+    $sessionId = if ($currentSessionIdValue) {
+        [string]$currentSessionIdValue
     }
     else {
         $null
@@ -203,13 +225,13 @@ function Get-TrackerStateSummary {
         trackerUpdatedAgeMs = $trackerUpdatedAgeMs
         effectiveAgeMs = $effectiveAgeMs
         freshnessThresholdMs = $FreshnessMs
-        isTracking = [bool]$payload.isTracking
-        isPaused = [bool]$payload.isPaused
-        activeDrawing = [string]$payload.activeDrawing
-        activeDrawingPath = [string]$payload.activeDrawingPath
+        isTracking = [bool](Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "isTracking")
+        isPaused = [bool](Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "isPaused")
+        activeDrawing = [string](Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "activeDrawing")
+        activeDrawingPath = [string](Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "activeDrawingPath")
         currentSessionId = $sessionId
-        recentCommandCount = @($payload.recentCommands).Count
-        sessionCount = @($payload.sessions).Count
+        recentCommandCount = if ($null -eq $recentCommands) { 0 } else { @($recentCommands).Count }
+        sessionCount = if ($null -eq $sessions) { 0 } else { @($sessions).Count }
     }
 }
 
@@ -288,12 +310,13 @@ function Get-CollectorStateSummary {
         }
     }
 
-    $snapshot = if ($state.snapshot) { $state.snapshot } else { $null }
+    $snapshot = Get-OptionalObjectPropertyValue -InputObject $state -PropertyName "snapshot"
     $lastCheckedAt = $null
     $lastCheckedAgeMs = $null
-    if ($snapshot -and $snapshot.lastCheckedAt) {
+    $lastCheckedAtValue = Get-OptionalObjectPropertyValue -InputObject $snapshot -PropertyName "lastCheckedAt"
+    if ($snapshot -and $lastCheckedAtValue) {
         try {
-            $lastCheckedAt = [DateTimeOffset]::FromUnixTimeMilliseconds([int64]$snapshot.lastCheckedAt)
+            $lastCheckedAt = [DateTimeOffset]::FromUnixTimeMilliseconds([int64]$lastCheckedAtValue)
             $lastCheckedAgeMs = [int][Math]::Round(([DateTimeOffset]::UtcNow - $lastCheckedAt).TotalMilliseconds)
         }
         catch {
@@ -302,11 +325,13 @@ function Get-CollectorStateSummary {
         }
     }
 
-    $pendingCount = @($state.pendingEvents).Count
+    $pendingEvents = Get-OptionalObjectPropertyValue -InputObject $state -PropertyName "pendingEvents"
+    $pendingCount = if ($null -eq $pendingEvents) { 0 } else { @($pendingEvents).Count }
     $nextSequence = 1
-    if ($null -ne $state.nextSequence) {
+    $nextSequenceValue = Get-OptionalObjectPropertyValue -InputObject $state -PropertyName "nextSequence"
+    if ($null -ne $nextSequenceValue) {
         try {
-            $nextSequence = [int]$state.nextSequence
+            $nextSequence = [int]$nextSequenceValue
         }
         catch {
             $nextSequence = 1
@@ -314,20 +339,42 @@ function Get-CollectorStateSummary {
     }
 
     $trackerUpdatedAtMs = 0
-    if ($snapshot -and $null -ne $snapshot.lastUpdated) {
+    $snapshotLastUpdatedValue = Get-OptionalObjectPropertyValue -InputObject $snapshot -PropertyName "lastUpdated"
+    if ($snapshot -and $null -ne $snapshotLastUpdatedValue) {
         try {
-            $trackerUpdatedAtMs = [int64]$snapshot.lastUpdated
+            $trackerUpdatedAtMs = [int64]$snapshotLastUpdatedValue
         }
         catch {
             $trackerUpdatedAtMs = 0
         }
     }
 
+    $sourceAvailable = if ($snapshot) {
+        [bool](Get-OptionalObjectPropertyValue -InputObject $snapshot -PropertyName "sourceAvailable")
+    }
+    else {
+        $false
+    }
+
+    $snapshotActiveDrawingPath = if ($snapshot) {
+        [string](Get-OptionalObjectPropertyValue -InputObject $snapshot -PropertyName "activeDrawingPath")
+    }
+    else {
+        $null
+    }
+
+    $snapshotCurrentSessionId = if ($snapshot) {
+        [string](Get-OptionalObjectPropertyValue -InputObject $snapshot -PropertyName "currentSessionId")
+    }
+    else {
+        $null
+    }
+
     return [ordered]@{
         exists = $true
         healthy = (
             $snapshot -and
-            [bool]$snapshot.sourceAvailable -and
+            $sourceAvailable -and
             $null -ne $lastCheckedAgeMs -and
             $lastCheckedAgeMs -le $FreshnessMs
         )
@@ -337,10 +384,10 @@ function Get-CollectorStateSummary {
         sizeBytes = [int64]$file.Length
         pendingCount = $pendingCount
         nextSequence = $nextSequence
-        lastStatus = [string]$state.lastStatus
-        sourceAvailable = if ($snapshot) { [bool]$snapshot.sourceAvailable } else { $false }
-        activeDrawingPath = if ($snapshot) { [string]$snapshot.activeDrawingPath } else { $null }
-        currentSessionId = if ($snapshot) { [string]$snapshot.currentSessionId } else { $null }
+        lastStatus = [string](Get-OptionalObjectPropertyValue -InputObject $state -PropertyName "lastStatus")
+        sourceAvailable = $sourceAvailable
+        activeDrawingPath = $snapshotActiveDrawingPath
+        currentSessionId = $snapshotCurrentSessionId
         lastCheckedAt = if ($lastCheckedAt) { $lastCheckedAt.ToString("o") } else { $null }
         lastCheckedAgeMs = $lastCheckedAgeMs
         freshnessThresholdMs = $FreshnessMs

@@ -31,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 import { agentService } from "@/services/agentService";
 import styles from "./ConduitRouteApp.module.css";
+import { ConduitRouteSectionSketch } from "./ConduitRouteSectionSketch";
 import { ConduitTerminalWorkflow } from "./ConduitTerminalWorkflow";
 import {
 	CANVAS_HEIGHT,
@@ -41,16 +42,13 @@ import {
 	OBSTACLES,
 	ROUTE_TABS,
 	ROUTING_MODES,
-	SECTION_METRICS,
 	SECTION_PRESETS,
 	WIRE_COLORS,
 } from "./conduitRouteData";
 import { AUTOWIRE_OBSTACLE_LAYER_PRESET_OPTIONS } from "./autowirePresets";
 import {
 	bendCount,
-	buildCostGrid,
 	pathLength,
-	routePath,
 	routeTagPosition,
 	toRoundedPathSvg,
 } from "./conduitRouteEngine";
@@ -78,304 +76,19 @@ import type {
 	RoutingMode,
 	SectionPreset,
 } from "./conduitRouteTypes";
-
-type CrewReviewProfile = "draftsmith" | "gridsage";
-
-type CrewReviewEntry = {
-	profileId: CrewReviewProfile;
-	status: "running" | "completed" | "failed";
-	response?: string;
-	error?: string;
-};
-
-function clamp(value: number, min: number, max: number): number {
-	return Math.max(min, Math.min(max, value));
-}
-
-function formatLength(length: number): string {
-	return `${Math.round(length)} px`;
-}
-
-function makeRouteId(): string {
-	return `route_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function toCsvValue(value: string | number): string {
-	const text = String(value ?? "");
-	if (/[",\r\n]/.test(text)) {
-		return `"${text.replace(/"/g, '""')}"`;
-	}
-	return text;
-}
-
-function colorVariantByPercent(
-	percent: number,
-): "success" | "warning" | "danger" {
-	if (percent <= 60) return "success";
-	if (percent <= 85) return "warning";
-	return "danger";
-}
-
-function getModeBadgeTone(
-	mode: RoutingMode,
-): "default" | "primary" | "success" | "warning" {
-	if (mode === "plan_view") return "success";
-	if (mode === "cable_tag") return "primary";
-	return "warning";
-}
-
-function inferObstacleTypeFromLayer(layerName: string): ObstacleType | null {
-	const layer = layerName.trim().toUpperCase();
-	if (!layer) return null;
-	if (layer.includes("TRENCH")) return "trench";
-	if (layer.includes("FENCE")) return "fence";
-	if (layer.includes("ROAD")) return "road";
-	if (
-		layer.includes("FOUND") ||
-		layer.includes("FNDN") ||
-		layer.startsWith("S-FNDN")
-	)
-		return "foundation";
-	if (layer.includes("KEEPOUT") || layer.includes("KEEP-OUT"))
-		return "foundation";
-	if (layer.includes("PAD") || layer.includes("S-CONC")) return "equipment_pad";
-	if (
-		layer.includes("BUILD") ||
-		layer.includes("A-WALL") ||
-		layer.startsWith("A-WALL") ||
-		layer.includes("S-STRU") ||
-		layer.includes("S-STEEL")
-	)
-		return "building";
-	if (layer.startsWith("E-CONDUIT") || layer === "E-CONDUIT") return "road";
-	return null;
-}
-
-function extractAgentResponseText(data: Record<string, unknown> | undefined): string {
-	if (!data) return "";
-	const directKeys = ["response", "reply", "output", "message"] as const;
-	for (const key of directKeys) {
-		const value = data[key];
-		if (typeof value === "string" && value.trim()) {
-			return value.trim();
-		}
-	}
-	return JSON.stringify(data);
-}
-
-function buildCadCrewReviewPrompt(args: {
-	profileId: CrewReviewProfile;
-	report: ConduitRouteBackcheckResponse;
-	draftsmithReview?: string;
-}): string {
-	const { profileId, report, draftsmithReview } = args;
-	const findingDigest = (report.findings || []).slice(0, 12).map((finding) => ({
-		route: finding.ref || finding.routeId,
-		status: finding.status,
-		issues: finding.issues.slice(0, 3).map((issue) => ({
-			code: issue.code,
-			severity: issue.severity,
-			message: issue.message,
-		})),
-		stats: {
-			bend_degrees: finding.stats.bend_degrees,
-			collision_count: finding.stats.collision_count,
-			diagonal_segment_count: finding.stats.diagonal_segment_count,
-		},
-	}));
-	const roleInstruction =
-		profileId === "draftsmith"
-			? "You are Draftsmith. Focus on CAD drafting correctness, geometry quality, and buildable route layout."
-			: "You are GridSage. Focus on electrical QA, routing safety, and constructability risks.";
-
-	const outputContract =
-		"Return exactly three sections: 1) Critical Findings, 2) Fix Plan, 3) Validation Checklist.";
-	const draftsmithContext = draftsmithReview?.trim()
-		? `Draftsmith prior review:\n${draftsmithReview}`
-		: "";
-
-	return [
-		roleInstruction,
-		outputContract,
-		"Prioritize concrete route IDs and deterministic steps. Avoid generic advice.",
-		`Backcheck summary: ${JSON.stringify(report.summary || {})}`,
-		`Backcheck warnings: ${JSON.stringify(report.warnings || [])}`,
-		`Finding digest: ${JSON.stringify(findingDigest)}`,
-		draftsmithContext,
-	]
-		.filter(Boolean)
-		.join("\n\n");
-}
-
-function SectionSketch({ preset }: { preset: SectionPreset["id"] }) {
-	if (preset === "stub_up") {
-		return (
-			<svg viewBox="0 0 320 170" className={styles.sectionSketch}>
-				<rect
-					x="0"
-					y="90"
-					width="320"
-					height="80"
-					className={styles.sectionSoil}
-				/>
-				<line x1="0" y1="90" x2="320" y2="90" className={styles.sectionGrade} />
-				<rect
-					x="92"
-					y="56"
-					width="130"
-					height="38"
-					className={styles.sectionConcrete}
-				/>
-				{[0, 1, 2, 3].map((index) => (
-					<g key={index}>
-						<rect
-							x={108 + index * 28}
-							y={22}
-							width="12"
-							height="68"
-							className={styles.sectionConduit}
-						/>
-						<circle
-							cx={114 + index * 28}
-							cy={54}
-							r="2.8"
-							className={styles.sectionCableA}
-						/>
-					</g>
-				))}
-			</svg>
-		);
-	}
-
-	if (preset === "duct_bank") {
-		return (
-			<svg viewBox="0 0 320 170" className={styles.sectionSketch}>
-				<rect
-					x="0"
-					y="80"
-					width="320"
-					height="90"
-					className={styles.sectionSoil}
-				/>
-				<line x1="0" y1="80" x2="320" y2="80" className={styles.sectionGrade} />
-				<rect
-					x="70"
-					y="34"
-					width="180"
-					height="108"
-					className={styles.sectionConcrete}
-				/>
-				{Array.from({ length: 3 }).map((_, row) =>
-					Array.from({ length: 4 }).map((__, col) => (
-						<circle
-							key={`${row}_${col}`}
-							cx={96 + col * 44}
-							cy={58 + row * 30}
-							r="10"
-							className={styles.sectionConduitHole}
-						/>
-					)),
-				)}
-			</svg>
-		);
-	}
-
-	if (preset === "trench") {
-		return (
-			<svg viewBox="0 0 320 170" className={styles.sectionSketch}>
-				<rect
-					x="0"
-					y="56"
-					width="320"
-					height="114"
-					className={styles.sectionSoil}
-				/>
-				<rect
-					x="72"
-					y="56"
-					width="176"
-					height="90"
-					className={styles.sectionVoid}
-				/>
-				<rect
-					x="80"
-					y="74"
-					width="160"
-					height="8"
-					className={styles.sectionTray}
-				/>
-				<rect
-					x="80"
-					y="97"
-					width="160"
-					height="8"
-					className={styles.sectionTray}
-				/>
-				<rect
-					x="80"
-					y="120"
-					width="160"
-					height="8"
-					className={styles.sectionTray}
-				/>
-				{Array.from({ length: 7 }).map((_, index) => (
-					<circle
-						key={`wire_${index}`}
-						cx={94 + index * 18}
-						cy="78"
-						r="3"
-						className={styles.sectionCableA}
-					/>
-				))}
-			</svg>
-		);
-	}
-
-	return (
-		<svg viewBox="0 0 320 170" className={styles.sectionSketch}>
-			<rect
-				x="0"
-				y="94"
-				width="320"
-				height="76"
-				className={styles.sectionSoil}
-			/>
-			<line x1="0" y1="94" x2="320" y2="94" className={styles.sectionGrade} />
-			<rect
-				x="124"
-				y="18"
-				width="18"
-				height="152"
-				className={styles.sectionWall}
-			/>
-			{[0, 1, 2].map((index) => (
-				<g key={`entry_${index}`}>
-					<rect
-						x="44"
-						y={32 + index * 36}
-						width="96"
-						height="10"
-						className={styles.sectionConduit}
-					/>
-					<rect
-						x="142"
-						y={30 + index * 36}
-						width="16"
-						height="14"
-						className={styles.sectionSeal}
-					/>
-					<rect
-						x="160"
-						y={32 + index * 36}
-						width="70"
-						height="10"
-						className={styles.sectionConduit}
-					/>
-				</g>
-			))}
-		</svg>
-	);
-}
+import {
+	type CrewReviewEntry,
+	buildCadCrewReviewPrompt,
+	clamp,
+	colorVariantByPercent,
+	createConduitRouteViewModel,
+	extractAgentResponseText,
+	formatLength,
+	getModeBadgeTone,
+	inferObstacleTypeFromLayer,
+	makeRouteId,
+	toCsvValue,
+} from "./conduitRouteViewModel";
 
 export function ConduitRouteApp() {
 	const [workspace, setWorkspace] = useState<"yard" | "terminal">("yard");
@@ -435,131 +148,61 @@ export function ConduitRouteApp() {
 			setWireFunction(DEFAULT_WIRE_FUNCTIONS[cableType]);
 		}
 	}, [cableType, wireFunction]);
-
-	const availableWireFunctions = useMemo(
-		() => Object.keys(WIRE_COLORS[cableType]),
-		[cableType],
-	);
-
-	const activeColor =
-		WIRE_COLORS[cableType][wireFunction] ??
-		WIRE_COLORS[cableType][DEFAULT_WIRE_FUNCTIONS[cableType]];
-
-	const obstacleLayerNames = useMemo(
-		() => obstacleLayerRules.map((rule) => rule.layerName),
-		[obstacleLayerRules],
-	);
-
-	const obstacleLayerTypeOverrides = useMemo(() => {
-		const overrides: Record<string, ObstacleType> = {};
-		for (const rule of obstacleLayerRules) {
-			overrides[rule.layerName] = rule.obstacleType;
-		}
-		return overrides;
-	}, [obstacleLayerRules]);
-
-	const costGrid = useMemo(
-		() => buildCostGrid(activeObstacles, clearance, mode),
-		[activeObstacles, clearance, mode],
-	);
-
-	const previewPath = useMemo(() => {
-		if (!startPoint || !hoverPoint) {
-			return { path: [] as Point2D[], valid: true, fallbackUsed: false };
-		}
-		return routePath(startPoint, hoverPoint, costGrid, mode);
-	}, [startPoint, hoverPoint, costGrid, mode]);
-
-	const selectedRoute = useMemo(
-		() => routes.find((route) => route.id === selectedRouteId) ?? null,
-		[routes, selectedRouteId],
-	);
-
-	const routeStats = useMemo(() => {
-		const totalLength = routes.reduce((sum, route) => sum + route.length, 0);
-		const totalBends = routes.reduce((sum, route) => sum + route.bendCount, 0);
-		const warningCount = routes.filter(
-			(route) => route.bendDegrees > 360,
-		).length;
-		return {
-			total: routes.length,
-			totalLength,
-			totalBends,
-			warningCount,
-		};
-	}, [routes]);
-	const routeBackcheckSummary = routeBackcheckReport?.summary ?? null;
-	const crewReviewCompletedCount = useMemo(
+	const {
+		activeColor,
+		availableWireFunctions,
+		cadSyncGate,
+		heroSubtitle,
+		heroTitle,
+		isTerminalWorkspace,
+		obstacleLayerNames,
+		obstacleLayerTypeOverrides,
+		previewPath,
+		routeBackcheckSummary,
+		routeStats,
+		sectionInfo,
+		sectionMetricCards,
+		selectedRoute,
+	} = useMemo(
 		() =>
-			crewReviewEntries.filter((entry) => entry.status === "completed").length,
-		[crewReviewEntries],
+			createConduitRouteViewModel({
+				workspace,
+				cableType,
+				wireFunction,
+				activeObstacles,
+				clearance,
+				mode,
+				startPoint,
+				hoverPoint,
+				routes,
+				selectedRouteId,
+				routeBackcheckReport,
+				crewReviewEntries,
+				obstacleLayerRules,
+				sectionPreset,
+			}),
+		[
+			activeObstacles,
+			cableType,
+			clearance,
+			crewReviewEntries,
+			hoverPoint,
+			mode,
+			obstacleLayerRules,
+			routeBackcheckReport,
+			routes,
+			sectionPreset,
+			selectedRouteId,
+			startPoint,
+			wireFunction,
+			workspace,
+		],
 	);
-	const hasCrewReviewFailures = useMemo(
-		() => crewReviewEntries.some((entry) => entry.status === "failed"),
-		[crewReviewEntries],
-	);
-	const cadSyncGate = useMemo(() => {
-		if (!routeBackcheckSummary) {
-			return {
-				color: "warning" as const,
-				label: "Backcheck required",
-				detail: "Run backcheck before issuing CAD sync decisions.",
-			};
-		}
-		if (routeBackcheckSummary.fail_count <= 0) {
-			if (routeBackcheckSummary.warn_count > 0) {
-				return {
-					color: "warning" as const,
-					label: "Ready with warnings",
-					detail:
-						"Fail findings are clear. Review warnings before final CAD publish.",
-				};
-			}
-			return {
-				color: "success" as const,
-				label: "Ready for CAD sync",
-				detail: "No failing findings in current backcheck report.",
-			};
-		}
-		if (hasCrewReviewFailures) {
-			return {
-				color: "danger" as const,
-				label: "Crew review failed",
-				detail: "Resolve agent review errors before proceeding.",
-			};
-		}
-		if (crewReviewCompletedCount < 2) {
-			return {
-				color: "warning" as const,
-				label: "Crew review required",
-				detail:
-					"Backcheck has failing findings. Run Draftsmith and GridSage review.",
-			};
-		}
-		return {
-			color: "danger" as const,
-			label: "Manual decision required",
-			detail:
-				"Fail findings remain after crew review. Apply fixes or document override.",
-		};
-	}, [routeBackcheckSummary, crewReviewCompletedCount, hasCrewReviewFailures]);
 
 	const necResult = useMemo(
 		() => calculateNec(necConductors, necConduit, ambientTempC),
 		[necConductors, necConduit, ambientTempC],
 	);
-
-	const sectionInfo = SECTION_PRESETS.find(
-		(preset) => preset.id === sectionPreset,
-	);
-	const sectionMetricCards = SECTION_METRICS[sectionPreset];
-	const isTerminalWorkspace = workspace === "terminal";
-	const heroTitle = isTerminalWorkspace
-		? "Terminal Strip Routing Deck"
-		: "Conduit Route Command Deck";
-	const heroSubtitle = isTerminalWorkspace
-		? "Scan terminal strips, click source and destination, and build route + schedule output."
-		: "Interactive cable/conduit routing with NEC snapshots, section previews, and bend-limit monitoring.";
 
 	const refreshObstacleLayerList = async (
 		options: { silent?: boolean } = {},
@@ -2380,7 +2023,7 @@ export function ConduitRouteApp() {
 												{sectionInfo?.description}
 											</Text>
 										</div>
-										<SectionSketch preset={sectionPreset} />
+										<ConduitRouteSectionSketch preset={sectionPreset} />
 										<div className={styles.sectionMetrics}>
 											{sectionMetricCards.map((metric) => (
 												<div

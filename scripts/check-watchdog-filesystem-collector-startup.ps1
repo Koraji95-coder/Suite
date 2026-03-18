@@ -342,8 +342,8 @@ else {
     }
     if ($errors.Count -gt 0) {
         Write-Host "Errors:"
-        foreach ($error in $errors) {
-            Write-Host " - $error"
+        foreach ($errorMessage in $errors) {
+            Write-Host " - $errorMessage"
         }
     }
 }

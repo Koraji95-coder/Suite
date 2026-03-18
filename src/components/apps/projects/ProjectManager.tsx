@@ -6,6 +6,7 @@ import { ProjectList } from "./ProjectList";
 import styles from "./ProjectManager.module.css";
 import { ProjectManagerDeleteDialogs } from "./ProjectManagerDeleteDialogs";
 import { ProjectManagerHeader } from "./ProjectManagerHeader";
+import { selectVisibleProjects } from "./projectManagerSelectors";
 import type { StatusFilter } from "./projectmanagertypes";
 import { TaskFormModal } from "./TaskFormModal";
 import { useProjectManagerState } from "./useProjectManagerState";
@@ -102,25 +103,10 @@ export function ProjectManager({
 		onCalendarMonthChange,
 	});
 
-	const visibleProjects = projects.filter((project) => {
-		if (statusFilter !== "all") {
-			if (statusFilter === "archived") {
-				if (project.status !== "completed") return false;
-			} else {
-				if (project.status === "completed") return false;
-				if (project.status !== statusFilter) return false;
-			}
-		}
-
-		if (projectSearch.trim()) {
-			const query = projectSearch.trim().toLowerCase();
-			return (
-				project.name.toLowerCase().includes(query) ||
-				project.description?.toLowerCase().includes(query)
-			);
-		}
-
-		return true;
+	const visibleProjects = selectVisibleProjects({
+		projects,
+		statusFilter,
+		projectSearch,
 	});
 
 	return (

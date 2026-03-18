@@ -1,14 +1,20 @@
 [CmdletBinding()]
 param(
     [string]$MirrorRoot = (Join-Path $env:USERPROFILE "Dropbox\SuiteLocalStateMirror"),
-    [string]$RepoRoot = (Join-Path $env:USERPROFILE "Documents\GitHub\Suite"),
-    [string]$WorkstationId = $(if ($env:COMPUTERNAME -eq "DUSTINWARD") { "DUSTINWARD" } else { "DUSTIN-HOME" }),
-    [string]$WorkstationLabel = $(if ($env:COMPUTERNAME -eq "DUSTINWARD") { "Dustin workstation" } else { "Dustin Home station" }),
-    [string]$WorkstationRole = $(if ($env:COMPUTERNAME -eq "DUSTINWARD") { "active" } else { "home" })
+    [string]$RepoRoot,
+    [string]$WorkstationId,
+    [string]$WorkstationLabel,
+    [string]$WorkstationRole
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $RepoRoot = Join-Path $PSScriptRoot ".."
+}
+
+. (Join-Path $PSScriptRoot "suite-workstation-config.ps1")
 
 function Ensure-Directory {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -69,81 +75,6 @@ function Restore-File {
     Copy-Item -LiteralPath $Source -Destination $Destination -Force
 }
 
-function Convert-ToTomlString {
-    param([Parameter(Mandatory = $true)][string]$Value)
-
-    $escaped = $Value.Replace("\", "\\").Replace('"', '\"')
-    return '"' + $escaped + '"'
-}
-
-function Set-TomlKeyInSection {
-    param(
-        [Parameter(Mandatory = $true)][string]$Content,
-        [Parameter(Mandatory = $true)][string]$SectionName,
-        [Parameter(Mandatory = $true)][string]$Key,
-        [Parameter(Mandatory = $true)][string]$ValueLiteral
-    )
-
-    $sectionPattern = "(?ms)(^\[" + [regex]::Escape($SectionName) + "\]\s*)(.*?)(?=^\[|\z)"
-
-    if ($Content -notmatch $sectionPattern) {
-        $separator = if ([string]::IsNullOrWhiteSpace($Content)) { "" } else { "`r`n`r`n" }
-        return $Content + $separator + "[$SectionName]`r`n$Key = $ValueLiteral`r`n"
-    }
-
-    return [regex]::Replace(
-        $Content,
-        $sectionPattern,
-        {
-            param($match)
-
-            $header = $match.Groups[1].Value
-            $body = $match.Groups[2].Value
-            $keyPattern = "(?m)^" + [regex]::Escape($Key) + "\s*=.*$"
-
-            if ($body -match $keyPattern) {
-                $body = [regex]::Replace($body, $keyPattern, "$Key = $ValueLiteral", 1)
-            }
-            else {
-                if ($body.Length -gt 0 -and -not ($body.EndsWith("`r`n") -or $body.EndsWith("`n"))) {
-                    $body += "`r`n"
-                }
-
-                $body += "$Key = $ValueLiteral`r`n"
-            }
-
-            return $header + $body
-        },
-        1
-    )
-}
-
-function Update-CodexConfig {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$ResolvedRepoRoot,
-        [Parameter(Mandatory = $true)][string]$ResolvedWorkstationId,
-        [Parameter(Mandatory = $true)][string]$ResolvedWorkstationLabel,
-        [Parameter(Mandatory = $true)][string]$ResolvedWorkstationRole
-    )
-
-    if (Test-Path -LiteralPath $Path) {
-        $content = Get-Content -LiteralPath $Path -Raw
-    }
-    else {
-        $content = ""
-    }
-
-    $serverPath = Join-Path $ResolvedRepoRoot "tools\suite-repo-mcp\server.mjs"
-    $content = Set-TomlKeyInSection -Content $content -SectionName "mcp_servers.suite_repo_mcp" -Key "args" -ValueLiteral ("[" + (Convert-ToTomlString -Value $serverPath) + "]")
-    $content = Set-TomlKeyInSection -Content $content -SectionName "mcp_servers.suite_repo_mcp.env" -Key "SUITE_WORKSTATION_ID" -ValueLiteral (Convert-ToTomlString -Value $ResolvedWorkstationId)
-    $content = Set-TomlKeyInSection -Content $content -SectionName "mcp_servers.suite_repo_mcp.env" -Key "SUITE_WORKSTATION_LABEL" -ValueLiteral (Convert-ToTomlString -Value $ResolvedWorkstationLabel)
-    $content = Set-TomlKeyInSection -Content $content -SectionName "mcp_servers.suite_repo_mcp.env" -Key "SUITE_WORKSTATION_ROLE" -ValueLiteral (Convert-ToTomlString -Value $ResolvedWorkstationRole)
-    $content = Set-TomlKeyInSection -Content $content -SectionName "features" -Key "rmcp_client" -ValueLiteral "true"
-
-    Set-Content -LiteralPath $Path -Value $content -Encoding UTF8
-}
-
 if (-not (Test-Path -LiteralPath $MirrorRoot)) {
     throw "Mirror root does not exist: $MirrorRoot"
 }
@@ -153,6 +84,11 @@ if (-not (Test-Path -LiteralPath $RepoRoot)) {
 }
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+$resolvedIdentity = Resolve-SuiteWorkstationProfile `
+    -ResolvedRepoRoot $resolvedRepoRoot `
+    -ExplicitWorkstationId $WorkstationId `
+    -ExplicitWorkstationLabel $WorkstationLabel `
+    -ExplicitWorkstationRole $WorkstationRole
 
 $mappings = @(
     [pscustomobject]@{
@@ -196,14 +132,15 @@ foreach ($mapping in $mappings) {
 }
 
 $codexConfigPath = Join-Path $env:USERPROFILE ".codex\config.toml"
-Update-CodexConfig `
+Update-SuiteCodexConfig `
     -Path $codexConfigPath `
     -ResolvedRepoRoot $resolvedRepoRoot `
-    -ResolvedWorkstationId $WorkstationId `
-    -ResolvedWorkstationLabel $WorkstationLabel `
-    -ResolvedWorkstationRole $WorkstationRole
+    -WorkstationProfile $resolvedIdentity
 
 Write-Host "Restored Suite local state from $MirrorRoot"
 Write-Host "Repo root: $resolvedRepoRoot"
-Write-Host "Workstation identity: $WorkstationId | $WorkstationLabel | $WorkstationRole"
+Write-Host (
+    "Workstation identity: " +
+    "$($resolvedIdentity.WorkstationId) | $($resolvedIdentity.WorkstationLabel) | $($resolvedIdentity.WorkstationRole)"
+)
 Write-Host "Restart Codex after restore so MCP/workstation settings reload."

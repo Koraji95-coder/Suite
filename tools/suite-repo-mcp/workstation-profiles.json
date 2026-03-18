@@ -1,0 +1,16 @@
+{
+  "profiles": [
+    {
+      "id": "DUSTINWARD",
+      "label": "Dustin workstation",
+      "role": "active",
+      "computerNames": ["DUSTINWARD"]
+    },
+    {
+      "id": "DUSTIN-HOME",
+      "label": "Dustin Home station",
+      "role": "home",
+      "computerNames": ["DUSTIN-HOME"]
+    }
+  ]
+}

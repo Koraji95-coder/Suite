@@ -22,16 +22,13 @@ import {
 	type CalendarEvent,
 	type Project,
 	type ProjectFile,
-	type ProjectFormData,
 	type ProjectStatus,
-	type StatusFilter,
 	type Task,
 	type TaskCount,
-	type TaskFilter,
-	type TaskFormData,
-	type ViewMode,
 } from "./projectmanagertypes";
+import { deriveProjectManagerSummary } from "./projectManagerSelectors";
 import { categoryColor, toDateOnly } from "./projectmanagerutils";
+import { useProjectManagerUiState } from "./useProjectManagerUiState";
 
 interface TaskSummary {
 	id: string;
@@ -63,32 +60,52 @@ export function useProjectManagerState({
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [files, setFiles] = useState<ProjectFile[]>([]);
 	const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-	const [showProjectModal, setShowProjectModal] = useState(false);
-	const [showTaskModal, setShowTaskModal] = useState(false);
-	const [editingProject, setEditingProject] = useState<Project | null>(null);
-	const [editingTask, setEditingTask] = useState<Task | null>(null);
-	const [parentTaskForSubtask, setParentTaskForSubtask] = useState<
-		string | null
-	>(null);
-	const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-	const [viewMode, setViewMode] = useState<ViewMode>("tasks");
+	const {
+		showProjectModal,
+		setShowProjectModal,
+		showTaskModal,
+		setShowTaskModal,
+		editingProject,
+		setEditingProject,
+		editingTask,
+		setEditingTask,
+		parentTaskForSubtask,
+		setParentTaskForSubtask,
+		expandedTasks,
+		setExpandedTasks,
+		viewMode,
+		setViewMode,
+		fileFilter,
+		setFileFilter,
+		projectSearch,
+		setProjectSearch,
+		statusFilter,
+		setStatusFilter,
+		taskFilter,
+		setTaskFilter,
+		projectIdPendingDelete,
+		setProjectIdPendingDelete,
+		taskIdPendingDelete,
+		setTaskIdPendingDelete,
+		projectForm,
+		setProjectForm,
+		taskForm,
+		setTaskForm,
+		resetProjectForm,
+		resetTaskForm,
+		openEditProject,
+		openEditTask,
+		openAddSubtask,
+		requestDeleteProject,
+		requestDeleteTask,
+	} = useProjectManagerUiState();
 	const [internalCurrentMonth, setInternalCurrentMonth] = useState(new Date());
 	const [internalSelectedDate, setInternalSelectedDate] = useState<
 		string | null
 	>(null);
-	const [fileFilter, setFileFilter] = useState("");
-	const [projectSearch, setProjectSearch] = useState("");
-	const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
-	const [taskFilter, setTaskFilter] = useState<TaskFilter>("all");
 	const [projectTaskCounts, setProjectTaskCounts] = useState<
 		Map<string, TaskCount>
 	>(new Map());
-	const [projectIdPendingDelete, setProjectIdPendingDelete] = useState<
-		string | null
-	>(null);
-	const [taskIdPendingDelete, setTaskIdPendingDelete] = useState<string | null>(
-		null,
-	);
 
 	const getCurrentUserId = useCallback(async (): Promise<string | null> => {
 		const {
@@ -103,23 +120,6 @@ export function useProjectManagerState({
 
 		return user.id;
 	}, [showToast]);
-
-	// Form states
-	const [projectForm, setProjectForm] = useState<ProjectFormData>({
-		name: "",
-		description: "",
-		deadline: "",
-		priority: "medium",
-		status: "active",
-		category: "",
-	});
-
-	const [taskForm, setTaskForm] = useState<TaskFormData>({
-		name: "",
-		description: "",
-		due_date: "",
-		priority: "medium",
-	});
 
 	// Calendar sync
 	const currentMonth = externalMonth ?? internalCurrentMonth;
@@ -465,10 +465,6 @@ export function useProjectManagerState({
 		}
 	};
 
-	const requestDeleteProject = (projectId: string) => {
-		setProjectIdPendingDelete(projectId);
-	};
-
 	const confirmDeleteProject = async () => {
 		if (!projectIdPendingDelete) return;
 		const projectId = projectIdPendingDelete;
@@ -774,10 +770,6 @@ export function useProjectManagerState({
 		return Array.from(ids);
 	};
 
-	const requestDeleteTask = (taskId: string) => {
-		setTaskIdPendingDelete(taskId);
-	};
-
 	const confirmDeleteTask = async () => {
 		if (!taskIdPendingDelete) return;
 		const taskId = taskIdPendingDelete;
@@ -935,57 +927,6 @@ export function useProjectManagerState({
 		}
 	};
 
-	const resetProjectForm = () => {
-		setProjectForm({
-			name: "",
-			description: "",
-			deadline: "",
-			priority: "medium",
-			status: "active",
-			category: "",
-		});
-	};
-
-	const resetTaskForm = () => {
-		setTaskForm({
-			name: "",
-			description: "",
-			due_date: "",
-			priority: "medium",
-		});
-	};
-
-	const openEditProject = (project: Project) => {
-		setEditingProject(project);
-		setProjectForm({
-			name: project.name,
-			description: project.description,
-			deadline: project.deadline || "",
-			priority: project.priority,
-			status: project.status === "completed" ? "archived" : project.status,
-			category: project.category || "",
-		});
-		setShowProjectModal(true);
-	};
-
-	const openEditTask = (task: Task) => {
-		setEditingTask(task);
-		setTaskForm({
-			name: task.name,
-			description: task.description || "",
-			due_date: task.due_date || "",
-			priority: task.priority,
-		});
-		setShowTaskModal(true);
-	};
-
-	const openAddSubtask = (parentId: string) => {
-		setParentTaskForSubtask(parentId);
-		setEditingTask(null);
-		resetTaskForm();
-		setShowTaskModal(true);
-	};
-
 	const toggleTaskExpansion = async (taskId: string) => {
 		const newExpanded = new Set(expandedTasks);
 		if (newExpanded.has(taskId)) {
@@ -1009,17 +950,20 @@ export function useProjectManagerState({
 		}
 	};
 
-	const totalProjects = projects.length;
-	const archivedProjects = projects.filter(
-		(p) => p.status === "completed",
-	).length;
-	const activeProjects = totalProjects - archivedProjects;
-	const currentCrumb = selectedProject?.name ?? "Overview";
-	const pendingProjectName =
-		projects.find((project) => project.id === projectIdPendingDelete)?.name ??
-		"this project";
-	const pendingTaskName =
-		tasks.find((task) => task.id === taskIdPendingDelete)?.name ?? "this task";
+	const {
+		totalProjects,
+		archivedProjects,
+		activeProjects,
+		currentCrumb,
+		pendingProjectName,
+		pendingTaskName,
+	} = deriveProjectManagerSummary({
+		projects,
+		selectedProject,
+		tasks,
+		projectIdPendingDelete,
+		taskIdPendingDelete,
+	});
 
 	return {
 		projects,

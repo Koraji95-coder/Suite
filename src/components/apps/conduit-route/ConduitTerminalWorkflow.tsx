@@ -51,148 +51,28 @@ import type {
 	TerminalRouteRecord,
 	TerminalScanData,
 	TerminalScanMeta,
-	TerminalScanProfile,
 } from "./conduitTerminalTypes";
-
-const EMPTY_LAYOUT: TerminalLayoutResult = {
-	canvasWidth: 940,
-	canvasHeight: 620,
-	transform: {
-		worldMinX: 0,
-		worldMaxX: 940,
-		worldMinY: 0,
-		worldMaxY: 620,
-		padding: 0,
-		usableWidth: 940,
-		usableHeight: 620,
-		orientation: "native",
-		sourceWorldMinX: 0,
-		sourceWorldMaxX: 940,
-		sourceWorldMinY: 0,
-		sourceWorldMaxY: 620,
-		rotationCenterX: 470,
-		rotationCenterY: 310,
-	},
-	orientation: "native",
-	strips: [],
-	terminals: [],
-};
-
-function parseEnvBoolean(raw: unknown, fallback: boolean): boolean {
-	if (typeof raw !== "string") return fallback;
-	const normalized = raw.trim().toLowerCase();
-	if (normalized === "true" || normalized === "1" || normalized === "yes") {
-		return true;
-	}
-	if (normalized === "false" || normalized === "0" || normalized === "no") {
-		return false;
-	}
-	return fallback;
-}
-
-function parseCsvEnv(raw: unknown): string[] {
-	if (typeof raw !== "string") return [];
-	return raw
-		.split(",")
-		.map((entry) => entry.trim().toUpperCase())
-		.filter(
-			(entry, index, all) => entry.length > 0 && all.indexOf(entry) === index,
-		);
-}
-
-function parseEnvNumber(raw: unknown, fallback: number): number {
-	if (typeof raw !== "string") return fallback;
-	const parsed = Number.parseFloat(raw.trim());
-	if (!Number.isFinite(parsed)) return fallback;
-	return parsed;
-}
-
-const AUTO_CONNECT_ON_MOUNT = parseEnvBoolean(
-	import.meta.env.VITE_TERMINAL_AUTO_CONNECT,
-	true,
-);
-
-const TERMINAL_BLOCK_ALLOW_LIST = parseCsvEnv(
-	import.meta.env.VITE_TERMINAL_BLOCK_ALLOW_LIST ?? "TB_STRIP_META_SIDE",
-);
-
-const DEFAULT_TERMINAL_SCAN_PROFILE: TerminalScanProfile = {
-	panelIdKeys: ["PANEL_ID"],
-	panelNameKeys: ["PANEL_NAME"],
-	sideKeys: ["SIDE"],
-	stripIdKeys: ["STRIP_ID"],
-	stripNumberKeys: ["STRIP_NO", "STRIP_NUM", "STRIP_NUMBER", "NUMBER", "NO"],
-	terminalCountKeys: ["TERMINAL_COUNT"],
-	terminalTagKeys: [
-		"PANEL_ID",
-		"PANEL_NAME",
-		"SIDE",
-		"STRIP_ID",
-		"TERMINAL_COUNT",
-	],
-	terminalNameTokens: ["TERMINAL", "TB", "TS"],
-	blockNameAllowList: TERMINAL_BLOCK_ALLOW_LIST,
-	requireStripId: true,
-	requireTerminalCount: true,
-	requireSide: true,
-	defaultPanelPrefix: "PANEL",
-	defaultTerminalCount: 12,
-};
-
-const JUMPER_COLOR = {
-	code: "JMP",
-	hex: "#f97316",
-	stroke: "#fb923c",
-	aci: 30,
-} as const;
-
-const ETAP_CLEANUP_COMMANDS: readonly EtapCleanupCommand[] = [
-	"ETAPFIX",
-	"ETAPTEXT",
-	"ETAPBLOCKS",
-	"ETAPLAYERFIX",
-	"ETAPOVERLAP",
-	"ETAPIMPORT",
-];
-
-const CAD_SYNC_MAX_RETRIES = 2;
-const CAD_SYNC_RETRY_BASE_DELAY_MS = 250;
-const CAD_DIAGNOSTIC_HISTORY_MAX = 30;
-const TERMINAL_CAD_BACKCHECK_REQUIRED = parseEnvBoolean(
-	import.meta.env.VITE_TERMINAL_CAD_BACKCHECK_REQUIRED,
-	true,
-);
-const TERMINAL_CAD_BACKCHECK_CLEARANCE = Math.max(
-	0,
-	Math.min(
-	200,
-	Number(
-			parseEnvNumber(import.meta.env.VITE_TERMINAL_CAD_BACKCHECK_CLEARANCE, 18),
-		) || 18,
-	),
-);
-
-function makeCadSessionId(): string {
-	try {
-		if (
-			typeof crypto !== "undefined" &&
-			typeof crypto.randomUUID === "function"
-		) {
-			return `cad-session-${crypto.randomUUID()}`;
-		}
-	} catch {
-		// Ignore and use timestamp fallback.
-	}
-	return `cad-session-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
-}
-
-function makeRouteId(): string {
-	return `troute_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function formatLength(length: number): string {
-	return `${Math.round(length)} px`;
-}
+import {
+	AUTO_CONNECT_ON_MOUNT,
+	CAD_DIAGNOSTIC_HISTORY_MAX,
+	CAD_SYNC_MAX_RETRIES,
+	CAD_SYNC_RETRY_BASE_DELAY_MS,
+	DEFAULT_TERMINAL_SCAN_PROFILE,
+	ETAP_CLEANUP_COMMANDS,
+	JUMPER_COLOR,
+	TERMINAL_CAD_BACKCHECK_CLEARANCE,
+	TERMINAL_CAD_BACKCHECK_REQUIRED,
+	backcheckStatusLabel,
+	backcheckStatusTone,
+	cadLayerForRoute,
+	createConduitTerminalViewModel,
+	delayMs,
+	formatLength,
+	makeCadSessionId,
+	makeDiagnosticId,
+	makeRouteId,
+	resolveCadProviderPath,
+} from "./conduitTerminalWorkflowModel";
 
 function dedupePath(path: Point2D[]): Point2D[] {
 	if (path.length <= 1) return path;
@@ -495,65 +375,6 @@ function buildTerminalLabelSyncRequest(
 	};
 }
 
-function delayMs(ms: number): Promise<void> {
-	return new Promise((resolve) => {
-		setTimeout(resolve, ms);
-	});
-}
-
-function makeDiagnosticId(): string {
-	return `cad-diag-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-}
-
-function resolveCadProviderPath(meta?: {
-	providerPath?: unknown;
-	source?: unknown;
-} | null): string {
-	const explicit =
-		typeof meta?.providerPath === "string" ? meta.providerPath.trim() : "";
-	if (explicit.length > 0) {
-		return explicit;
-	}
-	if (meta?.source === "dotnet") {
-		return "dotnet";
-	}
-	if (meta?.source === "autocad") {
-		return "com";
-	}
-	return "unknown";
-}
-
-function backcheckStatusTone(
-	status: TerminalRouteRecord["cadBackcheckStatus"],
-): "default" | "success" | "warning" | "danger" {
-	if (status === "pass") return "success";
-	if (status === "warn" || status === "overridden") return "warning";
-	if (status === "fail" || status === "error") return "danger";
-	return "default";
-}
-
-function backcheckStatusLabel(
-	status: TerminalRouteRecord["cadBackcheckStatus"],
-): string {
-	if (status === "pass") return "Backcheck pass";
-	if (status === "warn") return "Backcheck warn";
-	if (status === "fail") return "Backcheck fail";
-	if (status === "error") return "Backcheck error";
-	if (status === "overridden") return "Backcheck overridden";
-	return "Backcheck pending";
-}
-
-function cadLayerForRoute(route: TerminalRouteRecord): string {
-	if (route.routeType === "jumper") {
-		return "SUITE_WIRE_JUMPER";
-	}
-	const colorCode =
-		String(route.color.code || "")
-			.trim()
-			.toUpperCase() || "WIRE";
-	return `SUITE_WIRE_${route.cableType}_${colorCode}`;
-}
-
 function stripCenterPoint(
 	strip: TerminalLayoutResult["strips"][number],
 ): Point2D {
@@ -830,80 +651,49 @@ export function ConduitTerminalWorkflow() {
 			setWireFunction(DEFAULT_WIRE_FUNCTIONS[cableType]);
 		}
 	}, [cableType, wireFunction]);
-
-	const availableWireFunctions = useMemo(
-		() => Object.keys(WIRE_COLORS[cableType]),
-		[cableType],
+	const {
+		activeColor,
+		activeFromTerminal,
+		activeHoverTerminal,
+		availableWireFunctions,
+		cadBackcheckGateLabel,
+		cadPreflightLabel,
+		cadPreflightReady,
+		cadProviderConfigured,
+		layout,
+		panelRows,
+		routeRows,
+		routeStats,
+		selectedRoute,
+		stripById,
+		terminalById,
+	} = useMemo(
+		() =>
+			createConduitTerminalViewModel({
+				scanData,
+				routeType,
+				cableType,
+				wireFunction,
+				routes,
+				selectedRouteId,
+				fromTerminalId,
+				hoverTerminalId,
+				cadStatus,
+				preflightChecking,
+			}),
+		[
+			cableType,
+			cadStatus,
+			fromTerminalId,
+			hoverTerminalId,
+			preflightChecking,
+			routes,
+			routeType,
+			scanData,
+			selectedRouteId,
+			wireFunction,
+		],
 	);
-	const activeColor =
-		routeType === "jumper"
-			? JUMPER_COLOR
-			: (WIRE_COLORS[cableType][wireFunction] ??
-				WIRE_COLORS[cableType][DEFAULT_WIRE_FUNCTIONS[cableType]]);
-
-	const layout = useMemo(
-		() => (scanData ? buildTerminalLayout(scanData) : EMPTY_LAYOUT),
-		[scanData],
-	);
-	const terminalById = useMemo(
-		() => new Map(layout.terminals.map((terminal) => [terminal.id, terminal])),
-		[layout.terminals],
-	);
-	const stripById = useMemo(
-		() => new Map(layout.strips.map((strip) => [strip.stripId, strip])),
-		[layout.strips],
-	);
-	const activeFromTerminal = fromTerminalId
-		? terminalById.get(fromTerminalId)
-		: null;
-	const activeHoverTerminal = hoverTerminalId
-		? terminalById.get(hoverTerminalId)
-		: null;
-	const selectedRoute =
-		routes.find((route) => route.id === selectedRouteId) ?? null;
-
-	const routeStats = useMemo(() => {
-		const totalLength = routes.reduce((sum, route) => sum + route.length, 0);
-		return {
-			total: routes.length,
-			totalLength,
-			warnings: routes.filter((route) => route.bendDegrees > 360).length,
-			pending: routes.filter((route) => route.cadSyncStatus === "pending")
-				.length,
-			failed: routes.filter((route) => route.cadSyncStatus === "failed").length,
-			synced: routes.filter((route) => route.cadSyncStatus === "synced").length,
-			backcheckPass: routes.filter((route) => route.cadBackcheckStatus === "pass")
-				.length,
-			backcheckFail: routes.filter((route) => route.cadBackcheckStatus === "fail")
-				.length,
-			backcheckWarn: routes.filter((route) => route.cadBackcheckStatus === "warn")
-				.length,
-			backcheckOverridden: routes.filter(
-				(route) => route.cadBackcheckStatus === "overridden",
-			).length,
-			backcheckPending: routes.filter(
-				(route) =>
-					!route.cadBackcheckStatus || route.cadBackcheckStatus === "not_run",
-			).length,
-		};
-	}, [routes]);
-	const cadProviderConfigured =
-		cadStatus?.conduit_route_provider?.configured || "unknown";
-	const cadPreflightReady = Boolean(
-		cadStatus?.autocad_running && cadStatus?.drawing_open,
-	);
-	const cadPreflightLabel = preflightChecking
-		? "CAD Check..."
-		: cadStatus
-			? cadPreflightReady
-				? "CAD Drawing Ready"
-				: "CAD Not Ready"
-			: "CAD Unchecked";
-	const cadBackcheckGateLabel = TERMINAL_CAD_BACKCHECK_REQUIRED
-		? routeStats.backcheckFail > 0
-			? "Backcheck Failures Present"
-			: "Backcheck Gate Active"
-		: "Backcheck Gate Disabled";
 
 	useEffect(() => {
 		routesRef.current = routes;
@@ -970,31 +760,6 @@ export function ConduitTerminalWorkflow() {
 				setPreflightChecking(false);
 			}
 		};
-
-	const panelRows = useMemo(() => {
-		if (!scanData) return [];
-		return Object.entries(scanData.panels).map(([panelId, panel]) => {
-			const stripCount = Object.values(panel.sides).reduce(
-				(sum, side) => sum + side.strips.length,
-				0,
-			);
-			return { panelId, color: panel.color, name: panel.fullName, stripCount };
-		});
-	}, [scanData]);
-
-	const routeRows = routes
-		.slice()
-		.sort((a, b) => b.createdAt - a.createdAt)
-		.map((route) => ({
-			id: route.id,
-			ref: route.ref,
-			from: route.fromLabel,
-			to: route.toLabel,
-			function: route.wireFunction,
-			colorCode: route.color.code,
-			sync: route.cadSyncStatus || "local",
-			length: Math.round(route.length),
-		}));
 
 	const syncObstacleOverlay = async (
 		targetLayout: TerminalLayoutResult,

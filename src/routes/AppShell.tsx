@@ -4,9 +4,11 @@ import {
 	BookOpen,
 	CalendarDays,
 	Clock3,
+	Compass,
 	FolderOpen,
 	KeyRound,
 	LayoutDashboard,
+	Layers3,
 	LogOut,
 	Menu,
 	Settings,
@@ -18,7 +20,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { APP_NAME } from "../appMeta";
 import { useAuth } from "../auth/useAuth";
-import { PageHeaderProvider } from "../components/apps/ui/PageHeaderContext";
+import {
+	PageHeaderProvider,
+	usePageHeader,
+} from "../components/apps/ui/PageHeaderContext";
 import { Badge } from "../components/primitives/Badge";
 import AdminCrownPixel from "../components/roles/AdminCrownPixel";
 
@@ -42,6 +47,68 @@ const primaryNavItems = [
 	{ to: "/app/knowledge", label: "Knowledge", icon: BookOpen },
 	{ to: "/app/agent", label: "Koro Agent", icon: Sparkles },
 ];
+
+const sectionMeta = [
+	{
+		match: "/app/dashboard",
+		label: "Dashboard",
+		subtitle: "Cross-system command center for operations, architecture, and memory.",
+		icon: LayoutDashboard,
+	},
+	{
+		match: "/app/projects",
+		label: "Projects",
+		subtitle: "Project planning, telemetry, tasks, and delivery workflows.",
+		icon: FolderOpen,
+	},
+	{
+		match: "/app/calendar",
+		label: "Calendar",
+		subtitle: "Scheduling, commitments, and upcoming delivery timing.",
+		icon: CalendarDays,
+	},
+	{
+		match: "/app/apps",
+		label: "Apps",
+		subtitle: "Domain tools for drafting, transmittals, and engineering workflows.",
+		icon: Layers3,
+	},
+	{
+		match: "/app/knowledge",
+		label: "Knowledge",
+		subtitle: "References, formulas, standards context, and reusable guidance.",
+		icon: Compass,
+	},
+	{
+		match: "/app/agent",
+		label: "Koro Agent",
+		subtitle: "Profile-driven orchestration and collaborative execution.",
+		icon: Sparkles,
+	},
+	{
+		match: "/app/settings",
+		label: "Settings",
+		subtitle: "Account controls and workspace preferences.",
+		icon: Settings,
+	},
+	{
+		match: "/app/command-center",
+		label: "Command Center",
+		subtitle: "Developer diagnostics and incident-oriented controls.",
+		icon: TerminalSquare,
+	},
+] as const;
+
+function resolveShellMeta(pathname: string) {
+	const matched = sectionMeta.find((item) => pathname.startsWith(item.match));
+	return (
+		matched ?? {
+			label: "Workspace",
+			subtitle: "Suite operations and delivery workspace.",
+			icon: AppWindow,
+		}
+	);
+}
 
 function FirstLoginNamePrompt() {
 	const { user, profile, updateProfile } = useAuth();
@@ -363,9 +430,20 @@ function MobileDrawer({
 }
 
 export default function AppShell() {
+	return (
+		<PageHeaderProvider>
+			<ShellWorkspace />
+		</PageHeaderProvider>
+	);
+}
+
+function ShellWorkspace() {
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const { pathname } = useLocation();
+	const { header } = usePageHeader();
+	const shellMeta = useMemo(() => resolveShellMeta(pathname), [pathname]);
+	const HeaderIcon = shellMeta.icon;
 
 	const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
@@ -375,30 +453,75 @@ export default function AppShell() {
 		setMobileMenuOpen(false);
 	}, [pathname]);
 
+	const resolvedTitle = header.title || shellMeta.label;
+	const resolvedSubtitle = header.subtitle || shellMeta.subtitle;
+
 	return (
-		<PageHeaderProvider>
-			<div className={styles.appRoot}>
-				<FirstLoginNamePrompt />
-				<MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu} />
+		<div className={styles.appRoot}>
+			<FirstLoginNamePrompt />
+			<MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu} />
 
-				<div className={styles.shellBody}>
-					<DesktopSidebar />
-					<main ref={scrollRef} className={styles.main}>
-						<button
-							type="button"
-							className={styles.mobileMenuTrigger}
-							onClick={() => setMobileMenuOpen((previous) => !previous)}
-							aria-label="Open navigation menu"
-						>
-							<Menu size={18} />
-						</button>
+			<div className={styles.shellBody}>
+				<DesktopSidebar />
+				<main ref={scrollRef} className={styles.main}>
+					<div className={styles.commandFrame}>
+						<header className={styles.workspaceHeader}>
+							<div className={styles.workspaceHeaderMain}>
+								<button
+									type="button"
+									className={styles.mobileMenuTrigger}
+									onClick={() =>
+										setMobileMenuOpen((previous) => !previous)
+									}
+									aria-label="Open navigation menu"
+								>
+									<Menu size={18} />
+								</button>
+								<div className={styles.workspaceHeaderTitleBlock}>
+									<div className={styles.workspaceHeaderEyebrow}>
+										<HeaderIcon size={14} />
+										<span>{APP_NAME} Workspace</span>
+									</div>
+									<Text
+										as="h1"
+										size="lg"
+										weight="semibold"
+										className={styles.workspaceHeaderTitle}
+									>
+										{resolvedTitle}
+									</Text>
+									<Text
+										size="xs"
+										color="muted"
+										className={styles.workspaceHeaderSubtitle}
+									>
+										{resolvedSubtitle}
+									</Text>
+								</div>
+							</div>
+							<div className={styles.workspaceHeaderMeta}>
+								<Badge color="accent" variant="soft" size="sm">
+									Command Frame
+								</Badge>
+								<Badge color="primary" variant="outline" size="sm">
+									{shellMeta.label}
+								</Badge>
+								{header.centerContent ? (
+									<div className={styles.workspaceHeaderCenterContent}>
+										{header.centerContent}
+									</div>
+								) : null}
+							</div>
+						</header>
 
-						<Container size="full" padded={false}>
-							<Outlet />
-						</Container>
-					</main>
-				</div>
+						<section className={styles.workspaceContent}>
+							<Container size="full" padded={false}>
+								<Outlet />
+							</Container>
+						</section>
+					</div>
+				</main>
 			</div>
-		</PageHeaderProvider>
+		</div>
 	);
 }

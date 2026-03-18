@@ -105,7 +105,7 @@ export function ProjectTelemetryPanel({
 		const currentUpdatedAt = localRule?.updatedAt ?? 0;
 		const incomingUpdatedAt = incomingRule?.updatedAt ?? 0;
 		const nextRule =
-			!localRule || incomingUpdatedAt >= currentUpdatedAt
+			!localRule || incomingUpdatedAt > currentUpdatedAt
 				? incomingRule
 				: localRule;
 		if (nextRule !== localRule) {

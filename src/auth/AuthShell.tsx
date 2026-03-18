@@ -6,7 +6,6 @@ import { AgentPixelMark } from "@/components/agent/AgentPixelMark";
 import type { AgentProfileId } from "@/components/agent/agentProfiles";
 import { Button } from "@/components/primitives/Button";
 import { HStack } from "@/components/primitives/Stack";
-// Primitives
 import { Text } from "@/components/primitives/Text";
 import { cn } from "@/lib/utils";
 import styles from "./AuthShell.module.css";
@@ -26,11 +25,17 @@ const FLOATING_MARKS: {
 	left: string;
 	delay: string;
 }[] = [
-	{ id: "koro", size: 72, top: "18%", left: "50%", delay: "0s" },
-	{ id: "devstral", size: 36, top: "55%", left: "22%", delay: "0.6s" },
-	{ id: "sentinel", size: 32, top: "38%", left: "78%", delay: "1.2s" },
-	{ id: "forge", size: 28, top: "72%", left: "65%", delay: "1.8s" },
+	{ id: "koro", size: 72, top: "20%", left: "50%", delay: "0s" },
+	{ id: "devstral", size: 36, top: "54%", left: "20%", delay: "0.5s" },
+	{ id: "sentinel", size: 32, top: "38%", left: "80%", delay: "1.1s" },
+	{ id: "forge", size: 28, top: "72%", left: "64%", delay: "1.7s" },
 ];
+
+const ACCESS_SIGNALS = [
+	{ label: "Session", value: "Passwordless link flow" },
+	{ label: "Protection", value: "Verified redirect + guardrails" },
+	{ label: "Profiles", value: "Agent-ready workspace context" },
+] as const;
 
 export default function AuthShell({
 	children,
@@ -48,15 +53,11 @@ export default function AuthShell({
 
 	return (
 		<div className={styles.root}>
-			{/* ═══════════════════════════════════════════════════════════════════
-          NAV
-      ═══════════════════════════════════════════════════════════════════ */}
+			<div className={styles.ambientTop} aria-hidden="true" />
+			<div className={styles.ambientBottom} aria-hidden="true" />
+
 			<nav className={styles.nav}>
-				<Link
-					to="/"
-					className={styles.brandLink}
-					aria-label={`${APP_NAME} home`}
-				>
+				<Link to="/" className={styles.brandLink} aria-label={`${APP_NAME} home`}>
 					<AgentPixelMark
 						profileId="koro"
 						size={28}
@@ -66,102 +67,83 @@ export default function AuthShell({
 					<span className={styles.brandName}>{APP_NAME}</span>
 				</Link>
 
-				{navLink && (
-					<Link to={navLink.to}>
-						<Button variant="secondary" size="sm">
-							{navLink.label}
-						</Button>
-					</Link>
-				)}
+				<div className={styles.navRight}>
+					<span className={styles.navStatus}>Secure auth surface</span>
+					{navLink && (
+						<Link to={navLink.to}>
+							<Button variant="secondary" size="sm">
+								{navLink.label}
+							</Button>
+						</Link>
+					)}
+				</div>
 			</nav>
 
-			{/* ═══════════════════════════════════════════════════════════════════
-          MAIN CONTENT
-      ═══════════════════════════════════════════════════════════════════ */}
 			<main className={styles.main}>
 				<div
 					className={cn(
 						styles.contentGrid,
 						!hidePanel && styles.contentGridWithPanel,
+						mounted ? styles.contentGridVisible : styles.contentGridHidden,
 					)}
-					style={{
-						opacity: mounted ? 1 : 0,
-						transform: mounted ? "translateY(0)" : "translateY(12px)",
-						transition: "opacity 0.5s ease, transform 0.5s ease",
-					}}
 				>
-					{/* ─────────────────────────────────────────────────────────────────
-              LEFT PANEL (Agent showcase)
-          ───────────────────────────────────────────────────────────────── */}
 					{!hidePanel && (
 						<section className={styles.leftPanel}>
 							<div className={styles.leftPanelGradient} />
-
 							<div className={styles.leftPanelPattern} />
 
-							{/* Content */}
 							<div className={styles.leftPanelContent}>
-								{/* Floating agent marks */}
+								<div className={styles.leftEyebrow}>Agent-ready access</div>
+
 								<div className={styles.floatArea}>
-									{FLOATING_MARKS.map((m) => (
+									{FLOATING_MARKS.map((mark) => (
 										<div
-											key={m.id}
+											key={mark.id}
 											className={styles.floatMark}
 											style={{
-												top: m.top,
-												left: m.left,
+												top: mark.top,
+												left: mark.left,
 												transform: "translate(-50%, -50%)",
-												animationDelay: m.delay,
+												animationDelay: mark.delay,
 												opacity: mounted ? 1 : 0,
-												transition: `opacity 0.8s ease ${m.delay}`,
+												transition: `opacity 0.8s ease ${mark.delay}`,
 											}}
 										>
 											<AgentPixelMark
-												profileId={m.id}
-												size={m.size}
+												profileId={mark.id}
+												size={mark.size}
 												detailLevel="hero"
-												expression={m.id === "koro" ? "active" : "neutral"}
+												expression={mark.id === "koro" ? "active" : "neutral"}
 											/>
 										</div>
 									))}
 									<div className={styles.floatSpacer} aria-hidden="true" />
 								</div>
 
-								{/* Branding */}
 								<div className={styles.brandBlock}>
 									<Text size="xl" weight="semibold" block>
 										{APP_NAME}
 									</Text>
-									<Text
-										size="sm"
-										color="muted"
-										className={styles.tagline}
-										block
-									>
+									<Text size="sm" color="muted" className={styles.tagline} block>
 										{APP_TAGLINE}
 									</Text>
 								</div>
 
-								{/* Agent badges */}
-								<HStack
-									gap={3}
-									className={styles.agentBadgeRow}
-									wrap
-									justify="center"
-								>
-									{FLOATING_MARKS.map((m) => (
-										<div key={m.id} className={styles.agentBadge}>
-											<AgentPixelMark
-												profileId={m.id}
-												size={14}
-												detailLevel="hero"
-											/>
-											<Text
-												size="xs"
-												color="muted"
-												className={styles.agentName}
-											>
-												{m.id}
+								<div className={styles.signalGrid}>
+									{ACCESS_SIGNALS.map((signal) => (
+										<div key={signal.label} className={styles.signalCard}>
+											<div className={styles.signalLabel}>{signal.label}</div>
+											<div className={styles.signalValue}>{signal.value}</div>
+										</div>
+									))}
+								</div>
+
+								<HStack gap={3} className={styles.agentBadgeRow} wrap justify="center">
+									{FLOATING_MARKS.map((mark) => (
+										<div key={mark.id} className={styles.agentBadge}>
+											<AgentPixelMark profileId={mark.id} size={14} detailLevel="hero" />
+											<Text size="xs" color="muted" className={styles.agentName}>
+												{mark.id}
 											</Text>
 										</div>
 									))}
@@ -170,20 +152,20 @@ export default function AuthShell({
 						</section>
 					)}
 
-					{/* ─────────────────────────────────────────────────────────────────
-              RIGHT PANEL (Form content)
-          ───────────────────────────────────────────────────────────────── */}
-						<section
-							className={cn(
-								styles.rightPanel,
-								!hidePanel && styles.rightPanelWithLeft,
-								cardClassName,
-							)}
-							style={cardStyle}
-						>
-							<div className={styles.topAccent} />
-
-						{/* Content */}
+					<section
+						className={cn(
+							styles.rightPanel,
+							!hidePanel && styles.rightPanelWithLeft,
+							cardClassName,
+						)}
+						style={cardStyle}
+					>
+						<div className={styles.topAccent} />
+						<div className={styles.rightPanelHeader}>
+							<Text size="xs" color="muted">
+								Workspace authentication
+							</Text>
+						</div>
 						<div className={styles.rightPanelBody}>{children}</div>
 					</section>
 				</div>

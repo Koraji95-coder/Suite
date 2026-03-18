@@ -1,12 +1,15 @@
 // src/routes/LandingPage.tsx
 
 import {
+	Activity,
 	ArrowRight,
 	Bot,
 	CalendarDays,
 	FolderOpen,
 	Layers,
+	ShieldCheck,
 	Sparkles,
+	Workflow,
 	Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -71,6 +74,23 @@ const FEATURES = [
 	},
 ] as const;
 const AGENT_IDS = AGENT_PROFILE_IDS;
+const COMMAND_SIGNALS = [
+	{
+		icon: Activity,
+		label: "Live telemetry",
+		value: "Watchdog + sessions",
+	},
+	{
+		icon: Workflow,
+		label: "Ops flow",
+		value: "Projects, tasks, deadlines",
+	},
+	{
+		icon: ShieldCheck,
+		label: "Secure access",
+		value: "Passwordless and verified",
+	},
+] as const;
 
 function useScrollAnimation(threshold = 0.1) {
 	const ref = useRef<HTMLDivElement>(null);
@@ -139,6 +159,9 @@ export default function LandingPage() {
 
 	return (
 		<div className={styles.root}>
+			<div className={styles.ambientTop} aria-hidden="true" />
+			<div className={styles.ambientBottom} aria-hidden="true" />
+
 			<nav
 				className={cn(
 					styles.nav,
@@ -207,19 +230,37 @@ export default function LandingPage() {
 								className={styles.heroBadge}
 							>
 								<span className={styles.heroBadgeDot} />
-								Engineering workspace
+								Command-center workspace
 							</Badge>
 
 							<h1 className={styles.heroTitle}>
-								Projects, planning, and execution in{" "}
-								<span className={styles.heroHighlight}>one layout.</span>
+								One control surface for{" "}
+								<span className={styles.heroHighlight}>
+									projects, drawings, and AI execution.
+								</span>
 							</h1>
 
 							<Text color="muted" size="md" className={styles.heroCopy}>
-								{APP_TAGLINE}. Manage projects, coordinate timelines, generate
-								documents, and run AI-powered agents — all from a single unified
-								workspace.
+								{APP_TAGLINE}. Coordinate project operations, monitor telemetry,
+								and run specialized agents without context-switching between
+								separate tools.
 							</Text>
+
+							<div className={styles.heroSignalGrid}>
+								{COMMAND_SIGNALS.map((signal) => (
+									<div key={signal.label} className={styles.heroSignalCard}>
+										<signal.icon className={styles.heroSignalIcon} />
+										<div>
+											<div className={styles.heroSignalLabel}>
+												{signal.label}
+											</div>
+											<div className={styles.heroSignalValue}>
+												{signal.value}
+											</div>
+										</div>
+									</div>
+								))}
+							</div>
 
 							<HStack gap={3} wrap className={styles.heroFeatureBadges}>
 								<Badge color="success" variant="outline" dot pulse>
@@ -228,6 +269,19 @@ export default function LandingPage() {
 								<Badge color="primary" variant="outline" dot>
 									Email link verification
 								</Badge>
+							</HStack>
+
+							<HStack gap={3} wrap className={styles.heroCtaRow}>
+								<Link to="/signup">
+									<Button variant="primary" size="sm">
+										Start in Suite
+									</Button>
+								</Link>
+								<Link to="/login">
+									<Button variant="secondary" size="sm">
+										Sign in
+									</Button>
+								</Link>
 							</HStack>
 						</div>
 
@@ -238,6 +292,7 @@ export default function LandingPage() {
 							)}
 						>
 							<div className={styles.mainAgentWrap}>
+								<div className={styles.heroOrbit} aria-hidden="true" />
 								<div className={styles.mainAgentInner}>
 									<div className={styles.mainAgentGlow} />
 									<div className={styles.mainAgentFloat}>
@@ -269,46 +324,72 @@ export default function LandingPage() {
 										</div>
 									))}
 								</HStack>
+
+								<div className={styles.heroAgentCaption}>
+									Agent mesh with profile-specific memory and routing
+								</div>
 							</div>
 						</div>
 					</div>
 				</section>
 
-				<section ref={featuresAnim.ref} className={styles.featuresGrid}>
-					{FEATURES.map((f, i) => (
-						<Link
-							key={f.title}
-							to={f.to}
-							className={cn(
-								styles.featureCard,
-								featuresAnim.isVisible
-									? styles.featureVisible
-									: styles.featureHidden,
-							)}
-							style={{
-								transitionDelay: featuresAnim.isVisible ? `${i * 80}ms` : "0ms",
-							}}
-						>
-							<div className={styles.featureIconWrap}>
-								<f.icon className={styles.featureIcon} />
-							</div>
-							<Text as="h3" size="sm" weight="semibold" block>
-								{f.title}
-							</Text>
-							<Text
-								size="xs"
-								color="muted"
-								className={styles.featureCopy}
-								block
+				<section ref={featuresAnim.ref} className={styles.featuresSection}>
+					<div className={styles.sectionHeading}>
+						<Text as="h2" size="lg" weight="semibold" block>
+							Workspace modules
+						</Text>
+						<Text size="sm" color="muted" className={styles.sectionCopy} block>
+							A cohesive operating layer across planning, delivery, and
+							engineering execution.
+						</Text>
+					</div>
+					<div className={styles.featuresGrid}>
+						{FEATURES.map((f, i) => (
+							<Link
+								key={f.title}
+								to={f.to}
+								className={cn(
+									styles.featureCard,
+									featuresAnim.isVisible
+										? styles.featureVisible
+										: styles.featureHidden,
+								)}
+								style={{
+									transitionDelay: featuresAnim.isVisible
+										? `${i * 80}ms`
+										: "0ms",
+								}}
 							>
-								{f.description}
-							</Text>
-							<ArrowRight className={styles.featureArrow} />
-						</Link>
-					))}
+								<div className={styles.featureIconWrap}>
+									<f.icon className={styles.featureIcon} />
+								</div>
+								<Text as="h3" size="sm" weight="semibold" block>
+									{f.title}
+								</Text>
+								<Text
+									size="xs"
+									color="muted"
+									className={styles.featureCopy}
+									block
+								>
+									{f.description}
+								</Text>
+								<ArrowRight className={styles.featureArrow} />
+							</Link>
+						))}
+					</div>
 				</section>
 
 				<section ref={agentsAnim.ref} className={styles.agentsSection}>
+					<div className={styles.sectionHeading}>
+						<Text as="h2" size="lg" weight="semibold" block>
+							Agent command layer
+						</Text>
+						<Text size="sm" color="muted" className={styles.sectionCopy} block>
+							Specialized profiles operate independently and coordinate through
+							shared context when needed.
+						</Text>
+					</div>
 					<Panel
 						variant="default"
 						padding="lg"

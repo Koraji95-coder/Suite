@@ -1,19 +1,56 @@
 .root {
+	position: relative;
 	min-height: 100vh;
 	color: var(--text);
 	background: var(--bg);
+	overflow: clip;
+}
+
+.ambientTop,
+.ambientBottom {
+	position: fixed;
+	pointer-events: none;
+	z-index: 0;
+}
+
+.ambientTop {
+	inset: -18rem auto auto -14rem;
+	width: 38rem;
+	height: 38rem;
+	border-radius: 50%;
+	background: radial-gradient(
+		circle,
+		color-mix(in srgb, var(--primary) 24%, transparent),
+		transparent 68%
+	);
+	filter: blur(38px);
+	opacity: 0.5;
+}
+
+.ambientBottom {
+	inset: auto -16rem -18rem auto;
+	width: 42rem;
+	height: 42rem;
+	border-radius: 50%;
+	background: radial-gradient(
+		circle,
+		color-mix(in srgb, var(--accent) 20%, transparent),
+		transparent 70%
+	);
+	filter: blur(42px);
+	opacity: 0.44;
 }
 
 .nav {
 	position: sticky;
 	top: 0;
-	z-index: 50;
+	z-index: 20;
 	border-bottom: 1px solid transparent;
 	transition:
-		background 300ms ease,
-		backdrop-filter 300ms ease,
-		border-color 300ms ease,
-		box-shadow 300ms ease;
+		background 260ms ease,
+		backdrop-filter 260ms ease,
+		border-color 260ms ease,
+		box-shadow 260ms ease;
 }
 
 .navTop {
@@ -21,35 +58,35 @@
 }
 
 .navScrolled {
-	background: color-mix(in srgb, var(--bg) 80%, transparent);
-	backdrop-filter: blur(12px);
+	background: color-mix(in srgb, var(--bg) 78%, transparent);
+	backdrop-filter: blur(14px);
 	border-bottom-color: var(--line-soft);
-	box-shadow: 0 12px 24px rgb(0 0 0 / 12%);
+	box-shadow: 0 14px 30px rgb(0 0 0 / 26%);
 }
 
 .navContainer {
+	position: relative;
+	z-index: 1;
 	margin-inline: auto;
 	display: flex;
 	width: 100%;
-	max-width: 84rem;
+	max-width: 86rem;
 	align-items: center;
 	justify-content: space-between;
-	gap: 0.75rem;
-	padding: 0.75rem 1rem;
+	gap: 0.8rem;
+	padding: 0.82rem 1rem;
 }
 
 .brandLink {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.62rem;
-	font-size: 0.875rem;
-	font-weight: 650;
+	gap: 0.66rem;
 	color: var(--text);
 	text-decoration: none;
 }
 
 .brandMarkScale {
-	transition: transform 300ms ease;
+	transition: transform 260ms ease;
 }
 
 .brandMarkNormal {
@@ -61,45 +98,57 @@
 }
 
 .brandLabel {
-	letter-spacing: -0.01em;
+	font-size: 0.88rem;
+	font-weight: 700;
+	letter-spacing: 0.01em;
 }
 
 .navAuxLink {
 	display: none;
 	align-items: center;
 	justify-content: center;
-	border-radius: var(--radius-2);
-	padding: 0.5rem 1rem;
-	font-size: 0.875rem;
-	font-weight: 500;
+	padding: 0.48rem 0.86rem;
+	border-radius: 999px;
+	font-size: 0.82rem;
+	font-weight: 600;
 	color: var(--text-muted);
+	text-decoration: none;
 	transition:
-		background 200ms ease,
-		color 200ms ease;
+		background 180ms ease,
+		color 180ms ease;
 }
 
 .navAuxLink:hover {
+	background: color-mix(in srgb, var(--surface-2) 72%, transparent);
 	color: var(--text);
-	background: var(--surface-2);
 }
 
 .main {
+	position: relative;
+	z-index: 1;
 	margin-inline: auto;
 	width: 100%;
-	max-width: 84rem;
-	padding-inline: 1rem;
-	padding-bottom: 4rem;
+	max-width: 86rem;
+	padding: 0 1rem 4rem;
 }
 
 .hero {
 	position: relative;
 	margin-top: 1rem;
 	overflow: hidden;
-	border: 1px solid var(--line-soft);
+	border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--line-soft));
 	border-radius: var(--radius-4);
+	background:
+		linear-gradient(
+			160deg,
+			color-mix(in srgb, var(--surface) 90%, transparent),
+			color-mix(in srgb, var(--surface-2) 82%, transparent)
+		),
+		var(--surface);
+	box-shadow: var(--agent-shadow-soft);
 	transition:
-		opacity 700ms ease,
-		transform 700ms ease;
+		opacity 640ms ease,
+		transform 640ms ease;
 }
 
 .visible {
@@ -109,7 +158,7 @@
 
 .hiddenDown {
 	opacity: 0;
-	transform: translateY(1.5rem);
+	transform: translateY(1.2rem);
 }
 
 .heroBackground {
@@ -117,42 +166,47 @@
 	inset: 0;
 	background:
 		radial-gradient(
-			ellipse 90% 70% at 50% 30%,
-			color-mix(in srgb, var(--primary) 10%, transparent),
-			transparent
+			ellipse 90% 74% at 16% 14%,
+			color-mix(in srgb, var(--primary) 19%, transparent),
+			transparent 68%
 		),
 		radial-gradient(
-			ellipse 60% 60% at 80% 70%,
-			color-mix(in srgb, var(--accent) 6%, transparent),
-			transparent
-		),
-		var(--surface);
+			ellipse 76% 80% at 86% 74%,
+			color-mix(in srgb, var(--accent) 14%, transparent),
+			transparent 70%
+		);
 }
 
 .heroPattern {
 	position: absolute;
 	inset: 0;
-	opacity: 0.03;
-	background-image: radial-gradient(
-		circle,
-		var(--text-muted) 1px,
-		transparent 1px
-	);
-	background-size: 24px 24px;
+	opacity: 0.055;
+	background-image:
+		linear-gradient(
+			to right,
+			color-mix(in srgb, var(--line-soft) 56%, transparent) 1px,
+			transparent 1px
+		),
+		linear-gradient(
+			to bottom,
+			color-mix(in srgb, var(--line-soft) 56%, transparent) 1px,
+			transparent 1px
+		);
+	background-size: 22px 22px;
 }
 
 .heroGrid {
 	position: relative;
 	display: grid;
-	gap: 2rem;
+	gap: 2.1rem;
 	align-items: center;
-	padding: 4rem 1.5rem;
+	padding: 3.5rem 1.4rem;
 }
 
 .heroLeft {
 	transition:
-		opacity 700ms ease 200ms,
-		transform 700ms ease 200ms;
+		opacity 640ms ease 180ms,
+		transform 640ms ease 180ms;
 }
 
 .heroLeftVisible {
@@ -162,47 +216,91 @@
 
 .heroLeftHidden {
 	opacity: 0;
-	transform: translateX(-2rem);
+	transform: translateX(-1.8rem);
 }
 
 .heroBadge {
-	margin-bottom: 1.25rem;
+	margin-bottom: 1rem;
 }
 
 .heroBadgeDot {
-	width: 0.38rem;
-	height: 0.38rem;
+	width: 0.4rem;
+	height: 0.4rem;
 	border-radius: 999px;
 	background: var(--primary);
-	animation: pulse 2.2s ease-in-out infinite;
+	animation: pulse 2.3s ease-in-out infinite;
 }
 
 .heroTitle {
-	font-size: clamp(1.9rem, 3.6vw, 3rem);
-	font-weight: 650;
-	line-height: 1.15;
-	letter-spacing: -0.02em;
+	max-width: 16ch;
+	font-size: clamp(1.95rem, 3.9vw, 3.15rem);
+	font-weight: 700;
+	line-height: 1.06;
+	letter-spacing: -0.03em;
 }
 
 .heroHighlight {
-	color: var(--primary);
+	color: color-mix(in srgb, var(--primary) 86%, white 14%);
 }
 
 .heroCopy {
-	margin-top: 1.25rem;
-	max-width: 34rem;
-	line-height: 1.7;
+	margin-top: 1rem;
+	max-width: 42rem;
+	line-height: 1.68;
+}
+
+.heroSignalGrid {
+	margin-top: 1.2rem;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.55rem;
+}
+
+.heroSignalCard {
+	display: flex;
+	gap: 0.52rem;
+	align-items: flex-start;
+	padding: 0.62rem 0.66rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface) 86%, transparent);
+}
+
+.heroSignalIcon {
+	flex-shrink: 0;
+	width: 0.88rem;
+	height: 0.88rem;
+	margin-top: 0.14rem;
+	color: var(--primary);
+}
+
+.heroSignalLabel {
+	font-size: 0.66rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.heroSignalValue {
+	margin-top: 0.12rem;
+	font-size: 0.74rem;
+	color: var(--text);
 }
 
 .heroFeatureBadges {
-	margin-top: 2rem;
+	margin-top: 1.05rem;
+}
+
+.heroCtaRow {
+	margin-top: 1.1rem;
 }
 
 .heroRight {
 	display: none;
 	transition:
-		opacity 700ms ease 400ms,
-		transform 700ms ease 400ms;
+		opacity 640ms ease 340ms,
+		transform 640ms ease 340ms;
 }
 
 .heroRightVisible {
@@ -212,30 +310,45 @@
 
 .heroRightHidden {
 	opacity: 0;
-	transform: translateX(2rem);
+	transform: translateX(1.8rem);
 }
 
 .mainAgentWrap {
 	position: relative;
+	display: grid;
+	justify-items: center;
+}
+
+.heroOrbit {
+	position: absolute;
+	inset: 16% 10% 18%;
+	border-radius: 999px;
+	border: 1px dashed color-mix(in srgb, var(--primary) 36%, transparent);
+	opacity: 0.76;
+	animation: spin 24s linear infinite;
 }
 
 .mainAgentInner {
 	position: relative;
+	padding: 0.9rem;
 }
 
 .mainAgentGlow {
 	position: absolute;
 	inset: 0;
-	opacity: 0.3;
-	filter: blur(2rem);
 	border-radius: 999px;
-	background: var(--primary);
-	animation: pulse 2.2s ease-in-out infinite;
+	background: radial-gradient(
+		circle,
+		color-mix(in srgb, var(--primary) 38%, transparent),
+		transparent 72%
+	);
+	filter: blur(28px);
+	opacity: 0.56;
 }
 
 .mainAgentFloat {
 	position: relative;
-	animation: floatY 4s ease-in-out infinite;
+	animation: floatY 4.2s ease-in-out infinite;
 }
 
 .heroSecondaryRow {
@@ -246,36 +359,67 @@
 	padding: 0.5rem;
 	border: 1px solid var(--line-soft);
 	border-radius: 999px;
-	background: color-mix(in srgb, var(--surface) 60%, transparent);
-	transition:
-		border-color 300ms ease,
-		background 300ms ease;
-	animation: fadeInScale 400ms ease-out forwards;
+	background: color-mix(in srgb, var(--surface) 72%, transparent);
+	animation: fadeInScale 430ms ease-out forwards;
 	opacity: 0;
+	transition:
+		border-color 240ms ease,
+		background 240ms ease;
 }
 
 .heroSecondaryAgent:hover {
-	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
-	background: var(--surface);
+	border-color: color-mix(in srgb, var(--primary) 46%, var(--line-soft));
+	background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+}
+
+.heroAgentCaption {
+	margin-top: 0.8rem;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+.featuresSection {
+	margin-top: 1.35rem;
+	display: grid;
+	gap: 0.8rem;
+}
+
+.sectionHeading {
+	display: grid;
+	gap: 0.28rem;
+}
+
+.sectionCopy {
+	max-width: 44rem;
 }
 
 .featuresGrid {
-	margin-top: 1.5rem;
 	display: grid;
-	gap: 1rem;
+	gap: 0.88rem;
 }
 
 .featureCard {
 	position: relative;
-	padding: 1.25rem;
+	display: grid;
+	gap: 0.2rem;
+	padding: 1.1rem 1rem 1rem;
 	border: 1px solid var(--line-soft);
-	border-radius: var(--radius-4);
+	border-radius: var(--radius-3);
+	background:
+		linear-gradient(
+			165deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 82%, transparent)
+		),
+		var(--surface);
 	text-decoration: none;
-	background: var(--surface);
+	box-shadow: 0 10px 22px rgb(0 0 0 / 16%);
 	transition:
-		border-color 300ms ease,
-		box-shadow 300ms ease,
-		opacity 400ms ease;
+		border-color 220ms ease,
+		transform 220ms ease,
+		box-shadow 220ms ease,
+		opacity 380ms ease;
 }
 
 .featureVisible {
@@ -285,52 +429,73 @@
 
 .featureHidden {
 	opacity: 0;
-	transform: translateY(2rem);
+	transform: translateY(1.4rem);
+}
+
+.featureCard:hover {
+	transform: translateY(-2px);
+	border-color: color-mix(in srgb, var(--primary) 30%, var(--line-soft));
+	box-shadow: 0 16px 28px rgb(0 0 0 / 24%);
 }
 
 .featureIconWrap {
-	margin-bottom: 0.75rem;
 	display: inline-flex;
-	padding: 0.5rem;
-	border-radius: 0.7rem;
-	background: var(--surface-2);
-	transition: background 220ms ease;
+	padding: 0.52rem;
+	margin-bottom: 0.55rem;
+	border-radius: 0.72rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--line-soft));
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .featureIcon {
-	width: 1rem;
-	height: 1rem;
+	width: 0.96rem;
+	height: 0.96rem;
 	color: var(--primary);
 }
 
 .featureCopy {
-	margin-top: 0.35rem;
-	line-height: 1.55;
+	margin-top: 0.25rem;
+	line-height: 1.56;
 }
 
 .featureArrow {
 	position: absolute;
-	top: 1.25rem;
-	right: 1rem;
+	top: 1rem;
+	right: 0.95rem;
 	width: 0.9rem;
 	height: 0.9rem;
 	color: var(--text-muted);
 	opacity: 0;
+	transform: translateX(-2px);
 	transition:
-		opacity 240ms ease,
-		transform 240ms ease;
+		opacity 220ms ease,
+		transform 220ms ease;
+}
+
+.featureCard:hover .featureArrow {
+	opacity: 1;
+	transform: translateX(0);
 }
 
 .agentsSection {
-	margin-top: 1.5rem;
+	margin-top: 1.35rem;
 	display: grid;
-	gap: 1.5rem;
+	gap: 0.8rem;
 }
 
 .agentsPanel {
+	border: 1px solid var(--line-soft);
+	background:
+		linear-gradient(
+			170deg,
+			color-mix(in srgb, var(--surface) 90%, transparent),
+			color-mix(in srgb, var(--surface-2) 82%, transparent)
+		),
+		var(--surface);
+	box-shadow: 0 14px 28px rgb(0 0 0 / 20%);
 	transition:
-		opacity 500ms ease,
-		transform 500ms ease;
+		opacity 520ms ease,
+		transform 520ms ease;
 }
 
 .agentsPanelVisible {
@@ -340,11 +505,11 @@
 
 .agentsPanelHidden {
 	opacity: 0;
-	transform: translateX(-2rem);
+	transform: translateX(-1.4rem);
 }
 
 .agentsBadge {
-	margin-bottom: 1.25rem;
+	margin-bottom: 0.95rem;
 }
 
 .agentsBadgeDot {
@@ -355,28 +520,28 @@
 }
 
 .agentsCopy {
-	margin-top: 0.5rem;
-	max-width: 36rem;
-	line-height: 1.65;
+	margin-top: 0.38rem;
+	max-width: 40rem;
+	line-height: 1.6;
 }
 
 .agentGrid {
-	margin-top: 1.5rem;
+	margin-top: 1.2rem;
 	display: grid;
-	gap: 0.75rem;
+	gap: 0.62rem;
 }
 
 .agentCard {
 	display: flex;
-	gap: 0.75rem;
+	gap: 0.72rem;
 	align-items: flex-start;
-	padding: 0.75rem;
+	padding: 0.72rem 0.78rem;
 	border: 1px solid var(--line-soft);
-	border-radius: var(--radius-3);
-	background: var(--surface-2);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--surface) 90%, transparent);
 	transition:
-		border-color 300ms ease,
-		background 300ms ease,
+		border-color 240ms ease,
+		background 240ms ease,
 		opacity 300ms ease,
 		transform 300ms ease;
 }
@@ -388,7 +553,12 @@
 
 .agentCardHidden {
 	opacity: 0;
-	transform: translateY(1rem);
+	transform: translateY(0.9rem);
+}
+
+.agentCard:hover {
+	border-color: color-mix(in srgb, var(--primary) 28%, var(--line-soft));
+	background: color-mix(in srgb, var(--surface-2) 84%, transparent);
 }
 
 .agentMark {
@@ -396,20 +566,20 @@
 }
 
 .agentTagline {
-	margin-top: 0.1rem;
+	margin-top: 0.12rem;
 }
 
 .footer {
-	margin-top: 2.5rem;
-	padding-top: 1.5rem;
-	padding-inline: 0.25rem;
+	margin-top: 2.3rem;
+	padding-top: 1.2rem;
+	padding-inline: 0.18rem;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
-	gap: 1rem;
+	gap: 0.9rem;
 	border-top: 1px solid var(--line-soft);
-	transition: opacity 500ms ease 500ms;
+	transition: opacity 420ms ease 420ms;
 }
 
 .footerVisible {
@@ -423,7 +593,7 @@
 .footerBrand {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: 0.45rem;
 }
 
 .footerLinks {
@@ -435,8 +605,9 @@
 .footerLink {
 	font-size: 0.75rem;
 	color: var(--text-muted);
-	text-underline-offset: 2px;
-	transition: color 200ms ease;
+	text-decoration: none;
+	text-underline-offset: 3px;
+	transition: color 180ms ease;
 }
 
 .footerLink:hover {
@@ -468,10 +639,19 @@
 @keyframes pulse {
 	0%,
 	100% {
-		opacity: 0.25;
+		opacity: 0.24;
 	}
 	50% {
-		opacity: 0.4;
+		opacity: 0.42;
+	}
+}
+
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
 	}
 }
 
@@ -490,7 +670,7 @@
 
 	.heroGrid {
 		grid-template-columns: repeat(12, minmax(0, 1fr));
-		padding: 5rem 3rem;
+		padding: 4.4rem 2.8rem;
 	}
 
 	.heroLeft {
@@ -509,14 +689,6 @@
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
-	.agentsSection {
-		grid-template-columns: repeat(12, minmax(0, 1fr));
-	}
-
-	.agentsPanel {
-		grid-column: span 12 / span 12;
-	}
-
 	.agentGrid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
@@ -525,5 +697,11 @@
 @media (min-width: 64rem) {
 	.featuresGrid {
 		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 52rem) {
+	.heroSignalGrid {
+		grid-template-columns: 1fr;
 	}
 }

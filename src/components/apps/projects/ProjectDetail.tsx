@@ -90,112 +90,122 @@ export function ProjectDetail({
 
 	return (
 		<div className={styles.root}>
-			<ProjectDetailHeader
-				project={project}
-				tasks={tasks}
-				telemetry={telemetry}
-				onToggleArchive={onToggleArchive}
-				onExportMarkdown={onExportMarkdown}
-			/>
+			<div className={styles.primaryStack}>
+				<section className={styles.headerShell}>
+					<ProjectDetailHeader
+						project={project}
+						tasks={tasks}
+						telemetry={telemetry}
+						onToggleArchive={onToggleArchive}
+						onExportMarkdown={onExportMarkdown}
+					/>
+				</section>
 
-			<ProjectTelemetryPanel projectId={project.id} telemetry={telemetry} />
+				<section className={styles.telemetryShell}>
+					<ProjectTelemetryPanel projectId={project.id} telemetry={telemetry} />
+				</section>
+			</div>
 
-			<ProjectDetailViewTabs
-				viewMode={viewMode}
-				onViewModeChange={onViewModeChange}
-			/>
+			<section className={styles.workspaceShell}>
+				<ProjectDetailViewTabs
+					viewMode={viewMode}
+					onViewModeChange={onViewModeChange}
+				/>
 
-			{viewMode === "tasks" && (
-				<section className={styles.tasksPanel}>
-					<div className={styles.tasksHead}>
-						<h4 className={styles.tasksTitle}>Tasks</h4>
-						<button
-							onClick={onAddTask}
-							className={styles.addButton}
-							type="button"
-						>
-							<Plus className={styles.addIcon} />
-							<span>Add Task</span>
-						</button>
-					</div>
-
-					<div className={styles.divider} />
-
-					{tasks.length > 0 && (
-						<div className={styles.taskFilters}>
-							{(["all", "pending", "completed"] as const).map((filter) => (
+				<div className={styles.workspaceContent}>
+					{viewMode === "tasks" && (
+						<section className={styles.tasksPanel}>
+							<div className={styles.tasksHead}>
+								<h4 className={styles.tasksTitle}>Tasks</h4>
 								<button
-									key={filter}
+									onClick={onAddTask}
+									className={styles.addButton}
 									type="button"
-									onClick={() => onTaskFilterChange(filter)}
-									className={cn(
-										styles.taskFilterButton,
-										taskFilter === filter && styles.taskFilterActive,
-									)}
 								>
-									{filter.charAt(0).toUpperCase() + filter.slice(1)}
+									<Plus className={styles.addIcon} />
+									<span>Add Task</span>
 								</button>
-							))}
-						</div>
+							</div>
+
+							<div className={styles.divider} />
+
+							{tasks.length > 0 && (
+								<div className={styles.taskFilters}>
+									{(["all", "pending", "completed"] as const).map((filter) => (
+										<button
+											key={filter}
+											type="button"
+											onClick={() => onTaskFilterChange(filter)}
+											className={cn(
+												styles.taskFilterButton,
+												taskFilter === filter && styles.taskFilterActive,
+											)}
+										>
+											{filter.charAt(0).toUpperCase() + filter.slice(1)}
+										</button>
+									))}
+								</div>
+							)}
+
+							{tasks.length === 0 ? (
+								<div className={styles.empty}>
+									<CheckSquare className={styles.emptyIcon} />
+									<p className={styles.emptyTitle}>No tasks in this project</p>
+									<p className={styles.emptySub}>
+										Click <span className={styles.emptyHint}>Add Task</span> to
+										begin
+									</p>
+								</div>
+							) : (
+								<TaskList
+									tasks={tasks}
+									onToggleComplete={onToggleTaskComplete}
+									onAddSubtask={onAddSubtask}
+									onEditTask={onEditTask}
+									onDeleteTask={onDeleteTask}
+									onDragEnd={onDragEnd}
+									expandedTasks={expandedTasks}
+									onToggleExpand={onToggleExpand}
+									isProjectArchived={project.status === "completed"}
+									sensors={sensors}
+									filter={taskFilter}
+								/>
+							)}
+						</section>
 					)}
 
-					{tasks.length === 0 ? (
-						<div className={styles.empty}>
-							<CheckSquare className={styles.emptyIcon} />
-							<p className={styles.emptyTitle}>No tasks in this project</p>
-							<p className={styles.emptySub}>
-								Click <span className={styles.emptyHint}>Add Task</span> to
-								begin
-							</p>
-						</div>
-					) : (
-						<TaskList
-							tasks={tasks}
-							onToggleComplete={onToggleTaskComplete}
-							onAddSubtask={onAddSubtask}
-							onEditTask={onEditTask}
-							onDeleteTask={onDeleteTask}
-							onDragEnd={onDragEnd}
-							expandedTasks={expandedTasks}
-							onToggleExpand={onToggleExpand}
-							isProjectArchived={project.status === "completed"}
-							sensors={sensors}
-							filter={taskFilter}
+					{viewMode === "calendar" && (
+						<CalendarView
+							currentMonth={currentMonth}
+							onMonthChange={onMonthChange}
+							selectedDate={selectedCalendarDate}
+							onDateSelect={onCalendarDateSelect}
+							calendarEvents={calendarEvents}
 						/>
 					)}
-				</section>
-			)}
 
-			{viewMode === "calendar" && (
-				<CalendarView
-					currentMonth={currentMonth}
-					onMonthChange={onMonthChange}
-					selectedDate={selectedCalendarDate}
-					onDateSelect={onCalendarDateSelect}
-					calendarEvents={calendarEvents}
-				/>
-			)}
+					{viewMode === "files" && (
+						<FilesBrowser
+							files={files}
+							filter={fileFilter}
+							onFilterChange={onFileFilterChange}
+							onUpload={onFileUpload}
+							onDownload={onDownloadFile}
+							projectName={project.name}
+						/>
+					)}
 
-			{viewMode === "files" && (
-				<FilesBrowser
-					files={files}
-					filter={fileFilter}
-					onFilterChange={onFileFilterChange}
-					onUpload={onFileUpload}
-					onDownload={onDownloadFile}
-					projectName={project.name}
-				/>
-			)}
-
-			{viewMode === "ground-grids" && (
-				<ProjectDetailGroundGridsView
-					gridDesigns={gridDesigns}
-					onCreateDesign={() => {
-						void createLinkedDesign();
-					}}
-					onOpenDesign={openGridDesign}
-				/>
-			)}
+					{viewMode === "ground-grids" && (
+						<ProjectDetailGroundGridsView
+							gridDesigns={gridDesigns}
+							onCreateDesign={() => {
+								void createLinkedDesign();
+							}}
+							onOpenDesign={openGridDesign}
+						/>
+					)}
+				</div>
+			</section>
 		</div>
 	);
 }

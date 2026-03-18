@@ -1,39 +1,40 @@
 .root {
 	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0;
 	flex-wrap: wrap;
-	align-items: center;
-	gap: 0.45rem;
-	margin-bottom: 0.5rem;
 }
 
 .tab {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.4rem;
-	border-radius: 999px;
+	border-radius: var(--radius-3);
 	border: 1px solid var(--line-soft);
-	background: var(--surface);
+	background: color-mix(in srgb, var(--surface) 40%, transparent);
 	color: var(--text-muted);
-	padding: 0.42rem 0.75rem;
-	font-size: 0.8rem;
+	padding: 0.44rem 0.9rem;
+	font-size: 0.85rem;
 	font-weight: 600;
 	cursor: pointer;
 	transition:
 		border-color 120ms ease,
 		background 120ms ease,
-		color 120ms ease;
+		color 120ms ease,
+		box-shadow 120ms ease;
 }
 
 .tab:hover {
-	background: var(--surface-2);
+	background: color-mix(in srgb, var(--surface) 60%, transparent);
 	color: var(--text);
+	box-shadow: var(--shadow-sm);
 }
 
 .tabActive {
-	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	border-color: color-mix(in srgb, var(--primary) 50%, var(--border));
 	background: color-mix(in srgb, var(--primary) 18%, transparent);
 	color: var(--text);
-	box-shadow: var(--shadow-sm);
+	box-shadow: var(--shadow-medium);
 }
 
 .icon {

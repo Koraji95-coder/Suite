@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, Radar, Wrench } from "lucide-react";
+import { Activity, ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/primitives/Badge";
@@ -119,6 +119,10 @@ export function ProjectTelemetryPanel({
 
 	const effectiveRule = localRule ?? telemetry.rule;
 	const ruleConfigured = hasRuleValues(effectiveRule);
+	const sessionTimeline = (telemetry.sessions.length
+		? telemetry.sessions
+		: telemetry.liveSessions
+	).slice(0, 3);
 
 	const startEditingRules = () => {
 		setRuleError(null);
@@ -168,16 +172,14 @@ export function ProjectTelemetryPanel({
 	return (
 		<section className={styles.root}>
 			<div className={styles.header}>
-				<div className={styles.headerCopy}>
-					<div className={styles.iconWrap}>
-						<Activity className={styles.icon} />
+				<div>
+					<div className={styles.headerTitle}>
+						<Activity className={styles.headerIcon} />
+						<h4>Project telemetry</h4>
 					</div>
-					<div>
-						<h4 className={styles.title}>Recent CAD sessions</h4>
-						<p className={styles.description}>
-							Project-scoped session summaries from the Watchdog session ledger.
-						</p>
-					</div>
+					<p className={styles.description}>
+						Live AutoCAD sessions, collectors, and rule coverage for this project.
+					</p>
 				</div>
 				<Link to={dashboardLink} className={styles.link}>
 					<span>Open full telemetry</span>
@@ -185,33 +187,65 @@ export function ProjectTelemetryPanel({
 				</Link>
 			</div>
 
-			<div className={styles.stats}>
+			<div className={styles.statsGrid}>
 				<div className={styles.statCard}>
-					<Radar className={styles.statIcon} />
-					<div>
-						<div className={styles.statValue}>
-							{telemetry.activeCadSessionCount}
-						</div>
-						<div className={styles.statLabel}>Active sessions</div>
+					<div className={styles.statLabel}>Active sessions</div>
+					<div className={styles.statValue}>
+						{telemetry.activeCadSessionCount}
 					</div>
 				</div>
 				<div className={styles.statCard}>
-					<Wrench className={styles.statIcon} />
-					<div>
-						<div className={styles.statValue}>
-							{telemetry.totalCommandsInWindow}
-						</div>
-						<div className={styles.statLabel}>Commands in range</div>
+					<div className={styles.statLabel}>Commands in window</div>
+					<div className={styles.statValue}>
+						{telemetry.totalCommandsInWindow}
 					</div>
 				</div>
 				<div className={styles.statCard}>
-					<div>
-						<div className={styles.statValue}>
-							{ruleConfigured ? "Mapped" : "Needs rules"}
-						</div>
-						<div className={styles.statLabel}>Project attribution</div>
+					<div className={styles.statLabel}>Attribution</div>
+					<div className={styles.statValue}>
+						{ruleConfigured ? "Mapped" : "Needs rules"}
 					</div>
 				</div>
+				<div className={styles.statCard}>
+					<div className={styles.statLabel}>Collectors online</div>
+					<div className={styles.statValue}>
+						{telemetry.onlineCollectorCount ?? 0}
+					</div>
+				</div>
+			</div>
+
+			<div className={styles.timeline}>
+				<div className={styles.timelineHeader}>
+					<div className={styles.timelineTitleRow}>
+						<h5 className={styles.timelineTitle}>Recent CAD sessions</h5>
+						<span>Session timeline</span>
+					</div>
+					<span>{telemetry.sessions.length ?? telemetry.liveSessions.length} logged</span>
+				</div>
+				{sessionTimeline.length === 0 ? (
+					<p className={styles.timelineEmpty}>No sessions to show yet.</p>
+				) : (
+					sessionTimeline.map((session) => (
+						<div key={session.sessionId} className={styles.timelineItem}>
+							<div className={styles.timelineMarker} />
+							<div className={styles.timelineCopy}>
+								<p className={styles.timelineLabel}>
+									{basenameFromPath(session.drawingPath)}
+								</p>
+								<p className={styles.timelineMeta}>
+									{formatDuration(session.durationMs)} •{" "}
+									{formatRelativeTime(session.startedAt)}
+								</p>
+							</div>
+								<Badge
+									size="sm"
+									color={session.status === "live" ? "success" : "default"}
+								>
+								{session.status.toUpperCase()}
+							</Badge>
+						</div>
+					))
+				)}
 			</div>
 
 			<section className={styles.rulePanel}>

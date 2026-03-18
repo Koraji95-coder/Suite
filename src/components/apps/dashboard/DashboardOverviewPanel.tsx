@@ -616,12 +616,12 @@ export function DashboardOverviewPanel({
 								Search across telemetry, architecture, memory, and project data.
 							</Text>
 						</div>
-						<Button
-							variant="ghost"
-							size="xs"
-							onClick={() => setRefreshKey((value) => value + 1)}
-							iconLeft={<RefreshCw size={12} />}
-						>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => setRefreshKey((value) => value + 1)}
+						iconLeft={<RefreshCw size={12} />}
+					>
 							Resync
 						</Button>
 					</div>

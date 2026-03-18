@@ -1,9 +1,7 @@
 import {
 	Activity,
-	Archive,
 	ArrowRight,
 	Calendar,
-	FileDown,
 	Radar,
 	TerminalSquare,
 } from "lucide-react";
@@ -24,24 +22,6 @@ interface ProjectDetailHeaderProps {
 	telemetry?: ProjectWatchdogTelemetry;
 	onToggleArchive: (project: Project) => void;
 	onExportMarkdown: () => void;
-}
-
-function formatRelativeTime(timestamp: number | string | null | undefined): string {
-	if (!timestamp) return "—";
-	const timeValue =
-		typeof timestamp === "string"
-			? new Date(timestamp).getTime()
-			: Number(timestamp);
-	if (!Number.isFinite(timeValue) || timeValue <= 0) return "—";
-
-	const deltaMinutes = Math.round((Date.now() - timeValue) / 60000);
-	if (Math.abs(deltaMinutes) < 1) return "just now";
-	if (Math.abs(deltaMinutes) < 60) return `${deltaMinutes}m ago`;
-
-	const deltaHours = Math.round(deltaMinutes / 60);
-	if (Math.abs(deltaHours) < 24) return `${deltaHours}h ago`;
-
-	return `${Math.round(deltaHours / 24)}d ago`;
 }
 
 function formatProjectStatus(status: Project["status"]): string {
@@ -164,8 +144,8 @@ export function ProjectDetailHeader({
 
 	return (
 		<section className={styles.root}>
-			<div className={styles.top}>
-				<div className={styles.main}>
+			<div className={styles.primary}>
+				<div className={styles.infoBlock}>
 					<h3 className={styles.title}>{project.name}</h3>
 					<p className={styles.description}>{project.description}</p>
 
@@ -202,153 +182,71 @@ export function ProjectDetailHeader({
 					</div>
 				</div>
 
-				<div className={styles.sideRail}>
-					<div className={styles.commandCenterCard}>
-						<div className={styles.commandCenterHead}>
-							<div className={styles.commandCenterIcon}>
-								<TerminalSquare className={styles.commandCenterIconGlyph} />
-							</div>
-							<div className={styles.commandCenterCopy}>
-								<p className={styles.commandCenterEyebrow}>Project Ops</p>
-								<h4 className={styles.commandCenterTitle}>Dashboard Telemetry</h4>
-								<p className={styles.commandCenterSummary}>
-									{commandCenterSummary}
-								</p>
-							</div>
-						</div>
-
-						<div className={styles.commandCenterStats}>
-							<span className={styles.commandCenterStat}>
-								{openTaskCount} open
-							</span>
-							<span className={styles.commandCenterStat}>
-								{project.deadline
-									? `Due ${formatDateOnly(project.deadline)}`
-									: "No deadline"}
-							</span>
-						</div>
-
-						<Link to={dashboardLink} className={styles.commandCenterLink}>
-							<span>Open project telemetry</span>
-							<ArrowRight className={styles.commandCenterLinkIcon} />
-						</Link>
-					</div>
-
-					<div className={`${styles.commandCenterCard} ${styles.telemetryCard}`}>
-						<div className={styles.commandCenterHead}>
-							<div
-								className={`${styles.commandCenterIcon} ${styles.telemetryIcon}`}
-							>
-								<Activity className={styles.commandCenterIconGlyph} />
-							</div>
-							<div className={styles.commandCenterCopy}>
-								<p className={styles.commandCenterEyebrow}>Live CAD</p>
-								<h4 className={styles.commandCenterTitle}>Project Telemetry</h4>
-								<p className={styles.commandCenterSummary}>{telemetrySummary}</p>
-							</div>
-						</div>
-
-						<div className={styles.commandCenterStats}>
-							<span className={styles.commandCenterStat}>
-								<Radar className={styles.telemetryStatIcon} />
-								{telemetry?.onlineCollectorCount ?? 0} online
-							</span>
-							<span className={styles.commandCenterStat}>
-								{telemetry?.overview?.events.inWindow ?? 0} events / 24h
-							</span>
-							<span className={styles.commandCenterStat}>{telemetryStatusLabel}</span>
-							<span className={styles.commandCenterStat}>{ruleSummary}</span>
-						</div>
-
-						<div className={styles.telemetryBody}>
-							<p className={styles.telemetryPrimary}>
-								{latestTrackedLabel || "No active drawing mapped"}
-							</p>
-							<div className={styles.telemetryMeta}>
-								{leadAutoCadCollector ? (
-									<span>{leadAutoCadCollector.workstationId}</span>
-								) : null}
-								{telemetry?.latestTrackerUpdatedAt ? (
-									<span>
-										Tracker {formatRelativeTime(telemetry.latestTrackerUpdatedAt)}
-									</span>
-								) : null}
-								{telemetry?.latestAutoCadEvent ? (
-									<span>
-										{telemetry.latestAutoCadEvent.eventType}{" "}
-										{formatRelativeTime(telemetry.latestAutoCadEvent.timestamp)}
-									</span>
-								) : null}
-							</div>
-							<div className={styles.telemetryRuleList}>
-								{telemetry?.ruleConfigured ? (
-									<>
-										<span className={styles.telemetryRuleChip}>
-											{ruleRootsCount} root{ruleRootsCount === 1 ? "" : "s"}
-										</span>
-										<span className={styles.telemetryRuleChip}>
-											{rulePatternCount} pattern{rulePatternCount === 1 ? "" : "s"}
-										</span>
-										{telemetry.ruleUpdatedAt ? (
-											<span className={styles.telemetryRuleChip}>
-												Updated {formatRelativeTime(telemetry.ruleUpdatedAt)}
-											</span>
-										) : null}
-									</>
-								) : (
-									<span className={styles.telemetryRuleEmpty}>
-										No project mapping rules configured yet.
-									</span>
-								)}
-							</div>
-						</div>
-
-						<Link to={dashboardLink} className={styles.commandCenterLink}>
-							<span>Open live telemetry in dashboard</span>
-							<ArrowRight className={styles.commandCenterLinkIcon} />
-						</Link>
-					</div>
-
-					<div className={styles.actions}>
-						<button
-							onClick={() => onToggleArchive(project)}
-							className={styles.actionButton}
-							title={
-								project.status === "completed"
-									? "Unarchive project"
-									: "Archive project"
-							}
-							type="button"
-						>
-							<Archive className={styles.actionIcon} />
-							<span>
-								{project.status === "completed" ? "Unarchive" : "Archive"}
-							</span>
-						</button>
-						<button
-							onClick={onExportMarkdown}
-							className={styles.actionButton}
-							title="Copy project as Markdown"
-							type="button"
-						>
-							<FileDown className={styles.actionIcon} />
-							<span>Export</span>
-						</button>
-					</div>
+				<div className={styles.actions}>
+					<button
+						type="button"
+						className={styles.secondaryAction}
+						onClick={() => onToggleArchive(project)}
+					>
+						{project.status === "completed" ? "Reopen" : "Archive"}
+					</button>
+					<button
+						type="button"
+						className={styles.primaryAction}
+						onClick={onExportMarkdown}
+					>
+						Export summary
+					</button>
 				</div>
 			</div>
 
-			<div className={styles.progress}>
-				<div className={styles.progressMeta}>
-					<span className={styles.progressLabel}>Progress</span>
-					<span className={styles.progressValue}>{completionPercentage}%</span>
+			<div className={styles.commandGrid}>
+				<div className={styles.commandCard}>
+					<div className={styles.commandHeader}>
+						<div className={styles.commandIcon}>
+							<TerminalSquare className={styles.commandGlyph} />
+						</div>
+						<div>
+							<p className={styles.commandEyebrow}>Project Ops</p>
+							<h4 className={styles.commandTitle}>Dashboard telemetry</h4>
+						</div>
+					</div>
+					<p className={styles.commandCopy}>{commandCenterSummary}</p>
+					<div className={styles.commandStats}>
+						<span>{openTaskCount} open</span>
+						<span>
+							{project.deadline
+								? `Due ${formatDateOnly(project.deadline)}`
+								: "No deadline"}
+						</span>
+					</div>
+					<Link to={dashboardLink} className={styles.commandLink}>
+						<span>Go to dashboard</span>
+						<ArrowRight className={styles.commandLinkIcon} />
+					</Link>
 				</div>
-				<progress
-					className={styles.progressTrack}
-					max={100}
-					value={completionPercentage}
-					aria-label={`Project progress: ${completionPercentage}%`}
-				/>
+
+				<div className={`${styles.commandCard} ${styles.telemetryCard}`}>
+					<div className={styles.commandHeader}>
+						<div className={`${styles.commandIcon} ${styles.telemetryIcon}`}>
+							<Activity className={styles.commandGlyph} />
+						</div>
+						<div>
+							<p className={styles.commandEyebrow}>Live CAD</p>
+							<h4 className={styles.commandTitle}>Project telemetry</h4>
+						</div>
+					</div>
+					<p className={styles.commandCopy}>{telemetrySummary}</p>
+					<div className={styles.commandStats}>
+						<span>
+							<Radar className={styles.telemetryStatIcon} />
+							{telemetry?.onlineCollectorCount ?? 0} online
+						</span>
+						<span>{telemetry?.overview?.events.inWindow ?? 0} events / 24h</span>
+						<span>{telemetryStatusLabel}</span>
+						<span>{ruleSummary}</span>
+					</div>
+				</div>
 			</div>
 		</section>
 	);

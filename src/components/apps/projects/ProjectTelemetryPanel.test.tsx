@@ -76,8 +76,8 @@ describe("ProjectTelemetryPanel", () => {
 		);
 
 		expect(screen.getByText("Recent CAD sessions")).toBeTruthy();
-		expect(screen.getByText("Drawing1.dwg")).toBeTruthy();
-		expect(screen.getByText("Commands in range")).toBeTruthy();
+		expect(screen.getAllByText("Drawing1.dwg").length).toBeGreaterThan(0);
+	expect(screen.getByText("Commands in window")).toBeTruthy();
 		expect(screen.getByText("Project mapping rules")).toBeTruthy();
 		expect(screen.getByText("C:/Projects/Alpha")).toBeTruthy();
 		const link = screen.getByRole("link", {

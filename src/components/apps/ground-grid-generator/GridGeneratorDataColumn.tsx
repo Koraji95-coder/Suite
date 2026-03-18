@@ -4,6 +4,7 @@ import { GridGeneratorDataPreviewTables } from "./GridGeneratorDataPreviewTables
 import type { PasteMode } from "./GridGeneratorPanelModels";
 import { GridGeneratorPastePanel } from "./GridGeneratorPastePanel";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
+import styles from "./GridGeneratorDataColumn.module.css";
 
 interface GridGeneratorDataColumnProps {
 	isDragging: boolean;
@@ -51,7 +52,7 @@ export function GridGeneratorDataColumn({
 	onClearAll,
 }: GridGeneratorDataColumnProps) {
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+		<div className={styles.root}>
 			<GridGeneratorDataDropzone
 				isDragging={isDragging}
 				fileInputRef={fileInputRef}

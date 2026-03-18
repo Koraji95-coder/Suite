@@ -1,5 +1,6 @@
-import { hexToRgba } from "@/lib/palette";
+import type { CSSProperties, ReactNode } from "react";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
+import styles from "./GridGeneratorDataPreviewTables.module.css";
 
 interface GridGeneratorDataPreviewTablesProps {
 	rods: GridRod[];
@@ -8,6 +9,51 @@ interface GridGeneratorDataPreviewTablesProps {
 	palettePrimary: string;
 	paletteText: string;
 	paletteTextMuted: string;
+}
+
+interface SectionWrapperProps {
+	title: string;
+	accent: string;
+	primary: string;
+	text: string;
+	textMuted: string;
+	children: ReactNode;
+	note?: string;
+	footer?: string;
+}
+
+function sectionVars(
+	accent: string,
+	primary: string,
+	text: string,
+	textMuted: string,
+): CSSProperties {
+	return {
+		"--gg-section-accent": accent,
+		"--gg-primary": primary,
+		"--gg-text": text,
+		"--gg-text-muted": textMuted,
+	} as CSSProperties;
+}
+
+function SectionWrapper({
+	title,
+	accent,
+	primary,
+	text,
+	textMuted,
+	children,
+	note,
+	footer,
+}: SectionWrapperProps) {
+	return (
+		<div className={styles.section} style={sectionVars(accent, primary, text, textMuted)}>
+			<div className={styles.sectionHeader}>{title}</div>
+			{note ? <div className={styles.sectionHint}>{note}</div> : null}
+			{children}
+			{footer ? <div className={styles.footerNote}>{footer}</div> : null}
+		</div>
+	);
 }
 
 export function GridGeneratorDataPreviewTables({
@@ -27,322 +73,102 @@ export function GridGeneratorDataPreviewTables({
 	return (
 		<>
 			{rods.length > 0 ? (
-				<div
-					style={{
-						borderRadius: 8,
-						border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-						overflow: "hidden",
-					}}
+				<SectionWrapper
+					title={`Ground Rods (${rods.length})`}
+					accent="#22c55e"
+					primary={palettePrimary}
+					text={paletteText}
+					textMuted={paletteTextMuted}
+					note={`${Math.max(0, rods.length - testWells.length)} standard rods + ${testWells.length} test wells included in rod total.`}
 				>
-					<div
-						style={{
-							padding: "6px 10px",
-							fontSize: 11,
-							fontWeight: 700,
-							color: "#22c55e",
-							background: hexToRgba("#22c55e", 0.08),
-						}}
-					>
-						Ground Rods ({rods.length})
-					</div>
-					<div
-						style={{
-							padding: "4px 10px",
-							fontSize: 10,
-							color: paletteTextMuted,
-							borderTop: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-						}}
-					>
-						{Math.max(0, rods.length - testWells.length)} standard rods +{" "}
-						{testWells.length} test wells included in rod total.
-					</div>
-					<div style={{ maxHeight: 150, overflowY: "auto" }}>
-						<table
-							style={{
-								width: "100%",
-								fontSize: 10,
-								borderCollapse: "collapse",
-							}}
-						>
+					<div className={styles.tableWrapTall}>
+						<table className={styles.table}>
 							<thead>
-								<tr style={{ color: paletteTextMuted }}>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Label
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>X</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>Y</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Depth
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Dia
-									</th>
+								<tr className={styles.tableHeadRow}>
+									<th className={styles.th}>Label</th>
+									<th className={styles.th}>X</th>
+									<th className={styles.th}>Y</th>
+									<th className={styles.th}>Depth</th>
+									<th className={styles.th}>Dia</th>
 								</tr>
 							</thead>
 							<tbody>
 								{rods.map((rod, index) => (
-									<tr
-										key={`rod-${index}`}
-										style={{
-											borderTop: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-											color: paletteText,
-										}}
-									>
-										<td
-											style={{
-												padding: "2px 6px",
-												fontWeight: 600,
-												textAlign: "center",
-											}}
-										>
-											{rod.label}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{rod.grid_x}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{rod.grid_y}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{rod.depth}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{rod.diameter}
-										</td>
+									<tr key={`rod-${index}`} className={styles.row}>
+										<td className={styles.strongCell}>{rod.label}</td>
+										<td className={styles.monoCell}>{rod.grid_x}</td>
+										<td className={styles.monoCell}>{rod.grid_y}</td>
+										<td className={styles.monoCell}>{rod.depth}</td>
+										<td className={styles.monoCell}>{rod.diameter}</td>
 									</tr>
 								))}
 							</tbody>
 						</table>
 					</div>
-				</div>
+				</SectionWrapper>
 			) : null}
 
 			{conductors.length > 0 ? (
-				<div
-					style={{
-						borderRadius: 8,
-						border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-						overflow: "hidden",
-					}}
+				<SectionWrapper
+					title={`Conductors (${conductors.length})`}
+					accent="#f59e0b"
+					primary={palettePrimary}
+					text={paletteText}
+					textMuted={paletteTextMuted}
 				>
-					<div
-						style={{
-							padding: "6px 10px",
-							fontSize: 11,
-							fontWeight: 700,
-							color: "#f59e0b",
-							background: hexToRgba("#f59e0b", 0.08),
-						}}
-					>
-						Conductors ({conductors.length})
-					</div>
-					<div style={{ maxHeight: 150, overflowY: "auto" }}>
-						<table
-							style={{
-								width: "100%",
-								fontSize: 10,
-								borderCollapse: "collapse",
-							}}
-						>
+					<div className={styles.tableWrapTall}>
+						<table className={styles.table}>
 							<thead>
-								<tr style={{ color: paletteTextMuted }}>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Label
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										X1
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Y1
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										X2
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Y2
-									</th>
+								<tr className={styles.tableHeadRow}>
+									<th className={styles.th}>Label</th>
+									<th className={styles.th}>X1</th>
+									<th className={styles.th}>Y1</th>
+									<th className={styles.th}>X2</th>
+									<th className={styles.th}>Y2</th>
 								</tr>
 							</thead>
 							<tbody>
 								{conductors.map((conductor, index) => (
-									<tr
-										key={`conductor-${index}`}
-										style={{
-											borderTop: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-											color: paletteText,
-										}}
-									>
-										<td
-											style={{
-												padding: "2px 6px",
-												fontWeight: 600,
-												textAlign: "center",
-											}}
-										>
-											{conductor.label}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{conductor.x1}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{conductor.y1}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{conductor.x2}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{conductor.y2}
-										</td>
+									<tr key={`conductor-${index}`} className={styles.row}>
+										<td className={styles.strongCell}>{conductor.label}</td>
+										<td className={styles.monoCell}>{conductor.x1}</td>
+										<td className={styles.monoCell}>{conductor.y1}</td>
+										<td className={styles.monoCell}>{conductor.x2}</td>
+										<td className={styles.monoCell}>{conductor.y2}</td>
 									</tr>
 								))}
 							</tbody>
 						</table>
 					</div>
-				</div>
+				</SectionWrapper>
 			) : null}
 
 			{tees.length > 0 ? (
-				<div
-					style={{
-						borderRadius: 8,
-						border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-						overflow: "hidden",
-					}}
+				<SectionWrapper
+					title={`Inferred Tees (${tees.length})`}
+					accent="#60a5fa"
+					primary={palettePrimary}
+					text={paletteText}
+					textMuted={paletteTextMuted}
+					note="Inferred from conductor topology and rod exclusions."
 				>
-					<div
-						style={{
-							padding: "6px 10px",
-							fontSize: 11,
-							fontWeight: 700,
-							color: "#60a5fa",
-							background: hexToRgba("#60a5fa", 0.08),
-						}}
-					>
-						Inferred Tees ({tees.length})
-					</div>
-					<div
-						style={{
-							padding: "4px 10px",
-							fontSize: 10,
-							color: paletteTextMuted,
-							borderTop: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-						}}
-					>
-						Inferred from conductor topology and rod exclusions.
-					</div>
-					<div style={{ maxHeight: 140, overflowY: "auto" }}>
-						<table
-							style={{
-								width: "100%",
-								fontSize: 10,
-								borderCollapse: "collapse",
-							}}
-						>
+					<div className={styles.tableWrapShort}>
+						<table className={styles.table}>
 							<thead>
-								<tr style={{ color: paletteTextMuted }}>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>#</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Grid X
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Grid Y
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Rotation
-									</th>
+								<tr className={styles.tableHeadRow}>
+									<th className={styles.th}>#</th>
+									<th className={styles.th}>Grid X</th>
+									<th className={styles.th}>Grid Y</th>
+									<th className={styles.th}>Rotation</th>
 								</tr>
 							</thead>
 							<tbody>
 								{tees.map((tee, index) => (
-									<tr
-										key={`tee-${index}`}
-										style={{
-											borderTop: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-											color: paletteText,
-										}}
-									>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontWeight: 600,
-											}}
-										>
-											T{index + 1}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{tee.grid_x}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{tee.grid_y}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
+									<tr key={`tee-${index}`} className={styles.row}>
+										<td className={styles.strongCell}>T{index + 1}</td>
+										<td className={styles.monoCell}>{tee.grid_x}</td>
+										<td className={styles.monoCell}>{tee.grid_y}</td>
+										<td className={styles.monoCell}>
 											{tee.rotation_deg.toFixed(1)} deg
 										</td>
 									</tr>
@@ -350,192 +176,71 @@ export function GridGeneratorDataPreviewTables({
 							</tbody>
 						</table>
 					</div>
-				</div>
+				</SectionWrapper>
 			) : null}
 
 			{crosses.length > 0 ? (
-				<div
-					style={{
-						borderRadius: 8,
-						border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-						overflow: "hidden",
-					}}
+				<SectionWrapper
+					title={`Inferred Crosses (${crosses.length})`}
+					accent="#06b6d4"
+					primary={palettePrimary}
+					text={paletteText}
+					textMuted={paletteTextMuted}
+					note="Inferred from conductor topology and rod exclusions."
 				>
-					<div
-						style={{
-							padding: "6px 10px",
-							fontSize: 11,
-							fontWeight: 700,
-							color: "#06b6d4",
-							background: hexToRgba("#06b6d4", 0.08),
-						}}
-					>
-						Inferred Crosses ({crosses.length})
-					</div>
-					<div
-						style={{
-							padding: "4px 10px",
-							fontSize: 10,
-							color: paletteTextMuted,
-							borderTop: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-						}}
-					>
-						Inferred from conductor topology and rod exclusions.
-					</div>
-					<div style={{ maxHeight: 140, overflowY: "auto" }}>
-						<table
-							style={{
-								width: "100%",
-								fontSize: 10,
-								borderCollapse: "collapse",
-							}}
-						>
+					<div className={styles.tableWrapShort}>
+						<table className={styles.table}>
 							<thead>
-								<tr style={{ color: paletteTextMuted }}>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>#</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Grid X
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Grid Y
-									</th>
+								<tr className={styles.tableHeadRow}>
+									<th className={styles.th}>#</th>
+									<th className={styles.th}>Grid X</th>
+									<th className={styles.th}>Grid Y</th>
 								</tr>
 							</thead>
 							<tbody>
 								{crosses.map((cross, index) => (
-									<tr
-										key={`cross-${index}`}
-										style={{
-											borderTop: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-											color: paletteText,
-										}}
-									>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontWeight: 600,
-											}}
-										>
-											X{index + 1}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{cross.grid_x}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{cross.grid_y}
-										</td>
+									<tr key={`cross-${index}`} className={styles.row}>
+										<td className={styles.strongCell}>X{index + 1}</td>
+										<td className={styles.monoCell}>{cross.grid_x}</td>
+										<td className={styles.monoCell}>{cross.grid_y}</td>
 									</tr>
 								))}
 							</tbody>
 						</table>
 					</div>
-				</div>
+				</SectionWrapper>
 			) : null}
 
 			{testWells.length > 0 ? (
-				<div
-					style={{
-						borderRadius: 8,
-						border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-						overflow: "hidden",
-					}}
+				<SectionWrapper
+					title={`Test Wells (${testWells.length})`}
+					accent="#ef4444"
+					primary={palettePrimary}
+					text={paletteText}
+					textMuted={paletteTextMuted}
+					footer="*TEST WELLS ARE INCLUDED IN GROUND ROD TOTALS"
 				>
-					<div
-						style={{
-							padding: "6px 10px",
-							fontSize: 11,
-							fontWeight: 700,
-							color: "#ef4444",
-							background: hexToRgba("#ef4444", 0.08),
-						}}
-					>
-						Test Wells ({testWells.length})
-					</div>
-					<div style={{ maxHeight: 140, overflowY: "auto" }}>
-						<table
-							style={{
-								width: "100%",
-								fontSize: 10,
-								borderCollapse: "collapse",
-							}}
-						>
+					<div className={styles.tableWrapShort}>
+						<table className={styles.table}>
 							<thead>
-								<tr style={{ color: paletteTextMuted }}>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>#</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Grid X
-									</th>
-									<th style={{ padding: "3px 6px", textAlign: "center" }}>
-										Grid Y
-									</th>
+								<tr className={styles.tableHeadRow}>
+									<th className={styles.th}>#</th>
+									<th className={styles.th}>Grid X</th>
+									<th className={styles.th}>Grid Y</th>
 								</tr>
 							</thead>
 							<tbody>
 								{testWells.map((testWell, index) => (
-									<tr
-										key={`test-well-${index}`}
-										style={{
-											borderTop: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-											color: paletteText,
-										}}
-									>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontWeight: 600,
-											}}
-										>
-											TW{index + 1}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{testWell.grid_x}
-										</td>
-										<td
-											style={{
-												padding: "2px 6px",
-												textAlign: "center",
-												fontFamily: "monospace",
-											}}
-										>
-											{testWell.grid_y}
-										</td>
+									<tr key={`test-well-${index}`} className={styles.row}>
+										<td className={styles.strongCell}>TW{index + 1}</td>
+										<td className={styles.monoCell}>{testWell.grid_x}</td>
+										<td className={styles.monoCell}>{testWell.grid_y}</td>
 									</tr>
 								))}
 							</tbody>
 						</table>
 					</div>
-					<div
-						style={{
-							padding: "6px 10px",
-							fontSize: 10,
-							fontWeight: 600,
-							color: paletteTextMuted,
-							borderTop: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-						}}
-					>
-						*TEST WELLS ARE INCLUDED IN GROUND ROD TOTALS
-					</div>
-				</div>
+				</SectionWrapper>
 			) : null}
 		</>
 	);

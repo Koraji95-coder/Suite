@@ -146,9 +146,16 @@ export function GridGeneratorPreviewColumn({
 		GridPreview3DComponent,
 	]);
 
+	const previewVars = {
+		"--gg-primary": palettePrimary,
+		"--gg-surface-light": paletteSurfaceLight,
+		"--gg-text": paletteText,
+		"--gg-text-muted": paletteTextMuted,
+	} as CSSProperties;
+
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-			<div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+		<div className={styles.root} style={previewVars}>
+			<div className={styles.toolbar}>
 				<button
 					onClick={onRunGeneration}
 					disabled={generating || conductors.length === 0}
@@ -221,7 +228,7 @@ export function GridGeneratorPreviewColumn({
 				)}
 			</div>
 
-			<div style={{ display: "flex", gap: 4 }}>
+			<div className={styles.previewTabs}>
 				{[
 					{ id: "2d" as const, label: "2D", icon: <Monitor size={12} /> },
 					{ id: "3d" as const, label: "3D", icon: <Box size={12} /> },
@@ -239,12 +246,8 @@ export function GridGeneratorPreviewColumn({
 					<button
 						key={tab.id}
 						onClick={() => onPreviewModeChange(tab.id)}
-						style={{
-							...btnStyle(previewMode === tab.id),
-							padding: "4px 10px",
-							fontSize: 11,
-							borderRadius: "6px 6px 0 0",
-						}}
+						style={btnStyle(previewMode === tab.id)}
+						className={styles.tabButton}
 					>
 						{tab.icon} {tab.label}
 					</button>
@@ -252,16 +255,8 @@ export function GridGeneratorPreviewColumn({
 			</div>
 
 			{previewMode === "contour" && (
-				<div
-					style={{
-						display: "flex",
-						gap: 8,
-						alignItems: "center",
-						fontSize: 11,
-						color: paletteTextMuted,
-					}}
-				>
-					<label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+				<div className={styles.contourControls}>
+					<label className={styles.fieldRow}>
 						Soil Resistivity:
 						<input
 							type="number"
@@ -269,22 +264,12 @@ export function GridGeneratorPreviewColumn({
 							onChange={(e) =>
 								onSoilResistivityChange(Number(e.target.value) || 0)
 							}
-							style={{
-								width: 70,
-								padding: "3px 6px",
-								fontSize: 11,
-								fontFamily: "monospace",
-								background: hexToRgba(paletteSurfaceLight, 0.3),
-								border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-								borderRadius: 4,
-								color: paletteText,
-								outline: "none",
-							}}
-						name="gridgeneratorpreviewcolumn_input_266"
+							className={styles.smallInput}
+							name="gridgeneratorpreviewcolumn_input_266"
 						/>
 						ohm-m
 					</label>
-					<label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+					<label className={styles.fieldRow}>
 						Fault Current:
 						<input
 							type="number"
@@ -292,18 +277,8 @@ export function GridGeneratorPreviewColumn({
 							onChange={(e) =>
 								onFaultCurrentChange(Number(e.target.value) || 0)
 							}
-							style={{
-								width: 70,
-								padding: "3px 6px",
-								fontSize: 11,
-								fontFamily: "monospace",
-								background: hexToRgba(paletteSurfaceLight, 0.3),
-								border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-								borderRadius: 4,
-								color: paletteText,
-								outline: "none",
-							}}
-						name="gridgeneratorpreviewcolumn_input_288"
+							className={styles.smallInput}
+							name="gridgeneratorpreviewcolumn_input_288"
 						/>
 						A
 					</label>
@@ -311,14 +286,7 @@ export function GridGeneratorPreviewColumn({
 			)}
 
 			{previewMode === "2d" && (
-				<div
-					style={{
-						display: "flex",
-						flexWrap: "wrap",
-						gap: 6,
-						alignItems: "center",
-					}}
-				>
+				<div className={styles.toggleToolbar}>
 					{[
 						{
 							id: "all",
@@ -360,12 +328,8 @@ export function GridGeneratorPreviewColumn({
 						<button
 							key={preset.id}
 							onClick={preset.apply}
-							style={{
-								...btnStyle(),
-								padding: "4px 8px",
-								fontSize: 11,
-								borderStyle: "dashed",
-							}}
+							style={btnStyle()}
+							className={styles.presetButton}
 						>
 							{preset.label}
 						</button>
@@ -402,26 +366,14 @@ export function GridGeneratorPreviewColumn({
 						<button
 							key={toggle.id}
 							onClick={() => toggle.set((prev) => !prev)}
-							style={{
-								...btnStyle(toggle.on),
-								padding: "4px 8px",
-								fontSize: 11,
-							}}
+							style={btnStyle(toggle.on)}
+							className={styles.toggleButton}
 						>
 							{toggle.label}
 						</button>
 					))}
 
-					<label
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: 6,
-							fontSize: 11,
-							color: paletteTextMuted,
-							marginLeft: 4,
-						}}
-					>
+					<label className={styles.calloutControl}>
 						Callout Size
 						<input
 							type="range"
@@ -438,16 +390,7 @@ export function GridGeneratorPreviewColumn({
 				</div>
 			)}
 
-			<div
-				style={{
-					borderRadius: 10,
-					border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-					background: hexToRgba(paletteSurfaceLight, 0.15),
-					flex: 1,
-					minHeight: 400,
-					overflow: "hidden",
-				}}
-			>
+			<div className={styles.previewFrame}>
 				{previewMode === "2d" && (
 					<GridPreview
 						rods={rods}
@@ -527,13 +470,7 @@ export function GridGeneratorPreviewColumn({
 					).length;
 					const rodOnlyCount = rods.length - testWellCount;
 					return (
-						<div
-							style={{
-								display: "grid",
-								gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-								gap: 8,
-							}}
-						>
+						<div className={styles.statsGrid}>
 							{[
 								{ label: "Ground Rods", value: rodOnlyCount, color: "#22c55e" },
 								{ label: "Test Wells", value: testWellCount, color: "#ef4444" },
@@ -547,31 +484,17 @@ export function GridGeneratorPreviewColumn({
 							].map((stat) => (
 								<div
 									key={stat.label}
-									style={{
-										padding: "10px 12px",
-										borderRadius: 8,
-										border: `1px solid ${hexToRgba(stat.color, 0.2)}`,
-										background: hexToRgba(stat.color, 0.06),
-										textAlign: "center",
-									}}
+									className={styles.statCard}
+									style={
+										{
+											"--gg-stat-color": stat.color,
+										} as CSSProperties
+									}
 								>
-									<div
-										style={{
-											fontSize: 20,
-											fontWeight: 700,
-											color: stat.color,
-											fontVariantNumeric: "tabular-nums",
-										}}
-									>
+									<div className={styles.statValue}>
 										{stat.value}
 									</div>
-									<div
-										style={{
-											fontSize: 10,
-											color: paletteTextMuted,
-											marginTop: 2,
-										}}
-									>
+									<div className={styles.statLabel}>
 										{stat.label}
 									</div>
 								</div>
@@ -581,46 +504,16 @@ export function GridGeneratorPreviewColumn({
 				})()}
 
 			{showPlotPreview && (
-				<div
-					style={{
-						position: "fixed",
-						inset: 0,
-						background: "rgba(0,0,0,0.45)",
-						display: "flex",
-						alignItems: "center",
-						justifyContent: "center",
-						zIndex: 1000,
-						padding: 16,
-					}}
-				>
-					<div
-						style={{
-							width: "min(760px, 96vw)",
-							borderRadius: 10,
-							background: paletteSurfaceLight,
-							border: `1px solid ${hexToRgba(palettePrimary, 0.25)}`,
-							padding: 14,
-							display: "flex",
-							flexDirection: "column",
-							gap: 12,
-						}}
-					>
-						<div style={{ fontSize: 14, fontWeight: 700, color: paletteText }}>
-							Pre-Plot Validation and Diff
-						</div>
-						<div style={{ fontSize: 11, color: paletteTextMuted }}>
+				<div className={styles.plotModalBackdrop}>
+					<div className={styles.plotModal}>
+						<div className={styles.plotTitle}>Pre-Plot Validation and Diff</div>
+						<div className={styles.plotSubtitle}>
 							{plotDiffPreview.hasBaseline
 								? "Comparing current grid against last successful AutoCAD plot."
 								: "No prior plot baseline found. This will be treated as first plot."}
 						</div>
 
-						<div
-							style={{
-								display: "grid",
-								gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-								gap: 8,
-							}}
-						>
+						<div className={styles.plotStatsGrid}>
 							{[
 								{
 									label: "Conductors Added",
@@ -655,63 +548,43 @@ export function GridGeneratorPreviewColumn({
 							].map((stat) => (
 								<div
 									key={stat.label}
-									style={{
-										borderRadius: 8,
-										padding: "8px 10px",
-										border: `1px solid ${hexToRgba(stat.color, 0.25)}`,
-										background: hexToRgba(stat.color, 0.08),
-									}}
+									className={styles.plotStatCard}
+									style={
+										{
+											"--gg-stat-color": stat.color,
+										} as CSSProperties
+									}
 								>
-									<div
-										style={{
-											fontSize: 16,
-											fontWeight: 700,
-											color: stat.color,
-											fontVariantNumeric: "tabular-nums",
-										}}
-									>
+									<div className={styles.plotStatValue}>
 										{stat.value}
 									</div>
-									<div style={{ fontSize: 10, color: paletteTextMuted }}>
+									<div className={styles.plotStatLabel}>
 										{stat.label}
 									</div>
 								</div>
 							))}
 						</div>
 
-						<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+						<div className={styles.issueList}>
 							{plotDiffPreview.issues.length === 0 ? (
-								<div style={{ color: "#22c55e", fontSize: 11 }}>
+								<div className={styles.issueOk}>
 									No blocking issues found.
 								</div>
 							) : (
 								plotDiffPreview.issues.map((issue, idx) => (
 									<div
 										key={`${issue.severity}-${idx}`}
-										style={{
-											fontSize: 11,
-											padding: "6px 8px",
-											borderRadius: 6,
-											border: `1px solid ${
-												issue.severity === "error"
-													? hexToRgba("#ef4444", 0.35)
-													: issue.severity === "warning"
-														? hexToRgba("#f59e0b", 0.35)
-														: hexToRgba("#10b981", 0.35)
-											}`,
-											background:
-												issue.severity === "error"
-													? hexToRgba("#ef4444", 0.1)
-													: issue.severity === "warning"
-														? hexToRgba("#f59e0b", 0.1)
-														: hexToRgba("#10b981", 0.1),
-											color:
-												issue.severity === "error"
-													? "#ef4444"
-													: issue.severity === "warning"
-														? "#f59e0b"
-														: "#10b981",
-										}}
+										className={styles.issueItem}
+										style={
+											{
+												"--gg-issue-color":
+													issue.severity === "error"
+														? "#ef4444"
+														: issue.severity === "warning"
+															? "#f59e0b"
+															: "#10b981",
+											} as CSSProperties
+										}
 									>
 										[{issue.severity.toUpperCase()}] {issue.message}
 									</div>
@@ -719,7 +592,7 @@ export function GridGeneratorPreviewColumn({
 							)}
 						</div>
 
-						<div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+						<div className={styles.plotActions}>
 							<button onClick={() => setShowPlotPreview(false)} style={btnStyle()}>
 								Cancel
 							</button>

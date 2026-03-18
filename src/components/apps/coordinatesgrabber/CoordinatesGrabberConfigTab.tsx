@@ -10,6 +10,7 @@ import { CoordinatesGrabberModePanel } from "./CoordinatesGrabberModePanel";
 import { CoordinatesGrabberPointNamingPanel } from "./CoordinatesGrabberPointNamingPanel";
 import { CoordinatesGrabberRunPanel } from "./CoordinatesGrabberRunPanel";
 import { CoordinatesGrabberValidationPanel } from "./CoordinatesGrabberValidationPanel";
+import styles from "./CoordinatesGrabberConfigTab.module.css";
 
 interface CoordinatesGrabberConfigTabProps {
 	state: CoordinatesGrabberState;
@@ -59,15 +60,8 @@ export function CoordinatesGrabberConfigTab({
 	progressStage,
 }: CoordinatesGrabberConfigTabProps) {
 	return (
-		<div style={{ flex: 1, overflow: "auto" }}>
-			<div
-				style={{
-					display: "grid",
-					gap: "12px",
-					gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-					alignItems: "start",
-				}}
-			>
+		<div className={styles.root}>
+			<div className={styles.grid}>
 				<CoordinatesGrabberValidationPanel errors={state.validationErrors} />
 
 				<CoordinatesGrabberModePanel

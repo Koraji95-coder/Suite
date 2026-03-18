@@ -1,0 +1,78 @@
+.root {
+	display: grid;
+	gap: 1rem;
+}
+
+.heroPanel {
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line-soft));
+	background:
+		radial-gradient(
+			110% 130% at 100% 0%,
+			color-mix(in srgb, var(--primary) 20%, transparent),
+			transparent 62%
+		),
+		linear-gradient(
+			165deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 58%, transparent)
+		);
+}
+
+.heroHeader {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.8rem;
+}
+
+.heroMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+
+.summaryText {
+	margin-top: 0.4rem;
+	max-width: 64ch;
+}
+
+.statRow {
+	margin-top: 0.8rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.statChip {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 0.18rem;
+	min-width: 7rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	padding: 0.45rem 0.6rem;
+	background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.statValue {
+	font-size: 0.92rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.statLabel {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.graphShell {
+	border: 1px solid var(--line-soft);
+}
+
+.graphViewport {
+	min-height: 32.5rem;
+	height: clamp(32.5rem, 70dvh, 61.25rem);
+}

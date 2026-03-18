@@ -1,0 +1,73 @@
+.section {
+	border-radius: 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--gg-primary, var(--primary)) 15%, transparent);
+	overflow: hidden;
+}
+
+.sectionHeader {
+	padding: 0.375rem 0.625rem;
+	font-size: 0.6875rem;
+	font-weight: 700;
+	color: var(--gg-section-accent, var(--text));
+	background: color-mix(in srgb, var(--gg-section-accent, var(--primary)) 8%, transparent);
+}
+
+.sectionHint {
+	padding: 0.25rem 0.625rem;
+	font-size: 0.625rem;
+	color: var(--gg-text-muted, var(--text-muted));
+	border-top: 1px solid color-mix(in srgb, var(--gg-primary, var(--primary)) 6%, transparent);
+}
+
+.tableWrapTall {
+	max-height: 9.375rem;
+	overflow-y: auto;
+}
+
+.tableWrapShort {
+	max-height: 8.75rem;
+	overflow-y: auto;
+}
+
+.table {
+	width: 100%;
+	font-size: 0.625rem;
+	border-collapse: collapse;
+}
+
+.tableHeadRow {
+	color: var(--gg-text-muted, var(--text-muted));
+}
+
+.th {
+	padding: 0.1875rem 0.375rem;
+	text-align: center;
+}
+
+.row {
+	border-top: 1px solid color-mix(in srgb, var(--gg-primary, var(--primary)) 6%, transparent);
+	color: var(--gg-text, var(--text));
+}
+
+.cell {
+	padding: 0.125rem 0.375rem;
+	text-align: center;
+}
+
+.strongCell {
+	composes: cell;
+	font-weight: 600;
+}
+
+.monoCell {
+	composes: cell;
+	font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.footerNote {
+	padding: 0.375rem 0.625rem;
+	font-size: 0.625rem;
+	font-weight: 600;
+	color: var(--gg-text-muted, var(--text-muted));
+	border-top: 1px solid color-mix(in srgb, var(--gg-primary, var(--primary)) 6%, transparent);
+}

@@ -2,7 +2,6 @@ import {
 	Activity,
 	ArrowUpRight,
 	BrainCircuit,
-	ClipboardList,
 	FolderKanban,
 	GitBranch,
 	HardDrive,
@@ -38,6 +37,7 @@ import type {
 	DashboardLiveAutoCadSessionCard,
 	DashboardSessionTimelineRow,
 } from "./dashboardWatchdogSelectors";
+import type { DashboardWorkLedgerViewModel } from "./dashboardWorkLedgerSelectors";
 import {
 	formatBytes,
 	formatDuration,
@@ -638,18 +638,22 @@ interface DashboardWorkLedgerSectionProps {
 	panelRef: RefObject<HTMLDivElement | null>;
 	className: string;
 	entries: WorkLedgerRow[];
+	viewModel: DashboardWorkLedgerViewModel;
 	error: string | null;
 	onOpenChangelog: () => void;
-	onOpenEntryPath: (pathValue: string) => void;
+	onOpenLatestReceipt: (entry: WorkLedgerRow) => void;
+	onOpenHotspotEntry: (entry: WorkLedgerRow) => void;
 }
 
 export function DashboardWorkLedgerSection({
 	panelRef,
 	className,
 	entries,
+	viewModel,
 	error,
 	onOpenChangelog,
-	onOpenEntryPath,
+	onOpenLatestReceipt,
+	onOpenHotspotEntry,
 }: DashboardWorkLedgerSectionProps) {
 	return (
 		<Panel
@@ -681,53 +685,265 @@ export function DashboardWorkLedgerSection({
 			{error ? (
 				<div className={styles.emptyState}>{error}</div>
 			) : (
-				<div className={styles.rowList}>
-					{entries.length === 0 ? (
-						<div className={styles.emptyStateCompact}>
-							No work ledger entries matched the current filters.
+				<div className={styles.sectionBlock}>
+					<div className={styles.ledgerSummaryRow}>
+						<div className={styles.ledgerReadinessCard}>
+							<div className={styles.ledgerReadinessHeader}>
+								<Text size="xs" color="muted" className={styles.subpanelLabel}>
+									Publisher readiness
+								</Text>
+								<Badge color={viewModel.readinessTone} variant="soft">
+									{viewModel.readinessLabel}
+								</Badge>
+							</div>
+							<div className={styles.ledgerReadinessDetail}>
+								{viewModel.readinessDetail}
+							</div>
 						</div>
-					) : (
-						entries.slice(0, 6).map((entry) => {
-							const firstPath = entry.architecture_paths[0] || "";
-							return (
-								<div key={entry.id} className={styles.dataRow}>
+						<div className={styles.ledgerKpiGrid}>
+							<div className={styles.ledgerKpiCard}>
+								<div className={styles.ledgerKpiValue}>{viewModel.readyCount}</div>
+								<div className={styles.ledgerKpiLabel}>Ready</div>
+							</div>
+							<div className={styles.ledgerKpiCard}>
+								<div className={styles.ledgerKpiValue}>
+									{viewModel.publishedCount}
+								</div>
+								<div className={styles.ledgerKpiLabel}>Published</div>
+							</div>
+							<div className={styles.ledgerKpiCard}>
+								<div className={styles.ledgerKpiValue}>
+									{viewModel.blockerCount}
+								</div>
+								<div className={styles.ledgerKpiLabel}>Blockers</div>
+							</div>
+							<div className={styles.ledgerKpiCard}>
+								<div className={styles.ledgerKpiValue}>
+									{viewModel.hotspotLinkedCount}
+								</div>
+								<div className={styles.ledgerKpiLabel}>Hotspot links</div>
+							</div>
+						</div>
+					</div>
+
+					<div className={styles.sectionBlock}>
+						<Text size="xs" color="muted" className={styles.subpanelLabel}>
+							Latest milestones
+						</Text>
+						<div className={styles.rowList}>
+							{viewModel.latestReadyEntry ? (
+								<div className={styles.dataRow}>
 									<div>
-										<div className={styles.dataRowTitle}>{entry.title}</div>
-										<div className={styles.dataRowMeta}>
-											{entry.source_kind} • {entry.publish_state}
-											{entry.app_area ? ` • ${entry.app_area}` : ""}
+										<div className={styles.dataRowTitle}>
+											Ready: {viewModel.latestReadyEntry.title}
 										</div>
-										<div className={styles.dataRowMeta}>{entry.summary}</div>
+										<div className={styles.dataRowMeta}>
+											{viewModel.latestReadyEntry.summary}
+										</div>
 									</div>
 									<div className={styles.dataRowAside}>
-										<Badge
-											color={
-												entry.publish_state === "published"
-													? "success"
-													: entry.publish_state === "ready"
-														? "accent"
-														: "primary"
-											}
-											variant="soft"
-										>
-											{entry.publish_state}
+										<Badge color="accent" variant="soft">
+											ready
 										</Badge>
-										{firstPath ? (
+										<button
+											type="button"
+											className={styles.sessionActionButton}
+											onClick={() =>
+												onOpenHotspotEntry(viewModel.latestReadyEntry!)
+											}
+										>
+											Open entry
+										</button>
+									</div>
+								</div>
+							) : null}
+							{viewModel.latestPublishedEntry ? (
+								<div className={styles.dataRow}>
+									<div>
+										<div className={styles.dataRowTitle}>
+											Published: {viewModel.latestPublishedEntry.title}
+										</div>
+										<div className={styles.dataRowMeta}>
+											{viewModel.latestPublishedEntry.summary}
+										</div>
+									</div>
+									<div className={styles.dataRowAside}>
+										<Badge color="success" variant="soft">
+											published
+										</Badge>
+										<button
+											type="button"
+											className={styles.sessionActionButton}
+											onClick={() =>
+												onOpenLatestReceipt(viewModel.latestPublishedEntry!)
+											}
+										>
+											Open latest receipt
+										</button>
+									</div>
+								</div>
+							) : null}
+							{!viewModel.latestReadyEntry && !viewModel.latestPublishedEntry ? (
+								<div className={styles.emptyStateCompact}>
+									No ready or published milestones matched the current filters.
+								</div>
+							) : null}
+						</div>
+					</div>
+
+					{viewModel.latestSuccessfulReceipt ? (
+						<div className={styles.sectionBlock}>
+							<Text size="xs" color="muted" className={styles.subpanelLabel}>
+								Latest receipt
+							</Text>
+							<div className={styles.dataRow}>
+								<div>
+									<div className={styles.dataRowTitle}>
+										{viewModel.latestSuccessfulReceipt.entry.title}
+									</div>
+									<div className={styles.dataRowMeta}>
+										{viewModel.latestSuccessfulReceipt.job.external_reference ||
+											viewModel.latestSuccessfulReceipt.job.artifact_dir ||
+											"Successful publish receipt"}
+									</div>
+								</div>
+								<div className={styles.dataRowAside}>
+									<Badge color="success" variant="soft">
+										succeeded
+									</Badge>
+									<button
+										type="button"
+										className={styles.sessionActionButton}
+										onClick={() =>
+											onOpenLatestReceipt(
+												viewModel.latestSuccessfulReceipt!.entry,
+											)
+										}
+									>
+										Open latest receipt
+									</button>
+								</div>
+							</div>
+						</div>
+					) : null}
+
+					{viewModel.latestFailedReceipt ? (
+						<div className={styles.sectionBlock}>
+							<Text size="xs" color="muted" className={styles.subpanelLabel}>
+								Latest blocker
+							</Text>
+							<div className={styles.dataRow}>
+								<div>
+									<div className={styles.dataRowTitle}>
+										{viewModel.latestFailedReceipt.entry.title}
+									</div>
+									<div className={styles.dataRowMeta}>
+										{viewModel.latestFailedReceipt.job.error_text ||
+											viewModel.latestFailedReceipt.job.stderr_excerpt ||
+											"Publish failed"}
+									</div>
+								</div>
+								<div className={styles.dataRowAside}>
+									<Badge color="danger" variant="soft">
+										failed
+									</Badge>
+									<button
+										type="button"
+										className={styles.sessionActionButton}
+										onClick={() =>
+											onOpenLatestReceipt(viewModel.latestFailedReceipt!.entry)
+										}
+									>
+										Open latest receipt
+									</button>
+								</div>
+							</div>
+						</div>
+					) : null}
+
+					<div className={styles.sectionBlock}>
+						<Text size="xs" color="muted" className={styles.subpanelLabel}>
+							Hotspot-linked entries
+						</Text>
+						<div className={styles.rowList}>
+							{viewModel.hotspotLinkedEntries.length === 0 ? (
+								<div className={styles.emptyStateCompact}>
+									No hotspot-linked entries matched the current filters.
+								</div>
+							) : (
+								viewModel.hotspotLinkedEntries.map((entry) => (
+									<div key={entry.id} className={styles.dataRow}>
+										<div>
+											<div className={styles.dataRowTitle}>{entry.title}</div>
+											<div className={styles.dataRowMeta}>
+												{entry.source_kind} • {entry.publish_state}
+												{entry.app_area ? ` • ${entry.app_area}` : ""}
+											</div>
+										</div>
+										<div className={styles.dataRowAside}>
+											<Badge
+												color={
+													entry.publish_state === "published"
+														? "success"
+														: entry.publish_state === "ready"
+															? "accent"
+															: "primary"
+												}
+												variant="soft"
+											>
+												{entry.publish_state}
+											</Badge>
 											<button
 												type="button"
 												className={styles.sessionActionButton}
-												onClick={() => onOpenEntryPath(firstPath)}
+												onClick={() => onOpenHotspotEntry(entry)}
 											>
-												Path
+												Open hotspot-linked entry
 											</button>
-										) : (
-											<ClipboardList size={14} />
-										)}
+										</div>
 									</div>
+								))
+							)}
+						</div>
+					</div>
+
+					<div className={styles.sectionBlock}>
+						<Text size="xs" color="muted" className={styles.subpanelLabel}>
+							Recent ledger entries
+						</Text>
+						<div className={styles.rowList}>
+							{entries.length === 0 ? (
+								<div className={styles.emptyStateCompact}>
+									No work ledger entries matched the current filters.
 								</div>
-							);
-						})
-					)}
+							) : (
+								entries.slice(0, 4).map((entry) => (
+									<div key={entry.id} className={styles.dataRow}>
+										<div>
+											<div className={styles.dataRowTitle}>{entry.title}</div>
+											<div className={styles.dataRowMeta}>
+												{entry.summary}
+											</div>
+										</div>
+										<div className={styles.dataRowAside}>
+											<Badge
+												color={
+													entry.publish_state === "published"
+														? "success"
+														: entry.publish_state === "ready"
+															? "accent"
+															: "primary"
+												}
+												variant="soft"
+											>
+												{entry.publish_state}
+											</Badge>
+										</div>
+									</div>
+								))
+							)}
+						</div>
+					</div>
 				</div>
 			)}
 		</Panel>

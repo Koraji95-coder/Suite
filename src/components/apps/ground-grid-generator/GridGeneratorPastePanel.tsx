@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { hexToRgba } from "@/lib/palette";
 import type { PasteMode } from "./GridGeneratorPanelModels";
 import type { GridConductor, GridPlacement, GridRod } from "./types";
+import styles from "./GridGeneratorPastePanel.module.css";
 
 interface GridGeneratorPastePanelProps {
 	pasteMode: PasteMode;
@@ -39,96 +40,35 @@ export function GridGeneratorPastePanel({
 	onLoadSampleData,
 	onClearAll,
 }: GridGeneratorPastePanelProps) {
+	const panelVars = {
+		"--gg-primary": palettePrimary,
+		"--gg-surface-light": paletteSurfaceLight,
+		"--gg-text": paletteText,
+		"--gg-text-muted": paletteTextMuted,
+	} as CSSProperties;
+
 	return (
-		<div
-			style={{
-				borderRadius: 8,
-				border: `1px solid ${hexToRgba(palettePrimary, 0.15)}`,
-				background: hexToRgba(paletteSurfaceLight, 0.2),
-				overflow: "hidden",
-			}}
-		>
-			<div
-				style={{
-					padding: "10px 12px 6px",
-					borderBottom: `1px solid ${hexToRgba(palettePrimary, 0.08)}`,
-				}}
-			>
-				<div
-					style={{
-						fontSize: 12,
-						fontWeight: 600,
-						color: paletteText,
-						marginBottom: 2,
-					}}
-				>
-					Paste Coordinate Data
-				</div>
-				<div
-					style={{
-						fontSize: 11,
-						color: paletteTextMuted,
-						lineHeight: 1.4,
-					}}
-				>
+		<div className={styles.panel} style={panelVars}>
+			<div className={styles.header}>
+				<div className={styles.title}>Paste Coordinate Data</div>
+				<div className={styles.subtitle}>
 					Paste your tab-separated coordinates below to generate the ground grid
 					design.
 				</div>
 			</div>
-			<div
-				style={{
-					display: "flex",
-					borderBottom: `1px solid ${hexToRgba(palettePrimary, 0.1)}`,
-				}}
-			>
+			<div className={styles.modeTabs}>
 				{(["rods", "conductors"] as const).map((mode) => (
 					<button
 						key={mode}
 						onClick={() => onPasteModeChange(mode)}
-						style={{
-							flex: 1,
-							padding: "6px 0",
-							fontSize: 11,
-							fontWeight: 600,
-							border: "none",
-							cursor: "pointer",
-							background:
-								pasteMode === mode
-									? hexToRgba(palettePrimary, 0.12)
-									: "transparent",
-							color: pasteMode === mode ? paletteText : paletteTextMuted,
-							borderBottom:
-								pasteMode === mode
-									? "2px solid #f59e0b"
-									: "2px solid transparent",
-						}}
+						className={`${styles.modeTab} ${pasteMode === mode ? styles.modeTabActive : ""}`}
 					>
 						Paste {mode.charAt(0).toUpperCase() + mode.slice(1)}
 					</button>
 				))}
 			</div>
-			<div
-				style={{
-					padding: "6px 10px 0",
-					fontSize: 10,
-					fontFamily: "ui-monospace, SFMono-Regular, monospace",
-					color: paletteTextMuted,
-					borderBottom: `1px solid ${hexToRgba(palettePrimary, 0.06)}`,
-					overflow: "hidden",
-				}}
-			>
-				<pre
-					style={{
-						margin: 0,
-						paddingBottom: 4,
-						fontSize: 11,
-						lineHeight: 1.4,
-						fontFamily: "ui-monospace, SFMono-Regular, monospace",
-						whiteSpace: "pre",
-						tabSize: 8,
-						fontVariantNumeric: "tabular-nums",
-					}}
-				>
+			<div className={styles.schemaHeader}>
+				<pre className={styles.schemaPre}>
 					{pasteMode === "rods"
 						? "Label\tDepth\tX\tY\tDia\tGridX\tGridY"
 						: "#\tLabel\tLen\tX1\tY1\tDia\tX2\tY2"}
@@ -142,27 +82,10 @@ export function GridGeneratorPastePanel({
 						? "R1\t20\t0\t0\t1.5\t0\t0\nR2\t20\t286\t0\t1.5\t286\t0"
 						: "1\tC1\t286\t0\t0\t1.5\t286\t0\n2\tC2\t286\t0\t8\t1.5\t286\t8"
 				}
-				style={{
-					width: "100%",
-					minHeight: 80,
-					padding: "6px 10px",
-					fontSize: 11,
-					lineHeight: 1.4,
-					fontFamily: "ui-monospace, SFMono-Regular, monospace",
-					background: "transparent",
-					border: "none",
-					color: paletteText,
-					outline: "none",
-					resize: "none",
-					boxSizing: "border-box",
-					textAlign: "left",
-					tabSize: 8,
-					whiteSpace: "pre",
-					fontVariantNumeric: "tabular-nums",
-				}}
-			name="gridgeneratorpastepanel_textarea_137"
+				className={styles.textarea}
+				name="gridgeneratorpastepanel_textarea_137"
 			/>
-			<div style={{ display: "flex", gap: 6, padding: "6px 10px" }}>
+			<div className={styles.actions}>
 				<button onClick={onApplyPaste} style={btnStyle()}>
 					<FileSpreadsheet size={12} /> Parse
 				</button>

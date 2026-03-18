@@ -1,0 +1,95 @@
+.panel {
+	border-radius: 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--gg-primary, var(--primary)) 15%, transparent);
+	background: color-mix(in srgb, var(--gg-surface-light, var(--surface)) 20%, transparent);
+	overflow: hidden;
+}
+
+.header {
+	padding: 0.625rem 0.75rem 0.375rem;
+	border-bottom: 1px solid
+		color-mix(in srgb, var(--gg-primary, var(--primary)) 8%, transparent);
+}
+
+.title {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--gg-text, var(--text));
+	margin-bottom: 0.125rem;
+}
+
+.subtitle {
+	font-size: 0.6875rem;
+	color: var(--gg-text-muted, var(--text-muted));
+	line-height: 1.4;
+}
+
+.modeTabs {
+	display: flex;
+	border-bottom: 1px solid
+		color-mix(in srgb, var(--gg-primary, var(--primary)) 10%, transparent);
+}
+
+.modeTab {
+	flex: 1;
+	padding: 0.375rem 0;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	border: none;
+	cursor: pointer;
+	background: transparent;
+	color: var(--gg-text-muted, var(--text-muted));
+	border-bottom: 2px solid transparent;
+}
+
+.modeTabActive {
+	background: color-mix(in srgb, var(--gg-primary, var(--primary)) 12%, transparent);
+	color: var(--gg-text, var(--text));
+	border-bottom-color: var(--accent);
+}
+
+.schemaHeader {
+	padding: 0.375rem 0.625rem 0;
+	font-size: 0.625rem;
+	font-family: ui-monospace, SFMono-Regular, monospace;
+	color: var(--gg-text-muted, var(--text-muted));
+	border-bottom: 1px solid
+		color-mix(in srgb, var(--gg-primary, var(--primary)) 6%, transparent);
+	overflow: hidden;
+}
+
+.schemaPre {
+	margin: 0;
+	padding-bottom: 0.25rem;
+	font-size: 0.6875rem;
+	line-height: 1.4;
+	font-family: ui-monospace, SFMono-Regular, monospace;
+	white-space: pre;
+	tab-size: 8;
+	font-variant-numeric: tabular-nums;
+}
+
+.textarea {
+	width: 100%;
+	min-height: 5rem;
+	padding: 0.375rem 0.625rem;
+	font-size: 0.6875rem;
+	line-height: 1.4;
+	font-family: ui-monospace, SFMono-Regular, monospace;
+	background: transparent;
+	border: none;
+	color: var(--gg-text, var(--text));
+	outline: none;
+	resize: none;
+	box-sizing: border-box;
+	text-align: left;
+	tab-size: 8;
+	white-space: pre;
+	font-variant-numeric: tabular-nums;
+}
+
+.actions {
+	display: flex;
+	gap: 0.375rem;
+	padding: 0.375rem 0.625rem;
+}

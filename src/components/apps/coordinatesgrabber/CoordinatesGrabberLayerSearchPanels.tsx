@@ -1,11 +1,8 @@
 import type { Dispatch, SetStateAction } from "react";
-import { type ColorScheme, hexToRgba } from "@/lib/palette";
-import {
-	configCardStyle,
-	configInputStyle,
-	configTitleStyle,
-} from "./CoordinatesGrabberConfigStyles";
+import { cn } from "@/lib/utils";
+import type { ColorScheme } from "@/lib/palette";
 import type { CoordinatesGrabberState } from "./CoordinatesGrabberModels";
+import styles from "./CoordinatesGrabberLayerSearchPanels.module.css";
 
 interface CoordinatesGrabberLayerSearchPanelsProps {
 	state: CoordinatesGrabberState;
@@ -23,7 +20,7 @@ interface CoordinatesGrabberLayerSearchPanelsProps {
 export function CoordinatesGrabberLayerSearchPanels({
 	state,
 	setState,
-	palette,
+	palette: _palette,
 	availableLayers,
 	refreshLayers,
 	handleStyleChange,
@@ -36,19 +33,11 @@ export function CoordinatesGrabberLayerSearchPanels({
 
 	return (
 		<>
-			<div style={configCardStyle(palette)}>
-				<h3 style={configTitleStyle(palette)}>Layer Configuration</h3>
-				<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+			<div className={styles.card}>
+				<h3 className={styles.title}>Layer Configuration</h3>
+				<div className={styles.stack}>
 					<div>
-						<div
-							style={{
-								fontSize: "12px",
-								color: palette.textMuted,
-								display: "flex",
-								justifyContent: "space-between",
-								alignItems: "center",
-							}}
-						>
+						<div className={styles.headerRow}>
 							<span>Layer Name:</span>
 							<button
 								onClick={async () => {
@@ -60,16 +49,7 @@ export function CoordinatesGrabberLayerSearchPanels({
 										addLog("[WARNING] No layers found");
 									}
 								}}
-								style={{
-									padding: "4px 8px",
-									borderRadius: "3px",
-									border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
-									background: hexToRgba(palette.primary, 0.1),
-									color: palette.primary,
-									fontSize: "11px",
-									cursor: "pointer",
-									fontWeight: "500",
-								}}
+								className={styles.secondaryButton}
 							>
 								🔄 Refresh
 							</button>
@@ -83,8 +63,9 @@ export function CoordinatesGrabberLayerSearchPanels({
 										layerName: e.target.value,
 									}))
 								}
-								style={configInputStyle(palette)}
-							 name="coordinatesgrabberlayersearchpanels_select_78">
+								className={styles.input}
+								name="coordinatesgrabberlayersearchpanels_select_78"
+							>
 								<option value="">-- Select a layer --</option>
 								{availableLayers.map((layer) => (
 									<option key={layer} value={layer}>
@@ -103,31 +84,15 @@ export function CoordinatesGrabberLayerSearchPanels({
 										layerName: e.target.value,
 									}))
 								}
-								style={configInputStyle(palette)}
-							name="coordinatesgrabberlayersearchpanels_input_96"
+								className={styles.input}
+								name="coordinatesgrabberlayersearchpanels_input_96"
 							/>
 						)}
-						<div
-							style={{
-								display: "flex",
-								gap: "8px",
-								marginTop: "8px",
-								flexWrap: "wrap",
-							}}
-						>
+						<div className={styles.actionsRow}>
 							<button
 								type="button"
 								onClick={handleAddLayer}
-								style={{
-									padding: "6px 10px",
-									borderRadius: "4px",
-									border: `1px solid ${hexToRgba(palette.primary, 0.3)}`,
-									background: hexToRgba(palette.primary, 0.1),
-									color: palette.primary,
-									fontSize: "11px",
-									fontWeight: "600",
-									cursor: "pointer",
-								}}
+								className={styles.primaryActionButton}
 							>
 								+ Add Layer
 							</button>
@@ -135,64 +100,24 @@ export function CoordinatesGrabberLayerSearchPanels({
 								type="button"
 								onClick={handleClearLayers}
 								disabled={state.selectedLayers.length === 0}
-								style={{
-									padding: "6px 10px",
-									borderRadius: "4px",
-									border: `1px solid ${hexToRgba(palette.primary, 0.2)}`,
-									background: "transparent",
-									color:
-										state.selectedLayers.length === 0
-											? palette.textMuted
-											: palette.text,
-									fontSize: "11px",
-									fontWeight: "600",
-									cursor:
-										state.selectedLayers.length === 0
-											? "not-allowed"
-											: "pointer",
-								}}
+								className={styles.ghostActionButton}
 							>
 								Clear Layers
 							</button>
 						</div>
-						<div
-							style={{
-								marginTop: "8px",
-								display: "flex",
-								flexDirection: "column",
-								gap: "6px",
-							}}
-						>
+						<div className={styles.selectedLayers}>
 							{state.selectedLayers.length === 0 ? (
-								<div style={{ fontSize: "11px", color: palette.textMuted }}>
+								<div className={styles.emptyHint}>
 									No layers added yet. Add one or more layers to run together.
 								</div>
 							) : (
 								state.selectedLayers.map((layer) => (
-									<div
-										key={layer}
-										style={{
-											display: "flex",
-											alignItems: "center",
-											justifyContent: "space-between",
-											padding: "6px 8px",
-											borderRadius: "4px",
-											background: hexToRgba(palette.primary, 0.08),
-											border: `1px solid ${hexToRgba(palette.primary, 0.18)}`,
-											fontSize: "11px",
-										}}
-									>
-										<span style={{ color: palette.text }}>{layer}</span>
+									<div key={layer} className={styles.selectedLayerRow}>
+										<span className={styles.selectedLayerLabel}>{layer}</span>
 										<button
 											type="button"
 											onClick={() => handleRemoveLayer(layer)}
-											style={{
-												border: "none",
-												background: "transparent",
-												color: palette.textMuted,
-												cursor: "pointer",
-												fontSize: "12px",
-											}}
+											className={styles.removeLayerButton}
 										>
 											✕
 										</button>
@@ -204,17 +129,14 @@ export function CoordinatesGrabberLayerSearchPanels({
 				</div>
 			</div>
 
-			<div style={configCardStyle(palette)}>
-				<h3 style={configTitleStyle(palette)}>Reference Point Style</h3>
-				<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+			<div className={styles.card}>
+				<h3 className={styles.title}>Reference Point Style</h3>
+				<div className={styles.stack}>
 					<label
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: "8px",
-							cursor: "pointer",
-							fontSize: "13px",
-						}}
+						className={cn(
+							styles.optionRow,
+							state.extractionStyle === "center" && styles.optionActive,
+						)}
 					>
 						<input
 							type="radio"
@@ -222,27 +144,17 @@ export function CoordinatesGrabberLayerSearchPanels({
 							value="center"
 							checked={state.extractionStyle === "center"}
 							onChange={() => handleStyleChange("center")}
-							style={{ cursor: "pointer" }}
+							className={styles.optionInput}
 						/>
-						<span
-							style={{
-								color:
-									state.extractionStyle === "center"
-										? palette.primary
-										: palette.text,
-							}}
-						>
+						<span className={styles.optionLabel}>
 							Single block at geometry center
 						</span>
 					</label>
 					<label
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: "8px",
-							cursor: "pointer",
-							fontSize: "13px",
-						}}
+						className={cn(
+							styles.optionRow,
+							state.extractionStyle === "corners" && styles.optionActive,
+						)}
 					>
 						<input
 							type="radio"
@@ -250,34 +162,19 @@ export function CoordinatesGrabberLayerSearchPanels({
 							value="corners"
 							checked={state.extractionStyle === "corners"}
 							onChange={() => handleStyleChange("corners")}
-							style={{ cursor: "pointer" }}
+							className={styles.optionInput}
 						/>
-						<span
-							style={{
-								color:
-									state.extractionStyle === "corners"
-										? palette.primary
-										: palette.text,
-							}}
-						>
+						<span className={styles.optionLabel}>
 							Four blocks at geometry corners (NW, NE, SW, SE)
 						</span>
 					</label>
 				</div>
 			</div>
 
-			<div style={configCardStyle(palette)}>
-				<h3 style={configTitleStyle(palette)}>Scan Options</h3>
-				<div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-					<label
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: "8px",
-							cursor: "pointer",
-							fontSize: "13px",
-						}}
-					>
+			<div className={styles.card}>
+				<h3 className={styles.title}>Scan Options</h3>
+				<div className={styles.stack}>
+					<label className={styles.optionRow}>
 						<input
 							type="checkbox"
 							checked={state.scanSelection}
@@ -287,22 +184,12 @@ export function CoordinatesGrabberLayerSearchPanels({
 									scanSelection: e.target.checked,
 								}))
 							}
-							style={{ cursor: "pointer" }}
-						name="coordinatesgrabberlayersearchpanels_input_280"
+							className={styles.optionInput}
+							name="coordinatesgrabberlayersearchpanels_input_280"
 						/>
-						<span style={{ color: palette.text }}>
-							Scan selected entities only
-						</span>
+						<span className={styles.optionLabel}>Scan selected entities only</span>
 					</label>
-					<label
-						style={{
-							display: "flex",
-							alignItems: "center",
-							gap: "8px",
-							cursor: "pointer",
-							fontSize: "13px",
-						}}
-					>
+					<label className={styles.optionRow}>
 						<input
 							type="checkbox"
 							checked={state.includeModelspace}
@@ -312,22 +199,19 @@ export function CoordinatesGrabberLayerSearchPanels({
 									includeModelspace: e.target.checked,
 								}))
 							}
-							style={{ cursor: "pointer" }}
-						name="coordinatesgrabberlayersearchpanels_input_304"
+							className={styles.optionInput}
+							name="coordinatesgrabberlayersearchpanels_input_304"
 						/>
-						<span style={{ color: palette.text }}>
+						<span className={styles.optionLabel}>
 							Include ModelSpace geometry (outside blocks)
 						</span>
 					</label>
 				</div>
 			</div>
 
-			<div style={configCardStyle(palette)}>
-				<h3 style={configTitleStyle(palette)}>Reference Block</h3>
-				<label
-					htmlFor="coords-layer-search-ref-scale"
-					style={{ fontSize: "12px", color: palette.textMuted }}
-				>
+			<div className={styles.card}>
+				<h3 className={styles.title}>Reference Block</h3>
+				<label htmlFor="coords-layer-search-ref-scale" className={styles.scaleLabel}>
 					Scale:
 				</label>
 				<input
@@ -342,8 +226,8 @@ export function CoordinatesGrabberLayerSearchPanels({
 					}
 					min="0.0001"
 					step="0.1"
-					style={configInputStyle(palette)}
-				name="coordinatesgrabberlayersearchpanels_input_327"
+					className={styles.input}
+					name="coordinatesgrabberlayersearchpanels_input_327"
 				/>
 			</div>
 		</>

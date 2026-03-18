@@ -8,7 +8,7 @@ import {
 	Wrench,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
@@ -16,6 +16,7 @@ import { Input } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { Text } from "@/components/primitives/Text";
 import { logger } from "@/lib/logger";
+import { buildDashboardLedgerSearchParams } from "@/lib/workLedgerNavigation";
 import { supabase } from "@/supabase/client";
 import { safeSupabaseQuery } from "@/supabase/utils";
 import {
@@ -77,6 +78,7 @@ function toCsvValue(values: string[]) {
 }
 
 export default function ChangelogRoutePage() {
+	const navigate = useNavigate();
 	const [searchParams, setSearchParams] = useSearchParams();
 	const [entries, setEntries] = useState<WorkLedgerRow[]>([]);
 	const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -321,6 +323,19 @@ export default function ChangelogRoutePage() {
 		await loadEntries();
 	};
 
+	const openDashboardSummary = () => {
+		const next = buildDashboardLedgerSearchParams({
+			projectId: searchParams.get("project"),
+			query: searchParams.get("query"),
+			path: searchParams.get("path"),
+			hotspot: searchParams.get("hotspot"),
+			publishState:
+				(searchParams.get("publishState") as WorkLedgerPublishState | "all" | null) ||
+				"all",
+		});
+		navigate(`/app/dashboard${next.toString() ? `?${next.toString()}` : ""}`);
+	};
+
 	return (
 		<PageFrame
 			title="Changelog"
@@ -340,6 +355,14 @@ export default function ChangelogRoutePage() {
 							</Text>
 						</div>
 						<div className={styles.publisherActions}>
+							<Button
+								variant="ghost"
+								size="sm"
+								iconRight={<ArrowUpRight size={14} />}
+								onClick={openDashboardSummary}
+							>
+								Open dashboard summary
+							</Button>
 							<Button
 								variant="ghost"
 								size="sm"

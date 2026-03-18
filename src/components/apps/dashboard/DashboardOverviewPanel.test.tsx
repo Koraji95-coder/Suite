@@ -9,6 +9,8 @@ const mockListSessions = vi.hoisted(() => vi.fn());
 const mockListCollectors = vi.hoisted(() => vi.fn());
 const mockLoadMemories = vi.hoisted(() => vi.fn());
 const mockFetchWorkLedgerEntries = vi.hoisted(() => vi.fn());
+const mockFetchWorktaleReadiness = vi.hoisted(() => vi.fn());
+const mockListPublishJobs = vi.hoisted(() => vi.fn());
 const mockUseDashboardOverviewData = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/watchdogService", () => ({
@@ -27,6 +29,8 @@ vi.mock("@/lib/agent-memory/service", () => ({
 vi.mock("@/services/workLedgerService", () => ({
 	workLedgerService: {
 		fetchEntries: mockFetchWorkLedgerEntries,
+		fetchWorktaleReadiness: mockFetchWorktaleReadiness,
+		listPublishJobs: mockListPublishJobs,
 	},
 }));
 
@@ -224,11 +228,56 @@ describe("DashboardOverviewPanel", () => {
 					hotspot_ids: [],
 					publish_state: "ready",
 					published_at: null,
-					external_reference: null,
+					external_reference: "worktale:note:job-1",
 					external_url: null,
-					user_id: "local",
+					user_id: "user-1",
 					created_at: "2026-03-18T00:00:00.000Z",
 					updated_at: "2026-03-18T00:00:00.000Z",
+				},
+			],
+			error: null,
+		});
+		mockFetchWorktaleReadiness.mockResolvedValue({
+			data: {
+				ok: true,
+				publisher: "worktale",
+				workstationId: "DUSTIN-HOME",
+				ready: true,
+				checks: {
+					cliInstalled: true,
+					cliPath: "C:/tools/worktale.exe",
+					repoPath: "C:/repo",
+					repoExists: true,
+					gitRepository: true,
+					gitEmailConfigured: true,
+					gitEmail: "user@example.com",
+					bootstrapped: true,
+				},
+				issues: [],
+				recommendedActions: [],
+			},
+			error: null,
+		});
+		mockListPublishJobs.mockResolvedValue({
+			data: [
+				{
+					id: "job-1",
+					entry_id: "ledger-1",
+					user_id: "user-1",
+					publisher: "worktale",
+					mode: "note",
+					status: "succeeded",
+					workstation_id: "DUSTIN-HOME",
+					repo_path: "C:/repo",
+					artifact_dir: "C:/artifacts/job-1",
+					stdout_excerpt: "ok",
+					stderr_excerpt: "",
+					error_text: null,
+					external_reference: "worktale:note:job-1",
+					external_url: null,
+					published_at: "2026-03-18T03:00:00.000Z",
+					created_at: "2026-03-18T03:00:00.000Z",
+					updated_at: "2026-03-18T03:00:00.000Z",
 				},
 			],
 			error: null,
@@ -285,7 +334,34 @@ describe("DashboardOverviewPanel", () => {
 		expect(screen.getByText("Seq 1")).toBeTruthy();
 		expect(screen.getByText("Telemetry hotspots")).toBeTruthy();
 		expect(screen.getByText("Work Ledger")).toBeTruthy();
-		expect(screen.getByText("Refactor agent service facade")).toBeTruthy();
+		expect(
+			screen.getAllByText("Refactor agent service facade").length,
+		).toBeGreaterThan(0);
+		expect(screen.getByText("Worktale ready")).toBeTruthy();
+		expect(screen.getByText("Open latest receipt")).toBeTruthy();
+		expect(screen.getByText("Hotspot-linked entries")).toBeTruthy();
 		expect(screen.getAllByText("Drawing1.dwg").length).toBeGreaterThan(0);
+	});
+
+	it("shows publisher setup messaging when Worktale is unavailable", async () => {
+		mockFetchWorktaleReadiness.mockResolvedValueOnce({
+			data: null,
+			error: new Error("Sign in to use Worktale publishing."),
+		});
+
+		render(
+			<MemoryRouter initialEntries={["/app/dashboard?focus=ledger"]}>
+				<Routes>
+					<Route path="/app/dashboard" element={<DashboardOverviewPanel />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText("Worktale unavailable")).toBeTruthy();
+		});
+		expect(
+			screen.getByText("Sign in to use Worktale publishing."),
+		).toBeTruthy();
 	});
 });

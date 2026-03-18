@@ -37,6 +37,15 @@ This is a restart/handoff doc summarizing what has already been completed and wh
   - `AutoDraftComparePanel`
   - `ConduitRouteApp`
   - `ConduitTerminalWorkflow`
+- Work Ledger is now a first-class product surface:
+  - `/app/changelog`
+  - workstation-local Worktale publisher
+  - publish-job receipts
+  - dashboard Ops Summary bridge for readiness, milestones, blockers, and hotspot-linked entries
+- `agentService` now routes through split capability modules under `src/services/agent/`.
+- Request transport and orchestration internals were split into smaller transport/event/run helpers.
+- Graph Explorer and Architecture Map now use the same command-surface shell language as the main dashboard.
+- Coordinates Grabber primary tabs and key Ground Grid preview/data panels moved further away from legacy inline-style presentation patterns.
 
 ### Current Baseline
 
@@ -218,6 +227,12 @@ New canonical changelog/history work now lives in the Suite work ledger:
 - Dashboard module: Work Ledger
 - Publish path: Suite stays canonical; Worktale-style payloads are generated outbound from ledger entries
 
+UI-overhaul audit for the current command-center tranche:
+
+- `docs/development/ui-overhaul-audit-2026-03-18.md`
+- Shared-route overhaul is effectively complete for dashboard, changelog, projects, graph, architecture, and agent shells.
+- Remaining visual debt is concentrated in Ground Grid manual-editor surfaces and a few app-local overlays/tool panes.
+
 Frontend refactor target remains the same: thin route/app shells, feature-scoped controller hooks, pure selectors/formatters, and focused presentational sections.
 
 ## P1 - Agent output normalization
@@ -258,10 +273,10 @@ Goal: safely select template-defined names/values from `config.yaml` without bri
 ## 4) Suggested Next Session Order
 
 1. On `DUSTIN-HOME`, pull latest `main`, run `scripts/restore-suite-local-state.ps1 -WorkstationId DUSTIN-HOME`, and restart Codex.
-2. Split `src/services/agentService.ts` by capability before doing another large agent UI pass.
-3. Continue conduit workflow section/action-hook extraction.
-4. Continue AutoDraft compare viewport/controller extraction.
-5. Finish secondary state-hook splits (ground grid, coordinates grabber, transmittal models).
+2. Finish Ground Grid manual-editor presentation cleanup so the last major visual outlier matches the command-surface system.
+3. Split `src/services/workLedgerService.ts` into transport, realtime, and local-fallback layers.
+4. Continue deeper AutoDraft and Conduit controller/service extraction.
+5. Start backend hotspot splitting with `backend/coordinatesgrabber.py`, then reassess the next highest-pressure backend module.
 
 ## 5) Fast Resume Commands
 

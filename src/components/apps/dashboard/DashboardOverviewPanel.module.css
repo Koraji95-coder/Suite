@@ -433,6 +433,63 @@
 	gap: 0.65rem;
 }
 
+.ledgerSummaryRow {
+	display: grid;
+	grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+	gap: 0.8rem;
+}
+
+.ledgerReadinessCard,
+.ledgerKpiCard {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.ledgerReadinessCard {
+	display: grid;
+	gap: 0.55rem;
+	padding: 0.85rem 0.9rem;
+}
+
+.ledgerReadinessHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.65rem;
+}
+
+.ledgerReadinessDetail {
+	font-size: 0.8rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}
+
+.ledgerKpiGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.65rem;
+}
+
+.ledgerKpiCard {
+	display: grid;
+	gap: 0.18rem;
+	padding: 0.75rem 0.8rem;
+}
+
+.ledgerKpiValue {
+	font-size: 1.05rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.ledgerKpiLabel {
+	font-size: 0.72rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
 .subpanelLabel {
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
@@ -675,6 +732,11 @@
 
 	.trendChart {
 		grid-template-columns: repeat(12, minmax(0, 1fr));
+	}
+
+	.ledgerSummaryRow,
+	.ledgerKpiGrid {
+		grid-template-columns: 1fr;
 	}
 
 	.sessionTimelineHeader {

@@ -17,8 +17,12 @@ import {
 } from "@/data/architectureModel";
 import { loadMemories } from "@/lib/agent-memory/service";
 import type { Memory } from "@/lib/agent-memory/types";
+import { buildChangelogSearchParams } from "@/lib/workLedgerNavigation";
 import {
+	type WorkLedgerPublishJobRow,
+	type WorkLedgerPublishState,
 	type WorkLedgerRow,
+	type WorktaleReadinessResponse,
 	workLedgerService,
 } from "@/services/workLedgerService";
 import {
@@ -37,6 +41,7 @@ import {
 	DashboardWorkLedgerSection,
 	DashboardWatchdogSection,
 } from "./DashboardOverviewSections";
+import { buildDashboardWorkLedgerViewModel } from "./dashboardWorkLedgerSelectors";
 import { buildDashboardWatchdogViewModel } from "./dashboardWatchdogSelectors";
 import { useDashboardOverviewData } from "./useDashboardOverviewData";
 
@@ -53,6 +58,15 @@ type DashboardFocus =
 	| "ledger"
 	| "memory"
 	| "projects";
+
+function normalizeLedgerPublishState(
+	value: string | null,
+): WorkLedgerPublishState | "all" {
+	if (value === "draft" || value === "ready" || value === "published") {
+		return value;
+	}
+	return "all";
+}
 
 const TIME_WINDOW_OPTIONS = [
 	{ value: "4", label: "4 hours" },
@@ -130,9 +144,16 @@ export function DashboardOverviewPanel({
 	const [collectors, setCollectors] = useState<WatchdogCollector[]>([]);
 	const [memories, setMemories] = useState<Memory[]>([]);
 	const [workLedgerEntries, setWorkLedgerEntries] = useState<WorkLedgerRow[]>([]);
+	const [workLedgerJobsByEntry, setWorkLedgerJobsByEntry] = useState<
+		Record<string, WorkLedgerPublishJobRow[]>
+	>({});
 	const [watchdogError, setWatchdogError] = useState<string | null>(null);
 	const [memoryError, setMemoryError] = useState<string | null>(null);
 	const [workLedgerError, setWorkLedgerError] = useState<string | null>(null);
+	const [worktaleReadiness, setWorktaleReadiness] =
+		useState<WorktaleReadinessResponse | null>(null);
+	const [worktaleReadinessError, setWorktaleReadinessError] =
+		useState<string | null>(null);
 	const [telemetryLoading, setTelemetryLoading] = useState(true);
 	const [refreshKey, setRefreshKey] = useState(0);
 	const watchdogSectionRef = useRef<HTMLDivElement | null>(null);
@@ -147,6 +168,9 @@ export function DashboardOverviewPanel({
 	const selectedCollectorId = searchParams.get("collector") || "all";
 	const selectedWindowHours = searchParams.get("window") || "24";
 	const selectedFocus = parseDashboardFocus(searchParams.get("focus"));
+	const selectedLedgerPublishState = normalizeLedgerPublishState(
+		searchParams.get("publishState"),
+	);
 	const searchValue = searchParams.get("query") || "";
 	const query = searchValue.trim().toLowerCase();
 
@@ -194,6 +218,7 @@ export function DashboardOverviewPanel({
 				collectorsResult,
 				memoriesResult,
 				workLedgerResult,
+				worktaleReadinessResult,
 			] = await Promise.allSettled([
 				watchdogService.getOverview({
 					projectId,
@@ -217,6 +242,7 @@ export function DashboardOverviewPanel({
 					projectId,
 					limit: 16,
 				}),
+				workLedgerService.fetchWorktaleReadiness(),
 			]);
 
 			if (cancelled || refreshCycle !== refreshKey) return;
@@ -269,6 +295,57 @@ export function DashboardOverviewPanel({
 						? workLedgerResult.reason.message
 						: "Work ledger is unavailable.",
 				);
+			}
+
+			if (worktaleReadinessResult.status === "fulfilled") {
+				setWorktaleReadiness(worktaleReadinessResult.value.data);
+				setWorktaleReadinessError(
+					worktaleReadinessResult.value.error
+						? String(worktaleReadinessResult.value.error.message || "")
+						: null,
+				);
+			} else {
+				setWorktaleReadiness(null);
+				setWorktaleReadinessError(
+					worktaleReadinessResult.reason instanceof Error
+						? worktaleReadinessResult.reason.message
+						: "Worktale readiness is unavailable.",
+				);
+			}
+
+			const candidateEntries =
+				workLedgerResult.status === "fulfilled"
+					? (workLedgerResult.value.data ?? [])
+							.filter(
+								(entry) =>
+									entry.user_id !== "local" &&
+									(entry.publish_state === "ready" ||
+										entry.publish_state === "published"),
+							)
+							.slice(0, 8)
+					: [];
+
+			if (candidateEntries.length > 0) {
+				const publishJobResults = await Promise.all(
+					candidateEntries.map(async (entry) => ({
+						entryId: entry.id,
+						result: await workLedgerService.listPublishJobs(entry.id, 1),
+					})),
+				);
+				if (cancelled || refreshCycle !== refreshKey) return;
+				setWorkLedgerJobsByEntry(
+					publishJobResults.reduce<Record<string, WorkLedgerPublishJobRow[]>>(
+						(acc, item) => {
+							if (!item.result.error && item.result.data.length > 0) {
+								acc[item.entryId] = item.result.data;
+							}
+							return acc;
+						},
+						{},
+					),
+				);
+			} else {
+				setWorkLedgerJobsByEntry({});
 			}
 
 			setTelemetryLoading(false);
@@ -429,6 +506,12 @@ export function DashboardOverviewPanel({
 					) {
 						return false;
 					}
+					if (
+						selectedLedgerPublishState !== "all" &&
+						entry.publish_state !== selectedLedgerPublishState
+					) {
+						return false;
+					}
 					return matchesQuery(query, [
 						entry.title,
 						entry.summary,
@@ -441,7 +524,28 @@ export function DashboardOverviewPanel({
 					]);
 				})
 				.slice(0, 6),
-		[query, selectedDomain, selectedProjectId, workLedgerEntries],
+		[
+			query,
+			selectedDomain,
+			selectedLedgerPublishState,
+			selectedProjectId,
+			workLedgerEntries,
+		],
+	);
+	const workLedgerViewModel = useMemo(
+		() =>
+			buildDashboardWorkLedgerViewModel({
+				entries: filteredWorkLedgerEntries,
+				jobsByEntry: workLedgerJobsByEntry,
+				readiness: worktaleReadiness,
+				readinessError: worktaleReadinessError,
+			}),
+		[
+			filteredWorkLedgerEntries,
+			workLedgerJobsByEntry,
+			worktaleReadiness,
+			worktaleReadinessError,
+		],
 	);
 
 	const openTasks = Array.from(projectTaskCounts.values()).reduce(
@@ -516,29 +620,43 @@ export function DashboardOverviewPanel({
 			?.label ?? `${selectedWindowHours} hours`;
 
 	const openChangelog = () => {
-		const next = new URLSearchParams();
-		if (selectedProjectId !== "all") {
-			next.set("project", selectedProjectId);
-		}
-		if (query) {
-			next.set("query", searchValue);
-		}
+		let rootPath: string | null = null;
 		if (selectedDomain !== "all") {
 			const domain = ARCHITECTURE_DOMAINS.find(
 				(item) => item.id === selectedDomain,
 			);
-			const firstRoot = domain?.repoRoots[0];
-			if (firstRoot) {
-				next.set("path", firstRoot);
-			}
+			rootPath = domain?.repoRoots[0] ?? null;
 		}
+		const next = buildChangelogSearchParams({
+			projectId: selectedProjectId !== "all" ? selectedProjectId : null,
+			query: query ? searchValue : null,
+			path: rootPath,
+			publishState: selectedLedgerPublishState,
+		});
 		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
 	};
 
-	const openWorkLedgerPath = (pathValue: string) => {
-		const normalizedPath = String(pathValue || "").trim();
-		if (!normalizedPath) return;
-		navigate(`/app/apps/graph?path=${encodeURIComponent(normalizedPath)}`);
+	const openWorkLedgerReceipt = (entry: WorkLedgerRow) => {
+		const next = buildChangelogSearchParams({
+			projectId: entry.project_id,
+			query: entry.external_reference || entry.title,
+			publishState:
+				entry.publish_state === "published" ? "published" : "ready",
+		});
+		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
+	};
+
+	const openHotspotLinkedEntry = (entry: WorkLedgerRow) => {
+		const publishState = normalizeLedgerPublishState(entry.publish_state);
+		const next = buildChangelogSearchParams({
+			projectId:
+				selectedProjectId !== "all" ? selectedProjectId : entry.project_id,
+			query: entry.title,
+			path: entry.architecture_paths[0] || null,
+			hotspot: entry.hotspot_ids[0] || null,
+			publishState,
+		});
+		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
 	};
 
 	return (
@@ -802,9 +920,11 @@ export function DashboardOverviewPanel({
 						panelRef={ledgerSectionRef}
 						className={ledgerPanelClassName}
 						entries={filteredWorkLedgerEntries}
+						viewModel={workLedgerViewModel}
 						error={workLedgerError}
 						onOpenChangelog={openChangelog}
-						onOpenEntryPath={openWorkLedgerPath}
+						onOpenLatestReceipt={openWorkLedgerReceipt}
+						onOpenHotspotEntry={openHotspotLinkedEntry}
 					/>
 
 					<DashboardMemorySection

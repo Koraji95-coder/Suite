@@ -1,3 +1,77 @@
+.routeRoot {
+	display: grid;
+	gap: 1rem;
+}
+
+.routeHero {
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line-soft));
+	background:
+		radial-gradient(
+			110% 130% at 100% 0%,
+			color-mix(in srgb, var(--primary) 20%, transparent),
+			transparent 62%
+		),
+		linear-gradient(
+			165deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 58%, transparent)
+		);
+}
+
+.routeHeroHeader {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.8rem;
+}
+
+.routeHeroText {
+	margin-top: 0.4rem;
+	max-width: 68ch;
+}
+
+.routeHeroBadges {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+
+.routeStatRow {
+	margin-top: 0.8rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.routeStatChip {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 0.18rem;
+	min-width: 7rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	padding: 0.45rem 0.6rem;
+	background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.routeStatValue {
+	font-size: 0.92rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.routeStatLabel {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.routeMapShell {
+	border: 1px solid var(--line-soft);
+}
+
 .root {
 	display: grid;
 	gap: 2rem;

@@ -2,6 +2,202 @@
 	animation: spin 1s linear infinite;
 }
 
+.root {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.toolbar {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.previewTabs {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.tabButton {
+	padding: 0.25rem 0.625rem;
+	font-size: 0.6875rem;
+	border-radius: 0.375rem 0.375rem 0 0;
+}
+
+.contourControls {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	font-size: 0.6875rem;
+	color: var(--gg-text-muted, var(--text-muted));
+}
+
+.fieldRow {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.smallInput {
+	width: 4.375rem;
+	padding: 0.1875rem 0.375rem;
+	font-size: 0.6875rem;
+	font-family: ui-monospace, SFMono-Regular, monospace;
+	background: color-mix(in srgb, var(--gg-surface-light, var(--surface)) 30%, transparent);
+	border: 1px solid color-mix(in srgb, var(--gg-primary, var(--primary)) 15%, transparent);
+	border-radius: 0.25rem;
+	color: var(--gg-text, var(--text));
+	outline: none;
+}
+
+.toggleToolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.375rem;
+	align-items: center;
+}
+
+.presetButton {
+	padding: 0.25rem 0.5rem;
+	font-size: 0.6875rem;
+	border-style: dashed;
+}
+
+.toggleButton {
+	padding: 0.25rem 0.5rem;
+	font-size: 0.6875rem;
+}
+
+.calloutControl {
+	display: flex;
+	align-items: center;
+	gap: 0.375rem;
+	font-size: 0.6875rem;
+	color: var(--gg-text-muted, var(--text-muted));
+	margin-left: 0.25rem;
+}
+
+.previewFrame {
+	border-radius: 0.625rem;
+	border: 1px solid color-mix(in srgb, var(--gg-primary, var(--primary)) 15%, transparent);
+	background: color-mix(in srgb, var(--gg-surface-light, var(--surface)) 15%, transparent);
+	flex: 1;
+	min-height: 25rem;
+	overflow: hidden;
+}
+
+.statsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+	gap: 0.5rem;
+}
+
+.statCard {
+	padding: 0.625rem 0.75rem;
+	border-radius: 0.5rem;
+	border: 1px solid color-mix(in srgb, var(--gg-stat-color, var(--primary)) 20%, transparent);
+	background: color-mix(in srgb, var(--gg-stat-color, var(--primary)) 6%, transparent);
+	text-align: center;
+}
+
+.statValue {
+	font-size: 1.25rem;
+	font-weight: 700;
+	color: var(--gg-stat-color, var(--text));
+	font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+	font-size: 0.625rem;
+	color: var(--gg-text-muted, var(--text-muted));
+	margin-top: 0.125rem;
+}
+
+.plotModalBackdrop {
+	position: fixed;
+	inset: 0;
+	background: rgb(0 0 0 / 45%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+	padding: 1rem;
+}
+
+.plotModal {
+	width: min(47.5rem, 96vw);
+	border-radius: 0.625rem;
+	background: var(--gg-surface-light, var(--surface));
+	border: 1px solid color-mix(in srgb, var(--gg-primary, var(--primary)) 25%, transparent);
+	padding: 0.875rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.plotTitle {
+	font-size: 0.875rem;
+	font-weight: 700;
+	color: var(--gg-text, var(--text));
+}
+
+.plotSubtitle {
+	font-size: 0.6875rem;
+	color: var(--gg-text-muted, var(--text-muted));
+}
+
+.plotStatsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(10.625rem, 1fr));
+	gap: 0.5rem;
+}
+
+.plotStatCard {
+	border-radius: 0.5rem;
+	padding: 0.5rem 0.625rem;
+	border: 1px solid color-mix(in srgb, var(--gg-stat-color, var(--primary)) 25%, transparent);
+	background: color-mix(in srgb, var(--gg-stat-color, var(--primary)) 8%, transparent);
+}
+
+.plotStatValue {
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--gg-stat-color, var(--text));
+	font-variant-numeric: tabular-nums;
+}
+
+.plotStatLabel {
+	font-size: 0.625rem;
+	color: var(--gg-text-muted, var(--text-muted));
+}
+
+.issueList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.375rem;
+}
+
+.issueOk {
+	color: var(--success);
+	font-size: 0.6875rem;
+}
+
+.issueItem {
+	font-size: 0.6875rem;
+	padding: 0.375rem 0.5rem;
+	border-radius: 0.375rem;
+	border: 1px solid color-mix(in srgb, var(--gg-issue-color, var(--primary)) 35%, transparent);
+	background: color-mix(in srgb, var(--gg-issue-color, var(--primary)) 10%, transparent);
+	color: var(--gg-issue-color, var(--text));
+}
+
+.plotActions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+}
+
 .lazyPanelState {
 	height: 100%;
 	min-height: 260px;

@@ -479,6 +479,7 @@ export type AutoDraftReviewedRunBundle = {
 };
 
 const DEFAULT_TIMEOUT_MS = 20_000;
+const DEFAULT_COMPARE_TIMEOUT_MS = 120_000;
 const DEFAULT_REPLACEMENT_TUNING: AutoDraftReplacementTuning = {
 	unresolved_confidence_threshold: 0.36,
 	ambiguity_margin_threshold: 0.08,
@@ -2125,23 +2126,27 @@ class AutoDraftService {
 		cadContext?: Record<string, unknown>;
 		replacementTuning?: Partial<AutoDraftReplacementTuning>;
 	}): Promise<AutoDraftCompareResponse> {
-		const payload = await this.requestJson<unknown>("/api/autodraft/compare", {
-			method: "POST",
-			body: JSON.stringify({
-				engine: args.engine,
-				tolerance_profile: args.toleranceProfile,
-				calibration_mode: args.calibrationMode ?? "auto",
-				agent_review_mode: args.agentReviewMode ?? "pre",
-				manual_override: args.manualOverride ?? false,
-				markups: args.markups,
-				pdf_points: args.pdfPoints ?? [],
-				cad_points: args.cadPoints ?? [],
-				roi: args.roi,
-				calibration_seed: args.calibrationSeed,
-				cad_context: args.cadContext,
-				replacement_tuning: args.replacementTuning,
-			}),
-		});
+		const payload = await this.requestJson<unknown>(
+			"/api/autodraft/compare",
+			{
+				method: "POST",
+				body: JSON.stringify({
+					engine: args.engine,
+					tolerance_profile: args.toleranceProfile,
+					calibration_mode: args.calibrationMode ?? "auto",
+					agent_review_mode: args.agentReviewMode ?? "pre",
+					manual_override: args.manualOverride ?? false,
+					markups: args.markups,
+					pdf_points: args.pdfPoints ?? [],
+					cad_points: args.cadPoints ?? [],
+					roi: args.roi,
+					calibration_seed: args.calibrationSeed,
+					cad_context: args.cadContext,
+					replacement_tuning: args.replacementTuning,
+				}),
+			},
+			DEFAULT_COMPARE_TIMEOUT_MS,
+		);
 		return normalizeComparePayload(payload);
 	}
 

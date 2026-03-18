@@ -98,6 +98,7 @@ describe("autoDraftService compare endpoints", () => {
 	});
 
 	it("runCompare posts normalized compare payload", async () => {
+		const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
 		vi.spyOn(globalThis, "fetch").mockResolvedValue(
 			new Response(
 				JSON.stringify({
@@ -302,6 +303,9 @@ describe("autoDraftService compare endpoints", () => {
 		expect(
 			compareResult.replacement_tuning?.unresolved_confidence_threshold,
 		).toBe(0.36);
+		expect(
+			setTimeoutSpy.mock.calls.some(([, delay]) => delay === 120_000),
+		).toBe(true);
 	});
 
 	it("runCompare normalizes markup review queue metadata", async () => {

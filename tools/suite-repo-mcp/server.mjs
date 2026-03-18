@@ -2,6 +2,7 @@
 
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -48,6 +49,57 @@ function createTextResult(text, isError = false) {
 		content: [{ type: "text", text }],
 		isError,
 	};
+}
+
+function getWorkstationContext() {
+	const computerName = String(process.env.COMPUTERNAME || os.hostname() || "").trim();
+	const workstationId =
+		String(process.env.SUITE_WORKSTATION_ID || "").trim() ||
+		computerName ||
+		"unknown";
+	const workstationLabel =
+		String(process.env.SUITE_WORKSTATION_LABEL || "").trim() || null;
+	const workstationRole =
+		String(process.env.SUITE_WORKSTATION_ROLE || "").trim() || null;
+	const source =
+		String(process.env.SUITE_WORKSTATION_ID || "").trim().length > 0
+			? "mcp_env"
+			: computerName
+				? "hostname"
+				: "unknown";
+	return {
+		workstationId,
+		workstationLabel,
+		workstationRole,
+		computerName: computerName || null,
+		platform: process.platform,
+		repoRoot: REPO_ROOT,
+		source,
+	};
+}
+
+function formatWorkstationContext() {
+	const context = getWorkstationContext();
+	const lines = ["## Workstation Context", ""];
+	lines.push(`- Workstation ID: ${context.workstationId}`);
+	if (context.workstationLabel) {
+		lines.push(`- Label: ${context.workstationLabel}`);
+	}
+	if (context.workstationRole) {
+		lines.push(`- Role: ${context.workstationRole}`);
+	}
+	if (context.computerName) {
+		lines.push(`- Computer Name: ${context.computerName}`);
+	}
+	lines.push(`- Platform: ${context.platform}`);
+	lines.push(`- Repo Root: ${toPosix(context.repoRoot)}`);
+	lines.push(`- Source: ${context.source}`);
+	lines.push("");
+	lines.push("Supported MCP env overrides:");
+	lines.push("- `SUITE_WORKSTATION_ID`");
+	lines.push("- `SUITE_WORKSTATION_LABEL`");
+	lines.push("- `SUITE_WORKSTATION_ROLE`");
+	return lines.join("\n");
 }
 
 function escapeRegExp(value) {
@@ -1317,6 +1369,10 @@ async function toolVerifyAgentRoutingGuardrails() {
 	return createTextResult(lines.join("\n"), !ok);
 }
 
+async function toolGetWorkstationContext() {
+	return createTextResult(formatWorkstationContext());
+}
+
 const PROMPTS = {
 	"repo.pr_description": {
 		description: "Generate a structured PR description for this repo.",
@@ -1437,6 +1493,11 @@ Notes: ${notes}
    - Supabase "issued in the future" warning spam is handled by docs/security/supabase-clock-skew-runbook.md
    - do not treat clock-skew warning noise as a reason to reopen gateway workaround loops
 `,
+	},
+	"repo.workstation_context": {
+		description:
+			"Return the current workstation identity exposed to suite_repo_mcp.",
+		template: () => formatWorkstationContext(),
 	},
 	"repo.agent_profile_playbook": {
 		description:
@@ -1797,6 +1858,16 @@ const TOOLS = [
 			},
 		},
 		handler: toolAddApiErrorWrapper,
+	},
+	{
+		name: "repo.get_workstation_context",
+		description:
+			"Return the current workstation identifier, label, role, and computer name for this MCP session.",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		handler: toolGetWorkstationContext,
 	},
 	{
 		name: "repo.verify_agent_routing_guardrails",

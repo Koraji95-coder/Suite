@@ -1,0 +1,8 @@
+# Merge this block into C:\Users\DustinWard\.codex\config.toml on the home PC.
+# Keep the existing [mcp_servers.suite_repo_mcp] command/args block, and only
+# replace or add the env section below for the home workstation identity.
+
+[mcp_servers.suite_repo_mcp.env]
+SUITE_WORKSTATION_ID = "DUSTIN-HOME"
+SUITE_WORKSTATION_LABEL = "Dustin Home station"
+SUITE_WORKSTATION_ROLE = "home"

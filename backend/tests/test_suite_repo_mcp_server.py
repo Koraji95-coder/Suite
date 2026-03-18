@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import queue
 import re
 import shutil
@@ -13,11 +14,15 @@ from typing import Any, Dict, Optional, Tuple
 
 
 class _McpServerProcess:
-    def __init__(self) -> None:
+    def __init__(self, *, env: Optional[Dict[str, str]] = None) -> None:
         repo_root = Path(__file__).resolve().parents[2]
+        proc_env = os.environ.copy()
+        if env:
+            proc_env.update(env)
         self._proc = subprocess.Popen(
             ["node", "tools/suite-repo-mcp/server.mjs"],
             cwd=repo_root,
+            env=proc_env,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -195,6 +200,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("repo.run_tests", tool_names)
         self.assertIn("repo.search", tool_names)
         self.assertIn("repo.generate_route", tool_names)
+        self.assertIn("repo.get_workstation_context", tool_names)
         self.assertIn("repo.verify_agent_routing_guardrails", tool_names)
 
     def test_tool_call_repo_search_returns_text(self) -> None:
@@ -262,6 +268,34 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("npm run gateway:dev", text)
         self.assertIn("SUITE_GATEWAY_USE_FULL_CLI=1", text)
 
+    def test_prompt_get_returns_workstation_context(self) -> None:
+        with _McpServerProcess(
+            env={
+                "SUITE_WORKSTATION_ID": "suite-secondary",
+                "SUITE_WORKSTATION_LABEL": "Dustin travel workstation",
+                "SUITE_WORKSTATION_ROLE": "secondary",
+                "COMPUTERNAME": "TEST-WS",
+            }
+        ) as server:
+            server.initialize()
+            response = server.request(
+                "prompts/get",
+                {
+                    "name": "repo.workstation_context",
+                    "arguments": {},
+                },
+            )
+
+        messages = response.get("result", {}).get("messages", [])
+        self.assertTrue(messages)
+        content = messages[0].get("content", {}) if isinstance(messages[0], dict) else {}
+        text = str(content.get("text") or "")
+        self.assertIn("Workstation ID: suite-secondary", text)
+        self.assertIn("Label: Dustin travel workstation", text)
+        self.assertIn("Role: secondary", text)
+        self.assertIn("Computer Name: TEST-WS", text)
+        self.assertIn("Source: mcp_env", text)
+
     def test_prompt_get_returns_agent_handoff_gateway_block(self) -> None:
         with _McpServerProcess() as server:
             server.initialize()
@@ -318,6 +352,36 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         text = str(content[0].get("text") if isinstance(content[0], dict) else "")
         self.assertIn("Profile count checked", text)
         self.assertIn("Result:", text)
+
+    def test_tool_get_workstation_context_returns_text(self) -> None:
+        with _McpServerProcess(
+            env={
+                "SUITE_WORKSTATION_ID": "suite-main",
+                "SUITE_WORKSTATION_LABEL": "Dustin main workstation",
+                "SUITE_WORKSTATION_ROLE": "primary",
+                "COMPUTERNAME": "MAIN-WS",
+            }
+        ) as server:
+            server.initialize()
+            response = server.request(
+                "tools/call",
+                {
+                    "name": "repo.get_workstation_context",
+                    "arguments": {},
+                },
+                timeout=10.0,
+            )
+
+        result = response.get("result", {})
+        self.assertFalse(bool(result.get("isError")))
+        content = result.get("content", [])
+        self.assertTrue(content)
+        text = str(content[0].get("text") if isinstance(content[0], dict) else "")
+        self.assertIn("Workstation ID: suite-main", text)
+        self.assertIn("Label: Dustin main workstation", text)
+        self.assertIn("Role: primary", text)
+        self.assertIn("Computer Name: MAIN-WS", text)
+        self.assertIn("Source: mcp_env", text)
 
     def test_unknown_tool_returns_jsonrpc_error(self) -> None:
         with _McpServerProcess() as server:

@@ -54,6 +54,11 @@ command = "node"
 args = ["/workspaces/Suite/tools/suite-repo-mcp/server.mjs"]
 startup_timeout_sec = 20
 tool_timeout_sec = 180
+
+[mcp_servers.suite_repo_mcp.env]
+SUITE_WORKSTATION_ID = "DUSTINWARD"
+SUITE_WORKSTATION_LABEL = "Dustin workstation"
+SUITE_WORKSTATION_ROLE = "active"
 ```
 
 If your Codex build requires RMCP client mode for MCP servers, enable this once:
@@ -69,6 +74,8 @@ Then restart Codex.
 
 - The server only operates inside this repo root (`/workspaces/Suite`).
 - Tooling is aligned to your stack (`Biome`, `TypeScript`, `Flask`, `Supabase SQL`).
+- Optional workstation identity env vars are supported: `SUITE_WORKSTATION_ID`, `SUITE_WORKSTATION_LABEL`, `SUITE_WORKSTATION_ROLE`.
+- A ready-to-merge home machine example lives at `tools/suite-repo-mcp/examples/dustin-home-workstation.toml`.
 - No Git push/commit automation is included.
 - `repo.generate_route` intentionally does not auto-edit `src/App.tsx`; it returns a registration hint.
 

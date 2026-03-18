@@ -1,14 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useToast } from "@/components/notification-system/ToastProvider";
-import { supabase } from "@/supabase/client";
-import type { Json } from "@/supabase/database";
-import { coordinatesGrabberService } from "./coordinatesGrabberService";
 import type { PlotDiffPreview } from "./GridGeneratorPanelModels";
-import {
-	computeGridMaxY,
-	generatePlacements,
-	totalConductorLength,
-} from "./gridEngine";
 import {
 	conductorKey,
 	coordinateBucketKey,
@@ -21,6 +13,8 @@ import type {
 	GridPlacement,
 	GridRod,
 } from "./types";
+import { useGridAutoCadPlotController } from "./useGridAutoCadPlotController";
+import { useGridPlacementGenerationController } from "./useGridPlacementGenerationController";
 
 type PlotSnapshot = {
 	conductors: GridConductor[];
@@ -227,163 +221,35 @@ export function useGridPlacementController({
 		rods,
 	]);
 
-	const runGeneration = useCallback(() => {
-		if (conductors.length === 0) {
-			showToast("error", "No conductor data to process");
-			return;
-		}
-		setGenerating(true);
-		addLog("generator", "[PROCESSING] Generating grid placements...");
-		requestAnimationFrame(() => {
-			const maxY = computeGridMaxY(rods, conductors);
-			const nextConfig = { ...config, grid_max_y: maxY };
-			const result = generatePlacements(rods, conductors, nextConfig);
-			const effectivePlacements =
-				placementLock && placements.length > 0 ? placements : result.placements;
-			setPlacements(effectivePlacements);
-			setSegmentCount(result.segmentCount);
-			if (placementLock && placements.length > 0) {
-				setTeeCount(countPlacementType("TEE", placements));
-				setCrossCount(countPlacementType("CROSS", placements));
-				addLog(
-					"generator",
-					"[WARNING] Placement lock is ON. Generated placements were not applied.",
-				);
-			} else {
-				setTeeCount(result.teeCount);
-				setCrossCount(result.crossCount);
-			}
-			setPlacementSourceSignature(dataSignature(rods, conductors));
-
-			if (currentDesignId) {
-				void supabase.from("ground_grid_results").insert({
-					design_id: currentDesignId,
-					placements: effectivePlacements as unknown as Json,
-					segment_count: result.segmentCount,
-					tee_count:
-						placementLock && placements.length > 0
-							? countPlacementType("TEE", placements)
-							: result.teeCount,
-					cross_count:
-						placementLock && placements.length > 0
-							? countPlacementType("CROSS", placements)
-							: result.crossCount,
-					rod_count: rods.length,
-					total_conductor_length: totalConductorLength(conductors),
-				});
-			}
-
-			setGenerating(false);
-			addLog(
-				"generator",
-				`[SUCCESS] Generated ${result.placements.length} placements (${result.teeCount} tees, ${result.crossCount} crosses, ${conductors.length} conductors)`,
-			);
-			showToast("success", `Generated: ${result.placements.length} placements`);
-		});
-	}, [
-		conductors,
-		showToast,
+	const runGeneration = useGridPlacementGenerationController({
 		addLog,
-		rods,
+		conductors,
 		config,
-		placementLock,
-		placements,
 		countPlacementType,
 		currentDesignId,
-	]);
-
-	const handlePlotToAutoCad = useCallback(async () => {
-		if (!backendConnected) {
-			showToast(
-				"error",
-				"AutoCAD backend is offline. Check the log for more details.",
-			);
-			addLog(
-				"generator",
-				"[ERROR] Cannot plot to AutoCAD - backend is not connected",
-			);
-			return;
-		}
-		if (conductors.length === 0 && placements.length === 0) {
-			addLog("generator", "[ERROR] Nothing to plot - generate or load grid data first");
-			showToast("error", "Nothing to plot");
-			return;
-		}
-		if (
-			placements.length > 0 &&
-			placementSourceSignature !== dataSignature(rods, conductors)
-		) {
-			addLog(
-				"generator",
-				"[ERROR] Placements are stale relative to rods/conductors. Regenerate before plotting.",
-			);
-			showToast("error", "Placements are stale. Regenerate grid first.");
-			return;
-		}
-
-		addLog("generator", "[PROCESSING] Plotting to active AutoCAD drawing...");
-		const plotConfig = {
-			...config,
-			grid_max_y: computeGridMaxY(rods, conductors),
-		};
-		const result = await coordinatesGrabberService.plotGroundGrid({
-			conductors: conductors.map((conductor) => ({
-				x1: conductor.x1,
-				y1: conductor.y1,
-				x2: conductor.x2,
-				y2: conductor.y2,
-			})),
-			placements: placements.map((placement) => ({
-				type: placement.type,
-				grid_x: placement.grid_x,
-				grid_y: placement.grid_y,
-				autocad_x: placement.autocad_x,
-				autocad_y: placement.autocad_y,
-				rotation_deg: placement.rotation_deg,
-			})),
-			config: {
-				origin_x_feet: plotConfig.origin_x_feet,
-				origin_x_inches: plotConfig.origin_x_inches,
-				origin_y_feet: plotConfig.origin_y_feet,
-				origin_y_inches: plotConfig.origin_y_inches,
-				block_scale: plotConfig.block_scale,
-				layer_name: plotConfig.layer_name,
-				grid_max_y: plotConfig.grid_max_y,
-			},
-		});
-
-		if (!result.success) {
-			addLog(
-				"generator",
-				`[ERROR] Plot failed: ${result.error_details || result.message}`,
-			);
-			showToast("error", result.message);
-			return;
-		}
-
-		setLastPlottedSnapshot({
-			conductors: conductors.map((conductor) => ({ ...conductor })),
-			placements: placements.map((placement) => ({ ...placement })),
-		});
-
-		const testWellInfo = result.test_well_block_name
-			? ` (test-well block: ${result.test_well_block_name})`
-			: "";
-		addLog("generator", `[SUCCESS] ${result.message}${testWellInfo}`);
-		showToast(
-			"success",
-			`Plotted ${result.lines_drawn} lines and ${result.blocks_inserted} placements`,
-		);
-	}, [
-		backendConnected,
-		showToast,
-		addLog,
-		conductors,
+		placementLock,
 		placements,
-		config,
 		rods,
+		setCrossCount,
+		setGenerating,
+		setPlacementSourceSignature,
+		setPlacements,
+		setSegmentCount,
+		setTeeCount,
+		showToast,
+	});
+
+	const handlePlotToAutoCad = useGridAutoCadPlotController({
+		addLog,
+		backendConnected,
+		conductors,
+		config,
 		placementSourceSignature,
-	]);
+		placements,
+		rods,
+		setLastPlottedSnapshot,
+		showToast,
+	});
 
 	return {
 		countPlacementType,
@@ -409,4 +275,3 @@ export function useGridPlacementController({
 		teeCount,
 	};
 }
-

@@ -223,6 +223,7 @@ describe("DashboardOverviewPanel", () => {
 					architecture_paths: ["src/services/agentService.ts"],
 					hotspot_ids: [],
 					publish_state: "ready",
+					published_at: null,
 					external_reference: null,
 					external_url: null,
 					user_id: "local",

@@ -302,7 +302,14 @@ export function useProjectManagerState({
 			loadExpandedTasks();
 			setTaskFilter("all");
 		}
-	}, [selectedProject, loadTasks, loadFiles, loadCalendarEvents]);
+	}, [
+		selectedProject,
+		loadTasks,
+		loadFiles,
+		loadCalendarEvents,
+		setExpandedTasks,
+		setTaskFilter,
+	]);
 
 	// Load task counts for all projects
 	const loadAllProjectTaskCounts = useCallback(

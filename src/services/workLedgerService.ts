@@ -10,6 +10,8 @@ export type WorkLedgerInsert =
 	Database["public"]["Tables"]["work_ledger_entries"]["Insert"];
 export type WorkLedgerUpdate =
 	Database["public"]["Tables"]["work_ledger_entries"]["Update"];
+export type WorkLedgerPublishJobRow =
+	Database["public"]["Tables"]["work_ledger_publish_jobs"]["Row"];
 
 export type WorkLedgerSourceKind =
 	| "manual"
@@ -51,6 +53,51 @@ export interface WorktalePublishPayload {
 	json: Record<string, unknown>;
 }
 
+export interface WorktaleReadinessChecks {
+	cliInstalled: boolean;
+	cliPath: string;
+	repoPath: string;
+	repoExists: boolean;
+	gitRepository: boolean;
+	gitEmailConfigured: boolean;
+	gitEmail: string;
+	bootstrapped: boolean;
+}
+
+export interface WorktaleReadinessResponse {
+	ok: boolean;
+	publisher: "worktale";
+	workstationId: string;
+	ready: boolean;
+	checks: WorktaleReadinessChecks;
+	issues: string[];
+	recommendedActions: string[];
+}
+
+export interface WorkLedgerPublishResult {
+	ok: boolean;
+	entry: WorkLedgerRow;
+	job: WorkLedgerPublishJobRow;
+	artifacts: {
+		artifactDir: string;
+		markdownPath: string;
+		jsonPath: string;
+	};
+	publisher: "worktale";
+	workstationId: string;
+	ready: boolean;
+	checks: WorktaleReadinessChecks;
+	issues: string[];
+	recommendedActions: string[];
+}
+
+export interface WorkLedgerOpenArtifactFolderResult {
+	ok: boolean;
+	entryId: string;
+	jobId: string;
+	artifactDir: string;
+}
+
 type WorkLedgerListener = (entry: WorkLedgerRow) => void;
 
 const LOCAL_STORAGE_KEY = "suite:work-ledger:local";
@@ -82,6 +129,60 @@ async function getCurrentUserId(): Promise<string | null> {
 	}
 	warnedMissingUser = false;
 	return user.id;
+}
+
+async function getSupabaseAccessToken(): Promise<string | null> {
+	try {
+		const {
+			data: { session },
+			error,
+		} = await supabase.auth.getSession();
+		if (error || !session?.access_token) return null;
+		return String(session.access_token);
+	} catch {
+		return null;
+	}
+}
+
+async function parseApiError(response: Response): Promise<string> {
+	try {
+		const payload = (await response.json()) as unknown;
+		if (payload && typeof payload === "object") {
+			const value = String(
+				(payload as Record<string, unknown>).error ||
+					(payload as Record<string, unknown>).message ||
+					"",
+			).trim();
+			if (value) return value;
+		}
+	} catch {
+		// No-op; fallback to raw response text.
+	}
+	const text = await response.text().catch(() => "");
+	return text || `HTTP ${response.status}`;
+}
+
+async function requestWorkLedgerApi(
+	path: string,
+	init: RequestInit = {},
+): Promise<unknown> {
+	const accessToken = await getSupabaseAccessToken();
+	const headers = new Headers(init.headers || {});
+	if (!headers.has("Content-Type")) {
+		headers.set("Content-Type", "application/json");
+	}
+	if (accessToken) {
+		headers.set("Authorization", `Bearer ${accessToken}`);
+	}
+	const response = await fetch(path, {
+		...init,
+		headers,
+		credentials: "include",
+	});
+	if (!response.ok) {
+		throw new Error(await parseApiError(response));
+	}
+	return (await response.json()) as unknown;
 }
 
 function sanitizeArray(values: string[] | undefined): string[] {
@@ -132,6 +233,7 @@ function buildLocalEntry(
 		architecture_paths: sanitizeArray(input.architecturePaths),
 		hotspot_ids: sanitizeArray(input.hotspotIds),
 		publish_state: input.publishState ?? "draft",
+		published_at: null,
 		external_reference: String(input.externalReference || "").trim() || null,
 		external_url: String(input.externalUrl || "").trim() || null,
 		user_id: userId ?? "local",
@@ -275,6 +377,7 @@ export function buildWorktalePublishPayload(entry: WorkLedgerRow): WorktalePubli
 			architecturePaths: entry.architecture_paths,
 			hotspotIds: entry.hotspot_ids,
 			publishState: entry.publish_state,
+			publishedAt: entry.published_at,
 			externalReference: entry.external_reference,
 			externalUrl: entry.external_url,
 			updatedAt: entry.updated_at,
@@ -409,6 +512,7 @@ export const workLedgerService = {
 								? sanitizeArray(patch.hotspotIds)
 								: entry.hotspot_ids,
 							publish_state: patch.publishState ?? entry.publish_state,
+							published_at: entry.published_at,
 							external_reference:
 								patch.externalReference === undefined
 									? entry.external_reference
@@ -471,5 +575,173 @@ export const workLedgerService = {
 		}
 
 		return null;
+	},
+
+	async fetchWorktaleReadiness(): Promise<{
+		data: WorktaleReadinessResponse | null;
+		error: Error | null;
+	}> {
+		const userId = await getCurrentUserId();
+		if (!userId) {
+			return {
+				data: null,
+				error: new Error("Sign in to use Worktale publishing."),
+			};
+		}
+		try {
+			const payload = (await requestWorkLedgerApi(
+				"/api/work-ledger/publishers/worktale/readiness",
+				{ method: "GET" },
+			)) as WorktaleReadinessResponse;
+			return {
+				data: payload,
+				error: null,
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error : new Error(String(error)),
+			};
+		}
+	},
+
+	async bootstrapWorktale(): Promise<{
+		data: WorktaleReadinessResponse | null;
+		error: Error | null;
+	}> {
+		const userId = await getCurrentUserId();
+		if (!userId) {
+			return {
+				data: null,
+				error: new Error("Sign in to bootstrap Worktale."),
+			};
+		}
+		try {
+			const payload = (await requestWorkLedgerApi(
+				"/api/work-ledger/publishers/worktale/bootstrap",
+				{ method: "POST" },
+			)) as WorktaleReadinessResponse;
+			return {
+				data: payload,
+				error: null,
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error : new Error(String(error)),
+			};
+		}
+	},
+
+	async publishEntryToWorktale(entryId: string): Promise<{
+		data: WorkLedgerPublishResult | null;
+		error: Error | null;
+	}> {
+		const normalizedId = String(entryId || "").trim();
+		if (!normalizedId) {
+			return {
+				data: null,
+				error: new Error("Entry id is required."),
+			};
+		}
+		const userId = await getCurrentUserId();
+		if (!userId) {
+			return {
+				data: null,
+				error: new Error("Sign in to publish to Worktale."),
+			};
+		}
+		try {
+			const payload = (await requestWorkLedgerApi(
+				`/api/work-ledger/entries/${encodeURIComponent(normalizedId)}/publish/worktale`,
+				{ method: "POST" },
+			)) as WorkLedgerPublishResult;
+			return {
+				data: payload,
+				error: null,
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error : new Error(String(error)),
+			};
+		}
+	},
+
+	async listPublishJobs(
+		entryId: string,
+		limit = 12,
+	): Promise<{
+		data: WorkLedgerPublishJobRow[];
+		error: Error | null;
+	}> {
+		const normalizedId = String(entryId || "").trim();
+		if (!normalizedId) {
+			return {
+				data: [],
+				error: new Error("Entry id is required."),
+			};
+		}
+		const userId = await getCurrentUserId();
+		if (!userId) {
+			return {
+				data: [],
+				error: new Error("Sign in to load publish receipts."),
+			};
+		}
+		try {
+			const payload = (await requestWorkLedgerApi(
+				`/api/work-ledger/entries/${encodeURIComponent(normalizedId)}/publish-jobs?limit=${Math.max(1, Math.min(200, Math.trunc(limit || 12)))}`,
+				{ method: "GET" },
+			)) as { jobs?: WorkLedgerPublishJobRow[] };
+			return {
+				data: Array.isArray(payload.jobs) ? payload.jobs : [],
+				error: null,
+			};
+		} catch (error) {
+			return {
+				data: [],
+				error: error instanceof Error ? error : new Error(String(error)),
+			};
+		}
+	},
+
+	async openPublishJobArtifactFolder(
+		entryId: string,
+		jobId: string,
+	): Promise<{
+		data: WorkLedgerOpenArtifactFolderResult | null;
+		error: Error | null;
+	}> {
+		const normalizedEntryId = String(entryId || "").trim();
+		const normalizedJobId = String(jobId || "").trim();
+		if (!normalizedEntryId || !normalizedJobId) {
+			return {
+				data: null,
+				error: new Error("Entry id and job id are required."),
+			};
+		}
+		const userId = await getCurrentUserId();
+		if (!userId) {
+			return {
+				data: null,
+				error: new Error("Sign in to open publish artifacts."),
+			};
+		}
+		try {
+			const payload = (await requestWorkLedgerApi(
+				`/api/work-ledger/entries/${encodeURIComponent(normalizedEntryId)}/publish-jobs/${encodeURIComponent(normalizedJobId)}/open-artifact-folder`,
+				{ method: "POST" },
+			)) as WorkLedgerOpenArtifactFolderResult;
+			return {
+				data: payload,
+				error: null,
+			};
+		} catch (error) {
+			return {
+				data: null,
+				error: error instanceof Error ? error : new Error(String(error)),
+			};
+		}
 	},
 };

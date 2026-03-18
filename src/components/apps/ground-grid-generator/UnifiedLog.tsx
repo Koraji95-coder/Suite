@@ -1,6 +1,5 @@
 import { Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { type LogEntry, useGroundGrid } from "./GroundGridContext";
 import styles from "./UnifiedLog.module.css";
@@ -31,9 +30,7 @@ function isNearBottom(element: HTMLElement, thresholdPx = 64): boolean {
 }
 
 export function UnifiedLog() {
-	const { logs, clearLogs } = useGroundGrid();
-	const [wsLive, setWsLive] = useState(coordinatesGrabberService.isConnected());
-	const [wsLastUpdate, setWsLastUpdate] = useState<number | null>(null);
+	const { logs, clearLogs, wsLastUpdate, wsLive } = useGroundGrid();
 
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const shouldAutoScrollRef = useRef(true);
@@ -49,36 +46,6 @@ export function UnifiedLog() {
 		element.addEventListener("scroll", onScroll, { passive: true });
 		shouldAutoScrollRef.current = isNearBottom(element);
 		return () => element.removeEventListener("scroll", onScroll);
-	}, []);
-
-	useEffect(() => {
-		const unsubscribeConnected = coordinatesGrabberService.on(
-			"connected",
-			(event) => {
-				if (event.type !== "connected") return;
-				setWsLive(true);
-				setWsLastUpdate(Date.now());
-			},
-		);
-		const unsubscribeStatus = coordinatesGrabberService.on("status", (event) => {
-			if (event.type !== "status") return;
-			setWsLive(true);
-			setWsLastUpdate(Date.now());
-		});
-		const unsubscribeDisconnected = coordinatesGrabberService.on(
-			"service-disconnected",
-			() => setWsLive(false),
-		);
-		const unsubscribeError = coordinatesGrabberService.on("error", () => {
-			setWsLive(false);
-		});
-
-		return () => {
-			unsubscribeConnected();
-			unsubscribeStatus();
-			unsubscribeDisconnected();
-			unsubscribeError();
-		};
 	}, []);
 
 	useEffect(() => {

@@ -8,7 +8,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
 import { cn } from "@/lib/utils";
 import { CoordinatesGrabber } from "../coordinatesgrabber/CoordinatesGrabber";
 import { GridGeneratorPanel } from "./GridGeneratorPanel";
@@ -135,51 +134,9 @@ function StatusPill({
 }
 
 function GroundGridGeneratorInner() {
-	const { backendConnected, logs } = useGroundGrid();
+	const { backendConnected, logs, wsLastUpdate, wsLive } = useGroundGrid();
 
-	const [wsLive, setWsLive] = useState(() =>
-		coordinatesGrabberService.isConnected(),
-	);
-	const [wsLastUpdate, setWsLastUpdate] = useState<number | null>(null);
 	const [activeTab, setActiveTab] = useState<TabId>("generator");
-
-	useEffect(() => {
-		const unsubscribeConnected = coordinatesGrabberService.on(
-			"connected",
-			(event) => {
-				if (event.type !== "connected") return;
-				setWsLive(true);
-				setWsLastUpdate(Date.now());
-			},
-		);
-
-		const unsubscribeStatus = coordinatesGrabberService.on(
-			"status",
-			(event) => {
-				if (event.type !== "status") return;
-				setWsLive(true);
-				setWsLastUpdate(Date.now());
-			},
-		);
-
-		const unsubscribeDisconnected = coordinatesGrabberService.on(
-			"service-disconnected",
-			() => {
-				setWsLive(false);
-			},
-		);
-
-		const unsubscribeError = coordinatesGrabberService.on("error", () => {
-			setWsLive(false);
-		});
-
-		return () => {
-			unsubscribeConnected();
-			unsubscribeStatus();
-			unsubscribeDisconnected();
-			unsubscribeError();
-		};
-	}, []);
 
 	const wsLiveStamp = useMemo(
 		() => (wsLastUpdate ? new Date(wsLastUpdate).toLocaleTimeString() : "--"),

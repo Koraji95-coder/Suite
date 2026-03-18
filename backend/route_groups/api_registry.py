@@ -17,6 +17,7 @@ from .api_batch_find_replace import create_batch_find_replace_blueprint
 from .api_watchdog import create_watchdog_blueprint
 from .api_health import create_health_blueprint
 from .api_dashboard import create_dashboard_blueprint
+from .api_work_ledger import create_work_ledger_blueprint
 from .api_transmittal import create_transmittal_blueprint
 from .api_transmittal_render import create_transmittal_render_blueprint
 
@@ -153,6 +154,15 @@ def register_route_groups(
     )
     app.register_blueprint(
         create_dashboard_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
+            supabase_url=supabase_url,
+            supabase_api_key=supabase_api_key,
+        )
+    )
+    app.register_blueprint(
+        create_work_ledger_blueprint(
             limiter=limiter,
             logger=logger,
             require_supabase_user=require_supabase_user,

@@ -5,15 +5,18 @@ import {
 } from "./workLedgerService";
 
 const mockGetUser = vi.hoisted(() => vi.fn());
+const mockGetSession = vi.hoisted(() => vi.fn());
 const mockRemoveChannel = vi.hoisted(() => vi.fn());
 const mockChannelSubscribe = vi.hoisted(() => vi.fn());
 const mockChannelOn = vi.hoisted(() => vi.fn());
 const mockSafeSupabaseQuery = vi.hoisted(() => vi.fn());
+const mockFetch = vi.hoisted(() => vi.fn());
 
 vi.mock("@/supabase/client", () => ({
 	supabase: {
 		auth: {
 			getUser: mockGetUser,
+			getSession: mockGetSession,
 		},
 		channel: vi.fn(() => ({
 			on: mockChannelOn.mockReturnThis(),
@@ -31,15 +34,22 @@ vi.mock("@/supabase/utils", () => ({
 describe("workLedgerService", () => {
 	beforeEach(() => {
 		localStorage.clear();
+		vi.stubGlobal("fetch", mockFetch);
 		mockGetUser.mockResolvedValue({
 			data: { user: null },
 			error: new Error("missing-user"),
 		});
+		mockGetSession.mockResolvedValue({
+			data: { session: null },
+			error: null,
+		});
 		mockSafeSupabaseQuery.mockReset();
+		mockFetch.mockReset();
 	});
 
 	afterEach(() => {
 		localStorage.clear();
+		vi.unstubAllGlobals();
 		vi.clearAllMocks();
 	});
 
@@ -100,6 +110,7 @@ describe("workLedgerService", () => {
 			architecture_paths: ["src/services/agentService.ts"],
 			hotspot_ids: ["agentService"],
 			publish_state: "ready",
+			published_at: null,
 			external_reference: "worktale draft",
 			external_url: null,
 			user_id: "local",
@@ -117,5 +128,158 @@ describe("workLedgerService", () => {
 			publishState: "ready",
 			appArea: "agent",
 		});
+	});
+
+	it("loads readiness and triggers publish APIs for authenticated users", async () => {
+		mockGetUser.mockResolvedValue({
+			data: { user: { id: "user-1" } },
+			error: null,
+		});
+		mockGetSession.mockResolvedValue({
+			data: { session: { access_token: "token-1" } },
+			error: null,
+		});
+
+		mockFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					ok: true,
+					publisher: "worktale",
+					workstationId: "DUSTIN-HOME",
+					ready: true,
+					checks: {
+						cliInstalled: true,
+						cliPath: "C:\\tools\\worktale.exe",
+						repoPath: "C:\\repo",
+						repoExists: true,
+						gitRepository: true,
+						gitEmailConfigured: true,
+						gitEmail: "user@example.com",
+						bootstrapped: true,
+					},
+					issues: [],
+					recommendedActions: [],
+				}),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					ok: true,
+					entry: {
+						id: "ledger-1",
+						title: "Ledger entry",
+						summary: "Summary",
+						source_kind: "manual",
+						commit_refs: [],
+						project_id: null,
+						app_area: null,
+						architecture_paths: [],
+						hotspot_ids: [],
+						publish_state: "published",
+						published_at: "2026-03-18T03:00:00.000Z",
+						external_reference: "worktale:note:job-1",
+						external_url: null,
+						user_id: "user-1",
+						created_at: "2026-03-18T02:00:00.000Z",
+						updated_at: "2026-03-18T03:00:00.000Z",
+					},
+					job: {
+						id: "job-1",
+						entry_id: "ledger-1",
+						user_id: "user-1",
+						publisher: "worktale",
+						mode: "note",
+						status: "succeeded",
+						workstation_id: "DUSTIN-HOME",
+						repo_path: "C:\\repo",
+						artifact_dir: "C:\\artifacts\\job-1",
+						stdout_excerpt: "",
+						stderr_excerpt: "",
+						error_text: null,
+						external_reference: "worktale:note:job-1",
+						external_url: null,
+						published_at: "2026-03-18T03:00:00.000Z",
+						created_at: "2026-03-18T03:00:00.000Z",
+						updated_at: "2026-03-18T03:00:00.000Z",
+					},
+					artifacts: {
+						artifactDir: "C:\\artifacts\\job-1",
+						markdownPath: "C:\\artifacts\\job-1\\entry.md",
+						jsonPath: "C:\\artifacts\\job-1\\entry.json",
+					},
+					publisher: "worktale",
+					workstationId: "DUSTIN-HOME",
+					ready: true,
+					checks: {
+						cliInstalled: true,
+						cliPath: "C:\\tools\\worktale.exe",
+						repoPath: "C:\\repo",
+						repoExists: true,
+						gitRepository: true,
+						gitEmailConfigured: true,
+						gitEmail: "user@example.com",
+						bootstrapped: true,
+					},
+					issues: [],
+					recommendedActions: [],
+				}),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					ok: true,
+					jobs: [
+						{
+							id: "job-1",
+							entry_id: "ledger-1",
+							user_id: "user-1",
+							publisher: "worktale",
+							mode: "note",
+							status: "succeeded",
+							workstation_id: "DUSTIN-HOME",
+							repo_path: "C:\\repo",
+							artifact_dir: "C:\\artifacts\\job-1",
+							stdout_excerpt: "",
+							stderr_excerpt: "",
+							error_text: null,
+							external_reference: "worktale:note:job-1",
+							external_url: null,
+							published_at: "2026-03-18T03:00:00.000Z",
+							created_at: "2026-03-18T03:00:00.000Z",
+							updated_at: "2026-03-18T03:00:00.000Z",
+						},
+					],
+				}),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: async () => ({
+					ok: true,
+					entryId: "ledger-1",
+					jobId: "job-1",
+					artifactDir: "C:\\artifacts\\job-1",
+				}),
+			});
+
+		const readiness = await workLedgerService.fetchWorktaleReadiness();
+		expect(readiness.error).toBeNull();
+		expect(readiness.data?.ready).toBe(true);
+
+		const publish = await workLedgerService.publishEntryToWorktale("ledger-1");
+		expect(publish.error).toBeNull();
+		expect(publish.data?.entry.publish_state).toBe("published");
+
+		const jobs = await workLedgerService.listPublishJobs("ledger-1");
+		expect(jobs.error).toBeNull();
+		expect(jobs.data).toHaveLength(1);
+
+		const openArtifact = await workLedgerService.openPublishJobArtifactFolder(
+			"ledger-1",
+			"job-1",
+		);
+		expect(openArtifact.error).toBeNull();
+		expect(openArtifact.data?.artifactDir).toBe("C:\\artifacts\\job-1");
+		expect(mockFetch).toHaveBeenCalledTimes(4);
 	});
 });

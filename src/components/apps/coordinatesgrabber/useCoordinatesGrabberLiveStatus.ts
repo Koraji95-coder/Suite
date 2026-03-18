@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
+import { useGroundGrid } from "../ground-grid-generator/GroundGridContext";
 import type { LiveBackendStatus } from "./CoordinatesGrabberModels";
 
 interface UseCoordinatesGrabberLiveStatusOptions {
@@ -11,17 +12,17 @@ export function useCoordinatesGrabberLiveStatus({
 	addLog,
 	activeRunIdRef,
 }: UseCoordinatesGrabberLiveStatusOptions) {
-	const [wsConnected, setWsConnected] = useState(
-		coordinatesGrabberService.isConnected(),
-	);
+	const {
+		liveBackendStatus: sharedLiveBackendStatus,
+		reconnectBackend,
+		wsLastUpdate,
+		wsLive,
+	} = useGroundGrid();
+	const [wsConnected, setWsConnected] = useState(wsLive);
 	const [lastWsEventAt, setLastWsEventAt] = useState<number | null>(null);
-	const [liveBackendStatus, setLiveBackendStatus] = useState<LiveBackendStatus>({
-		autocadRunning: false,
-		drawingOpen: false,
-		drawingName: null,
-		error: null,
-		lastUpdated: null,
-	});
+	const [liveBackendStatus, setLiveBackendStatus] = useState<LiveBackendStatus>(
+		sharedLiveBackendStatus,
+	);
 	const [progress, setProgress] = useState(0);
 	const [progressStage, setProgressStage] = useState<string>("");
 	const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -70,60 +71,30 @@ export function useCoordinatesGrabberLiveStatus({
 	}, [queueProgressReset]);
 
 	const reconnectLiveStream = useCallback(async () => {
-		try {
-			coordinatesGrabberService.disconnect();
-			await coordinatesGrabberService.connectWebSocket();
-			setWsConnected(true);
+		const ok = await reconnectBackend();
+		if (ok) {
 			setLastWsEventAt(Date.now());
 			addLog("[INFO] Reconnected WebSocket live stream");
-		} catch (err) {
-			const message = err instanceof Error ? err.message : "Unknown error";
-			setWsConnected(false);
-			addLog(`[WARNING] WebSocket reconnect failed: ${message}`);
+		} else {
+			addLog("[WARNING] WebSocket reconnect failed");
 		}
-	}, [addLog]);
+	}, [addLog, reconnectBackend]);
+
+	useEffect(() => {
+		setWsConnected(wsLive);
+	}, [wsLive]);
+
+	useEffect(() => {
+		setLiveBackendStatus(sharedLiveBackendStatus);
+	}, [sharedLiveBackendStatus]);
+
+	useEffect(() => {
+		if (!wsLastUpdate) return;
+		setLastWsEventAt((prev) => (prev && prev > wsLastUpdate ? prev : wsLastUpdate));
+	}, [wsLastUpdate]);
 
 	useEffect(() => {
 		let mounted = true;
-
-		const unsubscribeConnected = coordinatesGrabberService.on(
-			"connected",
-			(event) => {
-				if (!mounted || event.type !== "connected") return;
-				setWsConnected(true);
-				setLastWsEventAt(Date.now());
-			},
-		);
-
-		const unsubscribeStatus = coordinatesGrabberService.on(
-			"status",
-			(event) => {
-				if (!mounted || event.type !== "status") return;
-				setWsConnected(true);
-				setLiveBackendStatus({
-					autocadRunning: event.autocad_running,
-					drawingOpen: event.drawing_open,
-					drawingName:
-						typeof event.drawing_name === "string" ? event.drawing_name : null,
-					error: typeof event.error === "string" ? event.error : null,
-					lastUpdated: Date.now(),
-				});
-				setLastWsEventAt(Date.now());
-			},
-		);
-
-		const unsubscribeDisconnected = coordinatesGrabberService.on(
-			"service-disconnected",
-			() => {
-				if (!mounted) return;
-				setWsConnected(false);
-			},
-		);
-
-		const unsubscribeError = coordinatesGrabberService.on("error", () => {
-			if (!mounted) return;
-			setWsConnected(false);
-		});
 
 		const unsubscribeProgress = coordinatesGrabberService.on(
 			"progress",
@@ -163,10 +134,6 @@ export function useCoordinatesGrabberLiveStatus({
 
 		return () => {
 			mounted = false;
-			unsubscribeConnected();
-			unsubscribeStatus();
-			unsubscribeDisconnected();
-			unsubscribeError();
 			unsubscribeProgress();
 			unsubscribeComplete();
 			unsubscribeWsError();

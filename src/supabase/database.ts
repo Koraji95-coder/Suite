@@ -336,6 +336,7 @@ export type Database = {
 					architecture_paths: string[];
 					hotspot_ids: string[];
 					publish_state: string;
+					published_at: string | null;
 					external_reference: string | null;
 					external_url: string | null;
 					user_id: string;
@@ -353,6 +354,7 @@ export type Database = {
 					architecture_paths?: string[];
 					hotspot_ids?: string[];
 					publish_state?: string;
+					published_at?: string | null;
 					external_reference?: string | null;
 					external_url?: string | null;
 					user_id?: string;
@@ -370,9 +372,70 @@ export type Database = {
 					architecture_paths?: string[];
 					hotspot_ids?: string[];
 					publish_state?: string;
+					published_at?: string | null;
 					external_reference?: string | null;
 					external_url?: string | null;
 					user_id?: string;
+					created_at?: string;
+					updated_at?: string;
+				}
+			>;
+
+			work_ledger_publish_jobs: DatabaseTable<
+				{
+					id: string;
+					entry_id: string;
+					user_id: string;
+					publisher: string;
+					mode: string;
+					status: string;
+					workstation_id: string | null;
+					repo_path: string | null;
+					artifact_dir: string | null;
+					stdout_excerpt: string | null;
+					stderr_excerpt: string | null;
+					error_text: string | null;
+					external_reference: string | null;
+					external_url: string | null;
+					published_at: string | null;
+					created_at: string;
+					updated_at: string;
+				},
+				{
+					id?: string;
+					entry_id: string;
+					user_id?: string;
+					publisher: string;
+					mode: string;
+					status: string;
+					workstation_id?: string | null;
+					repo_path?: string | null;
+					artifact_dir?: string | null;
+					stdout_excerpt?: string | null;
+					stderr_excerpt?: string | null;
+					error_text?: string | null;
+					external_reference?: string | null;
+					external_url?: string | null;
+					published_at?: string | null;
+					created_at?: string;
+					updated_at?: string;
+				},
+				{
+					id?: string;
+					entry_id?: string;
+					user_id?: string;
+					publisher?: string;
+					mode?: string;
+					status?: string;
+					workstation_id?: string | null;
+					repo_path?: string | null;
+					artifact_dir?: string | null;
+					stdout_excerpt?: string | null;
+					stderr_excerpt?: string | null;
+					error_text?: string | null;
+					external_reference?: string | null;
+					external_url?: string | null;
+					published_at?: string | null;
 					created_at?: string;
 					updated_at?: string;
 				}

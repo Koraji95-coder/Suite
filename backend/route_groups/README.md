@@ -68,6 +68,7 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_agent_orchestration_runtime.py`: persistent run-ledger + background worker orchestration runtime for parallel agent stages
 - `api_agent_orchestration_templates.py`: profile instruction templates + stage prompt builders for orchestration flows
 - `api_dashboard.py`: `/api/dashboard/load`, `/api/dashboard/load/<job_id>`
+- `api_work_ledger.py`: `/api/work-ledger/publishers/worktale/readiness`, `/api/work-ledger/publishers/worktale/bootstrap`, `/api/work-ledger/entries/<entry_id>/publish/worktale`, `/api/work-ledger/entries/<entry_id>/publish-jobs`, `/api/work-ledger/entries/<entry_id>/publish-jobs/<job_id>/open-artifact-folder`
 - `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
 - `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
 - `api_transmittal_render.py`: `/api/transmittal/render`

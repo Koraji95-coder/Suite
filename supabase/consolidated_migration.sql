@@ -178,9 +178,33 @@ create table if not exists public.work_ledger_entries (
 	architecture_paths text[] not null default '{}',
 	hotspot_ids text[] not null default '{}',
 	publish_state text not null default 'draft',
+	published_at timestamptz null,
 	external_reference text null,
 	external_url text null,
 	user_id uuid not null references auth.users (id) on delete cascade,
+	created_at timestamptz not null default timezone('utc', now()),
+	updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table if exists public.work_ledger_entries
+	add column if not exists published_at timestamptz null;
+
+create table if not exists public.work_ledger_publish_jobs (
+	id uuid primary key default gen_random_uuid(),
+	entry_id uuid not null references public.work_ledger_entries (id) on delete cascade,
+	user_id uuid not null references auth.users (id) on delete cascade,
+	publisher text not null,
+	mode text not null,
+	status text not null,
+	workstation_id text null,
+	repo_path text null,
+	artifact_dir text null,
+	stdout_excerpt text null,
+	stderr_excerpt text null,
+	error_text text null,
+	external_reference text null,
+	external_url text null,
+	published_at timestamptz null,
 	created_at timestamptz not null default timezone('utc', now()),
 	updated_at timestamptz not null default timezone('utc', now())
 );
@@ -427,6 +451,9 @@ create index if not exists idx_work_ledger_entries_user_id on public.work_ledger
 create index if not exists idx_work_ledger_entries_project_id on public.work_ledger_entries (project_id);
 create index if not exists idx_work_ledger_entries_publish_state on public.work_ledger_entries (publish_state);
 create index if not exists idx_work_ledger_entries_updated_at on public.work_ledger_entries (updated_at desc);
+create index if not exists idx_work_ledger_publish_jobs_entry_id on public.work_ledger_publish_jobs (entry_id, created_at desc);
+create index if not exists idx_work_ledger_publish_jobs_user_id on public.work_ledger_publish_jobs (user_id, created_at desc);
+create index if not exists idx_work_ledger_publish_jobs_status on public.work_ledger_publish_jobs (status, created_at desc);
 
 create index if not exists idx_calendar_events_user_id on public.calendar_events (user_id);
 create index if not exists idx_calendar_events_project_id on public.calendar_events (project_id);
@@ -526,6 +553,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_work_ledger_entries_updated_at on public.work_ledger_entries;
 create trigger set_work_ledger_entries_updated_at
 before update on public.work_ledger_entries
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_work_ledger_publish_jobs_updated_at on public.work_ledger_publish_jobs;
+create trigger set_work_ledger_publish_jobs_updated_at
+before update on public.work_ledger_publish_jobs
 for each row execute function public.set_updated_at();
 
 create or replace function public.upsert_user_setting(

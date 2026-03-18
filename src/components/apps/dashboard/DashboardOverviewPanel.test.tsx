@@ -251,6 +251,8 @@ describe("DashboardOverviewPanel", () => {
 		});
 		expect(screen.getByText("Operations and Watchdog")).toBeTruthy();
 		expect(screen.getByText("Live AutoCAD sessions")).toBeTruthy();
+		expect(screen.getByText("Session timeline")).toBeTruthy();
+		expect(screen.getByText("Seq 1")).toBeTruthy();
 		expect(screen.getByText("Telemetry hotspots")).toBeTruthy();
 		expect(screen.getAllByText("Drawing1.dwg").length).toBeGreaterThan(0);
 	});

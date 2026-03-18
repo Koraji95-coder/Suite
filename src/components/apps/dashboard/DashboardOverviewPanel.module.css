@@ -237,6 +237,137 @@
 	grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
 }
 
+.sessionTimeline {
+	display: grid;
+	gap: 0.65rem;
+}
+
+.sessionTimelineRow {
+	display: grid;
+	gap: 0.55rem;
+	padding: 0.75rem 0.8rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 72%, transparent),
+			color-mix(in srgb, var(--surface) 90%, transparent)
+		);
+}
+
+.sessionTimelineHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.65rem;
+}
+
+.sessionTimelineHeading {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.45rem;
+	min-width: 0;
+}
+
+.sessionSequenceBadge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 1.3rem;
+	min-width: 2.6rem;
+	padding: 0 0.45rem;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line-soft));
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+	font-size: 0.64rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--primary);
+	flex-shrink: 0;
+}
+
+.sessionTimelineActions {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.3rem;
+	flex-shrink: 0;
+}
+
+.sessionActionButton {
+	height: 1.45rem;
+	padding: 0 0.45rem;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line-soft));
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+	color: var(--text);
+	font-size: 0.65rem;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.sessionActionButton:hover {
+	border-color: color-mix(in srgb, var(--primary) 38%, var(--line-soft));
+	background: color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.sessionTimelineTrack {
+	position: relative;
+	height: 0.55rem;
+	border-radius: 999px;
+	background:
+		linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--surface-3) 58%, transparent),
+			color-mix(in srgb, var(--surface) 80%, transparent)
+		);
+	overflow: hidden;
+}
+
+.sessionTimelineBar {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	min-width: 0.75rem;
+	border-radius: inherit;
+	box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.sessionTimelineBarLive {
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--primary) 88%, white 12%),
+		color-mix(in srgb, var(--info) 72%, transparent)
+	);
+}
+
+.sessionTimelineBarPaused {
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--warning) 88%, white 12%),
+		color-mix(in srgb, var(--accent) 74%, transparent)
+	);
+}
+
+.sessionTimelineBarCompleted {
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--secondary) 74%, white 12%),
+		color-mix(in srgb, var(--secondary) 56%, transparent)
+	);
+}
+
+.sessionTimelineMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.38rem;
+	font-size: 0.67rem;
+	color: var(--text-muted);
+}
+
 .subpanel,
 .sectionBlock {
 	display: grid;
@@ -485,5 +616,13 @@
 
 	.trendChart {
 		grid-template-columns: repeat(12, minmax(0, 1fr));
+	}
+
+	.sessionTimelineHeader {
+		flex-direction: column;
+	}
+
+	.sessionTimelineActions {
+		justify-content: flex-start;
 	}
 }

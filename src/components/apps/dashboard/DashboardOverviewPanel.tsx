@@ -121,6 +121,11 @@ function formatDuration(durationMs: number | null | undefined): string {
 	return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
+function clampPercentage(value: number): number {
+	if (!Number.isFinite(value)) return 0;
+	return Math.max(0, Math.min(100, value));
+}
+
 function parseDashboardFocus(value: string | null): DashboardFocus | null {
 	switch (value) {
 		case "watchdog":
@@ -182,14 +187,20 @@ export function DashboardOverviewPanel({
 		60 *
 		1000;
 
-	const updateFilter = (key: string, value: string) => {
+	const updateFilters = (updates: Record<string, string>) => {
 		const next = new URLSearchParams(searchParams);
-		if (!value || value === "all") {
-			next.delete(key);
-		} else {
-			next.set(key, value);
+		for (const [key, value] of Object.entries(updates)) {
+			if (!value || value === "all") {
+				next.delete(key);
+			} else {
+				next.set(key, value);
+			}
 		}
 		setSearchParams(next, { replace: true });
+	};
+
+	const updateFilter = (key: string, value: string) => {
+		updateFilters({ [key]: value });
 	};
 
 	useEffect(() => {
@@ -477,6 +488,44 @@ export function DashboardOverviewPanel({
 		...(watchdogOverview?.trendBuckets ?? []).map((bucket) => bucket.eventCount),
 	);
 	const telemetryHotspotProjects = (watchdogOverview?.projects.top ?? []).slice(0, 4);
+	const sessionTimelineRows = useMemo(() => {
+		const windowEnd = Date.now();
+		const windowStart = windowEnd - selectedWindowMs;
+		const safeWindow = Math.max(1, selectedWindowMs);
+		return watchdogSessions.slice(0, 8).map((session, index) => {
+			const collector = collectorById.get(session.collectorId) ?? null;
+			const trackerAt =
+				session.trackerUpdatedAt ??
+				collector?.lastHeartbeatAt ??
+				session.latestEventAt;
+			const rawEnd =
+				session.endedAt ??
+				Math.max(
+					session.latestEventAt,
+					session.startedAt + Math.max(0, session.durationMs),
+				);
+			const boundedStart = Math.max(windowStart, session.startedAt);
+			const boundedEnd = Math.min(windowEnd, Math.max(boundedStart, rawEnd));
+			const leftPercent = clampPercentage(
+				((boundedStart - windowStart) / safeWindow) * 100,
+			);
+			const widthPercent = Math.max(
+				2,
+				clampPercentage(((boundedEnd - boundedStart) / safeWindow) * 100),
+			);
+			return {
+				sequence: index + 1,
+				session,
+				collector,
+				trackerAt,
+				leftPercent,
+				widthPercent,
+				projectName: session.projectId
+					? allProjectsMap.get(session.projectId)?.name ?? session.projectId
+					: null,
+			};
+		});
+	}, [allProjectsMap, collectorById, selectedWindowMs, watchdogSessions]);
 	const privateMemoryCount = filteredMemories.filter(
 		(memory) => memory.scope === "private",
 	).length;
@@ -943,6 +992,126 @@ export function DashboardOverviewPanel({
 
 								<div className={styles.subpanel}>
 									<Text size="xs" color="muted" className={styles.subpanelLabel}>
+										Session timeline
+									</Text>
+									<div className={styles.sessionTimeline}>
+										{sessionTimelineRows.length === 0 ? (
+											<div className={styles.emptyStateCompact}>
+												No session timeline data in the selected window.
+											</div>
+										) : (
+											sessionTimelineRows.map((row) => {
+												const { session, collector } = row;
+												const canDrillProject = Boolean(
+													session.projectId &&
+														session.projectId !== selectedProjectId,
+												);
+												const canDrillCollector =
+													selectedCollectorId !== session.collectorId;
+												const sessionStatusClass =
+													session.status === "live"
+														? styles.sessionTimelineBarLive
+														: session.status === "paused"
+															? styles.sessionTimelineBarPaused
+															: styles.sessionTimelineBarCompleted;
+												return (
+													<div
+														key={session.sessionId}
+														className={styles.sessionTimelineRow}
+													>
+														<div className={styles.sessionTimelineHeader}>
+															<div className={styles.sessionTimelineHeading}>
+																<span className={styles.sessionSequenceBadge}>
+																	Seq {row.sequence}
+																</span>
+																<div>
+																	<div className={styles.dataRowTitle}>
+																		{basenameFromPath(session.drawingPath)}
+																	</div>
+																	<div className={styles.dataRowMeta}>
+																		{collector?.name || session.collectorId}
+																		{" • "}
+																		{row.projectName || "Unassigned"}
+																	</div>
+																</div>
+															</div>
+															<div className={styles.sessionTimelineActions}>
+																<Badge
+																	color={
+																		session.status === "live"
+																			? "primary"
+																			: session.status === "paused"
+																				? "warning"
+																				: "accent"
+																	}
+																	variant="soft"
+																>
+																	{session.status}
+																</Badge>
+																{canDrillProject && session.projectId ? (
+																	<button
+																		type="button"
+																		className={styles.sessionActionButton}
+																		onClick={() =>
+																			updateFilters({
+																				project: session.projectId || "",
+																				focus: "watchdog",
+																			})
+																		}
+																	>
+																		Project
+																	</button>
+																) : null}
+																{canDrillCollector ? (
+																	<button
+																		type="button"
+																		className={styles.sessionActionButton}
+																		onClick={() =>
+																			updateFilters({
+																				collector: session.collectorId,
+																				focus: "watchdog",
+																			})
+																		}
+																	>
+																		Collector
+																	</button>
+																) : null}
+															</div>
+														</div>
+														<div className={styles.sessionTimelineTrack}>
+															<div
+																className={`${styles.sessionTimelineBar} ${sessionStatusClass}`}
+																style={{
+																	left: `${row.leftPercent}%`,
+																	width: `${row.widthPercent}%`,
+																}}
+															/>
+														</div>
+														<div className={styles.sessionTimelineMeta}>
+															<span>
+																Started {formatRelativeTime(session.startedAt)}
+															</span>
+															<span>
+																Activity{" "}
+																{formatRelativeTime(
+																	session.lastActivityAt || session.latestEventAt,
+																)}
+															</span>
+															<span>{formatDuration(session.durationMs)}</span>
+															<span>{session.commandCount} command(s)</span>
+															<span>
+																Tracker {formatRelativeTime(row.trackerAt)}
+															</span>
+														</div>
+													</div>
+												);
+											})
+										)}
+									</div>
+								</div>
+
+								<div className={styles.subpanel}>
+									<Text size="xs" color="muted" className={styles.subpanelLabel}>
 										Recent CAD sessions
 									</Text>
 									<div className={styles.rowList}>
@@ -1265,8 +1434,10 @@ export function DashboardOverviewPanel({
 													type="button"
 													className={styles.projectRow}
 													onClick={() => {
-														updateFilter("project", entry.projectId);
-														updateFilter("focus", "watchdog");
+														updateFilters({
+															project: entry.projectId,
+															focus: "watchdog",
+														});
 													}}
 												>
 													<div>

@@ -1,17 +1,33 @@
-import type { CSSProperties } from "react";
 import { PROJECT_CATEGORIES } from "./projectmanagertypes";
 
 export const categoryColor = (cat: string | null | undefined): string =>
 	PROJECT_CATEGORIES.find((c) => c.key === (cat === "QAQC" ? "Standards" : cat))
 		?.color ?? "#a855f7";
 
-export const categoryBadgeStyle = (cat: string | null | undefined) => {
-	const color = categoryColor(cat);
-	return {
-		borderColor: color,
-		color,
-		backgroundColor: `${color}15`,
-	};
+export type ProjectCategoryTone =
+	| "coding"
+	| "substation"
+	| "standards"
+	| "school"
+	| "generic";
+
+export const normalizeProjectCategory = (
+	cat: string | null | undefined,
+): ProjectCategoryTone => {
+	const normalized =
+		cat === "QAQC" ? "standards" : String(cat || "").trim().toLowerCase();
+	switch (normalized) {
+		case "coding":
+			return "coding";
+		case "substation":
+			return "substation";
+		case "standards":
+			return "standards";
+		case "school":
+			return "school";
+		default:
+			return "generic";
+	}
 };
 
 export const formatDateOnly = (isoOrDateLike: string): string => {
@@ -45,21 +61,19 @@ export const getPriorityColor = (priority: string): string => {
 	}
 };
 
-export const getPriorityRowStyle = (priority: string): CSSProperties => {
-	const color = getPriorityColor(priority);
-	return {
-		border: `1px solid color-mix(in srgb, ${color} 28%, transparent)`,
-		background: `linear-gradient(135deg, color-mix(in srgb, ${color} 12%, transparent) 0%, color-mix(in srgb, var(--surface) 45%, transparent) 100%)`,
-	};
-};
+export type PriorityTone = "low" | "medium" | "high" | "urgent";
 
-export const getPriorityChipStyle = (priority: string): CSSProperties => {
-	const color = getPriorityColor(priority);
-	return {
-		border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`,
-		background: `color-mix(in srgb, ${color} 16%, transparent)`,
-		color: "var(--text)",
-	};
+export const getPriorityTone = (priority: string): PriorityTone => {
+	switch (priority) {
+		case "urgent":
+			return "urgent";
+		case "high":
+			return "high";
+		case "medium":
+			return "medium";
+		default:
+			return "low";
+	}
 };
 
 export type UrgencyTone = "none" | "danger" | "warning" | "success";

@@ -11,6 +11,48 @@
 	border-radius: var(--radius-3);
 	transition: box-shadow 120ms ease;
 	box-shadow: var(--shadow-sm);
+	border: 1px solid var(--line-soft);
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, var(--surface-2) 70%, transparent) 0%,
+		color-mix(in srgb, var(--surface) 90%, transparent) 100%
+	);
+}
+
+.rowLow {
+	border-color: color-mix(in srgb, var(--secondary) 28%, transparent);
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, var(--secondary) 10%, transparent) 0%,
+		color-mix(in srgb, var(--surface) 90%, transparent) 100%
+	);
+}
+
+.rowMedium {
+	border-color: color-mix(in srgb, var(--primary) 28%, transparent);
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, var(--primary) 10%, transparent) 0%,
+		color-mix(in srgb, var(--surface) 90%, transparent) 100%
+	);
+}
+
+.rowHigh {
+	border-color: color-mix(in srgb, var(--warning) 28%, transparent);
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, var(--warning) 10%, transparent) 0%,
+		color-mix(in srgb, var(--surface) 90%, transparent) 100%
+	);
+}
+
+.rowUrgent {
+	border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, var(--danger) 10%, transparent) 0%,
+		color-mix(in srgb, var(--surface) 90%, transparent) 100%
+	);
 }
 
 .dragHandle {
@@ -118,6 +160,30 @@
 	border-radius: var(--radius-1);
 	border: 1px solid transparent;
 	text-transform: capitalize;
+}
+
+.priorityChipLow {
+	border-color: color-mix(in srgb, var(--secondary) 42%, var(--border));
+	background: color-mix(in srgb, var(--secondary) 14%, transparent);
+	color: var(--text);
+}
+
+.priorityChipMedium {
+	border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+	color: var(--text);
+}
+
+.priorityChipHigh {
+	border-color: color-mix(in srgb, var(--warning) 42%, var(--border));
+	background: color-mix(in srgb, var(--warning) 14%, transparent);
+	color: var(--text);
+}
+
+.priorityChipUrgent {
+	border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+	background: color-mix(in srgb, var(--danger) 14%, transparent);
+	color: var(--text);
 }
 
 .actionIcon {

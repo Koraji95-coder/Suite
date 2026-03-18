@@ -3,9 +3,9 @@ import { cn } from "@/lib/utils";
 import styles from "./ProjectCard.module.css";
 import { type Project, type TaskCount } from "./projectmanagertypes";
 import {
-	categoryColor,
 	formatDateOnly,
-	getPriorityChipStyle,
+	getPriorityTone,
+	normalizeProjectCategory,
 } from "./projectmanagerutils";
 
 interface ProjectCardProps {
@@ -40,19 +40,39 @@ export function ProjectCard({
 		project.deadline &&
 		nextDue.date.split("T")[0] < project.deadline.split("T")[0];
 
+	const categoryTone = normalizeProjectCategory(project.category);
+	const priorityTone = getPriorityTone(project.priority);
+
+	const categoryToneClass =
+		categoryTone === "coding"
+			? styles.categoryCoding
+			: categoryTone === "substation"
+				? styles.categorySubstation
+				: categoryTone === "standards"
+					? styles.categoryStandards
+					: categoryTone === "school"
+						? styles.categorySchool
+						: styles.categoryGeneric;
+
+	const priorityToneClass =
+		priorityTone === "urgent"
+			? styles.priorityUrgent
+			: priorityTone === "high"
+				? styles.priorityHigh
+				: priorityTone === "medium"
+					? styles.priorityMedium
+					: styles.priorityLow;
+
 	return (
 		<div
 			onClick={() => onSelect(project)}
 			className={cn(styles.root, isSelected && styles.selected)}
 		>
-			<div className={styles.header}>
-				<div className={styles.identity}>
-					<div
-						className={styles.categoryDot}
-						style={{ backgroundColor: categoryColor(project.category) }}
-					/>
-					<h4 className={styles.title}>{project.name}</h4>
-				</div>
+				<div className={styles.header}>
+					<div className={styles.identity}>
+						<div className={cn(styles.categoryDot, categoryToneClass)} />
+						<h4 className={styles.title}>{project.name}</h4>
+					</div>
 				<div className={styles.actions}>
 					<button
 						onClick={(event) => {
@@ -83,10 +103,7 @@ export function ProjectCard({
 				) : (
 					<>
 						<span className={styles.statusText}>{project.status}</span>
-						<span
-							className={styles.priorityChip}
-							style={getPriorityChipStyle(project.priority)}
-						>
+						<span className={cn(styles.priorityChip, priorityToneClass)}>
 							{project.priority}
 						</span>
 					</>

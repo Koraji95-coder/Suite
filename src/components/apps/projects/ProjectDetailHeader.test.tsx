@@ -180,7 +180,7 @@ describe("ProjectDetailHeader", () => {
 		);
 
 		const link = screen.getByRole("link", {
-			name: /open project telemetry/i,
+			name: /go to dashboard/i,
 		}) as HTMLAnchorElement;
 		expect(link.getAttribute("href")).toBe(
 			"/app/dashboard?focus=watchdog&project=project-1",
@@ -200,10 +200,10 @@ describe("ProjectDetailHeader", () => {
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText("Project Telemetry")).toBeTruthy();
-		expect(screen.getByText("Drawing1.dwg")).toBeTruthy();
+		expect(screen.getByText(/project telemetry/i)).toBeTruthy();
+		expect(screen.getByText(/Drawing1\.dwg/i)).toBeTruthy();
 		expect(screen.getByText(/1 online/i)).toBeTruthy();
 		expect(screen.getByText(/2 roots • 2 patterns/i)).toBeTruthy();
-		expect(screen.getByText(/Open live telemetry in dashboard/i)).toBeTruthy();
+		expect(screen.getByText(/Go to dashboard/i)).toBeTruthy();
 	});
 });

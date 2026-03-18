@@ -15,8 +15,7 @@ import { cn } from "@/lib/utils";
 import { Task } from "./projectmanagertypes";
 import {
 	formatDateOnly,
-	getPriorityChipStyle,
-	getPriorityRowStyle,
+	getPriorityTone,
 	getUrgencyTone,
 } from "./projectmanagerutils";
 import styles from "./TaskItem.module.css";
@@ -48,6 +47,7 @@ export function TaskItem({
 }: TaskItemProps) {
 	const hasSubtasks = subtasks.length > 0;
 	const urgencyTone = getUrgencyTone(task.due_date);
+	const priorityTone = getPriorityTone(task.priority);
 
 	const {
 		attributes,
@@ -67,10 +67,15 @@ export function TaskItem({
 	return (
 		<div ref={setNodeRef} style={style} className={styles.root}>
 			<div
-				className={styles.row}
+				className={cn(
+					styles.row,
+					priorityTone === "urgent" && styles.rowUrgent,
+					priorityTone === "high" && styles.rowHigh,
+					priorityTone === "medium" && styles.rowMedium,
+					priorityTone === "low" && styles.rowLow,
+				)}
 				style={{
 					marginLeft: `${level * 24}px`,
-					...getPriorityRowStyle(task.priority),
 				}}
 			>
 				{!isProjectArchived && (
@@ -127,8 +132,13 @@ export function TaskItem({
 				</div>
 
 				<span
-					className={styles.priorityChip}
-					style={getPriorityChipStyle(task.priority)}
+					className={cn(
+						styles.priorityChip,
+						priorityTone === "urgent" && styles.priorityChipUrgent,
+						priorityTone === "high" && styles.priorityChipHigh,
+						priorityTone === "medium" && styles.priorityChipMedium,
+						priorityTone === "low" && styles.priorityChipLow,
+					)}
 				>
 					{task.priority}
 				</span>

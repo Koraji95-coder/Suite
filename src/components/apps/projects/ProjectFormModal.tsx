@@ -6,7 +6,7 @@ import {
 	ProjectFormData,
 	type ProjectStatus,
 } from "./projectmanagertypes";
-import { categoryColor } from "./projectmanagerutils";
+import { normalizeProjectCategory } from "./projectmanagerutils";
 
 interface ProjectFormModalProps {
 	isOpen: boolean;
@@ -25,6 +25,8 @@ export function ProjectFormModal({
 	setFormData,
 	isEditing,
 }: ProjectFormModalProps) {
+	const categoryTone = normalizeProjectCategory(formData.category || null);
+
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
 			<DialogContent className={styles.dialogContent}>
@@ -151,10 +153,18 @@ export function ProjectFormModal({
 					{formData.category && (
 						<div className={styles.categoryPreview}>
 							<div
-								className={styles.colorSwatch}
-								style={{
-									backgroundColor: categoryColor(formData.category || null),
-								}}
+								className={[
+									styles.colorSwatch,
+									categoryTone === "coding"
+										? styles.colorSwatchCoding
+										: categoryTone === "substation"
+											? styles.colorSwatchSubstation
+											: categoryTone === "standards"
+												? styles.colorSwatchStandards
+												: categoryTone === "school"
+													? styles.colorSwatchSchool
+													: styles.colorSwatchGeneric,
+								].join(" ")}
 							/>
 							<span className={styles.previewHint}>
 								Color auto-assigned from category

@@ -9,7 +9,7 @@ import {
 	type StatusFilter,
 	TaskCount,
 } from "./projectmanagertypes";
-import { categoryBadgeStyle } from "./projectmanagerutils";
+import { normalizeProjectCategory } from "./projectmanagerutils";
 
 interface ProjectListProps {
 	projects: Project[];
@@ -71,6 +71,21 @@ export function ProjectList({
 
 	const uncategorizedProjects = filteredProjects.filter((p) => !p.category);
 
+	const getGroupBadgeToneClass = (category: string | null | undefined) => {
+		switch (normalizeProjectCategory(category)) {
+			case "coding":
+				return styles.groupBadgeCoding;
+			case "substation":
+				return styles.groupBadgeSubstation;
+			case "standards":
+				return styles.groupBadgeStandards;
+			case "school":
+				return styles.groupBadgeSchool;
+			default:
+				return styles.uncategorizedBadge;
+		}
+	};
+
 	return (
 		<div className={styles.root}>
 			<h3 className={styles.title}>Projects</h3>
@@ -112,8 +127,10 @@ export function ProjectList({
 					<div key={group.cat.key} className={styles.group}>
 						<div className={styles.groupHeader}>
 							<span
-								className={styles.groupBadge}
-								style={categoryBadgeStyle(group.cat.key)}
+								className={cn(
+									styles.groupBadge,
+									getGroupBadgeToneClass(group.cat.key),
+								)}
 							>
 								{group.cat.key}
 							</span>

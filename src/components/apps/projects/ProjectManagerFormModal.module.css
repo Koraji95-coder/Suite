@@ -85,6 +85,26 @@
 	border: 1px solid color-mix(in srgb, var(--border) 95%, transparent);
 }
 
+.colorSwatchCoding {
+	background: var(--success);
+}
+
+.colorSwatchSubstation {
+	background: var(--primary);
+}
+
+.colorSwatchStandards {
+	background: var(--accent);
+}
+
+.colorSwatchSchool {
+	background: var(--warning);
+}
+
+.colorSwatchGeneric {
+	background: var(--secondary);
+}
+
 .previewHint {
 	font-size: 0.72rem;
 	color: var(--text-muted);

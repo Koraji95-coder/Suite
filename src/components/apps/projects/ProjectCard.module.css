@@ -2,7 +2,13 @@
 	padding: 0.82rem 0.9rem;
 	border-radius: var(--radius-3);
 	border: 1px solid var(--line-soft);
-	background: var(--surface);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 58%, transparent),
+			color-mix(in srgb, var(--surface) 94%, transparent)
+		),
+		var(--surface);
 	cursor: pointer;
 	transition:
 		transform 120ms ease,
@@ -14,6 +20,7 @@
 .root:hover {
 	transform: translateY(-1px);
 	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	box-shadow: var(--shadow-md);
 }
 
 .selected {
@@ -42,6 +49,28 @@
 	height: 0.7rem;
 	border-radius: 999px;
 	flex-shrink: 0;
+	border: 1px solid color-mix(in srgb, white 18%, transparent);
+	box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+.categoryCoding {
+	background: var(--success);
+}
+
+.categorySubstation {
+	background: var(--primary);
+}
+
+.categoryStandards {
+	background: var(--accent);
+}
+
+.categorySchool {
+	background: var(--warning);
+}
+
+.categoryGeneric {
+	background: var(--secondary);
 }
 
 .title {
@@ -99,6 +128,30 @@
 	border-radius: var(--radius-1);
 	border: 1px solid transparent;
 	text-transform: capitalize;
+}
+
+.priorityLow {
+	border-color: color-mix(in srgb, var(--secondary) 42%, var(--border));
+	background: color-mix(in srgb, var(--secondary) 14%, transparent);
+	color: var(--text);
+}
+
+.priorityMedium {
+	border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+	color: var(--text);
+}
+
+.priorityHigh {
+	border-color: color-mix(in srgb, var(--warning) 42%, var(--border));
+	background: color-mix(in srgb, var(--warning) 14%, transparent);
+	color: var(--text);
+}
+
+.priorityUrgent {
+	border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+	background: color-mix(in srgb, var(--danger) 14%, transparent);
+	color: var(--text);
 }
 
 .dueText {

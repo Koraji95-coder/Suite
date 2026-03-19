@@ -1,0 +1,115 @@
+.root {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.56rem;
+}
+
+.rootSm {
+	gap: 0.44rem;
+}
+
+.rootLg {
+	gap: 0.72rem;
+}
+
+.mark {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.82rem;
+	border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line-soft));
+	background:
+		linear-gradient(
+			150deg,
+			color-mix(in srgb, var(--primary) 24%, transparent),
+			color-mix(in srgb, var(--accent) 20%, transparent)
+		),
+		color-mix(in srgb, var(--surface) 90%, transparent);
+	box-shadow: 0 10px 22px rgb(0 0 0 / 22%);
+}
+
+.rootSm .mark {
+	width: 1.42rem;
+	height: 1.42rem;
+}
+
+.rootMd .mark {
+	width: 1.68rem;
+	height: 1.68rem;
+}
+
+.rootLg .mark {
+	width: 2.02rem;
+	height: 2.02rem;
+}
+
+.markCore {
+	position: relative;
+	width: 68%;
+	height: 68%;
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--surface) 86%, transparent);
+	border: 1px solid color-mix(in srgb, var(--line-soft) 85%, transparent);
+}
+
+.markStrokeTop,
+.markStrokeBottom {
+	position: absolute;
+	left: 16%;
+	width: 68%;
+	height: 0.19rem;
+	border-radius: 999px;
+}
+
+.markStrokeTop {
+	top: 32%;
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--primary) 86%, white 14%),
+		color-mix(in srgb, var(--accent) 78%, white 22%)
+	);
+	transform: rotate(-14deg);
+}
+
+.markStrokeBottom {
+	top: 56%;
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--accent) 78%, white 22%),
+		color-mix(in srgb, var(--primary) 86%, white 14%)
+	);
+	transform: rotate(14deg);
+}
+
+.labelWrap {
+	display: inline-grid;
+	gap: 0.04rem;
+}
+
+.label {
+	line-height: 1;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	color: var(--text);
+}
+
+.rootSm .label {
+	font-size: 0.82rem;
+}
+
+.rootMd .label {
+	font-size: 0.9rem;
+}
+
+.rootLg .label {
+	font-size: 1.06rem;
+}
+
+.subLabel {
+	font-size: 0.62rem;
+	line-height: 1;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}

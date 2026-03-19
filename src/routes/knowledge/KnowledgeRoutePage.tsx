@@ -11,15 +11,15 @@ export default function KnowledgeRoutePage() {
 			maxWidth="xl"
 		>
 			<Section
-				title="Math & Reference Library"
-				description="Calculators, plots, and references aligned with your engineering playbook."
+				title="Knowledge workspaces"
+				description="Open the engineering tools and references used by your current workflows."
 			>
 				<div className={styles.libraryGrid}>
 					<article className={styles.libraryCard}>
-						<h3 className={styles.libraryTitle}>Math & Reference Library</h3>
+						<h3 className={styles.libraryTitle}>Math tools</h3>
 						<p className={styles.libraryDescription}>
-							Calcs, plots, and formula banks that power drafting, grounding,
-							and analysis.
+							Calculators, plots, and formula references for drafting,
+							grounding, and electrical analysis.
 						</p>
 						<Link
 							to="/app/knowledge/math-tools"

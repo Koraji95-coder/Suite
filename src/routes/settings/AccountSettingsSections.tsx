@@ -5,9 +5,7 @@ import {
 	Database,
 	HardDrive,
 	KeyRound,
-	Loader2,
 	LogOut,
-	RefreshCw,
 	Save,
 	Settings2,
 	Shield,
@@ -15,7 +13,7 @@ import {
 	User,
 } from "lucide-react";
 import { Badge } from "@/components/primitives/Badge";
-import { Button, IconButton } from "@/components/primitives/Button";
+import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
@@ -359,20 +357,17 @@ export function AccountAgentPairingSection({
 						</Button>
 					)}
 
-					<IconButton
-						icon={
-							agentLoading ? (
-								<Loader2 size={14} className={styles.spin} />
-							) : (
-								<RefreshCw size={14} />
-							)
-						}
-						aria-label="Refresh status"
-						variant="ghost"
-						size="sm"
-						disabled={agentLoading}
-						onClick={() => void onRefreshAgentStatus()}
-					/>
+					{(agentHealthy !== true || Boolean(effectiveAgentError)) && (
+						<Button
+							variant="ghost"
+							size="sm"
+							disabled={agentLoading}
+							onClick={() => void onRefreshAgentStatus()}
+							className={styles.agentActionButton}
+						>
+							{agentLoading ? "Checking..." : "Check gateway"}
+						</Button>
+					)}
 				</div>
 
 				{effectiveAgentError && (

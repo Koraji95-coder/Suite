@@ -5,6 +5,7 @@ import { APP_NAME, APP_TAGLINE } from "@/appMeta";
 import { AgentPixelMark } from "@/components/agent/AgentPixelMark";
 import { AGENT_PROFILES } from "@/components/agent/agentProfiles";
 import type { AgentProfileId } from "@/components/agent/agentProfiles";
+import { SuiteLogo } from "@/components/brand/SuiteLogo";
 import { Button } from "@/components/primitives/Button";
 import { HStack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
@@ -19,22 +20,12 @@ type AuthShellProps = {
 	cardStyle?: CSSProperties;
 };
 
-const FLOATING_MARKS: {
-	id: AgentProfileId;
-	size: number;
-	top: string;
-	left: string;
-	delay: string;
-}[] = [
-	{ id: "koro", size: 68, top: "22%", left: "50%", delay: "0s" },
-	{ id: "devstral", size: 34, top: "56%", left: "24%", delay: "0.45s" },
-	{ id: "forge", size: 28, top: "72%", left: "68%", delay: "0.95s" },
-];
+const AUTH_HEADER_AGENT_IDS: AgentProfileId[] = ["koro", "devstral", "forge"];
 
 const ACCESS_SIGNALS = [
-	{ label: "Authentication", value: "Passwordless sign-in + passkeys" },
-	{ label: "Session", value: "Redirect-verified workspace access" },
-	{ label: "Profiles", value: "Profile-driven operations context" },
+	{ label: "Authentication", value: "Passkeys, email links, and trusted sessions" },
+	{ label: "Verification", value: "Brokered pairing when agent trust is required" },
+	{ label: "Scope", value: "Projects, telemetry, and operations context" },
 ] as const;
 
 export default function AuthShell({
@@ -55,13 +46,7 @@ export default function AuthShell({
 					className={styles.brandLink}
 					aria-label={`${APP_NAME} home`}
 				>
-					<AgentPixelMark
-						profileId="koro"
-						size={28}
-						detailLevel="hero"
-						expression="neutral"
-					/>
-					<span className={styles.brandName}>{APP_NAME}</span>
+					<SuiteLogo variant="compact" size="md" />
 				</Link>
 
 				<div className={styles.navRight}>
@@ -91,32 +76,12 @@ export default function AuthShell({
 							<div className={styles.leftPanelContent}>
 								<div className={styles.leftEyebrow}>Operations access</div>
 
-								<div className={styles.floatArea}>
-									{FLOATING_MARKS.map((mark) => (
-										<div
-											key={mark.id}
-											className={styles.floatMark}
-											style={{
-												top: mark.top,
-												left: mark.left,
-												transform: "translate(-50%, -50%)",
-												animationDelay: mark.delay,
-											}}
-										>
-											<AgentPixelMark
-												profileId={mark.id}
-												size={mark.size}
-												detailLevel="hero"
-												expression={mark.id === "koro" ? "active" : "neutral"}
-											/>
-										</div>
-									))}
-									<div className={styles.floatSpacer} aria-hidden="true" />
-								</div>
-
 								<div className={styles.brandBlock}>
+									<div className={styles.brandLogoWrap}>
+										<SuiteLogo variant="full" size="lg" />
+									</div>
 									<Text size="xl" weight="semibold" block>
-										{APP_NAME}
+										Operations access
 									</Text>
 									<Text
 										size="sm"
@@ -155,11 +120,11 @@ export default function AuthShell({
 									Workspace authentication
 								</Text>
 								<HStack gap={2} className={styles.agentBadgeRow} wrap>
-									{FLOATING_MARKS.map((mark) => (
-										<div key={mark.id} className={styles.agentBadge}>
+									{AUTH_HEADER_AGENT_IDS.map((id) => (
+										<div key={id} className={styles.agentBadge}>
 											<AgentPixelMark
-												profileId={mark.id}
-												size={12}
+												profileId={id}
+												size={14}
 												detailLevel="hero"
 											/>
 											<Text
@@ -167,7 +132,7 @@ export default function AuthShell({
 												color="muted"
 												className={styles.agentName}
 											>
-												{AGENT_PROFILES[mark.id].name}
+												{AGENT_PROFILES[id].name}
 											</Text>
 										</div>
 									))}

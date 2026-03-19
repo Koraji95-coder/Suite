@@ -1,21 +1,13 @@
 // src/routes/LandingPage.tsx
 
-import {
-	Activity,
-	ArrowRight,
-	CalendarDays,
-	FolderOpen,
-	Layers,
-	Sparkles,
-	Workflow,
-	Zap,
-} from "lucide-react";
+import { Activity, Sparkles, Workflow } from "lucide-react";
 import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { buildAgentPairingSearchFromLocation } from "@/auth/agentPairingParams";
-import { APP_NAME, APP_TAGLINE } from "../appMeta";
+import { APP_TAGLINE } from "../appMeta";
 import { AgentPixelMark } from "../components/agent/AgentPixelMark";
+import { SuiteLogo } from "../components/brand/SuiteLogo";
 import {
 	AGENT_PROFILE_IDS,
 	AGENT_PROFILES,
@@ -27,66 +19,22 @@ import { HStack } from "../components/primitives/Stack";
 import { Text } from "../components/primitives/Text";
 import styles from "./LandingPage.module.css";
 
-const FEATURES = [
-	{
-		icon: FolderOpen,
-		title: "Project Manager",
-		description:
-			"Track projects, tasks, deliverables, and document control in a unified workspace.",
-		to: "/app/projects",
-	},
-	{
-		icon: Sparkles,
-		title: "Agents",
-		description:
-			"Profile-driven orchestration for drafting, QA, and operations decisions.",
-		to: "/app/agent",
-	},
-	{
-		icon: CalendarDays,
-		title: "Calendar & Planning",
-		description:
-			"Drag-and-drop scheduling with urgency tracking and deadline visibility.",
-		to: "/app/calendar",
-	},
-	{
-		icon: Layers,
-		title: "Engineering Apps",
-		description:
-			"Ground grid generator, drawing list manager, transmittal builder, and more.",
-		to: "/app/apps",
-	},
-	{
-		icon: Zap,
-		title: "Math & Knowledge",
-		description:
-			"Three-phase calculators, formula banks, circuit generators, and IEEE/NEC references.",
-		to: "/app/knowledge",
-	},
-	{
-		icon: Activity,
-		title: "Operational telemetry",
-		description:
-			"Collector health, CAD sessions, and event activity aligned with project delivery.",
-		to: "/app/dashboard",
-	},
-] as const;
 const AGENT_IDS = AGENT_PROFILE_IDS;
 const COMMAND_SIGNALS = [
 	{
 		icon: Activity,
 		label: "Live telemetry",
-		value: "Watchdog + sessions",
+		value: "Watchdog sessions, collectors, and runtime health",
 	},
 	{
 		icon: Workflow,
 		label: "Ops flow",
-		value: "Projects, tasks, deadlines",
+		value: "Projects, tasks, deadlines, and delivery scope",
 	},
 	{
 		icon: Sparkles,
 		label: "Agent coordination",
-		value: "Profile-driven execution",
+		value: "Agents, engineering apps, and shared context",
 	},
 ] as const;
 
@@ -121,13 +69,7 @@ export default function LandingPage() {
 			<nav className={styles.nav}>
 				<div className={styles.navContainer}>
 					<Link to="/" className={styles.brandLink}>
-						<AgentPixelMark
-							profileId="koro"
-							size={24}
-							detailLevel="hero"
-							expression="neutral"
-						/>
-						<span className={styles.brandLabel}>{APP_NAME}</span>
+						<SuiteLogo variant="compact" size="md" />
 					</Link>
 
 					<HStack gap={2} align="center">
@@ -153,7 +95,7 @@ export default function LandingPage() {
 								className={styles.heroBadge}
 							>
 								<span className={styles.heroBadgeDot} />
-								Engineering operations workspace
+								Engineering operations
 							</Badge>
 
 							<h1 className={styles.heroTitle}>
@@ -193,78 +135,6 @@ export default function LandingPage() {
 								</Link>
 							</HStack>
 						</div>
-
-						<div className={styles.heroRight}>
-							<div className={styles.mainAgentWrap}>
-								<div className={styles.heroOrbit} aria-hidden="true" />
-								<div className={styles.mainAgentInner}>
-									<div className={styles.mainAgentGlow} />
-									<div className={styles.mainAgentFloat}>
-										<AgentPixelMark
-											profileId="koro"
-											size={120}
-											detailLevel="hero"
-											expression="active"
-										/>
-									</div>
-								</div>
-
-								<HStack
-									gap={3}
-									className={styles.heroSecondaryRow}
-									justify="center"
-								>
-									{AGENT_IDS.filter((id) => id !== "koro")
-										.slice(0, 2)
-										.map((id) => (
-											<div key={id} className={styles.heroSecondaryAgent}>
-												<AgentPixelMark
-													profileId={id}
-													size={28}
-													detailLevel="hero"
-												/>
-											</div>
-										))}
-								</HStack>
-
-								<div className={styles.heroAgentCaption}>
-									Agent mesh with profile-specific memory and routing
-								</div>
-							</div>
-						</div>
-					</div>
-				</section>
-
-				<section className={styles.featuresSection}>
-					<div className={styles.sectionHeading}>
-						<Text as="h2" size="lg" weight="semibold" block>
-							Workspace modules
-						</Text>
-						<Text size="sm" color="muted" className={styles.sectionCopy} block>
-							A cohesive operating layer across planning, delivery, and
-							engineering execution.
-						</Text>
-					</div>
-					<div className={styles.featuresGrid}>
-						{FEATURES.map((f) => (
-							<Link key={f.title} to={f.to} className={styles.featureCard}>
-								<div className={styles.featureIconWrap}>
-									<f.icon className={styles.featureIcon} />
-								</div>
-								<Text as="h3" size="sm" weight="semibold" block>
-									{f.title}
-								</Text>
-								<Text
-									size="xs"
-									color="muted"
-									className={styles.featureCopy}
-									block
-								>
-									{f.description}
-								</Text>
-								<ArrowRight className={styles.featureArrow} />
-							</Link>
-						))}
 					</div>
 				</section>
 
@@ -327,10 +197,7 @@ export default function LandingPage() {
 
 				<footer className={styles.footer}>
 					<HStack gap={2} align="center" className={styles.footerBrand}>
-						<AgentPixelMark profileId="koro" size={16} detailLevel="hero" />
-						<Text size="xs" color="muted">
-							{APP_NAME}
-						</Text>
+						<SuiteLogo variant="compact" size="sm" />
 					</HStack>
 
 					<HStack gap={4} className={styles.footerLinks}>

@@ -102,10 +102,10 @@ export default function AgentRoutePage() {
 				<div className={styles.surfaceHeader}>
 					<div>
 						<p className={styles.eyebrow}>Command surface</p>
-						<h2 className={styles.surfaceTitle}>Agent operations</h2>
+						<h2 className={styles.surfaceTitle}>Agents</h2>
 						<p className={styles.surfaceCopy}>
-							Manage route health, pairing state, and live orchestration in one
-							control lane.
+							Monitor gateway health, pairing state, and orchestration
+							readiness from one route.
 						</p>
 					</div>
 					<div className={styles.surfaceChips}>
@@ -164,16 +164,18 @@ export default function AgentRoutePage() {
 						</span>
 					</div>
 
-					<div className={styles.actions}>
-						<button
-							type="button"
-							onClick={() => void refreshConnectionState()}
-							className={styles.button}
-						>
-							<RefreshCw className={styles.buttonIcon} />
-							Refresh state
-						</button>
-					</div>
+					{statusState !== "online" || Boolean(connectionError) ? (
+						<div className={styles.actions}>
+							<button
+								type="button"
+								onClick={() => void refreshConnectionState()}
+								className={styles.button}
+							>
+								<RefreshCw className={styles.buttonIcon} />
+								Retry check
+							</button>
+						</div>
+					) : null}
 				</div>
 				{connectionError ? (
 					<p className={styles.errorText}>{connectionError}</p>
@@ -182,7 +184,7 @@ export default function AgentRoutePage() {
 					<p className={styles.hintText}>
 						Start or restart the local gateway with{" "}
 						<code className={styles.inlineCode}>npm run gateway:dev</code>, then
-						click Refresh state.
+						retry the route check.
 					</p>
 				) : null}
 			</section>

@@ -117,14 +117,14 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 	},
 	{
 		id: "graph-explorer",
-		title: "Graph Explorer",
+		title: "Architecture Graph",
 		description:
-			"Visualize architecture modules and agent memory graph relationships.",
+			"Alternate node-link view for architecture modules and agent memory relationships.",
 		to: "/app/apps/graph",
 		status: "active",
 		icon: CircuitBoard,
 		lane: "intelligence",
-		signal: "Repo graph",
+		signal: "Architecture graph",
 	},
 	{
 		id: "batch-find-replace",
@@ -150,7 +150,7 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 	},
 	{
 		id: "agent",
-		title: "Agent Studio",
+		title: "Agents",
 		description:
 			"Pair and run profile-based AI workflows with deterministic model routing.",
 		to: "/app/agent",

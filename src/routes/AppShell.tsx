@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { APP_NAME } from "../appMeta";
 import { useAuth } from "../auth/useAuth";
+import { SuiteLogo } from "../components/brand/SuiteLogo";
 import {
 	PageHeaderProvider,
 	usePageHeader,
@@ -286,15 +287,7 @@ function SidebarBrand() {
 			className={styles.brandLink}
 			aria-label="Go to dashboard"
 		>
-			<div className={styles.brandMark}>
-				<span className={styles.brandCell} />
-				<span className={styles.brandCell} />
-				<span className={styles.brandCell} />
-				<span className={styles.brandCell} />
-			</div>
-			<Text size="lg" weight="semibold" className={styles.brandText}>
-				{APP_NAME}
-			</Text>
+			<SuiteLogo variant="compact" size="md" />
 		</NavLink>
 	);
 }

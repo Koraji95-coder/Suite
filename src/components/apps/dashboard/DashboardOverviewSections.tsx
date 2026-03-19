@@ -583,7 +583,7 @@ export function DashboardArchitectureSection({
 						Repository Architecture
 					</Text>
 					<Text size="xs" color="muted">
-						Hotspots, domains, and generated checkpoint candidates from the latest repo scan.
+						Hotspots from the latest repo scan plus a curated checkpoint watchlist.
 					</Text>
 				</div>
 				<div className={styles.architectureActions}>
@@ -657,7 +657,7 @@ export function DashboardArchitectureSection({
 
 			<div className={styles.sectionBlock}>
 				<Text size="xs" color="muted" className={styles.subpanelLabel}>
-					Generated checkpoint candidates
+					Checkpoint watchlist
 				</Text>
 				<div className={styles.rowList}>
 					{filteredFixCandidates.map((candidate) => (
@@ -1241,11 +1241,9 @@ interface DashboardProjectOperationsSectionProps {
 	loadProgress: number;
 	filteredProjects: DashboardProject[];
 	projectTaskCounts: ReadonlyMap<string, DashboardTaskCount>;
-	telemetryHotspotProjects: Array<{ projectId: string; eventCount: number }>;
 	allProjectsMap: ReadonlyMap<string, DashboardProject>;
 	filteredActivities: ActivityLogRow[];
 	handleNavigateToProject: (projectId: string) => void;
-	updateFilters: (updates: Record<string, string>) => void;
 }
 
 export function DashboardProjectOperationsSection({
@@ -1256,11 +1254,9 @@ export function DashboardProjectOperationsSection({
 	loadProgress,
 	filteredProjects,
 	projectTaskCounts,
-	telemetryHotspotProjects,
 	allProjectsMap,
 	filteredActivities,
 	handleNavigateToProject,
-	updateFilters,
 }: DashboardProjectOperationsSectionProps) {
 	return (
 		<Panel
@@ -1276,7 +1272,7 @@ export function DashboardProjectOperationsSection({
 						Project Operations
 					</Text>
 					<Text size="xs" color="muted">
-						Deadlines, task health, and recent activity for the selected scope.
+						Deadlines, task health, and recent human activity for the selected scope.
 					</Text>
 				</div>
 				{isLoading && (
@@ -1317,53 +1313,6 @@ export function DashboardProjectOperationsSection({
 							);
 						})}
 					</div>
-
-					<div className={styles.sectionBlock}>
-						<Text size="xs" color="muted" className={styles.subpanelLabel}>
-							High-activity projects
-						</Text>
-						<div className={styles.rowList}>
-							{telemetryHotspotProjects.length === 0 ? (
-								<div className={styles.emptyStateCompact}>
-									No project telemetry hotspots matched the current filters.
-								</div>
-							) : (
-								telemetryHotspotProjects.map((entry) => {
-									const hotspotProject =
-										allProjectsMap.get(entry.projectId) ?? null;
-									return (
-										<button
-											key={entry.projectId}
-											type="button"
-											className={styles.projectRow}
-											onClick={() =>
-												updateFilters({
-													project: entry.projectId,
-													focus: "watchdog",
-												})
-											}
-										>
-											<div>
-												<div className={styles.dataRowTitle}>
-													{hotspotProject?.name ?? entry.projectId}
-												</div>
-												<div className={styles.dataRowMeta}>
-													{hotspotProject
-														? `${hotspotProject.status} • ${hotspotProject.priority}`
-														: "Project telemetry focus"}
-												</div>
-											</div>
-											<div className={styles.projectRowAside}>
-												<span>{entry.eventCount} events</span>
-												<ArrowUpRight size={14} />
-											</div>
-										</button>
-									);
-								})
-							)}
-						</div>
-					</div>
-
 					<div className={styles.sectionBlock}>
 						<Text size="xs" color="muted" className={styles.subpanelLabel}>
 							Recent activity

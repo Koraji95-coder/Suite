@@ -389,7 +389,7 @@ export function useProjectManagerState({
 			const payload: Database["public"]["Tables"]["projects"]["Insert"] = {
 				...projectForm,
 				deadline: toDateOnly(projectForm.deadline) || null,
-				category: projectForm.category || "Uncategorized",
+				category: projectForm.category || "Other",
 				color: projectForm.category
 					? categoryColor(projectForm.category)
 					: categoryColor(null),
@@ -431,7 +431,7 @@ export function useProjectManagerState({
 			const payload: Database["public"]["Tables"]["projects"]["Update"] = {
 				...projectForm,
 				deadline: toDateOnly(projectForm.deadline) || null,
-				category: projectForm.category || "Uncategorized",
+				category: projectForm.category || "Other",
 				color: projectForm.category
 					? categoryColor(projectForm.category)
 					: categoryColor(null),

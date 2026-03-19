@@ -1,6 +1,5 @@
 // src/components/apps/ground-grid/GroundGridContext.tsx
 import { createContext, useCallback, useContext, useState } from "react";
-import { useToast } from "@/components/notification-system/ToastProvider";
 import {
 	type GroundGridLiveBackendStatus,
 	useGroundGridBackendBridge,
@@ -40,7 +39,6 @@ export function GroundGridProvider({
 }: {
 	children: React.ReactNode;
 }) {
-	const { showToast } = useToast();
 	const [logs, setLogs] = useState<LogEntry[]>([]);
 
 	const addLog = useCallback((source: LogEntry["source"], message: string) => {
@@ -62,7 +60,6 @@ export function GroundGridProvider({
 		wsLive,
 	} = useGroundGridBackendBridge({
 		addLog,
-		showToast,
 	});
 
 	return (

@@ -207,6 +207,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 0.5rem;
+	flex-wrap: wrap;
 }
 
 .statusError {
@@ -214,20 +215,38 @@
 	color: var(--warning);
 }
 
+.degradedBadge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0.2rem 0.45rem;
+	border-radius: 999px;
+	border: 1px solid color-mix(in oklab, var(--warning) 45%, var(--border));
+	background: color-mix(in oklab, var(--warning) 12%, transparent);
+	color: color-mix(in oklab, var(--warning) 82%, var(--text));
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
 .reconnectButton {
-	border: 0;
-	border-radius: 0.35rem;
-	padding: 0.35rem 0.6rem;
-	font-size: 0.75rem;
+	border: 1px solid color-mix(in oklab, var(--border) 70%, var(--primary));
+	border-radius: 0.45rem;
+	padding: 0.25rem 0.5rem;
+	font-size: 0.7rem;
 	font-weight: 600;
-	background: linear-gradient(
-			130deg,
-			color-mix(in srgb, var(--accent) 25%, transparent),
-			color-mix(in srgb, var(--surface-2) 40%, transparent)
-		);
-	color: var(--text);
+	background: color-mix(in oklab, var(--surface-2) 85%, transparent);
+	color: var(--text-muted);
 	cursor: pointer;
-	transition: opacity 120ms ease;
+	transition:
+		opacity 120ms ease,
+		color 120ms ease,
+		border-color 120ms ease;
+}
+
+.reconnectButton:hover:not(:disabled) {
+	color: var(--text);
+	border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
 }
 
 .reconnectButton:disabled {

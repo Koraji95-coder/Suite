@@ -36,8 +36,8 @@ export default function ArchitectureMapRoutePage() {
 							<Text size="xs" color="muted" className={styles.routeHeroText}>
 								Domain boundaries, dependency pressure, and staged refactor
 								checkpoints live in this primary map-first workspace. When you
-								need a lightweight node-link exploration, open the Graph
-								Explorer compatibility view on the same data model.
+								need a lightweight node-link exploration, open the Architecture
+								Graph compatibility view on the same data model.
 							</Text>
 						</div>
 						<div className={styles.routeHeroBadges}>
@@ -49,7 +49,7 @@ export default function ArchitectureMapRoutePage() {
 							</Badge>
 							<Link to="/app/apps/graph?source=architecture">
 								<Button size="sm" variant="secondary">
-									Open Graph Explorer
+									Open Architecture Graph
 								</Button>
 							</Link>
 						</div>
@@ -65,7 +65,7 @@ export default function ArchitectureMapRoutePage() {
 							<div className={styles.routeStatValue}>
 								{ARCHITECTURE_FIX_CANDIDATES.length}
 							</div>
-							<div className={styles.routeStatLabel}>Refactor checkpoints</div>
+							<div className={styles.routeStatLabel}>Checkpoint watchlist</div>
 						</div>
 					</div>
 				</Panel>

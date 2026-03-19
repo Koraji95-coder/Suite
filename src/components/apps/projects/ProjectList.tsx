@@ -68,10 +68,17 @@ export function ProjectList({
 
 	const categorizedProjects = PROJECT_CATEGORIES.map((cat) => ({
 		cat,
-		items: filteredProjects.filter((p) => p.category === cat.key),
+		items: filteredProjects.filter((p) => {
+			if (cat.key === "Other") {
+				return (
+					!p.category ||
+					p.category.trim().length === 0 ||
+					p.category.toLowerCase() === "uncategorized"
+				);
+			}
+			return p.category === cat.key;
+		}),
 	})).filter((group) => group.items.length > 0);
-
-	const uncategorizedProjects = filteredProjects.filter((p) => !p.category);
 
 	const getGroupBadgeToneClass = (category: string | null | undefined) => {
 		switch (normalizeProjectCategory(category)) {
@@ -158,35 +165,6 @@ export function ProjectList({
 						</div>
 					</div>
 				))}
-
-				{uncategorizedProjects.length > 0 && (
-					<div className={styles.group}>
-						<div className={styles.groupHeader}>
-							<span
-								className={cn(styles.groupBadge, styles.uncategorizedBadge)}
-							>
-								Uncategorized
-							</span>
-							<span className={styles.groupCount}>
-								({uncategorizedProjects.length}{" "}
-								{uncategorizedProjects.length === 1 ? "project" : "projects"})
-							</span>
-						</div>
-						<div className={styles.cards}>
-							{uncategorizedProjects.map((project) => (
-								<ProjectCard
-									key={project.id}
-									project={project}
-									isSelected={selectedProject?.id === project.id}
-									taskInfo={projectTaskCounts.get(project.id)}
-									onSelect={onSelectProject}
-									onEdit={onEditProject}
-									onDelete={onDeleteProject}
-								/>
-							))}
-						</div>
-					</div>
-				)}
 
 				{filteredProjects.length === 0 && (
 					<div className={styles.emptyState}>

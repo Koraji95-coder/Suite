@@ -18,6 +18,10 @@
 	align-items: center;
 }
 
+.storageHint {
+	margin-top: 0.2rem;
+}
+
 .statsGrid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

@@ -24,7 +24,7 @@ export default function AppsRoutePage() {
 				<div className={styles.hero}>
 					<div className={styles.heroIntro}>
 						<div>
-							<p className={styles.eyebrow}>Workspace modules</p>
+							<p className={styles.eyebrow}>Engineering apps</p>
 							<h2 className={styles.heroTitle}>
 								One launch surface for projects, automation, and intelligence.
 							</h2>
@@ -41,7 +41,7 @@ export default function AppsRoutePage() {
 							</Link>
 							<Link to="/app/agent" className={styles.heroLinkSecondary}>
 								<Bot className={styles.heroLinkIcon} />
-								<span>Open Agent Studio</span>
+								<span>Open Agents</span>
 							</Link>
 						</div>
 					</div>

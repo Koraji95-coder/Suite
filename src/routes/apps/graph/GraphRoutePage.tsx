@@ -49,8 +49,8 @@ export default function GraphRoutePage() {
 
 	return (
 		<PageFrame
-			title="Graph Explorer"
-			description="Node-link view aligned with the same architecture + agent-memory model as Architecture Map."
+			title="Architecture Graph"
+			description="Alternate node-link view over the same architecture and memory model used by Architecture Map."
 			maxWidth="full"
 		>
 			<div className={styles.root}>
@@ -58,7 +58,7 @@ export default function GraphRoutePage() {
 					<div className={styles.heroHeader}>
 						<div>
 							<Text size="sm" weight="semibold">
-								Graph Explorer (Compatibility View)
+								Architecture Graph (Compatibility View)
 							</Text>
 							<Text size="xs" color="muted" className={styles.summaryText}>
 								Use this node-link visualization for targeted exploration while
@@ -73,9 +73,9 @@ export default function GraphRoutePage() {
 							<Badge color="accent" variant="soft">
 								Agent memory
 							</Badge>
-							<Link to="/app/architecture?focus=hotspots">
+							<Link to="/app/architecture">
 								<Button size="sm" variant="secondary">
-									Open Architecture Map
+									Open architecture workspace
 								</Button>
 							</Link>
 						</div>

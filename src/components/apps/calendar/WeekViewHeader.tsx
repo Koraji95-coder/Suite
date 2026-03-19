@@ -9,7 +9,12 @@ interface WeekViewHeaderProps {
 }
 
 function getTimezoneBadgeLabel(now: Date): string {
-	const offsetLabel = format(now, "O");
+	const offsetMinutes = -now.getTimezoneOffset();
+	const sign = offsetMinutes >= 0 ? "+" : "-";
+	const absMinutes = Math.abs(offsetMinutes);
+	const offsetHours = String(Math.floor(absMinutes / 60)).padStart(2, "0");
+	const offsetRemainder = String(absMinutes % 60).padStart(2, "0");
+	const offsetLabel = `UTC${sign}${offsetHours}:${offsetRemainder}`;
 	const timeZoneName = Intl.DateTimeFormat(undefined, {
 		timeZoneName: "short",
 	})
@@ -17,7 +22,7 @@ function getTimezoneBadgeLabel(now: Date): string {
 		.find((part) => part.type === "timeZoneName")
 		?.value;
 	return timeZoneName
-		? `Local (${timeZoneName} • ${offsetLabel})`
+		? `Local time (${timeZoneName} • ${offsetLabel})`
 		: `Local (${offsetLabel})`;
 }
 

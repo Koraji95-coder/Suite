@@ -270,6 +270,7 @@ export function DashboardOverviewPanel({
 	const [worktaleReadinessError, setWorktaleReadinessError] =
 		useState<string | null>(null);
 	const [telemetryLoading, setTelemetryLoading] = useState(true);
+	const initialFocusAppliedRef = useRef(false);
 	const watchdogSectionRef = useRef<HTMLDivElement | null>(null);
 	const architectureSectionRef = useRef<HTMLDivElement | null>(null);
 	const ledgerSectionRef = useRef<HTMLDivElement | null>(null);
@@ -494,6 +495,10 @@ export function DashboardOverviewPanel({
 	}, [loadLedgerSuggestions]);
 
 	useEffect(() => {
+		if (!selectedFocus || initialFocusAppliedRef.current) {
+			return;
+		}
+
 		const focusMap = {
 			watchdog: watchdogSectionRef,
 			architecture: architectureSectionRef,
@@ -503,6 +508,7 @@ export function DashboardOverviewPanel({
 		};
 		const targetRef = selectedFocus ? focusMap[selectedFocus] : null;
 		if (!targetRef?.current) return;
+		initialFocusAppliedRef.current = true;
 
 		const frame = window.requestAnimationFrame(() => {
 			targetRef.current?.scrollIntoView({
@@ -900,10 +906,10 @@ export function DashboardOverviewPanel({
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => navigate("/app/apps/graph")}
+						onClick={() => navigate("/app/architecture")}
 						iconRight={<ArrowUpRight size={14} />}
 					>
-						Graph Explorer
+						Architecture Map
 					</Button>
 					<Button
 						variant="secondary"
@@ -1177,11 +1183,9 @@ export function DashboardOverviewPanel({
 						loadProgress={loadProgress}
 						filteredProjects={filteredProjects}
 						projectTaskCounts={projectTaskCounts}
-						telemetryHotspotProjects={telemetryHotspotProjects}
 						allProjectsMap={allProjectsMap}
 						filteredActivities={filteredActivities}
 						handleNavigateToProject={handleNavigateToProject}
-						updateFilters={updateFilters}
 					/>
 				</div>
 			</div>

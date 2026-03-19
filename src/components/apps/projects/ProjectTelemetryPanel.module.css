@@ -262,6 +262,15 @@
 	gap: 0.75rem;
 }
 
+.ruleSummaryCard {
+	display: grid;
+	gap: 0.28rem;
+	padding: 0.72rem 0.78rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
 .detailLabel {
 	font-size: 0.75rem;
 	text-transform: uppercase;
@@ -272,4 +281,10 @@
 .detailValue {
 	font-size: 0.9rem;
 	color: var(--text);
+}
+
+.ruleMeta {
+	grid-column: 1 / -1;
+	font-size: 0.78rem;
+	color: var(--text-muted);
 }

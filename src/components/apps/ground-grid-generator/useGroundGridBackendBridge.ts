@@ -11,10 +11,6 @@ export interface GroundGridLiveBackendStatus {
 
 interface UseGroundGridBackendBridgeOptions {
 	addLog: (source: "grabber" | "generator" | "system", message: string) => void;
-	showToast: (
-		type: "success" | "error" | "warning" | "info",
-		message: string,
-	) => void;
 }
 
 const DEFAULT_LIVE_BACKEND_STATUS: GroundGridLiveBackendStatus = {
@@ -27,7 +23,6 @@ const DEFAULT_LIVE_BACKEND_STATUS: GroundGridLiveBackendStatus = {
 
 export function useGroundGridBackendBridge({
 	addLog,
-	showToast,
 }: UseGroundGridBackendBridgeOptions) {
 	const [backendConnected, setBackendConnected] = useState(false);
 	const [wsLive, setWsLive] = useState(() =>
@@ -39,7 +34,6 @@ export function useGroundGridBackendBridge({
 		useState<GroundGridLiveBackendStatus>(DEFAULT_LIVE_BACKEND_STATUS);
 
 	const hasInitRef = useRef(false);
-	const shownDisconnectToastRef = useRef(false);
 	const lastWsStatusAtRef = useRef(0);
 	const wasConnectedRef = useRef(false);
 	const isFirstCheckRef = useRef(true);
@@ -79,18 +73,14 @@ export function useGroundGridBackendBridge({
 			} else if (wasConnected !== isNowConnected) {
 				if (isNowConnected) {
 					addLog("system", `AutoCAD connection established (${source})`);
-					shownDisconnectToastRef.current = false;
-					showToast("success", "AutoCAD backend connected");
+					addLog("system", "CAD features restored and synchronized.");
 					await refreshLayers();
 				} else {
-					addLog("system", "AutoCAD connection lost - waiting for reconnection...");
-					if (!shownDisconnectToastRef.current) {
-						shownDisconnectToastRef.current = true;
-						showToast(
-							"warning",
-							"AutoCAD connection lost. CAD features are in offline mode.",
-						);
-					}
+					addLog("system", "AutoCAD connection lost. Operating in offline mode.");
+					addLog(
+						"system",
+						"Keep working locally; reconnect will restore CAD-linked actions.",
+					);
 				}
 			}
 
@@ -98,7 +88,7 @@ export function useGroundGridBackendBridge({
 			isFirstCheckRef.current = false;
 			setBackendConnected(isNowConnected);
 		},
-		[addLog, refreshLayers, showToast],
+		[addLog, refreshLayers],
 	);
 
 	const reconnectBackend = useCallback(async () => {
@@ -107,7 +97,7 @@ export function useGroundGridBackendBridge({
 			await coordinatesGrabberService.connectWebSocket();
 			setWsLive(true);
 			setWsLastUpdate(Date.now());
-			addLog("system", "Reconnected WebSocket status stream");
+			addLog("system", "Reconnect requested. Waiting for live status heartbeat.");
 			return true;
 		} catch (error) {
 			setWsLive(false);

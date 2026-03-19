@@ -79,6 +79,20 @@
 	color: var(--text-muted);
 }
 
+.storageHint {
+	margin: 0;
+	font-size: 0.74rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.storageHint code {
+	padding: 0.08rem 0.28rem;
+	border-radius: 0.36rem;
+	background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+	color: var(--text);
+}
+
 .signalRow {
 	display: flex;
 	flex-wrap: wrap;

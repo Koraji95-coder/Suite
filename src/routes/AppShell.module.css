@@ -130,46 +130,8 @@
 .brandLink {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.7rem;
 	padding: 0.25rem 0.5rem;
 	text-decoration: none;
-}
-
-.brandMark {
-	display: grid;
-	height: 2.2rem;
-	width: 2.2rem;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 0.15rem;
-	padding: 0.24rem;
-	border-radius: 0.9rem;
-	border: 1px solid var(--line-soft);
-	background: color-mix(in srgb, var(--surface) 82%, transparent);
-}
-
-.brandCell {
-	border-radius: 0.2rem;
-}
-
-.brandCell:nth-child(1) {
-	background: var(--primary);
-}
-
-.brandCell:nth-child(2) {
-	background: var(--accent);
-}
-
-.brandCell:nth-child(3) {
-	background: color-mix(in srgb, var(--text) 70%, transparent);
-}
-
-.brandCell:nth-child(4) {
-	background: var(--primary);
-}
-
-.brandText {
-	line-height: 1;
-	letter-spacing: -0.02em;
 }
 
 .sidebarFooterCluster {

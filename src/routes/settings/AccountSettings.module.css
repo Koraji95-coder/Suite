@@ -283,21 +283,11 @@
 	background: color-mix(in srgb, var(--warning) 8%, transparent);
 }
 
-.spin {
-	animation: spin 1s linear infinite;
-}
-
 @keyframes status-ping {
 	75%,
 	100% {
 		transform: scale(2);
 		opacity: 0;
-	}
-}
-
-@keyframes spin {
-	to {
-		transform: rotate(360deg);
 	}
 }
 

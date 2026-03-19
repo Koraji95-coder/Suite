@@ -1,5 +1,5 @@
 // src/components/apps/ground-grid/GroundGridGeneratorApp.tsx
-import { MapPin, ScrollText, Server, Signal } from "lucide-react";
+import { AlertTriangle, MapPin, ScrollText, Server, Signal } from "lucide-react";
 import {
 	type ReactNode,
 	useCallback,
@@ -172,6 +172,10 @@ function GroundGridGeneratorInner() {
 		: wsLastUpdate
 			? `Last seen: ${wsLiveStamp}`
 			: "Waiting for websocket status updates";
+	const isDegraded = !backendConnected || !wsLive || Boolean(liveBackendStatus.error);
+	const statusSummary = isDegraded
+		? "Degraded mode: CAD-linked actions may be limited until connection is restored."
+		: "Live mode: CAD-linked actions are available.";
 
 	const handleReconnect = useCallback(async () => {
 		setIsReconnecting(true);
@@ -218,23 +222,30 @@ function GroundGridGeneratorInner() {
 					</div>
 					<div className={styles.statusExtras}>
 						<span className={styles.statusExtraText}>
-							{liveBackendStatus.autocadRunning ? "AutoCAD running" : "AutoCAD idle"} ·{" "}
-							{drawingLabel}
+							{statusSummary}
 						</span>
 						<div className={styles.statusExtraActions}>
+							{isDegraded ? (
+								<span className={styles.degradedBadge}>
+									<AlertTriangle size={12} />
+									Degraded
+								</span>
+							) : null}
 							{liveBackendStatus.error ? (
 								<span className={styles.statusError}>
 									{liveBackendStatus.error}
 								</span>
 							) : null}
-							<button
-								type="button"
-								className={styles.reconnectButton}
-								onClick={handleReconnect}
-								disabled={isReconnecting}
-							>
-								{isReconnecting ? "Reconnecting…" : "Reconnect stream"}
-							</button>
+							{(!wsLive || !backendConnected) && (
+								<button
+									type="button"
+									className={styles.reconnectButton}
+									onClick={handleReconnect}
+									disabled={isReconnecting}
+								>
+									{isReconnecting ? "Retrying connection…" : "Retry connection"}
+								</button>
+							)}
 						</div>
 					</div>
 				</div>

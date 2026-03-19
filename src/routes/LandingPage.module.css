@@ -177,6 +177,7 @@
 
 .heroBadge {
 	margin-bottom: 1rem;
+	align-self: flex-start;
 }
 
 .heroBadgeDot {
@@ -184,7 +185,7 @@
 	height: 0.4rem;
 	border-radius: 999px;
 	background: var(--accent);
-	animation: pulse 2.3s ease-in-out infinite;
+	opacity: 0.8;
 }
 
 .heroTitle {
@@ -248,80 +249,6 @@
 	margin-top: 1.1rem;
 }
 
-.heroRight {
-	display: none;
-}
-
-.mainAgentWrap {
-	position: relative;
-	display: grid;
-	justify-items: center;
-}
-
-.heroOrbit {
-	position: absolute;
-	inset: 16% 10% 18%;
-	border-radius: 999px;
-	border: 1px dashed color-mix(in srgb, var(--accent) 34%, transparent);
-	opacity: 0.22;
-}
-
-.mainAgentInner {
-	position: relative;
-	padding: 0.9rem;
-}
-
-.mainAgentGlow {
-	position: absolute;
-	inset: 0;
-	border-radius: 999px;
-	background: radial-gradient(
-		circle,
-		color-mix(in srgb, var(--accent) 24%, transparent),
-		transparent 72%
-	);
-	filter: blur(24px);
-	opacity: 0.42;
-}
-
-.mainAgentFloat {
-	position: relative;
-	animation: floatY 8s ease-in-out infinite;
-}
-
-.heroSecondaryRow {
-	margin-top: 1.5rem;
-}
-
-.heroSecondaryAgent {
-	padding: 0.5rem;
-	border: 1px solid var(--line-soft);
-	border-radius: 999px;
-	background: color-mix(in srgb, var(--surface) 72%, transparent);
-	opacity: 1;
-	transition:
-		border-color 240ms ease,
-		background 240ms ease;
-}
-
-.heroSecondaryAgent:hover {
-	border-color: color-mix(in srgb, var(--accent) 46%, var(--line-soft));
-	background: color-mix(in srgb, var(--surface-2) 84%, transparent);
-}
-
-.heroAgentCaption {
-	margin-top: 0.8rem;
-	font-size: 0.72rem;
-	color: var(--text-muted);
-	text-align: center;
-}
-
-.featuresSection {
-	margin-top: 1.35rem;
-	display: grid;
-	gap: 0.8rem;
-}
-
 .sectionHeading {
 	display: grid;
 	gap: 0.28rem;
@@ -329,78 +256,6 @@
 
 .sectionCopy {
 	max-width: 44rem;
-}
-
-.featuresGrid {
-	display: grid;
-	gap: 0.88rem;
-}
-
-.featureCard {
-	position: relative;
-	display: grid;
-	gap: 0.2rem;
-	padding: 1.1rem 1rem 1rem;
-	border: 1px solid var(--line-soft);
-	border-radius: var(--radius-3);
-	background:
-		linear-gradient(
-			165deg,
-			color-mix(in srgb, var(--surface) 92%, transparent),
-			color-mix(in srgb, var(--surface-2) 82%, transparent)
-		),
-		var(--surface);
-	text-decoration: none;
-	box-shadow: 0 10px 22px rgb(0 0 0 / 16%);
-	transition:
-		border-color 220ms ease,
-		transform 220ms ease,
-		box-shadow 220ms ease;
-}
-
-.featureCard:hover {
-	transform: translateY(-2px);
-	border-color: color-mix(in srgb, var(--accent) 28%, var(--line-soft));
-	box-shadow: 0 16px 28px rgb(0 0 0 / 24%);
-}
-
-.featureIconWrap {
-	display: inline-flex;
-	padding: 0.52rem;
-	margin-bottom: 0.55rem;
-	border-radius: 0.72rem;
-	border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-soft));
-	background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-.featureIcon {
-	width: 0.96rem;
-	height: 0.96rem;
-	color: var(--accent);
-}
-
-.featureCopy {
-	margin-top: 0.25rem;
-	line-height: 1.56;
-}
-
-.featureArrow {
-	position: absolute;
-	top: 1rem;
-	right: 0.95rem;
-	width: 0.9rem;
-	height: 0.9rem;
-	color: var(--text-muted);
-	opacity: 0;
-	transform: translateX(-2px);
-	transition:
-		opacity 220ms ease,
-		transform 220ms ease;
-}
-
-.featureCard:hover .featureArrow {
-	opacity: 1;
-	transform: translateX(0);
 }
 
 .agentsSection {
@@ -508,26 +363,6 @@
 	text-decoration: underline;
 }
 
-@keyframes floatY {
-	0%,
-	100% {
-		transform: translateY(0);
-	}
-	50% {
-		transform: translateY(-0.5rem);
-	}
-}
-
-@keyframes pulse {
-	0%,
-	100% {
-		opacity: 0.24;
-	}
-	50% {
-		opacity: 0.42;
-	}
-}
-
 @media (min-width: 48rem) {
 	.navContainer {
 		padding-inline: 2rem;
@@ -546,31 +381,17 @@
 		grid-column: span 7 / span 7;
 	}
 
-	.heroRight {
-		display: flex;
-		grid-column: span 5 / span 5;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.featuresGrid {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-
 	.agentGrid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
 
-@media (min-width: 64rem) {
-	.featuresGrid {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-	}
-}
-
 @media (max-width: 52rem) {
 	.heroSignalGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.heroSummaryGrid {
 		grid-template-columns: 1fr;
 	}
 }

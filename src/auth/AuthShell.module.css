@@ -57,15 +57,8 @@
 .brandLink {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.62rem;
 	color: var(--text);
 	text-decoration: none;
-}
-
-.brandName {
-	font-size: 0.9rem;
-	font-weight: 700;
-	letter-spacing: -0.01em;
 }
 
 .navRight {
@@ -171,23 +164,13 @@
 	color: color-mix(in srgb, var(--accent) 75%, white 25%);
 }
 
-.floatArea {
-	position: relative;
-	margin-bottom: 2rem;
-}
-
-.floatMark {
-	position: absolute;
-	animation: float 10s ease-in-out infinite;
-}
-
-.floatSpacer {
-	width: 12rem;
-	height: 12rem;
-}
-
 .brandBlock {
 	text-align: center;
+}
+
+.brandLogoWrap {
+	display: inline-flex;
+	margin-bottom: 0.75rem;
 }
 
 .tagline {
@@ -232,7 +215,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 0.38rem;
-	padding: 0.26rem 0.56rem;
+	padding: 0.26rem 0.5rem;
 	border: 1px solid var(--line-soft);
 	border-radius: 999px;
 	background: color-mix(in srgb, var(--surface) 80%, transparent);
@@ -269,21 +252,11 @@
 }
 
 .rightPanelHeader {
-	padding: 0.62rem 1.5rem 0;
+	padding: 0.72rem 1.5rem 0;
 }
 
 .rightPanelBody {
 	padding: 1.25rem 1.5rem 1.5rem;
-}
-
-@keyframes float {
-	0%,
-	100% {
-		transform: translate(-50%, -50%) translateY(0);
-	}
-	50% {
-		transform: translate(-50%, -50%) translateY(-6px);
-	}
 }
 
 @media (min-width: 48rem) {

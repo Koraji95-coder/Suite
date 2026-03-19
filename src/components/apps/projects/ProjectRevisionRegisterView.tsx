@@ -259,6 +259,10 @@ export function ProjectRevisionRegisterView({
 						Track drawing changes, linked files, AutoDraft references, and
 						transmittal context for this project.
 					</Text>
+					<Text size="xs" color="muted" className={styles.storageHint}>
+						Persistence: Supabase-backed register rows linked to this project and
+						its uploaded files.
+					</Text>
 				</div>
 				<div className={styles.headerActions}>
 					<Button

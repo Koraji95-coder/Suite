@@ -100,6 +100,18 @@ export function EventDialogFields({
 	setTaskId,
 	setError,
 }: EventDialogFieldsProps) {
+	const safeProjectOptions = projectOptions.filter(
+		(project) => project.id.trim().length > 0,
+	);
+	const safeTaskOptions = filteredTaskOptions.filter(
+		(task) => task.id.trim().length > 0,
+	);
+	const safeStartTime = TIME_OPTIONS.some((option) => option.value === startTime)
+		? startTime
+		: (TIME_OPTIONS[0]?.value ?? "09:00");
+	const safeEndTime = TIME_OPTIONS.some((option) => option.value === endTime)
+		? endTime
+		: (TIME_OPTIONS[1]?.value ?? TIME_OPTIONS[0]?.value ?? "10:00");
 	const projectSelectValue = projectId ?? NO_PROJECT_VALUE;
 	const taskSelectValue = taskId ?? NO_TASK_VALUE;
 
@@ -120,7 +132,7 @@ export function EventDialogFields({
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value={NO_PROJECT_VALUE}>No project</SelectItem>
-							{projectOptions.map((project) => (
+							{safeProjectOptions.map((project) => (
 								<SelectItem key={project.id} value={project.id}>
 									{project.name}
 								</SelectItem>
@@ -142,7 +154,7 @@ export function EventDialogFields({
 						</SelectTrigger>
 						<SelectContent>
 							<SelectItem value={NO_TASK_VALUE}>No task</SelectItem>
-							{filteredTaskOptions.map((task) => (
+							{safeTaskOptions.map((task) => (
 								<SelectItem key={task.id} value={task.id}>
 									{task.name}
 								</SelectItem>
@@ -220,7 +232,7 @@ export function EventDialogFields({
 				{!allDay ? (
 					<div className={cn(styles.timeColumn, styles.fieldStack)}>
 						<Label htmlFor="start-time">Start Time</Label>
-						<Select value={startTime} onValueChange={setStartTime}>
+						<Select value={safeStartTime} onValueChange={setStartTime}>
 							<SelectTrigger id="start-time">
 								<SelectValue placeholder="Select time" />
 							</SelectTrigger>
@@ -277,7 +289,7 @@ export function EventDialogFields({
 				{!allDay ? (
 					<div className={cn(styles.timeColumn, styles.fieldStack)}>
 						<Label htmlFor="end-time">End Time</Label>
-						<Select value={endTime} onValueChange={setEndTime}>
+						<Select value={safeEndTime} onValueChange={setEndTime}>
 							<SelectTrigger id="end-time">
 								<SelectValue placeholder="Select time" />
 							</SelectTrigger>

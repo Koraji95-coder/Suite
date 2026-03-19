@@ -123,6 +123,9 @@ export function ProjectTelemetryPanel({
 		? telemetry.sessions
 		: telemetry.liveSessions
 	).slice(0, 3);
+	const loggedSessionCount = telemetry.sessions.length
+		? telemetry.sessions.length
+		: telemetry.liveSessions.length;
 
 	const startEditingRules = () => {
 		setRuleError(null);
@@ -220,7 +223,7 @@ export function ProjectTelemetryPanel({
 						<h5 className={styles.timelineTitle}>Recent CAD sessions</h5>
 						<span>Session timeline</span>
 					</div>
-					<span>{telemetry.sessions.length ?? telemetry.liveSessions.length} logged</span>
+					<span>{loggedSessionCount} logged</span>
 				</div>
 				{sessionTimeline.length === 0 ? (
 					<p className={styles.timelineEmpty}>No sessions to show yet.</p>
@@ -237,10 +240,10 @@ export function ProjectTelemetryPanel({
 									{formatRelativeTime(session.startedAt)}
 								</p>
 							</div>
-								<Badge
-									size="sm"
-									color={session.status === "live" ? "success" : "default"}
-								>
+							<Badge
+								size="sm"
+								color={session.status === "live" ? "success" : "default"}
+							>
 								{session.status.toUpperCase()}
 							</Badge>
 						</div>
@@ -292,48 +295,48 @@ export function ProjectTelemetryPanel({
 
 				{editingRules ? (
 					<div className={styles.ruleEditorGrid}>
-						<label htmlFor="project-rule-roots" className={styles.ruleField}>
-							<span className={styles.ruleFieldLabel}>Roots</span>
+						<label htmlFor="project-rule-roots" className={styles.formField}>
+							<span className={styles.formLabel}>Roots</span>
 							<textarea
 								id="project-rule-roots"
 								name="project_rule_roots"
-								className={styles.ruleTextArea}
+								className={styles.textArea}
 								rows={3}
 								value={ruleRoots}
 								onChange={(event) => setRuleRoots(event.target.value)}
 								placeholder="One path per line"
 							/>
 						</label>
-						<label htmlFor="project-rule-include" className={styles.ruleField}>
-							<span className={styles.ruleFieldLabel}>Include globs</span>
+						<label htmlFor="project-rule-include" className={styles.formField}>
+							<span className={styles.formLabel}>Include globs</span>
 							<textarea
 								id="project-rule-include"
 								name="project_rule_include_globs"
-								className={styles.ruleTextArea}
+								className={styles.textArea}
 								rows={3}
 								value={ruleIncludes}
 								onChange={(event) => setRuleIncludes(event.target.value)}
 								placeholder="One glob per line"
 							/>
 						</label>
-						<label htmlFor="project-rule-exclude" className={styles.ruleField}>
-							<span className={styles.ruleFieldLabel}>Exclude globs</span>
+						<label htmlFor="project-rule-exclude" className={styles.formField}>
+							<span className={styles.formLabel}>Exclude globs</span>
 							<textarea
 								id="project-rule-exclude"
 								name="project_rule_exclude_globs"
-								className={styles.ruleTextArea}
+								className={styles.textArea}
 								rows={3}
 								value={ruleExcludes}
 								onChange={(event) => setRuleExcludes(event.target.value)}
 								placeholder="One glob per line"
 							/>
 						</label>
-						<label htmlFor="project-rule-patterns" className={styles.ruleField}>
-							<span className={styles.ruleFieldLabel}>Drawing patterns</span>
+						<label htmlFor="project-rule-patterns" className={styles.formField}>
+							<span className={styles.formLabel}>Drawing patterns</span>
 							<textarea
 								id="project-rule-patterns"
 								name="project_rule_drawing_patterns"
-								className={styles.ruleTextArea}
+								className={styles.textArea}
 								rows={3}
 								value={rulePatterns}
 								onChange={(event) => setRulePatterns(event.target.value)}
@@ -342,32 +345,32 @@ export function ProjectTelemetryPanel({
 						</label>
 					</div>
 				) : (
-					<div className={styles.ruleSummaryGrid}>
+					<div className={styles.ruleDetails}>
 						<div className={styles.ruleSummaryCard}>
-							<div className={styles.ruleSummaryLabel}>Roots</div>
-							<div className={styles.ruleSummaryValue}>
+							<div className={styles.detailLabel}>Roots</div>
+							<div className={styles.detailValue}>
 								{toDisplayList(effectiveRule?.roots)}
 							</div>
 						</div>
 						<div className={styles.ruleSummaryCard}>
-							<div className={styles.ruleSummaryLabel}>Include</div>
-							<div className={styles.ruleSummaryValue}>
+							<div className={styles.detailLabel}>Include</div>
+							<div className={styles.detailValue}>
 								{toDisplayList(effectiveRule?.includeGlobs)}
 							</div>
 						</div>
 						<div className={styles.ruleSummaryCard}>
-							<div className={styles.ruleSummaryLabel}>Exclude</div>
-							<div className={styles.ruleSummaryValue}>
+							<div className={styles.detailLabel}>Exclude</div>
+							<div className={styles.detailValue}>
 								{toDisplayList(effectiveRule?.excludeGlobs)}
 							</div>
 						</div>
 						<div className={styles.ruleSummaryCard}>
-							<div className={styles.ruleSummaryLabel}>Drawing patterns</div>
-							<div className={styles.ruleSummaryValue}>
+							<div className={styles.detailLabel}>Drawing patterns</div>
+							<div className={styles.detailValue}>
 								{toDisplayList(effectiveRule?.drawingPatterns)}
 							</div>
 						</div>
-						<div className={styles.ruleSummaryMeta}>
+						<div className={styles.ruleMeta}>
 							Updated{" "}
 							{effectiveRule?.updatedAt
 								? formatRelativeTime(effectiveRule.updatedAt)

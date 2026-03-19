@@ -22,12 +22,6 @@ export function ProjectDetailViewTabs({
 }: ProjectDetailViewTabsProps) {
 	return (
 		<div className={styles.root}>
-			<div className={styles.header}>
-				<p className={styles.eyebrow}>Workspace lanes</p>
-				<p className={styles.copy}>
-					Switch between tasks, calendar, files, revisions, and grid design views.
-				</p>
-			</div>
 			<div className={styles.tabRow}>
 				{tabs.map(({ mode, label, icon: Icon }) => (
 					<button

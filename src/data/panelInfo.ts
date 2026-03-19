@@ -22,7 +22,7 @@ export const dashboardInfo = {
 			content: [
 				"Filter by project, repo area, collector, agent profile, and time range",
 				"Use focus pills to jump directly to Watchdog, architecture, work ledger, agent memory, or project operations",
-				"Open Graph Explorer for deeper repo inspection without leaving the same architecture data model",
+				"Open Architecture Graph for deeper repo inspection without leaving the same architecture data model",
 				"Use project deep links to move from Project Manager into the command center with the correct filters applied",
 			],
 			tips: [

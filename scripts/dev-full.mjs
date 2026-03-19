@@ -78,6 +78,22 @@ function commandExists(command) {
 	return probe.status === 0;
 }
 
+function killStaleNamedPipeBridgeHosts() {
+	if (process.platform !== "win32" || !commandExists("powershell")) return;
+	const script = [
+		"$targets = Get-CimInstance Win32_Process | Where-Object {",
+		"  ($_.Name -eq 'NamedPipeServer.exe') -or",
+		"  (($_.Name -eq 'dotnet.exe' -or $_.Name -eq '.NET Host') -and $_.CommandLine -like '*NamedPipeServer*')",
+		"} | Select-Object -ExpandProperty ProcessId -Unique",
+		"foreach ($id in $targets) {",
+		"  try { Stop-Process -Id $id -Force -ErrorAction Stop } catch {}",
+		"}",
+	].join(" ");
+	spawnSync("powershell", ["-NoProfile", "-Command", script], {
+		stdio: "ignore",
+	});
+}
+
 function parseHttpEndpoint(urlValue, fallbackPort) {
 	const raw = String(urlValue || "").trim();
 	if (!raw) {
@@ -646,6 +662,7 @@ async function main() {
 		`[dev-full] Redis mode: ${redisStatus.mode} (storage=${redisStatus.storageUri}, reason=${redisStatus.reason}).`,
 	);
 	await ensureAutoDraftApi(sharedEnv);
+	killStaleNamedPipeBridgeHosts();
 
 	run(
 		"pipe-bridge",

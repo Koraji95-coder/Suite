@@ -100,7 +100,11 @@ For the next session on `DUSTIN-HOME`:
    - `npm run workstation:mirror`
 6. The destination box can use the new npm alias instead of the raw PowerShell path:
    - `npm run workstation:restore -- -WorkstationId DUSTIN-HOME`
-7. Verify startup/doctor status before doing app work:
+7. Bootstrap Worktale on each workstation where changelog publishing matters:
+   - `npm install -g worktale`
+   - `npm run worktale:bootstrap`
+   - `worktale hook status`
+8. Verify startup/doctor status before doing app work:
    - `npm run watchdog:startup:check`
    - `npm run watchdog:startup:autocad:check`
    - `npm run watchdog:backend:startup:check`

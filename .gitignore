@@ -48,3 +48,5 @@ test-results/
 backend/*.sqlite3
 backend/*.sqlite3-*
 backend/.learning/
+.worktale/
+supabase/.temp/

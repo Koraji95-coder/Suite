@@ -27,6 +27,7 @@
 		"workstation:sync": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1",
 		"workstation:mirror": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-local-state.ps1",
 		"workstation:restore": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/restore-suite-local-state.ps1",
+		"worktale:bootstrap": "worktale init",
 		"gateway:dev": "node scripts/run-agent-gateway.mjs",
 		"auth:playwright:bootstrap": "node scripts/bootstrap-playwright-auth-state.mjs",
 		"auth:magiclink:generate": "node scripts/generate-auth-magiclink.mjs",

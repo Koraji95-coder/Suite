@@ -12,7 +12,7 @@ Date: March 19, 2026
 
 2. Install and bootstrap Worktale on this workstation.
    - `npm install -g worktale`
-   - `worktale hook install .`
+   - `npm run worktale:bootstrap`
    - `worktale hook status`
    - Goal: clear the CLI/bootstrap warnings and enable automatic commit capture.
 
@@ -96,15 +96,20 @@ Date: March 19, 2026
    - `npm run workstation:restore -- -WorkstationId DUSTIN-HOME`
    - Replace `DUSTIN-HOME` with the actual target workstation id if needed.
 
-3. If you only need MCP/workstation env rewritten:
+3. Bootstrap Worktale on the destination workstation:
+   - `npm install -g worktale`
+   - `npm run worktale:bootstrap`
+   - `worktale hook status`
+
+4. If you only need MCP/workstation env rewritten:
    - `npm run workstation:sync -- -WorkstationId DUSTIN-HOME`
 
-4. Restart the developer window / Codex session.
+5. Restart the developer window / Codex session.
 
-5. Start the app stack:
+6. Start the app stack:
    - `npm run dev:full`
 
-6. Run the workstation checks:
+7. Run the workstation checks:
    - `npm run watchdog:startup:check`
    - `npm run watchdog:startup:autocad:check`
    - `npm run watchdog:backend:startup:check`

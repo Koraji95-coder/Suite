@@ -15,8 +15,10 @@ from backend.work_ledger.artifacts import (
     resolve_artifact_root,
 )
 from backend.work_ledger.publisher import WorkLedgerPublisher
+from backend.work_ledger.suggestions import WorkLedgerSuggestionBuilder
 from backend.work_ledger.store import WorkLedgerStore
 from backend.work_ledger.worktale_runtime import WorktaleRuntime
+from backend.watchdog import WatchdogMonitorService
 
 
 def _extract_user_id(user: dict[str, Any]) -> str:
@@ -59,6 +61,8 @@ def create_work_ledger_blueprint(
     requests_module: Any = requests,
     subprocess_module: Any = subprocess,
     socket_module: Any = socket,
+    agent_run_orchestrator: Any = None,
+    watchdog_service: Any = None,
 ) -> Blueprint:
     """Create /api/work-ledger route group blueprint."""
     bp = Blueprint("work_ledger_api", __name__, url_prefix="/api/work-ledger")
@@ -82,6 +86,13 @@ def create_work_ledger_blueprint(
         artifact_writer=artifact_writer,
         logger=logger,
     )
+    suggestion_builder = WorkLedgerSuggestionBuilder(
+        repo_root=resolved_repo_root,
+        logger=logger,
+        subprocess_module=subprocess_module,
+        agent_run_orchestrator=agent_run_orchestrator,
+        watchdog_service=watchdog_service or WatchdogMonitorService(),
+    )
 
     @bp.route("/publishers/worktale/readiness", methods=["GET"])
     @require_supabase_user
@@ -90,6 +101,62 @@ def create_work_ledger_blueprint(
         workstation_id = runtime.resolve_workstation_id()
         payload = publisher.readiness(workstation_id=workstation_id)
         return jsonify({"ok": True, **payload}), 200
+
+    @bp.route("/draft-suggestions", methods=["GET"])
+    @require_supabase_user
+    @limiter.limit("3600 per hour")
+    def api_work_ledger_draft_suggestions():
+        user = getattr(g, "supabase_user", {}) or {}
+        user_id = _extract_user_id(user)
+        if not user_id:
+            return jsonify({"ok": False, "error": "Authenticated user id not found."}), 401
+
+        bearer_token = _extract_bearer_token()
+        limit = _parse_query_int("limit", 12)
+        try:
+            try:
+                existing_entries = store.list_entries_for_user(
+                    user_id=user_id,
+                    bearer_token=bearer_token,
+                    limit=200,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Unable to load existing Work Ledger entries while building suggestions: %s",
+                    exc,
+                )
+                existing_entries = []
+
+            payload = suggestion_builder.build(
+                user_id=user_id,
+                existing_entries=existing_entries,
+                limit=limit,
+            )
+            return jsonify({"ok": True, **payload}), 200
+        except ValueError as exc:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                        "code": "WORK_LEDGER_SUGGESTIONS_INVALID_QUERY",
+                    }
+                ),
+                400,
+            )
+        except Exception as exc:
+            logger.exception("Failed to build work ledger draft suggestions")
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Failed to build work ledger draft suggestions.",
+                        "code": "WORK_LEDGER_SUGGESTIONS_FAILED",
+                        "message": str(exc),
+                    }
+                ),
+                500,
+            )
 
     @bp.route("/publishers/worktale/bootstrap", methods=["POST"])
     @require_supabase_user

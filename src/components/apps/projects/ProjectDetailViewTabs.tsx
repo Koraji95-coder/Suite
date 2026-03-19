@@ -1,4 +1,4 @@
-import { Calendar, CheckSquare, FileDown, MapPin } from "lucide-react";
+import { Calendar, CheckSquare, FileDown, FilePenLine, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import styles from "./ProjectDetailViewTabs.module.css";
 import type { ViewMode } from "./projectmanagertypes";
@@ -12,6 +12,7 @@ const tabs: { mode: ViewMode; label: string; icon: typeof CheckSquare }[] = [
 	{ mode: "tasks", label: "Tasks", icon: CheckSquare },
 	{ mode: "calendar", label: "Calendar", icon: Calendar },
 	{ mode: "files", label: "Files", icon: FileDown },
+	{ mode: "revisions", label: "Revisions", icon: FilePenLine },
 	{ mode: "ground-grids", label: "Ground Grids", icon: MapPin },
 ];
 
@@ -24,7 +25,7 @@ export function ProjectDetailViewTabs({
 			<div className={styles.header}>
 				<p className={styles.eyebrow}>Workspace lanes</p>
 				<p className={styles.copy}>
-					Switch between tasks, calendar, files, and grid design views.
+					Switch between tasks, calendar, files, revisions, and grid design views.
 				</p>
 			</div>
 			<div className={styles.tabRow}>

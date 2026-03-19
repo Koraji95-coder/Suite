@@ -15,6 +15,7 @@ import styles from "./ProjectDetailHeader.module.css";
 import type { Project, Task } from "./projectmanagertypes";
 import type { ProjectWatchdogTelemetry } from "./useProjectWatchdogTelemetry";
 import { formatDateOnly } from "./projectmanagerutils";
+import { ProjectHealthScoreCard } from "./ProjectHealthScoreCard";
 
 interface ProjectDetailHeaderProps {
 	project: Project;
@@ -247,6 +248,14 @@ export function ProjectDetailHeader({
 						<span>{ruleSummary}</span>
 					</div>
 				</div>
+			</div>
+			<div className={styles.healthShell}>
+				<ProjectHealthScoreCard
+					tasks={tasks}
+					projectId={project.id}
+					deadline={project.deadline}
+					telemetry={telemetry}
+				/>
 			</div>
 		</section>
 	);

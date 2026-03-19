@@ -168,6 +168,7 @@ def register_route_groups(
             require_supabase_user=require_supabase_user,
             supabase_url=supabase_url,
             supabase_api_key=supabase_api_key,
+            agent_run_orchestrator=agent_run_orchestrator,
         )
     )
     app.register_blueprint(

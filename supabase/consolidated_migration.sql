@@ -213,6 +213,28 @@ create table if not exists public.work_ledger_publish_jobs (
 	updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.drawing_revision_register_entries (
+	id uuid primary key default gen_random_uuid(),
+	project_id uuid not null references public.projects (id) on delete cascade,
+	file_id uuid null references public.files (id) on delete set null,
+	drawing_number text not null default '',
+	title text not null default '',
+	revision text not null default '',
+	previous_revision text null,
+	issue_summary text not null default '',
+	issue_status text not null default 'open',
+	issue_severity text not null default 'medium',
+	source_kind text not null default 'manual',
+	source_ref text null,
+	autodraft_request_id text null,
+	transmittal_number text null,
+	transmittal_document_name text null,
+	notes text null,
+	user_id uuid not null references auth.users (id) on delete cascade,
+	created_at timestamptz not null default timezone('utc', now()),
+	updated_at timestamptz not null default timezone('utc', now())
+);
+
 create table if not exists public.calendar_events (
 	id uuid primary key default gen_random_uuid(),
 	project_id uuid null references public.projects (id) on delete cascade,
@@ -458,6 +480,9 @@ create index if not exists idx_work_ledger_entries_updated_at on public.work_led
 create index if not exists idx_work_ledger_publish_jobs_entry_id on public.work_ledger_publish_jobs (entry_id, created_at desc);
 create index if not exists idx_work_ledger_publish_jobs_user_id on public.work_ledger_publish_jobs (user_id, created_at desc);
 create index if not exists idx_work_ledger_publish_jobs_status on public.work_ledger_publish_jobs (status, created_at desc);
+create index if not exists idx_drawing_revision_register_entries_project_id on public.drawing_revision_register_entries (project_id, updated_at desc);
+create index if not exists idx_drawing_revision_register_entries_user_id on public.drawing_revision_register_entries (user_id, updated_at desc);
+create index if not exists idx_drawing_revision_register_entries_status on public.drawing_revision_register_entries (issue_status, updated_at desc);
 
 create index if not exists idx_calendar_events_user_id on public.calendar_events (user_id);
 create index if not exists idx_calendar_events_project_id on public.calendar_events (project_id);
@@ -562,6 +587,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_work_ledger_publish_jobs_updated_at on public.work_ledger_publish_jobs;
 create trigger set_work_ledger_publish_jobs_updated_at
 before update on public.work_ledger_publish_jobs
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_drawing_revision_register_entries_updated_at on public.drawing_revision_register_entries;
+create trigger set_drawing_revision_register_entries_updated_at
+before update on public.drawing_revision_register_entries
 for each row execute function public.set_updated_at();
 
 create or replace function public.upsert_user_setting(

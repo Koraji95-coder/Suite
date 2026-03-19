@@ -1,0 +1,245 @@
+.root {
+	display: grid;
+	gap: 1rem;
+}
+
+.header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.headerActions {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.statsGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 0.75rem;
+}
+
+.statCard {
+	padding: 0.9rem 1rem;
+	border-radius: var(--radius-3);
+	border: 1px solid var(--line-soft);
+	background:
+		linear-gradient(
+			165deg,
+			color-mix(in srgb, var(--surface) 94%, transparent),
+			color-mix(in srgb, var(--surface-2) 76%, transparent)
+		),
+		var(--surface);
+	box-shadow: var(--shadow-xs);
+}
+
+.statValue {
+	font-size: 1.35rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.statLabel {
+	margin-top: 0.22rem;
+	font-size: 0.76rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.formPanel {
+	display: grid;
+	gap: 1rem;
+}
+
+.formHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+}
+
+.formGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 0.85rem;
+}
+
+.field {
+	display: grid;
+	gap: 0.35rem;
+}
+
+.fieldWide {
+	grid-column: 1 / -1;
+}
+
+.label {
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.select,
+.textarea {
+	width: 100%;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+	color: var(--text);
+	padding: 0.72rem 0.82rem;
+	font: inherit;
+}
+
+.select:focus,
+.textarea:focus {
+	outline: 2px solid color-mix(in srgb, var(--primary) 45%, transparent);
+	outline-offset: 1px;
+	border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+}
+
+.textarea {
+	resize: vertical;
+	min-height: 120px;
+}
+
+.formActions {
+	display: flex;
+	justify-content: flex-end;
+}
+
+.error {
+	padding: 0.8rem 0.95rem;
+	border-radius: var(--radius-2);
+	border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+	background: color-mix(in srgb, var(--danger) 10%, transparent);
+	color: var(--text);
+	font-size: 0.88rem;
+}
+
+.emptyState {
+	display: grid;
+	justify-items: center;
+	gap: 0.45rem;
+	padding: 2rem 1.25rem;
+	border-radius: var(--radius-3);
+	border: 1px dashed var(--line-soft);
+	background: color-mix(in srgb, var(--surface) 75%, transparent);
+	text-align: center;
+}
+
+.emptyIcon {
+	width: 1.8rem;
+	height: 1.8rem;
+	color: var(--text-muted);
+}
+
+.emptyTitle {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.emptyCopy {
+	margin: 0;
+	max-width: 44ch;
+	font-size: 0.88rem;
+	color: var(--text-muted);
+}
+
+.entryList {
+	display: grid;
+	gap: 0.9rem;
+}
+
+.entryCard {
+	display: grid;
+	gap: 0.95rem;
+}
+
+.entryHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 0.9rem;
+	flex-wrap: wrap;
+}
+
+.entryTitleRow {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	flex-wrap: wrap;
+}
+
+.badgeRow {
+	display: flex;
+	gap: 0.4rem;
+	flex-wrap: wrap;
+}
+
+.entryMeta {
+	display: flex;
+	gap: 0.6rem;
+	flex-wrap: wrap;
+	font-size: 0.82rem;
+	color: var(--text-muted);
+	margin-top: 0.25rem;
+}
+
+.entryActions {
+	display: flex;
+	gap: 0.45rem;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.summary {
+	font-size: 0.92rem;
+	line-height: 1.55;
+	color: var(--text);
+}
+
+.referenceGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+	gap: 0.7rem;
+}
+
+.referenceCard {
+	display: grid;
+	gap: 0.18rem;
+	padding: 0.8rem 0.9rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+	font-size: 0.84rem;
+	color: var(--text);
+}
+
+.referenceLabel {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.notes {
+	padding: 0.85rem 0.95rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface) 90%, transparent);
+	font-size: 0.87rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}

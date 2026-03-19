@@ -511,6 +511,18 @@
 	gap: 0.65rem;
 }
 
+.ledgerSuggestionSection {
+	display: grid;
+	gap: 0.65rem;
+	padding-top: 0.35rem;
+}
+
+.ledgerSuggestionSection .suggestionReason {
+	margin-top: 0.3rem;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+
 .ledgerKpiCard {
 	display: grid;
 	gap: 0.18rem;

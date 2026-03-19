@@ -5,6 +5,7 @@ export type {
 	WorkLedgerFilters,
 	WorkLedgerInput,
 	WorkLedgerInsert,
+	WorkLedgerDraftSuggestionsResponse,
 	WorkLedgerPublishJobRow,
 	WorkLedgerLifecycleState,
 	WorkLedgerPublishResult,
@@ -15,11 +16,13 @@ export type {
 	WorktalePublishPayload,
 	WorktaleReadinessResponse,
 } from "./work-ledger/types";
+export type { WorkLedgerDraftSuggestion } from "./work-ledger/types";
 
 import type {
 	WorkLedgerFilters,
 	WorkLedgerInput,
 	WorkLedgerInsert,
+	WorkLedgerDraftSuggestionsResponse,
 	WorkLedgerPublishJobRow,
 	WorkLedgerPublishResult,
 	WorkLedgerOpenArtifactFolderResult,
@@ -48,6 +51,8 @@ import {
 	stopRealtimeIfIdle,
 } from "./work-ledger/realtime";
 import { buildWorktalePublishPayload as buildPayload } from "./work-ledger/payload";
+import { fetchWorkLedgerDraftSuggestions } from "./work-ledger/suggestions";
+import type { WorkLedgerDraftSuggestion } from "./work-ledger/types";
 
 type WorkLedgerListener = (entry: WorkLedgerRow) => void;
 
@@ -521,5 +526,12 @@ export const workLedgerService = {
 				error: classifyPublisherError(error),
 			};
 		}
+	},
+	async fetchDraftSuggestions(): Promise<{
+		data: WorkLedgerDraftSuggestion[];
+		error: Error | null;
+		sources: WorkLedgerDraftSuggestionsResponse["sources"];
+	}> {
+		return fetchWorkLedgerDraftSuggestions();
 	},
 };

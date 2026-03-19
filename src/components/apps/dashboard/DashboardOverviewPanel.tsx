@@ -1,5 +1,5 @@
 import { ArrowUpRight, LayoutDashboard } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
 	AGENT_PROFILE_IDS,
@@ -23,6 +23,7 @@ import {
 	type WorkLedgerPublishJobRow,
 	type WorkLedgerPublishState,
 	type WorkLedgerRow,
+	type WorkLedgerDraftSuggestion,
 	type WorktaleReadinessResponse,
 	workLedgerService,
 } from "@/services/workLedgerService";
@@ -256,6 +257,11 @@ export function DashboardOverviewPanel({
 	const [workLedgerJobsByEntry, setWorkLedgerJobsByEntry] = useState<
 		Record<string, WorkLedgerPublishJobRow[]>
 	>({});
+	const [ledgerSuggestions, setLedgerSuggestions] = useState<WorkLedgerDraftSuggestion[]>(
+		[],
+	);
+	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+	const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
 	const [watchdogError, setWatchdogError] = useState<string | null>(null);
 	const [memoryError, setMemoryError] = useState<string | null>(null);
 	const [workLedgerError, setWorkLedgerError] = useState<string | null>(null);
@@ -473,6 +479,19 @@ export function DashboardOverviewPanel({
 		selectedProjectId,
 		selectedWindowMs,
 	]);
+
+	const loadLedgerSuggestions = useCallback(async () => {
+		setSuggestionsLoading(true);
+		setSuggestionsError(null);
+		const result = await workLedgerService.fetchDraftSuggestions();
+		setLedgerSuggestions(result.data);
+		setSuggestionsError(result.error ? result.error.message : null);
+		setSuggestionsLoading(false);
+	}, []);
+
+	useEffect(() => {
+		void loadLedgerSuggestions();
+	}, [loadLedgerSuggestions]);
 
 	useEffect(() => {
 		const focusMap = {
@@ -1133,6 +1152,9 @@ export function DashboardOverviewPanel({
 						entries={filteredWorkLedgerEntries}
 						viewModel={workLedgerViewModel}
 						error={workLedgerError}
+						suggestions={ledgerSuggestions}
+						suggestionsLoading={suggestionsLoading}
+						suggestionsError={suggestionsError}
 						onOpenChangelog={openChangelog}
 						onOpenLatestReceipt={openWorkLedgerReceipt}
 						onOpenHotspotEntry={openHotspotLinkedEntry}

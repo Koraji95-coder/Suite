@@ -96,6 +96,30 @@ class WorkLedgerStore:
             raise RuntimeError(error)
         return self._first_row(payload)
 
+    def list_entries_for_user(
+        self,
+        *,
+        user_id: str,
+        bearer_token: str | None = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        payload, error, _ = self._request(
+            "GET",
+            "work_ledger_entries",
+            bearer_token=bearer_token,
+            params={
+                "select": "*",
+                "user_id": f"eq.{user_id}",
+                "order": "updated_at.desc",
+                "limit": str(max(1, min(200, int(limit)))),
+            },
+        )
+        if error:
+            raise RuntimeError(error)
+        if isinstance(payload, list):
+            return [row for row in payload if isinstance(row, dict)]
+        return []
+
     def list_publish_jobs(
         self,
         *,

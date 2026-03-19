@@ -67,6 +67,115 @@
 	margin-top: 0.85rem;
 }
 
+.suggestionPanel {
+	border: 1px solid color-mix(in srgb, var(--primary) 15%, var(--line-soft));
+	background: color-mix(in srgb, var(--surface-elevated) 85%, transparent);
+	border-radius: var(--radius-3);
+}
+
+.suggestionReason {
+	margin-top: 0.2rem;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+
+.suggestionActive {
+	border-color: color-mix(in srgb, var(--primary) 32%, var(--line-soft));
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.suggestionStats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+	margin-bottom: 0.9rem;
+	font-size: 0.76rem;
+	color: var(--text-muted);
+}
+
+.suggestionStats span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.28rem 0.58rem;
+	border-radius: 999px;
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+}
+
+.suggestionList {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.dataRow {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.85rem 0.95rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+}
+
+.dataRowTitle {
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--text-strong);
+}
+
+.dataRowMeta {
+	margin-top: 0.3rem;
+	font-size: 0.8rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}
+
+.suggestionMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	margin-top: 0.55rem;
+	font-size: 0.74rem;
+	color: var(--text-muted);
+}
+
+.dataRowAside {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-shrink: 0;
+}
+
+.sessionActionButton {
+	border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line-soft));
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+	color: var(--text-strong);
+	padding: 0.45rem 0.8rem;
+	font: inherit;
+	font-size: 0.78rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		background-color 140ms ease,
+		border-color 140ms ease;
+}
+
+.sessionActionButton:hover {
+	border-color: color-mix(in srgb, var(--accent) 32%, var(--line-soft));
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.emptyStateCompact {
+	border: 1px dashed var(--line-soft);
+	border-radius: var(--radius-2);
+	padding: 0.95rem 1rem;
+	color: var(--text-muted);
+	background: color-mix(in srgb, var(--surface-elevated) 82%, transparent);
+}
+
 .panelHeader {
 	display: flex;
 	align-items: flex-start;

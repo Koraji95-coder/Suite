@@ -13,6 +13,7 @@ import { ProjectDetailGroundGridsView } from "./ProjectDetailGroundGridsView";
 import { ProjectDetailHeader } from "./ProjectDetailHeader";
 import { ProjectTelemetryPanel } from "./ProjectTelemetryPanel";
 import { ProjectDetailViewTabs } from "./ProjectDetailViewTabs";
+import { ProjectRevisionRegisterView } from "./ProjectRevisionRegisterView";
 import {
 	type CalendarEvent,
 	type Project,
@@ -203,6 +204,10 @@ export function ProjectDetail({
 							}}
 							onOpenDesign={openGridDesign}
 						/>
+					)}
+
+					{viewMode === "revisions" && (
+						<ProjectRevisionRegisterView project={project} files={files} />
 					)}
 				</div>
 			</section>

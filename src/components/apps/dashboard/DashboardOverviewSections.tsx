@@ -38,6 +38,7 @@ import type {
 	DashboardSessionTimelineRow,
 } from "./dashboardWatchdogSelectors";
 import type { DashboardWorkLedgerViewModel } from "./dashboardWorkLedgerSelectors";
+import type { WorkLedgerDraftSuggestion } from "@/services/workLedgerService";
 import {
 	formatBytes,
 	formatDuration,
@@ -690,6 +691,9 @@ interface DashboardWorkLedgerSectionProps {
 	onOpenChangelog: () => void;
 	onOpenLatestReceipt: (entry: WorkLedgerRow) => void;
 	onOpenHotspotEntry: (entry: WorkLedgerRow) => void;
+	suggestions: WorkLedgerDraftSuggestion[];
+	suggestionsLoading: boolean;
+	suggestionsError: string | null;
 }
 
 export function DashboardWorkLedgerSection({
@@ -701,6 +705,9 @@ export function DashboardWorkLedgerSection({
 	onOpenChangelog,
 	onOpenLatestReceipt,
 	onOpenHotspotEntry,
+	suggestions,
+	suggestionsLoading,
+	suggestionsError,
 }: DashboardWorkLedgerSectionProps) {
 	return (
 		<Panel
@@ -789,12 +796,59 @@ export function DashboardWorkLedgerSection({
 								<div className={styles.ledgerKpiLabel}>Blockers</div>
 							</div>
 							<div className={styles.ledgerKpiCard}>
-								<div className={styles.ledgerKpiValue}>
-									{viewModel.hotspotLinkedCount}
-								</div>
-								<div className={styles.ledgerKpiLabel}>Hotspot links</div>
+							<div className={styles.ledgerKpiValue}>
+								{viewModel.hotspotLinkedCount}
 							</div>
+							<div className={styles.ledgerKpiLabel}>Hotspot links</div>
 						</div>
+					</div>
+					<section className={styles.ledgerSuggestionSection}>
+						<Text size="xs" color="muted" className={styles.subpanelLabel}>
+							Suggested drafts
+						</Text>
+						{suggestionsLoading ? (
+							<div className={styles.emptyStateCompact}>Checking for suggestions…</div>
+						) : suggestionsError ? (
+							<div className={styles.error}>{suggestionsError}</div>
+						) : suggestions.length === 0 ? (
+							<div className={styles.emptyStateCompact}>
+								No draft suggestions right now. Keep working and we’ll capture notable moments.
+							</div>
+						) : (
+							<div className={styles.rowList}>
+								{suggestions.slice(0, 3).map((suggestion) => (
+									<div key={suggestion.suggestionId} className={styles.dataRow}>
+										<div>
+											<div className={styles.dataRowTitle}>
+												{suggestion.title}
+											</div>
+											<div className={styles.dataRowMeta}>
+												{suggestion.summary}
+											</div>
+											<div className={styles.dataRowMeta}>
+												{suggestion.sourceKind}
+												{suggestion.commitRefs.length > 0
+													? ` • ${suggestion.commitRefs.join(", ")}`
+													: ""}
+												{suggestion.projectId
+													? ` • ${suggestion.projectId}`
+													: ""}
+											</div>
+										</div>
+										<div className={styles.dataRowAside}>
+											<button
+												type="button"
+												className={styles.sessionActionButton}
+												onClick={onOpenChangelog}
+											>
+												Review in changelog
+											</button>
+										</div>
+									</div>
+								))}
+							</div>
+						)}
+					</section>
 					</div>
 
 					<div className={styles.sectionBlock}>

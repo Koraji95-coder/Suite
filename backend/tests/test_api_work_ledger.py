@@ -177,6 +177,16 @@ class _SubprocessStub:
         _ = (cwd, capture_output, text, check, shell)
         if command[:3] == ["git", "config", "user.email"]:
             return _CompletedProcessStub(0, stdout="user@example.com\n")
+        if command[:2] == ["git", "log"]:
+            return _CompletedProcessStub(
+                0,
+                stdout="abc1234567890abc\x1fSplit agent transport plumbing\x1f2026-03-18T05:00:00+00:00\n",
+            )
+        if command[:2] == ["git", "show"]:
+            return _CompletedProcessStub(
+                0,
+                stdout="src/services/agentService.ts\nsrc/components/apps/projects/ProjectDetailHeader.tsx\n",
+            )
         if command[:3] == ["worktale", "hook", "install"]:
             (self.repo_root / ".worktale").mkdir(parents=True, exist_ok=True)
             return _CompletedProcessStub(0, stdout="Hook installed")
@@ -185,6 +195,52 @@ class _SubprocessStub:
                 return _CompletedProcessStub(1, stderr="Worktale note failed")
             return _CompletedProcessStub(0, stdout="Note added")
         return _CompletedProcessStub(0, stdout="")
+
+
+class _AgentRunOrchestratorStub:
+    def list_activity(self, *, user_id: str, limit: int) -> list[dict[str, Any]]:
+        _ = limit
+        return [
+            {
+                "runId": "run-1",
+                "taskId": "task-1",
+                "profileId": "forge",
+                "eventType": "run_completed",
+                "message": "Completed project telemetry scorecard lane.",
+                "createdAt": "2026-03-18T04:00:00+00:00",
+                "payload": {
+                    "title": "Project telemetry scorecard",
+                    "projectId": "project-1",
+                },
+                "status": "completed",
+                "stage": "integration",
+                "userId": user_id,
+            }
+        ]
+
+
+class _WatchdogServiceStub:
+    def list_sessions(
+        self,
+        scope_key: str,
+        *,
+        limit: int,
+        time_window_ms: int,
+    ) -> dict[str, Any]:
+        _ = (scope_key, limit, time_window_ms)
+        return {
+            "sessions": [
+                {
+                    "sessionId": "session-1",
+                    "projectId": "project-1",
+                    "drawingPath": "C:/Projects/Alpha/Drawing1.dwg",
+                    "status": "completed",
+                    "durationMs": 45 * 60 * 1000,
+                    "commandCount": 12,
+                    "workstationId": "DUSTIN-HOME",
+                }
+            ]
+        }
 
 
 class TestApiWorkLedger(unittest.TestCase):
@@ -197,6 +253,8 @@ class TestApiWorkLedger(unittest.TestCase):
 
         self.requests_stub = _RequestsStub()
         self.subprocess_stub = _SubprocessStub(repo_root=self.repo_root)
+        self.agent_run_orchestrator = _AgentRunOrchestratorStub()
+        self.watchdog_service = _WatchdogServiceStub()
 
         self.which_patcher = patch(
             "backend.work_ledger.worktale_runtime.shutil.which",
@@ -242,6 +300,8 @@ class TestApiWorkLedger(unittest.TestCase):
                 repo_root=self.repo_root,
                 requests_module=self.requests_stub,
                 subprocess_module=self.subprocess_stub,
+                agent_run_orchestrator=self.agent_run_orchestrator,
+                watchdog_service=self.watchdog_service,
             )
         )
         self.client = app.test_client()
@@ -344,6 +404,25 @@ class TestApiWorkLedger(unittest.TestCase):
         self.assertEqual(publish_response.status_code, 400)
         payload = publish_response.get_json() or {}
         self.assertEqual(payload.get("code"), "WORK_LEDGER_ENTRY_INVALID_STATE")
+
+    def test_draft_suggestions_merge_git_agent_and_watchdog_sources(self) -> None:
+        response = self.client.get(
+            "/api/work-ledger/draft-suggestions?limit=6",
+            headers={"Authorization": "Bearer user-token"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(bool(payload.get("ok")))
+        self.assertGreaterEqual(int(payload.get("count") or 0), 3)
+        self.assertEqual((payload.get("sources") or {}).get("git"), 1)
+        self.assertEqual((payload.get("sources") or {}).get("agent"), 1)
+        self.assertEqual((payload.get("sources") or {}).get("watchdog"), 1)
+        suggestions = payload.get("suggestions") or []
+        self.assertTrue(
+            any(item.get("sourceKind") == "git_checkpoint" for item in suggestions)
+        )
+        self.assertTrue(any(item.get("sourceKind") == "agent_run" for item in suggestions))
+        self.assertTrue(any(item.get("sourceKind") == "watchdog" for item in suggestions))
 
 
 if __name__ == "__main__":

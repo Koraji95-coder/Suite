@@ -441,6 +441,72 @@ export type Database = {
 				}
 			>;
 
+			drawing_revision_register_entries: DatabaseTable<
+				{
+					id: string;
+					project_id: string;
+					file_id: string | null;
+					drawing_number: string;
+					title: string;
+					revision: string;
+					previous_revision: string | null;
+					issue_summary: string;
+					issue_status: string;
+					issue_severity: string;
+					source_kind: string;
+					source_ref: string | null;
+					autodraft_request_id: string | null;
+					transmittal_number: string | null;
+					transmittal_document_name: string | null;
+					notes: string | null;
+					user_id: string;
+					created_at: string;
+					updated_at: string;
+				},
+				{
+					id?: string;
+					project_id: string;
+					file_id?: string | null;
+					drawing_number?: string;
+					title?: string;
+					revision?: string;
+					previous_revision?: string | null;
+					issue_summary?: string;
+					issue_status?: string;
+					issue_severity?: string;
+					source_kind?: string;
+					source_ref?: string | null;
+					autodraft_request_id?: string | null;
+					transmittal_number?: string | null;
+					transmittal_document_name?: string | null;
+					notes?: string | null;
+					user_id?: string;
+					created_at?: string;
+					updated_at?: string;
+				},
+				{
+					id?: string;
+					project_id?: string;
+					file_id?: string | null;
+					drawing_number?: string;
+					title?: string;
+					revision?: string;
+					previous_revision?: string | null;
+					issue_summary?: string;
+					issue_status?: string;
+					issue_severity?: string;
+					source_kind?: string;
+					source_ref?: string | null;
+					autodraft_request_id?: string | null;
+					transmittal_number?: string | null;
+					transmittal_document_name?: string | null;
+					notes?: string | null;
+					user_id?: string;
+					created_at?: string;
+					updated_at?: string;
+				}
+			>;
+
 			calendar_events: DatabaseTable<
 				{
 					id: string;

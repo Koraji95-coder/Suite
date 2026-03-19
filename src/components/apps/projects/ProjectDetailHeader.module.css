@@ -145,6 +145,10 @@
 	gap: 1rem;
 }
 
+.healthShell {
+	grid-column: 1 / -1;
+}
+
 .commandCard {
 	padding: 1rem;
 	border-radius: var(--radius-3);

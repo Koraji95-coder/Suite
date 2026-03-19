@@ -289,6 +289,57 @@ describe("workLedgerService", () => {
 		expect(mockFetch).toHaveBeenCalledTimes(4);
 	});
 
+	it("loads draft suggestions from the backend route for authenticated users", async () => {
+		mockGetUser.mockResolvedValue({
+			data: { user: { id: "user-1" } },
+			error: null,
+		});
+		mockGetSession.mockResolvedValue({
+			data: { session: { access_token: "token-1" } },
+			error: null,
+		});
+		mockFetch.mockResolvedValue({
+			ok: true,
+			json: async () => ({
+				ok: true,
+				count: 1,
+				sources: {
+					git: 1,
+					agent: 0,
+					watchdog: 0,
+				},
+				suggestions: [
+					{
+						suggestionId: "suggest-git-1",
+						sourceKey: "git:abc123",
+						sourceKind: "git_checkpoint",
+						title: "Recent git checkpoint",
+						summary: "Generated from git history.",
+						commitRefs: ["abc123"],
+						projectId: "project-1",
+						appArea: "agent",
+						architecturePaths: ["src/services/agentService.ts"],
+						hotspotIds: ["src/services/agentService.ts"],
+						lifecycleState: "completed",
+						publishState: "draft",
+						externalReference: "suggestion:git:abc123",
+						createdAt: "2026-03-18T00:00:00.000Z",
+					},
+				],
+			}),
+		});
+
+		const result = await workLedgerService.fetchDraftSuggestions();
+		expect(result.error).toBeNull();
+		expect(result.sources).toEqual({
+			git: 1,
+			agent: 0,
+			watchdog: 0,
+		});
+		expect(result.data).toHaveLength(1);
+		expect(result.data[0]?.sourceKind).toBe("git_checkpoint");
+	});
+
 	it("returns a friendly readiness error when publisher routes are unavailable", async () => {
 		mockGetUser.mockResolvedValue({
 			data: { user: { id: "user-1" } },

@@ -27,6 +27,7 @@ import {
 	type WorkLedgerPublishJobRow,
 	type WorkLedgerPublishState,
 	type WorkLedgerRow,
+	type WorkLedgerDraftSuggestion,
 	type WorktaleReadinessResponse,
 	workLedgerService,
 } from "@/services/workLedgerService";
@@ -131,6 +132,19 @@ export default function ChangelogRoutePage() {
 	const [publishJobsByEntry, setPublishJobsByEntry] = useState<
 		Record<string, WorkLedgerPublishJobRow[]>
 	>({});
+	const [draftSuggestions, setDraftSuggestions] = useState<
+		WorkLedgerDraftSuggestion[]
+	>([]);
+	const [suggestionSources, setSuggestionSources] = useState<{
+		git: number;
+		agent: number;
+		watchdog: number;
+	} | null>(null);
+	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+	const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+	const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(
+		null,
+	);
 	const [form, setForm] = useState<WorkLedgerInput>({
 		title: "",
 		summary: "",
@@ -183,10 +197,26 @@ export default function ChangelogRoutePage() {
 		]);
 
 		setEntries(entriesResult.data);
-		setProjects(((projectsResult.data as ProjectOption[] | null) ?? []).slice(0, 100));
-		setError(entriesResult.error ? String(entriesResult.error.message || "Unable to load work ledger.") : null);
+		setProjects(
+			((projectsResult.data as ProjectOption[] | null) ?? []).slice(0, 100),
+		);
+		setError(
+			entriesResult.error
+				? String(entriesResult.error.message || "Unable to load work ledger.")
+				: null,
+		);
 		setLoading(false);
 	}, [filters]);
+
+	const loadSuggestions = useCallback(async () => {
+		setSuggestionsLoading(true);
+		setSuggestionsError(null);
+		const result = await workLedgerService.fetchDraftSuggestions();
+		setDraftSuggestions(result.data);
+		setSuggestionSources(result.sources);
+		setSuggestionsError(result.error ? result.error.message : null);
+		setSuggestionsLoading(false);
+	}, []);
 
 	const loadReadiness = useCallback(async () => {
 		setReadinessLoading(true);
@@ -196,9 +226,31 @@ export default function ChangelogRoutePage() {
 		setReadinessLoading(false);
 	}, []);
 
+	const applySuggestion = (suggestion: WorkLedgerDraftSuggestion) => {
+		setForm({
+			title: suggestion.title,
+			summary: suggestion.summary,
+			sourceKind: suggestion.sourceKind,
+			commitRefs: suggestion.commitRefs ?? [],
+			projectId: suggestion.projectId ?? null,
+			appArea: suggestion.appArea ?? "",
+			architecturePaths: suggestion.architecturePaths ?? [],
+			hotspotIds: suggestion.hotspotIds ?? [],
+			lifecycleState: suggestion.lifecycleState,
+			publishState: suggestion.publishState ?? "draft",
+			externalReference: suggestion.externalReference ?? "",
+			externalUrl: "",
+		});
+		setSelectedSuggestionId(suggestion.suggestionId);
+	};
+
 	useEffect(() => {
 		void loadEntries();
 	}, [loadEntries]);
+
+	useEffect(() => {
+		void loadSuggestions();
+	}, [loadSuggestions]);
 
 	useEffect(() => {
 		void loadReadiness();
@@ -384,6 +436,8 @@ export default function ChangelogRoutePage() {
 				externalUrl: "",
 			});
 			await loadEntries();
+			await loadSuggestions();
+			setSelectedSuggestionId(null);
 		}
 		setSaving(false);
 	};
@@ -519,6 +573,86 @@ export default function ChangelogRoutePage() {
 					)}
 					{publisherError ? <div className={styles.error}>{publisherError}</div> : null}
 				</Panel>
+
+					{(suggestionsLoading ||
+						suggestionsError ||
+						draftSuggestions.length > 0) && (
+					<Panel variant="default" padding="lg" className={styles.suggestionPanel}>
+						<div className={styles.panelHeader}>
+							<div>
+								<Text size="sm" weight="semibold">
+									Draft suggestions
+								</Text>
+								<Text size="xs" color="muted">
+									Review-first needs pulled from activity, Watchdog telemetry, and observations.
+								</Text>
+							</div>
+							{suggestionsLoading && (
+								<Badge color="warning" variant="soft">
+									Loading
+								</Badge>
+							)}
+						</div>
+						{suggestionSources ? (
+							<div className={styles.suggestionStats}>
+								<span>{suggestionSources.git} git</span>
+								<span>{suggestionSources.agent} agent</span>
+								<span>{suggestionSources.watchdog} watchdog</span>
+							</div>
+						) : null}
+
+						{suggestionsError ? (
+							<div className={styles.error}>{suggestionsError}</div>
+						) : draftSuggestions.length === 0 ? (
+							<div className={styles.emptyStateCompact}>
+								No suggested drafts right now. Keep working and we’ll capture notable moments.
+							</div>
+						) : (
+							<div className={styles.suggestionList}>
+								{draftSuggestions.map((suggestion) => (
+									<div
+										key={suggestion.suggestionId}
+										className={`${styles.dataRow} ${
+											selectedSuggestionId === suggestion.suggestionId
+												? styles.suggestionActive
+												: ""
+										}`}
+									>
+										<div>
+											<div className={styles.dataRowTitle}>
+												{suggestion.title}
+											</div>
+											<div className={styles.dataRowMeta}>
+												{suggestion.summary}
+											</div>
+											<div className={styles.suggestionMeta}>
+												<span>{suggestion.sourceKind}</span>
+												{suggestion.commitRefs.length > 0 ? (
+													<span>{suggestion.commitRefs.join(", ")}</span>
+												) : null}
+												{suggestion.projectId ? (
+													<span>
+														{projectMap.get(suggestion.projectId) ||
+															suggestion.projectId}
+													</span>
+												) : null}
+											</div>
+										</div>
+										<div className={styles.dataRowAside}>
+											<button
+												type="button"
+												className={styles.sessionActionButton}
+												onClick={() => applySuggestion(suggestion)}
+											>
+												Load into form
+											</button>
+										</div>
+									</div>
+								))}
+							</div>
+						)}
+					</Panel>
+				)}
 
 				<Panel variant="default" padding="lg" className={styles.formPanel}>
 					<div className={styles.panelHeader}>

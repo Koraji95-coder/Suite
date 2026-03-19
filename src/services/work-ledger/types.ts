@@ -109,3 +109,32 @@ export interface WorkLedgerOpenArtifactFolderResult {
 	jobId: string;
 	artifactDir: string;
 }
+
+export interface WorkLedgerDraftSuggestion {
+	suggestionId: string;
+	sourceKey: string;
+	sourceKind: WorkLedgerSourceKind;
+	title: string;
+	summary: string;
+	commitRefs: string[];
+	projectId?: string | null;
+	appArea?: string | null;
+	architecturePaths: string[];
+	hotspotIds: string[];
+	lifecycleState: WorkLedgerLifecycleState;
+	publishState: WorkLedgerPublishState;
+	externalReference?: string | null;
+	createdAt: string;
+	details?: Record<string, unknown>;
+}
+
+export interface WorkLedgerDraftSuggestionsResponse {
+	ok: boolean;
+	count: number;
+	sources: {
+		git: number;
+		agent: number;
+		watchdog: number;
+	};
+	suggestions: WorkLedgerDraftSuggestion[];
+}

@@ -11,6 +11,7 @@ const mockLoadMemories = vi.hoisted(() => vi.fn());
 const mockFetchWorkLedgerEntries = vi.hoisted(() => vi.fn());
 const mockFetchWorktaleReadiness = vi.hoisted(() => vi.fn());
 const mockListPublishJobs = vi.hoisted(() => vi.fn());
+const mockFetchDraftSuggestions = vi.hoisted(() => vi.fn());
 const mockUseDashboardOverviewData = vi.hoisted(() => vi.fn());
 
 vi.mock("@/services/watchdogService", () => ({
@@ -31,6 +32,7 @@ vi.mock("@/services/workLedgerService", () => ({
 		fetchEntries: mockFetchWorkLedgerEntries,
 		fetchWorktaleReadiness: mockFetchWorktaleReadiness,
 		listPublishJobs: mockListPublishJobs,
+		fetchDraftSuggestions: mockFetchDraftSuggestions,
 	},
 }));
 
@@ -282,6 +284,32 @@ describe("DashboardOverviewPanel", () => {
 				},
 			],
 			error: null,
+		});
+		mockFetchDraftSuggestions.mockResolvedValue({
+			data: [
+				{
+					suggestionId: "suggest-git-1",
+					sourceKey: "git:abc123",
+					sourceKind: "git_checkpoint",
+					title: "Recent git checkpoint",
+					summary: "Pulled from recent git history.",
+					commitRefs: ["abc123"],
+					projectId: "project-1",
+					appArea: "agent",
+					architecturePaths: ["src/services/agentService.ts"],
+					hotspotIds: ["src/services/agentService.ts"],
+					lifecycleState: "completed",
+					publishState: "draft",
+					externalReference: "suggestion:git:abc123",
+					createdAt: "2026-03-18T00:00:00.000Z",
+				},
+			],
+			error: null,
+			sources: {
+				git: 1,
+				agent: 0,
+				watchdog: 0,
+			},
 		});
 	});
 

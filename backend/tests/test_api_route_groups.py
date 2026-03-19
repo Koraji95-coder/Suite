@@ -379,6 +379,7 @@ class TestApiRouteGroups(unittest.TestCase):
             backup_max_bytes=1024 * 1024,
             backup_max_files=100,
             autodraft_dotnet_api_url="",
+            autodraft_execute_provider="dotnet_api",
             conduit_route_autocad_provider="com",
             batch_session_cookie="bfr_session",
             batch_session_ttl_seconds=3600,

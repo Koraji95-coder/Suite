@@ -7,6 +7,7 @@ from backend.route_groups.api_runtime_config import (
     AUTODRAFT_DOTNET_API_DEFAULT_URL,
     derive_default_passkey_rp_id,
     normalize_auth_passkey_provider,
+    normalize_autodraft_execute_provider,
     resolve_agent_webhook_secret,
     resolve_api_key,
     resolve_autodraft_dotnet_api_url,
@@ -127,6 +128,29 @@ class TestApiRuntimeConfig(unittest.TestCase):
         self.assertEqual(
             normalize_auth_passkey_provider(raw_value="bad", logger=logger),
             "supabase",
+        )
+        self.assertEqual(len(logger.warnings), 1)
+
+    def test_normalize_autodraft_execute_provider(self) -> None:
+        logger = _LoggerStub()
+        self.assertEqual(
+            normalize_autodraft_execute_provider(raw_value="bridge", logger=logger),
+            "dotnet_bridge",
+        )
+        self.assertEqual(
+            normalize_autodraft_execute_provider(
+                raw_value="dotnet_bridge_fallback_api",
+                logger=logger,
+            ),
+            "dotnet_bridge_fallback_api",
+        )
+        self.assertEqual(
+            normalize_autodraft_execute_provider(raw_value="api", logger=logger),
+            "dotnet_api",
+        )
+        self.assertEqual(
+            normalize_autodraft_execute_provider(raw_value="bad", logger=logger),
+            "dotnet_bridge_fallback_api",
         )
         self.assertEqual(len(logger.warnings), 1)
 

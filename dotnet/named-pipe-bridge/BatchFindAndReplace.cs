@@ -5,13 +5,17 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using System.Threading;
 
 const string DefaultPipeName = "SUITE_AUTOCAD_PIPE";
 var pipeName = args.Length > 0 ? args[0] : DefaultPipeName;
 var expectedToken = (Environment.GetEnvironmentVariable("AUTOCAD_DOTNET_TOKEN") ?? "").Trim();
-var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+{
+    TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+};
 var maxPipeServerInstances = ResolveMaxPipeServerInstances();
 var maxPipeWorkerConcurrency = ParsePositiveIntEnv("AUTOCAD_DOTNET_MAX_PIPE_WORKERS", 2);
 var workerLimiter = new SemaphoreSlim(maxPipeWorkerConcurrency, maxPipeWorkerConcurrency);
@@ -274,6 +278,7 @@ static class PipeRouter
             var actionStopwatch = Stopwatch.StartNew();
             JsonObject result = normalizedAction switch
             {
+                "autodraft_execute" => AutoDraftExecuteAction.Handle(payload),
                 "conduit_route_terminal_scan" => TerminalScanAction.Handle(payload),
                 "conduit_route_obstacle_scan" => ObstacleScanAction.Handle(payload),
                 "conduit_route_terminal_routes_draw" => TerminalRouteDrawAction.Handle(payload),

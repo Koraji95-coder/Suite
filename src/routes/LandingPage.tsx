@@ -1,6 +1,6 @@
 // src/routes/LandingPage.tsx
 
-import { Activity, Sparkles, Workflow } from "lucide-react";
+import { Activity, Boxes, ClipboardList, Sparkles, Workflow } from "lucide-react";
 import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
@@ -35,6 +35,29 @@ const COMMAND_SIGNALS = [
 		icon: Sparkles,
 		label: "Agent coordination",
 		value: "Agents, engineering apps, and shared context",
+	},
+] as const;
+
+const HERO_SUMMARY_ITEMS = [
+	{
+		icon: ClipboardList,
+		label: "Delivery scope",
+		value: "Projects, revisions, transmittals, and review checkpoints stay in one workflow.",
+	},
+	{
+		icon: Boxes,
+		label: "CAD execution",
+		value: "Markup planning, CAD preflight, and bridge-backed automation run through the same control surface.",
+	},
+	{
+		icon: Activity,
+		label: "Runtime state",
+		value: "Collectors, health signals, and route diagnostics stay visible while you work.",
+	},
+	{
+		icon: Sparkles,
+		label: "Shared context",
+		value: "Agents, architecture, and work ledger history stay aligned instead of fragmenting across tools.",
 	},
 ] as const;
 
@@ -73,7 +96,7 @@ export default function LandingPage() {
 					</Link>
 
 					<HStack gap={2} align="center">
-						<Link to="/login">
+						<Link to="/login" className={styles.navActionLink}>
 							<Button variant="primary" size="sm">
 								Sign in
 							</Button>
@@ -95,7 +118,7 @@ export default function LandingPage() {
 								className={styles.heroBadge}
 							>
 								<span className={styles.heroBadgeDot} />
-								Engineering operations
+								Engineering ops
 							</Badge>
 
 							<h1 className={styles.heroTitle}>
@@ -134,6 +157,56 @@ export default function LandingPage() {
 									</Button>
 								</Link>
 							</HStack>
+						</div>
+
+						<div className={styles.heroRight}>
+							<Panel
+								variant="default"
+								padding="md"
+								className={styles.heroSummaryPanel}
+							>
+								<div className={styles.heroSummaryHeader}>
+									<Text size="xs" weight="semibold" className={styles.heroSummaryEyebrow}>
+										Operations inside Suite
+									</Text>
+									<Text as="h2" size="lg" weight="semibold" block>
+										One workspace for delivery, CAD flow, and execution control
+									</Text>
+									<Text size="sm" color="muted" block>
+										The same surface tracks project delivery, CAD readiness,
+										runtime health, and agent-assisted work without a second tool
+										stack.
+									</Text>
+								</div>
+
+								<div className={styles.heroSummaryGrid}>
+									{HERO_SUMMARY_ITEMS.map((item) => (
+										<div key={item.label} className={styles.heroSummaryCard}>
+											<div className={styles.heroSummaryIconShell}>
+												<item.icon className={styles.heroSummaryIcon} />
+											</div>
+											<div>
+												<Text
+													size="sm"
+													weight="semibold"
+													className={styles.heroSummaryLabel}
+													block
+												>
+													{item.label}
+												</Text>
+												<Text
+													size="xs"
+													color="muted"
+													className={styles.heroSummaryValue}
+													block
+												>
+													{item.value}
+												</Text>
+											</div>
+										</div>
+									))}
+								</div>
+							</Panel>
 						</div>
 					</div>
 				</section>

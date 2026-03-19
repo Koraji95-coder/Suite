@@ -144,6 +144,7 @@ from route_groups.api_env_parsing import (
 from route_groups.api_runtime_config import (
     derive_default_passkey_rp_id as runtime_config_derive_default_passkey_rp_id_helper,
     normalize_auth_passkey_provider as runtime_config_normalize_auth_passkey_provider_helper,
+    normalize_autodraft_execute_provider as runtime_config_normalize_autodraft_execute_provider_helper,
     resolve_agent_webhook_secret as runtime_config_resolve_agent_webhook_secret_helper,
     resolve_api_key as runtime_config_resolve_api_key_helper,
     resolve_autodraft_dotnet_api_url as runtime_config_resolve_autodraft_dotnet_api_url_helper,
@@ -450,6 +451,10 @@ BACKUP_MAX_FILES = _parse_int_env("BACKUP_MAX_FILES", 500, minimum=10)
 AUTODRAFT_DOTNET_API_URL = runtime_config_resolve_autodraft_dotnet_api_url_helper(
     os_module=os,
 )
+AUTODRAFT_EXECUTE_PROVIDER = runtime_config_normalize_autodraft_execute_provider_helper(
+    raw_value=(os.environ.get("AUTODRAFT_EXECUTE_PROVIDER") or "dotnet_bridge_fallback_api"),
+    logger=logger,
+)
 
 
 def _normalize_conduit_provider_env(raw_value: str) -> str:
@@ -563,6 +568,13 @@ def _send_autocad_dotnet_command(action: str, payload: Dict[str, Any]) -> Dict[s
 
 AUTOCAD_DOTNET_COMMAND_SENDER = (
     _send_autocad_dotnet_command if dotnet_send_command_helper is not None else None
+)
+
+logger.info(
+    "AutoDraft execute provider configured (provider=%s, dotnet_api_configured=%s, bridge_sender_ready=%s).",
+    AUTODRAFT_EXECUTE_PROVIDER,
+    bool(AUTODRAFT_DOTNET_API_URL),
+    bool(AUTOCAD_DOTNET_COMMAND_SENDER),
 )
 
 # ── Agent Broker + Supabase Auth ────────────────────────────────
@@ -1924,6 +1936,7 @@ register_route_groups(
     backup_max_bytes=BACKUP_MAX_BYTES,
     backup_max_files=BACKUP_MAX_FILES,
     autodraft_dotnet_api_url=AUTODRAFT_DOTNET_API_URL,
+    autodraft_execute_provider=AUTODRAFT_EXECUTE_PROVIDER,
     conduit_route_autocad_provider=CONDUIT_ROUTE_AUTOCAD_PROVIDER,
     batch_session_cookie=BATCH_SESSION_COOKIE,
     batch_session_ttl_seconds=BATCH_SESSION_TTL_SECONDS,

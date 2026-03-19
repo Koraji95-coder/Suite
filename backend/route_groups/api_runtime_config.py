@@ -88,6 +88,33 @@ def normalize_auth_passkey_provider(
     return provider
 
 
+def normalize_autodraft_execute_provider(
+    *,
+    raw_value: str,
+    logger: Any,
+) -> str:
+    provider = (raw_value or "dotnet_bridge_fallback_api").strip().lower()
+    aliases = {
+        "": "dotnet_bridge_fallback_api",
+        "bridge": "dotnet_bridge",
+        "dotnet_bridge": "dotnet_bridge",
+        "bridge_fallback_api": "dotnet_bridge_fallback_api",
+        "dotnet_bridge_fallback_api": "dotnet_bridge_fallback_api",
+        "bridge_with_api_fallback": "dotnet_bridge_fallback_api",
+        "api": "dotnet_api",
+        "http": "dotnet_api",
+        "dotnet_api": "dotnet_api",
+    }
+    resolved = aliases.get(provider)
+    if resolved is None:
+        logger.warning(
+            "Unsupported AUTODRAFT_EXECUTE_PROVIDER=%r; falling back to 'dotnet_bridge_fallback_api'.",
+            provider,
+        )
+        return "dotnet_bridge_fallback_api"
+    return resolved
+
+
 def derive_default_passkey_rp_id(
     *,
     auth_passkey_allowed_origins: Iterable[str],

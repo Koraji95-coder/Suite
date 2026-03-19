@@ -53,6 +53,7 @@ def register_route_groups(
     backup_max_bytes: int,
     backup_max_files: int,
     autodraft_dotnet_api_url: str,
+    autodraft_execute_provider: str,
     conduit_route_autocad_provider: str,
     batch_session_cookie: str,
     batch_session_ttl_seconds: int,
@@ -90,6 +91,8 @@ def register_route_groups(
             limiter=limiter,
             logger=logger,
             autodraft_dotnet_api_url=autodraft_dotnet_api_url,
+            autodraft_execute_provider=autodraft_execute_provider,
+            send_autodraft_dotnet_command=send_autocad_dotnet_command,
             get_manager=get_manager,
         )
     )

@@ -6855,11 +6855,102 @@ def create_autodraft_blueprint(
     limiter: Limiter,
     logger: Any,
     autodraft_dotnet_api_url: str,
+    autodraft_execute_provider: str,
+    send_autodraft_dotnet_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
     get_manager: Optional[Callable[[], Any]] = None,
 ) -> Blueprint:
     """Create /api/autodraft route group blueprint."""
     bp = Blueprint("autodraft_api", __name__, url_prefix="/api/autodraft")
     dotnet_base_url = (autodraft_dotnet_api_url or "").strip().rstrip("/")
+
+    def _normalize_execute_provider(raw_value: str) -> str:
+        normalized = str(raw_value or "").strip().lower().replace("-", "_")
+        aliases = {
+            "": "dotnet_bridge_fallback_api",
+            "bridge": "dotnet_bridge",
+            "dotnet_bridge": "dotnet_bridge",
+            "bridge_fallback_api": "dotnet_bridge_fallback_api",
+            "dotnet_bridge_fallback_api": "dotnet_bridge_fallback_api",
+            "bridge_with_api_fallback": "dotnet_bridge_fallback_api",
+            "api": "dotnet_api",
+            "http": "dotnet_api",
+            "dotnet_api": "dotnet_api",
+        }
+        resolved = aliases.get(normalized)
+        if resolved is not None:
+            return resolved
+        logger.warning(
+            "Unknown AUTODRAFT_EXECUTE_PROVIDER=%s; defaulting to dotnet_bridge_fallback_api.",
+            raw_value,
+        )
+        return "dotnet_bridge_fallback_api"
+
+    execute_provider = _normalize_execute_provider(autodraft_execute_provider)
+    execute_bridge_enabled = execute_provider in {
+        "dotnet_bridge",
+        "dotnet_bridge_fallback_api",
+    }
+    execute_api_fallback_enabled = execute_provider == "dotnet_bridge_fallback_api"
+
+    def _call_autodraft_execute_bridge(
+        *,
+        payload: Dict[str, Any],
+        request_id: str,
+    ) -> Dict[str, Any]:
+        if send_autodraft_dotnet_command is None:
+            raise RuntimeError(
+                "AutoDraft .NET bridge is unavailable. Install pywin32 and ensure the named-pipe bridge is running."
+            )
+
+        started_at = time.time()
+        response = send_autodraft_dotnet_command(
+            "autodraft_execute",
+            {
+                **payload,
+                "requestId": request_id,
+            },
+        )
+        elapsed_ms = int((time.time() - started_at) * 1000)
+
+        if not isinstance(response, dict):
+            raise RuntimeError("Malformed response from AutoDraft .NET bridge.")
+        if not response.get("ok"):
+            raise RuntimeError(
+                str(response.get("error") or "Unknown AutoDraft .NET bridge error.")
+            )
+
+        result_payload = response.get("result")
+        if not isinstance(result_payload, dict):
+            raise RuntimeError("AutoDraft .NET bridge returned invalid result payload.")
+
+        data = result_payload.get("data") if isinstance(result_payload.get("data"), dict) else {}
+        warnings = result_payload.get("warnings")
+        normalized_warnings = warnings if isinstance(warnings, list) else []
+
+        normalized_response: Dict[str, Any] = {
+            "ok": bool(result_payload.get("success", True)),
+            "source": "dotnet-bridge",
+            "job_id": str(data.get("jobId") or response.get("id") or f"bridge-{request_id}"),
+            "status": str(data.get("status") or "preflight-only"),
+            "accepted": int(data.get("accepted") or 0),
+            "skipped": int(data.get("skipped") or 0),
+            "dry_run": bool(data.get("dryRun", payload.get("dry_run", True))),
+            "message": str(
+                data.get("message")
+                or result_payload.get("message")
+                or "AutoDraft bridge request completed."
+            ),
+            "requestId": request_id,
+            "warnings": normalized_warnings,
+            "meta": {
+                **(result_payload.get("meta") if isinstance(result_payload.get("meta"), dict) else {}),
+                "bridgeMs": elapsed_ms,
+                "providerPath": "dotnet_bridge",
+                "requestId": request_id,
+                "bridgeRequestId": str(response.get("id") or ""),
+            },
+        }
+        return normalized_response
 
     def _resolve_cad_context_for_request(
         *,
@@ -6931,8 +7022,14 @@ def create_autodraft_blueprint(
                 {
                     "ok": True,
                     "app": "AutoDraft Studio",
-                    "mode": "dotnet-proxy" if dotnet_base_url else "local-fallback",
+                    "mode": execute_provider,
                     "dotnet": dotnet_status,
+                    "execute_provider": {
+                        "provider": execute_provider,
+                        "bridge_ready": bool(send_autodraft_dotnet_command),
+                        "api_configured": bool(dotnet_base_url),
+                        "api_fallback_enabled": execute_api_fallback_enabled,
+                    },
                     "elapsed_ms": elapsed_ms,
                 }
             ),
@@ -8032,16 +8129,47 @@ def create_autodraft_blueprint(
 
         payload["backcheck_fail_count"] = server_backcheck_fail_count
         payload.setdefault("requestId", request_id)
+        if execute_bridge_enabled:
+            try:
+                bridge_response = _call_autodraft_execute_bridge(
+                    payload=payload,
+                    request_id=request_id,
+                )
+                return jsonify(bridge_response), 200
+            except Exception as bridge_exc:
+                logger.warning(
+                    "AutoDraft bridge execute failed request_id=%s provider=%s error=%s",
+                    request_id,
+                    execute_provider,
+                    bridge_exc,
+                )
+                if not execute_api_fallback_enabled:
+                    return _autodraft_error_response(
+                        code="AUTODRAFT_UPSTREAM_ERROR",
+                        message=str(bridge_exc),
+                        request_id=request_id,
+                        status_code=502,
+                        meta={
+                            "endpoint": "/api/autodraft/execute",
+                            "provider": execute_provider,
+                            "provider_path": "dotnet_bridge",
+                        },
+                    )
+
         if not dotnet_base_url:
+            bridge_message = (
+                "Execution requires AutoDraft .NET bridge or API integration. "
+                "Configure AUTODRAFT_EXECUTE_PROVIDER and/or AUTODRAFT_DOTNET_API_URL."
+            )
             return _autodraft_error_response(
                 code="AUTODRAFT_EXECUTE_NOT_CONFIGURED",
-                message=(
-                    "Execution requires .NET API integration. Configure "
-                    "AUTODRAFT_DOTNET_API_URL."
-                ),
+                message=bridge_message,
                 request_id=request_id,
                 status_code=501,
-                meta={"endpoint": "/api/autodraft/execute"},
+                meta={
+                    "endpoint": "/api/autodraft/execute",
+                    "provider": execute_provider,
+                },
             )
 
         upstream, error, status = _proxy_json(
@@ -8060,11 +8188,17 @@ def create_autodraft_blueprint(
                 meta={
                     "endpoint": "/api/autodraft/execute",
                     "upstream_status": status,
+                    "provider": execute_provider,
+                    "provider_path": "dotnet_api",
                 },
             )
 
         upstream.setdefault("requestId", request_id)
         upstream["source"] = "dotnet"
+        if isinstance(upstream.get("meta"), dict):
+            upstream["meta"]["providerPath"] = "dotnet_api"
+        else:
+            upstream["meta"] = {"providerPath": "dotnet_api"}
         return jsonify(upstream), status
 
     @bp.route("/backcheck", methods=["POST"])

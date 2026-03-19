@@ -38,6 +38,7 @@ export type AutoDraftCommitCounts = {
 	titleBlockUpdates: number;
 	textReplacementUpdates: number;
 	textDeleteUpdates: number;
+	textSwapUpdates: number;
 	dimensionTextUpdates: number;
 };
 
@@ -69,6 +70,7 @@ export type AutoDraftExecutionSummary = {
 	titleBlockUpdates: ReadonlyArray<Record<string, unknown>>;
 	textReplacementUpdates: ReadonlyArray<Record<string, unknown>>;
 	textDeleteUpdates: ReadonlyArray<Record<string, unknown>>;
+	textSwapUpdates: ReadonlyArray<Record<string, unknown>>;
 	dimensionTextUpdates: ReadonlyArray<Record<string, unknown>>;
 	createdHandles: ReadonlyArray<string>;
 };
@@ -93,6 +95,7 @@ export function summarizeAutoDraftExecution(
 	const titleBlockUpdates = readReceiptList(receipt.titleBlockUpdates);
 	const textReplacementUpdates = readReceiptList(receipt.textReplacementUpdates);
 	const textDeleteUpdates = readReceiptList(receipt.textDeleteUpdates);
+	const textSwapUpdates = readReceiptList(receipt.textSwapUpdates);
 	const dimensionTextUpdates = readReceiptList(receipt.dimensionTextUpdates);
 
 	return {
@@ -119,6 +122,7 @@ export function summarizeAutoDraftExecution(
 			titleBlockUpdates: titleBlockUpdates.length,
 			textReplacementUpdates: textReplacementUpdates.length,
 			textDeleteUpdates: textDeleteUpdates.length,
+			textSwapUpdates: textSwapUpdates.length,
 			dimensionTextUpdates: dimensionTextUpdates.length,
 		},
 		cad: {
@@ -138,6 +142,7 @@ export function summarizeAutoDraftExecution(
 		titleBlockUpdates,
 		textReplacementUpdates,
 		textDeleteUpdates,
+		textSwapUpdates,
 		dimensionTextUpdates,
 		createdHandles,
 	};
@@ -216,6 +221,12 @@ export function buildAutoDraftRevisionTraceNotes(args: {
 		);
 		appendLine(
 			lines,
+			summary.counts.textSwapUpdates > 0
+				? `Text swaps: ${summary.counts.textSwapUpdates}`
+				: "",
+		);
+		appendLine(
+			lines,
 			summary.counts.dimensionTextUpdates > 0
 				? `Dimension text updates: ${summary.counts.dimensionTextUpdates}`
 				: "",
@@ -255,6 +266,9 @@ export function buildAutoDraftExecutionIssueSummary(
 	}
 	if (summary.counts.textDeleteUpdates > 0) {
 		detailParts.push(`${summary.counts.textDeleteUpdates} text deletion(s)`);
+	}
+	if (summary.counts.textSwapUpdates > 0) {
+		detailParts.push(`${summary.counts.textSwapUpdates} text swap update(s)`);
 	}
 	if (summary.counts.dimensionTextUpdates > 0) {
 		detailParts.push(`${summary.counts.dimensionTextUpdates} dimension update(s)`);

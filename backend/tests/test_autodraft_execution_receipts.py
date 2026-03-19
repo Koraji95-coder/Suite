@@ -69,6 +69,24 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                                         "handle": "5E6F",
                                     }
                                 ],
+                                "textSwapUpdates": [
+                                    {
+                                        "slot": "first",
+                                        "targetEntityId": "9A0B",
+                                        "entityType": "AcDbText",
+                                        "previousValue": "PANEL A",
+                                        "nextValue": "PANEL B",
+                                        "handle": "9A0B",
+                                    },
+                                    {
+                                        "slot": "second",
+                                        "targetEntityId": "9A0C",
+                                        "entityType": "AcDbText",
+                                        "previousValue": "PANEL B",
+                                        "nextValue": "PANEL A",
+                                        "handle": "9A0C",
+                                    },
+                                ],
                                 "dimensionTextUpdates": [
                                     {
                                         "targetEntityId": "7A8B",
@@ -131,6 +149,27 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                     ],
                 )
                 self.assertEqual(
+                    receipt["textSwapUpdates"],
+                    [
+                        {
+                            "slot": "first",
+                            "targetEntityId": "9A0B",
+                            "entityType": "AcDbText",
+                            "previousValue": "PANEL A",
+                            "nextValue": "PANEL B",
+                            "handle": "9A0B",
+                        },
+                        {
+                            "slot": "second",
+                            "targetEntityId": "9A0C",
+                            "entityType": "AcDbText",
+                            "previousValue": "PANEL B",
+                            "nextValue": "PANEL A",
+                            "handle": "9A0C",
+                        },
+                    ],
+                )
+                self.assertEqual(
                     receipt["dimensionTextUpdates"],
                     [
                         {
@@ -152,6 +191,7 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                                drawing_name, drawing_path, warnings_json, created_handles_json,
                                workflow_context_json, revision_context_json, title_block_updates_json,
                                text_replacement_updates_json, text_delete_updates_json,
+                               text_swap_updates_json,
                                dimension_text_updates_json
                         from autodraft_execution_receipts
                         where request_id = ?
@@ -178,7 +218,8 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                 self.assertIn("\"fieldKey\":\"revision\"", row[12])
                 self.assertIn("\"targetEntityId\":\"3C4D\"", row[13])
                 self.assertIn("\"targetEntityId\":\"5E6F\"", row[14])
-                self.assertIn("\"targetEntityId\":\"7A8B\"", row[15])
+                self.assertIn("\"targetEntityId\":\"9A0B\"", row[15])
+                self.assertIn("\"targetEntityId\":\"7A8B\"", row[16])
 
 
 if __name__ == "__main__":

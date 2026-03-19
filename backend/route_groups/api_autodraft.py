@@ -854,6 +854,153 @@ def _build_dimension_text_execute_target(
     }
 
 
+def _build_text_swap_execute_target(
+    action: Dict[str, Any],
+    *,
+    cad_context: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    if _normalize_text(action.get("category")) != "swap":
+        return None
+
+    raw_target = action.get("execute_target")
+    if isinstance(raw_target, dict):
+        kind = _normalize_text(raw_target.get("kind"))
+        first_target_entity_id = str(
+            raw_target.get("first_target_entity_id")
+            or raw_target.get("left_target_entity_id")
+            or raw_target.get("source_entity_id")
+            or ""
+        ).strip()
+        second_target_entity_id = str(
+            raw_target.get("second_target_entity_id")
+            or raw_target.get("right_target_entity_id")
+            or raw_target.get("target_entity_id")
+            or ""
+        ).strip()
+        first_current_value = str(
+            raw_target.get("first_current_value")
+            or raw_target.get("left_current_value")
+            or ""
+        ).strip()
+        second_current_value = str(
+            raw_target.get("second_current_value")
+            or raw_target.get("right_current_value")
+            or ""
+        ).strip()
+        entity_type_hint = str(
+            raw_target.get("entity_type_hint")
+            or raw_target.get("entity_type")
+            or ""
+        ).strip()
+        if (
+            kind == "text_swap"
+            and first_target_entity_id
+            and second_target_entity_id
+            and first_target_entity_id.lower() != second_target_entity_id.lower()
+        ):
+            return {
+                "kind": "text_swap",
+                "first_target_entity_id": first_target_entity_id,
+                "first_current_value": first_current_value or None,
+                "second_target_entity_id": second_target_entity_id,
+                "second_current_value": second_current_value or None,
+                "entity_type_hint": entity_type_hint or "text",
+            }
+
+    cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
+    text_entities = _extract_text_entities(cad_context_obj)
+    if len(text_entities) < 2:
+        return None
+
+    markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+    markup_meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    markup_bounds = _normalize_bounds(markup.get("bounds"))
+
+    resolved_pair: Optional[List[Dict[str, Any]]] = None
+
+    callout_points = _normalize_point_list(markup_meta.get("callout_points"))
+    if len(callout_points) >= 2:
+        farthest_pair = _farthest_point_pair(callout_points)
+        endpoint_points = (
+            [farthest_pair[0], farthest_pair[1]]
+            if farthest_pair
+            else [callout_points[0], callout_points[-1]]
+        )
+        search_radius = 36.0
+        if markup_bounds:
+            search_radius = max(
+                search_radius,
+                math.hypot(
+                    float(markup_bounds.get("width") or 0.0),
+                    float(markup_bounds.get("height") or 0.0),
+                )
+                * 2.5,
+            )
+        selected: List[Dict[str, Any]] = []
+        used_ids: set[str] = set()
+        for point in endpoint_points:
+            best_candidate: Optional[Dict[str, Any]] = None
+            best_distance = float("inf")
+            for entity in text_entities:
+                entity_id = str(entity.get("id") or "").strip()
+                entity_bounds = (
+                    entity.get("bounds") if isinstance(entity.get("bounds"), dict) else None
+                )
+                if not entity_id or entity_id in used_ids or not entity_bounds:
+                    continue
+                entity_center = _resolve_bounds_center(entity_bounds)
+                distance = _distance_between_points(point, entity_center)
+                if distance < best_distance:
+                    best_candidate = entity
+                    best_distance = distance
+            if best_candidate and best_distance <= search_radius:
+                selected.append(best_candidate)
+                used_ids.add(str(best_candidate.get("id") or "").strip())
+        if len(selected) == 2:
+            resolved_pair = selected
+
+    if resolved_pair is None and markup_bounds:
+        candidates = [
+            entity
+            for entity in text_entities
+            if _bounds_overlap(
+                _expand_bounds(markup_bounds, 2.0),
+                _expand_bounds(entity.get("bounds") or {}, 1.0),
+            )
+        ]
+        if len(candidates) == 2:
+            resolved_pair = sorted(
+                candidates,
+                key=lambda entity: (
+                    float((entity.get("bounds") or {}).get("x") or 0.0),
+                    float((entity.get("bounds") or {}).get("y") or 0.0),
+                    str(entity.get("id") or ""),
+                ),
+            )
+
+    if not resolved_pair or len(resolved_pair) != 2:
+        return None
+
+    first, second = resolved_pair
+    first_target_entity_id = str(first.get("id") or "").strip()
+    second_target_entity_id = str(second.get("id") or "").strip()
+    if (
+        not first_target_entity_id
+        or not second_target_entity_id
+        or first_target_entity_id.lower() == second_target_entity_id.lower()
+    ):
+        return None
+
+    return {
+        "kind": "text_swap",
+        "first_target_entity_id": first_target_entity_id,
+        "first_current_value": str(first.get("text") or "").strip() or None,
+        "second_target_entity_id": second_target_entity_id,
+        "second_current_value": str(second.get("text") or "").strip() or None,
+        "entity_type_hint": "text",
+    }
+
+
 def _prepare_autodraft_execute_actions(
     actions: List[Dict[str, Any]],
     *,
@@ -907,6 +1054,19 @@ def _prepare_autodraft_execute_actions(
                 isinstance(next_action.get("execute_target"), dict)
                 and _normalize_text(next_action["execute_target"].get("kind"))
                 == "dimension_text_override"
+            ):
+                next_action.pop("execute_target", None)
+        elif category == "swap":
+            execute_target = _build_text_swap_execute_target(
+                next_action,
+                cad_context=cad_context,
+            )
+            if execute_target:
+                next_action["execute_target"] = execute_target
+            elif (
+                isinstance(next_action.get("execute_target"), dict)
+                and _normalize_text(next_action["execute_target"].get("kind"))
+                == "text_swap"
             ):
                 next_action.pop("execute_target", None)
         prepared_actions.append(next_action)

@@ -80,6 +80,7 @@ def _ensure_schema(connection: sqlite3.Connection, db_path: Path) -> None:
                 title_block_updates_json text,
                 text_replacement_updates_json text,
                 text_delete_updates_json text,
+                text_swap_updates_json text,
                 dimension_text_updates_json text,
                 created_at text not null
             )
@@ -100,6 +101,10 @@ def _ensure_schema(connection: sqlite3.Connection, db_path: Path) -> None:
         if "text_delete_updates_json" not in existing_columns:
             connection.execute(
                 "alter table autodraft_execution_receipts add column text_delete_updates_json text"
+            )
+        if "text_swap_updates_json" not in existing_columns:
+            connection.execute(
+                "alter table autodraft_execution_receipts add column text_swap_updates_json text"
             )
         if "dimension_text_updates_json" not in existing_columns:
             connection.execute(
@@ -201,6 +206,21 @@ def _extract_dimension_text_updates(
     return [entry for entry in raw_updates if isinstance(entry, dict)]
 
 
+def _extract_text_swap_updates(
+    response_payload: Dict[str, Any],
+) -> list[Dict[str, Any]]:
+    meta = response_payload.get("meta")
+    if not isinstance(meta, dict):
+        return []
+    commit = meta.get("commit")
+    if not isinstance(commit, dict):
+        return []
+    raw_updates = commit.get("textSwapUpdates")
+    if not isinstance(raw_updates, list):
+        return []
+    return [entry for entry in raw_updates if isinstance(entry, dict)]
+
+
 def persist_autodraft_execution_receipt(
     *,
     request_id: str,
@@ -232,6 +252,7 @@ def persist_autodraft_execution_receipt(
     title_block_updates = _extract_title_block_updates(response_payload)
     text_replacement_updates = _extract_text_replacement_updates(response_payload)
     text_delete_updates = _extract_text_delete_updates(response_payload)
+    text_swap_updates = _extract_text_swap_updates(response_payload)
     dimension_text_updates = _extract_dimension_text_updates(response_payload)
 
     receipt_summary = {
@@ -253,6 +274,7 @@ def persist_autodraft_execution_receipt(
         "titleBlockUpdates": title_block_updates,
         "textReplacementUpdates": text_replacement_updates,
         "textDeleteUpdates": text_delete_updates,
+        "textSwapUpdates": text_swap_updates,
         "dimensionTextUpdates": dimension_text_updates,
     }
 
@@ -280,9 +302,10 @@ def persist_autodraft_execution_receipt(
                 title_block_updates_json,
                 text_replacement_updates_json,
                 text_delete_updates_json,
+                text_swap_updates_json,
                 dimension_text_updates_json,
                 created_at
-            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 receipt_summary["id"],
@@ -305,6 +328,7 @@ def persist_autodraft_execution_receipt(
                 _normalize_json(title_block_updates),
                 _normalize_json(text_replacement_updates),
                 _normalize_json(text_delete_updates),
+                _normalize_json(text_swap_updates),
                 _normalize_json(dimension_text_updates),
                 created_at,
             ),

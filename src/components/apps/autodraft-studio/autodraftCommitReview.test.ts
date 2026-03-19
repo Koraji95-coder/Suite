@@ -18,7 +18,7 @@ function buildAction(overrides: Partial<AutoDraftAction>): AutoDraftAction {
 }
 
 describe("autodraftCommitReview", () => {
-it("marks note, title block, resolved replacement, delete, and dimension actions as commit ready", () => {
+it("marks note, title block, resolved replacement, delete, swap, and dimension actions as commit ready", () => {
 		const summary = buildAutoDraftCommitReview(
 			[
 				buildAction({
@@ -57,6 +57,20 @@ it("marks note, title block, resolved replacement, delete, and dimension actions
 					},
 				}),
 				buildAction({
+					id: "swap-1",
+					category: "SWAP",
+					action: "Swap panel labels",
+					markup: {
+						text: "swap this with RP1L5-4",
+						meta: {
+							callout_points: [
+								{ x: 15, y: 18 },
+								{ x: 44, y: 18 },
+							],
+						},
+					},
+				}),
+				buildAction({
 					id: "dimension-1",
 					category: "DIMENSION",
 					action: "Update dimension to 12'-0\"",
@@ -73,7 +87,7 @@ it("marks note, title block, resolved replacement, delete, and dimension actions
 			},
 		);
 
-		expect(summary.readyCount).toBe(5);
+		expect(summary.readyCount).toBe(6);
 		expect(summary.needsContextCount).toBe(0);
 		expect(summary.reviewCount).toBe(0);
 		expect(summary.items[0]?.status).toBe("ready");
@@ -119,6 +133,11 @@ it("marks note, title block, resolved replacement, delete, and dimension actions
 				action: "Delete bus duct A3",
 			}),
 			buildAction({
+				id: "swap-1",
+				category: "SWAP",
+				action: "Swap panel labels",
+			}),
+			buildAction({
 				id: "dimension-1",
 				category: "DIMENSION",
 				action: "Update dimension text",
@@ -127,7 +146,7 @@ it("marks note, title block, resolved replacement, delete, and dimension actions
 		]);
 
 		expect(summary.readyCount).toBe(0);
-		expect(summary.reviewCount).toBe(3);
+		expect(summary.reviewCount).toBe(4);
 		expect(summary.items.every((item) => item.status === "review")).toBe(true);
 	});
 });

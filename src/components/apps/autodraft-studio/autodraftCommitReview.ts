@@ -13,6 +13,7 @@ export type AutoDraftCommitReviewFamily =
 	| "title_block"
 	| "text_replacement"
 	| "text_delete"
+	| "text_swap"
 	| "dimension"
 	| "unsupported";
 
@@ -255,6 +256,42 @@ function buildDimensionReviewItem(
 	};
 }
 
+function buildTextSwapReviewItem(
+	action: AutoDraftAction,
+): AutoDraftCommitReviewItem {
+	const calloutPoints = Array.isArray(action.markup?.meta?.callout_points)
+		? action.markup?.meta?.callout_points
+		: [];
+	const hasBounds = Boolean(action.markup?.bounds);
+	if (calloutPoints.length >= 2 || hasBounds) {
+		return {
+			id: action.id,
+			family: "text_swap",
+			familyLabel: "Text swap",
+			status: "ready",
+			title: action.action,
+			summary:
+				"Text swap is commit-enabled when preview resolves two CAD text targets.",
+			target:
+				calloutPoints.length >= 2
+					? "Preview resolves two text targets from callout endpoints"
+					: "Preview resolves two text targets from markup bounds",
+			reason: "",
+		};
+	}
+	return {
+		id: action.id,
+		family: "text_swap",
+		familyLabel: "Text swap",
+		status: "review",
+		title: action.action,
+		summary: "Text swap commit needs two resolvable CAD text targets.",
+		target: "",
+		reason:
+			"Provide two callout endpoints or bounds that isolate exactly two CAD text targets.",
+	};
+}
+
 function buildUnsupportedReviewItem(
 	action: AutoDraftAction,
 ): AutoDraftCommitReviewItem {
@@ -299,6 +336,9 @@ export function buildAutoDraftCommitReview(
 			}
 			if (action.category === "DELETE") {
 				return buildTextDeleteReviewItem(action);
+			}
+			if (action.category === "SWAP") {
+				return buildTextSwapReviewItem(action);
 			}
 			if (action.category === "DIMENSION") {
 				return buildDimensionReviewItem(action);

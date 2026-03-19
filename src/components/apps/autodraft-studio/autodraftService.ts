@@ -122,6 +122,7 @@ export type AutoDraftExecutionReceipt = {
 	titleBlockUpdates?: Record<string, unknown>[];
 	textReplacementUpdates?: Record<string, unknown>[];
 	textDeleteUpdates?: Record<string, unknown>[];
+	textSwapUpdates?: Record<string, unknown>[];
 	dimensionTextUpdates?: Record<string, unknown>[];
 };
 
@@ -874,6 +875,11 @@ const normalizeExecutePayload = (
 						executionReceiptPayload.textDeleteUpdates,
 					)
 						? executionReceiptPayload.textDeleteUpdates.filter(isRecord)
+						: undefined,
+					textSwapUpdates: Array.isArray(
+						executionReceiptPayload.textSwapUpdates,
+					)
+						? executionReceiptPayload.textSwapUpdates.filter(isRecord)
 						: undefined,
 					dimensionTextUpdates: Array.isArray(
 						executionReceiptPayload.dimensionTextUpdates,

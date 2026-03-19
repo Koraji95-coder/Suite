@@ -112,6 +112,34 @@ def _build_dimension_action(*, text: str = '12\'-0"') -> dict[str, object]:
     }
 
 
+def _build_swap_action(
+    *,
+    text: str = "swap this with RP1L5-4",
+    include_callout_points: bool = True,
+) -> dict[str, object]:
+    meta: dict[str, object] = {}
+    if include_callout_points:
+        meta["callout_points"] = [
+            {"x": 20, "y": 20},
+            {"x": 72, "y": 30},
+        ]
+    return {
+        "id": "action-swap-1",
+        "rule_id": "swap-blue-arrows",
+        "category": "SWAP",
+        "action": "Swap the two marked text values.",
+        "confidence": 0.9,
+        "status": "proposed",
+        "markup": {
+            "type": "arrow",
+            "color": "blue",
+            "text": text,
+            "bounds": {"x": 30, "y": 18, "width": 46, "height": 14},
+            "meta": meta,
+        },
+    }
+
+
 class TestApiAutoDraftExecuteProvider(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -809,6 +837,135 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
                             "type": "AcDbAlignedDimension",
                             "text": '11\'-0"',
                             "bounds": {"x": 48, "y": 23, "width": 18, "height": 4},
+                        },
+                    ]
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_prepares_text_swap_target_for_bridge(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            target = actions[0].get("execute_target") if isinstance(actions[0], dict) else None
+            self.assertEqual(
+                target,
+                {
+                    "kind": "text_swap",
+                    "first_target_entity_id": "SW1",
+                    "first_current_value": "PANEL A",
+                    "second_target_entity_id": "SW2",
+                    "second_current_value": "PANEL B",
+                    "entity_type_hint": "text",
+                },
+            )
+            return {
+                "id": "bridge-job-swap-1",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview complete.",
+                    "data": {
+                        "jobId": "autodraft-swap-1",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview complete.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-swap-target-1"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-swap-target-1",
+                "actions": [_build_swap_action()],
+                "dry_run": True,
+                "cad_context": {
+                    "entities": [
+                        {
+                            "id": "SW1",
+                            "text": "PANEL A",
+                            "bounds": {"x": 18, "y": 18, "width": 10, "height": 4},
+                        },
+                        {
+                            "id": "SW2",
+                            "text": "PANEL B",
+                            "bounds": {"x": 68, "y": 28, "width": 10, "height": 4},
+                        },
+                    ]
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_leaves_text_swap_target_unset_when_candidate_is_ambiguous(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            first = actions[0]
+            self.assertIsInstance(first, dict)
+            assert isinstance(first, dict)
+            self.assertNotIn("execute_target", first)
+            return {
+                "id": "bridge-job-swap-2",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview review required.",
+                    "data": {
+                        "jobId": "autodraft-swap-2",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview review required.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-swap-target-2"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-swap-target-2",
+                "actions": [_build_swap_action(include_callout_points=False)],
+                "dry_run": True,
+                "cad_context": {
+                    "entities": [
+                        {
+                            "id": "SW1",
+                            "text": "PANEL A",
+                            "bounds": {"x": 18, "y": 18, "width": 10, "height": 4},
+                        },
+                        {
+                            "id": "SW2",
+                            "text": "PANEL B",
+                            "bounds": {"x": 22, "y": 19, "width": 10, "height": 4},
+                        },
+                        {
+                            "id": "SW3",
+                            "text": "PANEL C",
+                            "bounds": {"x": 26, "y": 20, "width": 10, "height": 4},
                         },
                     ]
                 },

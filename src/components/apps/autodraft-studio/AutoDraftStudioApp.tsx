@@ -1654,6 +1654,11 @@ export function AutoDraftStudioApp() {
 												text deletes {executionSummary.counts.textDeleteUpdates}
 											</Badge>
 										) : null}
+										{executionSummary?.counts.textSwapUpdates ? (
+											<Badge color="accent" variant="soft">
+												text swaps {executionSummary.counts.textSwapUpdates}
+											</Badge>
+										) : null}
 										{executionSummary?.counts.dimensionTextUpdates ? (
 											<Badge color="default" variant="soft">
 												dim updates {executionSummary.counts.dimensionTextUpdates}
@@ -1743,6 +1748,30 @@ export function AutoDraftStudioApp() {
 													{String(item.previousValue || "Deleted text")}
 												</Text>
 												<Text size="xs" color="muted">
+													{String(item.handle || item.targetEntityId || "target unavailable")}
+												</Text>
+											</div>
+										))}
+									</div>
+								) : null}
+								{executionSummary?.textSwapUpdates.length ? (
+									<div className={styles.executeUpdateList}>
+										<Text size="xs" color="muted">
+											Text swap updates
+										</Text>
+										{executionSummary.textSwapUpdates.map((item, index) => (
+											<div
+												key={`text-swap-${index}`}
+												className={styles.executeUpdateCard}
+											>
+												<Text size="xs">
+													{String(item.previousValue || "")}
+													{" -> "}
+													{String(item.nextValue || "")}
+												</Text>
+												<Text size="xs" color="muted">
+													{String(item.slot || "target")}
+													{" · "}
 													{String(item.handle || item.targetEntityId || "target unavailable")}
 												</Text>
 											</div>

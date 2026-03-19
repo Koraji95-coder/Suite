@@ -138,6 +138,7 @@ public sealed class AutoDraftExecuteTextDeleteTests
                         },
                     },
                     Array.Empty<JsonObject>(),
+                    Array.Empty<JsonObject>(),
                 }
             )
         );

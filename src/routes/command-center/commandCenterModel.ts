@@ -160,6 +160,19 @@ export const COMMAND_GROUPS: CommandGroup[] = [
 				command: "npm run gateway:dev",
 			},
 			{
+				id: "gateway-startup-check",
+				name: "Check Gateway Startup",
+				description: "Verify the local agent gateway is already running and healthy.",
+				command: "npm run gateway:startup:check",
+			},
+			{
+				id: "gateway-startup-start",
+				name: "Start Gateway In Background",
+				description:
+					"Start the local agent gateway in the background if it is missing.",
+				command: "npm run gateway:startup:start",
+			},
+			{
 				id: "flask",
 				name: "Ground Grid Flask API",
 				description: "Run Flask backend for AutoCAD workflows.",
@@ -262,6 +275,13 @@ export const COMMAND_GROUPS: CommandGroup[] = [
 				name: "Start Backend For Watchdog",
 				description: "Start the backend in the background if the watchdog backend is missing.",
 				command: "npm run watchdog:backend:startup:start",
+			},
+			{
+				id: "workstation-bootstrap",
+				name: "Bootstrap Workstation Runtime",
+				description:
+					"Start local Supabase, Watchdog startup entries, backend, and gateway.",
+				command: "npm run workstation:bootstrap",
 			},
 			{
 				id: "watchdog-autocad-plugin-check",

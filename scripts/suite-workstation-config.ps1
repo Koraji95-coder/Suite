@@ -309,6 +309,8 @@ function Get-SuiteWorkstationMcpEnv {
         SUITE_WATCHDOG_AUTOCAD_PLUGIN_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-watchdog-autocad-plugin.ps1")
         SUITE_WATCHDOG_AUTOCAD_READINESS_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-watchdog-autocad-readiness.ps1")
         SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-watchdog-backend-startup.ps1")
+        SUITE_GATEWAY_STARTUP_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-gateway-startup.ps1")
+        SUITE_RUNTIME_BOOTSTRAP_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\bootstrap-suite-runtime.ps1")
     }
 }
 

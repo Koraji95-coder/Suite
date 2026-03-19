@@ -91,10 +91,23 @@ npm run watchdog:startup:check
 npm run watchdog:startup:autocad:install
 npm run watchdog:startup:autocad:check
 npm run watchdog:backend:startup:start
+npm run workstation:bootstrap
 npm run watchdog:autocad:doctor
 ```
 
 On Windows workstations where scheduled-task registration is denied, the startup installers fall back to HKCU `Run` registration automatically.
+
+### Background gateway/bootstrap workflow
+
+Use the Agent + Backend and Watchdog groups when you want the local runtime running without foreground terminals:
+
+```bash
+npm run gateway:startup:check
+npm run gateway:startup:start
+npm run workstation:bootstrap
+```
+
+`npm run workstation:bootstrap` is the repo-level runtime bootstrap used by workstation restore. It starts local Supabase, refreshes `.env.local`, ensures Watchdog startup/install state, starts the backend, and starts the gateway in the background.
 
 ### ZeroClaw Gateway Toolchain (Windows)
 

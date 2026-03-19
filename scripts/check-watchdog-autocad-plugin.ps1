@@ -102,6 +102,20 @@ function Get-TrustedPathSummary {
     }
 }
 
+function Add-UniqueError {
+    param(
+        [System.Collections.Generic.List[string]]$ErrorList,
+        [string]$Message
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Message)) {
+        return
+    }
+    if (-not $ErrorList.Contains($Message)) {
+        $ErrorList.Add($Message)
+    }
+}
+
 if (-not $BundleRoot) {
     $BundleRoot = Get-DefaultBundleRoot
 }
@@ -148,13 +162,42 @@ else {
 }
 
 if (-not $dllExists) {
-    $errors.Add("Plugin DLL not found.")
+    Add-UniqueError -ErrorList $errors -Message "Plugin DLL not found."
+}
+if (-not $depsExists) {
+    Add-UniqueError -ErrorList $errors -Message "Plugin dependency manifest (.deps.json) not found."
+}
+if (-not $runtimeConfigExists) {
+    Add-UniqueError -ErrorList $errors -Message "Plugin runtime config (.runtimeconfig.json) not found."
 }
 if ($packageExists -and [string]::IsNullOrWhiteSpace($productCode)) {
-    $errors.Add("PackageContents.xml is missing ProductCode.")
+    Add-UniqueError -ErrorList $errors -Message "PackageContents.xml is missing ProductCode."
 }
 if ($packageExists -and [string]::IsNullOrWhiteSpace($upgradeCode)) {
-    $errors.Add("PackageContents.xml is missing UpgradeCode.")
+    Add-UniqueError -ErrorList $errors -Message "PackageContents.xml is missing UpgradeCode."
+}
+if ($packageExists -and -not $loadOnStartup) {
+    Add-UniqueError -ErrorList $errors -Message "PackageContents.xml does not enable LoadOnAutoCADStartup."
+}
+if (-not $trustedPathSummary.registered) {
+    Add-UniqueError -ErrorList $errors -Message "AutoCAD trusted path registration is missing for the plugin bundle."
+}
+
+$expectedCommands = @(
+    "STARTTRACKER",
+    "STOPTRACKER",
+    "TRACKERSTATUS",
+    "TRACKEREXPORT",
+    "TRACKERCONFIG"
+)
+$missingCommands = @(
+    $expectedCommands |
+        Where-Object { $commands -notcontains $_ }
+)
+if ($missingCommands.Count -gt 0) {
+    Add-UniqueError `
+        -ErrorList $errors `
+        -Message ("PackageContents.xml is missing commands: " + ($missingCommands -join ", "))
 }
 
 $result = [ordered]@{

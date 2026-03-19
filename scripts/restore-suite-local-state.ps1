@@ -4,7 +4,8 @@ param(
     [string]$RepoRoot,
     [string]$WorkstationId,
     [string]$WorkstationLabel,
-    [string]$WorkstationRole
+    [string]$WorkstationRole,
+    [switch]$SkipBootstrap
 )
 
 Set-StrictMode -Version Latest
@@ -14,7 +15,19 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $RepoRoot = Join-Path $PSScriptRoot ".."
 }
 
-. (Join-Path $PSScriptRoot "suite-workstation-config.ps1")
+$workstationConfigScriptCandidates = @(
+    (Join-Path $PSScriptRoot "suite-workstation-config.ps1"),
+    (Join-Path $RepoRoot "scripts\suite-workstation-config.ps1")
+) | Select-Object -Unique
+$workstationConfigScript = $workstationConfigScriptCandidates | Where-Object {
+    Test-Path -LiteralPath $_
+} | Select-Object -First 1
+
+if (-not $workstationConfigScript) {
+    throw "suite-workstation-config.ps1 was not found next to the restore script or under the repo root."
+}
+
+. $workstationConfigScript
 
 function Ensure-Directory {
     param([Parameter(Mandatory = $true)][string]$Path)
@@ -137,10 +150,68 @@ Update-SuiteCodexConfig `
     -ResolvedRepoRoot $resolvedRepoRoot `
     -WorkstationProfile $resolvedIdentity
 
+$bootstrapResult = $null
+if (-not $SkipBootstrap) {
+    $bootstrapScriptCandidates = @(
+        (Join-Path $PSScriptRoot "bootstrap-suite-runtime.ps1"),
+        (Join-Path $resolvedRepoRoot "scripts\bootstrap-suite-runtime.ps1")
+    ) | Select-Object -Unique
+    $bootstrapScript = $bootstrapScriptCandidates | Where-Object {
+        Test-Path -LiteralPath $_
+    } | Select-Object -First 1
+
+    if (-not $bootstrapScript) {
+        Write-Warning "bootstrap-suite-runtime.ps1 was not found. Runtime services were not auto-started."
+    }
+    else {
+        try {
+            $bootstrapRaw = & PowerShell.exe `
+                -NoProfile `
+                -ExecutionPolicy Bypass `
+                -File $bootstrapScript `
+                -RepoRoot $resolvedRepoRoot `
+                -CodexConfigPath $codexConfigPath `
+                -Json 2>&1
+            $bootstrapExitCode = 0
+            $bootstrapExitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
+            if ($bootstrapExitCodeVariable) {
+                $bootstrapExitCode = [int]$bootstrapExitCodeVariable.Value
+            }
+            $bootstrapText = [string]::Join(
+                [Environment]::NewLine,
+                @(
+                    $bootstrapRaw | ForEach-Object {
+                        if ($null -eq $_) { "" } else { $_.ToString() }
+                    }
+                )
+            ).Trim()
+
+            if ($bootstrapExitCode -ne 0) {
+                throw "bootstrap-suite-runtime.ps1 exited with code $bootstrapExitCode. $bootstrapText"
+            }
+            if ([string]::IsNullOrWhiteSpace($bootstrapText)) {
+                throw "bootstrap-suite-runtime.ps1 returned no output."
+            }
+
+            $bootstrapResult = $bootstrapText | ConvertFrom-Json
+        }
+        catch {
+            Write-Warning "Runtime bootstrap after restore needs attention. $($_.Exception.Message)"
+        }
+    }
+}
+
 Write-Host "Restored Suite local state from $MirrorRoot"
 Write-Host "Repo root: $resolvedRepoRoot"
 Write-Host (
     "Workstation identity: " +
     "$($resolvedIdentity.WorkstationId) | $($resolvedIdentity.WorkstationLabel) | $($resolvedIdentity.WorkstationRole)"
 )
+if ($bootstrapResult) {
+    $bootstrapStatus = if ($bootstrapResult.ok) { "ok" } else { "needs_attention" }
+    Write-Host "Runtime bootstrap: $bootstrapStatus"
+    foreach ($step in @($bootstrapResult.steps)) {
+        Write-Host "- [$($step.state)] $($step.name): $($step.summary)"
+    }
+}
 Write-Host "Restart Codex after restore so MCP/workstation settings reload."

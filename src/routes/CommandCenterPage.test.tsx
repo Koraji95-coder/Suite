@@ -134,8 +134,26 @@ describe("CommandCenterPage", () => {
 		).toBeTruthy();
 		expect(screen.getByText("Check Backend Startup")).toBeTruthy();
 		expect(screen.getByText("npm run watchdog:backend:startup:check")).toBeTruthy();
+		expect(screen.getByText("Bootstrap Workstation Runtime")).toBeTruthy();
+		expect(screen.getByText("npm run workstation:bootstrap")).toBeTruthy();
 		expect(screen.getByText("Run AutoCAD Watchdog Doctor")).toBeTruthy();
 		expect(screen.getByText("npm run watchdog:autocad:doctor")).toBeTruthy();
+	});
+
+	it("shows gateway startup command presets on the ops commands tab", () => {
+		render(
+			<MemoryRouter initialEntries={["/app/command-center"]}>
+				<Routes>
+					<Route path="/app/command-center" element={<CommandCenterPage />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		expect(screen.getByText("Agent + Backend")).toBeTruthy();
+		expect(screen.getByText("Check Gateway Startup")).toBeTruthy();
+		expect(screen.getByText("npm run gateway:startup:check")).toBeTruthy();
+		expect(screen.getByText("Start Gateway In Background")).toBeTruthy();
+		expect(screen.getByText("npm run gateway:startup:start")).toBeTruthy();
 	});
 
 	it("shows Supabase command presets on the ops commands tab", () => {

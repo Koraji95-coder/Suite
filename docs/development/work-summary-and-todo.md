@@ -93,6 +93,7 @@ For the next session on `DUSTIN-HOME`:
 1. Pull latest `main`.
 2. Run:
    - `PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/restore-suite-local-state.ps1 -WorkstationId DUSTIN-HOME`
+   - restore now auto-bootstraps local Supabase, Watchdog startup, backend, and gateway unless `-SkipBootstrap` is passed
 3. Restart Codex so the workstation-specific MCP env reloads.
 4. If only the MCP workstation block needs to be rewritten, skip the full restore and run:
    - `npm run workstation:sync -- -WorkstationId DUSTIN-HOME`
@@ -108,6 +109,7 @@ For the next session on `DUSTIN-HOME`:
    - `npm run watchdog:startup:check`
    - `npm run watchdog:startup:autocad:check`
    - `npm run watchdog:backend:startup:check`
+   - `npm run gateway:startup:check`
    - `npm run watchdog:autocad:doctor`
 
 ## 1) What Is Already Done

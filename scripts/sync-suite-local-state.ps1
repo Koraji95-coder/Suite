@@ -91,7 +91,8 @@ function Write-MirrorReadme {
 
     $lines += ""
     $lines += "Home-PC restore helper:"
-    $lines += "- Run restore-suite-local-state.ps1 from this mirror on the destination machine after the repo is present locally."
+    $lines += "- From the repo checkout on the destination machine, run: npm run workstation:restore -- -WorkstationId <TARGET_ID>"
+    $lines += "- The restore flow now re-stamps the workstation profile and bootstraps local runtime services automatically."
     $lines += ""
     $lines += "For the freshest transfer snapshot, close Codex/ZeroClaw/Suite processes first and rerun the sync script once manually."
     $lines += "The scheduled sync keeps this folder close to 1:1, but live SQLite/WAL files can still reflect in-use state."

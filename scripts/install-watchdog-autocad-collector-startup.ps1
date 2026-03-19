@@ -16,6 +16,10 @@ param(
     [int]$PollIntervalMs = 5000,
     [int]$BatchSize = 100,
     [ValidateRange(5, 1440)][int]$CheckIntervalMinutes = 15,
+    [ValidateSet("Debug", "Release")][string]$PluginConfiguration = "Debug",
+    [string]$AutoCadVersion,
+    [string]$AutoCadInstallDir,
+    [switch]$SkipPluginInstall,
     [switch]$ForceRunKey
 )
 
@@ -25,6 +29,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $daemonScript = (Resolve-Path (Join-Path $PSScriptRoot "watchdog-autocad-collector-daemon.ps1")).Path
 $checkScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-collector-startup.ps1")).Path
+$pluginInstallScript = (Resolve-Path (Join-Path $PSScriptRoot "install-watchdog-autocad-plugin.ps1")).Path
+$pluginCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-plugin.ps1")).Path
 $localAppData = if ($env:LOCALAPPDATA) {
     $env:LOCALAPPDATA
 }
@@ -120,6 +126,76 @@ function Resolve-AbsolutePath {
         return [System.IO.Path]::GetFullPath($PathValue)
     }
     return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $PathValue))
+}
+
+function Invoke-JsonScript {
+    param(
+        [string]$ScriptPath,
+        [string[]]$Arguments
+    )
+
+    $processArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        $ScriptPath
+    )
+    if ($Arguments) {
+        $processArgs += $Arguments
+    }
+
+    $output = & PowerShell.exe @processArgs 2>&1
+    $exitCode = 0
+    $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
+    if ($exitCodeVariable) {
+        $exitCode = [int]$exitCodeVariable.Value
+    }
+    if ($exitCode -ne 0) {
+        $errorText = [string]::Join([Environment]::NewLine, $output)
+        throw "Script '$ScriptPath' exited with code $exitCode. $errorText"
+    }
+
+    $raw = [string]::Join([Environment]::NewLine, $output)
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+        throw "Script '$ScriptPath' returned no output."
+    }
+    return $raw | ConvertFrom-Json
+}
+
+function Invoke-PluginInstall {
+    param(
+        [string]$ScriptPath,
+        [string]$BuildConfiguration,
+        [string]$ResolvedAutoCadVersion,
+        [string]$ResolvedAutoCadInstallDir
+    )
+
+    $processArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        $ScriptPath,
+        "-Configuration",
+        $BuildConfiguration
+    )
+    if (-not [string]::IsNullOrWhiteSpace($ResolvedAutoCadVersion)) {
+        $processArgs += @("-AutoCadVersion", $ResolvedAutoCadVersion)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ResolvedAutoCadInstallDir)) {
+        $processArgs += @("-AutoCadInstallDir", $ResolvedAutoCadInstallDir)
+    }
+
+    & PowerShell.exe @processArgs
+    $exitCode = 0
+    $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
+    if ($exitCodeVariable) {
+        $exitCode = [int]$exitCodeVariable.Value
+    }
+    if ($exitCode -ne 0) {
+        throw "Script '$ScriptPath' exited with code $exitCode."
+    }
 }
 
 function Get-AutoCadStateJsonPath {
@@ -352,12 +428,72 @@ else {
         -NamedMutex $mutexName
 }
 
-& $checkScript `
-    -ConfigPath $ConfigPath `
-    -CodexConfigPath $CodexConfigPath `
-    -TaskName $TaskName `
-    -CheckTaskName $CheckTaskName `
-    -RunKeyName $RunKeyName `
-    -MutexName $mutexName `
-    -StartIfMissing `
-    -Json
+$pluginInstallAttempted = $false
+$pluginInstallOk = $false
+$pluginInstallError = $null
+$pluginWasAlreadyHealthy = $false
+$pluginCheckArguments = @("-Json")
+
+try {
+    $pluginCheckResult = Invoke-JsonScript -ScriptPath $pluginCheckScript -Arguments $pluginCheckArguments
+    $pluginWasAlreadyHealthy = [bool]$pluginCheckResult.ok
+}
+catch {
+    $pluginCheckResult = [pscustomobject]@{
+        ok = $false
+        errors = @("Initial plugin check failed: $($_.Exception.Message)")
+    }
+}
+
+if ((-not $SkipPluginInstall) -and (-not $pluginWasAlreadyHealthy)) {
+    $pluginInstallAttempted = $true
+    try {
+        Invoke-PluginInstall `
+            -ScriptPath $pluginInstallScript `
+            -BuildConfiguration $PluginConfiguration `
+            -ResolvedAutoCadVersion $AutoCadVersion `
+            -ResolvedAutoCadInstallDir $AutoCadInstallDir
+        $pluginInstallOk = $true
+        Write-Host "Ensured AutoCAD plugin bundle is installed for Watchdog."
+    }
+    catch {
+        $pluginInstallError = $_.Exception.Message
+        Write-Warning "AutoCAD plugin install failed during collector startup setup. $pluginInstallError"
+    }
+}
+
+$startupResult = Invoke-JsonScript `
+    -ScriptPath $checkScript `
+    -Arguments @(
+        "-ConfigPath", $ConfigPath,
+        "-CodexConfigPath", $CodexConfigPath,
+        "-TaskName", $TaskName,
+        "-CheckTaskName", $CheckTaskName,
+        "-RunKeyName", $RunKeyName,
+        "-MutexName", $mutexName,
+        "-StartIfMissing",
+        "-Json"
+    )
+
+try {
+    $pluginCheckResult = Invoke-JsonScript -ScriptPath $pluginCheckScript -Arguments $pluginCheckArguments
+}
+catch {
+    $pluginCheckResult = [pscustomobject]@{
+        ok = $false
+        errors = @("Plugin check failed after startup install: $($_.Exception.Message)")
+    }
+}
+
+$result = [ordered]@{}
+foreach ($property in $startupResult.PSObject.Properties) {
+    $result[$property.Name] = $property.Value
+}
+$result["pluginInstallAttempted"] = $pluginInstallAttempted
+$result["pluginInstallOk"] = $pluginInstallOk
+$result["pluginInstallError"] = $pluginInstallError
+$result["pluginWasAlreadyHealthy"] = $pluginWasAlreadyHealthy
+$result["plugin"] = $pluginCheckResult
+$result["overallHealthy"] = [bool]($startupResult.healthy -and $pluginCheckResult.ok)
+
+$result | ConvertTo-Json -Depth 8

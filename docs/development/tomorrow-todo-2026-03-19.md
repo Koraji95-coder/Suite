@@ -41,13 +41,12 @@ This is the handoff checklist for resuming on the other workstation after restor
 2. Restore mirrored workstation-local state:
    - `npm run workstation:restore -- -WorkstationId DUSTIN-HOME`
    - Replace `DUSTIN-HOME` if the destination workstation id differs.
+   - Restore now auto-bootstraps local Supabase, Watchdog startup, backend, and gateway unless `-SkipBootstrap` is passed.
 
 3. Restart Codex / the developer window so MCP env changes reload.
 
-4. Re-bootstrap local Supabase on that machine:
-   - `npm run supabase:start`
-   - `npm run supabase:env:local`
-   - `npm run supabase:db:reset`
+4. Reconfirm local Supabase on that machine:
+   - `npm run supabase:status`
    - `npm run supabase:types`
 
 5. Reconfirm Worktale:
@@ -58,6 +57,7 @@ This is the handoff checklist for resuming on the other workstation after restor
    - `npm run watchdog:startup:check`
    - `npm run watchdog:startup:autocad:check`
    - `npm run watchdog:backend:startup:check`
+   - `npm run gateway:startup:check`
    - `npm run watchdog:autocad:plugin:check`
    - `npm run watchdog:autocad:doctor`
 

@@ -7,8 +7,10 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
+import { Input } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
@@ -24,10 +26,13 @@ import {
 	type AutoDraftHealth,
 	type AutoDraftBackcheckResponse,
 	type AutoDraftExecuteResponse,
+	type AutoDraftExecuteRevisionContext,
+	type AutoDraftExecuteWorkflowContext,
 	type AutoDraftPlanResponse,
 	autoDraftService,
 } from "./autodraftService";
 import { agentService } from "@/services/agentService";
+import { projectRevisionRegisterService } from "@/services/projectRevisionRegisterService";
 import {
 	detectArcsFromSegments,
 	extendDeadEndSegments,
@@ -111,6 +116,8 @@ type CrewReviewEntry = {
 	error?: string;
 };
 
+type ExecuteMode = "preview" | "commit";
+
 function extractAgentResponseText(data: Record<string, unknown> | undefined): string {
 	if (!data) return "";
 	const directKeys = ["response", "reply", "output", "message"] as const;
@@ -152,6 +159,7 @@ function buildCrewReviewPrompt(args: {
 }
 
 export function AutoDraftStudioApp() {
+	const { showToast } = useToast();
 	const [activeTab, setActiveTab] = useState<TabId>("architecture");
 	const [expandedRule, setExpandedRule] = useState<string | null>(null);
 	const [expandedPhase, setExpandedPhase] = useState<number>(0);
@@ -168,6 +176,25 @@ export function AutoDraftStudioApp() {
 		useState<AutoDraftBackcheckResponse | null>(null);
 	const [backcheckError, setBackcheckError] = useState<string | null>(null);
 	const [executeOverrideReason, setExecuteOverrideReason] = useState("");
+	const [workflowContext, setWorkflowContext] =
+		useState<AutoDraftExecuteWorkflowContext>({
+			lane: "autodraft-studio",
+			phase: "demo",
+		});
+	const [revisionContext, setRevisionContext] =
+		useState<AutoDraftExecuteRevisionContext>({
+			projectId: "",
+			fileId: "",
+			drawingNumber: "",
+			title: "",
+			revision: "",
+			previousRevision: "",
+			issueSummary: "AutoDraft execution receipt recorded from Studio.",
+			notes: "",
+		});
+	const [revisionTraceMessage, setRevisionTraceMessage] = useState<string | null>(
+		null,
+	);
 	const [crewReviewEntries, setCrewReviewEntries] = useState<CrewReviewEntry[]>(
 		[],
 	);
@@ -225,6 +252,116 @@ export function AutoDraftStudioApp() {
 		void refreshStatus();
 	}, [refreshStatus]);
 
+	const buildWorkflowContext = (): AutoDraftExecuteWorkflowContext | undefined => {
+		const next: AutoDraftExecuteWorkflowContext = {
+			projectId: workflowContext.projectId?.trim(),
+			projectName: workflowContext.projectName?.trim(),
+			lane: workflowContext.lane?.trim(),
+			phase: workflowContext.phase?.trim(),
+			workflowId: workflowContext.workflowId?.trim(),
+			itemId: workflowContext.itemId?.trim(),
+			summary: workflowContext.summary?.trim(),
+		};
+		return Object.values(next).some(Boolean) ? next : undefined;
+	};
+
+	const buildRevisionContext = (): AutoDraftExecuteRevisionContext | undefined => {
+		const fallbackProjectId = workflowContext.projectId?.trim();
+		const next: AutoDraftExecuteRevisionContext = {
+			projectId: revisionContext.projectId?.trim() || fallbackProjectId,
+			fileId: revisionContext.fileId?.trim(),
+			drawingNumber: revisionContext.drawingNumber?.trim(),
+			title: revisionContext.title?.trim(),
+			revision: revisionContext.revision?.trim(),
+			previousRevision: revisionContext.previousRevision?.trim(),
+			issueSummary: revisionContext.issueSummary?.trim(),
+			notes: revisionContext.notes?.trim(),
+		};
+		return Object.values(next).some(Boolean) ? next : undefined;
+	};
+
+	const persistRevisionTrace = useCallback(
+		async (
+			executed: AutoDraftExecuteResponse,
+			mode: ExecuteMode,
+			revisionPayload: AutoDraftExecuteRevisionContext | undefined,
+		) => {
+			if (mode !== "commit" || executed.dry_run || executed.accepted <= 0) {
+				setRevisionTraceMessage(null);
+				return;
+			}
+			const resolvedProjectId = revisionPayload?.projectId?.trim();
+			const requestId =
+				executed.requestId?.trim() ||
+				executed.meta?.requestId?.trim() ||
+				executed.meta?.executionReceipt?.requestId?.trim();
+			if (!resolvedProjectId || !requestId) {
+				setRevisionTraceMessage(
+					"Commit receipt stored locally. Add a project id in trace context to link it into the revision register.",
+				);
+				return;
+			}
+			const receipt = executed.meta?.executionReceipt;
+			const status = executed.status.trim();
+			const notes = [
+				revisionPayload?.notes?.trim(),
+				executed.message?.trim(),
+				receipt?.id ? `Receipt: ${receipt.id}` : "",
+				receipt?.providerPath ? `Provider: ${receipt.providerPath}` : "",
+				status ? `Status: ${status}` : "",
+				typeof executed.accepted === "number"
+					? `Accepted: ${executed.accepted}`
+					: "",
+				typeof executed.skipped === "number"
+					? `Skipped: ${executed.skipped}`
+					: "",
+				Array.isArray(receipt?.createdHandles) &&
+				receipt.createdHandles.length > 0
+					? `Created handles: ${receipt.createdHandles.join(", ")}`
+					: "",
+				workflowContext.lane?.trim() ? `Workflow lane: ${workflowContext.lane.trim()}` : "",
+				workflowContext.phase?.trim()
+					? `Workflow phase: ${workflowContext.phase.trim()}`
+					: "",
+			]
+				.filter(Boolean)
+				.join("\n");
+			const row = await projectRevisionRegisterService.upsertAutoDraftExecutionEntry({
+				projectId: resolvedProjectId,
+				fileId: revisionPayload?.fileId?.trim() || null,
+				drawingNumber: revisionPayload?.drawingNumber?.trim(),
+				title: revisionPayload?.title?.trim(),
+				revision: revisionPayload?.revision?.trim(),
+				previousRevision: revisionPayload?.previousRevision?.trim() || null,
+				issueSummary:
+					revisionPayload?.issueSummary?.trim() ||
+					executed.message?.trim() ||
+					"AutoDraft execution receipt recorded.",
+				notes,
+				requestId,
+				sourceRef: receipt?.id || executed.job_id || null,
+				status,
+				accepted: executed.accepted,
+				skipped: executed.skipped,
+			});
+			if (row) {
+				const message = `Linked commit receipt to revision register for project ${resolvedProjectId}.`;
+				setRevisionTraceMessage(message);
+				showToast("success", message);
+				return;
+			}
+			const message =
+				"Commit receipt stored, but the revision register link could not be created.";
+			setRevisionTraceMessage(message);
+			showToast("warning", message);
+		},
+		[
+			showToast,
+			workflowContext.lane,
+			workflowContext.phase,
+		],
+	);
+
 	const runDemoPlan = async () => {
 		setLoadingPlan(true);
 		setExecuteResult(null);
@@ -244,10 +381,11 @@ export function AutoDraftStudioApp() {
 		}
 	};
 
-	const runDemoExecuteDryRun = async () => {
+	const runDemoExecute = async (mode: ExecuteMode) => {
 		setLoadingExecute(true);
 		setExecuteResult(null);
 		setExecuteError(null);
+		setRevisionTraceMessage(null);
 		try {
 			const plan = planResult ?? (await autoDraftService.plan(DEMO_MARKUPS));
 			if (!planResult) {
@@ -266,16 +404,21 @@ export function AutoDraftStudioApp() {
 				);
 				return;
 			}
+			const workflowPayload = buildWorkflowContext();
+			const revisionPayload = buildRevisionContext();
 
 			const executed = await autoDraftService.execute(plan.actions, {
-				dryRun: true,
+				dryRun: mode !== "commit",
 				backcheckRequestId: backcheckResult?.requestId || undefined,
 				backcheckOverrideReason: hasFailingBackcheck
 					? overrideReason || undefined
 					: undefined,
 				backcheckFailCount,
+				workflowContext: workflowPayload,
+				revisionContext: revisionPayload,
 			});
 			setExecuteResult(executed);
+			await persistRevisionTrace(executed, mode, revisionPayload);
 		} catch (error) {
 			const message =
 				error instanceof Error && error.message.trim().length > 0
@@ -764,13 +907,113 @@ export function AutoDraftStudioApp() {
 							<Button
 								variant="outline"
 								size="sm"
-								onClick={() => void runDemoExecuteDryRun()}
+								onClick={() => void runDemoExecute("preview")}
 								loading={loadingExecute}
 							>
-								Execute dry run
+								Preview execute
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => void runDemoExecute("commit")}
+								loading={loadingExecute}
+							>
+								Commit to CAD
 							</Button>
 						</div>
 					</HStack>
+				</div>
+				<div className={styles.executionContextPanel}>
+					<div className={styles.executionContextHeader}>
+						<div>
+							<Text size="sm" weight="semibold">
+								Execution trace context
+							</Text>
+							<Text size="xs" color="muted">
+								Optional workflow and revision data for linking commit receipts
+								into project history.
+							</Text>
+						</div>
+						<Badge color="accent" variant="soft">
+							Preview {"->"} Commit
+						</Badge>
+					</div>
+					<div className={styles.executionContextGrid}>
+						<label className={styles.compareField}>
+							<span>Project id</span>
+							<Input
+								value={
+									revisionContext.projectId?.trim().length
+										? revisionContext.projectId
+										: workflowContext.projectId ?? ""
+								}
+								onChange={(event) => {
+									const nextValue = event.target.value;
+									setRevisionContext((prev) => ({
+										...prev,
+										projectId: nextValue,
+									}));
+									setWorkflowContext((prev) => ({
+										...prev,
+										projectId: nextValue,
+									}));
+								}}
+								placeholder="project-uuid"
+							/>
+						</label>
+						<label className={styles.compareField}>
+							<span>Workflow lane</span>
+							<Input
+								value={workflowContext.lane ?? ""}
+								onChange={(event) =>
+									setWorkflowContext((prev) => ({
+										...prev,
+										lane: event.target.value,
+									}))
+								}
+								placeholder="autodraft-studio"
+							/>
+						</label>
+						<label className={styles.compareField}>
+							<span>Drawing number</span>
+							<Input
+								value={revisionContext.drawingNumber ?? ""}
+								onChange={(event) =>
+									setRevisionContext((prev) => ({
+										...prev,
+										drawingNumber: event.target.value,
+									}))
+								}
+								placeholder="E-101"
+							/>
+						</label>
+						<label className={styles.compareField}>
+							<span>Revision</span>
+							<Input
+								value={revisionContext.revision ?? ""}
+								onChange={(event) =>
+									setRevisionContext((prev) => ({
+										...prev,
+										revision: event.target.value,
+									}))
+								}
+								placeholder="B"
+							/>
+						</label>
+						<label className={`${styles.compareField} ${styles.executionContextWide}`}>
+							<span>Issue summary</span>
+							<Input
+								value={revisionContext.issueSummary ?? ""}
+								onChange={(event) =>
+									setRevisionContext((prev) => ({
+										...prev,
+										issueSummary: event.target.value,
+									}))
+								}
+								placeholder="AutoDraft execution receipt recorded from Studio."
+							/>
+						</label>
+					</div>
 				</div>
 				{planResult ? (
 					<div className={styles.planSummary}>
@@ -948,10 +1191,56 @@ export function AutoDraftStudioApp() {
 							Accepted {executeResult.accepted}, skipped {executeResult.skipped}
 							, dry run: {executeResult.dry_run ? "yes" : "no"}.
 						</Text>
+						{executeResult.requestId ? (
+							<Text size="xs" color="muted">
+								Request ID: {executeResult.requestId}
+							</Text>
+						) : null}
 						{executeResult.job_id ? (
 							<Text size="xs" color="muted">
 								Job ID: {executeResult.job_id}
 							</Text>
+						) : null}
+						{executeResult.meta?.cad ? (
+							<Text size="xs" color="muted">
+								CAD: {String(executeResult.meta.cad.drawingName || "unknown")}
+								{typeof executeResult.meta.cad.readOnly === "boolean"
+									? executeResult.meta.cad.readOnly
+										? " · read-only"
+										: " · writable"
+									: ""}
+							</Text>
+						) : null}
+						{executeResult.meta?.commit ? (
+							<Text size="xs" color="muted">
+								Commit: {String(executeResult.meta.commit.committed || 0)} written
+								{Array.isArray(executeResult.meta.commit.createdHandles) &&
+								executeResult.meta.commit.createdHandles.length > 0
+									? ` · handles ${executeResult.meta.commit.createdHandles.join(", ")}`
+									: ""}
+							</Text>
+						) : null}
+						{executeResult.meta?.executionReceipt ? (
+							<Text size="xs" color="muted">
+								Receipt: {executeResult.meta.executionReceipt.id || "stored"}
+								{executeResult.meta.executionReceipt.providerPath
+									? ` · ${executeResult.meta.executionReceipt.providerPath}`
+									: ""}
+							</Text>
+						) : null}
+						{revisionTraceMessage ? (
+							<Text size="xs" color="primary">
+								{revisionTraceMessage}
+							</Text>
+						) : null}
+						{executeResult.warnings?.length ? (
+							<div className={styles.executeWarnings}>
+								{executeResult.warnings.map((warning) => (
+									<Text key={warning} size="xs" color="warning">
+										{warning}
+									</Text>
+								))}
+							</div>
 						) : null}
 						{executeResult.message ? (
 							<Text size="xs" color="muted">

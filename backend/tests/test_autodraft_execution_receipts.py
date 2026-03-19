@@ -50,6 +50,14 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                 self.assertEqual(receipt["requestId"], "req-receipt-1")
                 self.assertEqual(receipt["status"], "committed")
                 self.assertFalse(receipt["dryRun"])
+                self.assertEqual(
+                    receipt["workflowContext"],
+                    {"project_id": "project-1"},
+                )
+                self.assertEqual(
+                    receipt["revisionContext"],
+                    {"drawing_number": "E-101"},
+                )
                 self.assertEqual(get_receipt_db_path().as_posix(), db_path.replace("\\", "/"))
 
                 connection = sqlite3.connect(db_path)
@@ -57,7 +65,8 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                     row = connection.execute(
                         """
                         select request_id, provider_path, status, dry_run, accepted, skipped,
-                               drawing_name, drawing_path, warnings_json, created_handles_json
+                               drawing_name, drawing_path, warnings_json, created_handles_json,
+                               workflow_context_json, revision_context_json
                         from autodraft_execution_receipts
                         where request_id = ?
                         """,
@@ -78,6 +87,8 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                 self.assertEqual(row[7], r"C:\Drawings\sample.dwg")
                 self.assertIn("Used AddText fallback.", row[8])
                 self.assertIn("1A2B", row[9])
+                self.assertIn("project-1", row[10])
+                self.assertIn("E-101", row[11])
 
 
 if __name__ == "__main__":

@@ -93,6 +93,14 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
         def _bridge_sender(action: str, payload: dict[str, object]) -> dict[str, object]:
             self.assertEqual(action, "autodraft_execute")
             self.assertEqual(payload.get("requestId"), "req-bridge-1")
+            self.assertEqual(
+                payload.get("workflow_context"),
+                {"project_id": "project-1", "lane": "autodraft-studio"},
+            )
+            self.assertEqual(
+                payload.get("revision_context"),
+                {"project_id": "project-1", "drawing_number": "E-101"},
+            )
             return {
                 "id": "bridge-job-1",
                 "ok": True,
@@ -124,6 +132,14 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
                 "requestId": "req-bridge-1",
                 "actions": [_build_valid_action()],
                 "dry_run": True,
+                "workflow_context": {
+                    "project_id": "project-1",
+                    "lane": "autodraft-studio",
+                },
+                "revision_context": {
+                    "project_id": "project-1",
+                    "drawing_number": "E-101",
+                },
             },
         )
         self.assertEqual(response.status_code, 200)
@@ -139,6 +155,10 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
         self.assertEqual(
             payload.get("meta", {}).get("executionReceipt", {}).get("requestId"),
             "req-bridge-1",
+        )
+        self.assertEqual(
+            payload.get("meta", {}).get("executionReceipt", {}).get("workflowContext"),
+            {"project_id": "project-1", "lane": "autodraft-studio"},
         )
 
     def test_execute_returns_bridge_error_without_fallback(self) -> None:

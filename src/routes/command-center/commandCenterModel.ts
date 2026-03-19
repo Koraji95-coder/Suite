@@ -65,6 +65,48 @@ export const COMMAND_GROUPS: CommandGroup[] = [
 				command: "npm run dev:full",
 			},
 			{
+				id: "kill-vite",
+				name: "Kill Frontend (5173)",
+				description: "Stop the Vite dev server by local port.",
+				command:
+					"Get-NetTCPConnection -LocalPort 5173 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }",
+			},
+			{
+				id: "kill-backend",
+				name: "Kill Backend (5000)",
+				description: "Stop the Flask/Python backend by local port.",
+				command:
+					"Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }",
+			},
+			{
+				id: "kill-gateway",
+				name: "Kill Gateway (3000)",
+				description: "Stop the local agent gateway by local port.",
+				command:
+					"Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }",
+			},
+			{
+				id: "kill-pipe-bridge",
+				name: "Kill AutoCAD Pipe Bridge",
+				description: "Stop the named-pipe host used for AutoCAD automation.",
+				command:
+					"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*NamedPipeServer.dll*' -and $_.CommandLine -like '*SUITE_AUTOCAD_PIPE*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }",
+			},
+			{
+				id: "kill-watchdog-collectors",
+				name: "Kill Watchdog Collectors",
+				description: "Stop the filesystem and AutoCAD collector workers.",
+				command:
+					"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*run-watchdog-filesystem-collector.py*' -or $_.CommandLine -like '*run-watchdog-autocad-state-collector.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }",
+			},
+			{
+				id: "kill-suite-local",
+				name: "Kill All Local Suite Services",
+				description: "Stop frontend, backend, gateway, bridge, and collectors.",
+				command:
+					"@(5173,5000,3000) | ForEach-Object { Get-NetTCPConnection -LocalPort $_ -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force } }; Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*NamedPipeServer.dll*' -or $_.CommandLine -like '*run-watchdog-filesystem-collector.py*' -or $_.CommandLine -like '*run-watchdog-autocad-state-collector.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }",
+			},
+			{
 				id: "build",
 				name: "Production Build",
 				description: "Create production bundle.",

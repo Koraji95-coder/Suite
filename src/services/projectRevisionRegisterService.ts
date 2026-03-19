@@ -43,6 +43,22 @@ export interface DrawingRevisionRegisterInput {
 	notes?: string | null;
 }
 
+export interface AutoDraftExecutionTraceInput {
+	projectId: string;
+	fileId?: string | null;
+	drawingNumber?: string;
+	title?: string;
+	revision?: string;
+	previousRevision?: string | null;
+	issueSummary?: string;
+	notes?: string | null;
+	requestId: string;
+	sourceRef?: string | null;
+	status?: string | null;
+	accepted?: number;
+	skipped?: number;
+}
+
 const LOCAL_STORAGE_KEY = "suite:project-revision-register:local";
 
 const createId = () =>
@@ -526,5 +542,49 @@ export const projectRevisionRegisterService = {
 		return files
 			.filter((file) => !existingFileIds.has(file.id))
 			.map((file) => buildImportDraft(normalizedProjectId, file));
+	},
+
+	async upsertAutoDraftExecutionEntry(
+		input: AutoDraftExecutionTraceInput,
+	): Promise<DrawingRevisionRegisterRow | null> {
+		const normalizedProjectId = normalizeText(input.projectId);
+		const requestId = normalizeText(input.requestId);
+		if (!normalizedProjectId || !requestId) {
+			return null;
+		}
+
+		const issueSummary =
+			normalizeText(input.issueSummary) ||
+			`AutoDraft ${normalizeText(input.status) || "execution"} receipt recorded.`;
+		const notes = normalizeText(input.notes);
+		const title =
+			normalizeText(input.title) ||
+			normalizeText(input.drawingNumber) ||
+			"AutoDraft execution";
+		const existing = await this.fetchEntries(normalizedProjectId);
+		const matched = existing.data.find(
+			(entry) => normalizeText(entry.autodraft_request_id) === requestId,
+		);
+		const basePayload: DrawingRevisionRegisterInput = {
+			projectId: normalizedProjectId,
+			fileId: input.fileId ?? null,
+			drawingNumber: normalizeText(input.drawingNumber),
+			title,
+			revision: normalizeText(input.revision),
+			previousRevision: normalizeText(input.previousRevision) || null,
+			issueSummary,
+			issueStatus:
+				Number(input.accepted || 0) > 0 ? "in-review" : "open",
+			issueSeverity:
+				Number(input.skipped || 0) > 0 ? "medium" : "low",
+			sourceKind: "autodraft",
+			sourceRef: normalizeText(input.sourceRef) || null,
+			autodraftRequestId: requestId,
+			notes: notes || null,
+		};
+		if (matched) {
+			return await this.updateEntry(matched.id, basePayload);
+		}
+		return await this.createEntry(basePayload);
 	},
 };

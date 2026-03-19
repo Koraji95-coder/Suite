@@ -44,7 +44,19 @@ describe("autodraft request layer builders", () => {
 				status: "review",
 				markup: {},
 			},
-		]);
+		], {
+			dryRun: false,
+			backcheckRequestId: "req-backcheck-1",
+			workflowContext: {
+				projectId: "project-1",
+				lane: "autodraft-studio",
+			},
+			revisionContext: {
+				projectId: "project-1",
+				drawingNumber: "E-101",
+				revision: "B",
+			},
+		});
 		await requestAutoDraftBackcheck(client, [], {
 			cadContext: { drawing: "A1.dwg" },
 			requireCadContext: true,
@@ -60,6 +72,31 @@ describe("autodraft request layer builders", () => {
 			"/api/autodraft/execute",
 			expect.objectContaining({
 				method: "POST",
+				body: JSON.stringify({
+					actions: [
+						{
+							id: "a1",
+							rule_id: null,
+							category: "NOTE",
+							action: "review",
+							confidence: 0.5,
+							status: "review",
+							markup: {},
+						},
+					],
+					dry_run: false,
+					backcheck_request_id: "req-backcheck-1",
+					backcheck_fail_count: 0,
+					workflow_context: {
+						project_id: "project-1",
+						lane: "autodraft-studio",
+					},
+					revision_context: {
+						project_id: "project-1",
+						drawing_number: "E-101",
+						revision: "B",
+					},
+				}),
 			}),
 		);
 		expect(requestJson).toHaveBeenCalledWith(

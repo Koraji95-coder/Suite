@@ -161,6 +161,9 @@ def persist_autodraft_execution_receipt(
         "drawingName": _extract_drawing_name(response_payload) or None,
         "drawingPath": _extract_drawing_path(response_payload) or None,
         "createdAt": created_at,
+        "workflowContext": workflow_context,
+        "revisionContext": revision_context,
+        "createdHandles": created_handles,
     }
 
     with _connect() as connection:

@@ -77,6 +77,60 @@ export type AutoDraftExecuteResponse = {
 	skipped: number;
 	dry_run: boolean;
 	message?: string;
+	requestId?: string;
+	warnings?: string[];
+	meta?: AutoDraftExecuteMeta;
+};
+
+export type AutoDraftExecuteWorkflowContext = {
+	projectId?: string;
+	projectName?: string;
+	lane?: string;
+	phase?: string;
+	workflowId?: string;
+	itemId?: string;
+	summary?: string;
+};
+
+export type AutoDraftExecuteRevisionContext = {
+	projectId?: string;
+	fileId?: string;
+	drawingNumber?: string;
+	title?: string;
+	revision?: string;
+	previousRevision?: string;
+	issueSummary?: string;
+	notes?: string;
+};
+
+export type AutoDraftExecutionReceipt = {
+	id?: string;
+	requestId?: string;
+	jobId?: string;
+	providerPath?: string;
+	source?: string;
+	status?: string;
+	dryRun?: boolean;
+	accepted?: number;
+	skipped?: number;
+	drawingName?: string | null;
+	drawingPath?: string | null;
+	createdAt?: string;
+	workflowContext?: Record<string, unknown>;
+	revisionContext?: Record<string, unknown>;
+	createdHandles?: string[];
+};
+
+export type AutoDraftExecuteMeta = {
+	mode?: string;
+	previewReadyCount?: number;
+	providerPath?: string;
+	requestId?: string;
+	bridgeRequestId?: string;
+	bridgeMs?: number;
+	cad?: Record<string, unknown>;
+	commit?: Record<string, unknown>;
+	executionReceipt?: AutoDraftExecutionReceipt;
 };
 
 export type AutoDraftBackcheckFinding = {
@@ -751,6 +805,78 @@ const normalizeExecutePayload = (
 		};
 	}
 
+	const warnings = Array.isArray(payload.warnings)
+		? payload.warnings.filter((item): item is string => typeof item === "string")
+		: undefined;
+	const metaPayload = isRecord(payload.meta) ? payload.meta : null;
+	const executionReceiptPayload = metaPayload && isRecord(metaPayload.executionReceipt)
+		? metaPayload.executionReceipt
+		: null;
+	const executionReceipt: AutoDraftExecutionReceipt | undefined =
+		executionReceiptPayload
+			? {
+					id: toNonEmptyString(executionReceiptPayload.id) || undefined,
+					requestId:
+						toNonEmptyString(executionReceiptPayload.requestId) || undefined,
+					jobId: toNonEmptyString(executionReceiptPayload.jobId) || undefined,
+					providerPath:
+						toNonEmptyString(executionReceiptPayload.providerPath) || undefined,
+					source: toNonEmptyString(executionReceiptPayload.source) || undefined,
+					status: toNonEmptyString(executionReceiptPayload.status) || undefined,
+					dryRun:
+						typeof executionReceiptPayload.dryRun === "boolean"
+							? executionReceiptPayload.dryRun
+							: undefined,
+					accepted:
+						typeof executionReceiptPayload.accepted === "number"
+							? executionReceiptPayload.accepted
+							: undefined,
+					skipped:
+						typeof executionReceiptPayload.skipped === "number"
+							? executionReceiptPayload.skipped
+							: undefined,
+					drawingName:
+						typeof executionReceiptPayload.drawingName === "string"
+							? executionReceiptPayload.drawingName
+							: null,
+					drawingPath:
+						typeof executionReceiptPayload.drawingPath === "string"
+							? executionReceiptPayload.drawingPath
+							: null,
+					createdAt:
+						toNonEmptyString(executionReceiptPayload.createdAt) || undefined,
+					workflowContext: isRecord(executionReceiptPayload.workflowContext)
+						? executionReceiptPayload.workflowContext
+						: undefined,
+					revisionContext: isRecord(executionReceiptPayload.revisionContext)
+						? executionReceiptPayload.revisionContext
+						: undefined,
+					createdHandles: Array.isArray(executionReceiptPayload.createdHandles)
+						? executionReceiptPayload.createdHandles.filter(
+								(item): item is string => typeof item === "string",
+							)
+						: undefined,
+				}
+			: undefined;
+	const meta: AutoDraftExecuteMeta | undefined = metaPayload
+		? {
+				mode: toNonEmptyString(metaPayload.mode) || undefined,
+				previewReadyCount:
+					typeof metaPayload.previewReadyCount === "number"
+						? metaPayload.previewReadyCount
+						: undefined,
+				providerPath: toNonEmptyString(metaPayload.providerPath) || undefined,
+				requestId: toNonEmptyString(metaPayload.requestId) || undefined,
+				bridgeRequestId:
+					toNonEmptyString(metaPayload.bridgeRequestId) || undefined,
+				bridgeMs:
+					typeof metaPayload.bridgeMs === "number" ? metaPayload.bridgeMs : undefined,
+				cad: isRecord(metaPayload.cad) ? metaPayload.cad : undefined,
+				commit: isRecord(metaPayload.commit) ? metaPayload.commit : undefined,
+				executionReceipt,
+			}
+		: undefined;
+
 	return {
 		ok: Boolean(payload.ok),
 		source: toNonEmptyString(payload.source, "unknown"),
@@ -760,6 +886,9 @@ const normalizeExecutePayload = (
 		skipped: toInt(payload.skipped, 0),
 		dry_run: Boolean(payload.dry_run),
 		message: toNonEmptyString(payload.message) || undefined,
+		requestId: toNonEmptyString(payload.requestId) || undefined,
+		warnings,
+		meta,
 	};
 };
 
@@ -2030,6 +2159,8 @@ class AutoDraftService {
 			backcheckRequestId?: string;
 			backcheckOverrideReason?: string;
 			backcheckFailCount?: number;
+			workflowContext?: AutoDraftExecuteWorkflowContext;
+			revisionContext?: AutoDraftExecuteRevisionContext;
 		},
 	): Promise<AutoDraftExecuteResponse> {
 		const payload = await requestAutoDraftExecute(

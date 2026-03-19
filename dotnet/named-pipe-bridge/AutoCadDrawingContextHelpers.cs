@@ -6,6 +6,7 @@ static partial class ConduitRouteStubHandlers
         bool ReadOnly,
         bool CommandStateAvailable,
         int? CommandMask,
+        string ActiveLayer,
         string ActiveLayout,
         string ActiveSpace,
         int? LayoutCount,
@@ -21,6 +22,10 @@ static partial class ConduitRouteStubHandlers
         var drawingPath = StringOrDefault(ReadProperty(session.Document, "FullName"), "");
         var readOnly = TryReadBoolLike(ReadProperty(session.Document, "ReadOnly"), fallback: false);
         var commandStateAvailable = TryReadCommandActiveMask(session, out var commandMask);
+        var activeLayerObject = ReadProperty(session.Document, "ActiveLayer");
+        var activeLayer = activeLayerObject is null
+            ? ""
+            : StringOrDefault(ReadProperty(activeLayerObject, "Name"), "");
         var activeLayoutObject = ReadProperty(session.Document, "ActiveLayout");
         var activeLayout = activeLayoutObject is null
             ? ""
@@ -38,6 +43,7 @@ static partial class ConduitRouteStubHandlers
             ReadOnly: readOnly,
             CommandStateAvailable: commandStateAvailable,
             CommandMask: commandStateAvailable ? commandMask : null,
+            ActiveLayer: activeLayer,
             ActiveLayout: activeLayout,
             ActiveSpace: activeSpace,
             LayoutCount: layoutCount,

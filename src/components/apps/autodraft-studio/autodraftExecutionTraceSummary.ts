@@ -45,6 +45,7 @@ export type AutoDraftCommitCounts = {
 export type AutoDraftCadContextSummary = {
 	drawingName: string;
 	drawingPath: string;
+	activeLayer: string;
 	activeLayout: string;
 	activeSpace: string;
 	readOnly: boolean | null;
@@ -128,6 +129,7 @@ export function summarizeAutoDraftExecution(
 		cad: {
 			drawingName: asString(cadRecord.drawingName),
 			drawingPath: asString(cadRecord.drawingPath),
+			activeLayer: asString(cadRecord.activeLayer),
 			activeLayout: asString(cadRecord.activeLayout),
 			activeSpace: asString(cadRecord.activeSpace),
 			readOnly:
@@ -184,6 +186,10 @@ export function buildAutoDraftRevisionTraceNotes(args: {
 		appendLine(
 			lines,
 			summary.cad.drawingName ? `Drawing: ${summary.cad.drawingName}` : "",
+		);
+		appendLine(
+			lines,
+			summary.cad.activeLayer ? `Layer: ${summary.cad.activeLayer}` : "",
 		);
 		appendLine(
 			lines,

@@ -1604,8 +1604,10 @@ export function AutoDraftStudioApp() {
 										{executionSummary?.cad.activeLayout || "No active layout"}
 									</Text>
 									<Text size="xs" color="muted">
-										{executionSummary?.cad.activeSpace
-											? `Space: ${executionSummary.cad.activeSpace}`
+										{executionSummary?.cad.activeLayer
+											? `Layer: ${executionSummary.cad.activeLayer}`
+											: executionSummary?.cad.activeSpace
+												? `Space: ${executionSummary.cad.activeSpace}`
 											: "Space unavailable"}
 									</Text>
 									<Text size="xs" color="muted">

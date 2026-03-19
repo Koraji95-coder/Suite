@@ -756,22 +756,14 @@ def _build_text_delete_execute_target(
 
     cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
     markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
-    markup_bounds = _normalize_bounds(markup.get("bounds"))
-    if not markup_bounds:
+    candidate = _resolve_single_text_like_execute_candidate(
+        markup=markup,
+        cad_context=cad_context_obj,
+        entity_filter=lambda _entity: True,
+    )
+    if not candidate:
         return None
 
-    candidates = [
-        entity
-        for entity in _extract_text_entities(cad_context_obj)
-        if _bounds_overlap(
-            _expand_bounds(markup_bounds, 2.0),
-            _expand_bounds(entity.get("bounds") or {}, 1.0),
-        )
-    ]
-    if len(candidates) != 1:
-        return None
-
-    candidate = candidates[0]
     target_entity_id = str(candidate.get("id") or "").strip()
     if not target_entity_id:
         return None
@@ -823,24 +815,19 @@ def _build_dimension_text_execute_target(
     markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
     markup_text = _normalize_display_text(markup.get("text"), max_length=120)
     target_value = str(markup_text or "").strip()
-    markup_bounds = _normalize_bounds(markup.get("bounds"))
-    if not target_value or not markup_bounds:
+    if not target_value:
         return None
 
     cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
-    candidates = [
-        entity
-        for entity in _extract_text_entities(cad_context_obj)
-        if "dimension" in _normalize_text(entity.get("entity_type"))
-        and _bounds_overlap(
-            _expand_bounds(markup_bounds, 2.0),
-            _expand_bounds(entity.get("bounds") or {}, 1.0),
-        )
-    ]
-    if len(candidates) != 1:
+    candidate = _resolve_single_text_like_execute_candidate(
+        markup=markup,
+        cad_context=cad_context_obj,
+        entity_filter=lambda entity: "dimension"
+        in _normalize_text(entity.get("entity_type")),
+    )
+    if not candidate:
         return None
 
-    candidate = candidates[0]
     target_entity_id = str(candidate.get("id") or "").strip()
     if not target_entity_id:
         return None
@@ -4401,6 +4388,9 @@ def _extract_text_entities(cad_context: Dict[str, Any]) -> List[Dict[str, Any]]:
                 ).strip(),
             }
         )
+        layer_name = str(entry.get("layer") or "").strip()
+        if layer_name:
+            text_entities[-1]["layer"] = layer_name
     return text_entities
 
 
@@ -4443,6 +4433,120 @@ def _resolve_replacement_target_point(
     if bounds:
         return _resolve_bounds_center(bounds), "bounds-center"
     return None, "unavailable"
+
+
+def _resolve_strong_nearest_entity(
+    entities: List[Dict[str, Any]],
+    *,
+    target_point: Optional[Dict[str, float]],
+    max_distance: float,
+) -> Optional[Dict[str, Any]]:
+    if target_point is None or not entities:
+        return None
+
+    ranked: List[Tuple[float, Dict[str, Any]]] = []
+    for entity in entities:
+        bounds = entity.get("bounds") if isinstance(entity.get("bounds"), dict) else None
+        if not bounds:
+            continue
+        distance = _distance_between_points(target_point, _resolve_bounds_center(bounds))
+        if distance <= max_distance:
+            ranked.append((distance, entity))
+
+    ranked.sort(key=lambda item: (item[0], str(item[1].get("id") or "")))
+    if len(ranked) == 1:
+        return ranked[0][1]
+    if len(ranked) < 2:
+        return None
+
+    first_distance, first_entity = ranked[0]
+    second_distance, _second_entity = ranked[1]
+    if (
+        second_distance - first_distance >= 8.0
+        or second_distance >= max(first_distance * 1.75, first_distance + 4.0)
+    ) and first_distance <= max_distance:
+        return first_entity
+    return None
+
+
+def _resolve_single_text_like_execute_candidate(
+    *,
+    markup: Dict[str, Any],
+    cad_context: Dict[str, Any],
+    entity_filter: Callable[[Dict[str, Any]], bool],
+) -> Optional[Dict[str, Any]]:
+    markup_bounds = _normalize_bounds(markup.get("bounds"))
+    if not markup_bounds:
+        return None
+
+    entities = [
+        entity
+        for entity in _extract_text_entities(cad_context)
+        if entity_filter(entity)
+    ]
+    if not entities:
+        return None
+
+    markup_layer = _normalize_text(markup.get("layer"))
+    if markup_layer:
+        same_layer_entities = [
+            entity
+            for entity in entities
+            if _normalize_text(entity.get("layer")) == markup_layer
+        ]
+        if same_layer_entities:
+            entities = same_layer_entities
+
+    target_point, target_source = _resolve_replacement_target_point(
+        markup=markup,
+        bounds=markup_bounds,
+    )
+    if target_point is not None:
+        pointer_hits = [
+            entity
+            for entity in entities
+            if _bounds_contains_point(
+                entity.get("bounds") if isinstance(entity.get("bounds"), dict) else {},
+                target_point,
+            )
+        ]
+        if len(pointer_hits) == 1:
+            return pointer_hits[0]
+        if len(pointer_hits) > 1:
+            return None
+
+    overlap_candidates = [
+        entity
+        for entity in entities
+        if _bounds_overlap(
+            _expand_bounds(markup_bounds, 2.0),
+            _expand_bounds(entity.get("bounds") or {}, 1.0),
+        )
+    ]
+    if len(overlap_candidates) == 1:
+        return overlap_candidates[0]
+
+    markup_diag = math.hypot(markup_bounds["width"], markup_bounds["height"])
+    search_radius = max(24.0, markup_diag * 2.5)
+
+    if target_source == "callout-tail":
+        nearest_overlap = _resolve_strong_nearest_entity(
+            overlap_candidates,
+            target_point=target_point,
+            max_distance=search_radius,
+        )
+        if nearest_overlap is not None:
+            return nearest_overlap
+
+        nearest_entity = _resolve_strong_nearest_entity(
+            entities,
+            target_point=target_point,
+            max_distance=search_radius,
+        )
+        if nearest_entity is not None:
+            return nearest_entity
+
+    return None
 
 
 def _is_replacement_markup_candidate(action: Dict[str, Any]) -> bool:

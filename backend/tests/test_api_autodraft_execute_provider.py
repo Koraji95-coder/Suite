@@ -95,7 +95,17 @@ def _build_delete_text_action() -> dict[str, object]:
     }
 
 
-def _build_dimension_action(*, text: str = '12\'-0"') -> dict[str, object]:
+def _build_dimension_action(
+    *,
+    text: str = '12\'-0"',
+    include_callout_points: bool = False,
+) -> dict[str, object]:
+    meta: dict[str, object] = {}
+    if include_callout_points:
+        meta["callout_points"] = [
+            {"x": 42, "y": 22},
+            {"x": 55, "y": 24},
+        ]
     return {
         "id": "action-dimension-1",
         "rule_id": "dimension-text-blue",
@@ -108,6 +118,7 @@ def _build_dimension_action(*, text: str = '12\'-0"') -> dict[str, object]:
             "color": "blue",
             "text": text,
             "bounds": {"x": 40, "y": 20, "width": 26, "height": 8},
+            "meta": meta,
         },
     }
 
@@ -723,6 +734,81 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
+    def test_execute_prepares_text_delete_target_from_unique_callout_candidate(self) -> None:
+        action = _build_delete_text_action()
+        markup = action.get("markup")
+        self.assertIsInstance(markup, dict)
+        assert isinstance(markup, dict)
+        markup["meta"] = {
+            "callout_points": [
+                {"x": 13, "y": 13},
+                {"x": 14, "y": 13},
+            ]
+        }
+
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            target = actions[0].get("execute_target") if isinstance(actions[0], dict) else None
+            self.assertEqual(
+                target,
+                {
+                    "kind": "text_delete",
+                    "target_entity_id": "AB12",
+                    "current_value": "OLD PANEL",
+                    "entity_type_hint": "text",
+                },
+            )
+            return {
+                "id": "bridge-job-delete-3",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview complete.",
+                    "data": {
+                        "jobId": "autodraft-delete-3",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview complete.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-delete-target-3"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-delete-target-3",
+                "actions": [action],
+                "dry_run": True,
+                "cad_context": {
+                    "entities": [
+                        {
+                            "id": "AB12",
+                            "text": "OLD PANEL",
+                            "bounds": {"x": 12, "y": 12, "width": 10, "height": 4},
+                        },
+                        {
+                            "id": "CD34",
+                            "text": "OLD PANEL 2",
+                            "bounds": {"x": 26, "y": 16, "width": 10, "height": 4},
+                        },
+                    ]
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
     def test_execute_prepares_dimension_text_target_for_bridge(self) -> None:
         def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
             actions = payload.get("actions")
@@ -837,6 +923,73 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
                             "type": "AcDbAlignedDimension",
                             "text": '11\'-0"',
                             "bounds": {"x": 48, "y": 23, "width": 18, "height": 4},
+                        },
+                    ]
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_prepares_dimension_target_from_unique_callout_candidate(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            target = actions[0].get("execute_target") if isinstance(actions[0], dict) else None
+            self.assertEqual(
+                target,
+                {
+                    "kind": "dimension_text_override",
+                    "target_entity_id": "D1A2",
+                    "target_value": '12\'-0"',
+                    "current_value": '10\'-0"',
+                    "entity_type_hint": "dimension",
+                },
+            )
+            return {
+                "id": "bridge-job-dimension-3",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview complete.",
+                    "data": {
+                        "jobId": "autodraft-dimension-3",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview complete.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-dimension-target-3"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-dimension-target-3",
+                "actions": [_build_dimension_action(include_callout_points=True)],
+                "dry_run": True,
+                "cad_context": {
+                    "entities": [
+                        {
+                            "id": "D1A2",
+                            "type": "AcDbRotatedDimension",
+                            "text": '10\'-0"',
+                            "bounds": {"x": 42, "y": 22, "width": 18, "height": 4},
+                        },
+                        {
+                            "id": "D1B3",
+                            "type": "AcDbAlignedDimension",
+                            "text": '11\'-0"',
+                            "bounds": {"x": 72, "y": 32, "width": 18, "height": 4},
                         },
                     ]
                 },

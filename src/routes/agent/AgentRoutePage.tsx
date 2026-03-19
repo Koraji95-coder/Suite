@@ -38,16 +38,21 @@ export default function AgentRoutePage() {
 		loading,
 		error: connectionError,
 		refreshNow: refreshConnectionState,
-	} =
-		useAgentConnectionStatus({
-			userId: user?.id ?? null,
-		});
+	} = useAgentConnectionStatus({
+		userId: user?.id ?? null,
+	});
 	const showGatewayRestartHint = shouldShowGatewayRestartHint(connectionError);
-	const statusLabel = loading || healthy === null ? "Checking" : healthy ? "Online" : "Offline";
+	const statusState = loading ? "checking" : healthy ? "online" : "offline";
+	const statusLabel =
+		statusState === "checking"
+			? "Checking"
+			: statusState === "online"
+				? "Online"
+				: "Offline";
 	const statusSummary =
-		loading || healthy === null
+		statusState === "checking"
 			? "Verifying gateway reachability and broker link."
-			: healthy
+			: statusState === "online"
 				? "Gateway and broker transport are reachable."
 				: "Gateway or broker transport is unreachable.";
 	const pairingSummary = paired
@@ -78,7 +83,11 @@ export default function AgentRoutePage() {
 			localStorage.removeItem("agent-active-profile");
 			void refreshConnectionState();
 		} catch (error) {
-			logger.error("Failed to reset local agent panel cache.", "AgentRoutePage", error);
+			logger.error(
+				"Failed to reset local agent panel cache.",
+				"AgentRoutePage",
+				error,
+			);
 		}
 	};
 
@@ -131,16 +140,12 @@ export default function AgentRoutePage() {
 							<span
 								className={cn(
 									styles.statusDot,
-									(loading || healthy === null) && styles.statusUnknown,
-									healthy === true && styles.statusOnline,
-									healthy === false && styles.statusOffline,
+									statusState === "checking" && styles.statusUnknown,
+									statusState === "online" && styles.statusOnline,
+									statusState === "offline" && styles.statusOffline,
 								)}
 							/>
-							{loading || healthy === null
-								? "Checking"
-								: healthy
-									? "Online"
-									: "Offline"}
+							{statusLabel}
 						</span>
 						<span className={styles.separator} />
 						<span className={styles.statusItem}>
@@ -168,7 +173,6 @@ export default function AgentRoutePage() {
 							<RefreshCw className={styles.buttonIcon} />
 							Refresh state
 						</button>
-
 					</div>
 				</div>
 				{connectionError ? (
@@ -187,7 +191,9 @@ export default function AgentRoutePage() {
 				<AgentPanelBoundary onResetPanelCache={handleResetPanelCache}>
 					{loading || healthy === null ? (
 						<section className={styles.loadingPanel}>
-							<p className={styles.loadingLabel}>Checking agent gateway state</p>
+							<p className={styles.loadingLabel}>
+								Checking agent gateway state
+							</p>
 							<Progress
 								value={36}
 								indeterminate

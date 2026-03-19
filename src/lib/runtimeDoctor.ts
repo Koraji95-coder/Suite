@@ -1,5 +1,8 @@
 import { recordAppDiagnostic } from "@/lib/appDiagnostics";
-import { fetchWithTimeout, parseResponseErrorMessage } from "@/lib/fetchWithTimeout";
+import {
+	fetchWithTimeout,
+	parseResponseErrorMessage,
+} from "@/lib/fetchWithTimeout";
 import { supabase } from "@/supabase/client";
 import { isSupabaseConfigured } from "@/supabase/utils";
 
@@ -19,18 +22,26 @@ export interface SuiteRuntimeDoctorReport {
 }
 
 function resolveBackendHealthPath(): string | null {
-	const configuredBackendUrl = String(import.meta.env.VITE_BACKEND_URL || "").trim();
-	if (configuredBackendUrl) {
-		return `${configuredBackendUrl.replace(/\/+$/, "")}/health`;
+	if (import.meta.env.DEV) {
+		return "/health";
 	}
-	return null;
+	const configuredBackendUrl = String(
+		import.meta.env.VITE_BACKEND_URL || "",
+	).trim();
+	return configuredBackendUrl
+		? `${configuredBackendUrl.replace(/\/+$/, "")}/health`
+		: "/health";
 }
 
 function ok(label: string, detail: string, key: string): RuntimeCheckResult {
 	return { key, label, status: "ok", detail };
 }
 
-function warning(label: string, detail: string, key: string): RuntimeCheckResult {
+function warning(
+	label: string,
+	detail: string,
+	key: string,
+): RuntimeCheckResult {
 	return { key, label, status: "warning", detail };
 }
 
@@ -195,18 +206,12 @@ export async function runSuiteRuntimeDoctor(): Promise<SuiteRuntimeDoctorReport>
 		checks.push(
 			await checkRoute({
 				key: "backend-health",
-				label: "Backend health",
+				label: import.meta.env.DEV
+					? "Backend health (via Vite proxy)"
+					: "Backend health",
 				path: backendHealthPath,
 				accessToken,
 			}),
-		);
-	} else {
-		checks.push(
-			warning(
-				"Backend health",
-				"VITE_BACKEND_URL is not configured, so backend health is inferred from the /api proxy checks below.",
-				"backend-health",
-			),
 		);
 	}
 	checks.push(

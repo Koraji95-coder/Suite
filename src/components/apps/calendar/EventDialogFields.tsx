@@ -26,6 +26,10 @@ import {
 	EVENT_DIALOG_TIME_OPTIONS,
 } from "./eventDialogModels";
 
+const TIME_OPTIONS = EVENT_DIALOG_TIME_OPTIONS.filter(
+	(option) => option.value.trim().length > 0,
+);
+
 interface EventDialogFieldsProps {
 	projectOptions: Array<{ id: string; name: string }>;
 	filteredTaskOptions: Array<{
@@ -221,7 +225,7 @@ export function EventDialogFields({
 								<SelectValue placeholder="Select time" />
 							</SelectTrigger>
 							<SelectContent>
-								{EVENT_DIALOG_TIME_OPTIONS.map((option) => (
+								{TIME_OPTIONS.map((option) => (
 									<SelectItem key={option.value} value={option.value}>
 										{option.label}
 									</SelectItem>
@@ -278,7 +282,7 @@ export function EventDialogFields({
 								<SelectValue placeholder="Select time" />
 							</SelectTrigger>
 							<SelectContent>
-								{EVENT_DIALOG_TIME_OPTIONS.map((option) => (
+								{TIME_OPTIONS.map((option) => (
 									<SelectItem key={option.value} value={option.value}>
 										{option.label}
 									</SelectItem>

@@ -49,8 +49,9 @@ export function buildPasskeyBackendStatus(
 	passkeyCapability: PasskeyCapability | null,
 	passkeyLoading: boolean,
 ): StatusDescriptor {
-	if (passkeyLoading) return { value: "Checking", tone: "muted" };
-	if (!passkeyCapability?.enabled) return { value: "Rollout off", tone: "warning" };
+	if (passkeyLoading) return { value: "Checking", tone: "primary" };
+	if (!passkeyCapability?.enabled)
+		return { value: "Rollout off", tone: "warning" };
 	if (!passkeyCapability.config_ready) {
 		return { value: "Needs config", tone: "warning" };
 	}
@@ -71,7 +72,9 @@ export function buildAgentGatewayStatus(
 		: { value: "Offline", tone: "danger" };
 }
 
-export function buildAgentPairingStatus(agentPaired: boolean): StatusDescriptor {
+export function buildAgentPairingStatus(
+	agentPaired: boolean,
+): StatusDescriptor {
 	return agentPaired
 		? { value: "Paired", tone: "success" }
 		: { value: "Not paired", tone: "warning" };

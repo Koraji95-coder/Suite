@@ -1,5 +1,5 @@
 // src/auth/AuthShell.tsx
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { APP_NAME, APP_TAGLINE } from "@/appMeta";
 import { AgentPixelMark } from "@/components/agent/AgentPixelMark";
@@ -32,9 +32,9 @@ const FLOATING_MARKS: {
 ];
 
 const ACCESS_SIGNALS = [
-	{ label: "Session", value: "Passwordless link flow" },
-	{ label: "Protection", value: "Verified redirect + guardrails" },
-	{ label: "Profiles", value: "Profile-based operations context" },
+	{ label: "Authentication", value: "Passwordless sign-in + passkeys" },
+	{ label: "Session", value: "Redirect-verified workspace access" },
+	{ label: "Profiles", value: "Profile-driven operations context" },
 ] as const;
 
 export default function AuthShell({
@@ -44,20 +44,17 @@ export default function AuthShell({
 	cardClassName,
 	cardStyle,
 }: AuthShellProps) {
-	const [mounted, setMounted] = useState(false);
-
-	useEffect(() => {
-		const id = requestAnimationFrame(() => setMounted(true));
-		return () => cancelAnimationFrame(id);
-	}, []);
-
 	return (
 		<div className={styles.root}>
 			<div className={styles.ambientTop} aria-hidden="true" />
 			<div className={styles.ambientBottom} aria-hidden="true" />
 
 			<nav className={styles.nav}>
-				<Link to="/" className={styles.brandLink} aria-label={`${APP_NAME} home`}>
+				<Link
+					to="/"
+					className={styles.brandLink}
+					aria-label={`${APP_NAME} home`}
+				>
 					<AgentPixelMark
 						profileId="koro"
 						size={28}
@@ -84,7 +81,6 @@ export default function AuthShell({
 					className={cn(
 						styles.contentGrid,
 						!hidePanel && styles.contentGridWithPanel,
-						mounted ? styles.contentGridVisible : styles.contentGridHidden,
 					)}
 				>
 					{!hidePanel && (
@@ -105,8 +101,6 @@ export default function AuthShell({
 												left: mark.left,
 												transform: "translate(-50%, -50%)",
 												animationDelay: mark.delay,
-												opacity: mounted ? 1 : 0,
-												transition: `opacity 0.8s ease ${mark.delay}`,
 											}}
 										>
 											<AgentPixelMark
@@ -124,7 +118,12 @@ export default function AuthShell({
 									<Text size="xl" weight="semibold" block>
 										{APP_NAME}
 									</Text>
-									<Text size="sm" color="muted" className={styles.tagline} block>
+									<Text
+										size="sm"
+										color="muted"
+										className={styles.tagline}
+										block
+									>
 										{APP_TAGLINE}
 									</Text>
 								</div>
@@ -137,7 +136,6 @@ export default function AuthShell({
 										</div>
 									))}
 								</div>
-
 							</div>
 						</section>
 					)}
@@ -159,8 +157,16 @@ export default function AuthShell({
 								<HStack gap={2} className={styles.agentBadgeRow} wrap>
 									{FLOATING_MARKS.map((mark) => (
 										<div key={mark.id} className={styles.agentBadge}>
-											<AgentPixelMark profileId={mark.id} size={12} detailLevel="hero" />
-											<Text size="xs" color="muted" className={styles.agentName}>
+											<AgentPixelMark
+												profileId={mark.id}
+												size={12}
+												detailLevel="hero"
+											/>
+											<Text
+												size="xs"
+												color="muted"
+												className={styles.agentName}
+											>
 												{AGENT_PROFILES[mark.id].name}
 											</Text>
 										</div>

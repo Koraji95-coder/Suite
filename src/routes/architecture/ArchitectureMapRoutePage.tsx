@@ -35,8 +35,9 @@ export default function ArchitectureMapRoutePage() {
 							</Text>
 							<Text size="xs" color="muted" className={styles.routeHeroText}>
 								Domain boundaries, dependency pressure, and staged refactor
-								checkpoints in one map-first workspace. Use Graph Explorer as an
-								alternate node-link view.
+								checkpoints live in this primary map-first workspace. When you
+								need a lightweight node-link exploration, open the Graph
+								Explorer compatibility view on the same data model.
 							</Text>
 						</div>
 						<div className={styles.routeHeroBadges}>

@@ -5,7 +5,6 @@ import { ProjectList } from "./ProjectList";
 import styles from "./ProjectManager.module.css";
 import { ProjectManagerDeleteDialogs } from "./ProjectManagerDeleteDialogs";
 import { ProjectManagerHeader } from "./ProjectManagerHeader";
-import { selectVisibleProjects } from "./projectManagerSelectors";
 import type { StatusFilter } from "./projectmanagertypes";
 import { TaskFormModal } from "./TaskFormModal";
 import { useProjectManagerState } from "./useProjectManagerState";
@@ -100,12 +99,6 @@ export function ProjectManager({
 		onCalendarMonthChange,
 	});
 
-	const visibleProjects = selectVisibleProjects({
-		projects,
-		statusFilter,
-		projectSearch,
-	});
-
 	return (
 		<div className={styles.root}>
 			<ProjectManagerHeader
@@ -116,7 +109,6 @@ export function ProjectManager({
 				activeProjects={activeProjects}
 				archivedProjects={archivedProjects}
 				totalProjects={totalProjects}
-				visibleProjectCount={visibleProjects.length}
 				onCreateProject={() => {
 					setEditingProject(null);
 					resetProjectForm();
@@ -165,19 +157,19 @@ export function ProjectManager({
 						</div>
 					</div>
 					<div className={styles.listPane}>
-					<ProjectList
-						projects={projects}
-						selectedProject={selectedProject}
-						projectTaskCounts={projectTaskCounts}
-						onSelectProject={setSelectedProject}
-						onEditProject={openEditProject}
-						onDeleteProject={requestDeleteProject}
-						filter={statusFilter}
-						onFilterChange={(f) => setStatusFilter(f as StatusFilter)}
-						searchQuery={projectSearch}
-						onSearchChange={setProjectSearch}
-						showControls={false}
-					/>
+						<ProjectList
+							projects={projects}
+							selectedProject={selectedProject}
+							projectTaskCounts={projectTaskCounts}
+							onSelectProject={setSelectedProject}
+							onEditProject={openEditProject}
+							onDeleteProject={requestDeleteProject}
+							filter={statusFilter}
+							onFilterChange={(f) => setStatusFilter(f as StatusFilter)}
+							searchQuery={projectSearch}
+							onSearchChange={setProjectSearch}
+							showControls={false}
+						/>
 					</div>
 				</div>
 

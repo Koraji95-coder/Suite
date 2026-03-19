@@ -11,8 +11,13 @@ import {
 	Undo2,
 	Zap,
 } from "lucide-react";
-import { useEffect, useState, type CSSProperties, type ComponentType } from "react";
-import { hexToRgba } from "@/lib/palette";
+import {
+	useEffect,
+	useState,
+	type CSSProperties,
+	type ComponentType,
+} from "react";
+import { cn } from "@/lib/utils";
 import { Progress } from "@/components/primitives/Progress";
 import type { PlotDiffPreview, PreviewMode } from "./GridGeneratorPanelModels";
 import styles from "./GridGeneratorPreviewColumn.module.css";
@@ -100,12 +105,15 @@ export function GridGeneratorPreviewColumn({
 	const [calloutScale, setCalloutScale] = useState(1.2);
 	const [showPlotPreview, setShowPlotPreview] = useState(false);
 	const [gridPreview3DLoading, setGridPreview3DLoading] = useState(false);
-	const [gridPreview3DError, setGridPreview3DError] = useState<string | null>(null);
-	const [GridPreview3DComponent, setGridPreview3DComponent] = useState<ComponentType<{
-		rods: GridRod[];
-		conductors: GridConductor[];
-		placements: GridPlacement[];
-	}> | null>(null);
+	const [gridPreview3DError, setGridPreview3DError] = useState<string | null>(
+		null,
+	);
+	const [GridPreview3DComponent, setGridPreview3DComponent] =
+		useState<ComponentType<{
+			rods: GridRod[];
+			conductors: GridConductor[];
+			placements: GridPlacement[];
+		}> | null>(null);
 
 	useEffect(() => {
 		if (
@@ -146,6 +154,13 @@ export function GridGeneratorPreviewColumn({
 		GridPreview3DComponent,
 	]);
 
+	useEffect(() => {
+		if (previewMode === "3d") return;
+		setGridPreview3DError(null);
+		setGridPreview3DComponent(null);
+		setGridPreview3DLoading(false);
+	}, [previewMode]);
+
 	const previewVars = {
 		"--gg-primary": palettePrimary,
 		"--gg-surface-light": paletteSurfaceLight,
@@ -159,12 +174,10 @@ export function GridGeneratorPreviewColumn({
 				<button
 					onClick={onRunGeneration}
 					disabled={generating || conductors.length === 0}
+					className={cn(styles.toolbarButton, styles.generateButton)}
 					style={{
 						...btnStyle(true),
-						background: `linear-gradient(135deg, ${hexToRgba("#f59e0b", 0.25)}, ${hexToRgba("#ea580c", 0.2)})`,
-						borderColor: hexToRgba("#f59e0b", 0.4),
-						color: paletteText,
-						opacity: conductors.length === 0 ? 0.5 : 1,
+						opacity: conductors.length === 0 ? 0.5 : undefined,
 					}}
 				>
 					{generating ? (
@@ -190,6 +203,7 @@ export function GridGeneratorPreviewColumn({
 				<button
 					onClick={onUndo}
 					disabled={!canUndo}
+					className={cn(styles.toolbarButton, styles.actionButton)}
 					style={{ ...btnStyle(), opacity: canUndo ? 1 : 0.4 }}
 				>
 					<Undo2 size={14} />
@@ -197,23 +211,28 @@ export function GridGeneratorPreviewColumn({
 				<button
 					onClick={onRedo}
 					disabled={!canRedo}
+					className={cn(styles.toolbarButton, styles.actionButton)}
 					style={{ ...btnStyle(), opacity: canRedo ? 1 : 0.4 }}
 				>
 					<Redo2 size={14} />
 				</button>
 				<button
 					onClick={onTogglePlacementLock}
-					style={{
-						...btnStyle(placementLock),
-						borderStyle: "dashed",
-						opacity: hasPlacements ? 1 : 0.6,
-					}}
 					disabled={!hasPlacements}
 					title={
 						placementLock
 							? "Placements are locked: Generate Grid will not overwrite them."
 							: "Placements are unlocked: Generate Grid will replace them."
 					}
+					className={cn(
+						styles.toolbarButton,
+						styles.actionButton,
+						styles.dashedButton,
+					)}
+					style={{
+						...btnStyle(placementLock),
+						opacity: hasPlacements ? 1 : 0.6,
+					}}
 				>
 					{placementLock ? <Lock size={14} /> : <LockOpen size={14} />}
 					{placementLock ? "Placements Locked" : "Placements Unlocked"}
@@ -221,14 +240,23 @@ export function GridGeneratorPreviewColumn({
 
 				{hasPlacements && (
 					<>
-						<button onClick={onExportExcel} style={btnStyle()}>
+						<button
+							onClick={onExportExcel}
+							className={cn(styles.toolbarButton, styles.actionButton)}
+							style={btnStyle()}
+						>
 							<FileSpreadsheet size={14} /> Excel
 						</button>
-						<button onClick={onExportPdf} style={btnStyle()}>
+						<button
+							onClick={onExportPdf}
+							className={cn(styles.toolbarButton, styles.actionButton)}
+							style={btnStyle()}
+						>
 							<FileText size={14} /> PDF
 						</button>
 						<button
 							onClick={() => setShowPlotPreview(true)}
+							className={cn(styles.toolbarButton, styles.actionButton)}
 							style={{
 								...btnStyle(),
 								opacity: backendConnected ? 1 : 0.5,
@@ -258,8 +286,12 @@ export function GridGeneratorPreviewColumn({
 					<button
 						key={tab.id}
 						onClick={() => onPreviewModeChange(tab.id)}
-						style={btnStyle(previewMode === tab.id)}
-						className={styles.tabButton}
+						className={cn(
+							styles.tabButton,
+							previewMode === tab.id
+								? styles.tabButtonActive
+								: styles.tabButtonInactive,
+						)}
 					>
 						{tab.icon} {tab.label}
 					</button>
@@ -341,7 +373,11 @@ export function GridGeneratorPreviewColumn({
 							key={preset.id}
 							onClick={preset.apply}
 							style={btnStyle()}
-							className={styles.presetButton}
+							className={cn(
+								styles.toolbarButton,
+								styles.actionButton,
+								styles.presetButton,
+							)}
 						>
 							{preset.label}
 						</button>
@@ -379,7 +415,12 @@ export function GridGeneratorPreviewColumn({
 							key={toggle.id}
 							onClick={() => toggle.set((prev) => !prev)}
 							style={btnStyle(toggle.on)}
-							className={styles.toggleButton}
+							className={cn(
+								styles.toggleButton,
+								toggle.on
+									? styles.toggleButtonActive
+									: styles.toggleButtonInactive,
+							)}
 						>
 							{toggle.label}
 						</button>
@@ -396,7 +437,7 @@ export function GridGeneratorPreviewColumn({
 							onChange={(event) =>
 								setCalloutScale(Number(event.target.value) || 1.2)
 							}
-						name="gridgeneratorpreviewcolumn_input_424"
+							name="gridgeneratorpreviewcolumn_input_424"
 						/>
 					</label>
 				</div>
@@ -437,12 +478,15 @@ export function GridGeneratorPreviewColumn({
 							</div>
 						)}
 						{gridPreview3DError && (
-							<div className={`${styles.lazyPanelState} ${styles.lazyPanelStateError}`}>
+							<div
+								className={`${styles.lazyPanelState} ${styles.lazyPanelStateError}`}
+							>
 								<div>3D preview module failed to load.</div>
 								<div className={styles.lazyPanelDetail}>
 									{gridPreview3DError}
 									<span className={styles.lazyPanelHelper}>
-										Reload the grid or open the log tab for details before retrying.
+										Reload the grid or open the log tab for details before
+										retrying.
 									</span>
 								</div>
 								<button
@@ -515,12 +559,8 @@ export function GridGeneratorPreviewColumn({
 										} as CSSProperties
 									}
 								>
-									<div className={styles.statValue}>
-										{stat.value}
-									</div>
-									<div className={styles.statLabel}>
-										{stat.label}
-									</div>
+									<div className={styles.statValue}>{stat.value}</div>
+									<div className={styles.statLabel}>{stat.label}</div>
 								</div>
 							))}
 						</div>
@@ -579,21 +619,15 @@ export function GridGeneratorPreviewColumn({
 										} as CSSProperties
 									}
 								>
-									<div className={styles.plotStatValue}>
-										{stat.value}
-									</div>
-									<div className={styles.plotStatLabel}>
-										{stat.label}
-									</div>
+									<div className={styles.plotStatValue}>{stat.value}</div>
+									<div className={styles.plotStatLabel}>{stat.label}</div>
 								</div>
 							))}
 						</div>
 
 						<div className={styles.issueList}>
 							{plotDiffPreview.issues.length === 0 ? (
-								<div className={styles.issueOk}>
-									No blocking issues found.
-								</div>
+								<div className={styles.issueOk}>No blocking issues found.</div>
 							) : (
 								plotDiffPreview.issues.map((issue, idx) => (
 									<div
@@ -617,7 +651,10 @@ export function GridGeneratorPreviewColumn({
 						</div>
 
 						<div className={styles.plotActions}>
-							<button onClick={() => setShowPlotPreview(false)} style={btnStyle()}>
+							<button
+								onClick={() => setShowPlotPreview(false)}
+								style={btnStyle()}
+							>
 								Cancel
 							</button>
 							<button

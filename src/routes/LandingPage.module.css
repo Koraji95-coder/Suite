@@ -20,11 +20,11 @@
 	border-radius: 50%;
 	background: radial-gradient(
 		circle,
-		color-mix(in srgb, var(--primary) 24%, transparent),
+		color-mix(in srgb, var(--primary) 18%, transparent),
 		transparent 68%
 	);
-	filter: blur(38px);
-	opacity: 0.5;
+	filter: blur(34px);
+	opacity: 0.38;
 }
 
 .ambientBottom {
@@ -34,11 +34,11 @@
 	border-radius: 50%;
 	background: radial-gradient(
 		circle,
-		color-mix(in srgb, var(--accent) 20%, transparent),
+		color-mix(in srgb, var(--accent) 18%, transparent),
 		transparent 70%
 	);
-	filter: blur(42px);
-	opacity: 0.44;
+	filter: blur(36px);
+	opacity: 0.32;
 }
 
 .nav {
@@ -126,19 +126,6 @@
 		),
 		var(--surface);
 	box-shadow: var(--agent-shadow-soft);
-	transition:
-		opacity 640ms ease,
-		transform 640ms ease;
-}
-
-.visible {
-	opacity: 1;
-	transform: translateY(0);
-}
-
-.hiddenDown {
-	opacity: 0;
-	transform: translateY(1.2rem);
 }
 
 .heroBackground {
@@ -147,12 +134,12 @@
 	background:
 		radial-gradient(
 			ellipse 90% 74% at 16% 14%,
-			color-mix(in srgb, var(--primary) 19%, transparent),
+			color-mix(in srgb, var(--primary) 14%, transparent),
 			transparent 68%
 		),
 		radial-gradient(
 			ellipse 76% 80% at 86% 74%,
-			color-mix(in srgb, var(--accent) 14%, transparent),
+			color-mix(in srgb, var(--accent) 18%, transparent),
 			transparent 70%
 		);
 }
@@ -184,19 +171,8 @@
 }
 
 .heroLeft {
-	transition:
-		opacity 640ms ease 180ms,
-		transform 640ms ease 180ms;
-}
-
-.heroLeftVisible {
-	opacity: 1;
-	transform: translateX(0);
-}
-
-.heroLeftHidden {
-	opacity: 0;
-	transform: translateX(-1.8rem);
+	display: grid;
+	align-content: start;
 }
 
 .heroBadge {
@@ -207,7 +183,7 @@
 	width: 0.4rem;
 	height: 0.4rem;
 	border-radius: 999px;
-	background: var(--primary);
+	background: var(--accent);
 	animation: pulse 2.3s ease-in-out infinite;
 }
 
@@ -220,7 +196,7 @@
 }
 
 .heroHighlight {
-	color: color-mix(in srgb, var(--primary) 86%, white 14%);
+	color: color-mix(in srgb, var(--accent) 82%, white 18%);
 }
 
 .heroCopy {
@@ -251,7 +227,7 @@
 	width: 0.88rem;
 	height: 0.88rem;
 	margin-top: 0.14rem;
-	color: var(--primary);
+	color: var(--accent);
 }
 
 .heroSignalLabel {
@@ -274,19 +250,6 @@
 
 .heroRight {
 	display: none;
-	transition:
-		opacity 640ms ease 340ms,
-		transform 640ms ease 340ms;
-}
-
-.heroRightVisible {
-	opacity: 1;
-	transform: translateX(0);
-}
-
-.heroRightHidden {
-	opacity: 0;
-	transform: translateX(1.8rem);
 }
 
 .mainAgentWrap {
@@ -299,8 +262,8 @@
 	position: absolute;
 	inset: 16% 10% 18%;
 	border-radius: 999px;
-	border: 1px dashed color-mix(in srgb, var(--primary) 36%, transparent);
-	opacity: 0.34;
+	border: 1px dashed color-mix(in srgb, var(--accent) 34%, transparent);
+	opacity: 0.22;
 }
 
 .mainAgentInner {
@@ -314,11 +277,11 @@
 	border-radius: 999px;
 	background: radial-gradient(
 		circle,
-		color-mix(in srgb, var(--primary) 38%, transparent),
+		color-mix(in srgb, var(--accent) 24%, transparent),
 		transparent 72%
 	);
-	filter: blur(28px);
-	opacity: 0.56;
+	filter: blur(24px);
+	opacity: 0.42;
 }
 
 .mainAgentFloat {
@@ -342,7 +305,7 @@
 }
 
 .heroSecondaryAgent:hover {
-	border-color: color-mix(in srgb, var(--primary) 46%, var(--line-soft));
+	border-color: color-mix(in srgb, var(--accent) 46%, var(--line-soft));
 	background: color-mix(in srgb, var(--surface-2) 84%, transparent);
 }
 
@@ -395,19 +358,9 @@
 		box-shadow 220ms ease;
 }
 
-.featureVisible {
-	opacity: 1;
-	transform: translateY(0);
-}
-
-.featureHidden {
-	opacity: 1;
-	transform: translateY(0);
-}
-
 .featureCard:hover {
 	transform: translateY(-2px);
-	border-color: color-mix(in srgb, var(--primary) 30%, var(--line-soft));
+	border-color: color-mix(in srgb, var(--accent) 28%, var(--line-soft));
 	box-shadow: 0 16px 28px rgb(0 0 0 / 24%);
 }
 
@@ -416,14 +369,14 @@
 	padding: 0.52rem;
 	margin-bottom: 0.55rem;
 	border-radius: 0.72rem;
-	border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--line-soft));
-	background: color-mix(in srgb, var(--primary) 12%, transparent);
+	border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-soft));
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .featureIcon {
 	width: 0.96rem;
 	height: 0.96rem;
-	color: var(--primary);
+	color: var(--accent);
 }
 
 .featureCopy {
@@ -466,19 +419,6 @@
 		),
 		var(--surface);
 	box-shadow: 0 14px 28px rgb(0 0 0 / 20%);
-	transition:
-		opacity 520ms ease,
-		transform 520ms ease;
-}
-
-.agentsPanelVisible {
-	opacity: 1;
-	transform: translateX(0);
-}
-
-.agentsPanelHidden {
-	opacity: 0;
-	transform: translateX(-1.4rem);
 }
 
 .agentsBadge {
@@ -518,18 +458,8 @@
 		opacity 220ms ease;
 }
 
-.agentCardVisible {
-	opacity: 1;
-	transform: translateY(0);
-}
-
-.agentCardHidden {
-	opacity: 1;
-	transform: translateY(0);
-}
-
 .agentCard:hover {
-	border-color: color-mix(in srgb, var(--primary) 28%, var(--line-soft));
+	border-color: color-mix(in srgb, var(--accent) 28%, var(--line-soft));
 	background: color-mix(in srgb, var(--surface-2) 84%, transparent);
 }
 
@@ -551,15 +481,6 @@
 	justify-content: space-between;
 	gap: 0.9rem;
 	border-top: 1px solid var(--line-soft);
-	transition: opacity 420ms ease 420ms;
-}
-
-.footerVisible {
-	opacity: 1;
-}
-
-.footerHidden {
-	opacity: 0;
 }
 
 .footerBrand {

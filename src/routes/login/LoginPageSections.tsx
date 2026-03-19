@@ -16,11 +16,7 @@ import { cn } from "../../lib/utils";
 import styles from "../LoginPage.module.css";
 
 const AGENT_IDS = AGENT_PROFILE_IDS;
-
-type LoginPageFrameProps = {
-	mounted: boolean;
-	children: ReactNode;
-};
+type LoginPageFrameProps = { children: ReactNode };
 
 type LoginSessionStateProps = {
 	redirecting: boolean;
@@ -51,11 +47,11 @@ type LoginFormProps = {
 	onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
-export function LoginPageFrame({ mounted, children }: LoginPageFrameProps) {
+export function LoginPageFrame({ children }: LoginPageFrameProps) {
 	return (
 		<AuthShell navLink={{ to: "/", label: "Back to landing" }}>
-			<div className={cn(styles.pageRoot, mounted ? styles.visible : styles.hidden)}>
-				<LoginPageAgentShowcase mounted={mounted} />
+			<div className={styles.pageRoot}>
+				<LoginPageAgentShowcase />
 				<Stack gap={6}>{children}</Stack>
 			</div>
 		</AuthShell>
@@ -72,11 +68,7 @@ export function LoginSessionState({
 			<div className={styles.headerCenter}>
 				<Badge color="primary" variant="soft" className={styles.statusBadge}>
 					<span
-						className={cn(
-							styles.statusDot,
-							styles.dotPrimary,
-							styles.dotPulse,
-						)}
+						className={cn(styles.statusDot, styles.dotPrimary, styles.dotPulse)}
 					/>
 					{redirecting ? "Redirecting" : "Preparing your session"}
 				</Badge>
@@ -119,11 +111,7 @@ export function LoginSentState({ email, onSendAnother }: LoginSentStateProps) {
 			<div className={styles.headerCenter}>
 				<Badge color="success" variant="soft" className={styles.statusBadge}>
 					<span
-						className={cn(
-							styles.statusDot,
-							styles.dotSuccess,
-							styles.dotPulse,
-						)}
+						className={cn(styles.statusDot, styles.dotSuccess, styles.dotPulse)}
 					/>
 					Link sent
 				</Badge>
@@ -144,7 +132,8 @@ export function LoginSentState({ email, onSendAnother }: LoginSentStateProps) {
 						<Text weight="semibold" color="default">
 							{email.trim()}
 						</Text>
-						, we sent a sign-in link. Open that email on this device to continue.
+						, we sent a sign-in link. Open that email on this device to
+						continue.
 					</Text>
 				</Panel>
 
@@ -238,17 +227,7 @@ export function LoginForm({
 						required
 					/>
 
-					<div
-						aria-hidden="true"
-						style={{
-							position: "absolute",
-							left: "-10000px",
-							top: "auto",
-							width: 1,
-							height: 1,
-							overflow: "hidden",
-						}}
-					>
+					<div aria-hidden="true" className={styles.honeypotField}>
 						<label htmlFor={`hp-${honeypotFieldName}`}>Company</label>
 						<input
 							id={`hp-${honeypotFieldName}`}
@@ -304,9 +283,9 @@ export function LoginForm({
 	);
 }
 
-function LoginPageAgentShowcase({ mounted }: { mounted: boolean }) {
+function LoginPageAgentShowcase() {
 	return (
-		<div className={cn(styles.agentShowcase, mounted ? styles.visible : styles.hidden)}>
+		<div className={styles.agentShowcase}>
 			<div className={styles.mainAgentWrap}>
 				<div className={styles.agentGlow} />
 				<div className={styles.mainAgentInner}>
@@ -320,15 +299,13 @@ function LoginPageAgentShowcase({ mounted }: { mounted: boolean }) {
 			</div>
 
 			<HStack gap={2} justify="center">
-				{AGENT_IDS.filter((id) => id !== "koro").map((id, index) => (
-					<div
-						key={id}
-						className={styles.secondaryAgent}
-						style={{ animationDelay: `${400 + index * 100}ms` }}
-					>
-						<AgentPixelMark profileId={id} size={20} detailLevel="hero" />
-					</div>
-				))}
+				{AGENT_IDS.filter((id) => id !== "koro")
+					.slice(0, 3)
+					.map((id) => (
+						<div key={id} className={styles.secondaryAgent}>
+							<AgentPixelMark profileId={id} size={20} detailLevel="hero" />
+						</div>
+					))}
 			</HStack>
 		</div>
 	);

@@ -10,11 +10,10 @@ import {
 	Workflow,
 	Zap,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { buildAgentPairingSearchFromLocation } from "@/auth/agentPairingParams";
-import { cn } from "@/lib/utils";
 import { APP_NAME, APP_TAGLINE } from "../appMeta";
 import { AgentPixelMark } from "../components/agent/AgentPixelMark";
 import {
@@ -91,39 +90,10 @@ const COMMAND_SIGNALS = [
 	},
 ] as const;
 
-function useScrollAnimation(threshold = 0.1) {
-	const ref = useRef<HTMLDivElement>(null);
-	const [isVisible, setIsVisible] = useState(false);
-
-	useEffect(() => {
-		const element = ref.current;
-		if (!element) return;
-
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				if (entry.isIntersecting) {
-					setIsVisible(true);
-					observer.unobserve(element);
-				}
-			},
-			{ threshold },
-		);
-
-		observer.observe(element);
-		return () => observer.disconnect();
-	}, [threshold]);
-
-	return { ref, isVisible };
-}
-
 export default function LandingPage() {
-	const [mounted, setMounted] = useState(false);
 	const { user } = useAuth();
 	const location = useLocation();
 	const navigate = useNavigate();
-
-	const featuresAnim = useScrollAnimation(0.1);
-	const agentsAnim = useScrollAnimation(0.1);
 
 	useEffect(() => {
 		const pairingSearch = buildAgentPairingSearchFromLocation(
@@ -142,11 +112,6 @@ export default function LandingPage() {
 			{ replace: true },
 		);
 	}, [location.hash, location.search, navigate]);
-
-	useEffect(() => {
-		const id = requestAnimationFrame(() => setMounted(true));
-		return () => cancelAnimationFrame(id);
-	}, []);
 
 	return (
 		<div className={styles.root}>
@@ -176,22 +141,12 @@ export default function LandingPage() {
 			</nav>
 
 			<main className={styles.main}>
-				<section
-					className={cn(
-						styles.hero,
-						mounted ? styles.visible : styles.hiddenDown,
-					)}
-				>
+				<section className={styles.hero}>
 					<div className={styles.heroBackground} />
 					<div className={styles.heroPattern} />
 
 					<div className={styles.heroGrid}>
-						<div
-							className={cn(
-								styles.heroLeft,
-								mounted ? styles.heroLeftVisible : styles.heroLeftHidden,
-							)}
-						>
+						<div className={styles.heroLeft}>
 							<Badge
 								color="default"
 								variant="outline"
@@ -239,12 +194,7 @@ export default function LandingPage() {
 							</HStack>
 						</div>
 
-						<div
-							className={cn(
-								styles.heroRight,
-								mounted ? styles.heroRightVisible : styles.heroRightHidden,
-							)}
-						>
+						<div className={styles.heroRight}>
 							<div className={styles.mainAgentWrap}>
 								<div className={styles.heroOrbit} aria-hidden="true" />
 								<div className={styles.mainAgentInner}>
@@ -266,18 +216,14 @@ export default function LandingPage() {
 								>
 									{AGENT_IDS.filter((id) => id !== "koro")
 										.slice(0, 2)
-										.map((id, i) => (
-										<div
-											key={id}
-											className={styles.heroSecondaryAgent}
-											style={{ animationDelay: `${600 + i * 100}ms` }}
-										>
-											<AgentPixelMark
-												profileId={id}
-												size={28}
-												detailLevel="hero"
-											/>
-										</div>
+										.map((id) => (
+											<div key={id} className={styles.heroSecondaryAgent}>
+												<AgentPixelMark
+													profileId={id}
+													size={28}
+													detailLevel="hero"
+												/>
+											</div>
 										))}
 								</HStack>
 
@@ -289,7 +235,7 @@ export default function LandingPage() {
 					</div>
 				</section>
 
-				<section ref={featuresAnim.ref} className={styles.featuresSection}>
+				<section className={styles.featuresSection}>
 					<div className={styles.sectionHeading}>
 						<Text as="h2" size="lg" weight="semibold" block>
 							Workspace modules
@@ -300,22 +246,8 @@ export default function LandingPage() {
 						</Text>
 					</div>
 					<div className={styles.featuresGrid}>
-						{FEATURES.map((f, i) => (
-							<Link
-								key={f.title}
-								to={f.to}
-								className={cn(
-									styles.featureCard,
-									featuresAnim.isVisible
-										? styles.featureVisible
-										: styles.featureHidden,
-								)}
-								style={{
-									transitionDelay: featuresAnim.isVisible
-										? `${i * 80}ms`
-										: "0ms",
-								}}
-							>
+						{FEATURES.map((f) => (
+							<Link key={f.title} to={f.to} className={styles.featureCard}>
 								<div className={styles.featureIconWrap}>
 									<f.icon className={styles.featureIcon} />
 								</div>
@@ -336,7 +268,7 @@ export default function LandingPage() {
 					</div>
 				</section>
 
-				<section ref={agentsAnim.ref} className={styles.agentsSection}>
+				<section className={styles.agentsSection}>
 					<div className={styles.sectionHeading}>
 						<Text as="h2" size="lg" weight="semibold" block>
 							Agent operations layer
@@ -346,16 +278,7 @@ export default function LandingPage() {
 							shared context when needed.
 						</Text>
 					</div>
-					<Panel
-						variant="default"
-						padding="lg"
-						className={cn(
-							styles.agentsPanel,
-							agentsAnim.isVisible
-								? styles.agentsPanelVisible
-								: styles.agentsPanelHidden,
-						)}
-					>
+					<Panel variant="default" padding="lg" className={styles.agentsPanel}>
 						<Badge color="accent" variant="soft" className={styles.agentsBadge}>
 							<span className={styles.agentsBadgeDot} />
 							Profile-driven agents
@@ -370,23 +293,10 @@ export default function LandingPage() {
 						</Text>
 
 						<div className={styles.agentGrid}>
-							{AGENT_IDS.map((id, i) => {
+							{AGENT_IDS.map((id) => {
 								const profile = AGENT_PROFILES[id];
 								return (
-									<div
-										key={id}
-										className={cn(
-											styles.agentCard,
-											agentsAnim.isVisible
-												? styles.agentCardVisible
-												: styles.agentCardHidden,
-										)}
-										style={{
-											transitionDelay: agentsAnim.isVisible
-												? `${200 + i * 100}ms`
-												: "0ms",
-										}}
-									>
+									<div key={id} className={styles.agentCard}>
 										<div className={styles.agentMark}>
 											<AgentPixelMark
 												profileId={id}
@@ -415,12 +325,7 @@ export default function LandingPage() {
 					</Panel>
 				</section>
 
-				<footer
-					className={cn(
-						styles.footer,
-						mounted ? styles.footerVisible : styles.footerHidden,
-					)}
-				>
+				<footer className={styles.footer}>
 					<HStack gap={2} align="center" className={styles.footerBrand}>
 						<AgentPixelMark profileId="koro" size={16} detailLevel="hero" />
 						<Text size="xs" color="muted">

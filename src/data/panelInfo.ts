@@ -28,7 +28,7 @@ export const dashboardInfo = {
 			tips: [
 				"Use `focus=watchdog` or `focus=ledger` links when you need to land on a specific command module",
 				"Watchdog telemetry is canonical on the dashboard; project pages only show scoped summaries",
-				"Ledger entries can link directly into Graph Explorer paths for repo-aware changelog review",
+				"Ledger entries can deep-link back into Architecture Map hotspots when deeper context is required",
 			],
 		},
 	],

@@ -13,7 +13,7 @@ export default function LoginPage() {
 	if (showSessionCard) {
 		const redirecting = Boolean(controller.user && !controller.loading);
 		return (
-			<LoginPageFrame mounted={controller.mounted}>
+			<LoginPageFrame>
 				<LoginSessionState
 					redirecting={redirecting}
 					redirectMessage={controller.redirectMessage}
@@ -26,7 +26,7 @@ export default function LoginPage() {
 
 	if (controller.sent) {
 		return (
-			<LoginPageFrame mounted={controller.mounted}>
+			<LoginPageFrame>
 				<LoginSentState
 					email={controller.email}
 					onSendAnother={controller.resetSent}
@@ -36,7 +36,7 @@ export default function LoginPage() {
 	}
 
 	return (
-		<LoginPageFrame mounted={controller.mounted}>
+		<LoginPageFrame>
 			<LoginForm
 				email={controller.email}
 				onEmailChange={controller.setEmail}

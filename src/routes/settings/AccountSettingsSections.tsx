@@ -90,8 +90,8 @@ export function AccountSecurityOverviewSection({
 			<Stack gap={4}>
 				<SectionHeader
 					icon={ShieldCheck}
-					title="Security overview"
-					description="Current session and trust posture for this workspace."
+					title="Security posture"
+					description="Identity, session, and agent gateway health for this workspace."
 					tone="primary"
 				/>
 
@@ -246,7 +246,7 @@ export function AccountAgentPairingSection({
 				<SectionHeader
 					icon={Bot}
 					title="Agent pairing"
-					description="Trust this browser session with profile-driven agent coordination."
+					description="Coordinate trusted devices for automated orchestration."
 					tone="primary"
 				/>
 
@@ -277,9 +277,9 @@ export function AccountAgentPairingSection({
 						>
 							Pairing status: {agentPaired ? "Paired" : "Not paired"}
 						</Badge>
-					<Badge size="sm" variant="soft" color="accent">
-						Verification mode: {usesBroker ? "Brokered" : "Direct"}
-					</Badge>
+						<Badge size="sm" variant="soft" color="accent">
+							Verification mode: {usesBroker ? "Brokered" : "Direct"}
+						</Badge>
 					</HStack>
 					<Text size="xs" color="muted">
 						{usesBroker
@@ -440,7 +440,8 @@ export function AccountSessionActionsSection({
 						Last sign-in: {lastSignInAt ?? "unknown"}
 					</Text>
 					<Text size="xs" color="muted">
-						Signed in as: <Text weight="semibold">{userEmail ?? "unknown"}</Text>
+						Signed in as:{" "}
+						<Text weight="semibold">{userEmail ?? "unknown"}</Text>
 					</Text>
 				</Stack>
 			</Stack>

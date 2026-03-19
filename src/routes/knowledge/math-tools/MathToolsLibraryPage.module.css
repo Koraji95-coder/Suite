@@ -23,7 +23,13 @@
 }
 
 .toolButtonActive {
-	border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
+	border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
 	color: var(--text);
-	background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+	background:
+		linear-gradient(
+			130deg,
+			color-mix(in srgb, var(--accent) 32%, transparent),
+			color-mix(in srgb, var(--surface) 78%, transparent)
+		),
+		color-mix(in srgb, var(--surface) 96%, transparent);
 }

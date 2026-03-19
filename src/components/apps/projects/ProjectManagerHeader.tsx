@@ -11,7 +11,6 @@ interface ProjectManagerHeaderProps {
 	activeProjects: number;
 	archivedProjects: number;
 	totalProjects: number;
-	visibleProjectCount: number;
 	onCreateProject: () => void;
 }
 
@@ -23,7 +22,6 @@ export function ProjectManagerHeader({
 	activeProjects,
 	archivedProjects,
 	totalProjects,
-	visibleProjectCount,
 	onCreateProject,
 }: ProjectManagerHeaderProps) {
 	const statusOptions: StatusFilter[] = [
@@ -64,11 +62,6 @@ export function ProjectManagerHeader({
 							<Plus className={styles.iconSm} />
 							New Project
 						</button>
-						{visibleProjectCount > 0 ? (
-							<span className={styles.queueBadge}>
-								{visibleProjectCount} in queue
-							</span>
-						) : null}
 					</div>
 				</div>
 
@@ -105,7 +98,7 @@ export function ProjectManagerHeader({
 								onChange={(event) => onProjectSearchChange(event.target.value)}
 								placeholder="Search projects..."
 								className={styles.searchInput}
-							name="projectmanagerheader_input_113"
+								name="projectmanagerheader_input_113"
 							/>
 						</div>
 						<div className={styles.statsGrid}>
@@ -117,9 +110,7 @@ export function ProjectManagerHeader({
 								<span className={styles.statLabel}>Archived</span>
 								<strong className={styles.statValue}>{archivedProjects}</strong>
 							</div>
-							<div
-								className={cn(styles.statCard, styles.statCardHighlight)}
-							>
+							<div className={styles.statCard}>
 								<span className={styles.statLabel}>Total</span>
 								<strong className={styles.statValue}>{totalProjects}</strong>
 							</div>

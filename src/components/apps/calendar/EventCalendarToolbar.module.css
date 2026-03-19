@@ -20,6 +20,7 @@
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: 0.5rem;
+	align-items: center;
 }
 
 .layoutCompact {
@@ -188,8 +189,10 @@
 	justify-content: center;
 	flex: 1 1 0;
 	min-width: 12rem;
-	min-height: 2.5rem;
+	min-height: 2.8rem;
+	padding: 0 0.5rem;
 	text-align: center;
+	white-space: nowrap;
 }
 
 .title {
@@ -258,6 +261,7 @@
 	cursor: pointer;
 	padding: 0.35rem 0.9rem;
 	white-space: nowrap;
+	min-width: 8rem;
 	flex-shrink: 0;
 }
 

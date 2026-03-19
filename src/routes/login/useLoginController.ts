@@ -37,7 +37,6 @@ function isDashboardDestination(path: string): boolean {
 type LoginController = {
 	loading: boolean;
 	user: unknown;
-	mounted: boolean;
 	email: string;
 	honeypot: string;
 	honeypotFieldName: string;
@@ -88,7 +87,6 @@ export function useLoginController(): LoginController {
 	const [redirectMessage, setRedirectMessage] = useState(
 		"Preparing your session...",
 	);
-	const [mounted, setMounted] = useState(false);
 	const passkeyCallbackHandledRef = useRef("");
 	const shouldPreloadDashboard = useMemo(
 		() => isDashboardDestination(from),
@@ -101,12 +99,13 @@ export function useLoginController(): LoginController {
 	const honeypotFieldName =
 		(import.meta.env.VITE_AUTH_HONEYPOT_FIELD || "company").trim() || "company";
 	const frontendPasskeyEnabled = useMemo(() => isFrontendPasskeyEnabled(), []);
-	const browserPasskeySupported = useMemo(() => isBrowserPasskeySupported(), []);
+	const browserPasskeySupported = useMemo(
+		() => isBrowserPasskeySupported(),
+		[],
+	);
 	const passkeyAvailable = useMemo(
 		() =>
-			frontendPasskeyEnabled &&
-			browserPasskeySupported &&
-			backendPasskeyReady,
+			frontendPasskeyEnabled && browserPasskeySupported && backendPasskeyReady,
 		[frontendPasskeyEnabled, browserPasskeySupported, backendPasskeyReady],
 	);
 	const canSubmit = useMemo(() => {
@@ -115,11 +114,6 @@ export function useLoginController(): LoginController {
 		if (requiresCaptcha) return captchaToken.trim().length > 0;
 		return true;
 	}, [captchaToken, email, loading, requiresCaptcha, submitting]);
-
-	useEffect(() => {
-		const id = requestAnimationFrame(() => setMounted(true));
-		return () => cancelAnimationFrame(id);
-	}, []);
 
 	useEffect(() => {
 		if (!frontendPasskeyEnabled || !browserPasskeySupported) {
@@ -204,10 +198,7 @@ export function useLoginController(): LoginController {
 				setRedirectProgress((current) =>
 					Math.max(
 						current,
-						Math.min(
-							baseline,
-							DASHBOARD_REDIRECT_MAX_PROGRESS_BEFORE_READY,
-						),
+						Math.min(baseline, DASHBOARD_REDIRECT_MAX_PROGRESS_BEFORE_READY),
 					),
 				);
 				if (ratio >= 1 && baselineProgressTimerId !== null) {
@@ -296,7 +287,8 @@ export function useLoginController(): LoginController {
 		return () => {
 			cancelled = true;
 			if (timeoutId !== null) window.clearTimeout(timeoutId);
-			if (minimumDelayTimerId !== null) window.clearTimeout(minimumDelayTimerId);
+			if (minimumDelayTimerId !== null)
+				window.clearTimeout(minimumDelayTimerId);
 			if (baselineProgressTimerId !== null) {
 				window.clearInterval(baselineProgressTimerId);
 			}
@@ -544,7 +536,10 @@ export function useLoginController(): LoginController {
 					);
 				}
 				if (verification.message) {
-					notification.success("Passkey sign-in complete", verification.message);
+					notification.success(
+						"Passkey sign-in complete",
+						verification.message,
+					);
 				}
 				await logAuthMethodTelemetry(
 					"passkey",
@@ -579,7 +574,6 @@ export function useLoginController(): LoginController {
 	return {
 		loading,
 		user,
-		mounted,
 		email,
 		honeypot,
 		honeypotFieldName,

@@ -50,7 +50,7 @@ export default function GraphRoutePage() {
 	return (
 		<PageFrame
 			title="Graph Explorer"
-			description="Architecture and agent-memory graph visualization."
+			description="Node-link view aligned with the same architecture + agent-memory model as Architecture Map."
 			maxWidth="full"
 		>
 			<div className={styles.root}>
@@ -58,21 +58,22 @@ export default function GraphRoutePage() {
 					<div className={styles.heroHeader}>
 						<div>
 							<Text size="sm" weight="semibold">
-								Graph Explorer (Alternate View)
+								Graph Explorer (Compatibility View)
 							</Text>
 							<Text size="xs" color="muted" className={styles.summaryText}>
-								Use this for node-link exploration. Architecture Map is the
-								primary deep-dive surface for hotspot triage and checkpoints.
+								Use this node-link visualization for targeted exploration while
+								Architecture Map stays the primary hotspot and dependency triage
+								surface.
 							</Text>
 						</div>
 						<div className={styles.heroMeta}>
 							<Badge color="primary" variant="soft">
-								Architecture
+								Architecture-first
 							</Badge>
 							<Badge color="accent" variant="soft">
 								Agent memory
 							</Badge>
-							<Link to="/app/architecture">
+							<Link to="/app/architecture?focus=hotspots">
 								<Button size="sm" variant="secondary">
 									Open Architecture Map
 								</Button>
@@ -82,7 +83,7 @@ export default function GraphRoutePage() {
 					<div className={styles.statRow}>
 						<div className={styles.statChip}>
 							<div className={styles.statValue}>{moduleCount}</div>
-							<div className={styles.statLabel}>Mapped modules</div>
+							<div className={styles.statLabel}>Architecture modules</div>
 						</div>
 						<div className={styles.statChip}>
 							<div className={styles.statValue}>

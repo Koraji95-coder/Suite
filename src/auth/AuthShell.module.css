@@ -20,11 +20,11 @@
 	border-radius: 50%;
 	background: radial-gradient(
 		circle,
-		color-mix(in srgb, var(--primary) 24%, transparent),
+		color-mix(in srgb, var(--primary) 18%, transparent),
 		transparent 70%
 	);
-	filter: blur(34px);
-	opacity: 0.5;
+	filter: blur(30px);
+	opacity: 0.38;
 }
 
 .ambientBottom {
@@ -34,11 +34,11 @@
 	border-radius: 50%;
 	background: radial-gradient(
 		circle,
-		color-mix(in srgb, var(--accent) 20%, transparent),
+		color-mix(in srgb, var(--accent) 18%, transparent),
 		transparent 72%
 	);
-	filter: blur(40px);
-	opacity: 0.42;
+	filter: blur(34px);
+	opacity: 0.34;
 }
 
 .nav {
@@ -100,19 +100,6 @@
 .contentGrid {
 	display: grid;
 	gap: 1.35rem;
-	transition:
-		opacity 420ms ease,
-		transform 420ms ease;
-}
-
-.contentGridVisible {
-	opacity: 1;
-	transform: translateY(0);
-}
-
-.contentGridHidden {
-	opacity: 0;
-	transform: translateY(0.8rem);
 }
 
 .leftPanel {
@@ -131,7 +118,7 @@
 	background:
 		radial-gradient(
 			ellipse 80% 68% at 50% 34%,
-			color-mix(in srgb, var(--primary) 18%, transparent),
+			color-mix(in srgb, var(--accent) 16%, transparent),
 			transparent 72%
 		),
 		radial-gradient(
@@ -275,9 +262,9 @@
 	height: 0.17rem;
 	background: linear-gradient(
 		90deg,
-		color-mix(in srgb, var(--primary) 90%, white 10%),
-		color-mix(in srgb, var(--accent) 88%, white 12%),
-		color-mix(in srgb, var(--primary) 90%, white 10%)
+		color-mix(in srgb, var(--accent) 84%, white 16%),
+		color-mix(in srgb, var(--primary) 64%, white 36%),
+		color-mix(in srgb, var(--accent) 84%, white 16%)
 	);
 }
 

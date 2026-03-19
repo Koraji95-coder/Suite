@@ -11,32 +11,34 @@ export default function KnowledgeRoutePage() {
 			maxWidth="xl"
 		>
 			<Section
-				title="Libraries"
-				description="Quick access to curated tool collections."
+				title="Math & Reference Library"
+				description="Calculators, plots, and references aligned with your engineering playbook."
 			>
 				<div className={styles.libraryGrid}>
 					<article className={styles.libraryCard}>
-						<h3 className={styles.libraryTitle}>Math Tools Library</h3>
+						<h3 className={styles.libraryTitle}>Math & Reference Library</h3>
 						<p className={styles.libraryDescription}>
-							Legacy engineering calculators and references in one route.
+							Calcs, plots, and formula banks that power drafting, grounding,
+							and analysis.
 						</p>
 						<Link
 							to="/app/knowledge/math-tools"
 							className={styles.libraryAction}
 						>
-							Open Library
+							Open library
 						</Link>
 					</article>
 					<article className={styles.libraryCard}>
 						<h3 className={styles.libraryTitle}>Whiteboard</h3>
 						<p className={styles.libraryDescription}>
-							Sketch, tag, and review saved whiteboard snapshots.
+							Sketch, tag, and review whiteboard snapshots alongside your
+							designs.
 						</p>
 						<Link
 							to="/app/knowledge/whiteboard"
 							className={styles.libraryAction}
 						>
-							Open Whiteboard
+							Open whiteboard
 						</Link>
 					</article>
 				</div>

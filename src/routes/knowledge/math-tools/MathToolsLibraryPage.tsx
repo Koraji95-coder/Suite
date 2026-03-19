@@ -63,8 +63,8 @@ export default function MathToolsLibraryPage() {
 
 	return (
 		<PageFrame
-			title="Math Tools Library"
-			description="Legacy calculators and engineering utilities collected in one place."
+			title="Math & Reference Library"
+			description="Calculators, plots, and formula resources tuned for your electrical workflows."
 			maxWidth="full"
 		>
 			<Section title="Tools">

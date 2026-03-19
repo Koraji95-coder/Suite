@@ -33,14 +33,15 @@ export const KNOWLEDGE_SECTIONS: KnowledgeSection[] = [
 		],
 	},
 	{
-		title: "Math Tools (Coming Soon)",
+		title: "Math & Reference highlights",
 		description:
-			"Planned calculation modules are documented here ahead of release.",
+			"Existing calculators, plots, and formula banks that stay synced with the engineering workstream.",
 		items: [
 			"Vector Calculator",
 			"Three-Phase Calculator",
-			"General Engineering Calculator Panel",
-			"Electrical Plot Generator",
+			"Engineering Calculator Panel",
+			"Formula Bank and Math Reference",
+			"Plot Generator & Circuit Builder",
 		],
 	},
 ];

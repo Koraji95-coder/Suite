@@ -1,3 +1,9 @@
+import {
+	fetchWithTimeout,
+	parseResponseErrorMessage,
+	FetchRequestError,
+	mapFetchErrorMessage,
+} from "@/lib/fetchWithTimeout";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 
@@ -47,31 +53,27 @@ export async function getSupabaseAccessToken(): Promise<string | null> {
 async function parseApiError(
 	response: Response,
 ): Promise<{ message: string; code: string }> {
+	const message = await parseResponseErrorMessage(
+		response,
+		`HTTP ${response.status}`,
+	);
+	let codeValue = `HTTP_${response.status}`;
 	try {
-		const payload = (await response.json()) as unknown;
+		const payload = (await response.clone().json()) as unknown;
 		if (payload && typeof payload === "object") {
-			const value = String(
-				(payload as Record<string, unknown>).error ||
-					(payload as Record<string, unknown>).message ||
-					"",
-			).trim();
-			const codeValue = String(
+			const candidate = String(
 				(payload as Record<string, unknown>).code || "",
 			).trim();
-			if (value) {
-				return {
-					message: value,
-					code: codeValue || `HTTP_${response.status}`,
-				};
+			if (candidate) {
+				codeValue = candidate;
 			}
 		}
 	} catch {
-		// No-op; fallback to raw response text.
+		// Ignore JSON parse issues and fall back to the HTTP status code.
 	}
-	const text = await response.text().catch(() => "");
 	return {
-		message: text || `HTTP ${response.status}`,
-		code: `HTTP_${response.status}`,
+		message,
+		code: codeValue,
 	};
 }
 
@@ -87,14 +89,45 @@ export async function requestWorkLedgerApi(
 	if (accessToken) {
 		headers.set("Authorization", `Bearer ${accessToken}`);
 	}
-	const response = await fetch(path, {
-		...init,
-		headers,
-		credentials: "include",
-	});
-	if (!response.ok) {
-		const parsed = await parseApiError(response);
-		throw new WorkLedgerApiError(parsed.message, response.status, parsed.code);
+	try {
+		const response = await fetchWithTimeout(path, {
+			...init,
+			headers,
+			credentials: "include",
+			timeoutMs: 20_000,
+			requestName: "Work Ledger API request",
+		});
+		if (!response.ok) {
+			const parsed = await parseApiError(response);
+			throw new WorkLedgerApiError(
+				parsed.message,
+				response.status,
+				parsed.code,
+			);
+		}
+		return (await response.json()) as unknown;
+	} catch (error) {
+		if (error instanceof WorkLedgerApiError) {
+			throw error;
+		}
+		if (error instanceof FetchRequestError) {
+			throw new WorkLedgerApiError(
+				mapFetchErrorMessage(error, "Work Ledger API request failed."),
+				0,
+				error.kind === "timeout" ? "TIMEOUT" : "NETWORK_ERROR",
+			);
+		}
+		if (error instanceof Error) {
+			throw new WorkLedgerApiError(
+				error.message || "Work Ledger API request failed.",
+				0,
+				"NETWORK_ERROR",
+			);
+		}
+		throw new WorkLedgerApiError(
+			"Work Ledger API request failed.",
+			0,
+			"NETWORK_ERROR",
+		);
 	}
-	return (await response.json()) as unknown;
 }

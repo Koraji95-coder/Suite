@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
@@ -27,6 +29,26 @@ def _build_valid_action() -> dict[str, object]:
 
 
 class TestApiAutoDraftExecuteProvider(unittest.TestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._temp_dir = tempfile.TemporaryDirectory()
+        self._receipts_env = patch.dict(
+            os.environ,
+            {
+                "SUITE_AUTODRAFT_RECEIPTS_DB": os.path.join(
+                    self._temp_dir.name,
+                    "autodraft-execution-receipts.sqlite3",
+                )
+            },
+            clear=False,
+        )
+        self._receipts_env.start()
+
+    def tearDown(self) -> None:
+        self._receipts_env.stop()
+        self._temp_dir.cleanup()
+        super().tearDown()
+
     def _build_client(
         self,
         *,
@@ -114,6 +136,10 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
         self.assertEqual(payload.get("skipped"), 0)
         self.assertEqual(payload.get("requestId"), "req-bridge-1")
         self.assertEqual(payload.get("meta", {}).get("providerPath"), "dotnet_bridge")
+        self.assertEqual(
+            payload.get("meta", {}).get("executionReceipt", {}).get("requestId"),
+            "req-bridge-1",
+        )
 
     def test_execute_returns_bridge_error_without_fallback(self) -> None:
         def _bridge_sender(_action: str, _payload: dict[str, object]) -> dict[str, object]:
@@ -184,6 +210,71 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
         self.assertEqual(payload.get("job_id"), "api-job-1")
         self.assertEqual(payload.get("meta", {}).get("providerPath"), "dotnet_api")
         request_mock.assert_called_once()
+
+    def test_execute_normalizes_bridge_commit_response(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            self.assertEqual(payload.get("requestId"), "req-bridge-commit-1")
+            self.assertEqual(payload.get("dry_run"), False)
+            return {
+                "id": "bridge-job-commit-1",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Commit completed in 'sample.dwg'. 1 action(s) were written.",
+                    "data": {
+                        "jobId": "autodraft-bridge-commit-1",
+                        "status": "committed",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": False,
+                        "mode": "commit",
+                        "previewReady": 1,
+                        "message": "Commit completed in 'sample.dwg'. 1 action(s) were written.",
+                        "cad": {
+                            "available": True,
+                            "drawingName": "sample.dwg",
+                            "drawingPath": r"C:\Drawings\sample.dwg",
+                            "commandStateAvailable": True,
+                            "readOnly": False,
+                        },
+                        "commit": {
+                            "requested": True,
+                            "committed": 1,
+                            "createdHandles": ["1A2B"],
+                            "notesLayer": "SUITE_AUTODRAFT_NOTES",
+                        },
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-bridge-commit-1"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-bridge-commit-1",
+                "actions": [_build_valid_action()],
+                "dry_run": False,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("status"), "committed")
+        self.assertFalse(payload.get("dry_run", True))
+        self.assertEqual(payload.get("accepted"), 1)
+        self.assertEqual(payload.get("meta", {}).get("cad", {}).get("drawingName"), "sample.dwg")
+        self.assertEqual(payload.get("meta", {}).get("commit", {}).get("committed"), 1)
+        self.assertEqual(
+            payload.get("meta", {}).get("executionReceipt", {}).get("providerPath"),
+            "dotnet_bridge",
+        )
 
 
 if __name__ == "__main__":

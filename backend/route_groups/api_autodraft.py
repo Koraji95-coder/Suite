@@ -43,6 +43,7 @@ from .api_autocad_error_helpers import (
     build_error_payload as autocad_build_error_payload,
     derive_request_id as autocad_derive_request_id,
 )
+from ..autodraft_execution_receipts import persist_autodraft_execution_receipt
 from .api_local_learning_runtime import get_local_learning_runtime
 from .pdf_text_extraction import (
     extract_embedded_text_page_lines,
@@ -6944,6 +6945,10 @@ def create_autodraft_blueprint(
             "warnings": normalized_warnings,
             "meta": {
                 **(result_payload.get("meta") if isinstance(result_payload.get("meta"), dict) else {}),
+                "cad": data.get("cad") if isinstance(data.get("cad"), dict) else None,
+                "commit": data.get("commit") if isinstance(data.get("commit"), dict) else None,
+                "mode": str(data.get("mode") or ("preview" if payload.get("dry_run", True) else "commit")),
+                "previewReadyCount": int(data.get("previewReady") or data.get("accepted") or 0),
                 "bridgeMs": elapsed_ms,
                 "providerPath": "dotnet_bridge",
                 "requestId": request_id,
@@ -7401,6 +7406,7 @@ def create_autodraft_blueprint(
                 if isinstance(page_position, dict):
                     transformed_page_position = _transform_point_to_cad(page_position, transform)
                     meta_obj["cad_position"] = transformed_page_position
+                meta_obj["cad_transform_applied"] = True
                 next_markup["meta"] = meta_obj
             if isinstance(markup.get("recognition"), dict):
                 recognition_obj = dict(markup.get("recognition") or {})
@@ -8135,6 +8141,23 @@ def create_autodraft_blueprint(
                     payload=payload,
                     request_id=request_id,
                 )
+                try:
+                    receipt_summary = persist_autodraft_execution_receipt(
+                        request_id=request_id,
+                        payload=payload,
+                        response_payload=bridge_response,
+                        provider_path="dotnet_bridge",
+                    )
+                    if isinstance(bridge_response.get("meta"), dict):
+                        bridge_response["meta"]["executionReceipt"] = receipt_summary
+                    else:
+                        bridge_response["meta"] = {"executionReceipt": receipt_summary}
+                except Exception:
+                    logger.exception(
+                        "AutoDraft execute receipt persistence failed request_id=%s provider=%s",
+                        request_id,
+                        execute_provider,
+                    )
                 return jsonify(bridge_response), 200
             except Exception as bridge_exc:
                 logger.warning(
@@ -8199,6 +8222,20 @@ def create_autodraft_blueprint(
             upstream["meta"]["providerPath"] = "dotnet_api"
         else:
             upstream["meta"] = {"providerPath": "dotnet_api"}
+        try:
+            receipt_summary = persist_autodraft_execution_receipt(
+                request_id=request_id,
+                payload=payload,
+                response_payload=upstream,
+                provider_path="dotnet_api",
+            )
+            upstream["meta"]["executionReceipt"] = receipt_summary
+        except Exception:
+            logger.exception(
+                "AutoDraft execute receipt persistence failed request_id=%s provider=%s",
+                request_id,
+                execute_provider,
+            )
         return jsonify(upstream), status
 
     @bp.route("/backcheck", methods=["POST"])

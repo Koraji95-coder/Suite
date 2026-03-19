@@ -71,7 +71,7 @@
 	border-radius: 999px;
 	color: var(--text);
 	text-decoration: none;
-	transition: none;
+	transition: color 140ms ease;
 	transform: none;
 	filter: none;
 	box-shadow: none;
@@ -80,13 +80,16 @@
 }
 
 .brandLink:hover,
-.brandLink:active,
-.brandLink:visited {
-	color: var(--text);
+.brandLink:active {
+	color: color-mix(in srgb, var(--accent) 72%, var(--text));
 	transform: none;
 	filter: none;
 	box-shadow: none;
 	text-decoration: none;
+}
+
+.brandLink:visited {
+	color: var(--text);
 }
 
 .brandLink:focus-visible {
@@ -107,7 +110,7 @@
 	color: var(--text);
 	line-height: 1;
 	text-decoration: none;
-	transition: none;
+	transition: color 140ms ease;
 	transform: none;
 	filter: none;
 	box-shadow: none;
@@ -117,15 +120,16 @@
 }
 
 .navActionLink:hover,
-.navActionLink:active,
-.navActionLink:visited {
-	color: var(--text);
-	border-color: color-mix(in srgb, var(--line-soft) 86%, transparent);
-	background: color-mix(in srgb, var(--surface) 82%, transparent);
+.navActionLink:active {
+	color: color-mix(in srgb, var(--accent) 74%, var(--text));
 	transform: none;
 	filter: none;
 	box-shadow: none;
 	text-decoration: none;
+}
+
+.navActionLink:visited {
+	color: var(--text);
 }
 
 .navActionLink:focus-visible {
@@ -221,14 +225,17 @@
 	gap: 1.4rem;
 	align-items: start;
 	padding: 2.75rem 1.4rem;
+	max-width: 76rem;
+	margin-inline: auto;
 }
 
 .heroLeft {
 	display: grid;
 	align-content: start;
 	gap: 0.25rem;
-	justify-self: center;
-	width: min(100%, 37rem);
+	justify-self: stretch;
+	width: 100%;
+	max-width: 37rem;
 }
 
 .sectionBadge {
@@ -283,8 +290,10 @@
 .heroRight {
 	display: grid;
 	align-content: stretch;
-	justify-self: center;
-	width: min(100%, 35rem);
+	justify-self: stretch;
+	width: 100%;
+	max-width: 35rem;
+	margin-inline: auto;
 }
 
 .heroSummaryPanel {
@@ -318,38 +327,39 @@
 
 .heroRailFlow {
 	display: grid;
-	gap: 0.68rem;
+	gap: 0.56rem;
 	border-top: 1px solid color-mix(in srgb, var(--line-soft) 70%, transparent);
-	padding-top: 0.68rem;
+	padding-top: 0.56rem;
 }
 
 .heroSummaryGrid {
 	margin-top: 0.12rem;
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 0.56rem;
+	gap: 0.5rem;
 }
 
 .heroSupportList {
 	display: grid;
 	grid-template-columns: 1fr;
-	gap: 0.42rem;
+	gap: 0.36rem;
 }
 
 .heroSupportItem {
 	display: flex;
-	gap: 0.52rem;
+	gap: 0.46rem;
 	align-items: flex-start;
-	padding: 0.58rem 0.64rem;
+	padding: 0.48rem 0.56rem;
 	border-radius: var(--radius-2);
 	border: 1px solid color-mix(in srgb, var(--line-soft) 84%, transparent);
 	background: color-mix(in srgb, var(--surface) 84%, transparent);
 }
 
 .heroSupportIcon {
-	width: 0.9rem;
-	height: 0.9rem;
+	width: 0.82rem;
+	height: 0.82rem;
 	color: var(--accent);
+	margin-top: 0.08rem;
 }
 
 .heroSupportContent {
@@ -358,17 +368,18 @@
 
 .heroSupportLabel {
 	letter-spacing: 0.02em;
+	line-height: 1.25;
 }
 
 .heroSupportValue {
-	line-height: 1.4;
+	line-height: 1.32;
 }
 
 .heroSummaryCard {
 	display: flex;
 	gap: 0.68rem;
 	align-items: flex-start;
-	padding: 0.8rem 0.85rem;
+	padding: 0.72rem 0.76rem;
 	border: 1px solid var(--line-soft);
 	border-radius: var(--radius-2);
 	background: color-mix(in srgb, var(--surface) 88%, transparent);
@@ -379,16 +390,16 @@
 	align-items: center;
 	justify-content: center;
 	flex-shrink: 0;
-	width: 1.85rem;
-	height: 1.85rem;
+	width: 1.7rem;
+	height: 1.7rem;
 	border-radius: 0.65rem;
 	background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 	border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line-soft));
 }
 
 .heroSummaryIcon {
-	width: 0.92rem;
-	height: 0.92rem;
+	width: 0.84rem;
+	height: 0.84rem;
 	color: var(--accent);
 }
 
@@ -397,15 +408,18 @@
 }
 
 .heroSummaryValue {
-	margin-top: 0.22rem;
-	line-height: 1.5;
+	margin-top: 0.16rem;
+	line-height: 1.42;
 }
 
 .agentsSection {
-	margin-top: 1.35rem;
+	margin-top: 1.5rem;
+	display: grid;
+	justify-items: center;
 }
 
 .agentsPanel {
+	width: min(100%, 74rem);
 	border: 1px solid var(--line-soft);
 	background:
 		linear-gradient(
@@ -419,9 +433,11 @@
 
 .agentsHeader {
 	display: grid;
-	gap: 0.32rem;
+	gap: 0.36rem;
 	justify-items: center;
 	text-align: center;
+	max-width: 50rem;
+	margin-inline: auto;
 }
 
 .agentsCopy {
@@ -434,6 +450,8 @@
 	margin-top: 1.2rem;
 	display: grid;
 	gap: 0.62rem;
+	max-width: 66rem;
+	margin-inline: auto;
 }
 
 .agentCard {
@@ -493,7 +511,7 @@
 	font-size: 0.75rem;
 	color: var(--text-muted);
 	text-decoration: none;
-	transition: none;
+	transition: color 140ms ease;
 	transform: none;
 	filter: none;
 	box-shadow: none;
@@ -502,13 +520,16 @@
 }
 
 .footerLink:hover,
-.footerLink:active,
-.footerLink:visited {
-	color: var(--text-muted);
+.footerLink:active {
+	color: color-mix(in srgb, var(--accent) 68%, var(--text-muted));
 	transform: none;
 	filter: none;
 	box-shadow: none;
 	text-decoration: none;
+}
+
+.footerLink:visited {
+	color: var(--text-muted);
 }
 
 .footerLink:focus-visible {
@@ -533,10 +554,13 @@
 
 	.heroLeft {
 		grid-column: span 6 / span 6;
+		max-width: 36rem;
 	}
 
 	.heroRight {
 		grid-column: span 6 / span 6;
+		max-width: 35rem;
+		justify-self: end;
 	}
 
 	.agentGrid {

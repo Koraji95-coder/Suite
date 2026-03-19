@@ -24,17 +24,17 @@ const COMMAND_SIGNALS = [
 	{
 		icon: Activity,
 		label: "Live telemetry",
-		value: "Watchdog sessions, collectors, and runtime health",
+		value: "Watchdog sessions, collectors, runtime health",
 	},
 	{
 		icon: Workflow,
 		label: "Ops flow",
-		value: "Projects, tasks, deadlines, and delivery scope",
+		value: "Projects, tasks, deadlines, delivery scope",
 	},
 	{
 		icon: Sparkles,
 		label: "Agent coordination",
-		value: "Agents, engineering apps, and shared context",
+		value: "Agents, app surfaces, shared context",
 	},
 ] as const;
 
@@ -229,7 +229,7 @@ export default function LandingPage() {
 								className={`${styles.sectionBadge} ${styles.agentsBadge}`}
 							>
 								<span className={styles.sectionBadgeDot} />
-								Agents
+								Profile-driven agents
 							</Badge>
 
 							<Text as="h2" size="xl" weight="semibold" block>

@@ -240,6 +240,9 @@ export function AutoDraftStudioApp() {
 	const [crewReviewError, setCrewReviewError] = useState<string | null>(null);
 	const [commitReviewAcknowledged, setCommitReviewAcknowledged] =
 		useState(false);
+	const [lastPreviewReviewKey, setLastPreviewReviewKey] = useState<string | null>(
+		null,
+	);
 	const [loadingPlan, setLoadingPlan] = useState(false);
 	const [loadingExecute, setLoadingExecute] = useState(false);
 	const [loadingBackcheck, setLoadingBackcheck] = useState(false);
@@ -274,6 +277,10 @@ export function AutoDraftStudioApp() {
 		[commitReview.items],
 	);
 	const lastCommitReviewResetKeyRef = useRef(commitReviewResetKey);
+	const previewIsCurrent =
+		lastPreviewReviewKey !== null && lastPreviewReviewKey === commitReviewResetKey;
+	const commitCanRun =
+		commitReview.readyCount > 0 && commitReviewAcknowledged && previewIsCurrent;
 
 	const translatedGeometryStats = useMemo(() => {
 		const arcResult = detectArcsFromSegments(DEMO_SEGMENTS, {
@@ -529,6 +536,12 @@ export function AutoDraftStudioApp() {
 					);
 					return;
 				}
+				if (!previewIsCurrent) {
+					setExecuteError(
+						"Run preview execute on the current plan before committing to CAD.",
+					);
+					return;
+				}
 				if (!commitReviewAcknowledged) {
 					setExecuteError(
 						"Review and confirm the commit targets before writing to CAD.",
@@ -550,6 +563,9 @@ export function AutoDraftStudioApp() {
 				revisionContext: revisionPayload,
 			});
 			setExecuteResult(executed);
+			if (mode === "preview" && executed.ok) {
+				setLastPreviewReviewKey(commitReviewResetKey);
+			}
 			await persistRevisionTrace(executed, mode, revisionPayload);
 		} catch (error) {
 			const message =
@@ -1091,6 +1107,7 @@ export function AutoDraftStudioApp() {
 								size="sm"
 								onClick={() => void runDemoExecute("commit")}
 								loading={loadingExecute}
+								disabled={!commitCanRun}
 							>
 								Commit to CAD
 							</Button>
@@ -1098,7 +1115,7 @@ export function AutoDraftStudioApp() {
 					</HStack>
 				</div>
 				<div className={styles.executionContextPanel}>
-					<div className={styles.executionContextHeader}>
+						<div className={styles.executionContextHeader}>
 						<div>
 							<Text size="sm" weight="semibold">
 								Execution workflow context
@@ -1108,11 +1125,40 @@ export function AutoDraftStudioApp() {
 								flow into revision history instead of staying local-only.
 							</Text>
 						</div>
-						<Badge color="accent" variant="soft">
-							Preview {"->"} Commit
-						</Badge>
-					</div>
-					{planResult ? (
+							<Badge color="accent" variant="soft">
+								Preview {"->"} Commit
+							</Badge>
+						</div>
+						<div className={styles.executionStageRow}>
+							<div className={styles.executionStageCard}>
+								<HStack gap={2} align="center" wrap>
+									<Badge color={previewIsCurrent ? "success" : "warning"} variant="soft">
+										{previewIsCurrent ? "Preview current" : "Preview required"}
+									</Badge>
+									<Text size="xs" color="muted">
+										{previewIsCurrent
+											? "The current commit targets were previewed against the active plan."
+											: "Run preview execute again whenever commit targets or revision context change."}
+									</Text>
+								</HStack>
+							</div>
+							<div className={styles.executionStageCard}>
+								<HStack gap={2} align="center" wrap>
+									<Badge
+										color={commitCanRun ? "success" : "default"}
+										variant="soft"
+									>
+										{commitCanRun ? "Commit ready" : "Commit blocked"}
+									</Badge>
+									<Text size="xs" color="muted">
+										{commitCanRun
+											? "All commit guards are satisfied for the current plan."
+											: "Commit stays disabled until preview is current and the review is acknowledged."}
+									</Text>
+								</HStack>
+							</div>
+						</div>
+						{planResult ? (
 						<div className={styles.commitReviewPanel}>
 							<div className={styles.commitReviewHeader}>
 								<div>

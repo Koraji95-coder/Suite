@@ -38,6 +38,7 @@ export type AutoDraftCommitCounts = {
 	titleBlockUpdates: number;
 	textReplacementUpdates: number;
 	textDeleteUpdates: number;
+	dimensionTextUpdates: number;
 };
 
 export type AutoDraftCadContextSummary = {
@@ -68,6 +69,7 @@ export type AutoDraftExecutionSummary = {
 	titleBlockUpdates: ReadonlyArray<Record<string, unknown>>;
 	textReplacementUpdates: ReadonlyArray<Record<string, unknown>>;
 	textDeleteUpdates: ReadonlyArray<Record<string, unknown>>;
+	dimensionTextUpdates: ReadonlyArray<Record<string, unknown>>;
 	createdHandles: ReadonlyArray<string>;
 };
 
@@ -91,6 +93,7 @@ export function summarizeAutoDraftExecution(
 	const titleBlockUpdates = readReceiptList(receipt.titleBlockUpdates);
 	const textReplacementUpdates = readReceiptList(receipt.textReplacementUpdates);
 	const textDeleteUpdates = readReceiptList(receipt.textDeleteUpdates);
+	const dimensionTextUpdates = readReceiptList(receipt.dimensionTextUpdates);
 
 	return {
 		requestId:
@@ -116,6 +119,7 @@ export function summarizeAutoDraftExecution(
 			titleBlockUpdates: titleBlockUpdates.length,
 			textReplacementUpdates: textReplacementUpdates.length,
 			textDeleteUpdates: textDeleteUpdates.length,
+			dimensionTextUpdates: dimensionTextUpdates.length,
 		},
 		cad: {
 			drawingName: asString(cadRecord.drawingName),
@@ -134,6 +138,7 @@ export function summarizeAutoDraftExecution(
 		titleBlockUpdates,
 		textReplacementUpdates,
 		textDeleteUpdates,
+		dimensionTextUpdates,
 		createdHandles,
 	};
 }
@@ -209,6 +214,12 @@ export function buildAutoDraftRevisionTraceNotes(args: {
 				? `Text deletions: ${summary.counts.textDeleteUpdates}`
 				: "",
 		);
+		appendLine(
+			lines,
+			summary.counts.dimensionTextUpdates > 0
+				? `Dimension text updates: ${summary.counts.dimensionTextUpdates}`
+				: "",
+		);
 	}
 
 	appendLine(
@@ -244,6 +255,9 @@ export function buildAutoDraftExecutionIssueSummary(
 	}
 	if (summary.counts.textDeleteUpdates > 0) {
 		detailParts.push(`${summary.counts.textDeleteUpdates} text deletion(s)`);
+	}
+	if (summary.counts.dimensionTextUpdates > 0) {
+		detailParts.push(`${summary.counts.dimensionTextUpdates} dimension update(s)`);
 	}
 	if (summary.counts.createdHandles > 0) {
 		detailParts.push(`${summary.counts.createdHandles} created handle(s)`);

@@ -507,6 +507,23 @@ class AutoCADManager:
                             values.append(value)
                     if values:
                         return " | ".join(values)
+                if "dimension" in type_name:
+                    for attr_name in ("TextOverride", "TextString", "Text"):
+                        try:
+                            raw_value = getattr(entity_obj, attr_name)
+                        except Exception:
+                            continue
+                        text_value = str(raw_value or "").strip()
+                        if text_value and text_value != "<>":
+                            return text_value
+                    try:
+                        measurement = getattr(entity_obj, "Measurement")
+                    except Exception:
+                        measurement = None
+                    if measurement is not None:
+                        measurement_text = str(measurement).strip()
+                        if measurement_text:
+                            return measurement_text
                 return text_value
 
             for idx in range(modelspace_count):

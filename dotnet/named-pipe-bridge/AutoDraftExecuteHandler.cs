@@ -13,6 +13,7 @@ static partial class ConduitRouteStubHandlers
     {
         "add",
         "delete",
+        "dimension",
         "swap",
         "note",
         "title_block",
@@ -72,7 +73,8 @@ static partial class ConduitRouteStubHandlers
                 createdHandles: [],
                 titleBlockUpdates: [],
                 textReplacementUpdates: [],
-                textDeleteUpdates: []
+                textDeleteUpdates: [],
+                dimensionTextUpdates: []
             );
         }
 
@@ -111,7 +113,8 @@ static partial class ConduitRouteStubHandlers
                 createdHandles: [],
                 titleBlockUpdates: [],
                 textReplacementUpdates: [],
-                textDeleteUpdates: []
+                textDeleteUpdates: [],
+                dimensionTextUpdates: []
             );
         }
 
@@ -159,7 +162,8 @@ static partial class ConduitRouteStubHandlers
                     createdHandles: [],
                     titleBlockUpdates: [],
                     textReplacementUpdates: [],
-                    textDeleteUpdates: []
+                    textDeleteUpdates: [],
+                    dimensionTextUpdates: []
                 );
             }
 
@@ -181,7 +185,8 @@ static partial class ConduitRouteStubHandlers
                     createdHandles: [],
                     titleBlockUpdates: [],
                     textReplacementUpdates: [],
-                    textDeleteUpdates: []
+                    textDeleteUpdates: [],
+                    dimensionTextUpdates: []
                 );
             }
 
@@ -205,7 +210,8 @@ static partial class ConduitRouteStubHandlers
                     createdHandles: [],
                     titleBlockUpdates: [],
                     textReplacementUpdates: [],
-                    textDeleteUpdates: []
+                    textDeleteUpdates: [],
+                    dimensionTextUpdates: []
                 );
             }
 
@@ -214,6 +220,7 @@ static partial class ConduitRouteStubHandlers
             var titleBlockUpdates = new List<JsonObject>();
             var textReplacementUpdates = new List<JsonObject>();
             var textDeleteUpdates = new List<JsonObject>();
+            var dimensionTextUpdates = new List<JsonObject>();
             foreach (var evaluation in evaluations)
             {
                 if (!evaluation.ReadyForPreview)
@@ -242,7 +249,8 @@ static partial class ConduitRouteStubHandlers
                         out var skipReason,
                         out var titleBlockActionUpdates,
                         out var textReplacementActionUpdates,
-                        out var textDeleteActionUpdates
+                        out var textDeleteActionUpdates,
+                        out var dimensionTextActionUpdates
                     ))
                 {
                     committed += 1;
@@ -261,6 +269,10 @@ static partial class ConduitRouteStubHandlers
                     if (textDeleteActionUpdates.Count > 0)
                     {
                         textDeleteUpdates.AddRange(textDeleteActionUpdates);
+                    }
+                    if (dimensionTextActionUpdates.Count > 0)
+                    {
+                        dimensionTextUpdates.AddRange(dimensionTextActionUpdates);
                     }
                 }
                 else if (!string.IsNullOrWhiteSpace(skipReason))
@@ -294,7 +306,8 @@ static partial class ConduitRouteStubHandlers
                 createdHandles: createdHandles,
                 titleBlockUpdates: titleBlockUpdates,
                 textReplacementUpdates: textReplacementUpdates,
-                textDeleteUpdates: textDeleteUpdates
+                textDeleteUpdates: textDeleteUpdates,
+                dimensionTextUpdates: dimensionTextUpdates
             );
         }
     }
@@ -472,6 +485,18 @@ static partial class ConduitRouteStubHandlers
                 commitBlockReason = targetReason;
             }
         }
+        else if (string.Equals(category, "dimension", StringComparison.OrdinalIgnoreCase))
+        {
+            if (TryResolveAutoDraftDimensionTextExecuteTarget(actionObject, out _, out var targetReason))
+            {
+                commitEnabled = true;
+                commitBlockReason = "";
+            }
+            else
+            {
+                commitBlockReason = targetReason;
+            }
+        }
 
         return new AutoDraftActionEvaluation(
             ActionObject: actionObject,
@@ -493,7 +518,8 @@ static partial class ConduitRouteStubHandlers
         out string skipReason,
         out IReadOnlyList<JsonObject> titleBlockUpdates,
         out IReadOnlyList<JsonObject> textReplacementUpdates,
-        out IReadOnlyList<JsonObject> textDeleteUpdates
+        out IReadOnlyList<JsonObject> textDeleteUpdates,
+        out IReadOnlyList<JsonObject> dimensionTextUpdates
     )
     {
         createdHandle = "";
@@ -501,6 +527,7 @@ static partial class ConduitRouteStubHandlers
         titleBlockUpdates = Array.Empty<JsonObject>();
         textReplacementUpdates = Array.Empty<JsonObject>();
         textDeleteUpdates = Array.Empty<JsonObject>();
+        dimensionTextUpdates = Array.Empty<JsonObject>();
 
         if (string.Equals(evaluation.Category, "note", StringComparison.OrdinalIgnoreCase))
         {
@@ -597,6 +624,19 @@ static partial class ConduitRouteStubHandlers
                 out createdHandle,
                 out skipReason,
                 out textDeleteUpdates
+            );
+        }
+
+        if (string.Equals(evaluation.Category, "dimension", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryCommitAutoDraftDimensionTextAction(
+                session: session,
+                actionObject: actionObject,
+                evaluation: evaluation,
+                warnings: warnings,
+                out createdHandle,
+                out skipReason,
+                out dimensionTextUpdates
             );
         }
 
@@ -890,6 +930,55 @@ static partial class ConduitRouteStubHandlers
         return true;
     }
 
+    private static bool TryCommitAutoDraftDimensionTextAction(
+        AutoCadSession session,
+        JsonObject actionObject,
+        AutoDraftActionEvaluation evaluation,
+        List<string> warnings,
+        out string createdHandle,
+        out string skipReason,
+        out IReadOnlyList<JsonObject> dimensionTextUpdates
+    )
+    {
+        createdHandle = "";
+        skipReason = "";
+        dimensionTextUpdates = Array.Empty<JsonObject>();
+
+        if (!TryResolveAutoDraftDimensionTextExecuteTarget(actionObject, out var target, out var targetReason))
+        {
+            skipReason = targetReason;
+            return false;
+        }
+
+        var outcome = CommitAutoDraftDimensionTextExecuteTarget(session.Document, target, warnings);
+        if (!outcome.Succeeded)
+        {
+            skipReason = outcome.SkipReason;
+            return false;
+        }
+
+        var updateNodes = new List<JsonObject>();
+        foreach (var updateNode in AutoDraftDimensionTextUpdatesToJsonArray(outcome.Updates))
+        {
+            if (updateNode is JsonObject updateObject)
+            {
+                updateNodes.Add(updateObject);
+            }
+        }
+        dimensionTextUpdates = updateNodes;
+        createdHandle = outcome.Handle;
+
+        if (!outcome.WroteChanges)
+        {
+            skipReason = string.IsNullOrWhiteSpace(outcome.SkipReason)
+                ? $"dimension override produced no writes for {evaluation.ActionId}"
+                : outcome.SkipReason;
+            return false;
+        }
+
+        return true;
+    }
+
     private static void AppendAutoDraftPreviewWarnings(
         IEnumerable<AutoDraftActionEvaluation> evaluations,
         List<string> warnings
@@ -959,7 +1048,8 @@ static partial class ConduitRouteStubHandlers
         IReadOnlyCollection<string> createdHandles,
         IReadOnlyCollection<JsonObject> titleBlockUpdates,
         IReadOnlyCollection<JsonObject> textReplacementUpdates,
-        IReadOnlyCollection<JsonObject> textDeleteUpdates
+        IReadOnlyCollection<JsonObject> textDeleteUpdates,
+        IReadOnlyCollection<JsonObject> dimensionTextUpdates
     )
     {
         var jobId = $"autodraft-{Guid.NewGuid():N}";
@@ -978,11 +1068,17 @@ static partial class ConduitRouteStubHandlers
         {
             textDeleteUpdateNode.Add(update.DeepClone());
         }
+        var dimensionTextUpdateNode = new JsonArray();
+        foreach (var update in dimensionTextUpdates)
+        {
+            dimensionTextUpdateNode.Add(update.DeepClone());
+        }
 
         var updatedHandles = new JsonArray();
         foreach (var handle in titleBlockUpdates
             .Concat(textReplacementUpdates)
             .Concat(textDeleteUpdates)
+            .Concat(dimensionTextUpdates)
             .Select(update => update["handle"]?.GetValue<string>() ?? "")
             .Where(handle => !string.IsNullOrWhiteSpace(handle))
             .Distinct(StringComparer.OrdinalIgnoreCase))
@@ -997,11 +1093,12 @@ static partial class ConduitRouteStubHandlers
             ["createdHandles"] = ToJsonArray(createdHandles),
             ["updatedHandles"] = updatedHandles,
             ["updatedAttributes"] = titleBlockUpdates.Count,
-            ["updatedTextEntities"] = textReplacementUpdates.Count + textDeleteUpdates.Count,
+            ["updatedTextEntities"] = textReplacementUpdates.Count + textDeleteUpdates.Count + dimensionTextUpdates.Count,
             ["notesLayer"] = AutoDraftNotesLayerName,
             ["titleBlockUpdates"] = titleBlockUpdateNode,
             ["textReplacementUpdates"] = textReplacementUpdateNode,
             ["textDeleteUpdates"] = textDeleteUpdateNode,
+            ["dimensionTextUpdates"] = dimensionTextUpdateNode,
         };
 
         var dataNode = new JsonObject

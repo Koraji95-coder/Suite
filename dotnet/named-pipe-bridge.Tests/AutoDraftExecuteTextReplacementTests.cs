@@ -141,6 +141,7 @@ public sealed class AutoDraftExecuteTextReplacementTests
                         },
                     },
                     Array.Empty<JsonObject>(),
+                    Array.Empty<JsonObject>(),
                 }
             )
         );

@@ -95,6 +95,23 @@ def _build_delete_text_action() -> dict[str, object]:
     }
 
 
+def _build_dimension_action(*, text: str = '12\'-0"') -> dict[str, object]:
+    return {
+        "id": "action-dimension-1",
+        "rule_id": "dimension-text-blue",
+        "category": "DIMENSION",
+        "action": "Update the reviewed dimension text.",
+        "confidence": 0.93,
+        "status": "proposed",
+        "markup": {
+            "type": "text",
+            "color": "blue",
+            "text": text,
+            "bounds": {"x": 40, "y": 20, "width": 26, "height": 8},
+        },
+    }
+
+
 class TestApiAutoDraftExecuteProvider(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -671,6 +688,127 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
                             "id": "CD34",
                             "text": "OLD PANEL 2",
                             "bounds": {"x": 18, "y": 15, "width": 10, "height": 4},
+                        },
+                    ]
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_prepares_dimension_text_target_for_bridge(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            target = actions[0].get("execute_target") if isinstance(actions[0], dict) else None
+            self.assertEqual(
+                target,
+                {
+                    "kind": "dimension_text_override",
+                    "target_entity_id": "D1A2",
+                    "target_value": '12\'-0"',
+                    "current_value": '10\'-0"',
+                    "entity_type_hint": "dimension",
+                },
+            )
+            return {
+                "id": "bridge-job-dimension-1",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview complete.",
+                    "data": {
+                        "jobId": "autodraft-dimension-1",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview complete.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-dimension-target-1"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-dimension-target-1",
+                "actions": [_build_dimension_action()],
+                "dry_run": True,
+                "cad_context": {
+                    "entities": [
+                        {
+                            "id": "D1A2",
+                            "type": "AcDbRotatedDimension",
+                            "text": '10\'-0"',
+                            "bounds": {"x": 42, "y": 22, "width": 18, "height": 4},
+                        }
+                    ]
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_leaves_dimension_target_unset_when_candidate_is_ambiguous(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            first = actions[0]
+            self.assertIsInstance(first, dict)
+            assert isinstance(first, dict)
+            self.assertNotIn("execute_target", first)
+            return {
+                "id": "bridge-job-dimension-2",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview review required.",
+                    "data": {
+                        "jobId": "autodraft-dimension-2",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview review required.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-dimension-target-2"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-dimension-target-2",
+                "actions": [_build_dimension_action()],
+                "dry_run": True,
+                "cad_context": {
+                    "entities": [
+                        {
+                            "id": "D1A2",
+                            "type": "AcDbRotatedDimension",
+                            "text": '10\'-0"',
+                            "bounds": {"x": 42, "y": 22, "width": 18, "height": 4},
+                        },
+                        {
+                            "id": "D1B3",
+                            "type": "AcDbAlignedDimension",
+                            "text": '11\'-0"',
+                            "bounds": {"x": 48, "y": 23, "width": 18, "height": 4},
                         },
                     ]
                 },

@@ -42,8 +42,7 @@
 }
 
 .nav {
-	position: sticky;
-	top: 0;
+	position: relative;
 	z-index: 20;
 	border-bottom: 1px solid var(--line-soft);
 	background: color-mix(in srgb, var(--bg) 96%, var(--surface));
@@ -71,7 +70,7 @@
 	border-radius: 999px;
 	color: var(--text);
 	text-decoration: none;
-	transition: color 140ms ease;
+	transition: none;
 	transform: none;
 	filter: none;
 	box-shadow: none;
@@ -81,7 +80,7 @@
 
 .brandLink:hover,
 .brandLink:active {
-	color: color-mix(in srgb, var(--accent) 72%, var(--text));
+	color: var(--text);
 	transform: none;
 	filter: none;
 	box-shadow: none;
@@ -110,7 +109,7 @@
 	color: var(--text);
 	line-height: 1;
 	text-decoration: none;
-	transition: color 140ms ease;
+	transition: none;
 	transform: none;
 	filter: none;
 	box-shadow: none;
@@ -121,7 +120,7 @@
 
 .navActionLink:hover,
 .navActionLink:active {
-	color: color-mix(in srgb, var(--accent) 74%, var(--text));
+	color: var(--text);
 	transform: none;
 	filter: none;
 	box-shadow: none;
@@ -223,7 +222,7 @@
 	position: relative;
 	display: grid;
 	gap: 1.4rem;
-	align-items: start;
+	align-items: center;
 	padding: 2.75rem 1.4rem;
 	max-width: 76rem;
 	margin-inline: auto;
@@ -234,15 +233,18 @@
 	align-content: start;
 	gap: 0.25rem;
 	justify-self: stretch;
+	align-self: center;
 	width: 100%;
 	max-width: 37rem;
 }
 
 .sectionBadge {
+	display: inline-flex;
+	align-items: center;
 	justify-self: start;
 	width: fit-content;
-	padding-inline: 0.42rem;
-	padding-block: 0.14rem;
+	padding-inline: 0.48rem;
+	padding-block: 0.18rem;
 	font-size: 0.54rem;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
@@ -255,6 +257,7 @@
 
 .agentsBadge {
 	margin-bottom: 0.58rem;
+	justify-self: center;
 }
 
 .sectionBadgeDot {
@@ -294,6 +297,7 @@
 	width: 100%;
 	max-width: 35rem;
 	margin-inline: auto;
+	align-self: center;
 }
 
 .heroSummaryPanel {
@@ -310,13 +314,15 @@
 	box-shadow: 0 16px 28px rgb(0 0 0 / 18%);
 	display: grid;
 	align-content: start;
-	gap: 0.72rem;
+	gap: 0.82rem;
 	margin-inline: auto;
 }
 
 .heroSummaryHeader {
 	display: grid;
 	gap: 0.46rem;
+	justify-items: center;
+	text-align: center;
 }
 
 .heroSummaryEyebrow {
@@ -327,9 +333,9 @@
 
 .heroRailFlow {
 	display: grid;
-	gap: 0.56rem;
+	gap: 0.72rem;
 	border-top: 1px solid color-mix(in srgb, var(--line-soft) 70%, transparent);
-	padding-top: 0.56rem;
+	padding-top: 0.72rem;
 }
 
 .heroSummaryGrid {
@@ -341,15 +347,16 @@
 
 .heroSupportList {
 	display: grid;
-	grid-template-columns: 1fr;
-	gap: 0.36rem;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.46rem;
 }
 
 .heroSupportItem {
-	display: flex;
-	gap: 0.46rem;
-	align-items: flex-start;
-	padding: 0.48rem 0.56rem;
+	display: grid;
+	gap: 0.28rem;
+	justify-items: center;
+	text-align: center;
+	padding: 0.42rem 0.48rem;
 	border-radius: var(--radius-2);
 	border: 1px solid color-mix(in srgb, var(--line-soft) 84%, transparent);
 	background: color-mix(in srgb, var(--surface) 84%, transparent);
@@ -359,7 +366,7 @@
 	width: 0.82rem;
 	height: 0.82rem;
 	color: var(--accent);
-	margin-top: 0.08rem;
+	margin-top: 0;
 }
 
 .heroSupportContent {
@@ -413,13 +420,13 @@
 }
 
 .agentsSection {
-	margin-top: 1.5rem;
+	margin-top: 1.3rem;
 	display: grid;
 	justify-items: center;
 }
 
 .agentsPanel {
-	width: min(100%, 74rem);
+	width: min(100%, 70rem);
 	border: 1px solid var(--line-soft);
 	background:
 		linear-gradient(
@@ -433,32 +440,33 @@
 
 .agentsHeader {
 	display: grid;
-	gap: 0.36rem;
+	gap: 0.42rem;
 	justify-items: center;
 	text-align: center;
-	max-width: 50rem;
+	max-width: 44rem;
 	margin-inline: auto;
 }
 
 .agentsCopy {
-	margin-top: 0.38rem;
-	max-width: 36rem;
-	line-height: 1.6;
+	margin-top: 0.18rem;
+	max-width: 34rem;
+	line-height: 1.65;
 }
 
 .agentGrid {
-	margin-top: 1.2rem;
+	margin-top: 1rem;
 	display: grid;
 	gap: 0.62rem;
-	max-width: 66rem;
+	max-width: 58rem;
 	margin-inline: auto;
 }
 
 .agentCard {
-	display: flex;
-	gap: 0.72rem;
-	align-items: flex-start;
-	padding: 0.72rem 0.78rem;
+	display: grid;
+	gap: 0.48rem;
+	justify-items: center;
+	text-align: center;
+	padding: 0.88rem 0.92rem;
 	border: 1px solid var(--line-soft);
 	border-radius: var(--radius-2);
 	background: color-mix(in srgb, var(--surface) 90%, transparent);
@@ -477,8 +485,14 @@
 	transition: none;
 }
 
+.agentCardCopy {
+	display: grid;
+	gap: 0.08rem;
+	justify-items: center;
+}
+
 .agentTagline {
-	margin-top: 0.12rem;
+	margin-top: 0.08rem;
 }
 
 .footer {
@@ -511,7 +525,7 @@
 	font-size: 0.75rem;
 	color: var(--text-muted);
 	text-decoration: none;
-	transition: color 140ms ease;
+	transition: none;
 	transform: none;
 	filter: none;
 	box-shadow: none;
@@ -521,7 +535,7 @@
 
 .footerLink:hover,
 .footerLink:active {
-	color: color-mix(in srgb, var(--accent) 68%, var(--text-muted));
+	color: var(--text-muted);
 	transform: none;
 	filter: none;
 	box-shadow: none;

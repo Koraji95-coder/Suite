@@ -1654,6 +1654,11 @@ export function AutoDraftStudioApp() {
 												text deletes {executionSummary.counts.textDeleteUpdates}
 											</Badge>
 										) : null}
+										{executionSummary?.counts.dimensionTextUpdates ? (
+											<Badge color="default" variant="soft">
+												dim updates {executionSummary.counts.dimensionTextUpdates}
+											</Badge>
+										) : null}
 									</div>
 								</div>
 							</div>
@@ -1736,6 +1741,28 @@ export function AutoDraftStudioApp() {
 											>
 												<Text size="xs">
 													{String(item.previousValue || "Deleted text")}
+												</Text>
+												<Text size="xs" color="muted">
+													{String(item.handle || item.targetEntityId || "target unavailable")}
+												</Text>
+											</div>
+										))}
+									</div>
+								) : null}
+								{executionSummary?.dimensionTextUpdates.length ? (
+									<div className={styles.executeUpdateList}>
+										<Text size="xs" color="muted">
+											Dimension text updates
+										</Text>
+										{executionSummary.dimensionTextUpdates.map((item, index) => (
+											<div
+												key={`dimension-update-${index}`}
+												className={styles.executeUpdateCard}
+											>
+												<Text size="xs">
+													{String(item.previousValue || "")}
+													{" -> "}
+													{String(item.nextValue || "")}
 												</Text>
 												<Text size="xs" color="muted">
 													{String(item.handle || item.targetEntityId || "target unavailable")}

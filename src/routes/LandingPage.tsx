@@ -255,7 +255,7 @@ export default function LandingPage() {
 												expression="neutral"
 											/>
 										</div>
-										<div>
+										<div className={styles.agentCardCopy}>
 											<Text size="sm" weight="semibold" block>
 												{profile.name}
 											</Text>

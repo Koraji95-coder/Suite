@@ -137,6 +137,7 @@ public sealed class AutoDraftExecuteTextDeleteTests
                             ["handle"] = "AB12",
                         },
                     },
+                    Array.Empty<JsonObject>(),
                 }
             )
         );

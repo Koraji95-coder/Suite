@@ -12,6 +12,8 @@ export type AutoDraftCommitReviewFamily =
 	| "note"
 	| "title_block"
 	| "text_replacement"
+	| "text_delete"
+	| "dimension"
 	| "unsupported";
 
 export type AutoDraftCommitReviewItem = {
@@ -195,6 +197,64 @@ function buildTextReplacementReviewItem(
 	};
 }
 
+function buildTextDeleteReviewItem(
+	action: AutoDraftAction,
+): AutoDraftCommitReviewItem {
+	const hasBounds = Boolean(action.markup?.bounds);
+	if (hasBounds) {
+		return {
+			id: action.id,
+			family: "text_delete",
+			familyLabel: "Text delete",
+			status: "ready",
+			title: action.action,
+			summary:
+				"Text deletion is commit-enabled when preview resolves a single CAD text target.",
+			target: "Preview resolves target from markup bounds",
+			reason: "",
+		};
+	}
+	return {
+		id: action.id,
+		family: "text_delete",
+		familyLabel: "Text delete",
+		status: "review",
+		title: action.action,
+		summary: "Text deletion commit needs a resolvable markup target.",
+		target: "",
+		reason: "Markup bounds are required before preview can resolve the CAD text target.",
+	};
+}
+
+function buildDimensionReviewItem(
+	action: AutoDraftAction,
+): AutoDraftCommitReviewItem {
+	const targetValue = asString(action.markup?.text);
+	if (targetValue && action.markup?.bounds) {
+		return {
+			id: action.id,
+			family: "dimension",
+			familyLabel: "Dimension",
+			status: "ready",
+			title: action.action,
+			summary:
+				"Dimension text override is commit-enabled when preview resolves a single CAD dimension target.",
+			target: `Override: ${targetValue}`,
+			reason: "",
+		};
+	}
+	return {
+		id: action.id,
+		family: "dimension",
+		familyLabel: "Dimension",
+		status: "review",
+		title: action.action,
+		summary: "Dimension commit needs explicit override text and a resolvable markup target.",
+		target: "",
+		reason: "Dimension text and markup bounds are required before preview can resolve the CAD target.",
+	};
+}
+
 function buildUnsupportedReviewItem(
 	action: AutoDraftAction,
 ): AutoDraftCommitReviewItem {
@@ -236,6 +296,12 @@ export function buildAutoDraftCommitReview(
 			}
 			if (action.category === "ADD" && action.replacement) {
 				return buildTextReplacementReviewItem(action);
+			}
+			if (action.category === "DELETE") {
+				return buildTextDeleteReviewItem(action);
+			}
+			if (action.category === "DIMENSION") {
+				return buildDimensionReviewItem(action);
 			}
 			return buildUnsupportedReviewItem(action);
 		})

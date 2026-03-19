@@ -784,6 +784,76 @@ def _build_text_delete_execute_target(
     }
 
 
+def _build_dimension_text_execute_target(
+    action: Dict[str, Any],
+    *,
+    cad_context: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    if _normalize_text(action.get("category")) != "dimension":
+        return None
+
+    raw_target = action.get("execute_target")
+    if isinstance(raw_target, dict):
+        kind = _normalize_text(raw_target.get("kind"))
+        target_entity_id = str(
+            raw_target.get("target_entity_id")
+            or raw_target.get("entity_id")
+            or ""
+        ).strip()
+        target_value = str(raw_target.get("target_value") or "").strip()
+        current_value = str(
+            raw_target.get("current_value")
+            or raw_target.get("old_text")
+            or ""
+        ).strip()
+        entity_type_hint = str(
+            raw_target.get("entity_type_hint")
+            or raw_target.get("entity_type")
+            or ""
+        ).strip()
+        if kind == "dimension_text_override" and target_entity_id and target_value:
+            return {
+                "kind": "dimension_text_override",
+                "target_entity_id": target_entity_id,
+                "target_value": target_value,
+                "current_value": current_value or None,
+                "entity_type_hint": entity_type_hint or "dimension",
+            }
+
+    markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+    markup_text = _normalize_display_text(markup.get("text"), max_length=120)
+    target_value = str(markup_text or "").strip()
+    markup_bounds = _normalize_bounds(markup.get("bounds"))
+    if not target_value or not markup_bounds:
+        return None
+
+    cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
+    candidates = [
+        entity
+        for entity in _extract_text_entities(cad_context_obj)
+        if "dimension" in _normalize_text(entity.get("entity_type"))
+        and _bounds_overlap(
+            _expand_bounds(markup_bounds, 2.0),
+            _expand_bounds(entity.get("bounds") or {}, 1.0),
+        )
+    ]
+    if len(candidates) != 1:
+        return None
+
+    candidate = candidates[0]
+    target_entity_id = str(candidate.get("id") or "").strip()
+    if not target_entity_id:
+        return None
+
+    return {
+        "kind": "dimension_text_override",
+        "target_entity_id": target_entity_id,
+        "target_value": target_value,
+        "current_value": str(candidate.get("text") or "").strip() or None,
+        "entity_type_hint": "dimension",
+    }
+
+
 def _prepare_autodraft_execute_actions(
     actions: List[Dict[str, Any]],
     *,
@@ -824,6 +894,19 @@ def _prepare_autodraft_execute_actions(
                 isinstance(next_action.get("execute_target"), dict)
                 and _normalize_text(next_action["execute_target"].get("kind"))
                 == "text_delete"
+            ):
+                next_action.pop("execute_target", None)
+        elif category == "dimension":
+            execute_target = _build_dimension_text_execute_target(
+                next_action,
+                cad_context=cad_context,
+            )
+            if execute_target:
+                next_action["execute_target"] = execute_target
+            elif (
+                isinstance(next_action.get("execute_target"), dict)
+                and _normalize_text(next_action["execute_target"].get("kind"))
+                == "dimension_text_override"
             ):
                 next_action.pop("execute_target", None)
         prepared_actions.append(next_action)
@@ -4153,6 +4236,9 @@ def _extract_text_entities(cad_context: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "text": text_value,
                 "text_norm": _normalize_learning_text(text_value),
                 "bounds": bounds,
+                "entity_type": str(
+                    entry.get("type") or entry.get("object_name") or ""
+                ).strip(),
             }
         )
     return text_entities

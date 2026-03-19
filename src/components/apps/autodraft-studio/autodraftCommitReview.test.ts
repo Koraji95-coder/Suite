@@ -18,7 +18,7 @@ function buildAction(overrides: Partial<AutoDraftAction>): AutoDraftAction {
 }
 
 describe("autodraftCommitReview", () => {
-	it("marks note, title block, and resolved replacement actions as commit ready", () => {
+it("marks note, title block, resolved replacement, delete, and dimension actions as commit ready", () => {
 		const summary = buildAutoDraftCommitReview(
 			[
 				buildAction({
@@ -47,6 +47,24 @@ describe("autodraftCommitReview", () => {
 						candidates: [],
 					},
 				}),
+				buildAction({
+					id: "delete-1",
+					category: "DELETE",
+					action: "Delete obsolete tag",
+					markup: {
+						text: "delete old tag",
+						bounds: { x: 10, y: 12, width: 30, height: 8 },
+					},
+				}),
+				buildAction({
+					id: "dimension-1",
+					category: "DIMENSION",
+					action: "Update dimension to 12'-0\"",
+					markup: {
+						text: "12'-0\"",
+						bounds: { x: 40, y: 20, width: 24, height: 6 },
+					},
+				}),
 			],
 			{
 				revision: "B",
@@ -55,7 +73,7 @@ describe("autodraftCommitReview", () => {
 			},
 		);
 
-		expect(summary.readyCount).toBe(3);
+		expect(summary.readyCount).toBe(5);
 		expect(summary.needsContextCount).toBe(0);
 		expect(summary.reviewCount).toBe(0);
 		expect(summary.items[0]?.status).toBe("ready");
@@ -100,10 +118,16 @@ describe("autodraftCommitReview", () => {
 				category: "DELETE",
 				action: "Delete bus duct A3",
 			}),
+			buildAction({
+				id: "dimension-1",
+				category: "DIMENSION",
+				action: "Update dimension text",
+				markup: { text: "" },
+			}),
 		]);
 
 		expect(summary.readyCount).toBe(0);
-		expect(summary.reviewCount).toBe(2);
+		expect(summary.reviewCount).toBe(3);
 		expect(summary.items.every((item) => item.status === "review")).toBe(true);
 	});
 });

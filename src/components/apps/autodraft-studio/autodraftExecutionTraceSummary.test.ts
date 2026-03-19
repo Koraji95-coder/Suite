@@ -45,6 +45,7 @@ function buildResponse(): AutoDraftExecuteResponse {
 				titleBlockUpdates: [{ attributeTag: "REV" }],
 				textReplacementUpdates: [{ targetEntityId: "42" }],
 				textDeleteUpdates: [{ targetEntityId: "99" }],
+				dimensionTextUpdates: [{ targetEntityId: "77" }],
 			},
 		},
 	};
@@ -58,6 +59,7 @@ describe("autodraftExecutionTraceSummary", () => {
 		expect(summary?.counts.titleBlockUpdates).toBe(1);
 		expect(summary?.counts.textReplacementUpdates).toBe(1);
 		expect(summary?.counts.textDeleteUpdates).toBe(1);
+		expect(summary?.counts.dimensionTextUpdates).toBe(1);
 		expect(summary?.cad.drawingName).toBe("E-101.dwg");
 		expect(summary?.cad.activeLayout).toBe("Sheet-1");
 		expect(summary?.cad.layoutCount).toBe(3);
@@ -83,6 +85,7 @@ describe("autodraftExecutionTraceSummary", () => {
 		expect(notes).toContain("Title block updates: 1");
 		expect(notes).toContain("Text replacement updates: 1");
 		expect(notes).toContain("Text deletions: 1");
+		expect(notes).toContain("Dimension text updates: 1");
 		expect(notes).toContain("Workflow lane: autodraft-studio");
 	});
 
@@ -92,5 +95,6 @@ describe("autodraftExecutionTraceSummary", () => {
 		expect(summary).toContain("1 title block update(s)");
 		expect(summary).toContain("1 text replacement update(s)");
 		expect(summary).toContain("1 text deletion(s)");
+		expect(summary).toContain("1 dimension update(s)");
 	});
 });

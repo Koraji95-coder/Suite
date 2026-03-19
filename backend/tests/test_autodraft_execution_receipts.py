@@ -69,6 +69,15 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                                         "handle": "5E6F",
                                     }
                                 ],
+                                "dimensionTextUpdates": [
+                                    {
+                                        "targetEntityId": "7A8B",
+                                        "entityType": "AcDbRotatedDimension",
+                                        "previousValue": "10'-0\"",
+                                        "nextValue": "12'-0\"",
+                                        "handle": "7A8B",
+                                    }
+                                ],
                             },
                         },
                     },
@@ -121,6 +130,18 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                         }
                     ],
                 )
+                self.assertEqual(
+                    receipt["dimensionTextUpdates"],
+                    [
+                        {
+                            "targetEntityId": "7A8B",
+                            "entityType": "AcDbRotatedDimension",
+                            "previousValue": "10'-0\"",
+                            "nextValue": "12'-0\"",
+                            "handle": "7A8B",
+                        }
+                    ],
+                )
                 self.assertEqual(get_receipt_db_path().as_posix(), db_path.replace("\\", "/"))
 
                 connection = sqlite3.connect(db_path)
@@ -130,7 +151,8 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                         select request_id, provider_path, status, dry_run, accepted, skipped,
                                drawing_name, drawing_path, warnings_json, created_handles_json,
                                workflow_context_json, revision_context_json, title_block_updates_json,
-                               text_replacement_updates_json, text_delete_updates_json
+                               text_replacement_updates_json, text_delete_updates_json,
+                               dimension_text_updates_json
                         from autodraft_execution_receipts
                         where request_id = ?
                         """,
@@ -156,6 +178,7 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                 self.assertIn("\"fieldKey\":\"revision\"", row[12])
                 self.assertIn("\"targetEntityId\":\"3C4D\"", row[13])
                 self.assertIn("\"targetEntityId\":\"5E6F\"", row[14])
+                self.assertIn("\"targetEntityId\":\"7A8B\"", row[15])
 
 
 if __name__ == "__main__":

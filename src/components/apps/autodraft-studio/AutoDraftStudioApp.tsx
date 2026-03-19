@@ -1649,6 +1649,11 @@ export function AutoDraftStudioApp() {
 												text updates {executionSummary.counts.textReplacementUpdates}
 											</Badge>
 										) : null}
+										{executionSummary?.counts.textDeleteUpdates ? (
+											<Badge color="warning" variant="soft">
+												text deletes {executionSummary.counts.textDeleteUpdates}
+											</Badge>
+										) : null}
 									</div>
 								</div>
 							</div>
@@ -1711,6 +1716,26 @@ export function AutoDraftStudioApp() {
 													{String(item.previousValue || "")}
 													{" -> "}
 													{String(item.nextValue || "")}
+												</Text>
+												<Text size="xs" color="muted">
+													{String(item.handle || item.targetEntityId || "target unavailable")}
+												</Text>
+											</div>
+										))}
+									</div>
+								) : null}
+								{executionSummary?.textDeleteUpdates.length ? (
+									<div className={styles.executeUpdateList}>
+										<Text size="xs" color="muted">
+											Text deletions
+										</Text>
+										{executionSummary.textDeleteUpdates.map((item, index) => (
+											<div
+												key={`text-delete-${index}`}
+												className={styles.executeUpdateCard}
+											>
+												<Text size="xs">
+													{String(item.previousValue || "Deleted text")}
 												</Text>
 												<Text size="xs" color="muted">
 													{String(item.handle || item.targetEntityId || "target unavailable")}

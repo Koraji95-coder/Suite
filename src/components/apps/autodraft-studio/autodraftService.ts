@@ -121,6 +121,7 @@ export type AutoDraftExecutionReceipt = {
 	createdHandles?: string[];
 	titleBlockUpdates?: Record<string, unknown>[];
 	textReplacementUpdates?: Record<string, unknown>[];
+	textDeleteUpdates?: Record<string, unknown>[];
 };
 
 export type AutoDraftExecuteMeta = {
@@ -867,6 +868,11 @@ const normalizeExecutePayload = (
 						executionReceiptPayload.textReplacementUpdates,
 					)
 						? executionReceiptPayload.textReplacementUpdates.filter(isRecord)
+						: undefined,
+					textDeleteUpdates: Array.isArray(
+						executionReceiptPayload.textDeleteUpdates,
+					)
+						? executionReceiptPayload.textDeleteUpdates.filter(isRecord)
 						: undefined,
 				}
 			: undefined;

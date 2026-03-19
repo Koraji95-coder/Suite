@@ -166,6 +166,7 @@ public sealed class AutoDraftExecuteTitleBlockTests
                         },
                     },
                     Array.Empty<JsonObject>(),
+                    Array.Empty<JsonObject>(),
                 }
             )
         );

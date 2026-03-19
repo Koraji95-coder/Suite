@@ -78,6 +78,23 @@ def _build_replacement_add_action(
     }
 
 
+def _build_delete_text_action() -> dict[str, object]:
+    return {
+        "id": "action-delete-text-1",
+        "rule_id": "delete-green-cloud",
+        "category": "DELETE",
+        "action": "Delete the obsolete text inside the cloud.",
+        "confidence": 0.92,
+        "status": "proposed",
+        "markup": {
+            "type": "cloud",
+            "color": "green",
+            "text": "delete old text",
+            "bounds": {"x": 10, "y": 10, "width": 40, "height": 20},
+        },
+    }
+
+
 class TestApiAutoDraftExecuteProvider(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -540,6 +557,123 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
                 "actions": [_build_replacement_add_action(status="ambiguous")],
                 "dry_run": True,
                 "backcheck_override_reason": "test replacement preview",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_prepares_text_delete_target_for_bridge(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            target = actions[0].get("execute_target") if isinstance(actions[0], dict) else None
+            self.assertEqual(
+                target,
+                {
+                    "kind": "text_delete",
+                    "target_entity_id": "AB12",
+                    "current_value": "OLD PANEL",
+                    "entity_type_hint": "text",
+                },
+            )
+            return {
+                "id": "bridge-job-delete-1",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview complete.",
+                    "data": {
+                        "jobId": "autodraft-delete-1",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview complete.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-delete-target-1"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-delete-target-1",
+                "actions": [_build_delete_text_action()],
+                "dry_run": True,
+                "cad_context": {
+                    "entities": [
+                        {
+                            "id": "AB12",
+                            "text": "OLD PANEL",
+                            "bounds": {"x": 12, "y": 12, "width": 10, "height": 4},
+                        }
+                    ]
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_leaves_text_delete_target_unset_when_candidate_is_ambiguous(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            first = actions[0]
+            self.assertIsInstance(first, dict)
+            assert isinstance(first, dict)
+            self.assertNotIn("execute_target", first)
+            return {
+                "id": "bridge-job-delete-2",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview review required.",
+                    "data": {
+                        "jobId": "autodraft-delete-2",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview review required.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-delete-target-2"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-delete-target-2",
+                "actions": [_build_delete_text_action()],
+                "dry_run": True,
+                "cad_context": {
+                    "entities": [
+                        {
+                            "id": "AB12",
+                            "text": "OLD PANEL",
+                            "bounds": {"x": 12, "y": 12, "width": 10, "height": 4},
+                        },
+                        {
+                            "id": "CD34",
+                            "text": "OLD PANEL 2",
+                            "bounds": {"x": 18, "y": 15, "width": 10, "height": 4},
+                        },
+                    ]
+                },
             },
         )
         self.assertEqual(response.status_code, 200)

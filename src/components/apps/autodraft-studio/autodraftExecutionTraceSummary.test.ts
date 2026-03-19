@@ -44,6 +44,7 @@ function buildResponse(): AutoDraftExecuteResponse {
 				createdHandles: ["AB12", "CD34"],
 				titleBlockUpdates: [{ attributeTag: "REV" }],
 				textReplacementUpdates: [{ targetEntityId: "42" }],
+				textDeleteUpdates: [{ targetEntityId: "99" }],
 			},
 		},
 	};
@@ -56,6 +57,7 @@ describe("autodraftExecutionTraceSummary", () => {
 		expect(summary?.counts.createdHandles).toBe(2);
 		expect(summary?.counts.titleBlockUpdates).toBe(1);
 		expect(summary?.counts.textReplacementUpdates).toBe(1);
+		expect(summary?.counts.textDeleteUpdates).toBe(1);
 		expect(summary?.cad.drawingName).toBe("E-101.dwg");
 		expect(summary?.cad.activeLayout).toBe("Sheet-1");
 		expect(summary?.cad.layoutCount).toBe(3);
@@ -80,6 +82,7 @@ describe("autodraftExecutionTraceSummary", () => {
 		expect(notes).toContain("Status: partially-committed");
 		expect(notes).toContain("Title block updates: 1");
 		expect(notes).toContain("Text replacement updates: 1");
+		expect(notes).toContain("Text deletions: 1");
 		expect(notes).toContain("Workflow lane: autodraft-studio");
 	});
 
@@ -88,5 +91,6 @@ describe("autodraftExecutionTraceSummary", () => {
 		expect(summary).toContain("AutoDraft commit:");
 		expect(summary).toContain("1 title block update(s)");
 		expect(summary).toContain("1 text replacement update(s)");
+		expect(summary).toContain("1 text deletion(s)");
 	});
 });

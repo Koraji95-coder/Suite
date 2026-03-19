@@ -2,24 +2,24 @@ using System.Reflection;
 using System.Text.Json.Nodes;
 using Xunit;
 
-public sealed class AutoDraftExecuteTextReplacementTests
+public sealed class AutoDraftExecuteTextDeleteTests
 {
     [Fact]
-    public void Dispatches_text_replacement_preview_with_request_id_and_preview_ready_count()
+    public void Dispatches_text_delete_preview_with_request_id_and_preview_ready_count()
     {
         PipeRouter.Configure(null);
 
         var response = PipeRouter.Handle(
             BuildRequestJson(
-                id: "bridge-text-replace-1",
+                id: "bridge-text-delete-1",
                 action: "autodraft_execute",
                 payload: new JsonObject
                 {
-                    ["requestId"] = "req-text-replace-preview",
+                    ["requestId"] = "req-text-delete-preview",
                     ["dry_run"] = true,
                     ["actions"] = new JsonArray
                     {
-                        BuildReplacementAction(includeExecuteTarget: true),
+                        BuildDeleteAction(includeExecuteTarget: true),
                     },
                 }
             )
@@ -28,7 +28,7 @@ public sealed class AutoDraftExecuteTextReplacementTests
         Assert.True(response["ok"]?.GetValue<bool>() ?? false);
         var result = Assert.IsType<JsonObject>(response["result"]);
         var meta = Assert.IsType<JsonObject>(result["meta"]);
-        Assert.Equal("req-text-replace-preview", meta["requestId"]?.GetValue<string>());
+        Assert.Equal("req-text-delete-preview", meta["requestId"]?.GetValue<string>());
         Assert.Equal("autodraft_execute", meta["action"]?.GetValue<string>());
 
         var data = Assert.IsType<JsonObject>(result["data"]);
@@ -40,19 +40,18 @@ public sealed class AutoDraftExecuteTextReplacementTests
     }
 
     [Fact]
-    public void Commits_text_replacement_updates_and_emits_receipt_shape()
+    public void Commits_text_delete_updates_and_emits_receipt_shape()
     {
-        var entity = new FakeTextEntity(handle: "1A2B", textString: "OLD PANEL NAME");
+        var entity = new FakeTextEntity(handle: "AB12", textString: "REMOVE ME");
         var document = new FakeDocument(entity);
-        var target = new ConduitRouteStubHandlers.AutoDraftTextReplacementExecuteTarget(
-            TargetEntityId: "1A2B",
-            TargetValue: "NEW PANEL NAME",
-            CurrentValue: "OLD PANEL NAME",
+        var target = new ConduitRouteStubHandlers.AutoDraftTextDeleteExecuteTarget(
+            TargetEntityId: "AB12",
+            CurrentValue: "REMOVE ME",
             EntityTypeHint: "text"
         );
         var warnings = new List<string>();
 
-        var outcome = ConduitRouteStubHandlers.CommitAutoDraftTextReplacementExecuteTarget(
+        var outcome = ConduitRouteStubHandlers.CommitAutoDraftTextDeleteExecuteTarget(
             document,
             target,
             warnings
@@ -60,35 +59,33 @@ public sealed class AutoDraftExecuteTextReplacementTests
 
         Assert.True(outcome.Succeeded, outcome.SkipReason);
         Assert.True(outcome.WroteChanges, outcome.SkipReason);
-        Assert.Equal("1A2B", outcome.Handle);
-        Assert.Equal("NEW PANEL NAME", entity.TextString);
+        Assert.Equal("AB12", outcome.Handle);
+        Assert.True(entity.Deleted);
         Assert.Equal(1, entity.UpdateCalls);
 
         var updateNode = Assert.Single(
-            ConduitRouteStubHandlers.AutoDraftTextReplacementUpdatesToJsonArray(outcome.Updates)
+            ConduitRouteStubHandlers.AutoDraftTextDeleteUpdatesToJsonArray(outcome.Updates)
                 .OfType<JsonObject>()
         );
-        Assert.Equal("1A2B", updateNode["targetEntityId"]?.GetValue<string>());
+        Assert.Equal("AB12", updateNode["targetEntityId"]?.GetValue<string>());
         Assert.Equal("AcDbText", updateNode["entityType"]?.GetValue<string>());
-        Assert.Equal("OLD PANEL NAME", updateNode["previousValue"]?.GetValue<string>());
-        Assert.Equal("NEW PANEL NAME", updateNode["nextValue"]?.GetValue<string>());
-        Assert.Equal("1A2B", updateNode["handle"]?.GetValue<string>());
+        Assert.Equal("REMOVE ME", updateNode["previousValue"]?.GetValue<string>());
+        Assert.Equal("AB12", updateNode["handle"]?.GetValue<string>());
         Assert.Empty(warnings);
     }
 
     [Fact]
-    public void Blocks_text_replacement_commit_when_current_value_does_not_match()
+    public void Blocks_text_delete_commit_when_current_value_does_not_match()
     {
-        var entity = new FakeTextEntity(handle: "1A2B", textString: "DIFFERENT");
+        var entity = new FakeTextEntity(handle: "AB12", textString: "KEEP ME");
         var document = new FakeDocument(entity);
-        var target = new ConduitRouteStubHandlers.AutoDraftTextReplacementExecuteTarget(
-            TargetEntityId: "1A2B",
-            TargetValue: "NEW PANEL NAME",
-            CurrentValue: "OLD PANEL NAME",
+        var target = new ConduitRouteStubHandlers.AutoDraftTextDeleteExecuteTarget(
+            TargetEntityId: "AB12",
+            CurrentValue: "REMOVE ME",
             EntityTypeHint: "text"
         );
 
-        var outcome = ConduitRouteStubHandlers.CommitAutoDraftTextReplacementExecuteTarget(
+        var outcome = ConduitRouteStubHandlers.CommitAutoDraftTextDeleteExecuteTarget(
             document,
             target,
             []
@@ -96,12 +93,12 @@ public sealed class AutoDraftExecuteTextReplacementTests
 
         Assert.False(outcome.Succeeded);
         Assert.Contains("did not match expected", outcome.SkipReason, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("DIFFERENT", entity.TextString);
+        Assert.False(entity.Deleted);
         Assert.Equal(0, entity.UpdateCalls);
     }
 
     [Fact]
-    public void Execute_result_places_text_replacement_updates_under_meta_commit()
+    public void Execute_result_places_text_delete_updates_under_meta_commit()
     {
         var buildResultMethod = typeof(ConduitRouteStubHandlers).GetMethod(
             "BuildAutoDraftExecuteResult",
@@ -121,7 +118,7 @@ public sealed class AutoDraftExecuteTextReplacementTests
                     1,
                     1,
                     "Commit completed.",
-                    new[] { "replacement updated" },
+                    new[] { "text deleted" },
                     new JsonObject
                     {
                         ["available"] = true,
@@ -129,55 +126,53 @@ public sealed class AutoDraftExecuteTextReplacementTests
                     },
                     Array.Empty<string>(),
                     Array.Empty<JsonObject>(),
+                    Array.Empty<JsonObject>(),
                     new JsonObject[]
                     {
                         new()
                         {
-                            ["targetEntityId"] = "1A2B",
+                            ["targetEntityId"] = "AB12",
                             ["entityType"] = "AcDbText",
-                            ["previousValue"] = "OLD",
-                            ["nextValue"] = "NEW",
-                            ["handle"] = "1A2B",
+                            ["previousValue"] = "REMOVE ME",
+                            ["handle"] = "AB12",
                         },
                     },
-                    Array.Empty<JsonObject>(),
                 }
             )
         );
 
         var meta = Assert.IsType<JsonObject>(result["meta"]);
         var commit = Assert.IsType<JsonObject>(meta["commit"]);
-        var textReplacementUpdates = Assert.IsType<JsonArray>(commit["textReplacementUpdates"]);
-        var update = Assert.Single(textReplacementUpdates.OfType<JsonObject>());
+        var textDeleteUpdates = Assert.IsType<JsonArray>(commit["textDeleteUpdates"]);
+        var update = Assert.Single(textDeleteUpdates.OfType<JsonObject>());
 
-        Assert.Equal("1A2B", update["targetEntityId"]?.GetValue<string>());
+        Assert.Equal("AB12", update["targetEntityId"]?.GetValue<string>());
         Assert.Equal("AcDbText", update["entityType"]?.GetValue<string>());
-        Assert.Equal("OLD", update["previousValue"]?.GetValue<string>());
-        Assert.Equal("NEW", update["nextValue"]?.GetValue<string>());
-        Assert.Equal("1A2B", update["handle"]?.GetValue<string>());
+        Assert.Equal("REMOVE ME", update["previousValue"]?.GetValue<string>());
+        Assert.Equal("AB12", update["handle"]?.GetValue<string>());
     }
 
-    private static JsonObject BuildReplacementAction(bool includeExecuteTarget)
+    private static JsonObject BuildDeleteAction(bool includeExecuteTarget)
     {
         var action = new JsonObject
         {
-            ["id"] = "action-text-replace-1",
-            ["rule_id"] = "add-red-cloud",
-            ["category"] = "ADD",
-            ["action"] = "Replace existing CAD text with reviewed markup text.",
+            ["id"] = "action-text-delete-1",
+            ["rule_id"] = "delete-red-markup",
+            ["category"] = "DELETE",
+            ["action"] = "Delete the matched text entity.",
             ["confidence"] = 0.9,
             ["status"] = "proposed",
             ["markup"] = new JsonObject
             {
                 ["type"] = "text",
                 ["color"] = "red",
-                ["text"] = "NEW PANEL NAME",
+                ["text"] = "REMOVE ME",
                 ["bounds"] = new JsonObject
                 {
-                    ["x"] = 80.0,
+                    ["x"] = 40.0,
                     ["y"] = 24.0,
-                    ["width"] = 30.0,
-                    ["height"] = 10.0,
+                    ["width"] = 16.0,
+                    ["height"] = 8.0,
                 },
             },
         };
@@ -186,10 +181,9 @@ public sealed class AutoDraftExecuteTextReplacementTests
         {
             action["execute_target"] = new JsonObject
             {
-                ["kind"] = "text_replacement",
-                ["target_entity_id"] = "1A2B",
-                ["target_value"] = "NEW PANEL NAME",
-                ["current_value"] = "OLD PANEL NAME",
+                ["kind"] = "text_delete",
+                ["target_entity_id"] = "AB12",
+                ["current_value"] = "REMOVE ME",
                 ["entity_type_hint"] = "text",
             };
         }
@@ -252,7 +246,14 @@ public sealed class AutoDraftExecuteTextReplacementTests
 
         public string TextString { get; set; }
 
+        public bool Deleted { get; private set; }
+
         public int UpdateCalls { get; private set; }
+
+        public void Delete()
+        {
+            Deleted = true;
+        }
 
         public void Update()
         {

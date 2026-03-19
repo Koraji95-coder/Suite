@@ -37,6 +37,7 @@ export type AutoDraftCommitCounts = {
 	createdHandles: number;
 	titleBlockUpdates: number;
 	textReplacementUpdates: number;
+	textDeleteUpdates: number;
 };
 
 export type AutoDraftCadContextSummary = {
@@ -66,6 +67,7 @@ export type AutoDraftExecutionSummary = {
 	cad: AutoDraftCadContextSummary;
 	titleBlockUpdates: ReadonlyArray<Record<string, unknown>>;
 	textReplacementUpdates: ReadonlyArray<Record<string, unknown>>;
+	textDeleteUpdates: ReadonlyArray<Record<string, unknown>>;
 	createdHandles: ReadonlyArray<string>;
 };
 
@@ -88,6 +90,7 @@ export function summarizeAutoDraftExecution(
 		: [];
 	const titleBlockUpdates = readReceiptList(receipt.titleBlockUpdates);
 	const textReplacementUpdates = readReceiptList(receipt.textReplacementUpdates);
+	const textDeleteUpdates = readReceiptList(receipt.textDeleteUpdates);
 
 	return {
 		requestId:
@@ -112,6 +115,7 @@ export function summarizeAutoDraftExecution(
 			createdHandles: createdHandles.length,
 			titleBlockUpdates: titleBlockUpdates.length,
 			textReplacementUpdates: textReplacementUpdates.length,
+			textDeleteUpdates: textDeleteUpdates.length,
 		},
 		cad: {
 			drawingName: asString(cadRecord.drawingName),
@@ -129,6 +133,7 @@ export function summarizeAutoDraftExecution(
 		},
 		titleBlockUpdates,
 		textReplacementUpdates,
+		textDeleteUpdates,
 		createdHandles,
 	};
 }
@@ -198,6 +203,12 @@ export function buildAutoDraftRevisionTraceNotes(args: {
 				? `Text replacement updates: ${summary.counts.textReplacementUpdates}`
 				: "",
 		);
+		appendLine(
+			lines,
+			summary.counts.textDeleteUpdates > 0
+				? `Text deletions: ${summary.counts.textDeleteUpdates}`
+				: "",
+		);
 	}
 
 	appendLine(
@@ -230,6 +241,9 @@ export function buildAutoDraftExecutionIssueSummary(
 		detailParts.push(
 			`${summary.counts.textReplacementUpdates} text replacement update(s)`,
 		);
+	}
+	if (summary.counts.textDeleteUpdates > 0) {
+		detailParts.push(`${summary.counts.textDeleteUpdates} text deletion(s)`);
 	}
 	if (summary.counts.createdHandles > 0) {
 		detailParts.push(`${summary.counts.createdHandles} created handle(s)`);

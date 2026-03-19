@@ -33,6 +33,8 @@ import {
 } from "./autodraftService";
 import { agentService } from "@/services/agentService";
 import { projectRevisionRegisterService } from "@/services/projectRevisionRegisterService";
+import { supabase } from "@/supabase/client";
+import type { Database } from "@/supabase/database";
 import {
 	detectArcsFromSegments,
 	extendDeadEndSegments,
@@ -122,6 +124,39 @@ type CrewReviewEntry = {
 };
 
 type ExecuteMode = "preview" | "commit";
+type ProjectContextOption = Pick<
+	Database["public"]["Tables"]["projects"]["Row"],
+	"id" | "name" | "status" | "category" | "color"
+>;
+type ProjectFileContextOption = Pick<
+	Database["public"]["Tables"]["files"]["Row"],
+	"id" | "name" | "file_path" | "project_id"
+>;
+type CommitPreviewLane = {
+	id: string;
+	label: string;
+	count: number;
+	description: string;
+};
+
+function deriveRevisionMetadataFromFileName(fileName: string) {
+	const baseName = fileName.replace(/\.[^/.]+$/, "");
+	const numberMatch = baseName.match(
+		/^((?:R3P-[A-Z0-9]{3,6})-[A-Z0-9]{1,4}-[A-Z0-9]{3}-\d{3})(?:\s+([A-Z0-9]+))?(?:[-_ ]+(.*))?$/i,
+	);
+	if (!numberMatch) {
+		return {
+			drawingNumber: "",
+			revision: "",
+			title: baseName.replace(/[_-]+/g, " ").trim(),
+		};
+	}
+	return {
+		drawingNumber: numberMatch[1].trim(),
+		revision: (numberMatch[2] || "").trim(),
+		title: (numberMatch[3] || "").replace(/[_-]+/g, " ").trim(),
+	};
+}
 
 function extractAgentResponseText(data: Record<string, unknown> | undefined): string {
 	if (!data) return "";
@@ -200,6 +235,8 @@ export function AutoDraftStudioApp() {
 	const [revisionTraceMessage, setRevisionTraceMessage] = useState<string | null>(
 		null,
 	);
+	const [projectOptions, setProjectOptions] = useState<ProjectContextOption[]>([]);
+	const [projectFiles, setProjectFiles] = useState<ProjectFileContextOption[]>([]);
 	const [crewReviewEntries, setCrewReviewEntries] = useState<CrewReviewEntry[]>(
 		[],
 	);
@@ -214,6 +251,50 @@ export function AutoDraftStudioApp() {
 		() => summarizeAutoDraftExecution(executeResult),
 		[executeResult],
 	);
+	const selectedProjectId =
+		revisionContext.projectId?.trim() || workflowContext.projectId?.trim() || "";
+	const selectedProject = useMemo(
+		() => projectOptions.find((project) => project.id === selectedProjectId) ?? null,
+		[projectOptions, selectedProjectId],
+	);
+	const selectedFile = useMemo(
+		() =>
+			projectFiles.find((file) => file.id === (revisionContext.fileId?.trim() || "")) ??
+			null,
+		[projectFiles, revisionContext.fileId],
+	);
+	const commitPreviewLanes = useMemo<CommitPreviewLane[]>(() => {
+		if (!planResult?.actions?.length) return [];
+		const noteCount = planResult.actions.filter(
+			(action) => action.category === "NOTE",
+		).length;
+		const titleBlockCount = planResult.actions.filter(
+			(action) => action.category === "TITLE_BLOCK",
+		).length;
+		const replacementCount = planResult.actions.filter(
+			(action) => action.replacement?.status === "resolved",
+		).length;
+		return [
+			{
+				id: "note",
+				label: "Notes",
+				count: noteCount,
+				description: "Callouts and note entities with resolved CAD targets.",
+			},
+			{
+				id: "title-block",
+				label: "Title blocks",
+				count: titleBlockCount,
+				description: "Structured attribute updates on recognized title block fields.",
+			},
+			{
+				id: "replacement",
+				label: "Text updates",
+				count: replacementCount,
+				description: "Resolved text replacements on known entity targets.",
+			},
+		].filter((lane) => lane.count > 0);
+	}, [planResult]);
 
 	const translatedGeometryStats = useMemo(() => {
 		const arcResult = detectArcsFromSegments(DEMO_SEGMENTS, {
@@ -260,6 +341,71 @@ export function AutoDraftStudioApp() {
 	useEffect(() => {
 		void refreshStatus();
 	}, [refreshStatus]);
+
+	useEffect(() => {
+		let cancelled = false;
+		const loadProjectOptions = async () => {
+			const {
+				data: { user },
+				error: authError,
+			} = await supabase.auth.getUser();
+			if (cancelled) return;
+			if (authError || !user) {
+				setProjectOptions([]);
+				return;
+			}
+
+			const { data, error } = await supabase
+				.from("projects")
+				.select("id, name, status, category, color")
+				.eq("user_id", user.id)
+				.order("created_at", { ascending: false });
+
+			if (cancelled) return;
+			if (error) {
+				showToast(
+					"warning",
+					"Project context is unavailable. Execution can still run without revision linking.",
+				);
+				setProjectOptions([]);
+				return;
+			}
+
+			setProjectOptions(data ?? []);
+		};
+
+		void loadProjectOptions();
+		return () => {
+			cancelled = true;
+		};
+	}, [showToast]);
+
+	useEffect(() => {
+		let cancelled = false;
+		if (!selectedProjectId) {
+			setProjectFiles([]);
+			return;
+		}
+
+		const loadProjectFiles = async () => {
+			const { data, error } = await supabase
+				.from("files")
+				.select("id, name, file_path, project_id")
+				.eq("project_id", selectedProjectId)
+				.order("uploaded_at", { ascending: false });
+			if (cancelled) return;
+			if (error) {
+				setProjectFiles([]);
+				return;
+			}
+			setProjectFiles(data ?? []);
+		};
+
+		void loadProjectFiles();
+		return () => {
+			cancelled = true;
+		};
+	}, [selectedProjectId]);
 
 	const buildWorkflowContext = (): AutoDraftExecuteWorkflowContext | undefined => {
 		const next: AutoDraftExecuteWorkflowContext = {
@@ -536,6 +682,48 @@ export function AutoDraftStudioApp() {
 		anchor.click();
 		document.body.removeChild(anchor);
 		URL.revokeObjectURL(url);
+	};
+
+	const handleProjectSelection = (nextValue: string) => {
+		const normalizedProjectId = nextValue.trim();
+		const nextProject =
+			projectOptions.find((project) => project.id === normalizedProjectId) ?? null;
+		setWorkflowContext((prev) => ({
+			...prev,
+			projectId: normalizedProjectId,
+			projectName: nextProject?.name ?? "",
+		}));
+		setRevisionContext((prev) => ({
+			...prev,
+			projectId: normalizedProjectId,
+			fileId: "",
+		}));
+	};
+
+	const handleProjectFileSelection = (nextValue: string) => {
+		const normalizedFileId = nextValue.trim();
+		const nextFile =
+			projectFiles.find((file) => file.id === normalizedFileId) ?? null;
+		const parsed = nextFile
+			? deriveRevisionMetadataFromFileName(nextFile.name)
+			: null;
+
+		setRevisionContext((prev) => ({
+			...prev,
+			fileId: normalizedFileId,
+			drawingNumber:
+				prev.drawingNumber?.trim() || !parsed?.drawingNumber
+					? prev.drawingNumber
+					: parsed.drawingNumber,
+			title:
+				prev.title?.trim() ||
+				!parsed ||
+				!nextFile
+					? prev.title
+					: parsed.title || nextFile.name.replace(/\.[^/.]+$/, ""),
+			revision:
+				prev.revision?.trim() || !parsed?.revision ? prev.revision : parsed.revision,
+		}));
 	};
 
 	return (
@@ -913,39 +1101,67 @@ export function AutoDraftStudioApp() {
 					<div className={styles.executionContextHeader}>
 						<div>
 							<Text size="sm" weight="semibold">
-								Execution trace context
+								Execution workflow context
 							</Text>
 							<Text size="xs" color="muted">
-								Optional workflow and revision data for linking commit receipts
-								into project history.
+								Link CAD commits to a real project and drawing so receipts can
+								flow into revision history instead of staying local-only.
 							</Text>
 						</div>
 						<Badge color="accent" variant="soft">
 							Preview {"->"} Commit
 						</Badge>
 					</div>
+					{commitPreviewLanes.length > 0 ? (
+						<div className={styles.commitPreviewGrid}>
+							{commitPreviewLanes.map((lane) => (
+								<div key={lane.id} className={styles.commitPreviewCard}>
+									<div className={styles.commitPreviewHeader}>
+										<Text size="sm" weight="semibold">
+											{lane.label}
+										</Text>
+										<Badge color="accent" variant="soft">
+											{lane.count}
+										</Badge>
+									</div>
+									<Text size="xs" color="muted" block>
+										{lane.description}
+									</Text>
+								</div>
+							))}
+						</div>
+					) : null}
+					{selectedProject || selectedFile ? (
+						<div className={styles.executionContextSummary}>
+							<Text size="xs" color="muted" block>
+								{selectedProject
+									? `Project: ${selectedProject.name}`
+									: "No project linked yet."}
+							</Text>
+							<Text size="xs" color="muted" block>
+								{selectedFile
+									? `Drawing file: ${selectedFile.name}`
+									: selectedProjectId
+										? "Select a project file to attach the commit receipt to a drawing."
+										: "Select a project to enable revision-register traceability."}
+							</Text>
+						</div>
+					) : null}
 					<div className={styles.executionContextGrid}>
 						<label className={styles.compareField}>
-							<span>Project id</span>
-							<Input
-								value={
-									revisionContext.projectId?.trim().length
-										? revisionContext.projectId
-										: workflowContext.projectId ?? ""
-								}
-								onChange={(event) => {
-									const nextValue = event.target.value;
-									setRevisionContext((prev) => ({
-										...prev,
-										projectId: nextValue,
-									}));
-									setWorkflowContext((prev) => ({
-										...prev,
-										projectId: nextValue,
-									}));
-								}}
-								placeholder="project-uuid"
-							/>
+							<span>Project</span>
+							<select
+								value={selectedProjectId}
+								onChange={(event) => handleProjectSelection(event.target.value)}
+								className={styles.executionContextSelect}
+							>
+								<option value="">Select project</option>
+								{projectOptions.map((project) => (
+									<option key={project.id} value={project.id}>
+										{project.name}
+									</option>
+								))}
+							</select>
 						</label>
 						<label className={styles.compareField}>
 							<span>Workflow lane</span>
@@ -959,6 +1175,24 @@ export function AutoDraftStudioApp() {
 								}
 								placeholder="autodraft-studio"
 							/>
+						</label>
+						<label className={styles.compareField}>
+							<span>Project file</span>
+							<select
+								value={revisionContext.fileId ?? ""}
+								onChange={(event) => handleProjectFileSelection(event.target.value)}
+								className={styles.executionContextSelect}
+								disabled={!selectedProjectId}
+							>
+								<option value="">
+									{selectedProjectId ? "Select drawing file" : "Pick project first"}
+								</option>
+								{projectFiles.map((file) => (
+									<option key={file.id} value={file.id}>
+										{file.name}
+									</option>
+								))}
+							</select>
 						</label>
 						<label className={styles.compareField}>
 							<span>Drawing number</span>

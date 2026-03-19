@@ -8,6 +8,8 @@ static partial class ConduitRouteStubHandlers
         int? CommandMask,
         string ActiveLayout,
         string ActiveSpace,
+        int? LayoutCount,
+        int? BlockCount,
         int? LayerCount,
         int? ModelSpaceCount,
         int? PaperSpaceCount
@@ -24,6 +26,8 @@ static partial class ConduitRouteStubHandlers
             ? ""
             : StringOrDefault(ReadProperty(activeLayoutObject, "Name"), "");
         var activeSpace = DescribeAutoCadActiveSpace(ReadProperty(session.Document, "ActiveSpace"));
+        var layoutCount = ReadAutoCadCollectionCount(ReadProperty(session.Document, "Layouts"));
+        var blockCount = ReadAutoCadCollectionCount(ReadProperty(session.Document, "Blocks"));
         var layerCount = ReadAutoCadCollectionCount(ReadProperty(session.Document, "Layers"));
         var modelSpaceCount = ReadAutoCadCollectionCount(session.Modelspace);
         var paperSpaceCount = ReadAutoCadCollectionCount(ReadProperty(session.Document, "PaperSpace"));
@@ -36,6 +40,8 @@ static partial class ConduitRouteStubHandlers
             CommandMask: commandStateAvailable ? commandMask : null,
             ActiveLayout: activeLayout,
             ActiveSpace: activeSpace,
+            LayoutCount: layoutCount,
+            BlockCount: blockCount,
             LayerCount: layerCount,
             ModelSpaceCount: modelSpaceCount,
             PaperSpaceCount: paperSpaceCount

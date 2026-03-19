@@ -39,6 +39,11 @@ import {
 	type Segment,
 } from "./engine/pdfToCadGeometry";
 import { AutoDraftComparePanel } from "./AutoDraftComparePanel";
+import {
+	buildAutoDraftExecutionIssueSummary,
+	buildAutoDraftRevisionTraceNotes,
+	summarizeAutoDraftExecution,
+} from "./autodraftExecutionTraceSummary";
 
 type TabId = "architecture" | "rules" | "pipeline" | "training";
 
@@ -205,6 +210,10 @@ export function AutoDraftStudioApp() {
 	const [loadingCrewReview, setLoadingCrewReview] = useState(false);
 	const [loadingHealth, setLoadingHealth] = useState(false);
 	const activeTabConfig = TABS.find((tab) => tab.id === activeTab) ?? TABS[0];
+	const executionSummary = useMemo(
+		() => summarizeAutoDraftExecution(executeResult),
+		[executeResult],
+	);
 
 	const translatedGeometryStats = useMemo(() => {
 		const arcResult = detectArcsFromSegments(DEMO_SEGMENTS, {
@@ -303,29 +312,11 @@ export function AutoDraftStudioApp() {
 			}
 			const receipt = executed.meta?.executionReceipt;
 			const status = executed.status.trim();
-			const notes = [
-				revisionPayload?.notes?.trim(),
-				executed.message?.trim(),
-				receipt?.id ? `Receipt: ${receipt.id}` : "",
-				receipt?.providerPath ? `Provider: ${receipt.providerPath}` : "",
-				status ? `Status: ${status}` : "",
-				typeof executed.accepted === "number"
-					? `Accepted: ${executed.accepted}`
-					: "",
-				typeof executed.skipped === "number"
-					? `Skipped: ${executed.skipped}`
-					: "",
-				Array.isArray(receipt?.createdHandles) &&
-				receipt.createdHandles.length > 0
-					? `Created handles: ${receipt.createdHandles.join(", ")}`
-					: "",
-				workflowContext.lane?.trim() ? `Workflow lane: ${workflowContext.lane.trim()}` : "",
-				workflowContext.phase?.trim()
-					? `Workflow phase: ${workflowContext.phase.trim()}`
-					: "",
-			]
-				.filter(Boolean)
-				.join("\n");
+			const notes = buildAutoDraftRevisionTraceNotes({
+				response: executed,
+				workflowContext,
+				revisionContext: revisionPayload,
+			});
 			const row = await projectRevisionRegisterService.upsertAutoDraftExecutionEntry({
 				projectId: resolvedProjectId,
 				fileId: revisionPayload?.fileId?.trim() || null,
@@ -335,8 +326,7 @@ export function AutoDraftStudioApp() {
 				previousRevision: revisionPayload?.previousRevision?.trim() || null,
 				issueSummary:
 					revisionPayload?.issueSummary?.trim() ||
-					executed.message?.trim() ||
-					"AutoDraft execution receipt recorded.",
+					buildAutoDraftExecutionIssueSummary(executed),
 				notes,
 				requestId,
 				sourceRef: receipt?.id || executed.job_id || null,
@@ -355,11 +345,7 @@ export function AutoDraftStudioApp() {
 			setRevisionTraceMessage(message);
 			showToast("warning", message);
 		},
-		[
-			showToast,
-			workflowContext.lane,
-			workflowContext.phase,
-		],
+		[showToast, workflowContext],
 	);
 
 	const runDemoPlan = async () => {
@@ -1000,6 +986,32 @@ export function AutoDraftStudioApp() {
 								placeholder="B"
 							/>
 						</label>
+						<label className={styles.compareField}>
+							<span>Previous revision</span>
+							<Input
+								value={revisionContext.previousRevision ?? ""}
+								onChange={(event) =>
+									setRevisionContext((prev) => ({
+										...prev,
+										previousRevision: event.target.value,
+									}))
+								}
+								placeholder="A"
+							/>
+						</label>
+						<label className={styles.compareField}>
+							<span>Drawing title</span>
+							<Input
+								value={revisionContext.title ?? ""}
+								onChange={(event) =>
+									setRevisionContext((prev) => ({
+										...prev,
+										title: event.target.value,
+									}))
+								}
+								placeholder="Main switchgear one-line"
+							/>
+						</label>
 						<label className={`${styles.compareField} ${styles.executionContextWide}`}>
 							<span>Issue summary</span>
 							<Input
@@ -1011,6 +1023,21 @@ export function AutoDraftStudioApp() {
 									}))
 								}
 								placeholder="AutoDraft execution receipt recorded from Studio."
+							/>
+						</label>
+						<label className={`${styles.compareField} ${styles.executionContextWide}`}>
+							<span>Revision notes</span>
+							<textarea
+								rows={2}
+								className={styles.executionContextTextarea}
+								value={revisionContext.notes ?? ""}
+								onChange={(event) =>
+									setRevisionContext((prev) => ({
+										...prev,
+										notes: event.target.value,
+									}))
+								}
+								placeholder="Optional PM trace notes, reviewer context, or closeout comments."
 							/>
 						</label>
 					</div>
@@ -1202,14 +1229,78 @@ export function AutoDraftStudioApp() {
 							</Text>
 						) : null}
 						{executeResult.meta?.cad ? (
-							<Text size="xs" color="muted">
-								CAD: {String(executeResult.meta.cad.drawingName || "unknown")}
-								{typeof executeResult.meta.cad.readOnly === "boolean"
-									? executeResult.meta.cad.readOnly
-										? " · read-only"
-										: " · writable"
-									: ""}
-							</Text>
+							<div className={styles.executeMetaGrid}>
+								<div className={styles.executeMetaCard}>
+									<Text size="xs" color="muted">
+										CAD drawing
+									</Text>
+									<Text size="sm" weight="semibold">
+										{executionSummary?.cad.drawingName || "unknown"}
+									</Text>
+									<Text size="xs" color="muted">
+										{executionSummary?.cad.readOnly === true
+											? "Read-only"
+											: executionSummary?.cad.readOnly === false
+												? "Writable"
+												: "State unknown"}
+									</Text>
+								</div>
+								<div className={styles.executeMetaCard}>
+									<Text size="xs" color="muted">
+										CAD context
+									</Text>
+									<Text size="sm" weight="semibold">
+										{executionSummary?.cad.activeLayout || "No active layout"}
+									</Text>
+									<Text size="xs" color="muted">
+										{executionSummary?.cad.activeSpace
+											? `Space: ${executionSummary.cad.activeSpace}`
+											: "Space unavailable"}
+									</Text>
+									<Text size="xs" color="muted">
+										{[
+											typeof executionSummary?.cad.layoutCount === "number"
+												? `layouts ${executionSummary.cad.layoutCount}`
+												: "",
+											typeof executionSummary?.cad.blockCount === "number"
+												? `blocks ${executionSummary.cad.blockCount}`
+												: "",
+											typeof executionSummary?.cad.layerCount === "number"
+												? `layers ${executionSummary.cad.layerCount}`
+												: "",
+										]
+											.filter(Boolean)
+											.join(" · ") || "Counts unavailable"}
+									</Text>
+								</div>
+								<div className={styles.executeMetaCard}>
+									<Text size="xs" color="muted">
+										Commit impact
+									</Text>
+									<Text size="sm" weight="semibold">
+										{executionSummary
+											? `${executionSummary.accepted} accepted / ${executionSummary.skipped} skipped`
+											: `${executeResult.accepted} accepted / ${executeResult.skipped} skipped`}
+									</Text>
+									<div className={styles.executeMetaBadges}>
+										{executionSummary?.counts.createdHandles ? (
+											<Badge color="primary" variant="soft">
+												handles {executionSummary.counts.createdHandles}
+											</Badge>
+										) : null}
+										{executionSummary?.counts.titleBlockUpdates ? (
+											<Badge color="accent" variant="soft">
+												title blocks {executionSummary.counts.titleBlockUpdates}
+											</Badge>
+										) : null}
+										{executionSummary?.counts.textReplacementUpdates ? (
+											<Badge color="success" variant="soft">
+												text updates {executionSummary.counts.textReplacementUpdates}
+											</Badge>
+										) : null}
+									</div>
+								</div>
+							</div>
 						) : null}
 						{executeResult.meta?.commit ? (
 							<Text size="xs" color="muted">
@@ -1221,12 +1312,63 @@ export function AutoDraftStudioApp() {
 							</Text>
 						) : null}
 						{executeResult.meta?.executionReceipt ? (
-							<Text size="xs" color="muted">
-								Receipt: {executeResult.meta.executionReceipt.id || "stored"}
-								{executeResult.meta.executionReceipt.providerPath
-									? ` · ${executeResult.meta.executionReceipt.providerPath}`
-									: ""}
-							</Text>
+							<>
+								<Text size="xs" color="muted">
+									Receipt: {executeResult.meta.executionReceipt.id || "stored"}
+									{executeResult.meta.executionReceipt.providerPath
+										? ` · ${executeResult.meta.executionReceipt.providerPath}`
+										: ""}
+								</Text>
+								{executionSummary?.cad.drawingPath ? (
+									<Text size="xs" color="muted">
+										Path: {executionSummary.cad.drawingPath}
+									</Text>
+								) : null}
+								{executionSummary?.titleBlockUpdates.length ? (
+									<div className={styles.executeUpdateList}>
+										<Text size="xs" color="muted">
+											Title block updates
+										</Text>
+										{executionSummary.titleBlockUpdates.map((item, index) => (
+											<div
+												key={`title-block-update-${index}`}
+												className={styles.executeUpdateCard}
+											>
+												<Text size="xs">
+													{String(item.attributeTag || item.normalizedFieldKey || "Field")}
+													{" -> "}
+													{String(item.nextValue || item.targetValue || "")}
+												</Text>
+												<Text size="xs" color="muted">
+													{String(item.handle || item.blockHandle || "handle unavailable")}
+												</Text>
+											</div>
+										))}
+									</div>
+								) : null}
+								{executionSummary?.textReplacementUpdates.length ? (
+									<div className={styles.executeUpdateList}>
+										<Text size="xs" color="muted">
+											Text replacement updates
+										</Text>
+										{executionSummary.textReplacementUpdates.map((item, index) => (
+											<div
+												key={`text-update-${index}`}
+												className={styles.executeUpdateCard}
+											>
+												<Text size="xs">
+													{String(item.previousValue || "")}
+													{" -> "}
+													{String(item.nextValue || "")}
+												</Text>
+												<Text size="xs" color="muted">
+													{String(item.handle || item.targetEntityId || "target unavailable")}
+												</Text>
+											</div>
+										))}
+									</div>
+								) : null}
+							</>
 						) : null}
 						{revisionTraceMessage ? (
 							<Text size="xs" color="primary">

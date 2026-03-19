@@ -63,6 +63,8 @@ static partial class ConduitRouteStubHandlers
                     commandStateAvailable: false,
                     activeLayout: null,
                     activeSpace: null,
+                    layoutCount: null,
+                    blockCount: null,
                     layerCount: null,
                     modelSpaceCount: null,
                     paperSpaceCount: null
@@ -99,6 +101,8 @@ static partial class ConduitRouteStubHandlers
                     commandStateAvailable: false,
                     activeLayout: null,
                     activeSpace: null,
+                    layoutCount: null,
+                    blockCount: null,
                     layerCount: null,
                     modelSpaceCount: null,
                     paperSpaceCount: null
@@ -129,6 +133,8 @@ static partial class ConduitRouteStubHandlers
                 commandStateAvailable: drawingContext.CommandStateAvailable,
                 activeLayout: drawingContext.ActiveLayout,
                 activeSpace: drawingContext.ActiveSpace,
+                layoutCount: drawingContext.LayoutCount,
+                blockCount: drawingContext.BlockCount,
                 layerCount: drawingContext.LayerCount,
                 modelSpaceCount: drawingContext.ModelSpaceCount,
                 paperSpaceCount: drawingContext.PaperSpaceCount
@@ -821,6 +827,8 @@ static partial class ConduitRouteStubHandlers
         bool commandStateAvailable,
         string? activeLayout,
         string? activeSpace,
+        int? layoutCount,
+        int? blockCount,
         int? layerCount,
         int? modelSpaceCount,
         int? paperSpaceCount
@@ -838,6 +846,8 @@ static partial class ConduitRouteStubHandlers
 
         cadNode["readOnly"] = readOnly is bool readOnlyValue ? readOnlyValue : null;
         cadNode["commandMask"] = commandMask is int commandMaskValue ? commandMaskValue : null;
+        cadNode["layoutCount"] = layoutCount is int layoutCountValue ? layoutCountValue : null;
+        cadNode["blockCount"] = blockCount is int blockCountValue ? blockCountValue : null;
         cadNode["layerCount"] = layerCount is int layerCountValue ? layerCountValue : null;
         cadNode["modelSpaceCount"] = modelSpaceCount is int modelSpaceCountValue ? modelSpaceCountValue : null;
         cadNode["paperSpaceCount"] = paperSpaceCount is int paperSpaceCountValue ? paperSpaceCountValue : null;

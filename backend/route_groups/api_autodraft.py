@@ -667,6 +667,59 @@ def _build_title_block_execute_target(
     }
 
 
+def _build_text_replacement_execute_target(
+    action: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    if _normalize_text(action.get("category")) != "add":
+        return None
+
+    raw_target = action.get("execute_target")
+    if isinstance(raw_target, dict):
+        kind = _normalize_text(raw_target.get("kind"))
+        target_entity_id = str(
+            raw_target.get("target_entity_id")
+            or raw_target.get("entity_id")
+            or ""
+        ).strip()
+        target_value = str(raw_target.get("target_value") or "").strip()
+        current_value = str(
+            raw_target.get("current_value")
+            or raw_target.get("old_text")
+            or ""
+        ).strip()
+        entity_type_hint = str(
+            raw_target.get("entity_type_hint")
+            or raw_target.get("entity_type")
+            or ""
+        ).strip()
+        if kind == "text_replacement" and target_entity_id and target_value:
+            return {
+                "kind": "text_replacement",
+                "target_entity_id": target_entity_id,
+                "target_value": target_value,
+                "current_value": current_value or None,
+                "entity_type_hint": entity_type_hint or None,
+            }
+
+    replacement = action.get("replacement") if isinstance(action.get("replacement"), dict) else {}
+    if _normalize_text(replacement.get("status")) != _REPLACEMENT_STATUS_RESOLVED:
+        return None
+
+    target_entity_id = str(replacement.get("target_entity_id") or "").strip()
+    target_value = str(replacement.get("new_text") or "").strip()
+    current_value = str(replacement.get("old_text") or "").strip()
+    if not target_entity_id or not target_value:
+        return None
+
+    return {
+        "kind": "text_replacement",
+        "target_entity_id": target_entity_id,
+        "target_value": target_value,
+        "current_value": current_value or None,
+        "entity_type_hint": "text",
+    }
+
+
 def _prepare_autodraft_execute_actions(
     actions: List[Dict[str, Any]],
     *,
@@ -675,7 +728,8 @@ def _prepare_autodraft_execute_actions(
     prepared_actions: List[Dict[str, Any]] = []
     for action in actions:
         next_action = dict(action)
-        if _normalize_text(next_action.get("category")) == "title_block":
+        category = _normalize_text(next_action.get("category"))
+        if category == "title_block":
             execute_target = _build_title_block_execute_target(
                 next_action,
                 revision_context=revision_context,
@@ -683,6 +737,16 @@ def _prepare_autodraft_execute_actions(
             if execute_target:
                 next_action["execute_target"] = execute_target
             else:
+                next_action.pop("execute_target", None)
+        elif category == "add":
+            execute_target = _build_text_replacement_execute_target(next_action)
+            if execute_target:
+                next_action["execute_target"] = execute_target
+            elif (
+                isinstance(next_action.get("execute_target"), dict)
+                and _normalize_text(next_action["execute_target"].get("kind"))
+                == "text_replacement"
+            ):
                 next_action.pop("execute_target", None)
         prepared_actions.append(next_action)
     return prepared_actions

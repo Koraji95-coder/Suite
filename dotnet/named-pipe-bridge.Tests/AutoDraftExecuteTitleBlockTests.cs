@@ -165,6 +165,7 @@ public sealed class AutoDraftExecuteTitleBlockTests
                             ["handle"] = "BEEF",
                         },
                     },
+                    Array.Empty<JsonObject>(),
                 }
             )
         );

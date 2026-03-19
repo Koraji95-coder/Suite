@@ -113,9 +113,9 @@ export default function LandingPage() {
 							<Badge
 								color="default"
 								variant="outline"
-								className={styles.heroBadge}
+								className={`${styles.sectionBadge} ${styles.heroBadge}`}
 							>
-								<span className={styles.heroBadgeDot} />
+								<span className={styles.sectionBadgeDot} />
 								Engineering ops
 							</Badge>
 
@@ -222,9 +222,13 @@ export default function LandingPage() {
 				<section className={styles.agentsSection}>
 					<Panel variant="default" padding="lg" className={styles.agentsPanel}>
 						<div className={styles.agentsHeader}>
-							<Badge color="accent" variant="soft" className={styles.agentsBadge}>
-								<span className={styles.agentsBadgeDot} />
-								Profile-driven agents
+							<Badge
+								color="default"
+								variant="outline"
+								className={`${styles.sectionBadge} ${styles.agentsBadge}`}
+							>
+								<span className={styles.sectionBadgeDot} />
+								Agents
 							</Badge>
 
 							<Text as="h2" size="xl" weight="semibold" block>

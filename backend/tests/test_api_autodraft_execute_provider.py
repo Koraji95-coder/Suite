@@ -49,6 +49,35 @@ def _build_title_block_action(*, text: str = "Revision") -> dict[str, object]:
     }
 
 
+def _build_replacement_add_action(
+    *,
+    status: str = "resolved",
+    target_entity_id: str = "1A2B",
+) -> dict[str, object]:
+    return {
+        "id": "action-replace-1",
+        "rule_id": "add-red-cloud",
+        "category": "ADD",
+        "action": "Replace existing CAD text with reviewed markup text.",
+        "confidence": 0.9,
+        "status": "proposed",
+        "markup": {
+            "type": "text",
+            "color": "red",
+            "text": "NEW PANEL NAME",
+            "bounds": {"x": 80, "y": 24, "width": 30, "height": 10},
+        },
+        "replacement": {
+            "status": status,
+            "new_text": "NEW PANEL NAME",
+            "old_text": "OLD PANEL NAME",
+            "target_entity_id": target_entity_id,
+            "confidence": 0.91,
+            "candidates": [],
+        },
+    }
+
+
 class TestApiAutoDraftExecuteProvider(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -412,6 +441,105 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
                 "requestId": "req-title-target-2",
                 "actions": [_build_title_block_action(text="Revision")],
                 "dry_run": True,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_prepares_text_replacement_target_for_bridge(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            target = actions[0].get("execute_target") if isinstance(actions[0], dict) else None
+            self.assertEqual(
+                target,
+                {
+                    "kind": "text_replacement",
+                    "target_entity_id": "1A2B",
+                    "target_value": "NEW PANEL NAME",
+                    "current_value": "OLD PANEL NAME",
+                    "entity_type_hint": "text",
+                },
+            )
+            return {
+                "id": "bridge-job-replace-1",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview complete.",
+                    "data": {
+                        "jobId": "autodraft-replace-1",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview complete.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-replace-target-1"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-replace-target-1",
+                "actions": [_build_replacement_add_action()],
+                "dry_run": True,
+                "backcheck_override_reason": "test replacement preview",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_leaves_text_replacement_target_unset_when_replacement_not_resolved(
+        self,
+    ) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            first = actions[0]
+            self.assertIsInstance(first, dict)
+            assert isinstance(first, dict)
+            self.assertNotIn("execute_target", first)
+            return {
+                "id": "bridge-job-replace-2",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview review required.",
+                    "data": {
+                        "jobId": "autodraft-replace-2",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview review required.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-replace-target-2"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-replace-target-2",
+                "actions": [_build_replacement_add_action(status="ambiguous")],
+                "dry_run": True,
+                "backcheck_override_reason": "test replacement preview",
             },
         )
         self.assertEqual(response.status_code, 200)

@@ -68,7 +68,8 @@ static partial class ConduitRouteStubHandlers
                     paperSpaceCount: null
                 ),
                 createdHandles: [],
-                titleBlockUpdates: []
+                titleBlockUpdates: [],
+                textReplacementUpdates: []
             );
         }
 
@@ -103,7 +104,8 @@ static partial class ConduitRouteStubHandlers
                     paperSpaceCount: null
                 ),
                 createdHandles: [],
-                titleBlockUpdates: []
+                titleBlockUpdates: [],
+                textReplacementUpdates: []
             );
         }
 
@@ -147,7 +149,8 @@ static partial class ConduitRouteStubHandlers
                     warnings: warnings,
                     cadNode: cadNode,
                     createdHandles: [],
-                    titleBlockUpdates: []
+                    titleBlockUpdates: [],
+                    textReplacementUpdates: []
                 );
             }
 
@@ -167,7 +170,8 @@ static partial class ConduitRouteStubHandlers
                     warnings: warnings,
                     cadNode: cadNode,
                     createdHandles: [],
-                    titleBlockUpdates: []
+                    titleBlockUpdates: [],
+                    textReplacementUpdates: []
                 );
             }
 
@@ -189,13 +193,15 @@ static partial class ConduitRouteStubHandlers
                     warnings: warnings,
                     cadNode: cadNode,
                     createdHandles: [],
-                    titleBlockUpdates: []
+                    titleBlockUpdates: [],
+                    textReplacementUpdates: []
                 );
             }
 
             var committed = 0;
             var createdHandles = new List<string>();
             var titleBlockUpdates = new List<JsonObject>();
+            var textReplacementUpdates = new List<JsonObject>();
             foreach (var evaluation in evaluations)
             {
                 if (!evaluation.ReadyForPreview)
@@ -222,7 +228,8 @@ static partial class ConduitRouteStubHandlers
                         warnings: warnings,
                         out var createdHandle,
                         out var skipReason,
-                        out var titleBlockActionUpdates
+                        out var titleBlockActionUpdates,
+                        out var textReplacementActionUpdates
                     ))
                 {
                     committed += 1;
@@ -233,6 +240,10 @@ static partial class ConduitRouteStubHandlers
                     if (titleBlockActionUpdates.Count > 0)
                     {
                         titleBlockUpdates.AddRange(titleBlockActionUpdates);
+                    }
+                    if (textReplacementActionUpdates.Count > 0)
+                    {
+                        textReplacementUpdates.AddRange(textReplacementActionUpdates);
                     }
                 }
                 else if (!string.IsNullOrWhiteSpace(skipReason))
@@ -264,7 +275,8 @@ static partial class ConduitRouteStubHandlers
                 warnings: warnings,
                 cadNode: cadNode,
                 createdHandles: createdHandles,
-                titleBlockUpdates: titleBlockUpdates
+                titleBlockUpdates: titleBlockUpdates,
+                textReplacementUpdates: textReplacementUpdates
             );
         }
     }
@@ -418,6 +430,18 @@ static partial class ConduitRouteStubHandlers
             commitEnabled = true;
             commitBlockReason = "";
         }
+        else if (string.Equals(category, "add", StringComparison.OrdinalIgnoreCase))
+        {
+            if (TryResolveAutoDraftTextReplacementExecuteTarget(actionObject, out _, out var targetReason))
+            {
+                commitEnabled = true;
+                commitBlockReason = "";
+            }
+            else
+            {
+                commitBlockReason = targetReason;
+            }
+        }
 
         return new AutoDraftActionEvaluation(
             ActionObject: actionObject,
@@ -437,12 +461,14 @@ static partial class ConduitRouteStubHandlers
         List<string> warnings,
         out string createdHandle,
         out string skipReason,
-        out IReadOnlyList<JsonObject> titleBlockUpdates
+        out IReadOnlyList<JsonObject> titleBlockUpdates,
+        out IReadOnlyList<JsonObject> textReplacementUpdates
     )
     {
         createdHandle = "";
         skipReason = "";
         titleBlockUpdates = Array.Empty<JsonObject>();
+        textReplacementUpdates = Array.Empty<JsonObject>();
 
         if (string.Equals(evaluation.Category, "note", StringComparison.OrdinalIgnoreCase))
         {
@@ -513,6 +539,19 @@ static partial class ConduitRouteStubHandlers
                 out createdHandle,
                 out skipReason,
                 out titleBlockUpdates
+            );
+        }
+
+        if (string.Equals(evaluation.Category, "add", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryCommitAutoDraftTextReplacementAction(
+                session: session,
+                actionObject: actionObject,
+                evaluation: evaluation,
+                warnings: warnings,
+                out createdHandle,
+                out skipReason,
+                out textReplacementUpdates
             );
         }
 
@@ -708,6 +747,55 @@ static partial class ConduitRouteStubHandlers
         return true;
     }
 
+    private static bool TryCommitAutoDraftTextReplacementAction(
+        AutoCadSession session,
+        JsonObject actionObject,
+        AutoDraftActionEvaluation evaluation,
+        List<string> warnings,
+        out string createdHandle,
+        out string skipReason,
+        out IReadOnlyList<JsonObject> textReplacementUpdates
+    )
+    {
+        createdHandle = "";
+        skipReason = "";
+        textReplacementUpdates = Array.Empty<JsonObject>();
+
+        if (!TryResolveAutoDraftTextReplacementExecuteTarget(actionObject, out var target, out var targetReason))
+        {
+            skipReason = targetReason;
+            return false;
+        }
+
+        var outcome = CommitAutoDraftTextReplacementExecuteTarget(session.Document, target, warnings);
+        if (!outcome.Succeeded)
+        {
+            skipReason = outcome.SkipReason;
+            return false;
+        }
+
+        var updateNodes = new List<JsonObject>();
+        foreach (var updateNode in AutoDraftTextReplacementUpdatesToJsonArray(outcome.Updates))
+        {
+            if (updateNode is JsonObject updateObject)
+            {
+                updateNodes.Add(updateObject);
+            }
+        }
+        textReplacementUpdates = updateNodes;
+        createdHandle = outcome.Handle;
+
+        if (!outcome.WroteChanges)
+        {
+            skipReason = string.IsNullOrWhiteSpace(outcome.SkipReason)
+                ? $"text replacement produced no writes for {evaluation.ActionId}"
+                : outcome.SkipReason;
+            return false;
+        }
+
+        return true;
+    }
+
     private static void AppendAutoDraftPreviewWarnings(
         IEnumerable<AutoDraftActionEvaluation> evaluations,
         List<string> warnings
@@ -771,7 +859,8 @@ static partial class ConduitRouteStubHandlers
         IReadOnlyCollection<string> warnings,
         JsonObject cadNode,
         IReadOnlyCollection<string> createdHandles,
-        IReadOnlyCollection<JsonObject> titleBlockUpdates
+        IReadOnlyCollection<JsonObject> titleBlockUpdates,
+        IReadOnlyCollection<JsonObject> textReplacementUpdates
     )
     {
         var jobId = $"autodraft-{Guid.NewGuid():N}";
@@ -780,9 +869,15 @@ static partial class ConduitRouteStubHandlers
         {
             titleBlockUpdateNode.Add(update.DeepClone());
         }
+        var textReplacementUpdateNode = new JsonArray();
+        foreach (var update in textReplacementUpdates)
+        {
+            textReplacementUpdateNode.Add(update.DeepClone());
+        }
 
         var updatedHandles = new JsonArray();
         foreach (var handle in titleBlockUpdates
+            .Concat(textReplacementUpdates)
             .Select(update => update["handle"]?.GetValue<string>() ?? "")
             .Where(handle => !string.IsNullOrWhiteSpace(handle))
             .Distinct(StringComparer.OrdinalIgnoreCase))
@@ -797,8 +892,10 @@ static partial class ConduitRouteStubHandlers
             ["createdHandles"] = ToJsonArray(createdHandles),
             ["updatedHandles"] = updatedHandles,
             ["updatedAttributes"] = titleBlockUpdates.Count,
+            ["updatedTextEntities"] = textReplacementUpdates.Count,
             ["notesLayer"] = AutoDraftNotesLayerName,
             ["titleBlockUpdates"] = titleBlockUpdateNode,
+            ["textReplacementUpdates"] = textReplacementUpdateNode,
         };
 
         var dataNode = new JsonObject

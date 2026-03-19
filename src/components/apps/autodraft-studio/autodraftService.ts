@@ -119,6 +119,8 @@ export type AutoDraftExecutionReceipt = {
 	workflowContext?: Record<string, unknown>;
 	revisionContext?: Record<string, unknown>;
 	createdHandles?: string[];
+	titleBlockUpdates?: Record<string, unknown>[];
+	textReplacementUpdates?: Record<string, unknown>[];
 };
 
 export type AutoDraftExecuteMeta = {
@@ -855,6 +857,16 @@ const normalizeExecutePayload = (
 						? executionReceiptPayload.createdHandles.filter(
 								(item): item is string => typeof item === "string",
 							)
+						: undefined,
+					titleBlockUpdates: Array.isArray(
+						executionReceiptPayload.titleBlockUpdates,
+					)
+						? executionReceiptPayload.titleBlockUpdates.filter(isRecord)
+						: undefined,
+					textReplacementUpdates: Array.isArray(
+						executionReceiptPayload.textReplacementUpdates,
+					)
+						? executionReceiptPayload.textReplacementUpdates.filter(isRecord)
 						: undefined,
 				}
 			: undefined;

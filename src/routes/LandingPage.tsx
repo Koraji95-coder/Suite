@@ -160,59 +160,60 @@ export default function LandingPage() {
 										stack.
 									</Text>
 								</div>
+								<div className={styles.heroRailFlow}>
+									<div className={styles.heroSupportList}>
+										{COMMAND_SIGNALS.map((signal) => (
+											<div key={signal.label} className={styles.heroSupportItem}>
+												<signal.icon className={styles.heroSupportIcon} />
+												<div className={styles.heroSupportContent}>
+													<Text
+														size="xs"
+														weight="semibold"
+														className={styles.heroSupportLabel}
+														block
+													>
+														{signal.label}
+													</Text>
+													<Text
+														size="xs"
+														color="muted"
+														className={styles.heroSupportValue}
+														block
+													>
+														{signal.value}
+													</Text>
+												</div>
+											</div>
+										))}
+									</div>
 
-								<div className={styles.heroSupportList}>
-									{COMMAND_SIGNALS.map((signal) => (
-										<div key={signal.label} className={styles.heroSupportItem}>
-											<signal.icon className={styles.heroSupportIcon} />
-											<div className={styles.heroSupportContent}>
-												<Text
-													size="xs"
-													weight="semibold"
-													className={styles.heroSupportLabel}
-													block
-												>
-													{signal.label}
-												</Text>
-												<Text
-													size="xs"
-													color="muted"
-													className={styles.heroSupportValue}
-													block
-												>
-													{signal.value}
-												</Text>
+									<div className={styles.heroSummaryGrid}>
+										{HERO_SUMMARY_ITEMS.map((item) => (
+											<div key={item.label} className={styles.heroSummaryCard}>
+												<div className={styles.heroSummaryIconShell}>
+													<item.icon className={styles.heroSummaryIcon} />
+												</div>
+												<div>
+													<Text
+														size="sm"
+														weight="semibold"
+														className={styles.heroSummaryLabel}
+														block
+													>
+														{item.label}
+													</Text>
+													<Text
+														size="xs"
+														color="muted"
+														className={styles.heroSummaryValue}
+														block
+													>
+														{item.value}
+													</Text>
+												</div>
 											</div>
-										</div>
-									))}
-								</div>
-
-								<div className={styles.heroSummaryGrid}>
-									{HERO_SUMMARY_ITEMS.map((item) => (
-										<div key={item.label} className={styles.heroSummaryCard}>
-											<div className={styles.heroSummaryIconShell}>
-												<item.icon className={styles.heroSummaryIcon} />
-											</div>
-											<div>
-												<Text
-													size="sm"
-													weight="semibold"
-													className={styles.heroSummaryLabel}
-													block
-												>
-													{item.label}
-												</Text>
-												<Text
-													size="xs"
-													color="muted"
-													className={styles.heroSummaryValue}
-													block
-												>
-													{item.value}
-												</Text>
-											</div>
-										</div>
-									))}
+										))}
+									</div>
 								</div>
 							</Panel>
 						</div>

@@ -606,26 +606,71 @@
 	appearance: none;
 }
 
-.commitPreviewGrid {
+.commitReviewPanel {
 	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-2);
+	padding: 0.85rem;
+	border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+	border-radius: var(--radius-2);
+	background:
+		radial-gradient(
+			120% 160% at 100% -20%,
+			color-mix(in srgb, var(--accent) 10%, transparent) 0%,
+			transparent 56%
+		),
+		color-mix(in srgb, var(--surface) 82%, transparent);
+}
+
+.commitReviewHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
 	gap: var(--space-2);
 }
 
-.commitPreviewCard {
-	display: grid;
-	gap: 0.3rem;
-	padding: 0.7rem 0.8rem;
-	border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
-	border-radius: var(--radius-2);
-	background: color-mix(in srgb, var(--surface) 86%, transparent);
-}
-
-.commitPreviewHeader {
+.commitReviewBadges {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-1);
+	gap: 0.35rem;
+	flex-wrap: wrap;
+}
+
+.commitReviewList {
+	display: grid;
+	gap: 0.55rem;
+	max-height: 14.5rem;
+	padding-right: var(--space-1);
+	overflow-y: auto;
+}
+
+.commitReviewItem {
+	display: grid;
+	gap: 0.32rem;
+	padding: 0.72rem 0.78rem;
+	border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--surface-2) 74%, transparent);
+}
+
+.commitReviewItemHeader {
+	display: grid;
+	gap: 0.22rem;
+}
+
+.commitReviewConfirm {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.6rem;
+	padding: 0.72rem 0.78rem;
+	border-radius: var(--radius-2);
+	border: 1px dashed color-mix(in srgb, var(--accent) 24%, var(--border));
+	background: color-mix(in srgb, var(--surface) 76%, transparent);
+	font-size: 0.8rem;
+	color: var(--text-muted);
+}
+
+.commitReviewConfirm input {
+	margin-top: 0.12rem;
 }
 
 .executionContextSummary {
@@ -799,8 +844,8 @@
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
-	.commitPreviewGrid {
-		grid-template-columns: 1fr;
+	.commitReviewHeader {
+		flex-direction: column;
 	}
 
 	.executeMetaGrid {

@@ -75,13 +75,23 @@
 	transform: none;
 	filter: none;
 	box-shadow: none;
+	line-height: 1;
+	text-decoration: none;
 }
 
-.brandLink:hover {
+.brandLink:hover,
+.brandLink:active,
+.brandLink:visited {
 	color: var(--text);
 	transform: none;
 	filter: none;
 	box-shadow: none;
+	text-decoration: none;
+}
+
+.brandLink:focus-visible {
+	outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+	outline-offset: 2px;
 }
 
 .navActionLink {
@@ -101,15 +111,26 @@
 	transform: none;
 	filter: none;
 	box-shadow: none;
+	text-decoration: none;
+	line-height: 1;
+	min-height: 2.05rem;
 }
 
-.navActionLink:hover {
+.navActionLink:hover,
+.navActionLink:active,
+.navActionLink:visited {
 	color: var(--text);
 	border-color: color-mix(in srgb, var(--line-soft) 86%, transparent);
 	background: color-mix(in srgb, var(--surface) 82%, transparent);
 	transform: none;
 	filter: none;
 	box-shadow: none;
+	text-decoration: none;
+}
+
+.navActionLink:focus-visible {
+	outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+	outline-offset: 2px;
 }
 
 .brandLabel {
@@ -197,36 +218,36 @@
 .heroGrid {
 	position: relative;
 	display: grid;
-	gap: 1.75rem;
-	align-items: center;
-	padding: 3.5rem 1.4rem;
+	gap: 1.4rem;
+	align-items: start;
+	padding: 2.75rem 1.4rem;
 }
 
 .heroLeft {
 	display: grid;
 	align-content: start;
-	gap: 0;
+	gap: 0.25rem;
 	justify-self: center;
-	width: min(100%, 38rem);
+	width: min(100%, 37rem);
 }
 
 .sectionBadge {
 	justify-self: start;
 	width: fit-content;
-	padding-inline: 0.4rem;
-	padding-block: 0.12rem;
-	font-size: 0.56rem;
+	padding-inline: 0.42rem;
+	padding-block: 0.14rem;
+	font-size: 0.54rem;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 	line-height: 1;
 }
 
 .heroBadge {
-	margin-bottom: 0.7rem;
+	margin-bottom: 0.58rem;
 }
 
 .agentsBadge {
-	margin-bottom: 0.72rem;
+	margin-bottom: 0.58rem;
 }
 
 .sectionBadgeDot {
@@ -238,7 +259,7 @@
 }
 
 .heroTitle {
-	max-width: 15ch;
+	max-width: 16ch;
 	font-size: clamp(1.95rem, 3.9vw, 3.15rem);
 	font-weight: 700;
 	line-height: 1.06;
@@ -263,12 +284,12 @@
 	display: grid;
 	align-content: stretch;
 	justify-self: center;
-	width: min(100%, 34rem);
+	width: min(100%, 35rem);
 }
 
 .heroSummaryPanel {
 	height: 100%;
-	max-width: 31rem;
+	max-width: 34rem;
 	border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--line-soft));
 	background:
 		linear-gradient(
@@ -280,7 +301,7 @@
 	box-shadow: 0 16px 28px rgb(0 0 0 / 18%);
 	display: grid;
 	align-content: start;
-	gap: 0.85rem;
+	gap: 0.72rem;
 	margin-inline: auto;
 }
 
@@ -295,25 +316,31 @@
 	color: color-mix(in srgb, var(--accent) 72%, var(--text-muted));
 }
 
+.heroRailFlow {
+	display: grid;
+	gap: 0.68rem;
+	border-top: 1px solid color-mix(in srgb, var(--line-soft) 70%, transparent);
+	padding-top: 0.68rem;
+}
+
 .heroSummaryGrid {
-	margin-top: 1rem;
+	margin-top: 0.12rem;
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 0.62rem;
+	gap: 0.56rem;
 }
 
 .heroSupportList {
 	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 0.52rem;
+	grid-template-columns: 1fr;
+	gap: 0.42rem;
 }
 
 .heroSupportItem {
-	display: grid;
-	gap: 0.4rem;
-	align-items: start;
-	justify-items: start;
-	padding: 0.7rem 0.72rem;
+	display: flex;
+	gap: 0.52rem;
+	align-items: flex-start;
+	padding: 0.58rem 0.64rem;
 	border-radius: var(--radius-2);
 	border: 1px solid color-mix(in srgb, var(--line-soft) 84%, transparent);
 	background: color-mix(in srgb, var(--surface) 84%, transparent);
@@ -334,7 +361,7 @@
 }
 
 .heroSupportValue {
-	line-height: 1.45;
+	line-height: 1.4;
 }
 
 .heroSummaryCard {
@@ -461,6 +488,8 @@
 }
 
 .footerLink {
+	display: inline-flex;
+	align-items: center;
 	font-size: 0.75rem;
 	color: var(--text-muted);
 	text-decoration: none;
@@ -468,13 +497,23 @@
 	transform: none;
 	filter: none;
 	box-shadow: none;
+	line-height: 1;
+	min-height: 1.2rem;
 }
 
-.footerLink:hover {
+.footerLink:hover,
+.footerLink:active,
+.footerLink:visited {
 	color: var(--text-muted);
 	transform: none;
 	filter: none;
 	box-shadow: none;
+	text-decoration: none;
+}
+
+.footerLink:focus-visible {
+	outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+	outline-offset: 2px;
 }
 
 @media (min-width: 48rem) {
@@ -488,7 +527,8 @@
 
 	.heroGrid {
 		grid-template-columns: repeat(12, minmax(0, 1fr));
-		padding: 4rem 2.8rem;
+		padding: 3.3rem 2.55rem;
+		gap: 1.45rem;
 	}
 
 	.heroLeft {
@@ -497,10 +537,6 @@
 
 	.heroRight {
 		grid-column: span 6 / span 6;
-	}
-
-	.heroSupportList {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 
 	.agentGrid {

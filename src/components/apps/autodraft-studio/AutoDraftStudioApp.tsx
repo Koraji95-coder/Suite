@@ -6,7 +6,7 @@ import {
 	Sparkles,
 	TriangleAlert,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
@@ -41,6 +41,9 @@ import {
 	type Segment,
 } from "./engine/pdfToCadGeometry";
 import { AutoDraftComparePanel } from "./AutoDraftComparePanel";
+import {
+	buildAutoDraftCommitReview,
+} from "./autodraftCommitReview";
 import {
 	buildAutoDraftExecutionIssueSummary,
 	buildAutoDraftRevisionTraceNotes,
@@ -132,12 +135,6 @@ type ProjectFileContextOption = Pick<
 	Database["public"]["Tables"]["files"]["Row"],
 	"id" | "name" | "file_path" | "project_id"
 >;
-type CommitPreviewLane = {
-	id: string;
-	label: string;
-	count: number;
-	description: string;
-};
 
 function deriveRevisionMetadataFromFileName(fileName: string) {
 	const baseName = fileName.replace(/\.[^/.]+$/, "");
@@ -241,6 +238,8 @@ export function AutoDraftStudioApp() {
 		[],
 	);
 	const [crewReviewError, setCrewReviewError] = useState<string | null>(null);
+	const [commitReviewAcknowledged, setCommitReviewAcknowledged] =
+		useState(false);
 	const [loadingPlan, setLoadingPlan] = useState(false);
 	const [loadingExecute, setLoadingExecute] = useState(false);
 	const [loadingBackcheck, setLoadingBackcheck] = useState(false);
@@ -263,38 +262,18 @@ export function AutoDraftStudioApp() {
 			null,
 		[projectFiles, revisionContext.fileId],
 	);
-	const commitPreviewLanes = useMemo<CommitPreviewLane[]>(() => {
-		if (!planResult?.actions?.length) return [];
-		const noteCount = planResult.actions.filter(
-			(action) => action.category === "NOTE",
-		).length;
-		const titleBlockCount = planResult.actions.filter(
-			(action) => action.category === "TITLE_BLOCK",
-		).length;
-		const replacementCount = planResult.actions.filter(
-			(action) => action.replacement?.status === "resolved",
-		).length;
-		return [
-			{
-				id: "note",
-				label: "Notes",
-				count: noteCount,
-				description: "Callouts and note entities with resolved CAD targets.",
-			},
-			{
-				id: "title-block",
-				label: "Title blocks",
-				count: titleBlockCount,
-				description: "Structured attribute updates on recognized title block fields.",
-			},
-			{
-				id: "replacement",
-				label: "Text updates",
-				count: replacementCount,
-				description: "Resolved text replacements on known entity targets.",
-			},
-		].filter((lane) => lane.count > 0);
-	}, [planResult]);
+	const commitReview = useMemo(
+		() => buildAutoDraftCommitReview(planResult?.actions ?? [], revisionContext),
+		[planResult?.actions, revisionContext],
+	);
+	const commitReviewResetKey = useMemo(
+		() =>
+			commitReview.items
+				.map((item) => `${item.id}:${item.status}:${item.target}:${item.reason}`)
+				.join("|"),
+		[commitReview.items],
+	);
+	const lastCommitReviewResetKeyRef = useRef(commitReviewResetKey);
 
 	const translatedGeometryStats = useMemo(() => {
 		const arcResult = detectArcsFromSegments(DEMO_SEGMENTS, {
@@ -406,6 +385,13 @@ export function AutoDraftStudioApp() {
 			cancelled = true;
 		};
 	}, [selectedProjectId]);
+
+	useEffect(() => {
+		if (lastCommitReviewResetKeyRef.current !== commitReviewResetKey) {
+			lastCommitReviewResetKeyRef.current = commitReviewResetKey;
+			setCommitReviewAcknowledged(false);
+		}
+	}, [commitReviewResetKey]);
 
 	const buildWorkflowContext = (): AutoDraftExecuteWorkflowContext | undefined => {
 		const next: AutoDraftExecuteWorkflowContext = {
@@ -535,6 +521,20 @@ export function AutoDraftStudioApp() {
 					"Backcheck contains failing actions. Enter an override reason to run execute.",
 				);
 				return;
+			}
+			if (mode === "commit") {
+				if (commitReview.readyCount <= 0) {
+					setExecuteError(
+						"No commit-ready targets are currently resolved. Review the plan or add missing revision context first.",
+					);
+					return;
+				}
+				if (!commitReviewAcknowledged) {
+					setExecuteError(
+						"Review and confirm the commit targets before writing to CAD.",
+					);
+					return;
+				}
 			}
 			const workflowPayload = buildWorkflowContext();
 			const revisionPayload = buildRevisionContext();
@@ -1112,23 +1112,94 @@ export function AutoDraftStudioApp() {
 							Preview {"->"} Commit
 						</Badge>
 					</div>
-					{commitPreviewLanes.length > 0 ? (
-						<div className={styles.commitPreviewGrid}>
-							{commitPreviewLanes.map((lane) => (
-								<div key={lane.id} className={styles.commitPreviewCard}>
-									<div className={styles.commitPreviewHeader}>
-										<Text size="sm" weight="semibold">
-											{lane.label}
-										</Text>
-										<Badge color="accent" variant="soft">
-											{lane.count}
-										</Badge>
-									</div>
-									<Text size="xs" color="muted" block>
-										{lane.description}
+					{planResult ? (
+						<div className={styles.commitReviewPanel}>
+							<div className={styles.commitReviewHeader}>
+								<div>
+									<Text size="sm" weight="semibold">
+										Pre-commit review
+									</Text>
+									<Text size="xs" color="muted">
+										Commit is now gated by resolved targets and explicit review, not
+										just by running execute.
 									</Text>
 								</div>
-							))}
+								<div className={styles.commitReviewBadges}>
+									<Badge color="success" variant="soft">
+										{commitReview.readyCount} ready
+									</Badge>
+									<Badge color="warning" variant="soft">
+										{commitReview.needsContextCount} needs context
+									</Badge>
+									<Badge color="default" variant="soft">
+										{commitReview.reviewCount} review
+									</Badge>
+								</div>
+							</div>
+							<div className={styles.commitReviewList}>
+								{commitReview.items.map((item) => (
+									<div key={item.id} className={styles.commitReviewItem}>
+										<div className={styles.commitReviewItemHeader}>
+											<HStack gap={2} align="center" wrap>
+												<Badge color="default" variant="soft">
+													{item.familyLabel}
+												</Badge>
+												<Badge
+													color={
+														item.status === "ready"
+															? "success"
+															: item.status === "needs_context"
+																? "warning"
+																: "default"
+													}
+													variant="soft"
+												>
+													{item.status === "ready"
+														? "Ready"
+														: item.status === "needs_context"
+															? "Needs context"
+															: "Review"}
+												</Badge>
+											</HStack>
+											<Text size="sm" weight="semibold" block>
+												{item.title}
+											</Text>
+										</div>
+										<Text size="xs" color="muted" block>
+											{item.summary}
+										</Text>
+										{item.target ? (
+											<Text size="xs" color="primary" block>
+												{item.target}
+											</Text>
+										) : null}
+										{item.reason ? (
+											<Text
+												size="xs"
+												color={item.status === "review" ? "warning" : "muted"}
+												block
+											>
+												{item.reason}
+											</Text>
+										) : null}
+									</div>
+								))}
+							</div>
+							<label className={styles.commitReviewConfirm}>
+								<input
+									type="checkbox"
+									checked={commitReviewAcknowledged}
+									onChange={(event) =>
+										setCommitReviewAcknowledged(event.target.checked)
+									}
+									disabled={commitReview.readyCount <= 0}
+								/>
+								<span>
+									{commitReview.readyCount > 0
+										? `I reviewed ${commitReview.readyCount} commit-ready target(s) before writing to CAD.`
+										: "No commit-ready targets yet. Resolve review items or add the missing context first."}
+								</span>
+							</label>
 						</div>
 					) : null}
 					{selectedProject || selectedFile ? (

@@ -15,6 +15,7 @@ import {
 	migrateFromLocalStorage,
 	saveSetting,
 } from "@/settings/userSettings";
+import { syncSharedProjectWatchdogRulesToLocalRuntime } from "@/services/projectWatchdogService";
 import { triggerAutoBackup } from "@/supabase/backupManager";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
@@ -106,6 +107,23 @@ export function useProjectManagerState({
 	const [projectTaskCounts, setProjectTaskCounts] = useState<
 		Map<string, TaskCount>
 	>(new Map());
+
+	const normalizeWatchdogRootPath = useCallback((value: string): string | null => {
+		const trimmed = value.trim();
+		return trimmed ? trimmed : null;
+	}, []);
+
+	const syncWatchdogRulesAfterProjectMutation = useCallback(async () => {
+		try {
+			await syncSharedProjectWatchdogRulesToLocalRuntime();
+		} catch (error) {
+			logger.warn(
+				"Failed to sync shared watchdog project rules to the local runtime.",
+				"ProjectManager",
+				error,
+			);
+		}
+	}, []);
 
 	const getCurrentUserId = useCallback(async (): Promise<string | null> => {
 		const {
@@ -386,13 +404,20 @@ export function useProjectManagerState({
 			const userId = await getCurrentUserId();
 			if (!userId) return;
 
+			const watchdogRootPath = normalizeWatchdogRootPath(
+				projectForm.watchdogRootPath,
+			);
 			const payload: Database["public"]["Tables"]["projects"]["Insert"] = {
-				...projectForm,
+				name: projectForm.name,
+				description: projectForm.description,
 				deadline: toDateOnly(projectForm.deadline) || null,
+				priority: projectForm.priority,
+				status: projectForm.status,
 				category: projectForm.category || "Other",
 				color: projectForm.category
 					? categoryColor(projectForm.category)
 					: categoryColor(null),
+				watchdog_root_path: watchdogRootPath,
 				user_id: userId,
 			};
 
@@ -413,6 +438,7 @@ export function useProjectManagerState({
 				setSelectedProject(data[0]);
 				setShowProjectModal(false);
 				resetProjectForm();
+				await syncWatchdogRulesAfterProjectMutation();
 				showToast("success", `Project "${projectForm.name}" created`);
 				triggerAutoBackup();
 			}
@@ -428,8 +454,12 @@ export function useProjectManagerState({
 			const userId = await getCurrentUserId();
 			if (!userId) return;
 
+			const watchdogRootPath = normalizeWatchdogRootPath(
+				projectForm.watchdogRootPath,
+			);
 			const payload: Database["public"]["Tables"]["projects"]["Update"] = {
-				...projectForm,
+				name: projectForm.name,
+				description: projectForm.description,
 				deadline: toDateOnly(projectForm.deadline) || null,
 				category: projectForm.category || "Other",
 				color: projectForm.category
@@ -437,6 +467,7 @@ export function useProjectManagerState({
 					: categoryColor(null),
 				priority: projectForm.priority,
 				status: projectForm.status,
+				watchdog_root_path: watchdogRootPath,
 			};
 
 			const { error } = await supabase
@@ -464,6 +495,7 @@ export function useProjectManagerState({
 			setShowProjectModal(false);
 			setEditingProject(null);
 			resetProjectForm();
+			await syncWatchdogRulesAfterProjectMutation();
 			showToast("success", `Project updated`);
 			triggerAutoBackup();
 		} catch (err) {
@@ -498,6 +530,7 @@ export function useProjectManagerState({
 			if (selectedProject?.id === projectId) {
 				setSelectedProject(remaining.length > 0 ? remaining[0] : null);
 			}
+			await syncWatchdogRulesAfterProjectMutation();
 			showToast("success", "Project deleted");
 			triggerAutoBackup();
 		} catch (err) {
@@ -957,6 +990,25 @@ export function useProjectManagerState({
 		}
 	};
 
+	const updateProjectWatchdogRootPath = (
+		projectId: string,
+		rootPath: string | null,
+	) => {
+		const normalizedRootPath = normalizeWatchdogRootPath(rootPath ?? "");
+		setProjects((previous) =>
+			previous.map((project) =>
+				project.id === projectId
+					? { ...project, watchdog_root_path: normalizedRootPath }
+					: project,
+			),
+		);
+		setSelectedProject((previous) =>
+			previous?.id === projectId
+				? { ...previous, watchdog_root_path: normalizedRootPath }
+				: previous,
+		);
+	};
+
 	const {
 		totalProjects,
 		archivedProjects,
@@ -1027,6 +1079,7 @@ export function useProjectManagerState({
 		handleDragEnd,
 		handleFileUpload,
 		downloadFile,
+		updateProjectWatchdogRootPath,
 		resetProjectForm,
 		resetTaskForm,
 		openEditProject,

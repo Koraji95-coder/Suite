@@ -45,6 +45,7 @@ import {
 	subscribeAppDiagnostics,
 	type AppDiagnostic,
 } from "../lib/appDiagnostics";
+import { useWatchdogProjectSync } from "../hooks/useWatchdogProjectSync";
 import { isCommandCenterAuthorized } from "../lib/devAccess";
 import { runSuiteRuntimeDoctor, type SuiteRuntimeDoctorReport } from "../lib/runtimeDoctor";
 import { getAppRole } from "../lib/roles";
@@ -622,6 +623,7 @@ export default function AppShell() {
 }
 
 function ShellWorkspace() {
+	useWatchdogProjectSync();
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 	const [diagnostics, setDiagnostics] = useState<AppDiagnostic[]>([]);

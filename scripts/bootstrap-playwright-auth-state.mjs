@@ -2,9 +2,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { loadRepoEnv, readSetting } from "./lib/env-files.mjs";
 
 const repoRoot = process.cwd();
-const envFilePath = path.join(repoRoot, ".env");
 
 function parseArgs(argv) {
 	const options = {
@@ -62,34 +62,12 @@ function printHelp() {
 			"  --email-prefix <prefix> Prefix for temp user email local-part.",
 			"                          Default: codex.playwright",
 			"",
-			"Required env (.env or process env):",
+			"Required env (.env/.env.local or process env):",
 			"  SUPABASE_URL",
 			"  SUPABASE_SERVICE_ROLE_KEY",
 			"  SUPABASE_ANON_KEY (or VITE_SUPABASE_ANON_KEY)",
 		].join("\n"),
 	);
-}
-
-function parseDotEnv(filePath) {
-	if (!fs.existsSync(filePath)) return {};
-	const out = {};
-	const raw = fs.readFileSync(filePath, "utf8");
-	for (const lineRaw of raw.split(/\r?\n/)) {
-		const line = lineRaw.trim();
-		if (!line || line.startsWith("#")) continue;
-		const idx = line.indexOf("=");
-		if (idx <= 0) continue;
-		const key = line.slice(0, idx).trim();
-		const value = line.slice(idx + 1).trim();
-		out[key] = value;
-	}
-	return out;
-}
-
-function readSetting(dotEnv, key, fallback = "") {
-	const fromProcess = (process.env[key] || "").trim();
-	if (fromProcess) return fromProcess;
-	return (dotEnv[key] || fallback).trim();
 }
 
 function normalizeOrigins(values) {
@@ -143,7 +121,7 @@ function extractSession(payload) {
 
 async function bootstrap() {
 	const args = parseArgs(process.argv.slice(2));
-	const dotEnv = parseDotEnv(envFilePath);
+	const dotEnv = loadRepoEnv(repoRoot);
 	const origins = normalizeOrigins(args.origins);
 
 	const supabaseUrl = readSetting(dotEnv, "SUPABASE_URL");

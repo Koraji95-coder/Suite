@@ -127,6 +127,17 @@ function normalizeMemoryContent(
 	};
 }
 
+async function requireUserId(): Promise<string> {
+	const {
+		data: { user },
+		error,
+	} = await supabase.auth.getUser();
+
+	if (error) throw error;
+	if (!user) throw new Error("Not authenticated");
+	return user.id;
+}
+
 export async function loadMemories(
 	memoryType?: Memory["memory_type"],
 ): Promise<Memory[]> {
@@ -174,11 +185,13 @@ export async function saveMemory(
 	memory: Omit<Memory, "id" | "created_at">,
 ): Promise<Memory | null> {
 	try {
+		const userId = await requireUserId();
 		const payload: Database["public"]["Tables"]["ai_memory"]["Insert"] = {
 			memory_type: memory.memory_type,
 			content: ((memory.content_raw ?? memory.content) as unknown) as Json,
 			connections: memory.connections as unknown as Json,
 			strength: memory.strength,
+			user_id: userId,
 		};
 		const { data, error } = await supabase
 			.from("ai_memory")

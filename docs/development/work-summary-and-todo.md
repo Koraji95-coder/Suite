@@ -103,7 +103,7 @@ For the next session on `DUSTIN-HOME`:
 7. Bootstrap Worktale on each workstation where changelog publishing matters:
    - `npm install -g worktale`
    - `npm run worktale:bootstrap`
-   - `worktale hook status`
+   - `npm run worktale:doctor`
 8. Verify startup/doctor status before doing app work:
    - `npm run watchdog:startup:check`
    - `npm run watchdog:startup:autocad:check`

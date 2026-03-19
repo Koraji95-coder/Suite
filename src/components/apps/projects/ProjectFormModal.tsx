@@ -77,6 +77,25 @@ export function ProjectFormModal({
 							placeholder="Project description"
 						/>
 					</div>
+					<div>
+						<label className={styles.label} htmlFor="project-form-watchdog-root">
+							Project root folder
+						</label>
+						<input
+							id="project-form-watchdog-root"
+							name="project_form_watchdog_root"
+							type="text"
+							value={formData.watchdogRootPath}
+							onChange={(e) =>
+								setFormData({
+									...formData,
+									watchdogRootPath: e.target.value,
+								})
+							}
+							className={styles.input}
+							placeholder="G:\\Company\\Projects\\Alpha"
+						/>
+					</div>
 					<div className={styles.gridTwo}>
 						<div>
 							<label className={styles.label} htmlFor="project-form-deadline">

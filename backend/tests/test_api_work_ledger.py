@@ -163,6 +163,52 @@ class _SubprocessStub:
     def __init__(self, *, repo_root: Path) -> None:
         self.repo_root = repo_root
         self.fail_publish_note = False
+        self.post_commit_installed = False
+        self.post_push_installed = False
+
+    def mark_bootstrapped(self) -> None:
+        (self.repo_root / ".worktale").mkdir(parents=True, exist_ok=True)
+
+    def _ensure_hooks_dir(self) -> Path:
+        hooks_dir = self.repo_root / ".git" / "hooks"
+        hooks_dir.mkdir(parents=True, exist_ok=True)
+        return hooks_dir
+
+    def _install_post_commit_hook(self) -> None:
+        hooks_dir = self._ensure_hooks_dir()
+        (hooks_dir / "post-commit").write_text(
+            "#!/bin/sh\n# Worktale post-commit hook\nworktale capture --silent 2>/dev/null || true\n",
+            encoding="utf-8",
+        )
+        (hooks_dir / "post-commit.ps1").write_text(
+            "# Worktale post-commit hook (Windows)\n& worktale capture --silent\n",
+            encoding="utf-8",
+        )
+        self.post_commit_installed = True
+
+    def _install_post_push_hook(self) -> None:
+        hooks_dir = self._ensure_hooks_dir()
+        (hooks_dir / "post-push").write_text(
+            "#!/bin/sh\n# Worktale post-push reminder\necho \"  Tip: run 'worktale digest' to review today's work\" 2>/dev/null || true\n",
+            encoding="utf-8",
+        )
+        self.post_push_installed = True
+
+    def install_hooks(self) -> None:
+        self._install_post_commit_hook()
+        self._install_post_push_hook()
+
+    def install_post_commit_only(self) -> None:
+        self._install_post_commit_hook()
+
+    def uninstall_hooks(self) -> None:
+        hooks_dir = self.repo_root / ".git" / "hooks"
+        for name in ("post-commit", "post-commit.ps1", "post-push"):
+            hook_path = hooks_dir / name
+            if hook_path.exists():
+                hook_path.unlink()
+        self.post_commit_installed = False
+        self.post_push_installed = False
 
     def run(
         self,
@@ -187,9 +233,20 @@ class _SubprocessStub:
                 0,
                 stdout="src/services/agentService.ts\nsrc/components/apps/projects/ProjectDetailHeader.tsx\n",
             )
+        if command[:2] == ["worktale", "init"]:
+            self.mark_bootstrapped()
+            self._install_post_commit_hook()
+            return _CompletedProcessStub(0, stdout="Initialized Worktale")
         if command[:3] == ["worktale", "hook", "install"]:
-            (self.repo_root / ".worktale").mkdir(parents=True, exist_ok=True)
-            return _CompletedProcessStub(0, stdout="Hook installed")
+            # Match the current Worktale CLI bug: install exits early if post-commit exists,
+            # even when post-push is still missing.
+            if self.post_commit_installed:
+                return _CompletedProcessStub(0, stdout="Worktale hooks are already installed")
+            self.install_hooks()
+            return _CompletedProcessStub(0, stdout="Hooks installed")
+        if command[:3] == ["worktale", "hook", "uninstall"]:
+            self.uninstall_hooks()
+            return _CompletedProcessStub(0, stdout="Hooks removed")
         if command[:2] == ["worktale", "note"]:
             if self.fail_publish_note:
                 return _CompletedProcessStub(1, stderr="Worktale note failed")
@@ -317,18 +374,28 @@ class TestApiWorkLedger(unittest.TestCase):
         readiness_payload = readiness.get_json() or {}
         self.assertFalse(bool(readiness_payload.get("ready")))
         self.assertIn("issues", readiness_payload)
+        self.assertFalse(
+            bool(((readiness_payload.get("checks") or {}).get("postPushHookInstalled")))
+        )
 
         bootstrap = self.client.post("/api/work-ledger/publishers/worktale/bootstrap")
         self.assertEqual(bootstrap.status_code, 200)
         bootstrap_payload = bootstrap.get_json() or {}
         self.assertTrue(bool(bootstrap_payload.get("ok")))
+        self.assertTrue(
+            bool(((bootstrap_payload.get("checks") or {}).get("postCommitHookInstalled")))
+        )
+        self.assertTrue(
+            bool(((bootstrap_payload.get("checks") or {}).get("postPushHookInstalled")))
+        )
 
         readiness_after = self.client.get("/api/work-ledger/publishers/worktale/readiness")
         readiness_after_payload = readiness_after.get_json() or {}
         self.assertTrue(bool(readiness_after_payload.get("ready")))
 
     def test_publish_ready_entry_updates_state_and_receipts(self) -> None:
-        (self.repo_root / ".worktale").mkdir(parents=True, exist_ok=True)
+        self.subprocess_stub.mark_bootstrapped()
+        self.subprocess_stub.install_hooks()
         publish_response = self.client.post(
             "/api/work-ledger/entries/ledger-ready/publish/worktale",
             headers={"Authorization": "Bearer user-token"},
@@ -358,7 +425,8 @@ class TestApiWorkLedger(unittest.TestCase):
         self.assertEqual(int(jobs_payload.get("count") or 0), 1)
 
     def test_open_artifact_folder_for_publish_job(self) -> None:
-        (self.repo_root / ".worktale").mkdir(parents=True, exist_ok=True)
+        self.subprocess_stub.mark_bootstrapped()
+        self.subprocess_stub.install_hooks()
         publish_response = self.client.post(
             "/api/work-ledger/entries/ledger-ready/publish/worktale",
             headers={"Authorization": "Bearer user-token"},
@@ -380,7 +448,8 @@ class TestApiWorkLedger(unittest.TestCase):
         self.assertTrue(str(payload.get("artifactDir") or "").strip())
 
     def test_publish_failure_leaves_entry_ready(self) -> None:
-        (self.repo_root / ".worktale").mkdir(parents=True, exist_ok=True)
+        self.subprocess_stub.mark_bootstrapped()
+        self.subprocess_stub.install_hooks()
         self.subprocess_stub.fail_publish_note = True
         publish_response = self.client.post(
             "/api/work-ledger/entries/ledger-ready/publish/worktale",
@@ -396,7 +465,8 @@ class TestApiWorkLedger(unittest.TestCase):
         self.assertEqual(job_rows[-1]["status"], "failed")
 
     def test_publish_rejects_non_ready_entries(self) -> None:
-        (self.repo_root / ".worktale").mkdir(parents=True, exist_ok=True)
+        self.subprocess_stub.mark_bootstrapped()
+        self.subprocess_stub.install_hooks()
         publish_response = self.client.post(
             "/api/work-ledger/entries/ledger-draft/publish/worktale",
             headers={"Authorization": "Bearer user-token"},
@@ -404,6 +474,31 @@ class TestApiWorkLedger(unittest.TestCase):
         self.assertEqual(publish_response.status_code, 400)
         payload = publish_response.get_json() or {}
         self.assertEqual(payload.get("code"), "WORK_LEDGER_ENTRY_INVALID_STATE")
+
+    def test_bootstrap_repairs_partial_hook_install(self) -> None:
+        self.subprocess_stub.mark_bootstrapped()
+        self.subprocess_stub.install_post_commit_only()
+
+        readiness = self.client.get("/api/work-ledger/publishers/worktale/readiness")
+        readiness_payload = readiness.get_json() or {}
+        self.assertFalse(bool(readiness_payload.get("ready")))
+        self.assertTrue(
+            bool(((readiness_payload.get("checks") or {}).get("postCommitHookInstalled")))
+        )
+        self.assertFalse(
+            bool(((readiness_payload.get("checks") or {}).get("postPushHookInstalled")))
+        )
+
+        bootstrap = self.client.post("/api/work-ledger/publishers/worktale/bootstrap")
+        self.assertEqual(bootstrap.status_code, 200)
+        bootstrap_payload = bootstrap.get_json() or {}
+        self.assertTrue(bool(bootstrap_payload.get("ready")))
+        self.assertTrue(
+            bool(((bootstrap_payload.get("checks") or {}).get("postCommitHookInstalled")))
+        )
+        self.assertTrue(
+            bool(((bootstrap_payload.get("checks") or {}).get("postPushHookInstalled")))
+        )
 
     def test_draft_suggestions_merge_git_agent_and_watchdog_sources(self) -> None:
         response = self.client.get(

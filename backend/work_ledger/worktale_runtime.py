@@ -33,6 +33,51 @@ class WorktaleRuntime:
         self.os_module = os_module
         self.socket_module = socket_module
 
+    def _read_text(self, path: Path) -> str:
+        try:
+            return path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return ""
+
+    def _resolve_hook_paths(self) -> Dict[str, Path]:
+        hooks_root = self.repo_root / ".git" / "hooks"
+        return {
+            "postCommit": hooks_root / "post-commit",
+            "postCommitPs1": hooks_root / "post-commit.ps1",
+            "postPush": hooks_root / "post-push",
+        }
+
+    def _is_post_commit_hook_installed(self) -> bool:
+        hook_paths = self._resolve_hook_paths()
+        post_commit = self._read_text(hook_paths["postCommit"]).lower()
+        post_commit_ps1 = self._read_text(hook_paths["postCommitPs1"]).lower()
+        return (
+            "worktale post-commit hook" in post_commit
+            or "worktale capture" in post_commit
+            or "worktale post-commit hook" in post_commit_ps1
+            or "worktale capture" in post_commit_ps1
+        )
+
+    def _is_post_push_hook_installed(self) -> bool:
+        post_push = self._read_text(self._resolve_hook_paths()["postPush"]).lower()
+        return (
+            "worktale post-push reminder" in post_push
+            or "worktale digest" in post_push
+        )
+
+    def _run_checked_command(
+        self,
+        command: list[str],
+        *,
+        cwd: Path | None = None,
+    ) -> Dict[str, Any]:
+        result = self._run_command(command, cwd=cwd)
+        if not result["ok"]:
+            raise RuntimeError(
+                _excerpt(result["stderr"] or result["stdout"] or "Worktale command failed.")
+            )
+        return result
+
     def resolve_workstation_id(self) -> str:
         configured = str(self.os_module.environ.get("SUITE_WORKSTATION_ID") or "").strip()
         if configured:
@@ -77,6 +122,8 @@ class WorktaleRuntime:
         repo_exists = self.repo_root.exists() and self.repo_root.is_dir()
         git_exists = (self.repo_root / ".git").exists()
         bootstrapped = (self.repo_root / ".worktale").exists()
+        post_commit_hook_installed = self._is_post_commit_hook_installed()
+        post_push_hook_installed = self._is_post_push_hook_installed()
 
         git_email = ""
         git_email_configured = False
@@ -102,7 +149,19 @@ class WorktaleRuntime:
             recommended_actions.append("Run `git config user.email \"you@example.com\"`.")
         if not bootstrapped:
             issues.append("Worktale is not bootstrapped for this repository yet.")
-            recommended_actions.append("Run bootstrap to install Worktale hook metadata.")
+            recommended_actions.append(
+                "Run `npm run worktale:bootstrap` to initialize the repository and install hooks."
+            )
+        if not post_commit_hook_installed:
+            issues.append("Worktale post-commit hook is not installed for automatic commit capture.")
+            recommended_actions.append(
+                "Run `npm run worktale:bootstrap` to install the automatic capture hook."
+            )
+        if not post_push_hook_installed:
+            issues.append("Worktale post-push hook is not installed for digest reminders.")
+            recommended_actions.append(
+                "Run `npm run worktale:bootstrap` to repair the Worktale hook set."
+            )
 
         return {
             "ready": len(issues) == 0,
@@ -115,6 +174,8 @@ class WorktaleRuntime:
                 "gitEmailConfigured": git_email_configured,
                 "gitEmail": git_email,
                 "bootstrapped": bootstrapped,
+                "postCommitHookInstalled": post_commit_hook_installed,
+                "postPushHookInstalled": post_push_hook_installed,
             },
             "issues": issues,
             "recommendedActions": recommended_actions,
@@ -129,18 +190,46 @@ class WorktaleRuntime:
         if not readiness["checks"]["gitRepository"]:
             raise RuntimeError("Repository .git folder is missing.")
 
-        command = ["worktale", "hook", "install", str(self.repo_root)]
-        result = self._run_command(command, cwd=self.repo_root)
+        commands_run: list[list[str]] = []
+        stdout_excerpt = ""
+        stderr_excerpt = ""
+
+        if not readiness["checks"]["bootstrapped"]:
+            init_command = ["worktale", "init"]
+            init_result = self._run_checked_command(init_command, cwd=self.repo_root)
+            commands_run.append(init_command)
+            stdout_excerpt = _excerpt(init_result["stdout"])
+            stderr_excerpt = _excerpt(init_result["stderr"])
+            readiness = self.check_readiness()
+
+        post_commit_installed = bool(readiness["checks"]["postCommitHookInstalled"])
+        post_push_installed = bool(readiness["checks"]["postPushHookInstalled"])
+        if not post_commit_installed and not post_push_installed:
+            install_command = ["worktale", "hook", "install", str(self.repo_root)]
+            install_result = self._run_checked_command(install_command, cwd=self.repo_root)
+            commands_run.append(install_command)
+            stdout_excerpt = _excerpt(install_result["stdout"])
+            stderr_excerpt = _excerpt(install_result["stderr"])
+            readiness = self.check_readiness()
+            post_commit_installed = bool(readiness["checks"]["postCommitHookInstalled"])
+            post_push_installed = bool(readiness["checks"]["postPushHookInstalled"])
+
+        if post_commit_installed != post_push_installed:
+            uninstall_command = ["worktale", "hook", "uninstall", str(self.repo_root)]
+            install_command = ["worktale", "hook", "install", str(self.repo_root)]
+            self._run_checked_command(uninstall_command, cwd=self.repo_root)
+            install_result = self._run_checked_command(install_command, cwd=self.repo_root)
+            commands_run.extend([uninstall_command, install_command])
+            stdout_excerpt = _excerpt(install_result["stdout"])
+            stderr_excerpt = _excerpt(install_result["stderr"])
+
         after = self.check_readiness()
-        if not result["ok"]:
-            raise RuntimeError(
-                _excerpt(result["stderr"] or result["stdout"] or "Worktale bootstrap failed.")
-            )
         return {
             "ok": True,
-            "command": command,
-            "stdout": _excerpt(result["stdout"]),
-            "stderr": _excerpt(result["stderr"]),
+            "command": commands_run[-1] if commands_run else [],
+            "commands": commands_run,
+            "stdout": stdout_excerpt,
+            "stderr": stderr_excerpt,
             "checks": after["checks"],
             "ready": bool(after["ready"]),
             "issues": list(after["issues"]),

@@ -6,6 +6,7 @@ import time
 import unittest
 
 from backend.route_groups.api_watchdog_service import WatchdogMonitorService
+from backend.watchdog.filesystem import normalize_path
 
 
 def make_service(temp_dir: str) -> WatchdogMonitorService:
@@ -132,8 +133,9 @@ class TestWatchdogMonitorService(unittest.TestCase):
 
             heartbeat = service.heartbeat("user:demo")
             roots = {str(event.get("root")) for event in heartbeat["events"] if event["type"] == "added"}
-            self.assertIn(root_one, roots)
-            self.assertIn(root_two, roots)
+            normalized_roots = {normalize_path(root_value) for root_value in roots}
+            self.assertIn(normalize_path(root_one), normalized_roots)
+            self.assertIn(normalize_path(root_two), normalized_roots)
 
     def test_config_validation_rejects_invalid_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -462,6 +464,128 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     for item in (listed.get("events") or [])
                 )
             )
+
+    def test_sync_project_rules_reconciles_local_runtime_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            alpha_root = os.path.join(temp_dir, "projects", "alpha")
+            beta_root = os.path.join(temp_dir, "projects", "beta")
+            gamma_root = os.path.join(temp_dir, "projects", "gamma")
+            os.makedirs(alpha_root, exist_ok=True)
+            os.makedirs(beta_root, exist_ok=True)
+            os.makedirs(gamma_root, exist_ok=True)
+
+            service = make_service(temp_dir)
+            service.put_project_rule(
+                "user:demo",
+                "project-alpha",
+                {"roots": [alpha_root], "includeGlobs": [], "excludeGlobs": [], "drawingPatterns": []},
+            )
+            service.put_project_rule(
+                "user:demo",
+                "project-beta",
+                {"roots": [beta_root], "includeGlobs": [], "excludeGlobs": [], "drawingPatterns": []},
+            )
+
+            synced = service.sync_project_rules(
+                "user:demo",
+                {
+                    "rules": [
+                        {
+                            "projectId": "project-alpha",
+                            "roots": [alpha_root],
+                            "includeGlobs": ["*.dwg"],
+                            "excludeGlobs": [],
+                            "drawingPatterns": ["*.dwg"],
+                        },
+                        {
+                            "projectId": "project-gamma",
+                            "roots": [gamma_root],
+                            "includeGlobs": [],
+                            "excludeGlobs": ["*.bak"],
+                            "drawingPatterns": [],
+                        },
+                    ]
+                },
+            )
+
+            self.assertEqual(int(synced.get("count") or 0), 2)
+            self.assertEqual(synced.get("deletedProjectIds"), ["project-beta"])
+            alpha_rule = service.get_project_rules("user:demo", "project-alpha").get("rule") or {}
+            gamma_rule = service.get_project_rules("user:demo", "project-gamma").get("rule") or {}
+            beta_rule = service.get_project_rules("user:demo", "project-beta").get("rule") or {}
+            self.assertEqual(alpha_rule.get("includeGlobs"), ["*.dwg"])
+            self.assertEqual(gamma_rule.get("excludeGlobs"), ["*.bak"])
+            self.assertEqual(beta_rule.get("roots"), [])
+
+    def test_prepare_drawing_activity_sync_returns_tracked_segment_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            service = make_service(temp_dir)
+            now_ms = int(time.time() * 1000)
+            project_root = os.path.join(temp_dir, "projects", "alpha")
+            os.makedirs(project_root, exist_ok=True)
+            drawing_path = os.path.join(project_root, "sheet-1.dwg")
+
+            service.register_collector(
+                "user:demo",
+                {
+                    "collectorId": "collector-cad",
+                    "name": "AutoCAD Collector",
+                    "collectorType": "autocad_state",
+                    "workstationId": "DUSTIN-HOME",
+                },
+            )
+            service.ingest_collector_events(
+                "user:demo",
+                {
+                    "collectorId": "collector-cad",
+                    "events": [
+                        {
+                            "eventKey": "evt-drawing-closed",
+                            "eventType": "drawing_closed",
+                            "projectId": "project-alpha",
+                            "drawingPath": drawing_path,
+                            "timestamp": now_ms,
+                            "sessionId": "session-1",
+                            "workstationId": "DUSTIN-HOME",
+                            "metadata": {
+                                "drawingName": "sheet-1.dwg",
+                                "trackedMs": 240000,
+                                "idleMs": 60000,
+                                "commandCount": 3,
+                                "segmentStartedAt": now_ms - 300000,
+                                "segmentEndedAt": now_ms,
+                                "workDate": "2026-03-19",
+                            },
+                        }
+                    ],
+                },
+            )
+
+            prepared = service.prepare_drawing_activity_sync("user:demo", limit=25)
+            self.assertEqual(int(prepared.get("readyCount") or 0), 1)
+            self.assertEqual(int(prepared.get("skippedCount") or 0), 0)
+            row = (prepared.get("rows") or [{}])[0]
+            self.assertEqual(row.get("project_id"), "project-alpha")
+            self.assertEqual(row.get("drawing_path"), drawing_path)
+            self.assertEqual(row.get("drawing_name"), "sheet-1.dwg")
+            self.assertEqual(int(row.get("tracked_ms") or 0), 240000)
+            self.assertEqual(int(row.get("idle_ms") or 0), 60000)
+            self.assertEqual(int(row.get("command_count") or 0), 3)
+            self.assertEqual(row.get("source_session_id"), "session-1")
+            self.assertEqual(row.get("workstation_id"), "DUSTIN-HOME")
+            self.assertEqual(row.get("work_date"), "2026-03-19")
+            self.assertTrue(str(row.get("sync_key") or "").startswith("watchdog:"))
+
+            cursor = service.mark_drawing_activity_synced(
+                "user:demo",
+                last_event_id=int(prepared.get("lastScannedEventId") or 0),
+                metadata={"syncedAt": now_ms, "syncedCount": 1},
+            )
+            self.assertEqual(int(cursor.get("lastEventId") or 0), int(prepared.get("lastScannedEventId") or 0))
+
+            follow_up = service.prepare_drawing_activity_sync("user:demo", limit=25)
+            self.assertEqual(int(follow_up.get("readyCount") or 0), 0)
+            self.assertEqual(follow_up.get("rows"), [])
 
     def test_duplicate_event_keys_are_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

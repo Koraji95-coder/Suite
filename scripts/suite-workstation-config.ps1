@@ -28,6 +28,62 @@ function Get-SuiteRoamingAppDataRoot {
     return Join-Path $env:USERPROFILE "AppData\Roaming"
 }
 
+function Test-SuiteDirectoryWriteAccess {
+    param([Parameter(Mandatory = $true)][string]$DirectoryPath)
+
+    try {
+        $null = New-Item -ItemType Directory -Path $DirectoryPath -Force
+        $probePath = Join-Path $DirectoryPath (".suite-write-test-" + [Guid]::NewGuid().ToString("N") + ".tmp")
+        Set-Content -Path $probePath -Value "ok" -Encoding ASCII
+        Remove-Item -Path $probePath -Force
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+function Get-SuitePreferredAutoCadPluginBundleRoot {
+    $candidates = New-Object System.Collections.Generic.List[string]
+    if ($env:ProgramFiles) {
+        $candidates.Add((Join-Path $env:ProgramFiles "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+    if (${env:ProgramFiles(x86)}) {
+        $candidates.Add((Join-Path ${env:ProgramFiles(x86)} "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+
+    $roamingAppData = Get-SuiteRoamingAppDataRoot
+    if ($roamingAppData) {
+        $candidates.Add((Join-Path $roamingAppData "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+    if ($env:ProgramData) {
+        $candidates.Add((Join-Path $env:ProgramData "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+    if ($env:ALLUSERSPROFILE) {
+        $candidates.Add((Join-Path $env:ALLUSERSPROFILE "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+
+    $normalizedCandidates = @(
+        $candidates |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { [System.IO.Path]::GetFullPath($_) } |
+            Select-Object -Unique
+    )
+
+    foreach ($candidate in $normalizedCandidates) {
+        $parentPath = Split-Path -Parent $candidate
+        if (Test-SuiteDirectoryWriteAccess -DirectoryPath $parentPath) {
+            return $candidate
+        }
+    }
+
+    if ($normalizedCandidates.Count -gt 0) {
+        return $normalizedCandidates[0]
+    }
+
+    return Join-Path (Get-SuiteRoamingAppDataRoot) "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"
+}
+
 function Convert-ToSuiteWorkstationLabel {
     param([Parameter(Mandatory = $true)][string]$Value)
 
@@ -249,7 +305,7 @@ function Get-SuiteWorkstationMcpEnv {
         SUITE_WATCHDOG_AUTOCAD_STARTUP_RUN_KEY_NAME = $autocadTaskName
         SUITE_WATCHDOG_AUTOCAD_STARTUP_MUTEX_NAME = "Local\SuiteWatchdogAutoCADCollectorDaemon-$slug"
         SUITE_WATCHDOG_AUTOCAD_STARTUP_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-watchdog-autocad-collector-startup.ps1")
-        SUITE_WATCHDOG_AUTOCAD_PLUGIN_BUNDLE_ROOT = (Join-Path $roamingAppData "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle")
+        SUITE_WATCHDOG_AUTOCAD_PLUGIN_BUNDLE_ROOT = (Get-SuitePreferredAutoCadPluginBundleRoot)
         SUITE_WATCHDOG_AUTOCAD_PLUGIN_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-watchdog-autocad-plugin.ps1")
         SUITE_WATCHDOG_AUTOCAD_READINESS_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-watchdog-autocad-readiness.ps1")
         SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-watchdog-backend-startup.ps1")

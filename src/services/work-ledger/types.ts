@@ -74,6 +74,8 @@ export interface WorktaleReadinessChecks {
 	gitEmailConfigured: boolean;
 	gitEmail: string;
 	bootstrapped: boolean;
+	postCommitHookInstalled: boolean;
+	postPushHookInstalled: boolean;
 }
 
 export interface WorktaleReadinessResponse {

@@ -112,12 +112,21 @@ export function useStandardsDrawingCheckerState() {
 							: issues.some((issue) => issue.severity === "warning")
 								? "warning"
 								: "pass";
+						const {
+							data: { user },
+							error: userError,
+						} = await supabase.auth.getUser();
+						if (userError || !user) {
+							showToast("error", "Sign in to run standards checks.");
+							return;
+						}
 
 						const payload = buildDrawingAnnotationInsert(
 							drawingName,
 							issues,
 							enabledRules.map((rule) => rule.name),
 							qaStatus,
+							user.id,
 						);
 
 						const { data, error } = await supabase

@@ -14,6 +14,7 @@ from flask_limiter import Limiter
 
 from backend.route_groups import register_route_groups
 from backend.route_groups.api_local_learning_runtime import LocalModelPrediction
+from backend.watchdog.filesystem import normalize_path
 
 
 class TestApiRouteGroups(unittest.TestCase):
@@ -520,7 +521,9 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/watchdog/projects/<project_id>/overview": ["GET"],
             "/api/watchdog/projects/<project_id>/events": ["GET"],
             "/api/watchdog/projects/<project_id>/sessions": ["GET"],
-            "/api/watchdog/projects/<project_id>/rules": ["GET", "PUT"],
+            "/api/watchdog/projects/<project_id>/rules": ["DELETE", "GET", "PUT"],
+            "/api/watchdog/project-rules/sync": ["POST"],
+            "/api/watchdog/drawing-activity/sync": ["POST"],
             "/health": ["GET"],
         }
 
@@ -2568,7 +2571,11 @@ class TestApiRouteGroups(unittest.TestCase):
         )
         self.assertEqual(get_response.status_code, 200)
         get_payload = get_response.get_json() or {}
-        self.assertEqual((get_payload.get("rule") or {}).get("roots"), [project_root])
+        returned_roots = list((get_payload.get("rule") or {}).get("roots") or [])
+        self.assertEqual(
+            [normalize_path(root_value) for root_value in returned_roots],
+            [normalize_path(project_root)],
+        )
 
         register_response = self.client.post(
             "/api/watchdog/collectors/register",
@@ -2616,6 +2623,187 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(project_events_response.status_code, 200)
         project_events_payload = project_events_response.get_json() or {}
         self.assertEqual(int(project_events_payload.get("count") or 0), 2)
+
+    def test_watchdog_project_rule_delete_clears_local_runtime_rule(self) -> None:
+        project_root = os.path.join(self.temp_dir.name, "project-delete")
+        os.makedirs(project_root, exist_ok=True)
+
+        put_response = self.client.put(
+            "/api/watchdog/projects/project-delete/rules",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "roots": [project_root],
+                "includeGlobs": ["*.dwg"],
+                "excludeGlobs": [],
+                "drawingPatterns": ["*.dwg"],
+            },
+        )
+        self.assertEqual(put_response.status_code, 200)
+
+        delete_response = self.client.delete(
+            "/api/watchdog/projects/project-delete/rules",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(delete_response.status_code, 200)
+        delete_payload = delete_response.get_json() or {}
+        self.assertTrue(delete_payload.get("deleted"))
+        self.assertEqual((delete_payload.get("rule") or {}).get("roots"), [])
+
+        get_response = self.client.get(
+            "/api/watchdog/projects/project-delete/rules",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(get_response.status_code, 200)
+        get_payload = get_response.get_json() or {}
+        self.assertEqual((get_payload.get("rule") or {}).get("roots"), [])
+
+    def test_watchdog_project_rules_sync_reconciles_local_runtime_rules(self) -> None:
+        legacy_root = os.path.join(self.temp_dir.name, "project-legacy")
+        alpha_root = os.path.join(self.temp_dir.name, "project-alpha-sync")
+        os.makedirs(legacy_root, exist_ok=True)
+        os.makedirs(alpha_root, exist_ok=True)
+
+        seed_response = self.client.put(
+            "/api/watchdog/projects/project-legacy/rules",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "roots": [legacy_root],
+                "includeGlobs": [],
+                "excludeGlobs": [],
+                "drawingPatterns": [],
+            },
+        )
+        self.assertEqual(seed_response.status_code, 200)
+
+        sync_response = self.client.post(
+            "/api/watchdog/project-rules/sync",
+            json={
+                "rules": [
+                    {
+                        "projectId": "project-alpha-sync",
+                        "roots": [alpha_root],
+                        "includeGlobs": ["*.dwg"],
+                        "excludeGlobs": ["*.bak"],
+                        "drawingPatterns": ["*.dwg"],
+                    }
+                ]
+            },
+        )
+        self.assertEqual(sync_response.status_code, 200)
+        sync_payload = sync_response.get_json() or {}
+        self.assertEqual(int(sync_payload.get("count") or 0), 1)
+        self.assertEqual(sync_payload.get("deletedProjectIds"), ["project-legacy"])
+
+        alpha_response = self.client.get(
+            "/api/watchdog/projects/project-alpha-sync/rules",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(alpha_response.status_code, 200)
+        alpha_payload = alpha_response.get_json() or {}
+        self.assertEqual(
+            [normalize_path(root) for root in ((alpha_payload.get("rule") or {}).get("roots") or [])],
+            [normalize_path(alpha_root)],
+        )
+        self.assertEqual((alpha_payload.get("rule") or {}).get("excludeGlobs"), ["*.bak"])
+
+        legacy_response = self.client.get(
+            "/api/watchdog/projects/project-legacy/rules",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(legacy_response.status_code, 200)
+        legacy_payload = legacy_response.get_json() or {}
+        self.assertEqual((legacy_payload.get("rule") or {}).get("roots"), [])
+
+    def test_watchdog_drawing_activity_sync_upserts_and_advances_cursor(self) -> None:
+        drawing_root = os.path.join(self.temp_dir.name, "project-sync")
+        os.makedirs(drawing_root, exist_ok=True)
+        drawing_path = os.path.join(drawing_root, "sheet-1.dwg")
+        now_ms = int(time.time() * 1000)
+
+        register_response = self.client.post(
+            "/api/watchdog/collectors/register",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "collectorId": "collector-cad",
+                "name": "AutoCAD Collector",
+                "collectorType": "autocad_state",
+                "workstationId": "DUSTIN-HOME",
+            },
+        )
+        self.assertEqual(register_response.status_code, 200)
+
+        ingest_response = self.client.post(
+            "/api/watchdog/collectors/events",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "collectorId": "collector-cad",
+                "events": [
+                    {
+                        "eventKey": "evt-drawing-sync",
+                        "eventType": "drawing_closed",
+                        "projectId": "project-sync",
+                        "drawingPath": drawing_path,
+                        "timestamp": now_ms,
+                        "sessionId": "session-1",
+                        "workstationId": "DUSTIN-HOME",
+                        "metadata": {
+                            "drawingName": "sheet-1.dwg",
+                            "trackedMs": 240000,
+                            "idleMs": 60000,
+                            "commandCount": 4,
+                            "segmentStartedAt": now_ms - 300000,
+                            "segmentEndedAt": now_ms,
+                            "workDate": "2026-03-19",
+                        },
+                    }
+                ],
+            },
+        )
+        self.assertEqual(ingest_response.status_code, 200)
+
+        with patch(
+            "backend.route_groups.api_watchdog.supabase_service_rest_request_helper",
+            return_value=([{"sync_key": "watchdog:evt-drawing-sync"}], None, 201),
+        ) as supabase_request:
+            sync_response = self.client.post(
+                "/api/watchdog/drawing-activity/sync",
+                json={"limit": 10},
+            )
+
+        self.assertEqual(sync_response.status_code, 200)
+        sync_payload = sync_response.get_json() or {}
+        self.assertEqual(sync_payload.get("synced"), 1)
+        self.assertEqual(sync_payload.get("skipped"), 0)
+        self.assertEqual(int((sync_payload.get("cursor") or {}).get("lastEventId") or 0), 1)
+
+        supabase_request.assert_called_once()
+        call_args, call_kwargs = supabase_request.call_args
+        self.assertEqual(call_args[0], "POST")
+        self.assertEqual(call_args[1], "project_drawing_work_segments")
+        sent_rows = call_kwargs.get("payload") or []
+        self.assertEqual(len(sent_rows), 1)
+        self.assertEqual(sent_rows[0].get("user_id"), "user-1")
+        self.assertEqual(sent_rows[0].get("project_id"), "project-sync")
+        self.assertEqual(sent_rows[0].get("drawing_path"), drawing_path)
+        self.assertEqual(int(sent_rows[0].get("tracked_ms") or 0), 240000)
+        self.assertEqual(int(sent_rows[0].get("idle_ms") or 0), 60000)
+        self.assertEqual(int(sent_rows[0].get("command_count") or 0), 4)
+
+        with patch(
+            "backend.route_groups.api_watchdog.supabase_service_rest_request_helper",
+            return_value=([], None, 200),
+        ) as follow_up_request:
+            follow_up_response = self.client.post(
+                "/api/watchdog/drawing-activity/sync",
+                json={"limit": 10},
+            )
+
+        self.assertEqual(follow_up_response.status_code, 200)
+        follow_up_payload = follow_up_response.get_json() or {}
+        self.assertEqual(follow_up_payload.get("synced"), 0)
+        self.assertEqual(follow_up_payload.get("skipped"), 0)
+        self.assertEqual(follow_up_payload.get("remaining"), 0)
+        follow_up_request.assert_not_called()
 
 
 if __name__ == "__main__":

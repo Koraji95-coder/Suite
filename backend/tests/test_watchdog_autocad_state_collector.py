@@ -241,7 +241,15 @@ class TestAutoCadStateCollector(unittest.TestCase):
             )
             self.assertEqual(
                 int(api_client.send_calls[0][1].get("durationMs") or 0),
-                300000,
+                240000,
+            )
+            self.assertEqual(
+                int(api_client.send_calls[0][1].get("metadata", {}).get("trackedMs") or 0),
+                240000,
+            )
+            self.assertEqual(
+                int(api_client.send_calls[0][1].get("metadata", {}).get("idleMs") or 0),
+                60000,
             )
 
     def test_failed_flush_replays_buffered_events_without_changing_event_keys(self) -> None:

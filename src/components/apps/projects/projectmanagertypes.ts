@@ -51,6 +51,7 @@ export interface ProjectFormData {
 	priority: Priority;
 	status: ProjectStatus;
 	category: string;
+	watchdogRootPath: string;
 }
 
 export interface TaskFormData {

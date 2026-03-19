@@ -79,6 +79,7 @@ export function ProjectManager({
 		handleDragEnd,
 		handleFileUpload,
 		downloadFile,
+		updateProjectWatchdogRootPath,
 		resetProjectForm,
 		resetTaskForm,
 		openEditProject,
@@ -208,6 +209,7 @@ export function ProjectManager({
 							onFileFilterChange={setFileFilter}
 							onFileUpload={handleFileUpload}
 							onDownloadFile={downloadFile}
+							onProjectWatchdogRootChange={updateProjectWatchdogRootPath}
 						/>
 					) : (
 						<div className={styles.emptyDetail}>

@@ -1,1028 +1,161 @@
 /**
- * Auto-generated Supabase database types
- * Generated from: supabase/consolidated_migration.sql
+ * Auto-generated Supabase database types.
+ * Generated via: npm run supabase:types
+ * Source of truth: local Supabase migrations in supabase/migrations/
  *
- * This file provides complete type safety for all Supabase queries.
- * All tables, columns, and constraints are properly typed.
+ * Refresh flow:
+ *   1. npm run supabase:start
+ *   2. npm run supabase:db:reset
+ *   3. npm run supabase:types
  */
 
 export type Json =
-	| string
-	| number
-	| boolean
-	| null
-	| { [key: string]: Json | undefined }
-	| Json[];
-
-type DatabaseTable<Row, Insert, Update> = {
-	Row: Row;
-	Insert: Insert;
-	Update: Update;
-	Relationships: [];
-};
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
-	public: {
-		Tables: {
-			formulas: DatabaseTable<
-				{
-					id: string;
-					name: string;
-					category: string;
-					formula: string;
-					description: string;
-					variables: Json;
-					user_id: string;
-					created_at: string;
-				},
-				{
-					id?: string;
-					name: string;
-					category: string;
-					formula: string;
-					description: string;
-					variables?: Json;
-					user_id?: string;
-					created_at?: string;
-				},
-				{
-					id?: string;
-					name?: string;
-					category?: string;
-					formula?: string;
-					description?: string;
-					variables?: Json;
-					user_id?: string;
-					created_at?: string;
-				}
-			>;
+  public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
 
-			saved_calculations: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					calculation_type: string;
-					inputs: Json;
-					results: Json;
-					notes: string;
-					created_at: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					calculation_type: string;
-					inputs?: Json;
-					results?: Json;
-					notes?: string;
-					created_at?: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					calculation_type?: string;
-					inputs?: Json;
-					results?: Json;
-					notes?: string;
-					created_at?: string;
-				}
-			>;
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-			saved_circuits: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					name: string;
-					circuit_data: Json;
-					image_url: string | null;
-					created_at: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					name: string;
-					circuit_data?: Json;
-					image_url?: string | null;
-					created_at?: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					name?: string;
-					circuit_data?: Json;
-					image_url?: string | null;
-					created_at?: string;
-				}
-			>;
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
-			projects: DatabaseTable<
-				{
-					id: string;
-					name: string;
-					description: string;
-					deadline: string | null;
-					priority: "low" | "medium" | "high" | "urgent";
-					color: string;
-					status: "active" | "completed" | "archived" | "on-hold";
-					category: string;
-					created_at: string;
-					updated_at: string;
-					user_id: string;
-				},
-				{
-					id?: string;
-					name: string;
-					description?: string;
-					deadline?: string | null;
-					priority?: "low" | "medium" | "high" | "urgent";
-					color?: string;
-					status?: "active" | "completed" | "archived" | "on-hold";
-					category?: string;
-					created_at?: string;
-					updated_at?: string;
-					user_id?: string;
-				},
-				{
-					id?: string;
-					name?: string;
-					description?: string;
-					deadline?: string | null;
-					priority?: "low" | "medium" | "high" | "urgent";
-					color?: string;
-					status?: "active" | "completed" | "archived" | "on-hold";
-					category?: string;
-					created_at?: string;
-					updated_at?: string;
-					user_id?: string;
-				}
-			>;
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
-			tasks: DatabaseTable<
-				{
-					id: string;
-					project_id: string | null;
-					name: string;
-					description: string;
-					completed: boolean;
-					order: number;
-					due_date: string | null;
-					parent_task_id: string | null;
-					priority: "low" | "medium" | "high" | "urgent";
-					created_at: string;
-					user_id: string;
-				},
-				{
-					id?: string;
-					project_id?: string | null;
-					name: string;
-					description?: string;
-					completed?: boolean;
-					order?: number;
-					due_date?: string | null;
-					parent_task_id?: string | null;
-					priority?: "low" | "medium" | "high" | "urgent";
-					created_at?: string;
-					user_id?: string;
-				},
-				{
-					id?: string;
-					project_id?: string | null;
-					name?: string;
-					description?: string;
-					completed?: boolean;
-					order?: number;
-					due_date?: string | null;
-					parent_task_id?: string | null;
-					priority?: "low" | "medium" | "high" | "urgent";
-					created_at?: string;
-					user_id?: string;
-				}
-			>;
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
-			files: DatabaseTable<
-				{
-					id: string;
-					project_id: string | null;
-					name: string;
-					file_path: string;
-					size: number;
-					mime_type: string;
-					uploaded_at: string;
-					user_id: string;
-				},
-				{
-					id?: string;
-					project_id?: string | null;
-					name: string;
-					file_path: string;
-					size?: number;
-					mime_type?: string;
-					uploaded_at?: string;
-					user_id?: string;
-				},
-				{
-					id?: string;
-					project_id?: string | null;
-					name?: string;
-					file_path?: string;
-					size?: number;
-					mime_type?: string;
-					uploaded_at?: string;
-					user_id?: string;
-				}
-			>;
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
-			profiles: DatabaseTable<
-				{
-					id: string;
-					email: string | null;
-					display_name: string | null;
-					avatar_url: string | null;
-					theme_preference: string | null;
-					created_at: string;
-					updated_at: string;
-				},
-				{
-					id: string;
-					email?: string | null;
-					display_name?: string | null;
-					avatar_url?: string | null;
-					theme_preference?: string | null;
-					created_at?: string;
-					updated_at?: string;
-				},
-				{
-					id?: string;
-					email?: string | null;
-					display_name?: string | null;
-					avatar_url?: string | null;
-					theme_preference?: string | null;
-					created_at?: string;
-					updated_at?: string;
-				}
-			>;
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
-			recent_files: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					file_name: string;
-					file_path: string;
-					file_type: string;
-					context: string;
-					accessed_at: string;
-					created_at: string;
-				},
-				{
-					id?: string;
-					user_id: string;
-					file_name: string;
-					file_path: string;
-					file_type?: string;
-					context?: string;
-					accessed_at?: string;
-					created_at?: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					file_name?: string;
-					file_path?: string;
-					file_type?: string;
-					context?: string;
-					accessed_at?: string;
-					created_at?: string;
-				}
-			>;
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
-			activity_log: DatabaseTable<
-				{
-					id: string;
-					action: string;
-					description: string;
-					project_id: string | null;
-					task_id: string | null;
-					timestamp: string;
-					user_id: string;
-				},
-				{
-					id?: string;
-					action: string;
-					description: string;
-					project_id?: string | null;
-					task_id?: string | null;
-					timestamp?: string;
-					user_id?: string;
-				},
-				{
-					id?: string;
-					action?: string;
-					description?: string;
-					project_id?: string | null;
-					task_id?: string | null;
-					timestamp?: string;
-					user_id?: string;
-				}
-			>;
-
-			work_ledger_entries: DatabaseTable<
-				{
-					id: string;
-					title: string;
-					summary: string;
-					source_kind: string;
-					commit_refs: string[];
-					project_id: string | null;
-					app_area: string | null;
-					architecture_paths: string[];
-					hotspot_ids: string[];
-					publish_state: string;
-					published_at: string | null;
-					external_reference: string | null;
-					external_url: string | null;
-					user_id: string;
-					created_at: string;
-					updated_at: string;
-				},
-				{
-					id?: string;
-					title: string;
-					summary?: string;
-					source_kind?: string;
-					commit_refs?: string[];
-					project_id?: string | null;
-					app_area?: string | null;
-					architecture_paths?: string[];
-					hotspot_ids?: string[];
-					publish_state?: string;
-					published_at?: string | null;
-					external_reference?: string | null;
-					external_url?: string | null;
-					user_id?: string;
-					created_at?: string;
-					updated_at?: string;
-				},
-				{
-					id?: string;
-					title?: string;
-					summary?: string;
-					source_kind?: string;
-					commit_refs?: string[];
-					project_id?: string | null;
-					app_area?: string | null;
-					architecture_paths?: string[];
-					hotspot_ids?: string[];
-					publish_state?: string;
-					published_at?: string | null;
-					external_reference?: string | null;
-					external_url?: string | null;
-					user_id?: string;
-					created_at?: string;
-					updated_at?: string;
-				}
-			>;
-
-			work_ledger_publish_jobs: DatabaseTable<
-				{
-					id: string;
-					entry_id: string;
-					user_id: string;
-					publisher: string;
-					mode: string;
-					status: string;
-					workstation_id: string | null;
-					repo_path: string | null;
-					artifact_dir: string | null;
-					stdout_excerpt: string | null;
-					stderr_excerpt: string | null;
-					error_text: string | null;
-					external_reference: string | null;
-					external_url: string | null;
-					published_at: string | null;
-					created_at: string;
-					updated_at: string;
-				},
-				{
-					id?: string;
-					entry_id: string;
-					user_id?: string;
-					publisher: string;
-					mode: string;
-					status: string;
-					workstation_id?: string | null;
-					repo_path?: string | null;
-					artifact_dir?: string | null;
-					stdout_excerpt?: string | null;
-					stderr_excerpt?: string | null;
-					error_text?: string | null;
-					external_reference?: string | null;
-					external_url?: string | null;
-					published_at?: string | null;
-					created_at?: string;
-					updated_at?: string;
-				},
-				{
-					id?: string;
-					entry_id?: string;
-					user_id?: string;
-					publisher?: string;
-					mode?: string;
-					status?: string;
-					workstation_id?: string | null;
-					repo_path?: string | null;
-					artifact_dir?: string | null;
-					stdout_excerpt?: string | null;
-					stderr_excerpt?: string | null;
-					error_text?: string | null;
-					external_reference?: string | null;
-					external_url?: string | null;
-					published_at?: string | null;
-					created_at?: string;
-					updated_at?: string;
-				}
-			>;
-
-			drawing_revision_register_entries: DatabaseTable<
-				{
-					id: string;
-					project_id: string;
-					file_id: string | null;
-					drawing_number: string;
-					title: string;
-					revision: string;
-					previous_revision: string | null;
-					issue_summary: string;
-					issue_status: string;
-					issue_severity: string;
-					source_kind: string;
-					source_ref: string | null;
-					autodraft_request_id: string | null;
-					transmittal_number: string | null;
-					transmittal_document_name: string | null;
-					notes: string | null;
-					user_id: string;
-					created_at: string;
-					updated_at: string;
-				},
-				{
-					id?: string;
-					project_id: string;
-					file_id?: string | null;
-					drawing_number?: string;
-					title?: string;
-					revision?: string;
-					previous_revision?: string | null;
-					issue_summary?: string;
-					issue_status?: string;
-					issue_severity?: string;
-					source_kind?: string;
-					source_ref?: string | null;
-					autodraft_request_id?: string | null;
-					transmittal_number?: string | null;
-					transmittal_document_name?: string | null;
-					notes?: string | null;
-					user_id?: string;
-					created_at?: string;
-					updated_at?: string;
-				},
-				{
-					id?: string;
-					project_id?: string;
-					file_id?: string | null;
-					drawing_number?: string;
-					title?: string;
-					revision?: string;
-					previous_revision?: string | null;
-					issue_summary?: string;
-					issue_status?: string;
-					issue_severity?: string;
-					source_kind?: string;
-					source_ref?: string | null;
-					autodraft_request_id?: string | null;
-					transmittal_number?: string | null;
-					transmittal_document_name?: string | null;
-					notes?: string | null;
-					user_id?: string;
-					created_at?: string;
-					updated_at?: string;
-				}
-			>;
-
-			calendar_events: DatabaseTable<
-				{
-					id: string;
-					project_id: string | null;
-					task_id: string | null;
-					due_date: string;
-					title: string;
-					type: "deadline" | "milestone" | "reminder";
-					description: string | null;
-					location: string | null;
-					color: string | null;
-					all_day: boolean;
-					start_at: string | null;
-					end_at: string | null;
-					user_id: string;
-				},
-				{
-					id?: string;
-					project_id?: string | null;
-					task_id?: string | null;
-					due_date: string;
-					title: string;
-					type?: "deadline" | "milestone" | "reminder";
-					description?: string | null;
-					location?: string | null;
-					color?: string | null;
-					all_day?: boolean;
-					start_at?: string | null;
-					end_at?: string | null;
-					user_id?: string;
-				},
-				{
-					id?: string;
-					project_id?: string | null;
-					task_id?: string | null;
-					due_date?: string;
-					title?: string;
-					type?: "deadline" | "milestone" | "reminder";
-					description?: string | null;
-					location?: string | null;
-					color?: string | null;
-					all_day?: boolean;
-					start_at?: string | null;
-					end_at?: string | null;
-					user_id?: string;
-				}
-			>;
-
-			whiteboards: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					title: string;
-					panel_context: string;
-					canvas_data: Json;
-					thumbnail_url: string | null;
-					tags: string[];
-					created_at: string;
-					updated_at: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					title: string;
-					panel_context: string;
-					canvas_data?: Json;
-					thumbnail_url?: string | null;
-					tags?: string[];
-					created_at?: string;
-					updated_at?: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					title?: string;
-					panel_context?: string;
-					canvas_data?: Json;
-					thumbnail_url?: string | null;
-					tags?: string[];
-					created_at?: string;
-					updated_at?: string;
-				}
-			>;
-
-			ai_conversations: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					panel_context: string | null;
-					title: string | null;
-					messages: Json;
-					context_data: Json;
-					created_at: string;
-					updated_at: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					panel_context?: string | null;
-					title?: string | null;
-					messages?: Json;
-					context_data?: Json;
-					created_at?: string;
-					updated_at?: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					panel_context?: string | null;
-					title?: string | null;
-					messages?: Json;
-					context_data?: Json;
-					created_at?: string;
-					updated_at?: string;
-				}
-			>;
-
-			ai_memory: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					memory_type: "preference" | "knowledge" | "pattern" | "relationship";
-					content: Json;
-					connections: Json;
-					strength: number;
-					created_at: string;
-					last_accessed: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					memory_type: "preference" | "knowledge" | "pattern" | "relationship";
-					content: Json;
-					connections?: Json;
-					strength?: number;
-					created_at?: string;
-					last_accessed?: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					memory_type?: "preference" | "knowledge" | "pattern" | "relationship";
-					content?: Json;
-					connections?: Json;
-					strength?: number;
-					created_at?: string;
-					last_accessed?: string;
-				}
-			>;
-
-			block_library: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					name: string;
-					file_path: string;
-					thumbnail_url: string | null;
-					category: string;
-					tags: string[];
-					is_dynamic: boolean;
-					dynamic_variations: Json;
-					attributes: Json;
-					views: Json;
-					file_size: number;
-					usage_count: number;
-					is_favorite: boolean;
-					created_at: string;
-					last_used: string | null;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					name: string;
-					file_path: string;
-					thumbnail_url?: string | null;
-					category?: string;
-					tags?: string[];
-					is_dynamic?: boolean;
-					dynamic_variations?: Json;
-					attributes?: Json;
-					views?: Json;
-					file_size?: number;
-					usage_count?: number;
-					is_favorite?: boolean;
-					created_at?: string;
-					last_used?: string | null;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					name?: string;
-					file_path?: string;
-					thumbnail_url?: string | null;
-					category?: string;
-					tags?: string[];
-					is_dynamic?: boolean;
-					dynamic_variations?: Json;
-					attributes?: Json;
-					views?: Json;
-					file_size?: number;
-					usage_count?: number;
-					is_favorite?: boolean;
-					created_at?: string;
-					last_used?: string | null;
-				}
-			>;
-
-			automation_workflows: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					name: string;
-					description: string | null;
-					workflow_type: "calculation" | "integration" | "report" | "custom";
-					script_data: Json;
-					schedule: string | null;
-					is_active: boolean;
-					last_run: string | null;
-					run_count: number;
-					created_at: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					name: string;
-					description?: string | null;
-					workflow_type: "calculation" | "integration" | "report" | "custom";
-					script_data?: Json;
-					schedule?: string | null;
-					is_active?: boolean;
-					last_run?: string | null;
-					run_count?: number;
-					created_at?: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					name?: string;
-					description?: string | null;
-					workflow_type?: "calculation" | "integration" | "report" | "custom";
-					script_data?: Json;
-					schedule?: string | null;
-					is_active?: boolean;
-					last_run?: string | null;
-					run_count?: number;
-					created_at?: string;
-				}
-			>;
-
-			drawing_annotations: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					project_id: string | null;
-					drawing_name: string;
-					file_path: string;
-					annotation_data: Json;
-					qa_checks: Json;
-					comparison_data: Json;
-					issues_found: Json;
-					status: "pending" | "reviewed" | "approved" | "rejected";
-					created_at: string;
-					reviewed_at: string | null;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					project_id?: string | null;
-					drawing_name: string;
-					file_path: string;
-					annotation_data?: Json;
-					qa_checks?: Json;
-					comparison_data?: Json;
-					issues_found?: Json;
-					status?: "pending" | "reviewed" | "approved" | "rejected";
-					created_at?: string;
-					reviewed_at?: string | null;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					project_id?: string | null;
-					drawing_name?: string;
-					file_path?: string;
-					annotation_data?: Json;
-					qa_checks?: Json;
-					comparison_data?: Json;
-					issues_found?: Json;
-					status?: "pending" | "reviewed" | "approved" | "rejected";
-					created_at?: string;
-					reviewed_at?: string | null;
-				}
-			>;
-
-			user_settings: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					setting_key: string;
-					setting_value: Json;
-					project_id: string | null;
-					created_at: string;
-					updated_at: string;
-				},
-				{
-					id?: string;
-					user_id: string;
-					setting_key: string;
-					setting_value: Json;
-					project_id?: string | null;
-					created_at?: string;
-					updated_at?: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					setting_key?: string;
-					setting_value?: Json;
-					project_id?: string | null;
-					created_at?: string;
-					updated_at?: string;
-				}
-			>;
-
-			ground_grid_rods: DatabaseTable<
-				{
-					id: string;
-					design_id: string;
-					label: string;
-					grid_x: number;
-					grid_y: number;
-					depth: number;
-					diameter: number;
-					sort_order: number;
-				},
-				{
-					id?: string;
-					design_id: string;
-					label: string;
-					grid_x: number;
-					grid_y: number;
-					depth: number;
-					diameter: number;
-					sort_order?: number;
-				},
-				{
-					id?: string;
-					design_id?: string;
-					label?: string;
-					grid_x?: number;
-					grid_y?: number;
-					depth?: number;
-					diameter?: number;
-					sort_order?: number;
-				}
-			>;
-
-			ground_grid_conductors: DatabaseTable<
-				{
-					id: string;
-					design_id: string;
-					label: string;
-					length: number | null;
-					x1: number;
-					y1: number;
-					x2: number;
-					y2: number;
-					diameter: number;
-					sort_order: number;
-				},
-				{
-					id?: string;
-					design_id: string;
-					label: string;
-					length?: number | null;
-					x1: number;
-					y1: number;
-					x2: number;
-					y2: number;
-					diameter: number;
-					sort_order?: number;
-				},
-				{
-					id?: string;
-					design_id?: string;
-					label?: string;
-					length?: number | null;
-					x1?: number;
-					y1?: number;
-					x2?: number;
-					y2?: number;
-					diameter?: number;
-					sort_order?: number;
-				}
-			>;
-
-			ground_grid_designs: DatabaseTable<
-				{
-					id: string;
-					name: string;
-					project_id: string | null;
-					config: Json;
-					updated_at: string;
-				},
-				{
-					id?: string;
-					name: string;
-					project_id?: string | null;
-					config: Json;
-					updated_at?: string;
-				},
-				{
-					id?: string;
-					name?: string;
-					project_id?: string | null;
-					config?: Json;
-					updated_at?: string;
-				}
-			>;
-
-			ground_grid_results: DatabaseTable<
-				{
-					id: string;
-					design_id: string;
-					placements: Json;
-					segment_count: number;
-					tee_count: number;
-					cross_count: number;
-					rod_count: number;
-					total_conductor_length: number;
-				},
-				{
-					id?: string;
-					design_id: string;
-					placements: Json;
-					segment_count: number;
-					tee_count: number;
-					cross_count: number;
-					rod_count: number;
-					total_conductor_length: number;
-				},
-				{
-					id?: string;
-					design_id?: string;
-					placements?: Json;
-					segment_count?: number;
-					tee_count?: number;
-					cross_count?: number;
-					rod_count?: number;
-					total_conductor_length?: number;
-				}
-			>;
-
-			user_preferences: DatabaseTable<
-				{
-					id: string;
-					user_id: string;
-					theme: string;
-					layout: string;
-					notifications_enabled: boolean;
-					auto_save: boolean;
-					language: string;
-					created_at: string;
-					updated_at: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					theme?: string;
-					layout?: string;
-					notifications_enabled?: boolean;
-					auto_save?: boolean;
-					language?: string;
-					created_at?: string;
-					updated_at?: string;
-				},
-				{
-					id?: string;
-					user_id?: string;
-					theme?: string;
-					layout?: string;
-					notifications_enabled?: boolean;
-					auto_save?: boolean;
-					language?: string;
-					created_at?: string;
-					updated_at?: string;
-				}
-			>;
-		};
-		Views: Record<string, never>;
-		Functions: {
-			upsert_user_setting: {
-				Args: {
-					p_user_id: string;
-					p_setting_key: string;
-					p_setting_value: Json;
-					p_project_id?: string | null;
-				};
-				Returns: undefined;
-			};
-		};
-		Enums: {
-			project_status: "active" | "completed" | "archived" | "on-hold";
-			project_priority: "low" | "medium" | "high" | "urgent";
-			task_priority: "low" | "medium" | "high" | "urgent";
-			event_type: "deadline" | "milestone" | "reminder";
-			memory_type: "preference" | "knowledge" | "pattern" | "relationship";
-			workflow_type: "calculation" | "integration" | "report" | "custom";
-			annotation_status: "pending" | "reviewed" | "approved" | "rejected";
-		};
-		CompositeTypes: Record<string, never>;
-	};
-};
-
-/**
- * Type helper for Supabase client configuration
- */
-export type Tables = Database["public"]["Tables"];
-export type Enums = Database["public"]["Enums"];
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

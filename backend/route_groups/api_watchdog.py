@@ -4,9 +4,13 @@ import os
 import time
 from typing import Any, Callable, Dict
 
+import requests
 from flask import Blueprint, g, jsonify, request
 from flask_limiter import Limiter
 
+from .api_supabase_service_request import (
+    supabase_service_rest_request as supabase_service_rest_request_helper,
+)
 from .api_watchdog_service import WatchdogMonitorService
 
 Decorator = Callable[[Callable[..., Any]], Callable[..., Any]]
@@ -55,22 +59,70 @@ def create_watchdog_blueprint(
     require_watchdog_collector_auth: Decorator,
     limiter: Limiter,
     logger: Any,
+    require_supabase_user: Decorator | None = None,
+    supabase_url: str = "",
+    supabase_api_key: str = "",
     time_module: Any = time,
     pick_directory_fn: Callable[[str | None], str | None] = _pick_directory_dialog,
+    requests_module: Any = requests,
 ) -> Blueprint:
     """Create watchdog routes under /api/watchdog."""
     bp = Blueprint("watchdog_api", __name__, url_prefix="/api/watchdog")
     service = WatchdogMonitorService(time_module=time_module)
+    supabase_url = str(supabase_url or "").strip()
+    supabase_api_key = str(supabase_api_key or "").strip()
+
+    def _require_supabase_user(endpoint: Callable[..., Any]) -> Callable[..., Any]:
+        if require_supabase_user is None:
+            return endpoint
+        return require_supabase_user(endpoint)
 
     def _watchdog_user_key() -> str:
         user = getattr(g, "supabase_user", {}) or {}
         user_id = str(user.get("id") or user.get("sub") or "").strip()
+        preferred_user_key = service.resolve_runtime_user_key()
+        if preferred_user_key:
+            return preferred_user_key
         if user_id:
             return f"user:{user_id}"
 
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         remote_addr = str(request.remote_addr or "unknown")
         return f"{auth_mode}:{remote_addr}"
+
+    def _extract_bearer_token() -> str | None:
+        auth_header = str(request.headers.get("Authorization") or "").strip()
+        if not auth_header:
+            return None
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1].strip()
+            return token or None
+        return None
+
+    def _watchdog_supabase_request(
+        method: str,
+        table_path: str,
+        *,
+        params: Dict[str, str] | None = None,
+        payload: Any = None,
+        extra_headers: Dict[str, str] | None = None,
+    ) -> tuple[Any, str | None, int]:
+        bearer_token = _extract_bearer_token()
+        auth_key = bearer_token or supabase_api_key
+        merged_headers = dict(extra_headers or {})
+        if bearer_token and supabase_api_key:
+            merged_headers["apikey"] = supabase_api_key
+        return supabase_service_rest_request_helper(
+            method,
+            table_path,
+            supabase_url=supabase_url,
+            supabase_service_role_key=auth_key,
+            params=params,
+            payload=payload,
+            extra_headers=merged_headers or None,
+            timeout=12,
+            requests_module=requests_module,
+        )
 
     def _parse_query_int(name: str, default: int | None = None) -> int | None:
         raw = request.args.get(name)
@@ -683,7 +735,7 @@ def create_watchdog_blueprint(
                 500,
             )
 
-    @bp.route("/projects/<project_id>/rules", methods=["GET", "PUT"])
+    @bp.route("/projects/<project_id>/rules", methods=["GET", "PUT", "DELETE"])
     @require_autocad_auth
     @limiter.limit("3600 per hour")
     def api_watchdog_project_rules(project_id: str):
@@ -727,6 +779,39 @@ def create_watchdog_blueprint(
                         {
                             "ok": False,
                             "error": "Failed to load project watchdog rules",
+                            "code": "WATCHDOG_PROJECT_RULES_FAILED",
+                            "message": str(exc),
+                        }
+                    ),
+                    500,
+                )
+
+        if request.method == "DELETE":
+            try:
+                result = service.delete_project_rule(user_key, normalized_project_id)
+                return jsonify({"ok": True, **result}), 200
+            except ValueError as exc:
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "error": str(exc),
+                            "code": "WATCHDOG_PROJECT_RULES_INVALID",
+                        }
+                    ),
+                    400,
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Failed to delete project watchdog rules (user=%s, project=%s)",
+                    user_key,
+                    normalized_project_id,
+                )
+                return (
+                    jsonify(
+                        {
+                            "ok": False,
+                            "error": "Failed to delete project watchdog rules",
                             "code": "WATCHDOG_PROJECT_RULES_FAILED",
                             "message": str(exc),
                         }
@@ -778,5 +863,182 @@ def create_watchdog_blueprint(
                 ),
                 500,
             )
+
+    @bp.route("/project-rules/sync", methods=["POST"])
+    @_require_supabase_user
+    @limiter.limit("3600 per hour")
+    def api_watchdog_project_rules_sync():
+        user_key = _watchdog_user_key()
+        if not request.is_json:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Expected JSON payload",
+                        "code": "WATCHDOG_PROJECT_RULES_INVALID",
+                    }
+                ),
+                400,
+            )
+
+        payload = request.get_json(silent=True) or {}
+        try:
+            result = service.sync_project_rules(user_key, payload)
+            return jsonify({"ok": True, **result}), 200
+        except ValueError as exc:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                        "code": "WATCHDOG_PROJECT_RULES_INVALID",
+                    }
+                ),
+                400,
+            )
+        except Exception as exc:
+            logger.exception("Failed to sync watchdog project rules (user=%s)", user_key)
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Failed to sync watchdog project rules",
+                        "code": "WATCHDOG_PROJECT_RULES_FAILED",
+                        "message": str(exc),
+                    }
+                ),
+                500,
+            )
+
+    @bp.route("/drawing-activity/sync", methods=["POST"])
+    @_require_supabase_user
+    @limiter.limit("3600 per hour")
+    def api_watchdog_drawing_activity_sync():
+        user_key = _watchdog_user_key()
+        user = getattr(g, "supabase_user", {}) or {}
+        user_id = str(user.get("id") or user.get("sub") or "").strip()
+        if not user_id:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Authenticated user id not found.",
+                        "code": "WATCHDOG_DRAWING_SYNC_AUTH_INVALID",
+                    }
+                ),
+                401,
+            )
+        if not supabase_url or not supabase_api_key:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Supabase configuration is unavailable.",
+                        "code": "WATCHDOG_DRAWING_SYNC_SUPABASE_UNAVAILABLE",
+                    }
+                ),
+                503,
+            )
+
+        payload = request.get_json(silent=True) if request.is_json else {}
+        if payload is None:
+            payload = {}
+        try:
+            prepared = service.prepare_drawing_activity_sync(
+                user_key,
+                limit=int(payload.get("limit") or 100),
+            )
+        except ValueError as exc:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                        "code": "WATCHDOG_DRAWING_SYNC_INVALID",
+                    }
+                ),
+                400,
+            )
+        except Exception as exc:
+            logger.exception("Failed to prepare drawing activity sync batch (user=%s)", user_key)
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Failed to prepare drawing activity sync batch",
+                        "code": "WATCHDOG_DRAWING_SYNC_PREPARE_FAILED",
+                        "message": str(exc),
+                    }
+                ),
+                500,
+            )
+
+        rows = [dict(row, user_id=user_id) for row in (prepared.get("rows") or [])]
+        last_scanned_event_id = int(prepared.get("lastScannedEventId") or 0)
+        if not rows:
+            cursor = service.mark_drawing_activity_synced(
+                user_key,
+                last_event_id=last_scanned_event_id,
+                metadata={
+                    "syncedAt": int(time_module.time() * 1000),
+                    "syncedCount": 0,
+                    "skippedCount": int(prepared.get("skippedCount") or 0),
+                },
+            )
+            return (
+                jsonify(
+                    {
+                        "ok": True,
+                        "synced": 0,
+                        "skipped": int(prepared.get("skippedCount") or 0),
+                        "remaining": 0,
+                        "cursor": cursor,
+                    }
+                ),
+                200,
+            )
+
+        response_payload, response_error, response_status = _watchdog_supabase_request(
+            "POST",
+            "project_drawing_work_segments",
+            params={"on_conflict": "sync_key"},
+            payload=rows,
+            extra_headers={"Prefer": "resolution=merge-duplicates,return=representation"},
+        )
+        if response_error:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": response_error,
+                        "code": "WATCHDOG_DRAWING_SYNC_FAILED",
+                        "status": response_status,
+                    }
+                ),
+                500 if response_status < 400 else response_status,
+            )
+
+        synced_rows = response_payload if isinstance(response_payload, list) else rows
+        cursor = service.mark_drawing_activity_synced(
+            user_key,
+            last_event_id=last_scanned_event_id,
+            metadata={
+                "syncedAt": int(time_module.time() * 1000),
+                "syncedCount": len(rows),
+                "skippedCount": int(prepared.get("skippedCount") or 0),
+            },
+        )
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "synced": len(rows),
+                    "skipped": int(prepared.get("skippedCount") or 0),
+                    "rows": synced_rows,
+                    "cursor": cursor,
+                }
+            ),
+            200,
+        )
 
     return bp

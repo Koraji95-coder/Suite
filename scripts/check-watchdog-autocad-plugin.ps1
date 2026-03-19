@@ -7,27 +7,132 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Get-DefaultBundleRoot {
+    $candidates = New-Object System.Collections.Generic.List[string]
+    if ($env:ProgramFiles) {
+        $candidates.Add((Join-Path $env:ProgramFiles "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+    if (${env:ProgramFiles(x86)}) {
+        $candidates.Add((Join-Path ${env:ProgramFiles(x86)} "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+    if ($env:APPDATA) {
+        $candidates.Add((Join-Path $env:APPDATA "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+    if ($env:ProgramData) {
+        $candidates.Add((Join-Path $env:ProgramData "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+    if ($env:ALLUSERSPROFILE) {
+        $candidates.Add((Join-Path $env:ALLUSERSPROFILE "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+    if ($env:USERPROFILE) {
+        $candidates.Add((Join-Path $env:USERPROFILE "AppData\Roaming\Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+
+    foreach ($candidate in $candidates) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $candidates[0]
+}
+
+function Get-AutoCadTrustedBundlePaths {
+    param([string]$ResolvedBundleRoot)
+
+    $bundleRootPath = [System.IO.Path]::GetFullPath($ResolvedBundleRoot).TrimEnd("\")
+    $bundleContentsPath = (Join-Path $bundleRootPath "Contents\Win64").TrimEnd("\")
+    return @(
+        "$bundleRootPath\..."
+        "$bundleContentsPath\..."
+    ) | Select-Object -Unique
+}
+
+function Get-AutoCadTrustedPathRegistryKeys {
+    $autoCadRoot = "HKCU:\Software\Autodesk\AutoCAD"
+    if (-not (Test-Path $autoCadRoot)) {
+        return @()
+    }
+
+    return @(
+        Get-ChildItem -Path $autoCadRoot -Recurse -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.PSPath -match "\\Profiles\\[^\\]+\\Variables$" -or
+                $_.PSPath -match "\\R[^\\]+\\[^\\]+\\Variables$"
+            } |
+            Select-Object -ExpandProperty PSPath -Unique
+    )
+}
+
+function Get-TrustedPathSummary {
+    param([string]$ResolvedBundleRoot)
+
+    $trustedEntries = Get-AutoCadTrustedBundlePaths -ResolvedBundleRoot $ResolvedBundleRoot
+    $matchingKeys = New-Object System.Collections.Generic.List[string]
+
+    foreach ($registryPath in (Get-AutoCadTrustedPathRegistryKeys)) {
+        try {
+            $currentTrustedPaths = [string](Get-ItemPropertyValue -Path $registryPath -Name TRUSTEDPATHS -ErrorAction Stop)
+        }
+        catch {
+            continue
+        }
+
+        $pathEntries = @(
+            $currentTrustedPaths -split ";" |
+                ForEach-Object { $_.Trim() } |
+                Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        )
+
+        foreach ($trustedEntry in $trustedEntries) {
+            if ($pathEntries -contains $trustedEntry) {
+                $matchingKeys.Add($registryPath)
+                break
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        registered = ($matchingKeys.Count -gt 0)
+        trustedEntries = @($trustedEntries)
+        registryKeys = @($matchingKeys | Select-Object -Unique)
+    }
+}
+
 if (-not $BundleRoot) {
-    $BundleRoot = Join-Path $env:APPDATA "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"
+    $BundleRoot = Get-DefaultBundleRoot
 }
 $BundleRoot = [System.IO.Path]::GetFullPath($BundleRoot)
 $bundleDllPath = Join-Path $BundleRoot "Contents\Win64\WatchdogCadTracker.dll"
+$bundleDepsPath = Join-Path $BundleRoot "Contents\Win64\WatchdogCadTracker.deps.json"
+$bundleRuntimeConfigPath = Join-Path $BundleRoot "Contents\Win64\WatchdogCadTracker.runtimeconfig.json"
 $packageContentsPath = Join-Path $BundleRoot "PackageContents.xml"
 
 $packageExists = Test-Path $packageContentsPath
 $dllExists = Test-Path $bundleDllPath
+$depsExists = Test-Path $bundleDepsPath
+$runtimeConfigExists = Test-Path $bundleRuntimeConfigPath
 $commands = @()
 $loadOnStartup = $false
+$productCode = $null
+$upgradeCode = $null
 $errors = New-Object System.Collections.Generic.List[string]
+$trustedPathSummary = Get-TrustedPathSummary -ResolvedBundleRoot $BundleRoot
 
 if ($packageExists) {
     try {
         [xml]$xml = Get-Content $packageContentsPath -Raw
-        $entry = $xml.ApplicationPackage.Components.ComponentEntry
+        $applicationPackage = $xml.DocumentElement
+        $productCode = [string]$applicationPackage.GetAttribute("ProductCode")
+        $upgradeCode = [string]$applicationPackage.GetAttribute("UpgradeCode")
+        $entry = $applicationPackage.SelectSingleNode("//ComponentEntry")
         if ($entry) {
-            $loadOnStartup = [string]$entry.LoadOnAutoCADStartup -eq "True"
-            foreach ($command in $entry.Commands.Command) {
-                $globalCommand = [string]$command.Global
+            $loadOnStartup = [string]$entry.GetAttribute("LoadOnAutoCADStartup") -eq "True"
+            foreach ($command in $entry.SelectNodes("Commands/Command")) {
+                $globalCommand = [string]$command.GetAttribute("Global")
                 if (-not [string]::IsNullOrWhiteSpace($globalCommand)) {
                     $commands += $globalCommand
                 }
@@ -45,13 +150,26 @@ else {
 if (-not $dllExists) {
     $errors.Add("Plugin DLL not found.")
 }
+if ($packageExists -and [string]::IsNullOrWhiteSpace($productCode)) {
+    $errors.Add("PackageContents.xml is missing ProductCode.")
+}
+if ($packageExists -and [string]::IsNullOrWhiteSpace($upgradeCode)) {
+    $errors.Add("PackageContents.xml is missing UpgradeCode.")
+}
 
 $result = [ordered]@{
     ok = ($errors.Count -eq 0)
     bundleRoot = $BundleRoot
     packageContentsExists = $packageExists
     dllExists = $dllExists
+    depsExists = $depsExists
+    runtimeConfigExists = $runtimeConfigExists
     loadOnAutoCadStartup = $loadOnStartup
+    trustedPathRegistered = [bool]$trustedPathSummary.registered
+    trustedPathEntries = @($trustedPathSummary.trustedEntries)
+    trustedPathRegistryKeys = @($trustedPathSummary.registryKeys)
+    productCode = $productCode
+    upgradeCode = $upgradeCode
     commands = $commands
     errors = @($errors)
 }

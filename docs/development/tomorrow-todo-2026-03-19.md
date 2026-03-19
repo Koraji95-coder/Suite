@@ -1,124 +1,107 @@
-# Tomorrow TODO
+# Workstation Resume TODO
 
 Date: March 19, 2026
+Branch: `main`
 
-## Must Do Before Broader Testing
+This is the handoff checklist for resuming on the other workstation after restoring local state.
 
-1. Apply the hosted Supabase schema changes.
-   - Run `supabase/consolidated_migration.sql`.
-   - Then run `backend/supabase/rls_hardening.sql`.
-   - Then run `backend/supabase/storage_policies.sql`.
-   - Goal: remove the `public.work_ledger_entries` degradation path and enable hosted Work Ledger + revision storage.
+## What Landed
 
-2. Install and bootstrap Worktale on this workstation.
-   - `npm install -g worktale`
-   - `npm run worktale:bootstrap`
-   - `worktale hook status`
-   - Goal: clear the CLI/bootstrap warnings and enable automatic commit capture.
+- Local Supabase bootstrap is now repo-driven:
+  - `supabase/config.toml`
+  - `supabase/migrations/`
+  - `npm run supabase:start`
+  - `npm run supabase:env:local`
+  - `npm run supabase:db:reset`
+  - `npm run supabase:types`
+- Worktale is bootstrapped in-repo:
+  - `npm run worktale:bootstrap`
+  - `npm run worktale:doctor`
+- Watchdog is now automatic across:
+  - filesystem collector startup
+  - AutoCAD state collector startup
+  - backend startup
+  - AutoCAD plugin autoload/install/check
+- Project Watchdog attribution is now shared across workstations:
+  - `projects.watchdog_root_path`
+  - shared rule persistence in project-scoped settings
+  - local rule sync on app startup/focus
+  - shared drawing segment sync to Supabase
+- AutoCAD tracking now:
+  - pauses after 5 minutes of inactivity
+  - tracks `trackedMs` vs `idleMs`
+  - groups same-day returns to the same drawing into one drawing-day journal in project telemetry
+- Landing page hover jitter is fixed and the two main hero panels now share a consistent width rail.
 
-3. Run a clean dev session and retest route loading.
-   - `npm run dev:full`
-   - Hard refresh the browser after startup.
-   - Re-check `Calendar`, `Changelog`, and `Dashboard`.
-
-## High-Value Bug Sweep
-
-1. Calendar
-   - Re-test the lazy route load after the hardened `dev:full` restart.
-   - If the dynamic import failure persists, capture the network response and Vite console output.
-
-2. Changelog
-   - Verify the new automatic draft-ingest flow is working.
-   - Verify section spacing and header composition after the latest layout cleanup.
-   - Next UI follow-up: replace the large readiness card emphasis with a tighter `status strip + automation inbox + narrative preview` layout.
-
-3. Ground Grid
-   - Verify 3D preview with real data.
-   - Verify the potential view no longer causes runaway layout growth.
-   - Verify websocket/offline state reads clearly without noisy toast behavior.
-
-4. AutoDraft
-   - Run live preview/commit tests for:
-     - note creation
-     - title block attribute updates
-     - structured text replacement
-     - explicit text delete
-     - text swap
-   - Record every ambiguous skip, false negative, and bad target match.
-
-## CAD Automation Next Steps
-
-1. Make project/revision linkage less manual in AutoDraft.
-   - Promote project/file/revision selection from loose metadata into a cleaner workflow input.
-
-2. Reduce ambiguous target skips.
-   - Keep improving bridge-side drawing context and target metadata so commit families fail less often for the right reasons.
-
-3. Add the next safe write family after the current set.
-   - Keep the same rule: explicit metadata only, no guessed geometry, no silent writes.
-
-4. Push receipt traceability further into PM workflows.
-   - Surface CAD execution receipts more directly in revision history and project delivery context.
-
-## Repo-Scale Suggestions
-
-1. Continue shrinking the current largest hotspots:
-   - `src/routes/ChangelogRoutePage.tsx`
-   - `src/components/apps/autodraft-studio/AutoDraftComparePanel.tsx`
-   - `src/components/apps/conduit-route/ConduitTerminalWorkflow.tsx`
-   - `backend/route_groups/api_autodraft.py`
-   - `backend/coordinatesgrabber.py`
-
-2. Revisit the generated architecture snapshot after major refactors.
-   - Keep it current before using hotspot output for planning.
-
-3. Keep Work Ledger automatic, not noisy.
-   - Auto-create draft entries from git/agent/Watchdog input.
-   - Keep publish/manual curation review-first.
-
-## Workstation Switch Checklist
-
-### On the current workstation
-
-1. Mirror local-only state to Dropbox:
-   - `npm run workstation:mirror`
-
-2. Push current git work:
-   - commit
-   - `git push`
-
-### On the destination workstation
+## First Steps On The Destination Workstation
 
 1. Pull the latest repo state:
-   - `git pull`
+   - `git pull --ff-only origin main`
 
-2. Restore mirrored local-only state:
+2. Restore mirrored workstation-local state:
    - `npm run workstation:restore -- -WorkstationId DUSTIN-HOME`
-   - Replace `DUSTIN-HOME` with the actual target workstation id if needed.
+   - Replace `DUSTIN-HOME` if the destination workstation id differs.
 
-3. Bootstrap Worktale on the destination workstation:
-   - `npm install -g worktale`
+3. Restart Codex / the developer window so MCP env changes reload.
+
+4. Re-bootstrap local Supabase on that machine:
+   - `npm run supabase:start`
+   - `npm run supabase:env:local`
+   - `npm run supabase:db:reset`
+   - `npm run supabase:types`
+
+5. Reconfirm Worktale:
    - `npm run worktale:bootstrap`
-   - `worktale hook status`
+   - `npm run worktale:doctor`
 
-4. If you only need MCP/workstation env rewritten:
-   - `npm run workstation:sync -- -WorkstationId DUSTIN-HOME`
-
-5. Restart the developer window / Codex session.
-
-6. Start the app stack:
-   - `npm run dev:full`
-
-7. Run the workstation checks:
+6. Reconfirm Watchdog startup:
    - `npm run watchdog:startup:check`
    - `npm run watchdog:startup:autocad:check`
    - `npm run watchdog:backend:startup:check`
+   - `npm run watchdog:autocad:plugin:check`
    - `npm run watchdog:autocad:doctor`
 
-## What You Need To Do
+## What To Test Next
 
-1. Apply the Supabase SQL in the hosted project.
-2. Install Worktale CLI on the machine where you want changelog publishing.
-3. Use `npm run workstation:mirror` before leaving one machine.
-4. Use `npm run workstation:restore -- -WorkstationId <TARGET>` on the next machine.
-5. Restart Codex after any workstation sync/restore so MCP settings reload.
+1. Shared project attribution smoke test
+   - Create or edit a project in Suite.
+   - Set `Project root folder`.
+   - Open a DWG inside that folder.
+   - Confirm the project telemetry page shows the session under `Tracked drawings`.
+
+2. Same-day drawing journal behavior
+   - Open Drawing A under the project root.
+   - Switch to Drawing B.
+   - Switch back to Drawing A.
+   - Confirm Drawing A stays one top-level drawing row and gains additional same-day segment entries instead of resetting.
+
+3. 5-minute AutoCAD idle pause
+   - Leave AutoCAD inactive for more than 5 minutes.
+   - Confirm tracked time stops increasing during idle.
+   - Resume with a command, drawing switch, or mouse activity and confirm tracking resumes.
+
+4. Cross-workstation continuity
+   - After restore, confirm the same project root settings show up.
+   - Confirm shared drawing history appears on the destination workstation without re-entering rules.
+
+## If Something Looks Off
+
+1. Force local/shared Watchdog sync:
+   - open the app and focus it once
+   - `npm run watchdog:autocad:collector:once`
+   - `npm run watchdog:collector:once`
+
+2. Recheck AutoCAD readiness:
+   - `npm run watchdog:autocad:doctor`
+
+3. Recheck local Supabase:
+   - `npm run supabase:status`
+
+4. Recheck Worktale:
+   - `npm run worktale:doctor`
+
+## Follow-Up Work After Smoke Testing
+
+1. Do a live browser verification of the new tracked-drawings project telemetry flow.
+2. Decide whether the tracked-drawings UI needs extra controls for filtering or deeper segment drill-in.
+3. If the second workstation path is clean, leave the shared Watchdog sync path as the default operating model.

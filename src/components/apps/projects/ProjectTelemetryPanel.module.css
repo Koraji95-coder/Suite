@@ -288,3 +288,261 @@
 	font-size: 0.78rem;
 	color: var(--text-muted);
 }
+
+.drawingsPanel {
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	padding: 1rem;
+	background: linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 74%, transparent)
+		),
+		var(--surface);
+	box-shadow: var(--shadow-sm);
+	display: flex;
+	flex-direction: column;
+	gap: 0.85rem;
+}
+
+.drawingsHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 1rem;
+}
+
+.drawingsCount {
+	font-size: 0.82rem;
+	color: var(--text-muted);
+}
+
+.drawingsList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.drawingCard {
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+	overflow: hidden;
+}
+
+.drawingSummaryButton {
+	width: 100%;
+	border: none;
+	background: transparent;
+	padding: 0.9rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+.drawingSummaryMain {
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+}
+
+.drawingToggle {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.65rem;
+}
+
+.toggleIcon {
+	width: 1rem;
+	height: 1rem;
+	color: var(--text-muted);
+	margin-top: 0.15rem;
+}
+
+.drawingTitle {
+	font-size: 0.98rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.drawingPath {
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	word-break: break-word;
+}
+
+.drawingSummaryStats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem 1rem;
+	font-size: 0.78rem;
+	color: var(--text-muted);
+}
+
+.drawingGroups {
+	border-top: 1px solid var(--line-soft);
+	padding: 0.85rem 0.9rem 0.95rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.dayGroup {
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface) 90%, transparent);
+	padding: 0.85rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.7rem;
+}
+
+.dayGroupHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 1rem;
+}
+
+.dayGroupTitle {
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.dayGroupMeta {
+	font-size: 0.76rem;
+	color: var(--text-muted);
+}
+
+.dayGroupAside {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.2rem;
+	font-size: 0.76rem;
+	color: var(--text-muted);
+}
+
+.segmentList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+}
+
+.segmentRow {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 1rem;
+	padding-top: 0.55rem;
+	border-top: 1px solid color-mix(in srgb, var(--line-soft) 70%, transparent);
+}
+
+.segmentRow:first-child {
+	padding-top: 0;
+	border-top: none;
+}
+
+.segmentMain {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+.segmentTitle {
+	font-size: 0.84rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.segmentMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem 0.8rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.segmentAside {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.25rem;
+	font-size: 0.78rem;
+	color: var(--text);
+}
+
+.sessionList {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.sessionRow {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 1rem;
+	padding: 0.85rem 1rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+}
+
+.sessionMain {
+	display: flex;
+	flex-direction: column;
+	gap: 0.18rem;
+}
+
+.sessionTitle {
+	font-size: 0.92rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.sessionMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem 0.85rem;
+	font-size: 0.76rem;
+	color: var(--text-muted);
+}
+
+.sessionAside {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.25rem;
+}
+
+.sessionAge {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.emptyState {
+	border-radius: var(--radius-2);
+	border: 1px dashed var(--line-soft);
+	padding: 0.85rem 1rem;
+	font-size: 0.84rem;
+	color: var(--text-muted);
+	background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+@media (max-width: 720px) {
+	.header,
+	.ruleHeader,
+	.drawingsHeader,
+	.dayGroupHeader,
+	.sessionRow {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.sessionAside,
+	.segmentAside,
+	.dayGroupAside {
+		align-items: flex-start;
+	}
+}

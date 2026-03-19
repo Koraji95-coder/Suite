@@ -42,7 +42,7 @@ export async function saveSetting(
 			p_user_id: userId,
 			p_setting_key: key,
 			p_setting_value: value as Json,
-			p_project_id: projectId ?? null,
+			p_project_id: projectId ?? undefined,
 		});
 
 		if (error) throw error;

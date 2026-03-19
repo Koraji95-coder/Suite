@@ -174,6 +174,166 @@ export const COMMAND_GROUPS: CommandGroup[] = [
 		],
 	},
 	{
+		title: "Supabase",
+		presets: [
+			{
+				id: "supabase-start",
+				name: "Start Local Supabase",
+				description: "Boot the local Supabase stack with tracked migrations.",
+				command: "npm run supabase:start",
+			},
+			{
+				id: "supabase-status",
+				name: "Show Supabase Status",
+				description: "Print local Supabase URLs, keys, and service status.",
+				command: "npm run supabase:status",
+			},
+			{
+				id: "supabase-env-local",
+				name: "Write Local Supabase Env",
+				description:
+					"Generate .env.local overrides from the running local Supabase stack.",
+				command: "npm run supabase:env:local",
+			},
+			{
+				id: "supabase-db-reset",
+				name: "Reset Local Supabase DB",
+				description: "Rebuild the local database from tracked migrations.",
+				command: "npm run supabase:db:reset",
+			},
+			{
+				id: "supabase-types",
+				name: "Generate Supabase Types",
+				description: "Refresh src/supabase/database.ts from the local database.",
+				command: "npm run supabase:types",
+			},
+			{
+				id: "supabase-stop",
+				name: "Stop Local Supabase",
+				description: "Shut down the local Supabase containers.",
+				command: "npm run supabase:stop",
+			},
+			{
+				id: "supabase-env-clear",
+				name: "Clear Local Supabase Env",
+				description:
+					"Remove the generated local Supabase overrides from .env.local.",
+				command: "npm run supabase:env:clear",
+			},
+		],
+	},
+	{
+		title: "Watchdog",
+		presets: [
+			{
+				id: "watchdog-fs-startup-install",
+				name: "Install Filesystem Collector Startup",
+				description:
+					"Register the filesystem collector for workstation startup and launch it now.",
+				command: "npm run watchdog:startup:install",
+			},
+			{
+				id: "watchdog-fs-startup-check",
+				name: "Check Filesystem Collector Startup",
+				description: "Verify filesystem collector startup registration and daemon health.",
+				command: "npm run watchdog:startup:check",
+			},
+			{
+				id: "watchdog-autocad-startup-install",
+				name: "Install AutoCAD Collector Startup",
+				description:
+					"Register the AutoCAD collector for workstation startup and launch it now.",
+				command: "npm run watchdog:startup:autocad:install",
+			},
+			{
+				id: "watchdog-autocad-startup-check",
+				name: "Check AutoCAD Collector Startup",
+				description: "Verify AutoCAD collector startup registration and daemon health.",
+				command: "npm run watchdog:startup:autocad:check",
+			},
+			{
+				id: "watchdog-backend-startup-check",
+				name: "Check Backend Startup",
+				description: "Verify the backend watchdog process is already running.",
+				command: "npm run watchdog:backend:startup:check",
+			},
+			{
+				id: "watchdog-backend-startup-start",
+				name: "Start Backend For Watchdog",
+				description: "Start the backend in the background if the watchdog backend is missing.",
+				command: "npm run watchdog:backend:startup:start",
+			},
+			{
+				id: "watchdog-autocad-plugin-check",
+				name: "Check AutoCAD Plugin",
+				description: "Validate the AutoCAD tracker plugin install state.",
+				command: "npm run watchdog:autocad:plugin:check",
+			},
+			{
+				id: "watchdog-autocad-plugin-install",
+				name: "Install AutoCAD Plugin",
+				description: "Install the AutoCAD tracker plugin bundle for this user profile.",
+				command: "npm run watchdog:autocad:plugin:install",
+			},
+			{
+				id: "watchdog-autocad-doctor",
+				name: "Run AutoCAD Watchdog Doctor",
+				description:
+					"Check startup, plugin, backend, tracker-state, and collector-state readiness.",
+				command: "npm run watchdog:autocad:doctor",
+			},
+		],
+	},
+	{
+		title: "Worktale",
+		presets: [
+			{
+				id: "worktale-bootstrap",
+				name: "Bootstrap Worktale",
+				description:
+					"Initialize .worktale and converge both automatic hooks for this repo.",
+				command: "npm run worktale:bootstrap",
+			},
+			{
+				id: "worktale-doctor",
+				name: "Check Worktale Readiness",
+				description:
+					"Verify CLI, git email, bootstrap state, and both Worktale hooks.",
+				command: "npm run worktale:doctor",
+			},
+			{
+				id: "worktale-status",
+				name: "Worktale Status",
+				description: "Show today's commit capture summary and streak.",
+				command: "worktale status",
+			},
+			{
+				id: "worktale-today",
+				name: "Worktale Today",
+				description: "Review the current day's captured activity summary.",
+				command: "worktale today",
+			},
+			{
+				id: "worktale-dash",
+				name: "Open Worktale Dashboard",
+				description: "Open the local Worktale dashboard for this repository.",
+				command: "worktale dash",
+			},
+			{
+				id: "worktale-digest",
+				name: "Generate Worktale Digest",
+				description: "Build the daily digest before review or publishing.",
+				command: "worktale digest",
+			},
+			{
+				id: "worktale-note",
+				name: "Append Worktale Note",
+				description: "Add a manual note to today's Worktale narrative.",
+				command: 'worktale note "what you worked on"',
+			},
+		],
+	},
+	{
 		title: "Npx Utilities",
 		presets: [
 			{

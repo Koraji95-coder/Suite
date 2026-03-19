@@ -122,8 +122,9 @@ export const storageInfo = {
 			title: "How to Update Database",
 			content: [
 				"All database changes are done through migrations",
-				"Migrations stored in supabase/migrations/ directory",
+				"Primary local migration chain lives in supabase/migrations/",
 				"Each migration has a timestamp and descriptive name",
+				"Hosted SQL Editor fallback copies remain under supabase/ and backend/supabase/",
 				"Migrations run automatically and maintain history",
 				"Row Level Security (RLS) protects all user data",
 			],

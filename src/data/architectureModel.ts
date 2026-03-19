@@ -216,17 +216,18 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 	{
 		id: "schema-sql",
 		domainId: "data",
-		label: "Schema SQL",
-		path: "supabase/consolidated_migration.sql",
+		label: "Schema Migrations",
+		path: "supabase/migrations",
 		summary:
-			"Core tables/enums for projects, tasks, app data, AI, and passkeys.",
+			"Primary local Supabase migration chain for schema, RLS, and storage policy setup.",
 	},
 	{
 		id: "rls-policies",
 		domainId: "data",
-		label: "RLS Policies",
-		path: "supabase/updated_rls_policies.sql",
-		summary: "Row-level security and per-user access enforcement.",
+		label: "Fallback SQL Copies",
+		path: "supabase/consolidated_migration.sql + backend/supabase",
+		summary:
+			"Hosted SQL Editor fallback copies kept in sync with the tracked migration chain.",
 	},
 	{
 		id: "supabase-bootstrap",
@@ -487,8 +488,8 @@ export const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
 		title: "Data + Access Governance",
 		steps: [
 			"src/supabase/client.ts",
-			"supabase/consolidated_migration.sql",
-			"supabase/updated_rls_policies.sql",
+			"supabase/migrations/*",
+			"supabase/consolidated_migration.sql + backend/supabase/*",
 			"per-user storage and table access controls",
 		],
 	},

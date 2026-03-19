@@ -178,6 +178,15 @@ class WatchdogLedger:
                     updated_at_ms INTEGER NOT NULL,
                     PRIMARY KEY (user_key, project_id)
                 );
+
+                CREATE TABLE IF NOT EXISTS watchdog_sync_cursors (
+                    user_key TEXT NOT NULL,
+                    sync_name TEXT NOT NULL,
+                    last_event_id INTEGER NOT NULL DEFAULT 0,
+                    metadata_json TEXT NOT NULL DEFAULT '{}',
+                    updated_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (user_key, sync_name)
+                );
                 """
             )
 
@@ -417,6 +426,129 @@ class WatchdogLedger:
                 (user_key,),
             ).fetchall()
         return [self._serialize_project_rule_row(row) for row in rows]
+
+    def resolve_preferred_user_key(self) -> Optional[str]:
+        query_plan = [
+            ("SELECT user_key FROM watchdog_project_rules ORDER BY updated_at_ms DESC LIMIT 1", ()),
+            ("SELECT user_key FROM watchdog_collectors ORDER BY updated_at_ms DESC LIMIT 1", ()),
+            ("SELECT user_key FROM watchdog_sync_cursors ORDER BY updated_at_ms DESC LIMIT 1", ()),
+            ("SELECT user_key FROM watchdog_user_state ORDER BY updated_at_ms DESC LIMIT 1", ()),
+            ("SELECT user_key FROM watchdog_legacy_states ORDER BY updated_at_ms DESC LIMIT 1", ()),
+            ("SELECT user_key FROM watchdog_events ORDER BY created_at_ms DESC LIMIT 1", ()),
+        ]
+        with self._lock, self._connect() as connection:
+            for query, params in query_plan:
+                row = connection.execute(query, params).fetchone()
+                if row is None:
+                    continue
+                user_key = _optional_text(row["user_key"])
+                if user_key:
+                    return user_key
+        return None
+
+    def delete_project_rule(self, user_key: str, project_id: str) -> bool:
+        normalized_project_id = _optional_text(project_id)
+        if not normalized_project_id:
+            return False
+        with self._lock, self._connect() as connection:
+            cursor = connection.execute(
+                """
+                DELETE FROM watchdog_project_rules
+                WHERE user_key = ? AND project_id = ?
+                """,
+                (user_key, normalized_project_id),
+            )
+        return int(cursor.rowcount or 0) > 0
+
+    def get_sync_cursor(self, user_key: str, sync_name: str) -> Dict[str, Any]:
+        normalized_sync_name = _optional_text(sync_name) or ""
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT last_event_id, metadata_json, updated_at_ms
+                FROM watchdog_sync_cursors
+                WHERE user_key = ? AND sync_name = ?
+                """,
+                (user_key, normalized_sync_name),
+            ).fetchone()
+        if row is None:
+            return {
+                "syncName": normalized_sync_name,
+                "lastEventId": 0,
+                "metadata": {},
+                "updatedAt": 0,
+            }
+        return {
+            "syncName": normalized_sync_name,
+            "lastEventId": int(row["last_event_id"] or 0),
+            "metadata": _safe_json_loads(row["metadata_json"], {}),
+            "updatedAt": int(row["updated_at_ms"] or 0),
+        }
+
+    def save_sync_cursor(
+        self,
+        user_key: str,
+        sync_name: str,
+        *,
+        last_event_id: int,
+        metadata: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        normalized_sync_name = _optional_text(sync_name) or ""
+        now_ms = int(time.time() * 1000)
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO watchdog_sync_cursors (
+                    user_key,
+                    sync_name,
+                    last_event_id,
+                    metadata_json,
+                    updated_at_ms
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_key, sync_name) DO UPDATE SET
+                    last_event_id = excluded.last_event_id,
+                    metadata_json = excluded.metadata_json,
+                    updated_at_ms = excluded.updated_at_ms
+                """,
+                (
+                    user_key,
+                    normalized_sync_name,
+                    max(0, int(last_event_id)),
+                    _safe_json_dumps(metadata or {}),
+                    now_ms,
+                ),
+            )
+        return {
+            "syncName": normalized_sync_name,
+            "lastEventId": max(0, int(last_event_id)),
+            "metadata": dict(metadata or {}),
+            "updatedAt": now_ms,
+        }
+
+    def list_drawing_segment_source_events(
+        self,
+        user_key: str,
+        *,
+        after_event_id: int,
+        limit: int,
+    ) -> List[Dict[str, Any]]:
+        safe_after = max(0, int(after_event_id))
+        safe_limit = max(1, min(500, int(limit)))
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM watchdog_events
+                WHERE user_key = ?
+                  AND event_id > ?
+                  AND event_type = 'drawing_closed'
+                  AND project_id IS NOT NULL
+                ORDER BY event_id ASC
+                LIMIT ?
+                """,
+                (user_key, safe_after, safe_limit),
+            ).fetchall()
+        return [self._serialize_event_row(row) for row in rows]
 
     def insert_events(
         self,

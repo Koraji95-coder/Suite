@@ -169,6 +169,56 @@ html.theme-animating * {
 	}
 }
 
+/* Custom cursor */
+#cursor,
+#cursor-ring {
+	position: fixed;
+	left: -100px;
+	top: -100px;
+	pointer-events: none;
+	user-select: none;
+	border-radius: 999px;
+	opacity: 0;
+	transform: translate(-50%, -50%);
+	will-change: transform, width, height, border-color, opacity;
+	z-index: 9999;
+	transition:
+		transform 140ms ease,
+		width 140ms ease,
+		height 140ms ease,
+		border-color 140ms ease,
+		background-color 140ms ease,
+		opacity 120ms ease;
+}
+
+body.cursor-enabled #cursor,
+body.cursor-enabled #cursor-ring {
+	opacity: 1;
+}
+
+#cursor {
+	width: 8px;
+	height: 8px;
+	background: color-mix(in srgb, var(--accent) 84%, white 16%);
+	box-shadow:
+		0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent),
+		0 0 18px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+#cursor-ring {
+	width: 34px;
+	height: 34px;
+	border: 1px solid rgb(232 201 126 / 32%);
+	background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#cursor,
+	#cursor-ring {
+		transition: none;
+	}
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    UTILITY CLASSES
    ═══════════════════════════════════════════════════════════════════════════ */

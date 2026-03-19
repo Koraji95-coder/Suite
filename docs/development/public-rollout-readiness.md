@@ -29,9 +29,8 @@ In Supabase project settings:
 - [ ] Agent pairing uses `X-Pairing-Code` and webhook requests enforce auth headers.
 - [ ] In broker mode, pair/unpair actions require email verification challenge flow (`/api/agent/pairing-challenge` + `/api/agent/pairing-confirm`).
 - [ ] Browser-exposed env values (`VITE_*`) contain no server-only secrets.
-- [ ] Supabase RLS script has been applied and verified (`backend/supabase/rls_hardening.sql`).
-- [ ] Supabase storage policies are applied (`backend/supabase/storage_policies.sql`).
-- [ ] Supabase schema bootstrap has been applied (`supabase/consolidated_migration.sql`).
+- [ ] The tracked Supabase migration chain has been applied and verified (`supabase/migrations/*`).
+- [ ] If using hosted SQL Editor fallback, the compatibility SQL copies have also been applied in order (`supabase/consolidated_migration.sql`, `backend/supabase/rls_hardening.sql`, `backend/supabase/storage_policies.sql`).
 - [ ] Passwordless auth abuse controls are tuned in backend env (`AUTH_EMAIL_*`).
 - [ ] CAPTCHA enforcement mode is explicitly set (`AUTH_EMAIL_REQUIRE_TURNSTILE`).
 

@@ -167,7 +167,7 @@ async function checkSupabaseTable(
 		if (response.status === 404) {
 			return error(
 				`Supabase ${table}`,
-				"Table is missing from Supabase. Run the latest migrations before relying on this surface.",
+				"Table is missing from Supabase. Run `npm run supabase:db:reset` for local dev or apply the fallback Supabase SQL stack before relying on this surface.",
 				`supabase-${table}`,
 			);
 		}

@@ -38,6 +38,17 @@ export interface BackupData {
 	tables: Record<string, Record<string, unknown>[]>;
 }
 
+async function upsertBackupRows(
+	tableName: BackupTable,
+	rows: Record<string, unknown>[],
+) {
+	// Restore data comes from a heterogeneous YAML payload, so this boundary stays
+	// intentionally dynamic instead of pretending each loop iteration is statically typed.
+	return await supabase
+		.from(tableName as never)
+		.upsert(rows as never, { onConflict: "id" });
+}
+
 function withBackupHeaders(base?: HeadersInit): HeadersInit {
 	const headers = new Headers(base);
 	if (BACKUP_API_KEY) headers.set("X-API-Key", BACKUP_API_KEY);
@@ -288,9 +299,10 @@ export async function restoreFromYaml(
 		if (!rows || rows.length === 0) continue;
 
 		try {
-			const { error } = await supabase
-				.from(tableName)
-				.upsert(rows, { onConflict: "id" });
+			const { error } = await upsertBackupRows(
+				tableName,
+				rows,
+			);
 
 			if (error) {
 				errors.push(`${tableName}: ${error.message}`);

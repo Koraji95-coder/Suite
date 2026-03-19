@@ -163,6 +163,7 @@ const telemetry = {
 	},
 	ruleConfigured: true,
 	ruleUpdatedAt: Date.now(),
+	trackedDrawings: [],
 } satisfies ProjectWatchdogTelemetry;
 
 describe("ProjectDetailHeader", () => {

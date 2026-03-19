@@ -1,16 +1,23 @@
-import { Activity, ArrowRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Activity, ArrowRight, ChevronDown, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/primitives/Badge";
 import { basenameFromPath } from "@/lib/watchdogTelemetry";
 import { buildDashboardWatchdogHref } from "@/lib/watchdogNavigation";
-import { watchdogService } from "@/services/watchdogService";
+import {
+	saveSharedProjectWatchdogRule,
+	syncSharedProjectWatchdogRulesToLocalRuntime,
+} from "@/services/projectWatchdogService";
 import styles from "./ProjectTelemetryPanel.module.css";
-import type { ProjectWatchdogTelemetry } from "./useProjectWatchdogTelemetry";
+import type {
+	ProjectTrackedDrawingSummary,
+	ProjectWatchdogTelemetry,
+} from "./useProjectWatchdogTelemetry";
 
 interface ProjectTelemetryPanelProps {
 	projectId: string;
 	telemetry: ProjectWatchdogTelemetry;
+	onRootPathChange?: (rootPath: string | null) => void;
 }
 
 function formatRelativeTime(timestamp: number | string | null | undefined): string {
@@ -38,6 +45,30 @@ function formatDuration(durationMs: number | null | undefined): string {
 	const hours = Math.floor(totalMinutes / 60);
 	const minutes = totalMinutes % 60;
 	return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+}
+
+function formatDateLabel(value: string): string {
+	if (!value) return "Unknown day";
+	const parsed = new Date(`${value}T00:00:00`);
+	if (Number.isNaN(parsed.getTime())) {
+		return value;
+	}
+	return parsed.toLocaleDateString([], {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	});
+}
+
+function formatClockTime(value: string): string {
+	const parsed = new Date(value);
+	if (Number.isNaN(parsed.getTime())) {
+		return value;
+	}
+	return parsed.toLocaleTimeString([], {
+		hour: "numeric",
+		minute: "2-digit",
+	});
 }
 
 function joinRuleLines(values: string[] | undefined): string {
@@ -86,6 +117,7 @@ function toDisplayList(values: string[] | undefined): string {
 export function ProjectTelemetryPanel({
 	projectId,
 	telemetry,
+	onRootPathChange,
 }: ProjectTelemetryPanelProps) {
 	const dashboardLink = buildDashboardWatchdogHref(projectId);
 	const [editingRules, setEditingRules] = useState(false);
@@ -96,6 +128,7 @@ export function ProjectTelemetryPanel({
 	const [ruleExcludes, setRuleExcludes] = useState("");
 	const [rulePatterns, setRulePatterns] = useState("");
 	const [localRule, setLocalRule] = useState(telemetry.rule);
+	const [expandedDrawings, setExpandedDrawings] = useState<Record<string, boolean>>({});
 
 	useEffect(() => {
 		if (editingRules) {
@@ -127,6 +160,11 @@ export function ProjectTelemetryPanel({
 		? telemetry.sessions.length
 		: telemetry.liveSessions.length;
 
+	const trackedDrawings = useMemo(
+		() => telemetry.trackedDrawings.slice(0, 12),
+		[telemetry.trackedDrawings],
+	);
+
 	const startEditingRules = () => {
 		setRuleError(null);
 		setEditingRules(true);
@@ -152,15 +190,26 @@ export function ProjectTelemetryPanel({
 		setSavingRules(true);
 		setRuleError(null);
 		try {
-			const response = await watchdogService.putProjectRule(projectId, {
+			const responseRule = await saveSharedProjectWatchdogRule(projectId, {
 				roots: parseRuleLines(ruleRoots),
 				includeGlobs: parseRuleLines(ruleIncludes),
 				excludeGlobs: parseRuleLines(ruleExcludes),
 				drawingPatterns: parseRuleLines(rulePatterns),
 				metadata: effectiveRule?.metadata ?? {},
 			});
-			setLocalRule(response.rule);
+			setLocalRule(responseRule);
 			setEditingRules(false);
+			onRootPathChange?.(responseRule.roots[0] ?? null);
+
+			try {
+				await syncSharedProjectWatchdogRulesToLocalRuntime();
+			} catch (syncError) {
+				setRuleError(
+					syncError instanceof Error
+						? `Rules saved, but local watchdog sync failed: ${syncError.message}`
+						: "Rules saved, but local watchdog sync failed.",
+				);
+			}
 		} catch (error) {
 			setRuleError(
 				error instanceof Error
@@ -172,6 +221,13 @@ export function ProjectTelemetryPanel({
 		}
 	};
 
+	const toggleDrawingExpansion = (drawing: ProjectTrackedDrawingSummary) => {
+		setExpandedDrawings((previous) => ({
+			...previous,
+			[drawing.drawingPath]: !previous[drawing.drawingPath],
+		}));
+	};
+
 	return (
 		<section className={styles.root}>
 			<div className={styles.header}>
@@ -181,7 +237,8 @@ export function ProjectTelemetryPanel({
 						<h4>Project telemetry</h4>
 					</div>
 					<p className={styles.description}>
-						Live AutoCAD sessions, collectors, and rule coverage for this project.
+						Live AutoCAD sessions, shared project mapping, and drawing-day
+						journals for this project.
 					</p>
 				</div>
 				<Link to={dashboardLink} className={styles.link}>
@@ -210,10 +267,8 @@ export function ProjectTelemetryPanel({
 					</div>
 				</div>
 				<div className={styles.statCard}>
-					<div className={styles.statLabel}>Collectors online</div>
-					<div className={styles.statValue}>
-						{telemetry.onlineCollectorCount ?? 0}
-					</div>
+					<div className={styles.statLabel}>Tracked drawings</div>
+					<div className={styles.statValue}>{telemetry.trackedDrawings.length}</div>
 				</div>
 			</div>
 
@@ -256,7 +311,8 @@ export function ProjectTelemetryPanel({
 					<div>
 						<h5 className={styles.ruleTitle}>Project mapping rules</h5>
 						<p className={styles.ruleDescription}>
-							Define roots and pattern filters used for telemetry attribution.
+							Shared across workstations. Deepest matching root wins, then newest
+							rule.
 						</p>
 					</div>
 					{editingRules ? (
@@ -376,6 +432,145 @@ export function ProjectTelemetryPanel({
 								? formatRelativeTime(effectiveRule.updatedAt)
 								: "—"}
 						</div>
+					</div>
+				)}
+			</section>
+
+			<section className={styles.drawingsPanel}>
+				<div className={styles.drawingsHeader}>
+					<div>
+						<h5 className={styles.ruleTitle}>Tracked drawings</h5>
+						<p className={styles.ruleDescription}>
+							Same-day returns append under the same drawing journal. Live local
+							session time is merged into today immediately.
+						</p>
+					</div>
+					<span className={styles.drawingsCount}>
+						{telemetry.trackedDrawings.length} drawing
+						{telemetry.trackedDrawings.length === 1 ? "" : "s"}
+					</span>
+				</div>
+
+				{trackedDrawings.length === 0 ? (
+					<div className={styles.emptyState}>
+						No tracked drawings have synced for this project yet.
+					</div>
+				) : (
+					<div className={styles.drawingsList}>
+						{trackedDrawings.map((drawing) => {
+							const expanded = Boolean(expandedDrawings[drawing.drawingPath]);
+							return (
+								<div key={drawing.drawingPath} className={styles.drawingCard}>
+									<button
+										type="button"
+										className={styles.drawingSummaryButton}
+										onClick={() => toggleDrawingExpansion(drawing)}
+									>
+										<div className={styles.drawingSummaryMain}>
+											<div className={styles.drawingToggle}>
+												{expanded ? (
+													<ChevronDown className={styles.toggleIcon} />
+												) : (
+													<ChevronRight className={styles.toggleIcon} />
+												)}
+												<div>
+													<div className={styles.drawingTitle}>
+														{drawing.drawingName}
+													</div>
+													<div className={styles.drawingPath}>
+														{drawing.drawingPath}
+													</div>
+												</div>
+											</div>
+											<div className={styles.drawingSummaryStats}>
+												<span>Lifetime {formatDuration(drawing.lifetimeTrackedMs)}</span>
+												<span>Today {formatDuration(drawing.todayTrackedMs)}</span>
+												<span>{drawing.daysWorkedCount} day(s)</span>
+												<span>
+													Last worked {formatRelativeTime(drawing.lastWorkedAt)}
+												</span>
+												{drawing.liveTrackedMs > 0 ? (
+													<Badge
+														size="sm"
+														color={
+															drawing.liveStatus === "paused"
+																? "warning"
+																: "success"
+														}
+														variant="soft"
+													>
+														{drawing.liveStatus === "paused" ? "Paused" : "Live"}{" "}
+														{formatDuration(drawing.liveTrackedMs)}
+													</Badge>
+												) : null}
+											</div>
+										</div>
+									</button>
+
+									{expanded ? (
+										<div className={styles.drawingGroups}>
+											{drawing.dateGroups.map((group) => (
+												<div key={`${drawing.drawingPath}:${group.workDate}`} className={styles.dayGroup}>
+													<div className={styles.dayGroupHeader}>
+														<div>
+															<div className={styles.dayGroupTitle}>
+																{formatDateLabel(group.workDate)}
+															</div>
+															<div className={styles.dayGroupMeta}>
+																{group.segmentCount} segment
+																{group.segmentCount === 1 ? "" : "s"} •{" "}
+																{formatDuration(group.trackedMs)} tracked
+															</div>
+														</div>
+														<div className={styles.dayGroupAside}>
+															<span>{formatDuration(group.idleMs)} idle</span>
+															<span>
+																{group.lastWorkedAt
+																	? formatRelativeTime(group.lastWorkedAt)
+																	: "—"}
+															</span>
+														</div>
+													</div>
+													<div className={styles.segmentList}>
+														{group.segments.map((segment) => (
+															<div key={segment.id} className={styles.segmentRow}>
+																<div className={styles.segmentMain}>
+																	<div className={styles.segmentTitle}>
+																		{segment.isLive
+																			? "Live session"
+																			: `${formatClockTime(segment.startedAt)} → ${formatClockTime(segment.endedAt)}`}
+																	</div>
+																	<div className={styles.segmentMeta}>
+																		<span>{segment.workstationId}</span>
+																		<span>{segment.commandCount} command(s)</span>
+																		<span>{formatDuration(segment.idleMs)} idle</span>
+																	</div>
+																</div>
+																<div className={styles.segmentAside}>
+																	<Badge
+																		color={
+																			segment.status === "live"
+																				? "primary"
+																				: segment.status === "paused"
+																					? "warning"
+																					: "accent"
+																		}
+																		variant="soft"
+																	>
+																		{segment.status}
+																	</Badge>
+																	<span>{formatDuration(segment.trackedMs)}</span>
+																</div>
+															</div>
+														))}
+													</div>
+												</div>
+											))}
+										</div>
+									) : null}
+								</div>
+							);
+						})}
 					</div>
 				)}
 			</section>

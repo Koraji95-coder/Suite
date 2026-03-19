@@ -8,7 +8,8 @@ from typing import Any, Dict, Mapping, Tuple
 
 
 def normalize_path(path_value: str) -> str:
-    return os.path.normcase(os.path.normpath(os.path.abspath(path_value)))
+    resolved = Path(path_value).expanduser().resolve(strict=False)
+    return os.path.normcase(os.path.normpath(str(resolved)))
 
 
 def relative_posix(path_value: str, root_value: str) -> str:
@@ -84,14 +85,14 @@ def scan_snapshot(
                             if not entry.is_file(follow_symlinks=False):
                                 continue
 
-                            absolute_path = os.path.abspath(entry.path)
+                            absolute_path = str(Path(entry.path).expanduser().resolve(strict=False))
                             normalized_key = normalize_path(absolute_path)
                             if normalized_key in normalized_exclude_paths:
                                 continue
 
                             files_scanned += 1
 
-                            rel_path = relative_posix(entry.path, root)
+                            rel_path = relative_posix(absolute_path, root)
                             if not is_included(
                                 rel_path=rel_path,
                                 name=entry.name,
@@ -202,7 +203,7 @@ def ensure_absolute_roots(raw_roots: list[str], *, allow_missing: bool) -> list[
         if not root_path.is_absolute():
             raise ValueError(f"Root path must be absolute: {root_value}")
 
-        normalized = os.path.abspath(str(root_path))
+        normalized = str(root_path.resolve(strict=False))
         if not allow_missing and not os.path.isdir(normalized):
             raise ValueError(f"Root path does not exist or is not a directory: {root_value}")
 

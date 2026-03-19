@@ -230,6 +230,8 @@ export interface WatchdogSessionSummary {
 	idleCount: number;
 	activationCount: number;
 	durationMs: number;
+	idleDurationMs?: number;
+	durationSource?: string | null;
 	sourceAvailable: boolean;
 	pendingCount: number;
 	trackerUpdatedAt?: number | null;
@@ -243,6 +245,28 @@ export interface WatchdogSessionsResponse {
 	collectorId?: string | null;
 	count: number;
 	sessions: WatchdogSessionSummary[];
+}
+
+export interface WatchdogProjectRulesSyncResponse {
+	ok: boolean;
+	rules: WatchdogProjectRule[];
+	count: number;
+	deletedProjectIds: string[];
+}
+
+export interface WatchdogDrawingActivitySyncCursor {
+	syncName: string;
+	lastEventId: number;
+	metadata: Record<string, unknown>;
+	updatedAt: number;
+}
+
+export interface WatchdogDrawingActivitySyncResponse {
+	ok: boolean;
+	synced: number;
+	skipped: number;
+	rows?: Record<string, unknown>[];
+	cursor?: WatchdogDrawingActivitySyncCursor;
 }
 
 function buildQueryString(
@@ -324,7 +348,7 @@ class WatchdogService {
 	private async requestJson<T>(
 		path: string,
 		options?: {
-			method?: "GET" | "POST" | "PUT";
+			method?: "GET" | "POST" | "PUT" | "DELETE";
 			body?: unknown;
 			timeoutMs?: number;
 		},
@@ -567,6 +591,40 @@ class WatchdogService {
 			{
 				method: "PUT",
 				body: rule,
+			},
+		);
+	}
+
+	async deleteProjectRule(projectId: string): Promise<WatchdogProjectRuleResponse> {
+		return this.requestJson<WatchdogProjectRuleResponse>(
+			`/api/watchdog/projects/${encodeURIComponent(projectId)}/rules`,
+			{
+				method: "DELETE",
+			},
+		);
+	}
+
+	async syncProjectRules(
+		rules: WatchdogProjectRule[],
+	): Promise<WatchdogProjectRulesSyncResponse> {
+		return this.requestJson<WatchdogProjectRulesSyncResponse>(
+			"/api/watchdog/project-rules/sync",
+			{
+				method: "POST",
+				body: { rules },
+			},
+		);
+	}
+
+	async syncDrawingActivity(
+		limit?: number,
+	): Promise<WatchdogDrawingActivitySyncResponse> {
+		return this.requestJson<WatchdogDrawingActivitySyncResponse>(
+			"/api/watchdog/drawing-activity/sync",
+			{
+				method: "POST",
+				body: { limit },
+				timeoutMs: 30_000,
 			},
 		);
 	}

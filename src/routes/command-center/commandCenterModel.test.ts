@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	COMMAND_GROUPS,
 	coerceActiveCommandCenterTab,
 	parseCommandCenterHistory,
 } from "./commandCenterModel";
@@ -60,5 +61,12 @@ describe("commandCenterModel", () => {
 			action: "watchdog_refreshed",
 			title: "Watchdog refresh",
 		});
+	});
+
+	it("includes the expected local workflow command groups", () => {
+		const titles = COMMAND_GROUPS.map((group) => group.title);
+		expect(titles).toContain("Supabase");
+		expect(titles).toContain("Watchdog");
+		expect(titles).toContain("Worktale");
 	});
 });

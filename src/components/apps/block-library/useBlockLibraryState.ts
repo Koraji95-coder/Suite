@@ -61,7 +61,16 @@ export function useBlockLibraryState() {
 		setIsUploading(true);
 
 		try {
-			const payload = buildUploadPayload(uploadForm);
+			const {
+				data: { user },
+				error: userError,
+			} = await supabase.auth.getUser();
+			if (userError || !user) {
+				showToast("error", "Sign in to upload blocks.");
+				return;
+			}
+
+			const payload = buildUploadPayload(uploadForm, user.id);
 			const { error } = await supabase.from("block_library").insert(payload);
 
 			if (!error) {

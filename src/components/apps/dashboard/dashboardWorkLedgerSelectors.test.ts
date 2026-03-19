@@ -81,6 +81,8 @@ describe("buildDashboardWorkLedgerViewModel", () => {
 					gitEmailConfigured: true,
 					gitEmail: "user@example.com",
 					bootstrapped: true,
+					postCommitHookInstalled: true,
+					postPushHookInstalled: true,
 				},
 				issues: [],
 				recommendedActions: [],

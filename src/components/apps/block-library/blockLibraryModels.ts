@@ -72,6 +72,7 @@ export const groupBlocksByCategory = (blocks: BlockFile[]) => {
 
 export const buildUploadPayload = (
 	form: BlockUploadForm,
+	userId: string,
 ): Database["public"]["Tables"]["block_library"]["Insert"] => {
 	return {
 		name: form.name,
@@ -85,5 +86,6 @@ export const buildUploadPayload = (
 		file_size: Math.floor(Math.random() * 1000000) + 50000,
 		usage_count: 0,
 		is_favorite: false,
+		user_id: userId,
 	};
 };

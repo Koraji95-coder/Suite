@@ -160,6 +160,7 @@
 }
 
 .main {
+	--landing-panel-max-width: 70rem;
 	position: relative;
 	z-index: 1;
 	margin-inline: auto;
@@ -171,6 +172,8 @@
 .hero {
 	position: relative;
 	margin-top: 1rem;
+	width: min(100%, var(--landing-panel-max-width));
+	margin-inline: auto;
 	overflow: hidden;
 	border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--line-soft));
 	border-radius: var(--radius-4);
@@ -221,10 +224,12 @@
 .heroGrid {
 	position: relative;
 	display: grid;
+	width: 100%;
 	gap: 1.4rem;
 	align-items: center;
+	justify-items: center;
 	padding: 2.75rem 1.4rem;
-	max-width: 76rem;
+	max-width: var(--landing-panel-max-width);
 	margin-inline: auto;
 }
 
@@ -232,16 +237,18 @@
 	display: grid;
 	align-content: start;
 	gap: 0.25rem;
-	justify-self: stretch;
+	justify-items: center;
+	text-align: center;
+	justify-self: center;
 	align-self: center;
 	width: 100%;
-	max-width: 37rem;
+	max-width: 42rem;
 }
 
 .sectionBadge {
 	display: inline-flex;
 	align-items: center;
-	justify-self: start;
+	justify-self: center;
 	width: fit-content;
 	padding-inline: 0.48rem;
 	padding-block: 0.18rem;
@@ -270,6 +277,7 @@
 
 .heroTitle {
 	max-width: 16ch;
+	margin-inline: auto;
 	font-size: clamp(1.95rem, 3.9vw, 3.15rem);
 	font-weight: 700;
 	line-height: 1.06;
@@ -283,11 +291,14 @@
 .heroCopy {
 	margin-top: 1rem;
 	max-width: 35rem;
+	margin-inline: auto;
+	text-align: center;
 	line-height: 1.68;
 }
 
 .heroCtaRow {
 	margin-top: 1.1rem;
+	justify-content: center;
 }
 
 .heroRight {
@@ -295,14 +306,15 @@
 	align-content: stretch;
 	justify-self: stretch;
 	width: 100%;
-	max-width: 35rem;
+	max-width: 56rem;
 	margin-inline: auto;
 	align-self: center;
 }
 
 .heroSummaryPanel {
 	height: 100%;
-	max-width: 34rem;
+	width: 100%;
+	max-width: 56rem;
 	border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--line-soft));
 	background:
 		linear-gradient(
@@ -426,7 +438,7 @@
 }
 
 .agentsPanel {
-	width: min(100%, 70rem);
+	width: min(100%, var(--landing-panel-max-width));
 	border: 1px solid var(--line-soft);
 	background:
 		linear-gradient(
@@ -561,20 +573,18 @@
 	}
 
 	.heroGrid {
-		grid-template-columns: repeat(12, minmax(0, 1fr));
+		grid-template-columns: minmax(0, 1fr);
 		padding: 3.3rem 2.55rem;
 		gap: 1.45rem;
 	}
 
 	.heroLeft {
-		grid-column: span 6 / span 6;
-		max-width: 36rem;
+		max-width: 44rem;
 	}
 
 	.heroRight {
-		grid-column: span 6 / span 6;
-		max-width: 35rem;
-		justify-self: end;
+		max-width: 56rem;
+		justify-self: stretch;
 	}
 
 	.agentGrid {

@@ -1,9 +1,5 @@
 #!/usr/bin/env node
-import fs from "node:fs";
-import path from "node:path";
-
-const repoRoot = process.cwd();
-const envFilePath = path.join(repoRoot, ".env");
+import { loadRepoEnv, readSetting } from "./lib/env-files.mjs";
 
 function printHelp() {
 	console.log(
@@ -19,7 +15,7 @@ function printHelp() {
 			"                          Default: http://localhost:5173/login",
 			"  --help, -h              Show this help.",
 			"",
-			"Required env (.env or process env):",
+			"Required env (.env/.env.local or process env):",
 			"  SUPABASE_URL",
 			"  SUPABASE_SERVICE_ROLE_KEY",
 		].join("\n"),
@@ -72,32 +68,10 @@ function assertAbsoluteHttpUrl(rawValue, flagName) {
 	return parsed.toString();
 }
 
-function parseDotEnv(filePath) {
-	if (!fs.existsSync(filePath)) return {};
-	const out = {};
-	for (const rawLine of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
-		const line = rawLine.trim();
-		if (!line || line.startsWith("#")) continue;
-		const splitAt = line.indexOf("=");
-		if (splitAt <= 0) continue;
-		const key = line.slice(0, splitAt).trim();
-		const value = line.slice(splitAt + 1).trim();
-		if (!key) continue;
-		out[key] = value;
-	}
-	return out;
-}
-
-function readSetting(dotEnv, key) {
-	const fromProcess = String(process.env[key] || "").trim();
-	if (fromProcess) return fromProcess;
-	return String(dotEnv[key] || "").trim();
-}
-
 async function generateMagicLink() {
 	const options = parseArgs(process.argv.slice(2));
 	const redirectUrl = assertAbsoluteHttpUrl(options.redirect, "--redirect");
-	const dotEnv = parseDotEnv(envFilePath);
+	const dotEnv = loadRepoEnv(process.cwd());
 	const supabaseUrl = readSetting(dotEnv, "SUPABASE_URL").replace(/\/+$/, "");
 	const serviceRole = readSetting(dotEnv, "SUPABASE_SERVICE_ROLE_KEY");
 

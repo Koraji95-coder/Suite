@@ -1,22 +1,37 @@
 # Supabase Apply + Verify Runbook
 
-This is the exact execution flow to apply database/storage hardening and verify isolation.
+This is the execution flow to apply Suite database/storage hardening and verify isolation.
 
 ## 0) Prerequisites
 
-- You are logged into the correct Supabase project.
-- You have an admin role for SQL Editor.
-- Application env points at the same Supabase project (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
+- For local development: Docker Desktop is installed/running and `npx supabase` is available.
+- For hosted fallback: you are logged into the correct Supabase project and have SQL Editor access.
+- Application env points at the same Supabase project (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) or `.env.local` has been generated from the local stack.
 
-## 1) Apply SQL scripts (in order)
+## 1) Preferred local CLI flow
 
-Run in Supabase SQL Editor:
+Run from the repo root:
+
+1. `npm run supabase:start`
+2. `npm run supabase:env:local`
+3. `npm run supabase:db:reset`
+4. `npm run supabase:types`
+
+Primary source of truth:
+
+1. `supabase/migrations/20260319000100_schema_bootstrap.sql`
+2. `supabase/migrations/20260319000200_rls_hardening.sql`
+3. `supabase/migrations/20260319000300_storage_policies.sql`
+
+## 2) Hosted SQL Editor fallback
+
+If you need to patch a hosted project manually, run these compatibility copies in Supabase SQL Editor:
 
 1. `supabase/consolidated_migration.sql`
 2. `backend/supabase/rls_hardening.sql`
 3. `backend/supabase/storage_policies.sql`
 
-## 2) Confirm RLS is enabled
+## 3) Confirm RLS is enabled
 
 Execute:
 
@@ -38,7 +53,7 @@ order by tablename;
 
 Expected: `rowsecurity = true` for all rows.
 
-## 3) Confirm public table policies exist
+## 4) Confirm public table policies exist
 
 Execute:
 
@@ -60,7 +75,7 @@ order by tablename, cmd, policyname;
 
 Expected: per table `select/insert/update/delete` policies scoped to `auth.uid() = user_id`.
 
-## 4) Confirm storage policies exist
+## 5) Confirm storage policies exist
 
 Execute:
 
@@ -80,7 +95,7 @@ Expected policies:
 - `project_files_update_own`
 - `project_files_delete_own`
 
-## 5) Confirm helper trigger coverage
+## 6) Confirm helper trigger coverage
 
 Execute:
 
@@ -96,7 +111,7 @@ Expected triggers on:
 
 - `projects`, `tasks`, `files`, `activity_log`, `calendar_events`, `recent_files`, `user_settings`
 
-## 6) Functional verification matrix
+## 7) Functional verification matrix
 
 Create two test users: `user_a`, `user_b`.
 
@@ -121,7 +136,7 @@ Create two test users: `user_a`, `user_b`.
 1. As `user_b`, attempt update/delete on any known `user_a` IDs via SQL (as authenticated session simulation).
 2. Expect operation denied by policy.
 
-## 7) App-level smoke checks
+## 8) App-level smoke checks
 
 - Login + logout
 - Create/update/delete project and task
@@ -129,7 +144,7 @@ Create two test users: `user_a`, `user_b`.
 - Upload/download project file
 - Dashboard counts match user data only
 
-## 8) Rollback strategy
+## 9) Rollback strategy
 
 If needed:
 
@@ -137,6 +152,6 @@ If needed:
 2. Disable newly added storage policies temporarily (only in emergency, document reason).
 3. Reapply SQL scripts in staging with test users and repeat verification matrix.
 
-## 9) Production go-live gate
+## 10) Production go-live gate
 
 Proceed only when all checks in this file and `docs/development/public-rollout-readiness.md` are complete.

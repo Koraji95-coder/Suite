@@ -8,13 +8,25 @@ Frontend filtering is not enough for security. Real isolation must be enforced b
 
 ## SQL Script
 
-Use:
+Preferred local source of truth:
+
+- `supabase/migrations/20260319000100_schema_bootstrap.sql`
+- `supabase/migrations/20260319000200_rls_hardening.sql`
+- `supabase/migrations/20260319000300_storage_policies.sql`
+
+Hosted SQL Editor fallback copies:
 
 - `supabase/consolidated_migration.sql`
 - `backend/supabase/rls_hardening.sql`
 - `backend/supabase/storage_policies.sql`
 
-Apply in Supabase SQL Editor (dev first, then production) in that order.
+Local dev flow:
+
+1. `npm run supabase:start`
+2. `npm run supabase:env:local`
+3. `npm run supabase:db:reset`
+
+If you are patching a hosted project directly, apply the fallback SQL Editor copies in the order shown above.
 
 ## What the script does
 

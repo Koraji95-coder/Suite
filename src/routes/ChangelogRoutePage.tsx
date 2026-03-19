@@ -676,9 +676,25 @@ export default function ChangelogRoutePage() {
 							</strong>
 						</div>
 						<div className={styles.publisherStatusCard}>
-							<span className={styles.label}>Bootstrap</span>
+							<span className={styles.label}>Repo bootstrap</span>
 							<strong>
 								{worktaleReadiness?.checks?.bootstrapped
+									? "installed"
+									: "not installed"}
+							</strong>
+						</div>
+						<div className={styles.publisherStatusCard}>
+							<span className={styles.label}>Post-commit hook</span>
+							<strong>
+								{worktaleReadiness?.checks?.postCommitHookInstalled
+									? "installed"
+									: "not installed"}
+							</strong>
+						</div>
+						<div className={styles.publisherStatusCard}>
+							<span className={styles.label}>Post-push hook</span>
+							<strong>
+								{worktaleReadiness?.checks?.postPushHookInstalled
 									? "installed"
 									: "not installed"}
 							</strong>

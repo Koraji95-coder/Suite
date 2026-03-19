@@ -7,6 +7,7 @@ import os
 import time
 import uuid
 from collections import Counter
+from datetime import datetime, timezone
 from typing import Any, Dict, Mapping, Optional
 
 from .filesystem import (
@@ -18,6 +19,9 @@ from .filesystem import (
     scan_snapshot,
 )
 from .store import WatchdogLedger
+
+
+DRAWING_ACTIVITY_SYNC_CURSOR = "supabase_project_drawing_segments"
 
 
 class WatchdogMonitorService:
@@ -37,6 +41,9 @@ class WatchdogMonitorService:
         self.max_collector_events_retained = max(500, int(max_collector_events_retained))
         self.ledger = ledger or WatchdogLedger(db_path=ledger_path)
         self._ledger = self.ledger
+
+    def resolve_runtime_user_key(self) -> str | None:
+        return self.ledger.resolve_preferred_user_key()
 
     def _legacy_scan_exclude_paths(self) -> set[str]:
         ledger_path = str(getattr(self.ledger, "db_path", "") or "").strip()
@@ -71,6 +78,16 @@ class WatchdogMonitorService:
         }
 
     @staticmethod
+    def _empty_project_rule_payload() -> Dict[str, Any]:
+        return {
+            "roots": [],
+            "includeGlobs": [],
+            "excludeGlobs": [],
+            "drawingPatterns": [],
+            "metadata": {},
+        }
+
+    @staticmethod
     def _optional_text(value: Any) -> Optional[str]:
         if value is None:
             return None
@@ -87,6 +104,57 @@ class WatchdogMonitorService:
             return int(value)
         except Exception:
             return None
+
+    @staticmethod
+    def _timestamp_ms_from_value(value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            return int(value)
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return int(text)
+        except Exception:
+            pass
+        normalized = text.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except Exception:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return int(parsed.timestamp() * 1000)
+
+    @staticmethod
+    def _iso_from_timestamp_ms(timestamp_ms: int | None) -> str | None:
+        if timestamp_ms is None or int(timestamp_ms) <= 0:
+            return None
+        return datetime.fromtimestamp(int(timestamp_ms) / 1000, tz=timezone.utc).isoformat()
+
+    @staticmethod
+    def _basename_from_path(path_value: str | None) -> str:
+        if not path_value:
+            return "Unknown"
+        normalized = str(path_value).replace("\\", "/").rstrip("/")
+        return normalized.split("/")[-1] or str(path_value)
+
+    def _metadata_text(self, metadata: Mapping[str, Any], *keys: str) -> str | None:
+        for key in keys:
+            text = self._optional_text(metadata.get(key))
+            if text:
+                return text
+        return None
+
+    def _metadata_int(self, metadata: Mapping[str, Any], *keys: str) -> int | None:
+        for key in keys:
+            value = self._optional_int(metadata.get(key))
+            if value is not None:
+                return value
+        return None
 
     @staticmethod
     def _parse_string_list(raw_value: Any) -> list[str]:
@@ -399,6 +467,203 @@ class WatchdogMonitorService:
     ) -> Dict[str, Any]:
         return self.upsert_project_rules(user_key, project_id, payload)
 
+    def delete_project_rule(self, user_key: str, project_id: str) -> Dict[str, Any]:
+        normalized_project_id = self._optional_text(project_id)
+        if not normalized_project_id:
+            raise ValueError("projectId is required")
+        deleted = self.ledger.delete_project_rule(user_key, normalized_project_id)
+        return {
+            "deleted": deleted,
+            "rule": self._empty_project_rule(normalized_project_id),
+        }
+
+    def sync_project_rules(
+        self,
+        user_key: str,
+        payload: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(payload, Mapping):
+            raise ValueError("Request body must be a JSON object")
+        raw_rules = payload.get("rules")
+        if raw_rules is None:
+            raw_rules = []
+        if not isinstance(raw_rules, list):
+            raise ValueError("rules must be a list")
+
+        normalized_rules: list[Dict[str, Any]] = []
+        seen_project_ids: set[str] = set()
+        for item in raw_rules:
+            if not isinstance(item, Mapping):
+                raise ValueError("rules must contain JSON objects")
+            project_id = self._optional_text(item.get("projectId"))
+            if not project_id:
+                raise ValueError("Each rule requires a projectId")
+            if project_id in seen_project_ids:
+                raise ValueError(f"Duplicate rule received for projectId '{project_id}'")
+            seen_project_ids.add(project_id)
+            normalized_rules.append(self._normalize_project_rule(project_id, item))
+
+        existing_rules = self.ledger.list_project_rules(user_key)
+        deleted_project_ids: list[str] = []
+        for existing_rule in existing_rules:
+            existing_project_id = self._optional_text(existing_rule.get("projectId"))
+            if not existing_project_id or existing_project_id in seen_project_ids:
+                continue
+            if self.ledger.delete_project_rule(user_key, existing_project_id):
+                deleted_project_ids.append(existing_project_id)
+
+        for rule in normalized_rules:
+            self.ledger.save_project_rule(user_key, rule)
+
+        return {
+            "rules": normalized_rules,
+            "count": len(normalized_rules),
+            "deletedProjectIds": deleted_project_ids,
+        }
+
+    def _resolve_work_date(
+        self,
+        metadata: Mapping[str, Any],
+        *,
+        started_at_ms: int | None,
+        ended_at_ms: int | None,
+    ) -> str:
+        work_date = self._optional_text(metadata.get("workDate"))
+        if work_date:
+            return work_date
+        reference_ms = ended_at_ms or started_at_ms or int(self.time.time() * 1000)
+        return datetime.fromtimestamp(reference_ms / 1000, tz=timezone.utc).date().isoformat()
+
+    def _build_drawing_segment_sync_key(
+        self,
+        event: Mapping[str, Any],
+        *,
+        drawing_path: str,
+        ended_at_ms: int,
+        session_id: str,
+    ) -> str:
+        event_key = self._optional_text(event.get("eventKey"))
+        if event_key:
+            return f"watchdog:{event_key}"
+        source_seed = "|".join(
+            [
+                str(event.get("collectorId") or "").strip().lower(),
+                str(event.get("workstationId") or "").strip().lower(),
+                normalize_path(drawing_path).lower(),
+                str(ended_at_ms),
+                session_id.strip().lower(),
+            ]
+        )
+        digest = hashlib.sha1(source_seed.encode("utf-8")).hexdigest()
+        return f"watchdog:drawing-segment:{digest}"
+
+    def _build_drawing_segment_row(
+        self,
+        event: Mapping[str, Any],
+    ) -> Dict[str, Any] | None:
+        event_id = self._optional_int(event.get("eventId")) or 0
+        project_id = self._optional_text(event.get("projectId"))
+        drawing_path = self._optional_text(event.get("drawingPath")) or self._optional_text(event.get("path"))
+        if not project_id or not drawing_path:
+            return None
+
+        metadata = dict(event.get("metadata") or {})
+        tracked_ms = self._event_tracked_duration_ms(event)
+        if tracked_ms is None:
+            return None
+        idle_ms = self._event_idle_duration_ms(event) or 0
+        session_id = self._optional_text(event.get("sessionId")) or f"event-{event_id}"
+        ended_at_ms = (
+            self._timestamp_ms_from_value(metadata.get("segmentEndedAt"))
+            or self._optional_int(event.get("timestamp"))
+            or int(self.time.time() * 1000)
+        )
+        started_at_ms = (
+            self._timestamp_ms_from_value(metadata.get("segmentStartedAt"))
+            or self._timestamp_ms_from_value(metadata.get("startedAt"))
+            or max(0, ended_at_ms - tracked_ms - idle_ms)
+        )
+        drawing_name = (
+            self._metadata_text(metadata, "drawingName")
+            or self._basename_from_path(drawing_path)
+        )
+        command_count = self._metadata_int(metadata, "commandCount") or 0
+        sync_key = self._build_drawing_segment_sync_key(
+            event,
+            drawing_path=drawing_path,
+            ended_at_ms=ended_at_ms,
+            session_id=session_id,
+        )
+        return {
+            "eventId": event_id,
+            "project_id": project_id,
+            "drawing_path": drawing_path,
+            "drawing_name": drawing_name,
+            "work_date": self._resolve_work_date(
+                metadata,
+                started_at_ms=started_at_ms,
+                ended_at_ms=ended_at_ms,
+            ),
+            "segment_started_at": self._iso_from_timestamp_ms(started_at_ms),
+            "segment_ended_at": self._iso_from_timestamp_ms(ended_at_ms),
+            "tracked_ms": int(tracked_ms),
+            "idle_ms": int(max(0, idle_ms)),
+            "command_count": int(max(0, command_count)),
+            "workstation_id": str(event.get("workstationId") or "").strip(),
+            "source_session_id": session_id,
+            "sync_key": sync_key,
+        }
+
+    def prepare_drawing_activity_sync(
+        self,
+        user_key: str,
+        *,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        safe_limit = max(1, min(500, int(limit)))
+        cursor = self.ledger.get_sync_cursor(user_key, DRAWING_ACTIVITY_SYNC_CURSOR)
+        after_event_id = int(cursor.get("lastEventId") or 0)
+        source_events = self.ledger.list_drawing_segment_source_events(
+            user_key,
+            after_event_id=after_event_id,
+            limit=safe_limit,
+        )
+        rows: list[Dict[str, Any]] = []
+        last_scanned_event_id = after_event_id
+        skipped_count = 0
+        for event in source_events:
+            event_id = self._optional_int(event.get("eventId")) or 0
+            if event_id > last_scanned_event_id:
+                last_scanned_event_id = event_id
+            row = self._build_drawing_segment_row(event)
+            if row is None:
+                skipped_count += 1
+                continue
+            rows.append(row)
+
+        return {
+            "cursor": cursor,
+            "rows": rows,
+            "scannedCount": len(source_events),
+            "readyCount": len(rows),
+            "skippedCount": skipped_count,
+            "lastScannedEventId": last_scanned_event_id,
+        }
+
+    def mark_drawing_activity_synced(
+        self,
+        user_key: str,
+        *,
+        last_event_id: int,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        return self.ledger.save_sync_cursor(
+            user_key,
+            DRAWING_ACTIVITY_SYNC_CURSOR,
+            last_event_id=max(0, int(last_event_id)),
+            metadata=dict(metadata or {}),
+        )
+
     def _match_project_rule(
         self,
         target_path: str,
@@ -571,6 +836,15 @@ class WatchdogMonitorService:
         duration_ms = self._optional_int(raw_event.get("durationMs"))
         if duration_ms is not None:
             payload["durationMs"] = int(duration_ms)
+            metadata.setdefault("trackedMs", int(duration_ms))
+        if "trackedMs" not in metadata:
+            active_seconds = self._optional_int(metadata.get("activeSeconds"))
+            if active_seconds is not None:
+                metadata["trackedMs"] = int(active_seconds) * 1000
+        if "idleMs" not in metadata:
+            idle_seconds = self._optional_int(metadata.get("idleSeconds"))
+            if idle_seconds is not None:
+                metadata["idleMs"] = int(idle_seconds) * 1000
         return payload
 
     def ingest_collector_events(self, user_key: str, payload: Mapping[str, Any]) -> Dict[str, Any]:
@@ -696,6 +970,43 @@ class WatchdogMonitorService:
             return synthetic_session_id
         return None
 
+    def _event_tracked_duration_ms(self, event: Mapping[str, Any]) -> int | None:
+        metadata = dict(event.get("metadata") or {})
+        tracked_ms = self._metadata_int(metadata, "trackedMs", "activeMs")
+        if tracked_ms is not None:
+            return max(0, int(tracked_ms))
+        duration_ms = self._optional_int(event.get("durationMs"))
+        if duration_ms is not None:
+            return max(0, int(duration_ms))
+        return None
+
+    def _event_idle_duration_ms(self, event: Mapping[str, Any]) -> int | None:
+        metadata = dict(event.get("metadata") or {})
+        idle_ms = self._metadata_int(metadata, "idleMs")
+        if idle_ms is not None:
+            return max(0, int(idle_ms))
+        idle_seconds = metadata.get("idleSeconds")
+        if isinstance(idle_seconds, (int, float)):
+            return max(0, int(round(float(idle_seconds) * 1000)))
+        return None
+
+    def _collector_live_tracked_duration_ms(self, metadata: Mapping[str, Any]) -> int | None:
+        tracked_ms = self._metadata_int(
+            metadata,
+            "currentSessionTrackedMs",
+            "activeTimeMs",
+            "trackedMs",
+        )
+        if tracked_ms is not None:
+            return max(0, int(tracked_ms))
+        return None
+
+    def _collector_live_idle_duration_ms(self, metadata: Mapping[str, Any]) -> int | None:
+        idle_ms = self._metadata_int(metadata, "currentSessionIdleMs", "idleMs")
+        if idle_ms is not None:
+            return max(0, int(idle_ms))
+        return None
+
     def list_sessions(
         self,
         user_key: str,
@@ -740,6 +1051,12 @@ class WatchdogMonitorService:
             event_type = str(event.get("eventType") or "unknown")
             timestamp = int(event.get("timestamp") or 0)
             drawing_path = self._optional_text(event.get("drawingPath")) or self._optional_text(event.get("path"))
+            event_metadata = dict(event.get("metadata") or {})
+            event_started_at = (
+                self._timestamp_ms_from_value(event_metadata.get("segmentStartedAt"))
+                or self._timestamp_ms_from_value(event_metadata.get("startedAt"))
+                or timestamp
+            )
             session = session_map.get(session_id)
             if session is None:
                 session = {
@@ -751,7 +1068,7 @@ class WatchdogMonitorService:
                     "drawingPath": drawing_path,
                     "status": "completed",
                     "active": False,
-                    "startedAt": timestamp,
+                    "startedAt": event_started_at,
                     "endedAt": None,
                     "latestEventAt": timestamp,
                     "lastActivityAt": None,
@@ -761,13 +1078,15 @@ class WatchdogMonitorService:
                     "idleCount": 0,
                     "activationCount": 0,
                     "durationMs": 0,
+                    "idleDurationMs": 0,
+                    "durationSource": None,
                     "sourceAvailable": False,
                     "pendingCount": 0,
                     "trackerUpdatedAt": None,
                 }
                 session_map[session_id] = session
 
-            session["startedAt"] = min(int(session.get("startedAt") or timestamp), timestamp)
+            session["startedAt"] = min(int(session.get("startedAt") or event_started_at), event_started_at)
             session["latestEventAt"] = max(int(session.get("latestEventAt") or 0), timestamp)
             session["lastEventType"] = event_type
             session["eventCount"] = int(session.get("eventCount") or 0) + 1
@@ -787,6 +1106,25 @@ class WatchdogMonitorService:
             elif event_type == "drawing_closed":
                 session["endedAt"] = timestamp
                 session["lastActivityAt"] = timestamp
+                tracked_duration_ms = self._event_tracked_duration_ms(event)
+                if tracked_duration_ms is not None:
+                    session["durationMs"] = max(
+                        int(session.get("durationMs") or 0),
+                        int(tracked_duration_ms),
+                    )
+                    session["durationSource"] = "tracker_closed"
+                idle_duration_ms = self._event_idle_duration_ms(event)
+                if idle_duration_ms is not None:
+                    session["idleDurationMs"] = max(
+                        int(session.get("idleDurationMs") or 0),
+                        int(idle_duration_ms),
+                    )
+                closed_command_count = self._metadata_int(event_metadata, "commandCount")
+                if closed_command_count is not None:
+                    session["commandCount"] = max(
+                        int(session.get("commandCount") or 0),
+                        int(closed_command_count),
+                    )
 
             if event_type == "drawing_closed":
                 tracking_key = self._session_tracking_key(event)
@@ -820,6 +1158,11 @@ class WatchdogMonitorService:
                 collector.get("lastHeartbeatAt") or now_ms
             )
             last_activity_at = self._optional_int(metadata.get("lastActivityAt"))
+            live_started_at = (
+                self._timestamp_ms_from_value(metadata.get("currentSessionStartedAt"))
+                or self._timestamp_ms_from_value(metadata.get("startedAt"))
+                or tracker_updated_at
+            )
             session = session_map.get(current_session_id)
             existing_project_id = self._optional_text(session.get("projectId")) if session else None
             effective_project_id = inferred_project_id or existing_project_id
@@ -835,7 +1178,7 @@ class WatchdogMonitorService:
                     "drawingPath": drawing_path,
                     "status": "completed",
                     "active": False,
-                    "startedAt": tracker_updated_at,
+                    "startedAt": live_started_at,
                     "endedAt": None,
                     "latestEventAt": tracker_updated_at,
                     "lastActivityAt": last_activity_at,
@@ -845,6 +1188,8 @@ class WatchdogMonitorService:
                     "idleCount": 0,
                     "activationCount": 0,
                     "durationMs": 0,
+                    "idleDurationMs": 0,
+                    "durationSource": None,
                     "sourceAvailable": False,
                     "pendingCount": 0,
                     "trackerUpdatedAt": tracker_updated_at,
@@ -862,6 +1207,10 @@ class WatchdogMonitorService:
                 max(0, self._optional_int(metadata.get("pendingCount")) or 0),
             )
             session["trackerUpdatedAt"] = tracker_updated_at
+            session["startedAt"] = min(
+                int(session.get("startedAt") or live_started_at),
+                int(live_started_at),
+            )
             session["latestEventAt"] = max(int(session.get("latestEventAt") or 0), tracker_updated_at)
             if last_activity_at is not None:
                 session["lastActivityAt"] = max(
@@ -872,6 +1221,25 @@ class WatchdogMonitorService:
                 session["drawingPath"] = drawing_path
             if effective_project_id:
                 session["projectId"] = effective_project_id
+            live_tracked_duration_ms = self._collector_live_tracked_duration_ms(metadata)
+            if live_tracked_duration_ms is not None:
+                session["durationMs"] = max(
+                    int(session.get("durationMs") or 0),
+                    int(live_tracked_duration_ms),
+                )
+                session["durationSource"] = "tracker_live"
+            live_idle_duration_ms = self._collector_live_idle_duration_ms(metadata)
+            if live_idle_duration_ms is not None:
+                session["idleDurationMs"] = max(
+                    int(session.get("idleDurationMs") or 0),
+                    int(live_idle_duration_ms),
+                )
+            live_command_count = self._metadata_int(metadata, "currentSessionCommandCount", "commandCount")
+            if live_command_count is not None:
+                session["commandCount"] = max(
+                    int(session.get("commandCount") or 0),
+                    int(live_command_count),
+                )
 
         sessions: list[Dict[str, Any]] = []
         for session in session_map.values():
@@ -889,7 +1257,13 @@ class WatchdogMonitorService:
                     tracker_updated_at or 0,
                 )
             started_at = int(session.get("startedAt") or effective_end or now_ms)
-            session["durationMs"] = max(0, int(effective_end or started_at) - started_at)
+            tracked_duration_ms = self._optional_int(session.get("durationMs"))
+            if tracked_duration_ms is None or (
+                tracked_duration_ms <= 0 and not self._optional_text(session.get("durationSource"))
+            ):
+                tracked_duration_ms = max(0, int(effective_end or started_at) - started_at)
+                session["durationSource"] = session.get("durationSource") or "elapsed_fallback"
+            session["durationMs"] = int(tracked_duration_ms)
             if not session.get("status"):
                 session["status"] = "completed"
             sessions.append(session)

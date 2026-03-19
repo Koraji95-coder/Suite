@@ -54,6 +54,10 @@ interface ProjectDetailProps {
 	onFileFilterChange: (filter: string) => void;
 	onFileUpload: (event: ChangeEvent<HTMLInputElement>) => void;
 	onDownloadFile: (file: ProjectFile) => void;
+	onProjectWatchdogRootChange: (
+		projectId: string,
+		rootPath: string | null,
+	) => void;
 }
 
 export function ProjectDetail({
@@ -84,6 +88,7 @@ export function ProjectDetail({
 	onFileFilterChange,
 	onFileUpload,
 	onDownloadFile,
+	onProjectWatchdogRootChange,
 }: ProjectDetailProps) {
 	const { createLinkedDesign, gridDesigns, openGridDesign } =
 		useProjectDetailGridDesigns(project);
@@ -103,7 +108,13 @@ export function ProjectDetail({
 				</section>
 
 				<section className={styles.telemetryShell}>
-					<ProjectTelemetryPanel projectId={project.id} telemetry={telemetry} />
+					<ProjectTelemetryPanel
+						projectId={project.id}
+						telemetry={telemetry}
+						onRootPathChange={(rootPath) =>
+							onProjectWatchdogRootChange(project.id, rootPath)
+						}
+					/>
 				</section>
 			</div>
 

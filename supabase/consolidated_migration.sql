@@ -1,5 +1,7 @@
--- Consolidated Supabase schema bootstrap for Suite.
--- Run this first in Supabase SQL Editor, then run:
+-- Legacy/operator fallback copy of the Suite schema bootstrap.
+-- Primary local-dev source of truth lives in supabase/migrations/.
+-- If you are running the local CLI workflow, prefer `npm run supabase:db:reset`.
+-- Hosted SQL Editor fallback order:
 --   1) backend/supabase/rls_hardening.sql
 --   2) backend/supabase/storage_policies.sql
 
@@ -127,6 +129,7 @@ create table if not exists public.projects (
 	color text not null default '#3B82F6',
 	status public.project_status not null default 'active',
 	category text not null default 'Uncategorized',
+	watchdog_root_path text null,
 	created_at timestamptz not null default timezone('utc', now()),
 	updated_at timestamptz not null default timezone('utc', now()),
 	user_id uuid not null references auth.users (id) on delete cascade
@@ -271,6 +274,26 @@ create table if not exists public.user_settings (
 	project_id uuid null references public.projects (id) on delete cascade,
 	created_at timestamptz not null default timezone('utc', now()),
 	updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.project_drawing_work_segments (
+	id uuid primary key default gen_random_uuid(),
+	user_id uuid not null references auth.users (id) on delete cascade,
+	project_id uuid not null references public.projects (id) on delete cascade,
+	drawing_path text not null,
+	drawing_name text not null default '',
+	work_date date not null,
+	segment_started_at timestamptz not null,
+	segment_ended_at timestamptz not null,
+	tracked_ms bigint not null default 0 check (tracked_ms >= 0),
+	idle_ms bigint not null default 0 check (idle_ms >= 0),
+	command_count integer not null default 0 check (command_count >= 0),
+	workstation_id text not null default '',
+	source_session_id text not null default '',
+	sync_key text not null,
+	created_at timestamptz not null default timezone('utc', now()),
+	updated_at timestamptz not null default timezone('utc', now()),
+	constraint project_drawing_work_segments_sync_key_key unique (sync_key)
 );
 
 create table if not exists public.user_preferences (
@@ -463,6 +486,9 @@ create table if not exists public.ground_grid_results (
 -- ============================================================================
 create index if not exists idx_projects_user_id on public.projects (user_id);
 create index if not exists idx_projects_created_at on public.projects (created_at desc);
+create index if not exists idx_projects_watchdog_root_path
+	on public.projects (watchdog_root_path)
+	where watchdog_root_path is not null;
 
 create index if not exists idx_tasks_user_id on public.tasks (user_id);
 create index if not exists idx_tasks_project_id on public.tasks (project_id);
@@ -500,6 +526,13 @@ create unique index if not exists user_settings_unique_scope_idx
 		setting_key,
 		coalesce(project_id, '00000000-0000-0000-0000-000000000000'::uuid)
 	);
+
+create index if not exists idx_project_drawing_work_segments_user_id
+	on public.project_drawing_work_segments (user_id, work_date desc, segment_ended_at desc);
+create index if not exists idx_project_drawing_work_segments_project_id
+	on public.project_drawing_work_segments (project_id, work_date desc, segment_ended_at desc);
+create index if not exists idx_project_drawing_work_segments_drawing_path
+	on public.project_drawing_work_segments (project_id, drawing_path, work_date desc);
 
 create index if not exists idx_user_passkeys_user_id
 	on public.user_passkeys (user_id);
@@ -562,6 +595,11 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_user_settings_updated_at on public.user_settings;
 create trigger set_user_settings_updated_at
 before update on public.user_settings
+for each row execute function public.set_updated_at();
+
+drop trigger if exists set_project_drawing_work_segments_updated_at on public.project_drawing_work_segments;
+create trigger set_project_drawing_work_segments_updated_at
+before update on public.project_drawing_work_segments
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_user_preferences_updated_at on public.user_preferences;

@@ -16,6 +16,7 @@ const DEFAULT_PROJECT_FORM: ProjectFormData = {
 	priority: "medium",
 	status: "active",
 	category: "Other",
+	watchdogRootPath: "",
 };
 
 const DEFAULT_TASK_FORM: TaskFormData = {
@@ -66,6 +67,7 @@ export function useProjectManagerUiState() {
 			priority: project.priority,
 			status: project.status === "completed" ? "archived" : project.status,
 			category: project.category || "",
+			watchdogRootPath: project.watchdog_root_path || "",
 		});
 		setShowProjectModal(true);
 	};

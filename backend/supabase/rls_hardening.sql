@@ -1,5 +1,6 @@
--- Row-level security hardening for Suite.
--- Run after supabase/consolidated_migration.sql
+-- Legacy/operator fallback copy of Suite row-level security hardening.
+-- Primary local-dev source of truth lives in supabase/migrations/.
+-- Hosted SQL Editor fallback: run after supabase/consolidated_migration.sql.
 
 -- ============================================================================
 -- Helper functions
@@ -61,6 +62,7 @@ alter table if exists public.activity_log enable row level security;
 alter table if exists public.calendar_events enable row level security;
 alter table if exists public.recent_files enable row level security;
 alter table if exists public.user_settings enable row level security;
+alter table if exists public.project_drawing_work_segments enable row level security;
 alter table if exists public.user_preferences enable row level security;
 alter table if exists public.user_passkeys enable row level security;
 alter table if exists public.formulas enable row level security;
@@ -109,6 +111,11 @@ for each row execute function public.set_user_id_from_auth();
 drop trigger if exists set_user_id_user_settings on public.user_settings;
 create trigger set_user_id_user_settings
 before insert on public.user_settings
+for each row execute function public.set_user_id_from_auth();
+
+drop trigger if exists set_user_id_project_drawing_work_segments on public.project_drawing_work_segments;
+create trigger set_user_id_project_drawing_work_segments
+before insert on public.project_drawing_work_segments
 for each row execute function public.set_user_id_from_auth();
 
 drop trigger if exists set_user_id_user_preferences on public.user_preferences;
@@ -371,6 +378,33 @@ with check (
 
 drop policy if exists user_settings_delete_own on public.user_settings;
 create policy user_settings_delete_own on public.user_settings
+for delete to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists project_drawing_work_segments_select_own on public.project_drawing_work_segments;
+create policy project_drawing_work_segments_select_own on public.project_drawing_work_segments
+for select to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists project_drawing_work_segments_insert_own on public.project_drawing_work_segments;
+create policy project_drawing_work_segments_insert_own on public.project_drawing_work_segments
+for insert to authenticated
+with check (
+	user_id = auth.uid()
+	and public.project_belongs_to_auth_user(project_id)
+);
+
+drop policy if exists project_drawing_work_segments_update_own on public.project_drawing_work_segments;
+create policy project_drawing_work_segments_update_own on public.project_drawing_work_segments
+for update to authenticated
+using (user_id = auth.uid())
+with check (
+	user_id = auth.uid()
+	and public.project_belongs_to_auth_user(project_id)
+);
+
+drop policy if exists project_drawing_work_segments_delete_own on public.project_drawing_work_segments;
+create policy project_drawing_work_segments_delete_own on public.project_drawing_work_segments
 for delete to authenticated
 using (user_id = auth.uid());
 

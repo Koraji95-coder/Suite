@@ -152,11 +152,23 @@ def _metadata_from_tracker_state(state: Mapping[str, Any] | None) -> Dict[str, A
     current_session = state.get("currentSession")
     current_session_key = _session_key(current_session if isinstance(current_session, Mapping) else None)
     current_session_command_count = 0
+    current_session_started_at = None
+    current_session_tracked_ms = 0
+    current_session_idle_ms = 0
     if isinstance(current_session, Mapping):
         try:
             current_session_command_count = max(0, int(current_session.get("commandCount") or 0))
         except Exception:
             current_session_command_count = 0
+        current_session_started_at = _optional_text(current_session.get("startedAt"))
+        current_session_tracked_ms = max(
+            0,
+            _duration_ms_from_value(current_session.get("activeTime")) or 0,
+        )
+        current_session_idle_ms = max(
+            0,
+            _duration_ms_from_value(current_session.get("idleTime")) or 0,
+        )
 
     return {
         "sourceAvailable": True,
@@ -167,6 +179,9 @@ def _metadata_from_tracker_state(state: Mapping[str, Any] | None) -> Dict[str, A
         "lastUpdated": _timestamp_ms_from_value(state.get("lastUpdated")) or 0,
         "lastActivityAt": _timestamp_ms_from_value(state.get("lastActivityAt")) or 0,
         "currentSessionId": current_session_key,
+        "currentSessionStartedAt": current_session_started_at,
+        "currentSessionTrackedMs": current_session_tracked_ms,
+        "currentSessionIdleMs": current_session_idle_ms,
         "currentSessionCommandCount": current_session_command_count,
         "idleTimeoutSeconds": int(state.get("idleTimeoutSeconds") or 0),
     }
@@ -569,6 +584,20 @@ class AutoCadStateCollector:
                 )
                 active_ms = _duration_ms_from_value(session.get("activeTime")) or 0
                 idle_ms = _duration_ms_from_value(session.get("idleTime")) or 0
+                started_at = _optional_text(session.get("startedAt"))
+                ended_at = _optional_text(session.get("endedAt"))
+                work_date = None
+                reference_text = ended_at or started_at
+                if reference_text and "T" in reference_text:
+                    work_date = reference_text.split("T", 1)[0].strip() or None
+                ended_at_ms = _timestamp_ms_from_value(ended_at)
+                started_at_ms = _timestamp_ms_from_value(started_at)
+                reference_ms = ended_at_ms or started_at_ms
+                if reference_ms and not work_date:
+                    work_date = datetime.fromtimestamp(
+                        reference_ms / 1000,
+                        tz=timezone.utc,
+                    ).date().isoformat()
                 sequence = self._next_sequence(state)
                 queued_events.append(
                     {
@@ -585,12 +614,17 @@ class AutoCadStateCollector:
                         "timestamp": int(closed_timestamp),
                         "drawingPath": closed_drawing_path,
                         "sessionId": session_key,
-                        "durationMs": int(active_ms + idle_ms),
+                        "durationMs": int(active_ms),
                         "metadata": {
                             "drawingName": _optional_text(session.get("drawingName")),
+                            "trackedMs": int(active_ms),
+                            "idleMs": int(idle_ms),
                             "activeSeconds": round(active_ms / 1000, 3),
                             "idleSeconds": round(idle_ms / 1000, 3),
                             "commandCount": int(session.get("commandCount") or 0),
+                            "segmentStartedAt": started_at,
+                            "segmentEndedAt": ended_at,
+                            "workDate": work_date,
                             "syncMode": "hybrid-state",
                         },
                     }
@@ -695,6 +729,10 @@ class AutoCadStateCollector:
             "activeDrawingName": _optional_text(snapshot.get("activeDrawingName")),
             "activeDrawingPath": _optional_text(snapshot.get("activeDrawingPath")),
             "currentSessionId": _optional_text(snapshot.get("currentSessionId")),
+            "currentSessionStartedAt": _optional_text(snapshot.get("currentSessionStartedAt")),
+            "currentSessionTrackedMs": int(snapshot.get("currentSessionTrackedMs") or 0),
+            "currentSessionIdleMs": int(snapshot.get("currentSessionIdleMs") or 0),
+            "currentSessionCommandCount": int(snapshot.get("currentSessionCommandCount") or 0),
             "trackerUpdatedAt": int(snapshot.get("lastUpdated") or 0),
             "lastActivityAt": int(snapshot.get("lastActivityAt") or 0),
         }

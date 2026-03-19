@@ -177,6 +177,7 @@ export const buildDrawingAnnotationInsert = (
 	issues: Issue[],
 	enabledRuleNames: string[],
 	qaStatus: DrawingAnnotation["qa_status"],
+	userId: string,
 ): Database["public"]["Tables"]["drawing_annotations"]["Insert"] => {
 	const status =
 		qaStatus === "pass"
@@ -193,5 +194,6 @@ export const buildDrawingAnnotationInsert = (
 		issues_found: issues.length,
 		status,
 		reviewed_at: new Date().toISOString(),
+		user_id: userId,
 	};
 };

@@ -1,9 +1,18 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { watchdogService, type WatchdogSessionSummary } from "@/services/watchdogService";
+import {
+	saveSharedProjectWatchdogRule,
+	syncSharedProjectWatchdogRulesToLocalRuntime,
+} from "@/services/projectWatchdogService";
+import type { WatchdogSessionSummary } from "@/services/watchdogService";
 import { ProjectTelemetryPanel } from "./ProjectTelemetryPanel";
 import type { ProjectWatchdogTelemetry } from "./useProjectWatchdogTelemetry";
+
+vi.mock("@/services/projectWatchdogService", () => ({
+	saveSharedProjectWatchdogRule: vi.fn(),
+	syncSharedProjectWatchdogRulesToLocalRuntime: vi.fn(),
+}));
 
 const baseSession = {
 	sessionId: "session-1",
@@ -31,41 +40,79 @@ const baseSession = {
 
 function createTelemetry(): ProjectWatchdogTelemetry {
 	return {
-	loading: false,
-	error: null,
-	overview: null,
-	recentEvents: [],
-	recentAutoCadEvents: [],
-	sessions: [baseSession],
-	liveSessions: [baseSession],
-	autoCadCollectors: [],
-	liveAutoCadCollectors: [],
-	activeCadSessionCount: 1,
-	onlineCollectorCount: 1,
-	latestAutoCadEvent: null,
-	latestSession: baseSession,
-	totalCommandsInWindow: 2,
-	latestTrackerUpdatedAt: Date.now(),
-	rule: {
-		projectId: "project-1",
-		roots: ["C:/Projects/Alpha"],
-		includeGlobs: ["**/*.dwg"],
-		excludeGlobs: [],
-		drawingPatterns: ["Drawing*.dwg"],
-		metadata: {},
-		updatedAt: Date.now(),
-	},
-	ruleConfigured: true,
-	ruleUpdatedAt: Date.now(),
+		loading: false,
+		error: null,
+		overview: null,
+		recentEvents: [],
+		recentAutoCadEvents: [],
+		sessions: [baseSession],
+		liveSessions: [baseSession],
+		autoCadCollectors: [],
+		liveAutoCadCollectors: [],
+		activeCadSessionCount: 1,
+		onlineCollectorCount: 1,
+		latestAutoCadEvent: null,
+		latestSession: baseSession,
+		totalCommandsInWindow: 2,
+		latestTrackerUpdatedAt: Date.now(),
+		rule: {
+			projectId: "project-1",
+			roots: ["C:/Projects/Alpha"],
+			includeGlobs: ["**/*.dwg"],
+			excludeGlobs: [],
+			drawingPatterns: ["Drawing*.dwg"],
+			metadata: {},
+			updatedAt: Date.now(),
+		},
+		ruleConfigured: true,
+		ruleUpdatedAt: Date.now(),
+		trackedDrawings: [
+			{
+				drawingPath: "C:/Projects/Alpha/Drawing1.dwg",
+				drawingName: "Drawing1.dwg",
+				lifetimeTrackedMs: 2 * 60 * 60 * 1000,
+				todayTrackedMs: 30 * 60 * 1000,
+				lastWorkedAt: new Date().toISOString(),
+				daysWorkedCount: 2,
+				liveTrackedMs: 10 * 60 * 1000,
+				liveStatus: "live",
+				dateGroups: [
+					{
+						workDate: "2026-03-19",
+						trackedMs: 30 * 60 * 1000,
+						idleMs: 5 * 60 * 1000,
+						segmentCount: 1,
+						lastWorkedAt: new Date().toISOString(),
+						segments: [
+							{
+								id: "segment-1",
+								workDate: "2026-03-19",
+								startedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+								endedAt: new Date().toISOString(),
+								trackedMs: 10 * 60 * 1000,
+								idleMs: 0,
+								commandCount: 2,
+								workstationId: "DUSTIN-HOME",
+								sourceSessionId: "session-1",
+								syncKey: "segment-1",
+								status: "live",
+								isLive: true,
+							},
+						],
+					},
+				],
+			},
+		],
 	};
 }
 
 afterEach(() => {
+	vi.clearAllMocks();
 	vi.restoreAllMocks();
 });
 
 describe("ProjectTelemetryPanel", () => {
-	it("renders recent session summaries and a dashboard link", () => {
+	it("renders recent sessions, dashboard link, and tracked drawings", () => {
 		render(
 			<MemoryRouter>
 				<ProjectTelemetryPanel
@@ -77,9 +124,8 @@ describe("ProjectTelemetryPanel", () => {
 
 		expect(screen.getByText("Recent CAD sessions")).toBeTruthy();
 		expect(screen.getAllByText("Drawing1.dwg").length).toBeGreaterThan(0);
-	expect(screen.getByText("Commands in window")).toBeTruthy();
-		expect(screen.getByText("Project mapping rules")).toBeTruthy();
-		expect(screen.getByText("C:/Projects/Alpha")).toBeTruthy();
+		expect(screen.getAllByText("Tracked drawings").length).toBeGreaterThan(0);
+		expect(screen.getByText(/Lifetime 2h/i)).toBeTruthy();
 		const link = screen.getByRole("link", {
 			name: /open full telemetry/i,
 		}) as HTMLAnchorElement;
@@ -88,24 +134,34 @@ describe("ProjectTelemetryPanel", () => {
 		);
 	});
 
-	it("saves edited rule values", async () => {
+	it("saves edited rule values through the shared project watchdog service", async () => {
 		const telemetry = createTelemetry();
-		const putRuleSpy = vi.spyOn(watchdogService, "putProjectRule").mockResolvedValue({
-			ok: true,
-			rule: {
-				projectId: "project-1",
-				roots: ["C:/Projects/Alpha", "C:/Projects/Beta"],
-				includeGlobs: ["**/*.dwg"],
-				excludeGlobs: ["**/archive/**"],
-				drawingPatterns: ["SHT-*.dwg"],
-				metadata: {},
-				updatedAt: Date.now(),
-			},
+		const saveRuleSpy = vi.mocked(saveSharedProjectWatchdogRule).mockResolvedValue({
+			projectId: "project-1",
+			roots: ["C:/Projects/Alpha", "C:/Projects/Beta"],
+			includeGlobs: ["**/*.dwg"],
+			excludeGlobs: ["**/archive/**"],
+			drawingPatterns: ["SHT-*.dwg"],
+			metadata: {},
+			updatedAt: Date.now(),
 		});
+		const syncSpy = vi
+			.mocked(syncSharedProjectWatchdogRulesToLocalRuntime)
+			.mockResolvedValue({
+				ok: true,
+				rules: [],
+				count: 0,
+				deletedProjectIds: [],
+			});
+		const onRootPathChange = vi.fn();
 
 		render(
 			<MemoryRouter>
-				<ProjectTelemetryPanel projectId="project-1" telemetry={telemetry} />
+				<ProjectTelemetryPanel
+					projectId="project-1"
+					telemetry={telemetry}
+					onRootPathChange={onRootPathChange}
+				/>
 			</MemoryRouter>,
 		);
 
@@ -121,25 +177,22 @@ describe("ProjectTelemetryPanel", () => {
 		});
 		fireEvent.click(screen.getByRole("button", { name: /save rules/i }));
 
-		await waitFor(() => expect(putRuleSpy).toHaveBeenCalledTimes(1));
-		expect(putRuleSpy).toHaveBeenCalledWith("project-1", {
+		await waitFor(() => expect(saveRuleSpy).toHaveBeenCalledTimes(1));
+		expect(saveRuleSpy).toHaveBeenCalledWith("project-1", {
 			roots: ["C:/Projects/Alpha", "C:/Projects/Beta"],
 			includeGlobs: ["**/*.dwg"],
 			excludeGlobs: ["**/archive/**"],
 			drawingPatterns: ["SHT-*.dwg"],
 			metadata: {},
 		});
-		await waitFor(() =>
-			expect(
-				screen.queryByRole("button", { name: /save rules/i }),
-			).toBeNull(),
-		);
+		await waitFor(() => expect(syncSpy).toHaveBeenCalledTimes(1));
+		expect(onRootPathChange).toHaveBeenCalledWith("C:/Projects/Alpha");
 		expect(screen.getByText(/C:\/Projects\/Beta/)).toBeTruthy();
 	});
 
 	it("cancels rule edits without saving", () => {
 		const telemetry = createTelemetry();
-		const putRuleSpy = vi.spyOn(watchdogService, "putProjectRule");
+		const saveRuleSpy = vi.mocked(saveSharedProjectWatchdogRule);
 
 		render(
 			<MemoryRouter>
@@ -153,7 +206,7 @@ describe("ProjectTelemetryPanel", () => {
 		});
 		fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
-		expect(putRuleSpy).not.toHaveBeenCalled();
+		expect(saveRuleSpy).not.toHaveBeenCalled();
 		expect(screen.getByText("C:/Projects/Alpha")).toBeTruthy();
 	});
 });

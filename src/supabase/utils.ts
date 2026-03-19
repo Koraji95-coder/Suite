@@ -56,8 +56,9 @@ export async function safeSupabaseQuery<T>(
 		const error: SupabaseError = {
 			message: "Supabase not configured",
 			details:
-				"Please create a .env file with valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. See .env.example for template.",
-			hint: "Run: cp .env.example .env and fill in your Supabase credentials",
+				"Set valid VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY values in .env or .env.local. See .env.example for the shared template.",
+			hint:
+				"Run `npm run supabase:env:local` for local Supabase or fill in .env from .env.example for hosted Supabase.",
 			code: "SUPABASE_NOT_CONFIGURED",
 		};
 
@@ -103,13 +104,13 @@ export function getSupabaseStatus(): { configured: boolean; message: string } {
 		return {
 			configured: false,
 			message:
-				"Missing Supabase credentials. Create a .env file from .env.example template.",
+				"Missing Supabase credentials. Configure .env from .env.example or generate .env.local with `npm run supabase:env:local`.",
 		};
 	}
 
 	return {
 		configured: false,
 		message:
-			"Supabase credentials appear to be placeholders. Update your .env file with real values.",
+			"Supabase credentials appear to be placeholders. Update .env or regenerate .env.local with real values.",
 	};
 }

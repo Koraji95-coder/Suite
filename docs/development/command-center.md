@@ -34,6 +34,9 @@ The UI intentionally copies commands to clipboard rather than executing them rem
 - Core Dev
 - Quality
 - Agent + Backend
+- Supabase
+- Watchdog
+- Worktale
 - Npx Utilities
 
 ### Canonical full-stack preset
@@ -49,6 +52,49 @@ This starts:
 - Frontend dev server
 - Backend API on `localhost:5000`
 - ZeroClaw gateway on `127.0.0.1:3000`
+
+### Local Supabase workflow
+
+Use the Supabase group when you need a local database/auth/storage stack:
+
+```bash
+npm run supabase:start
+npm run supabase:env:local
+npm run supabase:db:reset
+npm run supabase:types
+```
+
+This keeps `supabase/migrations/` as the source of truth and writes machine-local overrides to `.env.local`.
+
+### Worktale workflow
+
+Use the Worktale group when you need local changelog publishing and automatic capture:
+
+```bash
+npm run worktale:bootstrap
+npm run worktale:doctor
+worktale status
+worktale today
+worktale dash
+worktale digest
+```
+
+`npm run worktale:bootstrap` converges the repo into the fully-automatic state: `.worktale` present, post-commit capture installed, and post-push digest reminders installed.
+
+### Watchdog workflow
+
+Use the Watchdog group when you need workstation collector startup, backend startup, or AutoCAD readiness checks:
+
+```bash
+npm run watchdog:startup:install
+npm run watchdog:startup:check
+npm run watchdog:startup:autocad:install
+npm run watchdog:startup:autocad:check
+npm run watchdog:backend:startup:start
+npm run watchdog:autocad:doctor
+```
+
+On Windows workstations where scheduled-task registration is denied, the startup installers fall back to HKCU `Run` registration automatically.
 
 ### ZeroClaw Gateway Toolchain (Windows)
 
@@ -85,7 +131,7 @@ npm run gateway:dev
 
 To add a command preset, update `COMMAND_GROUPS` in:
 
-- `src/routes/CommandCenterPage.tsx`
+- `src/routes/command-center/commandCenterModel.ts`
 
 Keep presets scoped to local development workflows.
 

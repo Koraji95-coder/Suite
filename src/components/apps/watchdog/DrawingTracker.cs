@@ -25,6 +25,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -35,9 +36,50 @@ using Autodesk.AutoCAD.Runtime;
 using Application = Autodesk.AutoCAD.ApplicationServices.Application;
 
 [assembly: CommandClass(typeof(CadCommandCenter.DrawingTracker))]
+[assembly: ExtensionApplication(typeof(CadCommandCenter.DrawingTrackerApplication))]
 
 namespace CadCommandCenter
 {
+    public class DrawingTrackerApplication : IExtensionApplication
+    {
+        private static readonly string PluginLogPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "CadCommandCenter",
+            "tracker-plugin.log"
+        );
+
+        public void Initialize()
+        {
+            WriteLifecycleEvent("initialize");
+        }
+
+        public void Terminate()
+        {
+            WriteLifecycleEvent("terminate");
+        }
+
+        private static void WriteLifecycleEvent(string stage)
+        {
+            try
+            {
+                var directory = Path.GetDirectoryName(PluginLogPath);
+                if (!string.IsNullOrWhiteSpace(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.AppendAllText(
+                    PluginLogPath,
+                    $"{DateTimeOffset.UtcNow:O} {stage}{Environment.NewLine}"
+                );
+            }
+            catch (System.Exception ex)
+            {
+                Trace.TraceError($"Suite Watchdog plugin lifecycle log failed during {stage}: {ex}");
+            }
+        }
+    }
+
     // ─── Data Models ───
 
     public class DrawingSession
@@ -52,6 +94,9 @@ namespace CadCommandCenter
         public int CommandCount { get; set; }
         public List<string> CommandsUsed { get; set; } = new List<string>();
         public bool IsActive { get; set; }
+        public long TrackedMilliseconds => Math.Max(0L, (long)Math.Round(ActiveTime.TotalMilliseconds));
+        public long IdleMilliseconds => Math.Max(0L, (long)Math.Round(IdleTime.TotalMilliseconds));
+        public string WorkDate => (EndedAt ?? StartedAt).ToString("yyyy-MM-dd");
     }
 
     public class FolderEvent
@@ -65,7 +110,7 @@ namespace CadCommandCenter
 
     public class TrackerConfig
     {
-        public int IdleTimeoutSeconds { get; set; } = 180; // default 3 min
+        public int IdleTimeoutSeconds { get; set; } = 300; // default 5 min
         public Dictionary<string, string> WatchedFolders { get; set; } = new Dictionary<string, string>();
         public string OutputJsonPath { get; set; } = "";
         public bool AutoExportEnabled { get; set; } = true;
@@ -107,6 +152,9 @@ namespace CadCommandCenter
         public List<FolderEvent> FolderEvents { get; set; } = new List<FolderEvent>();
         public DateTime LastActivityAt { get; set; }
         public DateTime LastUpdated { get; set; }
+        public long CurrentSessionTrackedMilliseconds { get; set; }
+        public long CurrentSessionIdleMilliseconds { get; set; }
+        public string CurrentSessionStartedAt { get; set; }
     }
 
     // ─── Main Plugin Class ───
@@ -525,29 +573,25 @@ namespace CadCommandCenter
 
         private void IdleCheckTick(object sender, ElapsedEventArgs e)
         {
-            if (_currentSession == null || _isPaused) return;
+            if (_currentSession == null) return;
 
             var idleSec = (DateTime.Now - _lastActivityTime).TotalSeconds;
 
-            if (!_isPaused)
+            if (idleSec < _config.IdleTimeoutSeconds)
             {
                 // Still active → accumulate active time
                 _currentSession.ActiveTime += TimeSpan.FromSeconds(1);
             }
 
-            if (idleSec >= _config.IdleTimeoutSeconds && !_isPaused)
+            if (idleSec >= _config.IdleTimeoutSeconds)
             {
-                _isPaused = true;
-                var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-                // Can't write to command line from timer thread directly in all versions,
-                // so we use the idle event or just set state.
-                // The JSON export will reflect the paused state.
+                if (!_isPaused)
+                    _isPaused = true;
+                _currentSession.IdleTime += TimeSpan.FromSeconds(1);
+                return;
             }
 
-            if (_isPaused)
-            {
-                _currentSession.IdleTime += TimeSpan.FromSeconds(1);
-            }
+            _isPaused = false;
         }
 
 
@@ -640,13 +684,16 @@ namespace CadCommandCenter
                     IsTracking = _initialized,
                     IsPaused = _isPaused,
                     ActiveTimeSeconds = _currentSession?.ActiveTime.TotalSeconds ?? 0,
-                    IdleTimeSeconds = (DateTime.Now - _lastActivityTime).TotalSeconds,
+                    IdleTimeSeconds = _currentSession?.IdleTime.TotalSeconds ?? 0,
                     IdleTimeoutSeconds = _config.IdleTimeoutSeconds,
                     RecentCommands = _recentCommands.Take(10).ToList(),
                     CurrentSession = _currentSession,
                     Sessions = _allSessions.Take(30).ToList(),
                     LastActivityAt = _lastActivityTime,
                     LastUpdated = DateTime.Now,
+                    CurrentSessionTrackedMilliseconds = _currentSession?.TrackedMilliseconds ?? 0,
+                    CurrentSessionIdleMilliseconds = _currentSession?.IdleMilliseconds ?? 0,
+                    CurrentSessionStartedAt = _currentSession?.StartedAt.ToString("O"),
                 };
 
                 lock (_eventLock)

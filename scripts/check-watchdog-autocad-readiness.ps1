@@ -81,6 +81,36 @@ function Resolve-AbsolutePath {
 }
 
 function Get-DefaultBundleRoot {
+    if ($env:ProgramFiles) {
+        $candidate = Join-Path $env:ProgramFiles "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+    if (${env:ProgramFiles(x86)}) {
+        $candidate = Join-Path ${env:ProgramFiles(x86)} "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+    if ($env:APPDATA) {
+        $candidate = Join-Path $env:APPDATA "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+    if ($env:ProgramData) {
+        $candidate = Join-Path $env:ProgramData "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+    if ($env:ALLUSERSPROFILE) {
+        $candidate = Join-Path $env:ALLUSERSPROFILE "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
     if ($env:APPDATA) {
         return Join-Path $env:APPDATA "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"
     }
@@ -566,7 +596,17 @@ if (-not $ConfigPath) {
 if (-not $BundleRoot) {
     $BundleRoot = [string](Get-TomlStringValue -Path $CodexConfigPath -Key "SUITE_WATCHDOG_AUTOCAD_PLUGIN_BUNDLE_ROOT")
 }
-if (-not $BundleRoot) {
+$resolvedBundleRoot = $null
+if ($BundleRoot) {
+    $candidateBundleRoot = Resolve-AbsolutePath -PathValue $BundleRoot
+    if ($candidateBundleRoot -and (Test-Path $candidateBundleRoot)) {
+        $resolvedBundleRoot = $candidateBundleRoot
+    }
+}
+if (-not $resolvedBundleRoot) {
+    $resolvedBundleRoot = Get-DefaultBundleRoot
+}
+if (-not $resolvedBundleRoot) {
     $BundleRoot = Get-DefaultBundleRoot
 }
 if (-not $StateJsonPath) {
@@ -588,7 +628,7 @@ if ($StartIfMissing) {
 }
 $startup = Invoke-JsonScript -ScriptPath $startupCheckScript -Arguments $startupArgs
 
-$pluginArgs = @("-Json", "-BundleRoot", (Resolve-AbsolutePath -PathValue $BundleRoot))
+$pluginArgs = @("-Json", "-BundleRoot", (Resolve-AbsolutePath -PathValue $resolvedBundleRoot))
 $plugin = Invoke-JsonScript -ScriptPath $pluginCheckScript -Arguments $pluginArgs
 
 if (-not $StateJsonPath -and $startup.configPath -and (Test-Path $startup.configPath)) {

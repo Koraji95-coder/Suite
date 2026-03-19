@@ -8,6 +8,8 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>false</ImplicitUsings>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
     <AutoCadVersion Condition="'$(AutoCadVersion)' == ''">$([System.Environment]::GetEnvironmentVariable('AUTOCAD_VERSION'))</AutoCadVersion>
     <AutoCadVersion Condition="'$(AutoCadVersion)' == ''">2026</AutoCadVersion>
     <AutoCadTargetFramework Condition="'$(AutoCadTargetFramework)' == '' and $([MSBuild]::VersionGreaterThanOrEquals('$(AutoCadVersion)', '2025'))">net8.0-windows</AutoCadTargetFramework>

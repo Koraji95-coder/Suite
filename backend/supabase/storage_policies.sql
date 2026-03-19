@@ -1,5 +1,6 @@
--- Storage bucket and object policies for Suite project files.
--- Run after supabase/consolidated_migration.sql and backend/supabase/rls_hardening.sql
+-- Legacy/operator fallback copy of Suite storage policies.
+-- Primary local-dev source of truth lives in supabase/migrations/.
+-- Hosted SQL Editor fallback: run after supabase/consolidated_migration.sql and backend/supabase/rls_hardening.sql.
 
 -- Create the project files bucket if missing.
 insert into storage.buckets (id, name, public)

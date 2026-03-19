@@ -38,6 +38,7 @@ static partial class ConduitRouteStubHandlers
         }
 
         var evaluations = BuildAutoDraftActionEvaluations(actionsArray, warnings);
+        AppendAutoDraftPreviewWarnings(evaluations, warnings);
         var actionCount = actionsArray.Count;
         var previewReady = evaluations.Count(item => item.ReadyForPreview);
         var previewSkipped = Math.Max(0, actionCount - previewReady);
@@ -63,9 +64,11 @@ static partial class ConduitRouteStubHandlers
                     activeLayout: null,
                     activeSpace: null,
                     layerCount: null,
-                    modelSpaceCount: null
+                    modelSpaceCount: null,
+                    paperSpaceCount: null
                 ),
-                createdHandles: []
+                createdHandles: [],
+                titleBlockUpdates: []
             );
         }
 
@@ -96,27 +99,19 @@ static partial class ConduitRouteStubHandlers
                     activeLayout: null,
                     activeSpace: null,
                     layerCount: null,
-                    modelSpaceCount: null
+                    modelSpaceCount: null,
+                    paperSpaceCount: null
                 ),
-                createdHandles: []
+                createdHandles: [],
+                titleBlockUpdates: []
             );
         }
 
         using (session)
         {
-            var drawingName = StringOrDefault(ReadProperty(session.Document, "Name"), "Unknown.dwg");
-            var drawingPath = StringOrDefault(ReadProperty(session.Document, "FullName"), "");
-            var readOnly = TryReadBoolLike(ReadProperty(session.Document, "ReadOnly"), fallback: false);
-            var commandStateAvailable = TryReadCommandActiveMask(session, out var commandMask);
-            var activeLayoutObject = ReadProperty(session.Document, "ActiveLayout");
-            var activeLayout = activeLayoutObject is null
-                ? ""
-                : StringOrDefault(ReadProperty(activeLayoutObject, "Name"), "");
-            var activeSpace = DescribeActiveSpace(ReadProperty(session.Document, "ActiveSpace"));
-            var layerCount = ReadCountOrNull(ReadProperty(session.Document, "Layers"));
-            var modelSpaceCount = ReadCountOrNull(session.Modelspace);
+            var drawingContext = ReadAutoCadDrawingContext(session);
 
-            if (!commandStateAvailable)
+            if (!drawingContext.CommandStateAvailable)
             {
                 warnings.Add(
                     "Could not read AutoCAD command activity state. Proceeding with conservative preflight only."
@@ -125,18 +120,19 @@ static partial class ConduitRouteStubHandlers
 
             var cadNode = BuildAutoDraftCadSnapshot(
                 cadAvailable: true,
-                drawingName: drawingName,
-                drawingPath: drawingPath,
-                readOnly: readOnly,
-                commandMask: commandStateAvailable ? commandMask : null,
-                commandStateAvailable: commandStateAvailable,
-                activeLayout: activeLayout,
-                activeSpace: activeSpace,
-                layerCount: layerCount,
-                modelSpaceCount: modelSpaceCount
+                drawingName: drawingContext.DrawingName,
+                drawingPath: drawingContext.DrawingPath,
+                readOnly: drawingContext.ReadOnly,
+                commandMask: drawingContext.CommandMask,
+                commandStateAvailable: drawingContext.CommandStateAvailable,
+                activeLayout: drawingContext.ActiveLayout,
+                activeSpace: drawingContext.ActiveSpace,
+                layerCount: drawingContext.LayerCount,
+                modelSpaceCount: drawingContext.ModelSpaceCount,
+                paperSpaceCount: drawingContext.PaperSpaceCount
             );
 
-            if (readOnly)
+            if (drawingContext.ReadOnly)
             {
                 warnings.Add("Active drawing is read-only.");
                 return BuildAutoDraftExecuteResult(
@@ -146,16 +142,20 @@ static partial class ConduitRouteStubHandlers
                     skipped: actionCount,
                     previewReady: previewReady,
                     committed: 0,
-                    message: "Active drawing is read-only. AutoDraft execute was skipped.",
+                    message:
+                        "Active drawing is read-only. AutoDraft execute was skipped.",
                     warnings: warnings,
                     cadNode: cadNode,
-                    createdHandles: []
+                    createdHandles: [],
+                    titleBlockUpdates: []
                 );
             }
 
-            if (commandStateAvailable && commandMask > 0)
+            if (drawingContext.CommandStateAvailable && (drawingContext.CommandMask ?? 0) > 0)
             {
-                warnings.Add($"AutoCAD command state is busy (CMDACTIVE={commandMask}).");
+                warnings.Add(
+                    $"AutoCAD command state is busy (CMDACTIVE={drawingContext.CommandMask})."
+                );
                 return BuildAutoDraftExecuteResult(
                     dryRun: dryRun,
                     status: "cad_not_ready",
@@ -166,7 +166,8 @@ static partial class ConduitRouteStubHandlers
                     message: "AutoCAD is busy. AutoDraft execute was skipped.",
                     warnings: warnings,
                     cadNode: cadNode,
-                    createdHandles: []
+                    createdHandles: [],
+                    titleBlockUpdates: []
                 );
             }
 
@@ -174,8 +175,8 @@ static partial class ConduitRouteStubHandlers
             {
                 var previewStatus = previewReady > 0 ? "preview-ready" : "preview-review";
                 var previewMessage = previewReady > 0
-                    ? $"Preview complete in '{drawingName}'. {previewReady} action(s) are commit-ready; {previewSkipped} skipped."
-                    : $"Preview complete in '{drawingName}'. No actions are ready for commit; {previewSkipped} skipped.";
+                    ? $"Preview complete in '{drawingContext.DrawingName}'. {previewReady} action(s) are commit-ready; {previewSkipped} skipped."
+                    : $"Preview complete in '{drawingContext.DrawingName}'. No actions are ready for commit; {previewSkipped} skipped.";
 
                 return BuildAutoDraftExecuteResult(
                     dryRun: true,
@@ -187,12 +188,14 @@ static partial class ConduitRouteStubHandlers
                     message: previewMessage,
                     warnings: warnings,
                     cadNode: cadNode,
-                    createdHandles: []
+                    createdHandles: [],
+                    titleBlockUpdates: []
                 );
             }
 
             var committed = 0;
             var createdHandles = new List<string>();
+            var titleBlockUpdates = new List<JsonObject>();
             foreach (var evaluation in evaluations)
             {
                 if (!evaluation.ReadyForPreview)
@@ -218,13 +221,18 @@ static partial class ConduitRouteStubHandlers
                         evaluation: evaluation,
                         warnings: warnings,
                         out var createdHandle,
-                        out var skipReason
+                        out var skipReason,
+                        out var titleBlockActionUpdates
                     ))
                 {
                     committed += 1;
                     if (!string.IsNullOrWhiteSpace(createdHandle))
                     {
                         createdHandles.Add(createdHandle);
+                    }
+                    if (titleBlockActionUpdates.Count > 0)
+                    {
+                        titleBlockUpdates.AddRange(titleBlockActionUpdates);
                     }
                 }
                 else if (!string.IsNullOrWhiteSpace(skipReason))
@@ -240,10 +248,10 @@ static partial class ConduitRouteStubHandlers
                     ? "partially-committed"
                     : "committed";
             var commitMessage = committed <= 0
-                ? $"Commit blocked in '{drawingName}'. 0 action(s) were written; {commitSkipped} skipped."
+                ? $"Commit blocked in '{drawingContext.DrawingName}'. 0 action(s) were written; {commitSkipped} skipped."
                 : commitSkipped > 0
-                    ? $"Commit completed in '{drawingName}'. {committed} action(s) were written; {commitSkipped} skipped."
-                    : $"Commit completed in '{drawingName}'. {committed} action(s) were written.";
+                    ? $"Commit completed in '{drawingContext.DrawingName}'. {committed} action(s) were written; {commitSkipped} skipped."
+                    : $"Commit completed in '{drawingContext.DrawingName}'. {committed} action(s) were written.";
 
             return BuildAutoDraftExecuteResult(
                 dryRun: false,
@@ -255,7 +263,8 @@ static partial class ConduitRouteStubHandlers
                 message: commitMessage,
                 warnings: warnings,
                 cadNode: cadNode,
-                createdHandles: createdHandles
+                createdHandles: createdHandles,
+                titleBlockUpdates: titleBlockUpdates
             );
         }
     }
@@ -391,6 +400,24 @@ static partial class ConduitRouteStubHandlers
                 commitBlockReason = "";
             }
         }
+        else if (string.Equals(category, "title_block", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!TryResolveAutoDraftTitleBlockExecuteTarget(actionObject, out _, out var targetReason))
+            {
+                return new AutoDraftActionEvaluation(
+                    ActionObject: actionObject,
+                    ActionId: actionId,
+                    Category: category,
+                    ReadyForPreview: false,
+                    PreviewBlockReason: targetReason,
+                    CommitEnabled: false,
+                    CommitBlockReason: targetReason
+                );
+            }
+
+            commitEnabled = true;
+            commitBlockReason = "";
+        }
 
         return new AutoDraftActionEvaluation(
             ActionObject: actionObject,
@@ -409,73 +436,92 @@ static partial class ConduitRouteStubHandlers
         AutoDraftActionEvaluation evaluation,
         List<string> warnings,
         out string createdHandle,
-        out string skipReason
+        out string skipReason,
+        out IReadOnlyList<JsonObject> titleBlockUpdates
     )
     {
         createdHandle = "";
         skipReason = "";
+        titleBlockUpdates = Array.Empty<JsonObject>();
+
+        if (string.Equals(evaluation.Category, "note", StringComparison.OrdinalIgnoreCase))
+        {
+            var markupObject = actionObject["markup"] as JsonObject;
+            var noteText = ResolveAutoDraftNoteText(actionObject, markupObject);
+            if (string.IsNullOrWhiteSpace(noteText))
+            {
+                skipReason = "missing note text";
+                return false;
+            }
+
+            if (!TryResolveAutoDraftNoteTarget(markupObject, out var x, out var y, out var targetReason))
+            {
+                skipReason = targetReason;
+                return false;
+            }
+
+            EnsureLayerExists(session.Document, AutoDraftNotesLayerName, AutoDraftNotesLayerColorAci);
+            var sanitizedNoteText = SanitizeAutoDraftNoteText(noteText);
+            try
+            {
+                dynamic entity = ((dynamic)session.Modelspace).AddMText(
+                    CadPoint(SnapCoord(x), SnapCoord(y), 0.0),
+                    AutoDraftDefaultMTextWidth,
+                    sanitizedNoteText
+                );
+                SetEntityLayerAndColor(entity, AutoDraftNotesLayerName, AutoDraftNotesLayerColorAci);
+                createdHandle = GetEntityHandle(entity);
+                return true;
+            }
+            catch (Exception mtextEx)
+            {
+                BridgeLog.Warn(
+                    $"AutoDraft note MText insert failed for {evaluation.ActionId}: {mtextEx.Message}. Falling back to AddText."
+                );
+                try
+                {
+                    dynamic entity = ((dynamic)session.Modelspace).AddText(
+                        sanitizedNoteText,
+                        CadPoint(SnapCoord(x), SnapCoord(y), 0.0),
+                        AutoDraftDefaultTextHeight
+                    );
+                    SetEntityLayerAndColor(entity, AutoDraftNotesLayerName, AutoDraftNotesLayerColorAci);
+                    createdHandle = GetEntityHandle(entity);
+                    warnings.Add(
+                        $"{evaluation.ActionId}: MText insert failed; fallback AddText was used."
+                    );
+                    return true;
+                }
+                catch (Exception textEx)
+                {
+                    BridgeLog.Warn(
+                        $"AutoDraft note commit failed for {evaluation.ActionId}: {textEx.Message}"
+                    );
+                    skipReason = $"note creation failed: {textEx.Message}";
+                    return false;
+                }
+            }
+        }
+
+        if (string.Equals(evaluation.Category, "title_block", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryCommitAutoDraftTitleBlockAction(
+                session: session,
+                actionObject: actionObject,
+                evaluation: evaluation,
+                warnings: warnings,
+                out createdHandle,
+                out skipReason,
+                out titleBlockUpdates
+            );
+        }
 
         if (!string.Equals(evaluation.Category, "note", StringComparison.OrdinalIgnoreCase))
         {
             skipReason = $"commit mode for category '{evaluation.Category}' is not enabled yet";
             return false;
         }
-
-        var markupObject = actionObject["markup"] as JsonObject;
-        var noteText = ResolveAutoDraftNoteText(actionObject, markupObject);
-        if (string.IsNullOrWhiteSpace(noteText))
-        {
-            skipReason = "missing note text";
-            return false;
-        }
-
-        if (!TryResolveAutoDraftNoteTarget(markupObject, out var x, out var y, out var targetReason))
-        {
-            skipReason = targetReason;
-            return false;
-        }
-
-        EnsureLayerExists(session.Document, AutoDraftNotesLayerName, AutoDraftNotesLayerColorAci);
-        var sanitizedNoteText = SanitizeAutoDraftNoteText(noteText);
-        try
-        {
-            dynamic entity = ((dynamic)session.Modelspace).AddMText(
-                CadPoint(SnapCoord(x), SnapCoord(y), 0.0),
-                AutoDraftDefaultMTextWidth,
-                sanitizedNoteText
-            );
-            SetEntityLayerAndColor(entity, AutoDraftNotesLayerName, AutoDraftNotesLayerColorAci);
-            createdHandle = GetEntityHandle(entity);
-            return true;
-        }
-        catch (Exception mtextEx)
-        {
-            BridgeLog.Warn(
-                $"AutoDraft note MText insert failed for {evaluation.ActionId}: {mtextEx.Message}. Falling back to AddText."
-            );
-            try
-            {
-                dynamic entity = ((dynamic)session.Modelspace).AddText(
-                    sanitizedNoteText,
-                    CadPoint(SnapCoord(x), SnapCoord(y), 0.0),
-                    AutoDraftDefaultTextHeight
-                );
-                SetEntityLayerAndColor(entity, AutoDraftNotesLayerName, AutoDraftNotesLayerColorAci);
-                createdHandle = GetEntityHandle(entity);
-                warnings.Add(
-                    $"{evaluation.ActionId}: MText insert failed; fallback AddText was used."
-                );
-                return true;
-            }
-            catch (Exception textEx)
-            {
-                BridgeLog.Warn(
-                    $"AutoDraft note commit failed for {evaluation.ActionId}: {textEx.Message}"
-                );
-                skipReason = $"note creation failed: {textEx.Message}";
-                return false;
-            }
-        }
+        return false;
     }
 
     private static string ResolveAutoDraftNoteText(JsonObject actionObject, JsonObject? markupObject)
@@ -614,6 +660,70 @@ static partial class ConduitRouteStubHandlers
         return normalized.Length <= 500 ? normalized : normalized.Substring(0, 500);
     }
 
+    private static bool TryCommitAutoDraftTitleBlockAction(
+        AutoCadSession session,
+        JsonObject actionObject,
+        AutoDraftActionEvaluation evaluation,
+        List<string> warnings,
+        out string createdHandle,
+        out string skipReason,
+        out IReadOnlyList<JsonObject> titleBlockUpdates
+    )
+    {
+        createdHandle = "";
+        skipReason = "";
+        titleBlockUpdates = Array.Empty<JsonObject>();
+
+        if (!TryResolveAutoDraftTitleBlockExecuteTarget(actionObject, out var target, out var targetReason))
+        {
+            skipReason = targetReason;
+            return false;
+        }
+
+        var outcome = CommitAutoDraftTitleBlockExecuteTarget(session.Document, target, warnings);
+        if (!outcome.Succeeded)
+        {
+            skipReason = outcome.SkipReason;
+            return false;
+        }
+
+        var updateNodes = new List<JsonObject>();
+        foreach (var updateNode in AutoDraftTitleBlockUpdatesToJsonArray(outcome.TitleBlockUpdates))
+        {
+            if (updateNode is JsonObject updateObject)
+            {
+                updateNodes.Add(updateObject);
+            }
+        }
+        titleBlockUpdates = updateNodes;
+
+        if (!outcome.WroteChanges)
+        {
+            skipReason = string.IsNullOrWhiteSpace(outcome.SkipReason)
+                ? $"title block update produced no writes for {evaluation.ActionId}"
+                : outcome.SkipReason;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static void AppendAutoDraftPreviewWarnings(
+        IEnumerable<AutoDraftActionEvaluation> evaluations,
+        List<string> warnings
+    )
+    {
+        foreach (var evaluation in evaluations)
+        {
+            if (evaluation.ReadyForPreview || string.IsNullOrWhiteSpace(evaluation.PreviewBlockReason))
+            {
+                continue;
+            }
+
+            warnings.Add($"{evaluation.ActionId}: {evaluation.PreviewBlockReason}");
+        }
+    }
+
     private static JsonObject BuildAutoDraftCadSnapshot(
         bool cadAvailable,
         string? drawingName,
@@ -624,7 +734,8 @@ static partial class ConduitRouteStubHandlers
         string? activeLayout,
         string? activeSpace,
         int? layerCount,
-        int? modelSpaceCount
+        int? modelSpaceCount,
+        int? paperSpaceCount
     )
     {
         var cadNode = new JsonObject
@@ -641,42 +752,12 @@ static partial class ConduitRouteStubHandlers
         cadNode["commandMask"] = commandMask is int commandMaskValue ? commandMaskValue : null;
         cadNode["layerCount"] = layerCount is int layerCountValue ? layerCountValue : null;
         cadNode["modelSpaceCount"] = modelSpaceCount is int modelSpaceCountValue ? modelSpaceCountValue : null;
+        cadNode["paperSpaceCount"] = paperSpaceCount is int paperSpaceCountValue ? paperSpaceCountValue : null;
         cadNode["writable"] = cadAvailable
             && readOnly is bool readOnlyState
             && !readOnlyState
             && (!commandStateAvailable || (commandMask ?? 0) <= 0);
         return cadNode;
-    }
-
-    private static int? ReadCountOrNull(object? collection)
-    {
-        if (collection is null)
-        {
-            return null;
-        }
-        try
-        {
-            return ReadCount(collection);
-        }
-        catch (Exception ex)
-        {
-            BridgeLog.Warn($"Could not read AutoCAD collection count. {ex.GetType().Name}: {ex.Message}");
-            return null;
-        }
-    }
-
-    private static string DescribeActiveSpace(object? value)
-    {
-        var numeric = SafeInt(value);
-        if (numeric == 0)
-        {
-            return "model";
-        }
-        if (numeric == 1)
-        {
-            return "paper";
-        }
-        return string.IsNullOrWhiteSpace(StringOrDefault(value, "")) ? "" : StringOrDefault(value, "");
     }
 
     private static JsonObject BuildAutoDraftExecuteResult(
@@ -689,10 +770,37 @@ static partial class ConduitRouteStubHandlers
         string message,
         IReadOnlyCollection<string> warnings,
         JsonObject cadNode,
-        IReadOnlyCollection<string> createdHandles
+        IReadOnlyCollection<string> createdHandles,
+        IReadOnlyCollection<JsonObject> titleBlockUpdates
     )
     {
         var jobId = $"autodraft-{Guid.NewGuid():N}";
+        var titleBlockUpdateNode = new JsonArray();
+        foreach (var update in titleBlockUpdates)
+        {
+            titleBlockUpdateNode.Add(update.DeepClone());
+        }
+
+        var updatedHandles = new JsonArray();
+        foreach (var handle in titleBlockUpdates
+            .Select(update => update["handle"]?.GetValue<string>() ?? "")
+            .Where(handle => !string.IsNullOrWhiteSpace(handle))
+            .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            updatedHandles.Add(handle);
+        }
+
+        var commitNode = new JsonObject
+        {
+            ["requested"] = !dryRun,
+            ["committed"] = Math.Max(0, committed),
+            ["createdHandles"] = ToJsonArray(createdHandles),
+            ["updatedHandles"] = updatedHandles,
+            ["updatedAttributes"] = titleBlockUpdates.Count,
+            ["notesLayer"] = AutoDraftNotesLayerName,
+            ["titleBlockUpdates"] = titleBlockUpdateNode,
+        };
+
         var dataNode = new JsonObject
         {
             ["jobId"] = jobId,
@@ -704,13 +812,7 @@ static partial class ConduitRouteStubHandlers
             ["previewReady"] = Math.Max(0, previewReady),
             ["message"] = message,
             ["cad"] = cadNode,
-            ["commit"] = new JsonObject
-            {
-                ["requested"] = !dryRun,
-                ["committed"] = Math.Max(0, committed),
-                ["createdHandles"] = ToJsonArray(createdHandles),
-                ["notesLayer"] = AutoDraftNotesLayerName,
-            },
+            ["commit"] = commitNode.DeepClone(),
         };
 
         return new JsonObject
@@ -723,6 +825,7 @@ static partial class ConduitRouteStubHandlers
             ["meta"] = new JsonObject
             {
                 ["source"] = "dotnet",
+                ["commit"] = commitNode,
             },
         };
     }

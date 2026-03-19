@@ -16,7 +16,8 @@ static partial class ConduitRouteStubHandlers
         var unresolvedTargetIds = targetStripIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         using var session = ConnectAutoCad();
-        var drawingName = StringOrDefault(ReadProperty(session.Document, "Name"), "Unknown.dwg");
+        var drawingContext = ReadAutoCadDrawingContext(session);
+        var drawingName = drawingContext.DrawingName;
         var units = ResolveUnits(session.Document);
 
         var warnings = new List<string>();

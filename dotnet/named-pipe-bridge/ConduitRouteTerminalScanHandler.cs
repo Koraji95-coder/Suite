@@ -13,7 +13,8 @@ static partial class ConduitRouteStubHandlers
         var terminalProfile = ReadTerminalScanProfile(payload);
 
         using var session = ConnectAutoCad();
-        var drawingName = StringOrDefault(ReadProperty(session.Document, "Name"), "Unknown.dwg");
+        var drawingContext = ReadAutoCadDrawingContext(session);
+        var drawingName = drawingContext.DrawingName;
         var units = ResolveUnits(session.Document);
 
         var panels = new JsonObject();

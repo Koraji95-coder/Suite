@@ -77,10 +77,19 @@ def _ensure_schema(connection: sqlite3.Connection, db_path: Path) -> None:
                 revision_context_json text,
                 response_meta_json text,
                 created_handles_json text,
+                title_block_updates_json text,
                 created_at text not null
             )
             """
         )
+        existing_columns = {
+            str(row[1] or "").strip().lower()
+            for row in connection.execute("pragma table_info(autodraft_execution_receipts)")
+        }
+        if "title_block_updates_json" not in existing_columns:
+            connection.execute(
+                "alter table autodraft_execution_receipts add column title_block_updates_json text"
+            )
         connection.execute(
             "create index if not exists idx_autodraft_execution_receipts_request_id "
             "on autodraft_execution_receipts(request_id)"
@@ -119,6 +128,19 @@ def _extract_drawing_path(response_payload: Dict[str, Any]) -> str:
     return ""
 
 
+def _extract_title_block_updates(response_payload: Dict[str, Any]) -> list[Dict[str, Any]]:
+    meta = response_payload.get("meta")
+    if not isinstance(meta, dict):
+        return []
+    commit = meta.get("commit")
+    if not isinstance(commit, dict):
+        return []
+    raw_updates = commit.get("titleBlockUpdates")
+    if not isinstance(raw_updates, list):
+        return []
+    return [entry for entry in raw_updates if isinstance(entry, dict)]
+
+
 def persist_autodraft_execution_receipt(
     *,
     request_id: str,
@@ -147,6 +169,7 @@ def persist_autodraft_execution_receipt(
         if isinstance(commit_meta.get("createdHandles"), list)
         else []
     )
+    title_block_updates = _extract_title_block_updates(response_payload)
 
     receipt_summary = {
         "id": receipt_id,
@@ -164,6 +187,7 @@ def persist_autodraft_execution_receipt(
         "workflowContext": workflow_context,
         "revisionContext": revision_context,
         "createdHandles": created_handles,
+        "titleBlockUpdates": title_block_updates,
     }
 
     with _connect() as connection:
@@ -187,8 +211,9 @@ def persist_autodraft_execution_receipt(
                 revision_context_json,
                 response_meta_json,
                 created_handles_json,
+                title_block_updates_json,
                 created_at
-            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 receipt_summary["id"],
@@ -208,6 +233,7 @@ def persist_autodraft_execution_receipt(
                 _normalize_json(revision_context),
                 _normalize_json(meta),
                 _normalize_json(created_handles),
+                _normalize_json(title_block_updates),
                 created_at,
             ),
         )

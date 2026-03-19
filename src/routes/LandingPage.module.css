@@ -68,15 +68,35 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 0.66rem;
+	padding: 0.32rem 0.44rem;
+	margin-inline: -0.44rem;
+	border-radius: 999px;
 	color: var(--text);
 	text-decoration: none;
+}
+
+.brandLink:hover {
+	color: color-mix(in srgb, var(--text) 88%, var(--accent));
 }
 
 .navActionLink {
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
+	padding: 0.46rem 0.82rem;
+	border: 1px solid color-mix(in srgb, var(--line-soft) 86%, transparent);
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--surface) 82%, transparent);
+	font-size: 0.82rem;
+	font-weight: 600;
+	color: var(--text);
 	line-height: 1;
 	text-decoration: none;
+}
+
+.navActionLink:hover {
+	border-color: color-mix(in srgb, var(--accent) 28%, var(--line-soft));
+	color: color-mix(in srgb, var(--text) 90%, var(--accent));
 }
 
 .brandLabel {
@@ -95,9 +115,6 @@
 	font-weight: 600;
 	color: var(--text-muted);
 	text-decoration: none;
-	transition:
-		background 180ms ease,
-		color 180ms ease;
 }
 
 .navAuxLink:hover {
@@ -175,15 +192,18 @@
 .heroLeft {
 	display: grid;
 	align-content: start;
+	gap: 0;
 }
 
 .heroBadge {
 	justify-self: start;
 	width: fit-content;
-	margin-bottom: 1rem;
-	padding-inline: 0.55rem;
-	padding-block: 0.24rem;
-	font-size: 0.69rem;
+	margin-bottom: 0.78rem;
+	padding-inline: 0.48rem;
+	padding-block: 0.18rem;
+	font-size: 0.63rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 	line-height: 1;
 }
 
@@ -209,47 +229,8 @@
 
 .heroCopy {
 	margin-top: 1rem;
-	max-width: 42rem;
+	max-width: 40rem;
 	line-height: 1.68;
-}
-
-.heroSignalGrid {
-	margin-top: 1.2rem;
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 0.55rem;
-}
-
-.heroSignalCard {
-	display: flex;
-	gap: 0.52rem;
-	align-items: flex-start;
-	padding: 0.62rem 0.66rem;
-	border-radius: var(--radius-2);
-	border: 1px solid var(--line-soft);
-	background: color-mix(in srgb, var(--surface) 86%, transparent);
-}
-
-.heroSignalIcon {
-	flex-shrink: 0;
-	width: 0.88rem;
-	height: 0.88rem;
-	margin-top: 0.14rem;
-	color: var(--accent);
-}
-
-.heroSignalLabel {
-	font-size: 0.66rem;
-	font-weight: 700;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
-	color: var(--text-muted);
-}
-
-.heroSignalValue {
-	margin-top: 0.12rem;
-	font-size: 0.74rem;
-	color: var(--text);
 }
 
 .heroCtaRow {
@@ -292,6 +273,43 @@
 	gap: 0.62rem;
 }
 
+.heroSupportList {
+	margin-top: 1rem;
+	display: grid;
+	gap: 0.48rem;
+}
+
+.heroSupportItem {
+	display: flex;
+	gap: 0.6rem;
+	align-items: flex-start;
+	padding: 0.62rem 0.68rem;
+	border-radius: var(--radius-2);
+	border: 1px solid color-mix(in srgb, var(--line-soft) 84%, transparent);
+	background: color-mix(in srgb, var(--surface) 84%, transparent);
+}
+
+.heroSupportIcon {
+	flex-shrink: 0;
+	width: 0.9rem;
+	height: 0.9rem;
+	margin-top: 0.1rem;
+	color: var(--accent);
+}
+
+.heroSupportContent {
+	min-width: 0;
+}
+
+.heroSupportLabel {
+	letter-spacing: 0.02em;
+}
+
+.heroSupportValue {
+	margin-top: 0.16rem;
+	line-height: 1.45;
+}
+
 .heroSummaryCard {
 	display: flex;
 	gap: 0.68rem;
@@ -329,19 +347,8 @@
 	line-height: 1.5;
 }
 
-.sectionHeading {
-	display: grid;
-	gap: 0.28rem;
-}
-
-.sectionCopy {
-	max-width: 44rem;
-}
-
 .agentsSection {
 	margin-top: 1.35rem;
-	display: grid;
-	gap: 0.8rem;
 }
 
 .agentsPanel {
@@ -351,9 +358,14 @@
 			170deg,
 			color-mix(in srgb, var(--surface) 90%, transparent),
 			color-mix(in srgb, var(--surface-2) 82%, transparent)
-		),
+	),
 		var(--surface);
 	box-shadow: 0 14px 28px rgb(0 0 0 / 20%);
+}
+
+.agentsHeader {
+	display: grid;
+	gap: 0.32rem;
 }
 
 .agentsBadge {
@@ -465,16 +477,16 @@
 		grid-column: span 5 / span 5;
 	}
 
+	.heroSupportList {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
 	.agentGrid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
 
 @media (max-width: 52rem) {
-	.heroSignalGrid {
-		grid-template-columns: 1fr;
-	}
-
 	.heroSummaryGrid {
 		grid-template-columns: 1fr;
 	}

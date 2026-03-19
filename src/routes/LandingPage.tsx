@@ -97,9 +97,7 @@ export default function LandingPage() {
 
 					<HStack gap={2} align="center">
 						<Link to="/login" className={styles.navActionLink}>
-							<Button variant="primary" size="sm">
-								Sign in
-							</Button>
+							Sign in
 						</Link>
 					</HStack>
 				</div>
@@ -134,22 +132,6 @@ export default function LandingPage() {
 								separate tools.
 							</Text>
 
-							<div className={styles.heroSignalGrid}>
-								{COMMAND_SIGNALS.map((signal) => (
-									<div key={signal.label} className={styles.heroSignalCard}>
-										<signal.icon className={styles.heroSignalIcon} />
-										<div>
-											<div className={styles.heroSignalLabel}>
-												{signal.label}
-											</div>
-											<div className={styles.heroSignalValue}>
-												{signal.value}
-											</div>
-										</div>
-									</div>
-								))}
-							</div>
-
 							<HStack gap={3} wrap className={styles.heroCtaRow}>
 								<Link to={user ? "/app/dashboard" : "/login"}>
 									<Button variant="primary" size="sm">
@@ -177,6 +159,32 @@ export default function LandingPage() {
 										runtime health, and agent-assisted work without a second tool
 										stack.
 									</Text>
+								</div>
+
+								<div className={styles.heroSupportList}>
+									{COMMAND_SIGNALS.map((signal) => (
+										<div key={signal.label} className={styles.heroSupportItem}>
+											<signal.icon className={styles.heroSupportIcon} />
+											<div className={styles.heroSupportContent}>
+												<Text
+													size="xs"
+													weight="semibold"
+													className={styles.heroSupportLabel}
+													block
+												>
+													{signal.label}
+												</Text>
+												<Text
+													size="xs"
+													color="muted"
+													className={styles.heroSupportValue}
+													block
+												>
+													{signal.value}
+												</Text>
+											</div>
+										</div>
+									))}
 								</div>
 
 								<div className={styles.heroSummaryGrid}>
@@ -212,28 +220,22 @@ export default function LandingPage() {
 				</section>
 
 				<section className={styles.agentsSection}>
-					<div className={styles.sectionHeading}>
-						<Text as="h2" size="lg" weight="semibold" block>
-							Agent operations layer
-						</Text>
-						<Text size="sm" color="muted" className={styles.sectionCopy} block>
-							Specialized profiles operate independently and coordinate through
-							shared context when needed.
-						</Text>
-					</div>
 					<Panel variant="default" padding="lg" className={styles.agentsPanel}>
-						<Badge color="accent" variant="soft" className={styles.agentsBadge}>
-							<span className={styles.agentsBadgeDot} />
-							Profile-driven agents
-						</Badge>
+						<div className={styles.agentsHeader}>
+							<Badge color="accent" variant="soft" className={styles.agentsBadge}>
+								<span className={styles.agentsBadgeDot} />
+								Profile-driven agents
+							</Badge>
 
-						<Text as="h2" size="xl" weight="semibold" block>
-							Six profiles, built for distinct tasks
-						</Text>
-						<Text color="muted" size="sm" className={styles.agentsCopy} block>
-							Each profile has its own memory scope and specialization. Run one
-							at a time or coordinate across profiles when needed.
-						</Text>
+							<Text as="h2" size="xl" weight="semibold" block>
+								Six profiles, built for distinct tasks
+							</Text>
+							<Text color="muted" size="sm" className={styles.agentsCopy} block>
+								Specialized profiles operate independently, coordinate through
+								shared context when needed, and keep their own memory scope for
+								distinct engineering work.
+							</Text>
+						</div>
 
 						<div className={styles.agentGrid}>
 							{AGENT_IDS.map((id) => {

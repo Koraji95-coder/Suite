@@ -241,6 +241,76 @@ _TITLE_BLOCK_TEXT_PATTERN = re.compile(
     r"\b(revision|rev(?:ision)?|drawing\s+no|dwg\s+no|sheet\s+no|title|scale|date|checked|approved)\b",
     re.IGNORECASE,
 )
+_TITLE_BLOCK_ASSIGNMENT_PATTERNS: Dict[str, re.Pattern[str]] = {
+    "drawing_number": re.compile(
+        r"\b(?:drawing\s*(?:no|number)|dwg\s*(?:no|number)|dwgno)\b\s*[:=#-]\s*(?P<value>[^\n;,]+)",
+        re.IGNORECASE,
+    ),
+    "sheet_number": re.compile(
+        r"\b(?:sheet\s*(?:no|number)|sheet)\b\s*[:=#-]\s*(?P<value>[^\n;,]+)",
+        re.IGNORECASE,
+    ),
+    "revision": re.compile(
+        r"\b(?:rev(?:ision)?)\b(?:\s*(?:no|#))?\s*[:=#-]\s*(?P<value>[^\n;,]+)",
+        re.IGNORECASE,
+    ),
+    "title": re.compile(
+        r"\b(?:drawing\s+title|sheet\s+title|title)\b\s*[:=#-]\s*(?P<value>[^\n;]+)",
+        re.IGNORECASE,
+    ),
+    "scale": re.compile(
+        r"\bscale\b\s*[:=#-]\s*(?P<value>[^\n;,]+)",
+        re.IGNORECASE,
+    ),
+    "date": re.compile(
+        r"\bdate\b\s*[:=#-]\s*(?P<value>[^\n;,]+)",
+        re.IGNORECASE,
+    ),
+    "checked_by": re.compile(
+        r"\b(?:checked(?:\s+by)?|chkd)\b\s*[:=#-]\s*(?P<value>[^\n;,]+)",
+        re.IGNORECASE,
+    ),
+    "approved_by": re.compile(
+        r"\b(?:approved(?:\s+by)?|appr(?:oved)?)\b\s*[:=#-]\s*(?P<value>[^\n;,]+)",
+        re.IGNORECASE,
+    ),
+}
+_TITLE_BLOCK_FIELD_PATTERNS: Dict[str, re.Pattern[str]] = {
+    "drawing_number": re.compile(
+        r"\b(?:drawing\s*(?:no|number)|dwg\s*(?:no|number)|dwgno)\b",
+        re.IGNORECASE,
+    ),
+    "sheet_number": re.compile(
+        r"\b(?:sheet\s*(?:no|number)|sheet)\b",
+        re.IGNORECASE,
+    ),
+    "revision": re.compile(r"\b(?:rev(?:ision)?)\b", re.IGNORECASE),
+    "title": re.compile(r"\b(?:drawing\s+title|sheet\s+title|title)\b", re.IGNORECASE),
+    "scale": re.compile(r"\bscale\b", re.IGNORECASE),
+    "date": re.compile(r"\bdate\b", re.IGNORECASE),
+    "checked_by": re.compile(r"\b(?:checked(?:\s+by)?|chkd)\b", re.IGNORECASE),
+    "approved_by": re.compile(r"\b(?:approved(?:\s+by)?|appr(?:oved)?)\b", re.IGNORECASE),
+}
+_TITLE_BLOCK_ATTRIBUTE_TAG_CANDIDATES: Dict[str, List[str]] = {
+    "drawing_number": ["DWG_NO", "DRAWING_NO", "DRAWINGNUMBER", "DRG_NO", "DWGNUM"],
+    "sheet_number": ["SHEET_NO", "SHEETNUMBER", "SHEET", "SHT_NO", "SHT"],
+    "revision": ["REV", "REVISION", "REV_NO", "CURRENT_REV", "SHEET_REV"],
+    "title": ["TITLE", "DRAWING_TITLE", "SHEET_TITLE", "DWG_TITLE"],
+    "scale": ["SCALE"],
+    "date": ["DATE", "ISSUE_DATE", "DRAWN_DATE"],
+    "checked_by": ["CHECKED", "CHECKED_BY", "CHKD", "CHECK"],
+    "approved_by": ["APPROVED", "APPROVED_BY", "APP"],
+}
+_TITLE_BLOCK_REVISION_CONTEXT_FIELDS: Dict[str, Tuple[str, ...]] = {
+    "drawing_number": ("drawing_number",),
+    "sheet_number": ("sheet_number", "sheet"),
+    "revision": ("revision",),
+    "title": ("title",),
+    "scale": ("scale",),
+    "date": ("date",),
+    "checked_by": ("checked_by", "checked"),
+    "approved_by": ("approved_by", "approved"),
+}
 _DIMENSION_ONLY_PATTERN = re.compile(
     r"^\s*[-+]?\d+(?:\.\d+)?(?:['\"]|mm|cm|m|in|ft)?\s*$",
     re.IGNORECASE,
@@ -443,6 +513,179 @@ def _collect_markup_semantic_text(markup: Dict[str, Any]) -> str:
         seen.add(token)
         values.append(normalized)
     return " ".join(values).strip()
+
+
+def _normalize_execute_target_tags(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    seen: Set[str] = set()
+    normalized_tags: List[str] = []
+    for item in value:
+        tag = str(item or "").strip().upper()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        normalized_tags.append(tag)
+    return normalized_tags
+
+
+def _normalize_revision_context_payload(value: Any) -> Dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    normalized: Dict[str, str] = {}
+    for key, item in value.items():
+        key_text = _normalize_text(key)
+        if not key_text:
+            continue
+        item_text = str(item or "").strip()
+        if item_text:
+            normalized[key_text] = item_text
+    return normalized
+
+
+def _resolve_title_block_field_key(text: str) -> str:
+    normalized_text = str(text or "").strip()
+    if not normalized_text:
+        return ""
+    for field_key, pattern in _TITLE_BLOCK_FIELD_PATTERNS.items():
+        if pattern.search(normalized_text):
+            return field_key
+    return ""
+
+
+def _extract_title_block_value_from_text(text: str, field_key: str) -> str:
+    pattern = _TITLE_BLOCK_ASSIGNMENT_PATTERNS.get(field_key)
+    if not pattern:
+        return ""
+    match = pattern.search(str(text or ""))
+    if not match:
+        return ""
+    return str(match.group("value") or "").strip()
+
+
+def _resolve_title_block_value_from_revision_context(
+    field_key: str, revision_context: Dict[str, str]
+) -> str:
+    for context_key in _TITLE_BLOCK_REVISION_CONTEXT_FIELDS.get(field_key, ()):
+        candidate = str(revision_context.get(context_key) or "").strip()
+        if candidate:
+            return candidate
+    return ""
+
+
+def _build_title_block_execute_target(
+    action: Dict[str, Any],
+    *,
+    revision_context: Dict[str, str],
+) -> Optional[Dict[str, Any]]:
+    if _normalize_text(action.get("category")) != "title_block":
+        return None
+
+    raw_target = action.get("execute_target")
+    markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+    markup_meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+
+    if isinstance(raw_target, dict):
+        kind = _normalize_text(raw_target.get("kind"))
+        field_key = _normalize_text(raw_target.get("field_key"))
+        attribute_tags = _normalize_execute_target_tags(raw_target.get("attribute_tags"))
+        target_value = str(raw_target.get("target_value") or "").strip()
+        block_name_hint = str(raw_target.get("block_name_hint") or "").strip()
+        layout_hint = str(raw_target.get("layout_hint") or "").strip()
+        if (
+            kind == "title_block_attribute"
+            and field_key
+            and attribute_tags
+            and target_value
+        ):
+            return {
+                "kind": "title_block_attribute",
+                "field_key": field_key,
+                "attribute_tags": attribute_tags,
+                "target_value": target_value,
+                "block_name_hint": block_name_hint or None,
+                "layout_hint": layout_hint or None,
+            }
+
+    candidate_texts = [
+        value
+        for value in [
+            _collect_markup_semantic_text(markup),
+            str(action.get("action") or "").strip(),
+        ]
+        if str(value or "").strip()
+    ]
+    field_key = ""
+    source_text = ""
+    for candidate_text in candidate_texts:
+        field_key = _resolve_title_block_field_key(candidate_text)
+        if field_key:
+            source_text = candidate_text
+            break
+    if not field_key:
+        return None
+
+    target_value = _extract_title_block_value_from_text(source_text, field_key)
+    if not target_value:
+        for candidate_text in candidate_texts:
+            if candidate_text == source_text:
+                continue
+            target_value = _extract_title_block_value_from_text(
+                candidate_text, field_key
+            )
+            if target_value:
+                break
+    if not target_value:
+        target_value = _resolve_title_block_value_from_revision_context(
+            field_key, revision_context
+        )
+    if not target_value:
+        return None
+
+    attribute_tags = _TITLE_BLOCK_ATTRIBUTE_TAG_CANDIDATES.get(field_key, [])
+    if not attribute_tags:
+        return None
+
+    block_name_hint = str(
+        action.get("block_name_hint")
+        or markup_meta.get("block_name_hint")
+        or ""
+    ).strip()
+    layout_hint = str(
+        action.get("layout_hint")
+        or markup_meta.get("layout_hint")
+        or ""
+    ).strip()
+
+    return {
+        "kind": "title_block_attribute",
+        "field_key": field_key,
+        "attribute_tags": list(attribute_tags),
+        "target_value": target_value,
+        "block_name_hint": block_name_hint or None,
+        "layout_hint": layout_hint or None,
+    }
+
+
+def _prepare_autodraft_execute_actions(
+    actions: List[Dict[str, Any]],
+    *,
+    revision_context: Dict[str, str],
+) -> List[Dict[str, Any]]:
+    prepared_actions: List[Dict[str, Any]] = []
+    for action in actions:
+        next_action = dict(action)
+        if _normalize_text(next_action.get("category")) == "title_block":
+            execute_target = _build_title_block_execute_target(
+                next_action,
+                revision_context=revision_context,
+            )
+            if execute_target:
+                next_action["execute_target"] = execute_target
+            else:
+                next_action.pop("execute_target", None)
+        prepared_actions.append(next_action)
+    return prepared_actions
 
 
 def _infer_page_position_zone(
@@ -7557,6 +7800,16 @@ def create_autodraft_blueprint(
             )
             engine_used = _COMPARE_ENGINE_PYTHON
         _normalize_compare_result_semantics(compare_result)
+        plan_obj = compare_result.get("plan") if isinstance(compare_result.get("plan"), dict) else {}
+        plan_actions = plan_obj.get("actions") if isinstance(plan_obj.get("actions"), list) else []
+        if plan_actions:
+            plan_obj["actions"] = _prepare_autodraft_execute_actions(
+                [item for item in plan_actions if isinstance(item, dict)],
+                revision_context=_normalize_revision_context_payload(
+                    payload.get("revision_context")
+                ),
+            )
+            compare_result["plan"] = plan_obj
         markup_review_queue = _apply_markup_review_requirements(
             compare_result=compare_result,
             request_id=request_id,
@@ -8065,6 +8318,13 @@ def create_autodraft_blueprint(
         raw_actions = payload.get("actions")
         actions = raw_actions if isinstance(raw_actions, list) else []
         clean_actions = [item for item in actions if isinstance(item, dict)]
+        revision_context = _normalize_revision_context_payload(
+            payload.get("revision_context")
+        )
+        prepared_actions = _prepare_autodraft_execute_actions(
+            clean_actions,
+            revision_context=revision_context,
+        )
         client_cad_context = (
             payload.get("cad_context")
             if isinstance(payload.get("cad_context"), dict)
@@ -8074,7 +8334,7 @@ def create_autodraft_blueprint(
             get_manager=get_manager,
             logger=logger,
             request_id=request_id,
-            actions=clean_actions,
+            actions=prepared_actions,
         )
         cad_context = _merge_cad_context(
             live_context=live_cad_context,
@@ -8090,7 +8350,7 @@ def create_autodraft_blueprint(
             else "none"
         )
         backcheck_result = _build_local_backcheck(
-            actions=clean_actions,
+            actions=prepared_actions,
             cad_context=cad_context,
             request_id=request_id,
             cad_context_source=cad_context_source,
@@ -8135,6 +8395,7 @@ def create_autodraft_blueprint(
 
         payload["backcheck_fail_count"] = server_backcheck_fail_count
         payload.setdefault("requestId", request_id)
+        payload["actions"] = prepared_actions
         if execute_bridge_enabled:
             try:
                 bridge_response = _call_autodraft_execute_bridge(

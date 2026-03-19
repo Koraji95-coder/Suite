@@ -28,6 +28,27 @@ def _build_valid_action() -> dict[str, object]:
     }
 
 
+def _build_title_block_action(*, text: str = "Revision") -> dict[str, object]:
+    return {
+        "id": "action-title-1",
+        "rule_id": "title-block-rect",
+        "category": "TITLE_BLOCK",
+        "action": "Extract metadata only; skip geometry conversion",
+        "confidence": 0.97,
+        "status": "proposed",
+        "markup": {
+            "type": "text",
+            "color": "blue",
+            "text": text,
+            "bounds": {"x": 120, "y": 12, "width": 24, "height": 8},
+            "meta": {
+                "page_zone": "bottom-right",
+                "cad_transform_applied": True,
+            },
+        },
+    }
+
+
 class TestApiAutoDraftExecuteProvider(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -295,6 +316,105 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
             payload.get("meta", {}).get("executionReceipt", {}).get("providerPath"),
             "dotnet_bridge",
         )
+
+    def test_execute_prepares_title_block_targets_for_bridge(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            target = actions[0].get("execute_target") if isinstance(actions[0], dict) else None
+            self.assertEqual(
+                target,
+                {
+                    "kind": "title_block_attribute",
+                    "field_key": "revision",
+                    "attribute_tags": ["REV", "REVISION", "REV_NO", "CURRENT_REV", "SHEET_REV"],
+                    "target_value": "B",
+                    "block_name_hint": None,
+                    "layout_hint": None,
+                },
+            )
+            return {
+                "id": "bridge-job-title-1",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview complete.",
+                    "data": {
+                        "jobId": "autodraft-title-1",
+                        "status": "preview-ready",
+                        "accepted": 1,
+                        "skipped": 0,
+                        "dryRun": True,
+                        "message": "Preview complete.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-title-target-1"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-title-target-1",
+                "actions": [_build_title_block_action()],
+                "dry_run": True,
+                "revision_context": {
+                    "revision": "B",
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_execute_leaves_title_block_without_target_when_context_missing(self) -> None:
+        def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:
+            actions = payload.get("actions")
+            self.assertIsInstance(actions, list)
+            assert isinstance(actions, list)
+            first = actions[0]
+            self.assertIsInstance(first, dict)
+            assert isinstance(first, dict)
+            self.assertNotIn("execute_target", first)
+            return {
+                "id": "bridge-job-title-2",
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Preview requires title-block target metadata.",
+                    "data": {
+                        "jobId": "autodraft-title-2",
+                        "status": "preview-review",
+                        "accepted": 0,
+                        "skipped": 1,
+                        "dryRun": True,
+                        "message": "Preview requires title-block target metadata.",
+                    },
+                    "meta": {"source": "dotnet", "requestId": "req-title-target-2"},
+                    "warnings": [],
+                },
+            }
+
+        client = self._build_client(
+            execute_provider="dotnet_bridge",
+            send_autodraft_dotnet_command=_bridge_sender,
+        )
+
+        response = client.post(
+            "/api/autodraft/execute",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "requestId": "req-title-target-2",
+                "actions": [_build_title_block_action(text="Revision")],
+                "dry_run": True,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
 
 
 if __name__ == "__main__":

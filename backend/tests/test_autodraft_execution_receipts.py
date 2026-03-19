@@ -41,7 +41,18 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                                 "drawingName": "sample.dwg",
                                 "drawingPath": r"C:\Drawings\sample.dwg",
                             },
-                            "commit": {"createdHandles": ["1A2B"]},
+                            "commit": {
+                                "createdHandles": ["1A2B"],
+                                "titleBlockUpdates": [
+                                    {
+                                        "fieldKey": "revision",
+                                        "attributeTag": "REV",
+                                        "previousValue": "A",
+                                        "nextValue": "B",
+                                        "handle": "1A2B",
+                                    }
+                                ],
+                            },
                         },
                     },
                     provider_path="dotnet_bridge",
@@ -58,6 +69,18 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                     receipt["revisionContext"],
                     {"drawing_number": "E-101"},
                 )
+                self.assertEqual(
+                    receipt["titleBlockUpdates"],
+                    [
+                        {
+                            "fieldKey": "revision",
+                            "attributeTag": "REV",
+                            "previousValue": "A",
+                            "nextValue": "B",
+                            "handle": "1A2B",
+                        }
+                    ],
+                )
                 self.assertEqual(get_receipt_db_path().as_posix(), db_path.replace("\\", "/"))
 
                 connection = sqlite3.connect(db_path)
@@ -66,7 +89,7 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                         """
                         select request_id, provider_path, status, dry_run, accepted, skipped,
                                drawing_name, drawing_path, warnings_json, created_handles_json,
-                               workflow_context_json, revision_context_json
+                               workflow_context_json, revision_context_json, title_block_updates_json
                         from autodraft_execution_receipts
                         where request_id = ?
                         """,
@@ -89,6 +112,7 @@ class TestAutoDraftExecutionReceipts(unittest.TestCase):
                 self.assertIn("1A2B", row[9])
                 self.assertIn("project-1", row[10])
                 self.assertIn("E-101", row[11])
+                self.assertIn("\"fieldKey\":\"revision\"", row[12])
 
 
 if __name__ == "__main__":

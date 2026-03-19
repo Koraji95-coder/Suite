@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
 
 const WORKTALE_BIN = "worktale";
 const USE_SHELL = process.platform === "win32";
+const POST_COMMIT_COMMAND = "worktale capture --silent 2>/dev/null || true";
+const POST_PUSH_COMMAND = "echo \"  Tip: run 'worktale digest' to review today's work\" 2>/dev/null || true";
 
 function runCommand(command, args, { cwd }) {
 	const result = spawnSync(command, args, {
@@ -31,6 +34,15 @@ function readText(filePath) {
 	}
 }
 
+function writeExecutableHook(filePath, content) {
+	fs.writeFileSync(filePath, content.replace(/\n/g, os.EOL), "utf8");
+	try {
+		fs.chmodSync(filePath, 0o755);
+	} catch {
+		// Windows may ignore POSIX executable bits.
+	}
+}
+
 function resolveHookPaths(repoRoot) {
 	const hooksRoot = path.join(repoRoot, ".git", "hooks");
 	return {
@@ -38,6 +50,62 @@ function resolveHookPaths(repoRoot) {
 		postCommitPs1: path.join(hooksRoot, "post-commit.ps1"),
 		postPush: path.join(hooksRoot, "post-push"),
 	};
+}
+
+function isKnownBrokenWorktaleHook(content, expectedCommand) {
+	const normalizedLines = String(content || "")
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean);
+	if (!normalizedLines.length) return false;
+	const allowedLines = new Set([
+		"#!/bin/sh",
+		"# Worktale post-commit hook",
+		"# Worktale post-push reminder",
+		"# --- Worktale hook start ---",
+		"# --- Worktale hook end ---",
+		expectedCommand,
+		"else",
+		"fi",
+	]);
+	return (
+		normalizedLines.some((line) => line === "else" || line === "fi") &&
+		normalizedLines.every((line) => allowedLines.has(line))
+	);
+}
+
+function buildPostCommitHook() {
+	return `#!/bin/sh
+# Worktale post-commit hook
+# --- Worktale hook start ---
+${POST_COMMIT_COMMAND}
+# --- Worktale hook end ---
+`;
+}
+
+function buildPostPushHook() {
+	return `#!/bin/sh
+# Worktale post-push reminder
+# --- Worktale hook start ---
+${POST_PUSH_COMMAND}
+# --- Worktale hook end ---
+`;
+}
+
+function repairKnownBrokenHooks(repoRoot) {
+	const hookPaths = resolveHookPaths(repoRoot);
+	let repaired = false;
+	const postCommit = readText(hookPaths.postCommit);
+	if (isKnownBrokenWorktaleHook(postCommit, POST_COMMIT_COMMAND)) {
+		writeExecutableHook(hookPaths.postCommit, buildPostCommitHook());
+		repaired = true;
+	}
+	const postPush = readText(hookPaths.postPush);
+	if (isKnownBrokenWorktaleHook(postPush, POST_PUSH_COMMAND)) {
+		writeExecutableHook(hookPaths.postPush, buildPostPushHook());
+		repaired = true;
+	}
+	return repaired;
 }
 
 function isPostCommitHookInstalled(repoRoot) {
@@ -136,6 +204,11 @@ function ensureReady(repoRoot) {
 		if (!installResult.ok) {
 			printFailure(installResult, "Worktale hook reinstall failed.");
 		}
+		state = readState(repoRoot);
+	}
+
+	if (repairKnownBrokenHooks(repoRoot)) {
+		logStep("repaired malformed Worktale hook script");
 		state = readState(repoRoot);
 	}
 

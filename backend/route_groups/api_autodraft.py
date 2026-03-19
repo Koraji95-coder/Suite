@@ -43,7 +43,10 @@ from .api_autocad_error_helpers import (
     build_error_payload as autocad_build_error_payload,
     derive_request_id as autocad_derive_request_id,
 )
-from ..autodraft_execution_receipts import persist_autodraft_execution_receipt
+try:
+    from ..autodraft_execution_receipts import persist_autodraft_execution_receipt
+except ImportError:  # Support direct `python backend/api_server.py` imports via `route_groups`.
+    from autodraft_execution_receipts import persist_autodraft_execution_receipt
 from .api_local_learning_runtime import get_local_learning_runtime
 from .pdf_text_extraction import (
     extract_embedded_text_page_lines,

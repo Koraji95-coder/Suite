@@ -96,7 +96,11 @@ For the next session on `DUSTIN-HOME`:
 3. Restart Codex so the workstation-specific MCP env reloads.
 4. If only the MCP workstation block needs to be rewritten, skip the full restore and run:
    - `npm run workstation:sync -- -WorkstationId DUSTIN-HOME`
-5. Verify startup/doctor status before doing app work:
+5. If you are switching machines, mirror local-only state before leaving the current box:
+   - `npm run workstation:mirror`
+6. The destination box can use the new npm alias instead of the raw PowerShell path:
+   - `npm run workstation:restore -- -WorkstationId DUSTIN-HOME`
+7. Verify startup/doctor status before doing app work:
    - `npm run watchdog:startup:check`
    - `npm run watchdog:startup:autocad:check`
    - `npm run watchdog:backend:startup:check`

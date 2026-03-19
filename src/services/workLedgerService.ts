@@ -5,6 +5,7 @@ export type {
 	WorkLedgerFilters,
 	WorkLedgerInput,
 	WorkLedgerInsert,
+	WorkLedgerDraftSuggestion,
 	WorkLedgerDraftSuggestionsResponse,
 	WorkLedgerPublishJobRow,
 	WorkLedgerLifecycleState,
@@ -16,12 +17,12 @@ export type {
 	WorktalePublishPayload,
 	WorktaleReadinessResponse,
 } from "./work-ledger/types";
-export type { WorkLedgerDraftSuggestion } from "./work-ledger/types";
 
 import type {
 	WorkLedgerFilters,
 	WorkLedgerInput,
 	WorkLedgerInsert,
+	WorkLedgerDraftSuggestion,
 	WorkLedgerDraftSuggestionsResponse,
 	WorkLedgerPublishJobRow,
 	WorkLedgerPublishResult,
@@ -52,8 +53,6 @@ import {
 } from "./work-ledger/realtime";
 import { buildWorktalePublishPayload as buildPayload } from "./work-ledger/payload";
 import { fetchWorkLedgerDraftSuggestions } from "./work-ledger/suggestions";
-import type { WorkLedgerDraftSuggestion } from "./work-ledger/types";
-
 type WorkLedgerListener = (entry: WorkLedgerRow) => void;
 
 const listeners = new Set<WorkLedgerListener>();
@@ -74,6 +73,12 @@ function normalizeWorkLedgerEntry(entry: WorkLedgerRow): WorkLedgerRow {
 
 function normalizeWorkLedgerEntries(entries: WorkLedgerRow[]): WorkLedgerRow[] {
 	return entries.map(normalizeWorkLedgerEntry);
+}
+
+function resolveSuggestionReference(suggestion: WorkLedgerDraftSuggestion): string {
+	return String(
+		suggestion.externalReference || `suggestion:${suggestion.sourceKey}`,
+	).trim();
 }
 
 function isMissingWorkLedgerSchema(error: unknown): boolean {
@@ -533,5 +538,54 @@ export const workLedgerService = {
 		sources: WorkLedgerDraftSuggestionsResponse["sources"];
 	}> {
 		return fetchWorkLedgerDraftSuggestions();
+	},
+
+	async syncDraftSuggestions(
+		existingEntries: WorkLedgerRow[],
+		suggestions: WorkLedgerDraftSuggestion[],
+	): Promise<{
+		created: WorkLedgerRow[];
+		skipped: number;
+	}> {
+		const knownReferences = new Set(
+			existingEntries
+				.map((entry) => String(entry.external_reference || "").trim().toLowerCase())
+				.filter(Boolean),
+		);
+		const created: WorkLedgerRow[] = [];
+		let skipped = 0;
+
+		for (const suggestion of suggestions) {
+			const reference = resolveSuggestionReference(suggestion);
+			if (knownReferences.has(reference.toLowerCase())) {
+				skipped += 1;
+				continue;
+			}
+
+			const entry = await this.createEntry({
+				title: suggestion.title,
+				summary: suggestion.summary,
+				sourceKind: suggestion.sourceKind,
+				commitRefs: suggestion.commitRefs,
+				projectId: suggestion.projectId ?? null,
+				appArea: suggestion.appArea ?? "",
+				architecturePaths: suggestion.architecturePaths,
+				hotspotIds: suggestion.hotspotIds,
+				lifecycleState: suggestion.lifecycleState,
+				publishState: suggestion.publishState,
+				externalReference: reference,
+				externalUrl: null,
+			});
+
+			if (entry) {
+				created.push(entry);
+				knownReferences.add(reference.toLowerCase());
+			}
+		}
+
+		return {
+			created,
+			skipped,
+		};
 	},
 };

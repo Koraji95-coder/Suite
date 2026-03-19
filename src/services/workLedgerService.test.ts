@@ -340,6 +340,71 @@ describe("workLedgerService", () => {
 		expect(result.data[0]?.sourceKind).toBe("git_checkpoint");
 	});
 
+	it("auto-ingests missing draft suggestions into local work ledger storage", async () => {
+		const existing = await workLedgerService.createEntry({
+			title: "Existing draft",
+			summary: "Already tracked.",
+			sourceKind: "git_checkpoint",
+			commitRefs: ["abc123"],
+			projectId: null,
+			appArea: "agent",
+			architecturePaths: ["src/services/agentService.ts"],
+			hotspotIds: ["agentService"],
+			lifecycleState: "completed",
+			publishState: "draft",
+			externalReference: "suggestion:git:abc123",
+		});
+
+		expect(existing).not.toBeNull();
+
+		const syncResult = await workLedgerService.syncDraftSuggestions(
+			[existing!],
+			[
+				{
+					suggestionId: "suggest-git-1",
+					sourceKey: "git:abc123",
+					sourceKind: "git_checkpoint",
+					title: "Existing draft",
+					summary: "Already tracked.",
+					commitRefs: ["abc123"],
+					projectId: null,
+					appArea: "agent",
+					architecturePaths: ["src/services/agentService.ts"],
+					hotspotIds: ["agentService"],
+					lifecycleState: "completed",
+					publishState: "draft",
+					externalReference: "suggestion:git:abc123",
+					createdAt: "2026-03-18T00:00:00.000Z",
+				},
+				{
+					suggestionId: "suggest-agent-1",
+					sourceKey: "agent:run-1",
+					sourceKind: "agent_run",
+					title: "Auto-created draft",
+					summary: "Generated from agent history.",
+					commitRefs: [],
+					projectId: null,
+					appArea: "agent",
+					architecturePaths: ["src/routes/agent/AgentRoutePage.tsx"],
+					hotspotIds: ["AgentRoutePage"],
+					lifecycleState: "active",
+					publishState: "draft",
+					externalReference: "suggestion:agent:run-1",
+					createdAt: "2026-03-18T01:00:00.000Z",
+				},
+			],
+		);
+
+		expect(syncResult.skipped).toBe(1);
+		expect(syncResult.created).toHaveLength(1);
+		expect(syncResult.created[0]?.title).toBe("Auto-created draft");
+
+		const entries = await workLedgerService.fetchEntries({ limit: 10 });
+		expect(entries.data.some((entry) => entry.title === "Auto-created draft")).toBe(
+			true,
+		);
+	});
+
 	it("returns a friendly readiness error when publisher routes are unavailable", async () => {
 		mockGetUser.mockResolvedValue({
 			data: { user: { id: "user-1" } },

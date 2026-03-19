@@ -23,6 +23,18 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.45rem;
+	align-self: flex-start;
+}
+
+.panelIntro {
+	display: grid;
+	gap: 0.28rem;
+	min-width: 0;
+}
+
+.panelCopy {
+	max-width: 72ch;
+	line-height: 1.6;
 }
 
 .publisherStatusGrid {
@@ -168,6 +180,11 @@
 	background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
+.sessionActionButton:disabled {
+	cursor: default;
+	opacity: 0.65;
+}
+
 .emptyStateCompact {
 	border: 1px dashed var(--line-soft);
 	border-radius: var(--radius-2);
@@ -226,14 +243,23 @@
 
 .formActions {
 	display: flex;
-	justify-content: flex-end;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.8rem;
+	flex-wrap: wrap;
 	margin-top: 1rem;
+}
+
+.formHint {
+	max-width: 42ch;
+	line-height: 1.5;
 }
 
 .statsGrid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 	gap: 0.75rem;
+	justify-content: flex-end;
 	margin-bottom: 1rem;
 }
 

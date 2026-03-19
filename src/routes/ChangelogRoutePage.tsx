@@ -113,6 +113,31 @@ function toCsvValue(values: string[]) {
 	return values.join(", ");
 }
 
+function createEmptyForm(projectId: string | null = null): WorkLedgerInput {
+	return {
+		title: "",
+		summary: "",
+		sourceKind: "manual",
+		commitRefs: [],
+		projectId,
+		appArea: "",
+		architecturePaths: [],
+		hotspotIds: [],
+		lifecycleState: "active",
+		publishState: "draft",
+		externalReference: "",
+		externalUrl: "",
+	};
+}
+
+function resolveSuggestionReference(suggestion: WorkLedgerDraftSuggestion) {
+	return String(
+		suggestion.externalReference || `suggestion:${suggestion.sourceKey}`,
+	)
+		.trim()
+		.toLowerCase();
+}
+
 export default function ChangelogRoutePage() {
 	const navigate = useNavigate();
 	const [searchParams, setSearchParams] = useSearchParams();
@@ -145,20 +170,9 @@ export default function ChangelogRoutePage() {
 	const [selectedSuggestionId, setSelectedSuggestionId] = useState<string | null>(
 		null,
 	);
-	const [form, setForm] = useState<WorkLedgerInput>({
-		title: "",
-		summary: "",
-		sourceKind: "manual",
-		commitRefs: [],
-		projectId: null,
-		appArea: "",
-		architecturePaths: [],
-		hotspotIds: [],
-		lifecycleState: "active",
-		publishState: "draft",
-		externalReference: "",
-		externalUrl: "",
-	});
+	const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+	const [syncingSuggestionDrafts, setSyncingSuggestionDrafts] = useState(false);
+	const [form, setForm] = useState<WorkLedgerInput>(() => createEmptyForm());
 
 	const filters = useMemo<WorkLedgerFilters>(
 		() => ({
@@ -226,23 +240,29 @@ export default function ChangelogRoutePage() {
 		setReadinessLoading(false);
 	}, []);
 
-	const applySuggestion = (suggestion: WorkLedgerDraftSuggestion) => {
+	const applyEntryToForm = useCallback((
+		entry: WorkLedgerRow,
+		suggestionId: string | null = null,
+	) => {
 		setForm({
-			title: suggestion.title,
-			summary: suggestion.summary,
-			sourceKind: suggestion.sourceKind,
-			commitRefs: suggestion.commitRefs ?? [],
-			projectId: suggestion.projectId ?? null,
-			appArea: suggestion.appArea ?? "",
-			architecturePaths: suggestion.architecturePaths ?? [],
-			hotspotIds: suggestion.hotspotIds ?? [],
-			lifecycleState: suggestion.lifecycleState,
-			publishState: suggestion.publishState ?? "draft",
-			externalReference: suggestion.externalReference ?? "",
-			externalUrl: "",
+			title: entry.title,
+			summary: entry.summary,
+			sourceKind: entry.source_kind as WorkLedgerInput["sourceKind"],
+			commitRefs: entry.commit_refs ?? [],
+			projectId: entry.project_id ?? null,
+			appArea: entry.app_area ?? "",
+			architecturePaths: entry.architecture_paths ?? [],
+			hotspotIds: entry.hotspot_ids ?? [],
+			lifecycleState:
+				(entry.lifecycle_state as WorkLedgerLifecycleState | null | undefined) ??
+				"active",
+			publishState: entry.publish_state as WorkLedgerInput["publishState"],
+			externalReference: entry.external_reference ?? "",
+			externalUrl: entry.external_url ?? "",
 		});
-		setSelectedSuggestionId(suggestion.suggestionId);
-	};
+		setEditingEntryId(entry.id);
+		setSelectedSuggestionId(suggestionId);
+	}, []);
 
 	useEffect(() => {
 		void loadEntries();
@@ -269,6 +289,115 @@ export default function ChangelogRoutePage() {
 		() => new Map(projects.map((project) => [project.id, project.name])),
 		[projects],
 	);
+	const entriesByExternalReference = useMemo(
+		() =>
+			new Map(
+				entries
+					.map((entry) => [
+						String(entry.external_reference || "").trim().toLowerCase(),
+						entry,
+					] as const)
+					.filter(([reference]) => Boolean(reference)),
+			),
+		[entries],
+	);
+
+	const reviewSuggestion = useCallback(
+		(suggestion: WorkLedgerDraftSuggestion) => {
+			const linkedEntry = entriesByExternalReference.get(
+				resolveSuggestionReference(suggestion),
+			);
+			if (linkedEntry) {
+				applyEntryToForm(linkedEntry, suggestion.suggestionId);
+				return;
+			}
+
+			setForm({
+				title: suggestion.title,
+				summary: suggestion.summary,
+				sourceKind: suggestion.sourceKind,
+				commitRefs: suggestion.commitRefs ?? [],
+				projectId: suggestion.projectId ?? null,
+				appArea: suggestion.appArea ?? "",
+				architecturePaths: suggestion.architecturePaths ?? [],
+				hotspotIds: suggestion.hotspotIds ?? [],
+				lifecycleState: suggestion.lifecycleState,
+				publishState: suggestion.publishState ?? "draft",
+				externalReference: suggestion.externalReference ?? "",
+				externalUrl: "",
+			});
+			setEditingEntryId(null);
+			setSelectedSuggestionId(suggestion.suggestionId);
+		},
+		[applyEntryToForm, entriesByExternalReference],
+	);
+
+	useEffect(() => {
+		if (
+			loading ||
+			suggestionsLoading ||
+			syncingSuggestionDrafts ||
+			draftSuggestions.length === 0
+		) {
+			return;
+		}
+
+		const missingSuggestions = draftSuggestions.filter(
+			(suggestion) =>
+				!entriesByExternalReference.has(resolveSuggestionReference(suggestion)),
+		);
+		if (missingSuggestions.length === 0) {
+			return;
+		}
+
+		let cancelled = false;
+		setSyncingSuggestionDrafts(true);
+		void (async () => {
+			try {
+				const result = await workLedgerService.syncDraftSuggestions(
+					entries,
+					missingSuggestions,
+				);
+				if (cancelled) return;
+				if (result.created.length > 0) {
+					setEntries((prev) => {
+						const next = [
+							...result.created,
+							...prev.filter(
+								(entry) =>
+									!result.created.some((created) => created.id === entry.id),
+							),
+						];
+						return next.slice(0, 40);
+					});
+				}
+			} catch (syncError) {
+				if (!cancelled) {
+					setSuggestionsError(
+						String(
+							(syncError as { message?: unknown })?.message ||
+								"Unable to create draft entries from suggestions.",
+						),
+					);
+				}
+			} finally {
+				if (!cancelled) {
+					setSyncingSuggestionDrafts(false);
+				}
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		draftSuggestions,
+		entries,
+		entriesByExternalReference,
+		loading,
+		suggestionsLoading,
+		syncingSuggestionDrafts,
+	]);
 
 	const counts = useMemo(
 		() => ({
@@ -411,30 +540,22 @@ export default function ChangelogRoutePage() {
 		[],
 	);
 
-	const handleCreate = async () => {
+	const handleSaveEntry = async () => {
 		if (!form.title?.trim() || !form.summary?.trim()) return;
 		setSaving(true);
-		const created = await workLedgerService.createEntry({
+		const payload = {
 			...form,
 			commitRefs: form.commitRefs ?? [],
 			architecturePaths: form.architecturePaths ?? [],
 			hotspotIds: form.hotspotIds ?? [],
-		});
-		if (created) {
-			setForm({
-				title: "",
-				summary: "",
-				sourceKind: "manual",
-				commitRefs: [],
-				projectId: form.projectId ?? null,
-				appArea: form.appArea ?? "",
-				architecturePaths: form.architecturePaths ?? [],
-				hotspotIds: form.hotspotIds ?? [],
-				lifecycleState: "active",
-				publishState: "draft",
-				externalReference: "",
-				externalUrl: "",
-			});
+		};
+		const projectId = form.projectId ?? null;
+		const saved = editingEntryId
+			? await workLedgerService.updateEntry(editingEntryId, payload)
+			: await workLedgerService.createEntry(payload);
+		if (saved) {
+			setForm(createEmptyForm(projectId));
+			setEditingEntryId(null);
 			await loadEntries();
 			await loadSuggestions();
 			setSelectedSuggestionId(null);
@@ -448,6 +569,12 @@ export default function ChangelogRoutePage() {
 	) => {
 		await workLedgerService.updateEntry(entry.id, { publishState });
 		await loadEntries();
+	};
+
+	const clearEditor = () => {
+		setForm(createEmptyForm(form.projectId ?? null));
+		setEditingEntryId(null);
+		setSelectedSuggestionId(null);
 	};
 
 	const openDashboardSummary = () => {
@@ -476,11 +603,11 @@ export default function ChangelogRoutePage() {
 			<div className={styles.root}>
 				<Panel variant="default" padding="lg" className={styles.publisherPanel}>
 					<div className={styles.panelHeader}>
-						<div>
-							<Text size="sm" weight="semibold">
+						<div className={styles.panelIntro}>
+							<Text block size="sm" weight="semibold">
 								Worktale Publisher
 							</Text>
-							<Text size="xs" color="muted">
+							<Text block size="xs" color="muted" className={styles.panelCopy}>
 								Suite stays canonical. Worktale receives outbound publish jobs
 								with durable receipts.
 							</Text>
@@ -574,30 +701,36 @@ export default function ChangelogRoutePage() {
 					{publisherError ? <div className={styles.error}>{publisherError}</div> : null}
 				</Panel>
 
-					{(suggestionsLoading ||
-						suggestionsError ||
-						draftSuggestions.length > 0) && (
+				{(suggestionsLoading ||
+					suggestionsError ||
+					draftSuggestions.length > 0) && (
 					<Panel variant="default" padding="lg" className={styles.suggestionPanel}>
 						<div className={styles.panelHeader}>
-							<div>
-								<Text size="sm" weight="semibold">
-									Draft suggestions
+							<div className={styles.panelIntro}>
+								<Text block size="sm" weight="semibold">
+									Automation inbox
 								</Text>
-								<Text size="xs" color="muted">
-									Review-first needs pulled from activity, Watchdog telemetry, and observations.
+								<Text block size="xs" color="muted" className={styles.panelCopy}>
+									Git checkpoints, agent work, and Watchdog moments are drafted
+									automatically. Review and refine before publishing.
 								</Text>
 							</div>
-							{suggestionsLoading && (
+							{suggestionsLoading || syncingSuggestionDrafts ? (
 								<Badge color="warning" variant="soft">
-									Loading
+									{syncingSuggestionDrafts ? "Drafting…" : "Loading"}
 								</Badge>
-							)}
+							) : null}
 						</div>
 						{suggestionSources ? (
 							<div className={styles.suggestionStats}>
 								<span>{suggestionSources.git} git</span>
 								<span>{suggestionSources.agent} agent</span>
 								<span>{suggestionSources.watchdog} watchdog</span>
+							</div>
+						) : null}
+						{syncingSuggestionDrafts ? (
+							<div className={styles.emptyStateCompact}>
+								New suggestions are being added to the canonical draft ledger.
 							</div>
 						) : null}
 
@@ -609,46 +742,57 @@ export default function ChangelogRoutePage() {
 							</div>
 						) : (
 							<div className={styles.suggestionList}>
-								{draftSuggestions.map((suggestion) => (
-									<div
-										key={suggestion.suggestionId}
-										className={`${styles.dataRow} ${
-											selectedSuggestionId === suggestion.suggestionId
-												? styles.suggestionActive
-												: ""
-										}`}
-									>
-										<div>
-											<div className={styles.dataRowTitle}>
-												{suggestion.title}
+								{draftSuggestions.map((suggestion) => {
+									const linkedEntry = entriesByExternalReference.get(
+										resolveSuggestionReference(suggestion),
+									);
+									return (
+										<div
+											key={suggestion.suggestionId}
+											className={`${styles.dataRow} ${
+												selectedSuggestionId === suggestion.suggestionId
+													? styles.suggestionActive
+													: ""
+											}`}
+										>
+											<div>
+												<div className={styles.dataRowTitle}>
+													{suggestion.title}
+												</div>
+												<div className={styles.dataRowMeta}>
+													{suggestion.summary}
+												</div>
+												<div className={styles.suggestionMeta}>
+													<span>{suggestion.sourceKind}</span>
+													{linkedEntry ? (
+														<Badge color="accent" variant="soft">
+															draft added
+														</Badge>
+													) : null}
+													{suggestion.commitRefs.length > 0 ? (
+														<span>{suggestion.commitRefs.join(", ")}</span>
+													) : null}
+													{suggestion.projectId ? (
+														<span>
+															{projectMap.get(suggestion.projectId) ||
+																suggestion.projectId}
+														</span>
+													) : null}
+												</div>
 											</div>
-											<div className={styles.dataRowMeta}>
-												{suggestion.summary}
-											</div>
-											<div className={styles.suggestionMeta}>
-												<span>{suggestion.sourceKind}</span>
-												{suggestion.commitRefs.length > 0 ? (
-													<span>{suggestion.commitRefs.join(", ")}</span>
-												) : null}
-												{suggestion.projectId ? (
-													<span>
-														{projectMap.get(suggestion.projectId) ||
-															suggestion.projectId}
-													</span>
-												) : null}
+											<div className={styles.dataRowAside}>
+												<button
+													type="button"
+													className={styles.sessionActionButton}
+													onClick={() => reviewSuggestion(suggestion)}
+													disabled={!linkedEntry && syncingSuggestionDrafts}
+												>
+													{linkedEntry ? "Review draft" : "Review suggestion"}
+												</button>
 											</div>
 										</div>
-										<div className={styles.dataRowAside}>
-											<button
-												type="button"
-												className={styles.sessionActionButton}
-												onClick={() => applySuggestion(suggestion)}
-											>
-												Load into form
-											</button>
-										</div>
-									</div>
-								))}
+									);
+								})}
 							</div>
 						)}
 					</Panel>
@@ -656,23 +800,21 @@ export default function ChangelogRoutePage() {
 
 				<Panel variant="default" padding="lg" className={styles.formPanel}>
 					<div className={styles.panelHeader}>
-						<div>
-							<Text size="sm" weight="semibold">
-								Log Work
+						<div className={styles.panelIntro}>
+							<Text block size="sm" weight="semibold">
+								{editingEntryId ? "Draft editor" : "Log work"}
 							</Text>
-							<Text size="xs" color="muted">
-								Create a ledger entry that stays canonical in Suite and can be
-								published outward later.
+							<Text block size="xs" color="muted" className={styles.panelCopy}>
+								{editingEntryId
+									? "Review the auto-drafted entry, tighten the summary, and promote it when it is publish-ready."
+									: "Create a canonical ledger entry manually when the automation inbox is not enough."}
 							</Text>
 						</div>
-						<Button
-							variant="ghost"
-							size="sm"
-							iconRight={<RefreshCw size={14} />}
-							onClick={() => void loadEntries()}
-						>
-							Refresh
-						</Button>
+						{editingEntryId || selectedSuggestionId ? (
+							<Button variant="ghost" size="sm" onClick={clearEditor}>
+								Clear editor
+							</Button>
+						) : null}
 					</div>
 
 					<div className={styles.formGrid}>
@@ -836,14 +978,25 @@ export default function ChangelogRoutePage() {
 					</div>
 
 					<div className={styles.formActions}>
+						{editingEntryId ? (
+							<Text size="xs" color="muted" className={styles.formHint}>
+								Editing an existing draft entry.
+							</Text>
+						) : (
+							<div />
+						)}
 						<Button
 							variant="primary"
-							onClick={() => void handleCreate()}
+							onClick={() => void handleSaveEntry()}
 							disabled={
 								saving || !form.title?.trim() || !form.summary?.trim()
 							}
 						>
-							{saving ? "Saving…" : "Add entry"}
+							{saving
+								? "Saving…"
+								: editingEntryId
+									? "Save entry"
+									: "Add entry"}
 						</Button>
 					</div>
 				</Panel>
@@ -1016,6 +1169,13 @@ export default function ChangelogRoutePage() {
 											</div>
 										</div>
 										<div className={styles.entryActions}>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => applyEntryToForm(entry)}
+											>
+												Edit entry
+											</Button>
 											<Button
 												variant="ghost"
 												size="sm"

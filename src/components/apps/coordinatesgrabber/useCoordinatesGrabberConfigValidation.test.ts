@@ -31,7 +31,7 @@ describe("validateCoordinatesGrabberConfig", () => {
 		});
 
 		expect(errors).toContain(
-			"Only layer-based extraction is currently supported in this workflow",
+			"The web workflow currently supports only layer-search extraction",
 		);
 		expect(errors).toContain("Add at least one layer before starting extraction");
 		expect(errors).toContain("Start number must be at least 1");
@@ -40,4 +40,3 @@ describe("validateCoordinatesGrabberConfig", () => {
 		expect(errors).toContain("Scale must be greater than 0");
 	});
 });
-

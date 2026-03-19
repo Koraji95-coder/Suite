@@ -75,13 +75,6 @@ export function useGroundGridBackendBridge({
 						"system",
 						"Start AutoCAD and the backend server to enable CAD features",
 					);
-					if (!shownDisconnectToastRef.current) {
-						shownDisconnectToastRef.current = true;
-						showToast(
-							"error",
-							"AutoCAD backend not detected. Check the Log tab for details.",
-						);
-					}
 				}
 			} else if (wasConnected !== isNowConnected) {
 				if (isNowConnected) {
@@ -94,8 +87,8 @@ export function useGroundGridBackendBridge({
 					if (!shownDisconnectToastRef.current) {
 						shownDisconnectToastRef.current = true;
 						showToast(
-							"error",
-							"AutoCAD connection lost. Check the Log tab for details.",
+							"warning",
+							"AutoCAD connection lost. CAD features are in offline mode.",
 						);
 					}
 				}
@@ -204,15 +197,12 @@ export function useGroundGridBackendBridge({
 						"system",
 						"AutoCAD backend not detected - features will activate when available",
 					);
-					if (!shownDisconnectToastRef.current) {
-						shownDisconnectToastRef.current = true;
-						showToast(
-							"error",
-							"AutoCAD backend not detected. Check the Log tab for details.",
-						);
-					}
+					setBackendConnected(false);
 					isFirstCheckRef.current = false;
+					wasConnectedRef.current = false;
+					return;
 				}
+				await handleConnectedState(false, "HTTP");
 			}
 		};
 
@@ -228,7 +218,7 @@ export function useGroundGridBackendBridge({
 			unsubscribeDisconnected();
 			unsubscribeError();
 		};
-	}, [addLog, handleConnectedState, showToast]);
+	}, [addLog, handleConnectedState]);
 
 	return {
 		availableLayers,

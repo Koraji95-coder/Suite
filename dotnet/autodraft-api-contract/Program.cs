@@ -9,7 +9,7 @@ builder.Services.Configure<AutoDraftOptions>(
     builder.Configuration.GetSection("AutoDraft")
 );
 builder.Services.AddSingleton<IAutoDraftPlanner, RuleBasedAutoDraftPlanner>();
-builder.Services.AddSingleton<IAutoDraftExecutor, MockAutoDraftExecutor>();
+builder.Services.AddSingleton<IAutoDraftExecutor, DeterministicAutoDraftExecutor>();
 builder.Services.AddSingleton<IAutoDraftBackchecker, MockAutoDraftBackchecker>();
 builder.Services.AddSingleton<IAutoDraftComparer, RuleBasedAutoDraftComparer>();
 
@@ -34,19 +34,21 @@ app.MapGet("/", () =>
 );
 
 app.MapGet("/health", (IOptions<AutoDraftOptions> options) =>
-    Results.Ok(
+{
+    var executorEnabled = options.Value.EnableMockExecution;
+    return Results.Ok(
         new AutoDraftHealthResponse
         {
             Ok = true,
             App = "AutoDraft .NET API",
-            Mode = "contract-stub",
+            Mode = executorEnabled ? "deterministic-preflight" : "deterministic-disabled",
             Version = options.Value.Version,
             PlannerReady = true,
-            ExecutorReady = options.Value.EnableMockExecution,
+            ExecutorReady = executorEnabled,
             TimestampUtc = DateTimeOffset.UtcNow,
         }
-    )
-);
+    );
+});
 
 app.MapGet("/api/autodraft/rules", (IAutoDraftPlanner planner) =>
     Results.Ok(

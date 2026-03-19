@@ -16,7 +16,7 @@ execution from COM scripts into a .NET-native pipeline.
 ## Current behavior
 
 - `plan` uses seed deterministic rules and returns normalized action output.
-- `execute` is a mock executor (dry-run/accepted responses only).
+- `execute` is a deterministic preflight executor that accepts only execution-ready actions and reports skipped reasons. It still does not perform CAD writes.
 - `backcheck` is a deterministic CAD-context verifier (read-only findings, no CAD writes).
 - `compare` runs deterministic plan+backcheck over normalized markups + CAD context.
 - The API schema is intended to stay stable while internals evolve.

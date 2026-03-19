@@ -71,13 +71,15 @@ export function ProjectHealthScoreCard({
 			setLastActivityMinutes(null);
 			return;
 		}
-		activityService.fetchRecentActivity(3).then((result) => {
+		activityService.fetchRecentActivity(1, projectId).then((result) => {
 			if (cancelled) return;
-			const row = result.data.find((entry) => entry.project_id === projectId);
+			const row = result.data[0];
 			if (row) {
 				const minutes = minutesAgo(row.timestamp);
 				setLastActivityMinutes(minutes);
+				return;
 			}
+			setLastActivityMinutes(null);
 		});
 		return () => {
 			cancelled = true;

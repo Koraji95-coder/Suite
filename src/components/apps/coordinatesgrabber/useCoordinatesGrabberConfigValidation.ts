@@ -7,9 +7,7 @@ export function validateCoordinatesGrabberConfig(
 	const errors: string[] = [];
 
 	if (config.mode !== "layer_search") {
-		errors.push(
-			"Only layer-based extraction is currently supported in this workflow",
-		);
+		errors.push("The web workflow currently supports only layer-search extraction");
 	}
 
 	const hasLayerSelection =
@@ -60,7 +58,7 @@ export function useCoordinatesGrabberConfigValidation({
 		(newMode: CoordinatesGrabberState["mode"]) => {
 			if (newMode !== "layer_search") {
 				addLog(
-					`[INFO] '${newMode}' mode is not yet supported in this API flow. Staying on layer_search.`,
+					`[INFO] '${newMode}' remains available only in the legacy desktop tool. Staying on layer_search.`,
 				);
 				setState((prev) => ({ ...prev, mode: "layer_search" }));
 				return;
@@ -120,4 +118,3 @@ export function useCoordinatesGrabberConfigValidation({
 		handleStyleChange,
 	};
 }
-

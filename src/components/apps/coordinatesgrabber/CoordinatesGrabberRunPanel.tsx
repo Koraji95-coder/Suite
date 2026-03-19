@@ -76,16 +76,17 @@ export function CoordinatesGrabberRunPanel({
 				>
 					{state.isRunning ? "Extracting..." : "Start Extraction"}
 				</button>
-				{state.mode === "blocks" && (
+				{state.scanSelection && (
 					<button
 						onClick={() => void handleSelectionRefresh()}
-						disabled={!backendConnected}
+						disabled={!backendConnected || state.isRunning}
 						className={cn(
 							styles.secondaryAction,
-							!backendConnected && styles.secondaryActionDisabled,
+							(!backendConnected || state.isRunning) &&
+								styles.secondaryActionDisabled,
 						)}
 					>
-						Refresh
+						Refresh Selection
 					</button>
 				)}
 			</div>

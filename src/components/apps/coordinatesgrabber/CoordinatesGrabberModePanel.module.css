@@ -14,6 +14,13 @@
 	letter-spacing: 0.03125rem;
 }
 
+.description {
+	margin: 0 0 0.75rem;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
 .list {
 	display: flex;
 	flex-direction: column;
@@ -22,30 +29,44 @@
 
 .row {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: 0.5rem;
 	cursor: pointer;
 	font-size: 0.8125rem;
 	color: var(--text);
+	padding: 0.625rem 0.75rem;
+	border-radius: 0.625rem;
+	border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+	background: color-mix(in srgb, var(--surface-elevated) 82%, transparent);
 }
 
-.rowDisabled {
-	cursor: not-allowed;
-	opacity: 0.65;
-}
-
-.rowSelected .label {
-	color: var(--primary);
+.rowSelected {
+	border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .radio {
+	margin-top: 0.1rem;
 	cursor: pointer;
 }
 
-.rowDisabled .radio {
-	cursor: not-allowed;
+.textBlock {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+.rowSelected .label {
+	color: var(--accent);
 }
 
 .label {
 	color: inherit;
+	font-weight: 600;
+}
+
+.note {
+	font-size: 0.75rem;
+	line-height: 1.45;
+	color: var(--text-muted);
 }

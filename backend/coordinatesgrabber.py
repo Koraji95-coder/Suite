@@ -158,10 +158,6 @@ class Row:
     source_name: str = ""
     source_index: int = -1
     corner_name: Optional[str] = None
-    source_handle: str
-    source_name: str
-    source_index: int
-    corner_name: Optional[str] = None  # NW, NE, SW, SE for 4-corner mode
 
 
 # -------------------------

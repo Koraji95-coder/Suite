@@ -17,30 +17,30 @@ export function CoordinatesGrabberModePanel({
 	const modeOptions: Array<{
 		value: CoordinatesGrabberState["mode"];
 		label: string;
-		enabled: boolean;
+		description: string;
 	}> = [
-		{ value: "layer_search", label: "Layer Search", enabled: true },
-		{ value: "blocks", label: "Block Centers (coming soon)", enabled: false },
 		{
-			value: "polylines",
-			label: "Polyline Vertices (coming soon)",
-			enabled: false,
+			value: "layer_search",
+			label: "Layer Search",
+			description:
+				"Web extraction currently runs through the layer-search API workflow.",
 		},
 	];
 
 	return (
 		<div className={styles.root}>
-			<h3 className={styles.title}>Extraction Mode</h3>
+			<h3 className={styles.title}>Extraction Workflow</h3>
+			<p className={styles.description}>
+				Block-center and polyline extraction remain in the legacy desktop tool
+				until the API flow is expanded.
+			</p>
 			<div className={styles.list}>
 				{modeOptions.map((entryMode) => (
 					<label
 						key={entryMode.value}
 						className={cn(
 							styles.row,
-							!entryMode.enabled && styles.rowDisabled,
-							mode === entryMode.value &&
-								entryMode.enabled &&
-								styles.rowSelected,
+							mode === entryMode.value && styles.rowSelected,
 						)}
 					>
 						<input
@@ -49,10 +49,12 @@ export function CoordinatesGrabberModePanel({
 							value={entryMode.value}
 							checked={mode === entryMode.value}
 							onChange={() => onModeChange(entryMode.value)}
-							disabled={!entryMode.enabled}
 							className={styles.radio}
 						/>
-						<span className={styles.label}>{entryMode.label}</span>
+						<span className={styles.textBlock}>
+							<span className={styles.label}>{entryMode.label}</span>
+							<span className={styles.note}>{entryMode.description}</span>
+						</span>
 					</label>
 				))}
 			</div>

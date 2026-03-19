@@ -151,18 +151,21 @@ export const activityService = {
 		return fallback;
 	},
 
-	async fetchRecentActivity(limit = 7) {
+	async fetchRecentActivity(limit = 7, projectId?: string | null) {
 		const userId = await getCurrentUserId();
 		if (!userId) return { data: [] as ActivityLogRow[], error: null };
 
 		const result = await safeSupabaseQuery(
-			async () =>
-				await supabase
+			async () => {
+				let query = supabase
 					.from("activity_log")
 					.select("*")
-					.eq("user_id", userId)
-					.order("timestamp", { ascending: false })
-					.limit(limit),
+					.eq("user_id", userId);
+				if (projectId) {
+					query = query.eq("project_id", projectId);
+				}
+				return await query.order("timestamp", { ascending: false }).limit(limit);
+			},
 			"ActivityService",
 		);
 

@@ -153,15 +153,15 @@ Update-SuiteCodexConfig `
 $bootstrapResult = $null
 if (-not $SkipBootstrap) {
     $bootstrapScriptCandidates = @(
-        (Join-Path $PSScriptRoot "bootstrap-suite-runtime.ps1"),
-        (Join-Path $resolvedRepoRoot "scripts\bootstrap-suite-runtime.ps1")
+        (Join-Path $PSScriptRoot "run-suite-runtime-startup.ps1"),
+        (Join-Path $resolvedRepoRoot "scripts\run-suite-runtime-startup.ps1")
     ) | Select-Object -Unique
     $bootstrapScript = $bootstrapScriptCandidates | Where-Object {
         Test-Path -LiteralPath $_
     } | Select-Object -First 1
 
     if (-not $bootstrapScript) {
-        Write-Warning "bootstrap-suite-runtime.ps1 was not found. Runtime services were not auto-started."
+        Write-Warning "run-suite-runtime-startup.ps1 was not found. Runtime services were not auto-started."
     }
     else {
         try {
@@ -170,7 +170,6 @@ if (-not $SkipBootstrap) {
                 -ExecutionPolicy Bypass `
                 -File $bootstrapScript `
                 -RepoRoot $resolvedRepoRoot `
-                -CodexConfigPath $codexConfigPath `
                 -Json 2>&1
             $bootstrapExitCode = 0
             $bootstrapExitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
@@ -187,10 +186,10 @@ if (-not $SkipBootstrap) {
             ).Trim()
 
             if ($bootstrapExitCode -ne 0) {
-                throw "bootstrap-suite-runtime.ps1 exited with code $bootstrapExitCode. $bootstrapText"
+                throw "run-suite-runtime-startup.ps1 exited with code $bootstrapExitCode. $bootstrapText"
             }
             if ([string]::IsNullOrWhiteSpace($bootstrapText)) {
-                throw "bootstrap-suite-runtime.ps1 returned no output."
+                throw "run-suite-runtime-startup.ps1 returned no output."
             }
 
             $bootstrapResult = $bootstrapText | ConvertFrom-Json
@@ -210,7 +209,16 @@ Write-Host (
 if ($bootstrapResult) {
     $bootstrapStatus = if ($bootstrapResult.ok) { "ok" } else { "needs_attention" }
     Write-Host "Runtime bootstrap: $bootstrapStatus"
-    foreach ($step in @($bootstrapResult.steps)) {
+    $bootstrapSteps = if ($bootstrapResult.steps) {
+        @($bootstrapResult.steps)
+    }
+    elseif ($bootstrapResult.bootstrap -and $bootstrapResult.bootstrap.steps) {
+        @($bootstrapResult.bootstrap.steps)
+    }
+    else {
+        @()
+    }
+    foreach ($step in $bootstrapSteps) {
         Write-Host "- [$($step.state)] $($step.name): $($step.summary)"
     }
 }

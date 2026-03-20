@@ -54,6 +54,43 @@ function Convert-CommandOutputToText {
     ).Trim()
 }
 
+function Invoke-ExternalCommand {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory
+    )
+
+    Push-Location $WorkingDirectory
+    try {
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            $rawOutput = & $FilePath @Arguments 2>&1
+            $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
+            $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
+            $outputText = Convert-CommandOutputToText -Output $rawOutput
+        }
+        catch {
+            $exitCode = 1
+            $outputText = $_.Exception.Message
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    [pscustomobject]@{
+        ExitCode = $exitCode
+        Ok = ($exitCode -eq 0)
+        OutputText = $outputText
+        OutputTail = Get-OutputTail -Text $outputText
+    }
+}
+
 function Get-OutputTail {
     param(
         [string]$Text,
@@ -133,13 +170,46 @@ function Get-PortOwningProcessId {
 }
 
 function Test-DockerReady {
+    $previousErrorActionPreference = $ErrorActionPreference
     try {
-        & docker version | Out-Null
-        return $true
+        $ErrorActionPreference = "Continue"
+        $rawOutput = & docker version --format "{{.Server.Version}}" 2>&1
+        $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
+        $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
+        $outputText = Convert-CommandOutputToText -Output $rawOutput
+        return (
+            $exitCode -eq 0 -and
+            -not [string]::IsNullOrWhiteSpace($outputText) -and
+            $outputText -notmatch "(?i)failed to connect"
+        )
     }
     catch {
         return $false
     }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
+function Test-SupabaseOutputIndicatesReady {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    if (
+        $Text -match "(?im)\bcontainer is not ready\b" -or
+        $Text -match "(?im)\bfailed to inspect\b" -or
+        $Text -match "(?im)\btry rerunning the command with --debug\b"
+    ) {
+        return $false
+    }
+
+    return (
+        $Text -match "(?im)\bsupabase local development setup is running\b" -or
+        $Text -match "(?im)\bProject URL\b"
+    )
 }
 
 function Get-ProcessUptimeSeconds {
@@ -237,14 +307,20 @@ function New-ServiceStatus {
 
 $services = @()
 
+$supabaseStatusResult = Invoke-ExternalCommand -FilePath "node" -Arguments @((Join-Path $resolvedRepoRoot "scripts\run-supabase-cli.mjs"), "status") -WorkingDirectory $resolvedRepoRoot
+$supabaseStatusReady = $supabaseStatusResult.Ok -and (Test-SupabaseOutputIndicatesReady -Text $supabaseStatusResult.OutputText)
 $supabaseApiListening = Test-PortListening -Port 54321
 $supabaseDbListening = Test-PortListening -Port 54322
 $supabaseStudioListening = Test-PortListening -Port 54323
 $supabaseProcessId = Get-PortOwningProcessId -Port 54321
-$supabaseState = if ($supabaseApiListening -and $supabaseDbListening) {
+$supabaseState = if ($supabaseStatusReady -or ($supabaseApiListening -and $supabaseDbListening)) {
     "running"
 }
-elseif ($supabaseApiListening -or $supabaseDbListening) {
+elseif (
+    $supabaseApiListening -or
+    $supabaseDbListening -or
+    ($supabaseStatusResult.OutputText -match "(?im)\bcontainer is not ready\b")
+) {
     "starting"
 }
 else {
@@ -258,6 +334,9 @@ $supabaseSummary = switch ($supabaseState) {
 $supabaseStartupMode = if (Test-DockerReady) { "docker" } else { $null }
 $supabaseDetails = if ($supabaseState -eq "running" -and $supabaseStudioListening) {
     "API 54321, DB 54322, Studio 54323."
+}
+elseif ($supabaseState -eq "running" -and $supabaseStatusReady) {
+    "Supabase CLI reports the local stack is running."
 }
 elseif ($supabaseState -eq "starting") {
     "API 54321: $supabaseApiListening. DB 54322: $supabaseDbListening."
@@ -274,6 +353,12 @@ if ($supabaseState -eq "running" -and $supabaseStudioListening) {
     $supabaseNotes += [pscustomobject]@{
         label = "Console"
         value = "Supabase Studio is available at http://127.0.0.1:54323."
+    }
+}
+elseif ($supabaseState -eq "running" -and $supabaseStatusReady) {
+    $supabaseNotes += [pscustomobject]@{
+        label = "Status"
+        value = "Supabase CLI reports the local stack is healthy even though port probes are still catching up."
     }
 }
 elseif ($supabaseState -eq "starting") {

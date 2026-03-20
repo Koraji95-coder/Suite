@@ -72,13 +72,82 @@ function Resolve-DockerDesktopExecutable {
     return $null
 }
 
-function Test-DockerReady {
+function Invoke-DockerDesktopStartCommand {
+    $previousErrorActionPreference = $ErrorActionPreference
     try {
-        & docker version | Out-Null
-        return $true
+        $ErrorActionPreference = "Continue"
+        $rawOutput = & docker desktop start --detach 2>&1
+        $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
+        $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
+        $outputText = [string]::Join(
+            [Environment]::NewLine,
+            @(
+                $rawOutput | ForEach-Object {
+                    if ($null -eq $_) { "" } else { $_.ToString() }
+                }
+            )
+        ).Trim()
+
+        return [pscustomobject]@{
+            Ok = ($exitCode -eq 0)
+            ExitCode = $exitCode
+            OutputText = $outputText
+            OutputTail = Get-OutputTail -Text $outputText
+        }
+    }
+    catch {
+        return [pscustomobject]@{
+            Ok = $false
+            ExitCode = 1
+            OutputText = $_.Exception.Message
+            OutputTail = Get-OutputTail -Text $_.Exception.Message
+        }
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
+function Get-DockerDesktopProcessInfo {
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'Docker Desktop.exe' OR Name = 'com.docker.backend.exe'" -ErrorAction SilentlyContinue
+    $desktopProcess = @($processes | Where-Object { $_.Name -eq "Docker Desktop.exe" } | Select-Object -First 1)
+    $backendProcess = @($processes | Where-Object { $_.Name -eq "com.docker.backend.exe" } | Select-Object -First 1)
+
+    [pscustomobject]@{
+        DesktopRunning = ($desktopProcess.Count -gt 0)
+        DesktopProcessId = if ($desktopProcess.Count -gt 0) { [int]$desktopProcess[0].ProcessId } else { $null }
+        BackendRunning = ($backendProcess.Count -gt 0)
+        BackendProcessId = if ($backendProcess.Count -gt 0) { [int]$backendProcess[0].ProcessId } else { $null }
+    }
+}
+
+function Test-DockerReady {
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $rawOutput = & docker version --format "{{.Server.Version}}" 2>&1
+        $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
+        $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
+        $outputText = [string]::Join(
+            [Environment]::NewLine,
+            @(
+                $rawOutput | ForEach-Object {
+                    if ($null -eq $_) { "" } else { $_.ToString() }
+                }
+            )
+        ).Trim()
+
+        return (
+            $exitCode -eq 0 -and
+            -not [string]::IsNullOrWhiteSpace($outputText) -and
+            $outputText -notmatch "(?i)failed to connect"
+        )
     }
     catch {
         return $false
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
     }
 }
 
@@ -104,12 +173,17 @@ function Ensure-DockerRuntime {
             ready = $true
             serviceStarted = $false
             desktopLaunched = $false
+            desktopRunning = $true
+            desktopProcessId = $null
+            backendRunning = $true
+            backendProcessId = $null
             message = "Docker engine is already ready."
         }
     }
 
     $serviceStarted = $false
     $desktopLaunched = $false
+    $desktopProcessInfo = Get-DockerDesktopProcessInfo
 
     $dockerService = Get-Service -Name "com.docker.service" -ErrorAction SilentlyContinue
     if ($dockerService -and $dockerService.Status -ne "Running") {
@@ -123,36 +197,87 @@ function Ensure-DockerRuntime {
     }
 
     $desktopExecutable = Resolve-DockerDesktopExecutable
-    if ($desktopExecutable) {
-        try {
-            Start-Process -FilePath $desktopExecutable | Out-Null
+    if ($desktopExecutable -and -not $desktopProcessInfo.DesktopRunning) {
+        $dockerDesktopStart = Invoke-DockerDesktopStartCommand
+        if ($dockerDesktopStart.Ok) {
             $desktopLaunched = $true
+            Write-StatusLog -Tag "INFO" -Message "Docker Desktop start requested through the Docker CLI."
+            if (-not [string]::IsNullOrWhiteSpace($dockerDesktopStart.OutputTail)) {
+                Write-StatusLog -Tag "INFO" -Message $dockerDesktopStart.OutputTail
+            }
         }
-        catch {
-            Write-StatusLog -Tag "WARN" -Message "Docker Desktop launch warning: $($_.Exception.Message)"
+        else {
+            if (-not [string]::IsNullOrWhiteSpace($dockerDesktopStart.OutputTail)) {
+                Write-StatusLog -Tag "WARN" -Message "Docker Desktop CLI start warning: $($dockerDesktopStart.OutputTail)"
+            }
+
+            try {
+                Start-Process -FilePath $desktopExecutable | Out-Null
+                $desktopLaunched = $true
+                Write-StatusLog -Tag "INFO" -Message "Docker Desktop launch requested."
+            }
+            catch {
+                Write-StatusLog -Tag "WARN" -Message "Docker Desktop launch warning: $($_.Exception.Message)"
+            }
         }
+    }
+    elseif (-not $desktopExecutable -and -not $desktopProcessInfo.DesktopRunning) {
+        $dockerDesktopStart = Invoke-DockerDesktopStartCommand
+        if ($dockerDesktopStart.Ok) {
+            $desktopLaunched = $true
+            Write-StatusLog -Tag "INFO" -Message "Docker Desktop start requested through the Docker CLI."
+            if (-not [string]::IsNullOrWhiteSpace($dockerDesktopStart.OutputTail)) {
+                Write-StatusLog -Tag "INFO" -Message $dockerDesktopStart.OutputTail
+            }
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($dockerDesktopStart.OutputTail)) {
+            Write-StatusLog -Tag "WARN" -Message "Docker Desktop CLI start warning: $($dockerDesktopStart.OutputTail)"
+        }
+    }
+    elseif ($desktopProcessInfo.DesktopRunning) {
+        Write-StatusLog -Tag "INFO" -Message ("Docker Desktop is already starting. PID={0}" -f $desktopProcessInfo.DesktopProcessId)
     }
 
     $deadline = (Get-Date).AddSeconds($DockerReadyTimeoutSeconds)
     do {
         Start-Sleep -Seconds 5
         if (Test-DockerReady) {
+            $desktopProcessInfo = Get-DockerDesktopProcessInfo
             return [pscustomobject]@{
                 ok = $true
                 ready = $true
                 serviceStarted = $serviceStarted
                 desktopLaunched = $desktopLaunched
+                desktopRunning = $desktopProcessInfo.DesktopRunning
+                desktopProcessId = $desktopProcessInfo.DesktopProcessId
+                backendRunning = $desktopProcessInfo.BackendRunning
+                backendProcessId = $desktopProcessInfo.BackendProcessId
                 message = "Docker engine is ready."
             }
         }
     } while ((Get-Date) -lt $deadline)
+
+    $desktopProcessInfo = Get-DockerDesktopProcessInfo
+    $message = if ($desktopProcessInfo.DesktopRunning -or $desktopProcessInfo.BackendRunning) {
+        "Docker Desktop started but the engine did not become ready within $DockerReadyTimeoutSeconds seconds."
+    }
+    elseif ($desktopExecutable) {
+        "Docker Desktop is installed but did not stay running long enough for the engine to become ready."
+    }
+    else {
+        "Docker Desktop executable was not found and the engine did not become ready."
+    }
 
     return [pscustomobject]@{
         ok = $false
         ready = $false
         serviceStarted = $serviceStarted
         desktopLaunched = $desktopLaunched
-        message = "Docker engine did not become ready within $DockerReadyTimeoutSeconds seconds."
+        desktopRunning = $desktopProcessInfo.DesktopRunning
+        desktopProcessId = $desktopProcessInfo.DesktopProcessId
+        backendRunning = $desktopProcessInfo.BackendRunning
+        backendProcessId = $desktopProcessInfo.BackendProcessId
+        message = $message
     }
 }
 
@@ -227,24 +352,43 @@ $bootstrapResult = $null
 
 for ($attempt = 1; $attempt -le $BootstrapAttempts; $attempt += 1) {
     Write-StatusLog -Tag "START" -Message "Bootstrap attempt $attempt started."
+    $bootstrapResult = $null
     $dockerStatus = Ensure-DockerRuntime
     $dockerTag = if ($dockerStatus.ok) { "INFO" } else { "WARN" }
     Write-StatusLog -Tag $dockerTag -Message ("Docker status for attempt {0}: {1}" -f $attempt, $dockerStatus.message)
 
-    $bootstrapResult = Invoke-JsonPowerShellFile -ScriptPath $bootstrapScript -Arguments @(
-        "-RepoRoot", $resolvedRepoRoot,
-        "-BootstrapLogPath", $logPath,
-        "-Json"
-    )
-    $attemptPayloads += [pscustomobject]@{
-        attempt = $attempt
-        docker = $dockerStatus
-        bootstrapOk = $bootstrapResult.Ok
-        outputTail = $bootstrapResult.OutputTail
-        payload = $bootstrapResult.Payload
+    if (-not $dockerStatus.ok) {
+        $attemptPayloads += [pscustomobject]@{
+            attempt = $attempt
+            docker = $dockerStatus
+            bootstrapOk = $false
+            outputTail = $dockerStatus.message
+            payload = $null
+        }
+
+        if ($attempt -lt $BootstrapAttempts) {
+            Write-StatusLog -Tag "WARN" -Message ("Skipping runtime bootstrap for attempt {0} because Docker is not ready yet." -f $attempt)
+            Start-Sleep -Seconds $RetryDelaySeconds
+            continue
+        }
     }
 
-    $bootstrapPayloadOk = $bootstrapResult.Ok -and $bootstrapResult.Payload -and [bool]$bootstrapResult.Payload.ok
+    if ($dockerStatus.ok) {
+        $bootstrapResult = Invoke-JsonPowerShellFile -ScriptPath $bootstrapScript -Arguments @(
+            "-RepoRoot", $resolvedRepoRoot,
+            "-BootstrapLogPath", $logPath,
+            "-Json"
+        )
+        $attemptPayloads += [pscustomobject]@{
+            attempt = $attempt
+            docker = $dockerStatus
+            bootstrapOk = $bootstrapResult.Ok
+            outputTail = $bootstrapResult.OutputTail
+            payload = $bootstrapResult.Payload
+        }
+    }
+
+    $bootstrapPayloadOk = $bootstrapResult -and $bootstrapResult.Ok -and $bootstrapResult.Payload -and [bool]$bootstrapResult.Payload.ok
     if ($dockerStatus.ok -and $bootstrapPayloadOk) {
         break
     }

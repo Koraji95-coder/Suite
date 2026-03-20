@@ -389,9 +389,16 @@ function Test-SupabaseOutputIndicatesReady {
         return $false
     }
 
+    if (
+        $Text -match "(?im)\bcontainer is not ready\b" -or
+        $Text -match "(?im)\bfailed to inspect\b" -or
+        $Text -match "(?im)\btry rerunning the command with --debug\b"
+    ) {
+        return $false
+    }
+
     return (
         $Text -match "(?im)\bsupabase local development setup is running\b" -or
-        $Text -match "(?im)\bsupabase start is already running\b" -or
         $Text -match "(?im)\bProject URL\b"
     )
 }

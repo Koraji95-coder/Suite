@@ -28,6 +28,14 @@ const mockLoadDashboardOverviewFromBackend = vi.hoisted(() =>
 );
 const mockNotificationSuccess = vi.hoisted(() => vi.fn());
 const mockNotificationError = vi.hoisted(() => vi.fn());
+const mockFetchPasskeyCapability = vi.hoisted(() => vi.fn());
+const mockIsBrowserPasskeySupported = vi.hoisted(() => vi.fn(() => false));
+const mockIsFrontendPasskeyEnabled = vi.hoisted(() => vi.fn(() => false));
+const mockCompletePasskeyCallback = vi.hoisted(() => vi.fn());
+const mockCompletePasskeySignInVerification = vi.hoisted(() => vi.fn());
+const mockStartPasskeySignIn = vi.hoisted(() => vi.fn());
+const mockMarkPasskeySignInPending = vi.hoisted(() => vi.fn());
+const mockStartAuthentication = vi.hoisted(() => vi.fn());
 
 vi.mock("../auth/useAuth", () => ({
 	useAuth: () => authState,
@@ -41,36 +49,19 @@ vi.mock("../auth/NotificationContext", () => ({
 }));
 
 vi.mock("../auth/passkeyCapabilityApi", () => ({
-	fetchPasskeyCapability: vi.fn(async () => ({
-		passkey: {
-			enabled: false,
-			config_ready: false,
-			handlers_ready: false,
-		},
-	})),
-	isBrowserPasskeySupported: vi.fn(() => false),
-	isFrontendPasskeyEnabled: vi.fn(() => false),
+	fetchPasskeyCapability: mockFetchPasskeyCapability,
+	isBrowserPasskeySupported: mockIsBrowserPasskeySupported,
+	isFrontendPasskeyEnabled: mockIsFrontendPasskeyEnabled,
 }));
 
 vi.mock("../auth/passkeyAuthApi", () => ({
-	completePasskeyCallback: vi.fn(async () => ({
-		completed: false,
-		message: "",
-		intent: "sign-in",
-	})),
-	completePasskeySignInVerification: vi.fn(async () => ({
-		completed: false,
-		status: "failed",
-		message: "not implemented in this test",
-	})),
-	startPasskeySignIn: vi.fn(async () => ({
-		mode: "redirect",
-		redirect_url: "",
-	})),
+	completePasskeyCallback: mockCompletePasskeyCallback,
+	completePasskeySignInVerification: mockCompletePasskeySignInVerification,
+	startPasskeySignIn: mockStartPasskeySignIn,
 }));
 
 vi.mock("../auth/passkeySessionState", () => ({
-	markPasskeySignInPending: vi.fn(),
+	markPasskeySignInPending: mockMarkPasskeySignInPending,
 }));
 
 vi.mock("../auth/agentPairingParams", () => ({
@@ -113,6 +104,10 @@ vi.mock("../components/agent/AgentPixelMark", () => ({
 	AgentPixelMark: () => <div data-testid="agent-pixel-mark" />,
 }));
 
+vi.mock("@simplewebauthn/browser", () => ({
+	startAuthentication: mockStartAuthentication,
+}));
+
 describe("LoginPage", () => {
 	beforeEach(() => {
 		vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "");
@@ -126,6 +121,39 @@ describe("LoginPage", () => {
 		mockLoadDashboardOverviewFromBackend.mockImplementation(
 			async (_onProgress) => undefined,
 		);
+		mockFetchPasskeyCapability.mockReset();
+		mockFetchPasskeyCapability.mockResolvedValue({
+			passkey: {
+				enabled: false,
+				config_ready: false,
+				handlers_ready: false,
+			},
+		});
+		mockIsBrowserPasskeySupported.mockReset();
+		mockIsBrowserPasskeySupported.mockReturnValue(false);
+		mockIsFrontendPasskeyEnabled.mockReset();
+		mockIsFrontendPasskeyEnabled.mockReturnValue(false);
+		mockCompletePasskeyCallback.mockReset();
+		mockCompletePasskeyCallback.mockResolvedValue({
+			completed: false,
+			status: "failed",
+			message: "",
+			intent: "sign-in",
+		});
+		mockCompletePasskeySignInVerification.mockReset();
+		mockCompletePasskeySignInVerification.mockResolvedValue({
+			completed: false,
+			status: "failed",
+			message: "not implemented in this test",
+		});
+		mockStartPasskeySignIn.mockReset();
+		mockStartPasskeySignIn.mockResolvedValue({
+			mode: "redirect",
+			redirect_url: "",
+		});
+		mockMarkPasskeySignInPending.mockReset();
+		mockStartAuthentication.mockReset();
+		mockStartAuthentication.mockResolvedValue({ id: "credential-id" });
 	});
 
 	afterEach(() => {
@@ -183,5 +211,86 @@ describe("LoginPage", () => {
 
 		expect(screen.getByText("Opening your dashboard")).toBeTruthy();
 		expect(screen.getByText("Preparing dashboard...")).toBeTruthy();
+	});
+
+	it("shows only the inline login error when passkey verification fails", async () => {
+		mockIsBrowserPasskeySupported.mockReturnValue(true);
+		mockIsFrontendPasskeyEnabled.mockReturnValue(true);
+		mockFetchPasskeyCapability.mockResolvedValue({
+			passkey: {
+				enabled: true,
+				config_ready: true,
+				handlers_ready: true,
+			},
+		});
+		mockStartPasskeySignIn.mockResolvedValue({
+			mode: "webauthn",
+			state: "state-1",
+			public_key: {
+				challenge: "challenge",
+				rpId: "localhost",
+				timeout: 60000,
+				userVerification: "preferred",
+				allowCredentials: [],
+			},
+		});
+		mockStartAuthentication.mockResolvedValue({ id: "credential-id" });
+		mockCompletePasskeySignInVerification.mockResolvedValue({
+			completed: false,
+			status: "failed",
+			message: "Passkey sign-in could not be completed.",
+		});
+
+		render(
+			<MemoryRouter>
+				<LoginPage />
+			</MemoryRouter>,
+		);
+
+		fireEvent.click(await screen.findByRole("button", { name: "Use passkey" }));
+
+		expect(
+			await screen.findByText("Passkey sign-in could not be completed."),
+		).toBeTruthy();
+		expect(mockNotificationError).not.toHaveBeenCalled();
+	});
+
+	it("shows only the inline login error when a passkey credential request fails", async () => {
+		mockIsBrowserPasskeySupported.mockReturnValue(true);
+		mockIsFrontendPasskeyEnabled.mockReturnValue(true);
+		mockFetchPasskeyCapability.mockResolvedValue({
+			passkey: {
+				enabled: true,
+				config_ready: true,
+				handlers_ready: true,
+			},
+		});
+		mockStartPasskeySignIn.mockResolvedValue({
+			mode: "webauthn",
+			state: "state-1",
+			public_key: {
+				challenge: "challenge",
+				rpId: "localhost",
+				timeout: 60000,
+				userVerification: "preferred",
+				allowCredentials: [],
+			},
+		});
+		mockStartAuthentication.mockRejectedValue(
+			new Error("Credential request was cancelled."),
+		);
+
+		render(
+			<MemoryRouter>
+				<LoginPage />
+			</MemoryRouter>,
+		);
+
+		fireEvent.click(await screen.findByRole("button", { name: "Use passkey" }));
+
+		expect(
+			await screen.findByText("Credential request was cancelled."),
+		).toBeTruthy();
+		expect(mockNotificationError).not.toHaveBeenCalled();
 	});
 });

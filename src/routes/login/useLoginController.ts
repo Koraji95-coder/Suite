@@ -411,10 +411,6 @@ export function useLoginController(): LoginController {
 				if (!active) return;
 				if (result.completed === false || result.status === "failed") {
 					setError(result.message || "Passkey sign-in could not be completed.");
-					notification.error(
-						"Passkey callback failed",
-						result.message || "Passkey sign-in could not be completed.",
-					);
 				} else if (result.message) {
 					notification.success("Passkey callback complete", result.message);
 				}
@@ -430,7 +426,6 @@ export function useLoginController(): LoginController {
 					"sign_in_failed",
 					`Passkey callback completion failed: ${msg}`,
 				);
-				notification.error("Passkey callback failed", msg);
 			} finally {
 				if (active) {
 					setPasskeySubmitting(false);
@@ -565,7 +560,6 @@ export function useLoginController(): LoginController {
 				"sign_in_failed",
 				`Passkey sign-in failed to start: ${msg}`,
 			);
-			notification.error("Passkey sign-in failed", msg);
 		} finally {
 			setPasskeySubmitting(false);
 		}

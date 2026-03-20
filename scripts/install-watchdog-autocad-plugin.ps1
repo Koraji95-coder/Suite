@@ -110,6 +110,19 @@ function Get-CandidateBundleRoots {
     )
 }
 
+function Get-RunningAutoCadProcessSummary {
+    $processes = Get-Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.ProcessName -match "^acad$|^autocad$"
+    }
+    if (-not $processes) {
+        return $null
+    }
+
+    return ($processes | ForEach-Object {
+        "$($_.ProcessName) ($($_.Id))"
+    }) -join ", "
+}
+
 function Test-DirectoryWriteAccess {
     param([string]$DirectoryPath)
 
@@ -356,7 +369,19 @@ foreach ($existingFile in $existingBundleFiles) {
 
 foreach ($outputFile in $outputFiles) {
     $destinationPath = Join-Path $bundleContentsDir $outputFile.Name
-    Copy-Item -Path $outputFile.FullName -Destination $destinationPath -Force
+    try {
+        Copy-Item -Path $outputFile.FullName -Destination $destinationPath -Force
+    }
+    catch [System.IO.IOException] {
+        $runningAutoCad = Get-RunningAutoCadProcessSummary
+        $processHint = if ($runningAutoCad) {
+            " Running AutoCAD process(es): $runningAutoCad."
+        }
+        else {
+            ""
+        }
+        throw "AutoCAD plugin bundle file is locked at '$destinationPath'. Close AutoCAD, then rerun `npm run watchdog:autocad:plugin:install`.$processHint"
+    }
     try {
         Unblock-File -Path $destinationPath -ErrorAction Stop
     }

@@ -1,15 +1,23 @@
 // src/supabase/client.ts
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { shouldDetectSupabaseSessionInUrl } from "@/auth/supabaseCallback";
+import {
+	buildSupabaseAuthStorageKey,
+	cleanupLegacySupabaseAuthStorage,
+} from "./authStorage";
 import type { Database } from "./database";
 
 const supabaseUrl =
 	import.meta.env.VITE_SUPABASE_URL ?? "https://example.supabase.co";
 const supabaseAnonKey =
 	import.meta.env.VITE_SUPABASE_ANON_KEY ?? "public-anon-key-placeholder";
+const supabaseStorageKey = buildSupabaseAuthStorageKey(supabaseUrl);
 
 type AppSupabaseClient = SupabaseClient<Database>;
-const _global = globalThis as unknown as { __supabase?: AppSupabaseClient };
+const _global = globalThis as unknown as {
+	__supabase?: AppSupabaseClient;
+	__supabaseStorageKey?: string;
+};
 
 const devAuthOverrides = import.meta.env.DEV
 	? {
@@ -22,16 +30,19 @@ const devAuthOverrides = import.meta.env.DEV
 		}
 	: {};
 
-export const supabase = (_global.__supabase ??= createClient<Database>(
-	supabaseUrl,
-	supabaseAnonKey,
-	{
+cleanupLegacySupabaseAuthStorage(supabaseStorageKey);
+
+if (_global.__supabaseStorageKey !== supabaseStorageKey) {
+	_global.__supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 		auth: {
-			storageKey: "suite-auth",
+			storageKey: supabaseStorageKey,
 			autoRefreshToken: true,
 			detectSessionInUrl: shouldDetectSupabaseSessionInUrl,
 			persistSession: true,
 			...devAuthOverrides,
 		},
-	},
-)) as AppSupabaseClient;
+	});
+	_global.__supabaseStorageKey = supabaseStorageKey;
+}
+
+export const supabase = _global.__supabase as AppSupabaseClient;

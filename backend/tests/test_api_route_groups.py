@@ -478,6 +478,7 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/agent/activity": ["GET"],
             "/api/dashboard/load": ["POST"],
             "/api/dashboard/load/<job_id>": ["GET"],
+            "/api/command-center/supabase-sync-status": ["GET"],
             "/api/work-ledger/publishers/worktale/readiness": ["GET"],
             "/api/work-ledger/publishers/worktale/bootstrap": ["POST"],
             "/api/work-ledger/entries/<entry_id>/publish/worktale": ["POST"],

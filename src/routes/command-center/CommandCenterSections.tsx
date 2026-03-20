@@ -1,7 +1,9 @@
 import {
 	Check,
+	CloudUpload,
 	Clock3,
 	Copy,
+	RefreshCw,
 	ShieldAlert,
 	Terminal,
 } from "lucide-react";
@@ -22,6 +24,7 @@ import {
 	type CommandPreset,
 	type HistoryFilter,
 } from "./commandCenterModel";
+import type { SupabaseSyncRun, SupabaseSyncStatusPayload } from "./useSupabaseSyncStatus";
 
 export function CommandCenterPageHeader() {
 	return (
@@ -156,6 +159,10 @@ export function CommandCenterTabBar({
 interface CommandCenterCommandsSectionProps {
 	message: string | null;
 	commandGroups: CommandGroup[];
+	supabaseSyncStatus: SupabaseSyncStatusPayload | null;
+	supabaseSyncStatusLoading: boolean;
+	supabaseSyncStatusError: string | null;
+	onRefreshSupabaseSyncStatus: () => void;
 	copiedPresetId: string | null;
 	onCopyCommand: (preset: CommandPreset) => void;
 	historyFilter: HistoryFilter;
@@ -170,6 +177,10 @@ interface CommandCenterCommandsSectionProps {
 export function CommandCenterCommandsSection({
 	message,
 	commandGroups,
+	supabaseSyncStatus,
+	supabaseSyncStatusLoading,
+	supabaseSyncStatusError,
+	onRefreshSupabaseSyncStatus,
 	copiedPresetId,
 	onCopyCommand,
 	historyFilter,
@@ -189,6 +200,13 @@ export function CommandCenterCommandsSection({
 					</Text>
 				</Panel>
 			)}
+
+			<CommandCenterSupabaseSyncPanel
+				status={supabaseSyncStatus}
+				loading={supabaseSyncStatusLoading}
+				error={supabaseSyncStatusError}
+				onRefresh={onRefreshSupabaseSyncStatus}
+			/>
 
 			<div className={styles.groupsGrid}>
 				{commandGroups.map((group) => (
@@ -319,6 +337,128 @@ export function CommandCenterArchitectureSection() {
 	);
 }
 
+function CommandCenterSupabaseSyncPanel({
+	status,
+	loading,
+	error,
+	onRefresh,
+}: {
+	status: SupabaseSyncStatusPayload | null;
+	loading: boolean;
+	error: string | null;
+	onRefresh: () => void;
+}) {
+	const lastPreflight = status?.lastPreflight ?? null;
+	const lastPush = status?.lastPush ?? null;
+	const localEmailMessage =
+		lastPreflight?.checks?.localEmailMode?.message || "Local auth email mode not recorded yet.";
+	const modeMessage =
+		lastPreflight?.checks?.mode?.message || "Active Supabase target not recorded yet.";
+
+	return (
+		<Panel variant="default" padding="md" className={styles.supabaseStatusPanel}>
+			<Stack gap={4}>
+				<HStack justify="between" align="center" gap={3}>
+					<HStack gap={2} align="center">
+						<div className={styles.groupIcon}>
+							<CloudUpload size={14} />
+						</div>
+						<Stack gap={1}>
+							<Text size="sm" weight="semibold">
+								Supabase Sync Status
+							</Text>
+							<Text size="xs" color="muted">
+								Windows sign-in preflight updates this panel. Hosted pushes stay manual.
+							</Text>
+						</Stack>
+					</HStack>
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						iconLeft={<RefreshCw size={12} />}
+						onClick={onRefresh}
+						disabled={loading}
+					>
+						{loading ? "Refreshing" : "Refresh"}
+					</Button>
+				</HStack>
+
+				{error && (
+					<Panel variant="inset" padding="sm">
+						<Text size="xs" color="muted">
+							{error}
+						</Text>
+					</Panel>
+				)}
+
+				<div className={styles.supabaseStatusGrid}>
+					<StatusSummaryCard
+						title="Preflight"
+						record={lastPreflight}
+						pendingLabel="No Windows sign-in preflight recorded yet."
+						readyLabel="Ready"
+						errorLabel="Needs attention"
+						summary={lastPreflight?.summary || "Run the hosted preflight to seed status artifacts."}
+					/>
+					<StatusSummaryCard
+						title="Push Readiness"
+						record={
+							lastPreflight
+								? {
+										ok: lastPreflight.pushReady,
+										summary:
+											lastPreflight.pushReadinessSummary ||
+											"Hosted push readiness has not been recorded yet.",
+									}
+								: null
+						}
+						pendingLabel="Not checked"
+						readyLabel="Ready"
+						errorLabel="Blocked"
+						summary={
+							lastPreflight?.pushReadinessSummary ||
+							"Push stays blocked until a preflight reports readiness."
+						}
+					/>
+					<StatusSummaryCard
+						title="Last Push"
+						record={lastPush}
+						pendingLabel="No hosted push recorded yet."
+						readyLabel={lastPush?.dryRun ? "Dry run only" : "Applied"}
+						errorLabel="Failed"
+						summary={lastPush?.summary || "No hosted push has been recorded yet."}
+					/>
+				</div>
+
+				<div className={styles.supabaseStatusMeta}>
+					<Text size="xs" color="muted">
+						{modeMessage}
+					</Text>
+					<Text size="xs" color="muted">
+						{localEmailMessage}
+					</Text>
+					{status?.paths?.root && (
+						<Text size="xs" color="muted">
+							Status folder: <span className={styles.monoCode}>{status.paths.root}</span>
+						</Text>
+					)}
+				</div>
+
+				{status?.logTail?.length ? (
+					<pre className={styles.supabaseLogPre}>
+						{status.logTail.slice(-8).join("\n")}
+					</pre>
+				) : (
+					<Text size="xs" color="muted">
+						No Supabase sync log entries have been written yet.
+					</Text>
+				)}
+			</Stack>
+		</Panel>
+	);
+}
+
 function CommandCard({
 	preset,
 	copied,
@@ -350,6 +490,54 @@ function CommandCard({
 					</Button>
 				</HStack>
 				<pre className={styles.commandPre}>{preset.command}</pre>
+			</Stack>
+		</Panel>
+	);
+}
+
+function StatusSummaryCard({
+	title,
+	record,
+	pendingLabel,
+	readyLabel,
+	errorLabel,
+	summary,
+}: {
+	title: string;
+	record: Pick<SupabaseSyncRun, "ok" | "summary" | "timestamp" | "dryRun"> | null;
+	pendingLabel: string;
+	readyLabel: string;
+	errorLabel: string;
+	summary: string;
+}) {
+	const hasRecord = Boolean(record);
+	const isOk = Boolean(record?.ok);
+	const badgeColor = !hasRecord ? "default" : isOk ? "success" : "danger";
+	const badgeLabel = !hasRecord
+		? "Pending"
+		: isOk
+			? readyLabel
+			: errorLabel;
+
+	return (
+		<Panel variant="inset" padding="sm" className={styles.supabaseStatusCard}>
+			<Stack gap={2}>
+				<HStack justify="between" align="center" gap={2}>
+					<Text size="xs" weight="semibold">
+						{title}
+					</Text>
+					<Badge color={badgeColor} variant="soft" size="sm">
+						{badgeLabel}
+					</Badge>
+				</HStack>
+				<Text size="xs" color="muted">
+					{hasRecord ? summary : pendingLabel}
+				</Text>
+				{record?.timestamp && (
+					<Text size="xs" color="muted">
+						Updated: {new Date(record.timestamp).toLocaleString()}
+					</Text>
+				)}
 			</Stack>
 		</Panel>
 	);

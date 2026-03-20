@@ -1,6 +1,6 @@
 # Master Command Center (Dev-Only)
 
-The Command Center is a development-only, admin-gated control panel for copying common shell commands.
+The Command Center is a development-only, admin-gated control panel for copying common shell commands and reviewing a few local workstation status artifacts.
 
 ## Route
 
@@ -28,6 +28,10 @@ VITE_DEV_ADMIN_EMAILS=you@example.com,teammate@example.com
 ## Why Copy Instead of Execute
 
 The UI intentionally copies commands to clipboard rather than executing them remotely. This keeps the feature safe and avoids introducing a browser-to-shell execution surface.
+
+The only live status surface added here is read-only:
+
+- `Supabase Sync Status` reads the Windows sign-in preflight and last hosted push artifacts from the local backend.
 
 ## Command Groups
 
@@ -59,12 +63,26 @@ Use the Supabase group when you need a local database/auth/storage stack:
 
 ```bash
 npm run supabase:start
-npm run supabase:env:local
+npm run supabase:mode:local
+npm run supabase:mail:gmail
 npm run supabase:db:reset
 npm run supabase:types
 ```
 
 This keeps `supabase/migrations/` as the source of truth and writes machine-local overrides to `.env.local`.
+
+### Hosted Supabase workflow
+
+Use the guarded hosted workflow presets when you want visibility into migration drift or want to push tracked migrations to the linked hosted project:
+
+```bash
+npm run supabase:remote:preflight
+npm run supabase:remote:push:dry
+npm run supabase:remote:push
+npm run supabase:remote:task:install
+```
+
+`supabase:remote:task:install` registers the hosted preflight to run after Windows sign-in. It does not push automatically.
 
 ### Worktale workflow
 
@@ -92,6 +110,9 @@ npm run watchdog:startup:autocad:install
 npm run watchdog:startup:autocad:check
 npm run watchdog:backend:startup:start
 npm run workstation:bootstrap
+npm run workstation:stop
+npm run workstation:control-panel
+npm run workstation:startup:install
 npm run watchdog:autocad:doctor
 ```
 
@@ -108,6 +129,25 @@ npm run workstation:bootstrap
 ```
 
 `npm run workstation:bootstrap` is the repo-level runtime bootstrap used by workstation restore. It starts local Supabase, refreshes `.env.local`, ensures Watchdog startup/install state, starts the backend, and starts the gateway in the background.
+
+`npm run workstation:stop` force-stops the local frontend, backend, gateway, collectors, AutoCAD pipe bridge, and local Supabase stack.
+
+`npm run workstation:control-panel` opens the Windows HTML runtime control shell. It shows the six primary runtime services:
+
+- Supabase
+- Watchdog Backend
+- API Gateway
+- Suite Frontend
+- Filesystem Collector
+- AutoCAD Collector
+
+The shell includes `Bootstrap All`, `Start All`, `Stop All`, `Refresh Status`, and `Clear Log`, plus per-service `Start`, `Stop`, `Restart`, and `Logs`.
+
+Closing the window does **not** stop the local runtime. Use `Stop All` or `npm run workstation:stop` when you want to intentionally shut services down.
+
+`npm run workstation:startup:install` now registers that desktop shell to open automatically after Windows sign-in and auto-bootstrap the local runtime. When scheduled tasks are blocked on a workstation, it falls back to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+
+If the workstation does not have the WebView2 runtime, the launcher falls back to `npm run workstation:control-panel:legacy`.
 
 ### ZeroClaw Gateway Toolchain (Windows)
 

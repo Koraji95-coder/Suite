@@ -41,6 +41,15 @@ Repo env convenience keys (for operator reference) now exist in `.env`/`.env.exa
 - `SUPABASE_SMTP_SENDER_EMAIL`
 - `SUPABASE_SMTP_SENDER_NAME`
 
+For local Supabase, use the repo helpers instead of editing `supabase/config.toml` by hand:
+
+```bash
+npm run supabase:mail:gmail
+npm run supabase:mail:mailpit
+```
+
+Those commands update `.env.local` and restart the local Supabase stack when the SMTP mode changes.
+
 ## 3) Increase Email Rate Limits (After Custom SMTP)
 
 If you need higher auth-email throughput, update auth config after custom SMTP is active.

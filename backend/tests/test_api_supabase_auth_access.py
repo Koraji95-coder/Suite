@@ -127,6 +127,44 @@ class TestApiSupabaseAuthAccess(unittest.TestCase):
             "https://app.example.com/login?source=signup",
         )
 
+    def test_send_supabase_email_link_allows_local_signin_to_create_user(self) -> None:
+        requests_stub = _RequestsStub(post_response=_ResponseStub(200))
+
+        send_supabase_email_link(
+            "user@example.com",
+            "signin",
+            client_redirect_to="http://127.0.0.1:5173",
+            redirect_path="/login",
+            redirect_query=None,
+            supabase_url="http://127.0.0.1:54321",
+            supabase_api_key="public-key",
+            build_auth_redirect_url_fn=lambda *_args, **_kwargs: "http://127.0.0.1:5173/login",
+            requests_module=requests_stub,
+        )
+
+        self.assertEqual(len(requests_stub.post_calls), 1)
+        call = requests_stub.post_calls[0]
+        self.assertTrue(call["json"]["create_user"])
+
+    def test_send_supabase_email_link_keeps_hosted_signin_non_creating(self) -> None:
+        requests_stub = _RequestsStub(post_response=_ResponseStub(200))
+
+        send_supabase_email_link(
+            "user@example.com",
+            "signin",
+            client_redirect_to="https://app.example.com",
+            redirect_path="/login",
+            redirect_query=None,
+            supabase_url="https://demo.supabase.co",
+            supabase_api_key="public-key",
+            build_auth_redirect_url_fn=lambda *_args, **_kwargs: "https://app.example.com/login",
+            requests_module=requests_stub,
+        )
+
+        self.assertEqual(len(requests_stub.post_calls), 1)
+        call = requests_stub.post_calls[0]
+        self.assertFalse(call["json"]["create_user"])
+
     def test_generate_supabase_magic_link_url_returns_action_link(self) -> None:
         requests_stub = _RequestsStub(
             post_response=_ResponseStub(

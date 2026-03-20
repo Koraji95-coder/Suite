@@ -69,4 +69,32 @@ describe("commandCenterModel", () => {
 		expect(titles).toContain("Watchdog");
 		expect(titles).toContain("Worktale");
 	});
+
+	it("includes the workstation runtime control presets", () => {
+		const watchdogGroup = COMMAND_GROUPS.find(
+			(group) => group.title === "Watchdog",
+		);
+		const ids = (watchdogGroup?.presets || []).map((preset) => preset.id);
+		expect(ids).toContain("workstation-bootstrap");
+		expect(ids).toContain("workstation-stop");
+		expect(ids).toContain("workstation-control-panel");
+		expect(ids).toContain("workstation-startup-install");
+	});
+
+	it("includes the guarded hosted Supabase workflow presets", () => {
+		const supabaseGroup = COMMAND_GROUPS.find(
+			(group) => group.title === "Supabase",
+		);
+		const ids = (supabaseGroup?.presets || []).map((preset) => preset.id);
+		expect(ids).toContain("supabase-mode-local");
+		expect(ids).toContain("supabase-mode-hosted");
+		expect(ids).toContain("supabase-mail-gmail");
+		expect(ids).toContain("supabase-mail-mailpit");
+		expect(ids).toContain("supabase-remote-login");
+		expect(ids).toContain("supabase-remote-target-auto");
+		expect(ids).toContain("supabase-remote-preflight");
+		expect(ids).toContain("supabase-remote-push-dry");
+		expect(ids).toContain("supabase-remote-push");
+		expect(ids).toContain("supabase-remote-task-install");
+	});
 });

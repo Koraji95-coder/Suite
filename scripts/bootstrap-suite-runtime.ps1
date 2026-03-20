@@ -2,10 +2,12 @@
 param(
     [string]$RepoRoot,
     [string]$CodexConfigPath = (Join-Path $env:USERPROFILE ".codex\config.toml"),
+    [string]$BootstrapLogPath,
     [switch]$SkipSupabase,
     [switch]$SkipWatchdog,
     [switch]$SkipBackend,
     [switch]$SkipGateway,
+    [switch]$SkipFrontend,
     [switch]$Json
 )
 
@@ -55,6 +57,215 @@ function Get-OutputTail {
     return [string]::Join([Environment]::NewLine, $tail).Trim()
 }
 
+function Write-BootstrapLog {
+    param(
+        [Parameter(Mandatory = $true)][string]$Message,
+        [ValidateSet("SYS", "INFO", "OK", "WARN", "ERR", "START")][string]$Tag = "INFO"
+    )
+
+    if ([string]::IsNullOrWhiteSpace($BootstrapLogPath) -or [string]::IsNullOrWhiteSpace($Message)) {
+        return
+    }
+
+    $directory = Split-Path -Parent $BootstrapLogPath
+    if (-not [string]::IsNullOrWhiteSpace($directory)) {
+        New-Item -ItemType Directory -Path $directory -Force | Out-Null
+    }
+
+    $timestamp = (Get-Date).ToString("o")
+    Add-Content -Path $BootstrapLogPath -Value "[$timestamp] [$Tag] $Message"
+}
+
+function Format-CommandArguments {
+    param([string[]]$Arguments)
+
+    if (-not $Arguments -or $Arguments.Count -eq 0) {
+        return ""
+    }
+
+    $parts = foreach ($argument in $Arguments) {
+        if ($null -eq $argument) {
+            continue
+        }
+
+        $text = [string]$argument
+        if ($text -match "\s") {
+            '"' + $text.Replace('"', '\"') + '"'
+        }
+        else {
+            $text
+        }
+    }
+
+    return [string]::Join(" ", @($parts))
+}
+
+function Get-StepLogLevel {
+    param(
+        [string]$State,
+        [bool]$Ok
+    )
+
+    if (-not $Ok -or $State -eq "failed") {
+        return "ERR"
+    }
+
+    if ($State -eq "starting") {
+        return "WARN"
+    }
+
+    if ($State -eq "skipped") {
+        return "SYS"
+    }
+
+    return "OK"
+}
+
+function Get-StepLogLines {
+    param(
+        [Parameter(Mandatory = $true)][psobject]$Step,
+        [string]$FallbackText
+    )
+
+    $lines = @()
+    $payload = $Step.payload
+
+    switch ($Step.name) {
+        "supabase-start" {
+            if (-not [string]::IsNullOrWhiteSpace($FallbackText)) {
+                $lines += ($FallbackText -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            }
+        }
+        "supabase-env" {
+            if (-not [string]::IsNullOrWhiteSpace($FallbackText)) {
+                $lines += ($FallbackText -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+            }
+        }
+        "watchdog-filesystem" {
+            if ($payload) {
+                if ($payload.startupMode) {
+                    $lines += "Startup mode: $($payload.startupMode)"
+                }
+                if ($null -ne $payload.daemonRunning) {
+                    $lines += "Daemon running: $($payload.daemonRunning)"
+                }
+                foreach ($warning in @($payload.warnings)) {
+                    if (-not [string]::IsNullOrWhiteSpace([string]$warning)) {
+                        $lines += "Warning: $warning"
+                    }
+                }
+                foreach ($errorMessage in @($payload.errors)) {
+                    if (-not [string]::IsNullOrWhiteSpace([string]$errorMessage)) {
+                        $lines += "Error: $errorMessage"
+                    }
+                }
+            }
+        }
+        "watchdog-autocad-startup" {
+            if ($payload) {
+                if ($payload.startupMode) {
+                    $lines += "Startup mode: $($payload.startupMode)"
+                }
+                if ($null -ne $payload.daemonRunning) {
+                    $lines += "Daemon running: $($payload.daemonRunning)"
+                }
+                foreach ($warning in @($payload.warnings)) {
+                    if (-not [string]::IsNullOrWhiteSpace([string]$warning)) {
+                        $lines += "Warning: $warning"
+                    }
+                }
+                foreach ($errorMessage in @($payload.errors)) {
+                    if (-not [string]::IsNullOrWhiteSpace([string]$errorMessage)) {
+                        $lines += "Error: $errorMessage"
+                    }
+                }
+            }
+        }
+        "watchdog-autocad-plugin" {
+            if ($payload) {
+                if ($payload.bundleRoot) {
+                    $lines += "Bundle root: $($payload.bundleRoot)"
+                }
+                foreach ($errorMessage in @($payload.errors)) {
+                    if (-not [string]::IsNullOrWhiteSpace([string]$errorMessage)) {
+                        $lines += "Error: $errorMessage"
+                    }
+                }
+            }
+        }
+        "backend" {
+            if ($payload) {
+                $lines += "Backend running: $($payload.Running)"
+                if ($payload.ProcessId) {
+                    $lines += "Process ID: $($payload.ProcessId)"
+                }
+                if ($payload.CommandLine) {
+                    $lines += "Command: $($payload.CommandLine)"
+                }
+                if ($payload.Error) {
+                    $lines += "Error: $($payload.Error)"
+                }
+            }
+        }
+        "gateway" {
+            if ($payload) {
+                $lines += "Gateway running: $($payload.Running)"
+                $lines += "Gateway healthy: $($payload.Healthy)"
+                if ($payload.ProcessId) {
+                    $lines += "Process ID: $($payload.ProcessId)"
+                }
+                if ($payload.CommandLine) {
+                    $lines += "Command: $($payload.CommandLine)"
+                }
+                if ($payload.Error) {
+                    $lines += "Error: $($payload.Error)"
+                }
+            }
+        }
+        "frontend" {
+            if ($payload) {
+                $lines += "Frontend running: $($payload.Running)"
+                $lines += "Frontend healthy: $($payload.Healthy)"
+                if ($payload.ProcessId) {
+                    $lines += "Process ID: $($payload.ProcessId)"
+                }
+                if ($payload.Url) {
+                    $lines += "URL: $($payload.Url)"
+                }
+                if ($payload.LogPath) {
+                    $lines += "Log path: $($payload.LogPath)"
+                }
+                if ($payload.CommandLine) {
+                    $lines += "Command: $($payload.CommandLine)"
+                }
+                if ($payload.Error) {
+                    $lines += "Error: $($payload.Error)"
+                }
+            }
+        }
+    }
+
+    if ($lines.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($FallbackText)) {
+        $lines += ($FallbackText -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    }
+
+    return @($lines | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
+function Write-StepLog {
+    param(
+        [Parameter(Mandatory = $true)][psobject]$Step,
+        [string]$FallbackText
+    )
+
+    $tag = Get-StepLogLevel -State $Step.state -Ok ([bool]$Step.ok)
+    Write-BootstrapLog -Tag $tag -Message "$($Step.name): $($Step.summary)"
+
+    foreach ($line in (Get-StepLogLines -Step $Step -FallbackText $FallbackText)) {
+        Write-BootstrapLog -Tag $tag -Message $line
+    }
+}
+
 function Invoke-ExternalCommand {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
@@ -98,6 +309,9 @@ function Invoke-NodeScript {
     )
 
     $scriptPath = Join-Path $resolvedRepoRoot $ScriptRelativePath
+    $argumentText = Format-CommandArguments -Arguments $Arguments
+    $commandSuffix = if ([string]::IsNullOrWhiteSpace($argumentText)) { "" } else { " $argumentText" }
+    Write-BootstrapLog -Tag "INFO" -Message ("Running node {0}{1}" -f $ScriptRelativePath, $commandSuffix)
     return Invoke-ExternalCommand -FilePath "node" -Arguments (@($scriptPath) + $Arguments) -WorkingDirectory $resolvedRepoRoot
 }
 
@@ -108,6 +322,9 @@ function Invoke-PowerShellScript {
     )
 
     $scriptPath = Join-Path $resolvedRepoRoot $ScriptRelativePath
+    $argumentText = Format-CommandArguments -Arguments $Arguments
+    $commandSuffix = if ([string]::IsNullOrWhiteSpace($argumentText)) { "" } else { " $argumentText" }
+    Write-BootstrapLog -Tag "INFO" -Message ("Running PowerShell {0}{1}" -f $ScriptRelativePath, $commandSuffix)
     return Invoke-ExternalCommand -FilePath "PowerShell.exe" -Arguments (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath) + $Arguments) -WorkingDirectory $resolvedRepoRoot
 }
 
@@ -160,32 +377,49 @@ function New-StepResult {
     }
 }
 
+Write-BootstrapLog -Tag "START" -Message "Suite runtime bootstrap is starting."
+
 $steps = @()
+$frontendCheckScript = "scripts\check-suite-frontend-startup.ps1"
 
 if ($SkipSupabase) {
-    $steps += New-StepResult -Name "supabase" -State "skipped" -Ok $true -Summary "Skipped local Supabase bootstrap."
+    $supabaseSkippedStep = New-StepResult -Name "supabase" -State "skipped" -Ok $true -Summary "Skipped local Supabase bootstrap."
+    $steps += $supabaseSkippedStep
+    Write-StepLog -Step $supabaseSkippedStep
 }
 else {
     $supabaseStart = Invoke-NodeScript -ScriptRelativePath "scripts\run-supabase-cli.mjs" -Arguments @("start")
     $supabaseStartReady = $supabaseStart.Ok -or ($supabaseStart.OutputText -match "(?im)\balready running\b")
     if ($supabaseStartReady) {
-        $steps += New-StepResult -Name "supabase-start" -State "ready" -Ok $true -Summary "Local Supabase stack is running." -Details $supabaseStart.OutputTail
+        $supabaseStartStep = New-StepResult -Name "supabase-start" -State "ready" -Ok $true -Summary "Local Supabase stack is running." -Details $supabaseStart.OutputTail
+        $steps += $supabaseStartStep
+        Write-StepLog -Step $supabaseStartStep -FallbackText $supabaseStart.OutputTail
         $supabaseEnv = Invoke-NodeScript -ScriptRelativePath "scripts\write-supabase-local-env.mjs" -Arguments @()
         if ($supabaseEnv.Ok) {
-            $steps += New-StepResult -Name "supabase-env" -State "ready" -Ok $true -Summary "Local Supabase env overrides were refreshed." -Details $supabaseEnv.OutputTail
+            $supabaseEnvStep = New-StepResult -Name "supabase-env" -State "ready" -Ok $true -Summary "Local Supabase env overrides were refreshed." -Details $supabaseEnv.OutputTail
+            $steps += $supabaseEnvStep
+            Write-StepLog -Step $supabaseEnvStep -FallbackText $supabaseEnv.OutputTail
         }
         else {
-            $steps += New-StepResult -Name "supabase-env" -State "failed" -Ok $false -Summary "Local Supabase env overrides were not refreshed." -Details $supabaseEnv.OutputTail
+            $supabaseEnvStep = New-StepResult -Name "supabase-env" -State "failed" -Ok $false -Summary "Local Supabase env overrides were not refreshed." -Details $supabaseEnv.OutputTail
+            $steps += $supabaseEnvStep
+            Write-StepLog -Step $supabaseEnvStep -FallbackText $supabaseEnv.OutputTail
         }
     }
     else {
-        $steps += New-StepResult -Name "supabase-start" -State "failed" -Ok $false -Summary "Local Supabase stack did not start." -Details $supabaseStart.OutputTail
-        $steps += New-StepResult -Name "supabase-env" -State "skipped" -Ok $true -Summary "Skipped local Supabase env refresh because Supabase did not start."
+        $supabaseStartStep = New-StepResult -Name "supabase-start" -State "failed" -Ok $false -Summary "Local Supabase stack did not start." -Details $supabaseStart.OutputTail
+        $steps += $supabaseStartStep
+        Write-StepLog -Step $supabaseStartStep -FallbackText $supabaseStart.OutputTail
+        $supabaseEnvStep = New-StepResult -Name "supabase-env" -State "skipped" -Ok $true -Summary "Skipped local Supabase env refresh because Supabase did not start."
+        $steps += $supabaseEnvStep
+        Write-StepLog -Step $supabaseEnvStep
     }
 }
 
 if ($SkipWatchdog) {
-    $steps += New-StepResult -Name "watchdog" -State "skipped" -Ok $true -Summary "Skipped Watchdog runtime bootstrap."
+    $watchdogSkippedStep = New-StepResult -Name "watchdog" -State "skipped" -Ok $true -Summary "Skipped Watchdog runtime bootstrap."
+    $steps += $watchdogSkippedStep
+    Write-StepLog -Step $watchdogSkippedStep
 }
 else {
     $filesystemInstall = Invoke-PowerShellScript -ScriptRelativePath "scripts\install-watchdog-filesystem-collector-startup.ps1" -Arguments @()
@@ -197,13 +431,15 @@ else {
     else {
         $filesystemCheck.Result.OutputTail
     }
-    $steps += New-StepResult `
+    $filesystemStep = New-StepResult `
         -Name "watchdog-filesystem" `
         -State $(if ($filesystemReady) { "ready" } else { "failed" }) `
         -Ok $filesystemReady `
         -Summary $(if ($filesystemReady) { "Filesystem collector startup is installed and healthy." } else { "Filesystem collector startup needs attention." }) `
         -Details $filesystemDetails `
         -Payload $filesystemCheck.Payload
+    $steps += $filesystemStep
+    Write-StepLog -Step $filesystemStep -FallbackText $filesystemInstall.OutputTail
 
     $autocadInstall = Invoke-PowerShellScript -ScriptRelativePath "scripts\install-watchdog-autocad-collector-startup.ps1" -Arguments @()
     $autocadCheck = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-watchdog-autocad-collector-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
@@ -216,39 +452,49 @@ else {
     else {
         $autocadCheck.Result.OutputTail
     }
-    $steps += New-StepResult `
+    $autocadStartupStep = New-StepResult `
         -Name "watchdog-autocad-startup" `
         -State $(if ($autocadStartupReady) { "ready" } else { "failed" }) `
         -Ok $autocadStartupReady `
         -Summary $(if ($autocadStartupReady) { "AutoCAD collector startup is installed and healthy." } else { "AutoCAD collector startup needs attention." }) `
         -Details $autocadDetails `
         -Payload $autocadCheck.Payload
-    $steps += New-StepResult `
+    $steps += $autocadStartupStep
+    Write-StepLog -Step $autocadStartupStep -FallbackText $autocadInstall.OutputTail
+    $autocadPluginStep = New-StepResult `
         -Name "watchdog-autocad-plugin" `
         -State $(if ($pluginReady) { "ready" } else { "failed" }) `
         -Ok $pluginReady `
         -Summary $(if ($pluginReady) { "AutoCAD plugin install is healthy." } else { "AutoCAD plugin install needs attention." }) `
         -Details $autocadPlugin.Result.OutputTail `
         -Payload $autocadPlugin.Payload
+    $steps += $autocadPluginStep
+    Write-StepLog -Step $autocadPluginStep
 }
 
 if ($SkipBackend) {
-    $steps += New-StepResult -Name "backend" -State "skipped" -Ok $true -Summary "Skipped backend bootstrap."
+    $backendSkippedStep = New-StepResult -Name "backend" -State "skipped" -Ok $true -Summary "Skipped backend bootstrap."
+    $steps += $backendSkippedStep
+    Write-StepLog -Step $backendSkippedStep
 }
 else {
     $backendStart = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-watchdog-backend-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
     $backendReady = $backendStart.Result.Ok -and $backendStart.Payload -and [bool]$backendStart.Payload.Running
-    $steps += New-StepResult `
+    $backendStep = New-StepResult `
         -Name "backend" `
         -State $(if ($backendReady) { "ready" } else { "failed" }) `
         -Ok $backendReady `
         -Summary $(if ($backendReady) { "Backend is running." } else { "Backend is not running." }) `
         -Details $backendStart.Result.OutputTail `
         -Payload $backendStart.Payload
+    $steps += $backendStep
+    Write-StepLog -Step $backendStep
 }
 
 if ($SkipGateway) {
-    $steps += New-StepResult -Name "gateway" -State "skipped" -Ok $true -Summary "Skipped gateway bootstrap."
+    $gatewaySkippedStep = New-StepResult -Name "gateway" -State "skipped" -Ok $true -Summary "Skipped gateway bootstrap."
+    $steps += $gatewaySkippedStep
+    Write-StepLog -Step $gatewaySkippedStep
 }
 else {
     $gatewayStart = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-gateway-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
@@ -269,13 +515,50 @@ else {
         "starting" { "Gateway process is running and still warming up." ; break }
         default { "Gateway is not healthy." ; break }
     }
-    $steps += New-StepResult `
+    $gatewayStep = New-StepResult `
         -Name "gateway" `
         -State $gatewayState `
         -Ok $gatewayOk `
         -Summary $gatewaySummary `
         -Details $gatewayStart.Result.OutputTail `
         -Payload $gatewayStart.Payload
+    $steps += $gatewayStep
+    Write-StepLog -Step $gatewayStep
+}
+
+if ($SkipFrontend) {
+    $frontendSkippedStep = New-StepResult -Name "frontend" -State "skipped" -Ok $true -Summary "Skipped frontend bootstrap."
+    $steps += $frontendSkippedStep
+    Write-StepLog -Step $frontendSkippedStep
+}
+else {
+    $frontendStart = Invoke-JsonPowerShellScript -ScriptRelativePath $frontendCheckScript -Arguments @("-StartIfMissing", "-Json")
+    $frontendReady = $frontendStart.Result.Ok -and $frontendStart.Payload -and [bool]$frontendStart.Payload.Healthy
+    $frontendStarting = $frontendStart.Result.Ok -and $frontendStart.Payload -and (-not [bool]$frontendStart.Payload.Healthy) -and [bool]$frontendStart.Payload.Running
+    $frontendState = if ($frontendReady) {
+        "ready"
+    }
+    elseif ($frontendStarting) {
+        "starting"
+    }
+    else {
+        "failed"
+    }
+    $frontendOk = $frontendReady -or $frontendStarting
+    $frontendSummary = switch ($frontendState) {
+        "ready" { "Frontend dev server is ready." ; break }
+        "starting" { "Frontend process is running and still warming up." ; break }
+        default { "Frontend dev server is not healthy." ; break }
+    }
+    $frontendStep = New-StepResult `
+        -Name "frontend" `
+        -State $frontendState `
+        -Ok $frontendOk `
+        -Summary $frontendSummary `
+        -Details $frontendStart.Result.OutputTail `
+        -Payload $frontendStart.Payload
+    $steps += $frontendStep
+    Write-StepLog -Step $frontendStep
 }
 
 $overallOk = $true

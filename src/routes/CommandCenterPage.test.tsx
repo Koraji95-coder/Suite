@@ -19,6 +19,15 @@ vi.mock("@/lib/devAccess", () => ({
 		(email ?? "").trim().toLowerCase(),
 }));
 
+vi.mock("./command-center/useSupabaseSyncStatus", () => ({
+	useSupabaseSyncStatus: () => ({
+		status: null,
+		loading: false,
+		error: null,
+		refresh: vi.fn(),
+	}),
+}));
+
 function LocationProbe() {
 	const location = useLocation();
 	return <div>{`${location.pathname}${location.search}`}</div>;
@@ -136,6 +145,12 @@ describe("CommandCenterPage", () => {
 		expect(screen.getByText("npm run watchdog:backend:startup:check")).toBeTruthy();
 		expect(screen.getByText("Bootstrap Workstation Runtime")).toBeTruthy();
 		expect(screen.getByText("npm run workstation:bootstrap")).toBeTruthy();
+		expect(screen.getByText("Stop Workstation Runtime")).toBeTruthy();
+		expect(screen.getByText("npm run workstation:stop")).toBeTruthy();
+		expect(screen.getByText("Open Runtime Control Shell")).toBeTruthy();
+		expect(screen.getByText("npm run workstation:control-panel")).toBeTruthy();
+		expect(screen.getByText("Install Windows Runtime Startup")).toBeTruthy();
+		expect(screen.getByText("npm run workstation:startup:install")).toBeTruthy();
 		expect(screen.getByText("Run AutoCAD Watchdog Doctor")).toBeTruthy();
 		expect(screen.getByText("npm run watchdog:autocad:doctor")).toBeTruthy();
 	});
@@ -168,14 +183,38 @@ describe("CommandCenterPage", () => {
 		expect(screen.getByText("Supabase")).toBeTruthy();
 		expect(screen.getByText("Start Local Supabase")).toBeTruthy();
 		expect(screen.getByText("npm run supabase:start")).toBeTruthy();
+		expect(screen.getByText("Switch App To Local Supabase")).toBeTruthy();
+		expect(screen.getByText("npm run supabase:mode:local")).toBeTruthy();
+		expect(screen.getByText("Switch App To Hosted Supabase")).toBeTruthy();
+		expect(screen.getByText("npm run supabase:mode:hosted")).toBeTruthy();
 		expect(screen.getByText("Show Supabase Status")).toBeTruthy();
 		expect(screen.getByText("npm run supabase:status")).toBeTruthy();
+		expect(screen.getByText("Use Gmail For Local Auth Mail")).toBeTruthy();
+		expect(screen.getByText("npm run supabase:mail:gmail")).toBeTruthy();
+		expect(screen.getByText("Use Mailpit For Local Auth Mail")).toBeTruthy();
+		expect(screen.getByText("npm run supabase:mail:mailpit")).toBeTruthy();
 		expect(screen.getByText("Write Local Supabase Env")).toBeTruthy();
 		expect(screen.getByText("npm run supabase:env:local")).toBeTruthy();
 		expect(screen.getByText("Reset Local Supabase DB")).toBeTruthy();
 		expect(screen.getByText("npm run supabase:db:reset")).toBeTruthy();
 		expect(screen.getByText("Generate Supabase Types")).toBeTruthy();
 		expect(screen.getByText("npm run supabase:types")).toBeTruthy();
+		expect(screen.getByText("Run Hosted Preflight")).toBeTruthy();
+		expect(screen.getByText("npm run supabase:remote:preflight")).toBeTruthy();
+		expect(screen.getByText("Login To Hosted Supabase CLI")).toBeTruthy();
+		expect(screen.getByText("npm run supabase:remote:login")).toBeTruthy();
+		expect(screen.getByText("Set Hosted Project Ref")).toBeTruthy();
+		expect(
+			screen.getByText("npm run supabase:remote:target:auto"),
+		).toBeTruthy();
+		expect(screen.getByText("Dry-Run Hosted Push")).toBeTruthy();
+		expect(screen.getByText("npm run supabase:remote:push:dry")).toBeTruthy();
+		expect(screen.getByText("Push Migrations To Hosted")).toBeTruthy();
+		expect(screen.getByText("npm run supabase:remote:push")).toBeTruthy();
+		expect(screen.getByText("Install Windows Sign-In Preflight")).toBeTruthy();
+		expect(
+			screen.getByText("npm run supabase:remote:task:install"),
+		).toBeTruthy();
 		expect(screen.getByText("Stop Local Supabase")).toBeTruthy();
 		expect(screen.getByText("npm run supabase:stop")).toBeTruthy();
 		expect(screen.getByText("Clear Local Supabase Env")).toBeTruthy();

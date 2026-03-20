@@ -13,6 +13,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $gatewayLaunchScript = (Resolve-Path (Join-Path $PSScriptRoot "run-agent-gateway.mjs")).Path
 $dotenvPath = Join-Path $repoRoot ".env"
+$localDotenvPath = Join-Path $repoRoot ".env.local"
 
 function Get-TomlStringValue {
     param(
@@ -56,6 +57,22 @@ function Get-DotEnvValue {
     return $null
 }
 
+function Get-RepoEnvValue {
+    param([string]$Key)
+
+    $localValue = [string](Get-DotEnvValue -Path $localDotenvPath -Key $Key)
+    if (-not [string]::IsNullOrWhiteSpace($localValue)) {
+        return $localValue.Trim()
+    }
+
+    $repoValue = [string](Get-DotEnvValue -Path $dotenvPath -Key $Key)
+    if (-not [string]::IsNullOrWhiteSpace($repoValue)) {
+        return $repoValue.Trim()
+    }
+
+    return $null
+}
+
 function Get-WorkstationIdentity {
     param(
         [string]$TomlPath,
@@ -89,7 +106,7 @@ function Resolve-GatewayEndpoint {
         $env:AGENT_GATEWAY_HOST.Trim()
     }
     else {
-        [string](Get-DotEnvValue -Path $dotenvPath -Key "AGENT_GATEWAY_HOST")
+        [string](Get-RepoEnvValue -Key "AGENT_GATEWAY_HOST")
     }
     if ([string]::IsNullOrWhiteSpace($configuredHost)) {
         $configuredHost = "127.0.0.1"
@@ -99,7 +116,7 @@ function Resolve-GatewayEndpoint {
         $env:AGENT_GATEWAY_PORT.Trim()
     }
     else {
-        [string](Get-DotEnvValue -Path $dotenvPath -Key "AGENT_GATEWAY_PORT")
+        [string](Get-RepoEnvValue -Key "AGENT_GATEWAY_PORT")
     }
     if ([string]::IsNullOrWhiteSpace($configuredPort)) {
         $configuredPort = "3000"

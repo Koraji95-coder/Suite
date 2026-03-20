@@ -115,6 +115,35 @@ class TestApiBootstrapRuntime(unittest.TestCase):
             self.assertEqual(len(logger.warnings), 0)
 
     def test_load_default_env(self) -> None:
+        os_stub = _OSStub({"KEEP": "from-process"})
+        runtime = create_bootstrap_runtime(
+            logging_module=_LoggingStub(),
+            os_module=os_stub,
+            path_cls=Path,
+        )
+        logger = _LoggerStub()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            backend_dir = repo_root / "backend"
+            backend_dir.mkdir(parents=True, exist_ok=True)
+            api_server_path = backend_dir / "api_server.py"
+            api_server_path.write_text("# test", encoding="utf-8")
+            env_path = repo_root / ".env"
+            env_path.write_text("KEY=from-env\nKEEP=from-env", encoding="utf-8")
+            local_env_path = repo_root / ".env.local"
+            local_env_path.write_text(
+                "KEY=from-local\nLOCAL_ONLY=present\nKEEP=from-local",
+                encoding="utf-8",
+            )
+
+            resolved = runtime.load_default_env(str(api_server_path), logger)
+            self.assertEqual(resolved, local_env_path)
+            self.assertEqual(os_stub.environ.get("KEY"), "from-local")
+            self.assertEqual(os_stub.environ.get("LOCAL_ONLY"), "present")
+            self.assertEqual(os_stub.environ.get("KEEP"), "from-process")
+
+    def test_load_default_env_without_local_override(self) -> None:
         os_stub = _OSStub({})
         runtime = create_bootstrap_runtime(
             logging_module=_LoggingStub(),

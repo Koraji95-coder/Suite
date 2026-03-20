@@ -17,7 +17,9 @@ function Install-RunKeyFallback {
     $runKeyPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
     $runValue = "PowerShell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -File `"$daemonScript`" -MirrorRoot `"$MirrorRoot`" -IntervalMinutes $IntervalMinutes"
 
-    New-Item -Path $runKeyPath -Force | Out-Null
+    if (-not (Test-Path $runKeyPath)) {
+        New-Item -Path $runKeyPath -Force | Out-Null
+    }
     New-ItemProperty -Path $runKeyPath -Name $TaskName -Value $runValue -PropertyType String -Force | Out-Null
 
     & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -MirrorRoot $MirrorRoot
@@ -51,6 +53,7 @@ try {
         -Principal $principal `
         -Settings $settings `
         -Description "Mirror Suite local Codex/ZeroClaw/backend learning state into Dropbox." `
+        -ErrorAction Stop `
         -Force | Out-Null
 
     & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript -MirrorRoot $MirrorRoot

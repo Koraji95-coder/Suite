@@ -1,24 +1,21 @@
 .root {
-	border: 1px solid var(--line-soft);
+	border: 1px solid var(--brand-border-strong);
 	border-radius: var(--radius-3);
 	background:
 		radial-gradient(
 			140% 100% at 100% 0%,
-			color-mix(in srgb, var(--primary) 12%, transparent),
+			var(--brand-ambient-cool),
 			transparent 60%
 		),
 		radial-gradient(
 			110% 100% at 0% 100%,
-			color-mix(in srgb, var(--accent) 10%, transparent),
+			var(--brand-ambient-warm),
 			transparent 65%
 		),
-		linear-gradient(
-			160deg,
-			color-mix(in srgb, var(--panel-soft) 90%, transparent),
-			color-mix(in srgb, var(--panel-strong) 72%, transparent)
-		);
+		var(--brand-hero-gradient),
+		var(--brand-surface-neutral);
 	padding: clamp(1rem, 2vw, 2rem);
-	box-shadow: var(--agent-shadow-soft);
+	box-shadow: var(--brand-shadow-hero);
 }
 
 .stack {
@@ -45,7 +42,7 @@
 	font-weight: 700;
 	letter-spacing: 0.18em;
 	text-transform: uppercase;
-	color: var(--primary);
+	color: color-mix(in srgb, var(--accent) 82%, white 18%);
 }
 
 .crumbs {
@@ -99,8 +96,8 @@
 	color: var(--text-muted);
 	padding: 0.2rem 0.6rem;
 	border-radius: var(--radius-2);
-	border: 1px solid color-mix(in srgb, var(--line-soft) 80%, transparent);
-	background: color-mix(in srgb, var(--surface) 90%, transparent);
+	border: 1px solid var(--brand-chip-cool-border);
+	background: var(--brand-chip-cool-bg);
 }
 
 .createButton {
@@ -109,12 +106,13 @@
 	gap: 0.45rem;
 	border: 0;
 	border-radius: var(--radius-2);
-	background: var(--primary);
+	background: var(--brand-accent-gradient-strong);
 	color: var(--primary-contrast);
 	padding: 0.72rem 1.1rem;
 	font-size: 0.86rem;
 	font-weight: 700;
 	cursor: pointer;
+	box-shadow: 0 12px 28px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .createButton:hover {
@@ -152,8 +150,8 @@
 }
 
 .statusChip {
-	border: 1px solid var(--line-soft);
-	background: var(--surface);
+	border: 1px solid var(--brand-border-soft);
+	background: color-mix(in srgb, var(--brand-surface-neutral) 84%, transparent);
 	color: var(--text-muted);
 	padding: 0.45rem 0.8rem;
 	border-radius: var(--radius-2);
@@ -163,13 +161,13 @@
 }
 
 .statusChip:hover {
-	background: var(--surface-2);
+	background: color-mix(in srgb, var(--brand-surface-branded) 82%, transparent);
 	color: var(--text);
 }
 
 .statusChipActive {
-	border-color: var(--line-accent);
-	background: color-mix(in srgb, var(--primary) 18%, transparent);
+	border-color: var(--brand-border-strong);
+	background: var(--brand-hero-gradient);
 	color: var(--text);
 }
 
@@ -200,9 +198,15 @@
 
 .searchInput {
 	width: 100%;
-	border: 1px solid var(--line-soft);
+	border: 1px solid var(--brand-border-soft);
 	border-radius: var(--radius-2);
-	background: var(--surface-2);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--brand-surface-branded) 92%, transparent),
+			color-mix(in srgb, var(--brand-surface-neutral) 70%, transparent)
+		),
+		var(--brand-surface-branded);
 	color: var(--text);
 	padding: 0.62rem 0.85rem 0.62rem 2.15rem;
 	font-size: 0.86rem;
@@ -210,7 +214,7 @@
 
 .searchInput:focus-visible {
 	outline: none;
-	border-color: var(--line-accent);
+	border-color: var(--brand-border-strong);
 	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
@@ -225,18 +229,19 @@
 	gap: 0.18rem;
 	padding: 0.68rem 0.75rem;
 	border-radius: var(--radius-2);
-	border: 1px solid var(--line-soft);
-	background: color-mix(in srgb, var(--surface) 82%, transparent);
-}
-
-.statCardHighlight {
-	border-color: color-mix(in srgb, var(--primary) 34%, var(--line-soft));
+	border: 1px solid var(--brand-border-soft);
 	background:
 		linear-gradient(
 			180deg,
-			color-mix(in srgb, var(--primary) 12%, transparent),
-			color-mix(in srgb, var(--surface) 88%, transparent)
-		);
+			color-mix(in srgb, var(--brand-surface-neutral) 86%, transparent),
+			color-mix(in srgb, var(--brand-surface-branded) 70%, transparent)
+		),
+		var(--brand-surface-neutral);
+}
+
+.statCardHighlight {
+	border-color: var(--brand-border-strong);
+	background: var(--brand-hero-gradient);
 }
 
 .statLabel {

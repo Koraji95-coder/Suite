@@ -8,20 +8,34 @@ import {
 	writeEnvEntries,
 } from "./lib/env-files.mjs";
 import { runSupabaseSync } from "./lib/supabase-cli.mjs";
+import {
+	ACTIVE_LOCAL_SUPABASE_KEYS,
+	LOCAL_SUPABASE_SMTP_KEYS,
+	buildLocalSmtpEntries,
+	buildLocalSupabaseActiveEntries,
+	collectPreservedLocalEntries,
+	normalizeLocalEmailMode,
+	resolveLocalEmailConfig,
+} from "./lib/supabase-local-mode.mjs";
 
 const repoRoot = process.cwd();
 const { localEnvPath } = getRepoEnvPaths(repoRoot);
+const args = new Set(process.argv.slice(2));
+function readArgValue(flag) {
+	const index = process.argv.indexOf(flag);
+	if (index < 0) return "";
+	return String(process.argv[index + 1] || "").trim();
+}
 
-const MANAGED_KEYS = new Set([
-	"VITE_SUPABASE_URL",
-	"VITE_SUPABASE_ANON_KEY",
-	"SUPABASE_URL",
-	"SUPABASE_ANON_KEY",
-	"SUPABASE_SERVICE_ROLE_KEY",
-	"SUPABASE_JWT_SECRET",
-	"VITE_DEV_ADMIN_SOURCE",
-	"VITE_DEV_ADMIN_EMAIL",
-	"VITE_DEV_ADMIN_EMAILS",
+const requestedEmailMode =
+	normalizeLocalEmailMode(readArgValue("--mail")) ||
+	normalizeLocalEmailMode(readArgValue("--email"));
+const ensureRunning = args.has("--ensure-running");
+const strictMail = args.has("--strict-mail") || requestedEmailMode === "gmail";
+const restartIfRunning = args.has("--restart-if-running");
+const managedKeys = new Set([
+	...ACTIVE_LOCAL_SUPABASE_KEYS,
+	...LOCAL_SUPABASE_SMTP_KEYS,
 ]);
 
 function readRequiredValue(envMap, keys) {
@@ -34,29 +48,62 @@ function readRequiredValue(envMap, keys) {
 	return "";
 }
 
-const mergedRepoEnv = loadRepoEnv(repoRoot);
-const existingLocalEnv = readEnvFile(localEnvPath);
-const statusResult = runSupabaseSync(["status", "-o", "env"], {
-	cwd: repoRoot,
-	encoding: "utf8",
-});
+function readLocalStatusEnv() {
+	let wasRunning = false;
+	let startedNow = false;
+	let statusResult = runSupabaseSync(["status", "-o", "env"], {
+		cwd: repoRoot,
+		encoding: "utf8",
+	});
+	if (statusResult.status === 0) {
+		wasRunning = true;
+	}
 
-if (statusResult.status !== 0) {
-	const stderr = String(statusResult.stderr || "").trim();
-	const stdout = String(statusResult.stdout || "").trim();
-	console.error(
-		[
-			"supabase:env:local: unable to read local Supabase credentials.",
-			"Run `npm run supabase:start` first and make sure Docker Desktop is installed and running.",
-			stderr || stdout || "Supabase CLI did not return any output.",
-		]
-			.filter(Boolean)
-			.join("\n"),
-	);
-	process.exit(statusResult.status || 1);
+	if (statusResult.status !== 0 && ensureRunning) {
+		console.log(
+			"supabase:env:local: local Supabase is not running; starting it now.",
+		);
+		const startResult = runSupabaseSync(["start"], {
+			cwd: repoRoot,
+			encoding: "utf8",
+			stdio: "inherit",
+		});
+		if (startResult.status !== 0) {
+			process.exit(startResult.status || 1);
+		}
+		startedNow = true;
+		statusResult = runSupabaseSync(["status", "-o", "env"], {
+			cwd: repoRoot,
+			encoding: "utf8",
+		});
+	}
+
+	if (statusResult.status !== 0) {
+		const stderr = String(statusResult.stderr || "").trim();
+		const stdout = String(statusResult.stdout || "").trim();
+		console.error(
+			[
+				"supabase:env:local: unable to read local Supabase credentials.",
+				"Run `npm run supabase:start` first and make sure Docker Desktop is installed and running.",
+				stderr || stdout || "Supabase CLI did not return any output.",
+			]
+				.filter(Boolean)
+				.join("\n"),
+		);
+		process.exit(statusResult.status || 1);
+	}
+
+	return {
+		statusEnv: parseDotEnvText(statusResult.stdout || ""),
+		wasRunning,
+		startedNow,
+	};
 }
 
-const statusEnv = parseDotEnvText(statusResult.stdout || "");
+const mergedRepoEnv = loadRepoEnv(repoRoot);
+const existingLocalEnv = readEnvFile(localEnvPath);
+const statusState = readLocalStatusEnv();
+const statusEnv = statusState.statusEnv;
 const apiUrl = readRequiredValue(statusEnv, ["API_URL", "SUPABASE_URL"]);
 const anonKey = readRequiredValue(statusEnv, ["ANON_KEY", "SUPABASE_ANON_KEY"]);
 const serviceRoleKey = readRequiredValue(statusEnv, [
@@ -75,35 +122,40 @@ if (!apiUrl || !anonKey) {
 	process.exit(1);
 }
 
-const preservedLocalEntries = Object.entries(existingLocalEnv)
-	.filter(([key]) => !MANAGED_KEYS.has(key))
-	.sort(([left], [right]) => left.localeCompare(right));
+const currentEmailMode = normalizeLocalEmailMode(
+	existingLocalEnv.SUITE_SUPABASE_LOCAL_EMAIL_MODE,
+);
+const preserveLocalOverrides =
+	!requestedEmailMode || requestedEmailMode === currentEmailMode;
+const emailConfig = resolveLocalEmailConfig(
+	{ ...mergedRepoEnv, ...existingLocalEnv, ...process.env },
+	requestedEmailMode,
+	{
+		strict: strictMail,
+		useLocalOverrides: preserveLocalOverrides,
+	},
+);
+
+const preservedLocalEntries = collectPreservedLocalEntries(
+	existingLocalEnv,
+	managedKeys,
+);
 
 const generatedEntries = [
-	["VITE_SUPABASE_URL", apiUrl],
-	["VITE_SUPABASE_ANON_KEY", anonKey],
-	["SUPABASE_URL", apiUrl],
-	["SUPABASE_ANON_KEY", anonKey],
-	["VITE_DEV_ADMIN_SOURCE", "hybrid"],
+	...buildLocalSmtpEntries(emailConfig),
+	...buildLocalSupabaseActiveEntries({
+		apiUrl,
+		anonKey,
+		serviceRoleKey,
+		jwtSecret,
+		adminEmail: readSetting(mergedRepoEnv, "VITE_DEV_ADMIN_EMAIL"),
+		adminEmails: readSetting(mergedRepoEnv, "VITE_DEV_ADMIN_EMAILS"),
+	}),
 ];
 
-if (serviceRoleKey) {
-	generatedEntries.push(["SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey]);
-}
-
-if (jwtSecret) {
-	generatedEntries.push(["SUPABASE_JWT_SECRET", jwtSecret]);
-}
-
-const adminEmail = readSetting(mergedRepoEnv, "VITE_DEV_ADMIN_EMAIL");
-if (adminEmail) {
-	generatedEntries.push(["VITE_DEV_ADMIN_EMAIL", adminEmail]);
-}
-
-const adminEmails = readSetting(mergedRepoEnv, "VITE_DEV_ADMIN_EMAILS");
-if (adminEmails) {
-	generatedEntries.push(["VITE_DEV_ADMIN_EMAILS", adminEmails]);
-}
+const smtpEntriesChanged = buildLocalSmtpEntries(emailConfig).some(([key, value]) => {
+	return String(existingLocalEnv[key] || "") !== String(value || "");
+});
 
 writeEnvEntries(
 	localEnvPath,
@@ -115,4 +167,36 @@ writeEnvEntries(
 	],
 );
 
-console.log(`supabase:env:local: wrote ${localEnvPath}`);
+for (const warning of emailConfig.warnings) {
+	console.warn(`supabase:env:local: ${warning}`);
+}
+
+if (
+	smtpEntriesChanged &&
+	(restartIfRunning || statusState.startedNow) &&
+	(statusState.wasRunning || statusState.startedNow)
+) {
+	console.log(
+		"supabase:env:local: restarting local Supabase to apply SMTP/auth configuration changes.",
+	);
+	const stopResult = runSupabaseSync(["stop"], {
+		cwd: repoRoot,
+		encoding: "utf8",
+		stdio: "inherit",
+	});
+	if (stopResult.status !== 0) {
+		process.exit(stopResult.status || 1);
+	}
+	const startResult = runSupabaseSync(["start"], {
+		cwd: repoRoot,
+		encoding: "utf8",
+		stdio: "inherit",
+	});
+	if (startResult.status !== 0) {
+		process.exit(startResult.status || 1);
+	}
+}
+
+console.log(
+	`supabase:env:local: wrote ${localEnvPath} (${emailConfig.mode} local auth email mode)`,
+);

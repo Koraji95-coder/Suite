@@ -232,6 +232,12 @@ function Get-TrackerStateSummary {
     else {
         $lastWriteAgeMs
     }
+    $trackerReason = $null
+    if ($effectiveAgeMs -gt $FreshnessMs) {
+        $trackerAgeMinutes = [Math]::Round(($effectiveAgeMs / 60000.0), 1)
+        $trackerThresholdMinutes = [Math]::Round(($FreshnessMs / 60000.0), 1)
+        $trackerReason = "tracker-state.json is stale ($trackerAgeMinutes min old; threshold $trackerThresholdMinutes min)."
+    }
 
     $currentSession = Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "currentSession"
     $currentSessionIdValue = Get-OptionalObjectPropertyValue -InputObject $currentSession -PropertyName "sessionId"
@@ -255,6 +261,7 @@ function Get-TrackerStateSummary {
         trackerUpdatedAgeMs = $trackerUpdatedAgeMs
         effectiveAgeMs = $effectiveAgeMs
         freshnessThresholdMs = $FreshnessMs
+        reason = $trackerReason
         isTracking = [bool](Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "isTracking")
         isPaused = [bool](Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "isPaused")
         activeDrawing = [string](Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "activeDrawing")
@@ -399,6 +406,21 @@ function Get-CollectorStateSummary {
     else {
         $null
     }
+    $collectorReason = $null
+    if (-not $snapshot) {
+        $collectorReason = "Collector local state.json is missing snapshot metadata."
+    }
+    elseif (-not $sourceAvailable) {
+        $collectorReason = "Collector snapshot does not report a live tracker source."
+    }
+    elseif ($null -eq $lastCheckedAgeMs) {
+        $collectorReason = "Collector snapshot does not include a valid lastCheckedAt timestamp."
+    }
+    elseif ($lastCheckedAgeMs -gt $FreshnessMs) {
+        $collectorAgeMinutes = [Math]::Round(($lastCheckedAgeMs / 60000.0), 1)
+        $collectorThresholdMinutes = [Math]::Round(($FreshnessMs / 60000.0), 1)
+        $collectorReason = "Collector local state.json is stale ($collectorAgeMinutes min old; threshold $collectorThresholdMinutes min)."
+    }
 
     return [ordered]@{
         exists = $true
@@ -422,6 +444,7 @@ function Get-CollectorStateSummary {
         lastCheckedAgeMs = $lastCheckedAgeMs
         freshnessThresholdMs = $FreshnessMs
         trackerUpdatedAtMs = $trackerUpdatedAtMs
+        reason = $collectorReason
     }
 }
 
@@ -697,7 +720,13 @@ else {
     if ($trackerState.path) {
         Write-Host "Tracker state path: $($trackerState.path)"
     }
+    if ($trackerState.reason) {
+        Write-Host "Tracker reason: $($trackerState.reason)"
+    }
     if ($collectorState.path) {
         Write-Host "Collector state path: $($collectorState.path)"
+    }
+    if ($collectorState.reason) {
+        Write-Host "Collector reason: $($collectorState.reason)"
     }
 }

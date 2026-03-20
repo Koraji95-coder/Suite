@@ -5,6 +5,36 @@ import path from "node:path";
 import { loadRepoEnv, readSetting } from "./lib/env-files.mjs";
 
 const repoRoot = process.cwd();
+const SUPABASE_AUTH_STORAGE_PREFIX = "suite-auth";
+
+function normalizeSupabaseStorageScope(supabaseUrl) {
+	const rawValue = String(supabaseUrl || "").trim();
+	if (!rawValue) {
+		return "default";
+	}
+
+	try {
+		const parsed = new URL(rawValue);
+		const normalizedPath = parsed.pathname.replace(/\/+$/, "") || "/";
+		return `${parsed.origin}${normalizedPath}`;
+	} catch {
+		return rawValue;
+	}
+}
+
+function createDeterministicHash(value) {
+	let hash = 2166136261;
+	for (let index = 0; index < value.length; index += 1) {
+		hash ^= value.charCodeAt(index);
+		hash = Math.imul(hash, 16777619);
+	}
+	return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function buildSupabaseAuthStorageKey(supabaseUrl) {
+	const scope = normalizeSupabaseStorageScope(supabaseUrl);
+	return `${SUPABASE_AUTH_STORAGE_PREFIX}:${createDeterministicHash(scope)}`;
+}
 
 function parseArgs(argv) {
 	const options = {
@@ -212,12 +242,13 @@ async function bootstrap() {
 		throw new Error("Unable to extract session payload from Supabase verify response.");
 	}
 
+	const storageKey = buildSupabaseAuthStorageKey(supabaseUrl);
 	const sessionJson = JSON.stringify(session);
 	const state = {
 		cookies: [],
 		origins: origins.map((origin) => ({
 			origin,
-			localStorage: [{ name: "suite-auth", value: sessionJson }],
+			localStorage: [{ name: storageKey, value: sessionJson }],
 		})),
 	};
 
@@ -236,7 +267,7 @@ async function bootstrap() {
 				created_at: new Date().toISOString(),
 				email,
 				origins,
-				storage_key: "suite-auth",
+				storage_key: storageKey,
 				notes: "Session token omitted from metadata. See auth-state.json.",
 			},
 			null,

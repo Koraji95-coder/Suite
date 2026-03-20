@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-import { spawnSupabase, normalizeSupabaseDotEnv } from "./lib/supabase-cli.mjs";
+import {
+	createSupabaseRuntimeEnv,
+	spawnSupabase,
+	normalizeSupabaseDotEnv,
+} from "./lib/supabase-cli.mjs";
 
 const repoRoot = process.cwd();
 const args = process.argv.slice(2);
@@ -14,9 +18,10 @@ if (normalized) {
 	console.log("run-supabase-cli: normalized UTF-8 BOM from .env for Supabase CLI compatibility.");
 }
 
+const runtimeEnv = createSupabaseRuntimeEnv(repoRoot, process.env);
 const child = spawnSupabase(args, {
 	cwd: repoRoot,
-	env: process.env,
+	env: runtimeEnv,
 	stdio: "inherit",
 });
 

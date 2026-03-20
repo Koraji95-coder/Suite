@@ -19,12 +19,12 @@
 	background:
 		radial-gradient(
 			65% 85% at 4% 0%,
-			color-mix(in srgb, var(--accent) 18%, transparent),
+			var(--brand-ambient-warm),
 			transparent 62%
 		),
 		radial-gradient(
 			75% 95% at 100% 10%,
-			color-mix(in srgb, var(--primary) 14%, transparent),
+			var(--brand-ambient-cool),
 			transparent 64%
 		);
 	pointer-events: none;
@@ -45,27 +45,17 @@
 	justify-content: center;
 	border-radius: var(--radius-3);
 	color: color-mix(in srgb, var(--accent) 88%, white 12%);
-	border: 1px solid color-mix(in srgb, var(--accent) 36%, transparent);
-	background:
-		linear-gradient(
-			140deg,
-			color-mix(in srgb, var(--accent) 24%, transparent),
-			color-mix(in srgb, var(--primary) 12%, transparent)
-		),
-		var(--surface);
+	border: 1px solid var(--brand-border-warm);
+	background: var(--brand-accent-gradient);
 	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .topMargin {
 	margin-top: 1.25rem;
-	border-color: color-mix(in srgb, var(--border) 72%, transparent);
+	border-color: var(--brand-border-soft);
 	background:
-		linear-gradient(
-			150deg,
-			color-mix(in srgb, var(--surface) 84%, transparent),
-			color-mix(in srgb, var(--surface-2) 66%, transparent)
-		),
-		var(--surface);
+		var(--brand-hero-gradient),
+		var(--brand-surface-neutral);
 }
 
 .stateIcon {
@@ -106,14 +96,14 @@
 	grid-template-columns: auto minmax(0, 1fr) auto;
 	align-items: center;
 	gap: 0.6rem;
-	border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+	border: 1px solid var(--brand-border-soft);
 	background:
 		linear-gradient(
 			145deg,
-			color-mix(in srgb, var(--surface) 90%, transparent),
-			color-mix(in srgb, var(--surface-2) 62%, transparent)
+			color-mix(in srgb, var(--brand-surface-neutral) 90%, transparent),
+			color-mix(in srgb, var(--brand-surface-branded) 62%, transparent)
 		),
-		var(--surface);
+		var(--brand-surface-neutral);
 	color: var(--text-muted);
 	border-radius: 0.9rem;
 	padding: 0.52rem 0.72rem;
@@ -128,24 +118,18 @@
 }
 
 .tabButton:hover {
-	border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+	border-color: var(--brand-border-strong);
 	color: var(--text);
 	transform: translateY(-1px);
 }
 
 .tabButtonActive {
-	border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+	border-color: var(--brand-border-strong);
 	background:
-		linear-gradient(
-			145deg,
-			color-mix(in srgb, var(--primary) 15%, transparent),
-			color-mix(in srgb, var(--accent) 16%, transparent)
-		),
-		var(--surface);
+		var(--brand-hero-gradient),
+		var(--brand-surface-neutral);
 	color: var(--text);
-	box-shadow:
-		0 0 0 1px color-mix(in srgb, var(--primary) 30%, transparent),
-		0 12px 24px -22px color-mix(in srgb, var(--primary) 45%, transparent);
+	box-shadow: var(--brand-shadow);
 }
 
 .tabIconWrap {
@@ -155,8 +139,13 @@
 	align-items: center;
 	justify-content: center;
 	border-radius: 0.62rem;
-	border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-	background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+	border: 1px solid var(--brand-border-soft);
+	background:
+		linear-gradient(
+			145deg,
+			var(--brand-chip-cool-bg),
+			color-mix(in srgb, var(--brand-surface-branded) 82%, transparent)
+		);
 	color: var(--accent);
 }
 
@@ -189,6 +178,41 @@
 	gap: 1rem;
 }
 
+.supabaseStatusPanel {
+	border-color: var(--brand-border-soft);
+	background:
+		var(--brand-hero-gradient),
+		var(--brand-surface-neutral);
+}
+
+.supabaseStatusGrid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.supabaseStatusCard {
+	min-height: 8.25rem;
+}
+
+.supabaseStatusMeta {
+	display: grid;
+	gap: 0.3rem;
+}
+
+.supabaseLogPre {
+	margin: 0;
+	max-height: 11rem;
+	overflow: auto;
+	border: 1px solid var(--line-soft);
+	border-radius: 0.6rem;
+	padding: 0.55rem 0.62rem;
+	font-size: 0.7rem;
+	line-height: 1.35;
+	font-family: var(--font-mono, monospace);
+	color: var(--text);
+	background: color-mix(in srgb, var(--surface) 75%, transparent);
+}
+
 .groupHead {
 	display: flex;
 	align-items: center;
@@ -203,13 +227,13 @@
 	justify-content: center;
 	border-radius: 0.65rem;
 	color: var(--primary);
-	border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
-	background: color-mix(in srgb, var(--primary) 13%, transparent);
+	border: 1px solid var(--brand-chip-cool-border);
+	background: var(--brand-chip-cool-bg);
 }
 
 .commandPre {
 	overflow-x: auto;
-	border: 1px solid var(--line-soft);
+	border: 1px solid var(--brand-border-soft);
 	border-radius: 0.7rem;
 	padding: 0.62rem;
 	font-size: 0.74rem;
@@ -218,33 +242,25 @@
 	background:
 		linear-gradient(
 			180deg,
-			color-mix(in srgb, var(--bg) 94%, transparent),
-			color-mix(in srgb, var(--surface) 50%, transparent)
+			color-mix(in srgb, var(--brand-surface-branded) 94%, transparent),
+			color-mix(in srgb, var(--brand-surface-neutral) 50%, transparent)
 		),
 		var(--bg);
 }
 
 .architecturePanel {
 	min-height: 30rem;
-	border-color: color-mix(in srgb, var(--border) 74%, transparent);
+	border-color: var(--brand-border-soft);
 	background:
-		linear-gradient(
-			165deg,
-			color-mix(in srgb, var(--surface) 92%, transparent),
-			color-mix(in srgb, var(--surface-2) 58%, transparent)
-		),
-		var(--surface);
+		var(--brand-hero-gradient),
+		var(--brand-surface-neutral);
 }
 
 .historyPanel {
-	border-color: color-mix(in srgb, var(--border) 74%, transparent);
+	border-color: var(--brand-border-soft);
 	background:
-		linear-gradient(
-			165deg,
-			color-mix(in srgb, var(--surface) 92%, transparent),
-			color-mix(in srgb, var(--surface-2) 58%, transparent)
-		),
-		var(--surface);
+		var(--brand-hero-gradient),
+		var(--brand-surface-neutral);
 }
 
 .historyToolbar {
@@ -335,8 +351,8 @@
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 	color: var(--accent);
-	border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-	background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+	border: 1px solid var(--brand-chip-warm-border);
+	background: var(--brand-chip-warm-bg);
 }
 
 .historyTitle {
@@ -380,6 +396,10 @@
 @media (min-width: 48rem) {
 	.tabRow {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.supabaseStatusGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 
 	.groupsGrid {

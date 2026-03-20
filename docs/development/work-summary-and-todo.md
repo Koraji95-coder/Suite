@@ -19,6 +19,11 @@ This is a restart/handoff doc summarizing what has already been completed and wh
   - plugin install/check scripts
   - readiness doctor
   - live `tracker-state.json` export ingestion
+- Windows runtime control now includes:
+  - HTML desktop shell under `dotnet/Suite.RuntimeControl/`
+  - blue/gold operator-console UI
+  - visible Windows sign-in startup with HKCU `Run` fallback when scheduled tasks are denied
+  - local frontend (`5173`) as a first-class managed runtime service with shared log streaming
 - Versioned workstation profile sync is live:
   - `tools/suite-repo-mcp/workstation-profiles.json`
   - `scripts/sync-suite-workstation-profile.ps1`
@@ -110,7 +115,10 @@ For the next session on `DUSTIN-HOME`:
    - `npm run watchdog:startup:autocad:check`
    - `npm run watchdog:backend:startup:check`
    - `npm run gateway:startup:check`
+   - `npm run frontend:startup:check`
    - `npm run watchdog:autocad:doctor`
+9. For a full workstation replay guide, use:
+   - `docs/development/workstation-transfer-runbook.md`
 
 ## 1) What Is Already Done
 
@@ -279,6 +287,19 @@ Goal: safely select template-defined names/values from `config.yaml` without bri
 1. Add dashboards/alerts for auth and pairing abuse metrics.
 2. Add threshold alerts for passkey failure spikes and pairing-confirm failure bursts.
 3. Document runbook for lockout recovery and incident response.
+
+## P3 - Deferred Zeroclaw cherry-picks
+
+Only touch these when there is no higher-priority Suite product or reliability work open.
+
+1. Manual-port upstream `632d513` so direct-model chat output preserves user-facing assistant text when tool/native-call payloads are present.
+2. Review upstream `fc2aac7` for gateway websocket session persistence and restart-resume behavior.
+3. Review upstream `b6c2930` for autonomy/approval enforcement correctness across gateway and channel execution paths.
+4. Review upstream `9cc74a2` for shell-tool sandbox wiring and related tool-execution hardening.
+5. Review upstream `3c117d2` for configurable sub-agent/delegate timeout handling.
+6. Do not port upstream runtime model switching or pairing-flow changes without an explicit product decision:
+   - skip `58b98c5` because it conflicts with deterministic profile-model routing
+   - skip `4455b24`-style pairing/auth changes unless separately approved
 
 ## 4) Suggested Next Session Order
 

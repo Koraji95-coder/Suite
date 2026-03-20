@@ -51,6 +51,7 @@ namespace CadCommandCenter
         public void Initialize()
         {
             WriteLifecycleEvent("initialize");
+            TryAutoStartTracker();
         }
 
         public void Terminate()
@@ -58,7 +59,7 @@ namespace CadCommandCenter
             WriteLifecycleEvent("terminate");
         }
 
-        private static void WriteLifecycleEvent(string stage)
+        internal static void WriteLifecycleEvent(string stage, string detail = null)
         {
             try
             {
@@ -70,12 +71,26 @@ namespace CadCommandCenter
 
                 File.AppendAllText(
                     PluginLogPath,
-                    $"{DateTimeOffset.UtcNow:O} {stage}{Environment.NewLine}"
+                    $"{DateTimeOffset.UtcNow:O} {stage}{(string.IsNullOrWhiteSpace(detail) ? string.Empty : $" {detail}")}{Environment.NewLine}"
                 );
             }
             catch (System.Exception ex)
             {
                 Trace.TraceError($"Suite Watchdog plugin lifecycle log failed during {stage}: {ex}");
+            }
+        }
+
+        private static void TryAutoStartTracker()
+        {
+            try
+            {
+                var started = DrawingTracker.TryAutoStart();
+                WriteLifecycleEvent(started ? "tracker_autostart_started" : "tracker_autostart_skipped");
+            }
+            catch (System.Exception ex)
+            {
+                WriteLifecycleEvent("tracker_autostart_failed", $"{ex.GetType().Name}: {ex.Message}");
+                Trace.TraceError($"Suite Watchdog tracker autostart failed: {ex}");
             }
         }
     }
@@ -183,22 +198,59 @@ namespace CadCommandCenter
 
         // JSON output
         private static string _jsonOutputPath;
+        private static bool _pendingAutoloadAnnouncement = false;
+        private const string AutoloadAnnouncementMessage =
+            "\n[CAD Tracker] Auto-loaded and tracking is active. Use TRACKERSTATUS for details.\n";
 
 
         // ═══════════════════════════════════════════════════
         // COMMANDS
         // ═══════════════════════════════════════════════════
 
+        internal static bool TryAutoStart()
+        {
+            return new DrawingTracker().StartTrackerCore(silent: true, startReason: "autoload");
+        }
+
+        private static void TryWritePendingAutoloadAnnouncement(Editor ed = null)
+        {
+            if (!_pendingAutoloadAnnouncement)
+            {
+                return;
+            }
+
+            ed ??= Application.DocumentManager.MdiActiveDocument?.Editor;
+            if (ed == null)
+            {
+                return;
+            }
+
+            try
+            {
+                ed.WriteMessage(AutoloadAnnouncementMessage);
+                _pendingAutoloadAnnouncement = false;
+                DrawingTrackerApplication.WriteLifecycleEvent("tracker_autostart_announced");
+            }
+            catch (System.Exception ex)
+            {
+                Trace.TraceWarning($"Suite Watchdog tracker autostart announcement failed: {ex}");
+            }
+        }
+
         [CommandMethod("STARTTRACKER")]
         public void StartTracker()
         {
-            var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
-            if (ed == null) return;
+            StartTrackerCore(silent: false, startReason: "command");
+        }
 
+        private bool StartTrackerCore(bool silent, string startReason)
+        {
+            var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
             if (_initialized)
             {
-                ed.WriteMessage("\n[CAD Tracker] Already running. Use STOPTRACKER to reset.\n");
-                return;
+                if (!silent)
+                    ed?.WriteMessage("\n[CAD Tracker] Already running. Use STOPTRACKER to reset.\n");
+                return false;
             }
 
             // Config path next to the plugin DLL or in user profile
@@ -210,9 +262,13 @@ namespace CadCommandCenter
             _configPath = Path.Combine(baseDir, "tracker-config.json");
             _jsonOutputPath = Path.Combine(baseDir, "tracker-state.json");
             _config = TrackerConfig.LoadOrDefault(_configPath);
+            var configChanged = false;
 
             if (string.IsNullOrEmpty(_config.OutputJsonPath))
+            {
                 _config.OutputJsonPath = _jsonOutputPath;
+                configChanged = true;
+            }
             else
                 _jsonOutputPath = _config.OutputJsonPath;
 
@@ -220,8 +276,26 @@ namespace CadCommandCenter
             if (_config.WatchedFolders.Count == 0)
             {
                 _config.WatchedFolders["Active"] = @"C:\Users\" + Environment.UserName + @"\Desktop\Active";
-                ed.WriteMessage("\n[CAD Tracker] No folders configured. Added Desktop\\Active as default.");
-                ed.WriteMessage("\n  Use TRACKERCONFIG to set up your watched folders.\n");
+                configChanged = true;
+                if (!silent)
+                {
+                    ed?.WriteMessage("\n[CAD Tracker] No folders configured. Added Desktop\\Active as default.");
+                    ed?.WriteMessage("\n  Use TRACKERCONFIG to set up your watched folders.\n");
+                }
+            }
+
+            if (configChanged)
+            {
+                try
+                {
+                    _config.Save(_configPath);
+                }
+                catch (System.Exception ex)
+                {
+                    if (!silent)
+                        ed?.WriteMessage($"\n[CAD Tracker] Could not persist tracker defaults: {ex.Message}\n");
+                    Trace.TraceWarning($"Suite Watchdog tracker config save skipped: {ex}");
+                }
             }
 
             // Hook into AutoCAD events
@@ -248,9 +322,23 @@ namespace CadCommandCenter
             BeginSession();
 
             _initialized = true;
-            ed.WriteMessage($"\n[CAD Tracker] ✓ Started. Idle timeout: {_config.IdleTimeoutSeconds}s");
-            ed.WriteMessage($"\n[CAD Tracker]   Monitoring {_config.WatchedFolders.Count} folder(s)");
-            ed.WriteMessage($"\n[CAD Tracker]   State JSON: {_jsonOutputPath}\n");
+            ExportStateJson();
+            DrawingTrackerApplication.WriteLifecycleEvent($"tracker_started_{startReason}");
+
+            if (silent && string.Equals(startReason, "autoload", StringComparison.OrdinalIgnoreCase))
+            {
+                _pendingAutoloadAnnouncement = true;
+                TryWritePendingAutoloadAnnouncement(ed);
+            }
+
+            if (!silent)
+            {
+                ed?.WriteMessage($"\n[CAD Tracker] ✓ Started. Idle timeout: {_config.IdleTimeoutSeconds}s");
+                ed?.WriteMessage($"\n[CAD Tracker]   Monitoring {_config.WatchedFolders.Count} folder(s)");
+                ed?.WriteMessage($"\n[CAD Tracker]   State JSON: {_jsonOutputPath}\n");
+            }
+
+            return true;
         }
 
         [CommandMethod("STOPTRACKER")]
@@ -432,6 +520,7 @@ namespace CadCommandCenter
             if (newDoc == null) return;
 
             AttachDocEvents(newDoc);
+            TryWritePendingAutoloadAnnouncement(newDoc.Editor);
 
             var newPath = newDoc.Name;
             if (_currentSession == null)
@@ -452,6 +541,7 @@ namespace CadCommandCenter
             if (e.Document != null)
             {
                 AttachDocEvents(e.Document);
+                TryWritePendingAutoloadAnnouncement(e.Document.Editor);
                 RecordActivity();
             }
         }
@@ -514,6 +604,8 @@ namespace CadCommandCenter
 
         private void RecordActivity()
         {
+            TryWritePendingAutoloadAnnouncement();
+
             var wasPaused = _isPaused;
             _lastActivityTime = DateTime.Now;
             _isPaused = false;

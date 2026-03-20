@@ -133,7 +133,9 @@ function Install-RunKeyFallback {
         "-CodexConfigPath `"$TomlPath`" -MutexName `"$NamedMutex`""
     )
 
-    New-Item -Path $runKeyPath -Force | Out-Null
+    if (-not (Test-Path $runKeyPath)) {
+        New-Item -Path $runKeyPath -Force | Out-Null
+    }
     New-ItemProperty -Path $runKeyPath -Name $RunKeyEntryName -Value $runValue -PropertyType String -Force | Out-Null
 
     Start-Process PowerShell.exe -WindowStyle Hidden -ArgumentList @(

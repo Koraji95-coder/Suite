@@ -39,9 +39,16 @@ def create_bootstrap_runtime(
         if autocad_com_available and gencache_module is not None:
             gencache_module.is_readonly = True
 
-    def load_env_file(path: Any, logger: Any) -> None:
+    def load_env_file(
+        path: Any,
+        logger: Any,
+        *,
+        override: bool = False,
+        protected_keys: set[str] | None = None,
+    ) -> None:
         if not path.exists():
             return
+        protected = protected_keys or set()
         try:
             for raw in path.read_text().splitlines():
                 line = raw.strip()
@@ -54,14 +61,29 @@ def create_bootstrap_runtime(
                 if not key:
                     continue
                 value = value.strip().strip('"').strip("'")
-                os_module.environ.setdefault(key, value)
+                if override:
+                    if key in protected:
+                        continue
+                    os_module.environ[key] = value
+                else:
+                    os_module.environ.setdefault(key, value)
         except Exception as exc:
             logger.warning("Failed to load env file %s: %s", path, exc)
 
     def load_default_env(api_server_file: str, logger: Any):
-        env_path = path_cls(api_server_file).resolve().parents[1] / ".env"
-        load_env_file(env_path, logger)
-        return env_path
+        repo_root = path_cls(api_server_file).resolve().parents[1]
+        env_path = repo_root / ".env"
+        local_env_path = repo_root / ".env.local"
+        protected_keys = set(os_module.environ.keys())
+
+        load_env_file(env_path, logger, protected_keys=protected_keys)
+        load_env_file(
+            local_env_path,
+            logger,
+            override=True,
+            protected_keys=protected_keys,
+        )
+        return local_env_path if local_env_path.exists() else env_path
 
     return BootstrapRuntime(
         configure_logging=configure_logging,

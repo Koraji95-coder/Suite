@@ -42,9 +42,12 @@ That script builds the plugin and installs an Autodesk bundle under:
 
 - `%APPDATA%\Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle`
 
+On AutoCAD load, the bundle now auto-starts the tracker and emits a fresh
+`tracker-state.json` without requiring a manual command first.
+
 ## Tracker Commands
 
-- `STARTTRACKER`
+- `STARTTRACKER` (manual fallback if the tracker is not already running)
 - `STOPTRACKER`
 - `TRACKERSTATUS`
 - `TRACKEREXPORT`

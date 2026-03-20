@@ -22,6 +22,7 @@ import {
 	type CommandPreset,
 } from "./command-center/commandCenterModel";
 import { useCommandCenterHistory } from "./command-center/useCommandCenterHistory";
+import { useSupabaseSyncStatus } from "./command-center/useSupabaseSyncStatus";
 import { useCommandCenterTab } from "./command-center/useCommandCenterTab";
 
 export default function CommandCenterPage() {
@@ -49,6 +50,12 @@ export default function CommandCenterPage() {
 		enabled: isAllowed,
 		onLoadError: setMessage,
 	});
+	const {
+		status: supabaseSyncStatus,
+		loading: supabaseSyncStatusLoading,
+		error: supabaseSyncStatusError,
+		refresh: refreshSupabaseSyncStatus,
+	} = useSupabaseSyncStatus(isAllowed);
 
 	const copyCommand = useCallback(
 		async (preset: CommandPreset) => {
@@ -106,6 +113,18 @@ export default function CommandCenterPage() {
 		setMessage("Command Center history cleared.");
 	}, [clearHistory]);
 
+	const handleRefreshSupabaseSyncStatus = useCallback(() => {
+		refreshSupabaseSyncStatus();
+		appendHistory({
+			category: "System",
+			action: "supabase_sync_status_refreshed",
+			title: "Refreshed Supabase sync status",
+			detailsText:
+				"Loaded the latest Windows sign-in preflight and hosted push artifacts.",
+		});
+		setMessage("Refreshing Supabase sync status…");
+	}, [appendHistory, refreshSupabaseSyncStatus]);
+
 	if (!isAllowed) {
 		return (
 			<PageFrame maxWidth="full">
@@ -133,6 +152,10 @@ export default function CommandCenterPage() {
 					<CommandCenterCommandsSection
 						message={message}
 						commandGroups={COMMAND_GROUPS}
+						supabaseSyncStatus={supabaseSyncStatus}
+						supabaseSyncStatusLoading={supabaseSyncStatusLoading}
+						supabaseSyncStatusError={supabaseSyncStatusError}
+						onRefreshSupabaseSyncStatus={handleRefreshSupabaseSyncStatus}
 						copiedPresetId={copiedId}
 						onCopyCommand={(preset) => void copyCommand(preset)}
 						historyFilter={historyFilter}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 import time
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import requests
 
@@ -82,6 +83,15 @@ def _is_supabase_read_timeout(exc: Exception, requests_module: Any) -> bool:
     return "read timed out" in str(exc).strip().lower()
 
 
+def _is_local_supabase_url(supabase_url: str) -> bool:
+    try:
+        parsed = urlparse(str(supabase_url or "").strip())
+    except Exception:
+        return False
+    hostname = str(parsed.hostname or "").strip().lower()
+    return hostname in {"127.0.0.1", "localhost", "::1"}
+
+
 def send_supabase_email_link(
     email: str,
     flow: str,
@@ -120,9 +130,14 @@ def send_supabase_email_link(
     }
 
     endpoint = f"{supabase_url.rstrip('/')}/auth/v1/otp"
+    allow_local_signin_create_user = (
+        flow == "signin" and _is_local_supabase_url(supabase_url)
+    )
     payload: Dict[str, Any] = {
         "email": email,
-        "create_user": flow == "signup",
+        # Local Supabase starts empty, so allow sign-in to bootstrap a user
+        # instead of forcing the dev workflow through the separate signup page.
+        "create_user": flow == "signup" or allow_local_signin_create_user,
     }
     params: Dict[str, str] = {}
     if redirect_to:

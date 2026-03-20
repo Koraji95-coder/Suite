@@ -196,10 +196,37 @@ export const COMMAND_GROUPS: CommandGroup[] = [
 				command: "npm run supabase:start",
 			},
 			{
+				id: "supabase-mode-local",
+				name: "Switch App To Local Supabase",
+				description:
+					"Start local Supabase if needed and write the local .env.local overlay.",
+				command: "npm run supabase:mode:local",
+			},
+			{
+				id: "supabase-mode-hosted",
+				name: "Switch App To Hosted Supabase",
+				description: "Clear the local Supabase target overlay from .env.local.",
+				command: "npm run supabase:mode:hosted",
+			},
+			{
 				id: "supabase-status",
 				name: "Show Supabase Status",
 				description: "Print local Supabase URLs, keys, and service status.",
 				command: "npm run supabase:status",
+			},
+			{
+				id: "supabase-mail-gmail",
+				name: "Use Gmail For Local Auth Mail",
+				description:
+					"Point local Supabase auth email delivery at your configured Gmail SMTP credentials.",
+				command: "npm run supabase:mail:gmail",
+			},
+			{
+				id: "supabase-mail-mailpit",
+				name: "Use Mailpit For Local Auth Mail",
+				description:
+					"Switch local Supabase auth email delivery back to the local Mailpit inbox.",
+				command: "npm run supabase:mail:mailpit",
 			},
 			{
 				id: "supabase-env-local",
@@ -219,6 +246,48 @@ export const COMMAND_GROUPS: CommandGroup[] = [
 				name: "Generate Supabase Types",
 				description: "Refresh src/supabase/database.ts from the local database.",
 				command: "npm run supabase:types",
+			},
+			{
+				id: "supabase-remote-login",
+				name: "Login To Hosted Supabase CLI",
+				description:
+					"Open the repo-local Supabase CLI login flow without requiring a global supabase install.",
+				command: "npm run supabase:remote:login",
+			},
+			{
+				id: "supabase-remote-target-auto",
+				name: "Set Hosted Project Ref",
+				description:
+					"Derive SUPABASE_REMOTE_PROJECT_REF from the hosted Supabase URL in .env and write it to .env.local.",
+				command: "npm run supabase:remote:target:auto",
+			},
+			{
+				id: "supabase-remote-preflight",
+				name: "Run Hosted Preflight",
+				description:
+					"Check CLI auth, link state, drift, and Windows sign-in status artifacts without pushing.",
+				command: "npm run supabase:remote:preflight",
+			},
+			{
+				id: "supabase-remote-push-dry",
+				name: "Dry-Run Hosted Push",
+				description:
+					"Show which tracked migrations would be pushed to hosted Supabase.",
+				command: "npm run supabase:remote:push:dry",
+			},
+			{
+				id: "supabase-remote-push",
+				name: "Push Migrations To Hosted",
+				description:
+					"Run the guarded hosted migration push after a successful preflight.",
+				command: "npm run supabase:remote:push",
+			},
+			{
+				id: "supabase-remote-task-install",
+				name: "Install Windows Sign-In Preflight",
+				description:
+					"Register the hosted Supabase preflight to run automatically after Windows logon.",
+				command: "npm run supabase:remote:task:install",
 			},
 			{
 				id: "supabase-stop",
@@ -282,6 +351,27 @@ export const COMMAND_GROUPS: CommandGroup[] = [
 				description:
 					"Start local Supabase, Watchdog startup entries, backend, and gateway.",
 				command: "npm run workstation:bootstrap",
+			},
+			{
+				id: "workstation-stop",
+				name: "Stop Workstation Runtime",
+				description:
+					"Force-stop local Supabase, backend, gateway, collectors, and the AutoCAD pipe bridge.",
+				command: "npm run workstation:stop",
+			},
+			{
+				id: "workstation-control-panel",
+				name: "Open Runtime Control Shell",
+				description:
+					"Open the local Windows HTML runtime control shell with live service cards, bootstrap, restart, and stop controls.",
+				command: "npm run workstation:control-panel",
+			},
+			{
+				id: "workstation-startup-install",
+				name: "Install Windows Runtime Startup",
+				description:
+					"Open the Suite runtime control shell automatically after Windows sign-in and auto-bootstrap local services.",
+				command: "npm run workstation:startup:install",
 			},
 			{
 				id: "watchdog-autocad-plugin-check",

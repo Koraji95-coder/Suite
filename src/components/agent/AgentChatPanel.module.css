@@ -7,17 +7,17 @@
 		);
 	height: 100%;
 	overflow: hidden;
-	border: 1px solid var(--agent-surface-border);
+	border: 1px solid var(--brand-border-strong);
 	border-radius: 1.08rem;
 	background:
 		radial-gradient(
 			circle at 26% 12%,
-			color-mix(in srgb, var(--agent-accent-cool) 16%, transparent),
+			var(--brand-ambient-cool),
 			transparent 42%
 		),
 		radial-gradient(
 			circle at 88% 92%,
-			color-mix(in srgb, var(--agent-accent-warm) 18%, transparent),
+			var(--brand-ambient-warm),
 			transparent 46%
 		),
 		linear-gradient(
@@ -28,7 +28,7 @@
 		),
 		var(--agent-surface-base);
 	box-shadow:
-		var(--agent-shadow-soft),
+		var(--brand-shadow-hero),
 		inset 0 1px 0 rgb(255 255 255 / 3%);
 }
 
@@ -76,14 +76,15 @@
 	flex-direction: column;
 	gap: 0.55rem;
 	padding: 0.67rem;
-	border: 1px solid
-		color-mix(in srgb, var(--agent-surface-border) 90%, transparent);
+	border: 1px solid var(--brand-border-soft);
 	border-radius: 0.78rem;
-	background: color-mix(
-		in srgb,
-		var(--agent-surface-elevated) 76%,
-		transparent
-	);
+	background:
+		linear-gradient(
+			165deg,
+			color-mix(in srgb, var(--brand-surface-neutral) 78%, transparent),
+			color-mix(in srgb, var(--brand-surface-branded) 74%, transparent)
+		),
+		var(--brand-glass);
 	box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
 	backdrop-filter: blur(9px);
 }
@@ -132,8 +133,13 @@
 }
 
 .rosterItemActive {
-	border-color: color-mix(in srgb, var(--agent-accent-cool) 54%, transparent);
-	background: color-mix(in srgb, var(--agent-accent-cool) 14%, transparent);
+	border-color: var(--brand-border-strong);
+	background:
+		linear-gradient(
+			145deg,
+			var(--brand-chip-cool-bg),
+			color-mix(in srgb, var(--brand-surface-branded) 78%, transparent)
+		);
 }
 
 .teamHomeItem {
@@ -229,9 +235,9 @@
 }
 
 .priorityBubbleActive {
-	border-color: color-mix(in srgb, var(--agent-accent-warm) 56%, transparent);
+	border-color: var(--brand-chip-warm-border);
 	color: var(--agent-text-strong);
-	background: color-mix(in srgb, var(--agent-accent-warm) 14%, transparent);
+	background: var(--brand-chip-warm-bg);
 }
 
 .priorityBubble:hover {
@@ -377,14 +383,9 @@
 	justify-content: space-between;
 	gap: 0.8rem;
 	padding: 0.8rem 0.92rem;
-	border-bottom: 1px solid
-		color-mix(in srgb, var(--agent-surface-border) 82%, transparent);
+	border-bottom: 1px solid var(--brand-border-soft);
 	background:
-		linear-gradient(
-			90deg,
-			color-mix(in srgb, var(--agent-accent-cool) 12%, transparent),
-			color-mix(in srgb, var(--agent-accent-warm) 9%, transparent)
-		),
+		var(--brand-hero-gradient),
 		color-mix(in srgb, var(--agent-surface-base) 70%, transparent);
 	backdrop-filter: blur(12px);
 	box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--agent-surface-border) 62%, transparent);
@@ -471,11 +472,10 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 0.3rem;
-	border: 1px solid
-		color-mix(in srgb, var(--agent-accent-warm) 46%, transparent);
+	border: 1px solid var(--brand-chip-warm-border);
 	border-radius: 0.6rem;
 	padding: 0.36rem 0.56rem;
-	background: color-mix(in srgb, var(--agent-accent-warm) 14%, transparent);
+	background: var(--brand-chip-warm-bg);
 	color: var(--agent-text-strong);
 	font-size: 0.7rem;
 	font-weight: 600;
@@ -488,7 +488,7 @@
 
 .threadNewButton:hover {
 	transform: translateY(-1px);
-	background: color-mix(in srgb, var(--agent-accent-warm) 18%, transparent);
+	background: color-mix(in srgb, var(--brand-chip-warm-bg) 92%, white 8%);
 }
 
 .threadStaticLabel {

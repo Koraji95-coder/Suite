@@ -2,34 +2,10 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { loadRepoEnv } from "./lib/env-files.mjs";
 
 const repoRoot = process.cwd();
-const envFilePath = path.join(repoRoot, ".env");
-
-function parseDotEnv(filePath) {
-	if (!fs.existsSync(filePath)) return {};
-	const out = {};
-	for (const rawLine of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
-		const line = rawLine.trim();
-		if (!line || line.startsWith("#")) continue;
-		const splitAt = line.indexOf("=");
-		if (splitAt <= 0) continue;
-		const key = line.slice(0, splitAt).trim();
-		let value = line.slice(splitAt + 1).trim();
-		if (!key) continue;
-		if (
-			(value.startsWith('"') && value.endsWith('"')) ||
-			(value.startsWith("'") && value.endsWith("'"))
-		) {
-			value = value.slice(1, -1);
-		}
-		out[key] = value;
-	}
-	return out;
-}
-
-const dotEnvValues = parseDotEnv(envFilePath);
-const runtimeEnv = { ...dotEnvValues, ...process.env };
+const runtimeEnv = { ...loadRepoEnv(repoRoot), ...process.env };
 
 function envString(key) {
 	return String(runtimeEnv[key] || "").trim();

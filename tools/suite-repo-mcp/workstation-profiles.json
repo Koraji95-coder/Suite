@@ -15,6 +15,14 @@
       "computerNames": ["DUSTIN-HOME"],
       "gitUserName": "koraji95-coder",
       "gitUserEmail": "dustinwardelectricalengineer@outlook.com"
+    },
+    {
+      "id": "DUSTIN-WORK",
+      "label": "Dustin Work station",
+      "role": "work",
+      "computerNames": ["DUSTIN-WORK"],
+      "gitUserName": "koraji95-coder",
+      "gitUserEmail": "dustinwardelectricalengineer@outlook.com"
     }
   ]
 }

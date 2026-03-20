@@ -4,6 +4,15 @@ Date: March 19, 2026
 
 Use this when moving the active Suite workspace to another Windows workstation and you want the destination machine to match the source machine's local runtime, Supabase workflow, runtime shell, and AutoCAD Watchdog setup.
 
+## Naming Rule
+
+Do not reuse workstation ids across machines.
+
+- Home machine: `DUSTIN-HOME`
+- Work machine: `DUSTIN-WORK`
+
+If you are on the work machine, do not restore or sync it as `DUSTIN-HOME`. Keep each box on its own permanent id so MCP env, startup collectors, AutoCAD state, and local config files do not drift across machines again.
+
 ## Goal
 
 Bring the destination workstation up with:
@@ -45,10 +54,10 @@ npm run workstation:mirror
 ## Destination Machine Bring-Up
 
 1. Pull the latest `main`.
-2. Restore workstation-local state:
+2. Restore workstation-local state using the destination machine id:
 
 ```powershell
-npm run workstation:restore -- -WorkstationId DUSTIN-HOME
+npm run workstation:restore -- -WorkstationId DUSTIN-WORK
 ```
 
 3. Restart Codex / the developer session so workstation-local MCP config reloads.
@@ -83,6 +92,12 @@ npm run workstation:startup:install
 
 ```powershell
 npm run workstation:control-panel
+```
+
+9. If the work machine ever drifts, re-stamp only the workstation identity block:
+
+```powershell
+npm run workstation:sync -- -WorkstationId DUSTIN-WORK
 ```
 
 ## Runtime Shell Expectations

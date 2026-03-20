@@ -119,6 +119,10 @@ For the next session on `DUSTIN-HOME`:
    - `npm run watchdog:autocad:doctor`
 9. For a full workstation replay guide, use:
    - `docs/development/workstation-transfer-runbook.md`
+10. Keep workstation ids unique per box:
+   - home machine stays `DUSTIN-HOME`
+   - work machine should use `DUSTIN-WORK`
+   - never restore or sync the work machine as `DUSTIN-HOME`
 
 ## 1) What Is Already Done
 

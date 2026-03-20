@@ -81,7 +81,9 @@ function Invoke-ExternalCommand {
 
     Push-Location $WorkingDirectory
     try {
+        $previousErrorActionPreference = $ErrorActionPreference
         try {
+            $ErrorActionPreference = "Continue"
             $rawOutput = & $FilePath @Arguments 2>&1
             $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
             $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
@@ -90,6 +92,9 @@ function Invoke-ExternalCommand {
         catch {
             $exitCode = 1
             $outputText = $_.Exception.Message
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
         }
     }
     finally {

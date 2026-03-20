@@ -275,7 +275,9 @@ function Invoke-ExternalCommand {
 
     Push-Location $WorkingDirectory
     try {
+        $previousErrorActionPreference = $ErrorActionPreference
         try {
+            $ErrorActionPreference = "Continue"
             $rawOutput = & $FilePath @Arguments 2>&1
             $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
             $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
@@ -295,6 +297,9 @@ function Invoke-ExternalCommand {
                 OutputText = $outputText
                 OutputTail = Get-OutputTail -Text $outputText
             }
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
         }
     }
     finally {
@@ -377,6 +382,51 @@ function New-StepResult {
     }
 }
 
+function Test-SupabaseOutputIndicatesReady {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    return (
+        $Text -match "(?im)\bsupabase local development setup is running\b" -or
+        $Text -match "(?im)\bsupabase start is already running\b" -or
+        $Text -match "(?im)\bProject URL\b"
+    )
+}
+
+function Wait-ForSupabaseRuntimeReady {
+    param(
+        [ValidateRange(1, 12)][int]$MaxAttempts = 6,
+        [ValidateRange(1, 15)][int]$DelaySeconds = 5
+    )
+
+    $lastProbe = $null
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt += 1) {
+        $lastProbe = Invoke-NodeScript -ScriptRelativePath "scripts\run-supabase-cli.mjs" -Arguments @("status")
+        $probeReady = $lastProbe.Ok -and (Test-SupabaseOutputIndicatesReady -Text $lastProbe.OutputText)
+        if ($probeReady) {
+            return [pscustomobject]@{
+                Ready = $true
+                Attempts = $attempt
+                Probe = $lastProbe
+            }
+        }
+
+        if ($attempt -lt $MaxAttempts) {
+            Write-BootstrapLog -Tag "INFO" -Message ("Supabase status probe {0}/{1} is not ready yet." -f $attempt, $MaxAttempts)
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+
+    return [pscustomobject]@{
+        Ready = $false
+        Attempts = $MaxAttempts
+        Probe = $lastProbe
+    }
+}
+
 Write-BootstrapLog -Tag "START" -Message "Suite runtime bootstrap is starting."
 
 $steps = @()
@@ -389,11 +439,25 @@ if ($SkipSupabase) {
 }
 else {
     $supabaseStart = Invoke-NodeScript -ScriptRelativePath "scripts\run-supabase-cli.mjs" -Arguments @("start")
-    $supabaseStartReady = $supabaseStart.Ok -or ($supabaseStart.OutputText -match "(?im)\balready running\b")
+    $supabaseStartReady = $supabaseStart.Ok -or (Test-SupabaseOutputIndicatesReady -Text $supabaseStart.OutputText)
+    $supabaseStatusCheck = $null
+    if (-not $supabaseStartReady) {
+        Write-BootstrapLog -Tag "INFO" -Message "Supabase start did not report ready immediately; verifying local stack readiness."
+        $supabaseStatusCheck = Wait-ForSupabaseRuntimeReady
+        $supabaseStartReady = [bool]$supabaseStatusCheck.Ready
+    }
+    $supabaseDetailsParts = @($supabaseStart.OutputTail)
+    if ($supabaseStatusCheck -and $supabaseStatusCheck.Probe -and $supabaseStatusCheck.Probe.OutputTail) {
+        $supabaseDetailsParts += $supabaseStatusCheck.Probe.OutputTail
+    }
+    $supabaseDetails = [string]::Join(
+        [Environment]::NewLine,
+        @($supabaseDetailsParts | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    ).Trim()
     if ($supabaseStartReady) {
-        $supabaseStartStep = New-StepResult -Name "supabase-start" -State "ready" -Ok $true -Summary "Local Supabase stack is running." -Details $supabaseStart.OutputTail
+        $supabaseStartStep = New-StepResult -Name "supabase-start" -State "ready" -Ok $true -Summary "Local Supabase stack is running." -Details $supabaseDetails
         $steps += $supabaseStartStep
-        Write-StepLog -Step $supabaseStartStep -FallbackText $supabaseStart.OutputTail
+        Write-StepLog -Step $supabaseStartStep -FallbackText $supabaseDetails
         $supabaseEnv = Invoke-NodeScript -ScriptRelativePath "scripts\write-supabase-local-env.mjs" -Arguments @()
         if ($supabaseEnv.Ok) {
             $supabaseEnvStep = New-StepResult -Name "supabase-env" -State "ready" -Ok $true -Summary "Local Supabase env overrides were refreshed." -Details $supabaseEnv.OutputTail
@@ -407,9 +471,9 @@ else {
         }
     }
     else {
-        $supabaseStartStep = New-StepResult -Name "supabase-start" -State "failed" -Ok $false -Summary "Local Supabase stack did not start." -Details $supabaseStart.OutputTail
+        $supabaseStartStep = New-StepResult -Name "supabase-start" -State "failed" -Ok $false -Summary "Local Supabase stack did not start." -Details $supabaseDetails
         $steps += $supabaseStartStep
-        Write-StepLog -Step $supabaseStartStep -FallbackText $supabaseStart.OutputTail
+        Write-StepLog -Step $supabaseStartStep -FallbackText $supabaseDetails
         $supabaseEnvStep = New-StepResult -Name "supabase-env" -State "skipped" -Ok $true -Summary "Skipped local Supabase env refresh because Supabase did not start."
         $steps += $supabaseEnvStep
         Write-StepLog -Step $supabaseEnvStep

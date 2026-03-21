@@ -16,7 +16,6 @@ const visualInlineStyleAllowlist = new Set(
 		"src/auth/AuthEnvDebugCard.tsx",
 		"src/components/apps/autodraft-studio/AutoDraftComparePanel.tsx",
 		"src/components/apps/dashboard/StatsCards.tsx",
-		"src/components/apps/file-manager/file-manager-dashboard-all-files.tsx",
 		"src/components/apps/projects/ProjectCard.tsx",
 		"src/components/apps/projects/ProjectFormModal.tsx",
 		"src/components/apps/conduit-route/ConduitRouteApp.tsx",

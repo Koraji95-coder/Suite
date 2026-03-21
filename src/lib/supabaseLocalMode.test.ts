@@ -1,9 +1,40 @@
-import { describe, expect, it } from "vitest";
-import {
-	buildLocalSupabaseActiveEntries,
-	resolveDefaultLocalEmailMode,
-	resolveLocalEmailConfig,
-} from "../../scripts/lib/supabase-local-mode.mjs";
+import { beforeAll, describe, expect, it } from "vitest";
+
+let buildLocalSupabaseActiveEntries: (options: {
+	apiUrl: string;
+	anonKey: string;
+	serviceRoleKey?: string;
+	jwtSecret?: string;
+	adminEmail?: string;
+	adminEmails?: string;
+}) => Array<[string, string]>;
+let resolveDefaultLocalEmailMode: (
+	envMap: Record<string, string | undefined>,
+) => string;
+let resolveLocalEmailConfig: (
+	envMap: Record<string, string | undefined>,
+	requestedMode?: string,
+	options?: { strict?: boolean; useLocalOverrides?: boolean },
+) => {
+	mode: string;
+	smtp: {
+		host: string;
+		port: string;
+		user: string;
+		pass: string;
+		adminEmail: string;
+		senderName: string;
+	};
+	warnings: string[];
+};
+
+beforeAll(async () => {
+	// @ts-ignore - local script helper is authored as JS and exercised directly in tests.
+	const module = await import("../../scripts/lib/supabase-local-mode.mjs");
+	buildLocalSupabaseActiveEntries = module.buildLocalSupabaseActiveEntries;
+	resolveDefaultLocalEmailMode = module.resolveDefaultLocalEmailMode;
+	resolveLocalEmailConfig = module.resolveLocalEmailConfig;
+});
 
 describe("supabase local mode helpers", () => {
 	it("prefers gmail as the default local email mode when gmail creds exist", () => {

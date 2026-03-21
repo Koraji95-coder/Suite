@@ -29,6 +29,7 @@ else {
 }
 $runtimeStatusDir = Join-Path $statusBase "Suite\runtime-bootstrap"
 $runtimeStatusPath = Join-Path $runtimeStatusDir "last-bootstrap.json"
+$currentBootstrapPath = Join-Path $runtimeStatusDir "current-bootstrap.json"
 $runtimeLogPath = Join-Path $runtimeStatusDir "bootstrap.log"
 $frontendLogPath = Join-Path $runtimeStatusDir "frontend.log"
 
@@ -255,6 +256,19 @@ function Get-LastBootstrapStatus {
 
     try {
         return (Get-Content -Path $runtimeStatusPath -Raw | ConvertFrom-Json)
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-CurrentBootstrapStatus {
+    if (-not (Test-Path $currentBootstrapPath)) {
+        return $null
+    }
+
+    try {
+        return (Get-Content -Path $currentBootstrapPath -Raw | ConvertFrom-Json)
     }
     catch {
         return $null
@@ -841,8 +855,10 @@ $result = [ordered]@{
     runtime = [ordered]@{
         statusDir = $runtimeStatusDir
         statusPath = $runtimeStatusPath
+        currentBootstrapPath = $currentBootstrapPath
         logPath = $runtimeLogPath
         lastBootstrap = Get-LastBootstrapStatus
+        currentBootstrap = Get-CurrentBootstrapStatus
     }
     services = @($services)
 }

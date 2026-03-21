@@ -7,6 +7,7 @@ param(
     [ValidateSet("start", "stop", "restart", "status", "logs")]
     [string]$Action,
     [string]$RepoRoot,
+    [switch]$ForceUnsafeAutocadStop,
     [switch]$Json
 )
 
@@ -24,6 +25,7 @@ $gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-star
 $frontendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-frontend-startup.ps1")).Path
 $filesystemInstallScript = (Resolve-Path (Join-Path $PSScriptRoot "install-watchdog-filesystem-collector-startup.ps1")).Path
 $autocadInstallScript = (Resolve-Path (Join-Path $PSScriptRoot "install-watchdog-autocad-collector-startup.ps1")).Path
+$autocadSafetyScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-autocad-safety.ps1")).Path
 $runtimeStatusBase = if ($env:LOCALAPPDATA) {
     $env:LOCALAPPDATA
 }
@@ -35,6 +37,8 @@ else {
 }
 $runtimeStatusDir = Join-Path $runtimeStatusBase "Suite\runtime-bootstrap"
 $frontendLogPath = Join-Path $runtimeStatusDir "frontend.log"
+
+. $autocadSafetyScript
 
 function Convert-CommandOutputToText {
     param([object[]]$Output)
@@ -107,6 +111,46 @@ function Invoke-ExternalCommand {
         OutputText = $outputText
         OutputTail = Get-OutputTail -Text $outputText
     }
+}
+
+function Test-PortListening {
+    param([int]$Port)
+
+    return ($null -ne (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1))
+}
+
+function Test-SupabaseOutputIndicatesReady {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return $false
+    }
+
+    if (
+        $Text -match "(?im)\bcontainer is not ready\b" -or
+        $Text -match "(?im)\bstopped services\b" -or
+        $Text -match "(?im)\bno active local containers\b"
+    ) {
+        return $false
+    }
+
+    return (
+        $Text -match "(?im)\bsupabase local development setup is running\b" -or
+        $Text -match "(?im)\bProject URL\b"
+    )
+}
+
+function Test-SupabaseStopped {
+    $apiListening = Test-PortListening -Port 54321
+    $dbListening = Test-PortListening -Port 54322
+    $studioListening = Test-PortListening -Port 54323
+
+    if ($apiListening -or $dbListening -or $studioListening) {
+        return $false
+    }
+
+    $statusResult = Invoke-ExternalCommand -FilePath "node" -Arguments @((Join-Path $resolvedRepoRoot "scripts\run-supabase-cli.mjs"), "status") -WorkingDirectory $resolvedRepoRoot
+    return -not ($statusResult.Ok -and (Test-SupabaseOutputIndicatesReady -Text $statusResult.OutputText))
 }
 
 function Invoke-JsonPowerShellFile {
@@ -183,14 +227,14 @@ function Stop-PortListeners {
         }
     }
 
-    return @($stoppedIds)
+    return @($stoppedIds.ToArray())
 }
 
 function Stop-ProcessesByCommandTokens {
     param([string[]]$Tokens)
 
     $stoppedIds = New-Object System.Collections.Generic.List[int]
-    $processes = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe' OR Name LIKE 'python%' OR Name = 'node.exe' OR Name = 'node'"
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe' OR Name LIKE 'python%' OR Name = 'node.exe' OR Name = 'node' OR Name = 'dotnet.exe' OR Name = 'dotnet' OR Name = 'NamedPipeServer.exe' OR Name = 'NamedPipeServer' OR Name = '.NET Host'"
 
     foreach ($process in $processes) {
         $commandLine = [string]$process.CommandLine
@@ -227,22 +271,88 @@ function Stop-ProcessesByCommandTokens {
         }
     }
 
-    return @($stoppedIds)
+    return @($stoppedIds.ToArray())
+}
+
+function Get-ProcessesByCommandTokens {
+    param([string[]]$Tokens)
+
+    $matchedProcesses = New-Object System.Collections.Generic.List[object]
+    $seenIds = @{}
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe' OR Name LIKE 'python%' OR Name = 'node.exe' OR Name = 'node' OR Name = 'dotnet.exe' OR Name = 'dotnet' OR Name = 'NamedPipeServer.exe' OR Name = 'NamedPipeServer' OR Name = '.NET Host'"
+
+    foreach ($process in $processes) {
+        $commandLine = [string]$process.CommandLine
+        if ([string]::IsNullOrWhiteSpace($commandLine)) {
+            continue
+        }
+
+        $normalized = $commandLine.ToLowerInvariant()
+        $matchesAll = $true
+        foreach ($token in $Tokens) {
+            if ([string]::IsNullOrWhiteSpace($token)) {
+                continue
+            }
+            if (-not $normalized.Contains($token.ToLowerInvariant())) {
+                $matchesAll = $false
+                break
+            }
+        }
+
+        if (-not $matchesAll) {
+            continue
+        }
+
+        $processId = [int]$process.ProcessId
+        if ($seenIds.ContainsKey($processId)) {
+            continue
+        }
+
+        $seenIds[$processId] = $true
+        $matchedProcesses.Add($process)
+    }
+
+    return @($matchedProcesses.ToArray())
+}
+
+function Format-StoppedProcessMessage {
+    param(
+        [string]$Name,
+        [int[]]$StoppedIds
+    )
+
+    if (@($StoppedIds).Count -eq 0) {
+        return "$Name already stopped."
+    }
+
+    return "Stopped ${Name}: $([string]::Join(', ', @($StoppedIds)))"
 }
 
 function Stop-ServiceNow {
     switch ($Service) {
         "supabase" {
-            return Invoke-ExternalCommand -FilePath "node" -Arguments @((Join-Path $resolvedRepoRoot "scripts\run-supabase-cli.mjs"), "stop") -WorkingDirectory $resolvedRepoRoot
+            $supabaseStop = Invoke-ExternalCommand -FilePath "node" -Arguments @((Join-Path $resolvedRepoRoot "scripts\run-supabase-cli.mjs"), "stop") -WorkingDirectory $resolvedRepoRoot
+            $supabaseOk = $supabaseStop.Ok -or ($supabaseStop.OutputText -match "(?im)\bno containers to stop\b")
+            if (-not $supabaseOk) {
+                $supabaseOk = Test-SupabaseStopped
+            }
+
+            return [pscustomobject]@{
+                ExitCode = if ($supabaseOk) { 0 } else { $supabaseStop.ExitCode }
+                Ok = $supabaseOk
+                OutputText = $supabaseStop.OutputText
+                OutputTail = $supabaseStop.OutputTail
+            }
         }
         "backend" {
             $stoppedIds = Stop-ProcessesByCommandTokens -Tokens @("backend/api_server.py")
             Stop-PortListeners -Ports @(5000) | Out-Null
+            $message = Format-StoppedProcessMessage -Name "backend processes" -StoppedIds $stoppedIds
             return [pscustomobject]@{
                 ExitCode = 0
                 Ok = $true
-                OutputText = "Stopped backend processes: $([string]::Join(', ', $stoppedIds))"
-                OutputTail = "Stopped backend processes: $([string]::Join(', ', $stoppedIds))"
+                OutputText = $message
+                OutputTail = $message
             }
         }
         "gateway" {
@@ -256,11 +366,12 @@ function Stop-ServiceNow {
                 }
             }
             Stop-PortListeners -Ports @(3000) | Out-Null
+            $message = Format-StoppedProcessMessage -Name "gateway processes" -StoppedIds $stoppedIds.ToArray()
             return [pscustomobject]@{
                 ExitCode = 0
                 Ok = $true
-                OutputText = "Stopped gateway processes: $([string]::Join(', ', @($stoppedIds)))"
-                OutputTail = "Stopped gateway processes: $([string]::Join(', ', @($stoppedIds)))"
+                OutputText = $message
+                OutputTail = $message
             }
         }
         "frontend" {
@@ -274,11 +385,12 @@ function Stop-ServiceNow {
                 }
             }
             Stop-PortListeners -Ports @(5173) | Out-Null
+            $message = Format-StoppedProcessMessage -Name "frontend processes" -StoppedIds $stoppedIds.ToArray()
             return [pscustomobject]@{
                 ExitCode = 0
                 Ok = $true
-                OutputText = "Stopped frontend processes: $([string]::Join(', ', @($stoppedIds)))"
-                OutputTail = "Stopped frontend processes: $([string]::Join(', ', @($stoppedIds)))"
+                OutputText = $message
+                OutputTail = $message
             }
         }
         "watchdog-filesystem" {
@@ -291,14 +403,35 @@ function Stop-ServiceNow {
                     $stoppedIds.Add([int]$id)
                 }
             }
+            $message = Format-StoppedProcessMessage -Name "filesystem collector processes" -StoppedIds $stoppedIds.ToArray()
             return [pscustomobject]@{
                 ExitCode = 0
                 Ok = $true
-                OutputText = "Stopped filesystem collector processes: $([string]::Join(', ', @($stoppedIds)))"
-                OutputTail = "Stopped filesystem collector processes: $([string]::Join(', ', @($stoppedIds)))"
+                OutputText = $message
+                OutputTail = $message
             }
         }
         "watchdog-autocad" {
+            $daemonMatches = @(Get-ProcessesByCommandTokens -Tokens @("watchdog-autocad-collector-daemon.ps1"))
+            $workerMatches = @(Get-ProcessesByCommandTokens -Tokens @("run-watchdog-autocad-state-collector.py"))
+            $targetsPresent = ($daemonMatches.Count -gt 0 -or $workerMatches.Count -gt 0)
+
+            if ($targetsPresent -and -not $ForceUnsafeAutocadStop) {
+                $autocadSafety = Get-SuiteRuntimeAutoCadStopSafety
+                if ($autocadSafety.shouldSkipStop) {
+                    $message = "AutoCAD collector shutdown skipped for safety."
+                    return [pscustomobject]@{
+                        ExitCode = 0
+                        Ok = $true
+                        OutputText = $message
+                        OutputTail = $autocadSafety.reason
+                        PreferredSummary = $message
+                        PreferredDetails = $autocadSafety.reason
+                        SkippedForSafety = $true
+                    }
+                }
+            }
+
             $stoppedIds = New-Object System.Collections.Generic.List[int]
             foreach ($id in (Stop-ProcessesByCommandTokens -Tokens @("watchdog-autocad-collector-daemon.ps1"))) {
                 $stoppedIds.Add([int]$id)
@@ -308,11 +441,12 @@ function Stop-ServiceNow {
                     $stoppedIds.Add([int]$id)
                 }
             }
+            $message = Format-StoppedProcessMessage -Name "AutoCAD collector processes" -StoppedIds $stoppedIds.ToArray()
             return [pscustomobject]@{
                 ExitCode = 0
                 Ok = $true
-                OutputText = "Stopped AutoCAD collector processes: $([string]::Join(', ', @($stoppedIds)))"
-                OutputTail = "Stopped AutoCAD collector processes: $([string]::Join(', ', @($stoppedIds)))"
+                OutputText = $message
+                OutputTail = $message
             }
         }
     }
@@ -423,10 +557,15 @@ switch ($Action) {
     }
     "restart" {
         $stopResult = Stop-ServiceNow
-        $startResult = Start-ServiceNow
-        $operation = [pscustomobject]@{
-            Ok = ($stopResult.Ok -and $startResult.Ok)
-            OutputTail = @($stopResult.OutputTail, $startResult.OutputTail) | Where-Object { $_ } | Select-Object -First 2 | ForEach-Object { $_ } | Out-String
+        if ($stopResult.PSObject.Properties["SkippedForSafety"] -and [bool]$stopResult.SkippedForSafety) {
+            $operation = $stopResult
+        }
+        else {
+            $startResult = Start-ServiceNow
+            $operation = [pscustomobject]@{
+                Ok = ($stopResult.Ok -and $startResult.Ok)
+                OutputTail = @($stopResult.OutputTail, $startResult.OutputTail) | Where-Object { $_ } | Select-Object -First 2 | ForEach-Object { $_ } | Out-String
+            }
         }
     }
 }
@@ -434,14 +573,26 @@ switch ($Action) {
 $snapshot = Get-ServiceSnapshot
 $serviceStatus = $snapshot.Status
 $logTarget = Get-LogTarget
-$actionOk = Test-ServiceActionSucceeded -RequestedAction $Action -StatusObject $serviceStatus
-$summaryText = if ($serviceStatus) {
+$skippedForSafety = [bool]($operation.PSObject.Properties["SkippedForSafety"] -and $operation.SkippedForSafety)
+$actionOk = if ($skippedForSafety) {
+    $true
+}
+else {
+    Test-ServiceActionSucceeded -RequestedAction $Action -StatusObject $serviceStatus
+}
+$summaryText = if ($operation.PSObject.Properties["PreferredSummary"] -and -not [string]::IsNullOrWhiteSpace([string]$operation.PreferredSummary)) {
+    [string]$operation.PreferredSummary
+}
+elseif ($serviceStatus) {
     $serviceStatus.summary
 }
 else {
     "Service status is unavailable after the action."
 }
-$detailsText = if ($serviceStatus -and $serviceStatus.details) {
+$detailsText = if ($operation.PSObject.Properties["PreferredDetails"] -and -not [string]::IsNullOrWhiteSpace([string]$operation.PreferredDetails)) {
+    [string]$operation.PreferredDetails
+}
+elseif ($serviceStatus -and $serviceStatus.details) {
     $serviceStatus.details
 }
 else {
@@ -451,6 +602,8 @@ $result = [ordered]@{
     ok = [bool]($operation.Ok -and $actionOk)
     service = $Service
     action = $Action
+    forceUnsafeAutocadStop = [bool]$ForceUnsafeAutocadStop
+    skippedForSafety = $skippedForSafety
     summary = $summaryText
     details = $detailsText
     outputTail = [string]$operation.OutputTail

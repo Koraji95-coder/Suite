@@ -17,6 +17,9 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $bootstrapScript = (Resolve-Path (Join-Path $PSScriptRoot "bootstrap-suite-runtime.ps1")).Path
+$bootstrapStateScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-bootstrap-state.ps1")).Path
+$logUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-log-utils.ps1")).Path
+$retentionScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-retention.ps1")).Path
 $notificationScript = Join-Path $PSScriptRoot "show-windows-notification.ps1"
 $statusBase = if ($env:LOCALAPPDATA) {
     $env:LOCALAPPDATA
@@ -29,8 +32,13 @@ else {
 }
 $statusDir = Join-Path $statusBase "Suite\runtime-bootstrap"
 $statusPath = Join-Path $statusDir "last-bootstrap.json"
+$currentBootstrapPath = Join-Path $statusDir "current-bootstrap.json"
 $logPath = Join-Path $statusDir "bootstrap.log"
 New-Item -ItemType Directory -Path $statusDir -Force | Out-Null
+
+. $bootstrapStateScript
+. $logUtilsScript
+. $retentionScript
 
 function Write-StatusLog {
     param(
@@ -38,8 +46,17 @@ function Write-StatusLog {
         [ValidateSet("SYS", "INFO", "OK", "WARN", "ERR", "START")][string]$Tag = "SYS"
     )
 
-    $timestamp = (Get-Date).ToString("o")
-    Add-Content -Path $logPath -Value "[$timestamp] [$Tag] $Message"
+    Write-SuiteRuntimeTranscriptEntry -Path $logPath -Message $Message -Tag $Tag
+}
+
+try {
+    $retentionResult = Invoke-SuiteRuntimeArtifactRetention -BaseDirectory $statusBase
+    foreach ($warning in @($retentionResult.Warnings)) {
+        Write-StatusLog -Message "Runtime artifact retention warning: $warning" -Tag "WARN"
+    }
+}
+catch {
+    Write-StatusLog -Message "Runtime artifact retention warning: $($_.Exception.Message)" -Tag "WARN"
 }
 
 function Get-OutputTail {
@@ -349,15 +366,66 @@ function Show-Notification {
 $attemptPayloads = @()
 $dockerStatus = $null
 $bootstrapResult = $null
+$bootstrapStartedAt = (Get-Date).ToString("o")
+
+Save-SuiteRuntimeBootstrapState -Path $currentBootstrapPath -State ([ordered]@{
+    running = $true
+    done = $false
+    ok = $false
+    attempt = 0
+    maxAttempts = $BootstrapAttempts
+    currentStepId = "docker-ready"
+    currentStepLabel = "Checking Docker and local runtime prerequisites."
+    completedStepIds = @()
+    failedStepIds = @()
+    percent = 0
+    summary = "Checking Docker and local runtime prerequisites."
+    startedAt = $bootstrapStartedAt
+    updatedAt = $bootstrapStartedAt
+}) | Out-Null
 
 for ($attempt = 1; $attempt -le $BootstrapAttempts; $attempt += 1) {
     Write-StatusLog -Tag "START" -Message "Bootstrap attempt $attempt started."
+    $attemptSummary = if ($attempt -gt 1) {
+        "Retrying bootstrap (attempt $attempt/$BootstrapAttempts)."
+    }
+    else {
+        "Bootstrap attempt $attempt/$BootstrapAttempts started."
+    }
+    Update-SuiteRuntimeBootstrapState -Path $currentBootstrapPath -Properties ([ordered]@{
+        running = $true
+        done = $false
+        ok = $false
+        attempt = $attempt
+        maxAttempts = $BootstrapAttempts
+        currentStepId = "docker-ready"
+        currentStepLabel = "Checking Docker and local runtime prerequisites."
+        summary = $attemptSummary
+    }) -ResetFailedStepIds | Out-Null
     $bootstrapResult = $null
     $dockerStatus = Ensure-DockerRuntime
     $dockerTag = if ($dockerStatus.ok) { "INFO" } else { "WARN" }
     Write-StatusLog -Tag $dockerTag -Message ("Docker status for attempt {0}: {1}" -f $attempt, $dockerStatus.message)
 
     if (-not $dockerStatus.ok) {
+        $retryPending = $attempt -lt $BootstrapAttempts
+        $dockerStepLabel = if ($retryPending) {
+            "Waiting for Docker engine."
+        }
+        else {
+            "Docker engine did not become ready."
+        }
+        $dockerSummary = if ($retryPending) {
+            "{0} Retrying bootstrap (attempt {1}/{2})." -f $dockerStatus.message, ($attempt + 1), $BootstrapAttempts
+        }
+        else {
+            [string]$dockerStatus.message
+        }
+        Update-SuiteRuntimeBootstrapState -Path $currentBootstrapPath -Properties ([ordered]@{
+            currentStepId = "docker-ready"
+            currentStepLabel = $dockerStepLabel
+            summary = $dockerSummary
+        }) -AddFailedStepIds $(if ($retryPending) { @() } else { @("docker-ready") }) | Out-Null
         $attemptPayloads += [pscustomobject]@{
             attempt = $attempt
             docker = $dockerStatus
@@ -374,9 +442,17 @@ for ($attempt = 1; $attempt -le $BootstrapAttempts; $attempt += 1) {
     }
 
     if ($dockerStatus.ok) {
+        Update-SuiteRuntimeBootstrapState -Path $currentBootstrapPath -Properties ([ordered]@{
+            currentStepId = "docker-ready"
+            currentStepLabel = "Docker engine is ready."
+            summary = "Docker engine is ready."
+        }) -AddCompletedStepIds @("docker-ready") -RemoveFailedStepIds @("docker-ready") | Out-Null
         $bootstrapResult = Invoke-JsonPowerShellFile -ScriptPath $bootstrapScript -Arguments @(
             "-RepoRoot", $resolvedRepoRoot,
             "-BootstrapLogPath", $logPath,
+            "-CurrentBootstrapPath", $currentBootstrapPath,
+            "-BootstrapAttempt", $attempt,
+            "-BootstrapMaxAttempts", $BootstrapAttempts,
             "-Json"
         )
         $attemptPayloads += [pscustomobject]@{
@@ -421,6 +497,39 @@ elseif ($dockerStatus -and -not $dockerStatus.ok) {
 else {
     "Suite runtime bootstrap did not finish successfully."
 }
+
+$bootstrapFailedStepIds = @()
+if ($failedSteps.Count -gt 0) {
+    $bootstrapFailedStepIds = @($failedSteps)
+}
+elseif ($dockerStatus -and -not $dockerStatus.ok) {
+    $bootstrapFailedStepIds = @("docker-ready")
+}
+
+$finalStepId = if ($overallOk) {
+    $null
+}
+elseif ($bootstrapFailedStepIds.Count -gt 0) {
+    [string]$bootstrapFailedStepIds[0]
+}
+else {
+    $null
+}
+$finalStepLabel = if ([string]::IsNullOrWhiteSpace($finalStepId)) {
+    $null
+}
+else {
+    Get-SuiteRuntimeBootstrapStepLabel -StepId $finalStepId
+}
+
+Update-SuiteRuntimeBootstrapState -Path $currentBootstrapPath -Properties ([ordered]@{
+    running = $false
+    done = $true
+    ok = $overallOk
+    currentStepId = $finalStepId
+    currentStepLabel = $finalStepLabel
+    summary = $summary
+}) -AddFailedStepIds $bootstrapFailedStepIds | Out-Null
 
 $statusPayload = [ordered]@{
     ok = $overallOk

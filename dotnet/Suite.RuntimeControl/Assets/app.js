@@ -40,6 +40,30 @@ const SERVICE_META = {
   },
 };
 
+const BOOTSTRAP_STEP_ORDER = [
+  "docker-ready",
+  "supabase-start",
+  "supabase-env",
+  "watchdog-filesystem",
+  "watchdog-autocad-startup",
+  "watchdog-autocad-plugin",
+  "backend",
+  "gateway",
+  "frontend",
+];
+
+const BOOTSTRAP_STEP_META = {
+  "docker-ready": { label: "Docker Engine", shortLabel: "DK" },
+  "supabase-start": { label: "Supabase", shortLabel: "SB" },
+  "supabase-env": { label: "Supabase Env", shortLabel: "SE" },
+  "watchdog-filesystem": { label: "Filesystem Collector", shortLabel: "FS" },
+  "watchdog-autocad-startup": { label: "AutoCAD Collector", shortLabel: "AC" },
+  "watchdog-autocad-plugin": { label: "AutoCAD Plugin", shortLabel: "AP" },
+  backend: { label: "Watchdog Backend", shortLabel: "BE" },
+  gateway: { label: "API Gateway", shortLabel: "GW" },
+  frontend: { label: "Suite Frontend", shortLabel: "UI" },
+};
+
 const STATUS_LABELS = {
   running: "Running",
   starting: "Starting",
@@ -49,6 +73,7 @@ const STATUS_LABELS = {
 };
 
 const DISPLAY_TIME_ZONE = "America/Chicago";
+const bootstrapDisplayApi = globalThis.SuiteRuntimeControlBootstrapDisplayProgress || null;
 const state = {
   autoScroll: true,
   busy: false,
@@ -60,12 +85,17 @@ const state = {
   logs: [],
   progress: { visible: false, percent: 0, step: "" },
   lastBootstrap: "Waiting for status…",
-  splash: {
-    visible: true,
-    dismissing: false,
-    hasSnapshot: false,
-    startedAt: Date.now(),
+  bootstrap: null,
+  bootstrapDisplay: {
+    percent: 0,
+    percentExact: 0,
+    floorPercent: 0,
+    ceilingPercent: 0,
+    pulse: false,
+    currentStepId: null,
+    timestampMs: 0,
   },
+  hasSnapshot: false,
 };
 
 const headerDateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -100,17 +130,6 @@ const logTimestampFormatter = new Intl.DateTimeFormat("en-US", {
 });
 
 const dom = {
-  splash: document.getElementById("splash"),
-  appShell: document.getElementById("app-shell"),
-  splashServices: document.getElementById("splash-services"),
-  splashLog: document.getElementById("splash-log"),
-  splashStatus: document.getElementById("splash-status"),
-  splashStatusText: document.getElementById("splash-status-text"),
-  splashAction: document.getElementById("splash-action"),
-  splashClock: document.getElementById("splash-clock"),
-  splashProgressStep: document.getElementById("splash-progress-step"),
-  splashProgressPercent: document.getElementById("splash-progress-percent"),
-  splashProgressFill: document.getElementById("splash-progress-fill"),
   clockDate: document.getElementById("clock-date"),
   clock: document.getElementById("clock"),
   overallStatus: document.getElementById("overall-status"),
@@ -120,10 +139,6 @@ const dom = {
   servicesList: document.getElementById("services-list"),
   serviceDetail: document.getElementById("service-detail"),
   logBody: document.getElementById("log-body"),
-  progressPanel: document.getElementById("progress-panel"),
-  progressStep: document.getElementById("progress-step"),
-  progressPercent: document.getElementById("progress-percent"),
-  progressFill: document.getElementById("progress-fill"),
   actionLabel: document.getElementById("action-label"),
   autoscrollButton: document.getElementById("autoscroll-btn"),
   bootstrapButton: document.getElementById("bootstrap-btn"),
@@ -175,12 +190,40 @@ function formatLogTimestamp(value) {
   }
 }
 
+function syncBootstrapDisplay(nowMs = Date.now()) {
+  const previous = state.bootstrapDisplay || null;
+
+  if (!bootstrapDisplayApi?.computeBootstrapDisplayProgress) {
+    const percent = Math.max(0, Math.min(100, Number(state.bootstrap?.percent || 0)));
+    state.bootstrapDisplay = {
+      percent,
+      percentExact: percent,
+      floorPercent: percent,
+      ceilingPercent: percent,
+      pulse: false,
+      currentStepId: state.bootstrap?.currentStepId || null,
+      timestampMs: nowMs,
+    };
+    return !previous || previous.percent !== percent || previous.currentStepId !== state.bootstrapDisplay.currentStepId;
+  }
+
+  const next = bootstrapDisplayApi.computeBootstrapDisplayProgress(previous, state.bootstrap, nowMs);
+  state.bootstrapDisplay = next;
+
+  return (
+    !previous ||
+    previous.percent !== next.percent ||
+    previous.pulse !== next.pulse ||
+    previous.currentStepId !== next.currentStepId ||
+    previous.floorPercent !== next.floorPercent ||
+    previous.ceilingPercent !== next.ceilingPercent
+  );
+}
+
 function tickClock() {
   const now = new Date();
-  const timeText = `${headerTimeFormatter.format(now)} CT`;
   dom.clockDate.textContent = headerDateFormatter.format(now);
-  dom.clock.textContent = timeText;
-  dom.splashClock.textContent = timeText;
+  dom.clock.textContent = `${headerTimeFormatter.format(now)} CT`;
 }
 
 function normalizeNotes(items, fallbackLabel, fallbackValue) {
@@ -219,227 +262,6 @@ function renderNotesPanel(items, title = "Notes", className = "") {
       <div class="detail-label">${escapeHtml(title)}</div>
       <div class="notes-list">${rows}</div>
     </section>`;
-}
-
-function presentAction(action) {
-  if (!action) {
-    return "Idle";
-  }
-
-  return String(action)
-    .replaceAll("runtime.", "")
-    .replaceAll("service.", "")
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function getOrderedServices() {
-  const byId = new Map(state.services.map((service) => [service.id, service]));
-  return SERVICE_ORDER.map((serviceId) => {
-    const service = byId.get(serviceId);
-    const meta = SERVICE_META[serviceId] || {};
-    return {
-      id: serviceId,
-      name: service?.name || meta.bootLabel || serviceId,
-      summary: service?.summary || meta.description || "Waiting for runtime status…",
-      state: service?.state || (state.splash.hasSnapshot ? "stopped" : "pending"),
-      shortLabel: meta.shortLabel || serviceId.slice(0, 2).toUpperCase(),
-      description: meta.description || "",
-      service,
-    };
-  });
-}
-
-function ensureSelectedServiceId(orderedServices) {
-  const serviceIds = new Set(orderedServices.map((service) => service.id));
-  if (state.selectedServiceId && serviceIds.has(state.selectedServiceId)) {
-    return;
-  }
-
-  state.selectedServiceId = orderedServices[0]?.id || null;
-}
-
-function getSelectedServiceModel(orderedServices) {
-  ensureSelectedServiceId(orderedServices);
-  return orderedServices.find((service) => service.id === state.selectedServiceId) || null;
-}
-
-function getSplashPercent() {
-  if (state.progress.visible) {
-    return Math.max(4, Math.min(100, Number(state.progress.percent || 0)));
-  }
-
-  if (!state.splash.hasSnapshot) {
-    return 6;
-  }
-
-  const runningCount = state.services.filter((service) => service.state === "running").length;
-  const total = Math.max(state.services.length, SERVICE_ORDER.length, 1);
-  return state.busy ? Math.max(14, Math.round((runningCount / total) * 100)) : 100;
-}
-
-function getSplashStepText() {
-  if (state.progress.visible && state.progress.step) {
-    return state.progress.step;
-  }
-
-  if (state.busy) {
-    return `${presentAction(state.action)}…`;
-  }
-
-  if (!state.splash.hasSnapshot) {
-    return "Collecting runtime status…";
-  }
-
-  if (state.overall.state === "healthy") {
-    return "Runtime ready.";
-  }
-
-  return "Reviewing local services…";
-}
-
-function getSplashStatusModel() {
-  if (!state.splash.hasSnapshot) {
-    return { state: "booting", text: "Initializing runtime shell…" };
-  }
-
-  if (state.busy || state.progress.visible) {
-    return { state: "booting", text: getSplashStepText() };
-  }
-
-  if (state.overall.state === "healthy") {
-    return { state: "healthy", text: "Runtime ready." };
-  }
-
-  if (state.overall.state === "down") {
-    return { state: "down", text: "Runtime offline." };
-  }
-
-  return { state: "degraded", text: "Runtime needs attention." };
-}
-
-function renderSplash() {
-  const orderedServices = getOrderedServices();
-  dom.splashServices.innerHTML = orderedServices
-    .map((service) => {
-      const stateClass = service.state || "pending";
-      const badgeLabel = STATUS_LABELS[stateClass] || String(stateClass).toUpperCase();
-      const description = service.description || service.summary;
-      const subtitle = service.summary || description;
-      return `
-        <article class="splash-service ${escapeHtml(stateClass)}">
-          <div class="splash-node">${escapeHtml(service.shortLabel)}</div>
-          <div class="splash-service-copy">
-            <div class="splash-service-head">
-              <div>
-                <div class="splash-service-name">${escapeHtml(service.name)}</div>
-                <div class="splash-service-desc">${escapeHtml(description)}</div>
-              </div>
-              <div class="splash-service-badge ${escapeHtml(stateClass)}">
-                <span class="splash-node-dot"></span>
-                ${escapeHtml(badgeLabel)}
-              </div>
-            </div>
-            <div class="detail-text">${escapeHtml(subtitle)}</div>
-          </div>
-        </article>`;
-    })
-    .join("");
-
-  if (!state.logs.length) {
-    dom.splashLog.innerHTML = '<div class="log-empty splash-empty">Waiting for runtime output…</div>';
-  } else {
-    dom.splashLog.innerHTML = state.logs
-      .slice(-18)
-      .map((entry) => {
-        const tone = entry.tone ? ` tone-${entry.tone}` : "";
-        return `
-          <div class="splash-log-entry${tone}">
-            <span class="timestamp">${escapeHtml(entry.timestamp || "--:--:--")}</span>
-            <span class="tag">${escapeHtml(entry.tag || "INFO")}</span>
-            <span class="message">${escapeHtml(entry.message || "")}</span>
-          </div>`;
-      })
-      .join("");
-    dom.splashLog.scrollTop = dom.splashLog.scrollHeight;
-  }
-
-  const splashStatus = getSplashStatusModel();
-  dom.splashStatus.className = `splash-status ${splashStatus.state}`;
-  dom.splashStatusText.textContent = splashStatus.text;
-  dom.splashAction.textContent = getSplashStepText();
-  dom.splashProgressStep.textContent = getSplashStepText();
-  dom.splashProgressPercent.textContent = `${getSplashPercent()}%`;
-  dom.splashProgressFill.style.width = `${getSplashPercent()}%`;
-}
-
-function updateButtonState() {
-  const disable = state.busy;
-  dom.bootstrapButton.disabled = disable;
-  dom.startAllButton.disabled = disable;
-  dom.stopAllButton.disabled = disable;
-  dom.refreshButton.disabled = disable;
-  dom.clearLogButton.disabled = false;
-  dom.autoscrollButton.textContent = `Auto-scroll ${state.autoScroll ? "ON" : "OFF"}`;
-  dom.actionLabel.textContent = state.busy ? presentAction(state.action) : "Idle";
-}
-
-function renderHeader(orderedServices) {
-  dom.overallStatus.className = `overall-status ${state.overall.state || "booting"}`;
-  dom.overallStatusText.textContent = state.overall.text || "BOOTING";
-  const runningCount = orderedServices.filter((service) => service.state === "running").length;
-  dom.runningCount.textContent = `${runningCount} / ${orderedServices.length || SERVICE_ORDER.length} running`;
-  dom.lastBootstrap.textContent = state.lastBootstrap;
-}
-
-function renderServiceRail(orderedServices) {
-  if (!orderedServices.length) {
-    dom.servicesList.innerHTML = '<div class="log-empty">Waiting for runtime snapshot…</div>';
-    return;
-  }
-
-  dom.servicesList.innerHTML = orderedServices
-    .map((service) => {
-      const serviceState = service.state || "pending";
-      const badgeLabel = STATUS_LABELS[serviceState] || String(serviceState).toUpperCase();
-      const runtime = service.service || {};
-      const metaChips = [
-        {
-          label: "Port",
-          value: runtime.port > 0 ? String(runtime.port) : "—",
-        },
-        {
-          label: "Uptime",
-          value: fmtUptime(runtime.uptimeSeconds),
-        },
-      ]
-        .filter((item) => item.value && item.value !== "—")
-        .map(
-          (item) => `
-            <span class="mini-chip">
-              <span class="mini-label">${escapeHtml(item.label)}</span>
-              <span>${escapeHtml(item.value)}</span>
-            </span>`,
-        )
-        .join("");
-
-      return `
-        <button type="button" class="service-row ${escapeHtml(serviceState)}${state.selectedServiceId === service.id ? " selected" : ""}" data-service-select="${escapeHtml(service.id)}">
-          <div class="service-row-head">
-            <div class="service-row-main">
-              <div class="service-row-title">${escapeHtml(service.name)}</div>
-              <div class="service-row-subtitle">${escapeHtml(service.description || service.summary)}</div>
-            </div>
-            <div class="service-state-pill ${escapeHtml(serviceState)}">
-              <span class="service-dot"></span>
-              ${escapeHtml(badgeLabel)}
-            </div>
-          </div>
-          <div class="service-row-summary">${escapeHtml(service.summary || "")}</div>
-          ${metaChips ? `<div class="service-row-meta">${metaChips}</div>` : ""}
-        </button>`;
-    })
-    .join("");
 }
 
 function renderSupportCard(label, value, options = {}) {
@@ -485,19 +307,60 @@ function renderSubstatusCard(substatus) {
     </section>`;
 }
 
-function renderQuickChips(service, serviceState) {
-  const chips = [
-    {
-      text: `State • ${STATUS_LABELS[serviceState] || String(serviceState).toUpperCase()}`,
-      emphasis: serviceState === "starting" || serviceState === "error",
-    },
-    service.startupMode ? { text: `Startup • ${service.startupMode}` } : null,
-    service.processLabel ? { text: `Process • ${service.processLabel}` } : null,
-    state.busy && state.actionServiceId === service.id && state.action
-      ? { text: `Action • ${presentAction(state.action)}`, emphasis: true }
-      : null,
-  ].filter(Boolean);
+function presentAction(action) {
+  if (!action) {
+    return "Idle";
+  }
 
+  return String(action)
+    .replaceAll("runtime.", "")
+    .replaceAll("service.", "")
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getOrderedServices() {
+  const byId = new Map(state.services.map((service) => [service.id, service]));
+  return SERVICE_ORDER.map((serviceId) => {
+    const service = byId.get(serviceId);
+    const meta = SERVICE_META[serviceId] || {};
+    return {
+      id: serviceId,
+      name: service?.name || meta.bootLabel || serviceId,
+      summary: service?.summary || meta.description || "Waiting for runtime status…",
+      state: service?.state || (state.hasSnapshot ? "stopped" : "pending"),
+      shortLabel: meta.shortLabel || serviceId.slice(0, 2).toUpperCase(),
+      description: meta.description || "",
+      service,
+    };
+  });
+}
+
+function ensureSelectedServiceId(orderedServices) {
+  const serviceIds = new Set(orderedServices.map((service) => service.id));
+  if (state.selectedServiceId && serviceIds.has(state.selectedServiceId)) {
+    return;
+  }
+
+  state.selectedServiceId = orderedServices[0]?.id || null;
+}
+
+function getSelectedServiceModel(orderedServices) {
+  ensureSelectedServiceId(orderedServices);
+  return orderedServices.find((service) => service.id === state.selectedServiceId) || null;
+}
+
+function getServiceName(serviceId) {
+  const service = state.services.find((item) => item.id === serviceId);
+  if (service?.name) {
+    return service.name;
+  }
+
+  return SERVICE_META[serviceId]?.bootLabel || serviceId;
+}
+
+function renderQuickChips(items) {
+  const chips = items.filter(Boolean);
   if (!chips.length) {
     return "";
   }
@@ -515,7 +378,174 @@ function renderQuickChips(service, serviceState) {
     </div>`;
 }
 
+function renderBootstrapSequence(bootstrap) {
+  const completed = new Set(Array.isArray(bootstrap.completedStepIds) ? bootstrap.completedStepIds : []);
+  const failed = new Set(Array.isArray(bootstrap.failedStepIds) ? bootstrap.failedStepIds : []);
+  const currentStepId = bootstrap.running ? bootstrap.currentStepId : null;
+
+  return `
+    <section class="activity-sequence">
+      ${BOOTSTRAP_STEP_ORDER.map((stepId) => {
+        const meta = BOOTSTRAP_STEP_META[stepId] || { label: stepId, shortLabel: stepId.slice(0, 2).toUpperCase() };
+        let stepState = "pending";
+        if (failed.has(stepId)) {
+          stepState = "error";
+        } else if (currentStepId === stepId) {
+          stepState = "starting";
+        } else if (completed.has(stepId)) {
+          stepState = "running";
+        }
+
+        return `
+          <div class="activity-step ${escapeHtml(stepState)}">
+            <div class="activity-step-node">${escapeHtml(meta.shortLabel)}</div>
+            <div class="activity-step-copy">
+              <div class="activity-step-label">${escapeHtml(meta.label)}</div>
+              <div class="activity-step-state">${escapeHtml(STATUS_LABELS[stepState] || stepState.toUpperCase())}</div>
+            </div>
+          </div>`;
+      }).join("")}
+    </section>`;
+}
+
+function renderActivityCard() {
+  const bootstrap = state.bootstrap;
+  if (bootstrap?.showCard) {
+    const bootstrapProgress = state.bootstrapDisplay || {
+      percent: Math.max(0, Math.min(100, Number(bootstrap.percent || 0))),
+      pulse: false,
+    };
+    const completedCount = Array.isArray(bootstrap.completedStepIds) ? bootstrap.completedStepIds.length : 0;
+    const failedLabels = Array.isArray(bootstrap.failedStepLabels) ? bootstrap.failedStepLabels : [];
+    const bootstrapNotes = [
+      failedLabels.length
+        ? { label: "Failed Steps", value: failedLabels.join(", ") }
+        : null,
+      !bootstrap.running && !bootstrap.ok
+        ? { label: "Recovery", value: "Use Bootstrap All to retry the local runtime bootstrap." }
+        : null,
+    ].filter(Boolean);
+    const supportCards = [
+      bootstrapNotes.length ? renderNotesPanel(bootstrapNotes, "Bootstrap Notes") : "",
+      renderSupportCard("Started", formatHeaderTimestamp(bootstrap.startedAt)),
+      renderSupportCard("Updated", formatHeaderTimestamp(bootstrap.updatedAt)),
+    ]
+      .filter(Boolean)
+      .join("");
+    const chips = [
+      bootstrap.maxAttempts > 0
+        ? { text: `Attempt • ${Math.max(bootstrap.attempt || 1, 1)} / ${bootstrap.maxAttempts}` }
+        : null,
+      { text: `Completed • ${completedCount} / ${BOOTSTRAP_STEP_ORDER.length}` },
+      failedLabels.length ? { text: `Failed • ${failedLabels.length}`, emphasis: true } : null,
+    ];
+
+    return `
+      <article class="detail-card activity-card ${escapeHtml(bootstrap.statusState || "starting")}">
+        <div class="detail-card-body">
+          <header class="service-detail-head">
+            <div class="detail-title-group">
+              <div class="detail-eyebrow">Runtime Boot</div>
+              <div class="detail-title">${escapeHtml(bootstrap.running ? "Booting Local Runtime" : "Bootstrap Needs Attention")}</div>
+              <div class="detail-subtitle">Single-pass workstation bootstrap with real milestone progress and live service state.</div>
+            </div>
+            <div class="status-pill ${escapeHtml(bootstrap.statusState || "starting")}">
+              <span class="service-dot"></span>
+              ${escapeHtml(bootstrap.statusText || "BOOTING")}
+            </div>
+          </header>
+
+          <section class="detail-callout">
+            <div class="detail-callout-copy">
+              <div class="detail-callout-title">Current Phase</div>
+              <div class="detail-callout-text">${escapeHtml(bootstrap.summary || bootstrap.currentStepLabel || "Bootstrapping local runtime.")}</div>
+            </div>
+          </section>
+
+          ${renderQuickChips(chips)}
+
+          <section class="activity-progress-panel${bootstrap.running ? " live" : ""}">
+            <div class="progress-copy">
+              <span>${escapeHtml(bootstrap.currentStepLabel || bootstrap.summary || "Bootstrapping local runtime.")}</span>
+              <span>${escapeHtml(`${bootstrapProgress.percent || 0}%`)}</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill${bootstrap.running ? " live" : ""}${bootstrapProgress.pulse ? " pulse" : ""}" style="width: ${Math.max(0, Math.min(100, Number(bootstrapProgress.percent || 0)))}%"></div>
+            </div>
+          </section>
+
+          ${renderBootstrapSequence(bootstrap)}
+
+          ${supportCards ? `<section class="detail-support-grid">${supportCards}</section>` : ""}
+        </div>
+      </article>`;
+  }
+
+  if (!state.progress.visible) {
+    return "";
+  }
+
+  const isServiceAction = Boolean(state.actionServiceId);
+  const actionTarget = isServiceAction ? getServiceName(state.actionServiceId) : "Local Runtime";
+  const actionTitle = state.action === "start_all"
+    ? "Starting Local Services"
+    : state.action === "stop_all"
+      ? "Stopping Local Services"
+      : state.action === "bootstrap_all"
+        ? "Booting Local Runtime"
+        : `${presentAction(state.action)} ${actionTarget}`;
+  const actionSubtitle = isServiceAction
+    ? `Live action progress for ${actionTarget}.`
+    : "Live action progress for the local runtime.";
+  const chips = [
+    isServiceAction ? { text: `Target • ${actionTarget}` } : null,
+    state.action ? { text: `Action • ${presentAction(state.action)}` } : null,
+  ];
+
+  return `
+    <article class="detail-card activity-card starting">
+      <div class="detail-card-body">
+        <header class="service-detail-head">
+          <div class="detail-title-group">
+            <div class="detail-eyebrow">Runtime Activity</div>
+            <div class="detail-title">${escapeHtml(actionTitle)}</div>
+            <div class="detail-subtitle">${escapeHtml(actionSubtitle)}</div>
+          </div>
+          <div class="status-pill starting">
+            <span class="service-dot"></span>
+            WORKING
+          </div>
+        </header>
+
+        <section class="detail-callout">
+          <div class="detail-callout-copy">
+            <div class="detail-callout-title">Current Phase</div>
+            <div class="detail-callout-text">${escapeHtml(state.progress.step || "Working…")}</div>
+          </div>
+        </section>
+
+        ${renderQuickChips(chips)}
+
+        <section class="activity-progress-panel">
+          <div class="progress-copy">
+            <span>${escapeHtml(state.progress.step || "Working…")}</span>
+            <span>${escapeHtml(`${state.progress.percent || 0}%`)}</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" style="width: ${Math.max(0, Math.min(100, Number(state.progress.percent || 0)))}%"></div>
+          </div>
+        </section>
+      </div>
+    </article>`;
+}
+
 function renderServiceDetail(orderedServices) {
+  const activityCard = renderActivityCard();
+  if (activityCard) {
+    dom.serviceDetail.innerHTML = activityCard;
+    return;
+  }
+
   const selectedModel = getSelectedServiceModel(orderedServices);
   if (!selectedModel || !selectedModel.service) {
     dom.serviceDetail.innerHTML = '<div class="log-empty">Waiting for runtime snapshot…</div>';
@@ -532,7 +562,6 @@ function renderServiceDetail(orderedServices) {
   const canStart = !state.busy && (service.state === "stopped" || service.state === "error");
   const canStop = !state.busy && (service.state === "running" || service.state === "starting" || service.state === "error");
   const canRestart = !state.busy;
-
   const supportCards = [
     renderNotesPanel(serviceNotes, "Service Notes"),
     renderSubstatusCard(service.substatus),
@@ -540,6 +569,17 @@ function renderServiceDetail(orderedServices) {
   ]
     .filter(Boolean)
     .join("");
+  const chips = [
+    {
+      text: `State • ${STATUS_LABELS[serviceState] || String(serviceState).toUpperCase()}`,
+      emphasis: serviceState === "starting" || serviceState === "error",
+    },
+    service.startupMode ? { text: `Startup • ${service.startupMode}` } : null,
+    service.processLabel ? { text: `Process • ${service.processLabel}` } : null,
+    state.busy && state.actionServiceId === service.id && state.action
+      ? { text: `Action • ${presentAction(state.action)}`, emphasis: true }
+      : null,
+  ];
 
   dom.serviceDetail.innerHTML = `
     <article class="detail-card ${escapeHtml(serviceState)}">
@@ -563,7 +603,7 @@ function renderServiceDetail(orderedServices) {
           </div>
         </section>
 
-        ${renderQuickChips(service, serviceState)}
+        ${renderQuickChips(chips)}
 
         <section class="detail-metrics">
           <div class="metric-card">
@@ -623,14 +663,99 @@ function renderLogs() {
   }
 }
 
-function renderProgress() {
-  dom.progressPanel.classList.toggle("hidden", !state.progress.visible);
-  dom.progressStep.textContent = state.progress.step || "Working…";
-  dom.progressPercent.textContent = `${state.progress.percent || 0}%`;
-  dom.progressFill.style.width = `${state.progress.percent || 0}%`;
+function updateButtonState() {
+  const disable = state.busy;
+  dom.bootstrapButton.disabled = disable;
+  dom.startAllButton.disabled = disable;
+  dom.stopAllButton.disabled = disable;
+  dom.refreshButton.disabled = disable;
+  dom.clearLogButton.disabled = false;
+  dom.autoscrollButton.textContent = `Auto-scroll ${state.autoScroll ? "ON" : "OFF"}`;
+
+  if (state.bootstrap?.running) {
+    dom.actionLabel.textContent = state.bootstrap.currentStepLabel || state.bootstrap.summary || "Booting local runtime";
+    return;
+  }
+
+  if (state.bootstrap?.showCard) {
+    dom.actionLabel.textContent = state.bootstrap.summary || "Runtime bootstrap needs attention";
+    return;
+  }
+
+  dom.actionLabel.textContent = state.busy ? presentAction(state.action) : "Standing By";
+}
+
+function renderHeader(orderedServices) {
+  dom.overallStatus.className = `overall-status ${state.overall.state || "booting"}`;
+  dom.overallStatusText.textContent = state.overall.text || "BOOTING";
+  const runningCount = orderedServices.filter((service) => service.state === "running").length;
+  dom.runningCount.textContent = `${runningCount} / ${orderedServices.length || SERVICE_ORDER.length} running`;
+
+  if (state.bootstrap?.running) {
+    const attempt = Math.max(state.bootstrap.attempt || 1, 1);
+    const maxAttempts = Math.max(state.bootstrap.maxAttempts || attempt, attempt);
+    dom.lastBootstrap.textContent = `Booting now • Attempt ${attempt}/${maxAttempts}`;
+    return;
+  }
+
+  if (state.bootstrap?.showCard) {
+    dom.lastBootstrap.textContent = state.bootstrap.summary || "Runtime bootstrap needs attention.";
+    return;
+  }
+
+  dom.lastBootstrap.textContent = state.lastBootstrap;
+}
+
+function renderServiceRail(orderedServices) {
+  if (!orderedServices.length) {
+    dom.servicesList.innerHTML = '<div class="log-empty">Waiting for runtime snapshot…</div>';
+    return;
+  }
+
+  dom.servicesList.innerHTML = orderedServices
+    .map((service) => {
+      const serviceState = service.state || "pending";
+      const badgeLabel = STATUS_LABELS[serviceState] || String(serviceState).toUpperCase();
+      const runtime = service.service || {};
+      const metaChips = [
+        runtime.port > 0
+          ? { label: "Port", value: String(runtime.port) }
+          : null,
+        runtime.uptimeSeconds
+          ? { label: "Uptime", value: fmtUptime(runtime.uptimeSeconds) }
+          : null,
+      ]
+        .filter(Boolean)
+        .map(
+          (item) => `
+            <span class="mini-chip">
+              <span class="mini-label">${escapeHtml(item.label)}</span>
+              <span>${escapeHtml(item.value)}</span>
+            </span>`,
+        )
+        .join("");
+
+      return `
+        <button type="button" class="service-row ${escapeHtml(serviceState)}${state.selectedServiceId === service.id ? " selected" : ""}" data-service-select="${escapeHtml(service.id)}">
+          <div class="service-row-head">
+            <div class="service-row-main">
+              <div class="service-row-title">${escapeHtml(service.name)}</div>
+              <div class="service-row-subtitle">${escapeHtml(service.description || service.summary)}</div>
+            </div>
+            <div class="service-state-pill ${escapeHtml(serviceState)}">
+              <span class="service-dot"></span>
+              ${escapeHtml(badgeLabel)}
+            </div>
+          </div>
+          <div class="service-row-summary">${escapeHtml(service.summary || "")}</div>
+          ${metaChips ? `<div class="service-row-meta">${metaChips}</div>` : ""}
+        </button>`;
+    })
+    .join("");
 }
 
 function render() {
+  syncBootstrapDisplay();
   const orderedServices = getOrderedServices();
   ensureSelectedServiceId(orderedServices);
   updateButtonState();
@@ -638,36 +763,13 @@ function render() {
   renderServiceRail(orderedServices);
   renderServiceDetail(orderedServices);
   renderLogs();
-  renderProgress();
-  renderSplash();
-}
-
-function maybeDismissSplash() {
-  if (!state.splash.visible || state.splash.dismissing || !state.splash.hasSnapshot) {
-    return;
-  }
-
-  if (state.busy || state.progress.visible) {
-    return;
-  }
-
-  state.splash.dismissing = true;
-  const elapsed = Date.now() - state.splash.startedAt;
-  const delay = Math.max(250, 1100 - elapsed);
-  window.setTimeout(() => {
-    dom.splash.classList.add("hidden");
-    dom.appShell.classList.add("ready");
-    window.setTimeout(() => {
-      state.splash.visible = false;
-      dom.splash.setAttribute("aria-hidden", "true");
-    }, 420);
-  }, delay);
 }
 
 function hostPost(type, payload = {}) {
   if (!window.chrome?.webview) {
     return;
   }
+
   window.chrome.webview.postMessage({ type, payload });
 }
 
@@ -684,7 +786,7 @@ function handleHostMessage(message) {
       const payload = message.payload || {};
       state.overall = payload.overall || state.overall;
       state.services = Array.isArray(payload.services) ? payload.services : [];
-      state.splash.hasSnapshot = true;
+      state.hasSnapshot = true;
       const lastBootstrap = payload.runtime?.lastBootstrap;
       if (lastBootstrap?.summary) {
         const formattedTimestamp = formatHeaderTimestamp(lastBootstrap.timestamp);
@@ -697,6 +799,10 @@ function handleHostMessage(message) {
       ensureSelectedServiceId(getOrderedServices());
       break;
     }
+    case "runtime.bootstrap_state":
+      state.bootstrap = message.payload?.available ? message.payload : null;
+      syncBootstrapDisplay(Date.now());
+      break;
     case "runtime.log":
       if (message.payload?.reset) {
         state.logs = [];
@@ -730,7 +836,6 @@ function handleHostMessage(message) {
   }
 
   render();
-  maybeDismissSplash();
 }
 
 window.chrome?.webview?.addEventListener("message", (event) => {
@@ -783,5 +888,14 @@ dom.serviceDetail.addEventListener("click", (event) => {
 });
 
 setInterval(tickClock, 1000);
+setInterval(() => {
+  if (!state.bootstrap?.running || !state.bootstrap?.showCard) {
+    return;
+  }
+
+  if (syncBootstrapDisplay(Date.now())) {
+    render();
+  }
+}, 180);
 tickClock();
 render();

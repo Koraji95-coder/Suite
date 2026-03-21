@@ -7,65 +7,7 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div id="splash" class="splash">
-    <div class="splash-shell">
-      <header class="splash-header">
-        <div class="splash-brand">
-          <div class="brand-mark splash-brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 48 48" role="presentation" focusable="false">
-              <path d="M10 8.5h28v7H17v7h16v7H17v9h21V46H10z"></path>
-              <path class="brand-mark__trace" d="M38 8.5h4v29h-4z"></path>
-              <path class="brand-mark__trace" d="M6 18h4v20H6z"></path>
-            </svg>
-          </div>
-          <div class="splash-brand-copy">
-            <span class="wordmark">Suite</span>
-            <strong>Runtime Control</strong>
-            <span>Workstation bootstrap and service orchestration</span>
-          </div>
-        </div>
-        <div id="splash-status" class="splash-status booting">
-          <span class="status-dot"></span>
-          <span id="splash-status-text">Initializing runtime shell…</span>
-        </div>
-      </header>
-
-      <div class="splash-body">
-        <section class="splash-pane splash-pipeline-pane">
-          <div class="pane-label">Boot Sequence</div>
-          <div id="splash-services" class="splash-services">
-            <div class="log-empty splash-empty">Waiting for service snapshot…</div>
-          </div>
-        </section>
-
-        <section class="splash-pane splash-console-pane">
-          <div class="splash-console-header">
-            <div>
-              <div class="pane-label">Bootstrap Transcript</div>
-              <div id="splash-action" class="pane-subtle">Collecting runtime status…</div>
-            </div>
-            <div id="splash-clock" class="pane-subtle right">--:--:--</div>
-          </div>
-
-          <div id="splash-log" class="splash-log">
-            <div class="log-empty splash-empty">Waiting for runtime output…</div>
-          </div>
-
-          <div class="splash-progress">
-            <div class="progress-copy">
-              <span id="splash-progress-step">Collecting runtime status…</span>
-              <span id="splash-progress-percent">0%</span>
-            </div>
-            <div class="progress-track splash-track">
-              <div id="splash-progress-fill" class="progress-fill splash-fill"></div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  </div>
-
-  <div id="app-shell" class="shell-app">
+  <div id="app-shell" class="shell-app ready">
     <header class="shell-header">
       <div class="header-left">
         <div class="brand-mark" aria-hidden="true">
@@ -79,7 +21,7 @@
           <span class="wordmark">Suite</span>
           <div class="header-copy">
             <strong>Runtime Control</strong>
-            <span id="header-subtitle">Local services and collectors</span>
+            <span id="header-subtitle">Local runtime, collectors, and transcript</span>
           </div>
         </div>
       </div>
@@ -122,22 +64,13 @@
           <div id="service-detail" class="service-detail">
             <div class="log-empty">Select a service to inspect its state.</div>
           </div>
-          <div id="progress-panel" class="progress-panel hidden">
-            <div class="progress-copy">
-              <span id="progress-step">Working…</span>
-              <span id="progress-percent">0%</span>
-            </div>
-            <div class="progress-track">
-              <div id="progress-fill" class="progress-fill"></div>
-            </div>
-          </div>
         </section>
 
         <aside class="log-pane">
           <div class="pane-header log-header">
             <div>
-              <div class="pane-label">Output Log</div>
-              <div id="action-label" class="pane-subtle">Idle</div>
+              <div class="pane-label">Runtime Transcript</div>
+              <div id="action-label" class="pane-subtle">Standing By</div>
             </div>
             <button id="autoscroll-btn" class="shell-btn small subtle">Auto-scroll ON</button>
           </div>
@@ -150,6 +83,7 @@
     </div>
   </div>
 
+  <script src="./bootstrapDisplayProgress.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

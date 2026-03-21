@@ -10,6 +10,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
+. $processUtilsScript
 
 function Get-TomlStringValue {
     param(
@@ -138,11 +140,10 @@ function Start-Backend {
     }
 
     $launchCommand = [string]::Join(" ", $launchSegments)
-    Start-Process `
+    Start-SuiteDetachedProcess `
         -FilePath "PowerShell.exe" `
         -WorkingDirectory $WorkingDirectory `
-        -WindowStyle Hidden `
-        -ArgumentList @(
+        -Arguments @(
             "-NoProfile",
             "-ExecutionPolicy",
             "Bypass",

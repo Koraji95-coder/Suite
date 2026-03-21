@@ -20,6 +20,10 @@ $hostProjectRoot = Split-Path -Parent $hostProjectPath
 $hostBuildOutputDirectory = Join-Path $hostProjectRoot "bin\Debug\net8.0-windows"
 $hostOutputPath = Join-Path $hostBuildOutputDirectory "Suite.RuntimeControl.exe"
 $legacyScriptPath = (Resolve-Path (Join-Path $PSScriptRoot "open-suite-runtime-control.ps1")).Path
+$processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
+$retentionScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-retention.ps1")).Path
+. $processUtilsScript
+. $retentionScript
 $runtimeStatusBase = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
 if ([string]::IsNullOrWhiteSpace($runtimeStatusBase)) {
     $runtimeStatusBase = $env:TEMP
@@ -42,6 +46,16 @@ function Write-LauncherLog {
     }
     catch {
     }
+}
+
+try {
+    $retentionResult = Invoke-SuiteRuntimeLogRetention -BaseDirectory $runtimeStatusBase
+    foreach ($warning in @($retentionResult.Warnings)) {
+        Write-LauncherLog -Message $warning -Tag "WARN"
+    }
+}
+catch {
+    Write-LauncherLog -Message "Runtime log retention warning: $($_.Exception.Message)" -Tag "WARN"
 }
 
 function Show-LauncherMessage {
@@ -175,7 +189,7 @@ function Start-LegacyControlPanel {
         $arguments += "-AutoBootstrap"
     }
 
-    $process = Start-Process -FilePath "PowerShell.exe" -WorkingDirectory $resolvedRepoRoot -ArgumentList $arguments -PassThru -ErrorAction Stop
+    $process = Start-SuiteDetachedProcess -FilePath "PowerShell.exe" -WorkingDirectory $resolvedRepoRoot -Arguments $arguments
     Write-LauncherLog -Message "Legacy runtime control panel launched. PID=$($process.Id)." -Tag "WARN"
     return $process
 }
@@ -240,17 +254,15 @@ function Sync-HostToStagingDirectory {
         Write-LauncherLog -Message "Reusing staged desktop shell build at $stageDirectory."
     }
 
-    Get-ChildItem -Path $hostStageRoot -Directory -ErrorAction SilentlyContinue |
-        Sort-Object Name -Descending |
-        Select-Object -Skip 3 |
-        ForEach-Object {
-            try {
-                Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-            }
-            catch {
-                Write-LauncherLog -Message "Stale stage cleanup warning for $($_.FullName): $($_.Exception.Message)" -Tag "WARN"
-            }
+    try {
+        $retentionResult = Invoke-SuiteRuntimeStageRetention -BaseDirectory $runtimeStatusBase
+        foreach ($warning in @($retentionResult.Warnings)) {
+            Write-LauncherLog -Message $warning -Tag "WARN"
         }
+    }
+    catch {
+        Write-LauncherLog -Message "Stale stage cleanup warning: $($_.Exception.Message)" -Tag "WARN"
+    }
 
     return [pscustomobject]@{
         Directory = $stageDirectory

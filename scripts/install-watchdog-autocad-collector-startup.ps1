@@ -31,6 +31,8 @@ $daemonScript = (Resolve-Path (Join-Path $PSScriptRoot "watchdog-autocad-collect
 $checkScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-collector-startup.ps1")).Path
 $pluginInstallScript = (Resolve-Path (Join-Path $PSScriptRoot "install-watchdog-autocad-plugin.ps1")).Path
 $pluginCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-plugin.ps1")).Path
+$processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
+. $processUtilsScript
 $localAppData = if ($env:LOCALAPPDATA) {
     $env:LOCALAPPDATA
 }
@@ -233,7 +235,7 @@ function Install-RunKeyFallback {
     }
     New-ItemProperty -Path $runKeyPath -Name $RunKeyEntryName -Value $runValue -PropertyType String -Force | Out-Null
 
-    Start-Process PowerShell.exe -WindowStyle Hidden -ArgumentList @(
+    Start-SuiteDetachedProcess -FilePath "PowerShell.exe" -WorkingDirectory $repoRoot -Arguments @(
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",

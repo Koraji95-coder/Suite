@@ -21,6 +21,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $daemonScript = (Resolve-Path (Join-Path $PSScriptRoot "watchdog-filesystem-collector-daemon.ps1")).Path
 $checkScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-filesystem-collector-startup.ps1")).Path
+$processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
+. $processUtilsScript
 $localAppData = if ($env:LOCALAPPDATA) {
     $env:LOCALAPPDATA
 }
@@ -138,7 +140,7 @@ function Install-RunKeyFallback {
     }
     New-ItemProperty -Path $runKeyPath -Name $RunKeyEntryName -Value $runValue -PropertyType String -Force | Out-Null
 
-    Start-Process PowerShell.exe -WindowStyle Hidden -ArgumentList @(
+    Start-SuiteDetachedProcess -FilePath "PowerShell.exe" -WorkingDirectory $repoRoot -Arguments @(
         "-NoProfile",
         "-ExecutionPolicy",
         "Bypass",

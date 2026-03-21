@@ -12,6 +12,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $gatewayLaunchScript = (Resolve-Path (Join-Path $PSScriptRoot "run-agent-gateway.mjs")).Path
+$processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
+. $processUtilsScript
 $dotenvPath = Join-Path $repoRoot ".env"
 $localDotenvPath = Join-Path $repoRoot ".env.local"
 
@@ -216,11 +218,10 @@ function Resolve-NodeExecutable {
 function Start-GatewayProcess {
     param([Parameter(Mandatory = $true)][string]$NodeExecutable)
 
-    Start-Process `
+    Start-SuiteDetachedProcess `
         -FilePath $NodeExecutable `
         -WorkingDirectory $repoRoot `
-        -WindowStyle Hidden `
-        -ArgumentList @($gatewayLaunchScript) | Out-Null
+        -Arguments @($gatewayLaunchScript) | Out-Null
 }
 
 $identity = Get-WorkstationIdentity -TomlPath $CodexConfigPath -ExplicitWorkstationId $WorkstationId

@@ -74,12 +74,12 @@ internal sealed class RuntimeShellForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new System.Drawing.Size(1220, 780);
         Size = new System.Drawing.Size(1460, 900);
-        BackColor = System.Drawing.ColorTranslator.FromHtml("#0d0d0b");
+        BackColor = System.Drawing.ColorTranslator.FromHtml("#08131b");
 
         _webView = new WebView2
         {
             Dock = DockStyle.Fill,
-            DefaultBackgroundColor = System.Drawing.ColorTranslator.FromHtml("#0d0d0b"),
+            DefaultBackgroundColor = System.Drawing.ColorTranslator.FromHtml("#08131b"),
         };
         Controls.Add(_webView);
 
@@ -159,6 +159,12 @@ internal sealed class RuntimeShellForm : Form
         SendLog("SYS", "Runtime shell ready.", "sys");
         EmitInitialRuntimeLogTail();
         _runtimeLogOffset = GetCurrentLogLength();
+
+        if (_options.AutoBootstrap)
+        {
+            PrimeAutoBootstrapUiState();
+        }
+
         await PublishSnapshotAsync();
 
         if (_options.AutoBootstrap)
@@ -354,7 +360,7 @@ internal sealed class RuntimeShellForm : Form
                 }
 
                 var serviceName = GetServiceName(service.Value) ?? serviceId;
-                SendLog("INFO", $"Starting {serviceName}.", string.Empty);
+                SendLog("INFO", $"Starting {serviceName}.", "info");
                 SendProgress(true, ComputeStartProgressPercent(serviceId), $"Starting {serviceName}.");
 
                 var result = await RunControlActionAsync(serviceId, "start");
@@ -409,6 +415,7 @@ internal sealed class RuntimeShellForm : Form
 
             var summary = TryGetSummaryFromJson(result.CombinedOutput) ??
                 (result.Succeeded ? "Runtime services stopped." : "Runtime stop needs attention.");
+            var warnings = TryGetStringArrayFromJson(result.CombinedOutput, "warnings");
             if (result.Succeeded)
             {
                 SendLog("OK", summary, "ok");
@@ -416,6 +423,14 @@ internal sealed class RuntimeShellForm : Form
             else
             {
                 SendLog("ERR", summary, "err");
+            }
+
+            foreach (var warning in warnings)
+            {
+                if (!string.IsNullOrWhiteSpace(warning))
+                {
+                    SendLog("WARN", warning, "warn");
+                }
             }
         }
         catch (Exception exception)
@@ -456,10 +471,18 @@ internal sealed class RuntimeShellForm : Form
 
             if (result.Ok)
             {
-                SendLog("OK", result.Summary ?? $"{serviceName} {action} completed.", "ok");
+                if (result.SkippedForSafety)
+                {
+                    SendLog("WARN", result.Summary ?? $"{serviceName} {action} skipped for safety.", "warn");
+                }
+                else
+                {
+                    SendLog("OK", result.Summary ?? $"{serviceName} {action} completed.", "ok");
+                }
+
                 if (!string.IsNullOrWhiteSpace(result.Details))
                 {
-                    SendLog("INFO", result.Details, string.Empty);
+                    SendLog("INFO", result.Details, "info");
                 }
             }
             else
@@ -596,6 +619,7 @@ internal sealed class RuntimeShellForm : Form
             _lastSnapshotDocument?.Dispose();
             _lastSnapshotDocument = JsonDocument.Parse(payloadJson);
             PostRawEvent("runtime.snapshot", payloadJson);
+            PublishBootstrapStateFromSnapshot();
 
             if (_actionBusy)
             {
@@ -623,7 +647,6 @@ internal sealed class RuntimeShellForm : Form
         var root = _lastSnapshotDocument.RootElement;
         switch (_activeAction)
         {
-            case "bootstrap_all":
             case "start_all":
             {
                 var completed = 0;
@@ -709,6 +732,32 @@ internal sealed class RuntimeShellForm : Form
         }
     }
 
+    private void PrimeAutoBootstrapUiState()
+    {
+        PostEvent("runtime.action_state", new
+        {
+            busy = true,
+            action = "bootstrap_all",
+            serviceId = (string?)null,
+        });
+        PostEvent("runtime.progress", new
+        {
+            visible = true,
+            percent = 2,
+            step = "Preparing automatic runtime bootstrap.",
+            action = "bootstrap_all",
+            serviceId = (string?)null,
+        });
+    }
+
+    private void PublishBootstrapStateFromSnapshot()
+    {
+        var viewModel = BootstrapProgressReducer.TryParseFromSnapshot(_lastSnapshotDocument!.RootElement, out var bootstrapState)
+            ? BootstrapProgressReducer.Reduce(bootstrapState)
+            : BootstrapProgressReducer.Reduce(null);
+        PostEvent("runtime.bootstrap_state", viewModel);
+    }
+
     private async Task<ControlActionResult> RunControlActionAsync(string serviceId, string action)
     {
         var result = await ProcessRunner.RunPowerShellFileAsync(
@@ -722,6 +771,7 @@ internal sealed class RuntimeShellForm : Form
                 Ok: false,
                 Summary: $"{serviceId} {action} did not return JSON.",
                 Details: result.CombinedOutput,
+                SkippedForSafety: false,
                 LogTargetKind: null,
                 LogTargetTarget: null);
         }
@@ -732,6 +782,7 @@ internal sealed class RuntimeShellForm : Form
             Ok: root.TryGetProperty("ok", out var okElement) && okElement.ValueKind is JsonValueKind.True,
             Summary: GetStringProperty(root, "summary"),
             Details: GetStringProperty(root, "details") ?? GetStringProperty(root, "outputTail"),
+            SkippedForSafety: root.TryGetProperty("skippedForSafety", out var skippedElement) && skippedElement.ValueKind is JsonValueKind.True,
             LogTargetKind: TryGetNestedStringProperty(root, "logTarget", "kind"),
             LogTargetTarget: TryGetNestedStringProperty(root, "logTarget", "target"));
     }
@@ -956,11 +1007,45 @@ internal sealed class RuntimeShellForm : Form
         }
     }
 
+    private static string[] TryGetStringArrayFromJson(string text, string propertyName)
+    {
+        if (!TryExtractJsonObject(text, out var payloadJson))
+        {
+            return Array.Empty<string>();
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(payloadJson);
+            return GetStringArrayProperty(document.RootElement, propertyName);
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
     private static string? GetStringProperty(JsonElement element, string propertyName)
     {
         return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
             ? property.GetString()
             : null;
+    }
+
+    private static string[] GetStringArrayProperty(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<string>();
+        }
+
+        return property
+            .EnumerateArray()
+            .Where(static item => item.ValueKind == JsonValueKind.String)
+            .Select(static item => item.GetString())
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Cast<string>()
+            .ToArray();
     }
 
     private static string? TryGetNestedStringProperty(JsonElement element, string objectName, string propertyName)
@@ -1107,6 +1192,7 @@ internal sealed class RuntimeShellForm : Form
         tone = tag switch
         {
             "OK" => "ok",
+            "INFO" => "info",
             "WARN" => "warn",
             "ERR" => "err",
             "START" => "hi",
@@ -1160,6 +1246,7 @@ internal sealed class RuntimeShellForm : Form
         bool Ok,
         string? Summary,
         string? Details,
+        bool SkippedForSafety,
         string? LogTargetKind,
         string? LogTargetTarget)
     {

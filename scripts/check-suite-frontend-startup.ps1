@@ -15,6 +15,8 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $workerScriptPath = (Resolve-Path (Join-Path $PSScriptRoot "run-suite-frontend-dev.ps1")).Path
+$processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
+. $processUtilsScript
 $statusBase = if ($env:LOCALAPPDATA) {
     $env:LOCALAPPDATA
 }
@@ -97,11 +99,10 @@ function Resolve-NpmExecutable {
 }
 
 function Start-FrontendWorker {
-    Start-Process `
+    Start-SuiteDetachedProcess `
         -FilePath "PowerShell.exe" `
         -WorkingDirectory $resolvedRepoRoot `
-        -WindowStyle Hidden `
-        -ArgumentList @(
+        -Arguments @(
             "-NoProfile",
             "-ExecutionPolicy",
             "Bypass",

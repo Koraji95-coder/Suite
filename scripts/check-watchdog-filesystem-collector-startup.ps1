@@ -16,6 +16,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $daemonScript = (Resolve-Path (Join-Path $PSScriptRoot "watchdog-filesystem-collector-daemon.ps1")).Path
+$processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
+. $processUtilsScript
 $localAppData = if ($env:LOCALAPPDATA) {
     $env:LOCALAPPDATA
 }
@@ -185,7 +187,7 @@ function Start-CollectorDaemonProcess {
         $NamedMutex
     )
 
-    Start-Process PowerShell.exe -WindowStyle Hidden -ArgumentList $arguments | Out-Null
+    Start-SuiteDetachedProcess -FilePath "PowerShell.exe" -WorkingDirectory $repoRoot -Arguments $arguments | Out-Null
 }
 
 $identity = Get-WorkstationIdentity -TomlPath $CodexConfigPath -ExplicitWorkstationId $WorkstationId

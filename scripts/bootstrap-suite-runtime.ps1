@@ -3,6 +3,9 @@ param(
     [string]$RepoRoot,
     [string]$CodexConfigPath = (Join-Path $env:USERPROFILE ".codex\config.toml"),
     [string]$BootstrapLogPath,
+    [string]$CurrentBootstrapPath,
+    [ValidateRange(1, 5)][int]$BootstrapAttempt = 1,
+    [ValidateRange(1, 5)][int]$BootstrapMaxAttempts = 1,
     [switch]$SkipSupabase,
     [switch]$SkipWatchdog,
     [switch]$SkipBackend,
@@ -19,6 +22,11 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+$bootstrapStateScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-bootstrap-state.ps1")).Path
+$logUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-log-utils.ps1")).Path
+
+. $bootstrapStateScript
+. $logUtilsScript
 
 function Convert-CommandOutputToText {
     param([object[]]$Output)
@@ -67,13 +75,7 @@ function Write-BootstrapLog {
         return
     }
 
-    $directory = Split-Path -Parent $BootstrapLogPath
-    if (-not [string]::IsNullOrWhiteSpace($directory)) {
-        New-Item -ItemType Directory -Path $directory -Force | Out-Null
-    }
-
-    $timestamp = (Get-Date).ToString("o")
-    Add-Content -Path $BootstrapLogPath -Value "[$timestamp] [$Tag] $Message"
+    Write-SuiteRuntimeTranscriptEntry -Path $BootstrapLogPath -Message $Message -Tag $Tag
 }
 
 function Format-CommandArguments {
@@ -434,6 +436,115 @@ function Wait-ForSupabaseRuntimeReady {
     }
 }
 
+function Set-CurrentBootstrapStepStarted {
+    param(
+        [Parameter(Mandatory = $true)][string]$StepId,
+        [Parameter(Mandatory = $true)][string]$StepLabel,
+        [Parameter(Mandatory = $true)][string]$Summary
+    )
+
+    if ([string]::IsNullOrWhiteSpace($CurrentBootstrapPath)) {
+        return
+    }
+
+    Update-SuiteRuntimeBootstrapState -Path $CurrentBootstrapPath -Properties ([ordered]@{
+        running = $true
+        done = $false
+        ok = $false
+        attempt = $BootstrapAttempt
+        maxAttempts = $BootstrapMaxAttempts
+        currentStepId = $StepId
+        currentStepLabel = $StepLabel
+        summary = $Summary
+    }) -RemoveFailedStepIds @($StepId) | Out-Null
+}
+
+function Complete-CurrentBootstrapStep {
+    param(
+        [Parameter(Mandatory = $true)][string]$StepId,
+        [Parameter(Mandatory = $true)][string]$StepLabel,
+        [Parameter(Mandatory = $true)][string]$Summary
+    )
+
+    if ([string]::IsNullOrWhiteSpace($CurrentBootstrapPath)) {
+        return
+    }
+
+    Update-SuiteRuntimeBootstrapState -Path $CurrentBootstrapPath -Properties ([ordered]@{
+        running = $true
+        done = $false
+        ok = $false
+        attempt = $BootstrapAttempt
+        maxAttempts = $BootstrapMaxAttempts
+        currentStepId = $StepId
+        currentStepLabel = $StepLabel
+        summary = $Summary
+    }) -AddCompletedStepIds @($StepId) -RemoveFailedStepIds @($StepId) | Out-Null
+}
+
+function Fail-CurrentBootstrapStep {
+    param(
+        [Parameter(Mandatory = $true)][string]$StepId,
+        [Parameter(Mandatory = $true)][string]$StepLabel,
+        [Parameter(Mandatory = $true)][string]$Summary
+    )
+
+    if ([string]::IsNullOrWhiteSpace($CurrentBootstrapPath)) {
+        return
+    }
+
+    Update-SuiteRuntimeBootstrapState -Path $CurrentBootstrapPath -Properties ([ordered]@{
+        running = $true
+        done = $false
+        ok = $false
+        attempt = $BootstrapAttempt
+        maxAttempts = $BootstrapMaxAttempts
+        currentStepId = $StepId
+        currentStepLabel = $StepLabel
+        summary = $Summary
+    }) -AddFailedStepIds @($StepId) | Out-Null
+}
+
+function Wait-ForJsonServiceReady {
+    param(
+        [Parameter(Mandatory = $true)][string]$StepId,
+        [Parameter(Mandatory = $true)][string]$VerificationLabel,
+        [Parameter(Mandatory = $true)][string]$ScriptRelativePath,
+        [Parameter(Mandatory = $true)][scriptblock]$IsReady,
+        [ValidateRange(1, 12)][int]$MaxAttempts = 6,
+        [ValidateRange(1, 15)][int]$DelaySeconds = 5
+    )
+
+    $lastProbe = $null
+    Set-CurrentBootstrapStepStarted `
+        -StepId $StepId `
+        -StepLabel "Verifying $VerificationLabel health." `
+        -Summary "Verifying $VerificationLabel health."
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt += 1) {
+        $lastProbe = Invoke-JsonPowerShellScript -ScriptRelativePath $ScriptRelativePath -Arguments @("-Json")
+        $probeReady = & $IsReady $lastProbe
+        if ($probeReady) {
+            return [pscustomobject]@{
+                Ready = $true
+                Attempts = $attempt
+                Probe = $lastProbe
+            }
+        }
+
+        if ($attempt -lt $MaxAttempts) {
+            Write-BootstrapLog -Tag "INFO" -Message ("{0} status probe {1}/{2} is not healthy yet." -f $VerificationLabel, $attempt, $MaxAttempts)
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+
+    return [pscustomobject]@{
+        Ready = $false
+        Attempts = $MaxAttempts
+        Probe = $lastProbe
+    }
+}
+
 Write-BootstrapLog -Tag "START" -Message "Suite runtime bootstrap is starting."
 
 $steps = @()
@@ -445,11 +556,19 @@ if ($SkipSupabase) {
     Write-StepLog -Step $supabaseSkippedStep
 }
 else {
+    Set-CurrentBootstrapStepStarted `
+        -StepId "supabase-start" `
+        -StepLabel "Starting local Supabase stack." `
+        -Summary "Starting local Supabase stack."
     $supabaseStart = Invoke-NodeScript -ScriptRelativePath "scripts\run-supabase-cli.mjs" -Arguments @("start")
     $supabaseStartReady = $supabaseStart.Ok -or (Test-SupabaseOutputIndicatesReady -Text $supabaseStart.OutputText)
     $supabaseStatusCheck = $null
     if (-not $supabaseStartReady) {
         Write-BootstrapLog -Tag "INFO" -Message "Supabase start did not report ready immediately; verifying local stack readiness."
+        Set-CurrentBootstrapStepStarted `
+            -StepId "supabase-start" `
+            -StepLabel "Verifying local Supabase readiness." `
+            -Summary "Verifying local Supabase readiness."
         $supabaseStatusCheck = Wait-ForSupabaseRuntimeReady
         $supabaseStartReady = [bool]$supabaseStatusCheck.Ready
     }
@@ -465,22 +584,43 @@ else {
         $supabaseStartStep = New-StepResult -Name "supabase-start" -State "ready" -Ok $true -Summary "Local Supabase stack is running." -Details $supabaseDetails
         $steps += $supabaseStartStep
         Write-StepLog -Step $supabaseStartStep -FallbackText $supabaseDetails
+        Complete-CurrentBootstrapStep `
+            -StepId "supabase-start" `
+            -StepLabel "Supabase is ready." `
+            -Summary "Local Supabase stack is running."
+
+        Set-CurrentBootstrapStepStarted `
+            -StepId "supabase-env" `
+            -StepLabel "Refreshing local Supabase env overrides." `
+            -Summary "Refreshing local Supabase env overrides."
         $supabaseEnv = Invoke-NodeScript -ScriptRelativePath "scripts\write-supabase-local-env.mjs" -Arguments @()
         if ($supabaseEnv.Ok) {
             $supabaseEnvStep = New-StepResult -Name "supabase-env" -State "ready" -Ok $true -Summary "Local Supabase env overrides were refreshed." -Details $supabaseEnv.OutputTail
             $steps += $supabaseEnvStep
             Write-StepLog -Step $supabaseEnvStep -FallbackText $supabaseEnv.OutputTail
+            Complete-CurrentBootstrapStep `
+                -StepId "supabase-env" `
+                -StepLabel "Supabase env overrides are ready." `
+                -Summary "Local Supabase env overrides were refreshed."
         }
         else {
             $supabaseEnvStep = New-StepResult -Name "supabase-env" -State "failed" -Ok $false -Summary "Local Supabase env overrides were not refreshed." -Details $supabaseEnv.OutputTail
             $steps += $supabaseEnvStep
             Write-StepLog -Step $supabaseEnvStep -FallbackText $supabaseEnv.OutputTail
+            Fail-CurrentBootstrapStep `
+                -StepId "supabase-env" `
+                -StepLabel "Supabase env refresh failed." `
+                -Summary "Local Supabase env overrides were not refreshed."
         }
     }
     else {
         $supabaseStartStep = New-StepResult -Name "supabase-start" -State "failed" -Ok $false -Summary "Local Supabase stack did not start." -Details $supabaseDetails
         $steps += $supabaseStartStep
         Write-StepLog -Step $supabaseStartStep -FallbackText $supabaseDetails
+        Fail-CurrentBootstrapStep `
+            -StepId "supabase-start" `
+            -StepLabel "Supabase did not become ready." `
+            -Summary "Local Supabase stack did not start."
         $supabaseEnvStep = New-StepResult -Name "supabase-env" -State "skipped" -Ok $true -Summary "Skipped local Supabase env refresh because Supabase did not start."
         $steps += $supabaseEnvStep
         Write-StepLog -Step $supabaseEnvStep
@@ -493,6 +633,10 @@ if ($SkipWatchdog) {
     Write-StepLog -Step $watchdogSkippedStep
 }
 else {
+    Set-CurrentBootstrapStepStarted `
+        -StepId "watchdog-filesystem" `
+        -StepLabel "Ensuring filesystem collector startup." `
+        -Summary "Ensuring filesystem collector startup."
     $filesystemInstall = Invoke-PowerShellScript -ScriptRelativePath "scripts\install-watchdog-filesystem-collector-startup.ps1" -Arguments @()
     $filesystemCheck = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-watchdog-filesystem-collector-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
     $filesystemReady = $filesystemCheck.Result.Ok -and $filesystemCheck.Payload -and [bool]$filesystemCheck.Payload.healthy
@@ -511,7 +655,23 @@ else {
         -Payload $filesystemCheck.Payload
     $steps += $filesystemStep
     Write-StepLog -Step $filesystemStep -FallbackText $filesystemInstall.OutputTail
+    if ($filesystemReady) {
+        Complete-CurrentBootstrapStep `
+            -StepId "watchdog-filesystem" `
+            -StepLabel "Filesystem collector is ready." `
+            -Summary "Filesystem collector startup is installed and healthy."
+    }
+    else {
+        Fail-CurrentBootstrapStep `
+            -StepId "watchdog-filesystem" `
+            -StepLabel "Filesystem collector needs attention." `
+            -Summary "Filesystem collector startup needs attention."
+    }
 
+    Set-CurrentBootstrapStepStarted `
+        -StepId "watchdog-autocad-startup" `
+        -StepLabel "Ensuring AutoCAD collector startup." `
+        -Summary "Ensuring AutoCAD collector startup."
     $autocadInstall = Invoke-PowerShellScript -ScriptRelativePath "scripts\install-watchdog-autocad-collector-startup.ps1" -Arguments @()
     $autocadCheck = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-watchdog-autocad-collector-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
     $autocadPlugin = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-watchdog-autocad-plugin.ps1" -Arguments @("-Json")
@@ -532,6 +692,23 @@ else {
         -Payload $autocadCheck.Payload
     $steps += $autocadStartupStep
     Write-StepLog -Step $autocadStartupStep -FallbackText $autocadInstall.OutputTail
+    if ($autocadStartupReady) {
+        Complete-CurrentBootstrapStep `
+            -StepId "watchdog-autocad-startup" `
+            -StepLabel "AutoCAD collector startup is ready." `
+            -Summary "AutoCAD collector startup is installed and healthy."
+    }
+    else {
+        Fail-CurrentBootstrapStep `
+            -StepId "watchdog-autocad-startup" `
+            -StepLabel "AutoCAD collector startup needs attention." `
+            -Summary "AutoCAD collector startup needs attention."
+    }
+
+    Set-CurrentBootstrapStepStarted `
+        -StepId "watchdog-autocad-plugin" `
+        -StepLabel "Verifying AutoCAD plugin install." `
+        -Summary "Verifying AutoCAD plugin install."
     $autocadPluginStep = New-StepResult `
         -Name "watchdog-autocad-plugin" `
         -State $(if ($pluginReady) { "ready" } else { "failed" }) `
@@ -541,6 +718,18 @@ else {
         -Payload $autocadPlugin.Payload
     $steps += $autocadPluginStep
     Write-StepLog -Step $autocadPluginStep
+    if ($pluginReady) {
+        Complete-CurrentBootstrapStep `
+            -StepId "watchdog-autocad-plugin" `
+            -StepLabel "AutoCAD plugin is ready." `
+            -Summary "AutoCAD plugin install is healthy."
+    }
+    else {
+        Fail-CurrentBootstrapStep `
+            -StepId "watchdog-autocad-plugin" `
+            -StepLabel "AutoCAD plugin needs attention." `
+            -Summary "AutoCAD plugin install needs attention."
+    }
 }
 
 if ($SkipBackend) {
@@ -549,6 +738,10 @@ if ($SkipBackend) {
     Write-StepLog -Step $backendSkippedStep
 }
 else {
+    Set-CurrentBootstrapStepStarted `
+        -StepId "backend" `
+        -StepLabel "Ensuring Watchdog backend availability." `
+        -Summary "Ensuring Watchdog backend availability."
     $backendStart = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-watchdog-backend-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
     $backendReady = $backendStart.Result.Ok -and $backendStart.Payload -and [bool]$backendStart.Payload.Running
     $backendStep = New-StepResult `
@@ -560,6 +753,18 @@ else {
         -Payload $backendStart.Payload
     $steps += $backendStep
     Write-StepLog -Step $backendStep
+    if ($backendReady) {
+        Complete-CurrentBootstrapStep `
+            -StepId "backend" `
+            -StepLabel "Watchdog backend is ready." `
+            -Summary "Backend is running."
+    }
+    else {
+        Fail-CurrentBootstrapStep `
+            -StepId "backend" `
+            -StepLabel "Watchdog backend is not running." `
+            -Summary "Backend is not running."
+    }
 }
 
 if ($SkipGateway) {
@@ -568,33 +773,57 @@ if ($SkipGateway) {
     Write-StepLog -Step $gatewaySkippedStep
 }
 else {
+    Set-CurrentBootstrapStepStarted `
+        -StepId "gateway" `
+        -StepLabel "Ensuring local gateway availability." `
+        -Summary "Ensuring local gateway availability."
     $gatewayStart = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-gateway-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
     $gatewayReady = $gatewayStart.Result.Ok -and $gatewayStart.Payload -and [bool]$gatewayStart.Payload.Healthy
     $gatewayStarting = $gatewayStart.Result.Ok -and $gatewayStart.Payload -and (-not [bool]$gatewayStart.Payload.Healthy) -and [bool]$gatewayStart.Payload.Running
-    $gatewayState = if ($gatewayReady) {
-        "ready"
+    $gatewayStatusCheck = $null
+    if (-not $gatewayReady -and $gatewayStarting) {
+        Write-BootstrapLog -Tag "INFO" -Message "Gateway did not report healthy immediately; verifying local readiness."
+        $gatewayStatusCheck = Wait-ForJsonServiceReady `
+            -StepId "gateway" `
+            -VerificationLabel "gateway" `
+            -ScriptRelativePath "scripts\check-gateway-startup.ps1" `
+            -IsReady {
+                param($probe)
+                return $probe.Result.Ok -and $probe.Payload -and [bool]$probe.Payload.Healthy
+            }
+        $gatewayReady = [bool]$gatewayStatusCheck.Ready
     }
-    elseif ($gatewayStarting) {
-        "starting"
+    $gatewayDetailsParts = @($gatewayStart.Result.OutputTail)
+    if ($gatewayStatusCheck -and $gatewayStatusCheck.Probe -and $gatewayStatusCheck.Probe.Result.OutputTail) {
+        $gatewayDetailsParts += $gatewayStatusCheck.Probe.Result.OutputTail
     }
-    else {
-        "failed"
-    }
-    $gatewayOk = $gatewayReady -or $gatewayStarting
-    $gatewaySummary = switch ($gatewayState) {
-        "ready" { "Gateway is healthy." ; break }
-        "starting" { "Gateway process is running and still warming up." ; break }
-        default { "Gateway is not healthy." ; break }
-    }
+    $gatewayDetails = [string]::Join(
+        [Environment]::NewLine,
+        @($gatewayDetailsParts | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    ).Trim()
+    $gatewayState = if ($gatewayReady) { "ready" } else { "failed" }
+    $gatewaySummary = if ($gatewayReady) { "Gateway is healthy." } else { "Gateway is not healthy." }
     $gatewayStep = New-StepResult `
         -Name "gateway" `
         -State $gatewayState `
-        -Ok $gatewayOk `
+        -Ok $gatewayReady `
         -Summary $gatewaySummary `
-        -Details $gatewayStart.Result.OutputTail `
-        -Payload $gatewayStart.Payload
+        -Details $gatewayDetails `
+        -Payload $(if ($gatewayStatusCheck -and $gatewayStatusCheck.Probe -and $gatewayStatusCheck.Probe.Payload) { $gatewayStatusCheck.Probe.Payload } else { $gatewayStart.Payload })
     $steps += $gatewayStep
-    Write-StepLog -Step $gatewayStep
+    Write-StepLog -Step $gatewayStep -FallbackText $gatewayDetails
+    if ($gatewayReady) {
+        Complete-CurrentBootstrapStep `
+            -StepId "gateway" `
+            -StepLabel "Gateway is ready." `
+            -Summary "Gateway is healthy."
+    }
+    else {
+        Fail-CurrentBootstrapStep `
+            -StepId "gateway" `
+            -StepLabel "Gateway is not healthy." `
+            -Summary "Gateway is not healthy."
+    }
 }
 
 if ($SkipFrontend) {
@@ -603,33 +832,57 @@ if ($SkipFrontend) {
     Write-StepLog -Step $frontendSkippedStep
 }
 else {
+    Set-CurrentBootstrapStepStarted `
+        -StepId "frontend" `
+        -StepLabel "Ensuring Suite frontend availability." `
+        -Summary "Ensuring Suite frontend availability."
     $frontendStart = Invoke-JsonPowerShellScript -ScriptRelativePath $frontendCheckScript -Arguments @("-StartIfMissing", "-Json")
     $frontendReady = $frontendStart.Result.Ok -and $frontendStart.Payload -and [bool]$frontendStart.Payload.Healthy
     $frontendStarting = $frontendStart.Result.Ok -and $frontendStart.Payload -and (-not [bool]$frontendStart.Payload.Healthy) -and [bool]$frontendStart.Payload.Running
-    $frontendState = if ($frontendReady) {
-        "ready"
+    $frontendStatusCheck = $null
+    if (-not $frontendReady -and $frontendStarting) {
+        Write-BootstrapLog -Tag "INFO" -Message "Frontend did not report healthy immediately; verifying local readiness."
+        $frontendStatusCheck = Wait-ForJsonServiceReady `
+            -StepId "frontend" `
+            -VerificationLabel "frontend" `
+            -ScriptRelativePath $frontendCheckScript `
+            -IsReady {
+                param($probe)
+                return $probe.Result.Ok -and $probe.Payload -and [bool]$probe.Payload.Healthy
+            }
+        $frontendReady = [bool]$frontendStatusCheck.Ready
     }
-    elseif ($frontendStarting) {
-        "starting"
+    $frontendDetailsParts = @($frontendStart.Result.OutputTail)
+    if ($frontendStatusCheck -and $frontendStatusCheck.Probe -and $frontendStatusCheck.Probe.Result.OutputTail) {
+        $frontendDetailsParts += $frontendStatusCheck.Probe.Result.OutputTail
     }
-    else {
-        "failed"
-    }
-    $frontendOk = $frontendReady -or $frontendStarting
-    $frontendSummary = switch ($frontendState) {
-        "ready" { "Frontend dev server is ready." ; break }
-        "starting" { "Frontend process is running and still warming up." ; break }
-        default { "Frontend dev server is not healthy." ; break }
-    }
+    $frontendDetails = [string]::Join(
+        [Environment]::NewLine,
+        @($frontendDetailsParts | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    ).Trim()
+    $frontendState = if ($frontendReady) { "ready" } else { "failed" }
+    $frontendSummary = if ($frontendReady) { "Frontend dev server is ready." } else { "Frontend dev server is not healthy." }
     $frontendStep = New-StepResult `
         -Name "frontend" `
         -State $frontendState `
-        -Ok $frontendOk `
+        -Ok $frontendReady `
         -Summary $frontendSummary `
-        -Details $frontendStart.Result.OutputTail `
-        -Payload $frontendStart.Payload
+        -Details $frontendDetails `
+        -Payload $(if ($frontendStatusCheck -and $frontendStatusCheck.Probe -and $frontendStatusCheck.Probe.Payload) { $frontendStatusCheck.Probe.Payload } else { $frontendStart.Payload })
     $steps += $frontendStep
-    Write-StepLog -Step $frontendStep
+    Write-StepLog -Step $frontendStep -FallbackText $frontendDetails
+    if ($frontendReady) {
+        Complete-CurrentBootstrapStep `
+            -StepId "frontend" `
+            -StepLabel "Suite frontend is ready." `
+            -Summary "Frontend dev server is ready."
+    }
+    else {
+        Fail-CurrentBootstrapStep `
+            -StepId "frontend" `
+            -StepLabel "Suite frontend is not healthy." `
+            -Summary "Frontend dev server is not healthy."
+    }
 }
 
 $overallOk = $true

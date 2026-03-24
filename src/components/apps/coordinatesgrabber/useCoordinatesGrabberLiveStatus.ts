@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
-import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
-import { useGroundGrid } from "../ground-grid-generator/GroundGridContext";
+import { coordinatesGrabberService } from "@/components/apps/cad-runtime/coordinatesGrabberService";
+import { useCadRuntime } from "../cad-runtime/CadRuntimeContext";
 import type { LiveBackendStatus } from "./CoordinatesGrabberModels";
 
 interface UseCoordinatesGrabberLiveStatusOptions {
@@ -17,7 +17,7 @@ export function useCoordinatesGrabberLiveStatus({
 		reconnectBackend,
 		wsLastUpdate,
 		wsLive,
-	} = useGroundGrid();
+	} = useCadRuntime();
 	const [wsConnected, setWsConnected] = useState(wsLive);
 	const [lastWsEventAt, setLastWsEventAt] = useState<number | null>(null);
 	const [liveBackendStatus, setLiveBackendStatus] = useState<LiveBackendStatus>(

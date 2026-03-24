@@ -1,27 +1,23 @@
 // src/components/apps/ground-grid/GroundGridContext.tsx
 import { createContext, useCallback, useContext, useState } from "react";
 import {
-	type GroundGridLiveBackendStatus,
-	useGroundGridBackendBridge,
-} from "./useGroundGridBackendBridge";
+	CadRuntimeProvider,
+	useCadRuntime,
+	type CadRuntimeContextValue,
+	type CadRuntimeLogSource,
+	type CadRuntimeLogSink,
+} from "../cad-runtime/CadRuntimeContext";
 
 export interface LogEntry {
 	timestamp: string;
-	source: "grabber" | "generator" | "system";
+	source: CadRuntimeLogSource;
 	message: string;
 }
 
-interface GroundGridContextValue {
+interface GroundGridContextValue extends CadRuntimeContextValue {
 	logs: LogEntry[];
 	addLog: (source: LogEntry["source"], message: string) => void;
 	clearLogs: () => void;
-	liveBackendStatus: GroundGridLiveBackendStatus;
-	backendConnected: boolean;
-	wsLive: boolean;
-	wsLastUpdate: number | null;
-	availableLayers: string[];
-	refreshLayers: () => Promise<string[]>;
-	reconnectBackend: () => Promise<boolean>;
 }
 
 const GroundGridContext = createContext<GroundGridContextValue | null>(null);
@@ -32,6 +28,33 @@ export function useGroundGrid() {
 		throw new Error("useGroundGrid must be used within GroundGridProvider");
 	}
 	return ctx;
+}
+
+function GroundGridContextBridge({
+	addLog,
+	children,
+	clearLogs,
+	logs,
+}: {
+	addLog: CadRuntimeLogSink;
+	children: React.ReactNode;
+	clearLogs: () => void;
+	logs: LogEntry[];
+}) {
+	const runtime = useCadRuntime();
+
+	return (
+		<GroundGridContext.Provider
+			value={{
+				addLog,
+				clearLogs,
+				logs,
+				...runtime,
+			}}
+		>
+			{children}
+		</GroundGridContext.Provider>
+	);
 }
 
 export function GroundGridProvider({
@@ -50,34 +73,15 @@ export function GroundGridProvider({
 
 	const clearLogs = useCallback(() => setLogs([]), []);
 
-	const {
-		availableLayers,
-		backendConnected,
-		liveBackendStatus,
-		reconnectBackend,
-		refreshLayers,
-		wsLastUpdate,
-		wsLive,
-	} = useGroundGridBackendBridge({
-		addLog,
-	});
-
 	return (
-		<GroundGridContext.Provider
-			value={{
-				addLog,
-				availableLayers,
-				backendConnected,
-				clearLogs,
-				liveBackendStatus,
-				logs,
-				reconnectBackend,
-				refreshLayers,
-				wsLastUpdate,
-				wsLive,
-			}}
-		>
-			{children}
-		</GroundGridContext.Provider>
+		<CadRuntimeProvider addLog={addLog}>
+			<GroundGridContextBridge
+				addLog={addLog}
+				clearLogs={clearLogs}
+				logs={logs}
+			>
+				{children}
+			</GroundGridContextBridge>
+		</CadRuntimeProvider>
 	);
 }

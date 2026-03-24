@@ -61,6 +61,19 @@ function Invoke-SuiteRuntimeJsonPowerShellScript {
     }
 }
 
+function Get-SuiteRuntimeRunningAutoCadProcessSummary {
+    $processes = Get-Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.ProcessName -match "^acad$|^acadlt$|^autocad$"
+    }
+    if (-not $processes) {
+        return $null
+    }
+
+    return ($processes | ForEach-Object {
+        "$($_.ProcessName) ($($_.Id))"
+    }) -join ", "
+}
+
 function Get-SuiteRuntimeAutoCadStopSafety {
     param(
         [string]$CodexConfigPath = (Join-Path $env:USERPROFILE ".codex\config.toml"),
@@ -78,6 +91,8 @@ function Get-SuiteRuntimeAutoCadStopSafety {
             currentSessionId = $null
             trackerFresh = $false
             collectorFresh = $false
+            autoCadProcessRunning = $false
+            autoCadProcessSummary = $null
             readinessStatus = "unknown"
             payload = $null
         }
@@ -100,11 +115,15 @@ function Get-SuiteRuntimeAutoCadStopSafety {
             currentSessionId = $null
             trackerFresh = $false
             collectorFresh = $false
+            autoCadProcessRunning = $false
+            autoCadProcessSummary = $null
             readinessStatus = "unknown"
             payload = $result.Payload
         }
     }
 
+    $runningAutoCad = Get-SuiteRuntimeRunningAutoCadProcessSummary
+    $autoCadProcessRunning = -not [string]::IsNullOrWhiteSpace($runningAutoCad)
     $tracker = $result.Payload.trackerState
     $collector = $result.Payload.collectorState
     $trackerFresh = [bool]($tracker -and $tracker.healthy)
@@ -142,7 +161,15 @@ function Get-SuiteRuntimeAutoCadStopSafety {
 
     $state = "inactive"
     $reason = "Fresh AutoCAD telemetry does not show an active drawing."
-    if (($trackerFresh -or $collectorFresh) -and $hasActivitySignal) {
+    if (-not $autoCadProcessRunning) {
+        if ($hasActivitySignal) {
+            $reason = "No AutoCAD process is running; last drawing telemetry is from a prior session."
+        }
+        else {
+            $reason = "No AutoCAD process is running."
+        }
+    }
+    elseif (($trackerFresh -or $collectorFresh) -and $hasActivitySignal) {
         $state = "active"
         if (-not [string]::IsNullOrWhiteSpace($drawingName)) {
             $reason = "AutoCAD activity is active in '$drawingName'."
@@ -169,6 +196,8 @@ function Get-SuiteRuntimeAutoCadStopSafety {
         currentSessionId = $currentSessionId
         trackerFresh = $trackerFresh
         collectorFresh = $collectorFresh
+        autoCadProcessRunning = $autoCadProcessRunning
+        autoCadProcessSummary = $runningAutoCad
         readinessStatus = [string]$result.Payload.status
         payload = $result.Payload
     }

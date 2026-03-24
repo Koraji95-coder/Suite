@@ -54,6 +54,77 @@
 	gap: 1rem;
 }
 
+.sourceModeCard {
+	display: grid;
+	gap: 0.75rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+	border-radius: 0.9rem;
+	background: color-mix(in srgb, var(--primary) 4%, var(--surface));
+	padding: 0.9rem;
+}
+
+.sourceModeHeader {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.sourceModeTitle {
+	font-size: 0.8rem;
+	font-weight: 700;
+	color: var(--text);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+
+.sourceModeDescription,
+.projectMetadataHelper,
+.projectMetadataStatus {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.sourceModeGrid {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.sourceModeOption {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	border: 1px solid var(--border);
+	border-radius: 0.75rem;
+	background: var(--surface);
+	padding: 0.85rem;
+}
+
+.projectMetadataCard {
+	display: grid;
+	gap: 0.75rem;
+	border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+	border-radius: 0.75rem;
+	background: color-mix(in srgb, var(--surface-elevated, var(--surface)) 92%, var(--primary) 8%);
+	padding: 0.85rem;
+}
+
+.projectMetadataControls {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.fieldBlock {
+	display: grid;
+	gap: 0.4rem;
+}
+
+.fieldLabel {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--text);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
 .cidFiles {
 	display: grid;
 	gap: 0.75rem;
@@ -235,6 +306,15 @@
 	.standardDocRow {
 		grid-template-columns: 2fr 1.1fr 2fr 0.8fr 0.9fr 0.8fr 1.4fr;
 		align-items: center;
+	}
+
+	.sourceModeGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.projectMetadataControls {
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: end;
 	}
 
 	.cidHeader {

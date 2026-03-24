@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { agentService } from "@/services/agentService";
 import { AGENT_PAIRING_STATE_EVENT } from "@/services/agent/types";
+import { agentService } from "@/services/agentService";
 
 export const AGENT_POLL_VISIBLE_MS = 30_000;
 export const AGENT_POLL_HIDDEN_MS = 90_000;
 const AGENT_MAX_RETRY_AFTER_SECONDS = 120;
 const AGENT_TRANSIENT_RETRY_BACKOFF_MS = [2_000, 5_000, 10_000, 20_000, 30_000];
+const AGENT_STATUS_CACHE_TTL_MS = 5 * 60_000;
+const AGENT_MOUNT_HEALTH_REFRESH_TTL_MS = 60_000;
 
 interface AgentRefreshOptions {
 	includeHealth: boolean;
@@ -25,7 +27,10 @@ export interface AgentConnectionStatusState {
 }
 
 function resolveBasePollIntervalMs(): number {
-	if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+	if (
+		typeof document !== "undefined" &&
+		document.visibilityState === "hidden"
+	) {
 		return AGENT_POLL_HIDDEN_MS;
 	}
 	return AGENT_POLL_VISIBLE_MS;
@@ -40,37 +45,213 @@ function resolvePairingCacheKey(userId: string | null): string {
 	return `suite:agent:paired:${userId || "anonymous"}:${endpoint}`;
 }
 
+function resolveHealthCacheKey(userId: string | null): string {
+	const endpoint =
+		typeof (agentService as { getEndpoint?: () => string }).getEndpoint ===
+		"function"
+			? (agentService as { getEndpoint: () => string }).getEndpoint()
+			: "default-endpoint";
+	return `suite:agent:healthy:${userId || "anonymous"}:${endpoint}`;
+}
+
+function readCachedPairedValue(cacheKey: string): boolean {
+	try {
+		return localStorage.getItem(cacheKey) === "1";
+	} catch {
+		return false;
+	}
+}
+
+function writeCachedPairedValue(cacheKey: string, nextPaired: boolean) {
+	try {
+		localStorage.setItem(cacheKey, nextPaired ? "1" : "0");
+	} catch {
+		/* noop */
+	}
+}
+
+function readCachedHealthSnapshot(cacheKey: string): {
+	value: boolean;
+	updatedAt: number;
+} | null {
+	try {
+		const raw = localStorage.getItem(cacheKey);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as {
+			value?: boolean;
+			updatedAt?: number;
+		};
+		if (
+			typeof parsed?.value !== "boolean" ||
+			typeof parsed?.updatedAt !== "number"
+		) {
+			return null;
+		}
+		if (Date.now() - parsed.updatedAt > AGENT_STATUS_CACHE_TTL_MS) {
+			return null;
+		}
+		return {
+			value: parsed.value,
+			updatedAt: parsed.updatedAt,
+		};
+	} catch {
+		return null;
+	}
+}
+
+function readCachedHealthValue(cacheKey: string): boolean | null {
+	return readCachedHealthSnapshot(cacheKey)?.value ?? null;
+}
+
+function writeCachedHealthValue(cacheKey: string, nextHealthy: boolean) {
+	try {
+		localStorage.setItem(
+			cacheKey,
+			JSON.stringify({
+				value: nextHealthy,
+				updatedAt: Date.now(),
+			}),
+		);
+	} catch {
+		/* noop */
+	}
+}
+
+interface SharedAgentRefreshResult {
+	paired: boolean;
+	healthy: boolean | null;
+	error: string;
+	retryAfterUntilMs: number;
+	transientRetryCount: number;
+}
+
+const sharedRefreshByKey = new Map<string, Promise<SharedAgentRefreshResult>>();
+
+function resolveSharedRefreshKey(
+	pairingCacheKey: string,
+	healthCacheKey: string,
+	includeHealth: boolean,
+): string {
+	return `${pairingCacheKey}|${healthCacheKey}|${includeHealth ? "health" : "paired"}`;
+}
+
+async function runSharedAgentRefresh(options: {
+	pairingCacheKey: string;
+	healthCacheKey: string;
+	includeHealth: boolean;
+}): Promise<SharedAgentRefreshResult> {
+	const dedupeKey = resolveSharedRefreshKey(
+		options.pairingCacheKey,
+		options.healthCacheKey,
+		options.includeHealth,
+	);
+	const inFlight = sharedRefreshByKey.get(dedupeKey);
+	if (inFlight) {
+		return inFlight;
+	}
+
+	const promise = (async () => {
+		let nextPaired = readCachedPairedValue(options.pairingCacheKey);
+		let nextHealthy = readCachedHealthValue(options.healthCacheKey);
+		let nextError = "";
+		let retryAfterUntilMs = 0;
+		let transientRetryCount = 0;
+
+		try {
+			const result = await agentService.refreshPairingStatusDetailed();
+			nextPaired = result.ok
+				? result.paired
+				: result.transient
+					? nextPaired || result.paired
+					: result.paired;
+			writeCachedPairedValue(options.pairingCacheKey, nextPaired);
+
+			let shouldRunHealthCheck = options.includeHealth;
+			if (!result.ok) {
+				shouldRunHealthCheck = true;
+				const cappedRetryAfterSeconds = Math.min(
+					AGENT_MAX_RETRY_AFTER_SECONDS,
+					Math.max(0, result.retryAfterSeconds),
+				);
+				if (cappedRetryAfterSeconds > 0) {
+					retryAfterUntilMs = Date.now() + cappedRetryAfterSeconds * 1000;
+				}
+				if (result.transient) {
+					transientRetryCount = Math.min(
+						transientRetryCount + 1,
+						AGENT_TRANSIENT_RETRY_BACKOFF_MS.length,
+					);
+				}
+				nextError = result.message || "Unable to refresh agent session.";
+			}
+
+			if (shouldRunHealthCheck) {
+				nextHealthy = await agentService.healthCheck();
+				writeCachedHealthValue(options.healthCacheKey, nextHealthy);
+			}
+
+			return {
+				paired: nextPaired,
+				healthy: nextHealthy,
+				error: nextError,
+				retryAfterUntilMs,
+				transientRetryCount,
+			};
+		} catch (cause) {
+			transientRetryCount = Math.min(
+				transientRetryCount + 1,
+				AGENT_TRANSIENT_RETRY_BACKOFF_MS.length,
+			);
+			nextError =
+				cause instanceof Error
+					? cause.message
+					: "Unable to refresh agent status.";
+			nextHealthy = await agentService.healthCheck();
+			writeCachedHealthValue(options.healthCacheKey, nextHealthy);
+			return {
+				paired: nextPaired,
+				healthy: nextHealthy,
+				error: nextError,
+				retryAfterUntilMs,
+				transientRetryCount,
+			};
+		}
+	})().finally(() => {
+		sharedRefreshByKey.delete(dedupeKey);
+	});
+
+	sharedRefreshByKey.set(dedupeKey, promise);
+	return promise;
+}
+
 export function useAgentConnectionStatus(
 	options: UseAgentConnectionStatusOptions,
 ): AgentConnectionStatusState {
 	const { userId = null } = options;
-	const [healthy, setHealthy] = useState<boolean | null>(null);
-	const [paired, setPaired] = useState(false);
-	const [loading, setLoading] = useState(true);
+	const pairingCacheKey = resolvePairingCacheKey(userId);
+	const healthCacheKey = resolveHealthCacheKey(userId);
+	const [healthy, setHealthy] = useState<boolean | null>(() =>
+		readCachedHealthValue(healthCacheKey),
+	);
+	const [paired, setPaired] = useState(() =>
+		readCachedPairedValue(pairingCacheKey),
+	);
+	const [loading, setLoading] = useState(
+		() => readCachedHealthValue(healthCacheKey) === null,
+	);
 	const [error, setError] = useState("");
 	const pollTimerRef = useRef<number | null>(null);
 	const retryAfterUntilMsRef = useRef(0);
 	const transientRetryCountRef = useRef(0);
 	const mountedRef = useRef(true);
-	const pairingCacheKey = resolvePairingCacheKey(userId);
 
 	const readCachedPaired = useCallback((): boolean => {
-		try {
-			return localStorage.getItem(pairingCacheKey) === "1";
-		} catch {
-			return false;
-		}
+		return readCachedPairedValue(pairingCacheKey);
 	}, [pairingCacheKey]);
 
-	const writeCachedPaired = useCallback(
-		(nextPaired: boolean) => {
-			try {
-				localStorage.setItem(pairingCacheKey, nextPaired ? "1" : "0");
-			} catch {
-				/* noop */
-			}
-		},
-		[pairingCacheKey],
+	const readCachedHealthySnapshot = useCallback(
+		() => readCachedHealthSnapshot(healthCacheKey),
+		[healthCacheKey],
 	);
 
 	const clearPollTimer = useCallback(() => {
@@ -86,71 +267,33 @@ export function useAgentConnectionStatus(
 				setLoading(true);
 			}
 			try {
-				const result = await agentService.refreshPairingStatusDetailed();
-				if (!mountedRef.current) return;
-
-				setPaired((currentPaired) => {
-					const nextPaired = result.ok
-						? result.paired
-						: result.transient
-							? currentPaired || result.paired
-							: result.paired;
-					writeCachedPaired(nextPaired);
-					return nextPaired;
+				const result = await runSharedAgentRefresh({
+					pairingCacheKey,
+					healthCacheKey,
+					includeHealth: refreshOptions.includeHealth,
 				});
-
-				let shouldRunHealthCheck = refreshOptions.includeHealth;
-				if (!result.ok) {
-					shouldRunHealthCheck = true;
-					const cappedRetryAfterSeconds = Math.min(
-						AGENT_MAX_RETRY_AFTER_SECONDS,
-						Math.max(0, result.retryAfterSeconds),
-					);
-					if (cappedRetryAfterSeconds > 0) {
-						retryAfterUntilMsRef.current =
-							Date.now() + cappedRetryAfterSeconds * 1000;
-					}
-					if (result.transient) {
-						transientRetryCountRef.current = Math.min(
-							transientRetryCountRef.current + 1,
-							AGENT_TRANSIENT_RETRY_BACKOFF_MS.length,
-						);
-					} else {
-						transientRetryCountRef.current = 0;
-					}
-					setError(result.message || "Unable to refresh agent session.");
-				} else {
-					retryAfterUntilMsRef.current = 0;
-					transientRetryCountRef.current = 0;
-					setError("");
+				if (!mountedRef.current) return;
+				setPaired(result.paired);
+				if (result.healthy !== null) {
+					setHealthy(result.healthy);
 				}
-
-				if (shouldRunHealthCheck) {
-					const isHealthy = await agentService.healthCheck();
-					if (!mountedRef.current) return;
-					setHealthy(isHealthy);
-				}
+				retryAfterUntilMsRef.current = result.retryAfterUntilMs;
+				transientRetryCountRef.current = result.transientRetryCount;
+				setError(result.error);
 			} catch (cause) {
 				if (!mountedRef.current) return;
-				transientRetryCountRef.current = Math.min(
-					transientRetryCountRef.current + 1,
-					AGENT_TRANSIENT_RETRY_BACKOFF_MS.length,
-				);
-				const message =
+				setError(
 					cause instanceof Error
 						? cause.message
-						: "Unable to refresh agent status.";
-				setError(message);
-				const isHealthy = await agentService.healthCheck();
-				if (!mountedRef.current) return;
-				setHealthy(isHealthy);
+						: "Unable to refresh agent status.",
+				);
 			} finally {
 				if (mountedRef.current && refreshOptions.showLoading) {
 					setLoading(false);
 				}
 			}
 		},
-		[writeCachedPaired],
+		[healthCacheKey, pairingCacheKey],
 	);
 
 	const scheduleNextPoll = useCallback(() => {
@@ -166,14 +309,19 @@ export function useAgentConnectionStatus(
 						)
 					]
 				: baseIntervalMs;
-		const retryAfterDelayMs = Math.max(0, retryAfterUntilMsRef.current - Date.now());
+		const retryAfterDelayMs = Math.max(
+			0,
+			retryAfterUntilMsRef.current - Date.now(),
+		);
 		const nextDelayMs = Math.max(transientRetryDelayMs, retryAfterDelayMs);
 
 		pollTimerRef.current = window.setTimeout(() => {
-			void refreshState({ includeHealth: false, showLoading: false }).then(() => {
-				if (!mountedRef.current) return;
-				scheduleNextPoll();
-			});
+			void refreshState({ includeHealth: false, showLoading: false }).then(
+				() => {
+					if (!mountedRef.current) return;
+					scheduleNextPoll();
+				},
+			);
 		}, nextDelayMs);
 	}, [clearPollTimer, refreshState]);
 
@@ -183,15 +331,24 @@ export function useAgentConnectionStatus(
 	}, [refreshState, scheduleNextPoll]);
 
 	useEffect(() => {
+		const cachedHealthSnapshot = readCachedHealthySnapshot();
+		const cachedHealthy = cachedHealthSnapshot?.value ?? null;
+		const shouldRefreshHealth =
+			!cachedHealthSnapshot ||
+			Date.now() - cachedHealthSnapshot.updatedAt >
+				AGENT_MOUNT_HEALTH_REFRESH_TTL_MS;
 		mountedRef.current = true;
 		retryAfterUntilMsRef.current = 0;
 		transientRetryCountRef.current = 0;
-		setHealthy(null);
+		setHealthy(cachedHealthy);
 		setPaired(readCachedPaired());
 		setError("");
-		setLoading(true);
+		setLoading(cachedHealthy === null);
 
-		void refreshState({ includeHealth: true, showLoading: true }).then(() => {
+		void refreshState({
+			includeHealth: shouldRefreshHealth,
+			showLoading: cachedHealthy === null,
+		}).then(() => {
 			if (!mountedRef.current) return;
 			scheduleNextPoll();
 		});
@@ -200,14 +357,22 @@ export function useAgentConnectionStatus(
 			mountedRef.current = false;
 			clearPollTimer();
 		};
-	}, [clearPollTimer, refreshState, scheduleNextPoll, readCachedPaired]);
+	}, [
+		clearPollTimer,
+		readCachedHealthySnapshot,
+		readCachedPaired,
+		refreshState,
+		scheduleNextPoll,
+	]);
 
 	useEffect(() => {
 		const handleFocus = () => {
-			void refreshState({ includeHealth: false, showLoading: false }).then(() => {
-				if (!mountedRef.current) return;
-				scheduleNextPoll();
-			});
+			void refreshState({ includeHealth: false, showLoading: false }).then(
+				() => {
+					if (!mountedRef.current) return;
+					scheduleNextPoll();
+				},
+			);
 		};
 		window.addEventListener("focus", handleFocus);
 		return () => {
@@ -227,10 +392,12 @@ export function useAgentConnectionStatus(
 
 	useEffect(() => {
 		const handlePairingStateChanged = () => {
-			void refreshState({ includeHealth: false, showLoading: false }).then(() => {
-				if (!mountedRef.current) return;
-				scheduleNextPoll();
-			});
+			void refreshState({ includeHealth: false, showLoading: false }).then(
+				() => {
+					if (!mountedRef.current) return;
+					scheduleNextPoll();
+				},
+			);
 		};
 		window.addEventListener(
 			AGENT_PAIRING_STATE_EVENT,

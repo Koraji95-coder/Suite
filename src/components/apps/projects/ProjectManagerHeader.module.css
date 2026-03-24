@@ -1,19 +1,7 @@
 .root {
 	border: 1px solid var(--brand-border-strong);
 	border-radius: var(--radius-3);
-	background:
-		radial-gradient(
-			140% 100% at 100% 0%,
-			var(--brand-ambient-cool),
-			transparent 60%
-		),
-		radial-gradient(
-			110% 100% at 0% 100%,
-			var(--brand-ambient-warm),
-			transparent 65%
-		),
-		var(--brand-hero-gradient),
-		var(--brand-surface-neutral);
+	background: var(--suite-panel-surface-strong);
 	padding: clamp(1rem, 2vw, 2rem);
 	box-shadow: var(--brand-shadow-hero);
 }
@@ -167,7 +155,7 @@
 
 .statusChipActive {
 	border-color: var(--brand-border-strong);
-	background: var(--brand-hero-gradient);
+	background: var(--suite-panel-surface-strong);
 	color: var(--text);
 }
 
@@ -230,18 +218,12 @@
 	padding: 0.68rem 0.75rem;
 	border-radius: var(--radius-2);
 	border: 1px solid var(--brand-border-soft);
-	background:
-		linear-gradient(
-			180deg,
-			color-mix(in srgb, var(--brand-surface-neutral) 86%, transparent),
-			color-mix(in srgb, var(--brand-surface-branded) 70%, transparent)
-		),
-		var(--brand-surface-neutral);
+	background: var(--suite-panel-surface-soft);
 }
 
 .statCardHighlight {
 	border-color: var(--brand-border-strong);
-	background: var(--brand-hero-gradient);
+	background: var(--suite-panel-surface-strong);
 }
 
 .statLabel {

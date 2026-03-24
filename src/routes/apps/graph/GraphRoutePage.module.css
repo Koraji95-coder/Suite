@@ -5,17 +5,7 @@
 
 .heroPanel {
 	border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--line-soft));
-	background:
-		radial-gradient(
-			110% 130% at 100% 0%,
-			color-mix(in srgb, var(--primary) 20%, transparent),
-			transparent 62%
-		),
-		linear-gradient(
-			165deg,
-			color-mix(in srgb, var(--surface) 92%, transparent),
-			color-mix(in srgb, var(--surface-2) 58%, transparent)
-		);
+	background: var(--suite-panel-surface);
 }
 
 .heroHeader {
@@ -74,5 +64,5 @@
 
 .graphViewport {
 	min-height: 32.5rem;
-	height: clamp(32.5rem, 70dvh, 61.25rem);
+	height: var(--suite-panel-height-regular);
 }

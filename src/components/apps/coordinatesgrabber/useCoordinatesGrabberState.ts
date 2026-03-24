@@ -1,5 +1,6 @@
 import { type SetStateAction, useCallback, useEffect, useRef, useState } from "react";
-import { useGroundGrid } from "../ground-grid-generator/GroundGridContext";
+import { useCadRuntime } from "../cad-runtime/CadRuntimeContext";
+import type { CadRuntimeLogSink } from "../cad-runtime/CadRuntimeContext";
 import {
 	type CoordinatesGrabberState,
 	DEFAULT_STATE,
@@ -11,13 +12,16 @@ import {
 import { useCoordinatesGrabberExecutionHistory } from "./useCoordinatesGrabberExecutionHistory";
 import { useCoordinatesGrabberLiveStatus } from "./useCoordinatesGrabberLiveStatus";
 
-export function useCoordinatesGrabberState() {
+export function useCoordinatesGrabberState({
+	onLog,
+}: {
+	onLog?: CadRuntimeLogSink;
+} = {}) {
 	const {
-		addLog: ctxAddLog,
 		backendConnected,
 		availableLayers,
 		refreshLayers,
-	} = useGroundGrid();
+	} = useCadRuntime();
 	const [state, setStateInternal] =
 		useState<CoordinatesGrabberState>(DEFAULT_STATE);
 	const stateRef = useRef<CoordinatesGrabberState>(DEFAULT_STATE);
@@ -49,9 +53,9 @@ export function useCoordinatesGrabberState() {
 
 	const addLog = useCallback(
 		(message: string) => {
-			ctxAddLog("grabber", message);
+			onLog?.("grabber", message);
 		},
-		[ctxAddLog],
+		[onLog],
 	);
 
 	const {
@@ -160,4 +164,3 @@ export function useCoordinatesGrabberState() {
 		wsConnected,
 	};
 }
-

@@ -91,7 +91,7 @@ export function CalendarRightRail({
 								className={styles.newButton}
 							>
 								<PlusIcon size={14} aria-hidden="true" />
-								New
+								New event
 							</button>
 						</div>
 

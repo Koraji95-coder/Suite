@@ -71,6 +71,7 @@ def create_auth_email_blueprint(
             return _finalize(auth_email_generic_response(), 202)
 
         client_ip = get_request_ip()
+        email_hash = email_fingerprint(email)
         allowed, reason = is_auth_email_request_allowed(email, client_ip)
         if not allowed:
             logger.warning(
@@ -78,7 +79,7 @@ def create_auth_email_blueprint(
                 flow,
                 reason,
                 client_ip,
-                email_fingerprint(email),
+                email_hash,
             )
             return _finalize(auth_email_generic_response(), 202)
 
@@ -89,15 +90,29 @@ def create_auth_email_blueprint(
                     "Auth email captcha verification failed flow=%s ip=%s email_hash=%s",
                     flow,
                     client_ip,
-                    email_fingerprint(email),
+                    email_hash,
                 )
                 if auth_email_require_turnstile:
                     return _finalize(auth_email_generic_response(), 202)
 
         try:
             send_supabase_email_link(email, flow, client_redirect_to=client_redirect_to)
+            logger.info(
+                "Auth email request dispatched flow=%s ip=%s email_hash=%s redirect_supplied=%s",
+                flow,
+                client_ip,
+                email_hash,
+                "yes" if client_redirect_to else "no",
+            )
         except Exception as exc:
-            logger.warning("Email auth request failed for flow=%s: %s", flow, exc)
+            logger.warning(
+                "Email auth request failed flow=%s ip=%s email_hash=%s redirect_supplied=%s: %s",
+                flow,
+                client_ip,
+                email_hash,
+                "yes" if client_redirect_to else "no",
+                exc,
+            )
 
         return _finalize(auth_email_generic_response(), 202)
 

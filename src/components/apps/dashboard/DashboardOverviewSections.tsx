@@ -25,26 +25,31 @@ import {
 	summarizeWatchdogTarget,
 } from "@/lib/watchdogTelemetry";
 import type { ActivityLogRow } from "@/services/activityService";
-import type { WorkLedgerRow } from "@/services/workLedgerService";
 import type {
 	WatchdogCollector,
 	WatchdogCollectorEvent,
 	WatchdogOverviewResponse,
 	WatchdogSessionSummary,
 } from "@/services/watchdogService";
-import type { DashboardProject, DashboardTaskCount } from "./useDashboardOverviewData";
 import type {
-	DashboardLiveAutoCadSessionCard,
-	DashboardSessionTimelineRow,
-} from "./dashboardWatchdogSelectors";
-import type { DashboardWorkLedgerViewModel } from "./dashboardWorkLedgerSelectors";
-import type { WorkLedgerDraftSuggestion } from "@/services/workLedgerService";
+	WorkLedgerDraftSuggestion,
+	WorkLedgerRow,
+} from "@/services/workLedgerService";
+import styles from "./DashboardOverviewPanel.module.css";
 import {
 	formatBytes,
 	formatDuration,
 	formatRelativeTime,
 } from "./dashboardOverviewFormatters";
-import styles from "./DashboardOverviewPanel.module.css";
+import type {
+	DashboardLiveAutoCadSessionCard,
+	DashboardSessionTimelineRow,
+} from "./dashboardWatchdogSelectors";
+import type { DashboardWorkLedgerViewModel } from "./dashboardWorkLedgerSelectors";
+import type {
+	DashboardProject,
+	DashboardTaskCount,
+} from "./useDashboardOverviewData";
 
 function formatGeneratedAt(value: string): string {
 	const timestamp = Date.parse(value);
@@ -78,42 +83,42 @@ export function DashboardOverviewStatsGrid({
 }: DashboardOverviewStatsGridProps) {
 	return (
 		<section className={styles.statsGrid}>
-			<Panel variant="default" padding="md" className={styles.statCard}>
+			<Panel variant="support" padding="md" className={styles.statCard}>
 				<div className={styles.statIcon}>
 					<FolderKanban size={16} />
 				</div>
 				<div className={styles.statValue}>{projectsCount}</div>
 				<div className={styles.statLabel}>Active projects</div>
 			</Panel>
-			<Panel variant="default" padding="md" className={styles.statCard}>
+			<Panel variant="support" padding="md" className={styles.statCard}>
 				<div className={styles.statIcon}>
 					<ShieldCheck size={16} />
 				</div>
 				<div className={styles.statValue}>{openTasks}</div>
 				<div className={styles.statLabel}>Open tasks</div>
 			</Panel>
-			<Panel variant="default" padding="md" className={styles.statCard}>
+			<Panel variant="support" padding="md" className={styles.statCard}>
 				<div className={styles.statIcon}>
 					<Radar size={16} />
 				</div>
 				<div className={styles.statValue}>{collectorsOnline}</div>
 				<div className={styles.statLabel}>Collectors online</div>
 			</Panel>
-			<Panel variant="default" padding="md" className={styles.statCard}>
+			<Panel variant="support" padding="md" className={styles.statCard}>
 				<div className={styles.statIcon}>
 					<Activity size={16} />
 				</div>
 				<div className={styles.statValue}>{eventsInWindow}</div>
 				<div className={styles.statLabel}>Events in window</div>
 			</Panel>
-			<Panel variant="default" padding="md" className={styles.statCard}>
+			<Panel variant="support" padding="md" className={styles.statCard}>
 				<div className={styles.statIcon}>
 					<BrainCircuit size={16} />
 				</div>
 				<div className={styles.statValue}>{memoryCount}</div>
 				<div className={styles.statLabel}>Memory notes</div>
 			</Panel>
-			<Panel variant="default" padding="md" className={styles.statCard}>
+			<Panel variant="support" padding="md" className={styles.statCard}>
 				<div className={styles.statIcon}>
 					<HardDrive size={16} />
 				</div>
@@ -173,7 +178,7 @@ export function DashboardWatchdogSection({
 }: DashboardWatchdogSectionProps) {
 	return (
 		<Panel
-			variant="default"
+			variant="feature"
 			padding="lg"
 			className={className}
 			ref={panelRef}
@@ -181,18 +186,13 @@ export function DashboardWatchdogSection({
 		>
 			<div className={styles.panelHeader}>
 				<div>
-					<Text size="sm" weight="semibold">
+					<Text size="sm" weight="semibold" block>
 						Operations and Watchdog
 					</Text>
-					<Text size="xs" color="muted">
+					<Text size="xs" color="muted" block>
 						Collector health, recent file activity, and telemetry trends.
 					</Text>
 				</div>
-				{telemetryLoading && (
-					<Badge color="warning" variant="soft">
-						Loading
-					</Badge>
-				)}
 			</div>
 
 			{watchdogError ? (
@@ -242,7 +242,10 @@ export function DashboardWatchdogSection({
 													</div>
 												</div>
 												<div className={styles.sessionBadges}>
-													<Badge color={card.collectorStatusTone} variant="soft">
+													<Badge
+														color={card.collectorStatusTone}
+														variant="soft"
+													>
 														{card.collectorStatus}
 													</Badge>
 													<Badge color={card.trackingTone} variant="soft">
@@ -262,7 +265,8 @@ export function DashboardWatchdogSection({
 												</span>
 												{session.lastActivityAt ? (
 													<span>
-														Activity {formatRelativeTime(session.lastActivityAt)}
+														Activity{" "}
+														{formatRelativeTime(session.lastActivityAt)}
 													</span>
 												) : null}
 												<span>{formatDuration(session.durationMs)}</span>
@@ -331,7 +335,9 @@ export function DashboardWatchdogSection({
 									visibleCollectors.slice(0, 6).map((collector) => (
 										<div key={collector.collectorId} className={styles.dataRow}>
 											<div>
-												<div className={styles.dataRowTitle}>{collector.name}</div>
+												<div className={styles.dataRowTitle}>
+													{collector.name}
+												</div>
 												<div className={styles.dataRowMeta}>
 													{collector.workstationId} • {collector.collectorType}
 												</div>
@@ -481,7 +487,8 @@ export function DashboardWatchdogSection({
 													{basenameFromPath(session.drawingPath)}
 												</div>
 												<div className={styles.dataRowMeta}>
-													{session.workstationId} • {session.commandCount} command(s)
+													{session.workstationId} • {session.commandCount}{" "}
+													command(s)
 													{" • "}
 													{session.lastEventType || session.status}
 												</div>
@@ -526,9 +533,12 @@ export function DashboardWatchdogSection({
 										>
 											<div>
 												<div className={styles.dataRowTitle}>
-													{allProjectsMap.get(entry.projectId)?.name || entry.projectId}
+													{allProjectsMap.get(entry.projectId)?.name ||
+														entry.projectId}
 												</div>
-												<div className={styles.dataRowMeta}>{entry.projectId}</div>
+												<div className={styles.dataRowMeta}>
+													{entry.projectId}
+												</div>
 											</div>
 											<div className={styles.projectRowAside}>
 												<span>{entry.eventCount} event(s)</span>
@@ -571,7 +581,7 @@ export function DashboardArchitectureSection({
 }: DashboardArchitectureSectionProps) {
 	return (
 		<Panel
-			variant="default"
+			variant="support"
 			padding="lg"
 			className={className}
 			ref={panelRef}
@@ -579,11 +589,12 @@ export function DashboardArchitectureSection({
 		>
 			<div className={styles.panelHeader}>
 				<div>
-					<Text size="sm" weight="semibold">
+					<Text size="sm" weight="semibold" block>
 						Repository Architecture
 					</Text>
-					<Text size="xs" color="muted">
-						Hotspots from the latest repo scan plus a curated checkpoint watchlist.
+					<Text size="xs" color="muted" block>
+						Hotspots from the latest repo scan plus a curated checkpoint
+						watchlist.
 					</Text>
 				</div>
 				<div className={styles.architectureActions}>
@@ -711,7 +722,7 @@ export function DashboardWorkLedgerSection({
 }: DashboardWorkLedgerSectionProps) {
 	return (
 		<Panel
-			variant="default"
+			variant="support"
 			padding="lg"
 			className={className}
 			ref={panelRef}
@@ -719,11 +730,12 @@ export function DashboardWorkLedgerSection({
 		>
 			<div className={styles.panelHeader}>
 				<div>
-					<Text size="sm" weight="semibold">
+					<Text size="sm" weight="semibold" block>
 						Work Ledger
 					</Text>
-					<Text size="xs" color="muted">
-						Private roadmap plus changelog milestones linked to repo areas and publish receipts.
+					<Text size="xs" color="muted" block>
+						Private roadmap plus changelog milestones linked to repo areas and
+						publish receipts.
 					</Text>
 				</div>
 				<Button
@@ -754,35 +766,37 @@ export function DashboardWorkLedgerSection({
 								{viewModel.readinessDetail}
 							</div>
 						</div>
-					<div className={styles.ledgerKpiGrid}>
-						<div className={styles.ledgerKpiCard}>
-							<div className={styles.ledgerKpiValue}>
-								{viewModel.plannedCount}
+						<div className={styles.ledgerKpiGrid}>
+							<div className={styles.ledgerKpiCard}>
+								<div className={styles.ledgerKpiValue}>
+									{viewModel.plannedCount}
+								</div>
+								<div className={styles.ledgerKpiLabel}>Planned</div>
 							</div>
-							<div className={styles.ledgerKpiLabel}>Planned</div>
-						</div>
-						<div className={styles.ledgerKpiCard}>
-							<div className={styles.ledgerKpiValue}>
-								{viewModel.activeCount}
+							<div className={styles.ledgerKpiCard}>
+								<div className={styles.ledgerKpiValue}>
+									{viewModel.activeCount}
+								</div>
+								<div className={styles.ledgerKpiLabel}>In progress</div>
 							</div>
-							<div className={styles.ledgerKpiLabel}>In progress</div>
-						</div>
-						<div className={styles.ledgerKpiCard}>
-							<div className={styles.ledgerKpiValue}>
-								{viewModel.completedCount}
+							<div className={styles.ledgerKpiCard}>
+								<div className={styles.ledgerKpiValue}>
+									{viewModel.completedCount}
+								</div>
+								<div className={styles.ledgerKpiLabel}>Completed</div>
 							</div>
-							<div className={styles.ledgerKpiLabel}>Completed</div>
-						</div>
-						<div className={styles.ledgerKpiCard}>
-							<div className={styles.ledgerKpiValue}>
-								{viewModel.archivedCount}
+							<div className={styles.ledgerKpiCard}>
+								<div className={styles.ledgerKpiValue}>
+									{viewModel.archivedCount}
+								</div>
+								<div className={styles.ledgerKpiLabel}>Archived</div>
 							</div>
-							<div className={styles.ledgerKpiLabel}>Archived</div>
-						</div>
-						<div className={styles.ledgerKpiCard}>
-							<div className={styles.ledgerKpiValue}>{viewModel.readyCount}</div>
-							<div className={styles.ledgerKpiLabel}>Ready</div>
-						</div>
+							<div className={styles.ledgerKpiCard}>
+								<div className={styles.ledgerKpiValue}>
+									{viewModel.readyCount}
+								</div>
+								<div className={styles.ledgerKpiLabel}>Ready</div>
+							</div>
 							<div className={styles.ledgerKpiCard}>
 								<div className={styles.ledgerKpiValue}>
 									{viewModel.publishedCount}
@@ -796,59 +810,66 @@ export function DashboardWorkLedgerSection({
 								<div className={styles.ledgerKpiLabel}>Blockers</div>
 							</div>
 							<div className={styles.ledgerKpiCard}>
-							<div className={styles.ledgerKpiValue}>
-								{viewModel.hotspotLinkedCount}
+								<div className={styles.ledgerKpiValue}>
+									{viewModel.hotspotLinkedCount}
+								</div>
+								<div className={styles.ledgerKpiLabel}>Hotspot links</div>
 							</div>
-							<div className={styles.ledgerKpiLabel}>Hotspot links</div>
 						</div>
-					</div>
-					<section className={styles.ledgerSuggestionSection}>
-						<Text size="xs" color="muted" className={styles.subpanelLabel}>
-							Suggested drafts
-						</Text>
-						{suggestionsLoading ? (
-							<div className={styles.emptyStateCompact}>Checking for suggestions…</div>
-						) : suggestionsError ? (
-							<div className={styles.error}>{suggestionsError}</div>
-						) : suggestions.length === 0 ? (
-							<div className={styles.emptyStateCompact}>
-								No draft suggestions right now. Keep working and we’ll capture notable moments.
-							</div>
-						) : (
-							<div className={styles.rowList}>
-								{suggestions.slice(0, 3).map((suggestion) => (
-									<div key={suggestion.suggestionId} className={styles.dataRow}>
-										<div>
-											<div className={styles.dataRowTitle}>
-												{suggestion.title}
+						<section className={styles.ledgerSuggestionSection}>
+							<Text size="xs" color="muted" className={styles.subpanelLabel}>
+								Suggested drafts
+							</Text>
+							{suggestionsLoading ? (
+								<div className={styles.emptyStateCompact}>
+									Suggested drafts appear here once the ledger captures new
+									publish candidates.
+								</div>
+							) : suggestionsError ? (
+								<div className={styles.error}>{suggestionsError}</div>
+							) : suggestions.length === 0 ? (
+								<div className={styles.emptyStateCompact}>
+									No draft suggestions right now. Keep working and we’ll capture
+									notable moments.
+								</div>
+							) : (
+								<div className={styles.rowList}>
+									{suggestions.slice(0, 3).map((suggestion) => (
+										<div
+											key={suggestion.suggestionId}
+											className={styles.dataRow}
+										>
+											<div>
+												<div className={styles.dataRowTitle}>
+													{suggestion.title}
+												</div>
+												<div className={styles.dataRowMeta}>
+													{suggestion.summary}
+												</div>
+												<div className={styles.dataRowMeta}>
+													{suggestion.sourceKind}
+													{suggestion.commitRefs.length > 0
+														? ` • ${suggestion.commitRefs.join(", ")}`
+														: ""}
+													{suggestion.projectId
+														? ` • ${suggestion.projectId}`
+														: ""}
+												</div>
 											</div>
-											<div className={styles.dataRowMeta}>
-												{suggestion.summary}
-											</div>
-											<div className={styles.dataRowMeta}>
-												{suggestion.sourceKind}
-												{suggestion.commitRefs.length > 0
-													? ` • ${suggestion.commitRefs.join(", ")}`
-													: ""}
-												{suggestion.projectId
-													? ` • ${suggestion.projectId}`
-													: ""}
+											<div className={styles.dataRowAside}>
+												<button
+													type="button"
+													className={styles.sessionActionButton}
+													onClick={onOpenChangelog}
+												>
+													Review in changelog
+												</button>
 											</div>
 										</div>
-										<div className={styles.dataRowAside}>
-											<button
-												type="button"
-												className={styles.sessionActionButton}
-												onClick={onOpenChangelog}
-											>
-												Review in changelog
-											</button>
-										</div>
-									</div>
-								))}
-							</div>
-						)}
-					</section>
+									))}
+								</div>
+							)}
+						</section>
 					</div>
 
 					<div className={styles.sectionBlock}>
@@ -965,7 +986,8 @@ export function DashboardWorkLedgerSection({
 							!viewModel.latestCompletedEntry &&
 							!viewModel.latestPublishedEntry ? (
 								<div className={styles.emptyStateCompact}>
-									No roadmap or changelog milestones matched the current filters.
+									No roadmap or changelog milestones matched the current
+									filters.
 								</div>
 							) : null}
 						</div>
@@ -1101,9 +1123,7 @@ export function DashboardWorkLedgerSection({
 									<div key={entry.id} className={styles.dataRow}>
 										<div>
 											<div className={styles.dataRowTitle}>{entry.title}</div>
-											<div className={styles.dataRowMeta}>
-												{entry.summary}
-											</div>
+											<div className={styles.dataRowMeta}>{entry.summary}</div>
 										</div>
 										<div className={styles.dataRowAside}>
 											<Badge
@@ -1153,7 +1173,7 @@ export function DashboardMemorySection({
 
 	return (
 		<Panel
-			variant="default"
+			variant="support"
 			padding="lg"
 			className={className}
 			ref={panelRef}
@@ -1161,10 +1181,10 @@ export function DashboardMemorySection({
 		>
 			<div className={styles.panelHeader}>
 				<div>
-					<Text size="sm" weight="semibold">
+					<Text size="sm" weight="semibold" block>
 						Agent Memory
 					</Text>
-					<Text size="xs" color="muted">
+					<Text size="xs" color="muted" block>
 						Private and shared notes attached to the current workspace.
 					</Text>
 				</div>
@@ -1237,8 +1257,6 @@ interface DashboardProjectOperationsSectionProps {
 	panelRef: RefObject<HTMLDivElement | null>;
 	className: string;
 	isLoading: boolean;
-	loadMessage: string;
-	loadProgress: number;
 	filteredProjects: DashboardProject[];
 	projectTaskCounts: ReadonlyMap<string, DashboardTaskCount>;
 	allProjectsMap: ReadonlyMap<string, DashboardProject>;
@@ -1250,8 +1268,6 @@ export function DashboardProjectOperationsSection({
 	panelRef,
 	className,
 	isLoading,
-	loadMessage,
-	loadProgress,
 	filteredProjects,
 	projectTaskCounts,
 	allProjectsMap,
@@ -1260,7 +1276,7 @@ export function DashboardProjectOperationsSection({
 }: DashboardProjectOperationsSectionProps) {
 	return (
 		<Panel
-			variant="default"
+			variant="support"
 			padding="lg"
 			className={className}
 			ref={panelRef}
@@ -1268,23 +1284,21 @@ export function DashboardProjectOperationsSection({
 		>
 			<div className={styles.panelHeader}>
 				<div>
-					<Text size="sm" weight="semibold">
+					<Text size="sm" weight="semibold" block>
 						Project Operations
 					</Text>
-					<Text size="xs" color="muted">
-						Deadlines, task health, and recent human activity for the selected scope.
+					<Text size="xs" color="muted" block>
+						Deadlines, task health, and recent human activity for the selected
+						scope.
 					</Text>
 				</div>
-				{isLoading && (
-					<Badge color="warning" variant="soft">
-						Loading
-					</Badge>
-				)}
 			</div>
 
-			{isLoading ? (
+			{filteredProjects.length === 0 && filteredActivities.length === 0 ? (
 				<div className={styles.emptyState}>
-					{loadMessage} ({loadProgress}%)
+					{isLoading
+						? "Project scope appears here when matching work is available."
+						: "No projects or activity matched the current scope."}
 				</div>
 			) : (
 				<>
@@ -1306,7 +1320,9 @@ export function DashboardProjectOperationsSection({
 										</div>
 									</div>
 									<div className={styles.projectRowAside}>
-										<span>{counts?.completed ?? 0}/{counts?.total ?? 0}</span>
+										<span>
+											{counts?.completed ?? 0}/{counts?.total ?? 0}
+										</span>
 										<ArrowUpRight size={14} />
 									</div>
 								</button>

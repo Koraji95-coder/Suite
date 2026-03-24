@@ -54,6 +54,20 @@ describe("supabase local mode helpers", () => {
 		expect(config.smtp.port).toBe("2500");
 	});
 
+	it("normalizes spaced gmail app passwords before writing local smtp config", () => {
+		const config = resolveLocalEmailConfig(
+			{
+				GMAIL_SMTP_USER: "suite@example.com",
+				GMAIL_SMTP_APP_PASSWORD: "abcd efgh ijkl mnop",
+			},
+			"gmail",
+			{ strict: true },
+		);
+
+		expect(config.mode).toBe("gmail");
+		expect(config.smtp.pass).toBe("abcdefghijklmnop");
+	});
+
 	it("writes local target overrides that disable turnstile and switch auth to local", () => {
 		const entries = Object.fromEntries(
 			buildLocalSupabaseActiveEntries({

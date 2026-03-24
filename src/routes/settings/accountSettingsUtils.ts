@@ -11,9 +11,7 @@ export function buildSessionAuthStatus(
 ): StatusDescriptor {
 	return {
 		value:
-			sessionAuthMethod === "passkey"
-				? "Passkey-authenticated"
-				: "Authenticated",
+			sessionAuthMethod === "passkey" ? "Passkey session" : "Signed-in session",
 		tone: sessionAuthMethod === "passkey" ? "success" : "primary",
 	};
 }
@@ -22,7 +20,8 @@ export function buildPasskeyAuthStatus(
 	sessionAuthMethod: string | null | undefined,
 ): StatusDescriptor {
 	return {
-		value: sessionAuthMethod === "passkey" ? "Verified" : "Ready",
+		value:
+			sessionAuthMethod === "passkey" ? "Passkey active" : "Password sign-in",
 		tone: sessionAuthMethod === "passkey" ? "success" : "accent",
 	};
 }
@@ -49,14 +48,14 @@ export function buildPasskeyBackendStatus(
 	passkeyCapability: PasskeyCapability | null,
 	passkeyLoading: boolean,
 ): StatusDescriptor {
-	if (passkeyLoading) return { value: "Checking", tone: "primary" };
+	if (passkeyLoading) return { value: "Background", tone: "muted" };
 	if (!passkeyCapability?.enabled)
-		return { value: "Rollout off", tone: "warning" };
+		return { value: "Needs attention", tone: "warning" };
 	if (!passkeyCapability.config_ready) {
-		return { value: "Needs config", tone: "warning" };
+		return { value: "Needs attention", tone: "warning" };
 	}
 	if (!passkeyCapability.handlers_ready) {
-		return { value: "Handlers missing", tone: "warning" };
+		return { value: "Needs attention", tone: "warning" };
 	}
 	return { value: "Ready", tone: "success" };
 }
@@ -65,24 +64,24 @@ export function buildAgentGatewayStatus(
 	agentHealthy: boolean | null,
 ): StatusDescriptor {
 	if (agentHealthy === null) {
-		return { value: "Checking", tone: "primary" };
+		return { value: "Background", tone: "muted" };
 	}
 	return agentHealthy
-		? { value: "Online", tone: "success" }
-		: { value: "Offline", tone: "danger" };
+		? { value: "Ready", tone: "success" }
+		: { value: "Unavailable", tone: "danger" };
 }
 
 export function buildAgentPairingStatus(
 	agentPaired: boolean,
 ): StatusDescriptor {
 	return agentPaired
-		? { value: "Paired", tone: "success" }
-		: { value: "Not paired", tone: "warning" };
+		? { value: "Ready", tone: "success" }
+		: { value: "Needs attention", tone: "warning" };
 }
 
 export function buildAgentModeStatus(usesBroker: boolean): StatusDescriptor {
 	return {
-		value: usesBroker ? "Brokered verification" : "Direct gateway",
+		value: usesBroker ? "Email verification" : "Local verification",
 		tone: usesBroker ? "accent" : "primary",
 	};
 }

@@ -10,7 +10,14 @@ import {
 	subMonths,
 	subWeeks,
 } from "date-fns";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import {
+	type ReactNode,
+	startTransition,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 import {
 	AgendaDaysToShow,
 	addHoursToDate,
@@ -64,6 +71,11 @@ export function useEventCalendarState({
 	const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
 		null,
 	);
+	const setCalendarView = useCallback((nextView: CalendarView) => {
+		startTransition(() => {
+			setView(nextView);
+		});
+	}, []);
 
 	useEffect(() => {
 		if (controlledSelectedDate) setCurrentDate(controlledSelectedDate);
@@ -87,23 +99,23 @@ export function useEventCalendarState({
 
 			switch (event.key.toLowerCase()) {
 				case "a":
-					setView("agenda");
+					setCalendarView("agenda");
 					break;
 				case "d":
-					setView("day");
+					setCalendarView("day");
 					break;
 				case "m":
-					setView("month");
+					setCalendarView("month");
 					break;
 				case "w":
-					setView("week");
+					setCalendarView("week");
 					break;
 			}
 		};
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [isEventDialogOpen]);
+	}, [isEventDialogOpen, setCalendarView]);
 
 	const handlePrevious = () => {
 		if (view === "month") {
@@ -265,7 +277,7 @@ export function useEventCalendarState({
 		openNewEventDialog,
 		selectedDate,
 		selectedEvent,
-		setView,
+		setView: setCalendarView,
 		view,
 		viewTitle,
 	};

@@ -360,6 +360,11 @@ export type Database = {
           previous_revision: string | null
           project_id: string
           revision: string
+          revision_by: string
+          revision_checked_by: string
+          revision_date: string | null
+          revision_description: string
+          revision_sort_order: number
           source_kind: string
           source_ref: string | null
           title: string
@@ -381,6 +386,11 @@ export type Database = {
           previous_revision?: string | null
           project_id: string
           revision?: string
+          revision_by?: string
+          revision_checked_by?: string
+          revision_date?: string | null
+          revision_description?: string
+          revision_sort_order?: number
           source_kind?: string
           source_ref?: string | null
           title?: string
@@ -402,6 +412,11 @@ export type Database = {
           previous_revision?: string | null
           project_id?: string
           revision?: string
+          revision_by?: string
+          revision_checked_by?: string
+          revision_date?: string | null
+          revision_description?: string
+          revision_sort_order?: number
           source_kind?: string
           source_ref?: string | null
           title?: string
@@ -420,6 +435,62 @@ export type Database = {
           },
           {
             foreignKeyName: "drawing_revision_register_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_title_block_profiles: {
+        Row: {
+          acade_line1: string
+          acade_line2: string
+          acade_line4: string
+          block_name: string
+          created_at: string
+          id: string
+          project_id: string
+          project_root_path: string | null
+          signer_checked_by: string
+          signer_drawn_by: string
+          signer_engineer: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acade_line1?: string
+          acade_line2?: string
+          acade_line4?: string
+          block_name?: string
+          created_at?: string
+          id?: string
+          project_id: string
+          project_root_path?: string | null
+          signer_checked_by?: string
+          signer_drawn_by?: string
+          signer_engineer?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acade_line1?: string
+          acade_line2?: string
+          acade_line4?: string
+          block_name?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          project_root_path?: string | null
+          signer_checked_by?: string
+          signer_drawn_by?: string
+          signer_engineer?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_title_block_profiles_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"

@@ -1,4 +1,12 @@
-import { Dialog, DialogContent } from "@/components/apps/ui/dialog";
+import { Checkbox } from "@/components/apps/ui/checkbox";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { cn } from "@/lib/utils";
 import styles from "./StandardsDrawingDialogs.module.css";
 import type { QARule } from "./standardsDrawingModels";
@@ -31,14 +39,24 @@ export function StandardsDrawingRulesDialog({
 				showCloseButton={false}
 			>
 				<div className={styles.header}>
-					<h3 className={styles.title}>Standards Rules Configuration</h3>
-					<button
-						onClick={onClose}
-						className={styles.closeButton}
-						type="button"
-					>
-						<span className={styles.closeGlyph}>×</span>
-					</button>
+					<DialogHeader className={styles.headerText}>
+						<DialogTitle className={styles.title}>
+							Standards Rules Configuration
+						</DialogTitle>
+						<DialogDescription className={styles.subtitle}>
+							Enable or disable the rules that run when this drawing is checked.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogClose asChild>
+						<button
+							onClick={onClose}
+							className={styles.closeButton}
+							type="button"
+							aria-label="Close standards rules configuration"
+						>
+							<span className={styles.closeGlyph}>×</span>
+						</button>
+					</DialogClose>
 				</div>
 
 				<div className={styles.body}>
@@ -56,14 +74,21 @@ export function StandardsDrawingRulesDialog({
 								<div className={styles.ruleHead}>
 									<div className={styles.ruleMain}>
 										<div className={styles.ruleTop}>
-											<input
-												type="checkbox"
+											<Checkbox
+												id={`standards-rule-${rule.id}`}
 												checked={rule.enabled}
-												onChange={() => onToggleRule(rule.id)}
+												onCheckedChange={(checked) => {
+													if (checked === "indeterminate") return;
+													onToggleRule(rule.id);
+												}}
 												className={styles.toggle}
-											name="standardsdrawingrulesdialog_input_59"
 											/>
-											<h4 className={styles.ruleName}>{rule.name}</h4>
+											<label
+												htmlFor={`standards-rule-${rule.id}`}
+												className={styles.ruleName}
+											>
+												{rule.name}
+											</label>
 											<span
 												className={cn(
 													styles.chip,

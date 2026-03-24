@@ -10,7 +10,7 @@ import {
 	basenameFromPath,
 	readWatchdogCollectorRuntimeState,
 } from "@/lib/watchdogTelemetry";
-import { buildDashboardWatchdogHref } from "@/lib/watchdogNavigation";
+import { buildWatchdogHref } from "@/lib/watchdogNavigation";
 import styles from "./ProjectDetailHeader.module.css";
 import type { Project, Task } from "./projectmanagertypes";
 import type { ProjectWatchdogTelemetry } from "./useProjectWatchdogTelemetry";
@@ -80,7 +80,7 @@ export function ProjectDetailHeader({
 		return new Date(year, month - 1, day) < today;
 	}).length;
 	const categoryToneClass = getCategoryToneClass(project.category);
-	const dashboardLink = buildDashboardWatchdogHref(project.id);
+	const watchdogLink = buildWatchdogHref(project.id);
 	const leadSession = telemetry?.liveSessions[0] ?? telemetry?.latestSession ?? null;
 	const leadAutoCadCollector =
 		telemetry?.liveAutoCadCollectors[0] ?? telemetry?.autoCadCollectors[0] ?? null;
@@ -102,14 +102,14 @@ export function ProjectDetailHeader({
 		: null;
 	const commandCenterSummary =
 		overdueTaskCount > 0
-			? `${overdueTaskCount} overdue task${overdueTaskCount === 1 ? "" : "s"} need follow-up in the dashboard telemetry view.`
+			? `${overdueTaskCount} overdue task${overdueTaskCount === 1 ? "" : "s"} need follow-up in Watchdog and Projects.`
 			: openTaskCount > 0
-				? `${openTaskCount} active task${openTaskCount === 1 ? "" : "s"} remain for this project. Open dashboard telemetry to review recent file activity.`
-				: "All tracked tasks are complete. Use the dashboard for telemetry, architecture, and exports.";
+				? `${openTaskCount} active task${openTaskCount === 1 ? "" : "s"} remain for this project. Open Watchdog to review recent drawing and file activity.`
+				: "All tracked tasks are complete. Use Watchdog for live telemetry and recent project activity.";
 	const telemetrySummary = telemetry?.loading
 		? "Checking collector and AutoCAD session telemetry for this project."
 		: telemetry?.error
-			? "Project telemetry is temporarily unavailable. Use the dashboard link for a retry."
+			? "Project telemetry is temporarily unavailable. Use the Watchdog page for a retry."
 			: telemetry?.activeCadSessionCount
 				? `${telemetry.activeCadSessionCount} live AutoCAD session${telemetry.activeCadSessionCount === 1 ? "" : "s"} mapped to this project${latestTrackedLabel ? `, led by ${latestTrackedLabel}` : ""}${telemetry.totalCommandsInWindow ? ` with ${telemetry.totalCommandsInWindow} command${telemetry.totalCommandsInWindow === 1 ? "" : "s"} in range` : ""}.`
 				: telemetry?.sessions.length
@@ -209,7 +209,7 @@ export function ProjectDetailHeader({
 						</div>
 						<div>
 							<p className={styles.commandEyebrow}>Project Ops</p>
-							<h4 className={styles.commandTitle}>Dashboard telemetry</h4>
+							<h4 className={styles.commandTitle}>Watchdog</h4>
 						</div>
 					</div>
 					<p className={styles.commandCopy}>{commandCenterSummary}</p>
@@ -221,8 +221,8 @@ export function ProjectDetailHeader({
 								: "No deadline"}
 						</span>
 					</div>
-					<Link to={dashboardLink} className={styles.commandLink}>
-						<span>Go to dashboard</span>
+					<Link to={watchdogLink} className={styles.commandLink}>
+						<span>Open Watchdog</span>
 						<ArrowRight className={styles.commandLinkIcon} />
 					</Link>
 				</div>

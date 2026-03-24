@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import styles from "./CoordinatesGrabber.module.css";
 import { CoordinateYamlViewer } from "./CoordinateYamlViewer";
 import { useCoordinatesGrabberState } from "./useCoordinatesGrabberState";
+import type { CadRuntimeLogSource } from "../cad-runtime/useCadRuntimeBackendBridge";
 
 function getProgressLabel(stage: string, pct: number): string {
 	switch (stage) {
@@ -82,7 +83,11 @@ function StepCard({
 	);
 }
 
-export function CoordinatesGrabber() {
+export function CoordinatesGrabber({
+	onLog,
+}: {
+	onLog?: (source: CadRuntimeLogSource, message: string) => void;
+}) {
 	const {
 		addLog,
 		availableLayers,
@@ -105,7 +110,7 @@ export function CoordinatesGrabber() {
 		setState,
 		state,
 		wsLastEventStamp,
-	} = useCoordinatesGrabberState();
+	} = useCoordinatesGrabberState({ onLog });
 
 	const layersToRun =
 		state.selectedLayers.length > 0

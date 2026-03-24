@@ -16,6 +16,29 @@
 	margin-bottom: var(--space-6);
 }
 
+.contextMeta {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+	gap: 0.75rem;
+}
+
+.contextCard {
+	display: grid;
+	gap: 0.2rem;
+	padding: 0.8rem 0.9rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.contextLabel {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
 .iconBox {
 	display: grid;
 	place-items: center;
@@ -30,17 +53,11 @@
 .calendarPanel {
 	overflow: hidden;
 	border-color: color-mix(in srgb, var(--border) 92%, transparent);
-	background:
-		linear-gradient(
-			185deg,
-			color-mix(in srgb, var(--surface) 90%, transparent),
-			color-mix(in srgb, var(--surface-2) 76%, transparent)
-		),
-		var(--surface);
+	background: var(--suite-panel-surface-soft);
 }
 
 .calendarViewport {
-	min-height: clamp(620px, 72dvh, 1040px);
+	min-height: var(--suite-panel-height-loose);
 }
 
 .rightRail {

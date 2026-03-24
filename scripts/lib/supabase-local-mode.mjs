@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 export const ACTIVE_LOCAL_SUPABASE_KEYS = new Set([
 	"SUITE_SUPABASE_MODE",
 	"VITE_SUPABASE_URL",
@@ -53,6 +51,12 @@ export function buildMailpitSmtpValues() {
 	};
 }
 
+export function normalizeGmailAppPassword(value) {
+	return String(value || "")
+		.trim()
+		.replace(/\s+/g, "");
+}
+
 export function buildGmailSmtpValues(
 	envMap,
 	{ useLocalOverrides = true } = {},
@@ -63,9 +67,10 @@ export function buildGmailSmtpValues(
 	const user =
 		localValue("SUPABASE_LOCAL_SMTP_USER") ||
 		readFirstValue(envMap, ["SUPABASE_SMTP_USER", "GMAIL_SMTP_USER"]);
-	const pass =
+	const pass = normalizeGmailAppPassword(
 		localValue("SUPABASE_LOCAL_SMTP_PASS") ||
-		readFirstValue(envMap, ["SUPABASE_SMTP_PASS", "GMAIL_SMTP_APP_PASSWORD"]);
+			readFirstValue(envMap, ["SUPABASE_SMTP_PASS", "GMAIL_SMTP_APP_PASSWORD"]),
+	);
 	const adminEmail =
 		localValue("SUPABASE_LOCAL_SMTP_ADMIN_EMAIL") ||
 		readFirstValue(envMap, [

@@ -51,6 +51,16 @@ export interface AgentRunSnapshot {
 	steps: Array<Record<string, unknown>>;
 	messages: Array<Record<string, unknown>>;
 	stages: Record<string, unknown>;
+	tasks?: AgentTaskItem[];
+	taskSummary?: {
+		total: number;
+		queued: number;
+		running: number;
+		awaitingReview: number;
+		approved: number;
+		reworkRequested: number;
+		deferred: number;
+	};
 	finalOutput?: string;
 	finalError?: string;
 }

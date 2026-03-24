@@ -96,6 +96,7 @@ class TestAutoCadStateCollector(unittest.TestCase):
             collector = AutoCadStateCollector(
                 make_config(temp_dir, state_path),
                 api_client=api_client,
+                autocad_process_checker=lambda: True,
             )
 
             result = collector.run_once()
@@ -111,6 +112,64 @@ class TestAutoCadStateCollector(unittest.TestCase):
             self.assertEqual(sent_event_types, {"collector_online"})
             self.assertFalse(api_client.heartbeat_calls[0]["metadata"]["sourceAvailable"])
 
+    def test_process_exit_marks_source_unavailable_and_closes_session(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "tracker-state.json"
+            api_client = FakeCollectorApiClient()
+            process_running = {"value": True}
+            collector = AutoCadStateCollector(
+                make_config(temp_dir, state_path),
+                api_client=api_client,
+                autocad_process_checker=lambda: process_running["value"],
+            )
+
+            write_tracker_state(
+                state_path,
+                {
+                    "activeDrawing": "sheet-1.dwg",
+                    "activeDrawingPath": r"C:\Projects\Alpha\sheet-1.dwg",
+                    "isTracking": True,
+                    "isPaused": False,
+                    "idleTimeoutSeconds": 180,
+                    "recentCommands": ["LINE"],
+                    "lastActivityAt": "2026-03-18T10:00:01Z",
+                    "lastUpdated": "2026-03-18T10:00:02Z",
+                    "currentSession": {
+                        "sessionId": "session-1",
+                        "drawingName": "sheet-1.dwg",
+                        "fullPath": r"C:\Projects\Alpha\sheet-1.dwg",
+                        "startedAt": "2026-03-18T10:00:00Z",
+                        "commandCount": 1,
+                        "activeTime": "00:00:30",
+                        "idleTime": "00:00:00",
+                        "isActive": True,
+                    },
+                    "sessions": [],
+                },
+            )
+
+            collector.run_once()
+            api_client.send_calls.clear()
+
+            process_running["value"] = False
+            result = collector.run_once()
+
+            self.assertFalse(result["scan"]["sourceAvailable"])
+            self.assertEqual(result["scan"]["reason"], "autocad_process_not_running")
+            self.assertEqual(result["scan"]["queued"], 1)
+            self.assertEqual(len(api_client.send_calls), 1)
+            self.assertEqual(
+                [str(event.get("eventType") or "") for event in api_client.send_calls[0]],
+                ["drawing_closed"],
+            )
+            self.assertFalse(api_client.heartbeat_calls[-1]["metadata"]["sourceAvailable"])
+            self.assertIsNone(api_client.heartbeat_calls[-1]["metadata"]["currentSessionId"])
+
+            snapshot = dict(collector.state_store.load().get("snapshot") or {})
+            self.assertFalse(bool(snapshot.get("sourceAvailable")))
+            self.assertIsNone(snapshot.get("currentSessionId"))
+            self.assertIsNone(snapshot.get("activeDrawingPath"))
+
     def test_tracker_state_translates_to_session_idle_and_command_events(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             state_path = Path(temp_dir) / "tracker-state.json"
@@ -118,6 +177,7 @@ class TestAutoCadStateCollector(unittest.TestCase):
             collector = AutoCadStateCollector(
                 make_config(temp_dir, state_path),
                 api_client=api_client,
+                autocad_process_checker=lambda: True,
             )
 
             write_tracker_state(
@@ -259,6 +319,7 @@ class TestAutoCadStateCollector(unittest.TestCase):
             collector = AutoCadStateCollector(
                 make_config(temp_dir, state_path),
                 api_client=api_client,
+                autocad_process_checker=lambda: True,
             )
 
             write_tracker_state(
@@ -349,6 +410,7 @@ class TestAutoCadStateCollector(unittest.TestCase):
             collector = AutoCadStateCollector(
                 make_config(temp_dir, state_path),
                 api_client=api_client,
+                autocad_process_checker=lambda: True,
             )
 
             write_tracker_state(

@@ -14,11 +14,31 @@ export interface AgentCatalogContext {
 	setLastHealthError: (message: string | null) => void;
 }
 
+const lastHealthLogByEndpoint = new Map<string, boolean>();
+
+function logHealthState(endpoint: string, isHealthy: boolean) {
+	const previous = lastHealthLogByEndpoint.get(endpoint);
+	if (previous === isHealthy) {
+		return;
+	}
+	lastHealthLogByEndpoint.set(endpoint, isHealthy);
+	if (previous === undefined && isHealthy) {
+		return;
+	}
+	if (isHealthy) {
+		logger.debug("Agent health check recovered.", "AgentService");
+		return;
+	}
+	logger.warn("Agent health check is unavailable.", "AgentService");
+}
+
 export async function healthCheckAgent(
 	context: AgentCatalogContext,
 	timeoutMs: number,
 ) {
-	const healthEndpoint = context.useBroker ? context.brokerUrl : context.baseUrl;
+	const healthEndpoint = context.useBroker
+		? context.brokerUrl
+		: context.baseUrl;
 	try {
 		if (context.useBroker) {
 			const accessToken = await context.getSupabaseAccessToken();
@@ -37,16 +57,14 @@ export async function healthCheckAgent(
 				credentials: "include",
 				timeoutMs,
 				requestName: "Agent broker health check",
+				diagnosticsMode: "silent",
 			});
 
 			const isHealthy = response.ok;
 			context.setLastHealthError(
 				isHealthy ? null : `Gateway responded with status ${response.status}`,
 			);
-			logger.debug(
-				`Agent health check: ${isHealthy ? "healthy" : "unhealthy"}`,
-				"AgentService",
-			);
+			logHealthState(healthEndpoint, isHealthy);
 			return isHealthy;
 		}
 
@@ -54,15 +72,13 @@ export async function healthCheckAgent(
 			method: "GET",
 			timeoutMs,
 			requestName: "Agent gateway health check",
+			diagnosticsMode: "silent",
 		});
 		const isHealthy = response.ok;
 		context.setLastHealthError(
 			isHealthy ? null : `Gateway responded with status ${response.status}`,
 		);
-		logger.debug(
-			`Agent health check: ${isHealthy ? "healthy" : "unhealthy"}`,
-			"AgentService",
-		);
+		logHealthState(healthEndpoint, isHealthy);
 		return isHealthy;
 	} catch (error) {
 		const message = mapFetchErrorMessage(error, "Unknown connection error");
@@ -151,7 +167,10 @@ export async function fetchAgentProfileCatalog(
 		return {
 			success: false,
 			profiles: [],
-			error: mapFetchErrorMessage(error, "Unable to load agent profile metadata."),
+			error: mapFetchErrorMessage(
+				error,
+				"Unable to load agent profile metadata.",
+			),
 		};
 	}
 }

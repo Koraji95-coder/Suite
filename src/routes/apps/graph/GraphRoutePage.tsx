@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { GraphVisualization } from "@/components/apps/graph/GraphVisualization";
 import type { SourceFilter } from "@/components/apps/graph/types";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import { useRegisterPageHeader } from "@/components/apps/ui/PageHeaderContext";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
@@ -19,6 +20,11 @@ function parseSourceFilter(value: string | null): SourceFilter {
 
 export default function GraphRoutePage() {
 	const [searchParams, setSearchParams] = useSearchParams();
+	useRegisterPageHeader({
+		title: "Architecture Graph",
+		subtitle:
+			"Alternate node-link view over the same architecture and memory model used by Architecture Map.",
+	});
 	const sourceFilter = parseSourceFilter(searchParams.get("source"));
 	const searchQuery = searchParams.get("query") ?? "";
 
@@ -48,11 +54,7 @@ export default function GraphRoutePage() {
 	);
 
 	return (
-		<PageFrame
-			title="Architecture Graph"
-			description="Alternate node-link view over the same architecture and memory model used by Architecture Map."
-			maxWidth="full"
-		>
+		<PageFrame maxWidth="full">
 			<div className={styles.root}>
 				<Panel variant="default" padding="lg" className={styles.heroPanel}>
 					<div className={styles.heroHeader}>

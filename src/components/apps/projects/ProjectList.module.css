@@ -75,7 +75,7 @@
 	gap: 1rem;
 	overflow-y: auto;
 	padding-right: 0.25rem;
-	max-height: min(70dvh, 920px);
+	max-height: var(--suite-panel-scroll-max);
 	scroll-behavior: smooth;
 }
 

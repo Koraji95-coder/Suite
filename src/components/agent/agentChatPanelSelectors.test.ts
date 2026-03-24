@@ -5,6 +5,7 @@ import {
 	buildProfileRoster,
 	deriveActivityDetail,
 	deriveAvailableRunIds,
+	deriveResumableRunId,
 	filterActivityItems,
 	filterQueueTasks,
 	mergeRuntimeProfiles,
@@ -29,7 +30,9 @@ function makeTask(overrides: Partial<AgentTaskItem>): AgentTaskItem {
 	};
 }
 
-function makeActivity(overrides: Partial<AgentActivityItem>): AgentActivityItem {
+function makeActivity(
+	overrides: Partial<AgentActivityItem>,
+): AgentActivityItem {
 	return {
 		activityId: "activity-default",
 		source: "run",
@@ -71,6 +74,58 @@ describe("agentChatPanelSelectors", () => {
 		);
 
 		expect(runIds).toEqual(["run-2", "run-3", "run-1"]);
+	});
+
+	it("prefers active or review-pending runs when deriving a resumable run id", () => {
+		const resumableRunId = deriveResumableRunId(
+			[
+				makeTask({
+					taskId: "approved-1",
+					runId: "run-approved",
+					status: "approved",
+					updatedAt: "2026-03-20T12:00:00.000Z",
+				}),
+				makeTask({
+					taskId: "review-1",
+					runId: "run-review",
+					status: "awaiting_review",
+					updatedAt: "2026-03-21T12:00:00.000Z",
+				}),
+			],
+			[
+				makeActivity({
+					activityId: "activity-finished",
+					runId: "run-finished",
+					eventType: "run_completed",
+					createdAt: "2026-03-22T12:00:00.000Z",
+				}),
+			],
+		);
+
+		expect(resumableRunId).toBe("run-review");
+	});
+
+	it("falls back to the most recent workflow activity when no queue tasks exist", () => {
+		const resumableRunId = deriveResumableRunId(
+			[],
+			[
+				makeActivity({
+					activityId: "activity-old",
+					runId: "run-old",
+					eventType: "run_completed",
+					createdAt: "2026-03-21T12:00:00.000Z",
+				}),
+				makeActivity({
+					activityId: "activity-review",
+					runId: "run-review",
+					eventType: "task_awaiting_review",
+					source: "task",
+					createdAt: "2026-03-22T12:00:00.000Z",
+				}),
+			],
+		);
+
+		expect(resumableRunId).toBe("run-review");
 	});
 
 	it("filters queue tasks by status/priority/profile/run and preserves priority order", () => {
@@ -229,13 +284,12 @@ describe("agentChatPanelSelectors", () => {
 				runId: "run-1",
 			},
 		];
-		expect(resolveVisibleConversations("team", conversations).map((c) => c.id)).toEqual([
-			"run-1",
-		]);
-		expect(resolveVisibleConversations("devstral", conversations).map((c) => c.id)).toEqual([
-			"manual-1",
-			"run-1",
-		]);
+		expect(
+			resolveVisibleConversations("team", conversations).map((c) => c.id),
+		).toEqual(["run-1"]);
+		expect(
+			resolveVisibleConversations("devstral", conversations).map((c) => c.id),
+		).toEqual(["manual-1", "run-1"]);
 	});
 
 	it("normalizes assistant response text while preserving incomplete warning", () => {

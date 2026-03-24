@@ -1,12 +1,18 @@
 export type CommandCenterTab = "commands" | "architecture";
 
-export function buildDashboardWatchdogHref(projectId?: string | null): string {
+export function buildWatchdogHref(projectId?: string | null): string {
 	const params = new URLSearchParams();
-	params.set("focus", "watchdog");
 	if (projectId) {
 		params.set("project", projectId);
 	}
-	return `/app/dashboard?${params.toString()}`;
+	const serialized = params.toString();
+	return serialized ? `/app/watchdog?${serialized}` : "/app/watchdog";
+}
+
+// Legacy helper retained for compatibility while the dedicated Watchdog page
+// becomes the canonical telemetry destination.
+export function buildDashboardWatchdogHref(projectId?: string | null): string {
+	return buildWatchdogHref(projectId);
 }
 
 export function parseCommandCenterTab(value: string | null): CommandCenterTab | null {

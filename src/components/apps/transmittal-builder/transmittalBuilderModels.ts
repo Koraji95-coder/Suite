@@ -1,5 +1,9 @@
 import { FileArchive, FileText } from "lucide-react";
 import {
+	buildProjectMetadataRowsForFiles,
+	type ProjectDocumentMetadataRow,
+} from "@/services/projectDocumentMetadataService";
+import {
 	DEFAULT_FIRM,
 	DEFAULT_PE,
 	FIRM_NUMBERS,
@@ -28,6 +32,7 @@ export const REVISION_OPTIONS = [
 ];
 
 export type TransmittalType = "standard" | "cid";
+export type StandardDocumentSourceMode = "pdf_analysis" | "project_metadata";
 
 export type OutputFormat = "docx" | "pdf" | "both";
 
@@ -49,6 +54,8 @@ export type CidDocument = {
 export type StandardDocument = {
 	id: string;
 	fileName: string;
+	attachmentFileName: string;
+	projectRelativePath?: string;
 	drawingNumber: string;
 	title: string;
 	revision: string;
@@ -58,6 +65,7 @@ export type StandardDocument = {
 	accepted: boolean;
 	overrideReason: string;
 	modelVersion?: string;
+	metadataWarnings: string[];
 };
 
 export type OptionKey =
@@ -81,6 +89,8 @@ export type OptionsState = Record<OptionKey, boolean>;
 
 export type DraftState = {
 	transmittalType: TransmittalType;
+	standardDocumentSource: StandardDocumentSourceMode;
+	selectedProjectId: string;
 	projectName: string;
 	projectNumber: string;
 	date: string;
@@ -101,6 +111,7 @@ export type DraftState = {
 export type FileState = {
 	template: File | null;
 	index: File | null;
+	acadeReport: File | null;
 	pdfs: File[];
 	cid: File[];
 };
@@ -131,7 +142,7 @@ export type TransmittalPayload = {
 		template?: string;
 		index?: string;
 		pdfs?: string[];
-	cid?: string[];
+		cid?: string[];
 	};
 	cid_index_data?: Array<{
 		filename: string;
@@ -140,6 +151,8 @@ export type TransmittalPayload = {
 	}>;
 	pdf_document_data?: Array<{
 		file_name: string;
+		attachment_file_name?: string;
+		project_relative_path?: string;
 		drawing_number: string;
 		title: string;
 		revision: string;
@@ -149,6 +162,7 @@ export type TransmittalPayload = {
 		accepted: boolean;
 		override_reason: string;
 		model_version?: string;
+		metadata_warnings?: string[];
 	}>;
 	generated_at: string;
 };
@@ -306,6 +320,8 @@ export const buildDefaultDraft = ({
 		: (firms[0] ?? DEFAULT_FIRM);
 	return {
 		transmittalType: "standard",
+		standardDocumentSource: "project_metadata",
+		selectedProjectId: "",
 		projectName: "",
 		projectNumber: "",
 		date: formatDate(new Date()),
@@ -401,6 +417,8 @@ export const buildStandardDocuments = (
 			existing ?? {
 				id: createId(),
 				fileName: file.name,
+				attachmentFileName: file.name,
+				projectRelativePath: "",
 				drawingNumber: safeTrim(analysis?.drawing_number),
 				title: safeTrim(analysis?.title),
 				revision: safeTrim(analysis?.revision),
@@ -417,8 +435,68 @@ export const buildStandardDocuments = (
 						: !analysis?.needs_review,
 				overrideReason: safeTrim(analysis?.override_reason),
 				modelVersion: safeTrim(analysis?.recognition?.model_version),
+				metadataWarnings: [],
 			}
 		);
+	});
+};
+
+export const buildProjectMetadataDocuments = (
+	files: File[],
+	metadataRows: ProjectDocumentMetadataRow[],
+	current: StandardDocument[],
+): StandardDocument[] => {
+	const scopedEntries =
+		files.length > 0
+			? files.map((file) => ({
+					attachmentFileName: file.name,
+					row: buildProjectMetadataRowsForFiles([file.name], metadataRows)[0],
+				}))
+			: buildProjectMetadataRowsForFiles([], metadataRows).map((row) => ({
+					attachmentFileName: row.fileName,
+					row,
+				}));
+
+	return scopedEntries.map(({ attachmentFileName, row }) => {
+		const existing = current.find(
+			(doc) =>
+				doc.attachmentFileName === attachmentFileName ||
+				doc.fileName === row.fileName,
+		);
+		const metadataWarnings = [...row.issues, ...row.warnings];
+		const needsReview = row.reviewState !== "ready";
+
+		if (existing && (existing.source === "manual_review" || safeTrim(existing.overrideReason))) {
+			return {
+				...existing,
+				fileName: row.fileName,
+				attachmentFileName,
+				projectRelativePath: row.relativePath,
+				confidence: row.confidence,
+				needsReview,
+				accepted: existing.accepted || !needsReview,
+				source: "manual_review",
+				modelVersion: "project-metadata-v1",
+				metadataWarnings,
+			};
+		}
+
+		return {
+			id: existing?.id ?? createId(),
+			fileName: row.fileName,
+			attachmentFileName,
+			projectRelativePath: row.relativePath,
+			drawingNumber: safeTrim(row.drawingNumber),
+			title: safeTrim(row.title),
+			revision: safeTrim(row.revision),
+			confidence: row.confidence,
+			source: row.source,
+			needsReview,
+			accepted: !needsReview,
+			overrideReason: "",
+			modelVersion: "project-metadata-v1",
+			metadataWarnings,
+		};
 	});
 };
 
@@ -476,6 +554,13 @@ export const validateDraft = (draft: DraftState, files: FileState) => {
 	}
 
 	if (draft.transmittalType === "standard") {
+		if (
+			draft.standardDocumentSource === "project_metadata" &&
+			!safeTrim(draft.selectedProjectId)
+		) {
+			fields.selectedProjectId = true;
+			errors.push("Select a project when using project metadata mode.");
+		}
 		if (files.pdfs.length === 0) {
 			fields.pdfs = true;
 			errors.push("Select at least one PDF document.");
@@ -485,7 +570,7 @@ export const validateDraft = (draft: DraftState, files: FileState) => {
 			if (draft.standardDocuments.length === 0) {
 				fields.standardDocuments = true;
 				errors.push(
-					"Analyze PDF documents or upload a drawing index before generating.",
+					"Load project metadata, analyze PDF documents, or upload a drawing index before generating.",
 				);
 			}
 			const pendingReview = draft.standardDocuments.filter(
@@ -494,7 +579,7 @@ export const validateDraft = (draft: DraftState, files: FileState) => {
 			if (pendingReview.length > 0) {
 				fields.standardDocuments = true;
 				errors.push(
-					"Review or accept all low-confidence PDF document rows before generating without an index.",
+					"Review or accept all low-confidence document rows before generating without an index.",
 				);
 			}
 		}
@@ -583,7 +668,9 @@ export const buildPayload = (
 		pdf_document_data:
 			draft.transmittalType === "standard"
 				? draft.standardDocuments.map((doc) => ({
-						file_name: doc.fileName,
+						file_name: safeTrim(doc.attachmentFileName || doc.fileName),
+						attachment_file_name: safeTrim(doc.attachmentFileName || doc.fileName),
+						project_relative_path: safeTrim(doc.projectRelativePath) || undefined,
 						drawing_number: safeTrim(doc.drawingNumber),
 						title: safeTrim(doc.title),
 						revision: safeTrim(doc.revision),
@@ -593,13 +680,17 @@ export const buildPayload = (
 						accepted: doc.accepted,
 						override_reason: safeTrim(doc.overrideReason),
 						model_version: safeTrim(doc.modelVersion) || undefined,
+						metadata_warnings:
+							doc.metadataWarnings.length > 0
+								? [...doc.metadataWarnings]
+								: undefined,
 					}))
 				: undefined,
 		generated_at: new Date().toISOString(),
 	};
 };
 
-export const loadDraft = () => {
+export const loadDraft = (): DraftState => {
 	if (typeof window === "undefined") return buildDefaultDraft();
 	try {
 		const raw = window.localStorage.getItem(AUTOSAVE_KEY);
@@ -609,6 +700,11 @@ export const loadDraft = () => {
 		return {
 			...base,
 			...parsed,
+			standardDocumentSource:
+				parsed.standardDocumentSource === "project_metadata"
+					? ("project_metadata" as StandardDocumentSourceMode)
+					: ("pdf_analysis" as StandardDocumentSourceMode),
+			selectedProjectId: parsed.selectedProjectId ?? "",
 			options: { ...DEFAULT_OPTIONS, ...(parsed.options ?? {}) },
 			contacts:
 				Array.isArray(parsed.contacts) && parsed.contacts.length > 0
@@ -632,6 +728,8 @@ export const loadDraft = () => {
 				? parsed.standardDocuments.map((doc) => ({
 						id: doc.id ?? createId(),
 						fileName: doc.fileName ?? "",
+						attachmentFileName: doc.attachmentFileName ?? doc.fileName ?? "",
+						projectRelativePath: doc.projectRelativePath ?? "",
 						drawingNumber: doc.drawingNumber ?? "",
 						title: doc.title ?? "",
 						revision: doc.revision ?? "",
@@ -645,6 +743,9 @@ export const loadDraft = () => {
 						accepted: Boolean(doc.accepted),
 						overrideReason: doc.overrideReason ?? "",
 						modelVersion: doc.modelVersion ?? "",
+						metadataWarnings: Array.isArray(doc.metadataWarnings)
+							? doc.metadataWarnings.map((warning) => String(warning ?? ""))
+							: [],
 					}))
 				: base.standardDocuments,
 		};

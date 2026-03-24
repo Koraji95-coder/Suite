@@ -1,6 +1,6 @@
 // src/components/agent/AgentChatComposer.tsx
 import { ArrowUp, Mic, Paperclip, Sparkles, Square } from "lucide-react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 // Primitives
 import { Button, IconButton } from "@/components/primitives/Button";
 import { HStack } from "@/components/primitives/Stack";
@@ -13,6 +13,8 @@ export type AgentComposerMode = "direct" | "run";
 
 interface AgentChatComposerProps {
 	onSend: (message: string) => void;
+	value: string;
+	onValueChange: (value: string) => void;
 	disabled?: boolean;
 	isStreaming?: boolean;
 	onCancel?: () => void;
@@ -20,10 +22,13 @@ interface AgentChatComposerProps {
 	mode?: AgentComposerMode;
 	onModeChange?: (mode: AgentComposerMode) => void;
 	runModeDisabled?: boolean;
+	focusSignal?: number;
 }
 
 export function AgentChatComposer({
 	onSend,
+	value,
+	onValueChange,
 	disabled = false,
 	isStreaming = false,
 	onCancel,
@@ -31,17 +36,32 @@ export function AgentChatComposer({
 	mode = "direct",
 	onModeChange,
 	runModeDisabled = false,
+	focusSignal = 0,
 }: AgentChatComposerProps) {
-	const [value, setValue] = useState("");
 	const [isFocused, setIsFocused] = useState(false);
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const messageInputId = useId();
+
+	useEffect(() => {
+		if (!focusSignal || disabled) {
+			return;
+		}
+		textareaRef.current?.focus();
+	}, [disabled, focusSignal]);
+
+	useEffect(() => {
+		const el = textareaRef.current;
+		if (!el) return;
+		void value;
+		el.style.height = "auto";
+		el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+	}, [value]);
 
 	const handleSubmit = () => {
 		const msg = value.trim();
 		if (!msg || disabled) return;
 		onSend(msg);
-		setValue("");
+		onValueChange("");
 		if (textareaRef.current) {
 			textareaRef.current.style.height = "auto";
 		}
@@ -62,7 +82,7 @@ export function AgentChatComposer({
 	};
 
 	const handleTemplateClick = (prompt: string) => {
-		setValue(prompt);
+		onValueChange(prompt);
 		textareaRef.current?.focus();
 	};
 
@@ -135,7 +155,7 @@ export function AgentChatComposer({
 						name="agent_message"
 						ref={textareaRef}
 						value={value}
-						onChange={(e) => setValue(e.target.value)}
+						onChange={(e) => onValueChange(e.target.value)}
 						onKeyDown={handleKeyDown}
 						onInput={handleInput}
 						onFocus={() => setIsFocused(true)}

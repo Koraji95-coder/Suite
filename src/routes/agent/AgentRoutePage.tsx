@@ -1,14 +1,20 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/auth/useAuth";
 import { buildAgentPairingSearchFromLocation } from "@/auth/agentPairingParams";
+import { useAuth } from "@/auth/useAuth";
 import { AgentChatPanel } from "@/components/agent/AgentChatPanel";
 import { AgentPanelBoundary } from "@/components/agent/AgentPanelBoundary";
+import { PageContextBand } from "@/components/apps/ui/PageContextBand";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
-import { Progress } from "@/components/primitives/Progress";
+import { useRegisterPageHeader } from "@/components/apps/ui/PageHeaderContext";
+import {
+	type TrustState,
+	TrustStateBadge,
+} from "@/components/apps/ui/TrustStateBadge";
+import { Button } from "@/components/primitives/Button";
+import { Text } from "@/components/primitives/Text";
 import { logger } from "@/lib/logger";
-import { cn } from "@/lib/utils";
 import { agentService } from "@/services/agentService";
 import { agentTaskManager } from "@/services/agentTaskManager";
 import { useAgentConnectionStatus } from "@/services/useAgentConnectionStatus";
@@ -32,32 +38,41 @@ export default function AgentRoutePage() {
 	const { user } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
+	useRegisterPageHeader({
+		title: "Agents",
+		subtitle: "Profile-driven orchestration and collaborative execution.",
+	});
 	const {
 		healthy,
 		paired,
-		loading,
 		error: connectionError,
 		refreshNow: refreshConnectionState,
 	} = useAgentConnectionStatus({
 		userId: user?.id ?? null,
 	});
 	const showGatewayRestartHint = shouldShowGatewayRestartHint(connectionError);
-	const statusState = loading ? "checking" : healthy ? "online" : "offline";
-	const statusLabel =
-		statusState === "checking"
-			? "Checking"
-			: statusState === "online"
-				? "Online"
-				: "Offline";
+	const statusState =
+		healthy === null ? "standby" : healthy ? "online" : "offline";
+	const waitingForPairing = healthy === true && !paired;
 	const statusSummary =
-		statusState === "checking"
-			? "Verifying gateway reachability and broker link."
+		statusState === "standby"
+			? "The collaboration surface stays mounted while trust state settles in the background."
 			: statusState === "online"
-				? "Gateway and broker transport are reachable."
-				: "Gateway or broker transport is unreachable.";
+				? "Ask one agent directly or switch to a tracked crew objective when you need coordination."
+				: "Local agent access is unavailable until the gateway responds.";
 	const pairingSummary = paired
-		? "Paired session ready for orchestration and direct chat."
-		: "Pairing required before agent actions can run.";
+		? "This device is trusted for direct chat and objective runs."
+		: waitingForPairing
+			? "Pair this device in Settings to unlock direct chat and run objectives."
+			: "Pairing becomes available as soon as the gateway trust check finishes.";
+	const routeTrustState: TrustState =
+		statusState === "standby"
+			? "background"
+			: statusState === "offline"
+				? "unavailable"
+				: paired
+					? "ready"
+					: "needs-attention";
 
 	useEffect(() => {
 		const pairingSearch = buildAgentPairingSearchFromLocation(
@@ -92,91 +107,64 @@ export default function AgentRoutePage() {
 	};
 
 	return (
-		<PageFrame
-			title="Agents"
-			description="Profile-driven agents, orchestration, and automation"
-			maxWidth="full"
-			padded={false}
-		>
-			<section className={styles.statusPanel}>
-				<div className={styles.surfaceHeader}>
-					<div>
-						<p className={styles.eyebrow}>Command surface</p>
-						<h2 className={styles.surfaceTitle}>Agents</h2>
-						<p className={styles.surfaceCopy}>
-							Monitor gateway health, pairing state, and orchestration
-							readiness from one route.
-						</p>
+		<PageFrame maxWidth="full" padded={false}>
+			<PageContextBand
+				mode="hero"
+				className={styles.statusPanel}
+				eyebrow="Command surface"
+				summary={
+					<div className={styles.surfaceSummaryStack}>
+						<Text
+							size="sm"
+							color="muted"
+							block
+							className={styles.surfaceSummary}
+						>
+							{statusSummary}
+						</Text>
+						<Text size="xs" color="muted" block className={styles.surfaceHint}>
+							{pairingSummary}
+						</Text>
 					</div>
-					<div className={styles.surfaceChips}>
-						<span className={styles.surfaceChip}>{statusLabel}</span>
-						<span className={styles.surfaceChip}>
-							{paired ? "Paired" : "Pairing required"}
-						</span>
-					</div>
-				</div>
-				<div className={styles.metricsGrid}>
-					<article className={styles.metricCard}>
-						<p className={styles.metricLabel}>Gateway state</p>
-						<p className={styles.metricValue}>{statusLabel}</p>
-						<p className={styles.metricCopy}>{statusSummary}</p>
-					</article>
-					<article className={styles.metricCard}>
-						<p className={styles.metricLabel}>Pairing state</p>
-						<p className={styles.metricValue}>
-							{paired ? "Session paired" : "Pending pairing"}
-						</p>
-						<p className={styles.metricCopy}>{pairingSummary}</p>
-					</article>
-					<article className={styles.metricCard}>
-						<p className={styles.metricLabel}>Active endpoint</p>
-						<p className={styles.metricValue}>Bridge target</p>
-						<p className={styles.metricCopy}>{agentService.getEndpoint()}</p>
-					</article>
-				</div>
-				<div className={styles.statusRow}>
-					<div className={styles.statusInfo}>
-						<span className={styles.statusItem}>
-							<span
-								className={cn(
-									styles.statusDot,
-									statusState === "checking" && styles.statusUnknown,
-									statusState === "online" && styles.statusOnline,
-									statusState === "offline" && styles.statusOffline,
-								)}
-							/>
-							{statusLabel}
-						</span>
-						<span className={styles.separator} />
-						<span className={styles.statusItem}>
-							<span
-								className={cn(
-									styles.statusDot,
-									paired
-										? styles.statusPairingReady
-										: styles.statusPairingPending,
-								)}
-							/>
-							{paired ? "Paired" : "Not paired"}
-						</span>
-						<span className={styles.endpoint}>
-							{agentService.getEndpoint()}
-						</span>
-					</div>
-
-					{statusState !== "online" || Boolean(connectionError) ? (
-						<div className={styles.actions}>
-							<button
-								type="button"
-								onClick={() => void refreshConnectionState()}
-								className={styles.button}
+				}
+				meta={
+					<TrustStateBadge
+						state={routeTrustState}
+						label={
+							routeTrustState === "ready"
+								? "Agent access ready"
+								: routeTrustState === "needs-attention"
+									? "Pairing required"
+									: routeTrustState === "unavailable"
+										? "Gateway unavailable"
+										: "Trust state settling"
+						}
+					/>
+				}
+				actions={
+					<>
+						{waitingForPairing ? (
+							<Button
+								size="sm"
+								variant="secondary"
+								onClick={() => navigate("/app/settings")}
 							>
-								<RefreshCw className={styles.buttonIcon} />
-								Retry check
-							</button>
-						</div>
-					) : null}
-				</div>
+								Open Settings
+							</Button>
+						) : null}
+						{statusState !== "online" || Boolean(connectionError) ? (
+							<Button
+								size="sm"
+								variant="outline"
+								iconLeft={<RefreshCw size={14} />}
+								onClick={() => void refreshConnectionState()}
+							>
+								Refresh trust state
+							</Button>
+						) : null}
+					</>
+				}
+			>
 				{connectionError ? (
 					<p className={styles.errorText}>{connectionError}</p>
 				) : null}
@@ -184,34 +172,14 @@ export default function AgentRoutePage() {
 					<p className={styles.hintText}>
 						Start or restart the local gateway with{" "}
 						<code className={styles.inlineCode}>npm run gateway:dev</code>, then
-						retry the route check.
+						refresh trust state.
 					</p>
 				) : null}
-			</section>
+			</PageContextBand>
 
 			<div className={styles.chatWrap}>
 				<AgentPanelBoundary onResetPanelCache={handleResetPanelCache}>
-					{loading || healthy === null ? (
-						<section className={styles.loadingPanel}>
-							<p className={styles.loadingLabel}>
-								Checking agent gateway state
-							</p>
-							<Progress
-								value={36}
-								indeterminate
-								animated
-								size="sm"
-								color="accent"
-								className={styles.loadingProgress}
-							/>
-							<p className={styles.loadingCopy}>
-								Holding the orchestration surface until the current session and
-								gateway state are known.
-							</p>
-						</section>
-					) : (
-						<AgentChatPanel healthy={healthy} paired={paired} />
-					)}
+					<AgentChatPanel healthy={healthy} paired={paired} />
 				</AgentPanelBoundary>
 			</div>
 		</PageFrame>

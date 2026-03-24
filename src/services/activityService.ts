@@ -23,6 +23,12 @@ let realtimeChannel: RealtimeChannel | null = null;
 let realtimeUserId: string | null = null;
 let warnedMissingUser = false;
 
+type AuthLookupError = {
+	name?: string;
+	message?: string;
+	code?: string;
+};
+
 const createId = () =>
 	typeof crypto !== "undefined" && "randomUUID" in crypto
 		? crypto.randomUUID()
@@ -32,6 +38,37 @@ const emit = (entry: ActivityLogRow) => {
 	listeners.forEach((listener) => listener(entry));
 };
 
+const describeAuthLookupError = (error: unknown) => {
+	const candidate = (error ?? {}) as AuthLookupError;
+	return {
+		errorName:
+			typeof candidate.name === "string" && candidate.name.trim().length > 0
+				? candidate.name.trim()
+				: null,
+		errorCode:
+			typeof candidate.code === "string" && candidate.code.trim().length > 0
+				? candidate.code.trim()
+				: null,
+		errorMessage:
+			typeof candidate.message === "string" &&
+			candidate.message.trim().length > 0
+				? candidate.message.trim()
+				: null,
+	};
+};
+
+const isExpectedMissingSession = (error: unknown): boolean => {
+	const details = describeAuthLookupError(error);
+	const errorName = details.errorName?.toLowerCase() ?? "";
+	const errorCode = details.errorCode?.toLowerCase() ?? "";
+	const errorMessage = details.errorMessage?.toLowerCase() ?? "";
+	return (
+		errorName === "authsessionmissingerror" ||
+		errorCode === "authsessionmissingerror" ||
+		errorMessage.includes("auth session missing")
+	);
+};
+
 const getCurrentUserId = async (): Promise<string | null> => {
 	const {
 		data: { user },
@@ -39,7 +76,27 @@ const getCurrentUserId = async (): Promise<string | null> => {
 	} = await supabase.auth.getUser();
 	if (error || !user) {
 		if (!warnedMissingUser) {
-			logger.warn("ActivityService", "Missing authenticated user", { error });
+			const authError = describeAuthLookupError(error);
+			const data = {
+				...authError,
+				fallbackMode: "local_activity_entry",
+			};
+			if (!user && (!error || isExpectedMissingSession(error))) {
+				logger.info(
+					"No authenticated session yet; pre-auth activity telemetry will use a local fallback entry until sign-in completes.",
+					"ActivityService",
+					data,
+				);
+			} else {
+				logger.warn(
+					"Unable to resolve authenticated user for activity telemetry; using local fallback entry.",
+					"ActivityService",
+					{
+						...data,
+						error,
+					},
+				);
+			}
 			warnedMissingUser = true;
 		}
 		return null;
@@ -155,19 +212,16 @@ export const activityService = {
 		const userId = await getCurrentUserId();
 		if (!userId) return { data: [] as ActivityLogRow[], error: null };
 
-		const result = await safeSupabaseQuery(
-			async () => {
-				let query = supabase
-					.from("activity_log")
-					.select("*")
-					.eq("user_id", userId);
-				if (projectId) {
-					query = query.eq("project_id", projectId);
-				}
-				return await query.order("timestamp", { ascending: false }).limit(limit);
-			},
-			"ActivityService",
-		);
+		const result = await safeSupabaseQuery(async () => {
+			let query = supabase
+				.from("activity_log")
+				.select("*")
+				.eq("user_id", userId);
+			if (projectId) {
+				query = query.eq("project_id", projectId);
+			}
+			return await query.order("timestamp", { ascending: false }).limit(limit);
+		}, "ActivityService");
 
 		return {
 			data: (result.data ?? []) as ActivityLogRow[],

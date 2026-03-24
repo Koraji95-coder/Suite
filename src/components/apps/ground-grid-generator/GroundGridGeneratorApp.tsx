@@ -135,6 +135,7 @@ function StatusPill({
 
 function GroundGridGeneratorInner() {
 	const {
+		addLog,
 		backendConnected,
 		logs,
 		wsLastUpdate,
@@ -266,7 +267,7 @@ function GroundGridGeneratorInner() {
 						activeTab === "grabber" ? styles.panelScroll : styles.panelHidden,
 					)}
 				>
-					<CoordinatesGrabber />
+					<CoordinatesGrabber onLog={addLog} />
 				</div>
 
 				<div

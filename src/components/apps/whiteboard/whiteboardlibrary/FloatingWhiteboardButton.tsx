@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
@@ -85,16 +86,21 @@ export function FloatingWhiteboardButton({
 			/>
 
 			<Dialog open={showLibrary} onOpenChange={setShowLibrary}>
-				<DialogContent className={styles.dialogContent}>
+				<DialogContent className={styles.dialogContent} showCloseButton={false}>
 					<DialogHeader className={styles.dialogHeader}>
 						<div className={styles.dialogHeaderRow}>
 							<DialogTitle className={styles.dialogTitle}>
 								<BookOpen className={styles.dialogTitleIcon} />
 								<span>Whiteboard Library</span>
 							</DialogTitle>
+							<DialogDescription className="sr-only">
+								Browse, preview, and delete saved whiteboards.
+							</DialogDescription>
 							<button
+								type="button"
 								onClick={() => setShowLibrary(false)}
 								className={styles.dialogClose}
+								aria-label="Close whiteboard library"
 							>
 								×
 							</button>

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/primitives/Badge";
 import { basenameFromPath } from "@/lib/watchdogTelemetry";
-import { buildDashboardWatchdogHref } from "@/lib/watchdogNavigation";
+import { buildWatchdogHref } from "@/lib/watchdogNavigation";
 import {
 	saveSharedProjectWatchdogRule,
 	syncSharedProjectWatchdogRulesToLocalRuntime,
@@ -119,7 +119,7 @@ export function ProjectTelemetryPanel({
 	telemetry,
 	onRootPathChange,
 }: ProjectTelemetryPanelProps) {
-	const dashboardLink = buildDashboardWatchdogHref(projectId);
+	const watchdogLink = buildWatchdogHref(projectId);
 	const [editingRules, setEditingRules] = useState(false);
 	const [savingRules, setSavingRules] = useState(false);
 	const [ruleError, setRuleError] = useState<string | null>(null);
@@ -241,8 +241,8 @@ export function ProjectTelemetryPanel({
 						journals for this project.
 					</p>
 				</div>
-				<Link to={dashboardLink} className={styles.link}>
-					<span>Open full telemetry</span>
+				<Link to={watchdogLink} className={styles.link}>
+					<span>Open Watchdog</span>
 					<ArrowRight className={styles.linkIcon} />
 				</Link>
 			</div>

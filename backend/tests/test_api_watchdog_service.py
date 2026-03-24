@@ -316,6 +316,71 @@ class TestWatchdogMonitorService(unittest.TestCase):
             self.assertEqual(int(session.get("idleCount") or 0), 1)
             self.assertGreater(int(session.get("durationMs") or 0), 0)
 
+    def test_list_sessions_does_not_keep_session_live_when_source_is_unavailable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            service = make_service(temp_dir)
+            now_ms = int(time.time() * 1000)
+            service.register_collector(
+                "user:demo",
+                {
+                    "collectorId": "collector-cad",
+                    "name": "AutoCAD Collector",
+                    "collectorType": "autocad_state",
+                    "workstationId": "DUSTIN-HOME",
+                    "capabilities": ["autocad", "drawing_sessions", "commands"],
+                },
+            )
+            service.ingest_collector_events(
+                "user:demo",
+                {
+                    "collectorId": "collector-cad",
+                    "events": [
+                        {
+                            "eventType": "drawing_opened",
+                            "projectId": "project-1",
+                            "drawingPath": r"C:\\Projects\\Alpha\\Drawing1.dwg",
+                            "timestamp": now_ms - 5000,
+                            "sessionId": "session-1",
+                        },
+                        {
+                            "eventType": "drawing_closed",
+                            "projectId": "project-1",
+                            "drawingPath": r"C:\\Projects\\Alpha\\Drawing1.dwg",
+                            "timestamp": now_ms - 1000,
+                            "sessionId": "session-1",
+                        },
+                    ],
+                },
+            )
+            service.collector_heartbeat(
+                "user:demo",
+                {
+                    "collectorId": "collector-cad",
+                    "status": "online",
+                    "metadata": {
+                        "sourceAvailable": False,
+                        "activeDrawingPath": r"C:\\Projects\\Alpha\\Drawing1.dwg",
+                        "activeDrawingName": "Drawing1.dwg",
+                        "currentSessionId": "session-1",
+                        "trackerUpdatedAt": now_ms - 200,
+                        "lastActivityAt": now_ms - 300,
+                    },
+                },
+            )
+
+            sessions = service.list_sessions(
+                "user:demo",
+                project_id="project-1",
+                time_window_ms=60 * 60 * 1000,
+            )
+
+            self.assertEqual(int(sessions.get("count") or 0), 1)
+            session = (sessions.get("sessions") or [{}])[0]
+            self.assertEqual(session.get("sessionId"), "session-1")
+            self.assertFalse(bool(session.get("active")))
+            self.assertEqual(session.get("status"), "completed")
+            self.assertFalse(bool(session.get("sourceAvailable")))
+
     def test_list_sessions_derives_legacy_session_id_for_drawing_events_without_session_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             service = make_service(temp_dir)
@@ -565,6 +630,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
             self.assertEqual(int(prepared.get("readyCount") or 0), 1)
             self.assertEqual(int(prepared.get("skippedCount") or 0), 0)
             row = (prepared.get("rows") or [{}])[0]
+            self.assertNotIn("eventId", row)
             self.assertEqual(row.get("project_id"), "project-alpha")
             self.assertEqual(row.get("drawing_path"), drawing_path)
             self.assertEqual(row.get("drawing_name"), "sheet-1.dwg")

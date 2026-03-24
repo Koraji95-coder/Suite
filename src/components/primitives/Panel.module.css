@@ -1,19 +1,50 @@
 .panel {
 	position: relative;
-	transition: all 150ms ease;
+	transition:
+		background-color 150ms ease,
+		border-color 150ms ease,
+		box-shadow 150ms ease,
+		transform 150ms ease;
 	border: 1px solid transparent;
 }
 
 .variantDefault {
-	background: var(--surface);
-	border-color: var(--border);
-	box-shadow: var(--shadow-sm);
+	background: var(--suite-surface-support);
+	border-color: color-mix(in srgb, var(--brand-border-soft) 74%, transparent);
+	box-shadow: var(--suite-panel-shadow-subtle);
 }
 
 .variantElevated {
-	background: var(--surface);
-	border-color: var(--border-subtle);
-	box-shadow: var(--shadow-md);
+	background: var(--suite-surface-feature);
+	border-color: color-mix(in srgb, var(--brand-border-strong) 78%, transparent);
+	box-shadow: var(--brand-shadow-hero);
+}
+
+.variantSupport {
+	background: var(--suite-surface-support);
+	border-color: color-mix(in srgb, var(--brand-border-soft) 74%, transparent);
+	box-shadow: var(--suite-panel-shadow-subtle);
+}
+
+.variantFeature {
+	background: var(--suite-surface-feature);
+	border-color: color-mix(in srgb, var(--brand-border-strong) 82%, transparent);
+	box-shadow: var(--brand-shadow-hero);
+}
+
+.variantSunken {
+	background: var(--suite-surface-sunken);
+	border-color: color-mix(in srgb, var(--border) 88%, transparent);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 3%),
+		inset 0 18px 28px -28px rgb(0 0 0 / 72%);
+}
+
+.variantOverlay {
+	background: var(--suite-surface-overlay);
+	backdrop-filter: blur(22px);
+	border-color: color-mix(in srgb, var(--brand-border-soft) 76%, transparent);
+	box-shadow: var(--brand-shadow);
 }
 
 .variantOutline {
@@ -34,9 +65,11 @@
 }
 
 .variantInset {
-	background: var(--bg);
-	border-color: var(--border-subtle);
-	box-shadow: inset 0 2px 4px rgb(0 0 0 / 20%);
+	background: var(--suite-surface-sunken);
+	border-color: color-mix(in srgb, var(--border) 88%, transparent);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 3%),
+		inset 0 18px 28px -28px rgb(0 0 0 / 72%);
 }
 
 .paddingNone {
@@ -85,8 +118,8 @@
 
 .hover:hover {
 	transform: translateY(-2px);
-	box-shadow: var(--shadow-md);
-	border-color: var(--border-strong);
+	box-shadow: var(--brand-shadow);
+	border-color: color-mix(in srgb, var(--brand-border-strong) 88%, transparent);
 }
 
 .interactive {
@@ -98,7 +131,7 @@
 }
 
 .ghostHover:hover {
-	background: var(--surface);
+	background: var(--suite-surface-support);
 }
 
 .sectionHeader {

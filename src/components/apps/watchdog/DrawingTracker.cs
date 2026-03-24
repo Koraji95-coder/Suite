@@ -31,9 +31,11 @@ using System.Linq;
 using System.Text.Json;
 using System.Timers;
 using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using Application = Autodesk.AutoCAD.ApplicationServices.Application;
+using DiagnosticTrace = System.Diagnostics.Trace;
 
 [assembly: CommandClass(typeof(CadCommandCenter.DrawingTracker))]
 [assembly: ExtensionApplication(typeof(CadCommandCenter.DrawingTrackerApplication))]
@@ -56,6 +58,7 @@ namespace CadCommandCenter
 
         public void Terminate()
         {
+            DrawingTracker.ReleaseAutoloadAnnouncementHook();
             WriteLifecycleEvent("terminate");
         }
 
@@ -76,7 +79,7 @@ namespace CadCommandCenter
             }
             catch (System.Exception ex)
             {
-                Trace.TraceError($"Suite Watchdog plugin lifecycle log failed during {stage}: {ex}");
+                DiagnosticTrace.TraceError($"Suite Watchdog plugin lifecycle log failed during {stage}: {ex}");
             }
         }
 
@@ -90,7 +93,7 @@ namespace CadCommandCenter
             catch (System.Exception ex)
             {
                 WriteLifecycleEvent("tracker_autostart_failed", $"{ex.GetType().Name}: {ex.Message}");
-                Trace.TraceError($"Suite Watchdog tracker autostart failed: {ex}");
+                DiagnosticTrace.TraceError($"Suite Watchdog tracker autostart failed: {ex}");
             }
         }
     }
@@ -195,12 +198,37 @@ namespace CadCommandCenter
         private static List<FolderEvent> _folderEvents = new List<FolderEvent>();
         private static readonly object _eventLock = new object();
         private static readonly HashSet<string> _attachedDocumentKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> _attachedDatabaseKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SaveCommandNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "QSAVE",
+            "SAVE",
+            "SAVEAS",
+            "SAVEALL",
+        };
+        private static readonly TimeSpan SaveCommandCorrelationWindow = TimeSpan.FromSeconds(4);
+        private static readonly TimeSpan SaveSignalDedupeWindow = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan SyntheticSaveDelay = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan DuplicateSaveCommandWindow = TimeSpan.FromSeconds(2);
+        private static DateTime _lastCommandEndedAt = DateTime.MinValue;
+        private static string _lastCommandEndedName = string.Empty;
+        private static DateTime _lastSaveSignalAt = DateTime.MinValue;
+        private static string _lastSaveSignalDocumentKey = string.Empty;
+        private static DateTime _lastRecordedSaveCommandAt = DateTime.MinValue;
+        private static string _lastRecordedSaveCommandName = string.Empty;
+        private static string _lastRecordedSaveCommandDocumentKey = string.Empty;
+        private static DateTime _pendingSyntheticSaveReadyAtUtc = DateTime.MinValue;
+        private static string _pendingSyntheticSaveDocumentKey = string.Empty;
+        private static string _pendingSyntheticSavePath = string.Empty;
 
         // JSON output
         private static string _jsonOutputPath;
         private static bool _pendingAutoloadAnnouncement = false;
+        private static bool _autoloadAnnouncementHooked = false;
+        private static DateTime _autoloadAnnouncementReadyAtUtc = DateTime.MinValue;
+        private static readonly TimeSpan AutoloadAnnouncementDelay = TimeSpan.FromSeconds(8);
         private const string AutoloadAnnouncementMessage =
-            "\n[CAD Tracker] Auto-loaded and tracking is active. Use TRACKERSTATUS for details.\n";
+            "\n[CAD Tracker] Watchdog auto-loaded on startup. Tracking is active. Use TRACKERSTATUS for details.\n";
 
 
         // ═══════════════════════════════════════════════════
@@ -212,9 +240,14 @@ namespace CadCommandCenter
             return new DrawingTracker().StartTrackerCore(silent: true, startReason: "autoload");
         }
 
-        private static void TryWritePendingAutoloadAnnouncement(Editor ed = null)
+        private static void TryWritePendingAutoloadAnnouncement(Editor ed = null, bool force = false)
         {
             if (!_pendingAutoloadAnnouncement)
+            {
+                return;
+            }
+
+            if (!force && DateTime.UtcNow < _autoloadAnnouncementReadyAtUtc)
             {
                 return;
             }
@@ -229,12 +262,66 @@ namespace CadCommandCenter
             {
                 ed.WriteMessage(AutoloadAnnouncementMessage);
                 _pendingAutoloadAnnouncement = false;
+                _autoloadAnnouncementReadyAtUtc = DateTime.MinValue;
+                ReleaseAutoloadAnnouncementHook();
                 DrawingTrackerApplication.WriteLifecycleEvent("tracker_autostart_announced");
             }
             catch (System.Exception ex)
             {
-                Trace.TraceWarning($"Suite Watchdog tracker autostart announcement failed: {ex}");
+                DiagnosticTrace.TraceWarning($"Suite Watchdog tracker autostart announcement failed: {ex}");
             }
+        }
+
+        private static void QueueAutoloadAnnouncement()
+        {
+            _pendingAutoloadAnnouncement = true;
+            _autoloadAnnouncementReadyAtUtc = DateTime.UtcNow.Add(AutoloadAnnouncementDelay);
+            EnsureAutoloadAnnouncementHook();
+            DrawingTrackerApplication.WriteLifecycleEvent(
+                "tracker_autostart_queued",
+                _autoloadAnnouncementReadyAtUtc.ToString("O")
+            );
+        }
+
+        internal static void ReleaseAutoloadAnnouncementHook()
+        {
+            if (!_autoloadAnnouncementHooked)
+            {
+                return;
+            }
+
+            try
+            {
+                Application.Idle -= OnApplicationIdle;
+            }
+            catch
+            {
+                // Ignore Idle unhook failures during shutdown.
+            }
+
+            _autoloadAnnouncementHooked = false;
+        }
+
+        private static void EnsureAutoloadAnnouncementHook()
+        {
+            if (_autoloadAnnouncementHooked)
+            {
+                return;
+            }
+
+            Application.Idle += OnApplicationIdle;
+            _autoloadAnnouncementHooked = true;
+        }
+
+        private static void OnApplicationIdle(object sender, EventArgs e)
+        {
+            if (!_pendingAutoloadAnnouncement)
+            {
+                ReleaseAutoloadAnnouncementHook();
+                return;
+            }
+
+            TryWritePendingAutoloadAnnouncement();
         }
 
         [CommandMethod("STARTTRACKER")]
@@ -294,7 +381,7 @@ namespace CadCommandCenter
                 {
                     if (!silent)
                         ed?.WriteMessage($"\n[CAD Tracker] Could not persist tracker defaults: {ex.Message}\n");
-                    Trace.TraceWarning($"Suite Watchdog tracker config save skipped: {ex}");
+                    DiagnosticTrace.TraceWarning($"Suite Watchdog tracker config save skipped: {ex}");
                 }
             }
 
@@ -327,8 +414,7 @@ namespace CadCommandCenter
 
             if (silent && string.Equals(startReason, "autoload", StringComparison.OrdinalIgnoreCase))
             {
-                _pendingAutoloadAnnouncement = true;
-                TryWritePendingAutoloadAnnouncement(ed);
+                QueueAutoloadAnnouncement();
             }
 
             if (!silent)
@@ -359,6 +445,11 @@ namespace CadCommandCenter
 
             ExportStateJson();
             _initialized = false;
+            _pendingAutoloadAnnouncement = false;
+            _autoloadAnnouncementReadyAtUtc = DateTime.MinValue;
+            ClearPendingSyntheticSaveSignal();
+            ResetSaveSignalTracking();
+            ReleaseAutoloadAnnouncementHook();
             ed?.WriteMessage("\n[CAD Tracker] ■ Stopped. Final state exported.\n");
         }
 
@@ -483,6 +574,7 @@ namespace CadCommandCenter
                 try { DetachDocEvents(doc); } catch { }
             }
             _attachedDocumentKeys.Clear();
+            _attachedDatabaseKeys.Clear();
         }
 
         private void AttachDocEvents(Document doc)
@@ -493,6 +585,7 @@ namespace CadCommandCenter
                 return;
             doc.CommandEnded += OnCommandEnded;
             doc.CommandWillStart += OnCommandWillStart;
+            AttachDatabaseEvents(doc);
 
             // Additional activity signals
             doc.Editor.PointMonitor += OnPointMonitor;
@@ -505,10 +598,41 @@ namespace CadCommandCenter
             if (doc == null) return;
             doc.CommandEnded -= OnCommandEnded;
             doc.CommandWillStart -= OnCommandWillStart;
+            DetachDatabaseEvents(doc);
             try { doc.Editor.PointMonitor -= OnPointMonitor; } catch { }
             var documentKey = GetDocumentSubscriptionKey(doc);
             if (!string.IsNullOrWhiteSpace(documentKey))
                 _attachedDocumentKeys.Remove(documentKey);
+        }
+
+        private void AttachDatabaseEvents(Document doc)
+        {
+            var database = doc?.Database;
+            if (database == null) return;
+            var databaseKey = GetDatabaseSubscriptionKey(database);
+            if (!string.IsNullOrWhiteSpace(databaseKey) && _attachedDatabaseKeys.Contains(databaseKey))
+                return;
+            database.SaveComplete += OnDatabaseSaveComplete;
+            if (!string.IsNullOrWhiteSpace(databaseKey))
+                _attachedDatabaseKeys.Add(databaseKey);
+        }
+
+        private void DetachDatabaseEvents(Document doc)
+        {
+            var database = doc?.Database;
+            if (database == null) return;
+            try
+            {
+                database.SaveComplete -= OnDatabaseSaveComplete;
+            }
+            catch
+            {
+                // Ignore database event detach failures while a document is closing.
+            }
+
+            var databaseKey = GetDatabaseSubscriptionKey(database);
+            if (!string.IsNullOrWhiteSpace(databaseKey))
+                _attachedDatabaseKeys.Remove(databaseKey);
         }
 
         // ─── Document Events ───
@@ -569,19 +693,172 @@ namespace CadCommandCenter
 
             if (_currentSession != null)
             {
-                _currentSession.CommandCount++;
                 var cmd = e.GlobalCommandName.ToUpperInvariant();
-
-                // Track recent commands (dedup consecutive)
-                if (_recentCommands.Count == 0 || _recentCommands[0] != cmd)
+                var documentKey = GetDocumentSubscriptionKey(sender as Document);
+                var now = DateTime.Now;
+                _lastCommandEndedName = cmd;
+                _lastCommandEndedAt = now;
+                if (ShouldSkipDuplicateSaveCommand(cmd, documentKey, now))
+                    return;
+                AppendCommandToCurrentSession(cmd);
+                if (SaveCommandNames.Contains(cmd))
                 {
-                    _recentCommands.Insert(0, cmd);
-                    if (_recentCommands.Count > 20) _recentCommands.RemoveAt(20);
+                    _lastRecordedSaveCommandAt = now;
+                    _lastRecordedSaveCommandName = cmd;
+                    _lastRecordedSaveCommandDocumentKey = documentKey ?? string.Empty;
+                    _lastSaveSignalAt = now;
+                    _lastSaveSignalDocumentKey = documentKey ?? string.Empty;
+                    ClearPendingSyntheticSaveSignal();
+                    ExportStateJson();
                 }
-
-                if (!_currentSession.CommandsUsed.Contains(cmd))
-                    _currentSession.CommandsUsed.Add(cmd);
             }
+        }
+
+        private void OnDatabaseSaveComplete(object sender, DatabaseIOEventArgs e)
+        {
+            RecordSaveSignal(
+                FindDocumentForDatabase(sender as Database),
+                e?.FileName
+            );
+        }
+
+        private void AppendCommandToCurrentSession(string commandName)
+        {
+            if (_currentSession == null || string.IsNullOrWhiteSpace(commandName))
+                return;
+
+            _currentSession.CommandCount++;
+
+            if (_recentCommands.Count == 0 || _recentCommands[0] != commandName)
+            {
+                _recentCommands.Insert(0, commandName);
+                if (_recentCommands.Count > 20) _recentCommands.RemoveAt(20);
+            }
+
+            if (!_currentSession.CommandsUsed.Contains(commandName))
+                _currentSession.CommandsUsed.Add(commandName);
+        }
+
+        private void RecordSaveSignal(Document doc, string savedPath)
+        {
+            if (_currentSession == null)
+                return;
+
+            var activeDocument = Application.DocumentManager.MdiActiveDocument;
+            if (doc != null && activeDocument != null && !ReferenceEquals(doc, activeDocument))
+            {
+                return;
+            }
+
+            var normalizedPath = string.IsNullOrWhiteSpace(savedPath)
+                ? string.Empty
+                : Path.GetFullPath(savedPath).Trim();
+            var documentKey = GetDocumentSubscriptionKey(doc ?? activeDocument);
+            var correlatedSaveCommand = ResolveCorrelatedSaveCommand();
+            var now = DateTime.Now;
+
+            if (
+                !string.IsNullOrWhiteSpace(documentKey)
+                && string.Equals(documentKey, _lastSaveSignalDocumentKey, StringComparison.OrdinalIgnoreCase)
+                && (now - _lastSaveSignalAt) <= SaveSignalDedupeWindow
+            )
+            {
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(normalizedPath))
+            {
+                _currentSession.FullPath = normalizedPath;
+                _currentSession.DrawingName = Path.GetFileName(normalizedPath);
+            }
+
+            if (!string.IsNullOrWhiteSpace(correlatedSaveCommand))
+            {
+                _lastSaveSignalAt = now;
+                _lastSaveSignalDocumentKey = documentKey ?? string.Empty;
+                ClearPendingSyntheticSaveSignal();
+                ExportStateJson();
+                return;
+            }
+
+            QueueSyntheticSaveSignal(documentKey, normalizedPath);
+        }
+
+        private static string ResolveCorrelatedSaveCommand()
+        {
+            if (string.IsNullOrWhiteSpace(_lastCommandEndedName))
+                return string.Empty;
+
+            if (!SaveCommandNames.Contains(_lastCommandEndedName))
+                return string.Empty;
+
+            if ((DateTime.Now - _lastCommandEndedAt) > SaveCommandCorrelationWindow)
+                return string.Empty;
+
+            return _lastCommandEndedName;
+        }
+
+        private static bool ShouldSkipDuplicateSaveCommand(string commandName, string documentKey, DateTime observedAt)
+        {
+            if (!SaveCommandNames.Contains(commandName))
+                return false;
+
+            if (string.IsNullOrWhiteSpace(_lastRecordedSaveCommandName))
+                return false;
+
+            if (!string.Equals(commandName, _lastRecordedSaveCommandName, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (!string.Equals(documentKey ?? string.Empty, _lastRecordedSaveCommandDocumentKey, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return (observedAt - _lastRecordedSaveCommandAt) <= DuplicateSaveCommandWindow;
+        }
+
+        private static void QueueSyntheticSaveSignal(string documentKey, string normalizedPath)
+        {
+            _pendingSyntheticSaveDocumentKey = documentKey ?? string.Empty;
+            _pendingSyntheticSavePath = normalizedPath ?? string.Empty;
+            _pendingSyntheticSaveReadyAtUtc = DateTime.UtcNow.Add(SyntheticSaveDelay);
+        }
+
+        private static void ClearPendingSyntheticSaveSignal()
+        {
+            _pendingSyntheticSaveDocumentKey = string.Empty;
+            _pendingSyntheticSavePath = string.Empty;
+            _pendingSyntheticSaveReadyAtUtc = DateTime.MinValue;
+        }
+
+        private static void ResetSaveSignalTracking()
+        {
+            _lastCommandEndedAt = DateTime.MinValue;
+            _lastCommandEndedName = string.Empty;
+            _lastSaveSignalAt = DateTime.MinValue;
+            _lastSaveSignalDocumentKey = string.Empty;
+            _lastRecordedSaveCommandAt = DateTime.MinValue;
+            _lastRecordedSaveCommandName = string.Empty;
+            _lastRecordedSaveCommandDocumentKey = string.Empty;
+        }
+
+        private void TryFlushPendingSyntheticSaveSignal(bool force = false)
+        {
+            if (_currentSession == null || string.IsNullOrWhiteSpace(_pendingSyntheticSaveDocumentKey))
+                return;
+
+            if (!force && DateTime.UtcNow < _pendingSyntheticSaveReadyAtUtc)
+                return;
+
+            if (!string.IsNullOrWhiteSpace(_pendingSyntheticSavePath))
+            {
+                _currentSession.FullPath = _pendingSyntheticSavePath;
+                _currentSession.DrawingName = Path.GetFileName(_pendingSyntheticSavePath);
+            }
+
+            AppendCommandToCurrentSession("SAVE");
+            _lastSaveSignalAt = DateTime.Now;
+            _lastSaveSignalDocumentKey = _pendingSyntheticSaveDocumentKey;
+            ClearPendingSyntheticSaveSignal();
+            ExportStateJson();
         }
 
         // ─── Mouse movement = activity ───
@@ -638,20 +915,53 @@ namespace CadCommandCenter
 
             _lastActivityTime = DateTime.Now;
             _isPaused = false;
+            ResetSaveSignalTracking();
         }
 
         private static string GetDocumentSubscriptionKey(Document doc)
         {
             if (doc == null) return string.Empty;
-            if (!string.IsNullOrWhiteSpace(doc.Name))
-                return doc.Name;
-            return doc.GetHashCode().ToString();
+            try
+            {
+                if (doc.Database != null)
+                    return $"db:{doc.Database.GetHashCode()}";
+            }
+            catch
+            {
+                // Ignore disposed document/database handles during detach.
+            }
+            return $"doc:{doc.GetHashCode()}";
+        }
+
+        private static string GetDatabaseSubscriptionKey(Database database)
+        {
+            if (database == null) return string.Empty;
+            return $"db:{database.GetHashCode()}";
+        }
+
+        private static Document FindDocumentForDatabase(Database database)
+        {
+            if (database == null) return null;
+            foreach (Document doc in Application.DocumentManager)
+            {
+                try
+                {
+                    if (ReferenceEquals(doc.Database, database))
+                        return doc;
+                }
+                catch
+                {
+                    // Ignore documents that are mid-disposal.
+                }
+            }
+            return null;
         }
 
         private void EndCurrentSession()
         {
             if (_currentSession == null) return;
 
+            TryFlushPendingSyntheticSaveSignal(force: true);
             _currentSession.EndedAt = DateTime.Now;
             _currentSession.IsActive = false;
             _allSessions.Insert(0, _currentSession);
@@ -661,12 +971,14 @@ namespace CadCommandCenter
                 _allSessions.RemoveRange(100, _allSessions.Count - 100);
 
             _currentSession = null;
+            ResetSaveSignalTracking();
         }
 
         private void IdleCheckTick(object sender, ElapsedEventArgs e)
         {
             if (_currentSession == null) return;
 
+            TryFlushPendingSyntheticSaveSignal();
             var idleSec = (DateTime.Now - _lastActivityTime).TotalSeconds;
 
             if (idleSec < _config.IdleTimeoutSeconds)

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -46,6 +47,10 @@ export function WhiteboardSaveDialog({
 			<DialogContent className={styles.dialogContent}>
 				<DialogHeader>
 					<DialogTitle>Save Whiteboard</DialogTitle>
+					<DialogDescription className="sr-only">
+						Save this whiteboard with a title and optional tags for the{" "}
+						{panelContext} panel.
+					</DialogDescription>
 				</DialogHeader>
 
 				<div className={styles.body}>
@@ -88,10 +93,18 @@ export function WhiteboardSaveDialog({
 				</div>
 
 				<DialogFooter className={styles.footer}>
-					<button onClick={onClose} className={styles.cancelButton}>
+					<button
+						type="button"
+						onClick={onClose}
+						className={styles.cancelButton}
+					>
 						Cancel
 					</button>
-					<button onClick={handleSubmit} className={styles.primaryButton}>
+					<button
+						type="button"
+						onClick={handleSubmit}
+						className={styles.primaryButton}
+					>
 						Save Whiteboard
 					</button>
 				</DialogFooter>

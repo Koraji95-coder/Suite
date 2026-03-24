@@ -1,4 +1,4 @@
-import type { ExecutionResultPoint } from "../ground-grid-generator/coordinatesGrabberService";
+import type { ExecutionResultPoint } from "../cad-runtime/coordinatesGrabberService";
 import type { CoordinatePoint } from "./types";
 
 interface PointFallbackOptions {

@@ -11,6 +11,7 @@ import {
 import { ErrorBoundary } from "./components/notification-system/ErrorBoundary";
 import { ToastContainer } from "./components/notification-system/ToastContainer";
 import { logger } from "./lib/logger";
+import AgentPairingRedirectGate from "./routes/AgentPairingRedirectGate";
 import Shell from "./routes/AppShell";
 import LandingPage from "./routes/LandingPage";
 import LoginPage from "./routes/LoginPage";
@@ -28,6 +29,9 @@ const AppDashboardPage = lazy(() => import("./routes/AppDashboardPage"));
 const CalendarRoutePage = lazy(() => import("./routes/CalendarRoutePage"));
 const ChangelogRoutePage = lazy(() => import("./routes/ChangelogRoutePage"));
 const CommandCenterPage = lazy(() => import("./routes/CommandCenterPage"));
+const WatchdogRoutePage = lazy(
+	() => import("./routes/watchdog/WatchdogRoutePage"),
+);
 const GroundGridRoutePage = lazy(
 	() =>
 		import(
@@ -46,6 +50,9 @@ const StandardsCheckerRoutePage = lazy(
 );
 const BatchFindReplaceRoutePage = lazy(
 	() => import("./routes/apps/batch-find-replace/BatchFindReplaceRoutePage"),
+);
+const BlockLibraryRoutePage = lazy(
+	() => import("./routes/apps/block-library/BlockLibraryRoutePage"),
 );
 const EtapDxfCleanupRoutePage = lazy(
 	() => import("./routes/apps/etap-dxf-cleanup/EtapDxfCleanupRoutePage"),
@@ -94,6 +101,7 @@ export default function App() {
 				<AuthProvider>
 					<NotificationProvider>
 						<EnvDebug />
+						<AgentPairingRedirectGate />
 						{cursorEnabled && <Cursor />}
 
 						<Routes>
@@ -101,7 +109,10 @@ export default function App() {
 							<Route path="/login" element={<LoginPage />} />
 							<Route path="/signup" element={<SignupPage />} />
 							<Route path="/privacy" element={<PrivacyPage />} />
-							<Route path="/roadmap" element={<Navigate to="/app/changelog" replace />} />
+							<Route
+								path="/roadmap"
+								element={<Navigate to="/app/changelog" replace />}
+							/>
 							<Route
 								path="/agent/pairing-callback"
 								element={withRouteSuspense(<AgentPairingCallbackPage />)}
@@ -120,6 +131,10 @@ export default function App() {
 									<Route
 										path="dashboard"
 										element={withRouteSuspense(<AppDashboardPage />)}
+									/>
+									<Route
+										path="watchdog"
+										element={withRouteSuspense(<WatchdogRoutePage />)}
 									/>
 									<Route
 										path="projects"
@@ -162,10 +177,6 @@ export default function App() {
 										element={withRouteSuspense(<AutoWireRoutePage />)}
 									/>
 									<Route
-										path="apps/conduit-route"
-										element={<Navigate to="/app/apps/autowire" replace />}
-									/>
-									<Route
 										path="apps/graph"
 										element={withRouteSuspense(<GraphRoutePage />)}
 									/>
@@ -176,6 +187,10 @@ export default function App() {
 									<Route
 										path="apps/batch-find-replace"
 										element={withRouteSuspense(<BatchFindReplaceRoutePage />)}
+									/>
+									<Route
+										path="apps/block-library"
+										element={withRouteSuspense(<BlockLibraryRoutePage />)}
 									/>
 									<Route
 										path="apps/etap-dxf-cleanup"

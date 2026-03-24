@@ -1,5 +1,5 @@
 import { useCallback, type MutableRefObject } from "react";
-import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
+import { coordinatesGrabberService } from "@/components/apps/cad-runtime/coordinatesGrabberService";
 import type { CoordinatesGrabberState } from "./CoordinatesGrabberModels";
 
 interface UseCoordinatesGrabberResultFilesOptions {

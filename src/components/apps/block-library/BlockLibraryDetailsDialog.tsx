@@ -1,5 +1,12 @@
 import { Download, Package, Star, Tag, X } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/apps/ui/dialog";
+import {
+	Dialog,
+	DialogClose,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { cn } from "@/lib/utils";
 import styles from "./BlockLibraryDetailsDialog.module.css";
 import type { BlockFile } from "./blockLibraryModels";
@@ -21,8 +28,14 @@ export function BlockLibraryDetailsDialog({
 		<Dialog open onOpenChange={(open) => !open && onClose()}>
 			<DialogContent className={styles.dialogContent} showCloseButton={false}>
 				<div className={styles.header}>
-					<div className={styles.headerText}>
-						<h3 className={styles.title}>{selectedBlock.name}</h3>
+					<DialogHeader className={styles.headerText}>
+						<DialogTitle className={styles.title}>
+							{selectedBlock.name}
+						</DialogTitle>
+						<DialogDescription className={styles.description}>
+							Preview metadata, tags, and favorite controls for this block
+							library item.
+						</DialogDescription>
 						<p className={styles.meta}>
 							<span className={styles.categoryLabel}>
 								{selectedBlock.category}
@@ -32,10 +45,17 @@ export function BlockLibraryDetailsDialog({
 							<span>·</span>
 							<span>{selectedBlock.usage_count}× used</span>
 						</p>
-					</div>
-					<button onClick={onClose} className={styles.closeButton}>
-						<X className={styles.closeIcon} />
-					</button>
+					</DialogHeader>
+					<DialogClose asChild>
+						<button
+							type="button"
+							onClick={onClose}
+							className={styles.closeButton}
+							aria-label="Close block details"
+						>
+							<X className={styles.closeIcon} />
+						</button>
+					</DialogClose>
 				</div>
 
 				<div className={styles.body}>

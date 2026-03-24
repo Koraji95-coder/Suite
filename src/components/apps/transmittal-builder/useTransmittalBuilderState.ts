@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { logActivity } from "@/services/activityService";
+import { logger } from "@/lib/logger";
+import {
+	loadProjectDocumentMetadata,
+	type ProjectDocumentMetadataProjectOption,
+	type ProjectDocumentMetadataRow,
+} from "@/services/projectDocumentMetadataService";
+import { supabase } from "@/supabase/client";
 import {
 	AUTOSAVE_KEY,
 	buildCidDocuments,
 	buildDefaultDraft,
 	buildFormData,
+	buildProjectMetadataDocuments,
 	buildStandardDocuments,
 	type Contact,
 	createId,
@@ -20,6 +28,7 @@ import {
 	type OutputFormat,
 	resolveProfileId,
 	safeTrim,
+	type StandardDocumentSourceMode,
 	syncDraftToProfileCatalog,
 	validateDraft,
 } from "./transmittalBuilderModels";
@@ -34,6 +43,21 @@ import { transmittalService } from "./transmittalService";
 
 export function useTransmittalBuilderState() {
 	const [draft, setDraft] = useState<DraftState>(() => loadDraft());
+	const [projectOptions, setProjectOptions] = useState<
+		ProjectDocumentMetadataProjectOption[]
+	>([]);
+	const [projectMetadataRows, setProjectMetadataRows] = useState<
+		ProjectDocumentMetadataRow[]
+	>([]);
+	const [projectMetadataLoading, setProjectMetadataLoading] = useState(false);
+	const [projectMetadataError, setProjectMetadataError] = useState<string | null>(
+		null,
+	);
+	const [projectMetadataWarnings, setProjectMetadataWarnings] = useState<string[]>(
+		[],
+	);
+	const [projectMetadataLoadedAt, setProjectMetadataLoadedAt] =
+		useState<string | null>(null);
 	const [profileOptions, setProfileOptions] =
 		useState<PeProfile[]>(PE_PROFILES);
 	const [firmOptions, setFirmOptions] = useState<string[]>(FIRM_NUMBERS);
@@ -47,6 +71,7 @@ export function useTransmittalBuilderState() {
 	const [files, setFiles] = useState<FileState>({
 		template: null,
 		index: null,
+		acadeReport: null,
 		pdfs: [],
 		cid: [],
 	});
@@ -122,6 +147,63 @@ export function useTransmittalBuilderState() {
 	}, []);
 
 	useEffect(() => {
+		let active = true;
+
+		const loadProjects = async () => {
+			try {
+				const {
+					data: { user },
+					error: authError,
+				} = await supabase.auth.getUser();
+				if (authError || !user) {
+					if (active) {
+						setProjectOptions([]);
+					}
+					return;
+				}
+
+				const { data, error } = await supabase
+					.from("projects")
+					.select("id, name, description, watchdog_root_path")
+					.eq("user_id", user.id)
+					.order("created_at", { ascending: false });
+
+				if (error) {
+					throw error;
+				}
+
+				if (!active) return;
+				setProjectOptions(
+					((data ?? []) as
+						Array<{
+							id: string;
+							name: string;
+							description: string;
+							watchdog_root_path: string | null;
+						}>).map((project) => ({
+						id: project.id,
+						name: project.name,
+						description: project.description,
+						watchdogRootPath: project.watchdog_root_path,
+					})),
+				);
+			} catch (error) {
+				if (!active) return;
+				logger.error(
+					"Failed to load transmittal project options",
+					"TransmittalBuilder",
+					error,
+				);
+			}
+		};
+
+		void loadProjects();
+		return () => {
+			active = false;
+		};
+	}, []);
+
+	useEffect(() => {
 		setDraft((prev) =>
 			syncDraftToProfileCatalog(
 				prev,
@@ -131,6 +213,33 @@ export function useTransmittalBuilderState() {
 			),
 		);
 	}, [profileOptions, firmOptions, profileDefaults]);
+
+	useEffect(() => {
+		if (
+			draft.transmittalType !== "standard" ||
+			draft.standardDocumentSource !== "project_metadata"
+		) {
+			return;
+		}
+
+		setPdfAnalysisLoading(false);
+		setPdfAnalysisError(null);
+		setPdfAnalysisWarnings(projectMetadataWarnings);
+		setDraft((prev) => ({
+			...prev,
+			standardDocuments: buildProjectMetadataDocuments(
+				files.pdfs,
+				projectMetadataRows,
+				prev.standardDocuments,
+			),
+		}));
+	}, [
+		draft.standardDocumentSource,
+		draft.transmittalType,
+		files.pdfs,
+		projectMetadataRows,
+		projectMetadataWarnings,
+	]);
 
 	useEffect(() => {
 		if (typeof window === "undefined") return;
@@ -177,6 +286,16 @@ export function useTransmittalBuilderState() {
 	const handleIndexFiles = (selected: File[]) => {
 		setFiles((prev) => ({ ...prev, index: selected[0] ?? null }));
 	};
+
+	const handleAcadeReportFiles = useCallback((selected: File[]) => {
+		setFiles((prev) => ({
+			...prev,
+			acadeReport: selected[0] ?? null,
+		}));
+		setProjectMetadataError(null);
+		setProjectMetadataWarnings([]);
+		setProjectMetadataLoadedAt(null);
+	}, []);
 
 	const analyzePdfFiles = useCallback(
 		async (selected: File[]) => {
@@ -244,9 +363,28 @@ export function useTransmittalBuilderState() {
 	const handlePdfFiles = useCallback(
 		(selected: File[]) => {
 			setFiles((prev) => ({ ...prev, pdfs: selected }));
+			if (draft.standardDocumentSource === "project_metadata") {
+				setDraft((prev) => ({
+					...prev,
+					standardDocuments: buildProjectMetadataDocuments(
+						selected,
+						projectMetadataRows,
+						prev.standardDocuments,
+					),
+				}));
+				setPdfAnalysisLoading(false);
+				setPdfAnalysisError(null);
+				setPdfAnalysisWarnings(projectMetadataWarnings);
+				return;
+			}
 			void analyzePdfFiles(selected);
 		},
-		[analyzePdfFiles],
+		[
+			analyzePdfFiles,
+			draft.standardDocumentSource,
+			projectMetadataRows,
+			projectMetadataWarnings,
+		],
 	);
 
 	const handleCidFiles = (selected: File[]) => {
@@ -374,6 +512,116 @@ export function useTransmittalBuilderState() {
 		}));
 	};
 
+	const handleStandardDocumentSourceChange = useCallback(
+		(value: StandardDocumentSourceMode) => {
+			setDraft((prev) => ({
+				...prev,
+				standardDocumentSource: value,
+				standardDocuments:
+					value === "project_metadata"
+						? buildProjectMetadataDocuments(
+								files.pdfs,
+								projectMetadataRows,
+								prev.standardDocuments,
+							)
+						: prev.standardDocuments,
+			}));
+			setProjectMetadataError(null);
+			if (value === "pdf_analysis" && files.pdfs.length > 0) {
+				void analyzePdfFiles(files.pdfs);
+			}
+			if (value === "project_metadata") {
+				setPdfAnalysisLoading(false);
+				setPdfAnalysisError(null);
+				setPdfAnalysisWarnings(projectMetadataWarnings);
+			}
+		},
+		[analyzePdfFiles, files.pdfs, projectMetadataRows, projectMetadataWarnings],
+	);
+
+	const handleProjectSelectionChange = useCallback(
+		(projectId: string) => {
+			const selectedProject = projectOptions.find(
+				(project) => project.id === projectId,
+			);
+			setDraft((prev) => {
+				const nextProjectName =
+					safeTrim(prev.projectName) || safeTrim(selectedProject?.name);
+				const nextDescription =
+					safeTrim(prev.description) || safeTrim(selectedProject?.description);
+				return {
+					...prev,
+					selectedProjectId: projectId,
+					projectName: nextProjectName || prev.projectName,
+					description: nextDescription || prev.description,
+					standardDocuments:
+						prev.standardDocumentSource === "project_metadata"
+							? []
+							: prev.standardDocuments,
+				};
+			});
+			setProjectMetadataRows([]);
+			setProjectMetadataWarnings([]);
+			setProjectMetadataError(null);
+			setProjectMetadataLoadedAt(null);
+		},
+		[projectOptions],
+	);
+
+	const handleLoadProjectMetadata = useCallback(async () => {
+		const selectedProject = projectOptions.find(
+			(project) => project.id === draft.selectedProjectId,
+		);
+		if (!selectedProject) {
+			setProjectMetadataError("Select a project before loading project metadata.");
+			return;
+		}
+
+		setProjectMetadataLoading(true);
+		setProjectMetadataError(null);
+		try {
+			const result = await loadProjectDocumentMetadata(selectedProject, {
+				reportFile: files.acadeReport,
+			});
+			setProjectMetadataRows(result.rows);
+			setProjectMetadataWarnings(result.warnings);
+			setProjectMetadataLoadedAt(new Date().toISOString());
+			setDraft((prev) => ({
+				...prev,
+				selectedProjectId: selectedProject.id,
+				projectName: safeTrim(prev.projectName) || selectedProject.name,
+				projectNumber:
+					safeTrim(prev.projectNumber) || safeTrim(result.profile.acadeLine4),
+				description:
+					safeTrim(prev.description) || safeTrim(selectedProject.description),
+				standardDocuments:
+					prev.standardDocumentSource === "project_metadata"
+						? buildProjectMetadataDocuments(
+								files.pdfs,
+								result.rows,
+								prev.standardDocuments,
+							)
+						: prev.standardDocuments,
+			}));
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Failed to load project metadata.";
+			logger.error(
+				"Failed to load project metadata for transmittal builder",
+				"TransmittalBuilder",
+				error,
+			);
+			setProjectMetadataError(message);
+			setProjectMetadataRows([]);
+			setProjectMetadataWarnings([]);
+			setProjectMetadataLoadedAt(null);
+		} finally {
+			setProjectMetadataLoading(false);
+		}
+	}, [draft.selectedProjectId, files.acadeReport, files.pdfs, projectOptions]);
+
 	const resetSession = () => {
 		const next = buildDefaultDraft({
 			profiles: profileOptions,
@@ -382,7 +630,13 @@ export function useTransmittalBuilderState() {
 			defaultFirm: profileDefaults.firm,
 		});
 		setDraft(next);
-		setFiles({ template: null, index: null, pdfs: [], cid: [] });
+		setFiles({
+			template: null,
+			index: null,
+			acadeReport: null,
+			pdfs: [],
+			cid: [],
+		});
 		setOutputs([]);
 		setSubmitAttempted(false);
 		setLastSavedAt(null);
@@ -390,6 +644,11 @@ export function useTransmittalBuilderState() {
 		setPdfAnalysisLoading(false);
 		setPdfAnalysisError(null);
 		setPdfAnalysisWarnings([]);
+		setProjectMetadataRows([]);
+		setProjectMetadataLoading(false);
+		setProjectMetadataError(null);
+		setProjectMetadataWarnings([]);
+		setProjectMetadataLoadedAt(null);
 		if (typeof window !== "undefined") {
 			window.localStorage.removeItem(AUTOSAVE_KEY);
 		}
@@ -551,7 +810,9 @@ export function useTransmittalBuilderState() {
 				index: files.index?.name
 					? files.index.name
 					: draft.standardDocuments.length > 0
-						? `Auto-generated from ${draft.standardDocuments.length} PDF row(s)`
+						? draft.standardDocumentSource === "project_metadata"
+							? `Auto-generated from ${draft.standardDocuments.length} project row(s)`
+							: `Auto-generated from ${draft.standardDocuments.length} PDF row(s)`
 						: "Not selected",
 				documents:
 					pendingCount > 0
@@ -559,12 +820,18 @@ export function useTransmittalBuilderState() {
 						: reviewedCount > 0
 							? `${files.pdfs.length} PDFs (${reviewedCount} reviewed)`
 							: `${files.pdfs.length} PDFs`,
+				report:
+					files.acadeReport?.name ||
+					(draft.standardDocumentSource === "project_metadata"
+						? "No ACADE report"
+						: "—"),
 			};
 		}
 		return {
 			template: files.template?.name || "Not selected",
 			index: "—",
 			documents: `${files.cid.length} CID files`,
+			report: "—",
 		};
 	}, [draft.standardDocuments, draft.transmittalType, files]);
 
@@ -579,6 +846,11 @@ export function useTransmittalBuilderState() {
 		pdfAnalysisLoading,
 		pdfAnalysisError,
 		pdfAnalysisWarnings,
+		projectOptions,
+		projectMetadataLoading,
+		projectMetadataError,
+		projectMetadataWarnings,
+		projectMetadataLoadedAt,
 		outputFormat,
 		generationState,
 		outputs,
@@ -593,7 +865,11 @@ export function useTransmittalBuilderState() {
 		handlePeChange,
 		handleTemplateFiles,
 		handleIndexFiles,
+		handleAcadeReportFiles,
 		handlePdfFiles,
+		handleStandardDocumentSourceChange,
+		handleProjectSelectionChange,
+		handleLoadProjectMetadata,
 		analyzePdfFiles: () => analyzePdfFiles(files.pdfs),
 		handleCidFiles,
 		handleScanCid,

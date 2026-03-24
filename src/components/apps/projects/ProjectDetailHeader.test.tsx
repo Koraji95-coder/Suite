@@ -167,7 +167,7 @@ const telemetry = {
 } satisfies ProjectWatchdogTelemetry;
 
 describe("ProjectDetailHeader", () => {
-	it("links project telemetry to the dashboard watchdog focus", () => {
+	it("links project telemetry to the dedicated watchdog page", () => {
 		render(
 			<MemoryRouter>
 				<ProjectDetailHeader
@@ -181,11 +181,9 @@ describe("ProjectDetailHeader", () => {
 		);
 
 		const link = screen.getByRole("link", {
-			name: /go to dashboard/i,
+			name: /open watchdog/i,
 		}) as HTMLAnchorElement;
-		expect(link.getAttribute("href")).toBe(
-			"/app/dashboard?focus=watchdog&project=project-1",
-		);
+		expect(link.getAttribute("href")).toBe("/app/watchdog?project=project-1");
 	});
 
 	it("renders compact live AutoCAD telemetry for the current project", () => {
@@ -205,6 +203,8 @@ describe("ProjectDetailHeader", () => {
 		expect(screen.getByText(/Drawing1\.dwg/i)).toBeTruthy();
 		expect(screen.getByText(/1 online/i)).toBeTruthy();
 		expect(screen.getByText(/2 roots • 2 patterns/i)).toBeTruthy();
-		expect(screen.getByText(/Go to dashboard/i)).toBeTruthy();
+		expect(
+			screen.getByRole("link", { name: /open watchdog/i }),
+		).toBeTruthy();
 	});
 });

@@ -7,9 +7,9 @@ import {
 	RefreshCw,
 	Undo2,
 	WifiOff,
-	Zap,
 } from "lucide-react";
 import { Badge } from "@/components/primitives/Badge";
+import { Button } from "@/components/primitives/Button";
 import { HStack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
 import { cn } from "@/lib/utils";
@@ -19,104 +19,212 @@ import type {
 	AgentTaskItem,
 	AgentTaskPriority,
 } from "@/services/agent/types";
-import { AgentPixelMark } from "./AgentPixelMark";
 import styles from "./AgentChatPanel.module.css";
+import { AgentPixelMark } from "./AgentPixelMark";
 import type { AgentChannelScope } from "./agentChannelScope";
-import type { AgentMarkState } from "./agentMarkState";
-import { AGENT_PROFILE_IDS, type AgentProfile, type AgentProfileId } from "./agentProfiles";
 import {
 	ACTIVITY_DETAIL_PREVIEW_CHARS,
-	AGENT_NETWORK_NODES,
-	OPEN_QUEUE_STATUSES,
 	type ActivitySourceFilter,
+	AGENT_NETWORK_NODES,
+	activityTone,
+	deriveActivityDetail,
+	formatTimestamp,
+	OPEN_QUEUE_STATUSES,
 	type ProfileRosterEntry,
+	priorityColor,
 	type QueuePriorityFilter,
 	type QueueProfileFilter,
 	type QueueRunFilter,
 	type QueueStatusFilter,
-	STATUS_FILTERS,
-	activityTone,
-	deriveActivityDetail,
-	formatTimestamp,
-	priorityColor,
 	runConversationTitle,
+	STATUS_FILTERS,
 	shortRunId,
 	statusColor,
 	truncateText,
 } from "./agentChatPanelSelectors";
+import type { AgentMarkState } from "./agentMarkState";
+import {
+	AGENT_PROFILE_IDS,
+	type AgentProfile,
+	type AgentProfileId,
+} from "./agentProfiles";
 
 type AgentChatProfileSummary = Pick<AgentProfile, "name" | "tagline" | "focus">;
+type EmptyStateComposerMode = "direct" | "run";
 
 export function AgentChatEmptyState({
 	profile,
 	profileId,
-	templates,
 	isReady,
+	statusMessage,
 	avatarState,
-	onTemplateClick,
+	primaryActionLabel,
+	onPrimaryAction,
+	directProfileName,
+	runObjectiveEnabled,
+	onSelectMode,
+	onStarterSelect,
+	starterPrompts,
 }: {
 	profile: AgentChatProfileSummary;
 	profileId: AgentProfileId;
-	templates: Array<{ label: string; prompt: string }>;
 	isReady: boolean;
+	statusMessage: string;
 	avatarState: AgentMarkState;
-	onTemplateClick: (prompt: string) => void;
+	primaryActionLabel?: string;
+	onPrimaryAction?: () => void;
+	directProfileName: string;
+	runObjectiveEnabled: boolean;
+	onSelectMode?: (mode: EmptyStateComposerMode) => void;
+	onStarterSelect?: (mode: EmptyStateComposerMode, prompt: string) => void;
+	starterPrompts: Array<{
+		label: string;
+		prompt: string;
+		mode: EmptyStateComposerMode;
+	}>;
 }) {
+	const normalizedStatusMessage = statusMessage.trim().toLowerCase();
+	const pairingRequired = normalizedStatusMessage.includes("pair");
+
 	return (
 		<div className={styles.emptyRoot}>
 			<div className={styles.emptyAmbient} />
-			<div className={styles.emptyContent}>
+			<div className={styles.emptyCompactCard}>
 				<div className={styles.emptyAvatarWrap}>
 					<AgentPixelMark
 						profileId={profileId}
-						size={176}
+						size={56}
 						detailLevel="auto"
 						state={avatarState}
 					/>
 				</div>
-				<h2 className={styles.emptyTitle}>{profile.name}</h2>
-				<p className={styles.emptyTagline}>{profile.tagline}</p>
-				<p className={styles.emptyFocus}>{profile.focus}</p>
-
-				{!isReady ? (
-					<HStack
-						gap={2}
-						align="center"
-						className={cn(styles.statusPill, styles.statusPillWarning)}
-					>
-						<WifiOff size={14} className={styles.warningIcon} />
-						<Text size="sm" color="warning">
-							Waiting for connection...
-						</Text>
-					</HStack>
-				) : (
-					<HStack
-						gap={2}
-						align="center"
-						className={cn(styles.statusPill, styles.statusPillSuccess)}
-					>
-						<div className={styles.readyDot} />
-						<Text size="sm" color="success">
-							Ready to assist
-						</Text>
-					</HStack>
-				)}
-
-				{templates.length > 0 && isReady && (
-					<div className={styles.templateGrid}>
-						{templates.slice(0, 4).map((template) => (
-							<button
-								key={template.label}
-								type="button"
-								onClick={() => onTemplateClick(template.prompt)}
-								className={styles.templateCard}
+				<div className={styles.emptyContent}>
+					<div className={styles.emptyHeaderRow}>
+						<div>
+							<h2 className={styles.emptyTitle}>{profile.name}</h2>
+							<p className={styles.emptyTagline}>{profile.tagline}</p>
+						</div>
+						{isReady ? (
+							<HStack
+								gap={2}
+								align="center"
+								className={cn(styles.statusPill, styles.statusPillSuccess)}
 							>
-								<Zap size={14} />
-								<span>{template.label}</span>
-							</button>
-						))}
+								<div className={styles.readyDot} />
+								<Text size="sm" color="success">
+									Ready to assist
+								</Text>
+							</HStack>
+						) : null}
 					</div>
-				)}
+					<p className={styles.emptyGuide}>
+						{isReady ? (
+							<>
+								Use the composer below, or switch to{" "}
+								<strong>Run objective</strong>.
+							</>
+						) : pairingRequired ? (
+							<>
+								Pair this device in <strong>Settings</strong> first. Direct chat
+								and run objectives unlock as soon as the session is paired.
+							</>
+						) : (
+							<>
+								Keep this surface open while the gateway reconnects, then use
+								the composer below or switch to <strong>Run objective</strong>.
+							</>
+						)}
+					</p>
+					{isReady ? (
+						<p className={styles.emptyFocus}>
+							Direct replies currently route to{" "}
+							<strong>{directProfileName}</strong>. Stay in General for run
+							threads, or move into a specialist lane from the left rail when
+							you want a dedicated workspace.
+						</p>
+					) : null}
+					{!isReady && onPrimaryAction && primaryActionLabel ? (
+						<div className={styles.emptyActions}>
+							<Button size="sm" variant="primary" onClick={onPrimaryAction}>
+								{primaryActionLabel}
+							</Button>
+							{pairingRequired ? (
+								<Text size="xs" color="muted">
+									Managed verification stays attached to the signed-in
+									workspace.
+								</Text>
+							) : (
+								<HStack
+									gap={2}
+									align="center"
+									className={cn(styles.statusPill, styles.statusPillWarning)}
+								>
+									<WifiOff size={14} className={styles.warningIcon} />
+									<Text size="xs" color="warning">
+										Live gateway action is unavailable right now
+									</Text>
+								</HStack>
+							)}
+						</div>
+					) : null}
+					{isReady ? (
+						<>
+							<div className={styles.templateGrid}>
+								<button
+									type="button"
+									className={styles.templateCard}
+									onClick={() => onSelectMode?.("direct")}
+								>
+									<span className={styles.templateCardTitle}>
+										Ask {directProfileName}
+									</span>
+									<span className={styles.templateCardBody}>
+										Use direct chat when you want one specialist to answer and
+										keep iterating.
+									</span>
+								</button>
+								{runObjectiveEnabled ? (
+									<button
+										type="button"
+										className={styles.templateCard}
+										onClick={() => onSelectMode?.("run")}
+									>
+										<span className={styles.templateCardTitle}>
+											Run crew objective
+										</span>
+										<span className={styles.templateCardBody}>
+											Start a tracked multi-agent run when you want queue,
+											review, and deliverables.
+										</span>
+									</button>
+								) : null}
+							</div>
+							{starterPrompts.length > 0 ? (
+								<div className={styles.starterPromptRow}>
+									{starterPrompts.map((starter) => (
+										<button
+											key={`${starter.mode}:${starter.label}`}
+											type="button"
+											className={styles.starterPrompt}
+											onClick={() =>
+												onStarterSelect?.(starter.mode, starter.prompt)
+											}
+										>
+											<span className={styles.starterPromptLabel}>
+												{starter.label}
+											</span>
+											<span className={styles.starterPromptMode}>
+												{starter.mode === "run"
+													? "Run objective"
+													: "Direct chat"}
+											</span>
+										</button>
+									))}
+								</div>
+							) : null}
+						</>
+					) : null}
+				</div>
 			</div>
 		</div>
 	);
@@ -328,7 +436,9 @@ export function AgentChatLeftRail({
 							name="queue_profile_filter"
 							value={queueProfileFilter}
 							onChange={(event) =>
-								onQueueProfileFilterChange(event.target.value as QueueProfileFilter)
+								onQueueProfileFilterChange(
+									event.target.value as QueueProfileFilter,
+								)
 							}
 						>
 							<option value="all">all profiles</option>
@@ -376,11 +486,23 @@ export function AgentChatLeftRail({
 									}
 								}}
 							>
-								<HStack gap={2} align="center" className={styles.queueItemHeader}>
-									<Badge size="sm" variant="soft" color={priorityColor(task.priority)}>
+								<HStack
+									gap={2}
+									align="center"
+									className={styles.queueItemHeader}
+								>
+									<Badge
+										size="sm"
+										variant="soft"
+										color={priorityColor(task.priority)}
+									>
 										{task.priority}
 									</Badge>
-									<Badge size="sm" variant="outline" color={statusColor(task.status)}>
+									<Badge
+										size="sm"
+										variant="outline"
+										color={statusColor(task.status)}
+									>
 										{task.status.replace("_", " ")}
 									</Badge>
 								</HStack>
@@ -421,7 +543,7 @@ export function AgentChatRightRail({
 	onOpenRunConversation,
 }: {
 	channelScope: AgentChannelScope;
-	healthy: boolean;
+	healthy: boolean | null;
 	paired: boolean;
 	taskItems: AgentTaskItem[];
 	profileStateById: Partial<Record<AgentProfileId, AgentMarkState>>;
@@ -452,7 +574,11 @@ export function AgentChatRightRail({
 					</Text>
 				</HStack>
 				<div className={styles.networkSurface}>
-					<svg className={styles.networkLines} viewBox="0 0 240 180" aria-hidden>
+					<svg
+						className={styles.networkLines}
+						viewBox="0 0 240 180"
+						aria-hidden
+					>
 						<line x1="120" y1="34" x2="58" y2="94" />
 						<line x1="120" y1="34" x2="120" y2="126" />
 						<line x1="120" y1="34" x2="182" y2="94" />
@@ -472,7 +598,13 @@ export function AgentChatRightRail({
 						).length;
 						const nodeState =
 							profileStateById[node.profileId] ??
-							(healthy ? (paired ? (queued > 0 ? "running" : "idle") : "waiting") : "error");
+							(healthy === false
+								? "error"
+								: paired && healthy === true
+									? queued > 0
+										? "running"
+										: "idle"
+									: "waiting");
 						return (
 							<button
 								key={node.profileId}
@@ -491,7 +623,9 @@ export function AgentChatRightRail({
 									detailLevel="auto"
 									state={nodeState}
 								/>
-								{queued > 0 ? <span className={styles.networkCount}>{queued}</span> : null}
+								{queued > 0 ? (
+									<span className={styles.networkCount}>{queued}</span>
+								) : null}
 							</button>
 						);
 					})}
@@ -519,7 +653,11 @@ export function AgentChatRightRail({
 						reviewInboxTasks.slice(0, 8).map((task) => (
 							<div key={task.taskId} className={styles.reviewItem}>
 								<HStack gap={2} align="center" className={styles.reviewMetaRow}>
-									<Badge size="sm" variant="soft" color={priorityColor(task.priority)}>
+									<Badge
+										size="sm"
+										variant="soft"
+										color={priorityColor(task.priority)}
+									>
 										{task.priority}
 									</Badge>
 									<Text size="xs" color="muted">
@@ -548,7 +686,10 @@ export function AgentChatRightRail({
 										type="button"
 										onClick={() => onReviewAction(task.taskId, "approve")}
 										disabled={reviewBusyTaskId === task.taskId}
-										className={cn(styles.reviewActionButton, styles.reviewApprove)}
+										className={cn(
+											styles.reviewActionButton,
+											styles.reviewApprove,
+										)}
 									>
 										<Check size={12} />
 										Approve
@@ -557,7 +698,10 @@ export function AgentChatRightRail({
 										type="button"
 										onClick={() => onReviewAction(task.taskId, "rework")}
 										disabled={reviewBusyTaskId === task.taskId}
-										className={cn(styles.reviewActionButton, styles.reviewRework)}
+										className={cn(
+											styles.reviewActionButton,
+											styles.reviewRework,
+										)}
 									>
 										<Undo2 size={12} />
 										Rework
@@ -566,7 +710,10 @@ export function AgentChatRightRail({
 										type="button"
 										onClick={() => onReviewAction(task.taskId, "defer")}
 										disabled={reviewBusyTaskId === task.taskId}
-										className={cn(styles.reviewActionButton, styles.reviewDefer)}
+										className={cn(
+											styles.reviewActionButton,
+											styles.reviewDefer,
+										)}
 									>
 										<WifiOff size={12} />
 										Defer
@@ -585,7 +732,10 @@ export function AgentChatRightRail({
 					</Text>
 				</div>
 				<div className={styles.filterGrid}>
-					<label className={styles.filterField} htmlFor="activity-profile-filter">
+					<label
+						className={styles.filterField}
+						htmlFor="activity-profile-filter"
+					>
 						<span>profile</span>
 						<select
 							id="activity-profile-filter"
@@ -611,7 +761,9 @@ export function AgentChatRightRail({
 							id="activity-run-filter"
 							name="activity_run_filter"
 							value={activityRunFilter}
-							onChange={(event) => onActivityRunFilterChange(event.target.value)}
+							onChange={(event) =>
+								onActivityRunFilterChange(event.target.value)
+							}
 						>
 							<option value="all">all runs</option>
 							{availableRunIds.map((runId) => (
@@ -621,7 +773,10 @@ export function AgentChatRightRail({
 							))}
 						</select>
 					</label>
-					<label className={styles.filterField} htmlFor="activity-source-filter">
+					<label
+						className={styles.filterField}
+						htmlFor="activity-source-filter"
+					>
 						<span>source</span>
 						<select
 							id="activity-source-filter"
@@ -677,7 +832,9 @@ export function AgentChatRightRail({
 									return (
 										<>
 											{detail.meta ? (
-												<p className={styles.activityDetailMeta}>{detail.meta}</p>
+												<p className={styles.activityDetailMeta}>
+													{detail.meta}
+												</p>
 											) : null}
 											{detail.text ? (
 												<p

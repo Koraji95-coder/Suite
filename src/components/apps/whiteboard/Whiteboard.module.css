@@ -1,9 +1,12 @@
 .dialogContent {
-	max-width: 80rem;
-	max-height: 90vh;
+	width: min(92vw, 110rem);
+	max-width: min(92vw, 110rem);
+	height: min(92vh, 72rem);
+	max-height: min(92vh, 72rem);
 	padding: 0;
 	border: 1px solid var(--border);
 	background: var(--surface);
+	overflow: hidden;
 }
 
 .root {
@@ -92,16 +95,23 @@
 	display: flex;
 	flex: 1;
 	overflow: hidden;
+	min-height: 0;
 }
 
 .canvasViewport {
 	display: flex;
 	flex: 1;
-	align-items: center;
-	justify-content: center;
-	padding: 1rem;
-	overflow: auto;
-	background: var(--bg-base);
+	align-items: stretch;
+	justify-content: stretch;
+	padding: 1.25rem;
+	overflow: hidden;
+	background:
+		radial-gradient(
+			140% 120% at 50% 0%,
+			color-mix(in srgb, var(--primary) 8%, transparent),
+			transparent 56%
+		),
+		var(--bg-base);
 }
 
 .confirmDialogContent {

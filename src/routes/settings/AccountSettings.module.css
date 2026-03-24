@@ -18,6 +18,29 @@
 	background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
+.trustBandGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+	gap: 0.65rem;
+}
+
+.trustBandCard {
+	display: grid;
+	gap: 0.38rem;
+	padding: 0.78rem 0.88rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 70%, transparent);
+	border-radius: var(--radius-3);
+	background: color-mix(in srgb, var(--surface-elevated) 72%, transparent);
+}
+
+.trustBandLabel {
+	font-size: 0.66rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
 .sectionIconNeutral {
 	color: var(--accent);
 	background: color-mix(in srgb, var(--accent) 15%, transparent);
@@ -190,6 +213,10 @@
 	gap: 0.75rem;
 }
 
+.securityDetailRow {
+	padding-top: 0.1rem;
+}
+
 .profileGrid {
 	display: grid;
 	gap: 1rem;
@@ -232,16 +259,22 @@
 
 .agentPairingSummary {
 	display: grid;
-	gap: 0.5rem;
-	padding: 0.8rem;
+	gap: 0.6rem;
+	padding: 0.92rem 0.98rem;
 	border: 1px solid
 		color-mix(in srgb, var(--agent-surface-border) 90%, transparent);
-	border-radius: 0.8rem;
+	border-radius: 0.9rem;
 	background: color-mix(
 		in srgb,
 		var(--agent-surface-elevated) 72%,
 		transparent
 	);
+}
+
+.agentPairingStatusRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
 }
 
 .agentActionRow {
@@ -281,6 +314,56 @@
 	border: 1px dashed color-mix(in srgb, var(--warning) 42%, transparent);
 	border-radius: 0.65rem;
 	background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+
+.agentTechnicalDetails {
+	display: grid;
+	gap: 0.75rem;
+	padding-top: 0.2rem;
+}
+
+.agentTechnicalSummary {
+	cursor: pointer;
+	font-size: 0.78rem;
+	font-weight: 650;
+	color: var(--text);
+	list-style: none;
+}
+
+.agentTechnicalSummary::-webkit-details-marker {
+	display: none;
+}
+
+.agentTechnicalBody {
+	display: grid;
+	gap: 0.7rem;
+	padding: 0.82rem 0.92rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 68%, transparent);
+	border-radius: 0.85rem;
+	background: color-mix(in srgb, var(--surface-elevated) 68%, transparent);
+}
+
+.agentTechnicalGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+	gap: 0.65rem;
+}
+
+.agentTechnicalCard {
+	display: grid;
+	gap: 0.38rem;
+	padding: 0.75rem 0.82rem;
+	border: 1px solid color-mix(in srgb, var(--line-soft) 92%, transparent);
+	border-radius: 0.75rem;
+	background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.agentTechnicalLabel {
+	font-size: 0.66rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted);
 }
 
 @keyframes status-ping {

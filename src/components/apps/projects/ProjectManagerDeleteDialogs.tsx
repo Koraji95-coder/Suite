@@ -2,6 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -42,6 +43,9 @@ export function ProjectManagerDeleteDialogs({
 						</div>
 						<p className={styles.eyebrow}>Destructive action</p>
 						<DialogTitle>Delete project?</DialogTitle>
+						<DialogDescription className="sr-only">
+							Permanently delete the selected project and its related records.
+						</DialogDescription>
 					</DialogHeader>
 					<p className={styles.copy}>
 						Delete "{pendingProjectName}"? This will permanently remove its
@@ -77,6 +81,9 @@ export function ProjectManagerDeleteDialogs({
 						</div>
 						<p className={styles.eyebrow}>Destructive action</p>
 						<DialogTitle>Delete task?</DialogTitle>
+						<DialogDescription className="sr-only">
+							Permanently delete the selected task and all of its subtasks.
+						</DialogDescription>
 					</DialogHeader>
 					<p className={styles.copy}>
 						Delete "{pendingTaskName}"? This will also delete all subtasks.

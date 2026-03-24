@@ -97,7 +97,7 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		id: "transmittal-builder",
 		title: "Transmittal Builder",
 		description:
-			"Assemble transmittal packages with contacts and document lists.",
+			"Assemble transmittal packages from project metadata, PDFs, and contacts.",
 		to: "/app/apps/transmittal-builder",
 		status: "active",
 		icon: Workflow,
@@ -108,7 +108,7 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		id: "drawing-list-manager",
 		title: "Drawing List Manager",
 		description:
-			"Generate, validate, and export structured drawing lists from project files.",
+			"Scan title blocks, preview ACADE mapping, and export project drawing indexes.",
 		to: "/app/apps/drawing-list-manager",
 		status: "active",
 		icon: Replace,
@@ -130,7 +130,7 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		id: "batch-find-replace",
 		title: "Batch Find and Replace",
 		description:
-			"Run bulk find/replace jobs through the backend bridge with preview support.",
+			"Run text cleanup and active-drawing remediation through the backend bridge with preview support.",
 		to: "/app/apps/batch-find-replace",
 		status: "active",
 		icon: Replace,
@@ -173,7 +173,8 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		id: "block-library",
 		title: "Block Library",
 		description: "Central catalog for reusable engineering block assets.",
-		status: "coming-soon",
+		to: "/app/apps/block-library",
+		status: "active",
 		icon: SquareLibrary,
 		lane: "workspace",
 		signal: "Reusable assets",

@@ -8,11 +8,11 @@ import {
 	isFrontendPasskeyEnabled,
 	type PasskeyCapability,
 } from "@/auth/passkeyCapabilityApi";
+import type { AgentPairingAction } from "@/services/agent/types";
 import {
 	AgentPairingRequestError,
 	agentService,
 } from "@/services/agentService";
-import type { AgentPairingAction } from "@/services/agent/types";
 import {
 	logAuthMethodTelemetry,
 	logSecurityEvent,
@@ -21,11 +21,51 @@ import { useAgentConnectionStatus } from "@/services/useAgentConnectionStatus";
 import { supabase } from "@/supabase/client";
 
 const AGENT_VERIFICATION_COOLDOWN_SECONDS = 20;
+const PASSKEY_CAPABILITY_CACHE_KEY = "suite:passkey:capability";
+const PASSKEY_CAPABILITY_CACHE_TTL_MS = 5 * 60_000;
+
+function readCachedPasskeyCapability(): PasskeyCapability | null {
+	try {
+		const raw = localStorage.getItem(PASSKEY_CAPABILITY_CACHE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as {
+			value?: PasskeyCapability;
+			updatedAt?: number;
+		};
+		if (!parsed?.value || typeof parsed.updatedAt !== "number") {
+			return null;
+		}
+		if (Date.now() - parsed.updatedAt > PASSKEY_CAPABILITY_CACHE_TTL_MS) {
+			return null;
+		}
+		return parsed.value;
+	} catch {
+		return null;
+	}
+}
+
+function writeCachedPasskeyCapability(value: PasskeyCapability) {
+	try {
+		localStorage.setItem(
+			PASSKEY_CAPABILITY_CACHE_KEY,
+			JSON.stringify({
+				value,
+				updatedAt: Date.now(),
+			}),
+		);
+	} catch {
+		/* noop */
+	}
+}
 
 interface AccountUserLike {
 	id?: string | null;
 	email?: string | null;
 	last_sign_in_at?: string | null;
+	user_metadata?: {
+		display_name?: unknown;
+		full_name?: unknown;
+	} | null;
 }
 
 interface AccountProfileLike {
@@ -42,21 +82,49 @@ interface UseAccountProfileStateArgs {
 	}) => Promise<unknown>;
 }
 
+function resolveAccountDisplayName(
+	profile: AccountProfileLike | null | undefined,
+	user: AccountUserLike | null | undefined,
+) {
+	if (profile?.display_name?.trim()) {
+		return profile.display_name.trim();
+	}
+
+	if (typeof user?.user_metadata?.display_name === "string") {
+		return user.user_metadata.display_name.trim();
+	}
+
+	if (typeof user?.user_metadata?.full_name === "string") {
+		return user.user_metadata.full_name.trim();
+	}
+
+	return "";
+}
+
+function resolveAccountEmail(
+	profile: AccountProfileLike | null | undefined,
+	user: AccountUserLike | null | undefined,
+) {
+	return profile?.email ?? user?.email ?? "";
+}
+
 export function useAccountProfileState({
 	user,
 	profile,
 	updateProfile,
 }: UseAccountProfileStateArgs) {
-	const [displayName, setDisplayName] = useState("");
-	const [accountEmail, setAccountEmail] = useState("");
+	const resolvedDisplayName = resolveAccountDisplayName(profile, user);
+	const resolvedAccountEmail = resolveAccountEmail(profile, user);
+	const [displayName, setDisplayName] = useState(() => resolvedDisplayName);
+	const [accountEmail, setAccountEmail] = useState(() => resolvedAccountEmail);
 	const [isSavingProfile, setIsSavingProfile] = useState(false);
 	const [profileSaved, setProfileSaved] = useState(false);
 	const [profileError, setProfileError] = useState("");
 
 	useEffect(() => {
-		setDisplayName(profile?.display_name ?? "");
-		setAccountEmail(profile?.email ?? user?.email ?? "");
-	}, [profile?.display_name, profile?.email, user?.email]);
+		setDisplayName(resolvedDisplayName);
+		setAccountEmail(resolvedAccountEmail);
+	}, [resolvedAccountEmail, resolvedDisplayName]);
 
 	const canSaveProfile = useMemo(() => {
 		if (!user || isSavingProfile) return false;
@@ -159,8 +227,10 @@ export function useAccountPasskeyState({
 	const passkeyCallbackHandledRef = useRef("");
 	const [isStartingPasskeyEnroll, setIsStartingPasskeyEnroll] = useState(false);
 	const [passkeyCapability, setPasskeyCapability] =
-		useState<PasskeyCapability | null>(null);
-	const [passkeyLoading, setPasskeyLoading] = useState(true);
+		useState<PasskeyCapability | null>(() => readCachedPasskeyCapability());
+	const [passkeyLoading, setPasskeyLoading] = useState(
+		() => readCachedPasskeyCapability() === null,
+	);
 	const [passkeyError, setPasskeyError] = useState("");
 	const [passkeyNotice, setPasskeyNotice] = useState("");
 
@@ -171,13 +241,17 @@ export function useAccountPasskeyState({
 	);
 
 	const loadPasskeyCapability = useCallback(async () => {
-		setPasskeyLoading(true);
+		const cachedCapability = readCachedPasskeyCapability();
+		setPasskeyLoading(cachedCapability === null);
+		if (cachedCapability) {
+			setPasskeyCapability(cachedCapability);
+		}
 		setPasskeyError("");
 		try {
 			const result = await fetchPasskeyCapability();
 			setPasskeyCapability(result.passkey);
+			writeCachedPasskeyCapability(result.passkey);
 		} catch (err: unknown) {
-			setPasskeyCapability(null);
 			setPasskeyError(
 				err instanceof Error
 					? err.message
@@ -567,8 +641,7 @@ export function useAccountAgentPairingState({
 				);
 			} catch (err: unknown) {
 				const fallbackMessage = `Unable to request ${action} verification link.`;
-				const message =
-					err instanceof Error ? err.message : fallbackMessage;
+				const message = err instanceof Error ? err.message : fallbackMessage;
 				let retrySeconds = 0;
 				if (err instanceof AgentPairingRequestError) {
 					retrySeconds = Math.max(0, err.retryAfterSeconds);
@@ -623,9 +696,7 @@ export function useAccountAgentPairingState({
 			setAgentPairingCode("");
 		} catch (err: unknown) {
 			setAgentError(
-				err instanceof Error
-					? err.message
-					: "Unable to pair with the gateway.",
+				err instanceof Error ? err.message : "Unable to pair with the gateway.",
 			);
 		} finally {
 			setIsAgentActionBusy(false);
@@ -703,9 +774,7 @@ export function useAccountSessionActions() {
 			setAccountActionMessage("Signed out all active sessions.");
 		} catch (err: unknown) {
 			setAccountActionMessage(
-				err instanceof Error
-					? err.message
-					: "Failed to sign out all sessions.",
+				err instanceof Error ? err.message : "Failed to sign out all sessions.",
 			);
 		} finally {
 			setIsSigningOutAll(false);

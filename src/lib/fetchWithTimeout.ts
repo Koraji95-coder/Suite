@@ -1,6 +1,11 @@
 import { recordAppDiagnostic } from "@/lib/appDiagnostics";
 
-export type FetchErrorKind = "timeout" | "network" | "http" | "aborted" | "unknown";
+export type FetchErrorKind =
+	| "timeout"
+	| "network"
+	| "http"
+	| "aborted"
+	| "unknown";
 
 export class FetchRequestError extends Error {
 	readonly kind: FetchErrorKind;
@@ -24,10 +29,13 @@ export class FetchRequestError extends Error {
 	}
 }
 
+export type FetchDiagnosticsMode = "default" | "silent";
+
 export type FetchWithTimeoutInit = RequestInit & {
 	timeoutMs?: number;
 	requestName?: string;
 	throwOnHttpError?: boolean;
+	diagnosticsMode?: FetchDiagnosticsMode;
 };
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -60,13 +68,11 @@ export async function parseResponseErrorMessage(
 		const contentType = response.headers.get("content-type") || "";
 		const clone = response.clone();
 		if (contentType.includes("application/json")) {
-			const payload = (await clone.json()) as
-				| {
-						error?: string;
-						message?: string;
-						detail?: string;
-				  }
-				| null;
+			const payload = (await clone.json()) as {
+				error?: string;
+				message?: string;
+				detail?: string;
+			} | null;
 			const candidate = payload?.error || payload?.message || payload?.detail;
 			if (typeof candidate === "string" && candidate.trim().length > 0) {
 				return candidate.trim();
@@ -82,7 +88,9 @@ export async function parseResponseErrorMessage(
 	return fallback;
 }
 
-export function isFetchRequestError(error: unknown): error is FetchRequestError {
+export function isFetchRequestError(
+	error: unknown,
+): error is FetchRequestError {
 	return error instanceof FetchRequestError;
 }
 
@@ -125,12 +133,14 @@ export async function fetchWithTimeout(
 		timeoutMs: timeoutMsRaw = DEFAULT_TIMEOUT_MS,
 		requestName = "Request",
 		throwOnHttpError = false,
+		diagnosticsMode = "default",
 		signal: upstreamSignal,
 		...requestInit
 	} = init;
 	const timeoutMs = Number.isFinite(timeoutMsRaw)
 		? Math.max(1, Math.trunc(timeoutMsRaw))
 		: DEFAULT_TIMEOUT_MS;
+	const shouldRecordDiagnostics = diagnosticsMode !== "silent";
 
 	const controller = new AbortController();
 	let timedOut = false;
@@ -144,7 +154,9 @@ export async function fetchWithTimeout(
 		if (upstreamSignal.aborted) {
 			controller.abort();
 		} else {
-			upstreamSignal.addEventListener("abort", abortFromUpstream, { once: true });
+			upstreamSignal.addEventListener("abort", abortFromUpstream, {
+				once: true,
+			});
 		}
 	}
 
@@ -158,13 +170,15 @@ export async function fetchWithTimeout(
 		}
 		const fallback = `${requestName} failed (${response.status})`;
 		const message = await parseResponseErrorMessage(response, fallback);
-		recordAppDiagnostic({
-			source: "fetch",
-			severity: response.status >= 500 ? "error" : "warning",
-			title: `${requestName} HTTP ${response.status}`,
-			message,
-			context: describeRequestTarget(input),
-		});
+		if (shouldRecordDiagnostics) {
+			recordAppDiagnostic({
+				source: "fetch",
+				severity: response.status >= 500 ? "error" : "warning",
+				title: `${requestName} HTTP ${response.status}`,
+				message,
+				context: describeRequestTarget(input),
+			});
+		}
 		throw new FetchRequestError({
 			kind: "http",
 			message,
@@ -176,13 +190,15 @@ export async function fetchWithTimeout(
 		}
 		if (error instanceof Error && error.name === "AbortError") {
 			if (timedOut) {
-				recordAppDiagnostic({
-					source: "fetch",
-					severity: "error",
-					title: `${requestName} timed out`,
-					message: timeoutMessage(requestName, timeoutMs),
-					context: describeRequestTarget(input),
-				});
+				if (shouldRecordDiagnostics) {
+					recordAppDiagnostic({
+						source: "fetch",
+						severity: "error",
+						title: `${requestName} timed out`,
+						message: timeoutMessage(requestName, timeoutMs),
+						context: describeRequestTarget(input),
+					});
+				}
 				throw new FetchRequestError({
 					kind: "timeout",
 					message: timeoutMessage(requestName, timeoutMs),
@@ -204,14 +220,16 @@ export async function fetchWithTimeout(
 			});
 		}
 		if (error instanceof TypeError) {
-			recordAppDiagnostic({
-				source: "fetch",
-				severity: "error",
-				title: `${requestName} network error`,
-				message: `${requestName} failed due to a network error. Check backend connectivity and retry.`,
-				context: describeRequestTarget(input),
-				details: error.message,
-			});
+			if (shouldRecordDiagnostics) {
+				recordAppDiagnostic({
+					source: "fetch",
+					severity: "error",
+					title: `${requestName} network error`,
+					message: `${requestName} failed due to a network error. Check backend connectivity and retry.`,
+					context: describeRequestTarget(input),
+					details: error.message,
+				});
+			}
 			throw new FetchRequestError({
 				kind: "network",
 				message: `${requestName} failed due to a network error. Check backend connectivity and retry.`,
@@ -219,13 +237,15 @@ export async function fetchWithTimeout(
 			});
 		}
 		if (error instanceof Error) {
-			recordAppDiagnostic({
-				source: "fetch",
-				severity: "error",
-				title: `${requestName} failed`,
-				message: error.message || `${requestName} failed unexpectedly.`,
-				context: describeRequestTarget(input),
-			});
+			if (shouldRecordDiagnostics) {
+				recordAppDiagnostic({
+					source: "fetch",
+					severity: "error",
+					title: `${requestName} failed`,
+					message: error.message || `${requestName} failed unexpectedly.`,
+					context: describeRequestTarget(input),
+				});
+			}
 			throw new FetchRequestError({
 				kind: "unknown",
 				message: error.message || `${requestName} failed unexpectedly.`,

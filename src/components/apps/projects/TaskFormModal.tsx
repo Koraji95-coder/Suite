@@ -1,4 +1,10 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "../ui/dialog";
 import styles from "./ProjectManagerFormModal.module.css";
 import { type Priority, TaskFormData } from "./projectmanagertypes";
 
@@ -31,10 +37,10 @@ export function TaskFormModal({
 					<DialogTitle className={styles.title}>
 						{isEditing ? "Edit Task" : isSubtask ? "Add Subtask" : "Add Task"}
 					</DialogTitle>
-					<p className={styles.subcopy}>
+					<DialogDescription className={styles.subcopy}>
 						Use tasks to define execution work, ownership, and due dates inside
 						the project workspace.
-					</p>
+					</DialogDescription>
 				</DialogHeader>
 				<div className={styles.fields}>
 					<div>
@@ -109,10 +115,18 @@ export function TaskFormModal({
 					</div>
 				</div>
 				<div className={styles.footer}>
-					<button onClick={onSubmit} className={styles.buttonPrimary}>
+					<button
+						type="button"
+						onClick={onSubmit}
+						className={styles.buttonPrimary}
+					>
 						{isEditing ? "Update Task" : "Create Task"}
 					</button>
-					<button onClick={onClose} className={styles.buttonSecondary}>
+					<button
+						type="button"
+						onClick={onClose}
+						className={styles.buttonSecondary}
+					>
 						Cancel
 					</button>
 				</div>

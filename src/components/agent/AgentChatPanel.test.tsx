@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { agentService } from "@/services/agentService";
 import type { AgentActivityItem, AgentTaskItem } from "@/services/agent/types";
+import { agentService } from "@/services/agentService";
 import { agentTaskManager } from "@/services/agentTaskManager";
 import { AgentChatPanel } from "./AgentChatPanel";
 
@@ -106,7 +106,76 @@ describe("AgentChatPanel defensive rendering", () => {
 		);
 
 		await waitFor(() => {
-			expect(screen.getByText("Model backend-devstral-model")).toBeTruthy();
+			expect(
+				screen.getByText("Specialist lane • model backend-devstral-model"),
+			).toBeTruthy();
 		});
+	});
+
+	it("keeps the collaboration surface mounted while health is unresolved", async () => {
+		vi.spyOn(agentService, "usesBroker").mockReturnValue(true);
+		vi.spyOn(agentService, "fetchProfileCatalog").mockResolvedValue({
+			success: true,
+			profiles: [],
+		});
+		vi.spyOn(agentService, "listAgentTasks").mockResolvedValue({
+			success: true,
+			tasks: [],
+		});
+		vi.spyOn(agentService, "getAgentActivity").mockResolvedValue({
+			success: true,
+			activity: [],
+		});
+
+		render(
+			<MemoryRouter>
+				<AgentChatPanel healthy={null} paired={false} />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(
+				screen.getByPlaceholderText("Connecting to agent..."),
+			).toBeTruthy();
+			expect(screen.getByTestId("orchestration-panel")).toBeTruthy();
+		});
+	});
+
+	it("shows actionable quick-start controls and seeds the composer from a starter prompt", async () => {
+		vi.spyOn(agentService, "usesBroker").mockReturnValue(true);
+		vi.spyOn(agentService, "fetchProfileCatalog").mockResolvedValue({
+			success: true,
+			profiles: [],
+		});
+		vi.spyOn(agentService, "listAgentTasks").mockResolvedValue({
+			success: true,
+			tasks: [],
+		});
+		vi.spyOn(agentService, "getAgentActivity").mockResolvedValue({
+			success: true,
+			activity: [],
+		});
+
+		render(
+			<MemoryRouter>
+				<AgentChatPanel healthy paired />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByRole("button", { name: /ask koro/i })).toBeTruthy();
+		});
+		expect(
+			screen.getByRole("button", { name: /run crew objective/i }),
+		).toBeTruthy();
+		expect(screen.getByDisplayValue("Koro")).toBeTruthy();
+
+		fireEvent.click(screen.getByRole("button", { name: /feature review/i }));
+
+		expect(
+			screen.getByDisplayValue(
+				"Coordinate a reliability review for my active feature. Return concrete implementation steps, high-risk findings, and validation checks.",
+			),
+		).toBeTruthy();
 	});
 });

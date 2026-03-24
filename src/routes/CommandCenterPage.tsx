@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
+import { PageContextBand } from "@/components/apps/ui/PageContextBand";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import { useRegisterPageHeader } from "@/components/apps/ui/PageHeaderContext";
+import { Text } from "@/components/primitives/Text";
 import {
 	getDevAdminEmails,
 	isCommandCenterAuthorized,
@@ -12,22 +15,25 @@ import {
 	CommandCenterAccessPanel,
 	CommandCenterArchitectureSection,
 	CommandCenterCommandsSection,
-	CommandCenterPageHeader,
 	CommandCenterTabBar,
 } from "./command-center/CommandCenterSections";
 import {
 	COMMAND_GROUPS,
-	formatCommandCenterHistoryDetails,
 	type CommandCenterHistoryEntry,
 	type CommandPreset,
+	formatCommandCenterHistoryDetails,
 } from "./command-center/commandCenterModel";
 import { useCommandCenterHistory } from "./command-center/useCommandCenterHistory";
-import { useSupabaseSyncStatus } from "./command-center/useSupabaseSyncStatus";
 import { useCommandCenterTab } from "./command-center/useCommandCenterTab";
+import { useSupabaseSyncStatus } from "./command-center/useSupabaseSyncStatus";
 
 export default function CommandCenterPage() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const { user } = useAuth();
+	useRegisterPageHeader({
+		title: "Command Center",
+		subtitle: "Developer diagnostics and incident-oriented controls.",
+	});
 	const { activeTab, handleTabSelect } = useCommandCenterTab({
 		searchParams,
 		setSearchParams,
@@ -53,6 +59,7 @@ export default function CommandCenterPage() {
 	const {
 		status: supabaseSyncStatus,
 		loading: supabaseSyncStatusLoading,
+		refreshing: supabaseSyncStatusRefreshing,
 		error: supabaseSyncStatusError,
 		refresh: refreshSupabaseSyncStatus,
 	} = useSupabaseSyncStatus(isAllowed);
@@ -122,14 +129,21 @@ export default function CommandCenterPage() {
 			detailsText:
 				"Loaded the latest Windows sign-in preflight and hosted push artifacts.",
 		});
-		setMessage("Refreshing Supabase sync status…");
 	}, [appendHistory, refreshSupabaseSyncStatus]);
 
 	if (!isAllowed) {
 		return (
 			<PageFrame maxWidth="full">
 				<div className={styles.rootNarrow}>
-					<CommandCenterPageHeader />
+					<PageContextBand
+						eyebrow="Ops controls"
+						summary={
+							<Text size="sm" color="muted" block>
+								Access to command presets and incident diagnostics is limited to
+								authorized operations profiles.
+							</Text>
+						}
+					/>
 					<CommandCenterAccessPanel
 						userEmail={userEmail}
 						allowlist={allowlist}
@@ -142,11 +156,17 @@ export default function CommandCenterPage() {
 	return (
 		<PageFrame maxWidth="full">
 			<div className={styles.rootWide}>
-				<CommandCenterPageHeader />
-				<CommandCenterTabBar
-					activeTab={activeTab}
-					onSelect={handleTabSelect}
+				<PageContextBand
+					mode="compact"
+					eyebrow="Ops controls"
+					summary={
+						<Text size="sm" color="muted" block>
+							Copy incident commands, review the latest environment snapshot,
+							and inspect architecture without leaving the operations shell.
+						</Text>
+					}
 				/>
+				<CommandCenterTabBar activeTab={activeTab} onSelect={handleTabSelect} />
 
 				{activeTab === "commands" ? (
 					<CommandCenterCommandsSection
@@ -154,6 +174,7 @@ export default function CommandCenterPage() {
 						commandGroups={COMMAND_GROUPS}
 						supabaseSyncStatus={supabaseSyncStatus}
 						supabaseSyncStatusLoading={supabaseSyncStatusLoading}
+						supabaseSyncStatusRefreshing={supabaseSyncStatusRefreshing}
 						supabaseSyncStatusError={supabaseSyncStatusError}
 						onRefreshSupabaseSyncStatus={handleRefreshSupabaseSyncStatus}
 						copiedPresetId={copiedId}

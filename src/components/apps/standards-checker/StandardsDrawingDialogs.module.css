@@ -22,6 +22,10 @@
 	backdrop-filter: blur(8px);
 }
 
+.headerText {
+	min-width: 0;
+}
+
 .headerMeta {
 	display: inline-flex;
 	align-items: center;
@@ -365,6 +369,7 @@
 .ruleName {
 	margin: 0;
 	font-size: 1rem;
+	cursor: pointer;
 }
 
 .ruleDesc {
@@ -386,17 +391,12 @@
 }
 
 .toggle {
-	appearance: none;
 	width: 1.1rem;
 	height: 1.1rem;
-	border-radius: 0.28rem;
-	border: 1px solid color-mix(in srgb, var(--success) 35%, var(--border));
-	background: var(--surface);
 	margin-top: 0.17rem;
-	cursor: pointer;
 }
 
-.toggle:checked {
+.toggle[data-state="checked"] {
 	background: var(--success);
 	border-color: var(--success);
 }

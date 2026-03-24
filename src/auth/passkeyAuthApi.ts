@@ -24,6 +24,12 @@ export type PasskeyStartResponse = {
 	next_step?: string;
 };
 
+type PasskeyErrorResponse = {
+	error?: string;
+	message?: string;
+	next_step?: string;
+};
+
 export type PasskeyCallbackCompletePayload = {
 	state: string;
 	status: "success" | "failed";
@@ -70,9 +76,27 @@ async function parsePasskeyError(
 	fallbackMessage: string,
 ): Promise<string> {
 	try {
-		const payload = (await response.json()) as PasskeyStartResponse;
-		if (typeof payload.error === "string" && payload.error.trim().length > 0) {
-			return payload.error.trim();
+		const payload = (await response.json()) as PasskeyErrorResponse;
+		const message =
+			typeof payload.error === "string" && payload.error.trim().length > 0
+				? payload.error.trim()
+				: typeof payload.message === "string" &&
+					  payload.message.trim().length > 0
+					? payload.message.trim()
+					: "";
+		const nextStep =
+			typeof payload.next_step === "string" &&
+			payload.next_step.trim().length > 0
+				? payload.next_step.trim()
+				: "";
+		if (message && nextStep && !message.includes(nextStep)) {
+			return `${message} ${nextStep}`;
+		}
+		if (message) {
+			return message;
+		}
+		if (nextStep) {
+			return nextStep;
 		}
 	} catch (_error) {
 		// Ignore JSON parse errors and use fallback.

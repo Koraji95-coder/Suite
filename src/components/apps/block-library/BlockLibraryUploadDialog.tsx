@@ -1,5 +1,12 @@
 import type { Dispatch, FormEvent, ReactNode, SetStateAction } from "react";
-import { Dialog, DialogContent } from "@/components/apps/ui/dialog";
+import { Checkbox } from "@/components/apps/ui/checkbox";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import styles from "./BlockLibraryUploadDialog.module.css";
 import {
 	type BlockUploadForm,
@@ -28,9 +35,15 @@ export function BlockLibraryUploadDialog({
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className={styles.dialogContent}>
-				<h3 className={styles.title}>Upload Block</h3>
+				<DialogHeader>
+					<DialogTitle className={styles.title}>Upload Block</DialogTitle>
+					<DialogDescription>
+						Add a named CAD block with category, tags, and dynamic block
+						metadata.
+					</DialogDescription>
+				</DialogHeader>
 
-				<div className={styles.form} role="form" onSubmit={onSubmit}>
+				<form className={styles.form} onSubmit={onSubmit}>
 					<Field label="Block Name" labelFor="block-upload-name">
 						<input
 							id="block-upload-name"
@@ -78,14 +91,18 @@ export function BlockLibraryUploadDialog({
 						/>
 					</Field>
 
-					<label className={styles.checkboxLabel}>
-						<input
+					<label
+						className={styles.checkboxLabel}
+						htmlFor="block-upload-dynamic"
+					>
+						<Checkbox
 							id="block-upload-dynamic"
-							name="block_upload_dynamic"
-							type="checkbox"
 							checked={uploadForm.is_dynamic}
-							onChange={(e) =>
-								setUploadForm((p) => ({ ...p, is_dynamic: e.target.checked }))
+							onCheckedChange={(checked) =>
+								setUploadForm((p) => ({
+									...p,
+									is_dynamic: checked === true,
+								}))
 							}
 							className={styles.checkbox}
 						/>
@@ -94,9 +111,8 @@ export function BlockLibraryUploadDialog({
 
 					<div className={styles.actions}>
 						<button
-							type="button"
+							type="submit"
 							disabled={isUploading}
-							onClick={onSubmit as unknown as () => void}
 							className={styles.submitButton}
 						>
 							{isUploading ? "Uploading…" : "Upload Block"}
@@ -110,7 +126,7 @@ export function BlockLibraryUploadDialog({
 							Cancel
 						</button>
 					</div>
-				</div>
+				</form>
 			</DialogContent>
 		</Dialog>
 	);

@@ -9,6 +9,7 @@ import {
 	type DashboardOverviewPayload,
 	getCachedDashboardOverviewPayload,
 	loadDashboardOverviewFromBackend,
+	primeCachedDashboardOverviewPayload,
 } from "./dashboardOverviewService";
 
 export interface DashboardProject {
@@ -383,6 +384,17 @@ export function useDashboardOverviewData() {
 					userId,
 				);
 				if (!cancelled) setAllProjectsMap(projectMap);
+
+				primeCachedDashboardOverviewPayload({
+					projects: projectsData,
+					activities: activitiesData,
+					storageUsed: filesData.reduce(
+						(sum, file) => sum + (file.size || 0),
+						0,
+					),
+					projectTaskCounts: Object.fromEntries(counts),
+					allProjects: Array.from(projectMap.values()),
+				});
 
 				if (!cancelled) {
 					setLoadStage("complete");

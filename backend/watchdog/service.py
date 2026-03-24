@@ -595,7 +595,6 @@ class WatchdogMonitorService:
             session_id=session_id,
         )
         return {
-            "eventId": event_id,
             "project_id": project_id,
             "drawing_path": drawing_path,
             "drawing_name": drawing_name,
@@ -1145,6 +1144,7 @@ class WatchdogMonitorService:
             current_session_id = self._optional_text(metadata.get("currentSessionId"))
             if not current_session_id:
                 continue
+            source_available = bool(metadata.get("sourceAvailable"))
 
             drawing_path = self._optional_text(metadata.get("activeDrawingPath")) or self._optional_text(metadata.get("activeDrawingName"))
             inferred_project_id = self._optional_text(metadata.get("projectId"))
@@ -1199,9 +1199,14 @@ class WatchdogMonitorService:
             session["collectorId"] = collector_key
             session["collectorType"] = str(collector.get("collectorType") or "")
             session["workstationId"] = str(collector.get("workstationId") or "")
-            session["active"] = True
-            session["status"] = "paused" if bool(metadata.get("isPaused")) else "live"
-            session["sourceAvailable"] = bool(metadata.get("sourceAvailable"))
+            session["sourceAvailable"] = source_available
+            if source_available:
+                session["active"] = True
+                session["status"] = "paused" if bool(metadata.get("isPaused")) else "live"
+            else:
+                session["active"] = False
+                if not session.get("status") or str(session.get("status")) in {"live", "paused"}:
+                    session["status"] = "completed"
             session["pendingCount"] = max(
                 int(session.get("pendingCount") or 0),
                 max(0, self._optional_int(metadata.get("pendingCount")) or 0),

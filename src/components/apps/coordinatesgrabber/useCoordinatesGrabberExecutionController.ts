@@ -3,7 +3,7 @@ import {
 	type MutableRefObject,
 	type SetStateAction,
 } from "react";
-import { coordinatesGrabberService } from "@/components/apps/ground-grid-generator/coordinatesGrabberService";
+import { coordinatesGrabberService } from "@/components/apps/cad-runtime/coordinatesGrabberService";
 import {
 	calculatePerformanceMetrics,
 	createHistoryEntry,

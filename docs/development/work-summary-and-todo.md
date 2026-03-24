@@ -5,6 +5,11 @@ Branch: `main`
 
 This is a restart/handoff doc summarizing what has already been completed and what to do next.
 
+## Later Track
+
+- Monetization/productization backlog is parked here for later:
+  - `docs/development/monetization-readiness-backlog.md`
+
 ## March 18, 2026 Checkpoint
 
 ### What Landed In This Tranche

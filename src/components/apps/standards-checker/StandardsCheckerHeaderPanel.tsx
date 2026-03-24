@@ -20,7 +20,7 @@ export function StandardsCheckerHeaderPanel({
 						<ClipboardCheck className={styles.markIcon} />
 					</div>
 					<div>
-						<h1 className={styles.headerTitle}>Standards Checker</h1>
+						<p className={styles.headerTitle}>Standards categories</p>
 						<p className={styles.headerSubtitle}>
 							Verify designs against NEC, IEEE, and IEC standards.
 						</p>

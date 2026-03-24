@@ -10,52 +10,22 @@
 	padding-bottom: 1.25rem;
 }
 
-.rootWide::before {
-	content: "";
-	position: absolute;
-	inset: -0.75rem -0.4rem auto;
-	height: 14rem;
-	border-radius: 1.2rem;
-	background:
-		radial-gradient(
-			65% 85% at 4% 0%,
-			var(--brand-ambient-warm),
-			transparent 62%
-		),
-		radial-gradient(
-			75% 95% at 100% 10%,
-			var(--brand-ambient-cool),
-			transparent 64%
-		);
-	pointer-events: none;
-	z-index: -1;
-}
-
-.pageHeader {
-	display: flex;
-	align-items: center;
-	gap: 0.75rem;
-}
-
-.headerIcon {
-	display: flex;
-	width: 2.5rem;
-	height: 2.5rem;
-	align-items: center;
-	justify-content: center;
-	border-radius: var(--radius-3);
-	color: color-mix(in srgb, var(--accent) 88%, white 12%);
-	border: 1px solid var(--brand-border-warm);
-	background: var(--brand-accent-gradient);
-	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
 .topMargin {
 	margin-top: 1.25rem;
 	border-color: var(--brand-border-soft);
-	background:
-		var(--brand-hero-gradient),
-		var(--brand-surface-neutral);
+	background: var(--suite-panel-surface-strong);
+}
+
+.tabStrip {
+	margin-top: 1rem;
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.6rem;
+	padding: 0.85rem;
+	border: 1px solid var(--brand-border-soft);
+	border-radius: 1rem;
+	background: color-mix(in srgb, var(--suite-surface-support) 88%, transparent);
+	box-shadow: var(--suite-panel-shadow-subtle);
 }
 
 .stateIcon {
@@ -97,13 +67,7 @@
 	align-items: center;
 	gap: 0.6rem;
 	border: 1px solid var(--brand-border-soft);
-	background:
-		linear-gradient(
-			145deg,
-			color-mix(in srgb, var(--brand-surface-neutral) 90%, transparent),
-			color-mix(in srgb, var(--brand-surface-branded) 62%, transparent)
-		),
-		var(--brand-surface-neutral);
+	background: var(--suite-panel-surface-soft);
 	color: var(--text-muted);
 	border-radius: 0.9rem;
 	padding: 0.52rem 0.72rem;
@@ -125,9 +89,7 @@
 
 .tabButtonActive {
 	border-color: var(--brand-border-strong);
-	background:
-		var(--brand-hero-gradient),
-		var(--brand-surface-neutral);
+	background: var(--suite-panel-surface-strong);
 	color: var(--text);
 	box-shadow: var(--brand-shadow);
 }
@@ -140,12 +102,11 @@
 	justify-content: center;
 	border-radius: 0.62rem;
 	border: 1px solid var(--brand-border-soft);
-	background:
-		linear-gradient(
-			145deg,
-			var(--brand-chip-cool-bg),
-			color-mix(in srgb, var(--brand-surface-branded) 82%, transparent)
-		);
+	background: linear-gradient(
+		145deg,
+		var(--brand-chip-cool-bg),
+		color-mix(in srgb, var(--brand-surface-branded) 82%, transparent)
+	);
 	color: var(--accent);
 }
 
@@ -180,9 +141,7 @@
 
 .supabaseStatusPanel {
 	border-color: var(--brand-border-soft);
-	background:
-		var(--brand-hero-gradient),
-		var(--brand-surface-neutral);
+	background: var(--suite-panel-surface-strong);
 }
 
 .supabaseStatusGrid {
@@ -197,6 +156,18 @@
 .supabaseStatusMeta {
 	display: grid;
 	gap: 0.3rem;
+}
+
+.supabaseDetails {
+	border-top: 1px solid var(--line-soft);
+	padding-top: 0.85rem;
+}
+
+.supabaseDetailsSummary {
+	cursor: pointer;
+	font-size: 0.76rem;
+	font-weight: 600;
+	color: var(--text);
 }
 
 .supabaseLogPre {
@@ -251,16 +222,12 @@
 .architecturePanel {
 	min-height: 30rem;
 	border-color: var(--brand-border-soft);
-	background:
-		var(--brand-hero-gradient),
-		var(--brand-surface-neutral);
+	background: var(--suite-panel-surface-strong);
 }
 
 .historyPanel {
 	border-color: var(--brand-border-soft);
-	background:
-		var(--brand-hero-gradient),
-		var(--brand-surface-neutral);
+	background: var(--suite-panel-surface-strong);
 }
 
 .historyToolbar {

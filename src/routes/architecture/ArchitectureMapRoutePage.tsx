@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import { useRegisterPageHeader } from "@/components/apps/ui/PageHeaderContext";
 import { ArchitectureMapPanel } from "@/components/architecture/ArchitectureMapPanel";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
@@ -19,13 +20,13 @@ export default function ArchitectureMapRoutePage() {
 		(acc, item) => acc + item.modules.length,
 		0,
 	);
+	useRegisterPageHeader({
+		title: "Architecture Map",
+		subtitle: `Repo model: ${ARCHITECTURE_DOMAINS.length} domains, ${totalModules} modules, ${ARCHITECTURE_DEPENDENCIES.length} dependency links.`,
+	});
 
 	return (
-		<PageFrame
-			title="Architecture Map"
-			description={`Repo model: ${ARCHITECTURE_DOMAINS.length} domains, ${totalModules} modules, ${ARCHITECTURE_DEPENDENCIES.length} dependency links.`}
-			maxWidth="full"
-		>
+		<PageFrame maxWidth="full">
 			<div className={styles.routeRoot}>
 				<Panel variant="default" padding="lg" className={styles.routeHero}>
 					<div className={styles.routeHeroHeader}>

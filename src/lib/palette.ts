@@ -27,17 +27,17 @@ export const DEFAULT_SCHEME_KEY = "suiteDark";
 export const COLOR_SCHEMES: Record<string, ColorScheme> = {
 	[DEFAULT_SCHEME_KEY]: {
 		name: "Suite Dark",
-		description: "Unified graphite command theme",
-		background: "#0b0f17",
-		surface: "#141b26",
-		surfaceLight: "#1c2533",
-		primary: "#4f7cff",
-		secondary: "#72829a",
-		tertiary: "#c46d52",
-		accent: "#d2a24c",
-		text: "#e8edf6",
-		textMuted: "#93a1b7",
-		glow: "rgba(79, 124, 255, 0.2)",
+		description: "Graphite and brass control-room theme",
+		background: "#090d12",
+		surface: "#121821",
+		surfaceLight: "#1a2230",
+		primary: "#c7a05c",
+		secondary: "#6a7788",
+		tertiary: "#8a5f51",
+		accent: "#86663a",
+		text: "#ece7dc",
+		textMuted: "#a79f92",
+		glow: "rgba(115, 144, 255, 0.2)",
 	},
 };
 
@@ -165,12 +165,15 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--bg", palette.background);
 	rootStyle.setProperty("--bg-subtle", palette.background);
+	rootStyle.setProperty("--surface-0", palette.background);
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// SURFACES
 	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--surface", palette.surface);
 	rootStyle.setProperty("--surface-2", palette.surfaceLight);
+	rootStyle.setProperty("--surface-elevated", lightenHex(palette.surfaceLight, 0.12));
+	rootStyle.setProperty("--surface-strong", lightenHex(palette.surfaceLight, 0.2));
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// BORDERS
@@ -184,6 +187,7 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--text", palette.text);
 	rootStyle.setProperty("--text-muted", palette.textMuted);
+	rootStyle.setProperty("--text-strong", getContrastText(palette.background, "#f7f1e5", "#111"));
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// BRAND COLORS
@@ -193,6 +197,7 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 	rootStyle.setProperty("--primary-contrast", getContrastText(palette.primary));
 
 	rootStyle.setProperty("--accent", palette.accent);
+	rootStyle.setProperty("--brand-gold", lightenHex(palette.primary, 0.08));
 	rootStyle.setProperty("--secondary", palette.secondary);
 	rootStyle.setProperty("--tertiary", palette.tertiary);
 
@@ -200,15 +205,15 @@ function applyThemeTokens(palette: ColorScheme, schemeKey: string) {
 	// STATUS COLORS
 	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--success", "#4ea972");
-	rootStyle.setProperty("--warning", "#d2a24c");
+	rootStyle.setProperty("--warning", "#c89a4d");
 	rootStyle.setProperty("--danger", "#cf6a5b");
-	rootStyle.setProperty("--info", "#6f8dff");
+	rootStyle.setProperty("--info", "#7390ff");
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// EFFECTS
 	// ═══════════════════════════════════════════════════════════════════════════
 	rootStyle.setProperty("--glow", palette.glow);
-	rootStyle.setProperty("--focus-ring", hexToRgba(palette.primary, 0.25));
+	rootStyle.setProperty("--focus-ring", hexToRgba("#7390ff", 0.28));
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// SHADOWS

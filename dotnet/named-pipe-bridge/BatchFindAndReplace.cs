@@ -284,6 +284,10 @@ static class PipeRouter
                 "conduit_route_terminal_routes_draw" => TerminalRouteDrawAction.Handle(payload),
                 "conduit_route_terminal_labels_sync" => TerminalLabelSyncAction.Handle(payload),
                 "etap_dxf_cleanup_run" => EtapCleanupAction.Handle(payload),
+                "suite_drawing_list_scan" => SuiteDrawingListScanAction.Handle(payload),
+                "suite_title_block_apply" => SuiteTitleBlockApplyAction.Handle(payload),
+                "suite_batch_find_replace_preview" => SuiteBatchFindReplacePreviewAction.Handle(payload),
+                "suite_batch_find_replace_apply" => SuiteBatchFindReplaceApplyAction.Handle(payload),
                 _ => BuildActionNotImplementedResult(normalizedAction),
             };
             actionStopwatch.Stop();

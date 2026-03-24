@@ -46,6 +46,7 @@ interface DashboardLoadStatusResponse extends DashboardLoadProgress {
 
 const LOAD_TIMEOUT_MS = 35_000;
 const CACHED_PAYLOAD_MAX_AGE_MS = 45_000;
+const DASHBOARD_CACHE_STORAGE_KEY = "suite:dashboard:overview-payload";
 const POLL_SCHEDULE: ReadonlyArray<{
 	untilElapsedMs: number;
 	intervalMs: number;
@@ -64,6 +65,49 @@ let inFlightLoad: {
 	promise: Promise<DashboardOverviewPayload>;
 	progressListeners: Set<ProgressCallback>;
 } | null = null;
+
+function readPersistedPayload(): {
+	payload: DashboardOverviewPayload;
+	updatedAt: number;
+} | null {
+	if (typeof window === "undefined") return null;
+	try {
+		const raw = window.sessionStorage.getItem(DASHBOARD_CACHE_STORAGE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as {
+			payload?: DashboardOverviewPayload;
+			updatedAt?: number;
+		};
+		if (!parsed?.payload || typeof parsed?.updatedAt !== "number") {
+			return null;
+		}
+		if (Date.now() - parsed.updatedAt > CACHED_PAYLOAD_MAX_AGE_MS) {
+			window.sessionStorage.removeItem(DASHBOARD_CACHE_STORAGE_KEY);
+			return null;
+		}
+		return {
+			payload: parsed.payload,
+			updatedAt: parsed.updatedAt,
+		};
+	} catch {
+		return null;
+	}
+}
+
+function writePersistedPayload(
+	payload: DashboardOverviewPayload,
+	updatedAt: number,
+) {
+	if (typeof window === "undefined") return;
+	try {
+		window.sessionStorage.setItem(
+			DASHBOARD_CACHE_STORAGE_KEY,
+			JSON.stringify({ payload, updatedAt }),
+		);
+	} catch {
+		/* noop */
+	}
+}
 
 async function parseError(response: Response): Promise<string> {
 	try {
@@ -156,6 +200,13 @@ function resolvePollIntervalMs(
 function cachePayload(payload: DashboardOverviewPayload) {
 	cachedPayload = payload;
 	cachedPayloadAt = Date.now();
+	writePersistedPayload(payload, cachedPayloadAt);
+}
+
+export function primeCachedDashboardOverviewPayload(
+	payload: DashboardOverviewPayload,
+) {
+	cachePayload(payload);
 }
 
 export function getCachedDashboardOverviewPayload(): DashboardOverviewPayload | null {
@@ -166,6 +217,14 @@ export function getCachedDashboardOverviewPayload(): DashboardOverviewPayload | 
 		return null;
 	}
 	return cachedPayload;
+}
+
+function hydrateCachedPayloadFromSession(): DashboardOverviewPayload | null {
+	const persisted = readPersistedPayload();
+	if (!persisted) return null;
+	cachedPayload = persisted.payload;
+	cachedPayloadAt = persisted.updatedAt;
+	return persisted.payload;
 }
 
 async function runDashboardLoad(
@@ -243,3 +302,5 @@ export async function loadDashboardOverviewFromBackend(
 
 	return promise;
 }
+
+hydrateCachedPayloadFromSession();

@@ -1,4 +1,4 @@
-import { ArrowUpRight, LayoutDashboard } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -6,9 +6,16 @@ import {
 	AGENT_PROFILES,
 	type AgentProfileId,
 } from "@/components/agent/agentProfiles";
+import { PageContextBand } from "@/components/apps/ui/PageContextBand";
+import { SurfaceSkeleton } from "@/components/apps/ui/SurfaceSkeleton";
+import {
+	type TrustState,
+	TrustStateBadge,
+} from "@/components/apps/ui/TrustStateBadge";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
-import { Heading, Text } from "@/components/primitives/Text";
+import { Panel } from "@/components/primitives/Panel";
+import { Text } from "@/components/primitives/Text";
 import {
 	ARCHITECTURE_AUTOGEN,
 	ARCHITECTURE_DOMAINS,
@@ -19,32 +26,32 @@ import { loadMemories } from "@/lib/agent-memory/service";
 import type { Memory } from "@/lib/agent-memory/types";
 import { buildChangelogSearchParams } from "@/lib/workLedgerNavigation";
 import {
-	type WorkLedgerLifecycleState,
-	type WorkLedgerPublishJobRow,
-	type WorkLedgerPublishState,
-	type WorkLedgerRow,
-	type WorkLedgerDraftSuggestion,
-	type WorktaleReadinessResponse,
-	workLedgerService,
-} from "@/services/workLedgerService";
-import {
 	type WatchdogCollector,
 	type WatchdogCollectorEvent,
 	type WatchdogOverviewResponse,
 	type WatchdogSessionSummary,
 	watchdogService,
 } from "@/services/watchdogService";
+import {
+	type WorkLedgerDraftSuggestion,
+	type WorkLedgerLifecycleState,
+	type WorkLedgerPublishJobRow,
+	type WorkLedgerPublishState,
+	type WorkLedgerRow,
+	type WorktaleReadinessResponse,
+	workLedgerService,
+} from "@/services/workLedgerService";
 import styles from "./DashboardOverviewPanel.module.css";
 import {
 	DashboardArchitectureSection,
 	DashboardMemorySection,
 	DashboardOverviewStatsGrid,
 	DashboardProjectOperationsSection,
-	DashboardWorkLedgerSection,
 	DashboardWatchdogSection,
+	DashboardWorkLedgerSection,
 } from "./DashboardOverviewSections";
-import { buildDashboardWorkLedgerViewModel } from "./dashboardWorkLedgerSelectors";
 import { buildDashboardWatchdogViewModel } from "./dashboardWatchdogSelectors";
+import { buildDashboardWorkLedgerViewModel } from "./dashboardWorkLedgerSelectors";
 import { useDashboardOverviewData } from "./useDashboardOverviewData";
 
 interface DashboardOverviewPanelProps {
@@ -64,9 +71,22 @@ type DashboardFocus =
 type DashboardStatusCard = {
 	key: string;
 	label: string;
-	tone: "success" | "warning" | "danger" | "primary";
+	tone: "success" | "warning" | "danger" | "primary" | "default";
 	detail: string;
 };
+
+function toTrustState(tone: DashboardStatusCard["tone"]): TrustState {
+	switch (tone) {
+		case "success":
+			return "ready";
+		case "warning":
+			return "needs-attention";
+		case "danger":
+			return "unavailable";
+		default:
+			return "background";
+	}
+}
 
 function normalizeLedgerPublishState(
 	value: string | null,
@@ -100,7 +120,10 @@ const TIME_WINDOW_OPTIONS = [
 
 type FocusPillOption = DashboardFocus | "all";
 
-const FOCUS_PILL_OPTIONS: ReadonlyArray<{ value: FocusPillOption; label: string }> = [
+const FOCUS_PILL_OPTIONS: ReadonlyArray<{
+	value: FocusPillOption;
+	label: string;
+}> = [
 	{ value: "all", label: "Overview" },
 	{ value: "watchdog", label: "Watchdog" },
 	{ value: "architecture", label: "Architecture" },
@@ -118,7 +141,10 @@ function matchesQuery(query: string, values: Array<string | undefined | null>) {
 	);
 }
 
-function includesDomainPath(pathValue: string, domainId: DomainFilter): boolean {
+function includesDomainPath(
+	pathValue: string,
+	domainId: DomainFilter,
+): boolean {
 	if (domainId === "all") return true;
 	const domain = ARCHITECTURE_DOMAINS.find((item) => item.id === domainId);
 	if (!domain) return true;
@@ -200,7 +226,8 @@ function classifyStatusCard(
 				key,
 				label,
 				tone: "warning",
-				detail: "This surface requires an authenticated session before it can load.",
+				detail:
+					"This surface requires an authenticated session before it can load.",
 			};
 		}
 		return {
@@ -215,7 +242,7 @@ function classifyStatusCard(
 		return {
 			key,
 			label,
-			tone: "primary",
+			tone: "default",
 			detail: loadingDetail,
 		};
 	}
@@ -239,27 +266,29 @@ export function DashboardOverviewPanel({
 		activities,
 		storageUsed,
 		isLoading,
-		loadMessage,
-		loadProgress,
 		projectTaskCounts,
 		allProjectsMap,
 	} = useDashboardOverviewData();
 
 	const [watchdogOverview, setWatchdogOverview] =
 		useState<WatchdogOverviewResponse | null>(null);
-	const [watchdogEvents, setWatchdogEvents] = useState<WatchdogCollectorEvent[]>([]);
+	const [watchdogEvents, setWatchdogEvents] = useState<
+		WatchdogCollectorEvent[]
+	>([]);
 	const [watchdogSessions, setWatchdogSessions] = useState<
 		WatchdogSessionSummary[]
 	>([]);
 	const [collectors, setCollectors] = useState<WatchdogCollector[]>([]);
 	const [memories, setMemories] = useState<Memory[]>([]);
-	const [workLedgerEntries, setWorkLedgerEntries] = useState<WorkLedgerRow[]>([]);
+	const [workLedgerEntries, setWorkLedgerEntries] = useState<WorkLedgerRow[]>(
+		[],
+	);
 	const [workLedgerJobsByEntry, setWorkLedgerJobsByEntry] = useState<
 		Record<string, WorkLedgerPublishJobRow[]>
 	>({});
-	const [ledgerSuggestions, setLedgerSuggestions] = useState<WorkLedgerDraftSuggestion[]>(
-		[],
-	);
+	const [ledgerSuggestions, setLedgerSuggestions] = useState<
+		WorkLedgerDraftSuggestion[]
+	>([]);
 	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 	const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
 	const [watchdogError, setWatchdogError] = useState<string | null>(null);
@@ -267,8 +296,9 @@ export function DashboardOverviewPanel({
 	const [workLedgerError, setWorkLedgerError] = useState<string | null>(null);
 	const [worktaleReadiness, setWorktaleReadiness] =
 		useState<WorktaleReadinessResponse | null>(null);
-	const [worktaleReadinessError, setWorktaleReadinessError] =
-		useState<string | null>(null);
+	const [worktaleReadinessError, setWorktaleReadinessError] = useState<
+		string | null
+	>(null);
 	const [telemetryLoading, setTelemetryLoading] = useState(true);
 	const initialFocusAppliedRef = useRef(false);
 	const watchdogSectionRef = useRef<HTMLDivElement | null>(null);
@@ -378,16 +408,18 @@ export function DashboardOverviewPanel({
 			}
 
 			setWatchdogEvents(
-				eventsResult.status === "fulfilled" ? eventsResult.value.events ?? [] : [],
+				eventsResult.status === "fulfilled"
+					? (eventsResult.value.events ?? [])
+					: [],
 			);
 			setWatchdogSessions(
 				sessionsResult.status === "fulfilled"
-					? sessionsResult.value.sessions ?? []
+					? (sessionsResult.value.sessions ?? [])
 					: [],
 			);
 			setCollectors(
 				collectorsResult.status === "fulfilled"
-					? collectorsResult.value.collectors ?? []
+					? (collectorsResult.value.collectors ?? [])
 					: [],
 			);
 
@@ -405,7 +437,9 @@ export function DashboardOverviewPanel({
 			if (workLedgerResult.status === "fulfilled") {
 				setWorkLedgerEntries(workLedgerResult.value.data ?? []);
 				if (workLedgerResult.value.error) {
-					setWorkLedgerError(String(workLedgerResult.value.error.message || ""));
+					setWorkLedgerError(
+						String(workLedgerResult.value.error.message || ""),
+					);
 				}
 			} else {
 				setWorkLedgerEntries([]);
@@ -597,7 +631,11 @@ export function DashboardOverviewPanel({
 			ARCHITECTURE_DOMAINS.filter(
 				(domain) => selectedDomain === "all" || domain.id === selectedDomain,
 			).filter((domain) =>
-				matchesQuery(query, [domain.label, domain.summary, ...domain.repoRoots]),
+				matchesQuery(query, [
+					domain.label,
+					domain.summary,
+					...domain.repoRoots,
+				]),
 			),
 		[query, selectedDomain],
 	);
@@ -620,7 +658,9 @@ export function DashboardOverviewPanel({
 			ARCHITECTURE_FIX_CANDIDATES.filter((candidate) => {
 				if (
 					!selectedIncludeAdvanced &&
-					candidate.paths.every((pathValue) => isExternalAdvancedPath(pathValue))
+					candidate.paths.every((pathValue) =>
+						isExternalAdvancedPath(pathValue),
+					)
 				) {
 					return false;
 				}
@@ -744,7 +784,9 @@ export function DashboardOverviewPanel({
 
 	const trendMax = Math.max(
 		1,
-		...(watchdogOverview?.trendBuckets ?? []).map((bucket) => bucket.eventCount),
+		...(watchdogOverview?.trendBuckets ?? []).map(
+			(bucket) => bucket.eventCount,
+		),
 	);
 	const telemetryHotspotProjects = (watchdogOverview?.projects.top ?? []).slice(
 		0,
@@ -778,65 +820,74 @@ export function DashboardOverviewPanel({
 		TIME_WINDOW_OPTIONS.find((option) => option.value === selectedWindowHours)
 			?.label ?? `${selectedWindowHours} hours`;
 
-	const statusCards = useMemo<DashboardStatusCard[]>(
-		() => {
-			const publisherStatusCard = worktaleReadinessError
-				? classifyStatusCard(
-						"publisher",
-						"Worktale publisher",
-						worktaleReadinessError,
-						"Publisher tooling is ready on this workstation.",
-					)
-				: worktaleReadiness?.ready
+	const statusCards = useMemo<DashboardStatusCard[]>(() => {
+		const publisherStatusCard = worktaleReadinessError
+			? classifyStatusCard(
+					"publisher",
+					"Worktale publisher",
+					worktaleReadinessError,
+					"Publisher tooling is ready on this workstation.",
+				)
+			: worktaleReadiness?.ready
+				? {
+						key: "publisher",
+						label: "Worktale publisher",
+						tone: "success" as const,
+						detail: "Publisher tooling is ready on this workstation.",
+					}
+				: worktaleReadiness
 					? {
 							key: "publisher",
 							label: "Worktale publisher",
-							tone: "success" as const,
-							detail: "Publisher tooling is ready on this workstation.",
+							tone: "warning" as const,
+							detail:
+								worktaleReadiness.issues[0] ||
+								"Publisher setup is available but still needs bootstrap.",
 						}
-					: worktaleReadiness
-						? {
-								key: "publisher",
-								label: "Worktale publisher",
-								tone: "warning" as const,
-								detail:
-									worktaleReadiness.issues[0] ||
-									"Publisher setup is available but still needs bootstrap.",
-							}
-						: {
-								key: "publisher",
-								label: "Worktale publisher",
-								tone: "primary" as const,
-								detail:
-									"Publisher readiness will load after auth and backend routes are available.",
-							};
+					: {
+							key: "publisher",
+							label: "Worktale publisher",
+							tone: "default" as const,
+							detail:
+								"Publisher readiness becomes available as soon as the workstation snapshot is available.",
+						};
 
-			return [
-				classifyStatusCard(
-					"watchdog",
-					"Watchdog routes",
-					watchdogError,
-					"Collector sessions, events, and project telemetry are loading from the current backend.",
-					"Refreshing collector sessions and event summaries.",
-					telemetryLoading,
-				),
-				classifyStatusCard(
-					"ledger",
-					"Work Ledger storage",
-					workLedgerError,
-					"Ledger rows are available for roadmap and changelog summaries.",
-				),
-				publisherStatusCard,
-			];
-		},
-		[
-			telemetryLoading,
-			watchdogError,
-			workLedgerError,
-			worktaleReadiness,
-			worktaleReadinessError,
-		],
-	);
+		return [
+			classifyStatusCard(
+				"watchdog",
+				"Watchdog routes",
+				watchdogError,
+				"Collector sessions, events, and project telemetry are available from the current backend.",
+				"Collector sessions and event summaries settle in the background for the current workspace.",
+				telemetryLoading,
+			),
+			classifyStatusCard(
+				"ledger",
+				"Work Ledger storage",
+				workLedgerError,
+				"Ledger rows are available for roadmap and changelog summaries.",
+			),
+			publisherStatusCard,
+		];
+	}, [
+		telemetryLoading,
+		watchdogError,
+		workLedgerError,
+		worktaleReadiness,
+		worktaleReadinessError,
+	]);
+	const hasFirstViewportPayload =
+		projects.length > 0 ||
+		activities.length > 0 ||
+		projectTaskCounts.size > 0 ||
+		allProjectsMap.size > 0 ||
+		Boolean(watchdogOverview) ||
+		Boolean(worktaleReadiness) ||
+		Boolean(watchdogError) ||
+		Boolean(workLedgerError) ||
+		Boolean(worktaleReadinessError);
+	const showMissionSkeleton =
+		(isLoading || telemetryLoading) && !hasFirstViewportPayload;
 
 	const openChangelog = () => {
 		let rootPath: string | null = null;
@@ -861,8 +912,7 @@ export function DashboardOverviewPanel({
 			projectId: entry.project_id,
 			query: entry.external_reference || entry.title,
 			lifecycleState: entry.lifecycle_state,
-			publishState:
-				entry.publish_state === "published" ? "published" : "ready",
+			publishState: entry.publish_state === "published" ? "published" : "ready",
 		});
 		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
 	};
@@ -883,232 +933,311 @@ export function DashboardOverviewPanel({
 
 	return (
 		<div className={styles.root}>
-			<section className={styles.masthead}>
-				<div className={styles.mastheadBody}>
-					<div className={styles.heroMark}>
-						<LayoutDashboard size={24} />
+			<PageContextBand
+				eyebrow="Operations overview"
+				summary={
+					<Text size="sm" color="muted" block className={styles.subtitle}>
+						Track live delivery signals, architecture pressure, and team memory
+						from one shared control room.
+					</Text>
+				}
+				actions={
+					<div className={styles.mastheadActions}>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => navigate("/app/architecture")}
+							iconRight={<ArrowUpRight size={14} />}
+						>
+							Architecture Map
+						</Button>
+						<Button
+							variant="secondary"
+							size="sm"
+							onClick={handleNavigateToProjectsHub}
+						>
+							Project Manager
+						</Button>
 					</div>
-					<div className={styles.heroCopy}>
-						<Badge color="primary" variant="soft" className={styles.kicker}>
-							Operations overview
-						</Badge>
-						<Heading level={1} className={styles.title}>
-							One workspace for operations, repo health, and agent context
-						</Heading>
-						<Text size="sm" color="muted" className={styles.subtitle}>
-							Watchdog telemetry, architecture hotspots, long-term agent memory,
-							and project operations now share the same filter model.
-						</Text>
-					</div>
-				</div>
-
-				<div className={styles.mastheadActions}>
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => navigate("/app/architecture")}
-						iconRight={<ArrowUpRight size={14} />}
-					>
-						Architecture Map
-					</Button>
-					<Button
-						variant="secondary"
-						size="sm"
-						onClick={handleNavigateToProjectsHub}
-					>
-						Project Manager
-					</Button>
-				</div>
-			</section>
+				}
+			/>
 
 			<div className={styles.commandFrame}>
-				<section className={styles.statusStrip}>
-					{statusCards.map((card) => (
-						<div key={card.key} className={styles.statusCard}>
-							<div className={styles.statusCardHeader}>
-								<Text size="xs" weight="semibold">
-									{card.label}
-								</Text>
-								<Badge color={card.tone} variant="soft" size="sm">
-									{card.tone === "success"
-										? "ok"
-										: card.tone === "primary"
-											? "loading"
-											: card.tone}
-								</Badge>
-							</div>
-							<Text size="xs" color="muted" className={styles.statusCardDetail}>
-								{card.detail}
-							</Text>
-						</div>
-					))}
-				</section>
-
-				<section className={styles.filterPanel}>
-					<div className={styles.filterHeader}>
-						<div>
-							<Text size="xs" weight="semibold">
-								Focus filters
-							</Text>
-							<Text size="xs" color="muted">
-								Filter one command surface instead of jumping across separate pages.
-							</Text>
-						</div>
-					</div>
-
-					<section className={styles.filters}>
-						<div className={styles.filterField}>
-							<label htmlFor="dashboard-project-filter" className={styles.filterLabel}>
-								Project
-							</label>
-							<select
-								id="dashboard-project-filter"
-								value={selectedProjectId}
-								onChange={(event) => updateFilter("project", event.target.value)}
-								className={styles.select}
-								name="dashboard_project_filter"
-							>
-								<option value="all">All projects</option>
-								{projects.map((project) => (
-									<option key={project.id} value={project.id}>
-										{project.name}
-									</option>
-								))}
-							</select>
-						</div>
-
-						<div className={styles.filterField}>
-							<label htmlFor="dashboard-domain-filter" className={styles.filterLabel}>
-								Repo area
-							</label>
-							<select
-								id="dashboard-domain-filter"
-								value={selectedDomain}
-								onChange={(event) => updateFilter("domain", event.target.value)}
-								className={styles.select}
-								name="dashboard_domain_filter"
-							>
-								<option value="all">All domains</option>
-								{ARCHITECTURE_DOMAINS.map((domain) => (
-									<option key={domain.id} value={domain.id}>
-										{domain.label}
-									</option>
-								))}
-							</select>
-						</div>
-
-						<div className={styles.filterField}>
-							<label htmlFor="dashboard-agent-filter" className={styles.filterLabel}>
-								Agent
-							</label>
-							<select
-								id="dashboard-agent-filter"
-								value={selectedAgent}
-								onChange={(event) => updateFilter("agent", event.target.value)}
-								className={styles.select}
-								name="dashboard_agent_filter"
-							>
-								<option value="all">All agents</option>
-								{AGENT_PROFILE_IDS.map((profileId) => (
-									<option key={profileId} value={profileId}>
-										{AGENT_PROFILES[profileId].name}
-									</option>
-								))}
-							</select>
-						</div>
-
-						<div className={styles.filterField}>
-							<label
-								htmlFor="dashboard-collector-filter"
-								className={styles.filterLabel}
-							>
-								Collector
-							</label>
-							<select
-								id="dashboard-collector-filter"
-								value={selectedCollectorId}
-								onChange={(event) => updateFilter("collector", event.target.value)}
-								className={styles.select}
-								name="dashboard_collector_filter"
-							>
-								<option value="all">All collectors</option>
-								{filteredCollectorOptions.map((collector) => (
-									<option key={collector.collectorId} value={collector.collectorId}>
-										{collector.name}
-									</option>
-								))}
-							</select>
-						</div>
-
-						<div className={styles.filterField}>
-							<label htmlFor="dashboard-window-filter" className={styles.filterLabel}>
-								Time range
-							</label>
-							<select
-								id="dashboard-window-filter"
-								value={selectedWindowHours}
-								onChange={(event) => updateFilter("window", event.target.value)}
-								className={styles.select}
-								name="dashboard_window_filter"
-							>
-								{TIME_WINDOW_OPTIONS.map((option) => (
-									<option key={option.value} value={option.value}>
-										{option.label}
-									</option>
-								))}
-							</select>
-						</div>
-
-						<div className={styles.filterFieldWide}>
-							<label htmlFor="dashboard-query-filter" className={styles.filterLabel}>
-								Search
-							</label>
-							<input
-								id="dashboard-query-filter"
-								type="search"
-								value={searchValue}
-								onChange={(event) => updateFilter("query", event.target.value)}
-								placeholder="Search projects, files, memories, and actions..."
-								className={styles.searchInput}
-								name="dashboard_query_filter"
-							/>
-						</div>
+				{showMissionSkeleton ? (
+					<section className={styles.missionSkeletonGrid} aria-hidden="true">
+						<SurfaceSkeleton tone="feature" height="tall" lines={3} />
+						<SurfaceSkeleton tone="support" height="regular" lines={4} />
 					</section>
+				) : (
+					<section className={styles.missionGrid}>
+						<Panel
+							variant="feature"
+							padding="lg"
+							className={styles.missionSurface}
+						>
+							<div className={styles.missionHeader}>
+								<div className={styles.missionCopy}>
+									<Text size="sm" weight="semibold" block>
+										Workspace pulse
+									</Text>
+									<Text size="xs" color="muted" block>
+										One glance at trust, current scope, and the delivery
+										pressure that needs attention first.
+									</Text>
+								</div>
+								<div className={styles.missionContext}>
+									<div className={styles.missionContextCard}>
+										<span className={styles.metaLabel}>Project</span>
+										<strong>{selectedProject?.name || "All projects"}</strong>
+									</div>
+									<div className={styles.missionContextCard}>
+										<span className={styles.metaLabel}>Window</span>
+										<strong>{selectedWindowLabel}</strong>
+									</div>
+								</div>
+							</div>
 
-					<div className={styles.focusPills}>
-						{FOCUS_PILL_OPTIONS.map((option) => {
-							const isActive =
-								(option.value === "all" && !selectedFocus) ||
-								(option.value !== "all" && selectedFocus === option.value);
-							return (
-								<button
-									key={option.value}
-									type="button"
-									className={`${styles.focusPill} ${
-										isActive ? styles.focusPillActive : ""
-									}`}
-									onClick={() =>
-										updateFilter(
-											"focus",
-											option.value === "all" ? "" : option.value,
-										)
-									}
-								>
-									{option.label}
-								</button>
-							);
-						})}
-					</div>
-				</section>
+							<section className={styles.statusStrip}>
+								{statusCards.map((card) => (
+									<div key={card.key} className={styles.statusCard}>
+										<div className={styles.statusCardHeader}>
+											<Text size="xs" weight="semibold">
+												{card.label}
+											</Text>
+											<TrustStateBadge
+												state={toTrustState(card.tone)}
+												label={
+													card.tone === "success"
+														? "Ready"
+														: card.tone === "danger"
+															? "Unavailable"
+															: card.tone === "warning"
+																? "Needs attention"
+																: "Background"
+												}
+												variant="outline"
+											/>
+										</div>
+										<Text
+											size="xs"
+											color="muted"
+											className={styles.statusCardDetail}
+										>
+											{card.detail}
+										</Text>
+									</div>
+								))}
+							</section>
 
-				<DashboardOverviewStatsGrid
-					projectsCount={projects.length}
-					openTasks={openTasks}
-					collectorsOnline={watchdogOverview?.collectors.online ?? 0}
-					eventsInWindow={watchdogOverview?.events.inWindow ?? 0}
-					memoryCount={filteredMemories.length}
-					storageUsed={storageUsed}
-				/>
+							<div className={styles.missionHighlights}>
+								<div className={styles.highlightCard}>
+									<span className={styles.metaLabel}>Open tasks</span>
+									<strong>{openTasks}</strong>
+								</div>
+								<div className={styles.highlightCard}>
+									<span className={styles.metaLabel}>Overdue projects</span>
+									<strong>{overdueProjects}</strong>
+								</div>
+								<div className={styles.highlightCard}>
+									<span className={styles.metaLabel}>Live CAD sessions</span>
+									<strong>{activeCadSessionCount}</strong>
+								</div>
+							</div>
+						</Panel>
+
+						<Panel
+							variant="support"
+							padding="lg"
+							className={styles.filterPanel}
+						>
+							<div className={styles.filterHeader}>
+								<div>
+									<Text size="xs" weight="semibold" block>
+										Focus filters
+									</Text>
+									<Text size="xs" color="muted" block>
+										Keep the same scope across telemetry, architecture, ledger,
+										and memory.
+									</Text>
+								</div>
+							</div>
+
+							<section className={styles.filters}>
+								<div className={styles.filterField}>
+									<label
+										htmlFor="dashboard-project-filter"
+										className={styles.filterLabel}
+									>
+										Project
+									</label>
+									<select
+										id="dashboard-project-filter"
+										value={selectedProjectId}
+										onChange={(event) =>
+											updateFilter("project", event.target.value)
+										}
+										className={styles.select}
+										name="dashboard_project_filter"
+									>
+										<option value="all">All projects</option>
+										{projects.map((project) => (
+											<option key={project.id} value={project.id}>
+												{project.name}
+											</option>
+										))}
+									</select>
+								</div>
+
+								<div className={styles.filterField}>
+									<label
+										htmlFor="dashboard-domain-filter"
+										className={styles.filterLabel}
+									>
+										Repo area
+									</label>
+									<select
+										id="dashboard-domain-filter"
+										value={selectedDomain}
+										onChange={(event) =>
+											updateFilter("domain", event.target.value)
+										}
+										className={styles.select}
+										name="dashboard_domain_filter"
+									>
+										<option value="all">All domains</option>
+										{ARCHITECTURE_DOMAINS.map((domain) => (
+											<option key={domain.id} value={domain.id}>
+												{domain.label}
+											</option>
+										))}
+									</select>
+								</div>
+
+								<div className={styles.filterField}>
+									<label
+										htmlFor="dashboard-agent-filter"
+										className={styles.filterLabel}
+									>
+										Agent
+									</label>
+									<select
+										id="dashboard-agent-filter"
+										value={selectedAgent}
+										onChange={(event) =>
+											updateFilter("agent", event.target.value)
+										}
+										className={styles.select}
+										name="dashboard_agent_filter"
+									>
+										<option value="all">All agents</option>
+										{AGENT_PROFILE_IDS.map((profileId) => (
+											<option key={profileId} value={profileId}>
+												{AGENT_PROFILES[profileId].name}
+											</option>
+										))}
+									</select>
+								</div>
+
+								<div className={styles.filterField}>
+									<label
+										htmlFor="dashboard-collector-filter"
+										className={styles.filterLabel}
+									>
+										Collector
+									</label>
+									<select
+										id="dashboard-collector-filter"
+										value={selectedCollectorId}
+										onChange={(event) =>
+											updateFilter("collector", event.target.value)
+										}
+										className={styles.select}
+										name="dashboard_collector_filter"
+									>
+										<option value="all">All collectors</option>
+										{filteredCollectorOptions.map((collector) => (
+											<option
+												key={collector.collectorId}
+												value={collector.collectorId}
+											>
+												{collector.name}
+											</option>
+										))}
+									</select>
+								</div>
+
+								<div className={styles.filterField}>
+									<label
+										htmlFor="dashboard-window-filter"
+										className={styles.filterLabel}
+									>
+										Time range
+									</label>
+									<select
+										id="dashboard-window-filter"
+										value={selectedWindowHours}
+										onChange={(event) =>
+											updateFilter("window", event.target.value)
+										}
+										className={styles.select}
+										name="dashboard_window_filter"
+									>
+										{TIME_WINDOW_OPTIONS.map((option) => (
+											<option key={option.value} value={option.value}>
+												{option.label}
+											</option>
+										))}
+									</select>
+								</div>
+
+								<div className={styles.filterFieldWide}>
+									<label
+										htmlFor="dashboard-query-filter"
+										className={styles.filterLabel}
+									>
+										Search
+									</label>
+									<input
+										id="dashboard-query-filter"
+										type="search"
+										value={searchValue}
+										onChange={(event) =>
+											updateFilter("query", event.target.value)
+										}
+										placeholder="Search projects, files, memories, and actions..."
+										className={styles.searchInput}
+										name="dashboard_query_filter"
+									/>
+								</div>
+							</section>
+
+							<div className={styles.focusPills}>
+								{FOCUS_PILL_OPTIONS.map((option) => {
+									const isActive =
+										(option.value === "all" && !selectedFocus) ||
+										(option.value !== "all" && selectedFocus === option.value);
+									return (
+										<button
+											key={option.value}
+											type="button"
+											className={`${styles.focusPill} ${
+												isActive ? styles.focusPillActive : ""
+											}`}
+											onClick={() =>
+												updateFilter(
+													"focus",
+													option.value === "all" ? "" : option.value,
+												)
+											}
+										>
+											{option.label}
+										</button>
+									);
+								})}
+							</div>
+						</Panel>
+					</section>
+				)}
 
 				<div className={styles.moduleGrid}>
 					<DashboardWatchdogSection
@@ -1179,8 +1308,6 @@ export function DashboardOverviewPanel({
 						panelRef={projectSectionRef}
 						className={projectPanelClassName}
 						isLoading={isLoading}
-						loadMessage={loadMessage}
-						loadProgress={loadProgress}
 						filteredProjects={filteredProjects}
 						projectTaskCounts={projectTaskCounts}
 						allProjectsMap={allProjectsMap}
@@ -1188,6 +1315,15 @@ export function DashboardOverviewPanel({
 						handleNavigateToProject={handleNavigateToProject}
 					/>
 				</div>
+
+				<DashboardOverviewStatsGrid
+					projectsCount={projects.length}
+					openTasks={openTasks}
+					collectorsOnline={watchdogOverview?.collectors.online ?? 0}
+					eventsInWindow={watchdogOverview?.events.inWindow ?? 0}
+					memoryCount={filteredMemories.length}
+					storageUsed={storageUsed}
+				/>
 			</div>
 		</div>
 	);

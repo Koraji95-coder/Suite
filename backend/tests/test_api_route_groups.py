@@ -450,6 +450,8 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/batch-find-replace/session": ["POST"],
             "/api/batch-find-replace/preview": ["POST"],
             "/api/batch-find-replace/apply": ["POST"],
+            "/api/batch-find-replace/cad/preview": ["POST"],
+            "/api/batch-find-replace/cad/apply": ["POST"],
             "/api/auth/email-link": ["POST"],
             "/api/auth/passkey-capability": ["GET"],
             "/api/auth/passkey/sign-in": ["POST"],
@@ -479,6 +481,9 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/dashboard/load": ["POST"],
             "/api/dashboard/load/<job_id>": ["GET"],
             "/api/command-center/supabase-sync-status": ["GET"],
+            "/api/title-block-sync/scan": ["POST"],
+            "/api/title-block-sync/preview": ["POST"],
+            "/api/title-block-sync/apply": ["POST"],
             "/api/work-ledger/publishers/worktale/readiness": ["GET"],
             "/api/work-ledger/publishers/worktale/bootstrap": ["POST"],
             "/api/work-ledger/entries/<entry_id>/publish/worktale": ["POST"],
@@ -2783,6 +2788,7 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(call_args[1], "project_drawing_work_segments")
         sent_rows = call_kwargs.get("payload") or []
         self.assertEqual(len(sent_rows), 1)
+        self.assertNotIn("eventId", sent_rows[0])
         self.assertEqual(sent_rows[0].get("user_id"), "user-1")
         self.assertEqual(sent_rows[0].get("project_id"), "project-sync")
         self.assertEqual(sent_rows[0].get("drawing_path"), drawing_path)

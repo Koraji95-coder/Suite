@@ -112,7 +112,7 @@ afterEach(() => {
 });
 
 describe("ProjectTelemetryPanel", () => {
-	it("renders recent sessions, dashboard link, and tracked drawings", () => {
+	it("renders recent sessions, watchdog link, and tracked drawings", () => {
 		render(
 			<MemoryRouter>
 				<ProjectTelemetryPanel
@@ -127,11 +127,9 @@ describe("ProjectTelemetryPanel", () => {
 		expect(screen.getAllByText("Tracked drawings").length).toBeGreaterThan(0);
 		expect(screen.getByText(/Lifetime 2h/i)).toBeTruthy();
 		const link = screen.getByRole("link", {
-			name: /open full telemetry/i,
+			name: /open watchdog/i,
 		}) as HTMLAnchorElement;
-		expect(link.getAttribute("href")).toBe(
-			"/app/dashboard?focus=watchdog&project=project-1",
-		);
+		expect(link.getAttribute("href")).toBe("/app/watchdog?project=project-1");
 	});
 
 	it("saves edited rule values through the shared project watchdog service", async () => {

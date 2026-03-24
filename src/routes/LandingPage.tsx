@@ -1,17 +1,21 @@
 // src/routes/LandingPage.tsx
 
-import { Activity, Boxes, ClipboardList, Sparkles, Workflow } from "lucide-react";
-import { useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+	Activity,
+	Boxes,
+	ClipboardList,
+	Sparkles,
+	Workflow,
+} from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
-import { buildAgentPairingSearchFromLocation } from "@/auth/agentPairingParams";
 import { APP_TAGLINE } from "../appMeta";
 import { AgentPixelMark } from "../components/agent/AgentPixelMark";
-import { SuiteLogo } from "../components/brand/SuiteLogo";
 import {
 	AGENT_PROFILE_IDS,
 	AGENT_PROFILES,
 } from "../components/agent/agentProfiles";
+import { SuiteLogo } from "../components/brand/SuiteLogo";
 import { Badge } from "../components/primitives/Badge";
 import { Button } from "../components/primitives/Button";
 import { Panel } from "../components/primitives/Panel";
@@ -42,47 +46,31 @@ const HERO_SUMMARY_ITEMS = [
 	{
 		icon: ClipboardList,
 		label: "Delivery scope",
-		value: "Projects, revisions, transmittals, and review checkpoints stay in one workflow.",
+		value:
+			"Projects, revisions, transmittals, and review checkpoints stay in one workflow.",
 	},
 	{
 		icon: Boxes,
 		label: "CAD execution",
-		value: "Markup planning, CAD preflight, and bridge-backed automation run through the same control surface.",
+		value:
+			"Markup planning, CAD preflight, and bridge-backed automation run through the same control surface.",
 	},
 	{
 		icon: Activity,
 		label: "Runtime state",
-		value: "Collectors, health signals, and route diagnostics stay visible while you work.",
+		value:
+			"Collectors, health signals, and route diagnostics stay visible while you work.",
 	},
 	{
 		icon: Sparkles,
 		label: "Shared context",
-		value: "Agents, architecture, and work ledger history stay aligned instead of fragmenting across tools.",
+		value:
+			"Agents, architecture, and work ledger history stay aligned instead of fragmenting across tools.",
 	},
 ] as const;
 
 export default function LandingPage() {
 	const { user } = useAuth();
-	const location = useLocation();
-	const navigate = useNavigate();
-
-	useEffect(() => {
-		const pairingSearch = buildAgentPairingSearchFromLocation(
-			location.search,
-			location.hash,
-		);
-		if (!pairingSearch) {
-			return;
-		}
-
-		navigate(
-			{
-				pathname: "/agent/pairing-callback",
-				search: pairingSearch,
-			},
-			{ replace: true },
-		);
-	}, [location.hash, location.search, navigate]);
 
 	return (
 		<div className={styles.root}>
@@ -148,7 +136,11 @@ export default function LandingPage() {
 								className={styles.heroSummaryPanel}
 							>
 								<div className={styles.heroSummaryHeader}>
-									<Text size="xs" weight="semibold" className={styles.heroSummaryEyebrow}>
+									<Text
+										size="xs"
+										weight="semibold"
+										className={styles.heroSummaryEyebrow}
+									>
 										Operations inside Suite
 									</Text>
 									<Text as="h2" size="lg" weight="semibold" block>
@@ -156,14 +148,17 @@ export default function LandingPage() {
 									</Text>
 									<Text size="sm" color="muted" block>
 										The same surface tracks project delivery, CAD readiness,
-										runtime health, and agent-assisted work without a second tool
-										stack.
+										runtime health, and agent-assisted work without a second
+										tool stack.
 									</Text>
 								</div>
 								<div className={styles.heroRailFlow}>
 									<div className={styles.heroSupportList}>
 										{COMMAND_SIGNALS.map((signal) => (
-											<div key={signal.label} className={styles.heroSupportItem}>
+											<div
+												key={signal.label}
+												className={styles.heroSupportItem}
+											>
 												<signal.icon className={styles.heroSupportIcon} />
 												<div className={styles.heroSupportContent}>
 													<Text

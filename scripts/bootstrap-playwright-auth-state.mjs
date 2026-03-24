@@ -41,6 +41,7 @@ function parseArgs(argv) {
 		origins: [],
 		outputPath: path.join("output", "playwright", "auth-state.json"),
 		emailPrefix: "codex.playwright",
+		displayName: "Playwright User",
 	};
 
 	for (let i = 0; i < argv.length; i += 1) {
@@ -66,6 +67,13 @@ function parseArgs(argv) {
 			i += 1;
 			continue;
 		}
+		if (arg === "--display-name") {
+			const next = argv[i + 1];
+			if (!next) throw new Error("Missing value for --display-name");
+			options.displayName = next;
+			i += 1;
+			continue;
+		}
 		if (arg === "--help" || arg === "-h") {
 			printHelp();
 			process.exit(0);
@@ -86,11 +94,13 @@ function printHelp() {
 			"",
 			"Options:",
 			"  --origin, -o <url>      App origin to store session under (repeatable).",
-			"                          Defaults: http://localhost:5173 and http://127.0.0.1:5173",
+			"                          Defaults: Playwright base URL origin(s) plus Vite dev defaults.",
 			"  --out <path>            Output storage-state path.",
 			"                          Default: output/playwright/auth-state.json",
 			"  --email-prefix <prefix> Prefix for temp user email local-part.",
 			"                          Default: codex.playwright",
+			"  --display-name <name>   Display name stored in auth metadata.",
+			"                          Default: Playwright User",
 			"",
 			"Required env (.env/.env.local or process env):",
 			"  SUPABASE_URL",
@@ -100,8 +110,50 @@ function printHelp() {
 	);
 }
 
+function resolveDefaultOrigins() {
+	const defaults = [];
+	const seen = new Set();
+	const addOrigin = (value) => {
+		const trimmed = String(value || "")
+			.trim()
+			.replace(/\/+$/, "");
+		if (!trimmed || seen.has(trimmed)) return;
+		seen.add(trimmed);
+		defaults.push(trimmed);
+	};
+
+	const playwrightBaseUrl = String(
+		process.env.PLAYWRIGHT_BASE_URL || "",
+	).trim();
+	if (playwrightBaseUrl) {
+		try {
+			const parsed = new URL(playwrightBaseUrl);
+			addOrigin(`${parsed.protocol}//${parsed.host}`);
+		} catch {
+			// Ignore invalid override and fall through to deterministic defaults.
+		}
+	}
+
+	const playwrightPort = Number.parseInt(
+		String(process.env.PLAYWRIGHT_PORT || "4173"),
+		10,
+	);
+	const resolvedPlaywrightPort = Number.isFinite(playwrightPort)
+		? playwrightPort
+		: 4173;
+	addOrigin(`http://localhost:${resolvedPlaywrightPort}`);
+	addOrigin(`http://127.0.0.1:${resolvedPlaywrightPort}`);
+
+	if (resolvedPlaywrightPort !== 5173) {
+		addOrigin("http://localhost:5173");
+		addOrigin("http://127.0.0.1:5173");
+	}
+
+	return defaults;
+}
+
 function normalizeOrigins(values) {
-	const fallback = ["http://localhost:5173", "http://127.0.0.1:5173"];
+	const fallback = resolveDefaultOrigins();
 	const source = values.length > 0 ? values : fallback;
 	const seen = new Set();
 	const out = [];
@@ -132,7 +184,9 @@ async function requestJson(url, init, expected = [200]) {
 	const response = await fetch(url, init);
 	if (!expected.includes(response.status)) {
 		const body = await response.text();
-		throw new Error(`HTTP ${response.status} from ${url}: ${body.slice(0, 400)}`);
+		throw new Error(
+			`HTTP ${response.status} from ${url}: ${body.slice(0, 400)}`,
+		);
 	}
 	return response.json();
 }
@@ -153,6 +207,8 @@ async function bootstrap() {
 	const args = parseArgs(process.argv.slice(2));
 	const dotEnv = loadRepoEnv(repoRoot);
 	const origins = normalizeOrigins(args.origins);
+	const displayName =
+		String(args.displayName || "").trim() || "Playwright User";
 
 	const supabaseUrl = readSetting(dotEnv, "SUPABASE_URL");
 	const serviceRoleKey = readSetting(dotEnv, "SUPABASE_SERVICE_ROLE_KEY");
@@ -172,7 +228,9 @@ async function bootstrap() {
 
 	const baseUrl = supabaseUrl.replace(/\/+$/, "");
 	const randomSuffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
-	const safePrefix = args.emailPrefix.replace(/[^a-zA-Z0-9._-]/g, "").toLowerCase();
+	const safePrefix = args.emailPrefix
+		.replace(/[^a-zA-Z0-9._-]/g, "")
+		.toLowerCase();
 	const email = `${safePrefix}.${randomSuffix}@example.com`;
 	const password = `Tmp!${crypto.randomBytes(10).toString("hex")}`;
 
@@ -192,6 +250,8 @@ async function bootstrap() {
 				password,
 				email_confirm: true,
 				user_metadata: {
+					display_name: displayName,
+					full_name: displayName,
 					provisioned_by: "playwright-auth-bootstrap",
 				},
 			}),
@@ -216,9 +276,13 @@ async function bootstrap() {
 	);
 
 	const tokenHash = String(linkResult?.hashed_token || "").trim();
-	const verifyType = String(linkResult?.verification_type || "magiclink").trim();
+	const verifyType = String(
+		linkResult?.verification_type || "magiclink",
+	).trim();
 	if (!tokenHash) {
-		throw new Error("Supabase generate_link response did not include hashed_token.");
+		throw new Error(
+			"Supabase generate_link response did not include hashed_token.",
+		);
 	}
 
 	const verifyPayload = await requestJson(
@@ -239,7 +303,9 @@ async function bootstrap() {
 
 	const session = extractSession(verifyPayload);
 	if (!session) {
-		throw new Error("Unable to extract session payload from Supabase verify response.");
+		throw new Error(
+			"Unable to extract session payload from Supabase verify response.",
+		);
 	}
 
 	const storageKey = buildSupabaseAuthStorageKey(supabaseUrl);
@@ -265,6 +331,7 @@ async function bootstrap() {
 		JSON.stringify(
 			{
 				created_at: new Date().toISOString(),
+				display_name: displayName,
 				email,
 				origins,
 				storage_key: storageKey,
@@ -280,6 +347,7 @@ async function bootstrap() {
 	console.log(`- state: ${path.relative(repoRoot, outputPath)}`);
 	console.log(`- meta:  ${path.relative(repoRoot, metaPath)}`);
 	console.log(`- email: ${email}`);
+	console.log(`- display name: ${displayName}`);
 	console.log(`- origins: ${origins.join(", ")}`);
 	console.log("");
 	console.log("Use with Playwright CLI:");

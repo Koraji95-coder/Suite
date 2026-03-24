@@ -3,18 +3,7 @@
 	height: 100dvh;
 	overflow: hidden;
 	color: var(--text);
-	background:
-		radial-gradient(
-			130% 120% at 100% -20%,
-			color-mix(in srgb, var(--primary) 24%, transparent),
-			transparent 55%
-		),
-		radial-gradient(
-			120% 100% at -12% 112%,
-			color-mix(in srgb, var(--accent) 12%, transparent),
-			transparent 52%
-		),
-		var(--bg);
+	background: var(--suite-shell-backdrop);
 }
 
 .promptOverlay {
@@ -240,8 +229,6 @@
 }
 
 .commandFrame {
-	display: grid;
-	gap: 0.72rem;
 	min-height: 100%;
 	padding: 0.5rem 0.62rem 0.72rem;
 }
@@ -250,41 +237,36 @@
 	position: sticky;
 	top: 0;
 	z-index: 26;
-	display: flex;
-	align-items: flex-start;
-	justify-content: space-between;
-	gap: 0.72rem;
-	padding: 0.75rem 0.82rem;
-	border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
-	border-radius: 1rem;
-	background:
-		radial-gradient(
-			120% 100% at 100% -18%,
-			color-mix(in srgb, var(--primary) 14%, transparent),
-			transparent 58%
-		),
-		linear-gradient(
-			180deg,
-			color-mix(in srgb, var(--surface) 92%, transparent),
-			color-mix(in srgb, var(--surface-2) 84%, transparent)
-		);
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 1rem;
+	min-height: 6.2rem;
+	padding: 0.9rem 1rem 0.95rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+	border-top-left-radius: calc(1.1rem - 1px);
+	border-top-right-radius: calc(1.1rem - 1px);
+	background: var(--suite-header-surface);
 	backdrop-filter: blur(12px);
 	box-shadow:
-		0 1px 0 color-mix(in srgb, var(--surface-2) 25%, transparent) inset,
-		0 22px 36px -32px rgba(0, 0, 0, 0.6);
+		inset 0 1px 0 color-mix(in srgb, white 6%, transparent),
+		0 14px 30px -28px color-mix(in srgb, var(--primary) 36%, transparent);
 }
 
 .workspaceHeaderMain {
 	display: flex;
-	align-items: flex-start;
-	gap: 0.65rem;
+	align-items: center;
+	gap: 0.72rem;
 	min-width: 0;
+	height: 100%;
 }
 
 .workspaceHeaderTitleBlock {
 	display: grid;
-	gap: 0.26rem;
+	gap: 0.3rem;
+	align-content: center;
 	min-width: 0;
+	max-width: min(48rem, 100%);
 }
 
 .workspaceHeaderEyebrow {
@@ -298,50 +280,137 @@
 	color: var(--text-muted);
 }
 
+.workspaceHeaderEyebrowIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+}
+
 .workspaceHeaderTitle {
 	margin: 0;
 	letter-spacing: -0.02em;
+	line-height: 1.1;
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 1;
 }
 
 .workspaceHeaderSubtitle {
-	line-height: 1.4;
+	line-height: 1.35;
+	display: -webkit-box;
+	max-width: min(46rem, 100%);
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
 }
 
 .workspaceHeaderMeta {
-	display: inline-flex;
+	display: grid;
+	grid-template-columns: max-content minmax(0, 12rem) 11rem;
 	align-items: center;
-	flex-wrap: wrap;
-	justify-content: flex-end;
-	gap: 0.42rem;
+	gap: 0.5rem;
 	flex-shrink: 0;
 }
 
-.workspaceHeaderCenterContent {
-	display: inline-flex;
+.workspaceHeaderRailPair {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
 	align-items: center;
-	gap: 0.35rem;
+	gap: 0.38rem;
+	min-width: 0;
+}
+
+.workspaceRailChip {
+	justify-content: center;
+}
+
+.workspaceRailValue {
+	min-width: 0;
+	max-width: 100%;
+	justify-content: flex-start;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .diagnosticsToggle {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.4rem;
+	justify-content: space-between;
+	gap: 0.55rem;
+	min-width: 11rem;
+	height: 1.9rem;
 	border: 1px solid color-mix(in srgb, var(--line-soft) 88%, transparent);
 	border-radius: 999px;
 	background: color-mix(in srgb, var(--surface) 88%, transparent);
 	color: var(--text);
-	padding: 0.34rem 0.52rem;
+	padding: 0.28rem 0.42rem 0.28rem 0.58rem;
 	font-size: 0.72rem;
 	font-weight: 600;
 	cursor: pointer;
+	transition:
+		background 140ms ease,
+		border-color 140ms ease,
+		color 140ms ease;
 }
 
 .diagnosticsToggle:hover {
 	background: color-mix(in srgb, var(--surface-2) 88%, transparent);
 }
 
-.diagnosticsToggleBadge {
-	margin-inline-start: 0.05rem;
+.diagnosticsToggleLead {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.42rem;
+	min-width: 0;
+}
+
+.diagnosticsToggleLabel {
+	white-space: nowrap;
+}
+
+.diagnosticsToggleCount {
+	display: inline-flex;
+	min-width: 2.4rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	padding-inline: 0.35rem;
+	font-size: 0.68rem;
+	font-weight: 700;
+	line-height: 1;
+	background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+	color: currentColor;
+}
+
+.diagnosticsToggleSuccess {
+	border-color: color-mix(in srgb, var(--success) 22%, var(--line-soft));
+}
+
+.diagnosticsToggleSuccess .diagnosticsToggleCount {
+	background: color-mix(in srgb, var(--success) 16%, transparent);
+	color: var(--success);
+}
+
+.diagnosticsToggleWarning {
+	border-color: color-mix(in srgb, var(--warning) 32%, var(--line-soft));
+	background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+}
+
+.diagnosticsToggleWarning .diagnosticsToggleCount {
+	background: color-mix(in srgb, var(--warning) 16%, transparent);
+	color: var(--warning);
+}
+
+.diagnosticsToggleDanger {
+	border-color: color-mix(in srgb, var(--danger) 34%, var(--line-soft));
+	background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+}
+
+.diagnosticsToggleDanger .diagnosticsToggleCount {
+	background: color-mix(in srgb, var(--danger) 18%, transparent);
+	color: var(--danger);
 }
 
 .diagnosticsOverlay {
@@ -478,6 +547,18 @@
 
 .workspaceContent {
 	min-height: 0;
+	padding: 0.25rem 0.38rem 0.52rem;
+}
+
+.workspaceSurface {
+	position: relative;
+	display: grid;
+	grid-template-rows: auto 1fr;
+	min-height: 100%;
+	border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+	border-radius: 1.1rem;
+	background: var(--suite-panel-surface);
+	box-shadow: var(--suite-panel-shadow);
 }
 
 .mobileMenuTrigger {
@@ -592,12 +673,28 @@
 	}
 
 	.workspaceHeader {
-		flex-direction: column;
+		grid-template-columns: 1fr;
 		align-items: stretch;
+		min-height: auto;
+		padding: 0.82rem 0.82rem 0.78rem;
 	}
 
 	.workspaceHeaderMeta {
-		justify-content: flex-start;
+		grid-template-columns: 1fr;
+		justify-items: stretch;
+	}
+
+	.workspaceHeaderRailPair {
+		grid-template-columns: max-content minmax(0, 1fr);
+	}
+
+	.diagnosticsToggle {
+		min-width: 0;
+		width: 100%;
+	}
+
+	.workspaceContent {
+		padding: 0.14rem 0.22rem 0.34rem;
 	}
 
 	.diagnosticsDrawer {

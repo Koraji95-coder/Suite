@@ -28,26 +28,16 @@ export function PageFrame({
 	padded = true,
 	className,
 }: PageFrameProps) {
+	// Shell routes now own visible page identity. Keep legacy props in the
+	// signature for compatibility, but do not render a second page hero here.
+	void title;
+	void description;
+	void actions;
+
 	return (
 		<div className={cn(styles.root, padded && styles.padded, className)}>
 			<Container size={maxWidth} padded={padded}>
 				<div className={styles.inner}>
-					{(title || actions) && (
-						<div className={styles.header}>
-							<Stack gap={1} className={styles.headerText}>
-								{title && <Heading level={1}>{title}</Heading>}
-								{description && (
-									<Text color="muted" size="md">
-										{description}
-									</Text>
-								)}
-							</Stack>
-							{actions ? (
-								<div className={styles.headerActions}>{actions}</div>
-							) : null}
-						</div>
-					)}
-
 					<div className={styles.content}>{children}</div>
 				</div>
 			</Container>

@@ -1,9 +1,13 @@
 .root {
+	--calendar-hour-rail-width: 3.75rem;
 	position: sticky;
 	top: 0;
 	z-index: 30;
 	display: grid;
-	grid-template-columns: repeat(8, minmax(0, 1fr));
+	grid-template-columns: var(--calendar-hour-rail-width) repeat(
+			7,
+			minmax(0, 1fr)
+		);
 	border-bottom: 1px solid color-mix(in srgb, var(--primary) 12%, transparent);
 	background: color-mix(in srgb, var(--surface) 60%, transparent);
 	backdrop-filter: blur(10px);
@@ -93,6 +97,10 @@
 }
 
 @media (min-width: 640px) {
+	.root {
+		--calendar-hour-rail-width: 4.5rem;
+	}
+
 	.timezoneCell,
 	.dayButton {
 		font-size: 0.875rem;

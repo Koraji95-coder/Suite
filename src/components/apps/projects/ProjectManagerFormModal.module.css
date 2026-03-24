@@ -1,8 +1,20 @@
 .dialogContent {
 	max-width: min(44rem, calc(100vw - 1.5rem));
 	padding: clamp(1rem, 1.8vw, 1.5rem);
-	border: 1px solid var(--line-soft);
-	background: var(--surface);
+	border: 1px solid var(--brand-border-strong);
+	background:
+		radial-gradient(
+			140% 100% at 100% 0%,
+			var(--brand-ambient-cool),
+			transparent 60%
+		),
+		radial-gradient(
+			110% 100% at 0% 100%,
+			var(--brand-ambient-warm),
+			transparent 65%
+		),
+		var(--brand-hero-gradient), var(--brand-surface-neutral);
+	box-shadow: var(--brand-shadow-hero);
 }
 
 .header {
@@ -52,17 +64,67 @@
 .select,
 .textarea {
 	width: 100%;
-	border: 1px solid var(--line-soft);
+	border: 1px solid var(--brand-border-soft);
 	border-radius: var(--radius-2);
 	padding: 0.58rem 0.75rem;
 	font-size: 0.86rem;
 	color: var(--text);
-	background: var(--surface);
+	background: color-mix(in srgb, var(--brand-surface-neutral) 88%, transparent);
 	outline: none;
 	transition:
 		border-color 0.16s ease,
 		box-shadow 0.16s ease,
 		background 0.16s ease;
+}
+
+.dateTrigger {
+	position: relative;
+	width: 100%;
+	justify-content: flex-start;
+	gap: 0;
+	border-color: var(--brand-border-soft);
+	background: color-mix(in srgb, var(--brand-surface-neutral) 88%, transparent);
+	padding-inline: 0.75rem 2.55rem;
+	font-weight: 400;
+	outline: none;
+	outline-offset: 0;
+}
+
+.dateTrigger:hover {
+	border-color: var(--brand-border-strong);
+	background: color-mix(in srgb, var(--brand-surface-neutral) 94%, transparent);
+}
+
+.dateTrigger:focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.dateLabel {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mutedText {
+	color: var(--text-muted);
+}
+
+.calendarIcon {
+	position: absolute;
+	right: 0.85rem;
+	top: 50%;
+	width: 1rem;
+	height: 1rem;
+	flex-shrink: 0;
+	transform: translateY(-50%);
+	pointer-events: none;
+	color: color-mix(in srgb, var(--text-muted) 82%, transparent);
+}
+
+.popoverContent {
+	width: auto;
+	padding: 0.5rem;
 }
 
 .input:focus,
@@ -76,6 +138,37 @@
 .textarea {
 	min-height: 5.8rem;
 	resize: vertical;
+}
+
+.rootPathRow {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.55rem;
+}
+
+.browseButton {
+	border: 1px solid var(--brand-border-soft);
+	border-radius: var(--radius-2);
+	padding: 0.58rem 0.9rem;
+	font-size: 0.82rem;
+	font-weight: 700;
+	color: var(--text);
+	background: color-mix(in srgb, var(--brand-surface-branded) 78%, transparent);
+	cursor: pointer;
+	transition:
+		border-color 0.16s ease,
+		background 0.16s ease,
+		color 0.16s ease;
+}
+
+.browseButton:hover:not(:disabled) {
+	border-color: var(--brand-border-strong);
+	background: color-mix(in srgb, var(--brand-surface-branded) 92%, transparent);
+}
+
+.browseButton:disabled {
+	opacity: 0.65;
+	cursor: wait;
 }
 
 .textareaShort {

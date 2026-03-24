@@ -665,11 +665,20 @@ def create_auth_passkey_blueprint(
 
         passkey_row = _fetch_active_passkey_by_credential_id(credential_id)
         if not passkey_row:
+            _logger.warning(
+                "Passkey sign-in credential not found credential_hash=%s",
+                hashlib.sha256(credential_id.encode("utf-8")).hexdigest()[:12],
+            )
             return (
                 jsonify(
                     {
-                        "error": "Passkey credential was not recognized.",
+                        "error": "Passkey credential was not recognized by this Suite environment.",
                         "code": "passkey-credential-not-found",
+                        "next_step": (
+                            "If you reset local Supabase or switched environments, "
+                            "sign in with an email link and enroll this passkey again "
+                            "from Settings."
+                        ),
                     }
                 ),
                 401,

@@ -33,6 +33,7 @@ def create_batch_find_replace_blueprint(
     schedule_cleanup: Callable[[str], None],
     batch_session_cookie: str,
     batch_session_ttl_seconds: int,
+    send_autocad_dotnet_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
 ) -> Blueprint:
     """Create /api/batch-find-replace route group blueprint."""
     bp = Blueprint("batch_find_replace_api", __name__, url_prefix="/api/batch-find-replace")
@@ -238,6 +239,59 @@ def create_batch_find_replace_blueprint(
             "files_processed": len(uploaded_files),
             "updated_files": updated_files,
         }
+
+    def _call_dotnet_bridge_action(action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if send_autocad_dotnet_command is None:
+            raise RuntimeError("AutoCAD .NET bridge is not configured.")
+
+        response = send_autocad_dotnet_command(
+            action,
+            {
+                **payload,
+                "requestId": f"batch-{int(time.time() * 1000)}",
+            },
+        )
+        if not isinstance(response, dict):
+            raise RuntimeError("Malformed response from AutoCAD .NET bridge.")
+        if not response.get("ok"):
+            raise RuntimeError(
+                str(response.get("error") or response.get("message") or "Unknown bridge error.")
+            )
+        result_payload = response.get("result")
+        if not isinstance(result_payload, dict):
+            raise RuntimeError("Invalid .NET bridge result payload.")
+        return result_payload
+
+    def _parse_batch_rules_from_json(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+        parsed = payload.get("rules")
+        if not isinstance(parsed, list):
+            raise ValueError("rules must be an array")
+
+        if len(parsed) == 0:
+            raise ValueError("At least one rule is required")
+        if len(parsed) > MAX_BATCH_RULES:
+            raise ValueError(f"Too many rules. Maximum is {MAX_BATCH_RULES}")
+
+        rules: List[Dict[str, Any]] = []
+        for idx, item in enumerate(parsed):
+            if not isinstance(item, dict):
+                continue
+            find_text = str(item.get("find", "")).strip()
+            if not find_text:
+                continue
+            rules.append(
+                {
+                    "id": str(item.get("id", f"rule-{idx + 1}")),
+                    "find": find_text,
+                    "replace": str(item.get("replace", "")),
+                    "useRegex": bool(item.get("useRegex", False)),
+                    "matchCase": bool(item.get("matchCase", False)),
+                }
+            )
+
+        if not rules:
+            raise ValueError("No valid rules provided")
+        return rules
 
     def export_batch_changes_to_excel(changes: List[Dict[str, Any]]) -> Tuple[str, str]:
         """Export batch find/replace changes to a styled Excel report."""
@@ -490,6 +544,87 @@ def create_batch_find_replace_blueprint(
             return jsonify({"success": False, "error": str(exc)}), 400
         except Exception as exc:
             logger.exception("Batch apply failed")
+            return jsonify({"success": False, "error": str(exc)}), 500
+
+    @bp.route("/cad/preview", methods=["POST"])
+    @require_batch_session_or_api_key
+    @limiter.limit("30 per hour")
+    def api_batch_find_replace_cad_preview():
+        try:
+            payload = request.get_json(silent=True) or {}
+            rules = _parse_batch_rules_from_json(payload)
+            bridge_result = _call_dotnet_bridge_action(
+                "suite_batch_find_replace_preview",
+                {
+                    "rules": rules,
+                    "blockNameHint": str(payload.get("blockNameHint") or "").strip(),
+                },
+            )
+            if not bridge_result.get("success", False):
+                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(bridge_result), status_code
+
+            data = bridge_result.get("data") or {}
+            matches = data.get("matches") or []
+            return jsonify(
+                {
+                    "success": True,
+                    "requestId": bridge_result.get("meta", {}).get("requestId"),
+                    "matches": matches,
+                    "matchCount": len(matches),
+                    "warnings": bridge_result.get("warnings") or [],
+                    "drawingName": data.get("drawingName"),
+                    "message": bridge_result.get("message") or "CAD preview completed.",
+                }
+            )
+        except ValueError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+        except Exception as exc:
+            logger.exception("CAD batch preview failed")
+            return jsonify({"success": False, "error": str(exc)}), 500
+
+    @bp.route("/cad/apply", methods=["POST"])
+    @require_batch_session_or_api_key
+    @limiter.limit("20 per hour")
+    def api_batch_find_replace_cad_apply():
+        try:
+            payload = request.get_json(silent=True) or {}
+            matches = payload.get("matches")
+            if not isinstance(matches, list) or len(matches) == 0:
+                raise ValueError("matches must contain at least one preview row.")
+
+            bridge_result = _call_dotnet_bridge_action(
+                "suite_batch_find_replace_apply",
+                {
+                    "matches": matches,
+                    "blockNameHint": str(payload.get("blockNameHint") or "").strip(),
+                },
+            )
+            if not bridge_result.get("success", False):
+                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(bridge_result), status_code
+
+            data = bridge_result.get("data") or {}
+            change_rows = data.get("changes") or []
+            report_path, report_dir = export_batch_changes_to_excel(change_rows)
+            schedule_cleanup(report_dir)
+
+            if hasattr(os, "startfile"):
+                try:
+                    os.startfile(report_path)
+                except Exception as exc:
+                    logger.warning("Could not auto-open Excel report: %s", exc)
+
+            return send_file(
+                report_path,
+                as_attachment=True,
+                download_name=os.path.basename(report_path),
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        except ValueError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+        except Exception as exc:
+            logger.exception("CAD batch apply failed")
             return jsonify({"success": False, "error": str(exc)}), 500
 
     return bp

@@ -1,11 +1,13 @@
+import { AlertCircle, Expand, Minimize2, Plus, Trash2 } from "lucide-react";
 import {
-	AlertCircle,
-	Expand,
-	Minimize2,
-	Plus,
-	Trash2,
-} from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+	startTransition,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/primitives/Badge";
 import { IconButton } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
@@ -18,24 +20,19 @@ import {
 	type AgentReviewAction,
 	type AgentTaskItem,
 } from "@/services/agent/types";
-import {
-	agentService,
-} from "@/services/agentService";
+import { agentService } from "@/services/agentService";
 import {
 	type AgentConversation,
 	agentTaskManager,
 } from "@/services/agentTaskManager";
-import {
-	AgentChatComposer,
-	type AgentComposerMode,
-} from "./AgentChatComposer";
+import { AgentChatComposer, type AgentComposerMode } from "./AgentChatComposer";
 import { AgentChatMessages } from "./AgentChatMessages";
+import styles from "./AgentChatPanel.module.css";
 import {
 	AgentChatEmptyState,
 	AgentChatLeftRail,
 	AgentChatRightRail,
 } from "./AgentChatPanelSections";
-import styles from "./AgentChatPanel.module.css";
 import {
 	AgentOrchestrationPanel,
 	type AgentOrchestrationRunEventPayload,
@@ -47,6 +44,32 @@ import {
 	type AgentChannelScope,
 	isAgentProfileScope,
 } from "./agentChannelScope";
+import {
+	type ActivitySourceFilter,
+	addToBoundedSet,
+	buildProfileRoster,
+	countQueuePriorities,
+	deriveAvailableRunIds,
+	deriveResumableRunId,
+	eventBodyFromPayload,
+	filterActivityItems,
+	filterQueueTasks,
+	mergeRuntimeProfiles,
+	normalizeAssistantReply,
+	normalizeKnownProfileId,
+	payloadText,
+	type QueuePriorityFilter,
+	type QueueProfileFilter,
+	type QueueRunFilter,
+	type QueueStatusFilter,
+	REVIEW_WARNING_STATUSES,
+	RUNNING_TASK_STATUSES,
+	resolveVisibleConversations,
+	runConversationTitle,
+	selectQueueTasks,
+	selectReviewInboxTasks,
+	shortRunId,
+} from "./agentChatPanelSelectors";
 import { type AgentMarkState, resolveAgentMarkState } from "./agentMarkState";
 import {
 	sanitizeActivityItems,
@@ -58,35 +81,10 @@ import {
 	type AgentProfileId,
 	DEFAULT_AGENT_PROFILE,
 } from "./agentProfiles";
-import {
-	type ActivitySourceFilter,
-	type QueuePriorityFilter,
-	type QueueProfileFilter,
-	type QueueRunFilter,
-	type QueueStatusFilter,
-	REVIEW_WARNING_STATUSES,
-	RUNNING_TASK_STATUSES,
-	addToBoundedSet,
-	buildProfileRoster,
-	countQueuePriorities,
-	deriveAvailableRunIds,
-	eventBodyFromPayload,
-	filterActivityItems,
-	filterQueueTasks,
-	mergeRuntimeProfiles,
-	normalizeAssistantReply,
-	normalizeKnownProfileId,
-	payloadText,
-	resolveVisibleConversations,
-	runConversationTitle,
-	shortRunId,
-	selectQueueTasks,
-	selectReviewInboxTasks,
-} from "./agentChatPanelSelectors";
 import { getAgentTaskTemplates } from "./agentTaskTemplates";
 
 interface AgentChatPanelProps {
-	healthy: boolean;
+	healthy: boolean | null;
 	paired: boolean;
 }
 
@@ -96,6 +94,23 @@ const ACTIVE_AGENT_STORAGE_KEY = "agent-active-profile";
 const GENERAL_SCOPE_ID = "team";
 const DEFAULT_ORCHESTRATION_OBJECTIVE =
 	"Coordinate a reliability review for my active feature. Return concrete implementation steps, high-risk findings, and validation checks.";
+const RUN_OBJECTIVE_STARTERS = [
+	{
+		label: "Feature review",
+		prompt:
+			"Coordinate a reliability review for my active feature. Return concrete implementation steps, high-risk findings, and validation checks.",
+	},
+	{
+		label: "Project QC pass",
+		prompt:
+			"Run a coordinated project QC pass. Assign the right specialists, summarize the main risks, and end with a practical action list.",
+	},
+	{
+		label: "Delivery readiness",
+		prompt:
+			"Review this scope for delivery readiness. Identify blockers, missing outputs, and the exact next steps to get it ready for release.",
+	},
+] as const;
 const WORKFLOW_POLL_VISIBLE_MS = 20_000;
 const WORKFLOW_POLL_HIDDEN_MS = 60_000;
 const WORKFLOW_POLL_ERROR_MS = 45_000;
@@ -130,6 +145,7 @@ type WorkflowThinkingEntry = {
 };
 
 export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
+	const navigate = useNavigate();
 	const [profileId, setProfileId] = useState<AgentProfileId>(() => {
 		try {
 			const stored = localStorage.getItem(ACTIVE_AGENT_STORAGE_KEY);
@@ -154,8 +170,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const [conversations, setConversations] = useState<AgentConversation[]>([]);
 	const [activeConvId, setActiveConvId] = useState<string | null>(null);
 	const [directThinking, setDirectThinking] = useState(false);
-	const [composerMode, setComposerMode] =
-		useState<AgentComposerMode>("direct");
+	const [composerMode, setComposerMode] = useState<AgentComposerMode>("direct");
+	const [composerDraft, setComposerDraft] = useState("");
+	const [composerFocusSignal, setComposerFocusSignal] = useState(0);
 	const [orchestrationObjective, setOrchestrationObjective] = useState(
 		DEFAULT_ORCHESTRATION_OBJECTIVE,
 	);
@@ -195,12 +212,14 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	>([]);
 	const seenActivityIdsRef = useRef<Set<string>>(new Set());
 	const eventMirrorKeysRef = useRef<Set<string>>(new Set());
+	const seededRunConversationIdsRef = useRef<Set<string>>(new Set());
 	const activityBridgeReadyRef = useRef(false);
 	const mountedRef = useRef(true);
 	const workflowRefreshEpochRef = useRef(0);
 	const workflowRefreshInFlightRef = useRef<Promise<void> | null>(null);
 	const workflowPollFailureCountRef = useRef(0);
 	const workflowErrorRef = useRef("");
+	const workflowSyncTimerRef = useRef<number | null>(null);
 
 	useEffect(() => {
 		mountedRef.current = true;
@@ -208,6 +227,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			mountedRef.current = false;
 			agentService.cancelActiveRequest();
 			workflowRefreshEpochRef.current += 1;
+			if (workflowSyncTimerRef.current !== null) {
+				window.clearTimeout(workflowSyncTimerRef.current);
+				workflowSyncTimerRef.current = null;
+			}
 		};
 	}, []);
 
@@ -222,7 +245,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		const loadRuntimeProfiles = async () => {
 			const result = await agentService.fetchProfileCatalog();
 			if (!active || !result.success) return;
-			setRuntimeProfiles(result.profiles);
+			startTransition(() => {
+				setRuntimeProfiles(result.profiles);
+			});
 		};
 		const handleRuntimeProfileRefresh = () => {
 			void loadRuntimeProfiles();
@@ -258,7 +283,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		const convs = agentTaskManager.getConversations();
 		setConversations(convs);
 		setActiveConvId((current) => {
-			if (current && convs.some((conversation) => conversation.id === current)) {
+			if (
+				current &&
+				convs.some((conversation) => conversation.id === current)
+			) {
 				return current;
 			}
 			return convs[0]?.id ?? null;
@@ -298,12 +326,30 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				}
 			: scopeProfile;
 	const templates = getAgentTaskTemplates(scopeProfileId);
+	const starterPrompts = useMemo(
+		() => [
+			...templates.slice(0, 2).map((template) => ({
+				label: template.label,
+				prompt: template.prompt,
+				mode: "direct" as const,
+			})),
+			...RUN_OBJECTIVE_STARTERS.slice(0, agentService.usesBroker() ? 2 : 0).map(
+				(starter) => ({
+					label: starter.label,
+					prompt: starter.prompt,
+					mode: "run" as const,
+				}),
+			),
+		],
+		[templates],
+	);
 	const profileRouteLabel =
 		channelScope === "team"
-			? `General live feed - coordinator ${scopeProfile.name}`
-			: `Model ${scopeProfile.modelPrimary}`;
-	const channelLabel =
-		channelScope === "team" ? "General" : scopeProfile.name;
+			? composerMode === "run"
+				? "Crew objective workspace with shared run threads"
+				: `Direct replies route to ${scopeProfile.name}`
+			: `Specialist lane • model ${scopeProfile.modelPrimary}`;
+	const channelLabel = channelScope === "team" ? "General" : scopeProfile.name;
 
 	const refreshConversations = useCallback(() => {
 		const next = agentTaskManager.getConversations();
@@ -384,7 +430,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				},
 			);
 
-			const normalizedEventType = String(eventType || "").trim().toLowerCase();
+			const normalizedEventType = String(eventType || "")
+				.trim()
+				.toLowerCase();
 			const resolvedProfileId = String(options?.profileId || "").trim();
 			const isAgentMessage = normalizedEventType === "agent_message";
 
@@ -414,7 +462,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const applyWorkflowThinkingEvent = useCallback(
 		(runId: string, eventType: string, profileIdCandidate?: string) => {
 			const normalizedRunId = String(runId || "").trim();
-			const normalizedEventType = String(eventType || "").trim().toLowerCase();
+			const normalizedEventType = String(eventType || "")
+				.trim()
+				.toLowerCase();
 			if (!normalizedRunId || !normalizedEventType) return;
 			const normalizedProfile = normalizeKnownProfileId(profileIdCandidate);
 			if (ACTIVE_STEP_EVENT_TYPES.has(normalizedEventType)) {
@@ -458,10 +508,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						...current,
 						[normalizedRunId]: {
 							activeProfiles: nextActiveProfiles,
-							lastProfileId:
-								nextActiveProfiles.includes(existing.lastProfileId)
-									? existing.lastProfileId
-									: nextActiveProfiles[nextActiveProfiles.length - 1],
+							lastProfileId: nextActiveProfiles.includes(existing.lastProfileId)
+								? existing.lastProfileId
+								: nextActiveProfiles[nextActiveProfiles.length - 1],
 							updatedAt: Date.now(),
 						},
 					};
@@ -523,7 +572,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 
 	const handleDirectSend = useCallback(
 		async (message: string) => {
-			if (!healthy || !paired) return;
+			if (healthy !== true || !paired) return;
 			const outboundProfileId: AgentProfileId =
 				channelScope === "team" ? profileId : scopeProfileId;
 			const outboundMessage = message;
@@ -637,6 +686,20 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		[composerMode, channelScope, applyChannelScope, handleDirectSend],
 	);
 
+	const primeComposer = useCallback(
+		(mode: AgentComposerMode, prompt?: string) => {
+			setComposerMode(mode);
+			if (typeof prompt === "string") {
+				if (mode === "run") {
+					setOrchestrationObjective(prompt);
+				}
+				setComposerDraft(prompt);
+			}
+			setComposerFocusSignal((current) => current + 1);
+		},
+		[],
+	);
+
 	const refreshWorkflowData = useCallback(
 		(silent = false) => {
 			if (workflowRefreshInFlightRef.current) {
@@ -678,9 +741,18 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					);
 					const refreshErrors: string[] = [];
 
-					if (tasksResult.success) {
-						setTaskItems(normalizedTasks);
-					} else {
+					if (tasksResult.success || activityResult.success) {
+						startTransition(() => {
+							if (tasksResult.success) {
+								setTaskItems(normalizedTasks);
+							}
+							if (activityResult.success) {
+								setActivityItems(normalizedActivity);
+							}
+						});
+					}
+
+					if (!tasksResult.success) {
 						logger.warn(
 							"Task queue refresh returned unsuccessful response.",
 							"AgentChatPanel",
@@ -696,9 +768,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						);
 					}
 
-					if (activityResult.success) {
-						setActivityItems(normalizedActivity);
-					} else {
+					if (!activityResult.success) {
 						logger.warn(
 							"Activity refresh returned unsuccessful response.",
 							"AgentChatPanel",
@@ -767,6 +837,23 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			return trackedPromise;
 		},
 		[channelScope, scopeProfileId],
+	);
+
+	const scheduleWorkflowRefresh = useCallback(
+		(delayMs = 280) => {
+			if (!agentService.usesBroker()) return;
+			if (workflowSyncTimerRef.current !== null) {
+				window.clearTimeout(workflowSyncTimerRef.current);
+			}
+			workflowSyncTimerRef.current = window.setTimeout(
+				() => {
+					workflowSyncTimerRef.current = null;
+					void refreshWorkflowData(true);
+				},
+				Math.max(0, delayMs),
+			);
+		},
+		[refreshWorkflowData],
 	);
 
 	useEffect(() => {
@@ -846,11 +933,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					);
 				}
 				const eventType = String(item.eventType || "").toLowerCase();
-				if (
-					eventType.includes("approved") ||
-					eventType.includes("completed")
-				) {
-					const profile = String(item.profileId || "").trim().toLowerCase();
+				if (eventType.includes("approved") || eventType.includes("completed")) {
+					const profile = String(item.profileId || "")
+						.trim()
+						.toLowerCase();
 					if (profile && profile in AGENT_PROFILES) {
 						markProfileSuccess(profile as AgentProfileId);
 					}
@@ -874,11 +960,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			}
 
 			const eventType = String(item.eventType || "").toLowerCase();
-			const profile = String(item.profileId || "").trim().toLowerCase();
-			if (
-				eventType.includes("approved") ||
-				eventType.includes("completed")
-			) {
+			const profile = String(item.profileId || "")
+				.trim()
+				.toLowerCase();
+			if (eventType.includes("approved") || eventType.includes("completed")) {
 				if (profile && profile in AGENT_PROFILES) {
 					markProfileSuccess(profile as AgentProfileId);
 				}
@@ -886,7 +971,11 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 
 			const runId = String(item.runId || "").trim();
 			if (!runId) continue;
-			const detail = eventBodyFromPayload(eventType, item.payload, item.message);
+			const detail = eventBodyFromPayload(
+				eventType,
+				item.payload,
+				item.message,
+			);
 			const runEventId = Number(
 				String(activityId || "")
 					.trim()
@@ -924,7 +1013,18 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		return () => window.clearTimeout(timer);
 	}, [workflowInitialLoadDone]);
 
-	const isReady = healthy && paired;
+	const isHealthy = healthy === true;
+	const healthPending = healthy === null;
+	const connectionBlocked = healthy === false;
+	const waitingForPairing = isHealthy && !paired;
+	const isReady = isHealthy && paired;
+	const emptyStateStatusMessage = connectionBlocked
+		? "Gateway unreachable. Retry the route check to restore live agent actions."
+		: healthPending
+			? "Verifying gateway reachability and pairing state."
+			: waitingForPairing
+				? "Pairing is required before this channel can run agent actions."
+				: "Ready to assist";
 	const showQueueRefreshSpinner =
 		workflowLoading &&
 		!workflowInitialLoadDone &&
@@ -936,6 +1036,10 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 
 	const availableRunIds = useMemo(
 		() => deriveAvailableRunIds(taskItems, activityItems),
+		[taskItems, activityItems],
+	);
+	const resumableRunId = useMemo(
+		() => deriveResumableRunId(taskItems, activityItems),
 		[taskItems, activityItems],
 	);
 
@@ -950,6 +1054,15 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			setActivityRunFilter("all");
 		}
 	}, [queueRunFilter, activityRunFilter, availableRunIds]);
+
+	useEffect(() => {
+		const runId = String(resumableRunId || "").trim();
+		if (!runId) return;
+		if (addToBoundedSet(seededRunConversationIdsRef.current, runId, 64)) {
+			return;
+		}
+		void openGeneralRunConversation(runId, { focus: false });
+	}, [resumableRunId, openGeneralRunConversation]);
 
 	const filteredQueueTasks = useMemo(
 		() =>
@@ -995,9 +1108,15 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		[queueTasks, queueProfileFilter, queueRunFilter],
 	);
 
-	const priorityCounts = useMemo(() => countQueuePriorities(queueTasks), [queueTasks]);
+	const priorityCounts = useMemo(
+		() => countQueuePriorities(queueTasks),
+		[queueTasks],
+	);
 
-	const profileRoster = useMemo(() => buildProfileRoster(queueTasks), [queueTasks]);
+	const profileRoster = useMemo(
+		() => buildProfileRoster(queueTasks),
+		[queueTasks],
+	);
 
 	const handleReviewAction = useCallback(
 		async (taskId: string, action: AgentReviewAction) => {
@@ -1122,17 +1241,19 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				{
 					source: "run",
 					requestId: payload.requestId,
-				dedupeKey: `client-run-start:${runId}`,
+					dedupeKey: `client-run-start:${runId}`,
 				},
 			);
 			refreshConversations();
 			applyWorkflowThinkingEvent(runId, "run_started", "koro");
+			scheduleWorkflowRefresh(120);
 		},
 		[
 			appendRunEventToConversation,
 			openGeneralRunConversation,
 			refreshConversations,
 			applyWorkflowThinkingEvent,
+			scheduleWorkflowRefresh,
 		],
 	);
 
@@ -1141,7 +1262,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 			const runId = String(payload.runId || "").trim();
 			if (!runId) return;
 			const event = payload.event;
-			const normalizedType = String(event.eventType || "").trim().toLowerCase();
+			const normalizedType = String(event.eventType || "")
+				.trim()
+				.toLowerCase();
 			const message = eventBodyFromPayload(
 				normalizedType,
 				event.payload,
@@ -1159,16 +1282,37 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						: `run:${runId}:event:${normalizedType}:${event.requestId}`,
 			});
 			applyWorkflowThinkingEvent(runId, normalizedType, profile);
+			if (
+				normalizedType === "run_started" ||
+				normalizedType === "task_running" ||
+				normalizedType === "task_awaiting_review" ||
+				normalizedType === "task_reviewed" ||
+				normalizedType === "run_completed" ||
+				normalizedType === "run_failed" ||
+				normalizedType === "run_cancelled"
+			) {
+				scheduleWorkflowRefresh(normalizedType.startsWith("run_") ? 120 : 220);
+			}
 		},
-		[appendRunEventToConversation, applyWorkflowThinkingEvent],
+		[
+			appendRunEventToConversation,
+			applyWorkflowThinkingEvent,
+			scheduleWorkflowRefresh,
+		],
 	);
 
 	const handleOrchestrationRunStatusChange = useCallback(
 		(payload: AgentOrchestrationRunStatusPayload) => {
 			const runId = String(payload.runId || "").trim();
 			if (!runId) return;
-			const status = String(payload.status || "").trim().toLowerCase();
-			if (status === "running" || status === "queued" || status === "cancel_requested") {
+			const status = String(payload.status || "")
+				.trim()
+				.toLowerCase();
+			if (
+				status === "running" ||
+				status === "queued" ||
+				status === "cancel_requested"
+			) {
 				setWorkflowThinkingByRunId((current) => {
 					const existing = current[runId];
 					if (existing) {
@@ -1197,8 +1341,13 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 				delete next[runId];
 				return next;
 			});
+			scheduleWorkflowRefresh(
+				status === "completed" || status === "failed" || status === "cancelled"
+					? 120
+					: 240,
+			);
 		},
-		[],
+		[scheduleWorkflowRefresh],
 	);
 
 	const handleOrchestrationRunCleared = useCallback(
@@ -1215,6 +1364,24 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		[],
 	);
 
+	const handleOpenRunReviewInbox = useCallback(
+		(payload: { runId: string }) => {
+			const runId = String(payload.runId || "").trim();
+			if (!runId) return;
+			applyChannelScope("team");
+			setStatusFilter("awaiting_review");
+			setPriorityFilter("all");
+			setQueueProfileFilter("all");
+			setQueueRunFilter(runId);
+			setActivityProfileFilter("all");
+			setActivityRunFilter(runId);
+			setActivitySourceFilter("all");
+			void openGeneralRunConversation(runId, { focus: true });
+			scheduleWorkflowRefresh(0);
+		},
+		[applyChannelScope, openGeneralRunConversation, scheduleWorkflowRefresh],
+	);
+
 	const visibleConversations = useMemo(
 		() => resolveVisibleConversations(channelScope, conversations),
 		[channelScope, conversations],
@@ -1224,7 +1391,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	useEffect(() => {
 		if (
 			activeConvId &&
-			visibleConversations.some((conversation) => conversation.id === activeConvId)
+			visibleConversations.some(
+				(conversation) => conversation.id === activeConvId,
+			)
 		) {
 			return;
 		}
@@ -1242,7 +1411,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const visibleWorkflowRunId =
 		activeConversationRunId && workflowThinkingByRunId[activeConversationRunId]
 			? activeConversationRunId
-			: activeWorkflowRuns[0]?.runId ?? "";
+			: (activeWorkflowRuns[0]?.runId ?? "");
 	const visibleWorkflowThinkingEntry = visibleWorkflowRunId
 		? workflowThinkingByRunId[visibleWorkflowRunId]
 		: null;
@@ -1251,7 +1420,7 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 	const isThinking = directThinking || showWorkflowThinking;
 	const thinkingProfileId = directThinking
 		? directThinkingProfileId
-		: visibleWorkflowThinkingEntry?.lastProfileId ?? DEFAULT_AGENT_PROFILE;
+		: (visibleWorkflowThinkingEntry?.lastProfileId ?? DEFAULT_AGENT_PROFILE);
 	const thinkingContent = directThinking ? liveStreamText : "";
 	const now = Date.now();
 	const hasRunningQueue = queueTasks.some((task) =>
@@ -1281,30 +1450,31 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		for (const id of AGENT_PROFILE_IDS) {
 			const rosterEntry = entries[id];
 			next[id] = resolveAgentMarkState({
-				error: !healthy,
-				waiting: healthy && !paired,
+				error: connectionBlocked,
+				waiting: healthPending || waitingForPairing,
 				running:
 					Boolean(rosterEntry?.active) ||
 					(channelScope !== "team" && id === scopeProfileId && directThinking),
 				warning: Boolean(rosterEntry?.warningCount),
 				success: (profileSuccessUntil[id] ?? 0) > currentTime,
-				focus:
-					channelScope !== "team" && id === scopeProfileId && healthy && paired,
+				focus: channelScope !== "team" && id === scopeProfileId && isReady,
 			});
 		}
 		return next;
 	}, [
 		profileRoster,
-		healthy,
-		paired,
+		connectionBlocked,
+		healthPending,
+		waitingForPairing,
 		channelScope,
 		scopeProfileId,
 		directThinking,
 		profileSuccessUntil,
+		isReady,
 	]);
 	const centerAvatarState = resolveAgentMarkState({
-		error: !healthy,
-		waiting: healthy && !paired,
+		error: connectionBlocked,
+		waiting: healthPending || waitingForPairing,
 		running: hasRunningQueue,
 		speaking: isThinking,
 		thinking: isThinking,
@@ -1313,8 +1483,8 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 		focus: isReady && channelScope !== "team",
 	});
 	const assistantBaseState = resolveAgentMarkState({
-		error: !healthy,
-		waiting: healthy && !paired,
+		error: connectionBlocked,
+		waiting: healthPending || waitingForPairing,
 		running: hasRunningQueue,
 		warning: hasReviewWarnings,
 		success: activeProfileSuccess,
@@ -1372,23 +1542,37 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 								<p className={styles.headerEyebrow}>Command channel</p>
 								<p className={styles.headerChannelName}>{channelLabel}</p>
 								<p className={styles.headerRouteLabel}>{profileRouteLabel}</p>
+								{channelScope === "team" && composerMode === "direct" ? (
+									<label
+										htmlFor="agent-direct-profile"
+										className={styles.headerRoutingRow}
+									>
+										<span className={styles.headerRoutingLabel}>
+											Direct replies
+										</span>
+										<select
+											id="agent-direct-profile"
+											name="agent_direct_profile"
+											value={profileId}
+											className={styles.headerRoutingSelect}
+											onChange={(event) =>
+												setProfileId(
+													normalizeKnownProfileId(event.target.value) ??
+														DEFAULT_AGENT_PROFILE,
+												)
+											}
+										>
+											{AGENT_PROFILE_IDS.map((id) => (
+												<option key={id} value={id}>
+													{resolvedProfiles[id].name}
+												</option>
+											))}
+										</select>
+									</label>
+								) : null}
 							</div>
 						</div>
 						<div className={styles.centerHeaderMetrics}>
-							<Badge
-								size="sm"
-								variant="soft"
-								color={healthy ? "success" : "danger"}
-							>
-								{healthy ? "online" : "offline"}
-							</Badge>
-							<Badge
-								size="sm"
-								variant="soft"
-								color={paired ? "primary" : "warning"}
-							>
-								{paired ? "paired" : "unpaired"}
-							</Badge>
 							<Badge size="sm" variant="outline" color="default">
 								{conversationCount} conv
 							</Badge>
@@ -1475,14 +1659,28 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 						<AgentChatEmptyState
 							profile={profile}
 							profileId={scopeProfileId}
-							templates={templates}
 							isReady={isReady}
+							statusMessage={emptyStateStatusMessage}
 							avatarState={centerAvatarState}
-							onTemplateClick={(prompt) => {
-								if (!isReady) return;
-								setComposerMode("direct");
-								void handleDirectSend(prompt);
+							directProfileName={scopeProfile.name}
+							runObjectiveEnabled={agentService.usesBroker()}
+							starterPrompts={starterPrompts}
+							onSelectMode={(mode) => {
+								primeComposer(mode);
 							}}
+							onStarterSelect={(mode, prompt) => {
+								primeComposer(mode, prompt);
+							}}
+							primaryActionLabel={
+								waitingForPairing ? "Pair device in Settings" : undefined
+							}
+							onPrimaryAction={
+								waitingForPairing
+									? () => {
+											navigate("/app/settings");
+										}
+									: undefined
+							}
 						/>
 					)}
 				</div>
@@ -1491,6 +1689,9 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					<AgentChatComposer
 						mode={composerMode}
 						onModeChange={setComposerMode}
+						value={composerDraft}
+						onValueChange={setComposerDraft}
+						focusSignal={composerFocusSignal}
 						onSend={handleComposerSend}
 						disabled={!isReady || (composerMode === "direct" && directThinking)}
 						isStreaming={composerMode === "direct" && directThinking}
@@ -1510,12 +1711,15 @@ export function AgentChatPanel({ healthy, paired }: AgentChatPanelProps) {
 					<AgentOrchestrationPanel
 						healthy={healthy}
 						paired={paired}
+						condensed={composerMode === "direct"}
 						objective={orchestrationObjective}
 						runStartSignal={orchestrationRunStartSignal}
+						resumeRunId={resumableRunId}
 						onRunStarted={handleOrchestrationRunStarted}
 						onRunEvent={handleOrchestrationRunEvent}
 						onRunStatusChange={handleOrchestrationRunStatusChange}
 						onRunCleared={handleOrchestrationRunCleared}
+						onOpenReviewInbox={handleOpenRunReviewInbox}
 					/>
 				</div>
 			</div>

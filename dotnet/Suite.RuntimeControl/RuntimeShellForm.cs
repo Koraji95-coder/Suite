@@ -47,6 +47,7 @@ internal sealed class RuntimeShellForm : Form
     private bool _isClosing;
     private bool _uiReady;
     private bool _snapshotInFlight;
+    private bool _snapshotRefreshPending;
     private bool _actionBusy;
     private string? _activeAction;
     private string? _activeServiceId;
@@ -153,6 +154,7 @@ internal sealed class RuntimeShellForm : Form
             throw new InvalidOperationException($"Runtime shell navigation failed with status {eventArgs.WebErrorStatus}.");
         }
 
+        RuntimeShellLogger.Log($"runtime-shell-navigation-complete: autoBootstrap={_options.AutoBootstrap}");
         _uiReady = true;
         EnsureVisibleOnDesktop();
         FlushQueuedMessages();
@@ -162,15 +164,15 @@ internal sealed class RuntimeShellForm : Form
 
         if (_options.AutoBootstrap)
         {
+            RuntimeShellLogger.Log("runtime-shell-auto-bootstrap-prime");
             PrimeAutoBootstrapUiState();
+            RuntimeShellLogger.Log("runtime-shell-auto-bootstrap-queue");
+            _ = RunBootstrapAllAsync(autoTriggered: true);
+            _ = PublishSnapshotAsync();
+            return;
         }
 
         await PublishSnapshotAsync();
-
-        if (_options.AutoBootstrap)
-        {
-            _ = RunBootstrapAllAsync(autoTriggered: true);
-        }
     }
 
     private async Task OnWebMessageReceivedAsync(CoreWebView2WebMessageReceivedEventArgs eventArgs)
@@ -294,11 +296,13 @@ internal sealed class RuntimeShellForm : Form
     {
         if (!TryBeginAction("bootstrap_all", null))
         {
+            RuntimeShellLogger.Log($"runtime-shell-bootstrap-skipped: autoTriggered={autoTriggered}; actionBusy={_actionBusy}");
             return;
         }
 
         try
         {
+            RuntimeShellLogger.Log($"runtime-shell-bootstrap-run: autoTriggered={autoTriggered}");
             _runtimeLogOffset = GetCurrentLogLength();
             SendLog(
                 "START",
@@ -312,6 +316,7 @@ internal sealed class RuntimeShellForm : Form
                 _bootstrapScriptPath,
                 _repoRoot,
                 new[] { "-RepoRoot", _repoRoot, "-Json" });
+            RuntimeShellLogger.Log($"runtime-shell-bootstrap-result: autoTriggered={autoTriggered}; succeeded={result.Succeeded}; outputLength={result.CombinedOutput.Length}");
 
             PumpRuntimeLog();
             await PublishSnapshotAsync(force: true);
@@ -354,30 +359,61 @@ internal sealed class RuntimeShellForm : Form
             foreach (var serviceId in ServiceOrder)
             {
                 var service = FindService(serviceId);
-                if (service is null || ServiceSatisfiesStart(service.Value))
+                if (service is null)
                 {
                     continue;
                 }
 
                 var serviceName = GetServiceName(service.Value) ?? serviceId;
+                if (ServiceIsReady(service.Value))
+                {
+                    continue;
+                }
+
+                if (ServiceIsActive(service.Value))
+                {
+                    SendLog("INFO", $"Waiting for {serviceName} to finish starting.", "info");
+                    SendProgress(true, ComputeStartProgressPercent(serviceId), $"Waiting for {serviceName} to finish starting.");
+                    var alreadyStartingReady = await WaitForServiceConditionAsync(serviceId, ServiceIsReady, TimeSpan.FromSeconds(40));
+                    await PublishSnapshotAsync(force: true);
+                    PublishProgressFromSnapshot();
+                    if (!alreadyStartingReady)
+                    {
+                        SendLog("ERR", $"{serviceName} did not reach a ready state.", "err");
+                        return;
+                    }
+
+                    SendLog("OK", $"{serviceName} is ready.", "ok");
+                    continue;
+                }
+
                 SendLog("INFO", $"Starting {serviceName}.", "info");
                 SendProgress(true, ComputeStartProgressPercent(serviceId), $"Starting {serviceName}.");
 
                 var result = await RunControlActionAsync(serviceId, "start");
+                var ready = await WaitForServiceConditionAsync(serviceId, ServiceIsReady, TimeSpan.FromSeconds(40));
                 await PublishSnapshotAsync(force: true);
                 PublishProgressFromSnapshot();
 
-                if (!result.Ok)
+                var refreshedService = FindService(serviceId);
+                var refreshedSummary = refreshedService.HasValue ? GetStringProperty(refreshedService.Value, "summary") : null;
+                var refreshedDetails = refreshedService.HasValue ? GetStringProperty(refreshedService.Value, "details") : null;
+
+                if (!ready)
                 {
-                    SendLog("ERR", result.Summary ?? $"Failed to start {serviceName}.", "err");
-                    if (!string.IsNullOrWhiteSpace(result.Details))
+                    SendLog("ERR", refreshedSummary ?? result.Summary ?? $"Failed to start {serviceName}.", "err");
+                    if (!string.IsNullOrWhiteSpace(refreshedDetails))
+                    {
+                        SendLog("WARN", refreshedDetails, "warn");
+                    }
+                    else if (!string.IsNullOrWhiteSpace(result.Details))
                     {
                         SendLog("WARN", result.Details, "warn");
                     }
                     return;
                 }
 
-                SendLog("OK", result.Summary ?? $"{serviceName} started.", "ok");
+                SendLog("OK", refreshedSummary ?? result.Summary ?? $"{serviceName} started.", "ok");
             }
         }
         catch (Exception exception)
@@ -466,29 +502,51 @@ internal sealed class RuntimeShellForm : Form
             SendProgress(visible: true, percent: 35, step: $"{ToPresentTense(action)} {serviceName}.");
 
             var result = await RunControlActionAsync(serviceId, action);
+            var actionSettled = action switch
+            {
+                "start" or "restart" => await WaitForServiceConditionAsync(serviceId, ServiceIsReady, TimeSpan.FromSeconds(40)),
+                "stop" => await WaitForServiceConditionAsync(serviceId, ServiceSatisfiesStop, TimeSpan.FromSeconds(20)),
+                _ => result.Ok,
+            };
             await PublishSnapshotAsync(force: true);
             PublishProgressFromSnapshot();
 
-            if (result.Ok)
-            {
-                if (result.SkippedForSafety)
-                {
-                    SendLog("WARN", result.Summary ?? $"{serviceName} {action} skipped for safety.", "warn");
-                }
-                else
-                {
-                    SendLog("OK", result.Summary ?? $"{serviceName} {action} completed.", "ok");
-                }
+            var refreshedService = FindService(serviceId);
+            var refreshedSummary = refreshedService.HasValue ? GetStringProperty(refreshedService.Value, "summary") : null;
+            var refreshedDetails = refreshedService.HasValue ? GetStringProperty(refreshedService.Value, "details") : null;
 
-                if (!string.IsNullOrWhiteSpace(result.Details))
+            if (result.SkippedForSafety)
+            {
+                SendLog("WARN", refreshedSummary ?? result.Summary ?? $"{serviceName} {action} skipped for safety.", "warn");
+                if (!string.IsNullOrWhiteSpace(refreshedDetails))
+                {
+                    SendLog("INFO", refreshedDetails, "info");
+                }
+                else if (!string.IsNullOrWhiteSpace(result.Details))
+                {
+                    SendLog("INFO", result.Details, "info");
+                }
+            }
+            else if (actionSettled)
+            {
+                SendLog("OK", refreshedSummary ?? result.Summary ?? $"{serviceName} {action} completed.", "ok");
+                if (!string.IsNullOrWhiteSpace(refreshedDetails))
+                {
+                    SendLog("INFO", refreshedDetails, "info");
+                }
+                else if (!string.IsNullOrWhiteSpace(result.Details))
                 {
                     SendLog("INFO", result.Details, "info");
                 }
             }
             else
             {
-                SendLog("ERR", result.Summary ?? $"{serviceName} {action} failed.", "err");
-                if (!string.IsNullOrWhiteSpace(result.Details))
+                SendLog("ERR", refreshedSummary ?? result.Summary ?? $"{serviceName} {action} failed.", "err");
+                if (!string.IsNullOrWhiteSpace(refreshedDetails))
+                {
+                    SendLog("WARN", refreshedDetails, "warn");
+                }
+                else if (!string.IsNullOrWhiteSpace(result.Details))
                 {
                     SendLog("WARN", result.Details, "warn");
                 }
@@ -599,32 +657,38 @@ internal sealed class RuntimeShellForm : Form
 
         if (_snapshotInFlight)
         {
+            _snapshotRefreshPending = true;
             return;
         }
 
         _snapshotInFlight = true;
         try
         {
-            var result = await ProcessRunner.RunPowerShellFileAsync(
-                _statusScriptPath,
-                _repoRoot,
-                new[] { "-RepoRoot", _repoRoot, "-Json" });
-
-            if (!TryExtractJsonObject(result.CombinedOutput, out var payloadJson))
+            do
             {
-                SendError("Runtime snapshot failed.", "The status script did not return JSON.");
-                return;
-            }
+                _snapshotRefreshPending = false;
+                var result = await ProcessRunner.RunPowerShellFileAsync(
+                    _statusScriptPath,
+                    _repoRoot,
+                    new[] { "-RepoRoot", _repoRoot, "-Json" });
 
-            _lastSnapshotDocument?.Dispose();
-            _lastSnapshotDocument = JsonDocument.Parse(payloadJson);
-            PostRawEvent("runtime.snapshot", payloadJson);
-            PublishBootstrapStateFromSnapshot();
+                if (!TryExtractJsonObject(result.CombinedOutput, out var payloadJson))
+                {
+                    SendError("Runtime snapshot failed.", "The status script did not return JSON.");
+                    return;
+                }
 
-            if (_actionBusy)
-            {
-                PublishProgressFromSnapshot();
+                _lastSnapshotDocument?.Dispose();
+                _lastSnapshotDocument = JsonDocument.Parse(payloadJson);
+                PostRawEvent("runtime.snapshot", payloadJson);
+                PublishBootstrapStateFromSnapshot();
+
+                if (_actionBusy)
+                {
+                    PublishProgressFromSnapshot();
+                }
             }
+            while (_snapshotRefreshPending && !_isClosing);
         }
         catch (Exception exception)
         {
@@ -658,13 +722,15 @@ internal sealed class RuntimeShellForm : Form
                         continue;
                     }
 
-                    if (ServiceSatisfiesStart(service))
+                    if (ServiceIsReady(service))
                     {
                         completed += 1;
                         continue;
                     }
 
-                    step = $"{(_activeAction == "bootstrap_all" ? "Bootstrapping" : "Starting")} {GetServiceName(service) ?? serviceId}.";
+                    step = ServiceIsActive(service)
+                        ? $"Waiting for {GetServiceName(service) ?? serviceId} to finish starting."
+                        : $"{(_activeAction == "bootstrap_all" ? "Bootstrapping" : "Starting")} {GetServiceName(service) ?? serviceId}.";
                     break;
                 }
 
@@ -707,11 +773,13 @@ internal sealed class RuntimeShellForm : Form
             {
                 if (TryGetActiveService(root, out var service))
                 {
-                    var ready = ServiceSatisfiesStart(service);
-                    var percent = ready ? 100 : 40;
+                    var ready = ServiceIsReady(service);
+                    var percent = ready ? 100 : 70;
                     var step = ready
                         ? $"{GetServiceName(service) ?? _activeServiceId} is ready."
-                        : $"Starting {GetServiceName(service) ?? _activeServiceId}.";
+                        : ServiceIsActive(service)
+                            ? $"Waiting for {GetServiceName(service) ?? _activeServiceId} to finish starting."
+                            : $"Starting {GetServiceName(service) ?? _activeServiceId}.";
                     SendProgress(true, percent, step);
                 }
                 break;
@@ -1115,18 +1183,41 @@ internal sealed class RuntimeShellForm : Form
         return GetStringProperty(service, "name");
     }
 
-    private static bool ServiceSatisfiesStart(JsonElement service)
+    private static bool ServiceIsActive(JsonElement service)
     {
-        var state = GetStringProperty(service, "state");
-        return string.Equals(state, "running", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(state, "starting", StringComparison.OrdinalIgnoreCase);
+        return RuntimeServiceState.IsActive(GetStringProperty(service, "state"));
     }
 
     private static bool ServiceSatisfiesStop(JsonElement service)
     {
-        var state = GetStringProperty(service, "state");
-        return !string.Equals(state, "running", StringComparison.OrdinalIgnoreCase) &&
-               !string.Equals(state, "starting", StringComparison.OrdinalIgnoreCase);
+        return RuntimeServiceState.IsStopped(GetStringProperty(service, "state"));
+    }
+
+    private static bool ServiceIsReady(JsonElement service)
+    {
+        return RuntimeServiceState.IsReady(GetStringProperty(service, "state"));
+    }
+
+    private async Task<bool> WaitForServiceConditionAsync(
+        string serviceId,
+        Func<JsonElement, bool> predicate,
+        TimeSpan timeout,
+        int pollIntervalMilliseconds = 1000)
+    {
+        var deadline = DateTimeOffset.UtcNow.Add(timeout);
+        while (!_isClosing && DateTimeOffset.UtcNow < deadline)
+        {
+            await PublishSnapshotAsync(force: true);
+            if (FindService(serviceId) is { } currentService && predicate(currentService))
+            {
+                return true;
+            }
+
+            await Task.Delay(pollIntervalMilliseconds);
+        }
+
+        await PublishSnapshotAsync(force: true);
+        return FindService(serviceId) is { } finalService && predicate(finalService);
     }
 
     private static int ComputeStartProgressPercent(string serviceId)

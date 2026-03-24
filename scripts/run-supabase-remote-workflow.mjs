@@ -12,7 +12,9 @@ import {
 
 const repoRoot = process.cwd();
 const argv = process.argv.slice(2);
-const command = String(argv[0] || "").trim().toLowerCase();
+const command = String(argv[0] || "")
+	.trim()
+	.toLowerCase();
 const flags = new Set(argv.slice(1));
 const dryRun = flags.has("--dry-run");
 const notifyOnFailure = flags.has("--notify-on-failure");
@@ -121,7 +123,10 @@ async function checkGatewayHealth() {
 	const url = `http://${probeHost}:${Number.isFinite(port) ? port : 3000}/health`;
 
 	try {
-		const response = await fetch(url, { method: "GET", signal: AbortSignal.timeout(3000) });
+		const response = await fetch(url, {
+			method: "GET",
+			signal: AbortSignal.timeout(3000),
+		});
 		return {
 			level: response.ok ? "ok" : "warning",
 			ok: response.ok,
@@ -229,7 +234,9 @@ function verifyLinkedProject() {
 			? "Linked hosted project verified."
 			: excerptText(relisted.stderr || relisted.stdout) ||
 				"Hosted project linked, but migration listing still failed.",
-		output: excerptText((relisted.stdout || relisted.stderr) || linkResult.stdout),
+		output: excerptText(
+			relisted.stdout || relisted.stderr || linkResult.stdout,
+		),
 		migrationList: relisted,
 		linkResult,
 	};
@@ -280,7 +287,11 @@ function buildCheck(level, ok, message, output = "") {
 
 function showFailureNotification(title, message) {
 	if (process.platform !== "win32") return;
-	const scriptPath = path.join(repoRoot, "scripts", "show-windows-notification.ps1");
+	const scriptPath = path.join(
+		repoRoot,
+		"scripts",
+		"show-windows-notification.ps1",
+	);
 	if (!fs.existsSync(scriptPath)) return;
 
 	spawnSync(
@@ -354,13 +365,14 @@ async function runPreflightWorkflow() {
 					"error",
 					false,
 					"Hosted dry-run skipped because the linked project is unavailable.",
-			),
+				),
 	};
 
 	const ok = Boolean(cliAuth.ok && linkedProject?.ok && dryRunCheck?.ok);
 	const pushReady = Boolean(
 		ok && (activeMode !== "local" || (localSupabase.ok && gateway.ok)),
 	);
+	const localRuntimeReady = Boolean(localSupabase.ok && gateway.ok);
 	const summary = ok
 		? dryRunCheck?.message || "Hosted Supabase preflight is ready."
 		: dryRunCheck?.message ||
@@ -369,9 +381,17 @@ async function runPreflightWorkflow() {
 			"Hosted Supabase preflight failed.";
 	const pushReadinessSummary = pushReady
 		? "Hosted migration push is ready."
-		: activeMode === "local"
+		: activeMode === "local" && !localRuntimeReady
 			? "Hosted push is blocked until local Supabase and the gateway are healthy."
-			: "Hosted push is blocked because the active target checks are incomplete.";
+			: !cliAuth.ok
+				? cliAuth.message || "Hosted push is blocked until CLI auth is ready."
+				: !linkedProject?.ok
+					? linkedProject?.message ||
+						"Hosted push is blocked until the hosted project link check succeeds."
+					: !dryRunCheck?.ok
+						? dryRunCheck?.message ||
+							"Hosted push is blocked until the hosted dry-run succeeds."
+						: "Hosted push is blocked because the active target checks are incomplete.";
 
 	const payload = {
 		kind: "preflight",

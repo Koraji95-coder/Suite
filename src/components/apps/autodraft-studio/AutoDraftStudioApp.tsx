@@ -14,7 +14,13 @@ import { Input } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
+import { agentService } from "@/services/agentService";
+import { projectRevisionRegisterService } from "@/services/projectRevisionRegisterService";
+import { supabase } from "@/supabase/client";
+import type { Database } from "@/supabase/database";
+import { AutoDraftComparePanel } from "./AutoDraftComparePanel";
 import styles from "./AutoDraftStudioApp.module.css";
+import { buildAutoDraftCommitReview } from "./autodraftCommitReview";
 import {
 	type AutoDraftRule,
 	MIGRATION_BREAKDOWN,
@@ -23,32 +29,24 @@ import {
 	TRAINING_PHASES,
 } from "./autodraftData";
 import {
-	type AutoDraftHealth,
+	buildAutoDraftExecutionIssueSummary,
+	buildAutoDraftRevisionTraceNotes,
+	summarizeAutoDraftExecution,
+} from "./autodraftExecutionTraceSummary";
+import {
 	type AutoDraftBackcheckResponse,
 	type AutoDraftExecuteResponse,
 	type AutoDraftExecuteRevisionContext,
 	type AutoDraftExecuteWorkflowContext,
+	type AutoDraftHealth,
 	type AutoDraftPlanResponse,
 	autoDraftService,
 } from "./autodraftService";
-import { agentService } from "@/services/agentService";
-import { projectRevisionRegisterService } from "@/services/projectRevisionRegisterService";
-import { supabase } from "@/supabase/client";
-import type { Database } from "@/supabase/database";
 import {
 	detectArcsFromSegments,
 	extendDeadEndSegments,
 	type Segment,
 } from "./engine/pdfToCadGeometry";
-import { AutoDraftComparePanel } from "./AutoDraftComparePanel";
-import {
-	buildAutoDraftCommitReview,
-} from "./autodraftCommitReview";
-import {
-	buildAutoDraftExecutionIssueSummary,
-	buildAutoDraftRevisionTraceNotes,
-	summarizeAutoDraftExecution,
-} from "./autodraftExecutionTraceSummary";
 
 type TabId = "architecture" | "rules" | "pipeline" | "training";
 
@@ -155,7 +153,9 @@ function deriveRevisionMetadataFromFileName(fileName: string) {
 	};
 }
 
-function extractAgentResponseText(data: Record<string, unknown> | undefined): string {
+function extractAgentResponseText(
+	data: Record<string, unknown> | undefined,
+): string {
 	if (!data) return "";
 	const directKeys = ["response", "reply", "output", "message"] as const;
 	for (const key of directKeys) {
@@ -229,20 +229,24 @@ export function AutoDraftStudioApp() {
 			issueSummary: "AutoDraft execution receipt recorded from Studio.",
 			notes: "",
 		});
-	const [revisionTraceMessage, setRevisionTraceMessage] = useState<string | null>(
-		null,
+	const [revisionTraceMessage, setRevisionTraceMessage] = useState<
+		string | null
+	>(null);
+	const [projectOptions, setProjectOptions] = useState<ProjectContextOption[]>(
+		[],
 	);
-	const [projectOptions, setProjectOptions] = useState<ProjectContextOption[]>([]);
-	const [projectFiles, setProjectFiles] = useState<ProjectFileContextOption[]>([]);
+	const [projectFiles, setProjectFiles] = useState<ProjectFileContextOption[]>(
+		[],
+	);
 	const [crewReviewEntries, setCrewReviewEntries] = useState<CrewReviewEntry[]>(
 		[],
 	);
 	const [crewReviewError, setCrewReviewError] = useState<string | null>(null);
 	const [commitReviewAcknowledged, setCommitReviewAcknowledged] =
 		useState(false);
-	const [lastPreviewReviewKey, setLastPreviewReviewKey] = useState<string | null>(
-		null,
-	);
+	const [lastPreviewReviewKey, setLastPreviewReviewKey] = useState<
+		string | null
+	>(null);
 	const [loadingPlan, setLoadingPlan] = useState(false);
 	const [loadingExecute, setLoadingExecute] = useState(false);
 	const [loadingBackcheck, setLoadingBackcheck] = useState(false);
@@ -254,31 +258,40 @@ export function AutoDraftStudioApp() {
 		[executeResult],
 	);
 	const selectedProjectId =
-		revisionContext.projectId?.trim() || workflowContext.projectId?.trim() || "";
+		revisionContext.projectId?.trim() ||
+		workflowContext.projectId?.trim() ||
+		"";
 	const selectedProject = useMemo(
-		() => projectOptions.find((project) => project.id === selectedProjectId) ?? null,
+		() =>
+			projectOptions.find((project) => project.id === selectedProjectId) ??
+			null,
 		[projectOptions, selectedProjectId],
 	);
 	const selectedFile = useMemo(
 		() =>
-			projectFiles.find((file) => file.id === (revisionContext.fileId?.trim() || "")) ??
-			null,
+			projectFiles.find(
+				(file) => file.id === (revisionContext.fileId?.trim() || ""),
+			) ?? null,
 		[projectFiles, revisionContext.fileId],
 	);
 	const commitReview = useMemo(
-		() => buildAutoDraftCommitReview(planResult?.actions ?? [], revisionContext),
+		() =>
+			buildAutoDraftCommitReview(planResult?.actions ?? [], revisionContext),
 		[planResult?.actions, revisionContext],
 	);
 	const commitReviewResetKey = useMemo(
 		() =>
 			commitReview.items
-				.map((item) => `${item.id}:${item.status}:${item.target}:${item.reason}`)
+				.map(
+					(item) => `${item.id}:${item.status}:${item.target}:${item.reason}`,
+				)
 				.join("|"),
 		[commitReview.items],
 	);
 	const lastCommitReviewResetKeyRef = useRef(commitReviewResetKey);
 	const previewIsCurrent =
-		lastPreviewReviewKey !== null && lastPreviewReviewKey === commitReviewResetKey;
+		lastPreviewReviewKey !== null &&
+		lastPreviewReviewKey === commitReviewResetKey;
 	const commitCanRun =
 		commitReview.readyCount > 0 && commitReviewAcknowledged && previewIsCurrent;
 
@@ -400,7 +413,9 @@ export function AutoDraftStudioApp() {
 		}
 	}, [commitReviewResetKey]);
 
-	const buildWorkflowContext = (): AutoDraftExecuteWorkflowContext | undefined => {
+	const buildWorkflowContext = ():
+		| AutoDraftExecuteWorkflowContext
+		| undefined => {
 		const next: AutoDraftExecuteWorkflowContext = {
 			projectId: workflowContext.projectId?.trim(),
 			projectName: workflowContext.projectName?.trim(),
@@ -413,7 +428,9 @@ export function AutoDraftStudioApp() {
 		return Object.values(next).some(Boolean) ? next : undefined;
 	};
 
-	const buildRevisionContext = (): AutoDraftExecuteRevisionContext | undefined => {
+	const buildRevisionContext = ():
+		| AutoDraftExecuteRevisionContext
+		| undefined => {
 		const fallbackProjectId = workflowContext.projectId?.trim();
 		const next: AutoDraftExecuteRevisionContext = {
 			projectId: revisionContext.projectId?.trim() || fallbackProjectId,
@@ -456,23 +473,24 @@ export function AutoDraftStudioApp() {
 				workflowContext,
 				revisionContext: revisionPayload,
 			});
-			const row = await projectRevisionRegisterService.upsertAutoDraftExecutionEntry({
-				projectId: resolvedProjectId,
-				fileId: revisionPayload?.fileId?.trim() || null,
-				drawingNumber: revisionPayload?.drawingNumber?.trim(),
-				title: revisionPayload?.title?.trim(),
-				revision: revisionPayload?.revision?.trim(),
-				previousRevision: revisionPayload?.previousRevision?.trim() || null,
-				issueSummary:
-					revisionPayload?.issueSummary?.trim() ||
-					buildAutoDraftExecutionIssueSummary(executed),
-				notes,
-				requestId,
-				sourceRef: receipt?.id || executed.job_id || null,
-				status,
-				accepted: executed.accepted,
-				skipped: executed.skipped,
-			});
+			const row =
+				await projectRevisionRegisterService.upsertAutoDraftExecutionEntry({
+					projectId: resolvedProjectId,
+					fileId: revisionPayload?.fileId?.trim() || null,
+					drawingNumber: revisionPayload?.drawingNumber?.trim(),
+					title: revisionPayload?.title?.trim(),
+					revision: revisionPayload?.revision?.trim(),
+					previousRevision: revisionPayload?.previousRevision?.trim() || null,
+					issueSummary:
+						revisionPayload?.issueSummary?.trim() ||
+						buildAutoDraftExecutionIssueSummary(executed),
+					notes,
+					requestId,
+					sourceRef: receipt?.id || executed.job_id || null,
+					status,
+					accepted: executed.accepted,
+					skipped: executed.skipped,
+				});
 			if (row) {
 				const message = `Linked commit receipt to revision register for project ${resolvedProjectId}.`;
 				setRevisionTraceMessage(message);
@@ -520,7 +538,8 @@ export function AutoDraftStudioApp() {
 				setExecuteError("No actions available to execute.");
 				return;
 			}
-			const hasFailingBackcheck = (backcheckResult?.summary.fail_count || 0) > 0;
+			const hasFailingBackcheck =
+				(backcheckResult?.summary.fail_count || 0) > 0;
 			const backcheckFailCount = backcheckResult?.summary.fail_count || 0;
 			const overrideReason = executeOverrideReason.trim();
 			if (hasFailingBackcheck && !overrideReason) {
@@ -609,7 +628,9 @@ export function AutoDraftStudioApp() {
 
 	const runCadCrewReview = async () => {
 		if (!backcheckResult) {
-			setCrewReviewError("Run backcheck first before requesting CAD crew review.");
+			setCrewReviewError(
+				"Run backcheck first before requesting CAD crew review.",
+			);
 			return;
 		}
 
@@ -703,7 +724,8 @@ export function AutoDraftStudioApp() {
 	const handleProjectSelection = (nextValue: string) => {
 		const normalizedProjectId = nextValue.trim();
 		const nextProject =
-			projectOptions.find((project) => project.id === normalizedProjectId) ?? null;
+			projectOptions.find((project) => project.id === normalizedProjectId) ??
+			null;
 		setWorkflowContext((prev) => ({
 			...prev,
 			projectId: normalizedProjectId,
@@ -732,13 +754,13 @@ export function AutoDraftStudioApp() {
 					? prev.drawingNumber
 					: parsed.drawingNumber,
 			title:
-				prev.title?.trim() ||
-				!parsed ||
-				!nextFile
+				prev.title?.trim() || !parsed || !nextFile
 					? prev.title
 					: parsed.title || nextFile.name.replace(/\.[^/.]+$/, ""),
 			revision:
-				prev.revision?.trim() || !parsed?.revision ? prev.revision : parsed.revision,
+				prev.revision?.trim() || !parsed?.revision
+					? prev.revision
+					: parsed.revision,
 		}));
 	};
 
@@ -748,8 +770,8 @@ export function AutoDraftStudioApp() {
 				<div className={styles.headerRow}>
 					<div>
 						<HStack gap={2} align="center">
-							<Text as="h1" size="2xl" weight="bold">
-								AutoDraft Studio
+							<Text size="sm" weight="semibold">
+								Markup-to-CAD command center
 							</Text>
 							<Badge color="primary" variant="soft">
 								New App
@@ -775,11 +797,11 @@ export function AutoDraftStudioApp() {
 					<Panel variant="inset" padding="md" className={styles.statusCard}>
 						<HStack gap={2} align="center">
 							<Server size={14} />
-							<Text size="sm" weight="semibold">
+							<Text size="sm" weight="semibold" block>
 								Backend
 							</Text>
 						</HStack>
-						<Text size="sm" color={health?.ok ? "success" : "danger"}>
+						<Text size="sm" color={health?.ok ? "success" : "danger"} block>
 							{health?.ok ? "Online" : "Unavailable"}
 						</Text>
 					</Panel>
@@ -787,11 +809,11 @@ export function AutoDraftStudioApp() {
 					<Panel variant="inset" padding="md" className={styles.statusCard}>
 						<HStack gap={2} align="center">
 							<Sparkles size={14} />
-							<Text size="sm" weight="semibold">
+							<Text size="sm" weight="semibold" block>
 								Rule Source
 							</Text>
 						</HStack>
-						<Text size="sm">
+						<Text size="sm" block>
 							{rulesSource === "backend" ? "Backend rules" : "Local seed rules"}
 						</Text>
 					</Panel>
@@ -803,13 +825,14 @@ export function AutoDraftStudioApp() {
 							) : (
 								<TriangleAlert size={14} />
 							)}
-							<Text size="sm" weight="semibold">
+							<Text size="sm" weight="semibold" block>
 								.NET API
 							</Text>
 						</HStack>
 						<Text
 							size="sm"
 							color={health?.dotnet?.reachable ? "success" : "warning"}
+							block
 						>
 							{health?.dotnet?.reachable
 								? "Connected"
@@ -824,35 +847,35 @@ export function AutoDraftStudioApp() {
 			<Panel variant="inset" padding="md" className={styles.commandStrip}>
 				<div className={styles.commandCopy}>
 					<p className={styles.eyebrow}>AutoDraft command center</p>
-					<Text size="sm" weight="semibold">
+					<Text size="sm" weight="semibold" block>
 						{activeTabConfig.label} lane
 					</Text>
-					<Text size="xs" color="muted">
+					<Text size="xs" color="muted" block>
 						{activeTabConfig.hint}
 					</Text>
 				</div>
 				<div className={styles.commandStats}>
 					<div className={styles.commandStat}>
-						<Text size="xs" color="muted">
+						<Text size="xs" color="muted" block>
 							Rules loaded
 						</Text>
-						<Text size="sm" weight="semibold">
+						<Text size="sm" weight="semibold" block>
 							{rules.length}
 						</Text>
 					</div>
 					<div className={styles.commandStat}>
-						<Text size="xs" color="muted">
+						<Text size="xs" color="muted" block>
 							Pipeline stages
 						</Text>
-						<Text size="sm" weight="semibold">
+						<Text size="sm" weight="semibold" block>
 							{PIPELINE_STEPS.length}
 						</Text>
 					</div>
 					<div className={styles.commandStat}>
-						<Text size="xs" color="muted">
+						<Text size="xs" color="muted" block>
 							Training phases
 						</Text>
-						<Text size="sm" weight="semibold">
+						<Text size="sm" weight="semibold" block>
 							{TRAINING_PHASES.length}
 						</Text>
 					</div>
@@ -885,10 +908,10 @@ export function AutoDraftStudioApp() {
 								padding="md"
 								className={styles.migrationCard}
 							>
-								<Text size="sm" weight="semibold">
+								<Text size="sm" weight="semibold" block>
 									{item.title}
 								</Text>
-								<Text size="sm" color="muted">
+								<Text size="sm" color="muted" block>
 									{item.description}
 								</Text>
 							</Panel>
@@ -896,7 +919,7 @@ export function AutoDraftStudioApp() {
 					</div>
 
 					<Panel variant="inset" padding="md">
-						<Text size="sm" weight="semibold">
+						<Text size="sm" weight="semibold" block>
 							Data Flow
 						</Text>
 						<pre className={styles.flowCode}>
@@ -910,7 +933,7 @@ export function AutoDraftStudioApp() {
 					</Panel>
 
 					<Panel variant="default" padding="md">
-						<Text size="sm" weight="semibold">
+						<Text size="sm" weight="semibold" block>
 							TypeScript Port Snapshot
 						</Text>
 						<div className={styles.metricsGrid}>
@@ -940,7 +963,8 @@ export function AutoDraftStudioApp() {
 					{rules.map((rule) => {
 						const open = expandedRule === rule.id;
 						const examples = Array.isArray(rule.examples) ? rule.examples : [];
-						const badgeColor = STATUS_BADGE_BY_CATEGORY[rule.category] ?? "default";
+						const badgeColor =
+							STATUS_BADGE_BY_CATEGORY[rule.category] ?? "default";
 						return (
 							<Panel
 								key={rule.id}
@@ -1115,7 +1139,7 @@ export function AutoDraftStudioApp() {
 					</HStack>
 				</div>
 				<div className={styles.executionContextPanel}>
-						<div className={styles.executionContextHeader}>
+					<div className={styles.executionContextHeader}>
 						<div>
 							<Text size="sm" weight="semibold">
 								Execution workflow context
@@ -1125,40 +1149,43 @@ export function AutoDraftStudioApp() {
 								flow into revision history instead of staying local-only.
 							</Text>
 						</div>
-							<Badge color="accent" variant="soft">
-								Preview {"->"} Commit
-							</Badge>
+						<Badge color="accent" variant="soft">
+							Preview {"->"} Commit
+						</Badge>
+					</div>
+					<div className={styles.executionStageRow}>
+						<div className={styles.executionStageCard}>
+							<HStack gap={2} align="center" wrap>
+								<Badge
+									color={previewIsCurrent ? "success" : "warning"}
+									variant="soft"
+								>
+									{previewIsCurrent ? "Preview current" : "Preview required"}
+								</Badge>
+								<Text size="xs" color="muted">
+									{previewIsCurrent
+										? "The current commit targets were previewed against the active plan."
+										: "Run preview execute again whenever commit targets or revision context change."}
+								</Text>
+							</HStack>
 						</div>
-						<div className={styles.executionStageRow}>
-							<div className={styles.executionStageCard}>
-								<HStack gap={2} align="center" wrap>
-									<Badge color={previewIsCurrent ? "success" : "warning"} variant="soft">
-										{previewIsCurrent ? "Preview current" : "Preview required"}
-									</Badge>
-									<Text size="xs" color="muted">
-										{previewIsCurrent
-											? "The current commit targets were previewed against the active plan."
-											: "Run preview execute again whenever commit targets or revision context change."}
-									</Text>
-								</HStack>
-							</div>
-							<div className={styles.executionStageCard}>
-								<HStack gap={2} align="center" wrap>
-									<Badge
-										color={commitCanRun ? "success" : "default"}
-										variant="soft"
-									>
-										{commitCanRun ? "Commit ready" : "Commit blocked"}
-									</Badge>
-									<Text size="xs" color="muted">
-										{commitCanRun
-											? "All commit guards are satisfied for the current plan."
-											: "Commit stays disabled until preview is current and the review is acknowledged."}
-									</Text>
-								</HStack>
-							</div>
+						<div className={styles.executionStageCard}>
+							<HStack gap={2} align="center" wrap>
+								<Badge
+									color={commitCanRun ? "success" : "default"}
+									variant="soft"
+								>
+									{commitCanRun ? "Commit ready" : "Commit blocked"}
+								</Badge>
+								<Text size="xs" color="muted">
+									{commitCanRun
+										? "All commit guards are satisfied for the current plan."
+										: "Commit stays disabled until preview is current and the review is acknowledged."}
+								</Text>
+							</HStack>
 						</div>
-						{planResult ? (
+					</div>
+					{planResult ? (
 						<div className={styles.commitReviewPanel}>
 							<div className={styles.commitReviewHeader}>
 								<div>
@@ -1166,8 +1193,8 @@ export function AutoDraftStudioApp() {
 										Pre-commit review
 									</Text>
 									<Text size="xs" color="muted">
-										Commit is now gated by resolved targets and explicit review, not
-										just by running execute.
+										Commit is now gated by resolved targets and explicit review,
+										not just by running execute.
 									</Text>
 								</div>
 								<div className={styles.commitReviewBadges}>
@@ -1297,12 +1324,16 @@ export function AutoDraftStudioApp() {
 							<span>Project file</span>
 							<select
 								value={revisionContext.fileId ?? ""}
-								onChange={(event) => handleProjectFileSelection(event.target.value)}
+								onChange={(event) =>
+									handleProjectFileSelection(event.target.value)
+								}
 								className={styles.executionContextSelect}
 								disabled={!selectedProjectId}
 							>
 								<option value="">
-									{selectedProjectId ? "Select drawing file" : "Pick project first"}
+									{selectedProjectId
+										? "Select drawing file"
+										: "Pick project first"}
 								</option>
 								{projectFiles.map((file) => (
 									<option key={file.id} value={file.id}>
@@ -1363,7 +1394,9 @@ export function AutoDraftStudioApp() {
 								placeholder="Main switchgear one-line"
 							/>
 						</label>
-						<label className={`${styles.compareField} ${styles.executionContextWide}`}>
+						<label
+							className={`${styles.compareField} ${styles.executionContextWide}`}
+						>
 							<span>Issue summary</span>
 							<Input
 								value={revisionContext.issueSummary ?? ""}
@@ -1376,7 +1409,9 @@ export function AutoDraftStudioApp() {
 								placeholder="AutoDraft execution receipt recorded from Studio."
 							/>
 						</label>
-						<label className={`${styles.compareField} ${styles.executionContextWide}`}>
+						<label
+							className={`${styles.compareField} ${styles.executionContextWide}`}
+						>
 							<span>Revision notes</span>
 							<textarea
 								rows={2}
@@ -1465,7 +1500,9 @@ export function AutoDraftStudioApp() {
 									rows={2}
 									className={styles.overrideTextarea}
 									value={executeOverrideReason}
-									onChange={(event) => setExecuteOverrideReason(event.target.value)}
+									onChange={(event) =>
+										setExecuteOverrideReason(event.target.value)
+									}
 									placeholder="Explain why execute is safe despite failing checks..."
 								/>
 							</div>
@@ -1608,7 +1645,7 @@ export function AutoDraftStudioApp() {
 											? `Layer: ${executionSummary.cad.activeLayer}`
 											: executionSummary?.cad.activeSpace
 												? `Space: ${executionSummary.cad.activeSpace}`
-											: "Space unavailable"}
+												: "Space unavailable"}
 									</Text>
 									<Text size="xs" color="muted">
 										{[
@@ -1648,7 +1685,8 @@ export function AutoDraftStudioApp() {
 										) : null}
 										{executionSummary?.counts.textReplacementUpdates ? (
 											<Badge color="success" variant="soft">
-												text updates {executionSummary.counts.textReplacementUpdates}
+												text updates{" "}
+												{executionSummary.counts.textReplacementUpdates}
 											</Badge>
 										) : null}
 										{executionSummary?.counts.textDeleteUpdates ? (
@@ -1663,7 +1701,8 @@ export function AutoDraftStudioApp() {
 										) : null}
 										{executionSummary?.counts.dimensionTextUpdates ? (
 											<Badge color="default" variant="soft">
-												dim updates {executionSummary.counts.dimensionTextUpdates}
+												dim updates{" "}
+												{executionSummary.counts.dimensionTextUpdates}
 											</Badge>
 										) : null}
 									</div>
@@ -1672,7 +1711,8 @@ export function AutoDraftStudioApp() {
 						) : null}
 						{executeResult.meta?.commit ? (
 							<Text size="xs" color="muted">
-								Commit: {String(executeResult.meta.commit.committed || 0)} written
+								Commit: {String(executeResult.meta.commit.committed || 0)}{" "}
+								written
 								{Array.isArray(executeResult.meta.commit.createdHandles) &&
 								executeResult.meta.commit.createdHandles.length > 0
 									? ` · handles ${executeResult.meta.commit.createdHandles.join(", ")}`
@@ -1703,12 +1743,20 @@ export function AutoDraftStudioApp() {
 												className={styles.executeUpdateCard}
 											>
 												<Text size="xs">
-													{String(item.attributeTag || item.normalizedFieldKey || "Field")}
+													{String(
+														item.attributeTag ||
+															item.normalizedFieldKey ||
+															"Field",
+													)}
 													{" -> "}
 													{String(item.nextValue || item.targetValue || "")}
 												</Text>
 												<Text size="xs" color="muted">
-													{String(item.handle || item.blockHandle || "handle unavailable")}
+													{String(
+														item.handle ||
+															item.blockHandle ||
+															"handle unavailable",
+													)}
 												</Text>
 											</div>
 										))}
@@ -1719,21 +1767,27 @@ export function AutoDraftStudioApp() {
 										<Text size="xs" color="muted">
 											Text replacement updates
 										</Text>
-										{executionSummary.textReplacementUpdates.map((item, index) => (
-											<div
-												key={`text-update-${index}`}
-												className={styles.executeUpdateCard}
-											>
-												<Text size="xs">
-													{String(item.previousValue || "")}
-													{" -> "}
-													{String(item.nextValue || "")}
-												</Text>
-												<Text size="xs" color="muted">
-													{String(item.handle || item.targetEntityId || "target unavailable")}
-												</Text>
-											</div>
-										))}
+										{executionSummary.textReplacementUpdates.map(
+											(item, index) => (
+												<div
+													key={`text-update-${index}`}
+													className={styles.executeUpdateCard}
+												>
+													<Text size="xs">
+														{String(item.previousValue || "")}
+														{" -> "}
+														{String(item.nextValue || "")}
+													</Text>
+													<Text size="xs" color="muted">
+														{String(
+															item.handle ||
+																item.targetEntityId ||
+																"target unavailable",
+														)}
+													</Text>
+												</div>
+											),
+										)}
 									</div>
 								) : null}
 								{executionSummary?.textDeleteUpdates.length ? (
@@ -1750,7 +1804,11 @@ export function AutoDraftStudioApp() {
 													{String(item.previousValue || "Deleted text")}
 												</Text>
 												<Text size="xs" color="muted">
-													{String(item.handle || item.targetEntityId || "target unavailable")}
+													{String(
+														item.handle ||
+															item.targetEntityId ||
+															"target unavailable",
+													)}
 												</Text>
 											</div>
 										))}
@@ -1774,7 +1832,11 @@ export function AutoDraftStudioApp() {
 												<Text size="xs" color="muted">
 													{String(item.slot || "target")}
 													{" · "}
-													{String(item.handle || item.targetEntityId || "target unavailable")}
+													{String(
+														item.handle ||
+															item.targetEntityId ||
+															"target unavailable",
+													)}
 												</Text>
 											</div>
 										))}
@@ -1785,21 +1847,27 @@ export function AutoDraftStudioApp() {
 										<Text size="xs" color="muted">
 											Dimension text updates
 										</Text>
-										{executionSummary.dimensionTextUpdates.map((item, index) => (
-											<div
-												key={`dimension-update-${index}`}
-												className={styles.executeUpdateCard}
-											>
-												<Text size="xs">
-													{String(item.previousValue || "")}
-													{" -> "}
-													{String(item.nextValue || "")}
-												</Text>
-												<Text size="xs" color="muted">
-													{String(item.handle || item.targetEntityId || "target unavailable")}
-												</Text>
-											</div>
-										))}
+										{executionSummary.dimensionTextUpdates.map(
+											(item, index) => (
+												<div
+													key={`dimension-update-${index}`}
+													className={styles.executeUpdateCard}
+												>
+													<Text size="xs">
+														{String(item.previousValue || "")}
+														{" -> "}
+														{String(item.nextValue || "")}
+													</Text>
+													<Text size="xs" color="muted">
+														{String(
+															item.handle ||
+																item.targetEntityId ||
+																"target unavailable",
+														)}
+													</Text>
+												</div>
+											),
+										)}
 									</div>
 								) : null}
 							</>
@@ -1842,10 +1910,10 @@ export function AutoDraftStudioApp() {
 function Metric({ label, value }: { label: string; value: number }) {
 	return (
 		<div className={styles.metricCard}>
-			<Text size="xs" color="muted">
+			<Text size="xs" color="muted" block>
 				{label}
 			</Text>
-			<Text size="lg" weight="semibold">
+			<Text size="lg" weight="semibold" block>
 				{value}
 			</Text>
 		</div>

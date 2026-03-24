@@ -3,6 +3,7 @@ import { useNotification } from "@/auth/NotificationContext";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -145,6 +146,9 @@ export function WhiteboardLibrary({ filterByPanel }: WhiteboardLibraryProps) {
 				<DialogContent className={styles.dialogContent}>
 					<DialogHeader>
 						<DialogTitle>Delete whiteboard?</DialogTitle>
+						<DialogDescription className="sr-only">
+							Permanently remove this saved whiteboard from the library.
+						</DialogDescription>
 					</DialogHeader>
 					<p className={styles.dialogText}>
 						This permanently deletes {pendingDelete?.title ?? "this whiteboard"}

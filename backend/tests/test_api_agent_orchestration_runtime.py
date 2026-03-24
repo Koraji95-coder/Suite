@@ -144,6 +144,9 @@ class TestApiAgentOrchestrationRuntime(unittest.TestCase):
                 assert snapshot is not None
                 self.assertEqual(snapshot["status"], "completed")
                 self.assertTrue(snapshot["finalOutput"])
+                self.assertEqual(len(snapshot["tasks"]), 2)
+                self.assertEqual(snapshot["taskSummary"]["total"], 2)
+                self.assertEqual(snapshot["taskSummary"]["awaitingReview"], 2)
                 self.assertEqual(len(snapshot["steps"]), 5)
                 self.assertIn("stage_a", snapshot["stages"])
                 self.assertIn("stage_b", snapshot["stages"])

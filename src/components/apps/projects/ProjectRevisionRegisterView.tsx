@@ -55,6 +55,11 @@ function buildDefaultForm(projectId: string): DrawingRevisionRegisterInput {
 		title: "",
 		revision: "",
 		previousRevision: "",
+		revisionDescription: "",
+		revisionBy: "",
+		revisionCheckedBy: "",
+		revisionDate: "",
+		revisionSortOrder: 0,
 		issueSummary: "",
 		issueStatus: "open",
 		issueSeverity: "medium",
@@ -171,6 +176,11 @@ export function ProjectRevisionRegisterView({
 			title: entry.title,
 			revision: entry.revision,
 			previousRevision: entry.previous_revision ?? "",
+			revisionDescription: entry.revision_description ?? "",
+			revisionBy: entry.revision_by ?? "",
+			revisionCheckedBy: entry.revision_checked_by ?? "",
+			revisionDate: entry.revision_date ?? "",
+			revisionSortOrder: entry.revision_sort_order ?? 0,
 			issueSummary: entry.issue_summary,
 			issueStatus: entry.issue_status as DrawingRevisionIssueStatus,
 			issueSeverity: entry.issue_severity as DrawingRevisionSeverity,
@@ -376,6 +386,72 @@ export function ProjectRevisionRegisterView({
 									}))
 								}
 								placeholder="A"
+							/>
+						</label>
+						<label className={`${styles.field} ${styles.fieldWide}`}>
+							<span className={styles.label}>Revision description</span>
+							<Input
+								value={form.revisionDescription ?? ""}
+								onChange={(event) =>
+									setForm((prev) => ({
+										...prev,
+										revisionDescription: event.target.value,
+									}))
+								}
+								placeholder="Issued for approval"
+							/>
+						</label>
+						<label className={styles.field}>
+							<span className={styles.label}>Revision by</span>
+							<Input
+								value={form.revisionBy ?? ""}
+								onChange={(event) =>
+									setForm((prev) => ({
+										...prev,
+										revisionBy: event.target.value,
+									}))
+								}
+								placeholder="KE"
+							/>
+						</label>
+						<label className={styles.field}>
+							<span className={styles.label}>Revision checked by</span>
+							<Input
+								value={form.revisionCheckedBy ?? ""}
+								onChange={(event) =>
+									setForm((prev) => ({
+										...prev,
+										revisionCheckedBy: event.target.value,
+									}))
+								}
+								placeholder="DW"
+							/>
+						</label>
+						<label className={styles.field}>
+							<span className={styles.label}>Revision date</span>
+							<Input
+								type="date"
+								value={form.revisionDate ?? ""}
+								onChange={(event) =>
+									setForm((prev) => ({
+										...prev,
+										revisionDate: event.target.value,
+									}))
+								}
+							/>
+						</label>
+						<label className={styles.field}>
+							<span className={styles.label}>Revision sort order</span>
+							<Input
+								type="number"
+								value={String(form.revisionSortOrder ?? 0)}
+								onChange={(event) =>
+									setForm((prev) => ({
+										...prev,
+										revisionSortOrder: Number(event.target.value || 0),
+									}))
+								}
+								placeholder="0"
 							/>
 						</label>
 						<label className={styles.field}>
@@ -605,6 +681,9 @@ export function ProjectRevisionRegisterView({
 											{entry.previous_revision ? (
 												<span>Prev {entry.previous_revision}</span>
 											) : null}
+											{entry.revision_date ? (
+												<span>{entry.revision_date}</span>
+											) : null}
 											{linkedFile ? <span>{linkedFile.name}</span> : null}
 										</div>
 									</div>
@@ -652,6 +731,16 @@ export function ProjectRevisionRegisterView({
 								<div className={styles.summary}>{entry.issue_summary}</div>
 
 								<div className={styles.referenceGrid}>
+									<div className={styles.referenceCard}>
+										<span className={styles.referenceLabel}>Revision Note</span>
+										<span>{entry.revision_description || "—"}</span>
+									</div>
+									<div className={styles.referenceCard}>
+										<span className={styles.referenceLabel}>By / Checked</span>
+										<span>
+											{entry.revision_by || "—"} / {entry.revision_checked_by || "—"}
+										</span>
+									</div>
 									<div className={styles.referenceCard}>
 										<span className={styles.referenceLabel}>AutoDraft</span>
 										<span>{entry.autodraft_request_id || "—"}</span>

@@ -1109,6 +1109,14 @@ class AgentRunOrchestrator:
         if not run_row:
             return None
 
+        task_rows = self._fetch_all(
+            """
+            SELECT * FROM agent_tasks
+            WHERE run_id = ?
+            ORDER BY created_at ASC, task_id ASC
+            """,
+            (run_id,),
+        )
         step_rows = self._fetch_all(
             "SELECT * FROM agent_run_steps WHERE run_id = ? ORDER BY id ASC",
             (run_id,),
@@ -1136,6 +1144,35 @@ class AgentRunOrchestrator:
             "finalOutput": str(run_row["final_output"] or ""),
             "finalError": str(run_row["final_error"] or ""),
         }
+
+        task_summary = {
+            "total": 0,
+            "queued": 0,
+            "running": 0,
+            "awaitingReview": 0,
+            "approved": 0,
+            "reworkRequested": 0,
+            "deferred": 0,
+        }
+        run_payload["tasks"] = []
+        for row in task_rows:
+            task_payload = self._serialize_task_row(row)
+            run_payload["tasks"].append(task_payload)
+            task_summary["total"] += 1
+            normalized_status = _normalize_task_status(task_payload.get("status"))
+            if normalized_status == "queued":
+                task_summary["queued"] += 1
+            elif normalized_status == "running":
+                task_summary["running"] += 1
+            elif normalized_status == "awaiting_review":
+                task_summary["awaitingReview"] += 1
+            elif normalized_status == "approved":
+                task_summary["approved"] += 1
+            elif normalized_status == "rework_requested":
+                task_summary["reworkRequested"] += 1
+            elif normalized_status == "deferred":
+                task_summary["deferred"] += 1
+        run_payload["taskSummary"] = task_summary
 
         steps = []
         stage_summary: Dict[str, Dict[str, int]] = {}

@@ -1,22 +1,27 @@
 .root {
-	padding: 0.85rem 1rem 0.72rem;
-	background:
-		linear-gradient(
-			180deg,
-			color-mix(in srgb, var(--agent-surface-base) 70%, transparent),
-			color-mix(in srgb, var(--agent-surface-base) 95%, transparent)
-		);
-	border-top: 1px solid color-mix(in srgb, var(--agent-surface-border) 56%, transparent);
+	padding: 0.68rem 0.82rem 0.58rem;
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--agent-surface-base) 70%, transparent),
+		color-mix(in srgb, var(--agent-surface-base) 95%, transparent)
+	);
+	border-top: 1px solid
+		color-mix(in srgb, var(--agent-surface-border) 56%, transparent);
 }
 
 .modeRow {
 	display: inline-flex;
 	gap: 0.32rem;
-	margin-bottom: 0.65rem;
+	margin-bottom: 0.45rem;
 	padding: 0.18rem;
-	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 72%, transparent);
+	border: 1px solid
+		color-mix(in srgb, var(--agent-surface-border) 72%, transparent);
 	border-radius: 999px;
-	background: color-mix(in srgb, var(--agent-surface-elevated) 52%, transparent);
+	background: color-mix(
+		in srgb,
+		var(--agent-surface-elevated) 52%,
+		transparent
+	);
 }
 
 .modeButton {
@@ -45,7 +50,11 @@
 
 .modeButtonIdle:hover {
 	color: var(--text);
-	background: color-mix(in srgb, var(--agent-surface-elevated) 80%, transparent);
+	background: color-mix(
+		in srgb,
+		var(--agent-surface-elevated) 80%,
+		transparent
+	);
 }
 
 .modeButton:disabled {
@@ -54,12 +63,12 @@
 }
 
 .templatesWrap {
-	margin-bottom: 0.7rem;
+	margin-bottom: 0.48rem;
 }
 
 .templatesLabel {
 	display: block;
-	margin-bottom: 0.4rem;
+	margin-bottom: 0.3rem;
 	padding-inline: 0.2rem;
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
@@ -81,7 +90,11 @@
 	flex-shrink: 0;
 	white-space: nowrap;
 	border-color: color-mix(in srgb, var(--agent-accent-warm) 26%, transparent);
-	background: color-mix(in srgb, var(--agent-surface-elevated) 86%, transparent);
+	background: color-mix(
+		in srgb,
+		var(--agent-surface-elevated) 86%,
+		transparent
+	);
 	transition:
 		border-color var(--agent-motion-fast) ease,
 		background-color var(--agent-motion-fast) ease,
@@ -96,14 +109,14 @@
 
 .composerCard {
 	position: relative;
-	border: 1px solid color-mix(in srgb, var(--agent-surface-border) 88%, transparent);
+	border: 1px solid
+		color-mix(in srgb, var(--agent-surface-border) 88%, transparent);
 	border-radius: 0.95rem;
-	background:
-		linear-gradient(
-			145deg,
-			color-mix(in srgb, var(--agent-surface-base) 92%, transparent),
-			color-mix(in srgb, var(--agent-surface-elevated) 86%, transparent)
-		);
+	background: linear-gradient(
+		145deg,
+		color-mix(in srgb, var(--agent-surface-base) 92%, transparent),
+		color-mix(in srgb, var(--agent-surface-elevated) 86%, transparent)
+	);
 	box-shadow: 0 10px 24px rgb(0 0 0 / 24%);
 	transition:
 		border-color var(--agent-motion-fast) ease,
@@ -112,7 +125,11 @@
 }
 
 .composerCardIdle:hover {
-	border-color: color-mix(in srgb, var(--agent-surface-border-strong) 88%, transparent);
+	border-color: color-mix(
+		in srgb,
+		var(--agent-surface-border-strong) 88%,
+		transparent
+	);
 }
 
 .composerCardFocused {
@@ -127,15 +144,15 @@
 }
 
 .textareaWrap {
-	padding: 0.72rem 0.95rem 0.48rem;
+	padding: 0.56rem 0.8rem 0.34rem;
 }
 
 .textarea {
 	width: 100%;
 	resize: none;
 	background: transparent;
-	font-size: 0.89rem;
-	line-height: 1.52;
+	font-size: 0.84rem;
+	line-height: 1.46;
 	color: var(--text);
 	outline: none;
 	border: 0;
@@ -153,8 +170,9 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 0.44rem;
-	border-top: 1px solid color-mix(in srgb, var(--agent-surface-border) 72%, transparent);
+	padding: 0.36rem 0.42rem;
+	border-top: 1px solid
+		color-mix(in srgb, var(--agent-surface-border) 72%, transparent);
 }
 
 .toolbarIconButton {
@@ -188,7 +206,8 @@
 		color-mix(in srgb, var(--agent-accent-warm) 88%, #ffc17b 12%),
 		color-mix(in srgb, var(--agent-accent-cool) 78%, #aee9ff 22%)
 	);
-	box-shadow: 0 10px 20px color-mix(in srgb, var(--agent-accent-warm) 24%, transparent);
+	box-shadow: 0 10px 20px
+		color-mix(in srgb, var(--agent-accent-warm) 24%, transparent);
 }
 
 .sendButtonReady:hover {
@@ -219,12 +238,16 @@
 
 .sendButtonDisabled {
 	color: var(--text-muted);
-	background: color-mix(in srgb, var(--agent-surface-elevated) 82%, transparent);
+	background: color-mix(
+		in srgb,
+		var(--agent-surface-elevated) 82%,
+		transparent
+	);
 	cursor: not-allowed;
 }
 
 .hint {
-	margin-top: 0.45rem;
+	margin-top: 0.3rem;
 	text-align: left;
 }
 
@@ -232,7 +255,11 @@
 	padding: 0.11rem 0.34rem;
 	border-radius: 0.28rem;
 	color: var(--text-muted);
-	background: color-mix(in srgb, var(--agent-surface-elevated) 88%, transparent);
+	background: color-mix(
+		in srgb,
+		var(--agent-surface-elevated) 88%,
+		transparent
+	);
 	font-size: 0.64rem;
 	font-family:
 		ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;

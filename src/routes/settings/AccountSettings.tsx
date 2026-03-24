@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
+import { PageContextBand } from "@/components/apps/ui/PageContextBand";
+import { TrustStateBadge } from "@/components/apps/ui/TrustStateBadge";
 import { Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
 import { agentService } from "@/services/agentService";
@@ -11,6 +13,12 @@ import {
 	AccountSessionActionsSection,
 } from "./AccountSettingsSections";
 import {
+	useAccountAgentPairingState,
+	useAccountPasskeyState,
+	useAccountProfileState,
+	useAccountSessionActions,
+} from "./accountSettingsHooks";
+import {
 	buildAgentGatewayStatus,
 	buildAgentModeStatus,
 	buildAgentPairingStatus,
@@ -20,12 +28,7 @@ import {
 	buildPasskeyFrontendStatus,
 	buildSessionAuthStatus,
 } from "./accountSettingsUtils";
-import {
-	useAccountAgentPairingState,
-	useAccountPasskeyState,
-	useAccountProfileState,
-	useAccountSessionActions,
-} from "./accountSettingsHooks";
+import styles from "./AccountSettings.module.css";
 
 export default function AccountSettings() {
 	const { user, profile, signOut, sessionAuthMethod, updateProfile } =
@@ -66,24 +69,64 @@ export default function AccountSettings() {
 
 	return (
 		<Stack gap={4}>
-			<div>
-				<Text size="lg" weight="semibold">
-					Identity and trust
-				</Text>
-				<Text size="sm" color="muted">
-					Authentication, profile, and trusted device controls for this workspace.
-				</Text>
-			</div>
-
-			<AccountSecurityOverviewSection
-				passkeyAuthStatus={passkeyAuthStatus}
-				sessionAuthStatus={sessionAuthStatus}
-				passkeyBrowserStatus={passkeyBrowserStatus}
-				passkeyFrontendStatus={passkeyFrontendStatus}
-				passkeyBackendStatus={passkeyBackendStatus}
-				agentGatewayStatus={agentGatewayStatus}
-				agentPairingStatus={agentPairingStatus}
-				agentModeStatus={agentModeStatus}
+			<PageContextBand
+				eyebrow="Trust controls"
+				summary={
+					<Text size="sm" color="muted" block>
+						Manage how this workspace recognizes you, how passkeys are staged,
+						and how trusted agent access is attached to this device.
+					</Text>
+				}
+				meta={
+					<div className={styles.trustBandGrid}>
+						<div className={styles.trustBandCard}>
+							<span className={styles.trustBandLabel}>Session</span>
+							<TrustStateBadge
+								state={
+									sessionAuthMethod === "passkey" ? "ready" : "background"
+								}
+								label={sessionAuthStatus.value}
+							/>
+						</div>
+						<div className={styles.trustBandCard}>
+							<span className={styles.trustBandLabel}>Passkeys</span>
+							<TrustStateBadge
+								state={
+									passkeyBackendStatus.tone === "success"
+										? "ready"
+										: passkeyBackendStatus.tone === "muted"
+											? "background"
+											: "needs-attention"
+								}
+								label={passkeyBackendStatus.value}
+							/>
+						</div>
+						<div className={styles.trustBandCard}>
+							<span className={styles.trustBandLabel}>Agent gateway</span>
+							<TrustStateBadge
+								state={
+									agentGatewayStatus.tone === "success"
+										? "ready"
+										: agentGatewayStatus.tone === "muted"
+											? "background"
+											: "unavailable"
+								}
+								label={agentGatewayStatus.value}
+							/>
+						</div>
+						<div className={styles.trustBandCard}>
+							<span className={styles.trustBandLabel}>Verification</span>
+							<TrustStateBadge
+								state={
+									agentPairingStatus.tone === "success"
+										? "ready"
+										: "needs-attention"
+								}
+								label={agentModeStatus.value}
+							/>
+						</div>
+					</div>
+				}
 			/>
 
 			<AccountProfileSection
@@ -98,6 +141,17 @@ export default function AccountSettings() {
 				onSaveProfile={profileState.saveAccountProfile}
 			/>
 
+			<AccountSecurityOverviewSection
+				passkeyAuthStatus={passkeyAuthStatus}
+				sessionAuthStatus={sessionAuthStatus}
+				passkeyBrowserStatus={passkeyBrowserStatus}
+				passkeyFrontendStatus={passkeyFrontendStatus}
+				passkeyBackendStatus={passkeyBackendStatus}
+				agentGatewayStatus={agentGatewayStatus}
+				agentPairingStatus={agentPairingStatus}
+				agentModeStatus={agentModeStatus}
+			/>
+
 			<AccountAgentPairingSection
 				usesBroker={usesBroker}
 				agentHealthy={agentPairing.agentHealthy}
@@ -110,9 +164,7 @@ export default function AccountSettings() {
 				agentVerificationCooldownSeconds={
 					agentPairing.agentVerificationCooldownSeconds
 				}
-				lastAgentVerificationAction={
-					agentPairing.lastAgentVerificationAction
-				}
+				lastAgentVerificationAction={agentPairing.lastAgentVerificationAction}
 				onAgentPairingCodeChange={agentPairing.setAgentPairingCode}
 				onPairAgent={agentPairing.pairAgent}
 				onUnpairAgent={agentPairing.unpairAgent}

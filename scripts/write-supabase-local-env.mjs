@@ -7,7 +7,10 @@ import {
 	readSetting,
 	writeEnvEntries,
 } from "./lib/env-files.mjs";
-import { runSupabaseSync } from "./lib/supabase-cli.mjs";
+import {
+	runSupabaseStartWithRetry,
+	runSupabaseSync,
+} from "./lib/supabase-cli.mjs";
 import {
 	ACTIVE_LOCAL_SUPABASE_KEYS,
 	LOCAL_SUPABASE_SMTP_KEYS,
@@ -48,7 +51,47 @@ function readRequiredValue(envMap, keys) {
 	return "";
 }
 
-function readLocalStatusEnv() {
+function writeSupabaseCommandOutput(result) {
+	const stdout = String(result?.stdout || "");
+	const stderr = String(result?.stderr || "");
+	if (stdout) {
+		process.stdout.write(stdout);
+	}
+	if (stderr) {
+		process.stderr.write(stderr);
+	}
+}
+
+async function startLocalSupabase() {
+	const { result } = await runSupabaseStartWithRetry(
+		() => {
+			const startResult = runSupabaseSync(["start"], {
+				cwd: repoRoot,
+				encoding: "utf8",
+				stdio: "pipe",
+				maxBuffer: 10 * 1024 * 1024,
+			});
+			writeSupabaseCommandOutput(startResult);
+			return startResult;
+		},
+		{
+			delayMs: 4000,
+			onRetry: ({ nextAttempt, maxAttempts, outputText }) => {
+				const retryReason = /Conflict\./i.test(outputText)
+					? "Docker container name conflict"
+					: "transient Supabase startup failure";
+				console.warn(
+					`supabase:env:local: ${retryReason} detected. Retrying local Supabase start (${nextAttempt}/${maxAttempts}) in 4s.`,
+				);
+			},
+		},
+	);
+	if (result?.status !== 0) {
+		process.exit(result?.status || 1);
+	}
+}
+
+async function readLocalStatusEnv() {
 	let wasRunning = false;
 	let startedNow = false;
 	let statusResult = runSupabaseSync(["status", "-o", "env"], {
@@ -63,14 +106,7 @@ function readLocalStatusEnv() {
 		console.log(
 			"supabase:env:local: local Supabase is not running; starting it now.",
 		);
-		const startResult = runSupabaseSync(["start"], {
-			cwd: repoRoot,
-			encoding: "utf8",
-			stdio: "inherit",
-		});
-		if (startResult.status !== 0) {
-			process.exit(startResult.status || 1);
-		}
+		await startLocalSupabase();
 		startedNow = true;
 		statusResult = runSupabaseSync(["status", "-o", "env"], {
 			cwd: repoRoot,
@@ -102,7 +138,7 @@ function readLocalStatusEnv() {
 
 const mergedRepoEnv = loadRepoEnv(repoRoot);
 const existingLocalEnv = readEnvFile(localEnvPath);
-const statusState = readLocalStatusEnv();
+const statusState = await readLocalStatusEnv();
 const statusEnv = statusState.statusEnv;
 const apiUrl = readRequiredValue(statusEnv, ["API_URL", "SUPABASE_URL"]);
 const anonKey = readRequiredValue(statusEnv, ["ANON_KEY", "SUPABASE_ANON_KEY"]);
@@ -187,14 +223,7 @@ if (
 	if (stopResult.status !== 0) {
 		process.exit(stopResult.status || 1);
 	}
-	const startResult = runSupabaseSync(["start"], {
-		cwd: repoRoot,
-		encoding: "utf8",
-		stdio: "inherit",
-	});
-	if (startResult.status !== 0) {
-		process.exit(startResult.status || 1);
-	}
+	await startLocalSupabase();
 }
 
 console.log(

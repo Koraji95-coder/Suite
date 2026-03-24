@@ -1,26 +1,65 @@
-.libraryGrid {
+.root {
+	display: grid;
+	gap: 1rem;
+}
+
+.bandSummary {
+	margin: 0;
+	max-width: 42rem;
+	font-size: 0.85rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}
+
+.bandStats {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.65rem;
+}
+
+.bandStat {
+	display: grid;
+	gap: 0.16rem;
+	min-width: 7rem;
+	padding: 0.7rem 0.82rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	background: color-mix(in srgb, var(--surface-elevated) 84%, transparent);
+}
+
+.bandStat strong {
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.bandStat span {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+
+.featuredGrid {
 	display: grid;
 	gap: 0.8rem;
 }
 
+.featuredCard,
 .libraryCard {
 	display: grid;
 	gap: 0.5rem;
-	border: 1px solid var(--line-soft);
-	border-radius: var(--radius-3);
-	padding: 1rem;
-	background:
-		linear-gradient(
-			185deg,
-			color-mix(in srgb, var(--surface) 90%, transparent),
-			color-mix(in srgb, var(--surface-2) 72%, transparent)
-		),
-		var(--surface);
+}
+
+.featuredLabel {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: color-mix(in srgb, var(--accent) 82%, white 18%);
 }
 
 .libraryTitle {
 	margin: 0;
-	font-size: 0.9rem;
+	font-size: 1rem;
 	font-weight: 700;
 	color: var(--text);
 }
@@ -54,12 +93,65 @@
 	border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
 }
 
-.sectionList {
+.referenceStrip {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+	gap: 0.7rem;
+}
+
+.referencePill {
+	display: grid;
+	gap: 0.2rem;
+	padding: 0.78rem 0.86rem;
+	border: 1px solid var(--line-soft);
+	border-radius: var(--radius-3);
+	background: color-mix(in srgb, var(--suite-surface-overlay) 82%, transparent);
+}
+
+.referencePill strong {
+	font-size: 0.78rem;
+	color: var(--text);
+}
+
+.referencePill span {
+	font-size: 0.72rem;
+	line-height: 1.4;
+	color: var(--text-muted);
+}
+
+.sectionEyebrow {
+	margin: 0 0 0.38rem;
+	font-size: 0.66rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.sectionTitle {
 	margin: 0;
+	font-size: 0.95rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.sectionDescription {
+	margin: 0.45rem 0 0;
+	font-size: 0.8rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}
+
+.sectionList {
+	margin: 0.9rem 0 0;
 	padding-left: 1.15rem;
 	font-size: 0.88rem;
 	line-height: 1.45;
 	color: var(--text-muted);
+}
+
+.sectionCard {
+	min-height: 100%;
 }
 
 .sectionList li + li {
@@ -67,7 +159,20 @@
 }
 
 @media (min-width: 48rem) {
-	.libraryGrid {
+	.featuredGrid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.sectionGrid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1rem;
+		align-items: start;
+	}
+}
+
+@media (min-width: 72rem) {
+	.sectionGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 }

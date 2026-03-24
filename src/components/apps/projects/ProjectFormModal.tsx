@@ -1,4 +1,21 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { useState } from "react";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "@/components/apps/ui/Popover";
+import { Button } from "@/components/primitives/Button";
+import { cn } from "@/lib/utils";
+import { Calendar } from "../calendar/Calendar";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "../ui/dialog";
 import styles from "./ProjectManagerFormModal.module.css";
 import {
 	PROJECT_CATEGORIES,
@@ -6,7 +23,6 @@ import {
 	ProjectFormData,
 	type ProjectStatus,
 } from "./projectmanagertypes";
-import { normalizeProjectCategory } from "./projectmanagerutils";
 
 interface ProjectFormModalProps {
 	isOpen: boolean;
@@ -15,6 +31,16 @@ interface ProjectFormModalProps {
 	formData: ProjectFormData;
 	setFormData: (data: ProjectFormData) => void;
 	isEditing: boolean;
+	onBrowseRootPath: () => Promise<void>;
+	isBrowsingRootPath: boolean;
+}
+
+function parseDeadlineDate(value: string) {
+	const source = String(value || "").trim();
+	if (!source) return null;
+	const normalized = source.includes("T") ? source : `${source}T12:00:00`;
+	const parsed = new Date(normalized);
+	return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 export function ProjectFormModal({
@@ -24,13 +50,16 @@ export function ProjectFormModal({
 	formData,
 	setFormData,
 	isEditing,
+	onBrowseRootPath,
+	isBrowsingRootPath,
 }: ProjectFormModalProps) {
+	const [deadlineOpen, setDeadlineOpen] = useState(false);
 	const safeCategory = PROJECT_CATEGORIES.some(
 		(category) => category.key === formData.category,
 	)
 		? formData.category
 		: "Other";
-	const categoryTone = normalizeProjectCategory(formData.category || null);
+	const deadlineDate = parseDeadlineDate(formData.deadline);
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -40,10 +69,10 @@ export function ProjectFormModal({
 					<DialogTitle className={styles.title}>
 						{isEditing ? "Edit Project" : "Create New Project"}
 					</DialogTitle>
-					<p className={styles.subcopy}>
+					<DialogDescription className={styles.subcopy}>
 						Define the workspace metadata, timeline, and operating category used
 						by the project command center.
-					</p>
+					</DialogDescription>
 				</DialogHeader>
 				<div className={styles.fields}>
 					<div>
@@ -78,39 +107,84 @@ export function ProjectFormModal({
 						/>
 					</div>
 					<div>
-						<label className={styles.label} htmlFor="project-form-watchdog-root">
+						<label
+							className={styles.label}
+							htmlFor="project-form-watchdog-root"
+						>
 							Project root folder
 						</label>
-						<input
-							id="project-form-watchdog-root"
-							name="project_form_watchdog_root"
-							type="text"
-							value={formData.watchdogRootPath}
-							onChange={(e) =>
-								setFormData({
-									...formData,
-									watchdogRootPath: e.target.value,
-								})
-							}
-							className={styles.input}
-							placeholder="G:\\Company\\Projects\\Alpha"
-						/>
+						<div className={styles.rootPathRow}>
+							<input
+								id="project-form-watchdog-root"
+								name="project_form_watchdog_root"
+								type="text"
+								value={formData.watchdogRootPath}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										watchdogRootPath: e.target.value,
+									})
+								}
+								className={styles.input}
+								placeholder="G:\\Company\\Projects\\Alpha"
+							/>
+							<button
+								type="button"
+								onClick={() => void onBrowseRootPath()}
+								className={styles.browseButton}
+								disabled={isBrowsingRootPath}
+							>
+								{isBrowsingRootPath ? "Browsing..." : "Browse"}
+							</button>
+						</div>
 					</div>
 					<div className={styles.gridTwo}>
 						<div>
 							<label className={styles.label} htmlFor="project-form-deadline">
 								Deadline
 							</label>
-							<input
-								id="project-form-deadline"
-								name="project_form_deadline"
-								type="date"
-								value={formData.deadline ? formData.deadline.split("T")[0] : ""}
-								onChange={(e) =>
-									setFormData({ ...formData, deadline: e.target.value })
-								}
-								className={styles.input}
-							/>
+							<Popover open={deadlineOpen} onOpenChange={setDeadlineOpen}>
+								<PopoverTrigger asChild>
+									<Button
+										id="project-form-deadline"
+										type="button"
+										variant="outline"
+										className={cn(
+											styles.dateTrigger,
+											!deadlineDate && styles.mutedText,
+										)}
+									>
+										<span
+											className={cn(
+												styles.dateLabel,
+												!deadlineDate && styles.mutedText,
+											)}
+										>
+											{deadlineDate
+												? format(deadlineDate, "PPP")
+												: "Select deadline"}
+										</span>
+										<CalendarIcon
+											className={styles.calendarIcon}
+											aria-hidden="true"
+										/>
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent className={styles.popoverContent} align="start">
+									<Calendar
+										mode="single"
+										selected={deadlineDate ?? undefined}
+										defaultMonth={deadlineDate ?? new Date()}
+										onSelect={(date) => {
+											setFormData({
+												...formData,
+												deadline: date ? format(date, "yyyy-MM-dd") : "",
+											});
+											setDeadlineOpen(false);
+										}}
+									/>
+								</PopoverContent>
+							</Popover>
 						</div>
 						<div>
 							<label className={styles.label} htmlFor="project-form-priority">
@@ -181,35 +255,20 @@ export function ProjectFormModal({
 							</select>
 						</div>
 					</div>
-					{formData.category && (
-						<div className={styles.categoryPreview}>
-							<div
-								className={[
-									styles.colorSwatch,
-									categoryTone === "coding"
-										? styles.colorSwatchCoding
-										: categoryTone === "substation"
-											? styles.colorSwatchSubstation
-											: categoryTone === "standards"
-												? styles.colorSwatchStandards
-									: categoryTone === "school"
-										? styles.colorSwatchSchool
-										: categoryTone === "other"
-											? styles.colorSwatchOther
-											: styles.colorSwatchGeneric,
-								].join(" ")}
-							/>
-							<span className={styles.previewHint}>
-								Color auto-assigned from category
-							</span>
-						</div>
-					)}
 				</div>
 				<div className={styles.footer}>
-					<button onClick={onSubmit} className={styles.buttonPrimary}>
+					<button
+						type="button"
+						onClick={onSubmit}
+						className={styles.buttonPrimary}
+					>
 						{isEditing ? "Update Project" : "Create Project"}
 					</button>
-					<button onClick={onClose} className={styles.buttonSecondary}>
+					<button
+						type="button"
+						onClick={onClose}
+						className={styles.buttonSecondary}
+					>
 						Cancel
 					</button>
 				</div>

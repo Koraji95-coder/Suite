@@ -32,6 +32,11 @@ export interface DrawingRevisionRegisterInput {
 	title?: string;
 	revision?: string;
 	previousRevision?: string | null;
+	revisionDescription?: string;
+	revisionBy?: string;
+	revisionCheckedBy?: string;
+	revisionDate?: string | null;
+	revisionSortOrder?: number;
 	issueSummary?: string;
 	issueStatus?: DrawingRevisionIssueStatus;
 	issueSeverity?: DrawingRevisionSeverity;
@@ -154,6 +159,13 @@ function buildLocalEntry(
 		title: normalizeText(input.title),
 		revision: normalizeText(input.revision),
 		previous_revision: normalizeText(input.previousRevision) || null,
+		revision_description: normalizeText(input.revisionDescription),
+		revision_by: normalizeText(input.revisionBy),
+		revision_checked_by: normalizeText(input.revisionCheckedBy),
+		revision_date: normalizeText(input.revisionDate) || null,
+		revision_sort_order: Number.isFinite(Number(input.revisionSortOrder))
+			? Number(input.revisionSortOrder)
+			: 0,
 		issue_summary: normalizeText(input.issueSummary),
 		issue_status: normalizeIssueStatus(input.issueStatus),
 		issue_severity: normalizeSeverity(input.issueSeverity),
@@ -225,6 +237,11 @@ function buildImportDraft(
 		title: parsed.title || file.name.replace(/\.[^/.]+$/, ""),
 		revision: normalizeText(parsed.revision),
 		previousRevision: null,
+		revisionDescription: "",
+		revisionBy: "",
+		revisionCheckedBy: "",
+		revisionDate: null,
+		revisionSortOrder: 0,
 		issueSummary,
 		issueStatus: "open",
 		issueSeverity,
@@ -324,6 +341,13 @@ export const projectRevisionRegisterService = {
 			title: normalizeText(input.title),
 			revision: normalizeText(input.revision),
 			previous_revision: normalizeText(input.previousRevision) || null,
+			revision_description: normalizeText(input.revisionDescription),
+			revision_by: normalizeText(input.revisionBy),
+			revision_checked_by: normalizeText(input.revisionCheckedBy),
+			revision_date: normalizeText(input.revisionDate) || null,
+			revision_sort_order: Number.isFinite(Number(input.revisionSortOrder))
+				? Number(input.revisionSortOrder)
+				: 0,
 			issue_summary: normalizeText(input.issueSummary),
 			issue_status: normalizeIssueStatus(input.issueStatus),
 			issue_severity: normalizeSeverity(input.issueSeverity),
@@ -387,6 +411,28 @@ export const projectRevisionRegisterService = {
 								patch.previousRevision === undefined
 									? entry.previous_revision
 									: normalizeText(patch.previousRevision) || null,
+							revision_description:
+								patch.revisionDescription === undefined
+									? entry.revision_description
+									: normalizeText(patch.revisionDescription),
+							revision_by:
+								patch.revisionBy === undefined
+									? entry.revision_by
+									: normalizeText(patch.revisionBy),
+							revision_checked_by:
+								patch.revisionCheckedBy === undefined
+									? entry.revision_checked_by
+									: normalizeText(patch.revisionCheckedBy),
+							revision_date:
+								patch.revisionDate === undefined
+									? entry.revision_date
+									: normalizeText(patch.revisionDate) || null,
+							revision_sort_order:
+								patch.revisionSortOrder === undefined
+									? entry.revision_sort_order
+									: Number.isFinite(Number(patch.revisionSortOrder))
+										? Number(patch.revisionSortOrder)
+										: 0,
 							issue_summary:
 								patch.issueSummary === undefined
 									? entry.issue_summary
@@ -445,6 +491,28 @@ export const projectRevisionRegisterService = {
 				patch.previousRevision === undefined
 					? undefined
 					: normalizeText(patch.previousRevision) || null,
+			revision_description:
+				patch.revisionDescription === undefined
+					? undefined
+					: normalizeText(patch.revisionDescription),
+			revision_by:
+				patch.revisionBy === undefined
+					? undefined
+					: normalizeText(patch.revisionBy),
+			revision_checked_by:
+				patch.revisionCheckedBy === undefined
+					? undefined
+					: normalizeText(patch.revisionCheckedBy),
+			revision_date:
+				patch.revisionDate === undefined
+					? undefined
+					: normalizeText(patch.revisionDate) || null,
+			revision_sort_order:
+				patch.revisionSortOrder === undefined
+					? undefined
+					: Number.isFinite(Number(patch.revisionSortOrder))
+						? Number(patch.revisionSortOrder)
+						: 0,
 			issue_summary:
 				patch.issueSummary === undefined
 					? undefined
@@ -572,6 +640,11 @@ export const projectRevisionRegisterService = {
 			title,
 			revision: normalizeText(input.revision),
 			previousRevision: normalizeText(input.previousRevision) || null,
+			revisionDescription: "",
+			revisionBy: "",
+			revisionCheckedBy: "",
+			revisionDate: null,
+			revisionSortOrder: 0,
 			issueSummary,
 			issueStatus:
 				Number(input.accepted || 0) > 0 ? "in-review" : "open",

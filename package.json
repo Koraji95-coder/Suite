@@ -78,8 +78,8 @@
 		"format": "biome format src backend dotnet scripts",
 		"format:write": "biome format --write src backend dotnet scripts",
 		"ci:audit": "npm audit --audit-level=high",
-		"test:unit": "vitest run --exclude \"**/autodraft upgrade/**\"",
-		"test:unit:watch": "vitest --exclude \"**/autodraft upgrade/**\"",
+		"test:unit": "vitest run",
+		"test:unit:watch": "vitest",
 		"test:e2e": "playwright test",
 		"test:e2e:list": "playwright test --list",
 		"deps:python:lock": "python -m piptools compile backend/requirements-api.in --output-file backend/requirements-api.lock.txt && python -m piptools compile backend/Transmittal-Builder/requirements.in --output-file backend/Transmittal-Builder/requirements.lock.txt"

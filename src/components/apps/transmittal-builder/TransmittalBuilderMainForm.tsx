@@ -10,6 +10,7 @@ import {
 	type OptionKey,
 } from "./transmittalBuilderModels";
 import type { PeProfile } from "./transmittalConfig";
+import type { ProjectDocumentMetadataProjectOption } from "@/services/projectDocumentMetadataService";
 
 interface TransmittalBuilderMainFormProps {
 	draft: DraftState;
@@ -22,6 +23,11 @@ interface TransmittalBuilderMainFormProps {
 	pdfAnalysisLoading: boolean;
 	pdfAnalysisError: string | null;
 	pdfAnalysisWarnings: string[];
+	projectOptions: ProjectDocumentMetadataProjectOption[];
+	projectMetadataLoading: boolean;
+	projectMetadataError: string | null;
+	projectMetadataWarnings: string[];
+	projectMetadataLoadedAt: string | null;
 	isInvalid: (key: string) => boolean;
 	updateDraft: (
 		key: keyof DraftState,
@@ -30,7 +36,13 @@ interface TransmittalBuilderMainFormProps {
 	handlePeChange: (value: string) => void;
 	handleTemplateFiles: (selected: File[]) => void;
 	handleIndexFiles: (selected: File[]) => void;
+	handleAcadeReportFiles: (selected: File[]) => void;
 	handlePdfFiles: (selected: File[]) => void;
+	handleStandardDocumentSourceChange: (
+		value: DraftState["standardDocumentSource"],
+	) => void;
+	handleProjectSelectionChange: (projectId: string) => void;
+	handleLoadProjectMetadata: () => void;
 	analyzePdfFiles: () => void;
 	handleCidFiles: (selected: File[]) => void;
 	handleScanCid: () => void;
@@ -72,12 +84,21 @@ export function TransmittalBuilderMainForm({
 	pdfAnalysisLoading,
 	pdfAnalysisError,
 	pdfAnalysisWarnings,
+	projectOptions,
+	projectMetadataLoading,
+	projectMetadataError,
+	projectMetadataWarnings,
+	projectMetadataLoadedAt,
 	isInvalid,
 	updateDraft,
 	handlePeChange,
 	handleTemplateFiles,
 	handleIndexFiles,
+	handleAcadeReportFiles,
 	handlePdfFiles,
+	handleStandardDocumentSourceChange,
+	handleProjectSelectionChange,
+	handleLoadProjectMetadata,
 	analyzePdfFiles,
 	handleCidFiles,
 	handleScanCid,
@@ -100,11 +121,20 @@ export function TransmittalBuilderMainForm({
 				pdfAnalysisLoading={pdfAnalysisLoading}
 				pdfAnalysisError={pdfAnalysisError}
 				pdfAnalysisWarnings={pdfAnalysisWarnings}
+				projectOptions={projectOptions}
+				projectMetadataLoading={projectMetadataLoading}
+				projectMetadataError={projectMetadataError}
+				projectMetadataWarnings={projectMetadataWarnings}
+				projectMetadataLoadedAt={projectMetadataLoadedAt}
 				isInvalid={isInvalid}
 				updateDraft={updateDraft}
 				handleTemplateFiles={handleTemplateFiles}
 				handleIndexFiles={handleIndexFiles}
+				handleAcadeReportFiles={handleAcadeReportFiles}
 				handlePdfFiles={handlePdfFiles}
+				handleStandardDocumentSourceChange={handleStandardDocumentSourceChange}
+				handleProjectSelectionChange={handleProjectSelectionChange}
+				handleLoadProjectMetadata={handleLoadProjectMetadata}
 				handleAnalyzePdfs={analyzePdfFiles}
 				handleCidFiles={handleCidFiles}
 				handleScanCid={handleScanCid}

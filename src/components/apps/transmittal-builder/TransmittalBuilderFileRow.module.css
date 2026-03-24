@@ -36,6 +36,15 @@
 	gap: 0.5rem;
 }
 
+.pickerSurface {
+	display: grid;
+	gap: 0.7rem;
+	padding: 0.85rem 0.95rem;
+	border: 1px solid var(--border);
+	border-radius: 0.75rem;
+	background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+}
+
 .uploadHint {
 	display: flex;
 	align-items: center;
@@ -44,7 +53,32 @@
 	color: var(--text-muted);
 }
 
+.browseRow {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 0.75rem;
+	align-items: center;
+}
+
+.hiddenInput {
+	display: none;
+}
+
 .preview {
+	min-width: 0;
 	font-size: 0.75rem;
 	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+	.browseRow {
+		grid-template-columns: 1fr;
+	}
+
+	.preview {
+		white-space: normal;
+	}
 }

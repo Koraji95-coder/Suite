@@ -13,8 +13,8 @@ type MockAgentConnectionStatusState = {
 
 const mockUsesBroker = vi.hoisted(() => vi.fn<() => boolean>());
 const mockAgentRefreshNow = vi.hoisted(() => vi.fn<() => Promise<void>>());
-const mockUseAgentConnectionStatus = vi.hoisted(
-	() => vi.fn<() => MockAgentConnectionStatusState>(),
+const mockUseAgentConnectionStatus = vi.hoisted(() =>
+	vi.fn<() => MockAgentConnectionStatusState>(),
 );
 const mockPair = vi.hoisted(() => vi.fn<() => Promise<boolean>>());
 const mockUnpair = vi.hoisted(() => vi.fn<() => Promise<void>>());
@@ -118,7 +118,9 @@ vi.mock("@/services/useAgentConnectionStatus", () => ({
 
 describe("AccountSettings agent pairing", () => {
 	beforeEach(() => {
-		mockUseAgentConnectionStatus.mockReturnValue(createAgentConnectionStatusState());
+		mockUseAgentConnectionStatus.mockReturnValue(
+			createAgentConnectionStatusState(),
+		);
 		mockAgentRefreshNow.mockResolvedValue();
 		mockPair.mockResolvedValue(false);
 		mockUnpair.mockResolvedValue();
@@ -136,12 +138,10 @@ describe("AccountSettings agent pairing", () => {
 		expect(
 			screen.getByRole("button", { name: "Pair this device" }),
 		).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Resend link" })).toBeTruthy();
 		expect(
-			screen.getByRole("button", { name: "Unpair this device" }),
-		).toBeTruthy();
-		expect(
-			screen.getByRole("button", { name: "Resend verification" }),
-		).toBeTruthy();
+			screen.queryByRole("button", { name: "Unpair this device" }),
+		).toBeNull();
 		expect(screen.queryByPlaceholderText("000000")).toBeNull();
 	});
 
@@ -154,11 +154,11 @@ describe("AccountSettings agent pairing", () => {
 		);
 
 		expect(screen.getByPlaceholderText("000000")).toBeTruthy();
-		expect(screen.getByRole("button", { name: "Pair" })).toBeTruthy();
-		expect(screen.getByRole("button", { name: "Unpair" })).toBeTruthy();
 		expect(
-			screen.queryByRole("button", { name: "Resend verification" }),
-		).toBeNull();
+			screen.getByRole("button", { name: "Pair this device" }),
+		).toBeTruthy();
+		expect(screen.queryByRole("button", { name: "Unpair" })).toBeNull();
+		expect(screen.queryByRole("button", { name: "Resend link" })).toBeNull();
 	});
 
 	it("shows actionable cooldown messaging for broker 429 failures", async () => {
@@ -187,7 +187,10 @@ describe("AccountSettings agent pairing", () => {
 			).toBeTruthy();
 		});
 		expect(
-			screen.getByText(/Verification actions are cooling down|cooling down/i),
+			screen.getByText(/temporarily rate-limited by the email provider/i),
+		).toBeTruthy();
+		expect(
+			screen.getByRole("button", { name: /Pair this device \(16s\)/i }),
 		).toBeTruthy();
 	});
 });

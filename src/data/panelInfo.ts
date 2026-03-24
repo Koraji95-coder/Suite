@@ -26,8 +26,8 @@ export const dashboardInfo = {
 				"Use project deep links to move from Project Manager into the command center with the correct filters applied",
 			],
 			tips: [
-				"Use `focus=watchdog` or `focus=ledger` links when you need to land on a specific command module",
-				"Watchdog telemetry is canonical on the dashboard; project pages only show scoped summaries",
+				"Use `/app/watchdog` for the dedicated collector and drawing telemetry workspace, or `focus=ledger` when you need the dashboard to land on the work ledger module",
+				"Watchdog telemetry is canonical on the dedicated Watchdog page; project pages only show scoped summaries",
 				"Ledger entries can deep-link back into Architecture Map hotspots when deeper context is required",
 			],
 		},
@@ -75,65 +75,6 @@ export const projectsInfo = {
 				"Files are stored securely in Supabase Storage",
 				"View, download, or delete files from the Files tab",
 				"Search files by name or type using the search box",
-			],
-		},
-	],
-};
-
-export const storageInfo = {
-	title: "Storage & Database Information",
-	colorScheme: "teal" as const,
-	sections: [
-		{
-			title: "File Storage",
-			content:
-				"The Storage Manager provides access to all files across your projects. Browse files by project, search by name or type, and manage your file library in one central location.",
-		},
-		{
-			title: "Database Browser",
-			content: [
-				"View all database tables and their contents",
-				"Inspect table schemas and row counts",
-				"Browse data directly from the interface",
-				"Monitor database health and structure",
-			],
-		},
-		{
-			title: "Database Info Section",
-			content: 'Click "Database Info" to view:',
-		},
-		{
-			title: "Connection Details",
-			content: [
-				"Supabase connection status and configuration",
-				"Environment variables (pre-configured automatically)",
-				"Database URL and API keys status",
-			],
-		},
-		{
-			title: "Schema Information",
-			content: [
-				"Core Tables: projects, tasks, files, calendar_events, activity_log",
-				"Engineering Tables: formulas, saved_calculations, saved_circuits",
-				"Enhanced Tables: whiteboards, ai_conversations, ai_memory, block_library, automation_workflows, drawing_annotations, user_preferences",
-			],
-		},
-		{
-			title: "How to Update Database",
-			content: [
-				"All database changes are done through migrations",
-				"Primary local migration chain lives in supabase/migrations/",
-				"Each migration has a timestamp and descriptive name",
-				"Hosted SQL Editor fallback copies remain under supabase/ and backend/supabase/",
-				"Migrations run automatically and maintain history",
-				"Row Level Security (RLS) protects all user data",
-			],
-			tips: [
-				"Never commit database credentials to version control",
-				"Always use migrations for schema changes",
-				"Test RLS policies before deploying to production",
-				"Keep regular backups of important data",
-				"Use Database Info to understand table structure",
 			],
 		},
 	],

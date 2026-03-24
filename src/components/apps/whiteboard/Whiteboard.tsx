@@ -5,6 +5,7 @@ import { useAuth } from "@/auth/useAuth";
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
@@ -187,6 +188,12 @@ export function Whiteboard({
 		<>
 			<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
 				<DialogContent className={styles.dialogContent} showCloseButton={false}>
+					<DialogHeader className="sr-only">
+						<DialogTitle>Whiteboard for {panelContext}</DialogTitle>
+						<DialogDescription>
+							Draw, annotate, save, or export notes for the current panel.
+						</DialogDescription>
+					</DialogHeader>
 					<div className={styles.root}>
 						{/* Header */}
 						<div className={styles.header}>
@@ -198,17 +205,27 @@ export function Whiteboard({
 							</div>
 							<div className={styles.headerActions}>
 								<button
+									type="button"
 									onClick={() => setShowSaveDialog(true)}
 									className={styles.actionButton}
 								>
 									<Save className={styles.actionIcon} />
 									{isSaving ? "Saving…" : "Save"}
 								</button>
-								<button onClick={exportAsImage} className={styles.actionButton}>
+								<button
+									type="button"
+									onClick={exportAsImage}
+									className={styles.actionButton}
+								>
 									<Download className={styles.actionIcon} />
 									Export
 								</button>
-								<button onClick={onClose} className={styles.closeButton}>
+								<button
+									type="button"
+									onClick={onClose}
+									className={styles.closeButton}
+									aria-label="Close whiteboard"
+								>
 									<X className={styles.closeIcon} />
 								</button>
 							</div>
@@ -260,6 +277,9 @@ export function Whiteboard({
 				<DialogContent className={styles.confirmDialogContent}>
 					<DialogHeader>
 						<DialogTitle>Clear whiteboard?</DialogTitle>
+						<DialogDescription className="sr-only">
+							Remove every stroke and shape from the current whiteboard.
+						</DialogDescription>
 					</DialogHeader>
 					<p className={styles.dialogText}>
 						This will remove all strokes and cannot be undone.
@@ -291,23 +311,27 @@ export function Whiteboard({
 					}
 				}}
 			>
-					<DialogContent className={styles.textDialogContent}>
-						<DialogHeader>
-							<DialogTitle>Add Text</DialogTitle>
-						</DialogHeader>
-						<input
-							id="whiteboard-text-input"
-							name="whiteboard_text"
-							aria-label="Whiteboard text"
-							type="text"
-							value={textValue}
-							onChange={(e) => setTextValue(e.target.value)}
+				<DialogContent className={styles.textDialogContent}>
+					<DialogHeader>
+						<DialogTitle>Add Text</DialogTitle>
+						<DialogDescription className="sr-only">
+							Enter text to place on the whiteboard at the selected position.
+						</DialogDescription>
+					</DialogHeader>
+					<input
+						id="whiteboard-text-input"
+						name="whiteboard_text"
+						aria-label="Whiteboard text"
+						type="text"
+						value={textValue}
+						onChange={(e) => setTextValue(e.target.value)}
 						className={styles.textInput}
 						placeholder="Enter text"
 						autoFocus
 					/>
 					<DialogFooter className={styles.dialogFooter}>
 						<button
+							type="button"
 							onClick={() => {
 								setShowTextDialog(false);
 								setTextPosition(null);
@@ -317,7 +341,11 @@ export function Whiteboard({
 						>
 							Cancel
 						</button>
-						<button onClick={confirmAddText} className={styles.primaryButton}>
+						<button
+							type="button"
+							onClick={confirmAddText}
+							className={styles.primaryButton}
+						>
 							Add Text
 						</button>
 					</DialogFooter>

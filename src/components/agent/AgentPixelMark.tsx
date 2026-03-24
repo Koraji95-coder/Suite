@@ -1,7 +1,7 @@
 // src/components/agent/AgentPixelMark.tsx
 import {
-	memo,
 	type CSSProperties,
+	memo,
 	type ReactElement,
 	useEffect,
 	useId,
@@ -18,8 +18,8 @@ import {
 	type CrestVectorElement,
 } from "./agentCrestDefinitions";
 import type { MarkExpression } from "./agentMarkPatterns";
-import type { AgentProfileId } from "./agentProfiles";
 import { type AgentMarkState, mapLegacyMarkState } from "./agentMarkState";
+import type { AgentProfileId } from "./agentProfiles";
 
 interface AgentPixelMarkProps {
 	profileId: AgentProfileId;
@@ -129,7 +129,10 @@ function AgentPixelMarkInner({
 }: AgentPixelMarkProps) {
 	const crest = CREST_VARIANTS[profileId];
 	const gradientId = useId();
-	const safeGradientId = useMemo(() => gradientId.replace(/[:]/g, ""), [gradientId]);
+	const safeGradientId = useMemo(
+		() => gradientId.replace(/[:]/g, ""),
+		[gradientId],
+	);
 	const [frameIndex, setFrameIndex] = useState(0);
 	const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
@@ -146,9 +149,9 @@ function AgentPixelMarkInner({
 		};
 	}, []);
 
-	const reducedMotion =
-		motionPreset === "reduced" || prefersReducedMotion;
-	const effectiveState = state ?? mapLegacyMarkState({ expression, pulse, breathe });
+	const reducedMotion = motionPreset === "reduced" || prefersReducedMotion;
+	const effectiveState =
+		state ?? mapLegacyMarkState({ expression, pulse, breathe });
 
 	const framesForState = CREST_STATE_PHASES[effectiveState] ?? [0];
 
@@ -156,9 +159,7 @@ function AgentPixelMarkInner({
 		framesForState.length > 0 ? frameIndex % framesForState.length : 0;
 	const phaseStep = framesForState[normalizedFrameIndex] ?? 0;
 	const phaseRatio =
-		framesForState.length > 1
-			? phaseStep / (framesForState.length - 1)
-			: 0;
+		framesForState.length > 1 ? phaseStep / (framesForState.length - 1) : 0;
 	const effectiveDetail = resolveDetailLevel(size, detailLevel);
 
 	const cadenceMs = useMemo(() => {
@@ -197,8 +198,9 @@ function AgentPixelMarkInner({
 		switch (effectiveState) {
 			case "error":
 				return "var(--danger)";
-			case "warning":
 			case "waiting":
+				return "var(--info)";
+			case "warning":
 				return "var(--warning)";
 			case "success":
 				return "var(--success)";
@@ -239,7 +241,8 @@ function AgentPixelMarkInner({
 			effectiveState === "warning");
 	const showBreathe =
 		!reducedMotion && size >= 40 && (breathe || effectiveState === "focus");
-	const showStateSweep = size >= 26 && effectiveState !== "idle";
+	const showStateSweep =
+		size >= 26 && effectiveState !== "idle" && effectiveState !== "waiting";
 	const motionMode = reducedMotion ? "reduced" : "balanced";
 	const symbolElements =
 		effectiveDetail === "micro" ? crest.microSymbol : crest.symbol;
@@ -284,11 +287,22 @@ function AgentPixelMarkInner({
 					data-agent-vector="true"
 				>
 					<defs>
-						<linearGradient id={`agent-shell-${safeGradientId}`} x1="20%" y1="8%" x2="82%" y2="88%">
+						<linearGradient
+							id={`agent-shell-${safeGradientId}`}
+							x1="20%"
+							y1="8%"
+							x2="82%"
+							y2="88%"
+						>
 							<stop offset="0%" stopColor="var(--crest-shell)" />
 							<stop offset="100%" stopColor="var(--crest-shell-deep)" />
 						</linearGradient>
-						<radialGradient id={`agent-core-${safeGradientId}`} cx="42%" cy="24%" r="80%">
+						<radialGradient
+							id={`agent-core-${safeGradientId}`}
+							cx="42%"
+							cy="24%"
+							r="80%"
+						>
 							<stop
 								offset="0%"
 								stopColor="color-mix(in srgb, var(--crest-core) 88%, white 12%)"

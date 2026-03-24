@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import os
 import socket
+import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Callable, Dict, Mapping, Optional
 
 from .filesystem_collector import FilesystemCollectorStateStore, WatchdogCollectorApiClient
 
@@ -314,12 +315,16 @@ class AutoCadStateCollector:
         api_client: WatchdogCollectorApiClient | None = None,
         state_store: FilesystemCollectorStateStore | None = None,
         time_module: Any = time,
+        autocad_process_checker: Callable[[], bool | None] | None = None,
     ) -> None:
         self.config = config
         self.api_client = api_client or WatchdogCollectorApiClient(config)
         self.state_store = state_store or FilesystemCollectorStateStore(config.state_path)
         self.time = time_module
         self._registration_verified = False
+        self._autocad_process_checker = (
+            autocad_process_checker or self._default_autocad_process_checker
+        )
 
     def _next_sequence(self, state: Dict[str, Any]) -> int:
         sequence = max(1, int(state.get("nextSequence") or 1))
@@ -372,6 +377,120 @@ class AutoCadStateCollector:
         if not isinstance(parsed, dict):
             raise RuntimeError("AutoCAD tracker state must be a JSON object")
         return parsed
+
+    def _default_autocad_process_checker(self) -> bool | None:
+        if os.name != "nt":
+            return None
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq acad.exe", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="ignore",
+                check=False,
+                timeout=5,
+            )
+        except Exception:
+            return None
+
+        output = str(result.stdout or "").strip()
+        if not output:
+            return False
+        normalized = output.lower()
+        if "no tasks are running" in normalized:
+            return False
+        return "acad.exe" in normalized
+
+    def _mark_source_unavailable(
+        self,
+        *,
+        state: Dict[str, Any],
+        previous_snapshot: Mapping[str, Any],
+        now_ms: int,
+        reason: str,
+    ) -> Dict[str, Any]:
+        pending = list(state.get("pendingEvents") or [])
+        queued_now = 0
+        previous_session_id = _optional_text(previous_snapshot.get("currentSessionId"))
+        previous_drawing_path = _optional_text(previous_snapshot.get("activeDrawingPath"))
+        previous_drawing_name = _optional_text(previous_snapshot.get("activeDrawingName")) or _optional_text(
+            previous_snapshot.get("activeDrawing")
+        )
+        previous_tracked_ms = int(previous_snapshot.get("currentSessionTrackedMs") or 0)
+        previous_idle_ms = int(previous_snapshot.get("currentSessionIdleMs") or 0)
+        previous_command_count = int(previous_snapshot.get("currentSessionCommandCount") or 0)
+        previous_started_at = _optional_text(previous_snapshot.get("currentSessionStartedAt"))
+        previous_last_updated = int(previous_snapshot.get("lastUpdated") or 0)
+        previous_source_available = bool(previous_snapshot.get("sourceAvailable"))
+
+        if previous_source_available and previous_session_id and previous_drawing_path:
+            closed_timestamp = max(now_ms, previous_last_updated or 0)
+            sequence = self._next_sequence(state)
+            ended_at = datetime.fromtimestamp(
+                closed_timestamp / 1000,
+                tz=timezone.utc,
+            ).isoformat()
+            work_date = None
+            if previous_started_at and "T" in previous_started_at:
+                work_date = previous_started_at.split("T", 1)[0].strip() or None
+            pending.append(
+                {
+                    "sequence": sequence,
+                    "sourceEventId": sequence,
+                    "eventKey": self._build_event_key(
+                        "drawing_closed",
+                        previous_drawing_path,
+                        previous_session_id,
+                        closed_timestamp,
+                    ),
+                    "eventType": "drawing_closed",
+                    "sourceType": "autocad",
+                    "timestamp": closed_timestamp,
+                    "drawingPath": previous_drawing_path,
+                    "sessionId": previous_session_id,
+                    "durationMs": previous_tracked_ms,
+                    "metadata": {
+                        "drawingName": previous_drawing_name,
+                        "trackedMs": previous_tracked_ms,
+                        "idleMs": previous_idle_ms,
+                        "activeSeconds": round(previous_tracked_ms / 1000, 3),
+                        "idleSeconds": round(previous_idle_ms / 1000, 3),
+                        "commandCount": previous_command_count,
+                        "segmentStartedAt": previous_started_at,
+                        "segmentEndedAt": ended_at,
+                        "workDate": work_date,
+                        "syncMode": "hybrid-state",
+                        "sourceUnavailableReason": reason,
+                    },
+                }
+            )
+            queued_now += 1
+
+        state["pendingEvents"] = pending
+        state["snapshot"] = {
+            **previous_snapshot,
+            "sourceAvailable": False,
+            "sourceUnavailableReason": reason,
+            "activeDrawing": None,
+            "activeDrawingPath": None,
+            "activeDrawingName": None,
+            "currentSessionId": None,
+            "currentSessionStartedAt": None,
+            "currentSessionTrackedMs": 0,
+            "currentSessionIdleMs": 0,
+            "currentSessionCommandCount": 0,
+            "isPaused": False,
+            "lastCheckedAt": now_ms,
+        }
+        self.state_store.save(state)
+        return {
+            "queued": queued_now,
+            "sourceAvailable": False,
+            "trackerUpdatedAt": previous_last_updated,
+            "statePath": str(self.config.state_json_path),
+            "reason": reason,
+        }
 
     def _normalize_command_events(
         self,
@@ -434,25 +553,28 @@ class AutoCadStateCollector:
     def scan_once(self) -> Dict[str, Any]:
         state = self.state_store.load()
         previous_snapshot = dict(state.get("snapshot") or {})
-        pending = list(state.get("pendingEvents") or [])
         now_ms = int(self.time.time() * 1000)
+        autocad_process_running = self._autocad_process_checker()
 
         tracker_state = self._load_tracker_state()
         if tracker_state is None:
-            state["snapshot"] = {
-                **previous_snapshot,
-                "sourceAvailable": False,
-                "lastCheckedAt": now_ms,
-            }
-            self.state_store.save(state)
-            return {
-                "queued": 0,
-                "sourceAvailable": False,
-                "trackerUpdatedAt": 0,
-                "statePath": str(self.config.state_json_path),
-            }
+            return self._mark_source_unavailable(
+                state=state,
+                previous_snapshot=previous_snapshot,
+                now_ms=now_ms,
+                reason="tracker_state_missing",
+            )
+
+        if autocad_process_running is False:
+            return self._mark_source_unavailable(
+                state=state,
+                previous_snapshot=previous_snapshot,
+                now_ms=now_ms,
+                reason="autocad_process_not_running",
+            )
 
         metadata_snapshot = _metadata_from_tracker_state(tracker_state)
+        pending = list(state.get("pendingEvents") or [])
         current_session = tracker_state.get("currentSession")
         current_session_key = _session_key(current_session if isinstance(current_session, Mapping) else None)
         drawing_path = _optional_text(

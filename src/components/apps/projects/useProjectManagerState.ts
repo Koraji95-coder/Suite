@@ -10,15 +10,17 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/logger";
 import { logActivity } from "@/services/activityService";
+import { syncSharedProjectWatchdogRulesToLocalRuntime } from "@/services/projectWatchdogService";
+import { watchdogService } from "@/services/watchdogService";
 import {
 	loadSetting,
 	migrateFromLocalStorage,
 	saveSetting,
 } from "@/settings/userSettings";
-import { syncSharedProjectWatchdogRulesToLocalRuntime } from "@/services/projectWatchdogService";
 import { triggerAutoBackup } from "@/supabase/backupManager";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
+import { deriveProjectManagerSummary } from "./projectManagerSelectors";
 import {
 	type CalendarEvent,
 	type Project,
@@ -27,7 +29,6 @@ import {
 	type Task,
 	type TaskCount,
 } from "./projectmanagertypes";
-import { deriveProjectManagerSummary } from "./projectManagerSelectors";
 import { categoryColor, toDateOnly } from "./projectmanagerutils";
 import { useProjectManagerUiState } from "./useProjectManagerUiState";
 
@@ -107,11 +108,15 @@ export function useProjectManagerState({
 	const [projectTaskCounts, setProjectTaskCounts] = useState<
 		Map<string, TaskCount>
 	>(new Map());
+	const [isPickingProjectRoot, setIsPickingProjectRoot] = useState(false);
 
-	const normalizeWatchdogRootPath = useCallback((value: string): string | null => {
-		const trimmed = value.trim();
-		return trimmed ? trimmed : null;
-	}, []);
+	const normalizeWatchdogRootPath = useCallback(
+		(value: string): string | null => {
+			const trimmed = value.trim();
+			return trimmed ? trimmed : null;
+		},
+		[],
+	);
 
 	const syncWatchdogRulesAfterProjectMutation = useCallback(async () => {
 		try {
@@ -967,6 +972,36 @@ export function useProjectManagerState({
 		}
 	};
 
+	const pickProjectRootPath = useCallback(async () => {
+		if (isPickingProjectRoot) return;
+		setIsPickingProjectRoot(true);
+		try {
+			const result = await watchdogService.pickRoot(
+				projectForm.watchdogRootPath || null,
+			);
+			if (result.cancelled || !result.path) {
+				return;
+			}
+			setProjectForm((current) => ({
+				...current,
+				watchdogRootPath: result.path || "",
+			}));
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Unable to browse for a project root folder.";
+			showToast("error", message);
+		} finally {
+			setIsPickingProjectRoot(false);
+		}
+	}, [
+		isPickingProjectRoot,
+		projectForm.watchdogRootPath,
+		setProjectForm,
+		showToast,
+	]);
+
 	const toggleTaskExpansion = async (taskId: string) => {
 		const newExpanded = new Set(expandedTasks);
 		if (newExpanded.has(taskId)) {
@@ -1079,6 +1114,8 @@ export function useProjectManagerState({
 		handleDragEnd,
 		handleFileUpload,
 		downloadFile,
+		pickProjectRootPath,
+		isPickingProjectRoot,
 		updateProjectWatchdogRootPath,
 		resetProjectForm,
 		resetTaskForm,

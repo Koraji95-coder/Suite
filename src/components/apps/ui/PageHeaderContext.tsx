@@ -3,6 +3,7 @@ import {
 	createContext,
 	useCallback,
 	useContext,
+	useEffect,
 	useMemo,
 	useState,
 } from "react";
@@ -11,6 +12,7 @@ export type PageHeaderConfig = {
 	title?: string;
 	subtitle?: string;
 	icon?: ReactNode;
+	// Legacy compatibility slot. The shell no longer renders this in the top rail.
 	centerContent?: ReactNode;
 };
 
@@ -59,4 +61,27 @@ export function PageHeaderProvider({ children }: { children: ReactNode }) {
 
 export function usePageHeader() {
 	return useContext(PageHeaderContext);
+}
+
+export function useRegisterPageHeader(config: PageHeaderConfig) {
+	const { setHeader, clearHeader } = usePageHeader();
+	const { title, subtitle, icon, centerContent } = config;
+
+	useEffect(() => {
+		if (!title && !subtitle && !icon && !centerContent) {
+			clearHeader();
+			return;
+		}
+
+		setHeader({
+			title,
+			subtitle,
+			icon,
+			centerContent,
+		});
+
+		return () => {
+			clearHeader();
+		};
+	}, [centerContent, clearHeader, icon, setHeader, subtitle, title]);
 }

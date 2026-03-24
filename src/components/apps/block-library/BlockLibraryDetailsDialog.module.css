@@ -20,6 +20,12 @@
 	min-width: 0;
 }
 
+.description {
+	margin-top: 0.25rem;
+	font-size: 0.8rem;
+	color: var(--text-muted);
+}
+
 .title {
 	margin: 0;
 	font-size: 1.25rem;

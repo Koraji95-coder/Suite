@@ -35,6 +35,7 @@ interface TransmittalBuilderRightRailProps {
 		template: string;
 		index: string;
 		documents: string;
+		report: string;
 	};
 	optionSummary: Array<{
 		label: string;
@@ -43,6 +44,7 @@ interface TransmittalBuilderRightRailProps {
 	lastSavedAt: Date | null;
 	submitAttempted: boolean;
 	validationErrors: string[];
+	projectMetadataLoadedAt: string | null;
 }
 
 export function TransmittalBuilderRightRail({
@@ -59,6 +61,7 @@ export function TransmittalBuilderRightRail({
 	lastSavedAt,
 	submitAttempted,
 	validationErrors,
+	projectMetadataLoadedAt,
 }: TransmittalBuilderRightRailProps) {
 	return (
 		<div className={styles.root}>
@@ -199,6 +202,19 @@ export function TransmittalBuilderRightRail({
 						<div className={styles.muted}>
 							Index: {fileSummary.index} | {fileSummary.documents}
 						</div>
+						{draft.transmittalType === "standard" ? (
+							<div className={styles.muted}>ACADE report: {fileSummary.report}</div>
+						) : null}
+						{draft.transmittalType === "standard" ? (
+							<div className={styles.muted}>
+								Metadata:{" "}
+								{draft.standardDocumentSource === "project_metadata"
+									? projectMetadataLoadedAt
+										? `Project metadata (${new Date(projectMetadataLoadedAt).toLocaleString()})`
+										: "Project metadata"
+									: "PDF OCR / manual review"}
+							</div>
+						) : null}
 					</div>
 
 					<div>

@@ -1,5 +1,11 @@
 import type { FormEvent } from "react";
-import { Dialog, DialogContent } from "@/components/apps/ui/dialog";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import styles from "./StandardsDrawingDialogs.module.css";
 
 interface StandardsDrawingUploadDialogProps {
@@ -26,7 +32,12 @@ export function StandardsDrawingUploadDialog({
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className={styles.dialogShell}>
-				<h3 className={styles.title}>Check Drawing</h3>
+				<DialogHeader>
+					<DialogTitle className={styles.title}>Check Drawing</DialogTitle>
+					<DialogDescription className={styles.subtitle}>
+						Run the enabled standards rules against a named drawing snapshot.
+					</DialogDescription>
+				</DialogHeader>
 				{checkingDrawing ? (
 					<div className={styles.loadingBox}>
 						<p>Running standards checks...</p>
@@ -35,7 +46,10 @@ export function StandardsDrawingUploadDialog({
 				) : (
 					<form onSubmit={onSubmit} className={styles.form}>
 						<div>
-							<label className={styles.fieldLabel} htmlFor="standards-drawing-name">
+							<label
+								className={styles.fieldLabel}
+								htmlFor="standards-drawing-name"
+							>
 								Drawing Name *
 							</label>
 							<input

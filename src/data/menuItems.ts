@@ -15,7 +15,6 @@ import {
 	FlaskConical,
 	FolderOpen,
 	GitBranch,
-	HardDrive,
 	LayoutDashboard,
 	Settings,
 	Waves,
@@ -61,7 +60,6 @@ export const menuSections: MenuSection[] = [
 				label: "Project Manager",
 				color: "cyan",
 			},
-			{ id: "storage", icon: HardDrive, label: "Storage", color: "cyan" },
 		],
 	},
 	{
@@ -145,7 +143,6 @@ export const menuSections: MenuSection[] = [
 export const sidebarNavItems: SidebarNavItem[] = [
 	{ id: "dashboard", icon: LayoutDashboard, label: "Dashboard", color: "cyan" },
 	{ id: "projects", icon: FolderOpen, label: "Projects", color: "cyan" },
-	{ id: "storage", icon: HardDrive, label: "Storage", color: "cyan" },
 	{ id: "calendar", icon: CalendarDays, label: "Calendar", color: "cyan" },
 	{ divider: true },
 	{ id: "appshub", icon: AppWindow, label: "Apps", color: "teal" },

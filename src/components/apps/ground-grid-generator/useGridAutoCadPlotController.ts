@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { coordinatesGrabberService } from "./coordinatesGrabberService";
+import { coordinatesGrabberService } from "../cad-runtime/coordinatesGrabberService";
 import { computeGridMaxY } from "./gridEngine";
 import { dataSignature } from "./gridGeneratorStateShared";
 import type { GridConductor, GridConfig, GridPlacement, GridRod } from "./types";

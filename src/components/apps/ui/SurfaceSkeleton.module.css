@@ -1,0 +1,91 @@
+.surface {
+	position: relative;
+	overflow: hidden;
+	display: grid;
+	gap: 0.8rem;
+	border-radius: var(--radius-4);
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 72%, transparent);
+}
+
+.surface::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		90deg,
+		transparent 0%,
+		rgb(255 255 255 / 4%) 42%,
+		transparent 72%
+	);
+	transform: translateX(-100%);
+	animation: surface-shimmer 2.4s ease-in-out infinite;
+	pointer-events: none;
+}
+
+.hero {
+	padding: clamp(1rem, 2vw, 1.35rem);
+	background: var(--suite-surface-feature);
+	box-shadow: var(--suite-panel-shadow-subtle);
+}
+
+.feature {
+	padding: clamp(1rem, 1.8vw, 1.2rem);
+	background: var(--suite-surface-feature);
+	box-shadow: var(--suite-panel-shadow-subtle);
+}
+
+.support {
+	padding: clamp(0.9rem, 1.4vw, 1.05rem);
+	background: var(--suite-surface-support);
+	box-shadow:
+		0 16px 30px -34px color-mix(in srgb, var(--primary) 18%, transparent),
+		inset 0 1px 0 rgb(255 255 255 / 3%);
+}
+
+.line,
+.block {
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--surface-elevated) 84%, transparent);
+}
+
+.line {
+	height: 0.92rem;
+}
+
+.lineShort {
+	width: min(9rem, 42%);
+}
+
+.lineMedium {
+	width: min(18rem, 72%);
+}
+
+.lineLong {
+	width: min(34rem, 92%);
+}
+
+.block {
+	min-height: 10rem;
+}
+
+.compact {
+	min-height: 6.25rem;
+}
+
+.regular {
+	min-height: 10rem;
+}
+
+.tall {
+	min-height: 14rem;
+}
+
+@keyframes surface-shimmer {
+	0% {
+		transform: translateX(-100%);
+	}
+
+	100% {
+		transform: translateX(100%);
+	}
+}

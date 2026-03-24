@@ -37,13 +37,95 @@ export type SupabaseSyncStatusPayload = {
 	logTail: string[];
 };
 
+const STATUS_CACHE_TTL_MS = 60_000;
+const STATUS_CACHE_STORAGE_KEY = "suite:command-center:supabase-sync-status";
+
+let cachedSupabaseSyncStatus: SupabaseSyncStatusPayload | null = null;
+let cachedSupabaseSyncStatusAt = 0;
+
+function readPersistedSupabaseSyncStatus(): {
+	status: SupabaseSyncStatusPayload;
+	updatedAt: number;
+} | null {
+	if (typeof window === "undefined") return null;
+	try {
+		const raw = window.sessionStorage.getItem(STATUS_CACHE_STORAGE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as {
+			status?: SupabaseSyncStatusPayload;
+			updatedAt?: number;
+		};
+		if (!parsed?.status || typeof parsed?.updatedAt !== "number") {
+			return null;
+		}
+		if (Date.now() - parsed.updatedAt > STATUS_CACHE_TTL_MS) {
+			window.sessionStorage.removeItem(STATUS_CACHE_STORAGE_KEY);
+			return null;
+		}
+		return {
+			status: parsed.status,
+			updatedAt: parsed.updatedAt,
+		};
+	} catch {
+		return null;
+	}
+}
+
+function writePersistedSupabaseSyncStatus(
+	status: SupabaseSyncStatusPayload,
+	updatedAt: number,
+) {
+	if (typeof window === "undefined") return;
+	try {
+		window.sessionStorage.setItem(
+			STATUS_CACHE_STORAGE_KEY,
+			JSON.stringify({ status, updatedAt }),
+		);
+	} catch {
+		/* noop */
+	}
+}
+
+function readCachedSupabaseSyncStatus(): SupabaseSyncStatusPayload | null {
+	if (cachedSupabaseSyncStatus) {
+		if (Date.now() - cachedSupabaseSyncStatusAt > STATUS_CACHE_TTL_MS) {
+			cachedSupabaseSyncStatus = null;
+			cachedSupabaseSyncStatusAt = 0;
+		} else {
+			return cachedSupabaseSyncStatus;
+		}
+	}
+	const persisted = readPersistedSupabaseSyncStatus();
+	if (!persisted) {
+		cachedSupabaseSyncStatus = null;
+		cachedSupabaseSyncStatusAt = 0;
+		return null;
+	}
+	cachedSupabaseSyncStatus = persisted.status;
+	cachedSupabaseSyncStatusAt = persisted.updatedAt;
+	return persisted.status;
+}
+
+function writeCachedSupabaseSyncStatus(nextStatus: SupabaseSyncStatusPayload) {
+	cachedSupabaseSyncStatus = nextStatus;
+	cachedSupabaseSyncStatusAt = Date.now();
+	writePersistedSupabaseSyncStatus(nextStatus, cachedSupabaseSyncStatusAt);
+}
+
 export function useSupabaseSyncStatus(enabled: boolean) {
-	const [status, setStatus] = useState<SupabaseSyncStatusPayload | null>(null);
-	const [loading, setLoading] = useState(false);
+	const initialCachedStatus = enabled ? readCachedSupabaseSyncStatus() : null;
+	const [status, setStatus] = useState<SupabaseSyncStatusPayload | null>(
+		() => initialCachedStatus,
+	);
+	const [loading, setLoading] = useState(
+		() => enabled && initialCachedStatus === null,
+	);
+	const [refreshing, setRefreshing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [refreshToken, setRefreshToken] = useState(0);
 
 	useEffect(() => {
+		void refreshToken;
 		if (!enabled) {
 			setStatus(null);
 			setLoading(false);
@@ -52,7 +134,10 @@ export function useSupabaseSyncStatus(enabled: boolean) {
 		}
 
 		const controller = new AbortController();
-		setLoading(true);
+		const coldLoad =
+			refreshToken === 0 && readCachedSupabaseSyncStatus() === null;
+		setLoading(coldLoad);
+		setRefreshing(!coldLoad);
 		setError(null);
 
 		const loadStatus = async () => {
@@ -86,6 +171,7 @@ export function useSupabaseSyncStatus(enabled: boolean) {
 				}
 
 				const payload = (await response.json()) as SupabaseSyncStatusPayload;
+				writeCachedSupabaseSyncStatus(payload);
 				setStatus(payload);
 			} catch (loadError) {
 				if (controller.signal.aborted) {
@@ -99,6 +185,7 @@ export function useSupabaseSyncStatus(enabled: boolean) {
 			} finally {
 				if (!controller.signal.aborted) {
 					setLoading(false);
+					setRefreshing(false);
 				}
 			}
 		};
@@ -113,6 +200,7 @@ export function useSupabaseSyncStatus(enabled: boolean) {
 	return {
 		status,
 		loading,
+		refreshing,
 		error,
 		refresh: () => setRefreshToken((current) => current + 1),
 	};

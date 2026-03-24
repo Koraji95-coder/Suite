@@ -12,6 +12,7 @@ import {
 	ShieldCheck,
 	User,
 } from "lucide-react";
+import { TrustStateBadge } from "@/components/apps/ui/TrustStateBadge";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
@@ -19,9 +20,9 @@ import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
 import type { AgentPairingAction } from "@/services/agent/types";
+import styles from "./AccountSettings.module.css";
 import { SectionHeader, StatusTile } from "./accountSettingsShared";
 import type { StatusDescriptor } from "./accountSettingsUtils";
-import styles from "./AccountSettings.module.css";
 
 interface AccountSecurityOverviewSectionProps {
 	passkeyAuthStatus: StatusDescriptor;
@@ -84,65 +85,56 @@ export function AccountSecurityOverviewSection({
 	agentModeStatus,
 }: AccountSecurityOverviewSectionProps) {
 	return (
-		<Panel variant="default" padding="lg">
+		<Panel variant="support" padding="lg">
 			<Stack gap={4}>
 				<SectionHeader
 					icon={ShieldCheck}
-					title="Security posture"
-					description="Identity, session, and agent gateway health for this workspace."
+					title="Security"
+					description="A compact read on how this workspace is trusted before you inspect the deeper technical detail."
 					tone="primary"
 				/>
 
 				<div className={styles.securityGrid}>
 					<StatusTile
-						title="Passkey auth"
-						value={passkeyAuthStatus.value}
-						tone={passkeyAuthStatus.tone}
+						title="Access method"
+						value={sessionAuthStatus.value}
+						tone={sessionAuthStatus.tone}
 						icon={KeyRound}
 					/>
 					<StatusTile
-						title="Session auth"
-						value={sessionAuthStatus.value}
-						tone={sessionAuthStatus.tone}
-						icon={Shield}
-					/>
-					<StatusTile
-						title="Browser support"
-						value={passkeyBrowserStatus.value}
-						tone={passkeyBrowserStatus.tone}
-						icon={HardDrive}
-					/>
-					<StatusTile
-						title="Frontend"
-						value={passkeyFrontendStatus.value}
-						tone={passkeyFrontendStatus.tone}
-						icon={Settings2}
-					/>
-					<StatusTile
-						title="Backend"
+						title="Passkeys"
 						value={passkeyBackendStatus.value}
 						tone={passkeyBackendStatus.tone}
 						icon={Database}
 					/>
 					<StatusTile
-						title="Agent gateway"
+						title="Agent access"
 						value={agentGatewayStatus.value}
 						tone={agentGatewayStatus.tone}
 						icon={Bot}
 					/>
 					<StatusTile
-						title="Agent pairing"
-						value={agentPairingStatus.value}
-						tone={agentPairingStatus.tone}
-						icon={KeyRound}
-					/>
-					<StatusTile
-						title="Agent mode"
+						title="Verification path"
 						value={agentModeStatus.value}
 						tone={agentModeStatus.tone}
 						icon={Settings2}
 					/>
 				</div>
+
+				<HStack gap={2} wrap className={styles.securityDetailRow}>
+					<Badge variant="soft" color={passkeyBrowserStatus.tone} size="sm">
+						Browser {passkeyBrowserStatus.value.toLowerCase()}
+					</Badge>
+					<Badge variant="soft" color={passkeyFrontendStatus.tone} size="sm">
+						Frontend {passkeyFrontendStatus.value.toLowerCase()}
+					</Badge>
+					<Badge variant="soft" color={passkeyAuthStatus.tone} size="sm">
+						{passkeyAuthStatus.value}
+					</Badge>
+					<Badge variant="soft" color={agentModeStatus.tone} size="sm">
+						{agentModeStatus.value}
+					</Badge>
+				</HStack>
 			</Stack>
 		</Panel>
 	);
@@ -160,12 +152,12 @@ export function AccountProfileSection({
 	onSaveProfile,
 }: AccountProfileSectionProps) {
 	return (
-		<Panel variant="default" padding="lg">
+		<Panel variant="support" padding="lg">
 			<Stack gap={4}>
 				<SectionHeader
 					icon={User}
-					title="Profile"
-					description="Your display identity and contact email."
+					title="Identity"
+					description="How your name and contact details appear across the workspace."
 					tone="accent"
 				/>
 
@@ -238,51 +230,65 @@ export function AccountAgentPairingSection({
 	onResendVerification,
 	onRefreshAgentStatus,
 }: AccountAgentPairingSectionProps) {
+	const gatewayState =
+		agentHealthy === true
+			? "ready"
+			: agentHealthy === false
+				? "unavailable"
+				: "background";
+	const pairingState =
+		agentHealthy === false
+			? "unavailable"
+			: agentPaired
+				? "ready"
+				: agentHealthy === null
+					? "background"
+					: "needs-attention";
+	const pairingHeadline =
+		pairingState === "ready"
+			? "Trusted agent access is attached to this device."
+			: pairingState === "unavailable"
+				? "Agent access is unavailable until the local gateway responds."
+				: pairingState === "background"
+					? "Trust state is settling in the background."
+					: "Pair this device to unlock direct chat and orchestration.";
+	const pairingSummary = usesBroker
+		? "Managed verification sends a confirmation link to the signed-in account before the pairing state changes."
+		: "Local verification keeps pairing scoped to this browser for troubleshooting and direct gateway work.";
+	const primaryActionLabel =
+		agentHealthy !== true
+			? agentLoading
+				? "Refreshing trust state..."
+				: "Refresh trust state"
+			: usesBroker && agentVerificationCooldownSeconds > 0
+				? `Pair this device (${agentVerificationCooldownSeconds}s)`
+				: agentPaired
+					? "Refresh trust state"
+					: "Pair this device";
+
 	return (
-		<Panel variant="default" padding="lg" className={styles.agentPairingPanel}>
+		<Panel variant="feature" padding="lg" className={styles.agentPairingPanel}>
 			<Stack gap={4}>
 				<SectionHeader
 					icon={Bot}
-					title="Agent pairing"
-					description="Coordinate trusted devices for automated orchestration."
+					title="Pairing"
+					description="Attach a trusted device to managed agent access without turning this page into a gateway dashboard."
 					tone="primary"
 				/>
 
 				<div className={styles.agentPairingSummary}>
-					<HStack gap={2} wrap>
-						<Badge
-							size="sm"
-							variant="soft"
-							color={
-								agentHealthy === true
-									? "success"
-									: agentHealthy === false
-										? "danger"
-										: "default"
-							}
-						>
-							Agent gateway:{" "}
-							{agentHealthy === null
-								? "Checking"
-								: agentHealthy
-									? "Online"
-									: "Offline"}
-						</Badge>
-						<Badge
-							size="sm"
-							variant="soft"
-							color={agentPaired ? "success" : "warning"}
-						>
-							Pairing status: {agentPaired ? "Paired" : "Not paired"}
-						</Badge>
-						<Badge size="sm" variant="soft" color="accent">
-							Verification mode: {usesBroker ? "Brokered" : "Direct"}
-						</Badge>
-					</HStack>
+					<div className={styles.agentPairingStatusRow}>
+						<TrustStateBadge state={pairingState} label={pairingHeadline} />
+					</div>
 					<Text size="xs" color="muted">
-						{usesBroker
-							? "Pairing and unpairing are completed through email verification links for this signed-in account."
-							: "Direct mode is for local troubleshooting and stores pairing only in this browser session."}
+						{pairingSummary}
+					</Text>
+					<Text size="xs" color="muted">
+						{gatewayState === "ready"
+							? "Gateway is available for trusted device checks."
+							: gatewayState === "unavailable"
+								? "Gateway must reconnect before pairing can continue."
+								: "Gateway trust is settling in the background."}
 					</Text>
 				</div>
 
@@ -307,36 +313,43 @@ export function AccountAgentPairingSection({
 						size="sm"
 						disabled={
 							isAgentActionBusy ||
-							(usesBroker && agentVerificationCooldownSeconds > 0) ||
-							(!usesBroker &&
-								(agentPairingCode.trim().length !== 6 || agentHealthy !== true))
+							(agentHealthy !== true && agentLoading) ||
+							(agentHealthy === true &&
+								usesBroker &&
+								!agentPaired &&
+								agentVerificationCooldownSeconds > 0) ||
+							(agentHealthy === true &&
+								!usesBroker &&
+								!agentPaired &&
+								agentPairingCode.trim().length !== 6)
 						}
 						loading={isAgentActionBusy}
-						onClick={() => void onPairAgent()}
-						className={styles.agentActionButton}
-					>
-						{usesBroker && agentVerificationCooldownSeconds > 0
-							? `Pair this device (${agentVerificationCooldownSeconds}s)`
-							: usesBroker
-								? "Pair this device"
-								: "Pair"}
-					</Button>
-
-					<Button
-						variant="secondary"
-						size="sm"
-						disabled={
-							isAgentActionBusy ||
-							(usesBroker && agentVerificationCooldownSeconds > 0) ||
-							!agentPaired
+						onClick={() =>
+							void (agentHealthy === true && !agentPaired
+								? onPairAgent()
+								: onRefreshAgentStatus())
 						}
-						onClick={() => void onUnpairAgent()}
 						className={styles.agentActionButton}
 					>
-						{usesBroker ? "Unpair this device" : "Unpair"}
+						{primaryActionLabel}
 					</Button>
 
-					{usesBroker && (
+					{agentPaired ? (
+						<Button
+							variant="secondary"
+							size="sm"
+							disabled={
+								isAgentActionBusy ||
+								(usesBroker && agentVerificationCooldownSeconds > 0)
+							}
+							onClick={() => void onUnpairAgent()}
+							className={styles.agentActionButton}
+						>
+							{usesBroker ? "Unpair this device" : "Unpair"}
+						</Button>
+					) : null}
+
+					{usesBroker && !agentPaired && (
 						<Button
 							variant="secondary"
 							size="sm"
@@ -352,40 +365,69 @@ export function AccountAgentPairingSection({
 							className={styles.agentActionButton}
 						>
 							{agentVerificationCooldownSeconds > 0
-								? `Resend verification (${agentVerificationCooldownSeconds}s)`
-								: "Resend verification"}
-						</Button>
-					)}
-
-					{(agentHealthy !== true || Boolean(effectiveAgentError)) && (
-						<Button
-							variant="ghost"
-							size="sm"
-							disabled={agentLoading}
-							onClick={() => void onRefreshAgentStatus()}
-							className={styles.agentActionButton}
-						>
-							{agentLoading ? "Checking..." : "Check gateway"}
+								? `Resend link (${agentVerificationCooldownSeconds}s)`
+								: "Resend link"}
 						</Button>
 					)}
 				</div>
 
-				{effectiveAgentError && (
-					<Text size="xs" color="danger" className={styles.agentNoticeError}>
-						{effectiveAgentError}
-					</Text>
-				)}
-				{agentNotice && (
-					<Text size="xs" color="muted" className={styles.agentNotice}>
-						{agentNotice}
-					</Text>
-				)}
-				{usesBroker && agentVerificationCooldownSeconds > 0 && (
-					<Text size="xs" color="muted" className={styles.agentCooldown}>
-						Verification requests are temporarily cooling down. Try again in{" "}
-						{agentVerificationCooldownSeconds}s.
-					</Text>
-				)}
+				<details className={styles.agentTechnicalDetails}>
+					<summary className={styles.agentTechnicalSummary}>
+						View technical details
+					</summary>
+					<div className={styles.agentTechnicalBody}>
+						<div className={styles.agentTechnicalGrid}>
+							<div className={styles.agentTechnicalCard}>
+								<span className={styles.agentTechnicalLabel}>Gateway</span>
+								<TrustStateBadge
+									state={gatewayState}
+									label={
+										gatewayState === "ready"
+											? "Available"
+											: gatewayState === "unavailable"
+												? "Unavailable"
+												: "Background"
+									}
+								/>
+							</div>
+							<div className={styles.agentTechnicalCard}>
+								<span className={styles.agentTechnicalLabel}>Pairing</span>
+								<TrustStateBadge
+									state={pairingState}
+									label={agentPaired ? "Attached" : "Pairing required"}
+								/>
+							</div>
+							<div className={styles.agentTechnicalCard}>
+								<span className={styles.agentTechnicalLabel}>
+									Verification path
+								</span>
+								<Badge size="sm" variant="soft" color="accent">
+									{usesBroker ? "Managed verification" : "Local verification"}
+								</Badge>
+							</div>
+						</div>
+						{effectiveAgentError ? (
+							<Text
+								size="xs"
+								color="danger"
+								className={styles.agentNoticeError}
+							>
+								{effectiveAgentError}
+							</Text>
+						) : null}
+						{agentNotice ? (
+							<Text size="xs" color="muted" className={styles.agentNotice}>
+								{agentNotice}
+							</Text>
+						) : null}
+						{usesBroker && agentVerificationCooldownSeconds > 0 ? (
+							<Text size="xs" color="muted" className={styles.agentCooldown}>
+								Verification email cooldown: {agentVerificationCooldownSeconds}s
+								remaining.
+							</Text>
+						) : null}
+					</div>
+				</details>
 			</Stack>
 		</Panel>
 	);
@@ -400,12 +442,12 @@ export function AccountSessionActionsSection({
 	userEmail,
 }: AccountSessionActionsSectionProps) {
 	return (
-		<Panel variant="default" padding="lg">
+		<Panel variant="support" padding="lg">
 			<Stack gap={4}>
 				<SectionHeader
 					icon={LogOut}
-					title="Session actions"
-					description="Sign out this device or revoke all active sessions."
+					title="Workspace"
+					description="Session controls, account context, and sign-out actions for this device."
 					tone="neutral"
 				/>
 

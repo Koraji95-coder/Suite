@@ -1,4 +1,5 @@
 import { Grid, List, Upload } from "lucide-react";
+import { PageContextBand } from "@/components/apps/ui/PageContextBand";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
 import styles from "./BlockLibrary.module.css";
 import { BlockLibraryCatalog } from "./BlockLibraryCatalog";
@@ -45,34 +46,40 @@ export function BlockLibrary() {
 	} = useBlockLibraryState();
 
 	return (
-		<PageFrame
-			title="Block Library"
-			description="Manage your CAD block collection"
-			actions={
-				<div className={styles.actions}>
-					<button
-						onClick={() =>
-							setViewMode((prev) => (prev === "grid" ? "list" : "grid"))
-						}
-						className={styles.viewModeButton}
-						title={viewMode === "grid" ? "List view" : "Grid view"}
-					>
-						{viewMode === "grid" ? (
-							<List className={styles.viewModeIcon} />
-						) : (
-							<Grid className={styles.viewModeIcon} />
-						)}
-					</button>
-					<button
-						onClick={() => setShowUploadModal(true)}
-						className={styles.uploadButton}
-					>
-						<Upload className={styles.uploadIcon} />
-						Upload Block
-					</button>
-				</div>
-			}
-		>
+		<PageFrame maxWidth="full">
+			<PageContextBand
+				eyebrow="Catalog workspace"
+				summary={
+					<p className={styles.summaryText}>
+						Manage imports, tags, favorites, and browsing views from one CAD
+						block catalog.
+					</p>
+				}
+				actions={
+					<div className={styles.actions}>
+						<button
+							onClick={() =>
+								setViewMode((prev) => (prev === "grid" ? "list" : "grid"))
+							}
+							className={styles.viewModeButton}
+							title={viewMode === "grid" ? "List view" : "Grid view"}
+						>
+							{viewMode === "grid" ? (
+								<List className={styles.viewModeIcon} />
+							) : (
+								<Grid className={styles.viewModeIcon} />
+							)}
+						</button>
+						<button
+							onClick={() => setShowUploadModal(true)}
+							className={styles.uploadButton}
+						>
+							<Upload className={styles.uploadIcon} />
+							Upload Block
+						</button>
+					</div>
+				}
+			/>
 			<BlockLibraryFiltersPanel
 				searchTerm={searchTerm}
 				onSearchTermChange={setSearchTerm}

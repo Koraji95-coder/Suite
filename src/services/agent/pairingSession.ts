@@ -7,10 +7,7 @@ import {
 	saveSetting,
 } from "@/settings/userSettings";
 import { logSecurityEvent } from "../securityEventService";
-import type {
-	AgentPairingRefreshResult,
-	AgentPairingState,
-} from "./types";
+import type { AgentPairingRefreshResult, AgentPairingState } from "./types";
 
 const AGENT_PAIRING_SETTING_KEY = "agent_pairing_state_v1";
 const DEFAULT_RESTORE_WINDOW_HOURS = 24;
@@ -73,7 +70,10 @@ export interface AgentBrokerPairingContext {
 }
 
 export async function persistDirectPairingForUser(
-	context: Pick<AgentDirectPairingContext, "useBroker" | "activeUserId" | "baseUrl">,
+	context: Pick<
+		AgentDirectPairingContext,
+		"useBroker" | "activeUserId" | "baseUrl"
+	>,
 ): Promise<void> {
 	if (context.useBroker) return;
 	if (!context.activeUserId) return;
@@ -158,7 +158,10 @@ export async function restoreDirectPairingForUser(
 
 	if (!PAIRING_RESTORE_NO_EXPIRY) {
 		const updatedAt = Date.parse(saved.updatedAt);
-		if (!Number.isFinite(updatedAt) || Date.now() - updatedAt > MAX_RESTORE_AGE_MS) {
+		if (
+			!Number.isFinite(updatedAt) ||
+			Date.now() - updatedAt > MAX_RESTORE_AGE_MS
+		) {
 			await clearPersistedPairing();
 			await logSecurityEvent(
 				"agent_restore_failed",
@@ -234,6 +237,7 @@ export async function refreshBrokerPairingStatusDetailed(
 				credentials: "include",
 				timeoutMs: 15_000,
 				requestName: "Agent broker pairing session request",
+				diagnosticsMode: "silent",
 			});
 
 			if (response.ok) {
@@ -271,8 +275,7 @@ export async function refreshBrokerPairingStatusDetailed(
 					terminal: true,
 					status: response.status,
 					code: errorPayload.code || "AUTH_INVALID",
-					message:
-						errorPayload.message || "Invalid or expired Supabase token.",
+					message: errorPayload.message || "Invalid or expired Supabase token.",
 					retryAfterSeconds: 0,
 					kind: "unauthorized",
 				};

@@ -6,13 +6,13 @@ import type {
 	AgentTaskStatus,
 } from "@/services/agent/types";
 import type { AgentConversation } from "@/services/agentTaskManager";
-import { normalizeAgentResponseText } from "./agentResponseNormalizer";
 import {
 	AGENT_PROFILE_IDS,
 	AGENT_PROFILES,
 	type AgentProfile,
 	type AgentProfileId,
 } from "./agentProfiles";
+import { normalizeAgentResponseText } from "./agentResponseNormalizer";
 
 export const OPEN_QUEUE_STATUSES: AgentTaskStatus[] = [
 	"queued",
@@ -186,7 +186,10 @@ export function addToBoundedSet(
 	return false;
 }
 
-export function truncateText(value: string | undefined, maxChars: number): string {
+export function truncateText(
+	value: string | undefined,
+	maxChars: number,
+): string {
 	const text = String(value || "").trim();
 	if (!text) return "";
 	if (text.length <= maxChars) return text;
@@ -290,7 +293,9 @@ export function eventBodyFromPayload(
 
 	const stage = payloadText(payload, ["stage"]);
 	const modelUsed = payloadText(payload, ["modelUsed", "model", "model_used"]);
-	const latency = Number(payload?.latencyMs ?? payload?.latency_ms ?? Number.NaN);
+	const latency = Number(
+		payload?.latencyMs ?? payload?.latency_ms ?? Number.NaN,
+	);
 	const metaParts: string[] = [];
 	if (stage) metaParts.push(`stage ${stage}`);
 	if (modelUsed) metaParts.push(`model ${modelUsed}`);
@@ -332,6 +337,90 @@ export function deriveAvailableRunIds(
 		.slice(0, 40);
 }
 
+function taskResumePriority(status: AgentTaskStatus): number {
+	switch (status) {
+		case "running":
+			return 6;
+		case "queued":
+			return 5;
+		case "awaiting_review":
+			return 4;
+		case "rework_requested":
+			return 3;
+		default:
+			return 1;
+	}
+}
+
+function activityResumePriority(item: AgentActivityItem): number {
+	const eventType = String(item.eventType || "")
+		.trim()
+		.toLowerCase();
+	if (
+		eventType === "run_started" ||
+		eventType === "task_running" ||
+		eventType === "step_started"
+	) {
+		return 4;
+	}
+	if (
+		eventType === "task_awaiting_review" ||
+		eventType === "task_reviewed" ||
+		eventType === "run_completed"
+	) {
+		return 3;
+	}
+	if (
+		eventType === "run_cancel_requested" ||
+		eventType === "run_failed" ||
+		eventType === "run_cancelled"
+	) {
+		return 2;
+	}
+	return 1;
+}
+
+export function deriveResumableRunId(
+	taskItems: AgentTaskItem[],
+	activityItems: AgentActivityItem[],
+): string {
+	let bestRunId = "";
+	let bestPriority = -1;
+	let bestStamp = "";
+
+	for (const task of taskItems) {
+		const runId = String(task.runId || "").trim();
+		if (!runId) continue;
+		const priority = taskResumePriority(task.status);
+		const stamp = String(task.updatedAt || task.createdAt || "").trim();
+		if (
+			priority > bestPriority ||
+			(priority === bestPriority && stamp > bestStamp)
+		) {
+			bestRunId = runId;
+			bestPriority = priority;
+			bestStamp = stamp;
+		}
+	}
+
+	for (const activity of activityItems) {
+		const runId = String(activity.runId || "").trim();
+		if (!runId) continue;
+		const priority = activityResumePriority(activity);
+		const stamp = String(activity.createdAt || "").trim();
+		if (
+			priority > bestPriority ||
+			(priority === bestPriority && stamp > bestStamp)
+		) {
+			bestRunId = runId;
+			bestPriority = priority;
+			bestStamp = stamp;
+		}
+	}
+
+	return bestRunId;
+}
+
 export function filterQueueTasks(args: {
 	queueTasks: AgentTaskItem[];
 	statusFilter: QueueStatusFilter;
@@ -347,15 +436,18 @@ export function filterQueueTasks(args: {
 		queueRunFilter,
 	} = args;
 	return [...queueTasks]
-		.filter((task) => (statusFilter === "all" ? true : task.status === statusFilter))
+		.filter((task) =>
+			statusFilter === "all" ? true : task.status === statusFilter,
+		)
 		.filter((task) =>
 			priorityFilter === "all" ? true : task.priority === priorityFilter,
 		)
 		.filter((task) =>
 			queueProfileFilter === "all"
 				? true
-				: String(task.assigneeProfile || "").trim().toLowerCase() ===
-					queueProfileFilter,
+				: String(task.assigneeProfile || "")
+						.trim()
+						.toLowerCase() === queueProfileFilter,
 		)
 		.filter((task) =>
 			queueRunFilter === "all"
@@ -386,13 +478,16 @@ export function filterActivityItems(args: {
 	} = args;
 	return activityItems
 		.filter((item) =>
-			activitySourceFilter === "all" ? true : item.source === activitySourceFilter,
+			activitySourceFilter === "all"
+				? true
+				: item.source === activitySourceFilter,
 		)
 		.filter((item) =>
 			activityProfileFilter === "all"
 				? true
-				: String(item.profileId || "").trim().toLowerCase() ===
-					activityProfileFilter,
+				: String(item.profileId || "")
+						.trim()
+						.toLowerCase() === activityProfileFilter,
 		)
 		.filter((item) =>
 			activityRunFilter === "all"
@@ -412,8 +507,9 @@ export function selectReviewInboxTasks(args: {
 		.filter((task) =>
 			queueProfileFilter === "all"
 				? true
-				: String(task.assigneeProfile || "").trim().toLowerCase() ===
-					queueProfileFilter,
+				: String(task.assigneeProfile || "")
+						.trim()
+						.toLowerCase() === queueProfileFilter,
 		)
 		.filter((task) =>
 			queueRunFilter === "all"

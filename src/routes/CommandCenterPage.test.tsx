@@ -54,10 +54,7 @@ describe("CommandCenterPage", () => {
 			</MemoryRouter>,
 		);
 
-		expect(
-			screen.queryByText("/app/dashboard?focus=watchdog"),
-		).toBeNull();
-		expect(screen.getByText("Command Center")).toBeTruthy();
+		expect(screen.queryByText("/app/dashboard?focus=watchdog")).toBeNull();
 		expect(
 			screen
 				.getByRole("tab", { name: /Ops Commands/i })
@@ -133,7 +130,9 @@ describe("CommandCenterPage", () => {
 		);
 
 		expect(screen.getByText("Watchdog")).toBeTruthy();
-		expect(screen.getByText("Install Filesystem Collector Startup")).toBeTruthy();
+		expect(
+			screen.getByText("Install Filesystem Collector Startup"),
+		).toBeTruthy();
 		expect(screen.getByText("npm run watchdog:startup:install")).toBeTruthy();
 		expect(screen.getByText("Check Filesystem Collector Startup")).toBeTruthy();
 		expect(screen.getByText("npm run watchdog:startup:check")).toBeTruthy();
@@ -142,7 +141,9 @@ describe("CommandCenterPage", () => {
 			screen.getByText("npm run watchdog:startup:autocad:install"),
 		).toBeTruthy();
 		expect(screen.getByText("Check Backend Startup")).toBeTruthy();
-		expect(screen.getByText("npm run watchdog:backend:startup:check")).toBeTruthy();
+		expect(
+			screen.getByText("npm run watchdog:backend:startup:check"),
+		).toBeTruthy();
 		expect(screen.getByText("Bootstrap Workstation Runtime")).toBeTruthy();
 		expect(screen.getByText("npm run workstation:bootstrap")).toBeTruthy();
 		expect(screen.getByText("Stop Workstation Runtime")).toBeTruthy();
@@ -150,7 +151,9 @@ describe("CommandCenterPage", () => {
 		expect(screen.getByText("Open Runtime Control Shell")).toBeTruthy();
 		expect(screen.getByText("npm run workstation:control-panel")).toBeTruthy();
 		expect(screen.getByText("Install Windows Runtime Startup")).toBeTruthy();
-		expect(screen.getByText("npm run workstation:startup:install")).toBeTruthy();
+		expect(
+			screen.getByText("npm run workstation:startup:install"),
+		).toBeTruthy();
 		expect(screen.getByText("Run AutoCAD Watchdog Doctor")).toBeTruthy();
 		expect(screen.getByText("npm run watchdog:autocad:doctor")).toBeTruthy();
 	});

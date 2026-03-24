@@ -1,5 +1,7 @@
 /* src/theme.css */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url(
+	"https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+);
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CSS CUSTOM PROPERTIES
@@ -7,11 +9,27 @@
    Values below are canonical fallbacks.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
+	/* Typography */
+	--font-body:
+		"Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+		sans-serif;
+	--font-heading:
+		"Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+		sans-serif;
+	--font-meta:
+		"Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+		sans-serif;
+	--font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+		monospace;
+
 	/* Backgrounds */
-	--bg: #0b0f17;
-	--bg-subtle: #0b0f17;
-	--surface: #141b26;
-	--surface-2: #1c2533;
+	--bg: #090d12;
+	--bg-subtle: #090d12;
+	--surface: #121821;
+	--surface-2: #1a2230;
+	--surface-0: #090d12;
+	--surface-elevated: #212b3a;
+	--surface-strong: #263243;
 	/* Compatibility aliases for canonical class suggestions */
 	--background: var(--bg);
 	--bg-base: var(--bg);
@@ -24,26 +42,28 @@
 	--border-strong: rgba(232, 237, 246, 0.18);
 
 	/* Text */
-	--text: #e8edf6;
-	--text-muted: #93a1b7;
+	--text: #ece7dc;
+	--text-strong: #f5efe4;
+	--text-muted: #a79f92;
 
 	/* Brand Colors */
-	--primary: #4f7cff;
-	--primary-hover: #7094ff;
-	--primary-contrast: #f4f7ff;
-	--accent: #d2a24c;
-	--secondary: #72829a;
-	--tertiary: #c46d52;
+	--primary: #c7a05c;
+	--primary-hover: #d4b276;
+	--primary-contrast: #15110b;
+	--accent: #86663a;
+	--brand-gold: #d9ba7f;
+	--secondary: #6a7788;
+	--tertiary: #8a5f51;
 
 	/* Status Colors */
 	--success: #4ea972;
-	--warning: #d2a24c;
+	--warning: #c89a4d;
 	--danger: #cf6a5b;
-	--info: #6f8dff;
+	--info: #7390ff;
 
 	/* Effects */
-	--glow: rgba(79, 124, 255, 0.2);
-	--focus-ring: color-mix(in oklab, var(--primary) 25%, transparent);
+	--glow: rgba(115, 144, 255, 0.2);
+	--focus-ring: color-mix(in oklab, var(--info) 28%, transparent);
 	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
 	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
 	--shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.4);
@@ -93,11 +113,24 @@ body,
 }
 
 body {
-	font-family: "Inter", system-ui, -apple-system, sans-serif;
+	font-family: var(--font-body);
 	font-size: 14px;
 	line-height: 1.5;
 	background-color: var(--bg);
 	color: var(--text);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+button,
+input,
+select,
+textarea {
+	font-family: var(--font-heading);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

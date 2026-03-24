@@ -140,7 +140,6 @@ export function EventCalendar({
 				<EventDialog
 					event={selectedEvent}
 					isOpen={isEventDialogOpen}
-					inline
 					onClose={closeEventDialog}
 					onSave={handleEventSave}
 					onDelete={handleEventDelete}

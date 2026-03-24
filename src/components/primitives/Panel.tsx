@@ -10,6 +10,10 @@ import styles from "./Panel.module.css";
 type PanelVariant =
 	| "default"
 	| "elevated"
+	| "support"
+	| "feature"
+	| "sunken"
+	| "overlay"
 	| "outline"
 	| "ghost"
 	| "glass"
@@ -39,6 +43,10 @@ export interface PanelProps extends HTMLAttributes<HTMLDivElement> {
 const variantClasses: Record<PanelVariant, string> = {
 	default: styles.variantDefault,
 	elevated: styles.variantElevated,
+	support: styles.variantSupport,
+	feature: styles.variantFeature,
+	sunken: styles.variantSunken,
+	overlay: styles.variantOverlay,
 	outline: styles.variantOutline,
 	ghost: styles.variantGhost,
 	glass: styles.variantGlass,

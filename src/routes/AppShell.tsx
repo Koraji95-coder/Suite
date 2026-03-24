@@ -1,6 +1,5 @@
 // src/routes/AppShell.tsx
 import {
-	AlertTriangle,
 	AppWindow,
 	BookOpen,
 	Bug,
@@ -8,13 +7,12 @@ import {
 	ChevronRight,
 	ClipboardList,
 	Clock3,
-	Compass,
 	FolderOpen,
 	KeyRound,
 	LayoutDashboard,
-	Layers3,
 	LogOut,
 	Menu,
+	Radar,
 	RefreshCw,
 	Settings,
 	Sparkles,
@@ -25,14 +23,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { APP_NAME } from "../appMeta";
 import { useAuth } from "../auth/useAuth";
-import { SuiteLogo } from "../components/brand/SuiteLogo";
 import {
 	PageHeaderProvider,
 	usePageHeader,
 } from "../components/apps/ui/PageHeaderContext";
+import { SuiteLogo } from "../components/brand/SuiteLogo";
 import { Badge } from "../components/primitives/Badge";
-import AdminCrownPixel from "../components/roles/AdminCrownPixel";
-
 // Primitives
 import { Button } from "../components/primitives/Button";
 import { Container } from "../components/primitives/Container";
@@ -40,20 +36,26 @@ import { Input } from "../components/primitives/Input";
 import { Panel } from "../components/primitives/Panel";
 import { Stack } from "../components/primitives/Stack";
 import { Text } from "../components/primitives/Text";
+import AdminCrownPixel from "../components/roles/AdminCrownPixel";
+import { useWatchdogProjectSync } from "../hooks/useWatchdogProjectSync";
 import {
+	type AppDiagnostic,
 	clearAppDiagnostics,
 	subscribeAppDiagnostics,
-	type AppDiagnostic,
 } from "../lib/appDiagnostics";
-import { useWatchdogProjectSync } from "../hooks/useWatchdogProjectSync";
 import { isCommandCenterAuthorized } from "../lib/devAccess";
-import { runSuiteRuntimeDoctor, type SuiteRuntimeDoctorReport } from "../lib/runtimeDoctor";
 import { getAppRole } from "../lib/roles";
+import {
+	runSuiteRuntimeDoctor,
+	type SuiteRuntimeDoctorReport,
+} from "../lib/runtimeDoctor";
 import { cn } from "../lib/utils";
 import styles from "./AppShell.module.css";
+import { resolveShellMeta } from "./appShellMeta";
 
 const primaryNavItems = [
 	{ to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
+	{ to: "/app/watchdog", label: "Watchdog", icon: Radar },
 	{ to: "/app/projects", label: "Projects", icon: FolderOpen },
 	{ to: "/app/calendar", label: "Calendar", icon: CalendarDays },
 	{ to: "/app/changelog", label: "Changelog", icon: ClipboardList },
@@ -61,74 +63,6 @@ const primaryNavItems = [
 	{ to: "/app/knowledge", label: "Knowledge", icon: BookOpen },
 	{ to: "/app/agent", label: "Agents", icon: Sparkles },
 ];
-
-const sectionMeta = [
-	{
-		match: "/app/dashboard",
-		label: "Dashboard",
-		subtitle: "Cross-system command center for operations, architecture, and memory.",
-		icon: LayoutDashboard,
-	},
-	{
-		match: "/app/projects",
-		label: "Projects",
-		subtitle: "Project planning, telemetry, tasks, and delivery workflows.",
-		icon: FolderOpen,
-	},
-	{
-		match: "/app/calendar",
-		label: "Calendar",
-		subtitle: "Scheduling, commitments, and upcoming delivery timing.",
-		icon: CalendarDays,
-	},
-	{
-		match: "/app/changelog",
-		label: "Changelog",
-		subtitle: "Canonical work ledger, linked checkpoints, and publish-ready notes.",
-		icon: ClipboardList,
-	},
-	{
-		match: "/app/apps",
-		label: "Apps",
-		subtitle: "Domain tools for drafting, transmittals, and engineering workflows.",
-		icon: Layers3,
-	},
-	{
-		match: "/app/knowledge",
-		label: "Knowledge",
-		subtitle: "References, formulas, standards context, and reusable guidance.",
-		icon: Compass,
-	},
-	{
-		match: "/app/agent",
-		label: "Agents",
-		subtitle: "Profile-driven orchestration and collaborative execution.",
-		icon: Sparkles,
-	},
-	{
-		match: "/app/settings",
-		label: "Settings",
-		subtitle: "Account controls and workspace preferences.",
-		icon: Settings,
-	},
-	{
-		match: "/app/command-center",
-		label: "Command Center",
-		subtitle: "Developer diagnostics and incident-oriented controls.",
-		icon: TerminalSquare,
-	},
-] as const;
-
-function resolveShellMeta(pathname: string) {
-	const matched = sectionMeta.find((item) => pathname.startsWith(item.match));
-	return (
-		matched ?? {
-			label: "Workspace",
-			subtitle: "Suite operations and delivery workspace.",
-			icon: AppWindow,
-		}
-	);
-}
 
 function FirstLoginNamePrompt() {
 	const { user, profile, updateProfile } = useAuth();
@@ -332,7 +266,12 @@ function SidebarSessionCluster({ compact = false }: { compact?: boolean }) {
 	const isAdmin = appRole === "Admin";
 
 	return (
-		<div className={cn(styles.sidebarFooterCluster, compact && styles.sidebarFooterCompact)}>
+		<div
+			className={cn(
+				styles.sidebarFooterCluster,
+				compact && styles.sidebarFooterCompact,
+			)}
+		>
 			<div className={styles.sessionClock} aria-label="Local time">
 				<Clock3 size={13} />
 				<span>{timeLabel}</span>
@@ -464,10 +403,10 @@ function AppDiagnosticsDrawer({
 			<aside className={styles.diagnosticsDrawer}>
 				<div className={styles.diagnosticsHeader}>
 					<div>
-						<Text size="sm" weight="semibold">
+						<Text size="sm" weight="semibold" block>
 							Diagnostics
 						</Text>
-						<Text size="xs" color="muted">
+						<Text size="xs" color="muted" block>
 							Runtime drift, route availability, and recent actionable warnings.
 						</Text>
 					</div>
@@ -496,7 +435,11 @@ function AppDiagnosticsDrawer({
 				</div>
 
 				<div className={styles.diagnosticsBody}>
-					<Panel variant="default" padding="md" className={styles.diagnosticsCard}>
+					<Panel
+						variant="default"
+						padding="md"
+						className={styles.diagnosticsCard}
+					>
 						<div className={styles.diagnosticsCardHeader}>
 							<Text size="xs" weight="semibold">
 								Runtime doctor
@@ -549,7 +492,11 @@ function AppDiagnosticsDrawer({
 						</div>
 					</Panel>
 
-					<Panel variant="default" padding="md" className={styles.diagnosticsCard}>
+					<Panel
+						variant="default"
+						padding="md"
+						className={styles.diagnosticsCard}
+					>
 						<div className={styles.diagnosticsCardHeader}>
 							<Text size="xs" weight="semibold">
 								Recent diagnostics
@@ -634,48 +581,73 @@ function ShellWorkspace() {
 	const { pathname } = useLocation();
 	const { header } = usePageHeader();
 	const shellMeta = useMemo(() => resolveShellMeta(pathname), [pathname]);
-	const HeaderIcon = shellMeta.icon;
+	const ShellMetaIcon = shellMeta.icon;
 
 	const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
 	useEffect(() => {
 		if (!pathname) return;
-		scrollRef.current?.scrollTo({ top: 0 });
+		if (typeof scrollRef.current?.scrollTo === "function") {
+			scrollRef.current.scrollTo({ top: 0 });
+		} else if (scrollRef.current) {
+			scrollRef.current.scrollTop = 0;
+		}
 		setMobileMenuOpen(false);
 	}, [pathname]);
 
-	const refreshRuntimeDoctor = useCallback(() => {
-		setRuntimeDoctorLoading(true);
-		void runSuiteRuntimeDoctor()
-			.then((report) => {
-				setRuntimeReport(report);
-			})
-			.finally(() => {
-				setRuntimeDoctorLoading(false);
-			});
-	}, []);
+	const refreshRuntimeDoctor = useCallback(
+		(mode: "background" | "manual" = "manual") => {
+			setRuntimeDoctorLoading(true);
+			void runSuiteRuntimeDoctor({ mode, force: mode === "manual" })
+				.then((report) => {
+					setRuntimeReport(report);
+				})
+				.finally(() => {
+					setRuntimeDoctorLoading(false);
+				});
+		},
+		[],
+	);
 
 	useEffect(() => subscribeAppDiagnostics(setDiagnostics), []);
 
 	useEffect(() => {
-		refreshRuntimeDoctor();
+		refreshRuntimeDoctor("background");
 	}, [refreshRuntimeDoctor]);
 
-	const resolvedTitle = header.title || shellMeta.label;
+	const resolvedTitle = header.title || shellMeta.title;
 	const resolvedSubtitle = header.subtitle || shellMeta.subtitle;
 	const actionableDiagnostics = diagnostics.filter(
 		(entry) => entry.severity === "error" || entry.severity === "warning",
 	);
-	const doctorIssueCount =
-		runtimeReport?.checks.filter((check) => check.status !== "ok").length ?? 0;
-	const diagnosticsCount = Math.max(actionableDiagnostics.length, doctorIssueCount);
+	const doctorIssueCount = runtimeReport?.actionableIssueCount ?? 0;
+	const diagnosticsCount = Math.max(
+		actionableDiagnostics.length,
+		doctorIssueCount,
+	);
 	const diagnosticsTone =
-		runtimeReport?.checks.some((check) => check.status === "error") ||
-		actionableDiagnostics.some((entry) => entry.severity === "error")
+		runtimeReport?.checks.some(
+			(check) => check.status === "error" && check.actionable !== false,
+		) || actionableDiagnostics.some((entry) => entry.severity === "error")
 			? "danger"
 			: diagnosticsCount > 0
 				? "warning"
 				: "success";
+	const diagnosticsDisplayCount =
+		diagnosticsCount > 99 ? "99+" : diagnosticsCount.toString();
+	const diagnosticsButtonToneClass =
+		diagnosticsTone === "danger"
+			? styles.diagnosticsToggleDanger
+			: diagnosticsTone === "warning"
+				? styles.diagnosticsToggleWarning
+				: styles.diagnosticsToggleSuccess;
+	const diagnosticsStatusLabel =
+		diagnosticsTone === "danger"
+			? "attention required"
+			: diagnosticsTone === "warning"
+				? "warnings present"
+				: "all checks clear";
+	const resolvedHeaderIcon = header.icon ?? <ShellMetaIcon size={14} />;
 
 	return (
 		<div className={styles.appRoot}>
@@ -687,90 +659,106 @@ function ShellWorkspace() {
 				diagnostics={actionableDiagnostics}
 				report={runtimeReport}
 				loading={runtimeDoctorLoading}
-				onRefresh={refreshRuntimeDoctor}
+				onRefresh={() => refreshRuntimeDoctor("manual")}
 			/>
 
 			<div className={styles.shellBody}>
 				<DesktopSidebar />
 				<main ref={scrollRef} className={styles.main}>
 					<div className={styles.commandFrame}>
-						<header className={styles.workspaceHeader}>
-							<div className={styles.workspaceHeaderMain}>
-								<button
-									type="button"
-									className={styles.mobileMenuTrigger}
-									onClick={() =>
-										setMobileMenuOpen((previous) => !previous)
-									}
-									aria-label="Open navigation menu"
-								>
-									<Menu size={18} />
-								</button>
-								<div className={styles.workspaceHeaderTitleBlock}>
-									<div className={styles.workspaceHeaderEyebrow}>
-										<HeaderIcon size={14} />
-										<span>{APP_NAME} Workspace</span>
+						<div className={styles.workspaceSurface}>
+							<header className={styles.workspaceHeader}>
+								<div className={styles.workspaceHeaderMain}>
+									<button
+										type="button"
+										className={styles.mobileMenuTrigger}
+										onClick={() => setMobileMenuOpen((previous) => !previous)}
+										aria-label="Open navigation menu"
+									>
+										<Menu size={18} />
+									</button>
+									<div className={styles.workspaceHeaderTitleBlock}>
+										<div className={styles.workspaceHeaderEyebrow}>
+											<span className={styles.workspaceHeaderEyebrowIcon}>
+												{resolvedHeaderIcon}
+											</span>
+											<span>{APP_NAME} Workspace</span>
+										</div>
+										<Text
+											as="h1"
+											size="lg"
+											weight="semibold"
+											block
+											className={styles.workspaceHeaderTitle}
+										>
+											{resolvedTitle}
+										</Text>
+										<Text
+											size="xs"
+											color="muted"
+											block
+											className={styles.workspaceHeaderSubtitle}
+										>
+											{resolvedSubtitle}
+										</Text>
 									</div>
-									<Text
-										as="h1"
-										size="lg"
-										weight="semibold"
-										className={styles.workspaceHeaderTitle}
-									>
-										{resolvedTitle}
-									</Text>
-									<Text
-										size="xs"
-										color="muted"
-										className={styles.workspaceHeaderSubtitle}
-									>
-										{resolvedSubtitle}
-									</Text>
 								</div>
-							</div>
-							<div className={styles.workspaceHeaderMeta}>
-								<Badge color="accent" variant="soft" size="sm">
-									Operations shell
-								</Badge>
-								<Badge color="primary" variant="outline" size="sm">
-									{shellMeta.label}
-								</Badge>
-								<button
-									type="button"
-									className={styles.diagnosticsToggle}
-									onClick={() => setDiagnosticsOpen(true)}
-								>
-									<Bug size={14} />
-									<span>Diagnostics</span>
+								<div className={styles.workspaceHeaderMeta}>
 									<Badge
-										color={diagnosticsTone}
+										color="accent"
 										variant="soft"
 										size="sm"
-										className={styles.diagnosticsToggleBadge}
+										className={styles.workspaceRailChip}
 									>
-										{diagnosticsCount}
+										Operations shell
 									</Badge>
-									<ChevronRight size={14} />
-								</button>
-								{runtimeReport && !runtimeReport.ok ? (
-									<Badge color="warning" variant="soft" size="sm">
-										<AlertTriangle size={12} />
-										Runtime drift
-									</Badge>
-								) : null}
-								{header.centerContent ? (
-									<div className={styles.workspaceHeaderCenterContent}>
-										{header.centerContent}
+									<div className={styles.workspaceHeaderRailPair}>
+										<Badge
+											color="default"
+											variant="soft"
+											size="sm"
+											className={styles.workspaceRailChip}
+										>
+											Area
+										</Badge>
+										<Badge
+											color="primary"
+											variant="outline"
+											size="sm"
+											className={styles.workspaceRailValue}
+										>
+											{shellMeta.areaLabel}
+										</Badge>
 									</div>
-								) : null}
-							</div>
-						</header>
+									<button
+										type="button"
+										className={cn(
+											styles.diagnosticsToggle,
+											diagnosticsButtonToneClass,
+										)}
+										onClick={() => setDiagnosticsOpen(true)}
+										aria-label={`Diagnostics ${diagnosticsStatusLabel}, ${diagnosticsDisplayCount} item${diagnosticsCount === 1 ? "" : "s"}`}
+									>
+										<span className={styles.diagnosticsToggleLead}>
+											<Bug size={14} />
+											<span className={styles.diagnosticsToggleLabel}>
+												Diagnostics
+											</span>
+										</span>
+										<span className={styles.diagnosticsToggleCount}>
+											{diagnosticsDisplayCount}
+										</span>
+										<ChevronRight size={14} />
+									</button>
+								</div>
+							</header>
 
-						<section className={styles.workspaceContent}>
-							<Container size="full" padded={false}>
-								<Outlet />
-							</Container>
-						</section>
+							<section className={styles.workspaceContent}>
+								<Container size="full" padded={false}>
+									<Outlet />
+								</Container>
+							</section>
+						</div>
 					</div>
 				</main>
 			</div>

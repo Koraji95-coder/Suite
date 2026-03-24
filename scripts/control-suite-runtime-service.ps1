@@ -592,6 +592,9 @@ else {
 $detailsText = if ($operation.PSObject.Properties["PreferredDetails"] -and -not [string]::IsNullOrWhiteSpace([string]$operation.PreferredDetails)) {
     [string]$operation.PreferredDetails
 }
+elseif (-not $operation.Ok -and -not [string]::IsNullOrWhiteSpace([string]$operation.OutputTail)) {
+    [string]$operation.OutputTail
+}
 elseif ($serviceStatus -and $serviceStatus.details) {
     $serviceStatus.details
 }

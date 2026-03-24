@@ -38,6 +38,73 @@ export interface BackupData {
 	tables: Record<string, Record<string, unknown>[]>;
 }
 
+const BACKUP_ORDER_COLUMNS: Partial<Record<BackupTable, readonly string[]>> = {
+	files: ["uploaded_at", "id"],
+	activity_log: ["timestamp", "id"],
+	calendar_events: ["due_date", "start_at", "id"],
+};
+
+const DEFAULT_BACKUP_ORDER_COLUMNS = [
+	"created_at",
+	"updated_at",
+	"id",
+] as const;
+
+function getBackupOrderColumns(tableName: BackupTable): readonly string[] {
+	return BACKUP_ORDER_COLUMNS[tableName] ?? DEFAULT_BACKUP_ORDER_COLUMNS;
+}
+
+function isMissingOrderColumnError(error: unknown): boolean {
+	const message =
+		error && typeof error === "object" && "message" in error
+			? String(error.message ?? "").toLowerCase()
+			: "";
+	return (
+		message.includes("does not exist") ||
+		message.includes("could not find") ||
+		message.includes("unknown column")
+	);
+}
+
+async function fetchTableRows(tableName: BackupTable): Promise<{
+	data: Record<string, unknown>[] | null;
+	error: { message: string } | null;
+}> {
+	let lastError: { message: string } | null = null;
+
+	for (const orderColumn of getBackupOrderColumns(tableName)) {
+		const { data, error } = await supabase
+			.from(tableName)
+			.select("*")
+			.order(orderColumn, { ascending: true });
+
+		if (!error) {
+			return {
+				data: (data ?? []) as Record<string, unknown>[],
+				error: null,
+			};
+		}
+
+		lastError = { message: error.message };
+		if (!isMissingOrderColumnError(error)) {
+			break;
+		}
+	}
+
+	const { data, error } = await supabase.from(tableName).select("*");
+	if (!error) {
+		return {
+			data: (data ?? []) as Record<string, unknown>[],
+			error: null,
+		};
+	}
+
+	return {
+		data: null,
+		error: { message: error.message || lastError?.message || "Unknown error" },
+	};
+}
+
 async function upsertBackupRows(
 	tableName: BackupTable,
 	rows: Record<string, unknown>[],
@@ -64,10 +131,7 @@ export async function fetchAllData(): Promise<BackupData> {
 
 	for (const tableName of BACKUP_TABLES) {
 		try {
-			const { data, error } = await supabase
-				.from(tableName)
-				.select("*")
-				.order("created_at", { ascending: true });
+			const { data, error } = await fetchTableRows(tableName);
 
 			if (error) {
 				logger.warn(
@@ -299,10 +363,7 @@ export async function restoreFromYaml(
 		if (!rows || rows.length === 0) continue;
 
 		try {
-			const { error } = await upsertBackupRows(
-				tableName,
-				rows,
-			);
+			const { error } = await upsertBackupRows(tableName, rows);
 
 			if (error) {
 				errors.push(`${tableName}: ${error.message}`);

@@ -21,6 +21,7 @@ from .api_command_center import create_command_center_blueprint
 from .api_work_ledger import create_work_ledger_blueprint
 from .api_transmittal import create_transmittal_blueprint
 from .api_transmittal_render import create_transmittal_render_blueprint
+from .api_title_block_sync import create_title_block_sync_blueprint
 
 
 def register_route_groups(
@@ -106,6 +107,7 @@ def register_route_groups(
             schedule_cleanup=schedule_cleanup,
             batch_session_cookie=batch_session_cookie,
             batch_session_ttl_seconds=batch_session_ttl_seconds,
+            send_autocad_dotnet_command=send_autocad_dotnet_command,
         )
     )
     app.register_blueprint(
@@ -170,6 +172,14 @@ def register_route_groups(
             limiter=limiter,
             logger=logger,
             require_supabase_user=require_supabase_user,
+        )
+    )
+    app.register_blueprint(
+        create_title_block_sync_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
+            send_autocad_dotnet_command=send_autocad_dotnet_command,
         )
     )
     app.register_blueprint(

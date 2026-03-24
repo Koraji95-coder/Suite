@@ -1,7 +1,11 @@
 .root {
+	--calendar-hour-rail-width: 3.75rem;
 	display: grid;
 	flex: 1 1 auto;
-	grid-template-columns: repeat(8, minmax(0, 1fr));
+	grid-template-columns: var(--calendar-hour-rail-width) repeat(
+			7,
+			minmax(0, 1fr)
+		);
 	overflow: hidden;
 }
 
@@ -24,13 +28,15 @@
 	transform: translateY(-50%);
 	display: inline-flex;
 	min-height: 1.75rem;
-	width: 3.5rem;
+	width: var(--calendar-hour-rail-width);
 	align-items: center;
 	justify-content: center;
 	border-radius: 0.375rem;
+	background: var(--background);
 	padding: 0 0.625rem;
 	text-align: center;
 	font-size: 0.75rem;
+	font-weight: 500;
 	line-height: 1;
 	color: var(--text-muted);
 }
@@ -124,4 +130,10 @@
 
 .quarter3 {
 	top: calc((var(--week-cells-height) / 4) * 3);
+}
+
+@media (min-width: 640px) {
+	.root {
+		--calendar-hour-rail-width: 4.5rem;
+	}
 }

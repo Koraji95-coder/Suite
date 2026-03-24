@@ -8,6 +8,7 @@ manual login.
 - Creates a temporary Supabase user (email-confirmed).
 - Generates and verifies a magic-link token server-side.
 - Writes Playwright storage state with `suite-auth` localStorage session.
+- Seeds a display name so protected routes do not stop on the first-login name prompt.
 
 Default output:
 
@@ -28,10 +29,21 @@ Set these env vars (or keep them in `.env`):
 npm run auth:playwright:bootstrap
 ```
 
+By default this now writes auth state for:
+
+- Playwright's configured base URL origin (`http://localhost:4173` / `http://127.0.0.1:4173` unless overridden)
+- Common Vite dev origins (`http://localhost:5173` / `http://127.0.0.1:5173`)
+
 Optional origin override:
 
 ```bash
 node scripts/bootstrap-playwright-auth-state.mjs --origin http://127.0.0.1:4173
+```
+
+Optional display-name override:
+
+```bash
+node scripts/bootstrap-playwright-auth-state.mjs --display-name "Suite E2E"
 ```
 
 Multiple origins:
@@ -48,6 +60,13 @@ node scripts/bootstrap-playwright-auth-state.mjs \
 npx --yes --package @playwright/cli playwright-cli open http://localhost:5173/
 npx --yes --package @playwright/cli playwright-cli state-load output/playwright/auth-state.json
 npx --yes --package @playwright/cli playwright-cli goto http://localhost:5173/app/apps/autodraft-studio
+```
+
+## Use With Repo Tests
+
+```bash
+npm run auth:playwright:bootstrap
+npx playwright test tests/e2e/authenticated-shell.spec.ts
 ```
 
 ## Notes

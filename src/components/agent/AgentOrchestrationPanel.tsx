@@ -6,19 +6,14 @@ import {
 	RefreshCw,
 	Sparkles,
 } from "lucide-react";
-import {
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
 import { logger } from "@/lib/logger";
+import type { AgentTaskItem } from "@/services/agent/types";
 import { type AgentRunSnapshot, agentService } from "@/services/agentService";
 import styles from "./AgentOrchestrationPanel.module.css";
 import { AgentPixelMark } from "./AgentPixelMark";
@@ -101,9 +96,20 @@ const STREAM_RETRY_BASE_MS = 800;
 const STREAM_RETRY_MAX_MS = 10_000;
 const MAX_TIMELINE_EVENTS = 400;
 const REFRESH_POLL_INTERVAL_MS = 5_000;
+const ORCHESTRATION_STORAGE_KEY = "agent-last-orchestration-run";
 const ORCHESTRATION_DEBUG_ENABLED = /^(1|true|yes)$/i.test(
 	String(import.meta.env.VITE_AGENT_DEBUG_ORCHESTRATION || "").trim(),
 );
+
+type RunTaskSummary = {
+	total: number;
+	queued: number;
+	running: number;
+	awaitingReview: number;
+	approved: number;
+	reworkRequested: number;
+	deferred: number;
+};
 
 function asRecord(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -173,6 +179,67 @@ function parseStageSummary(snapshot?: AgentRunSnapshot): Array<{
 		.sort((a, b) => a.stage.localeCompare(b.stage));
 }
 
+function parseTaskSummary(snapshot?: AgentRunSnapshot): RunTaskSummary {
+	const source = snapshot?.taskSummary;
+	return {
+		total: Math.max(0, Number(source?.total ?? 0)),
+		queued: Math.max(0, Number(source?.queued ?? 0)),
+		running: Math.max(0, Number(source?.running ?? 0)),
+		awaitingReview: Math.max(0, Number(source?.awaitingReview ?? 0)),
+		approved: Math.max(0, Number(source?.approved ?? 0)),
+		reworkRequested: Math.max(0, Number(source?.reworkRequested ?? 0)),
+		deferred: Math.max(0, Number(source?.deferred ?? 0)),
+	};
+}
+
+function parseRunTasks(snapshot?: AgentRunSnapshot): AgentTaskItem[] {
+	if (!Array.isArray(snapshot?.tasks)) return [];
+	return snapshot.tasks
+		.filter((task): task is AgentTaskItem => Boolean(task?.taskId))
+		.map((task) => ({
+			...task,
+			taskId: String(task.taskId || "").trim(),
+			runId: String(task.runId || "").trim(),
+			assigneeProfile: String(task.assigneeProfile || "").trim(),
+			stage: String(task.stage || "").trim(),
+			title: String(task.title || "").trim(),
+			description: String(task.description || "").trim(),
+			priority: task.priority,
+			status: task.status,
+			userId: String(task.userId || "").trim(),
+			requestId: String(task.requestId || "").trim(),
+			createdAt: String(task.createdAt || "").trim(),
+			updatedAt: String(task.updatedAt || "").trim(),
+			startedAt: String(task.startedAt || "").trim(),
+			finishedAt: String(task.finishedAt || "").trim(),
+			reviewAction: String(task.reviewAction || "").trim(),
+			reviewerId: String(task.reviewerId || "").trim(),
+			reviewerNote: String(task.reviewerNote || "").trim(),
+		}))
+		.filter((task) => task.taskId.length > 0);
+}
+
+function readPersistedRunId(): string {
+	try {
+		return String(localStorage.getItem(ORCHESTRATION_STORAGE_KEY) || "").trim();
+	} catch {
+		return "";
+	}
+}
+
+function persistRunId(runId: string): void {
+	try {
+		const normalized = String(runId || "").trim();
+		if (!normalized) {
+			localStorage.removeItem(ORCHESTRATION_STORAGE_KEY);
+			return;
+		}
+		localStorage.setItem(ORCHESTRATION_STORAGE_KEY, normalized);
+	} catch {
+		/* noop */
+	}
+}
+
 function statusColor(
 	status: RunStatus,
 ): "default" | "primary" | "success" | "warning" | "danger" {
@@ -203,21 +270,6 @@ function eventColor(
 		return "primary";
 	if (eventType.includes("cancel")) return "warning";
 	return "default";
-}
-
-function streamStateColor(
-	state: StreamState,
-): "default" | "primary" | "success" | "warning" | "danger" {
-	switch (state) {
-		case "connecting":
-			return "warning";
-		case "live":
-			return "success";
-		case "error":
-			return "danger";
-		default:
-			return "default";
-	}
 }
 
 function isProfileId(value: string): value is AgentProfileId {
@@ -276,25 +328,31 @@ function eventAvatarState(eventType: string): AgentMarkState {
 }
 
 interface AgentOrchestrationPanelProps {
-	healthy: boolean;
+	healthy: boolean | null;
 	paired: boolean;
+	condensed?: boolean;
 	objective?: string;
 	runStartSignal?: number;
+	resumeRunId?: string;
 	onRunStarted?: (payload: AgentOrchestrationRunStartedPayload) => void;
 	onRunEvent?: (payload: AgentOrchestrationRunEventPayload) => void;
 	onRunStatusChange?: (payload: AgentOrchestrationRunStatusPayload) => void;
 	onRunCleared?: (payload: { runId: string }) => void;
+	onOpenReviewInbox?: (payload: { runId: string }) => void;
 }
 
 export function AgentOrchestrationPanel({
 	healthy,
 	paired,
+	condensed = false,
 	objective,
 	runStartSignal,
+	resumeRunId,
 	onRunStarted,
 	onRunEvent,
 	onRunStatusChange,
 	onRunCleared,
+	onOpenReviewInbox,
 }: AgentOrchestrationPanelProps) {
 	const [selectedProfiles, setSelectedProfiles] =
 		useState<AgentProfileId[]>(DEFAULT_PROFILES);
@@ -305,9 +363,14 @@ export function AgentOrchestrationPanel({
 	const [stageSummary, setStageSummary] = useState<
 		ReturnType<typeof parseStageSummary>
 	>([]);
+	const [taskSummary, setTaskSummary] = useState<RunTaskSummary>(() =>
+		parseTaskSummary(),
+	);
+	const [runTasks, setRunTasks] = useState<AgentTaskItem[]>([]);
 	const [finalOutput, setFinalOutput] = useState("");
 	const [finalError, setFinalError] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [isRestoring, setIsRestoring] = useState(false);
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [error, setError] = useState<string>("");
 	const [streamState, setStreamState] = useState<StreamState>("idle");
@@ -324,12 +387,28 @@ export function AgentOrchestrationPanel({
 	const lastEventIdRef = useRef(0);
 	const lastScrolledEventIdRef = useRef(0);
 	const lastRunStartSignalRef = useRef(0);
+	const resumeAttemptedRunIdRef = useRef("");
 
 	const orchestrationAvailable = agentService.usesBroker();
-	const ready = orchestrationAvailable && healthy && paired;
+	const isHealthy = healthy === true;
+	const healthPending = healthy === null;
+	const ready = orchestrationAvailable && isHealthy && paired;
 	const runActive = runId.length > 0 && !TERMINAL_STATUSES.has(status);
-	const streamActive = runActive && streamState === "live";
 	const streamError = streamState === "error";
+	const idleCompact =
+		condensed &&
+		!runId &&
+		!isExpanded &&
+		!error &&
+		!streamNotice &&
+		status === "idle";
+	const showExpandedRunDetails =
+		isExpanded &&
+		(Boolean(runId) ||
+			stageSummary.length > 0 ||
+			events.length > 0 ||
+			Boolean(finalOutput) ||
+			Boolean(finalError));
 
 	const clearReconnectTimer = useCallback(() => {
 		if (reconnectTimerRef.current !== null) {
@@ -418,17 +497,61 @@ export function AgentOrchestrationPanel({
 		const nextStatus = String(snapshot.status || "running") as RunStatus;
 		const parsedEvents = parseEvents(snapshot);
 		const parsedSummary = parseStageSummary(snapshot);
+		const parsedTaskSummary = parseTaskSummary(snapshot);
+		const parsedRunTasks = parseRunTasks(snapshot);
 		const nextFinalOutput = String(snapshot.finalOutput || "");
 		const nextFinalError = String(snapshot.finalError || "");
 		const maxId = parsedEvents[parsedEvents.length - 1]?.id ?? 0;
 		if (maxId > 0) {
 			lastEventIdRef.current = Math.max(lastEventIdRef.current, maxId);
 		}
+		const snapshotRunId = String(snapshot.runId || "").trim();
+		if (snapshotRunId) {
+			setRunId((current) =>
+				current === snapshotRunId ? current : snapshotRunId,
+			);
+			persistRunId(snapshotRunId);
+		}
+		const snapshotRequestId = String(snapshot.requestId || "").trim();
+		if (snapshotRequestId) {
+			setRequestId((current) =>
+				current === snapshotRequestId ? current : snapshotRequestId,
+			);
+		}
+		const snapshotProfiles = Array.isArray(snapshot.profiles)
+			? snapshot.profiles
+					.map((value) =>
+						String(value || "")
+							.trim()
+							.toLowerCase(),
+					)
+					.filter(
+						(value): value is AgentProfileId =>
+							isProfileId(value) && value !== "koro",
+					)
+			: [];
+		if (snapshotProfiles.length > 0) {
+			setSelectedProfiles((current) =>
+				current.join("|") === snapshotProfiles.join("|")
+					? current
+					: snapshotProfiles,
+			);
+		}
 		setStatus((current) => (current === nextStatus ? current : nextStatus));
 		setEvents((current) =>
 			eventWindowMatches(current, parsedEvents) ? current : parsedEvents,
 		);
 		setStageSummary(parsedSummary);
+		setTaskSummary((current) =>
+			JSON.stringify(current) === JSON.stringify(parsedTaskSummary)
+				? current
+				: parsedTaskSummary,
+		);
+		setRunTasks((current) =>
+			JSON.stringify(current) === JSON.stringify(parsedRunTasks)
+				? current
+				: parsedRunTasks,
+		);
 		setFinalOutput((current) =>
 			current === nextFinalOutput ? current : nextFinalOutput,
 		);
@@ -471,6 +594,66 @@ export function AgentOrchestrationPanel({
 			);
 		}
 	}, [runId, hydrateFromSnapshot]);
+
+	useEffect(() => {
+		if (!orchestrationAvailable) return;
+		const candidateRunId = String(resumeRunId || readPersistedRunId()).trim();
+		if (!candidateRunId) return;
+		if (runActive) return;
+		if (candidateRunId === runId) return;
+		if (resumeAttemptedRunIdRef.current === candidateRunId) return;
+
+		let cancelled = false;
+		resumeAttemptedRunIdRef.current = candidateRunId;
+		setIsRestoring(true);
+
+		void (async () => {
+			try {
+				const result = await agentService.getOrchestrationRun(candidateRunId);
+				if (cancelled) return;
+				if (!result.success || !result.run) {
+					const errorText = String(result.error || "")
+						.trim()
+						.toLowerCase();
+					if (
+						candidateRunId === readPersistedRunId() &&
+						errorText.includes("not found")
+					) {
+						persistRunId("");
+					}
+					return;
+				}
+				setError("");
+				setRunId(candidateRunId);
+				setIsExpanded(true);
+				hydrateFromSnapshot(result.run);
+			} catch (error) {
+				if (cancelled) return;
+				logger.warn(
+					"Unable to restore orchestration run state.",
+					"AgentOrchestrationPanel",
+					{
+						runId: candidateRunId,
+						error,
+					},
+				);
+			} finally {
+				if (!cancelled) {
+					setIsRestoring(false);
+				}
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		orchestrationAvailable,
+		resumeRunId,
+		runActive,
+		runId,
+		hydrateFromSnapshot,
+	]);
 
 	useEffect(() => {
 		const reconnectCycle = streamEpoch;
@@ -678,10 +861,14 @@ export function AgentOrchestrationPanel({
 			}
 
 			setRunId(result.runId);
+			resumeAttemptedRunIdRef.current = result.runId;
+			persistRunId(result.runId);
 			setRequestId(String(result.requestId || ""));
 			setStatus((result.status || "queued") as RunStatus);
 			setEvents([]);
 			setStageSummary([]);
+			setTaskSummary(parseTaskSummary());
+			setRunTasks([]);
 			setFinalOutput("");
 			setFinalError("");
 			setStreamState("idle");
@@ -745,10 +932,14 @@ export function AgentOrchestrationPanel({
 		setStatus("idle");
 		setEvents([]);
 		setStageSummary([]);
+		setTaskSummary(parseTaskSummary());
+		setRunTasks([]);
 		setFinalOutput("");
 		setFinalError("");
 		setStreamState("idle");
 		setStreamNotice("");
+		persistRunId("");
+		resumeAttemptedRunIdRef.current = "";
 	}, [stopStreaming, runId, onRunCleared]);
 
 	const handleReconnectNow = useCallback(() => {
@@ -765,66 +956,126 @@ export function AgentOrchestrationPanel({
 	}, [runId, runActive, clearReconnectTimer, closeStreamSilently, refreshRun]);
 
 	const statusBadgeColor = useMemo(() => statusColor(status), [status]);
+	const reviewPendingCount =
+		taskSummary.awaitingReview + taskSummary.reworkRequested;
+	const activeTaskCount = taskSummary.queued + taskSummary.running;
+	const reviewProfiles = useMemo(
+		() =>
+			Array.from(
+				new Set(
+					runTasks
+						.filter(
+							(task) =>
+								task.status === "awaiting_review" ||
+								task.status === "rework_requested",
+						)
+						.map((task) => String(task.assigneeProfile || "").trim())
+						.filter(Boolean),
+				),
+			),
+		[runTasks],
+	);
+	const runSummaryText = useMemo(() => {
+		if (!runId && isRestoring) {
+			return "Restoring the latest orchestration run so the review handoff stays intact.";
+		}
+		if (!runId) return "";
+		if (status === "queued") {
+			return "Run is queued. The crew ledger is ready and tasks will start shortly.";
+		}
+		if (status === "running" || status === "cancel_requested") {
+			return activeTaskCount > 0
+				? `${activeTaskCount} task${activeTaskCount === 1 ? "" : "s"} currently active across the selected crew.`
+				: "The crew is coordinating now. The timeline will fill in as steps complete.";
+		}
+		if (status === "completed") {
+			if (reviewPendingCount > 0) {
+				return `${reviewPendingCount} task${
+					reviewPendingCount === 1 ? "" : "s"
+				} still need reviewer action before this run is truly finished.`;
+			}
+			if (taskSummary.approved > 0) {
+				return "Run finished and all tracked task handoffs have been reviewed.";
+			}
+			return "Run finished cleanly.";
+		}
+		if (status === "failed") {
+			return "Run stopped with an error. Review the timeline and any queued follow-up tasks before retrying.";
+		}
+		if (status === "cancelled") {
+			return "Run was cancelled. Any unfinished task handoffs were deferred for later review.";
+		}
+		return "";
+	}, [
+		activeTaskCount,
+		isRestoring,
+		reviewPendingCount,
+		runId,
+		status,
+		taskSummary.approved,
+	]);
+	const summaryTone =
+		status === "failed" || status === "cancelled"
+			? "danger"
+			: reviewPendingCount > 0
+				? "warning"
+				: status === "completed"
+					? "success"
+					: "default";
 
 	if (!orchestrationAvailable) {
 		return (
-			<Panel variant="inset" padding="md" className={styles.container}>
+			<Panel variant="sunken" padding="md" className={styles.container}>
 				<HStack align="center" gap={2}>
 					<Bot size={16} />
 					<Text size="sm" weight="semibold">
-						Live Agent Collaboration
+						Run coordination
 					</Text>
-					<Badge size="sm" color="warning" variant="soft">
-						Broker mode required
-					</Badge>
 				</HStack>
 				<Text size="xs" color="muted" block>
-					Set <code>VITE_AGENT_TRANSPORT=backend</code> to enable animated
-					multi-agent runs.
+					Switch the transport to backend mode when you want the crew to run a
+					shared objective.
 				</Text>
 			</Panel>
 		);
 	}
 
 	return (
-		<Panel variant="inset" padding="md" className={styles.container}>
+		<Panel variant="sunken" padding="md" className={styles.container}>
 			<div className={styles.header}>
 				<HStack gap={2} align="center">
 					<Sparkles size={16} />
 					<Text size="sm" weight="semibold">
-						Live Agent Collaboration
+						Run coordination
 					</Text>
-					<Badge color={statusBadgeColor} variant="soft" size="sm">
-						{status === "idle" ? "ready" : status}
-					</Badge>
-					<Badge color={streamStateColor(streamState)} variant="soft" size="sm">
-						{streamActive
-							? "stream live"
-							: streamState === "connecting"
-								? "stream connecting"
-								: streamState === "error"
-									? "stream error"
-									: "stream idle"}
-					</Badge>
+					{runId ? (
+						<Badge color={statusBadgeColor} variant="soft" size="sm">
+							{status.replaceAll("_", " ")}
+						</Badge>
+					) : null}
 				</HStack>
 				<HStack gap={1} align="center">
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => void handleReconnectNow()}
-						disabled={!runActive}
-					>
-						Reconnect
-					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						iconLeft={<RefreshCw size={14} />}
-						onClick={() => void refreshRun()}
-						disabled={!runId}
-					>
-						Refresh
-					</Button>
+					{runId ? (
+						<>
+							<Button
+								variant="ghost"
+								size="sm"
+								onClick={() => void handleReconnectNow()}
+								disabled={!runActive}
+							>
+								Reconnect
+							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
+								iconLeft={<RefreshCw size={14} />}
+								onClick={() => void refreshRun()}
+								disabled={!runId}
+							>
+								Refresh
+							</Button>
+						</>
+					) : null}
 					<Button
 						variant="ghost"
 						size="sm"
@@ -835,215 +1086,304 @@ export function AgentOrchestrationPanel({
 				</HStack>
 			</div>
 
-			<Text size="xs" color="muted" block>
-				Objective is provided by the unified command composer.
-			</Text>
-
-			<div className={styles.profileRow}>
-				{AGENT_PROFILE_IDS.filter((id) => id !== "koro").map((profileId) => {
-					const active = selectedProfiles.includes(profileId);
-					const profileState = resolveAgentMarkState({
-						error:
-							!healthy ||
-							streamError ||
-							status === "failed" ||
-							status === "cancelled",
-						waiting: healthy && !paired,
-						running: runActive && active,
-						warning: active && status === "cancel_requested",
-						success: active && !runActive && status === "completed",
-						focus: active && !runActive && ready,
-					});
-					return (
-						<button
-							key={profileId}
-							type="button"
-							onClick={() => handleToggleProfile(profileId)}
-							className={styles.profilePill}
-							data-active={active ? "true" : "false"}
-							disabled={runActive || isSubmitting}
-						>
-							<AgentPixelMark
-								profileId={profileId}
-								size={26}
-								detailLevel="auto"
-								state={profileState}
-							/>
-							<span>{AGENT_PROFILES[profileId].name}</span>
-						</button>
-					);
-				})}
-			</div>
-
-			<HStack gap={2} align="center" className={styles.controls}>
-				<Button
-					variant="primary"
-					size="sm"
-					iconLeft={isSubmitting ? <Loader2 size={14} /> : <Play size={14} />}
-					loading={isSubmitting}
-					onClick={() => void handleStart()}
-					disabled={runActive || !healthy || !paired}
-				>
-					Start Run
-				</Button>
-				<Button
-					variant="outline"
-					size="sm"
-					iconLeft={<PauseCircle size={14} />}
-					onClick={() => void handleCancel()}
-					disabled={!runActive}
-				>
-					Cancel
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					onClick={handleClear}
-					disabled={runActive && status !== "cancel_requested"}
-				>
-					Clear
-				</Button>
-			</HStack>
-
-			{error && (
-				<Text size="xs" color="danger" className={styles.errorText} block>
-					{error}
-				</Text>
-			)}
-			{streamNotice && (
-				<Text size="xs" color="warning" className={styles.errorText} block>
-					{streamNotice}
-				</Text>
-			)}
-
-			{runId && (
-				<HStack gap={2} align="center" className={styles.metaRow}>
+			{idleCompact ? (
+				<div className={styles.idleSummaryRow}>
+					<Text size="xs" color="muted" className={styles.idleSummaryText}>
+						Run coordination stays tucked away while direct chat is in focus.
+						Switch to Run objective when you want the crew to execute.
+					</Text>
 					<Badge size="sm" variant="outline" color="default">
-						run {runId.slice(-8)}
+						{selectedProfiles.length} profiles selected
 					</Badge>
-					{requestId ? (
-						<Badge size="sm" variant="outline" color="default">
-							req {requestId.slice(0, 14)}
-						</Badge>
-					) : null}
-				</HStack>
-			)}
-
-			{isExpanded ? (
+				</div>
+			) : (
 				<>
-					{stageSummary.length > 0 && (
-						<div className={styles.stageGrid}>
-							{stageSummary.map((stage) => (
-								<div key={stage.stage} className={styles.stageCard}>
-									<Text size="xs" weight="semibold" block>
-										{stage.stage.replace("_", " ").toUpperCase()}
-									</Text>
-									<Text size="xs" color="muted" block>
-										{stage.completed}/{stage.total} complete
-									</Text>
-									{stage.inProgress > 0 && (
-										<Text size="xs" color="primary" block>
-											{stage.inProgress} in progress
-										</Text>
-									)}
-									{stage.failed > 0 && (
-										<Text size="xs" color="danger" block>
-											{stage.failed} failed
-										</Text>
-									)}
-								</div>
-							))}
-						</div>
-					)}
+					<Text size="xs" color="muted" block>
+						Choose the profiles you want in the crew, then launch the current
+						objective from the unified composer.
+					</Text>
 
-					<div className={styles.timeline} ref={timelineRef}>
-						{events.length === 0 ? (
-							<div className={styles.emptyTimeline}>
-								<Text size="xs" color="muted">
-									No events yet. Start a run to watch agents collaborate in real
-									time.
-								</Text>
-							</div>
-						) : (
-							<Stack gap={2}>
-								{events.map((event) => {
-									const eventBody = extractEventBody(event);
-									const profileId = isProfileId(event.profileId)
-										? event.profileId
-										: null;
-									return (
-										<div key={event.id} className={styles.eventRow}>
-											<div className={styles.eventAvatar}>
-												{profileId ? (
-													<AgentPixelMark
-														profileId={profileId}
-														size={30}
-														detailLevel="auto"
-														state={eventAvatarState(event.eventType)}
-													/>
-												) : (
-													<div className={styles.systemAvatar}>SYS</div>
-												)}
-											</div>
-											<div className={styles.eventBubble}>
-												<HStack
-													gap={1}
-													align="center"
-													className={styles.eventMeta}
-												>
-													<Badge
-														size="sm"
-														variant="soft"
-														color={eventColor(event.eventType)}
-													>
-														{event.eventType}
-													</Badge>
-													{event.stage ? (
-														<Badge size="sm" variant="outline" color="default">
-															{event.stage}
-														</Badge>
-													) : null}
-													<Text size="xs" color="muted">
-														{formatTime(event.createdAt)}
-													</Text>
-												</HStack>
-												<Text size="sm" className={styles.eventText} block>
-													{eventBody}
-												</Text>
-											</div>
-										</div>
-									);
-								})}
-							</Stack>
+					<div className={styles.profileRow}>
+						{AGENT_PROFILE_IDS.filter((id) => id !== "koro").map(
+							(profileId) => {
+								const active = selectedProfiles.includes(profileId);
+								const profileState = resolveAgentMarkState({
+									error:
+										healthy === false ||
+										streamError ||
+										status === "failed" ||
+										status === "cancelled",
+									waiting: healthPending || (isHealthy && !paired),
+									running: runActive && active,
+									warning: active && status === "cancel_requested",
+									success: active && !runActive && status === "completed",
+									focus: active && !runActive && ready,
+								});
+								return (
+									<button
+										key={profileId}
+										type="button"
+										onClick={() => handleToggleProfile(profileId)}
+										className={styles.profilePill}
+										data-active={active ? "true" : "false"}
+										disabled={runActive || isSubmitting}
+									>
+										<AgentPixelMark
+											profileId={profileId}
+											size={24}
+											detailLevel="auto"
+											state={profileState}
+										/>
+										<span>{AGENT_PROFILES[profileId].name}</span>
+									</button>
+								);
+							},
 						)}
 					</div>
 
-					{finalOutput && (
-						<div className={styles.outputPanel}>
-							<Text
-								size="xs"
-								weight="semibold"
-								className={styles.outputHeading}
-								block
-							>
-								Final synthesis
-							</Text>
-							<pre className={styles.outputText}>{finalOutput}</pre>
+					<HStack gap={2} align="center" className={styles.controls}>
+						<Button
+							variant="primary"
+							size="sm"
+							iconLeft={
+								isSubmitting ? <Loader2 size={14} /> : <Play size={14} />
+							}
+							loading={isSubmitting}
+							onClick={() => void handleStart()}
+							disabled={runActive || !ready}
+						>
+							Start Run
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							iconLeft={<PauseCircle size={14} />}
+							onClick={() => void handleCancel()}
+							disabled={!runActive}
+						>
+							Cancel
+						</Button>
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={handleClear}
+							disabled={runActive && status !== "cancel_requested"}
+						>
+							Clear
+						</Button>
+					</HStack>
+
+					{error && (
+						<Text size="xs" color="danger" className={styles.errorText} block>
+							{error}
+						</Text>
+					)}
+					{streamNotice && (
+						<Text size="xs" color="warning" className={styles.errorText} block>
+							{streamNotice}
+						</Text>
+					)}
+
+					{runId && (
+						<HStack gap={2} align="center" className={styles.metaRow}>
+							<Badge size="sm" variant="outline" color="default">
+								run {runId.slice(-8)}
+							</Badge>
+							{requestId ? (
+								<Badge size="sm" variant="outline" color="default">
+									req {requestId.slice(0, 14)}
+								</Badge>
+							) : null}
+						</HStack>
+					)}
+
+					{(runSummaryText || runId) && (
+						<div className={styles.summaryPanel} data-tone={summaryTone}>
+							<div className={styles.summaryMain}>
+								<Text size="xs" weight="semibold" block>
+									{status === "completed" && reviewPendingCount > 0
+										? "Review handoff ready"
+										: status === "completed"
+											? "Run finished"
+											: status === "failed"
+												? "Run needs attention"
+												: status === "cancelled"
+													? "Run cancelled"
+													: status === "queued"
+														? "Run queued"
+														: status === "running" ||
+																status === "cancel_requested"
+															? "Run in progress"
+															: isRestoring
+																? "Restoring run"
+																: "Run state"}
+								</Text>
+								{runSummaryText ? (
+									<Text size="xs" color="muted" block>
+										{runSummaryText}
+									</Text>
+								) : null}
+								{reviewProfiles.length > 0 ? (
+									<Text size="xs" color="muted" block>
+										Waiting on {reviewProfiles.join(", ")}.
+									</Text>
+								) : null}
+							</div>
+							<div className={styles.summaryBadges}>
+								{taskSummary.total > 0 ? (
+									<Badge size="sm" variant="soft" color="default">
+										{taskSummary.total} tracked tasks
+									</Badge>
+								) : null}
+								{activeTaskCount > 0 ? (
+									<Badge size="sm" variant="soft" color="primary">
+										{activeTaskCount} active
+									</Badge>
+								) : null}
+								{reviewPendingCount > 0 ? (
+									<Badge size="sm" variant="soft" color="warning">
+										{reviewPendingCount} awaiting review
+									</Badge>
+								) : null}
+								{taskSummary.approved > 0 ? (
+									<Badge size="sm" variant="soft" color="success">
+										{taskSummary.approved} approved
+									</Badge>
+								) : null}
+							</div>
+							{runId && reviewPendingCount > 0 && onOpenReviewInbox ? (
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => onOpenReviewInbox({ runId })}
+								>
+									Open review inbox
+								</Button>
+							) : null}
 						</div>
 					)}
 
-					{finalError && !finalOutput && (
-						<div className={styles.outputPanel}>
-							<Text size="xs" color="danger" weight="semibold" block>
-								Run error
-							</Text>
-							<Text size="sm" color="danger" block>
-								{finalError}
-							</Text>
-						</div>
-					)}
+					{showExpandedRunDetails ? (
+						<>
+							{stageSummary.length > 0 && (
+								<div className={styles.stageGrid}>
+									{stageSummary.map((stage) => (
+										<div key={stage.stage} className={styles.stageCard}>
+											<Text size="xs" weight="semibold" block>
+												{stage.stage.replace("_", " ").toUpperCase()}
+											</Text>
+											<Text size="xs" color="muted" block>
+												{stage.completed}/{stage.total} complete
+											</Text>
+											{stage.inProgress > 0 && (
+												<Text size="xs" color="primary" block>
+													{stage.inProgress} in progress
+												</Text>
+											)}
+											{stage.failed > 0 && (
+												<Text size="xs" color="danger" block>
+													{stage.failed} failed
+												</Text>
+											)}
+										</div>
+									))}
+								</div>
+							)}
+
+							<div className={styles.timeline} ref={timelineRef}>
+								{events.length === 0 ? (
+									<div className={styles.emptyTimeline}>
+										<Text size="xs" color="muted">
+											No events yet. Start a run to watch agents collaborate in
+											real time.
+										</Text>
+									</div>
+								) : (
+									<Stack gap={2}>
+										{events.map((event) => {
+											const eventBody = extractEventBody(event);
+											const profileId = isProfileId(event.profileId)
+												? event.profileId
+												: null;
+											return (
+												<div key={event.id} className={styles.eventRow}>
+													<div className={styles.eventAvatar}>
+														{profileId ? (
+															<AgentPixelMark
+																profileId={profileId}
+																size={30}
+																detailLevel="auto"
+																state={eventAvatarState(event.eventType)}
+															/>
+														) : (
+															<div className={styles.systemAvatar}>SYS</div>
+														)}
+													</div>
+													<div className={styles.eventBubble}>
+														<HStack
+															gap={1}
+															align="center"
+															className={styles.eventMeta}
+														>
+															<Badge
+																size="sm"
+																variant="soft"
+																color={eventColor(event.eventType)}
+															>
+																{event.eventType}
+															</Badge>
+															{event.stage ? (
+																<Badge
+																	size="sm"
+																	variant="outline"
+																	color="default"
+																>
+																	{event.stage}
+																</Badge>
+															) : null}
+															<Text size="xs" color="muted">
+																{formatTime(event.createdAt)}
+															</Text>
+														</HStack>
+														<Text size="sm" className={styles.eventText} block>
+															{eventBody}
+														</Text>
+													</div>
+												</div>
+											);
+										})}
+									</Stack>
+								)}
+							</div>
+
+							{finalOutput && (
+								<div className={styles.outputPanel}>
+									<Text
+										size="xs"
+										weight="semibold"
+										className={styles.outputHeading}
+										block
+									>
+										Final synthesis
+									</Text>
+									<pre className={styles.outputText}>{finalOutput}</pre>
+								</div>
+							)}
+
+							{finalError && !finalOutput && (
+								<div className={styles.outputPanel}>
+									<Text size="xs" color="danger" weight="semibold" block>
+										Run error
+									</Text>
+									<Text size="sm" color="danger" block>
+										{finalError}
+									</Text>
+								</div>
+							)}
+						</>
+					) : null}
 				</>
-			) : null}
+			)}
 		</Panel>
 	);
 }

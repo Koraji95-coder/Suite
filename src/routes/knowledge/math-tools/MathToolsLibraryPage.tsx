@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PageFrame, Section } from "@/components/apps/ui/PageFrame";
+import { useRegisterPageHeader } from "@/components/apps/ui/PageHeaderContext";
 import { CalculatorPanel } from "@/components/knowledge/mathtools/CalculatorPanel";
 import { CircuitGenerator } from "@/components/knowledge/mathtools/CircuitGenerator";
 import { FormulaBank } from "@/components/knowledge/mathtools/FormulaBank";
@@ -37,6 +38,11 @@ const TOOL_OPTIONS: Array<{ key: ToolKey; label: string }> = [
 
 export default function MathToolsLibraryPage() {
 	const [activeTool, setActiveTool] = useState<ToolKey>("vector");
+	useRegisterPageHeader({
+		title: "Math tools",
+		subtitle:
+			"Calculators, plots, and reference formulas tuned for electrical workflows.",
+	});
 
 	const renderTool = () => {
 		switch (activeTool) {
@@ -62,11 +68,7 @@ export default function MathToolsLibraryPage() {
 	};
 
 	return (
-		<PageFrame
-			title="Math tools"
-			description="Calculators, plots, and reference formulas tuned for electrical workflows."
-			maxWidth="full"
-		>
+		<PageFrame maxWidth="full">
 			<Section title="Tools">
 				<div className={styles.toolsRow}>
 					{TOOL_OPTIONS.map((tool) => {

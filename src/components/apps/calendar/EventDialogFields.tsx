@@ -21,14 +21,7 @@ import { cn } from "@/lib/utils";
 import { Calendar } from "./Calendar";
 import type { EventColor } from "./calendarindex";
 import styles from "./EventDialogFields.module.css";
-import {
-	EVENT_DIALOG_COLOR_OPTIONS,
-	EVENT_DIALOG_TIME_OPTIONS,
-} from "./eventDialogModels";
-
-const TIME_OPTIONS = EVENT_DIALOG_TIME_OPTIONS.filter(
-	(option) => option.value.trim().length > 0,
-);
+import { EVENT_DIALOG_COLOR_OPTIONS } from "./eventDialogModels";
 
 interface EventDialogFieldsProps {
 	projectOptions: Array<{ id: string; name: string }>;
@@ -106,12 +99,8 @@ export function EventDialogFields({
 	const safeTaskOptions = filteredTaskOptions.filter(
 		(task) => task.id.trim().length > 0,
 	);
-	const safeStartTime = TIME_OPTIONS.some((option) => option.value === startTime)
-		? startTime
-		: (TIME_OPTIONS[0]?.value ?? "09:00");
-	const safeEndTime = TIME_OPTIONS.some((option) => option.value === endTime)
-		? endTime
-		: (TIME_OPTIONS[1]?.value ?? TIME_OPTIONS[0]?.value ?? "10:00");
+	const safeStartTime = /^\d{2}:\d{2}$/.test(startTime) ? startTime : "09:00";
+	const safeEndTime = /^\d{2}:\d{2}$/.test(endTime) ? endTime : "10:00";
 	const projectSelectValue = projectId ?? NO_PROJECT_VALUE;
 	const taskSelectValue = taskId ?? NO_TASK_VALUE;
 
@@ -229,23 +218,27 @@ export function EventDialogFields({
 					</Popover>
 				</div>
 
-				{!allDay ? (
-					<div className={cn(styles.timeColumn, styles.fieldStack)}>
-						<Label htmlFor="start-time">Start Time</Label>
-						<Select value={safeStartTime} onValueChange={setStartTime}>
-							<SelectTrigger id="start-time">
-								<SelectValue placeholder="Select time" />
-							</SelectTrigger>
-							<SelectContent>
-								{TIME_OPTIONS.map((option) => (
-									<SelectItem key={option.value} value={option.value}>
-										{option.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
-				) : null}
+				<div
+					className={cn(
+						styles.timeColumn,
+						styles.fieldStack,
+						allDay && styles.timeColumnDisabled,
+					)}
+				>
+					<Label htmlFor="start-time">Start Time</Label>
+					<input
+						id="start-time"
+						name="event_start_time"
+						type="time"
+						step={900}
+						min="00:00"
+						max="23:45"
+						value={safeStartTime}
+						onChange={(event) => setStartTime(event.target.value)}
+						className={styles.timeInput}
+						disabled={allDay}
+					/>
+				</div>
 			</div>
 
 			<div className={styles.dateTimeRow}>
@@ -286,23 +279,27 @@ export function EventDialogFields({
 					</Popover>
 				</div>
 
-				{!allDay ? (
-					<div className={cn(styles.timeColumn, styles.fieldStack)}>
-						<Label htmlFor="end-time">End Time</Label>
-						<Select value={safeEndTime} onValueChange={setEndTime}>
-							<SelectTrigger id="end-time">
-								<SelectValue placeholder="Select time" />
-							</SelectTrigger>
-							<SelectContent>
-								{TIME_OPTIONS.map((option) => (
-									<SelectItem key={option.value} value={option.value}>
-										{option.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
-				) : null}
+				<div
+					className={cn(
+						styles.timeColumn,
+						styles.fieldStack,
+						allDay && styles.timeColumnDisabled,
+					)}
+				>
+					<Label htmlFor="end-time">End Time</Label>
+					<input
+						id="end-time"
+						name="event_end_time"
+						type="time"
+						step={900}
+						min="00:00"
+						max="23:45"
+						value={safeEndTime}
+						onChange={(event) => setEndTime(event.target.value)}
+						className={styles.timeInput}
+						disabled={allDay}
+					/>
+				</div>
 			</div>
 
 			<div className={styles.allDayRow}>
@@ -324,7 +321,10 @@ export function EventDialogFields({
 			</div>
 
 			<fieldset className={styles.colorFieldset}>
-				<legend className={styles.colorLegend}>Etiquette</legend>
+				<legend className={styles.colorLegend}>Calendar color</legend>
+				<p className={styles.colorHelp}>
+					Choose the visual tag this event should use in the schedule.
+				</p>
 				<RadioGroup
 					className={styles.colorOptions}
 					defaultValue={EVENT_DIALOG_COLOR_OPTIONS[0]?.value}

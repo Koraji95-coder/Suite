@@ -2,7 +2,6 @@ import { Upload } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useMemo, useRef } from "react";
 import { Button } from "@/components/primitives/Button";
-import { Input } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
 import { cn } from "@/lib/utils";
 import styles from "./TransmittalBuilderFileRow.module.css";
@@ -89,18 +88,36 @@ export function TransmittalBuilderFileRow({
 					)}
 				</div>
 			</div>
-			<div className={styles.uploadHint}>
-				<Upload size={14} />
-				<span>Choose files or drag into the picker.</span>
+			<div className={styles.pickerSurface}>
+				<div className={styles.uploadHint}>
+					<Upload size={14} />
+					<span>Browse to attach files for this section.</span>
+				</div>
+				<div className={styles.browseRow}>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={() => {
+							if (inputRef.current) {
+								inputRef.current.value = "";
+								inputRef.current.click();
+							}
+						}}
+					>
+						Browse
+					</Button>
+					<div className={styles.preview}>{previewLabel}</div>
+				</div>
 			</div>
-			<Input
+			<input
 				ref={inputRef}
 				type="file"
 				accept={accept}
 				multiple={multiple}
 				onChange={handleChange}
+				className={styles.hiddenInput}
 			/>
-			<div className={styles.preview}>{previewLabel}</div>
 		</Panel>
 	);
 }

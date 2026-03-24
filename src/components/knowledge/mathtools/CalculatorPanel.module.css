@@ -51,6 +51,17 @@
 	outline: none;
 }
 
+.inputControl[type="number"] {
+	appearance: textfield;
+	padding-right: 0.9rem;
+}
+
+.inputControl[type="number"]::-webkit-inner-spin-button,
+.inputControl[type="number"]::-webkit-outer-spin-button {
+	margin: 0;
+	appearance: none;
+}
+
 .inputControl:focus {
 	box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
 }

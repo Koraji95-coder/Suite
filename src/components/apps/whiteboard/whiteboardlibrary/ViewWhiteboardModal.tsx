@@ -1,5 +1,11 @@
 import { Tag, X } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/apps/ui/dialog";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/apps/ui/dialog";
 import { SavedWhiteboard } from "../whiteboardtypes";
 import { formatDate } from "../whiteboardutils";
 import styles from "./ViewWhiteboardModal.module.css";
@@ -21,6 +27,12 @@ export function ViewWhiteboardModal({
 			onOpenChange={(open) => !open && onClose()}
 		>
 			<DialogContent className={styles.dialogContent} showCloseButton={false}>
+				<DialogHeader className="sr-only">
+					<DialogTitle>{whiteboard.title}</DialogTitle>
+					<DialogDescription>
+						View the saved whiteboard preview, metadata, and tags.
+					</DialogDescription>
+				</DialogHeader>
 				{/* Sticky header */}
 				<div className={styles.header}>
 					<div>
@@ -31,7 +43,12 @@ export function ViewWhiteboardModal({
 							<span>{formatDate(whiteboard.created_at)}</span>
 						</div>
 					</div>
-					<button onClick={onClose} className={styles.closeButton}>
+					<button
+						type="button"
+						onClick={onClose}
+						className={styles.closeButton}
+						aria-label="Close whiteboard preview"
+					>
 						<X className={styles.closeIcon} />
 					</button>
 				</div>

@@ -1,0 +1,104 @@
+.band {
+	position: relative;
+	overflow: hidden;
+	display: grid;
+	gap: 1rem;
+	border-radius: calc(var(--radius-4) - 0.08rem);
+}
+
+.bandHero {
+	padding: clamp(1rem, 2vw, 1.35rem);
+	border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+	background: var(--suite-panel-surface);
+	box-shadow: var(--suite-panel-shadow-subtle);
+}
+
+.bandCompact {
+	padding: clamp(0.82rem, 1.4vw, 1.05rem);
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 68%, transparent);
+	background: var(--suite-surface-support);
+	box-shadow:
+		0 14px 30px -34px color-mix(in srgb, var(--primary) 20%, transparent),
+		inset 0 1px 0 rgb(255 255 255 / 3%);
+}
+
+.main {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.9rem;
+}
+
+.intro {
+	display: grid;
+	gap: 0.45rem;
+	min-width: 0;
+	max-width: 72ch;
+}
+
+.eyebrow {
+	margin: 0;
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: color-mix(in srgb, var(--accent) 80%, white 20%);
+}
+
+.summary {
+	min-width: 0;
+	color: var(--text);
+}
+
+.aside {
+	display: grid;
+	justify-items: end;
+	align-content: start;
+	gap: 0.75rem;
+	flex-shrink: 0;
+}
+
+.meta {
+	display: inline-flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.45rem;
+}
+
+.actions {
+	display: inline-flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.55rem;
+}
+
+.body {
+	display: grid;
+	gap: 0.85rem;
+}
+
+.bandCompact .eyebrow {
+	font-size: 0.62rem;
+	letter-spacing: 0.12em;
+}
+
+.bandCompact .main {
+	gap: 0.75rem;
+}
+
+.bandCompact .body {
+	gap: 0.7rem;
+}
+
+@media (max-width: 860px) {
+	.aside {
+		width: 100%;
+		justify-items: start;
+	}
+
+	.meta,
+	.actions {
+		justify-content: flex-start;
+	}
+}

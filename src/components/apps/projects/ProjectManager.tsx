@@ -79,6 +79,8 @@ export function ProjectManager({
 		handleDragEnd,
 		handleFileUpload,
 		downloadFile,
+		pickProjectRootPath,
+		isPickingProjectRoot,
 		updateProjectWatchdogRootPath,
 		resetProjectForm,
 		resetTaskForm,
@@ -128,6 +130,8 @@ export function ProjectManager({
 				formData={projectForm}
 				setFormData={setProjectForm}
 				isEditing={Boolean(editingProject)}
+				onBrowseRootPath={pickProjectRootPath}
+				isBrowsingRootPath={isPickingProjectRoot}
 			/>
 
 			<TaskFormModal

@@ -27,22 +27,8 @@ export function AppsCatalogGrid({ items }: { items: AppsCatalogItem[] }) {
 								<h2 className={styles.title}>{item.title}</h2>
 							</div>
 						</div>
-						<span
-							className={cn(
-								styles.status,
-								item.status === "active" && styles.statusActive,
-								item.status === "in-progress" && styles.statusInProgress,
-								item.status === "coming-soon" && styles.statusComingSoon,
-							)}
-						>
-							{item.status}
-						</span>
 					</div>
 					<p className={styles.description}>{item.description}</p>
-					<div className={styles.metaRow}>
-						<span className={styles.metaItem}>{item.lane}</span>
-						<span className={styles.metaItem}>/{item.id}</span>
-					</div>
 					{item.to ? (
 						<Link className={styles.actionLink} to={item.to}>
 							<span>Open {item.title}</span>

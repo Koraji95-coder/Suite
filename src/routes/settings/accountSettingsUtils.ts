@@ -59,29 +59,3 @@ export function buildPasskeyBackendStatus(
 	}
 	return { value: "Ready", tone: "success" };
 }
-
-export function buildAgentGatewayStatus(
-	agentHealthy: boolean | null,
-): StatusDescriptor {
-	if (agentHealthy === null) {
-		return { value: "Background", tone: "muted" };
-	}
-	return agentHealthy
-		? { value: "Ready", tone: "success" }
-		: { value: "Unavailable", tone: "danger" };
-}
-
-export function buildAgentPairingStatus(
-	agentPaired: boolean,
-): StatusDescriptor {
-	return agentPaired
-		? { value: "Ready", tone: "success" }
-		: { value: "Needs attention", tone: "warning" };
-}
-
-export function buildAgentModeStatus(usesBroker: boolean): StatusDescriptor {
-	return {
-		value: usesBroker ? "Email verification" : "Local verification",
-		tone: usesBroker ? "accent" : "primary",
-	};
-}

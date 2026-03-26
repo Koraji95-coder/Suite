@@ -1,12 +1,36 @@
 import { describe, expect, it, vi } from "vitest";
 
-import {
-	isRetriableSupabaseStartFailure,
-	runSupabaseStartWithRetry,
-} from "../../scripts/lib/supabase-cli.mjs";
+async function loadSupabaseCli() {
+	const modulePath = "../../scripts/lib/supabase-cli.mjs";
+	return (await import(modulePath)) as {
+		isRetriableSupabaseStartFailure: (outputText?: string) => boolean;
+		runSupabaseStartWithRetry: (
+			runOnce: () => Promise<{
+				status?: number | null;
+				stdout?: string;
+				stderr?: string;
+			}>,
+			options?: {
+				maxAttempts?: number;
+				delayMs?: number;
+				onRetry?: (attempt: number, outputText: string) => void;
+			},
+		) => Promise<{
+			result: {
+				status?: number | null;
+				stdout?: string;
+				stderr?: string;
+			} | null;
+			attempts: number;
+			outputText: string;
+			retried: boolean;
+		}>;
+	};
+}
 
 describe("isRetriableSupabaseStartFailure", () => {
-	it("matches transient Docker container-name conflicts", () => {
+	it("matches transient Docker container-name conflicts", async () => {
+		const { isRetriableSupabaseStartFailure } = await loadSupabaseCli();
 		expect(
 			isRetriableSupabaseStartFailure(
 				'failed to create docker container: Error response from daemon: Conflict. The container name "/supabase_vector_Suite" is already in use by container "abc123".',
@@ -14,7 +38,8 @@ describe("isRetriableSupabaseStartFailure", () => {
 		).toBe(true);
 	});
 
-	it("matches transient Supabase edge runtime 502 failures", () => {
+	it("matches transient Supabase edge runtime 502 failures", async () => {
+		const { isRetriableSupabaseStartFailure } = await loadSupabaseCli();
 		expect(
 			isRetriableSupabaseStartFailure(
 				"Waiting for health checks...\nsupabase_edge_runtime_Suite container logs:\nStopping containers...\nError status 502:",
@@ -22,13 +47,15 @@ describe("isRetriableSupabaseStartFailure", () => {
 		).toBe(true);
 	});
 
-	it("ignores non-transient startup failures", () => {
+	it("ignores non-transient startup failures", async () => {
+		const { isRetriableSupabaseStartFailure } = await loadSupabaseCli();
 		expect(isRetriableSupabaseStartFailure("Docker Desktop is not running.")).toBe(false);
 	});
 });
 
 describe("runSupabaseStartWithRetry", () => {
 	it("retries a transient start failure once and returns the succeeding result", async () => {
+		const { runSupabaseStartWithRetry } = await loadSupabaseCli();
 		const runOnce = vi
 			.fn()
 			.mockResolvedValueOnce({
@@ -56,6 +83,7 @@ describe("runSupabaseStartWithRetry", () => {
 	});
 
 	it("does not retry non-transient failures", async () => {
+		const { runSupabaseStartWithRetry } = await loadSupabaseCli();
 		const runOnce = vi.fn().mockResolvedValue({
 			status: 1,
 			stdout: "",

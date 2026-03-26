@@ -27,7 +27,7 @@ interface FetchProfileDefaults {
 }
 
 const LOCAL_STORAGE_KEY = "suite:project-title-block-profiles:local";
-const DEFAULT_BLOCK_NAME = "R3P-24x36BORDER&TITLE";
+export const DEFAULT_PROJECT_TITLE_BLOCK_NAME = "R3P-24x36BORDER&TITLE";
 
 const createId = () =>
 	typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -50,7 +50,9 @@ function readLocalProfiles(): ProjectTitleBlockProfileRow[] {
 		}
 		const parsed = JSON.parse(raw) as unknown;
 		return Array.isArray(parsed)
-			? (parsed.filter((entry) => entry && typeof entry === "object") as ProjectTitleBlockProfileRow[])
+			? (parsed.filter(
+					(entry) => entry && typeof entry === "object",
+				) as ProjectTitleBlockProfileRow[])
 			: [];
 	} catch {
 		return [];
@@ -83,7 +85,7 @@ function buildDefaultProfile(
 		id: createId(),
 		project_id: normalizeText(projectId),
 		user_id: userId ?? "local",
-		block_name: DEFAULT_BLOCK_NAME,
+		block_name: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
 		project_root_path: normalizeText(defaults?.projectRootPath) || null,
 		acade_line1: "",
 		acade_line2: "",
@@ -136,8 +138,9 @@ export const projectTitleBlockProfileService = {
 		const userId = await getCurrentUserId();
 		if (!userId) {
 			const localProfile =
-				readLocalProfiles().find((entry) => entry.project_id === normalizedProjectId) ??
-				buildDefaultProfile(normalizedProjectId, null, defaults);
+				readLocalProfiles().find(
+					(entry) => entry.project_id === normalizedProjectId,
+				) ?? buildDefaultProfile(normalizedProjectId, null, defaults);
 			return {
 				data: mergeProfileDefaults(localProfile, defaults),
 				error: null,
@@ -166,8 +169,9 @@ export const projectTitleBlockProfileService = {
 		}
 
 		const localProfile =
-			readLocalProfiles().find((entry) => entry.project_id === normalizedProjectId) ??
-			buildDefaultProfile(normalizedProjectId, userId, defaults);
+			readLocalProfiles().find(
+				(entry) => entry.project_id === normalizedProjectId,
+			) ?? buildDefaultProfile(normalizedProjectId, userId, defaults);
 		if (result.error) {
 			const message = String(result.error.message || "").toLowerCase();
 			if (
@@ -208,7 +212,8 @@ export const projectTitleBlockProfileService = {
 		const userId = await getCurrentUserId();
 		const payloadBase = {
 			project_id: normalizedProjectId,
-			block_name: normalizeText(input.blockName) || DEFAULT_BLOCK_NAME,
+			block_name:
+				normalizeText(input.blockName) || DEFAULT_PROJECT_TITLE_BLOCK_NAME,
 			project_root_path: normalizeText(input.projectRootPath) || null,
 			acade_line1: normalizeText(input.acadeLine1),
 			acade_line2: normalizeText(input.acadeLine2),
@@ -220,7 +225,9 @@ export const projectTitleBlockProfileService = {
 
 		if (!userId) {
 			const current = readLocalProfiles();
-			const existing = current.find((entry) => entry.project_id === normalizedProjectId);
+			const existing = current.find(
+				(entry) => entry.project_id === normalizedProjectId,
+			);
 			const nextEntry: ProjectTitleBlockProfileRow = {
 				...(existing ?? buildDefaultProfile(normalizedProjectId, null)),
 				...payloadBase,
@@ -255,7 +262,9 @@ export const projectTitleBlockProfileService = {
 		}
 
 		const current = readLocalProfiles();
-		const existing = current.find((entry) => entry.project_id === normalizedProjectId);
+		const existing = current.find(
+			(entry) => entry.project_id === normalizedProjectId,
+		);
 		const fallback: ProjectTitleBlockProfileRow = {
 			...(existing ?? buildDefaultProfile(normalizedProjectId, userId)),
 			...payloadBase,

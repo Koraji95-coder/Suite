@@ -27,6 +27,29 @@
 	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--surface) 80%, transparent);
 }
 
+.bandFacts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
+
+.bandFact {
+	display: grid;
+	gap: 0.18rem;
+	min-width: 8.75rem;
+	padding: 0.78rem 0.88rem;
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 72%, transparent);
+	border-radius: var(--radius-3);
+	background: color-mix(in srgb, var(--suite-surface-overlay) 78%, transparent);
+}
+
+.bandFact strong {
+	font-size: 0.94rem;
+	font-weight: 700;
+	color: var(--text-strong);
+}
+
 .missionGrid {
 	display: grid;
 	gap: 1rem;
@@ -57,31 +80,25 @@
 	max-width: 40rem;
 }
 
-.missionContext,
 .missionHighlights {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-	gap: 0.75rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem;
 }
 
-.missionContext {
-	min-width: min(100%, 18rem);
-}
-
-.missionContextCard,
 .highlightCard {
 	display: grid;
-	gap: 0.22rem;
-	padding: 0.78rem 0.88rem;
+	gap: 0.18rem;
+	min-width: 8.75rem;
+	padding: 0.72rem 0.82rem;
 	border: 1px solid
-		color-mix(in srgb, var(--brand-border-soft) 76%, transparent);
+		color-mix(in srgb, var(--brand-border-soft) 70%, transparent);
 	border-radius: var(--radius-3);
-	background: color-mix(in srgb, var(--suite-surface-overlay) 78%, transparent);
+	background: color-mix(in srgb, var(--suite-surface-overlay) 72%, transparent);
 }
 
-.missionContextCard strong,
 .highlightCard strong {
-	font-size: 1rem;
+	font-size: 0.95rem;
 	font-weight: 700;
 	color: var(--text-strong);
 }
@@ -533,6 +550,89 @@
 	gap: 0.65rem;
 }
 
+.deliverySummaryGrid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.deliverySummaryCard {
+	display: grid;
+	gap: 0.32rem;
+	padding: 0.85rem 0.9rem;
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 78%, transparent);
+	border-radius: var(--radius-2);
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--suite-surface-feature) 92%, transparent),
+		color-mix(in srgb, var(--suite-surface-support) 86%, transparent)
+	);
+}
+
+.deliverySummaryCard strong {
+	font-size: 1.2rem;
+	font-weight: 800;
+	letter-spacing: -0.04em;
+	color: var(--text-strong);
+}
+
+.deliverySummaryCopy {
+	margin: 0;
+	font-size: 0.74rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.deliveryRowBody {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.85rem;
+	width: 100%;
+}
+
+.deliveryRowStatus {
+	display: grid;
+	justify-items: end;
+	gap: 0.45rem;
+	flex-shrink: 0;
+}
+
+.deliveryRowFootnote {
+	margin-top: 0.4rem;
+	font-size: 0.72rem;
+	line-height: 1.45;
+	color: color-mix(in srgb, var(--text-muted) 94%, white 6%);
+}
+
+.deliveryMetaList {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: 0.45rem;
+}
+
+.deliveryMetaChip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	padding: 0.22rem 0.5rem;
+	border-radius: 999px;
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	background: color-mix(in srgb, var(--suite-surface-sunken) 88%, transparent);
+	font-size: 0.68rem;
+	color: var(--text-muted);
+}
+
+.deliverySectionHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.65rem;
+}
+
 .ledgerSummaryRow {
 	display: grid;
 	grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -818,6 +918,10 @@
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}
 
+	.deliverySummaryGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
 	.missionGrid,
 	.statusStrip,
 	.moduleGrid {
@@ -832,12 +936,21 @@
 
 	.filters,
 	.statsGrid,
+	.deliverySummaryGrid,
 	.watchdogMeta,
 	.panelSubgrid,
 	.domainGrid,
 	.memoryStats,
 	.sessionGrid {
 		grid-template-columns: 1fr;
+	}
+
+	.deliveryRowBody {
+		flex-direction: column;
+	}
+
+	.deliveryRowStatus {
+		justify-items: start;
 	}
 
 	.filterFieldWide {

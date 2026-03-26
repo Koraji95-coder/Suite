@@ -132,6 +132,27 @@ describe("ProjectTelemetryPanel", () => {
 		expect(link.getAttribute("href")).toBe("/app/watchdog?project=project-1");
 	});
 
+	it("uses a compact session fallback when journals have not synced yet", () => {
+		const telemetry = createTelemetry();
+		telemetry.trackedDrawings = [];
+
+		render(
+			<MemoryRouter>
+				<ProjectTelemetryPanel
+					projectId="project-1"
+					telemetry={telemetry}
+				/>
+			</MemoryRouter>,
+		);
+
+		expect(
+			screen.getByText(
+				/drawing journals have not synced yet, but recent autocad sessions are already attributed to this project/i,
+			),
+		).toBeTruthy();
+		expect(screen.getByText(/started/i)).toBeTruthy();
+	});
+
 	it("saves edited rule values through the shared project watchdog service", async () => {
 		const telemetry = createTelemetry();
 		const saveRuleSpy = vi.mocked(saveSharedProjectWatchdogRule).mockResolvedValue({
@@ -205,6 +226,6 @@ describe("ProjectTelemetryPanel", () => {
 		fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
 
 		expect(saveRuleSpy).not.toHaveBeenCalled();
-		expect(screen.getByText("C:/Projects/Alpha")).toBeTruthy();
+		expect(screen.getAllByText("C:/Projects/Alpha").length).toBeGreaterThan(0);
 	});
 });

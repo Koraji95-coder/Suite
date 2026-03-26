@@ -1,5 +1,5 @@
 .dialogContent {
-	max-width: min(44rem, calc(100vw - 1.5rem));
+	max-width: min(58rem, calc(100vw - 1.5rem));
 	padding: clamp(1rem, 1.8vw, 1.5rem);
 	border: 1px solid var(--brand-border-strong);
 	background:
@@ -42,12 +42,106 @@
 	font-size: 0.84rem;
 	line-height: 1.5;
 	color: var(--text-muted);
-	max-width: 46ch;
+	max-width: 58ch;
+}
+
+.stepper {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.55rem;
+	margin-bottom: 1rem;
+}
+
+.stepButton {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 0.7rem;
+	align-items: center;
+	padding: 0.7rem 0.8rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--brand-border-soft);
+	background: color-mix(in srgb, var(--brand-surface-neutral) 84%, transparent);
+	color: var(--text);
+	text-align: left;
+	cursor: pointer;
+}
+
+.stepButton:hover {
+	border-color: var(--brand-border-strong);
+	background: color-mix(in srgb, var(--brand-surface-branded) 82%, transparent);
+}
+
+.stepButtonActive {
+	border-color: var(--brand-border-strong);
+	background: var(--suite-panel-surface-strong);
+}
+
+.stepButtonComplete {
+	border-color: color-mix(
+		in srgb,
+		var(--success) 45%,
+		var(--brand-border-soft)
+	);
+}
+
+.stepIconShell {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 999px;
+	border: 1px solid var(--brand-border-soft);
+	background: color-mix(in srgb, var(--brand-surface-branded) 70%, transparent);
+}
+
+.stepIcon {
+	width: 1rem;
+	height: 1rem;
+	color: var(--primary);
+}
+
+.stepCopy {
+	display: grid;
+	gap: 0.18rem;
+	min-width: 0;
+}
+
+.stepLabel {
+	font-size: 0.8rem;
+	font-weight: 700;
+}
+
+.stepDescription {
+	font-size: 0.74rem;
+	line-height: 1.45;
+	color: var(--text-muted);
 }
 
 .fields {
 	display: grid;
 	gap: 0.95rem;
+}
+
+.sectionIntro {
+	display: grid;
+	gap: 0.28rem;
+	margin-bottom: 0.15rem;
+}
+
+.sectionTitle {
+	margin: 0;
+	font-size: 0.96rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.sectionCopy {
+	margin: 0;
+	font-size: 0.8rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+	max-width: 58ch;
 }
 
 .label {
@@ -75,6 +169,69 @@
 		border-color 0.16s ease,
 		box-shadow 0.16s ease,
 		background 0.16s ease;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+	border-color: color-mix(in srgb, var(--primary) 44%, var(--border));
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+	background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.textarea {
+	min-height: 5.8rem;
+	resize: vertical;
+}
+
+.gridTwo {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.8rem;
+}
+
+.gridThree {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0.8rem;
+}
+
+.rootPathRow {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.55rem;
+}
+
+.browseButton,
+.secondaryButton,
+.buttonSecondary {
+	border: 1px solid var(--brand-border-soft);
+	border-radius: var(--radius-2);
+	padding: 0.58rem 0.9rem;
+	font-size: 0.82rem;
+	font-weight: 700;
+	color: var(--text);
+	background: color-mix(in srgb, var(--brand-surface-branded) 78%, transparent);
+	cursor: pointer;
+	transition:
+		border-color 0.16s ease,
+		background 0.16s ease,
+		color 0.16s ease,
+		opacity 0.16s ease;
+}
+
+.browseButton:hover:not(:disabled),
+.secondaryButton:hover:not(:disabled),
+.buttonSecondary:hover:not(:disabled) {
+	border-color: var(--brand-border-strong);
+	background: color-mix(in srgb, var(--brand-surface-branded) 92%, transparent);
+}
+
+.browseButton:disabled,
+.secondaryButton:disabled,
+.buttonSecondary:disabled {
+	opacity: 0.65;
+	cursor: wait;
 }
 
 .dateTrigger {
@@ -127,100 +284,167 @@
 	padding: 0.5rem;
 }
 
-.input:focus,
-.select:focus,
-.textarea:focus {
-	border-color: color-mix(in srgb, var(--primary) 44%, var(--border));
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
-	background: color-mix(in srgb, var(--surface) 90%, transparent);
-}
-
-.textarea {
-	min-height: 5.8rem;
-	resize: vertical;
-}
-
-.rootPathRow {
+.infoCard,
+.reviewChecklist {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
-	gap: 0.55rem;
+	gap: 0.75rem;
+	padding: 0.95rem 1rem;
+	border-radius: var(--radius-3);
+	border: 1px solid var(--brand-border-soft);
+	background: color-mix(in srgb, var(--brand-surface-branded) 72%, transparent);
 }
 
-.browseButton {
-	border: 1px solid var(--brand-border-soft);
-	border-radius: var(--radius-2);
-	padding: 0.58rem 0.9rem;
-	font-size: 0.82rem;
+.infoHeader,
+.reviewChecklistHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.infoTitle {
+	margin: 0;
+	font-size: 0.84rem;
 	font-weight: 700;
 	color: var(--text);
-	background: color-mix(in srgb, var(--brand-surface-branded) 78%, transparent);
-	cursor: pointer;
-	transition:
-		border-color 0.16s ease,
-		background 0.16s ease,
-		color 0.16s ease;
 }
 
-.browseButton:hover:not(:disabled) {
-	border-color: var(--brand-border-strong);
-	background: color-mix(in srgb, var(--brand-surface-branded) 92%, transparent);
+.infoCopy {
+	margin: 0;
+	font-size: 0.78rem;
+	line-height: 1.45;
+	color: var(--text-muted);
 }
 
-.browseButton:disabled {
-	opacity: 0.65;
-	cursor: wait;
+.validationBanner,
+.validationBannerReady {
+	display: grid;
+	gap: 0.18rem;
+	padding: 0.75rem 0.8rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--brand-border-soft);
+	background: color-mix(in srgb, var(--surface) 76%, transparent);
+	font-size: 0.78rem;
+	line-height: 1.45;
+	color: var(--text-muted);
 }
 
-.textareaShort {
-	min-height: 4.8rem;
+.validationBanner strong,
+.validationBannerReady strong {
+	color: var(--text);
 }
 
-.gridTwo {
+.validationBannerReady {
+	border-color: color-mix(
+		in srgb,
+		var(--success) 46%,
+		var(--brand-border-soft)
+	);
+	background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.validationBannerWarning {
+	border-color: color-mix(
+		in srgb,
+		var(--warning) 48%,
+		var(--brand-border-soft)
+	);
+	background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+
+.validationBannerError {
+	border-color: color-mix(in srgb, var(--danger) 48%, var(--brand-border-soft));
+	background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.validationStats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.6rem;
+}
+
+.validationStat {
+	display: grid;
+	gap: 0.2rem;
+	padding: 0.65rem 0.7rem;
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, var(--surface) 76%, transparent);
+	border: 1px solid var(--brand-border-soft);
+}
+
+.validationStat span,
+.previewLabel,
+.reviewLabel,
+.footerStep {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.validationStat strong {
+	font-size: 1rem;
+	color: var(--text);
+}
+
+.previewList {
+	display: grid;
+	gap: 0.35rem;
+}
+
+.previewList ul,
+.checklistList {
+	margin: 0;
+	padding-left: 1rem;
+	display: grid;
+	gap: 0.35rem;
+	font-size: 0.8rem;
+	color: var(--text);
+}
+
+.inlineNotice,
+.readinessHint {
+	display: grid;
+	gap: 0.18rem;
+	padding: 0.75rem 0.8rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--brand-border-soft);
+	background: color-mix(in srgb, var(--surface) 76%, transparent);
+	font-size: 0.78rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.readinessHint strong,
+.inlineNotice {
+	color: var(--text);
+}
+
+.reviewGrid {
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: 0.8rem;
 }
 
-.categoryPreview {
-	margin-top: 0.15rem;
-	display: inline-flex;
-	align-items: center;
-	gap: 0.46rem;
+.reviewCard {
+	display: grid;
+	gap: 0.26rem;
+	padding: 0.85rem 0.9rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--brand-border-soft);
+	background: color-mix(in srgb, var(--surface) 78%, transparent);
 }
 
-.colorSwatch {
-	width: 0.86rem;
-	height: 0.86rem;
-	border-radius: 999px;
-	border: 1px solid color-mix(in srgb, var(--border) 95%, transparent);
+.reviewCard strong {
+	font-size: 0.9rem;
+	color: var(--text);
 }
 
-.colorSwatchCoding {
-	background: var(--success);
-}
-
-.colorSwatchSubstation {
-	background: var(--primary);
-}
-
-.colorSwatchStandards {
-	background: var(--accent);
-}
-
-.colorSwatchSchool {
-	background: var(--warning);
-}
-
-.colorSwatchOther {
-	background: var(--secondary);
-}
-
-.colorSwatchGeneric {
-	background: var(--secondary);
-}
-
-.previewHint {
-	font-size: 0.72rem;
+.reviewCard p {
+	margin: 0;
+	font-size: 0.78rem;
+	line-height: 1.45;
 	color: var(--text-muted);
 }
 
@@ -228,11 +452,26 @@
 	margin-top: 1.1rem;
 	display: flex;
 	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.footerMeta {
+	display: grid;
+	gap: 0.15rem;
+}
+
+.footerStepCopy {
+	font-size: 0.78rem;
+	color: var(--text-muted);
+}
+
+.footerActions {
+	display: flex;
+	flex-direction: column;
 	gap: 0.55rem;
 }
 
-.buttonPrimary,
-.buttonSecondary {
+.buttonPrimary {
 	border-radius: var(--radius-2);
 	padding: 0.56rem 0.86rem;
 	font-size: 0.82rem;
@@ -241,41 +480,53 @@
 	transition:
 		background 0.16s ease,
 		border-color 0.16s ease,
-		color 0.16s ease;
-}
-
-.buttonPrimary {
+		color 0.16s ease,
+		opacity 0.16s ease;
 	border: 1px solid transparent;
 	color: var(--primary-contrast);
 	background: var(--primary);
 }
 
-.buttonPrimary:hover {
+.buttonPrimary:hover:not(:disabled) {
 	background: var(--primary-hover);
 }
 
-.buttonSecondary {
-	border: 1px solid var(--line-soft);
-	color: var(--text);
-	background: var(--surface);
+.buttonPrimary:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
 }
 
-.buttonSecondary:hover {
-	background: var(--surface-2);
-}
+@media (min-width: 48rem) {
+	.stepper {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
 
-@media (min-width: 40rem) {
 	.gridTwo {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
+	.gridThree {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.reviewGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
 	.footer {
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.footerActions {
 		flex-direction: row;
 		justify-content: flex-end;
 	}
 
 	.buttonPrimary,
-	.buttonSecondary {
+	.buttonSecondary,
+	.secondaryButton {
 		min-width: 8.8rem;
 	}
 }

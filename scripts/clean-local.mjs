@@ -233,7 +233,6 @@ function buildPreservationList(options) {
 		".env",
 		".worktale",
 		"supabase/.temp",
-		"zeroclaw-main/**",
 	];
 
 	if (!options.includePlaywrightAuth) {

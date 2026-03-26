@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import CommandCenterPage from "./CommandCenterPage";
@@ -23,8 +23,33 @@ vi.mock("./command-center/useSupabaseSyncStatus", () => ({
 	useSupabaseSyncStatus: () => ({
 		status: null,
 		loading: false,
+		refreshing: false,
 		error: null,
 		refresh: vi.fn(),
+	}),
+}));
+
+vi.mock("@/hooks/useSuiteRuntimeDoctor", () => ({
+	useSuiteRuntimeDoctor: () => ({
+		report: {
+			schemaVersion: "suite.doctor.v1",
+			checkedAt: "2026-03-24T03:00:00.000Z",
+			overallState: "ready",
+			actionableIssueCount: 0,
+			ok: true,
+			checks: [],
+			groupedChecks: [],
+			severityCounts: {
+				ready: 4,
+				background: 0,
+				"needs-attention": 0,
+				unavailable: 0,
+			},
+			recommendations: [],
+		},
+		loading: false,
+		refreshing: false,
+		refreshNow: vi.fn(),
 	}),
 }));
 
@@ -33,18 +58,8 @@ function LocationProbe() {
 	return <div>{`${location.pathname}${location.search}`}</div>;
 }
 
-function CommandCenterWithLocation() {
-	const location = useLocation();
-	return (
-		<>
-			<div data-testid="location">{`${location.pathname}${location.search}`}</div>
-			<CommandCenterPage />
-		</>
-	);
-}
-
 describe("CommandCenterPage", () => {
-	it("drops unsupported tab query parameters and stays on the command center route", async () => {
+	it("ignores unsupported tab query parameters and stays on the command center route", async () => {
 		render(
 			<MemoryRouter initialEntries={["/app/command-center?tab=watchdog"]}>
 				<Routes>
@@ -55,46 +70,25 @@ describe("CommandCenterPage", () => {
 		);
 
 		expect(screen.queryByText("/app/dashboard?focus=watchdog")).toBeNull();
-		expect(
-			screen
-				.getByRole("tab", { name: /Ops Commands/i })
-				.getAttribute("aria-selected"),
-		).toBe("true");
+		expect(screen.getByText("Developer toolshed")).toBeTruthy();
+		expect(screen.queryByRole("tab")).toBeNull();
 	});
 
-	it("keeps tab query param behavior when switching between architecture and commands", async () => {
+	it("keeps architecture routing out of the command center surface", async () => {
 		render(
-			<MemoryRouter initialEntries={["/app/command-center"]}>
+			<MemoryRouter initialEntries={["/app/command-center?tab=architecture"]}>
 				<Routes>
-					<Route
-						path="/app/command-center"
-						element={<CommandCenterWithLocation />}
-					/>
+					<Route path="/app/command-center" element={<CommandCenterPage />} />
 				</Routes>
 			</MemoryRouter>,
 		);
 
-		const architectureTab = screen.getByRole("tab", {
-			name: /Architecture/i,
-		});
-		const commandsTab = screen.getByRole("tab", {
-			name: /Ops Commands/i,
-		});
-
-		fireEvent.click(architectureTab);
-		expect(screen.getByTestId("location").textContent).toContain(
-			"/app/command-center?tab=architecture",
-		);
-		expect(architectureTab.getAttribute("aria-selected")).toBe("true");
-
-		fireEvent.click(commandsTab);
-		expect(screen.getByTestId("location").textContent).toContain(
-			"/app/command-center",
-		);
-		expect(commandsTab.getAttribute("aria-selected")).toBe("true");
+		expect(screen.getByText("Developer toolshed")).toBeTruthy();
+		expect(screen.queryByText("System structure map")).toBeNull();
+		expect(screen.queryByText("Architecture")).toBeNull();
 	});
 
-	it("shows Worktale command presets on the ops commands tab", () => {
+	it("shows evidence and logs command presets on the developer commands tab", () => {
 		render(
 			<MemoryRouter initialEntries={["/app/command-center"]}>
 				<Routes>
@@ -103,24 +97,17 @@ describe("CommandCenterPage", () => {
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText("Worktale")).toBeTruthy();
-		expect(screen.getByText("Bootstrap Worktale")).toBeTruthy();
-		expect(screen.getByText("npm run worktale:bootstrap")).toBeTruthy();
+		expect(screen.getByText("Evidence & Logs")).toBeTruthy();
+		expect(screen.getAllByText("Suite Doctor").length).toBeGreaterThan(0);
 		expect(screen.getByText("Check Worktale Readiness")).toBeTruthy();
 		expect(screen.getByText("npm run worktale:doctor")).toBeTruthy();
-		expect(screen.getByText("Worktale Status")).toBeTruthy();
-		expect(screen.getByText("worktale status")).toBeTruthy();
-		expect(screen.getByText("Worktale Today")).toBeTruthy();
-		expect(screen.getByText("worktale today")).toBeTruthy();
 		expect(screen.getByText("Open Worktale Dashboard")).toBeTruthy();
 		expect(screen.getByText("worktale dash")).toBeTruthy();
 		expect(screen.getByText("Generate Worktale Digest")).toBeTruthy();
 		expect(screen.getByText("worktale digest")).toBeTruthy();
-		expect(screen.getByText("Append Worktale Note")).toBeTruthy();
-		expect(screen.getByText('worktale note "what you worked on"')).toBeTruthy();
 	});
 
-	it("shows Watchdog command presets on the ops commands tab", () => {
+	it("keeps runtime workstation controls out of the copied command groups", () => {
 		render(
 			<MemoryRouter initialEntries={["/app/command-center"]}>
 				<Routes>
@@ -129,36 +116,16 @@ describe("CommandCenterPage", () => {
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText("Watchdog")).toBeTruthy();
 		expect(
-			screen.getByText("Install Filesystem Collector Startup"),
+			screen.getByText(
+				/Runtime Control owns local start, stop, restart, Watchdog plugin ops, and support bundle export/i,
+			),
 		).toBeTruthy();
-		expect(screen.getByText("npm run watchdog:startup:install")).toBeTruthy();
-		expect(screen.getByText("Check Filesystem Collector Startup")).toBeTruthy();
-		expect(screen.getByText("npm run watchdog:startup:check")).toBeTruthy();
-		expect(screen.getByText("Install AutoCAD Collector Startup")).toBeTruthy();
-		expect(
-			screen.getByText("npm run watchdog:startup:autocad:install"),
-		).toBeTruthy();
-		expect(screen.getByText("Check Backend Startup")).toBeTruthy();
-		expect(
-			screen.getByText("npm run watchdog:backend:startup:check"),
-		).toBeTruthy();
-		expect(screen.getByText("Bootstrap Workstation Runtime")).toBeTruthy();
-		expect(screen.getByText("npm run workstation:bootstrap")).toBeTruthy();
-		expect(screen.getByText("Stop Workstation Runtime")).toBeTruthy();
-		expect(screen.getByText("npm run workstation:stop")).toBeTruthy();
-		expect(screen.getByText("Open Runtime Control Shell")).toBeTruthy();
-		expect(screen.getByText("npm run workstation:control-panel")).toBeTruthy();
-		expect(screen.getByText("Install Windows Runtime Startup")).toBeTruthy();
-		expect(
-			screen.getByText("npm run workstation:startup:install"),
-		).toBeTruthy();
-		expect(screen.getByText("Run AutoCAD Watchdog Doctor")).toBeTruthy();
-		expect(screen.getByText("npm run watchdog:autocad:doctor")).toBeTruthy();
+		expect(screen.queryByText("Open Runtime Control Shell")).toBeNull();
+		expect(screen.queryByText("Run AutoCAD Watchdog Doctor")).toBeNull();
 	});
 
-	it("shows gateway startup command presets on the ops commands tab", () => {
+	it("keeps diagnostics-focused gateway and backend probes on the developer commands tab", () => {
 		render(
 			<MemoryRouter initialEntries={["/app/command-center"]}>
 				<Routes>
@@ -167,14 +134,16 @@ describe("CommandCenterPage", () => {
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText("Agent + Backend")).toBeTruthy();
-		expect(screen.getByText("Check Gateway Startup")).toBeTruthy();
-		expect(screen.getByText("npm run gateway:startup:check")).toBeTruthy();
-		expect(screen.getByText("Start Gateway In Background")).toBeTruthy();
-		expect(screen.getByText("npm run gateway:startup:start")).toBeTruthy();
+		expect(screen.getByText("Diagnostics")).toBeTruthy();
+		expect(screen.getByText("Gateway Health Probe")).toBeTruthy();
+		expect(
+			screen.getByText("curl -sS http://127.0.0.1:3000/health | cat"),
+		).toBeTruthy();
+		expect(screen.getByText("Backend Health Probe")).toBeTruthy();
+		expect(screen.getByText("Backend Runtime Snapshot")).toBeTruthy();
 	});
 
-	it("shows Supabase command presets on the ops commands tab", () => {
+	it("shows hosted push command presets on the developer commands tab", () => {
 		render(
 			<MemoryRouter initialEntries={["/app/command-center"]}>
 				<Routes>
@@ -183,25 +152,7 @@ describe("CommandCenterPage", () => {
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText("Supabase")).toBeTruthy();
-		expect(screen.getByText("Start Local Supabase")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:start")).toBeTruthy();
-		expect(screen.getByText("Switch App To Local Supabase")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:mode:local")).toBeTruthy();
-		expect(screen.getByText("Switch App To Hosted Supabase")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:mode:hosted")).toBeTruthy();
-		expect(screen.getByText("Show Supabase Status")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:status")).toBeTruthy();
-		expect(screen.getByText("Use Gmail For Local Auth Mail")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:mail:gmail")).toBeTruthy();
-		expect(screen.getByText("Use Mailpit For Local Auth Mail")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:mail:mailpit")).toBeTruthy();
-		expect(screen.getByText("Write Local Supabase Env")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:env:local")).toBeTruthy();
-		expect(screen.getByText("Reset Local Supabase DB")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:db:reset")).toBeTruthy();
-		expect(screen.getByText("Generate Supabase Types")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:types")).toBeTruthy();
+		expect(screen.getByText("Hosted Push")).toBeTruthy();
 		expect(screen.getByText("Run Hosted Preflight")).toBeTruthy();
 		expect(screen.getByText("npm run supabase:remote:preflight")).toBeTruthy();
 		expect(screen.getByText("Login To Hosted Supabase CLI")).toBeTruthy();
@@ -218,9 +169,5 @@ describe("CommandCenterPage", () => {
 		expect(
 			screen.getByText("npm run supabase:remote:task:install"),
 		).toBeTruthy();
-		expect(screen.getByText("Stop Local Supabase")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:stop")).toBeTruthy();
-		expect(screen.getByText("Clear Local Supabase Env")).toBeTruthy();
-		expect(screen.getByText("npm run supabase:env:clear")).toBeTruthy();
 	});
 });

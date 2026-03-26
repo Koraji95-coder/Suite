@@ -28,6 +28,11 @@ describe("workstation runtime PowerShell contracts", () => {
 			const payload = runPowerShellJson("scripts/get-suite-runtime-status.ps1", [
 				"-Json",
 			]);
+			expect(typeof payload.support?.text).toBe("string");
+			expect(typeof payload.support?.workstation?.workstationId).toBe("string");
+			expect(typeof payload.support?.config?.codexConfigPresent).toBe("boolean");
+			expect(typeof payload.support?.paths?.statusDir).toBe("string");
+			expect(payload.support?.config?.gatewayMode).toBe("suite_native");
 			expect(Array.isArray(payload.services)).toBe(true);
 			expect(payload.services).toHaveLength(6);
 			expect(payload.services.map((service: { id: string }) => service.id)).toEqual([
@@ -38,6 +43,34 @@ describe("workstation runtime PowerShell contracts", () => {
 				"watchdog-filesystem",
 				"watchdog-autocad",
 			]);
+			const gateway = payload.services.find(
+				(service: { id: string }) => service.id === "gateway",
+			);
+			expect(typeof gateway?.notes?.find((note: { label: string }) => note.label === "Gateway mode")?.value).toBe(
+				"string",
+			);
+		},
+		20_000,
+	);
+
+	test.runIf(process.platform === "win32")(
+		"legacy runtime control snapshot preserves compatibility component ids",
+		() => {
+			const payload = runPowerShellJson("scripts/open-suite-runtime-control.ps1", [
+				"-SnapshotJson",
+			]);
+			expect(Array.isArray(payload.components)).toBe(true);
+			expect(payload.components.map((component: { key: string }) => component.key)).toEqual([
+				"frontend",
+				"docker",
+				"supabase",
+				"backend",
+				"gateway",
+				"watchdogFilesystem",
+				"watchdogAutoCad",
+				"autocadPlugin",
+			]);
+			expect(typeof payload.summary).toBe("string");
 		},
 		20_000,
 	);
@@ -54,6 +87,9 @@ describe("workstation runtime PowerShell contracts", () => {
 			expect(payload.status?.id).toBe("gateway");
 			expect(typeof payload.summary).toBe("string");
 			expect(payload.logTarget?.kind).toBe("path");
+			expect(typeof payload.status?.notes?.find((note: { label: string }) => note.label === "Gateway mode")?.value).toBe(
+				"string",
+			);
 		},
 		20_000,
 	);

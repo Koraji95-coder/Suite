@@ -120,13 +120,10 @@ Future Codex sessions should preserve the repository guardrails in `AGENTS.md`, 
 
 Gateway policy is locked for handoffs and MCP usage:
 
-- default path: `zeroclaw-gateway` via `npm run gateway:dev`,
-- full CLI path (`zeroclaw gateway`) is incident-only diagnostics,
-- diagnostics command: `SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev`,
-- if full CLI rustc compile fails with stack overflow, `0xc0000005`, or ICE:
-  - capture toolchain versions + failure signature once,
-  - classify as compiler/toolchain instability,
-  - stop workaround iteration and continue on default gateway path.
+- default path: Suite-native gateway via `npm run gateway:dev`,
+- legacy ZeroClaw CLI fallback is retired from the active workflow,
+- if runtime status detects an unexpected legacy gateway process, stop it and relaunch `npm run gateway:dev`,
+- historical rust/toolchain failures from the retired path should stay archived as diagnostics only.
 - upstream bug report only after collecting a minimal reproducible diagnostic capture.
 
 Local Ollama startup gate is required before booting conversations or orchestration:

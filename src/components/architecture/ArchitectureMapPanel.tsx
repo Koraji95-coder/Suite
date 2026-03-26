@@ -16,13 +16,6 @@ import styles from "@/routes/architecture/ArchitectureMapRoutePage.module.css";
 
 type DomainFilter = "all" | ArchitectureDomainId;
 
-function isExternalAdvancedPath(pathValue: string): boolean {
-	return String(pathValue || "")
-		.toLowerCase()
-		.replace(/\\/g, "/")
-		.startsWith("zeroclaw-main/");
-}
-
 function normalizeText(value: string): string {
 	return value.trim().toLowerCase();
 }
@@ -60,7 +53,6 @@ function flowMatchesDomain(flow: ArchitectureFlow, domainId: DomainFilter): bool
 export function ArchitectureMapPanel() {
 	const [searchValue, setSearchValue] = useState("");
 	const [selectedDomain, setSelectedDomain] = useState<DomainFilter>("all");
-	const [includeAdvancedModules, setIncludeAdvancedModules] = useState(false);
 	const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
 	const query = useMemo(() => normalizeText(searchValue), [searchValue]);
@@ -131,13 +123,9 @@ export function ArchitectureMapPanel() {
 		() =>
 			ARCHITECTURE_AUTOGEN.hotspots
 				.filter((hotspot) => includesDomainPath(hotspot.path, selectedDomain))
-				.filter(
-					(hotspot) =>
-						includeAdvancedModules || !isExternalAdvancedPath(hotspot.path),
-				)
 				.filter((hotspot) => matchesQuery(query, [hotspot.path]))
 				.slice(0, 12),
-		[includeAdvancedModules, query, selectedDomain],
+		[query, selectedDomain],
 	);
 
 	const filteredFixCandidates = useMemo(
@@ -202,18 +190,6 @@ export function ArchitectureMapPanel() {
 							{domain.label}
 						</button>
 					))}
-					<button
-						type="button"
-						className={cn(
-							styles.archDomainChip,
-							includeAdvancedModules && styles.archDomainChipActive,
-						)}
-						onClick={() => setIncludeAdvancedModules((current) => !current)}
-					>
-						{includeAdvancedModules
-							? "External modules on"
-							: "External modules off"}
-					</button>
 				</div>
 			</div>
 

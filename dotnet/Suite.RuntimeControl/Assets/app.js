@@ -1,69 +1,3 @@
-const SERVICE_ORDER = [
-  "supabase",
-  "backend",
-  "gateway",
-  "frontend",
-  "watchdog-filesystem",
-  "watchdog-autocad",
-];
-
-const SERVICE_META = {
-  supabase: {
-    shortLabel: "SB",
-    bootLabel: "Supabase",
-    description: "PostgreSQL, Auth, Storage, and local APIs",
-  },
-  backend: {
-    shortLabel: "BE",
-    bootLabel: "Watchdog Backend",
-    description: "API server and runtime jobs",
-  },
-  gateway: {
-    shortLabel: "GW",
-    bootLabel: "API Gateway",
-    description: "Local transport and auth edge",
-  },
-  frontend: {
-    shortLabel: "UI",
-    bootLabel: "Suite Frontend",
-    description: "Vite shell and local app routes",
-  },
-  "watchdog-filesystem": {
-    shortLabel: "FS",
-    bootLabel: "Filesystem Collector",
-    description: "Filesystem watcher and activity intake",
-  },
-  "watchdog-autocad": {
-    shortLabel: "AC",
-    bootLabel: "AutoCAD Collector",
-    description: "Drawing tracker and plugin heartbeat",
-  },
-};
-
-const BOOTSTRAP_STEP_ORDER = [
-  "docker-ready",
-  "supabase-start",
-  "supabase-env",
-  "watchdog-filesystem",
-  "watchdog-autocad-startup",
-  "watchdog-autocad-plugin",
-  "backend",
-  "gateway",
-  "frontend",
-];
-
-const BOOTSTRAP_STEP_META = {
-  "docker-ready": { label: "Docker Engine", shortLabel: "DK" },
-  "supabase-start": { label: "Supabase", shortLabel: "SB" },
-  "supabase-env": { label: "Supabase Env", shortLabel: "SE" },
-  "watchdog-filesystem": { label: "Filesystem Collector", shortLabel: "FS" },
-  "watchdog-autocad-startup": { label: "AutoCAD Collector", shortLabel: "AC" },
-  "watchdog-autocad-plugin": { label: "AutoCAD Plugin", shortLabel: "AP" },
-  backend: { label: "Watchdog Backend", shortLabel: "BE" },
-  gateway: { label: "API Gateway", shortLabel: "GW" },
-  frontend: { label: "Suite Frontend", shortLabel: "UI" },
-};
-
 const STATUS_LABELS = {
   running: "Running",
   starting: "Starting",
@@ -72,9 +6,48 @@ const STATUS_LABELS = {
   pending: "Pending",
 };
 
+const SECTION_META = {
+  runtime: {
+    title: "Runtime",
+    subtitle: "Local runtime, collectors, and transcript.",
+  },
+  watchdog: {
+    title: "Watchdog",
+    subtitle: "Collector health surfaces and watchdog route launch.",
+  },
+  "developer-tools": {
+    title: "Developer Tools",
+    subtitle: "Developer workshop for local Suite development routes.",
+  },
+  diagnostics: {
+    title: "Diagnostics",
+    subtitle: "Incident and telemetry launch points for local debugging.",
+  },
+  support: {
+    title: "Support",
+    subtitle: "Support exports, logs, and workstation-ready help surfaces.",
+  },
+};
+
+const EMPTY_RUNTIME_CATALOG = Object.freeze({
+  serviceOrder: [],
+  services: {},
+  bootstrapStepOrder: [],
+  bootstrapSteps: {},
+  workshopRouteShortcuts: {},
+  supportActions: [],
+});
+
+const RELEASE_STATE_LABELS = {
+  released: "Released",
+  developer_beta: "Developer beta",
+  lab: "Lab",
+};
+
 const DISPLAY_TIME_ZONE = "America/Chicago";
 const bootstrapDisplayApi = globalThis.SuiteRuntimeControlBootstrapDisplayProgress || null;
 const state = {
+  activeSection: "runtime",
   autoScroll: true,
   busy: false,
   action: null,
@@ -95,6 +68,11 @@ const state = {
     currentStepId: null,
     timestampMs: 0,
   },
+  doctor: null,
+  runtimeMeta: null,
+  supportMeta: null,
+  runtimeCatalog: EMPTY_RUNTIME_CATALOG,
+  developerToolsManifest: { groups: [], tools: [] },
   hasSnapshot: false,
 };
 
@@ -130,10 +108,17 @@ const logTimestampFormatter = new Intl.DateTimeFormat("en-US", {
 });
 
 const dom = {
+  headerSubtitle: document.getElementById("header-subtitle"),
   clockDate: document.getElementById("clock-date"),
   clock: document.getElementById("clock"),
   overallStatus: document.getElementById("overall-status"),
   overallStatusText: document.getElementById("overall-status-text"),
+  sectionNav: document.getElementById("section-nav"),
+  runtimeToolbar: document.getElementById("runtime-toolbar"),
+  runtimeMain: document.getElementById("runtime-main"),
+  workshopMain: document.getElementById("workshop-main"),
+  workshopSubtitle: document.getElementById("workshop-subtitle"),
+  workshopContent: document.getElementById("workshop-content"),
   runningCount: document.getElementById("running-count"),
   lastBootstrap: document.getElementById("last-bootstrap"),
   servicesList: document.getElementById("services-list"),
@@ -321,9 +306,9 @@ function presentAction(action) {
 
 function getOrderedServices() {
   const byId = new Map(state.services.map((service) => [service.id, service]));
-  return SERVICE_ORDER.map((serviceId) => {
+  return getCatalogServiceOrder().map((serviceId) => {
     const service = byId.get(serviceId);
-    const meta = SERVICE_META[serviceId] || {};
+    const meta = getCatalogServiceMeta(serviceId);
     return {
       id: serviceId,
       name: service?.name || meta.bootLabel || serviceId,
@@ -356,7 +341,518 @@ function getServiceName(serviceId) {
     return service.name;
   }
 
-  return SERVICE_META[serviceId]?.bootLabel || serviceId;
+  return getCatalogServiceMeta(serviceId)?.bootLabel || serviceId;
+}
+
+function getSectionMeta(sectionId) {
+  return SECTION_META[sectionId] || SECTION_META.runtime;
+}
+
+function mapDoctorStateToStatusClass(doctorState) {
+  switch (doctorState) {
+    case "ready":
+      return "running";
+    case "background":
+      return "pending";
+    case "needs-attention":
+      return "error";
+    case "unavailable":
+      return "stopped";
+    default:
+      return "pending";
+  }
+}
+
+function flattenDoctorChecks(orderedServices) {
+  return orderedServices.flatMap((service) => {
+    const checks = Array.isArray(service.service?.checks) ? service.service.checks : [];
+    return checks
+      .filter((check) => check?.label)
+      .map((check) => ({
+        serviceName: service.name,
+        label: check.label,
+        detail: check.detail || check.description || "",
+        severity: check.severity || "background",
+        actionable: check.actionable !== false && (check.severity || "background") !== "ready",
+      }));
+  });
+}
+
+function renderDoctorCheckCards(orderedServices) {
+  const actionableChecks = flattenDoctorChecks(orderedServices)
+    .filter((check) => check.actionable)
+    .slice(0, 6);
+
+  if (!actionableChecks.length) {
+    return `
+      <section class="launch-group">
+        <div class="launch-group-title">Actionable Checks</div>
+        <div class="doctor-empty">Suite Doctor is clear. No workstation or local-runtime issues need action right now.</div>
+      </section>`;
+  }
+
+  const cards = actionableChecks
+    .map((check) => `
+      <article class="doctor-check-card ${escapeHtml(mapDoctorStateToStatusClass(check.severity))}">
+        <div class="doctor-check-head">
+          <div>
+            <div class="doctor-check-service">${escapeHtml(check.serviceName)}</div>
+            <div class="doctor-check-title">${escapeHtml(check.label)}</div>
+          </div>
+          <div class="status-pill ${escapeHtml(mapDoctorStateToStatusClass(check.severity))}">
+            <span class="service-dot"></span>
+            ${escapeHtml(check.severity === "needs-attention" ? "Needs attention" : check.severity === "unavailable" ? "Unavailable" : "Background")}
+          </div>
+        </div>
+        <div class="doctor-check-detail">${escapeHtml(check.detail || "Review the local runtime doctor for more detail.")}</div>
+      </article>`)
+    .join("");
+
+  return `
+    <section class="launch-group">
+      <div class="launch-group-title">Actionable Checks</div>
+      <div class="doctor-check-grid">
+        ${cards}
+      </div>
+    </section>`;
+}
+
+function normalizeRuntimeCatalog(payload) {
+  const serviceOrder = Array.isArray(payload?.serviceOrder)
+    ? payload.serviceOrder.filter(Boolean).map((item) => String(item))
+    : [];
+  const services = Object.fromEntries(
+    Object.entries(payload?.services || {})
+      .filter(([serviceId, meta]) => Boolean(serviceId && meta?.bootLabel))
+      .map(([serviceId, meta]) => [
+        String(serviceId),
+        {
+          shortLabel: meta?.shortLabel ? String(meta.shortLabel) : "",
+          bootLabel: String(meta.bootLabel),
+          description: meta?.description ? String(meta.description) : "",
+        },
+      ]),
+  );
+  const bootstrapStepOrder = Array.isArray(payload?.bootstrapStepOrder)
+    ? payload.bootstrapStepOrder.filter(Boolean).map((item) => String(item))
+    : [];
+  const bootstrapSteps = Object.fromEntries(
+    Object.entries(payload?.bootstrapSteps || {})
+      .filter(([stepId, meta]) => Boolean(stepId && meta?.label))
+      .map(([stepId, meta]) => [
+        String(stepId),
+        {
+          label: String(meta.label),
+          shortLabel: meta?.shortLabel ? String(meta.shortLabel) : "",
+        },
+      ]),
+  );
+  const workshopRouteShortcuts = Object.fromEntries(
+    Object.entries(payload?.workshopRouteShortcuts || {})
+      .filter(([routeId, route]) => Boolean(routeId && route?.title && route?.path))
+      .map(([routeId, route]) => [
+        String(routeId),
+        {
+          title: String(route.title),
+          path: String(route.path),
+          description: route?.description ? String(route.description) : "",
+        },
+      ]),
+  );
+  const supportActions = Array.isArray(payload?.supportActions)
+    ? payload.supportActions
+        .filter((action) => action?.id && action?.label)
+        .map((action) => ({
+          id: String(action.id),
+          label: String(action.label),
+          description: action?.description ? String(action.description) : "",
+        }))
+    : [];
+
+  return {
+    serviceOrder,
+    services,
+    bootstrapStepOrder,
+    bootstrapSteps,
+    workshopRouteShortcuts,
+    supportActions,
+  };
+}
+
+function getRuntimeCatalog() {
+  return state.runtimeCatalog || EMPTY_RUNTIME_CATALOG;
+}
+
+function getCatalogServiceOrder() {
+  const serviceOrder = getRuntimeCatalog().serviceOrder || [];
+  return serviceOrder.length
+    ? serviceOrder
+    : state.services.map((service) => service.id).filter(Boolean);
+}
+
+function getCatalogServiceMeta(serviceId) {
+  return getRuntimeCatalog().services?.[serviceId] || {};
+}
+
+function getCatalogBootstrapStepOrder() {
+  return getRuntimeCatalog().bootstrapStepOrder || [];
+}
+
+function getCatalogBootstrapStepMeta(stepId) {
+  return getRuntimeCatalog().bootstrapSteps?.[stepId] || null;
+}
+
+function getWorkshopRouteShortcuts() {
+  return getRuntimeCatalog().workshopRouteShortcuts || {};
+}
+
+function getSupportActions() {
+  return getRuntimeCatalog().supportActions || [];
+}
+
+function setActiveSection(sectionId) {
+  state.activeSection = SECTION_META[sectionId] ? sectionId : "runtime";
+}
+
+function normalizeReleaseState(releaseState) {
+  if (releaseState === "developer_beta") {
+    return "developer_beta";
+  }
+  if (releaseState === "lab") {
+    return "lab";
+  }
+  return "released";
+}
+
+function formatReleaseStateLabel(releaseState) {
+  return RELEASE_STATE_LABELS[normalizeReleaseState(releaseState)] || "Developer beta";
+}
+
+function normalizeDeveloperToolsManifest(payload) {
+  const groups = Array.isArray(payload?.groups)
+    ? payload.groups
+        .filter((group) => group?.id && group?.title)
+        .map((group) => ({
+          id: String(group.id),
+          title: String(group.title),
+          description: group.description ? String(group.description) : "",
+        }))
+    : [];
+  const tools = Array.isArray(payload?.tools)
+    ? payload.tools
+        .filter((tool) => tool?.id && tool?.title && tool?.route && tool?.group)
+        .map((tool) => ({
+          id: String(tool.id),
+          title: String(tool.title),
+          description: tool.description ? String(tool.description) : "",
+          route: String(tool.route),
+          group: String(tool.group),
+          audience: tool.audience === "dev" ? "dev" : "dev",
+          releaseState: normalizeReleaseState(
+            typeof tool.releaseState === "string" ? tool.releaseState : "developer_beta",
+          ),
+          futureProduct: Boolean(tool.futureProduct),
+          runtimeRequirements: Array.isArray(tool.runtimeRequirements)
+            ? tool.runtimeRequirements.filter(Boolean).map((item) => String(item))
+            : [],
+        }))
+    : [];
+
+  return { groups, tools };
+}
+
+function getDeveloperToolGroups() {
+  const manifest = state.developerToolsManifest || { groups: [], tools: [] };
+  return manifest.groups
+    .map((group) => ({
+      ...group,
+      items: manifest.tools.filter((tool) => tool.group === group.id),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+function mapDeveloperToolToRouteItem(tool) {
+  return {
+    id: tool.id,
+    title: tool.title,
+    path: tool.route,
+    description: tool.description,
+    releaseState: tool.releaseState,
+    futureProduct: tool.futureProduct,
+    runtimeRequirements: tool.runtimeRequirements,
+  };
+}
+
+function routeItemById(routeId) {
+  const tool = state.developerToolsManifest.tools.find((item) => item.id === routeId);
+  if (tool) {
+    return mapDeveloperToolToRouteItem(tool);
+  }
+
+  return getWorkshopRouteShortcuts()[routeId] || null;
+}
+
+function renderLaunchCards(routeIds, options = {}) {
+  return routeIds
+    .map((routeId) => {
+      const route = routeItemById(routeId);
+      if (!route) {
+        return "";
+      }
+
+      const releaseMeta = options.showMeta && route.releaseState
+        ? `<span class="launch-card-tag">${escapeHtml(formatReleaseStateLabel(route.releaseState))}</span>`
+        : "";
+      const futureProductMeta = options.showMeta && route.futureProduct
+        ? '<span class="launch-card-tag accent">Future product</span>'
+        : "";
+      const requirementMeta = options.showMeta && Array.isArray(route.runtimeRequirements) && route.runtimeRequirements.length
+        ? route.runtimeRequirements
+            .map((item) => `<span class="launch-card-tag subtle">${escapeHtml(item)}</span>`)
+            .join("")
+        : "";
+      const metaRow = releaseMeta || futureProductMeta || requirementMeta
+        ? `<div class="launch-card-meta">${releaseMeta}${futureProductMeta}${requirementMeta}</div>`
+        : "";
+
+      return `
+        <button type="button" class="launch-card" data-launch-route="${escapeHtml(routeId)}">
+          <div class="launch-card-title">${escapeHtml(route.title)}</div>
+          <div class="launch-card-path">${escapeHtml(route.path)}</div>
+          <div class="launch-card-desc">${escapeHtml(route.description)}</div>
+          ${metaRow}
+        </button>`;
+    })
+    .filter(Boolean)
+    .join("");
+}
+
+function renderLaunchGroups(groups, options = {}) {
+  return groups
+    .map((group) => {
+      const cards = renderLaunchCards(group.items || [], options);
+      if (!cards) {
+        return "";
+      }
+
+      return `
+        <section class="launch-group">
+          <div class="launch-group-title">${escapeHtml(group.title || "Tools")}</div>
+          ${group.description ? `<div class="launch-group-description">${escapeHtml(group.description)}</div>` : ""}
+          <div class="launch-grid">
+            ${cards}
+          </div>
+        </section>`;
+    })
+    .filter(Boolean)
+    .join("");
+}
+
+function renderWorkshopSection(orderedServices) {
+  const runningCount = orderedServices.filter((service) => service.state === "running").length;
+  const totalCount = orderedServices.length || getCatalogServiceOrder().length;
+  const healthChip = `${runningCount}/${totalCount} services running`;
+  const overallChip = state.overall.text || "BOOTING";
+  const section = state.activeSection;
+  const meta = getSectionMeta(section);
+  const doctor = state.doctor || {
+    overallState: "background",
+    actionableIssueCount: 0,
+    severityCounts: {
+      ready: 0,
+      background: 0,
+      "needs-attention": 0,
+      unavailable: 0,
+    },
+    recommendations: [],
+  };
+  const doctorStateClass = mapDoctorStateToStatusClass(doctor.overallState);
+  const doctorRecommendations = Array.isArray(doctor.recommendations)
+    ? doctor.recommendations.filter(Boolean).slice(0, 2)
+    : [];
+  const runtimeMeta = state.runtimeMeta || {};
+  const supportMeta = state.supportMeta || {};
+  const developerToolGroups = getDeveloperToolGroups().map((group) => ({
+    title: group.title,
+    description: group.description,
+    items: group.items.map((item) => item.id),
+  }));
+
+  if (section === "developer-tools") {
+    dom.workshopContent.innerHTML = `
+      <article class="workshop-card">
+        <header class="workshop-card-header">
+          <div>
+            <div class="detail-eyebrow">Developer Workshop</div>
+            <div class="workshop-card-title">Developer Tools</div>
+            <div class="workshop-card-subtitle">Launch developer-only Suite surfaces from Runtime Control.</div>
+          </div>
+          <div class="status-pill ${escapeHtml(state.overall.state || "booting")}">
+            <span class="service-dot"></span>
+            ${escapeHtml(overallChip)}
+          </div>
+        </header>
+        <div class="detail-quick-row">
+          <span class="quick-chip">${escapeHtml(`Runtime • ${healthChip}`)}</span>
+          <span class="quick-chip">${escapeHtml(`Section • ${meta.title}`)}</span>
+        </div>
+        ${developerToolGroups.length
+          ? renderLaunchGroups(developerToolGroups, { showMeta: true })
+          : '<div class="doctor-empty">Developer tool manifest is not available yet. Refresh the workstation shell after the Suite repo is available locally.</div>'}
+      </article>`;
+    return;
+  }
+
+  if (section === "watchdog") {
+    dom.workshopContent.innerHTML = `
+      <article class="workshop-card">
+        <header class="workshop-card-header">
+          <div>
+            <div class="detail-eyebrow">Observability</div>
+            <div class="workshop-card-title">Watchdog</div>
+            <div class="workshop-card-subtitle">Open collector health views and related developer portals.</div>
+          </div>
+          <div class="status-pill ${escapeHtml(state.overall.state || "booting")}">
+            <span class="service-dot"></span>
+            ${escapeHtml(overallChip)}
+          </div>
+        </header>
+        <div class="detail-quick-row">
+          <span class="quick-chip">${escapeHtml(`Runtime • ${healthChip}`)}</span>
+        </div>
+        ${renderLaunchGroups([
+          {
+            title: "Watchdog Surfaces",
+            description: "Customer-safe runtime observability plus the closest developer workshop routes.",
+            items: ["watchdog", "developer-portal", "command-center"],
+          },
+        ])}
+      </article>`;
+    return;
+  }
+
+  if (section === "diagnostics") {
+    dom.workshopContent.innerHTML = `
+      <article class="workshop-card">
+        <header class="workshop-card-header">
+          <div>
+            <div class="detail-eyebrow">Suite Doctor</div>
+            <div class="workshop-card-title">Diagnostics</div>
+            <div class="workshop-card-subtitle">Use one shared doctor view for workstation health, local runtime drift, and the fastest next diagnostic step.</div>
+          </div>
+          <div class="status-pill ${escapeHtml(doctorStateClass)}">
+            <span class="service-dot"></span>
+            ${escapeHtml(doctor.overallState === "ready" ? "Ready" : doctor.overallState === "background" ? "Background" : doctor.overallState === "needs-attention" ? "Needs attention" : "Unavailable")}
+          </div>
+        </header>
+        <section class="detail-callout">
+          <div class="detail-callout-copy">
+            <div class="detail-callout-title">Suite doctor</div>
+            <div class="detail-callout-text">${escapeHtml(
+              doctor.actionableIssueCount > 0
+                ? `${doctor.actionableIssueCount} actionable issue${doctor.actionableIssueCount === 1 ? "" : "s"} need attention before you rely on workstation-sensitive flows.`
+                : "All shared runtime and workstation checks are clear right now."
+            )}</div>
+          </div>
+        </section>
+        <div class="detail-quick-row">
+          <span class="quick-chip">${escapeHtml(`Runtime • ${healthChip}`)}</span>
+          <span class="quick-chip${doctor.actionableIssueCount > 0 ? " emphasis" : ""}">${escapeHtml(`Actionable • ${doctor.actionableIssueCount || 0}`)}</span>
+          <span class="quick-chip">${escapeHtml(`Ready • ${doctor.severityCounts?.ready || 0}`)}</span>
+          <span class="quick-chip">${escapeHtml(`Background • ${doctor.severityCounts?.background || 0}`)}</span>
+          <span class="quick-chip${(doctor.severityCounts?.["needs-attention"] || 0) > 0 ? " emphasis" : ""}">${escapeHtml(`Needs attention • ${doctor.severityCounts?.["needs-attention"] || 0}`)}</span>
+          <span class="quick-chip${(doctor.severityCounts?.unavailable || 0) > 0 ? " emphasis" : ""}">${escapeHtml(`Unavailable • ${doctor.severityCounts?.unavailable || 0}`)}</span>
+        </div>
+        ${doctorRecommendations.length ? renderNotesPanel(doctorRecommendations.map((item, index) => ({ label: `Recommendation ${index + 1}`, value: item })), "Recommendations") : ""}
+        ${renderDoctorCheckCards(orderedServices)}
+        ${renderLaunchGroups([
+          {
+            title: "Diagnostics Routes",
+            description: "Open the heavyweight tools only when the shared doctor says the workstation needs a deeper look.",
+            items: ["command-center", "watchdog", "developer-portal"],
+          },
+        ])}
+      </article>`;
+    return;
+  }
+
+  dom.workshopContent.innerHTML = `
+    <article class="workshop-card">
+      <header class="workshop-card-header">
+        <div>
+          <div class="detail-eyebrow">Support</div>
+          <div class="workshop-card-title">Support</div>
+          <div class="workshop-card-subtitle">Workstation-facing evidence, local paths, and the fastest routes into support-safe Suite surfaces.</div>
+        </div>
+      </header>
+      <div class="detail-quick-row">
+        <span class="quick-chip">${escapeHtml(`Runtime • ${healthChip}`)}</span>
+        <span class="quick-chip">${escapeHtml(`Doctor • ${doctor.actionableIssueCount || 0} actionable`)}</span>
+      </div>
+      <section class="detail-support-grid">
+        ${renderSupportCard(
+          "Workstation",
+          supportMeta.workstation?.workstationLabel
+            ? `${supportMeta.workstation.workstationId || supportMeta.workstation.workstationLabel} — ${supportMeta.workstation.workstationLabel}`
+            : supportMeta.workstation?.workstationId || "",
+          { mono: false },
+        )}
+        ${renderSupportCard(
+          "Gateway mode",
+          supportMeta.config?.gatewayMode || "Suite-native",
+          { mono: false },
+        )}
+        ${renderSupportCard("Codex config", supportMeta.config?.codexConfigPath || supportMeta.workstation?.codexConfigPath || "", { mono: true })}
+        ${renderSupportCard("Bootstrap log", supportMeta.paths?.bootstrapLogPath || runtimeMeta.logPath, { mono: true })}
+        ${renderSupportCard("Status directory", supportMeta.paths?.statusDir || runtimeMeta.statusDir, { mono: true })}
+        ${renderSupportCard("Last bootstrap", runtimeMeta.lastBootstrap?.summary || "", { mono: false })}
+        ${renderSupportCard("Supabase config", supportMeta.config?.supabaseConfigPath || "", { mono: true })}
+      </section>
+      <section class="launch-group">
+        <div class="launch-group-title">Support Actions</div>
+        <div class="launch-group-description">Open the local runtime evidence directly or copy a concise support handoff without leaving the desktop shell.</div>
+        <div class="launch-grid support-action-grid">
+          ${getSupportActions().map((action) => `
+            <button type="button" class="launch-card" data-support-action="${escapeHtml(action.id)}">
+              <div class="launch-card-title">${escapeHtml(action.label)}</div>
+              <div class="launch-card-desc">${escapeHtml(action.description)}</div>
+            </button>`).join("")}
+        </div>
+      </section>
+      ${renderLaunchGroups([
+        {
+          title: "Workshop Shortcuts",
+          description: "Support-safe routes that stay useful during debugging without dumping the full developer workshop into the customer app.",
+          items: ["developer-portal", "command-center", "watchdog"],
+        },
+      ])}
+    </article>`;
+}
+
+function renderSectionChrome(orderedServices) {
+  const runtimeActive = state.activeSection === "runtime";
+  const sectionMeta = getSectionMeta(state.activeSection);
+
+  if (dom.headerSubtitle) {
+    dom.headerSubtitle.textContent = sectionMeta.subtitle;
+  }
+
+  dom.runtimeToolbar.classList.toggle("hidden", !runtimeActive);
+  dom.runtimeMain.classList.toggle("hidden", !runtimeActive);
+  dom.workshopMain.classList.toggle("hidden", runtimeActive);
+  dom.workshopSubtitle.textContent = sectionMeta.subtitle;
+
+  if (dom.sectionNav) {
+    const tabs = dom.sectionNav.querySelectorAll("button[data-section]");
+    tabs.forEach((tab) => {
+      const sectionId = tab.getAttribute("data-section");
+      tab.classList.toggle("active", sectionId === state.activeSection);
+    });
+  }
+
+  if (!runtimeActive) {
+    renderWorkshopSection(orderedServices);
+  }
 }
 
 function renderQuickChips(items) {
@@ -382,11 +878,12 @@ function renderBootstrapSequence(bootstrap) {
   const completed = new Set(Array.isArray(bootstrap.completedStepIds) ? bootstrap.completedStepIds : []);
   const failed = new Set(Array.isArray(bootstrap.failedStepIds) ? bootstrap.failedStepIds : []);
   const currentStepId = bootstrap.running ? bootstrap.currentStepId : null;
+  const bootstrapStepOrder = getCatalogBootstrapStepOrder();
 
   return `
     <section class="activity-sequence">
-      ${BOOTSTRAP_STEP_ORDER.map((stepId) => {
-        const meta = BOOTSTRAP_STEP_META[stepId] || { label: stepId, shortLabel: stepId.slice(0, 2).toUpperCase() };
+      ${bootstrapStepOrder.map((stepId) => {
+        const meta = getCatalogBootstrapStepMeta(stepId) || { label: stepId, shortLabel: stepId.slice(0, 2).toUpperCase() };
         let stepState = "pending";
         if (failed.has(stepId)) {
           stepState = "error";
@@ -436,7 +933,7 @@ function renderActivityCard() {
       bootstrap.maxAttempts > 0
         ? { text: `Attempt • ${Math.max(bootstrap.attempt || 1, 1)} / ${bootstrap.maxAttempts}` }
         : null,
-      { text: `Completed • ${completedCount} / ${BOOTSTRAP_STEP_ORDER.length}` },
+      { text: `Completed • ${completedCount} / ${getCatalogBootstrapStepOrder().length || completedCount}` },
       failedLabels.length ? { text: `Failed • ${failedLabels.length}`, emphasis: true } : null,
     ];
 
@@ -689,7 +1186,7 @@ function renderHeader(orderedServices) {
   dom.overallStatus.className = `overall-status ${state.overall.state || "booting"}`;
   dom.overallStatusText.textContent = state.overall.text || "BOOTING";
   const runningCount = orderedServices.filter((service) => service.state === "running").length;
-  dom.runningCount.textContent = `${runningCount} / ${orderedServices.length || SERVICE_ORDER.length} running`;
+  dom.runningCount.textContent = `${runningCount} / ${orderedServices.length || getCatalogServiceOrder().length} running`;
 
   if (state.bootstrap?.running) {
     const attempt = Math.max(state.bootstrap.attempt || 1, 1);
@@ -758,11 +1255,15 @@ function render() {
   syncBootstrapDisplay();
   const orderedServices = getOrderedServices();
   ensureSelectedServiceId(orderedServices);
-  updateButtonState();
+  renderSectionChrome(orderedServices);
   renderHeader(orderedServices);
-  renderServiceRail(orderedServices);
-  renderServiceDetail(orderedServices);
-  renderLogs();
+
+  if (state.activeSection === "runtime") {
+    updateButtonState();
+    renderServiceRail(orderedServices);
+    renderServiceDetail(orderedServices);
+    renderLogs();
+  }
 }
 
 function hostPost(type, payload = {}) {
@@ -771,6 +1272,19 @@ function hostPost(type, payload = {}) {
   }
 
   window.chrome.webview.postMessage({ type, payload });
+}
+
+function requestRouteLaunch(routeId) {
+  const route = routeItemById(routeId);
+  if (!route) {
+    return;
+  }
+
+  hostPost("suite.route.open", {
+    routeId,
+    routePath: route.path,
+    routeTitle: route.title,
+  });
 }
 
 function pushLog(entry) {
@@ -782,9 +1296,18 @@ function pushLog(entry) {
 
 function handleHostMessage(message) {
   switch (message.type) {
+    case "runtime.catalog":
+      state.runtimeCatalog = normalizeRuntimeCatalog(message.payload);
+      break;
+    case "developer.manifest":
+      state.developerToolsManifest = normalizeDeveloperToolsManifest(message.payload);
+      break;
     case "runtime.snapshot": {
       const payload = message.payload || {};
       state.overall = payload.overall || state.overall;
+      state.doctor = payload.doctor || null;
+      state.runtimeMeta = payload.runtime || null;
+      state.supportMeta = payload.support || null;
       state.services = Array.isArray(payload.services) ? payload.services : [];
       state.hasSnapshot = true;
       const lastBootstrap = payload.runtime?.lastBootstrap;
@@ -850,6 +1373,44 @@ dom.clearLogButton.addEventListener("click", () => hostPost("runtime.clear_log")
 dom.autoscrollButton.addEventListener("click", () => {
   state.autoScroll = !state.autoScroll;
   render();
+});
+
+dom.sectionNav?.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-section]");
+  if (!button) {
+    return;
+  }
+
+  const sectionId = button.getAttribute("data-section");
+  if (!sectionId) {
+    return;
+  }
+
+  setActiveSection(sectionId);
+  render();
+});
+
+dom.workshopContent?.addEventListener("click", (event) => {
+  const supportButton = event.target.closest("button[data-support-action]");
+  if (supportButton) {
+    const supportAction = supportButton.getAttribute("data-support-action");
+    if (supportAction) {
+      hostPost(`suite.support.${supportAction}`);
+    }
+    return;
+  }
+
+  const button = event.target.closest("button[data-launch-route]");
+  if (!button) {
+    return;
+  }
+
+  const routeId = button.getAttribute("data-launch-route");
+  if (!routeId) {
+    return;
+  }
+
+  requestRouteLaunch(routeId);
 });
 
 dom.servicesList.addEventListener("click", (event) => {

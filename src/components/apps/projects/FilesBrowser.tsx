@@ -50,16 +50,12 @@ export function FilesBrowser({
 						</div>
 						<div>
 							<p className={styles.eyebrow}>Project files</p>
-							<h4 className={styles.title}>File storage</h4>
+							<h4 className={styles.title}>Files</h4>
 						</div>
 					</div>
 					<p className={styles.description}>
-						Track deliverables, search uploaded files, and keep project records
+						Keep package files, issued PDFs, and supporting deliverables
 						available from one lane for {projectName}.
-					</p>
-					<p className={styles.storageHint}>
-						Storage: Supabase table <code>files</code> + storage bucket{" "}
-						<code>project-files</code>. Uploads persist across backend restarts.
 					</p>
 					<div className={styles.signalRow}>
 						<span className={styles.signalChip}>{files.length} total files</span>

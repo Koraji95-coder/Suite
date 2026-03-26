@@ -32,9 +32,9 @@ Repo: `Suite`
   - one-time callback state is enforced server-side (TTL + consume-once)
   - optional required callback signing for external providers (`AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK=true`)
   - callback signature freshness checks (`AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_AGE_SECONDS`, clock-skew guard)
-  - ZeroClaw bridge endpoint emits signed callback fields for Suite:
+  - external callback bridge emits signed callback fields for Suite:
     - `GET /suite/passkey/callback`
-    - docs: `zeroclaw-main/docs/suite-passkey-bridge.md`
+    - contract: `docs/security/passkey-external-callback-contract.md`
   - provider JWT claims can be required (`suite_claims_required=1`) so callback status/email are claim-backed, not query-backed
 - Auth method telemetry is active for email-link flows (`security:auth_method:*` in `activity_log`)
   - reference: `docs/security/auth-telemetry.md`

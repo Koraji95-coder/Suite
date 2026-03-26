@@ -20,7 +20,6 @@ const INPUT_ROOTS = [
 	"src/supabase",
 	"supabase",
 	"backend/supabase",
-	"zeroclaw-main/src",
 	"docs",
 	"scripts",
 	".env.example",

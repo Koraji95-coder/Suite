@@ -18,7 +18,6 @@ const SNAPSHOT_INPUT_ROOTS = [
 	"src/supabase",
 	"supabase",
 	"backend/supabase",
-	"zeroclaw-main/src",
 	"docs",
 	"scripts",
 	".env.example",
@@ -52,7 +51,8 @@ const DOMAIN_ROOTS = [
 		roots: [
 			"src/routes/agent",
 			"src/services/agentService.ts",
-			"zeroclaw-main/src",
+			"scripts/suite-agent-gateway.mjs",
+			"scripts/run-agent-gateway.mjs",
 		],
 		maxChildrenPerRoot: 10,
 	},
@@ -63,7 +63,7 @@ const DOMAIN_ROOTS = [
 	},
 ];
 
-const HOTSPOT_ROOTS = ["src", "backend", "zeroclaw-main/src"];
+const HOTSPOT_ROOTS = ["src", "backend", "scripts"];
 const HOTSPOT_LIMIT = 25;
 
 const SKIP_DIRS = new Set([

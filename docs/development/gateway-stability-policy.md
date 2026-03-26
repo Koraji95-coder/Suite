@@ -6,28 +6,34 @@ Lock one stable operational path for gateway work so MCP/Codex sessions stop re-
 
 ## Locked Default
 
-- Default launch path: `zeroclaw-gateway`
+- Default launch path: Suite-native gateway (`scripts/suite-agent-gateway.mjs`)
 - Canonical command: `npm run gateway:dev`
-- Full CLI path (`zeroclaw gateway`) is incident-only diagnostics, not a daily alternative.
-- Diagnostic toggle: `SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev`
+- Legacy ZeroClaw CLI fallback is retired from the active Suite workflow.
+- If a legacy process is detected, stop it and relaunch `npm run gateway:dev`.
+- Do not reintroduce legacy gateway launchers or runtime toggles into active Suite tooling.
 
 ## Deterministic Decision Tree
 
 1. Start on default path.
    - Run: `npm run gateway:dev`
 2. If gateway starts, continue normal development.
-3. If gateway fails and diagnostics are explicitly needed:
-   - Run: `SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev`
-4. If full CLI diagnostic compile fails with rustc crash signatures (stack overflow, `0xc0000005`, ICE):
-   - capture evidence once,
-   - classify as compiler/toolchain instability,
-   - stop workaround iteration,
-   - return to default path (`npm run gateway:dev`).
-5. Do not stack speculative build-flag changes in-session after classification.
+3. If gateway status reports an unexpected legacy process mode:
+   - stop the detected legacy process,
+   - relaunch `npm run gateway:dev`,
+   - confirm runtime status returns to `Suite-native`.
+4. Historical rust/toolchain failures from the retired legacy CLI path stay archived as diagnostics only.
+
+## Path Definitions
+
+- `npm run gateway:dev`
+  - launches the Suite-native gateway
+- legacy launcher
+  - removed from the active Suite workflow
+  - any remaining legacy process should be treated as stale drift, not a supported mode
 
 ## Incident Protocol (Compiler/Toolchain Instability)
 
-Capture this once per incident window:
+Capture this once per incident window if a historical legacy diagnostic is being reviewed:
 
 1. Toolchain versions:
    - `rustc --version`
@@ -42,7 +48,7 @@ Capture this once per incident window:
 4. Classification:
    - `compiler/toolchain instability` when signatures match above.
 5. Resolution action:
-   - revert to default path and continue work.
+   - keep the live runtime on `npm run gateway:dev`.
 
 ## Upstream Escalation Rule
 

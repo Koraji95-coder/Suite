@@ -1,4 +1,12 @@
-import { Calendar, CheckSquare, FileDown, FilePenLine, MapPin } from "lucide-react";
+import {
+	CheckSquare,
+	ClipboardList,
+	FileCheck2,
+	FileDown,
+	FilePenLine,
+	FolderTree,
+	ShieldAlert,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import styles from "./ProjectDetailViewTabs.module.css";
 import type { ViewMode } from "./projectmanagertypes";
@@ -8,13 +16,35 @@ interface ProjectDetailViewTabsProps {
 	onViewModeChange: (mode: ViewMode) => void;
 }
 
-const tabs: { mode: ViewMode; label: string; icon: typeof CheckSquare }[] = [
-	{ mode: "tasks", label: "Tasks", icon: CheckSquare },
-	{ mode: "calendar", label: "Calendar", icon: Calendar },
-	{ mode: "files", label: "Files", icon: FileDown },
+const primaryTabs: { mode: ViewMode; label: string; icon: typeof CheckSquare }[] = [
+	{ mode: "setup", label: "Setup", icon: FolderTree },
+	{ mode: "readiness", label: "Readiness", icon: ClipboardList },
+	{ mode: "review", label: "Review", icon: ShieldAlert },
+	{ mode: "issue-sets", label: "Issue Sets", icon: FileCheck2 },
 	{ mode: "revisions", label: "Revisions", icon: FilePenLine },
-	{ mode: "ground-grids", label: "Ground Grids", icon: MapPin },
+	{ mode: "files", label: "Files & telemetry", icon: FileDown },
 ];
+
+function renderTab(
+	mode: ViewMode,
+	label: string,
+	Icon: typeof CheckSquare,
+	viewMode: ViewMode,
+	onViewModeChange: (mode: ViewMode) => void,
+) {
+	return (
+		<button
+			key={mode}
+			type="button"
+			onClick={() => onViewModeChange(mode)}
+			aria-pressed={viewMode === mode}
+			className={cn(styles.tab, viewMode === mode && styles.tabActive)}
+		>
+			<Icon className={styles.icon} />
+			<span>{label}</span>
+		</button>
+	);
+}
 
 export function ProjectDetailViewTabs({
 	viewMode,
@@ -22,19 +52,13 @@ export function ProjectDetailViewTabs({
 }: ProjectDetailViewTabsProps) {
 	return (
 		<div className={styles.root}>
-			<div className={styles.tabRow}>
-				{tabs.map(({ mode, label, icon: Icon }) => (
-					<button
-						key={mode}
-						type="button"
-						onClick={() => onViewModeChange(mode)}
-						aria-pressed={viewMode === mode}
-						className={cn(styles.tab, viewMode === mode && styles.tabActive)}
-					>
-						<Icon className={styles.icon} />
-						<span>{label}</span>
-					</button>
-				))}
+			<div className={styles.group}>
+				<div className={styles.groupLabel}>Delivery flow</div>
+				<div className={styles.tabRow}>
+					{primaryTabs.map(({ mode, label, icon }) =>
+						renderTab(mode, label, icon, viewMode, onViewModeChange),
+					)}
+				</div>
 			</div>
 		</div>
 	);

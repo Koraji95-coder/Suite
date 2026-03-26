@@ -2,6 +2,7 @@ import { Activity, ArrowRight, ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/primitives/Badge";
+import { cn } from "@/lib/utils";
 import { basenameFromPath } from "@/lib/watchdogTelemetry";
 import { buildWatchdogHref } from "@/lib/watchdogNavigation";
 import {
@@ -18,6 +19,8 @@ interface ProjectTelemetryPanelProps {
 	projectId: string;
 	telemetry: ProjectWatchdogTelemetry;
 	onRootPathChange?: (rootPath: string | null) => void;
+	compact?: boolean;
+	embedded?: boolean;
 }
 
 function formatRelativeTime(timestamp: number | string | null | undefined): string {
@@ -89,26 +92,6 @@ function parseRuleLines(rawValue: string): string[] {
 	return out;
 }
 
-function hasRuleValues(
-	rule:
-		| {
-				roots?: string[];
-				includeGlobs?: string[];
-				excludeGlobs?: string[];
-				drawingPatterns?: string[];
-		  }
-		| null
-		| undefined,
-): boolean {
-	if (!rule) return false;
-	return Boolean(
-		(rule.roots ?? []).length ||
-			(rule.includeGlobs ?? []).length ||
-			(rule.excludeGlobs ?? []).length ||
-			(rule.drawingPatterns ?? []).length,
-	);
-}
-
 function toDisplayList(values: string[] | undefined): string {
 	const list = values ?? [];
 	return list.length > 0 ? list.join(", ") : "None";
@@ -118,8 +101,11 @@ export function ProjectTelemetryPanel({
 	projectId,
 	telemetry,
 	onRootPathChange,
+	compact = false,
+	embedded = false,
 }: ProjectTelemetryPanelProps) {
 	const watchdogLink = buildWatchdogHref(projectId);
+	const [rulesExpanded, setRulesExpanded] = useState(false);
 	const [editingRules, setEditingRules] = useState(false);
 	const [savingRules, setSavingRules] = useState(false);
 	const [ruleError, setRuleError] = useState<string | null>(null);
@@ -151,7 +137,6 @@ export function ProjectTelemetryPanel({
 	}, [editingRules, localRule, telemetry.rule]);
 
 	const effectiveRule = localRule ?? telemetry.rule;
-	const ruleConfigured = hasRuleValues(effectiveRule);
 	const sessionTimeline = (telemetry.sessions.length
 		? telemetry.sessions
 		: telemetry.liveSessions
@@ -164,9 +149,40 @@ export function ProjectTelemetryPanel({
 		() => telemetry.trackedDrawings.slice(0, 12),
 		[telemetry.trackedDrawings],
 	);
+	const fallbackSessions = useMemo(
+		() => telemetry.sessions.slice(0, 4),
+		[telemetry.sessions],
+	);
+	const ruleSummaryItems = useMemo(
+		() =>
+			[
+				{
+					label: "Roots",
+					values: effectiveRule?.roots,
+					alwaysShow: true,
+				},
+				{
+					label: "Include",
+					values: effectiveRule?.includeGlobs,
+					alwaysShow: false,
+				},
+				{
+					label: "Exclude",
+					values: effectiveRule?.excludeGlobs,
+					alwaysShow: false,
+				},
+				{
+					label: "Drawing patterns",
+					values: effectiveRule?.drawingPatterns,
+					alwaysShow: false,
+				},
+			].filter((item) => item.alwaysShow || (item.values?.length ?? 0) > 0),
+		[effectiveRule],
+	);
 
 	const startEditingRules = () => {
 		setRuleError(null);
+		setRulesExpanded(true);
 		setEditingRules(true);
 		setRuleRoots(joinRuleLines(effectiveRule?.roots));
 		setRuleIncludes(joinRuleLines(effectiveRule?.includeGlobs));
@@ -229,55 +245,62 @@ export function ProjectTelemetryPanel({
 	};
 
 	return (
-		<section className={styles.root}>
-			<div className={styles.header}>
-				<div>
-					<div className={styles.headerTitle}>
-						<Activity className={styles.headerIcon} />
-						<h4>Project telemetry</h4>
+		<section className={cn(styles.root, compact && styles.compactRoot)}>
+			{embedded ? (
+				<div className={styles.embeddedHeader}>
+					<div className={styles.embeddedHeaderCopy}>
+						<p className={styles.embeddedEyebrow}>Tracking journals</p>
+						<h4 className={styles.embeddedTitle}>Project telemetry</h4>
 					</div>
-					<p className={styles.description}>
-						Live AutoCAD sessions, shared project mapping, and drawing-day
-						journals for this project.
-					</p>
+					<Link to={watchdogLink} className={styles.embeddedLink}>
+						<span>Watchdog</span>
+						<ArrowRight className={styles.linkIcon} />
+					</Link>
 				</div>
-				<Link to={watchdogLink} className={styles.link}>
-					<span>Open Watchdog</span>
-					<ArrowRight className={styles.linkIcon} />
-				</Link>
-			</div>
+			) : (
+				<div className={cn(styles.header, compact && styles.compactHeader)}>
+					<div>
+						<div className={styles.headerTitle}>
+							<Activity className={styles.headerIcon} />
+							<h4>{compact ? "Tracking and journals" : "Project telemetry"}</h4>
+						</div>
+						<p className={cn(styles.description, compact && styles.compactDescription)}>
+							{compact
+								? "Watchdog sessions, shared mapping rules, and drawing journals for this project."
+								: "Live AutoCAD sessions, shared project mapping, and drawing-day journals for this project."}
+						</p>
+					</div>
+					<Link to={watchdogLink} className={styles.link}>
+						<span>Open Watchdog</span>
+						<ArrowRight className={styles.linkIcon} />
+					</Link>
+				</div>
+			)}
 
-			<div className={styles.statsGrid}>
-				<div className={styles.statCard}>
+			<div className={cn(styles.statsGrid, compact && styles.compactStatsGrid)}>
+				<div className={cn(styles.statCard, compact && styles.compactStatCard)}>
 					<div className={styles.statLabel}>Active sessions</div>
 					<div className={styles.statValue}>
 						{telemetry.activeCadSessionCount}
 					</div>
 				</div>
-				<div className={styles.statCard}>
-					<div className={styles.statLabel}>Commands in window</div>
+				<div className={cn(styles.statCard, compact && styles.compactStatCard)}>
+					<div className={styles.statLabel}>Last tracker update</div>
 					<div className={styles.statValue}>
-						{telemetry.totalCommandsInWindow}
+						{telemetry.latestTrackerUpdatedAt
+							? formatRelativeTime(telemetry.latestTrackerUpdatedAt)
+							: "—"}
 					</div>
 				</div>
-				<div className={styles.statCard}>
-					<div className={styles.statLabel}>Attribution</div>
-					<div className={styles.statValue}>
-						{ruleConfigured ? "Mapped" : "Needs rules"}
-					</div>
-				</div>
-				<div className={styles.statCard}>
-					<div className={styles.statLabel}>Tracked drawings</div>
+				<div className={cn(styles.statCard, compact && styles.compactStatCard)}>
+					<div className={styles.statLabel}>Drawing journals</div>
 					<div className={styles.statValue}>{telemetry.trackedDrawings.length}</div>
 				</div>
 			</div>
 
-			<div className={styles.timeline}>
+			<section className={styles.timeline}>
 				<div className={styles.timelineHeader}>
-					<div className={styles.timelineTitleRow}>
-						<h5 className={styles.timelineTitle}>Recent CAD sessions</h5>
-						<span>Session timeline</span>
-					</div>
+					<h5 className={styles.timelineTitle}>Recent CAD sessions</h5>
 					<span>{loggedSessionCount} logged</span>
 				</div>
 				{sessionTimeline.length === 0 ? (
@@ -304,7 +327,7 @@ export function ProjectTelemetryPanel({
 						</div>
 					))
 				)}
-			</div>
+			</section>
 
 			<section className={styles.rulePanel}>
 				<div className={styles.ruleHeader}>
@@ -401,38 +424,46 @@ export function ProjectTelemetryPanel({
 						</label>
 					</div>
 				) : (
-					<div className={styles.ruleDetails}>
-						<div className={styles.ruleSummaryCard}>
-							<div className={styles.detailLabel}>Roots</div>
-							<div className={styles.detailValue}>
-								{toDisplayList(effectiveRule?.roots)}
+					<>
+						<button
+							type="button"
+							className={styles.ruleSummaryButton}
+							onClick={() => setRulesExpanded((current) => !current)}
+							aria-expanded={rulesExpanded}
+						>
+							<div className={styles.ruleSummaryMain}>
+								<span className={styles.detailLabel}>Primary root</span>
+								<span className={styles.ruleSummaryValue}>
+									{effectiveRule?.roots?.[0] ?? "No roots configured"}
+								</span>
 							</div>
-						</div>
-						<div className={styles.ruleSummaryCard}>
-							<div className={styles.detailLabel}>Include</div>
-							<div className={styles.detailValue}>
-								{toDisplayList(effectiveRule?.includeGlobs)}
+							<div className={styles.ruleSummaryMeta}>
+								<span>
+									{ruleSummaryItems.length} configured section
+									{ruleSummaryItems.length === 1 ? "" : "s"}
+								</span>
+								<span>
+									Updated{" "}
+									{effectiveRule?.updatedAt
+										? formatRelativeTime(effectiveRule.updatedAt)
+										: "—"}
+								</span>
+								<span>{rulesExpanded ? "Hide details" : "Show details"}</span>
 							</div>
-						</div>
-						<div className={styles.ruleSummaryCard}>
-							<div className={styles.detailLabel}>Exclude</div>
-							<div className={styles.detailValue}>
-								{toDisplayList(effectiveRule?.excludeGlobs)}
+						</button>
+						{rulesExpanded ? (
+							<div className={styles.ruleDetails}>
+								{ruleSummaryItems.map((item) => (
+									<div key={item.label} className={styles.ruleSummaryCard}>
+										<div className={styles.detailLabel}>{item.label}</div>
+										<div className={styles.detailValue}>
+											{toDisplayList(item.values)}
+										</div>
+									</div>
+								))}
 							</div>
-						</div>
-						<div className={styles.ruleSummaryCard}>
-							<div className={styles.detailLabel}>Drawing patterns</div>
-							<div className={styles.detailValue}>
-								{toDisplayList(effectiveRule?.drawingPatterns)}
-							</div>
-						</div>
-						<div className={styles.ruleMeta}>
-							Updated{" "}
-							{effectiveRule?.updatedAt
-								? formatRelativeTime(effectiveRule.updatedAt)
-								: "—"}
-						</div>
-					</div>
+						) : null}
+					</>
 				)}
 			</section>
 
@@ -451,7 +482,54 @@ export function ProjectTelemetryPanel({
 					</span>
 				</div>
 
-				{trackedDrawings.length === 0 ? (
+				{telemetry.loading ? (
+					<div className={styles.emptyState}>Loading project telemetry...</div>
+				) : telemetry.error ? (
+					<div className={styles.emptyState}>{telemetry.error}</div>
+				) : trackedDrawings.length === 0 && fallbackSessions.length > 0 ? (
+					<div className={styles.sessionFallback}>
+						<p className={styles.sessionFallbackCopy}>
+							Drawing journals have not synced yet, but recent AutoCAD sessions
+							are already attributed to this project.
+						</p>
+						<div className={styles.sessionList}>
+							{fallbackSessions.map((session) => (
+								<div key={session.sessionId} className={styles.sessionRow}>
+									<div className={styles.sessionMain}>
+										<div className={styles.sessionTitle}>
+											{basenameFromPath(session.drawingPath)}
+										</div>
+										<div className={styles.sessionMeta}>
+											<span>{session.workstationId}</span>
+											<span>Started {formatRelativeTime(session.startedAt)}</span>
+											<span>{session.commandCount} command(s)</span>
+											<span>{formatDuration(session.durationMs)}</span>
+										</div>
+									</div>
+									<div className={styles.sessionAside}>
+										<Badge
+											color={
+												session.status === "live"
+													? "primary"
+													: session.status === "paused"
+														? "warning"
+														: "accent"
+											}
+											variant="soft"
+										>
+											{session.status}
+										</Badge>
+										<div className={styles.sessionAge}>
+											{session.lastActivityAt
+												? `Activity ${formatRelativeTime(session.lastActivityAt)}`
+												: `Updated ${formatRelativeTime(session.latestEventAt)}`}
+										</div>
+									</div>
+								</div>
+							))}
+						</div>
+					</div>
+				) : trackedDrawings.length === 0 ? (
 					<div className={styles.emptyState}>
 						No tracked drawings have synced for this project yet.
 					</div>
@@ -574,53 +652,6 @@ export function ProjectTelemetryPanel({
 					</div>
 				)}
 			</section>
-
-			{telemetry.loading ? (
-				<div className={styles.emptyState}>Loading project telemetry...</div>
-			) : telemetry.error ? (
-				<div className={styles.emptyState}>{telemetry.error}</div>
-			) : telemetry.sessions.length === 0 ? (
-				<div className={styles.emptyState}>
-					No recent AutoCAD sessions have been attributed to this project.
-				</div>
-			) : (
-				<div className={styles.sessionList}>
-					{telemetry.sessions.slice(0, 4).map((session) => (
-						<div key={session.sessionId} className={styles.sessionRow}>
-							<div className={styles.sessionMain}>
-								<div className={styles.sessionTitle}>
-									{basenameFromPath(session.drawingPath)}
-								</div>
-								<div className={styles.sessionMeta}>
-									<span>{session.workstationId}</span>
-									<span>Started {formatRelativeTime(session.startedAt)}</span>
-									<span>{session.commandCount} command(s)</span>
-									<span>{formatDuration(session.durationMs)}</span>
-								</div>
-							</div>
-							<div className={styles.sessionAside}>
-								<Badge
-									color={
-										session.status === "live"
-											? "primary"
-											: session.status === "paused"
-												? "warning"
-												: "accent"
-									}
-									variant="soft"
-								>
-									{session.status}
-								</Badge>
-								<div className={styles.sessionAge}>
-									{session.lastActivityAt
-										? `Activity ${formatRelativeTime(session.lastActivityAt)}`
-										: `Updated ${formatRelativeTime(session.latestEventAt)}`}
-								</div>
-							</div>
-						</div>
-					))}
-				</div>
-			)}
 		</section>
 	);
 }

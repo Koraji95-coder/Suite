@@ -1,30 +1,15 @@
 import { ArrowUpRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-	AGENT_PROFILE_IDS,
-	AGENT_PROFILES,
-	type AgentProfileId,
-} from "@/components/agent/agentProfiles";
 import { PageContextBand } from "@/components/apps/ui/PageContextBand";
 import { SurfaceSkeleton } from "@/components/apps/ui/SurfaceSkeleton";
 import {
 	type TrustState,
 	TrustStateBadge,
 } from "@/components/apps/ui/TrustStateBadge";
-import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
 import { Text } from "@/components/primitives/Text";
-import {
-	ARCHITECTURE_AUTOGEN,
-	ARCHITECTURE_DOMAINS,
-	ARCHITECTURE_FIX_CANDIDATES,
-	type ArchitectureDomainId,
-} from "@/data/architectureModel";
-import { loadMemories } from "@/lib/agent-memory/service";
-import type { Memory } from "@/lib/agent-memory/types";
-import { buildChangelogSearchParams } from "@/lib/workLedgerNavigation";
 import {
 	type WatchdogCollector,
 	type WatchdogCollectorEvent,
@@ -32,26 +17,16 @@ import {
 	type WatchdogSessionSummary,
 	watchdogService,
 } from "@/services/watchdogService";
-import {
-	type WorkLedgerDraftSuggestion,
-	type WorkLedgerLifecycleState,
-	type WorkLedgerPublishJobRow,
-	type WorkLedgerPublishState,
-	type WorkLedgerRow,
-	type WorktaleReadinessResponse,
-	workLedgerService,
-} from "@/services/workLedgerService";
 import styles from "./DashboardOverviewPanel.module.css";
 import {
-	DashboardArchitectureSection,
-	DashboardMemorySection,
-	DashboardOverviewStatsGrid,
-	DashboardProjectOperationsSection,
+	DashboardDeliveryBoardSection,
 	DashboardWatchdogSection,
-	DashboardWorkLedgerSection,
 } from "./DashboardOverviewSections";
 import { buildDashboardWatchdogViewModel } from "./dashboardWatchdogSelectors";
-import { buildDashboardWorkLedgerViewModel } from "./dashboardWorkLedgerSelectors";
+import {
+	summarizeDashboardDeliveryProjects,
+	useDashboardDeliverySummary,
+} from "./useDashboardDeliverySummary";
 import { useDashboardOverviewData } from "./useDashboardOverviewData";
 
 interface DashboardOverviewPanelProps {
@@ -59,14 +34,7 @@ interface DashboardOverviewPanelProps {
 	onNavigateToProjectsHub?: () => void;
 }
 
-type DomainFilter = "all" | ArchitectureDomainId;
-type AgentFilter = "all" | AgentProfileId;
-type DashboardFocus =
-	| "watchdog"
-	| "architecture"
-	| "ledger"
-	| "memory"
-	| "projects";
+type DashboardFocus = "watchdog" | "projects";
 
 type DashboardStatusCard = {
 	key: string;
@@ -74,6 +42,24 @@ type DashboardStatusCard = {
 	tone: "success" | "warning" | "danger" | "primary" | "default";
 	detail: string;
 };
+
+type FocusPillOption = DashboardFocus | "all";
+
+const TIME_WINDOW_OPTIONS = [
+	{ value: "4", label: "4 hours" },
+	{ value: "24", label: "24 hours" },
+	{ value: "72", label: "72 hours" },
+	{ value: "168", label: "7 days" },
+] as const;
+
+const CUSTOMER_FOCUS_OPTIONS: ReadonlyArray<{
+	value: FocusPillOption;
+	label: string;
+}> = [
+	{ value: "all", label: "Overview" },
+	{ value: "watchdog", label: "Watchdog" },
+	{ value: "projects", label: "Delivery" },
+];
 
 function toTrustState(tone: DashboardStatusCard["tone"]): TrustState {
 	switch (tone) {
@@ -88,50 +74,6 @@ function toTrustState(tone: DashboardStatusCard["tone"]): TrustState {
 	}
 }
 
-function normalizeLedgerPublishState(
-	value: string | null,
-): WorkLedgerPublishState | "all" {
-	if (value === "draft" || value === "ready" || value === "published") {
-		return value;
-	}
-	return "all";
-}
-
-function normalizeLedgerLifecycleState(
-	value: string | null,
-): WorkLedgerLifecycleState | "all" {
-	if (
-		value === "planned" ||
-		value === "active" ||
-		value === "completed" ||
-		value === "archived"
-	) {
-		return value;
-	}
-	return "all";
-}
-
-const TIME_WINDOW_OPTIONS = [
-	{ value: "4", label: "4 hours" },
-	{ value: "24", label: "24 hours" },
-	{ value: "72", label: "72 hours" },
-	{ value: "168", label: "7 days" },
-] as const;
-
-type FocusPillOption = DashboardFocus | "all";
-
-const FOCUS_PILL_OPTIONS: ReadonlyArray<{
-	value: FocusPillOption;
-	label: string;
-}> = [
-	{ value: "all", label: "Overview" },
-	{ value: "watchdog", label: "Watchdog" },
-	{ value: "architecture", label: "Architecture" },
-	{ value: "ledger", label: "Work ledger" },
-	{ value: "memory", label: "Agent memory" },
-	{ value: "projects", label: "Project ops" },
-];
-
 function matchesQuery(query: string, values: Array<string | undefined | null>) {
 	if (!query) return true;
 	return values.some((value) =>
@@ -141,25 +83,9 @@ function matchesQuery(query: string, values: Array<string | undefined | null>) {
 	);
 }
 
-function includesDomainPath(
-	pathValue: string,
-	domainId: DomainFilter,
-): boolean {
-	if (domainId === "all") return true;
-	const domain = ARCHITECTURE_DOMAINS.find((item) => item.id === domainId);
-	if (!domain) return true;
-	const normalizedPath = pathValue.toLowerCase().replace(/\\/g, "/");
-	return domain.repoRoots.some((root) =>
-		normalizedPath.includes(root.toLowerCase().replace(/\\/g, "/")),
-	);
-}
-
 function parseDashboardFocus(value: string | null): DashboardFocus | null {
 	switch (value) {
 		case "watchdog":
-		case "architecture":
-		case "ledger":
-		case "memory":
 		case "projects":
 			return value;
 		default:
@@ -167,11 +93,19 @@ function parseDashboardFocus(value: string | null): DashboardFocus | null {
 	}
 }
 
-function isExternalAdvancedPath(pathValue: string): boolean {
-	const normalizedPath = String(pathValue || "")
-		.toLowerCase()
-		.replace(/\\/g, "/");
-	return normalizedPath.startsWith("zeroclaw-main/");
+function formatDashboardDate(value: string | null) {
+	if (!value) {
+		return "No deadline";
+	}
+	const parsed = new Date(value);
+	if (Number.isNaN(parsed.getTime())) {
+		return value;
+	}
+	return parsed.toLocaleDateString([], {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	});
 }
 
 function classifyStatusCard(
@@ -184,18 +118,6 @@ function classifyStatusCard(
 ): DashboardStatusCard {
 	if (errorMessage) {
 		const normalizedMessage = errorMessage.toLowerCase();
-		if (
-			normalizedMessage.includes("missing `work_ledger_entries`") ||
-			normalizedMessage.includes("table is missing")
-		) {
-			return {
-				key,
-				label,
-				tone: "warning",
-				detail:
-					"Hosted schema is behind the repo. Apply the latest Supabase migration or use the local fallback.",
-			};
-		}
 		if (
 			normalizedMessage.includes("route") &&
 			normalizedMessage.includes("unavailable")
@@ -261,14 +183,12 @@ export function DashboardOverviewPanel({
 }: DashboardOverviewPanelProps) {
 	const navigate = useNavigate();
 	const [searchParams, setSearchParams] = useSearchParams();
-	const {
+	const { projects, activities, isLoading, projectTaskCounts, allProjectsMap } =
+		useDashboardOverviewData();
+	const deliverySummary = useDashboardDeliverySummary(
 		projects,
-		activities,
-		storageUsed,
-		isLoading,
 		projectTaskCounts,
-		allProjectsMap,
-	} = useDashboardOverviewData();
+	);
 
 	const [watchdogOverview, setWatchdogOverview] =
 		useState<WatchdogOverviewResponse | null>(null);
@@ -279,47 +199,16 @@ export function DashboardOverviewPanel({
 		WatchdogSessionSummary[]
 	>([]);
 	const [collectors, setCollectors] = useState<WatchdogCollector[]>([]);
-	const [memories, setMemories] = useState<Memory[]>([]);
-	const [workLedgerEntries, setWorkLedgerEntries] = useState<WorkLedgerRow[]>(
-		[],
-	);
-	const [workLedgerJobsByEntry, setWorkLedgerJobsByEntry] = useState<
-		Record<string, WorkLedgerPublishJobRow[]>
-	>({});
-	const [ledgerSuggestions, setLedgerSuggestions] = useState<
-		WorkLedgerDraftSuggestion[]
-	>([]);
-	const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-	const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
 	const [watchdogError, setWatchdogError] = useState<string | null>(null);
-	const [memoryError, setMemoryError] = useState<string | null>(null);
-	const [workLedgerError, setWorkLedgerError] = useState<string | null>(null);
-	const [worktaleReadiness, setWorktaleReadiness] =
-		useState<WorktaleReadinessResponse | null>(null);
-	const [worktaleReadinessError, setWorktaleReadinessError] = useState<
-		string | null
-	>(null);
 	const [telemetryLoading, setTelemetryLoading] = useState(true);
 	const initialFocusAppliedRef = useRef(false);
 	const watchdogSectionRef = useRef<HTMLDivElement | null>(null);
-	const architectureSectionRef = useRef<HTMLDivElement | null>(null);
-	const ledgerSectionRef = useRef<HTMLDivElement | null>(null);
-	const memorySectionRef = useRef<HTMLDivElement | null>(null);
 	const projectSectionRef = useRef<HTMLDivElement | null>(null);
 
 	const selectedProjectId = searchParams.get("project") || "all";
-	const selectedDomain = (searchParams.get("domain") || "all") as DomainFilter;
-	const selectedAgent = (searchParams.get("agent") || "all") as AgentFilter;
 	const selectedCollectorId = searchParams.get("collector") || "all";
-	const selectedIncludeAdvanced = searchParams.get("includeAdvanced") === "1";
 	const selectedWindowHours = searchParams.get("window") || "24";
 	const selectedFocus = parseDashboardFocus(searchParams.get("focus"));
-	const selectedLedgerPublishState = normalizeLedgerPublishState(
-		searchParams.get("publishState"),
-	);
-	const selectedLedgerLifecycleState = normalizeLedgerLifecycleState(
-		searchParams.get("lifecycleState"),
-	);
 	const searchValue = searchParams.get("query") || "";
 	const query = searchValue.trim().toLowerCase();
 
@@ -328,6 +217,34 @@ export function DashboardOverviewPanel({
 		60 *
 		60 *
 		1000;
+
+	useEffect(() => {
+		const next = new URLSearchParams(searchParams);
+		let mutated = false;
+		for (const key of [
+			"domain",
+			"agent",
+			"includeAdvanced",
+			"lifecycleState",
+			"publishState",
+		]) {
+			if (next.has(key)) {
+				next.delete(key);
+				mutated = true;
+			}
+		}
+		if (
+			selectedFocus &&
+			selectedFocus !== "watchdog" &&
+			selectedFocus !== "projects"
+		) {
+			next.delete("focus");
+			mutated = true;
+		}
+		if (mutated) {
+			setSearchParams(next, { replace: true });
+		}
+	}, [searchParams, selectedFocus, setSearchParams]);
 
 	const updateFilters = (updates: Record<string, string>) => {
 		const next = new URLSearchParams(searchParams);
@@ -351,48 +268,32 @@ export function DashboardOverviewPanel({
 		const run = async () => {
 			setTelemetryLoading(true);
 			setWatchdogError(null);
-			setMemoryError(null);
-			setWorkLedgerError(null);
 
 			const projectId =
 				selectedProjectId !== "all" ? selectedProjectId : undefined;
 			const collectorId =
 				selectedCollectorId !== "all" ? selectedCollectorId : undefined;
 
-			const [
-				overviewResult,
-				eventsResult,
-				sessionsResult,
-				collectorsResult,
-				memoriesResult,
-				workLedgerResult,
-				worktaleReadinessResult,
-			] = await Promise.allSettled([
-				watchdogService.getOverview({
-					projectId,
-					timeWindowMs: selectedWindowMs,
-				}),
-				watchdogService.listEvents({
-					projectId,
-					collectorId,
-					limit: 8,
-					sinceMs: Date.now() - selectedWindowMs,
-				}),
-				watchdogService.listSessions({
-					projectId,
-					collectorId,
-					limit: 8,
-					timeWindowMs: selectedWindowMs,
-				}),
-				watchdogService.listCollectors(),
-				loadMemories(),
-				workLedgerService.fetchEntries({
-					projectId,
-					lifecycleState: selectedLedgerLifecycleState,
-					limit: 16,
-				}),
-				workLedgerService.fetchWorktaleReadiness(),
-			]);
+			const [overviewResult, eventsResult, sessionsResult, collectorsResult] =
+				await Promise.allSettled([
+					watchdogService.getOverview({
+						projectId,
+						timeWindowMs: selectedWindowMs,
+					}),
+					watchdogService.listEvents({
+						projectId,
+						collectorId,
+						limit: 8,
+						sinceMs: Date.now() - selectedWindowMs,
+					}),
+					watchdogService.listSessions({
+						projectId,
+						collectorId,
+						limit: 8,
+						timeWindowMs: selectedWindowMs,
+					}),
+					watchdogService.listCollectors(),
+				]);
 
 			if (cancelled) return;
 
@@ -423,84 +324,6 @@ export function DashboardOverviewPanel({
 					: [],
 			);
 
-			if (memoriesResult.status === "fulfilled") {
-				setMemories(memoriesResult.value);
-			} else {
-				setMemories([]);
-				setMemoryError(
-					memoriesResult.reason instanceof Error
-						? memoriesResult.reason.message
-						: "Agent memory is unavailable.",
-				);
-			}
-
-			if (workLedgerResult.status === "fulfilled") {
-				setWorkLedgerEntries(workLedgerResult.value.data ?? []);
-				if (workLedgerResult.value.error) {
-					setWorkLedgerError(
-						String(workLedgerResult.value.error.message || ""),
-					);
-				}
-			} else {
-				setWorkLedgerEntries([]);
-				setWorkLedgerError(
-					workLedgerResult.reason instanceof Error
-						? workLedgerResult.reason.message
-						: "Work ledger is unavailable.",
-				);
-			}
-
-			if (worktaleReadinessResult.status === "fulfilled") {
-				setWorktaleReadiness(worktaleReadinessResult.value.data);
-				setWorktaleReadinessError(
-					worktaleReadinessResult.value.error
-						? String(worktaleReadinessResult.value.error.message || "")
-						: null,
-				);
-			} else {
-				setWorktaleReadiness(null);
-				setWorktaleReadinessError(
-					worktaleReadinessResult.reason instanceof Error
-						? worktaleReadinessResult.reason.message
-						: "Worktale readiness is unavailable.",
-				);
-			}
-
-			const candidateEntries =
-				workLedgerResult.status === "fulfilled"
-					? (workLedgerResult.value.data ?? [])
-							.filter(
-								(entry) =>
-									entry.user_id !== "local" &&
-									(entry.publish_state === "ready" ||
-										entry.publish_state === "published"),
-							)
-							.slice(0, 8)
-					: [];
-
-			if (candidateEntries.length > 0) {
-				const publishJobResults = await Promise.all(
-					candidateEntries.map(async (entry) => ({
-						entryId: entry.id,
-						result: await workLedgerService.listPublishJobs(entry.id, 1),
-					})),
-				);
-				if (cancelled) return;
-				setWorkLedgerJobsByEntry(
-					publishJobResults.reduce<Record<string, WorkLedgerPublishJobRow[]>>(
-						(acc, item) => {
-							if (!item.result.error && item.result.data.length > 0) {
-								acc[item.entryId] = item.result.data;
-							}
-							return acc;
-						},
-						{},
-					),
-				);
-			} else {
-				setWorkLedgerJobsByEntry({});
-			}
-
 			setTelemetryLoading(false);
 		};
 
@@ -508,25 +331,7 @@ export function DashboardOverviewPanel({
 		return () => {
 			cancelled = true;
 		};
-	}, [
-		selectedCollectorId,
-		selectedLedgerLifecycleState,
-		selectedProjectId,
-		selectedWindowMs,
-	]);
-
-	const loadLedgerSuggestions = useCallback(async () => {
-		setSuggestionsLoading(true);
-		setSuggestionsError(null);
-		const result = await workLedgerService.fetchDraftSuggestions();
-		setLedgerSuggestions(result.data);
-		setSuggestionsError(result.error ? result.error.message : null);
-		setSuggestionsLoading(false);
-	}, []);
-
-	useEffect(() => {
-		void loadLedgerSuggestions();
-	}, [loadLedgerSuggestions]);
+	}, [selectedCollectorId, selectedProjectId, selectedWindowMs]);
 
 	useEffect(() => {
 		if (!selectedFocus || initialFocusAppliedRef.current) {
@@ -535,12 +340,9 @@ export function DashboardOverviewPanel({
 
 		const focusMap = {
 			watchdog: watchdogSectionRef,
-			architecture: architectureSectionRef,
-			ledger: ledgerSectionRef,
-			memory: memorySectionRef,
 			projects: projectSectionRef,
 		};
-		const targetRef = selectedFocus ? focusMap[selectedFocus] : null;
+		const targetRef = focusMap[selectedFocus];
 		if (!targetRef?.current) return;
 		initialFocusAppliedRef.current = true;
 
@@ -565,20 +367,26 @@ export function DashboardOverviewPanel({
 			? projects.find((project) => project.id === selectedProjectId) || null
 			: null;
 
-	const filteredProjects = useMemo(
+	const filteredDeliveryProjects = useMemo(
 		() =>
-			projects.filter((project) => {
-				if (selectedProjectId !== "all" && project.id !== selectedProjectId) {
+			deliverySummary.projects.filter((project) => {
+				if (
+					selectedProjectId !== "all" &&
+					project.projectId !== selectedProjectId
+				) {
 					return false;
 				}
 				return matchesQuery(query, [
 					project.name,
-					project.status,
-					project.priority,
-					project.category,
+					project.issueTag,
+					project.issueSetName,
+					project.transmittalNumber,
+					project.summary,
+					project.detail,
+					project.stateLabel,
 				]);
 			}),
-		[projects, query, selectedProjectId],
+		[deliverySummary.projects, query, selectedProjectId],
 	);
 
 	const filteredActivities = useMemo(
@@ -599,163 +407,7 @@ export function DashboardOverviewPanel({
 		[activities, query, selectedProjectId],
 	);
 
-	const filteredMemories = useMemo(
-		() =>
-			memories.filter((memory) => {
-				if (
-					selectedProjectId !== "all" &&
-					memory.project_id &&
-					memory.project_id !== selectedProjectId
-				) {
-					return false;
-				}
-				if (
-					selectedAgent !== "all" &&
-					memory.agent_profile_id !== selectedAgent &&
-					!memory.content.toLowerCase().includes(selectedAgent)
-				) {
-					return false;
-				}
-				return matchesQuery(query, [
-					memory.content,
-					memory.memory_type,
-					memory.agent_profile_id,
-					memory.project_id,
-				]);
-			}),
-		[memories, query, selectedAgent, selectedProjectId],
-	);
-
-	const filteredDomains = useMemo(
-		() =>
-			ARCHITECTURE_DOMAINS.filter(
-				(domain) => selectedDomain === "all" || domain.id === selectedDomain,
-			).filter((domain) =>
-				matchesQuery(query, [
-					domain.label,
-					domain.summary,
-					...domain.repoRoots,
-				]),
-			),
-		[query, selectedDomain],
-	);
-
-	const filteredHotspots = useMemo(
-		() =>
-			ARCHITECTURE_AUTOGEN.hotspots
-				.filter(
-					(hotspot) =>
-						selectedIncludeAdvanced || !isExternalAdvancedPath(hotspot.path),
-				)
-				.filter((hotspot) => includesDomainPath(hotspot.path, selectedDomain))
-				.filter((hotspot) => matchesQuery(query, [hotspot.path]))
-				.slice(0, 6),
-		[query, selectedDomain, selectedIncludeAdvanced],
-	);
-
-	const filteredFixCandidates = useMemo(
-		() =>
-			ARCHITECTURE_FIX_CANDIDATES.filter((candidate) => {
-				if (
-					!selectedIncludeAdvanced &&
-					candidate.paths.every((pathValue) =>
-						isExternalAdvancedPath(pathValue),
-					)
-				) {
-					return false;
-				}
-				if (selectedDomain === "all") return true;
-				return candidate.paths.some((pathValue) =>
-					includesDomainPath(pathValue, selectedDomain),
-				);
-			})
-				.filter((candidate) =>
-					matchesQuery(query, [
-						candidate.title,
-						candidate.detail,
-						...candidate.paths,
-					]),
-				)
-				.slice(0, 4),
-		[query, selectedDomain, selectedIncludeAdvanced],
-	);
-
-	const filteredWorkLedgerEntries = useMemo(
-		() =>
-			workLedgerEntries
-				.filter((entry) => {
-					if (
-						selectedProjectId !== "all" &&
-						entry.project_id !== selectedProjectId
-					) {
-						return false;
-					}
-					if (
-						selectedDomain !== "all" &&
-						!entry.architecture_paths.some((pathValue) =>
-							includesDomainPath(pathValue, selectedDomain),
-						)
-					) {
-						return false;
-					}
-					if (
-						selectedLedgerPublishState !== "all" &&
-						entry.publish_state !== selectedLedgerPublishState
-					) {
-						return false;
-					}
-					if (
-						selectedLedgerLifecycleState !== "all" &&
-						entry.lifecycle_state !== selectedLedgerLifecycleState
-					) {
-						return false;
-					}
-					return matchesQuery(query, [
-						entry.title,
-						entry.summary,
-						entry.source_kind,
-						entry.app_area,
-						entry.project_id,
-						...entry.commit_refs,
-						...entry.architecture_paths,
-						...entry.hotspot_ids,
-					]);
-				})
-				.slice(0, 6),
-		[
-			query,
-			selectedDomain,
-			selectedLedgerLifecycleState,
-			selectedLedgerPublishState,
-			selectedProjectId,
-			workLedgerEntries,
-		],
-	);
-	const workLedgerViewModel = useMemo(
-		() =>
-			buildDashboardWorkLedgerViewModel({
-				entries: filteredWorkLedgerEntries,
-				jobsByEntry: workLedgerJobsByEntry,
-				readiness: worktaleReadiness,
-				readinessError: worktaleReadinessError,
-			}),
-		[
-			filteredWorkLedgerEntries,
-			workLedgerJobsByEntry,
-			worktaleReadiness,
-			worktaleReadinessError,
-		],
-	);
-
-	const openTasks = Array.from(projectTaskCounts.values()).reduce(
-		(total, counts) => total + Math.max(counts.total - counts.completed, 0),
-		0,
-	);
-	const overdueProjects = Array.from(projectTaskCounts.values()).filter(
-		(counts) => counts.hasOverdue,
-	).length;
 	const {
-		filteredCollectorOptions,
 		visibleCollectors,
 		liveSessionCards,
 		activeCadSessionCount,
@@ -792,153 +444,122 @@ export function DashboardOverviewPanel({
 		0,
 		4,
 	);
-	const privateMemoryCount = filteredMemories.filter(
-		(memory) => memory.scope === "private",
-	).length;
-	const sharedMemoryCount = filteredMemories.length - privateMemoryCount;
+	const watchdogEventCountByProject = useMemo(
+		() =>
+			new Map(
+				(watchdogOverview?.projects.top ?? []).map((item) => [
+					item.projectId,
+					item.eventCount,
+				]),
+			),
+		[watchdogOverview],
+	);
+	const deliveryMetrics = useMemo(
+		() => summarizeDashboardDeliveryProjects(filteredDeliveryProjects),
+		[filteredDeliveryProjects],
+	);
+	const nextDeliveryDeadline = useMemo(() => {
+		const withDeadline = filteredDeliveryProjects
+			.filter((project) => project.deadline || project.nextDue?.date)
+			.map((project) => ({
+				project,
+				date: project.deadline || project.nextDue?.date || "",
+			}))
+			.filter((entry) => entry.date);
+		if (withDeadline.length === 0) {
+			return null;
+		}
+		return withDeadline.sort((left, right) =>
+			left.date.localeCompare(right.date),
+		)[0]?.project;
+	}, [filteredDeliveryProjects]);
+
 	const watchdogPanelClassName =
 		selectedFocus === "watchdog"
-			? `${styles.primaryPanel} ${styles.focusedPanel}`
-			: styles.primaryPanel;
-	const architecturePanelClassName =
-		selectedFocus === "architecture"
-			? `${styles.secondaryPanel} ${styles.focusedPanel}`
-			: styles.secondaryPanel;
-	const ledgerPanelClassName =
-		selectedFocus === "ledger"
-			? `${styles.secondaryPanel} ${styles.focusedPanel}`
-			: styles.secondaryPanel;
-	const memoryPanelClassName =
-		selectedFocus === "memory"
 			? `${styles.secondaryPanel} ${styles.focusedPanel}`
 			: styles.secondaryPanel;
 	const projectPanelClassName =
 		selectedFocus === "projects"
-			? `${styles.secondaryPanel} ${styles.focusedPanel}`
-			: styles.secondaryPanel;
+			? `${styles.primaryPanel} ${styles.focusedPanel}`
+			: styles.primaryPanel;
 	const selectedWindowLabel =
 		TIME_WINDOW_OPTIONS.find((option) => option.value === selectedWindowHours)
 			?.label ?? `${selectedWindowHours} hours`;
 
-	const statusCards = useMemo<DashboardStatusCard[]>(() => {
-		const publisherStatusCard = worktaleReadinessError
-			? classifyStatusCard(
-					"publisher",
-					"Worktale publisher",
-					worktaleReadinessError,
-					"Publisher tooling is ready on this workstation.",
-				)
-			: worktaleReadiness?.ready
-				? {
-						key: "publisher",
-						label: "Worktale publisher",
-						tone: "success" as const,
-						detail: "Publisher tooling is ready on this workstation.",
-					}
-				: worktaleReadiness
-					? {
-							key: "publisher",
-							label: "Worktale publisher",
-							tone: "warning" as const,
-							detail:
-								worktaleReadiness.issues[0] ||
-								"Publisher setup is available but still needs bootstrap.",
-						}
-					: {
-							key: "publisher",
-							label: "Worktale publisher",
-							tone: "default" as const,
-							detail:
-								"Publisher readiness becomes available as soon as the workstation snapshot is available.",
-						};
-
-		return [
+	const statusCards = useMemo<DashboardStatusCard[]>(
+		() => [
 			classifyStatusCard(
 				"watchdog",
-				"Watchdog routes",
+				"Drawing activity",
 				watchdogError,
-				"Collector sessions, events, and project telemetry are available from the current backend.",
-				"Collector sessions and event summaries settle in the background for the current workspace.",
+				"Watchdog sessions and collector summaries are available for the current delivery scope.",
+				"Drawing sessions and collector summaries settle in the background for the current delivery scope.",
 				telemetryLoading,
 			),
-			classifyStatusCard(
-				"ledger",
-				"Work Ledger storage",
-				workLedgerError,
-				"Ledger rows are available for roadmap and changelog summaries.",
-			),
-			publisherStatusCard,
-		];
-	}, [
-		telemetryLoading,
-		watchdogError,
-		workLedgerError,
-		worktaleReadiness,
-		worktaleReadinessError,
-	]);
+			{
+				key: "review",
+				label: "Review inbox",
+				tone:
+					deliveryMetrics.reviewPressureCount > 0
+						? "warning"
+						: deliverySummary.loading
+							? "default"
+							: "success",
+				detail:
+					deliveryMetrics.reviewPressureCount > 0
+						? `${deliveryMetrics.reviewPressureCount} review item${deliveryMetrics.reviewPressureCount === 1 ? "" : "s"} still need package decisions in the current scope.`
+						: deliverySummary.loading
+							? "Delivery review signals are settling in the background for the current scope."
+							: "No active package blockers are currently holding the selected project scope.",
+			},
+			{
+				key: "packages",
+				label: "Issue sets",
+				tone:
+					deliveryMetrics.readyCount > 0
+						? "success"
+						: deliveryMetrics.setupAttentionCount > 0
+							? "warning"
+							: "primary",
+				detail:
+					deliveryMetrics.readyCount > 0
+						? `${deliveryMetrics.readyCount} package${deliveryMetrics.readyCount === 1 ? "" : "s"} are ready to move into issue.`
+						: deliveryMetrics.setupAttentionCount > 0
+							? `${deliveryMetrics.setupAttentionCount} project${deliveryMetrics.setupAttentionCount === 1 ? "" : "s"} still need setup before package work can settle.`
+							: `${deliveryMetrics.packagesInProgressCount} package${deliveryMetrics.packagesInProgressCount === 1 ? "" : "s"} are still being assembled or reviewed.`,
+			},
+		],
+		[
+			deliveryMetrics.packagesInProgressCount,
+			deliveryMetrics.readyCount,
+			deliveryMetrics.reviewPressureCount,
+			deliveryMetrics.setupAttentionCount,
+			deliverySummary.loading,
+			telemetryLoading,
+			watchdogError,
+		],
+	);
+
 	const hasFirstViewportPayload =
 		projects.length > 0 ||
 		activities.length > 0 ||
 		projectTaskCounts.size > 0 ||
 		allProjectsMap.size > 0 ||
+		filteredDeliveryProjects.length > 0 ||
+		Boolean(deliverySummary.error) ||
 		Boolean(watchdogOverview) ||
-		Boolean(worktaleReadiness) ||
-		Boolean(watchdogError) ||
-		Boolean(workLedgerError) ||
-		Boolean(worktaleReadinessError);
+		Boolean(watchdogError);
 	const showMissionSkeleton =
 		(isLoading || telemetryLoading) && !hasFirstViewportPayload;
-
-	const openChangelog = () => {
-		let rootPath: string | null = null;
-		if (selectedDomain !== "all") {
-			const domain = ARCHITECTURE_DOMAINS.find(
-				(item) => item.id === selectedDomain,
-			);
-			rootPath = domain?.repoRoots[0] ?? null;
-		}
-		const next = buildChangelogSearchParams({
-			projectId: selectedProjectId !== "all" ? selectedProjectId : null,
-			query: query ? searchValue : null,
-			path: rootPath,
-			lifecycleState: selectedLedgerLifecycleState,
-			publishState: selectedLedgerPublishState,
-		});
-		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
-	};
-
-	const openWorkLedgerReceipt = (entry: WorkLedgerRow) => {
-		const next = buildChangelogSearchParams({
-			projectId: entry.project_id,
-			query: entry.external_reference || entry.title,
-			lifecycleState: entry.lifecycle_state,
-			publishState: entry.publish_state === "published" ? "published" : "ready",
-		});
-		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
-	};
-
-	const openHotspotLinkedEntry = (entry: WorkLedgerRow) => {
-		const publishState = normalizeLedgerPublishState(entry.publish_state);
-		const next = buildChangelogSearchParams({
-			projectId:
-				selectedProjectId !== "all" ? selectedProjectId : entry.project_id,
-			query: entry.title,
-			path: entry.architecture_paths[0] || null,
-			hotspot: entry.hotspot_ids[0] || null,
-			lifecycleState: entry.lifecycle_state,
-			publishState,
-		});
-		navigate(`/app/changelog${next.toString() ? `?${next.toString()}` : ""}`);
-	};
 
 	return (
 		<div className={styles.root}>
 			<PageContextBand
-				eyebrow="Operations overview"
+				eyebrow="Delivery overview"
 				summary={
 					<Text size="sm" color="muted" block className={styles.subtitle}>
-						Track live delivery signals, architecture pressure, and team memory
-						from one shared control room.
+						See which projects are ready to issue, which packages still need
+						review, and what drawing activity is live right now.
 					</Text>
 				}
 				actions={
@@ -946,21 +567,44 @@ export function DashboardOverviewPanel({
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() => navigate("/app/architecture")}
+							onClick={() => navigate("/app/watchdog")}
 							iconRight={<ArrowUpRight size={14} />}
 						>
-							Architecture Map
+							Open Watchdog
 						</Button>
 						<Button
 							variant="secondary"
 							size="sm"
 							onClick={handleNavigateToProjectsHub}
 						>
-							Project Manager
+							Open Projects
 						</Button>
 					</div>
 				}
-			/>
+			>
+				<div className={styles.bandFacts}>
+					<div className={styles.bandFact}>
+						<span className={styles.metaLabel}>Project</span>
+						<strong>{selectedProject?.name || "All projects"}</strong>
+					</div>
+					<div className={styles.bandFact}>
+						<span className={styles.metaLabel}>Next deadline</span>
+						<strong>
+							{nextDeliveryDeadline
+								? formatDashboardDate(
+										nextDeliveryDeadline.deadline ||
+											nextDeliveryDeadline.nextDue?.date ||
+											null,
+									)
+								: "No deadline"}
+						</strong>
+					</div>
+					<div className={styles.bandFact}>
+						<span className={styles.metaLabel}>Live CAD</span>
+						<strong>{activeCadSessionCount}</strong>
+					</div>
+				</div>
+			</PageContextBand>
 
 			<div className={styles.commandFrame}>
 				{showMissionSkeleton ? (
@@ -978,22 +622,12 @@ export function DashboardOverviewPanel({
 							<div className={styles.missionHeader}>
 								<div className={styles.missionCopy}>
 									<Text size="sm" weight="semibold" block>
-										Workspace pulse
+										Delivery mission board
 									</Text>
 									<Text size="xs" color="muted" block>
-										One glance at trust, current scope, and the delivery
-										pressure that needs attention first.
+										One glance at package readiness, review pressure, and the
+										next deadline the team is moving toward.
 									</Text>
-								</div>
-								<div className={styles.missionContext}>
-									<div className={styles.missionContextCard}>
-										<span className={styles.metaLabel}>Project</span>
-										<strong>{selectedProject?.name || "All projects"}</strong>
-									</div>
-									<div className={styles.missionContextCard}>
-										<span className={styles.metaLabel}>Window</span>
-										<strong>{selectedWindowLabel}</strong>
-									</div>
 								</div>
 							</div>
 
@@ -1031,16 +665,16 @@ export function DashboardOverviewPanel({
 
 							<div className={styles.missionHighlights}>
 								<div className={styles.highlightCard}>
-									<span className={styles.metaLabel}>Open tasks</span>
-									<strong>{openTasks}</strong>
+									<span className={styles.metaLabel}>Packages ready</span>
+									<strong>{deliveryMetrics.readyCount}</strong>
 								</div>
 								<div className={styles.highlightCard}>
-									<span className={styles.metaLabel}>Overdue projects</span>
-									<strong>{overdueProjects}</strong>
+									<span className={styles.metaLabel}>Review items</span>
+									<strong>{deliveryMetrics.reviewPressureCount}</strong>
 								</div>
 								<div className={styles.highlightCard}>
-									<span className={styles.metaLabel}>Live CAD sessions</span>
-									<strong>{activeCadSessionCount}</strong>
+									<span className={styles.metaLabel}>Transmittal queue</span>
+									<strong>{deliveryMetrics.transmittalQueueCount}</strong>
 								</div>
 							</div>
 						</Panel>
@@ -1056,8 +690,8 @@ export function DashboardOverviewPanel({
 										Focus filters
 									</Text>
 									<Text size="xs" color="muted" block>
-										Keep the same scope across telemetry, architecture, ledger,
-										and memory.
+										Keep the same project and time scope across package
+										readiness and drawing activity.
 									</Text>
 								</div>
 							</div>
@@ -1083,84 +717,6 @@ export function DashboardOverviewPanel({
 										{projects.map((project) => (
 											<option key={project.id} value={project.id}>
 												{project.name}
-											</option>
-										))}
-									</select>
-								</div>
-
-								<div className={styles.filterField}>
-									<label
-										htmlFor="dashboard-domain-filter"
-										className={styles.filterLabel}
-									>
-										Repo area
-									</label>
-									<select
-										id="dashboard-domain-filter"
-										value={selectedDomain}
-										onChange={(event) =>
-											updateFilter("domain", event.target.value)
-										}
-										className={styles.select}
-										name="dashboard_domain_filter"
-									>
-										<option value="all">All domains</option>
-										{ARCHITECTURE_DOMAINS.map((domain) => (
-											<option key={domain.id} value={domain.id}>
-												{domain.label}
-											</option>
-										))}
-									</select>
-								</div>
-
-								<div className={styles.filterField}>
-									<label
-										htmlFor="dashboard-agent-filter"
-										className={styles.filterLabel}
-									>
-										Agent
-									</label>
-									<select
-										id="dashboard-agent-filter"
-										value={selectedAgent}
-										onChange={(event) =>
-											updateFilter("agent", event.target.value)
-										}
-										className={styles.select}
-										name="dashboard_agent_filter"
-									>
-										<option value="all">All agents</option>
-										{AGENT_PROFILE_IDS.map((profileId) => (
-											<option key={profileId} value={profileId}>
-												{AGENT_PROFILES[profileId].name}
-											</option>
-										))}
-									</select>
-								</div>
-
-								<div className={styles.filterField}>
-									<label
-										htmlFor="dashboard-collector-filter"
-										className={styles.filterLabel}
-									>
-										Collector
-									</label>
-									<select
-										id="dashboard-collector-filter"
-										value={selectedCollectorId}
-										onChange={(event) =>
-											updateFilter("collector", event.target.value)
-										}
-										className={styles.select}
-										name="dashboard_collector_filter"
-									>
-										<option value="all">All collectors</option>
-										{filteredCollectorOptions.map((collector) => (
-											<option
-												key={collector.collectorId}
-												value={collector.collectorId}
-											>
-												{collector.name}
 											</option>
 										))}
 									</select>
@@ -1204,7 +760,7 @@ export function DashboardOverviewPanel({
 										onChange={(event) =>
 											updateFilter("query", event.target.value)
 										}
-										placeholder="Search projects, files, memories, and actions..."
+										placeholder="Search projects, issue tags, transmittals, and actions..."
 										className={styles.searchInput}
 										name="dashboard_query_filter"
 									/>
@@ -1212,7 +768,7 @@ export function DashboardOverviewPanel({
 							</section>
 
 							<div className={styles.focusPills}>
-								{FOCUS_PILL_OPTIONS.map((option) => {
+								{CUSTOMER_FOCUS_OPTIONS.map((option) => {
 									const isActive =
 										(option.value === "all" && !selectedFocus) ||
 										(option.value !== "all" && selectedFocus === option.value);
@@ -1240,14 +796,24 @@ export function DashboardOverviewPanel({
 				)}
 
 				<div className={styles.moduleGrid}>
+					<DashboardDeliveryBoardSection
+						panelRef={projectSectionRef}
+						className={projectPanelClassName}
+						isLoading={isLoading}
+						deliveryLoading={deliverySummary.loading}
+						deliveryError={deliverySummary.error}
+						deliveryProjects={filteredDeliveryProjects}
+						deliveryMetrics={deliveryMetrics}
+						watchdogEventCountByProject={watchdogEventCountByProject}
+						filteredActivities={filteredActivities}
+						handleNavigateToProject={handleNavigateToProject}
+					/>
 					<DashboardWatchdogSection
 						panelRef={watchdogSectionRef}
 						className={watchdogPanelClassName}
-						telemetryLoading={telemetryLoading}
 						watchdogError={watchdogError}
 						selectedProject={selectedProject}
 						selectedWindowLabel={selectedWindowLabel}
-						overdueProjects={overdueProjects}
 						activeCadSessionCount={activeCadSessionCount}
 						liveSessionCards={liveSessionCards}
 						watchdogOverview={watchdogOverview}
@@ -1263,67 +829,7 @@ export function DashboardOverviewPanel({
 						updateFilter={updateFilter}
 						updateFilters={updateFilters}
 					/>
-
-					<DashboardArchitectureSection
-						panelRef={architectureSectionRef}
-						className={architecturePanelClassName}
-						filteredDomains={filteredDomains}
-						filteredHotspots={filteredHotspots}
-						filteredFixCandidates={filteredFixCandidates}
-						includeAdvancedModules={selectedIncludeAdvanced}
-						snapshotGeneratedAt={ARCHITECTURE_AUTOGEN.generatedAt}
-						onDeepDive={() => navigate("/app/apps/graph")}
-						onToggleAdvancedModules={() =>
-							updateFilter(
-								"includeAdvanced",
-								selectedIncludeAdvanced ? "" : "1",
-							)
-						}
-					/>
-
-					<DashboardWorkLedgerSection
-						panelRef={ledgerSectionRef}
-						className={ledgerPanelClassName}
-						entries={filteredWorkLedgerEntries}
-						viewModel={workLedgerViewModel}
-						error={workLedgerError}
-						suggestions={ledgerSuggestions}
-						suggestionsLoading={suggestionsLoading}
-						suggestionsError={suggestionsError}
-						onOpenChangelog={openChangelog}
-						onOpenLatestReceipt={openWorkLedgerReceipt}
-						onOpenHotspotEntry={openHotspotLinkedEntry}
-					/>
-
-					<DashboardMemorySection
-						panelRef={memorySectionRef}
-						className={memoryPanelClassName}
-						memoryError={memoryError}
-						sharedMemoryCount={sharedMemoryCount}
-						privateMemoryCount={privateMemoryCount}
-						filteredMemories={filteredMemories}
-					/>
-
-					<DashboardProjectOperationsSection
-						panelRef={projectSectionRef}
-						className={projectPanelClassName}
-						isLoading={isLoading}
-						filteredProjects={filteredProjects}
-						projectTaskCounts={projectTaskCounts}
-						allProjectsMap={allProjectsMap}
-						filteredActivities={filteredActivities}
-						handleNavigateToProject={handleNavigateToProject}
-					/>
 				</div>
-
-				<DashboardOverviewStatsGrid
-					projectsCount={projects.length}
-					openTasks={openTasks}
-					collectorsOnline={watchdogOverview?.collectors.online ?? 0}
-					eventsInWindow={watchdogOverview?.events.inWindow ?? 0}
-					memoryCount={filteredMemories.length}
-					storageUsed={storageUsed}
-				/>
 			</div>
 		</div>
 	);

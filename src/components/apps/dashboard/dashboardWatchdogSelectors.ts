@@ -58,7 +58,9 @@ function clampPercentage(value: number): number {
 	return Math.max(0, Math.min(100, value));
 }
 
-function getCollectorStatusTone(status: string | null | undefined): CollectorTone {
+function getCollectorStatusTone(
+	status: string | null | undefined,
+): CollectorTone {
 	return status === "online" ? "success" : "warning";
 }
 
@@ -184,11 +186,11 @@ function buildSessionTimelineRows(
 				clampPercentage(((boundedEnd - boundedStart) / safeWindow) * 100),
 			),
 			projectName: session.projectId
-				? allProjectsMap.get(session.projectId)?.name ?? session.projectId
+				? (allProjectsMap.get(session.projectId)?.name ?? "Tracked project")
 				: null,
 			drawingLabel: basenameFromPath(session.drawingPath),
 			statusTone: getSessionStatusTone(session.status),
-		}
+		};
 	});
 }
 
@@ -234,14 +236,18 @@ export function buildDashboardWatchdogViewModel({
 		return visibleCollectorIds.has(collector.collectorId);
 	});
 
-	const liveSessionCards = buildLiveSessionCards(watchdogSessions, collectorById);
+	const liveSessionCards = buildLiveSessionCards(
+		watchdogSessions,
+		collectorById,
+	);
 
 	return {
 		filteredCollectorOptions,
 		visibleCollectors,
 		liveSessionCards,
-		activeCadSessionCount: liveSessionCards.filter((card) => card.session.active)
-			.length,
+		activeCadSessionCount: liveSessionCards.filter(
+			(card) => card.session.active,
+		).length,
 		sessionTimelineRows: buildSessionTimelineRows(
 			watchdogSessions,
 			collectorById,

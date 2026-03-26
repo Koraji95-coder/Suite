@@ -91,7 +91,6 @@ function listFilesRecursively(startPath) {
 			for (const entry of fs.readdirSync(current)) {
 				const next = path.join(current, entry);
 				const rel = path.relative(root, next);
-				if (rel.startsWith(`zeroclaw-main${path.sep}`)) continue;
 				if (rel.startsWith(`node_modules${path.sep}`)) continue;
 				if (rel.startsWith(`dist${path.sep}`)) continue;
 				if (rel.startsWith(`.git${path.sep}`)) continue;

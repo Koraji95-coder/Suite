@@ -15,8 +15,6 @@ import {
 	Radar,
 	RefreshCw,
 	Settings,
-	Sparkles,
-	TerminalSquare,
 	X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -37,31 +35,67 @@ import { Panel } from "../components/primitives/Panel";
 import { Stack } from "../components/primitives/Stack";
 import { Text } from "../components/primitives/Text";
 import AdminCrownPixel from "../components/roles/AdminCrownPixel";
+import { useSuiteRuntimeDoctor } from "../hooks/useSuiteRuntimeDoctor";
 import { useWatchdogProjectSync } from "../hooks/useWatchdogProjectSync";
 import {
 	type AppDiagnostic,
 	clearAppDiagnostics,
 	subscribeAppDiagnostics,
 } from "../lib/appDiagnostics";
-import { isCommandCenterAuthorized } from "../lib/devAccess";
-import { getAppRole } from "../lib/roles";
 import {
-	runSuiteRuntimeDoctor,
-	type SuiteRuntimeDoctorReport,
-} from "../lib/runtimeDoctor";
+	type AppAudience,
+	canAccessAudience,
+	isDevAudience,
+} from "../lib/audience";
+import type { SuiteRuntimeDoctorReport } from "../lib/runtimeDoctor";
+import { getAppRole } from "../lib/roles";
 import { cn } from "../lib/utils";
 import styles from "./AppShell.module.css";
 import { resolveShellMeta } from "./appShellMeta";
 
-const primaryNavItems = [
-	{ to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
-	{ to: "/app/watchdog", label: "Watchdog", icon: Radar },
-	{ to: "/app/projects", label: "Projects", icon: FolderOpen },
-	{ to: "/app/calendar", label: "Calendar", icon: CalendarDays },
-	{ to: "/app/changelog", label: "Changelog", icon: ClipboardList },
-	{ to: "/app/apps", label: "Apps", icon: AppWindow },
-	{ to: "/app/knowledge", label: "Knowledge", icon: BookOpen },
-	{ to: "/app/agent", label: "Agents", icon: Sparkles },
+type ShellNavItem = {
+	to: string;
+	label: string;
+	icon: typeof LayoutDashboard;
+	audience: AppAudience;
+};
+
+const primaryNavItems: ShellNavItem[] = [
+	{
+		to: "/app/dashboard",
+		label: "Dashboard",
+		icon: LayoutDashboard,
+		audience: "customer",
+	},
+	{ to: "/app/watchdog", label: "Watchdog", icon: Radar, audience: "customer" },
+	{
+		to: "/app/projects",
+		label: "Projects",
+		icon: FolderOpen,
+		audience: "customer",
+	},
+	{
+		to: "/app/calendar",
+		label: "Calendar",
+		icon: CalendarDays,
+		audience: "customer",
+	},
+	{ to: "/app/apps", label: "Apps", icon: AppWindow, audience: "customer" },
+	{
+		to: "/app/knowledge",
+		label: "Knowledge",
+		icon: BookOpen,
+		audience: "customer",
+	},
+];
+
+const developerNavItems: ShellNavItem[] = [
+	{
+		to: "/app/developer",
+		label: "Developer",
+		icon: ClipboardList,
+		audience: "dev",
+	},
 ];
 
 function FirstLoginNamePrompt() {
@@ -158,11 +192,20 @@ const navItemClass = (isActive: boolean) =>
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 	const { user } = useAuth();
-	const canAccessCommandCenter = isCommandCenterAuthorized(user);
+	const canAccessCommandCenter = isDevAudience(user);
 	const navRef = useRef<HTMLElement | null>(null);
 
 	const safeNavItems = primaryNavItems.filter(
-		(item) => item.to.trim().length > 0 && item.label.trim().length > 0,
+		(item) =>
+			item.to.trim().length > 0 &&
+			item.label.trim().length > 0 &&
+			canAccessAudience(user, item.audience),
+	);
+	const safeDeveloperNavItems = developerNavItems.filter(
+		(item) =>
+			item.to.trim().length > 0 &&
+			item.label.trim().length > 0 &&
+			canAccessAudience(user, item.audience),
 	);
 
 	useEffect(() => {
@@ -177,40 +220,51 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
 	return (
 		<nav ref={navRef} className={styles.sidebarNav}>
-			{safeNavItems.map((item) => {
-				const Icon = item.icon;
-				return (
-					<NavLink
-						key={item.to}
-						to={item.to}
-						className={({ isActive }) => navItemClass(isActive)}
-						onClick={onNavigate}
-					>
-						<Icon size={16} />
-						<span>{item.label}</span>
-					</NavLink>
-				);
-			})}
-
-			<NavLink
-				to="/app/settings"
-				className={({ isActive }) => navItemClass(isActive)}
-				onClick={onNavigate}
-			>
-				<Settings size={16} />
-				<span>Settings</span>
-			</NavLink>
-
-			{canAccessCommandCenter && (
+			<div className={styles.navGroup}>
+				<div className={styles.navGroupLabel}>Workspace</div>
+				{safeNavItems.map((item) => {
+					const Icon = item.icon;
+					return (
+						<NavLink
+							key={item.to}
+							to={item.to}
+							className={({ isActive }) => navItemClass(isActive)}
+							onClick={onNavigate}
+						>
+							<Icon size={16} />
+							<span>{item.label}</span>
+						</NavLink>
+					);
+				})}
 				<NavLink
-					to="/app/command-center"
+					to="/app/settings"
 					className={({ isActive }) => navItemClass(isActive)}
 					onClick={onNavigate}
 				>
-					<TerminalSquare size={16} />
-					<span>Command Center</span>
+					<Settings size={16} />
+					<span>Settings</span>
 				</NavLink>
-			)}
+			</div>
+
+			{canAccessCommandCenter ? (
+				<div className={styles.navGroup}>
+					<div className={styles.navGroupLabel}>Developer</div>
+					{safeDeveloperNavItems.map((item) => {
+						const Icon = item.icon;
+						return (
+							<NavLink
+								key={item.to}
+								to={item.to}
+								className={({ isActive }) => navItemClass(isActive)}
+								onClick={onNavigate}
+							>
+								<Icon size={16} />
+								<span>{item.label}</span>
+							</NavLink>
+						);
+					})}
+				</div>
+			) : null}
 		</nav>
 	);
 }
@@ -574,9 +628,12 @@ function ShellWorkspace() {
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 	const [diagnostics, setDiagnostics] = useState<AppDiagnostic[]>([]);
-	const [runtimeReport, setRuntimeReport] =
-		useState<SuiteRuntimeDoctorReport | null>(null);
-	const [runtimeDoctorLoading, setRuntimeDoctorLoading] = useState(false);
+	const {
+		report: runtimeReport,
+		loading: runtimeDoctorLoading,
+		refreshing: runtimeDoctorRefreshing,
+		refreshNow: refreshRuntimeDoctor,
+	} = useSuiteRuntimeDoctor();
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const { pathname } = useLocation();
 	const { header } = usePageHeader();
@@ -595,25 +652,7 @@ function ShellWorkspace() {
 		setMobileMenuOpen(false);
 	}, [pathname]);
 
-	const refreshRuntimeDoctor = useCallback(
-		(mode: "background" | "manual" = "manual") => {
-			setRuntimeDoctorLoading(true);
-			void runSuiteRuntimeDoctor({ mode, force: mode === "manual" })
-				.then((report) => {
-					setRuntimeReport(report);
-				})
-				.finally(() => {
-					setRuntimeDoctorLoading(false);
-				});
-		},
-		[],
-	);
-
 	useEffect(() => subscribeAppDiagnostics(setDiagnostics), []);
-
-	useEffect(() => {
-		refreshRuntimeDoctor("background");
-	}, [refreshRuntimeDoctor]);
 
 	const resolvedTitle = header.title || shellMeta.title;
 	const resolvedSubtitle = header.subtitle || shellMeta.subtitle;
@@ -658,8 +697,8 @@ function ShellWorkspace() {
 				onClose={() => setDiagnosticsOpen(false)}
 				diagnostics={actionableDiagnostics}
 				report={runtimeReport}
-				loading={runtimeDoctorLoading}
-				onRefresh={() => refreshRuntimeDoctor("manual")}
+				loading={runtimeDoctorLoading || runtimeDoctorRefreshing}
+				onRefresh={() => void refreshRuntimeDoctor("manual")}
 			/>
 
 			<div className={styles.shellBody}>
@@ -710,7 +749,7 @@ function ShellWorkspace() {
 										size="sm"
 										className={styles.workspaceRailChip}
 									>
-										Operations shell
+										Suite workspace
 									</Badge>
 									<div className={styles.workspaceHeaderRailPair}>
 										<Badge

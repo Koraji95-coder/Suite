@@ -13,8 +13,8 @@ import {
 } from "react";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
-import { hasAdminClaim } from "../lib/roles";
 import { logger } from "../lib/logger";
+import { hasAdminClaim } from "../lib/roles";
 import { agentService } from "../services/agentService";
 import { agentTaskManager } from "../services/agentTaskManager";
 import {
@@ -136,6 +136,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const lastSignedInTelemetryKeyRef = useRef<string>("");
 
 	useEffect(() => {
+		let isActive = true;
+		let lastBootstrapSessionKey = "";
+
 		const restoreAgentPairing = async (
 			context: "rehydrate" | "auth-change",
 		): Promise<void> => {
@@ -154,6 +157,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			}
 		};
 
+		const syncSessionShellState = (
+			currentUser: User | null,
+			sessionExpiresAt: number | null,
+		): string => {
+			const sessionKey = buildSessionAuthKey(currentUser?.id, sessionExpiresAt);
+			setUser(currentUser);
+			agentService.setActiveUser(
+				currentUser?.id ?? null,
+				currentUser?.email ?? null,
+				isUserAdmin(currentUser),
+			);
+			agentTaskManager.setScope(currentUser?.id ?? null);
+
+			if (currentUser) {
+				const restoredMethod = readSessionAuthMethod(sessionKey);
+				setSessionAuthMethod(restoredMethod ?? "email_link");
+			} else {
+				setSessionAuthMethod("email_link");
+				setProfile(null);
+				clearSessionAuthMarkers();
+				lastSignedInTelemetryKeyRef.current = "";
+				lastBootstrapSessionKey = "";
+			}
+
+			return sessionKey;
+		};
+
+		const bootstrapSignedInSession = (
+			currentUser: User | null,
+			sessionKey: string,
+			context: "rehydrate" | "auth-change",
+		): void => {
+			if (!currentUser) {
+				return;
+			}
+			if (lastBootstrapSessionKey === sessionKey) {
+				return;
+			}
+			lastBootstrapSessionKey = sessionKey;
+
+			void (async () => {
+				await restoreAgentPairing(context);
+				const nextProfile = await ensureProfileForUser(currentUser);
+				if (!isActive) {
+					return;
+				}
+				setProfile(nextProfile);
+			})().catch((error) => {
+				logger.error("AuthContext", "Deferred session bootstrap failed", {
+					context,
+					userId: currentUser.id,
+					error,
+				});
+			});
+		};
+
 		// Rehydrate session from storage on mount
 		const rehydrateSession = async () => {
 			try {
@@ -163,33 +222,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				} = await supabase.auth.getSession();
 				if (error) {
 					logger.error("AuthContext", "Failed to rehydrate session", { error });
-					setLoading(false);
 					return;
 				}
 
 				const currentUser = session?.user ?? null;
-				setUser(currentUser);
-				const sessionKey = buildSessionAuthKey(
-					currentUser?.id,
+				const sessionKey = syncSessionShellState(
+					currentUser,
 					session?.expires_at ?? null,
 				);
-				agentService.setActiveUser(
-					currentUser?.id ?? null,
-					currentUser?.email ?? null,
-					isUserAdmin(currentUser),
-				);
-				agentTaskManager.setScope(currentUser?.id ?? null);
-
-				if (currentUser) {
-					const restoredMethod = readSessionAuthMethod(sessionKey);
-					setSessionAuthMethod(restoredMethod ?? "email_link");
-					await restoreAgentPairing("rehydrate");
-					const p = await ensureProfileForUser(currentUser);
-					setProfile(p);
-				} else {
-					setSessionAuthMethod("email_link");
-					setProfile(null);
-				}
+				setLoading(false);
+				bootstrapSignedInSession(currentUser, sessionKey, "rehydrate");
 
 				sanitizeSupabaseCallbackUrlInPlace();
 			} catch (err) {
@@ -206,17 +248,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			data: { subscription },
 		} = supabase.auth.onAuthStateChange((event, session) => {
 			const currentUser = session?.user ?? null;
-			setUser(currentUser);
-			const sessionKey = buildSessionAuthKey(
-				currentUser?.id,
+			const sessionKey = syncSessionShellState(
+				currentUser,
 				session?.expires_at ?? null,
 			);
-			agentService.setActiveUser(
-				currentUser?.id ?? null,
-				currentUser?.email ?? null,
-				isUserAdmin(currentUser),
-			);
-			agentTaskManager.setScope(currentUser?.id ?? null);
+			setLoading(false);
 
 			if (currentUser) {
 				if (event === "SIGNED_IN") {
@@ -249,20 +285,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					setSessionAuthMethod(restoredMethod ?? "email_link");
 				}
 
-					// Async-safe pattern: avoid deadlocks by not awaiting directly inside the callback
-					(async () => {
-						await restoreAgentPairing("auth-change");
-						const p = await ensureProfileForUser(currentUser);
-						setProfile(p);
-					})();
-			} else {
-				setSessionAuthMethod("email_link");
-				clearSessionAuthMarkers();
-				setProfile(null);
+				bootstrapSignedInSession(currentUser, sessionKey, "auth-change");
 			}
 		});
 
 		return () => {
+			isActive = false;
 			subscription.unsubscribe();
 		};
 	}, []);
@@ -298,9 +326,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			try {
 				await agentService.unpair();
 			} catch (error) {
-				logger.warn("Failed to clear agent pairing on sign-out", "AuthContext", {
-					error,
-				});
+				logger.warn(
+					"Failed to clear agent pairing on sign-out",
+					"AuthContext",
+					{
+						error,
+					},
+				);
 			}
 		} else {
 			logger.info(

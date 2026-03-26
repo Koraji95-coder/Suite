@@ -1,0 +1,397 @@
+.root {
+	display: grid;
+	gap: 1.35rem;
+}
+
+.summary {
+	margin: 0;
+	max-width: 50rem;
+	line-height: 1.62;
+	color: color-mix(in srgb, var(--text-muted) 88%, transparent);
+}
+
+.heroMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+	align-items: center;
+	justify-content: flex-end;
+}
+
+.bandActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	align-items: center;
+	justify-content: flex-end;
+}
+
+.bandActionLink,
+.bandActionLinkSecondary {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.66rem 0.94rem;
+	border-radius: 999px;
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 82%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 78%, transparent),
+			color-mix(in srgb, var(--surface) 82%, transparent)
+		),
+		var(--suite-surface-sunken);
+	color: var(--text);
+	text-decoration: none;
+	font-size: 0.82rem;
+	font-weight: 700;
+	transition:
+		transform 140ms ease,
+		border-color 140ms ease;
+}
+
+.bandActionLinkSecondary {
+	color: var(--text-muted);
+}
+
+.bandActionLink:hover,
+.bandActionLinkSecondary:hover {
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+}
+
+.bandActionIcon {
+	width: 0.9rem;
+	height: 0.9rem;
+}
+
+.signalGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+	gap: 0.85rem;
+}
+
+.signalCard {
+	display: grid;
+	gap: 0.3rem;
+	padding: 0.95rem 1rem;
+	border-radius: var(--radius-3);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 82%, transparent);
+	background:
+		radial-gradient(
+			120% 120% at 100% 0%,
+			color-mix(in srgb, var(--brand-ambient-warm) 28%, transparent),
+			transparent 64%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 86%, transparent),
+			color-mix(in srgb, var(--surface) 84%, transparent)
+		),
+		var(--suite-surface-sunken);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 3%),
+		0 20px 36px -30px rgb(0 0 0 / 58%);
+}
+
+.signalLabel,
+.deskEyebrow,
+.surfaceTag,
+.metricLabel,
+.detailLabel {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.signalValue,
+.metricValue {
+	font-size: clamp(1.16rem, 1rem + 0.52vw, 1.6rem);
+	font-weight: 800;
+	letter-spacing: -0.03em;
+	color: var(--text);
+}
+
+.signalMeta,
+.detailMeta {
+	font-size: 0.78rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.deskGrid {
+	display: grid;
+	gap: 1.1rem;
+	grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.deskCard,
+.groupCard,
+.toolshedCard,
+.supportCard {
+	display: grid;
+	gap: 1rem;
+	min-height: 100%;
+	align-content: start;
+}
+
+.stagedGrid {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.supportGrid {
+	display: grid;
+	gap: 1rem;
+	grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.deskHeader,
+.stagedHeader,
+.supportHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.deskIdentity,
+.surfaceIdentity {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.85rem;
+	min-width: 0;
+}
+
+.iconShell {
+	display: grid;
+	place-items: center;
+	width: 2.9rem;
+	height: 2.9rem;
+	flex-shrink: 0;
+	border-radius: var(--radius-3);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-warm) 84%, transparent);
+	background:
+		radial-gradient(
+			120% 120% at 20% 20%,
+			color-mix(in srgb, var(--brand-gold) 22%, transparent),
+			transparent 62%
+		),
+		var(--brand-accent-gradient);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 9%),
+		0 20px 34px -28px color-mix(in srgb, var(--primary) 36%, transparent);
+}
+
+.icon {
+	width: 1.1rem;
+	height: 1.1rem;
+	color: var(--primary-contrast);
+}
+
+.deskTitle,
+.surfaceTitle,
+.supportTitle {
+	margin: 0.18rem 0 0;
+	font-size: 1.04rem;
+	font-weight: 700;
+	line-height: 1.18;
+	color: var(--text);
+}
+
+.deskDescription,
+.surfaceDescription,
+.supportDescription {
+	margin: 0;
+	font-size: 0.85rem;
+	line-height: 1.62;
+	color: var(--text-muted);
+}
+
+.statStrip {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.7rem;
+}
+
+.statItem {
+	display: grid;
+	gap: 0.18rem;
+	padding: 0.78rem 0.82rem;
+	border-radius: var(--radius-2);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 78%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 68%, transparent),
+			color-mix(in srgb, var(--surface) 76%, transparent)
+		),
+		var(--suite-surface-sunken);
+	box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+}
+
+.detailList,
+.toolList {
+	display: grid;
+	gap: 0.8rem;
+}
+
+.detailItem {
+	display: grid;
+	gap: 0.24rem;
+	padding-top: 0.82rem;
+	border-top: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+}
+
+.detailValue {
+	font-size: 0.9rem;
+	font-weight: 600;
+	line-height: 1.45;
+	color: var(--text);
+}
+
+.toolRow {
+	display: grid;
+	gap: 0.58rem;
+	padding-top: 0.85rem;
+	border-top: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+}
+
+.toolRow:first-child {
+	padding-top: 0;
+	border-top: none;
+}
+
+.toolRowHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.9rem;
+}
+
+.pillRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+}
+
+.actionRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.7rem;
+	align-items: center;
+}
+
+.actionLink,
+.actionLinkMuted,
+.surfaceLink {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	min-height: 2.3rem;
+	padding: 0.66rem 0.94rem;
+	border-radius: var(--radius-2);
+	font-size: 0.84rem;
+	font-weight: 700;
+	text-decoration: none;
+	transition:
+		border-color 140ms ease,
+		background-color 140ms ease,
+		color 140ms ease,
+		transform 140ms ease;
+}
+
+.actionLink,
+.surfaceLink {
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-warm) 58%, var(--line-soft));
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 82%, transparent),
+			color-mix(in srgb, var(--surface) 76%, transparent)
+		),
+		var(--suite-surface-sunken);
+	color: var(--text);
+}
+
+.actionLinkMuted {
+	flex-shrink: 0;
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface) 84%, transparent);
+	color: var(--text-muted);
+}
+
+.actionLink:hover,
+.actionLinkMuted:hover,
+.surfaceLink:hover {
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 88%, transparent),
+			color-mix(in srgb, var(--surface) 82%, transparent)
+		),
+		color-mix(in srgb, var(--surface-2) 88%, transparent);
+	color: var(--text);
+}
+
+.actionLinkIcon {
+	width: 0.9rem;
+	height: 0.9rem;
+}
+
+.surfaceCopy {
+	display: grid;
+	gap: 0.08rem;
+	min-width: 0;
+}
+
+@media (min-width: 72rem) {
+	.signalGrid {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 96rem) {
+	.stagedGrid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 56rem) {
+	.statStrip {
+		grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+	}
+
+	.toolRowHeader {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}
+
+@media (max-width: 40rem) {
+	.heroMeta,
+	.actionRow,
+	.bandActions {
+		width: 100%;
+	}
+
+	.actionLink,
+	.actionLinkMuted,
+	.bandActionLink,
+	.bandActionLinkSecondary {
+		width: 100%;
+	}
+}

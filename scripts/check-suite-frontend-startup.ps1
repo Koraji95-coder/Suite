@@ -14,21 +14,15 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
+. $runtimeSharedScript
 $workerScriptPath = (Resolve-Path (Join-Path $PSScriptRoot "run-suite-frontend-dev.ps1")).Path
 $processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
 . $processUtilsScript
-$statusBase = if ($env:LOCALAPPDATA) {
-    $env:LOCALAPPDATA
-}
-elseif ($env:TEMP) {
-    $env:TEMP
-}
-else {
-    $env:USERPROFILE
-}
-$runtimeStatusDir = Join-Path $statusBase "Suite\runtime-bootstrap"
-$frontendLogPath = Join-Path $runtimeStatusDir "frontend.log"
-$bootstrapLogPath = Join-Path $runtimeStatusDir "bootstrap.log"
+$runtimePaths = Get-SuiteRuntimePaths
+$runtimeStatusDir = $runtimePaths.RuntimeStatusDir
+$frontendLogPath = $runtimePaths.FrontendLogPath
+$bootstrapLogPath = $runtimePaths.RuntimeLogPath
 $frontendUrl = "http://127.0.0.1:5173"
 
 function Get-ListeningFrontendProcess {

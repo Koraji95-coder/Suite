@@ -530,6 +530,7 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/watchdog/projects/<project_id>/rules": ["DELETE", "GET", "PUT"],
             "/api/watchdog/project-rules/sync": ["POST"],
             "/api/watchdog/drawing-activity/sync": ["POST"],
+            "/api/runtime/status": ["GET"],
             "/health": ["GET"],
         }
 

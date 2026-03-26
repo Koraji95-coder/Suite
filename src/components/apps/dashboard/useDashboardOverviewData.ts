@@ -20,6 +20,7 @@ export interface DashboardProject {
 	priority: string;
 	color: string;
 	category: string | null;
+	watchdog_root_path: string | null;
 }
 
 export interface DashboardTaskCount {

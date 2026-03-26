@@ -11,32 +11,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
+. $runtimeSharedScript
 $gatewayLaunchScript = (Resolve-Path (Join-Path $PSScriptRoot "run-agent-gateway.mjs")).Path
 $processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
 . $processUtilsScript
 $dotenvPath = Join-Path $repoRoot ".env"
 $localDotenvPath = Join-Path $repoRoot ".env.local"
-
-function Get-TomlStringValue {
-    param(
-        [string]$Path,
-        [string]$Key
-    )
-
-    if (-not $Path -or -not (Test-Path $Path)) {
-        return $null
-    }
-
-    $pattern = "^\s*$([Regex]::Escape($Key))\s*=\s*""([^""]*)"""
-    foreach ($line in Get-Content $Path) {
-        $match = [Regex]::Match($line, $pattern)
-        if ($match.Success) {
-            return $match.Groups[1].Value.Trim()
-        }
-    }
-
-    return $null
-}
 
 function Get-DotEnvValue {
     param(
@@ -73,34 +54,6 @@ function Get-RepoEnvValue {
     }
 
     return $null
-}
-
-function Get-WorkstationIdentity {
-    param(
-        [string]$TomlPath,
-        [string]$ExplicitWorkstationId
-    )
-
-    $computerName = [string]($env:COMPUTERNAME)
-    $configuredWorkstationId = [string](Get-TomlStringValue -Path $TomlPath -Key "SUITE_WORKSTATION_ID")
-    $resolvedWorkstationId = if ($ExplicitWorkstationId) {
-        $ExplicitWorkstationId
-    }
-    elseif ($configuredWorkstationId) {
-        $configuredWorkstationId
-    }
-    elseif ($computerName) {
-        $computerName
-    }
-    else {
-        [System.Net.Dns]::GetHostName()
-    }
-
-    [pscustomobject]@{
-        WorkstationId = $resolvedWorkstationId.Trim()
-        WorkstationLabel = [string](Get-TomlStringValue -Path $TomlPath -Key "SUITE_WORKSTATION_LABEL")
-        WorkstationRole = [string](Get-TomlStringValue -Path $TomlPath -Key "SUITE_WORKSTATION_ROLE")
-    }
 }
 
 function Resolve-GatewayEndpoint {
@@ -169,7 +122,7 @@ function Get-ListeningGatewayProcess {
 }
 
 function Get-GatewayCandidateProcess {
-    $processes = Get-CimInstance Win32_Process -Filter "Name = 'node.exe' OR Name = 'node' OR Name = 'cargo.exe' OR Name = 'cargo' OR Name = 'zeroclaw-gateway.exe' OR Name = 'zeroclaw.exe' OR Name = 'powershell.exe' OR Name = 'pwsh.exe'"
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'node.exe' OR Name = 'node' OR Name = 'powershell.exe' OR Name = 'pwsh.exe'"
     foreach ($process in $processes) {
         $commandLine = [string]$process.CommandLine
         if ([string]::IsNullOrWhiteSpace($commandLine)) {
@@ -179,14 +132,68 @@ function Get-GatewayCandidateProcess {
         $normalized = $commandLine.ToLowerInvariant()
         if (
             $normalized.Contains("run-agent-gateway.mjs") -or
-            $normalized.Contains("zeroclaw-gateway") -or
-            $normalized.Contains("zeroclaw gateway")
+            $normalized.Contains("suite-agent-gateway.mjs")
         ) {
             return $process
         }
     }
 
     return $null
+}
+
+function Get-GatewayProcessMode {
+    param($Process)
+
+    if ($null -eq $Process) {
+        return $null
+    }
+
+    $commandLine = [string]$Process.CommandLine
+    if ([string]::IsNullOrWhiteSpace($commandLine)) {
+        return $null
+    }
+
+    $normalized = $commandLine.ToLowerInvariant()
+    if (
+        $normalized.Contains("suite-agent-gateway.mjs") -or
+        $normalized.Contains("run-agent-gateway.mjs")
+    ) {
+        return "suite_native"
+    }
+
+    return $null
+}
+
+function Stop-GatewayProcesses {
+    $stoppedIds = New-Object System.Collections.Generic.List[int]
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'node.exe' OR Name = 'node' OR Name = 'powershell.exe' OR Name = 'pwsh.exe'"
+
+    foreach ($process in $processes) {
+        $commandLine = [string]$process.CommandLine
+        if ([string]::IsNullOrWhiteSpace($commandLine)) {
+            continue
+        }
+
+        $normalized = $commandLine.ToLowerInvariant()
+        if (
+            $normalized.Contains("run-agent-gateway.mjs") -or
+            $normalized.Contains("suite-agent-gateway.mjs")
+        ) {
+            $processId = [int]$process.ProcessId
+            if ($stoppedIds.Contains($processId)) {
+                continue
+            }
+
+            try {
+                Stop-Process -Id $processId -Force -ErrorAction Stop
+                $stoppedIds.Add($processId) | Out-Null
+            }
+            catch {
+            }
+        }
+    }
+
+    return @($stoppedIds.ToArray())
 }
 
 function Test-GatewayHealth {
@@ -226,6 +233,8 @@ function Start-GatewayProcess {
 
 $identity = Get-WorkstationIdentity -TomlPath $CodexConfigPath -ExplicitWorkstationId $WorkstationId
 $endpoint = Resolve-GatewayEndpoint
+$gatewayMode = Get-SuiteGatewayMode
+$gatewayModeLabel = Get-SuiteGatewayModeLabel -GatewayMode $gatewayMode
 
 $gatewayProcess = Get-ListeningGatewayProcess -Port $endpoint.Port
 if (-not $gatewayProcess) {
@@ -233,8 +242,21 @@ if (-not $gatewayProcess) {
 }
 $healthy = Test-GatewayHealth -HealthUrl $endpoint.HealthUrl
 $listening = $null -ne (Get-ListeningGatewayProcess -Port $endpoint.Port)
+$gatewayProcessMode = Get-GatewayProcessMode -Process $gatewayProcess
+$gatewayModeMatches = [string]::IsNullOrWhiteSpace([string]$gatewayProcessMode) -or ($gatewayProcessMode -eq $gatewayMode)
+$runningCandidate = $healthy -or $listening -or $null -ne $gatewayProcess
 $startAttempted = $false
 $errorMessage = $null
+
+if ($runningCandidate -and -not $gatewayModeMatches -and $StartIfMissing) {
+    $stoppedProcessIds = Stop-GatewayProcesses
+    Start-Sleep -Seconds 2
+    $gatewayProcess = $null
+    $healthy = $false
+    $listening = $null -ne (Get-ListeningGatewayProcess -Port $endpoint.Port)
+    $gatewayProcessMode = $null
+    $gatewayModeMatches = $true
+}
 
 if (-not $healthy -and $StartIfMissing) {
     $nodeExecutable = Resolve-NodeExecutable
@@ -257,6 +279,11 @@ if (-not $healthy -and $StartIfMissing) {
                 elseif (-not $gatewayProcess) {
                     $gatewayProcess = Get-GatewayCandidateProcess
                 }
+                $gatewayProcessMode = Get-GatewayProcessMode -Process $gatewayProcess
+                $gatewayModeMatches = [string]::IsNullOrWhiteSpace([string]$gatewayProcessMode) -or ($gatewayProcessMode -eq $gatewayMode)
+                if ($healthy -and -not $gatewayModeMatches) {
+                    $healthy = $false
+                }
             } while ((Get-Date) -lt $deadline -and -not $healthy)
         }
         catch {
@@ -271,10 +298,20 @@ if (-not $gatewayProcess) {
 if (-not $listening) {
     $listening = $null -ne (Get-ListeningGatewayProcess -Port $endpoint.Port)
 }
+$gatewayProcessMode = Get-GatewayProcessMode -Process $gatewayProcess
+$gatewayModeMatches = [string]::IsNullOrWhiteSpace([string]$gatewayProcessMode) -or ($gatewayProcessMode -eq $gatewayMode)
+
+if ($healthy -and -not $gatewayModeMatches) {
+    $healthy = $false
+}
 
 $running = $healthy -or $listening -or $null -ne $gatewayProcess
 if (-not $healthy -and [string]::IsNullOrWhiteSpace($errorMessage)) {
-    if (-not $running) {
+    if ($running -and -not $gatewayModeMatches) {
+        $actualGatewayModeLabel = Get-SuiteGatewayModeLabel -GatewayMode $gatewayProcessMode
+        $errorMessage = "Gateway is running in $actualGatewayModeLabel mode while $gatewayModeLabel is configured."
+    }
+    elseif (-not $running) {
         $errorMessage = "Gateway process not running."
     }
     elseif ($startAttempted) {
@@ -285,12 +322,41 @@ if (-not $healthy -and [string]::IsNullOrWhiteSpace($errorMessage)) {
     }
 }
 
+$checkedAt = (Get-Date).ToString("o")
+$serviceState = if ($healthy) {
+    "ready"
+}
+elseif ($running -or $listening) {
+    "needs-attention"
+}
+else {
+    "unavailable"
+}
+$serviceDetail = if ($healthy) {
+    "$gatewayModeLabel gateway health endpoint is available."
+}
+elseif (-not [string]::IsNullOrWhiteSpace($errorMessage)) {
+    $errorMessage
+}
+elseif ($running) {
+    "$gatewayModeLabel gateway process is present but the health endpoint is not ready."
+}
+else {
+    "$gatewayModeLabel gateway is not running."
+}
+
 $result = [pscustomobject]@{
+    schemaVersion = "suite.runtime.v1"
+    checkedAt = $checkedAt
     Workstation = $identity.WorkstationId
     Host = $endpoint.Host
     Port = $endpoint.Port
     ProbeHost = $endpoint.ProbeHost
     HealthUrl = $endpoint.HealthUrl
+    GatewayMode = $gatewayMode
+    GatewayModeLabel = $gatewayModeLabel
+    GatewayProcessMode = $gatewayProcessMode
+    GatewayModeMatches = $gatewayModeMatches
     Running = $running
     Listening = $listening
     Healthy = $healthy
@@ -298,6 +364,33 @@ $result = [pscustomobject]@{
     CommandLine = if ($gatewayProcess) { $gatewayProcess.CommandLine } else { $null }
     StartAttempted = $startAttempted
     Error = $errorMessage
+    service = [pscustomobject]@{
+        id = "gateway"
+        label = "Gateway"
+        state = $serviceState
+        source = "script:check-gateway-startup.ps1"
+        observedAt = $checkedAt
+        actionableIssueCount = if ($serviceState -eq "ready") { 0 } else { 1 }
+        checks = @(
+            [pscustomobject]@{
+                key = "gateway-health"
+                label = "Gateway health endpoint"
+                subsystem = "gateway"
+                severity = $serviceState
+                detail = $serviceDetail
+                actionable = ($serviceState -ne "ready")
+                evidence = [pscustomobject]@{
+                    healthUrl = $endpoint.HealthUrl
+                    listening = $listening
+                    processId = if ($gatewayProcess) { $gatewayProcess.ProcessId } else { $null }
+                    startAttempted = $startAttempted
+                    gatewayMode = $gatewayMode
+                    gatewayProcessMode = $gatewayProcessMode
+                    gatewayModeMatches = $gatewayModeMatches
+                }
+            }
+        )
+    }
 }
 
 if ($Json) {
@@ -308,6 +401,10 @@ else {
     Write-Host "Listening: $($result.Listening)"
     Write-Host "Process ID: $($result.ProcessId)"
     Write-Host "Health URL: $($result.HealthUrl)"
+    Write-Host "Gateway mode: $($result.GatewayModeLabel)"
+    if ($result.GatewayProcessMode) {
+        Write-Host "Gateway process mode: $(Get-SuiteGatewayModeLabel -GatewayMode $result.GatewayProcessMode)"
+    }
     if ($result.CommandLine) {
         Write-Host "Command: $($result.CommandLine)"
     }

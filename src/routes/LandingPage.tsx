@@ -10,11 +10,6 @@ import {
 import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { APP_TAGLINE } from "../appMeta";
-import { AgentPixelMark } from "../components/agent/AgentPixelMark";
-import {
-	AGENT_PROFILE_IDS,
-	AGENT_PROFILES,
-} from "../components/agent/agentProfiles";
 import { SuiteLogo } from "../components/brand/SuiteLogo";
 import { Badge } from "../components/primitives/Badge";
 import { Button } from "../components/primitives/Button";
@@ -23,22 +18,21 @@ import { HStack } from "../components/primitives/Stack";
 import { Text } from "../components/primitives/Text";
 import styles from "./LandingPage.module.css";
 
-const AGENT_IDS = AGENT_PROFILE_IDS;
 const COMMAND_SIGNALS = [
 	{
 		icon: Activity,
-		label: "Live telemetry",
-		value: "Watchdog sessions, collectors, runtime health",
+		label: "Watchdog visibility",
+		value: "Tracked drawing activity, workstation coverage, and recent delivery movement",
 	},
 	{
 		icon: Workflow,
-		label: "Ops flow",
-		value: "Projects, tasks, deadlines, delivery scope",
+		label: "Delivery flow",
+		value: "Projects, review pressure, issue sets, and transmittals stay tied together",
 	},
 	{
-		icon: Sparkles,
-		label: "Agent coordination",
-		value: "Agents, app surfaces, shared context",
+		icon: ClipboardList,
+		label: "Review control",
+		value: "Blockers, issue prep, and release evidence stay attached to the same project story",
 	},
 ] as const;
 
@@ -51,21 +45,48 @@ const HERO_SUMMARY_ITEMS = [
 	},
 	{
 		icon: Boxes,
-		label: "CAD execution",
+		label: "Drawing control",
 		value:
-			"Markup planning, CAD preflight, and bridge-backed automation run through the same control surface.",
+			"Drawing lists, standards checks, and package prep stay tied to the same project workflow.",
 	},
 	{
 		icon: Activity,
-		label: "Runtime state",
+		label: "Tracked activity",
 		value:
-			"Collectors, health signals, and route diagnostics stay visible while you work.",
+			"Watchdog keeps drawing work visible without pushing raw collector noise into the product view.",
+	},
+	{
+		icon: Workflow,
+		label: "Issue control",
+		value:
+			"Issue sets, review checkpoints, and delivery receipts stay attached to the same project story.",
+	},
+] as const;
+
+const PRODUCT_SURFACES = [
+	{
+		icon: ClipboardList,
+		label: "Issue readiness",
+		value:
+			"Package blockers, review decisions, and transmittal prep stay in one delivery flow.",
+	},
+	{
+		icon: Activity,
+		label: "Watchdog telemetry",
+		value:
+			"See which drawings were opened, saved, and tracked without living in raw collector noise.",
+	},
+	{
+		icon: Boxes,
+		label: "Drawing control",
+		value:
+			"Drawing lists, standards, title-block review, and package assembly stay tied to the project.",
 	},
 	{
 		icon: Sparkles,
-		label: "Shared context",
+		label: "Workflow support",
 		value:
-			"Agents, architecture, and work ledger history stay aligned instead of fragmenting across tools.",
+			"Reference tools and automation support the delivery path without taking over the main workspace story.",
 	},
 ] as const;
 
@@ -110,14 +131,14 @@ export default function LandingPage() {
 							<h1 className={styles.heroTitle}>
 								One control surface for{" "}
 								<span className={styles.heroHighlight}>
-									projects, drawings, and AI execution.
+									project delivery and drawing control.
 								</span>
 							</h1>
 
 							<Text color="muted" size="md" className={styles.heroCopy}>
-								{APP_TAGLINE}. Coordinate project operations, monitor telemetry,
-								and run specialized agents without context-switching between
-								separate tools.
+								{APP_TAGLINE}. Coordinate project readiness, Watchdog telemetry,
+								and issue packages without bouncing between disconnected
+								document, drawing, and runtime tools.
 							</Text>
 
 							<HStack gap={3} wrap className={styles.heroCtaRow}>
@@ -141,16 +162,15 @@ export default function LandingPage() {
 										weight="semibold"
 										className={styles.heroSummaryEyebrow}
 									>
-										Operations inside Suite
+										Drawing production control
 									</Text>
 									<Text as="h2" size="lg" weight="semibold" block>
-										One workspace for delivery, CAD flow, and execution control
+										One workspace for delivery, telemetry, and issue control
 									</Text>
-									<Text size="sm" color="muted" block>
-										The same surface tracks project delivery, CAD readiness,
-										runtime health, and agent-assisted work without a second
-										tool stack.
-									</Text>
+								<Text size="sm" color="muted" block>
+									The same surface keeps package readiness, drawing activity,
+									and transmittal prep connected in one delivery workspace.
+								</Text>
 								</div>
 								<div className={styles.heroRailFlow}>
 									<div className={styles.heroSupportList}>
@@ -224,35 +244,30 @@ export default function LandingPage() {
 								className={`${styles.sectionBadge} ${styles.agentsBadge}`}
 							>
 								<span className={styles.sectionBadgeDot} />
-								Profile-driven agents
+								Product surfaces
 							</Badge>
 
 							<Text as="h2" size="xl" weight="semibold" block>
-								Six profiles, built for distinct tasks
+								Four workflow pillars behind the product
 							</Text>
 							<Text color="muted" size="sm" className={styles.agentsCopy} block>
-								Specialized profiles operate independently, coordinate through
-								shared context when needed, and keep their own memory scope for
-								distinct engineering work.
+								Suite stays focused on drawing delivery, review control, and
+								tracked project activity instead of scattering the work across
+								disconnected tools.
 							</Text>
 						</div>
 
 						<div className={styles.agentGrid}>
-							{AGENT_IDS.map((id) => {
-								const profile = AGENT_PROFILES[id];
+							{PRODUCT_SURFACES.map((surface) => {
+								const Icon = surface.icon;
 								return (
-									<div key={id} className={styles.agentCard}>
+									<div key={surface.label} className={styles.agentCard}>
 										<div className={styles.agentMark}>
-											<AgentPixelMark
-												profileId={id}
-												size={32}
-												detailLevel="hero"
-												expression="neutral"
-											/>
+											<Icon className={styles.heroSupportIcon} />
 										</div>
 										<div className={styles.agentCardCopy}>
 											<Text size="sm" weight="semibold" block>
-												{profile.name}
+												{surface.label}
 											</Text>
 											<Text
 												size="xs"
@@ -260,7 +275,7 @@ export default function LandingPage() {
 												className={styles.agentTagline}
 												block
 											>
-												{profile.tagline}
+												{surface.value}
 											</Text>
 										</div>
 									</div>

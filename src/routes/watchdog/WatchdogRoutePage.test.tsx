@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -8,12 +8,31 @@ import type {
 } from "@/services/watchdogService";
 import WatchdogRoutePage from "./WatchdogRoutePage";
 
+const authState = vi.hoisted(() => ({
+	user: {
+		id: "user-1",
+		email: "customer@example.com",
+		app_metadata: {},
+	},
+	allowCommandCenter: false,
+}));
 const mockGetUser = vi.hoisted(() => vi.fn());
 const mockProjectOrder = vi.hoisted(() => vi.fn());
 const mockGetOverview = vi.hoisted(() => vi.fn());
 const mockListEvents = vi.hoisted(() => vi.fn());
 const mockListSessions = vi.hoisted(() => vi.fn());
 const mockListCollectors = vi.hoisted(() => vi.fn());
+const mockFetchIssueSet = vi.hoisted(() => vi.fn());
+
+vi.mock("@/auth/useAuth", () => ({
+	useAuth: () => ({
+		user: authState.user,
+	}),
+}));
+
+vi.mock("@/lib/devAccess", () => ({
+	isCommandCenterAuthorized: () => authState.allowCommandCenter,
+}));
 
 vi.mock("@/supabase/client", () => ({
 	supabase: {
@@ -36,6 +55,12 @@ vi.mock("@/services/watchdogService", () => ({
 		listEvents: mockListEvents,
 		listSessions: mockListSessions,
 		listCollectors: mockListCollectors,
+	},
+}));
+
+vi.mock("@/services/projectIssueSetService", () => ({
+	projectIssueSetService: {
+		fetchIssueSet: mockFetchIssueSet,
 	},
 }));
 
@@ -121,6 +146,12 @@ function createSession(
 
 describe("WatchdogRoutePage", () => {
 	beforeEach(() => {
+		authState.user = {
+			id: "user-1",
+			email: "customer@example.com",
+			app_metadata: {},
+		};
+		authState.allowCommandCenter = false;
 		mockGetUser.mockResolvedValue({
 			data: {
 				user: {
@@ -189,11 +220,23 @@ describe("WatchdogRoutePage", () => {
 					sessionId: "session-2",
 					metadata: { commandName: "QSAVE" },
 				}),
+				createEvent({
+					eventId: 6,
+					collectorId: "collector-filesystem",
+					collectorType: "filesystem",
+					sourceType: "filesystem",
+					eventType: "modified",
+					projectId: null,
+					sessionId: null,
+					drawingPath: null,
+					path: "C:/Suite/output/test-failed-1.png",
+					metadata: {},
+				}),
 			],
-			count: 5,
+			count: 6,
 			afterEventId: 0,
-			lastEventId: 5,
-			nextEventId: 6,
+			lastEventId: 6,
+			nextEventId: 7,
 		});
 		mockListSessions.mockResolvedValue({
 			ok: true,
@@ -217,10 +260,65 @@ describe("WatchdogRoutePage", () => {
 			count: 1,
 			collectors: [createCollector()],
 		});
+		mockFetchIssueSet.mockResolvedValue({
+			data: {
+				id: "issue-set-1",
+				projectId: "project-1",
+				name: "Nanulak IFC package",
+				issueTag: "IFC-01",
+				status: "review",
+				targetDate: "2026-03-31",
+				transmittalNumber: "XMTL-001",
+				transmittalDocumentName: "IFC package",
+				summary: "Ready for package review.",
+				notes: null,
+				selectedDrawingPaths: [
+					"C:/Projects/Nanulak/R3P-25074-E0-0006 - BESS DRAWING INDEX.dwg",
+				],
+				snapshot: {
+					drawingCount: 2,
+					selectedDrawingCount: 1,
+					reviewItemCount: 1,
+					titleBlockReviewCount: 1,
+					standardsReviewCount: 0,
+					unresolvedRevisionCount: 0,
+					setupBlockerCount: 0,
+					trackedDrawingCount: 1,
+					acceptedTitleBlockCount: 0,
+					waivedStandardsCount: 0,
+				},
+				createdAt: "2026-03-23T00:00:00.000Z",
+				updatedAt: "2026-03-23T00:00:00.000Z",
+				issuedAt: null,
+			},
+			error: null,
+		});
 	});
 
 	afterEach(() => {
 		vi.clearAllMocks();
+	});
+
+	it("scopes customer reporting to the selected issue-set drawings", async () => {
+		render(
+			<MemoryRouter
+				initialEntries={[
+					"/app/watchdog?project=project-1&issueSet=issue-set-1",
+				]}
+			>
+				<Routes>
+					<Route path="/app/watchdog" element={<WatchdogRoutePage />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() =>
+			expect(screen.getAllByText(/Package IFC-01/i).length).toBeGreaterThan(0),
+		);
+		expect(
+			screen.getAllByText(/R3P-25074-E0-0006 - BESS DRAWING INDEX/i).length,
+		).toBeGreaterThan(0);
+		expect(screen.queryByText("Drawing-02.dwg")).toBeNull();
 	});
 
 	it("loads scoped watchdog data and renders the cleaned operator feed", async () => {
@@ -247,7 +345,7 @@ describe("WatchdogRoutePage", () => {
 				expect.objectContaining({
 					projectId: "project-1",
 					collectorId: "collector-cad",
-					limit: 18,
+					limit: 60,
 				}),
 			);
 		});
@@ -260,9 +358,21 @@ describe("WatchdogRoutePage", () => {
 			});
 		});
 
-		expect(await screen.findByText("Live CAD sessions")).toBeTruthy();
-		expect(screen.getByText("Project daybook")).toBeTruthy();
-		expect(screen.getByText("Operator feed")).toBeTruthy();
+		expect(
+			(await screen.findAllByText("Live activity")).length,
+		).toBeGreaterThanOrEqual(1);
+		expect(screen.getAllByText("Project drawings").length).toBeGreaterThanOrEqual(
+			1,
+		);
+		expect(screen.getAllByText("Latest actions").length).toBeGreaterThanOrEqual(
+			1,
+		);
+		expect(screen.queryByText("Attention")).toBeNull();
+		expect(screen.getAllByText("Coverage").length).toBeGreaterThanOrEqual(
+			1,
+		);
+		expect(screen.queryByText("Raw collector events")).toBeNull();
+		expect(screen.queryByText("Updated file")).toBeNull();
 		expect(screen.getAllByText("Saved drawing").length).toBeGreaterThanOrEqual(
 			1,
 		);
@@ -273,6 +383,44 @@ describe("WatchdogRoutePage", () => {
 			screen.getAllByRole("button", { name: /open project/i }).length,
 		).toBeGreaterThanOrEqual(1);
 		expect(screen.getByDisplayValue("Nanulak")).toBeTruthy();
+	});
+
+	it("shows the technical stream for dev users", async () => {
+		authState.user = {
+			id: "user-1",
+			email: "dev@example.com",
+			app_metadata: {
+				role: "admin",
+			},
+		};
+		authState.allowCommandCenter = true;
+
+		render(
+			<MemoryRouter initialEntries={["/app/watchdog"]}>
+				<Routes>
+					<Route path="/app/watchdog" element={<WatchdogRoutePage />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		expect(
+			await screen.findByRole("button", {
+				name: "Latest actions",
+			}),
+		).toBeTruthy();
+		fireEvent.click(
+			screen.getByRole("button", {
+				name: "Raw collector events",
+			}),
+		);
+		expect(
+			(await screen.findAllByText("Raw collector events")).length,
+		).toBeGreaterThanOrEqual(1);
+		expect(
+			screen.getAllByText("Filesystem • Modified").length,
+		).toBeGreaterThanOrEqual(
+			1,
+		);
 	});
 
 	it("scopes the operator surfaces to the selected drawing", async () => {
@@ -288,16 +436,16 @@ describe("WatchdogRoutePage", () => {
 			</MemoryRouter>,
 		);
 
-		expect(await screen.findByText("Drawing focus")).toBeTruthy();
 		expect(
-			screen.getByText("Cleaned actions for Drawing-02.dwg."),
+			await screen.findByText(
+				"Time-ordered user-facing drawing actions for Drawing-02.dwg, like opened, saved, and closed drawing activity.",
+			),
 		).toBeTruthy();
-		expect(
-			screen.getByText("Raw collector detail scoped to Drawing-02.dwg."),
-		).toBeTruthy();
+		expect(screen.queryByText("Focused drawing")).toBeNull();
 		expect(
 			screen.getAllByRole("button", { name: /clear drawing focus/i }).length,
 		).toBeGreaterThanOrEqual(1);
+		expect(screen.queryByText("Raw collector events")).toBeNull();
 		expect(screen.getAllByText("Drawing-02.dwg").length).toBeGreaterThanOrEqual(
 			2,
 		);

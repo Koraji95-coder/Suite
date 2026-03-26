@@ -16,6 +16,10 @@ export type TaskFilter = "all" | "pending" | "completed";
 
 /** Detail-panel view mode. */
 export type ViewMode =
+	| "setup"
+	| "readiness"
+	| "review"
+	| "issue-sets"
 	| "tasks"
 	| "calendar"
 	| "files"
@@ -52,6 +56,13 @@ export interface ProjectFormData {
 	status: ProjectStatus;
 	category: string;
 	watchdogRootPath: string;
+	titleBlockBlockName: string;
+	titleBlockAcadeLine1: string;
+	titleBlockAcadeLine2: string;
+	titleBlockAcadeLine4: string;
+	titleBlockDrawnBy: string;
+	titleBlockCheckedBy: string;
+	titleBlockEngineer: string;
 }
 
 export interface TaskFormData {

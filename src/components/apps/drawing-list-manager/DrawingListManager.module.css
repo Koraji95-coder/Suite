@@ -3,6 +3,19 @@
 	gap: 1.5rem;
 }
 
+.contextCopy {
+	display: grid;
+	gap: 0.35rem;
+}
+
+.contextTitle {
+	margin: 0;
+	font-size: clamp(1rem, 0.95rem + 0.35vw, 1.25rem);
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	color: var(--text);
+}
+
 .contextSummary {
 	margin: 0;
 	max-width: 72ch;
@@ -11,10 +24,51 @@
 	color: var(--text-muted);
 }
 
+.contextMeta {
+	display: inline-flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.45rem;
+}
+
 .toolbar {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.75rem;
+}
+
+.contextFacts {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.8rem 1rem;
+}
+
+.contextFact {
+	display: grid;
+	gap: 0.22rem;
+	min-width: 8.5rem;
+	padding-right: 1rem;
+	border-right: 1px solid color-mix(in srgb, var(--brand-border-soft) 58%, transparent);
+}
+
+.contextFact:last-child {
+	border-right: none;
+	padding-right: 0;
+}
+
+.contextFactLabel {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.contextFactValue {
+	font-size: clamp(1rem, 0.96rem + 0.18vw, 1.18rem);
+	font-weight: 700;
+	letter-spacing: -0.03em;
+	color: var(--text);
 }
 
 .secondaryButton,
@@ -58,35 +112,10 @@
 	pointer-events: none;
 }
 
-.summaryGrid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-	gap: 0.75rem;
-}
-
-.summaryCard,
 .card {
 	border: 1px solid var(--border);
 	border-radius: 0.85rem;
 	background: var(--surface);
-}
-
-.summaryCard {
-	padding: 0.9rem 1rem;
-	display: grid;
-	gap: 0.3rem;
-}
-
-.summaryCard strong {
-	font-size: 1.15rem;
-	color: var(--text);
-}
-
-.summaryLabel {
-	font-size: 0.75rem;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	color: var(--text-muted);
 }
 
 .message,
@@ -116,10 +145,34 @@
 	gap: 1rem;
 }
 
+.secondaryGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+	gap: 1rem;
+}
+
 .card {
 	padding: 1rem;
 	display: grid;
 	gap: 0.9rem;
+}
+
+.cardPlaceholder {
+	padding: 0.9rem 1rem;
+	border-radius: 0.8rem;
+	border: 1px dashed color-mix(in srgb, var(--border) 76%, transparent);
+	background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+	font-size: 0.82rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}
+
+.cardHeaderRow {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
 }
 
 .cardTitle,
@@ -220,6 +273,50 @@
 	color: var(--text-muted);
 }
 
+.setupChecklist {
+	display: grid;
+	gap: 0.55rem;
+}
+
+.setupChecklistItem {
+	display: grid;
+	gap: 0.18rem;
+	padding: 0.72rem 0.82rem;
+	border-radius: 0.75rem;
+	border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+	background: color-mix(in srgb, var(--surface-2) 58%, transparent);
+}
+
+.setupChecklistItemReady {
+	border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+	background: color-mix(in srgb, var(--success) 10%, var(--surface-2));
+}
+
+.setupChecklistItemPending {
+	border-color: color-mix(in srgb, var(--warning) 26%, var(--border));
+	background: color-mix(in srgb, var(--warning) 8%, var(--surface-2));
+}
+
+.setupChecklistLabel {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.setupChecklistValue {
+	font-size: 0.82rem;
+	line-height: 1.45;
+	color: var(--text);
+}
+
+.cardFootnote {
+	font-size: 0.78rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
 .artifactPanel {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
@@ -305,7 +402,8 @@
 }
 
 .issueBadge,
-.okBadge {
+.okBadge,
+.packageBadge {
 	display: inline-flex;
 	width: fit-content;
 	border-radius: 999px;
@@ -323,6 +421,12 @@
 	border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
 	background: color-mix(in srgb, var(--success) 10%, transparent);
 	color: var(--success);
+}
+
+.packageBadge {
+	border: 1px solid color-mix(in srgb, var(--primary) 36%, transparent);
+	background: color-mix(in srgb, var(--primary) 12%, transparent);
+	color: var(--text);
 }
 
 .inlineInput {
@@ -365,6 +469,16 @@
 }
 
 @media (max-width: 920px) {
+	.contextFacts {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+	}
+
+	.contextFact {
+		border-right: none;
+		padding-right: 0;
+	}
+
 	.configGrid {
 		grid-template-columns: 1fr;
 	}

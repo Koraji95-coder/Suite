@@ -1,0 +1,214 @@
+.emptyState {
+	padding: 1rem 1.1rem;
+	border-radius: var(--radius-2);
+	border: 1px dashed
+		color-mix(in srgb, var(--brand-border-soft) 80%, transparent);
+	background: color-mix(in srgb, var(--suite-surface-sunken) 88%, transparent);
+	font-size: 0.88rem;
+	color: var(--text-muted);
+}
+
+.inboxList {
+	display: grid;
+	gap: 0.8rem;
+}
+
+.inboxItem {
+	display: grid;
+	gap: 0.85rem;
+	align-items: start;
+	padding: 0.95rem 1rem;
+	border-radius: var(--radius-2);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 82%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--suite-surface-support) 95%, transparent),
+			color-mix(in srgb, var(--suite-surface-sunken) 88%, transparent)
+		),
+		var(--suite-surface-support);
+}
+
+.itemCopy {
+	display: grid;
+	gap: 0.35rem;
+}
+
+.itemHeading {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.65rem;
+}
+
+.badgeRow {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	align-items: center;
+}
+
+.itemTitle {
+	margin: 0;
+	font-size: 0.92rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.itemSummary {
+	margin: 0;
+	font-size: 0.86rem;
+	line-height: 1.5;
+	color: color-mix(in srgb, var(--text) 88%, transparent);
+}
+
+.itemDetail {
+	margin: 0;
+	font-size: 0.79rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.itemLink,
+.itemButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.45rem;
+	min-height: 2.2rem;
+	border-radius: var(--radius-2);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 90%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--suite-surface-support) 96%, transparent),
+			color-mix(in srgb, var(--suite-surface-sunken) 84%, transparent)
+		),
+		var(--suite-surface-support);
+	color: var(--text);
+	padding: 0.72rem 0.9rem;
+	font-size: 0.82rem;
+	font-weight: 700;
+	text-decoration: none;
+	transition:
+		background-color 150ms ease,
+		border-color 150ms ease,
+		color 150ms ease,
+		transform 150ms ease;
+}
+
+.itemActions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.45rem 0.6rem;
+	min-width: 0;
+}
+
+.itemButton {
+	font-family: inherit;
+	cursor: pointer;
+}
+
+.itemLink:hover,
+.itemButton:hover {
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--brand-border-strong) 90%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--suite-surface-feature) 92%, transparent),
+			color-mix(in srgb, var(--suite-surface-support) 86%, transparent)
+		),
+		var(--suite-surface-feature);
+}
+
+.quickActionRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+}
+
+.quickActionButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 2.2rem;
+	border-radius: var(--radius-2);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 90%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--suite-surface-sunken) 92%, transparent),
+			color-mix(in srgb, var(--suite-surface-support) 84%, transparent)
+		),
+		var(--suite-surface-sunken);
+	color: var(--text);
+	padding: 0.62rem 0.78rem;
+	font-size: 0.76rem;
+	font-weight: 700;
+	font-family: inherit;
+	cursor: pointer;
+	transition:
+		background-color 150ms ease,
+		border-color 150ms ease,
+		color 150ms ease,
+		transform 150ms ease,
+		opacity 150ms ease;
+}
+
+.quickActionButton:hover:not(:disabled) {
+	transform: translateY(-1px);
+}
+
+.quickActionButton:disabled {
+	cursor: progress;
+	opacity: 0.72;
+}
+
+.quickActionButtonAccent {
+	border-color: color-mix(in srgb, var(--status-accent-border) 80%, transparent);
+	color: color-mix(in srgb, var(--status-accent-text) 92%, white 8%);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--status-accent-bg) 68%, transparent),
+			color-mix(in srgb, var(--suite-surface-support) 90%, transparent)
+		),
+		var(--suite-surface-support);
+}
+
+.quickActionButtonWarning {
+	border-color: color-mix(in srgb, var(--status-warning-border) 80%, transparent);
+	color: color-mix(in srgb, var(--status-warning-text) 88%, white 12%);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--status-warning-bg) 64%, transparent),
+			color-mix(in srgb, var(--suite-surface-support) 90%, transparent)
+		),
+		var(--suite-surface-support);
+}
+
+.quickActionButtonSuccess {
+	border-color: color-mix(in srgb, var(--status-success-border) 80%, transparent);
+	color: color-mix(in srgb, var(--status-success-text) 90%, white 10%);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--status-success-bg) 60%, transparent),
+			color-mix(in srgb, var(--suite-surface-support) 90%, transparent)
+		),
+		var(--suite-surface-support);
+}
+
+@media (max-width: 760px) {
+	.itemHeading {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}

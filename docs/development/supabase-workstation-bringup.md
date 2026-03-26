@@ -52,6 +52,8 @@ npm run supabase:remote:preflight
    - a recorded preflight
    - the expected local email mode
 
+Runtime Control remains the primary local workshop door; Command Center is only the diagnostics surface for hosted push and related evidence.
+
 ## Hosted CLI Auth
 
 The guarded remote workflow uses the Supabase CLI login/link state on the workstation.

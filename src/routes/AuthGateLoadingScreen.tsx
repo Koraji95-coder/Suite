@@ -9,7 +9,7 @@ export function AuthGateLoadingScreen() {
 			<div className={styles.shell}>
 				<div className={styles.eyebrow}>{APP_NAME} Workspace</div>
 				<div className={styles.frame}>
-					<div className={styles.kicker}>Operations shell</div>
+					<div className={styles.kicker}>Suite workspace</div>
 					<div className={styles.panelGrid}>
 						<SurfaceSkeleton tone="hero" height="compact" />
 						<SurfaceSkeleton tone="support" height="regular" />

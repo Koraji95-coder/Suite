@@ -16,18 +16,6 @@
 	background: var(--suite-panel-surface-strong);
 }
 
-.tabStrip {
-	margin-top: 1rem;
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: 0.6rem;
-	padding: 0.85rem;
-	border: 1px solid var(--brand-border-soft);
-	border-radius: 1rem;
-	background: color-mix(in srgb, var(--suite-surface-support) 88%, transparent);
-	box-shadow: var(--suite-panel-shadow-subtle);
-}
-
 .stateIcon {
 	display: flex;
 	width: 2.5rem;
@@ -55,79 +43,6 @@
 	background: var(--surface-2);
 }
 
-.tabRow {
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: 0.6rem;
-}
-
-.tabButton {
-	display: grid;
-	grid-template-columns: auto minmax(0, 1fr) auto;
-	align-items: center;
-	gap: 0.6rem;
-	border: 1px solid var(--brand-border-soft);
-	background: var(--suite-panel-surface-soft);
-	color: var(--text-muted);
-	border-radius: 0.9rem;
-	padding: 0.52rem 0.72rem;
-	font-size: 0.8rem;
-	cursor: pointer;
-	text-align: left;
-	transition:
-		background-color 150ms ease,
-		color 150ms ease,
-		border-color 150ms ease,
-		transform 150ms ease;
-}
-
-.tabButton:hover {
-	border-color: var(--brand-border-strong);
-	color: var(--text);
-	transform: translateY(-1px);
-}
-
-.tabButtonActive {
-	border-color: var(--brand-border-strong);
-	background: var(--suite-panel-surface-strong);
-	color: var(--text);
-	box-shadow: var(--brand-shadow);
-}
-
-.tabIconWrap {
-	display: inline-flex;
-	width: 1.75rem;
-	height: 1.75rem;
-	align-items: center;
-	justify-content: center;
-	border-radius: 0.62rem;
-	border: 1px solid var(--brand-border-soft);
-	background: linear-gradient(
-		145deg,
-		var(--brand-chip-cool-bg),
-		color-mix(in srgb, var(--brand-surface-branded) 82%, transparent)
-	);
-	color: var(--accent);
-}
-
-.tabText {
-	display: flex;
-	flex-direction: column;
-	gap: 0.08rem;
-	min-width: 0;
-}
-
-.tabLabel {
-	font-size: 0.79rem;
-	font-weight: 650;
-	color: var(--text);
-}
-
-.tabHint {
-	font-size: 0.67rem;
-	color: var(--text-muted);
-}
-
 .groupsGrid {
 	margin-top: 1.25rem;
 	display: grid;
@@ -137,6 +52,13 @@
 .commandsStack {
 	display: grid;
 	gap: 1rem;
+}
+
+.contextMeta {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.45rem;
 }
 
 .supabaseStatusPanel {
@@ -217,12 +139,6 @@
 			color-mix(in srgb, var(--brand-surface-neutral) 50%, transparent)
 		),
 		var(--bg);
-}
-
-.architecturePanel {
-	min-height: 30rem;
-	border-color: var(--brand-border-soft);
-	background: var(--suite-panel-surface-strong);
 }
 
 .historyPanel {
@@ -361,10 +277,6 @@
 }
 
 @media (min-width: 48rem) {
-	.tabRow {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-
 	.supabaseStatusGrid {
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 	}

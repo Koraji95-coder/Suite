@@ -1,0 +1,318 @@
+.root {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.9rem;
+}
+
+.headerCopy {
+	display: grid;
+	gap: 0.35rem;
+	max-width: 44rem;
+}
+
+.eyebrow {
+	margin: 0;
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	color: color-mix(in srgb, var(--accent) 76%, white 24%);
+}
+
+.title {
+	margin: 0;
+	font-size: clamp(1.05rem, 0.98rem + 0.4vw, 1.35rem);
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	color: var(--text);
+}
+
+.description {
+	margin: 0;
+	font-size: 0.9rem;
+	line-height: 1.6;
+	color: color-mix(in srgb, var(--text-muted) 92%, white 8%);
+}
+
+.summaryPanel {
+	display: grid;
+	gap: 1rem;
+}
+
+.summaryTop {
+	display: grid;
+	grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.95fr);
+	gap: 1rem;
+	align-items: stretch;
+}
+
+.summaryMain {
+	display: grid;
+	gap: 1rem;
+}
+
+.summaryHeader {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.85rem;
+}
+
+.summaryIconShell {
+	display: grid;
+	place-items: center;
+	width: 2.6rem;
+	height: 2.6rem;
+	flex-shrink: 0;
+	border-radius: 999px;
+	border: 1px solid
+		color-mix(in srgb, var(--accent) 34%, var(--brand-border-strong));
+	background:
+		radial-gradient(
+			circle at 30% 30%,
+			color-mix(in srgb, var(--accent) 30%, transparent),
+			transparent 62%
+		),
+		color-mix(in srgb, var(--suite-surface-support) 94%, transparent);
+	box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+}
+
+.summaryIcon {
+	width: 1.15rem;
+	height: 1.15rem;
+	color: color-mix(in srgb, var(--accent) 72%, white 28%);
+}
+
+.summaryTitle {
+	margin: 0;
+	font-size: 0.95rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.summaryText {
+	margin: 0.35rem 0 0;
+	font-size: 0.92rem;
+	line-height: 1.6;
+	color: color-mix(in srgb, var(--text) 86%, transparent);
+}
+
+.metricRow {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 0.75rem;
+}
+
+.metricCard,
+.summaryFact {
+	display: grid;
+	gap: 0.35rem;
+	padding: 0.85rem 0.95rem;
+	border-radius: var(--radius-2);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 86%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--suite-surface-sunken) 96%, transparent),
+			color-mix(in srgb, var(--suite-surface-support) 86%, transparent)
+		),
+		var(--suite-surface-sunken);
+}
+
+.metricLabel,
+.cardEyebrow {
+	font-size: 0.67rem;
+	font-weight: 700;
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.metricValue,
+.cardTitle {
+	font-size: clamp(1.05rem, 1rem + 0.25vw, 1.28rem);
+	font-weight: 700;
+	letter-spacing: -0.03em;
+	color: var(--text);
+	margin: 0;
+}
+
+.summaryActions {
+	display: grid;
+	align-content: start;
+	gap: 0.6rem;
+}
+
+.workflowDivider {
+	height: 1px;
+	background: color-mix(in srgb, var(--brand-border-soft) 82%, transparent);
+}
+
+.summaryNote {
+	margin: 0;
+	font-size: 0.84rem;
+	line-height: 1.6;
+	color: color-mix(in srgb, var(--text) 82%, transparent);
+}
+
+.laneStrip {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 0.7rem;
+}
+
+.laneCard {
+	display: grid;
+	gap: 0.45rem;
+	padding: 0.82rem 0.92rem;
+	border-radius: var(--radius-2);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 86%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--suite-surface-sunken) 96%, transparent),
+			color-mix(in srgb, var(--suite-surface-support) 86%, transparent)
+		),
+		var(--suite-surface-sunken);
+}
+
+.laneCardReady {
+	border-color: color-mix(in srgb, var(--success) 24%, var(--brand-border-soft));
+}
+
+.laneCardBackground {
+	border-color: color-mix(in srgb, var(--accent) 24%, var(--brand-border-soft));
+}
+
+.laneCardNeedsAttention {
+	border-color: color-mix(in srgb, var(--warning) 28%, var(--brand-border-soft));
+}
+
+.laneHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.laneLabel {
+	font-size: 0.75rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.laneDetail {
+	margin: 0;
+	font-size: 0.8rem;
+	line-height: 1.55;
+	color: color-mix(in srgb, var(--text) 82%, transparent);
+}
+
+.utilityLinks {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.55rem 0.85rem;
+}
+
+.utilityLink {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	border: 0;
+	background: transparent;
+	padding: 0;
+	font-size: 0.8rem;
+	font-weight: 700;
+	text-decoration: none;
+	color: color-mix(in srgb, var(--text) 84%, transparent);
+}
+
+.utilityLink:hover {
+	color: var(--text);
+}
+
+.linkIcon {
+	width: 0.9rem;
+	height: 0.9rem;
+	flex-shrink: 0;
+}
+
+.inboxCopy {
+	margin: 0;
+	font-size: 0.85rem;
+	line-height: 1.55;
+	color: color-mix(in srgb, var(--text) 82%, transparent);
+}
+
+.inboxHeader {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.8rem;
+}
+
+.inboxTitle {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--text);
+}
+
+.filterRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+}
+
+.filterChip {
+	border-radius: 999px;
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 90%, transparent);
+	background: color-mix(in srgb, var(--suite-surface-sunken) 86%, transparent);
+	color: var(--text-muted);
+	padding: 0.4rem 0.7rem;
+	font-size: 0.76rem;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.filterChipActive {
+	border-color: color-mix(in srgb, var(--accent) 34%, var(--brand-border-strong));
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
+	color: var(--text);
+}
+
+.noticeList {
+	display: grid;
+	gap: 0.45rem;
+}
+
+.notice {
+	margin: 0;
+	padding: 0.75rem 0.9rem;
+	border-radius: var(--radius-2);
+	border: 1px solid
+		color-mix(in srgb, var(--warning) 24%, var(--brand-border-soft));
+	background: color-mix(in srgb, var(--warning) 9%, transparent);
+	font-size: 0.78rem;
+	line-height: 1.5;
+	color: color-mix(in srgb, var(--text) 86%, transparent);
+}
+
+@media (max-width: 980px) {
+	.summaryTop {
+		grid-template-columns: 1fr;
+	}
+}

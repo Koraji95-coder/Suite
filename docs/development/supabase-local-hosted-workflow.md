@@ -86,6 +86,8 @@ Status artifact location by default:
 
 The command presets in the `Supabase` group remain copy-only. Command Center does not execute shell commands.
 
+Use Runtime Control for local workstation start/stop/runtime ownership. Use Command Center only for diagnostics and hosted push evidence.
+
 ## Failure Meaning
 
 If hosted preflight fails:

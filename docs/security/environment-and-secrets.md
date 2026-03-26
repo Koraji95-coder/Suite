@@ -97,7 +97,7 @@ The repository ignore rules include:
     - `AUTH_PASSKEY_CALLBACK_SIGNING_SECRET`
     - `AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_AGE_SECONDS`
     - `AUTH_PASSKEY_CALLBACK_SIGNATURE_MAX_CLOCK_SKEW_SECONDS`
-  - If using ZeroClaw as external bridge, configure matching gateway env:
+  - Gateway callback-bridge compatibility env:
     - `ZC_SUITE_PASSKEY_CALLBACK_SIGNING_SECRET`
     - `ZC_SUITE_CALLBACK_ALLOWED_ORIGINS`
     - `ZC_SUITE_PASSKEY_PROVIDER_JWT_SECRET`

@@ -29,12 +29,9 @@ __pycache__/
 
 # .NET build artifacts
 **/bin/
-!zeroclaw-main/src/bin/
-!zeroclaw-main/src/bin/*.rs
 **/obj/
 
 # Rust/local build artifacts
-zeroclaw-main/target-local/
 
 # Local browser automation/session artifacts
 .playwright-cli/

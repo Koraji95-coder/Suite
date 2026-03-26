@@ -1,15 +1,15 @@
 # Suite Auth Architecture (Canonical)
 
-This is the canonical auth reference for Suite, including frontend, backend broker, and ZeroClaw boundaries.
+This is the canonical auth reference for Suite, including frontend, backend broker, and gateway boundaries.
 
 ## 1) System Boundaries
 
 - Identity/session authority: Supabase Auth (email-link session + JWT access token).
 - Product auth orchestrator: Suite backend (`/api/auth/*`, `/api/agent/*`).
-- Agent execution transport: ZeroClaw gateway.
+- Agent execution transport: Suite agent gateway.
 - Pairing source of truth in broker mode: Suite backend session/challenge state.
 
-ZeroClaw does **not** decide Supabase redirect behavior for pairing emails. Redirect selection is built in Suite backend before any ZeroClaw token exchange.
+The gateway does **not** decide Supabase redirect behavior for pairing emails. Redirect selection is built in Suite backend before any gateway token exchange.
 
 ## 2) End-to-End Flows
 
@@ -29,7 +29,7 @@ ZeroClaw does **not** decide Supabase redirect behavior for pairing emails. Redi
 5. Backend sends Supabase email link to callback path with `agent_action` + `agent_challenge`.
 6. Frontend callback page confirms via `POST /api/agent/pairing-confirm`.
 7. Backend:
-   - `pair`: exchanges stored code with ZeroClaw, sets broker session cookie.
+   - `pair`: exchanges stored code with the gateway, sets broker session cookie.
    - `unpair`: revokes token and clears broker session cookie.
 
 ## 3) Redirect Determinism Rules

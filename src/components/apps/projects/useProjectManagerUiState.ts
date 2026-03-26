@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DEFAULT_PROJECT_TITLE_BLOCK_NAME } from "@/services/projectTitleBlockProfileService";
 import type {
 	Project,
 	ProjectFormData,
@@ -17,6 +18,13 @@ const DEFAULT_PROJECT_FORM: ProjectFormData = {
 	status: "active",
 	category: "Other",
 	watchdogRootPath: "",
+	titleBlockBlockName: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
+	titleBlockAcadeLine1: "",
+	titleBlockAcadeLine2: "",
+	titleBlockAcadeLine4: "",
+	titleBlockDrawnBy: "",
+	titleBlockCheckedBy: "",
+	titleBlockEngineer: "",
 };
 
 const DEFAULT_TASK_FORM: TaskFormData = {
@@ -26,7 +34,10 @@ const DEFAULT_TASK_FORM: TaskFormData = {
 	priority: "medium",
 };
 
-export function useProjectManagerUiState() {
+export function useProjectManagerUiState(
+	initialViewMode: ViewMode = "setup",
+	initialIssueSetId: string | null = null,
+) {
 	const [showProjectModal, setShowProjectModal] = useState(false);
 	const [showTaskModal, setShowTaskModal] = useState(false);
 	const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -35,7 +46,10 @@ export function useProjectManagerUiState() {
 		string | null
 	>(null);
 	const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-	const [viewMode, setViewMode] = useState<ViewMode>("tasks");
+	const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
+	const [activeIssueSetId, setActiveIssueSetId] = useState<string | null>(
+		initialIssueSetId,
+	);
 	const [fileFilter, setFileFilter] = useState("");
 	const [projectSearch, setProjectSearch] = useState("");
 	const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
@@ -68,6 +82,13 @@ export function useProjectManagerUiState() {
 			status: project.status === "completed" ? "archived" : project.status,
 			category: project.category || "",
 			watchdogRootPath: project.watchdog_root_path || "",
+			titleBlockBlockName: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
+			titleBlockAcadeLine1: "",
+			titleBlockAcadeLine2: "",
+			titleBlockAcadeLine4: "",
+			titleBlockDrawnBy: "",
+			titleBlockCheckedBy: "",
+			titleBlockEngineer: "",
 		});
 		setShowProjectModal(true);
 	};
@@ -113,6 +134,8 @@ export function useProjectManagerUiState() {
 		setExpandedTasks,
 		viewMode,
 		setViewMode,
+		activeIssueSetId,
+		setActiveIssueSetId,
 		fileFilter,
 		setFileFilter,
 		projectSearch,

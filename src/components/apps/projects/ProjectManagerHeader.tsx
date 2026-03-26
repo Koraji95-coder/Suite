@@ -42,11 +42,11 @@ export function ProjectManagerHeader({
 
 	return (
 		<PageContextBand
-			eyebrow="Workspace operations"
+			eyebrow="Project delivery"
 			summary={
 				<div>
 					<p className={styles.subtitle}>
-						Track workstreams, deadlines, and deliverables in one place.
+						Track projects, issue timing, and delivery readiness in one place.
 					</p>
 					<p className={styles.summary}>
 						{currentFilterLabel} with {activeProjects} active and{" "}

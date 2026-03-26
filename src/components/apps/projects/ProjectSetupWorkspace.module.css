@@ -1,0 +1,150 @@
+.root {
+	display: grid;
+	gap: 1rem;
+}
+
+.header {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 1rem;
+}
+
+.headerCopy {
+	display: grid;
+	gap: 0.35rem;
+	max-width: 58rem;
+}
+
+.eyebrow {
+	margin: 0;
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--color-text-muted);
+}
+
+.title {
+	margin: 0;
+	font-size: 1.15rem;
+	font-weight: 650;
+	color: var(--color-text-primary);
+}
+
+.description {
+	margin: 0;
+	font-size: 0.95rem;
+	line-height: 1.55;
+	color: var(--color-text-secondary);
+}
+
+.summaryPanel {
+	display: grid;
+	grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.95fr);
+	gap: 1.25rem;
+	align-items: start;
+}
+
+.summaryHeader {
+	display: flex;
+	gap: 0.9rem;
+	align-items: flex-start;
+}
+
+.summaryIconShell {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.75rem;
+	height: 2.75rem;
+	border-radius: 0.95rem;
+	background: color-mix(in srgb, var(--color-accent-brass) 18%, transparent);
+	border: 1px solid color-mix(in srgb, var(--color-accent-brass) 28%, transparent);
+	color: var(--color-accent-brass);
+	flex-shrink: 0;
+}
+
+.summaryIcon {
+	width: 1.1rem;
+	height: 1.1rem;
+}
+
+.summaryTitle {
+	margin: 0 0 0.2rem;
+	font-size: 1rem;
+	font-weight: 650;
+	color: var(--color-text-primary);
+}
+
+.summaryText {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--color-text-primary);
+}
+
+.summaryDetail {
+	margin: 0.4rem 0 0;
+	font-size: 0.92rem;
+	line-height: 1.55;
+	color: var(--color-text-secondary);
+}
+
+.summaryActions {
+	display: grid;
+	gap: 0.85rem;
+	justify-items: start;
+}
+
+.primaryLink,
+.primaryButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.55rem;
+	padding: 0.72rem 1rem;
+	border-radius: 0.85rem;
+	border: 1px solid color-mix(in srgb, var(--color-accent-brass) 36%, transparent);
+	background: color-mix(in srgb, var(--color-accent-brass) 16%, transparent);
+	color: var(--color-text-primary);
+	text-decoration: none;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.primaryButton {
+	font: inherit;
+}
+
+.utilityLinks {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem 0.8rem;
+}
+
+.utilityLink,
+.utilityButton {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	background: none;
+	border: none;
+	padding: 0;
+	font: inherit;
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--color-text-secondary);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.linkIcon {
+	width: 0.95rem;
+	height: 0.95rem;
+}
+
+@media (max-width: 960px) {
+	.summaryPanel {
+		grid-template-columns: 1fr;
+	}
+}

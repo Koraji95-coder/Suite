@@ -48,12 +48,14 @@ async function flushEffects(): Promise<void> {
 describe("useAgentConnectionStatus", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
+		localStorage.clear();
 		mockRefreshPairingStatusDetailed.mockReset();
 		mockHealthCheck.mockReset();
 		mockHealthCheck.mockResolvedValue(true);
 	});
 
 	afterEach(() => {
+		localStorage.clear();
 		vi.useRealTimers();
 	});
 

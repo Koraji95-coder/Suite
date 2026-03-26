@@ -1607,9 +1607,9 @@ async function toolVerifyAgentRoutingGuardrails() {
 		"Agent Model Routing Guardrail",
 		"MCP/Handoff Guardrail",
 		"Gateway Build/Runtime Guardrail",
-		"`zeroclaw-gateway` is the default gateway path for Suite workflows.",
+		"The Suite-native gateway is the default gateway path for Suite workflows.",
 		"Use `npm run gateway:dev` as the canonical command",
-		"`SUITE_GATEWAY_USE_FULL_CLI=1` is allowed only for explicit diagnostics",
+		"Legacy ZeroClaw CLI fallback is retired from active Suite workflows.",
 		"strict single-model per profile",
 	];
 	const missingGuardrails = requiredGuardrails.filter(
@@ -2545,10 +2545,10 @@ Notes: ${notes}
    - keep /api/agent/runs* run-ledger flow additive
    - do not alter single-chat or pairing behavior as part of orchestration changes
 6. Gateway build/runtime policy (locked default):
-   - use \`npm run gateway:dev\` as the canonical command (zeroclaw-gateway default path)
-   - use \`SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev\` only for explicit diagnostics
-   - if full CLI compile fails with rustc stack overflow / 0xc0000005 / ICE, capture versions + failure signature once, classify as compiler/toolchain instability, stop workaround iteration, and continue on the default gateway path
-   - escalate upstream only after a minimal reproducible diagnostic capture is available
+   - use \`npm run gateway:dev\` as the canonical command (Suite-native gateway default path)
+   - legacy ZeroClaw CLI fallback is retired from active Suite workflows
+   - if runtime status reports an unexpected legacy gateway process, stop it and relaunch the canonical path
+   - keep any old rust/toolchain failure notes as archived diagnostics, not as active workaround guidance
 7. Watchdog collector startup gate:
    - workstation identity comes from \`.codex/config.toml\` or MCP workstation env overrides
    - use \`repo.check_watchdog_collector_startup\`, \`repo.check_watchdog_autocad_collector_startup\`, \`repo.check_watchdog_autocad_plugin\`, and \`repo.check_watchdog_autocad_readiness\` before relying on local collector telemetry when startup state is relevant
@@ -2666,20 +2666,17 @@ Operational notes:
 4. Request IDs for backend/gateway correlation.
 
 ### Gateway Build State (Required)
-1. Launch path selected: <default zeroclaw-gateway | diagnostic full CLI>
-2. Command used:
+1. Command used:
    - canonical: \`npm run gateway:dev\`
-   - diagnostic-only: \`SUITE_GATEWAY_USE_FULL_CLI=1 npm run gateway:dev\`
-3. Rust/toolchain evidence:
-   - \`rustc --version\`:
-   - \`cargo --version\`:
-   - \`rustup show active-toolchain\`:
-4. Result summary:
+2. Runtime snapshot state:
+   - configured mode: <Suite-native>
+   - detected process mode: <Suite-native | unexpected legacy process | unavailable>
+3. Result summary:
    - status:
    - failure signature (if any):
-   - classification: <normal | compiler/toolchain instability>
-5. Incident protocol:
-   - if diagnostic full CLI compile fails with rustc stack overflow / 0xc0000005 / ICE, record the signature once, stop workaround iteration, and continue on default gateway path.
+   - classification: <normal | stale legacy process | runtime issue>
+4. Incident protocol:
+   - if an unexpected legacy process is detected, record it once, stop it, and continue on the canonical Suite-native path.
 
 ### Model Readiness State (Required Before Conversation/Run Handoff)
 1. Provider mode:

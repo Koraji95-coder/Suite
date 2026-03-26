@@ -10,69 +10,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
+. $runtimeSharedScript
 $processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
 . $processUtilsScript
-
-function Get-TomlStringValue {
-    param(
-        [string]$Path,
-        [string]$Key
-    )
-
-    if (-not $Path -or -not (Test-Path $Path)) {
-        return $null
-    }
-
-    $pattern = "^\s*$([Regex]::Escape($Key))\s*=\s*""([^""]*)"""
-    foreach ($line in Get-Content $Path) {
-        $match = [Regex]::Match($line, $pattern)
-        if ($match.Success) {
-            return $match.Groups[1].Value.Trim()
-        }
-    }
-
-    return $null
-}
-
-function Get-WorkstationIdentity {
-    param(
-        [string]$TomlPath,
-        [string]$ExplicitWorkstationId
-    )
-
-    $computerName = [string]($env:COMPUTERNAME)
-    $configuredWorkstationId = [string](Get-TomlStringValue -Path $TomlPath -Key "SUITE_WORKSTATION_ID")
-    $resolvedWorkstationId = if ($ExplicitWorkstationId) {
-        $ExplicitWorkstationId
-    }
-    elseif ($configuredWorkstationId) {
-        $configuredWorkstationId
-    }
-    elseif ($computerName) {
-        $computerName
-    }
-    else {
-        [System.Net.Dns]::GetHostName()
-    }
-
-    [pscustomobject]@{
-        WorkstationId = $resolvedWorkstationId.Trim()
-        WorkstationLabel = [string](Get-TomlStringValue -Path $TomlPath -Key "SUITE_WORKSTATION_LABEL")
-        WorkstationRole = [string](Get-TomlStringValue -Path $TomlPath -Key "SUITE_WORKSTATION_ROLE")
-    }
-}
-
-function Resolve-AbsolutePath {
-    param([string]$PathValue)
-
-    if ([string]::IsNullOrWhiteSpace($PathValue)) {
-        return $null
-    }
-    if ([System.IO.Path]::IsPathRooted($PathValue)) {
-        return [System.IO.Path]::GetFullPath($PathValue)
-    }
-    return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $PathValue))
-}
 
 function Get-BackendProcess {
     $processes = Get-CimInstance Win32_Process -Filter "Name LIKE 'python%'"

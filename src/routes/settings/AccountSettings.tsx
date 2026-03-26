@@ -1,41 +1,33 @@
-import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { PageContextBand } from "@/components/apps/ui/PageContextBand";
 import { TrustStateBadge } from "@/components/apps/ui/TrustStateBadge";
 import { Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
-import { agentService } from "@/services/agentService";
+import styles from "./AccountSettings.module.css";
 import {
-	AccountAgentPairingSection,
 	AccountProfileSection,
 	AccountSecurityOverviewSection,
 	AccountSessionActionsSection,
 } from "./AccountSettingsSections";
 import {
-	useAccountAgentPairingState,
 	useAccountPasskeyState,
 	useAccountProfileState,
 	useAccountSessionActions,
 } from "./accountSettingsHooks";
 import {
-	buildAgentGatewayStatus,
-	buildAgentModeStatus,
-	buildAgentPairingStatus,
 	buildPasskeyAuthStatus,
 	buildPasskeyBackendStatus,
 	buildPasskeyBrowserStatus,
 	buildPasskeyFrontendStatus,
 	buildSessionAuthStatus,
 } from "./accountSettingsUtils";
-import styles from "./AccountSettings.module.css";
 
 export default function AccountSettings() {
 	const { user, profile, signOut, sessionAuthMethod, updateProfile } =
 		useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const usesBroker = useMemo(() => agentService.usesBroker(), []);
 
 	const profileState = useAccountProfileState({
 		profile,
@@ -44,12 +36,6 @@ export default function AccountSettings() {
 	});
 	const sessionActions = useAccountSessionActions();
 	const passkeyState = useAccountPasskeyState({ location, navigate });
-	const agentPairing = useAccountAgentPairingState({
-		userId: user?.id ?? null,
-		usesBroker,
-		location,
-		navigate,
-	});
 
 	const sessionAuthStatus = buildSessionAuthStatus(sessionAuthMethod);
 	const passkeyAuthStatus = buildPasskeyAuthStatus(sessionAuthMethod);
@@ -63,9 +49,6 @@ export default function AccountSettings() {
 		passkeyState.passkeyCapability,
 		passkeyState.passkeyLoading,
 	);
-	const agentGatewayStatus = buildAgentGatewayStatus(agentPairing.agentHealthy);
-	const agentPairingStatus = buildAgentPairingStatus(agentPairing.agentPaired);
-	const agentModeStatus = buildAgentModeStatus(usesBroker);
 
 	return (
 		<Stack gap={4}>
@@ -74,21 +57,19 @@ export default function AccountSettings() {
 				summary={
 					<Text size="sm" color="muted" block>
 						Manage how this workspace recognizes you, how passkeys are staged,
-						and how trusted agent access is attached to this device.
+						and how this device stays connected to your account.
 					</Text>
 				}
 				meta={
-					<div className={styles.trustBandGrid}>
-						<div className={styles.trustBandCard}>
+					<div className={styles.trustBandFacts}>
+						<div className={styles.trustBandFact}>
 							<span className={styles.trustBandLabel}>Session</span>
 							<TrustStateBadge
-								state={
-									sessionAuthMethod === "passkey" ? "ready" : "background"
-								}
+								state={sessionAuthMethod === "passkey" ? "ready" : "background"}
 								label={sessionAuthStatus.value}
 							/>
 						</div>
-						<div className={styles.trustBandCard}>
+						<div className={styles.trustBandFact}>
 							<span className={styles.trustBandLabel}>Passkeys</span>
 							<TrustStateBadge
 								state={
@@ -101,28 +82,11 @@ export default function AccountSettings() {
 								label={passkeyBackendStatus.value}
 							/>
 						</div>
-						<div className={styles.trustBandCard}>
-							<span className={styles.trustBandLabel}>Agent gateway</span>
+						<div className={styles.trustBandFact}>
+							<span className={styles.trustBandLabel}>Workspace</span>
 							<TrustStateBadge
-								state={
-									agentGatewayStatus.tone === "success"
-										? "ready"
-										: agentGatewayStatus.tone === "muted"
-											? "background"
-											: "unavailable"
-								}
-								label={agentGatewayStatus.value}
-							/>
-						</div>
-						<div className={styles.trustBandCard}>
-							<span className={styles.trustBandLabel}>Verification</span>
-							<TrustStateBadge
-								state={
-									agentPairingStatus.tone === "success"
-										? "ready"
-										: "needs-attention"
-								}
-								label={agentModeStatus.value}
+								state={user?.email ? "ready" : "background"}
+								label={user?.email ? "Connected" : "Background"}
 							/>
 						</div>
 					</div>
@@ -147,29 +111,6 @@ export default function AccountSettings() {
 				passkeyBrowserStatus={passkeyBrowserStatus}
 				passkeyFrontendStatus={passkeyFrontendStatus}
 				passkeyBackendStatus={passkeyBackendStatus}
-				agentGatewayStatus={agentGatewayStatus}
-				agentPairingStatus={agentPairingStatus}
-				agentModeStatus={agentModeStatus}
-			/>
-
-			<AccountAgentPairingSection
-				usesBroker={usesBroker}
-				agentHealthy={agentPairing.agentHealthy}
-				agentPaired={agentPairing.agentPaired}
-				agentLoading={agentPairing.agentLoading}
-				agentPairingCode={agentPairing.agentPairingCode}
-				isAgentActionBusy={agentPairing.isAgentActionBusy}
-				effectiveAgentError={agentPairing.effectiveAgentError}
-				agentNotice={agentPairing.agentNotice}
-				agentVerificationCooldownSeconds={
-					agentPairing.agentVerificationCooldownSeconds
-				}
-				lastAgentVerificationAction={agentPairing.lastAgentVerificationAction}
-				onAgentPairingCodeChange={agentPairing.setAgentPairingCode}
-				onPairAgent={agentPairing.pairAgent}
-				onUnpairAgent={agentPairing.unpairAgent}
-				onResendVerification={agentPairing.resendAgentVerification}
-				onRefreshAgentStatus={agentPairing.refreshAgentStatus}
 			/>
 
 			<AccountSessionActionsSection

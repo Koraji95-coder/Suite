@@ -1,17 +1,25 @@
 import {
 	AppWindow,
 	BookOpen,
+	Bot,
 	CalendarDays,
 	ClipboardList,
 	FolderOpen,
 	Layers3,
 	LayoutDashboard,
-	Radar,
 	type LucideIcon,
+	Network,
+	Radar,
 	Settings,
 	Sparkles,
 	TerminalSquare,
+	Wrench,
 } from "lucide-react";
+import {
+	DEVELOPER_TOOL_MANIFEST,
+	type DeveloperToolGroup,
+	getDeveloperToolGroup,
+} from "./developerToolsManifest";
 
 export interface ShellRouteMeta {
 	match: string;
@@ -21,46 +29,41 @@ export interface ShellRouteMeta {
 	icon: LucideIcon;
 }
 
+const developerGroupIconMap: Record<DeveloperToolGroup, LucideIcon> = {
+	"publishing-evidence": ClipboardList,
+	"automation-lab": Wrench,
+	"agent-lab": Bot,
+	"architecture-code": Network,
+	"developer-docs": BookOpen,
+};
+
+const developerToolShellMeta: readonly ShellRouteMeta[] =
+	DEVELOPER_TOOL_MANIFEST.map((tool) => {
+		const group = getDeveloperToolGroup(tool.group);
+		return {
+			match: tool.route,
+			title: tool.title,
+			subtitle: tool.description,
+			areaLabel: group?.title ?? "Developer",
+			icon: developerGroupIconMap[tool.group] ?? AppWindow,
+		};
+	});
+
 const shellRouteMeta: readonly ShellRouteMeta[] = [
 	{
-		match: "/app/apps/autowire",
-		title: "AutoWire",
-		subtitle:
-			"Unified routing workspace for conduit and cable runs, terminal workflows, and NEC checks.",
-		areaLabel: "Apps",
-		icon: AppWindow,
+		match: "/app/operations",
+		title: "Developer Portal",
+		subtitle: "Compatibility redirect to the developer workshop home.",
+		areaLabel: "Developer",
+		icon: ClipboardList,
 	},
 	{
-		match: "/app/apps/autodraft-studio",
-		title: "AutoDraft Studio",
+		match: "/app/developer",
+		title: "Developer Portal",
 		subtitle:
-			"Bluebeam markup recognition and CAD action planning through a .NET-ready API pipeline.",
-		areaLabel: "Apps",
-		icon: AppWindow,
-	},
-	{
-		match: "/app/apps/transmittal-builder",
-		title: "Transmittal Builder",
-		subtitle:
-			"Generate transmittal packages from project metadata, reviewed PDFs, and contacts.",
-		areaLabel: "Apps",
-		icon: AppWindow,
-	},
-	{
-		match: "/app/apps/drawing-list-manager",
-		title: "Drawing List Manager",
-		subtitle:
-			"Project-wide title block scan, ACADE mapping preview, and Suite second-pass sync.",
-		areaLabel: "Apps",
-		icon: AppWindow,
-	},
-	{
-		match: "/app/apps/batch-find-replace",
-		title: "Batch Find & Replace",
-		subtitle:
-			"Use file-based replacement or active-drawing AutoCAD cleanup from one shared surface.",
-		areaLabel: "Apps",
-		icon: AppWindow,
+			"Developer-only tools, staged features, and workstation workshop surfaces.",
+		areaLabel: "Developer",
+		icon: ClipboardList,
 	},
 	{
 		match: "/app/apps/block-library",
@@ -70,42 +73,11 @@ const shellRouteMeta: readonly ShellRouteMeta[] = [
 		icon: AppWindow,
 	},
 	{
-		match: "/app/apps/graph",
-		title: "Architecture Graph",
-		subtitle:
-			"Alternate node-link view over the same architecture and memory model used by Architecture Map.",
-		areaLabel: "Apps",
-		icon: AppWindow,
-	},
-	{
-		match: "/app/apps/ground-grid-generation",
-		title: "Ground Grid Generation",
-		subtitle:
-			"Coordinates capture and interactive grid generation in one workspace.",
-		areaLabel: "Apps",
-		icon: AppWindow,
-	},
-	{
 		match: "/app/apps/standards-checker",
 		title: "Standards Checker",
 		subtitle: "Verify designs against NEC, IEEE, and IEC standards.",
 		areaLabel: "Apps",
 		icon: AppWindow,
-	},
-	{
-		match: "/app/apps/etap-dxf-cleanup",
-		title: "ETAP DXF Cleanup",
-		subtitle:
-			"Run ETAP cleanup commands through the AutoCAD bridge with presets, timeout control, and execution history.",
-		areaLabel: "Apps",
-		icon: AppWindow,
-	},
-	{
-		match: "/app/knowledge/whiteboard",
-		title: "Whiteboard",
-		subtitle: "Sketch, save, and review whiteboard snapshots.",
-		areaLabel: "Knowledge",
-		icon: BookOpen,
 	},
 	{
 		match: "/app/knowledge/math-tools",
@@ -119,15 +91,16 @@ const shellRouteMeta: readonly ShellRouteMeta[] = [
 		match: "/app/agent/pairing-callback",
 		title: "Agent Pairing",
 		subtitle:
-			"Confirm the current device before opening the live agent surface.",
-		areaLabel: "Agents",
+			"Confirm the current device before opening the developer-only agent lab.",
+		areaLabel: "Developer",
 		icon: Sparkles,
 	},
+	...developerToolShellMeta,
 	{
 		match: "/app/dashboard",
 		title: "Dashboard",
 		subtitle:
-			"Cross-system command center for operations, architecture, and memory.",
+			"Mission board for active projects, drawing health, and upcoming delivery timing.",
 		areaLabel: "Dashboard",
 		icon: LayoutDashboard,
 	},
@@ -142,7 +115,7 @@ const shellRouteMeta: readonly ShellRouteMeta[] = [
 	{
 		match: "/app/projects",
 		title: "Projects",
-		subtitle: "Project planning, telemetry, tasks, and delivery workflows.",
+		subtitle: "Project setup, review, telemetry, and delivery workflows.",
 		areaLabel: "Projects",
 		icon: FolderOpen,
 	},
@@ -152,14 +125,6 @@ const shellRouteMeta: readonly ShellRouteMeta[] = [
 		subtitle: "Scheduling, commitments, and upcoming delivery timing.",
 		areaLabel: "Calendar",
 		icon: CalendarDays,
-	},
-	{
-		match: "/app/changelog",
-		title: "Changelog",
-		subtitle:
-			"Canonical work ledger, linked checkpoints, and publish-ready notes.",
-		areaLabel: "Changelog",
-		icon: ClipboardList,
 	},
 	{
 		match: "/app/apps",
@@ -177,13 +142,6 @@ const shellRouteMeta: readonly ShellRouteMeta[] = [
 		icon: BookOpen,
 	},
 	{
-		match: "/app/agent",
-		title: "Agents",
-		subtitle: "Profile-driven orchestration and collaborative execution.",
-		areaLabel: "Agents",
-		icon: Sparkles,
-	},
-	{
 		match: "/app/settings",
 		title: "Settings",
 		subtitle: "Account controls and workspace preferences.",
@@ -193,8 +151,9 @@ const shellRouteMeta: readonly ShellRouteMeta[] = [
 	{
 		match: "/app/command-center",
 		title: "Command Center",
-		subtitle: "Developer diagnostics and incident-oriented controls.",
-		areaLabel: "Command Center",
+		subtitle:
+			"Developer diagnostics toolshed for Suite Doctor, hosted push, and incident commands.",
+		areaLabel: "Developer",
 		icon: TerminalSquare,
 	},
 ] as const;
@@ -202,7 +161,7 @@ const shellRouteMeta: readonly ShellRouteMeta[] = [
 const defaultShellMeta: ShellRouteMeta = {
 	match: "/app",
 	title: "Workspace",
-	subtitle: "Suite operations and delivery workspace.",
+	subtitle: "Project delivery and drawing control workspace.",
 	areaLabel: "Workspace",
 	icon: AppWindow,
 };

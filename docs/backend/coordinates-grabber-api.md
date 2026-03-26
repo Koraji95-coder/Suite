@@ -171,9 +171,9 @@ Auth helper endpoint:
     - `suite_claims_required`
     - `suite_claims_format`
     - `suite_claims_alg`
-  - ZeroClaw bridge implementation for this contract:
-    - `GET /suite/passkey/callback` in `zeroclaw-main/src/gateway/mod.rs`
-    - setup doc: `zeroclaw-main/docs/suite-passkey-bridge.md`
+  - current isolated bridge implementation for this contract:
+    - `GET /suite/passkey/callback`
+    - contract doc: `docs/security/passkey-external-callback-contract.md`
 
 Endpoints (all require Supabase auth `Authorization: Bearer <access_token>`):
 

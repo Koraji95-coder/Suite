@@ -5,12 +5,14 @@ import { ProjectList } from "./ProjectList";
 import styles from "./ProjectManager.module.css";
 import { ProjectManagerDeleteDialogs } from "./ProjectManagerDeleteDialogs";
 import { ProjectManagerHeader } from "./ProjectManagerHeader";
-import type { StatusFilter } from "./projectmanagertypes";
+import type { StatusFilter, ViewMode } from "./projectmanagertypes";
 import { TaskFormModal } from "./TaskFormModal";
 import { useProjectManagerState } from "./useProjectManagerState";
 
 interface ProjectManagerProps {
 	initialProjectId?: string;
+	initialIssueSetId?: string;
+	initialViewMode?: ViewMode;
 	selectedCalendarDate?: string | null;
 	onCalendarDateChange?: (date: string | null) => void;
 	calendarMonth?: Date;
@@ -19,6 +21,8 @@ interface ProjectManagerProps {
 
 export function ProjectManager({
 	initialProjectId,
+	initialIssueSetId,
+	initialViewMode,
 	selectedCalendarDate: externalSelectedDate,
 	onCalendarDateChange,
 	calendarMonth: externalMonth,
@@ -44,6 +48,8 @@ export function ProjectManager({
 		expandedTasks,
 		viewMode,
 		setViewMode,
+		activeIssueSetId,
+		setActiveIssueSetId,
 		currentMonth,
 		setCurrentMonth,
 		selectedCalendarDate,
@@ -96,6 +102,8 @@ export function ProjectManager({
 		pendingTaskName,
 	} = useProjectManagerState({
 		initialProjectId,
+		initialIssueSetId,
+		initialViewMode,
 		externalSelectedDate,
 		onCalendarDateChange,
 		externalMonth,
@@ -121,6 +129,7 @@ export function ProjectManager({
 
 			<ProjectFormModal
 				isOpen={showProjectModal}
+				projectId={editingProject?.id ?? null}
 				onClose={() => {
 					setShowProjectModal(false);
 					setEditingProject(null);
@@ -156,8 +165,8 @@ export function ProjectManager({
 							<p className={styles.listPaneEyebrow}>Project queue</p>
 							<h3 className={styles.listPaneTitle}>Active portfolio</h3>
 							<p className={styles.listPaneCopy}>
-								Select a project to open its command center, telemetry, files,
-								and task lane.
+								Select a project to open setup, review, files, telemetry, and
+								the delivery workflow.
 							</p>
 						</div>
 					</div>
@@ -166,7 +175,11 @@ export function ProjectManager({
 							projects={projects}
 							selectedProject={selectedProject}
 							projectTaskCounts={projectTaskCounts}
-							onSelectProject={setSelectedProject}
+							onSelectProject={(project) => {
+								setSelectedProject(project);
+								setActiveIssueSetId(null);
+								setViewMode("setup");
+							}}
 							onEditProject={openEditProject}
 							onDeleteProject={requestDeleteProject}
 							filter={statusFilter}
@@ -205,6 +218,8 @@ export function ProjectManager({
 							onTaskFilterChange={setTaskFilter}
 							viewMode={viewMode}
 							onViewModeChange={setViewMode}
+							activeIssueSetId={activeIssueSetId}
+							onActiveIssueSetIdChange={setActiveIssueSetId}
 							selectedCalendarDate={selectedCalendarDate}
 							onCalendarDateSelect={setSelectedCalendarDate}
 							currentMonth={currentMonth}
@@ -222,8 +237,8 @@ export function ProjectManager({
 								Select a project to view details
 							</p>
 							<p className={styles.emptyCopy}>
-								Pick one from the queue to open tasks, files, telemetry, and
-								project operations.
+								Pick one from the queue to open setup, review, issue sets, and
+								project telemetry.
 							</p>
 						</div>
 					)}

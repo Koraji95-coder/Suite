@@ -19,8 +19,8 @@ Repo: `Suite`
   - Current active path is external-provider redirect mode when `AUTH_PASSKEY_PROVIDER=external` and external start URLs are configured.
   - Callback completion consumes one-time state and can continue sign-in via direct magic-link URL generation (service-role available) or email-link fallback.
   - External callback completion can require signed payload verification (`AUTH_PASSKEY_REQUIRE_SIGNED_CALLBACK=true` + `AUTH_PASSKEY_CALLBACK_SIGNING_SECRET`).
-  - ZeroClaw bridge endpoint is available for Suite external callback wiring: `GET /suite/passkey/callback` (see `zeroclaw-main/docs/suite-passkey-bridge.md`).
-  - ZeroClaw bridge supports provider JWT claim verification (`suite_claims_required=1`) before emitting Suite callback params.
+  - Current Suite-native external callback bridge endpoint: `GET /suite/passkey/callback` (contract: `docs/security/passkey-external-callback-contract.md`).
+  - The bridge supports provider JWT claim verification (`suite_claims_required=1`) before emitting Suite callback params.
 - Supported auth flows are:
   - `signin`
   - `signup`
@@ -39,7 +39,7 @@ Repo: `Suite`
   - `POST /api/agent/unpair` -> `428`
 - Session-only cleanup endpoint exists for sign-out:
   - `POST /api/agent/session/clear`
-- ZeroClaw gateway supports token revocation:
+- Suite agent gateway supports token revocation:
   - `POST /unpair` with bearer token
   - Last-token revoke generates a fresh one-time pairing code
 

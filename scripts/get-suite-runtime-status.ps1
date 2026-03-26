@@ -12,48 +12,20 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
+. $runtimeSharedScript
 $backendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-backend-startup.ps1")).Path
 $gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-startup.ps1")).Path
 $frontendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-frontend-startup.ps1")).Path
 $filesystemCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-filesystem-collector-startup.ps1")).Path
 $autocadCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-collector-startup.ps1")).Path
 $pluginCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-plugin.ps1")).Path
-$statusBase = if ($env:LOCALAPPDATA) {
-    $env:LOCALAPPDATA
-}
-elseif ($env:TEMP) {
-    $env:TEMP
-}
-else {
-    $env:USERPROFILE
-}
-$runtimeStatusDir = Join-Path $statusBase "Suite\runtime-bootstrap"
-$runtimeStatusPath = Join-Path $runtimeStatusDir "last-bootstrap.json"
-$currentBootstrapPath = Join-Path $runtimeStatusDir "current-bootstrap.json"
-$runtimeLogPath = Join-Path $runtimeStatusDir "bootstrap.log"
-$frontendLogPath = Join-Path $runtimeStatusDir "frontend.log"
-
-function Convert-CommandOutputToText {
-    param([object[]]$Output)
-
-    if (-not $Output) {
-        return ""
-    }
-
-    return [string]::Join(
-        [Environment]::NewLine,
-        @(
-            $Output | ForEach-Object {
-                if ($null -eq $_) {
-                    ""
-                }
-                else {
-                    $_.ToString()
-                }
-            }
-        )
-    ).Trim()
-}
+$runtimePaths = Get-SuiteRuntimePaths
+$runtimeStatusDir = $runtimePaths.RuntimeStatusDir
+$runtimeStatusPath = $runtimePaths.RuntimeStatusPath
+$currentBootstrapPath = $runtimePaths.CurrentBootstrapPath
+$runtimeLogPath = $runtimePaths.RuntimeLogPath
+$frontendLogPath = $runtimePaths.FrontendLogPath
 
 function Invoke-ExternalCommand {
     param(
@@ -92,72 +64,6 @@ function Invoke-ExternalCommand {
     }
 }
 
-function Get-OutputTail {
-    param(
-        [string]$Text,
-        [int]$LineCount = 10
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Text)) {
-        return ""
-    }
-
-    $lines = $Text -split "`r?`n"
-    return [string]::Join([Environment]::NewLine, ($lines | Select-Object -Last $LineCount)).Trim()
-}
-
-function Invoke-JsonPowerShellFile {
-    param(
-        [Parameter(Mandatory = $true)][string]$ScriptPath,
-        [string[]]$Arguments
-    )
-
-    try {
-        $rawOutput = & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @Arguments 2>&1
-        $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
-        $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
-        $outputText = Convert-CommandOutputToText -Output $rawOutput
-    }
-    catch {
-        $exitCode = 1
-        $outputText = $_.Exception.Message
-    }
-
-    $payload = $null
-    if (-not [string]::IsNullOrWhiteSpace($outputText)) {
-        try {
-            $payload = $outputText | ConvertFrom-Json
-        }
-        catch {
-            $firstBrace = $outputText.IndexOf("{")
-            $lastBrace = $outputText.LastIndexOf("}")
-            if ($firstBrace -ge 0 -and $lastBrace -gt $firstBrace) {
-                $jsonText = $outputText.Substring($firstBrace, ($lastBrace - $firstBrace) + 1)
-                try {
-                    $payload = $jsonText | ConvertFrom-Json
-                }
-                catch {
-                    $payload = $null
-                }
-            }
-        }
-    }
-
-    [pscustomobject]@{
-        ExitCode = $exitCode
-        Ok = ($exitCode -eq 0)
-        OutputText = $outputText
-        OutputTail = Get-OutputTail -Text $outputText
-        Payload = $payload
-    }
-}
-
-function Test-PortListening {
-    param([int]$Port)
-
-    return ($null -ne (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1))
-}
-
 function Get-PortOwningProcessId {
     param([int]$Port)
 
@@ -168,28 +74,6 @@ function Get-PortOwningProcessId {
     }
 
     return [int]$connection.OwningProcess
-}
-
-function Test-DockerReady {
-    $previousErrorActionPreference = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = "Continue"
-        $rawOutput = & docker version --format "{{.Server.Version}}" 2>&1
-        $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
-        $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
-        $outputText = Convert-CommandOutputToText -Output $rawOutput
-        return (
-            $exitCode -eq 0 -and
-            -not [string]::IsNullOrWhiteSpace($outputText) -and
-            $outputText -notmatch "(?i)failed to connect"
-        )
-    }
-    catch {
-        return $false
-    }
-    finally {
-        $ErrorActionPreference = $previousErrorActionPreference
-    }
 }
 
 function Test-SupabaseOutputIndicatesReady {
@@ -275,6 +159,17 @@ function Get-CurrentBootstrapStatus {
     }
 }
 
+function Convert-ServiceStateToDoctorState {
+    param([string]$State)
+
+    switch ($State) {
+        "running" { return "ready" }
+        "starting" { return "background" }
+        "error" { return "needs-attention" }
+        default { return "unavailable" }
+    }
+}
+
 function New-ServiceStatus {
     param(
         [Parameter(Mandatory = $true)][string]$Id,
@@ -295,11 +190,39 @@ function New-ServiceStatus {
     $resolvedDetails = if ([string]::IsNullOrWhiteSpace($Details)) { $null } else { $Details }
     $resolvedProcessLabel = if ($ProcessId) { Get-ProcessLabel -ProcessId $ProcessId } else { $null }
     $resolvedStartupMode = if ([string]::IsNullOrWhiteSpace($StartupMode)) { $null } else { $StartupMode }
+    $observedAt = (Get-Date).ToString("o")
+    $doctorState = Convert-ServiceStateToDoctorState -State $State
     $resolvedNotes = @($Notes | Where-Object {
         $null -ne $_ -and
         -not [string]::IsNullOrWhiteSpace([string]$_.label) -and
         -not [string]::IsNullOrWhiteSpace([string]$_.value)
     })
+    $serviceChecks = @(
+        [pscustomobject]@{
+            key = "$Id-status"
+            label = "$Name status"
+            subsystem = $Id
+            severity = $doctorState
+            detail = if ($resolvedDetails) { "$Summary $resolvedDetails" } else { $Summary }
+            actionable = ($doctorState -eq "needs-attention" -or $doctorState -eq "unavailable")
+            evidence = [pscustomobject]@{
+                port = $Port
+                processId = $ProcessId
+                processLabel = $resolvedProcessLabel
+                startupMode = $resolvedStartupMode
+            }
+        }
+    )
+    $probe = if ($Port -gt 0) {
+        [pscustomobject]@{
+            kind = "tcp"
+            port = $Port
+            processId = $ProcessId
+        }
+    }
+    else {
+        $null
+    }
 
     [pscustomobject]@{
         id = $Id
@@ -316,6 +239,10 @@ function New-ServiceStatus {
         notes = if ($resolvedNotes.Count -gt 0) { @($resolvedNotes) } else { @() }
         substatus = $Substatus
         logTarget = $LogTarget
+        observedAt = $observedAt
+        source = "script:get-suite-runtime-status.ps1"
+        checks = @($serviceChecks)
+        probe = $probe
     }
 }
 
@@ -461,9 +388,18 @@ $services += (New-ServiceStatus `
 $gatewayResult = Invoke-JsonPowerShellFile -ScriptPath $gatewayCheckScript -Arguments @("-Json")
 $gatewayRunning = [bool]($gatewayResult.Payload -and $gatewayResult.Payload.Running)
 $gatewayHealthy = [bool]($gatewayResult.Payload -and $gatewayResult.Payload.Healthy)
+$gatewayModeMatches = if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "GatewayModeMatches") {
+    [bool]$gatewayResult.Payload.GatewayModeMatches
+}
+else {
+    $true
+}
 $gatewayProcessId = if ($gatewayRunning -or $gatewayHealthy) { [int]$gatewayResult.Payload.ProcessId } else { $null }
 $gatewayState = if ($gatewayHealthy) {
     "running"
+}
+elseif ($gatewayRunning -and -not $gatewayModeMatches) {
+    "error"
 }
 elseif ($gatewayRunning) {
     "starting"
@@ -483,6 +419,9 @@ else {
 $gatewaySummary = if ($gatewayHealthy) {
     "Gateway is healthy."
 }
+elseif ($gatewayRunning -and -not $gatewayModeMatches) {
+    "Gateway mode needs attention."
+}
 elseif ($gatewayRunning) {
     "Gateway is running but still warming up."
 }
@@ -496,13 +435,25 @@ if (($gatewayHealthy -or $gatewayRunning) -and $gatewayResult.Payload -and $gate
         value = [string]$gatewayResult.Payload.CommandLine
     }
 }
-elseif ($gatewayResult.Payload -and $gatewayResult.Payload.Error) {
+if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "GatewayModeLabel") {
+    $gatewayNotes += [pscustomobject]@{
+        label = "Gateway mode"
+        value = [string]$gatewayResult.Payload.GatewayModeLabel
+    }
+}
+if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "GatewayProcessMode" -and -not [string]::IsNullOrWhiteSpace([string]$gatewayResult.Payload.GatewayProcessMode)) {
+    $gatewayNotes += [pscustomobject]@{
+        label = "Process mode"
+        value = Get-SuiteGatewayModeLabel -GatewayMode ([string]$gatewayResult.Payload.GatewayProcessMode)
+    }
+}
+if ($gatewayResult.Payload -and $gatewayResult.Payload.Error) {
     $gatewayNotes += [pscustomobject]@{
         label = "Status"
         value = [string]$gatewayResult.Payload.Error
     }
 }
-else {
+if ($gatewayNotes.Count -eq 0) {
     $gatewayNotes += [pscustomobject]@{
         label = "Recovery"
         value = "Use Bootstrap All or Start to restore the local gateway."
@@ -848,20 +799,70 @@ else {
 }
 
 $result = [ordered]@{
+    schemaVersion = "suite.runtime.v1"
+    checkedAt = (Get-Date).ToString("o")
     ok = ($runningCount -eq $services.Count)
     timestamp = (Get-Date).ToString("o")
     repoRoot = $resolvedRepoRoot
     overall = $overall
+    doctor = [ordered]@{
+        overallState = switch ($overall.state) {
+            "healthy" { "ready"; break }
+            "booting" { "background"; break }
+            "degraded" { "needs-attention"; break }
+            default { "unavailable"; break }
+        }
+        actionableIssueCount = @(
+            $services |
+                ForEach-Object { @($_.checks) } |
+                Where-Object {
+                    $_ -and
+                    $_.actionable -eq $true -and
+                    $_.severity -ne "ready"
+                }
+        ).Count
+        severityCounts = [ordered]@{
+            ready = @(
+                $services |
+                    ForEach-Object { @($_.checks) } |
+                    Where-Object { $_ -and $_.severity -eq "ready" }
+            ).Count
+            background = @(
+                $services |
+                    ForEach-Object { @($_.checks) } |
+                    Where-Object { $_ -and $_.severity -eq "background" }
+            ).Count
+            "needs-attention" = @(
+                $services |
+                    ForEach-Object { @($_.checks) } |
+                    Where-Object { $_ -and $_.severity -eq "needs-attention" }
+            ).Count
+            unavailable = @(
+                $services |
+                    ForEach-Object { @($_.checks) } |
+                    Where-Object { $_ -and $_.severity -eq "unavailable" }
+            ).Count
+        }
+        recommendations = @(
+            if ($overall.state -ne "healthy") {
+                "Use Runtime Control or Bootstrap All to reconcile the local stack before relying on workstation-sensitive flows."
+            }
+        )
+    }
     runtime = [ordered]@{
         statusDir = $runtimeStatusDir
         statusPath = $runtimeStatusPath
         currentBootstrapPath = $currentBootstrapPath
         logPath = $runtimeLogPath
+        frontendLogPath = $frontendLogPath
+        supportRoot = $runtimePaths.SupportRoot
         lastBootstrap = Get-LastBootstrapStatus
         currentBootstrap = Get-CurrentBootstrapStatus
     }
     services = @($services)
 }
+
+$result.support = New-SuiteSupportSummaryPayload -RuntimeStatus $result -RepoRoot $resolvedRepoRoot
 
 if ($Json) {
     $result | ConvertTo-Json -Depth 10

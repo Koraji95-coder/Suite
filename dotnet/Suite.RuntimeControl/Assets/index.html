@@ -27,7 +27,7 @@
       </div>
       <div class="header-right">
         <div class="clock-block">
-          <span id="clock-date" class="clock-date">---</span>
+          <span id="clock-date" class="clock-date">--/--/----</span>
           <span id="clock" class="clock">--:--:-- --</span>
         </div>
         <div id="overall-status" class="overall-status booting">
@@ -38,7 +38,15 @@
     </header>
 
     <div class="shell-layout">
-      <div class="shell-toolbar">
+      <nav id="section-nav" class="section-nav" aria-label="Runtime control sections">
+        <button type="button" class="section-tab active" data-section="runtime">Runtime</button>
+        <button type="button" class="section-tab" data-section="watchdog">Watchdog</button>
+        <button type="button" class="section-tab" data-section="developer-tools">Developer Tools</button>
+        <button type="button" class="section-tab" data-section="diagnostics">Diagnostics</button>
+        <button type="button" class="section-tab" data-section="support">Support</button>
+      </nav>
+
+      <div id="runtime-toolbar" class="shell-toolbar">
         <button id="bootstrap-btn" class="shell-btn primary">Bootstrap All</button>
         <button id="start-all-btn" class="shell-btn">Start All</button>
         <button id="stop-all-btn" class="shell-btn danger">Stop All</button>
@@ -46,7 +54,7 @@
         <button id="clear-log-btn" class="shell-btn subtle">Clear Log</button>
       </div>
 
-      <main class="shell-main">
+      <main id="runtime-main" class="shell-main">
         <aside class="service-rail">
           <div class="pane-header rail-header">
             <div>
@@ -79,6 +87,20 @@
             <div class="log-empty">No output yet.</div>
           </div>
         </aside>
+      </main>
+
+      <main id="workshop-main" class="workshop-main hidden">
+        <section class="workshop-pane">
+          <div class="pane-header workshop-header">
+            <div>
+              <div class="pane-label">Workshop</div>
+              <div id="workshop-subtitle" class="pane-subtle">Developer route launch surface.</div>
+            </div>
+          </div>
+          <div id="workshop-content" class="workshop-content">
+            <div class="log-empty">Select a section.</div>
+          </div>
+        </section>
       </main>
     </div>
   </div>

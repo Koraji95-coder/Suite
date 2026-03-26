@@ -9,7 +9,17 @@ import {
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { PageContextBand } from "@/components/apps/ui/PageContextBand";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
+import { ProjectWorkflowLinks } from "@/components/apps/ui/ProjectWorkflowLinks";
+import {
+	type TrustState,
+	TrustStateBadge,
+} from "@/components/apps/ui/TrustStateBadge";
 import { useToast } from "@/components/notification-system/ToastProvider";
+import { Badge } from "@/components/primitives/Badge";
+import {
+	buildProjectDetailHref,
+	buildProjectScopedAppHref,
+} from "@/lib/projectWorkflowNavigation";
 import { logger } from "@/lib/logger";
 import {
 	type AcadeDocumentReportRow,
@@ -22,6 +32,11 @@ import {
 	type DrawingRevisionRegisterRow,
 	projectRevisionRegisterService,
 } from "@/services/projectRevisionRegisterService";
+import {
+	type ProjectIssueSetRecord,
+	projectIssueSetService,
+} from "@/services/projectIssueSetService";
+import { projectReviewDecisionService } from "@/services/projectReviewDecisionService";
 import { projectTitleBlockProfileService } from "@/services/projectTitleBlockProfileService";
 import {
 	type TitleBlockEditableFields,
@@ -39,6 +54,11 @@ interface ProjectOption {
 	id: string;
 	name: string;
 	watchdog_root_path: string | null;
+}
+
+interface DrawingListManagerProps {
+	preferredProjectId?: string;
+	preferredIssueSetId?: string;
 }
 
 const EMPTY_SUMMARY: TitleBlockSyncSummary = {
@@ -87,7 +107,169 @@ function mapProfileRowToState(
 	};
 }
 
-export function DrawingListManager() {
+interface DrawingControlStage {
+	state: TrustState;
+	label: string;
+	step: string;
+	title: string;
+	detail: string;
+}
+
+function resolveDrawingControlStage(args: {
+	selectedProjectName: string | null;
+	packageLabel: string | null;
+	hasProject: boolean;
+	hasRoot: boolean;
+	loading: boolean;
+	scanning: boolean;
+	previewing: boolean;
+	applying: boolean;
+	drawingCount: number;
+	flaggedCount: number;
+	conflictCount: number;
+	warningCount: number;
+	selectedCount: number;
+	acceptedCount: number;
+}) {
+	const {
+		selectedProjectName,
+		packageLabel,
+		hasProject,
+		hasRoot,
+		loading,
+		scanning,
+		previewing,
+		applying,
+		drawingCount,
+		flaggedCount,
+		conflictCount,
+		warningCount,
+		selectedCount,
+		acceptedCount,
+	} = args;
+	const projectLabel = selectedProjectName ?? "this project";
+	const deliveryLabel = packageLabel
+		? `${projectLabel} • ${packageLabel}`
+		: projectLabel;
+
+	if (loading) {
+		return {
+			state: "background",
+			label: "Loading setup",
+			step: "Loading",
+			title: `Loading title block review defaults for ${deliveryLabel}.`,
+			detail:
+				"Project profile, revision register, and tracked root details are still loading.",
+		} satisfies DrawingControlStage;
+	}
+
+	if (!hasProject) {
+		return {
+			state: "needs-attention",
+			label: "Select project",
+			step: "Setup",
+			title: "Choose the project you want to prep for issue.",
+			detail:
+				"Pick the project first so the drawing scan, title block defaults, and export all stay tied to one package flow.",
+		} satisfies DrawingControlStage;
+	}
+
+	if (!hasRoot) {
+		return {
+			state: "needs-attention",
+			label: "Set tracked root",
+			step: "Setup",
+			title: `${projectLabel} still needs a tracked root path.`,
+			detail:
+				"Set the project root before the drawing scan can compare title blocks, revision rows, and ACADE mapping.",
+		} satisfies DrawingControlStage;
+	}
+
+	if (scanning) {
+		return {
+			state: "background",
+			label: "Scanning drawings",
+			step: "Scan",
+			title: `Scanning ${deliveryLabel} for drawing rows and title block signals.`,
+			detail: "Suite is building the package rows before review and sync.",
+		} satisfies DrawingControlStage;
+	}
+
+	if (previewing) {
+		return {
+			state: "background",
+			label: "Previewing sync",
+			step: "Title block review",
+			title: `Previewing the next sync pass for ${deliveryLabel}.`,
+			detail:
+				"Review the mismatches and selected drawing rows before Suite writes anything back.",
+		} satisfies DrawingControlStage;
+	}
+
+	if (applying) {
+		return {
+			state: "background",
+			label: "Applying sync",
+			step: "Apply",
+			title: `Applying the approved title block sync for ${deliveryLabel}.`,
+			detail:
+				"Suite and ACADE writeback are running for the selected drawings.",
+		} satisfies DrawingControlStage;
+	}
+
+	if (drawingCount === 0) {
+		return {
+			state: "background",
+			label: "Run first scan",
+			step: "Scan",
+			title: `Run the first drawing scan for ${deliveryLabel}.`,
+			detail:
+				"That scan creates the package rows, pulls revision context, and shows which drawings still need review before sync.",
+		} satisfies DrawingControlStage;
+	}
+
+	if (flaggedCount > 0 || conflictCount > 0 || warningCount > 0) {
+		return {
+			state: "needs-attention",
+			label: "Review mismatches",
+			step: "Title block review",
+			title: `${flaggedCount} drawing${flaggedCount === 1 ? " still needs" : " still need"} title block review for ${deliveryLabel}.`,
+			detail:
+				conflictCount > 0
+					? `${conflictCount} conflict${conflictCount === 1 ? " still needs" : " still need"} a decision before sync.`
+					: acceptedCount > 0
+						? `${acceptedCount} drawing${acceptedCount === 1 ? "" : "s"} already have package acceptance recorded.`
+						: "Review the flagged rows before moving into the final sync pass.",
+		} satisfies DrawingControlStage;
+	}
+
+	if (selectedCount === 0) {
+		return {
+			state: "background",
+			label: "Select drawings",
+			step: "Title block review",
+			title: `${deliveryLabel} is scanned, but no drawings are selected for sync yet.`,
+			detail:
+				"Pick the DWG rows that belong in the current package before applying the next writeback.",
+		} satisfies DrawingControlStage;
+	}
+
+	return {
+		state: "ready",
+		label: "Ready to sync",
+		step: "Apply",
+		title: `${deliveryLabel} is ready for the next title block sync pass.`,
+		detail:
+			acceptedCount > 0
+				? `${acceptedCount} drawing${acceptedCount === 1 ? "" : "s"} already have package acceptance recorded, and ${selectedCount} drawing${selectedCount === 1 ? "" : "s"} are staged for Suite and ACADE updates.`
+				: `${selectedCount} drawing${selectedCount === 1 ? "" : "s"} are staged for Suite and ACADE updates.`,
+	} satisfies DrawingControlStage;
+}
+
+export function DrawingListManager({
+	preferredProjectId,
+	preferredIssueSetId,
+}: DrawingListManagerProps) {
 	const { showToast } = useToast();
 	const [projects, setProjects] = useState<ProjectOption[]>([]);
 	const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -113,6 +295,11 @@ export function DrawingListManager() {
 	const [summary, setSummary] = useState<TitleBlockSyncSummary>(EMPTY_SUMMARY);
 	const [artifacts, setArtifacts] =
 		useState<TitleBlockSyncArtifacts>(EMPTY_ARTIFACTS);
+	const [preferredIssueSet, setPreferredIssueSet] =
+		useState<ProjectIssueSetRecord | null>(null);
+	const [reviewDecisions, setReviewDecisions] = useState<
+		Awaited<ReturnType<typeof projectReviewDecisionService.fetchDecisions>>["data"]
+	>([]);
 	const [warnings, setWarnings] = useState<string[]>([]);
 	const [message, setMessage] = useState<string | null>(null);
 	const [selectedRelativePaths, setSelectedRelativePaths] = useState<string[]>(
@@ -125,6 +312,7 @@ export function DrawingListManager() {
 	const [previewing, setPreviewing] = useState(false);
 	const [applying, setApplying] = useState(false);
 	const acadeReportInputRef = useRef<HTMLInputElement | null>(null);
+	const appliedIssueSetRef = useRef<string | null>(null);
 
 	const selectedProject = useMemo(
 		() => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -147,6 +335,62 @@ export function DrawingListManager() {
 				(row) => row.issues.length > 0 || row.warnings.length > 0,
 			).length,
 		[metadataRows],
+	);
+	const issueSetMetadataRows = useMemo(() => {
+		if (!preferredIssueSet) {
+			return metadataRows;
+		}
+		const scopedPaths = new Set(preferredIssueSet.selectedDrawingPaths);
+		return metadataRows.filter((row) => scopedPaths.has(row.relativePath));
+	}, [metadataRows, preferredIssueSet]);
+	const acceptedTitleBlockIds = useMemo(() => {
+		if (!preferredIssueSet?.id) {
+			return new Set<string>();
+		}
+		return new Set(
+			reviewDecisions
+				.filter(
+					(decision) =>
+						decision.itemType === "title-block" &&
+						decision.status === "accepted" &&
+						(decision.issueSetId || null) === preferredIssueSet.id,
+				)
+				.map((decision) => decision.itemId),
+		);
+	}, [preferredIssueSet?.id, reviewDecisions]);
+	const acceptedTitleBlockCount = useMemo(
+		() =>
+			issueSetMetadataRows.filter((row) =>
+				acceptedTitleBlockIds.has(`title-block:${row.id}`),
+			).length,
+		[acceptedTitleBlockIds, issueSetMetadataRows],
+	);
+	const packageReviewCount = useMemo(
+		() =>
+			issueSetMetadataRows.filter(
+				(row) =>
+					(row.reviewState !== "ready" ||
+						row.issues.length > 0 ||
+						row.warnings.length > 0) &&
+					!acceptedTitleBlockIds.has(`title-block:${row.id}`),
+			).length,
+		[acceptedTitleBlockIds, issueSetMetadataRows],
+	);
+	const packageConflictCount = useMemo(
+		() =>
+			issueSetMetadataRows.filter(
+				(row) =>
+					row.hasWdTbConflict &&
+					!acceptedTitleBlockIds.has(`title-block:${row.id}`),
+			).length,
+		[acceptedTitleBlockIds, issueSetMetadataRows],
+	);
+	const drawingCount = useMemo(
+		() =>
+			summary.drawingFiles > 0
+				? summary.drawingFiles
+				: rows.filter((row) => row.fileType === "dwg").length,
+		[rows, summary.drawingFiles],
 	);
 
 	useEffect(() => {
@@ -177,9 +421,21 @@ export function DrawingListManager() {
 				if (!cancelled) {
 					const nextProjects = (data ?? []) as ProjectOption[];
 					setProjects(nextProjects);
-					if (nextProjects.length > 0 && !selectedProjectId) {
-						setSelectedProjectId(nextProjects[0].id);
-					}
+					setSelectedProjectId((current) => {
+						if (
+							preferredProjectId &&
+							nextProjects.some((project) => project.id === preferredProjectId)
+						) {
+							return preferredProjectId;
+						}
+						if (
+							current &&
+							nextProjects.some((project) => project.id === current)
+						) {
+							return current;
+						}
+						return nextProjects[0]?.id ?? "";
+					});
 				}
 			} catch (error) {
 				logger.error(
@@ -201,10 +457,14 @@ export function DrawingListManager() {
 		return () => {
 			cancelled = true;
 		};
-	}, [selectedProjectId, showToast]);
+	}, [preferredProjectId, showToast]);
 
 	useEffect(() => {
-		if (!selectedProjectId) return;
+		if (!selectedProjectId) {
+			setRevisionEntries([]);
+			setReviewDecisions([]);
+			return;
+		}
 		let cancelled = false;
 
 		const loadProjectData = async () => {
@@ -214,12 +474,14 @@ export function DrawingListManager() {
 				const defaults = {
 					projectRootPath: selectedProject?.watchdog_root_path || null,
 				};
-				const [profileResult, revisionsResult] = await Promise.all([
+				const [profileResult, revisionsResult, decisionsResult] =
+					await Promise.all([
 					projectTitleBlockProfileService.fetchProfile(
 						selectedProjectId,
 						defaults,
 					),
 					projectRevisionRegisterService.fetchEntries(selectedProjectId),
+					projectReviewDecisionService.fetchDecisions(selectedProjectId),
 				]);
 
 				if (cancelled) return;
@@ -230,8 +492,10 @@ export function DrawingListManager() {
 					[
 						profileResult.error?.message || "",
 						revisionsResult.error?.message || "",
+						decisionsResult.error?.message || "",
 					].filter(Boolean),
 				);
+				setReviewDecisions(decisionsResult.data);
 				setAcadeReportFile(null);
 				setAcadeReportRows([]);
 				setAcadeReportError(null);
@@ -260,6 +524,49 @@ export function DrawingListManager() {
 			cancelled = true;
 		};
 	}, [selectedProjectId, selectedProject?.watchdog_root_path, showToast]);
+
+	useEffect(() => {
+		if (!selectedProjectId || !preferredIssueSetId) {
+			setPreferredIssueSet(null);
+			appliedIssueSetRef.current = null;
+			return;
+		}
+
+		let cancelled = false;
+		const loadIssueSet = async () => {
+			const result = await projectIssueSetService.fetchIssueSet(
+				selectedProjectId,
+				preferredIssueSetId,
+			);
+			if (cancelled) {
+				return;
+			}
+			setPreferredIssueSet(result.data);
+		};
+
+		void loadIssueSet();
+		return () => {
+			cancelled = true;
+		};
+	}, [preferredIssueSetId, selectedProjectId]);
+
+	useEffect(() => {
+		if (!preferredIssueSet || rows.length === 0) {
+			return;
+		}
+		if (appliedIssueSetRef.current === preferredIssueSet.id) {
+			return;
+		}
+
+		const available = new Set(rows.map((row) => row.relativePath));
+		const nextSelected = preferredIssueSet.selectedDrawingPaths.filter((path) =>
+			available.has(path),
+		);
+		if (nextSelected.length > 0) {
+			setSelectedRelativePaths(nextSelected);
+		}
+		appliedIssueSetRef.current = preferredIssueSet.id;
+	}, [preferredIssueSet, rows]);
 
 	const buildPayload = (nextRows?: TitleBlockSyncRow[]) => {
 		if (!selectedProjectId) {
@@ -478,28 +785,156 @@ export function DrawingListManager() {
 
 	const selectedCount = selectedRelativePaths.length;
 	const canRun = !!selectedProjectId && !!profile.projectRootPath?.trim();
+	const reviewCount = preferredIssueSet
+		? packageReviewCount
+		: Math.max(summary.flaggedFiles, metadataFlaggedCount);
+	const hasScanRows = rows.length > 0;
+	const showPreviewActions = hasScanRows || previewing || applying;
+	const showContextStats =
+		hasScanRows ||
+		reviewCount > 0 ||
+		summary.wdTbConflictCount > 0 ||
+		selectedCount > 0 ||
+		scanning ||
+		previewing ||
+		applying;
+	const showGeneratedMapping =
+		Boolean(selectedProjectId) &&
+		(hasScanRows ||
+			Boolean(artifacts.wdtPath) ||
+			Boolean(artifacts.wdlPath) ||
+			Boolean(artifacts.wdtText) ||
+			Boolean(artifacts.wdlText));
+	const showImportPanel = Boolean(selectedProjectId);
+	const stage = resolveDrawingControlStage({
+		selectedProjectName: selectedProject?.name ?? null,
+		packageLabel: preferredIssueSet?.issueTag ?? null,
+		hasProject: Boolean(selectedProjectId),
+		hasRoot: Boolean(profile.projectRootPath?.trim()),
+		loading: loadingProjects || loadingProjectData,
+		scanning,
+		previewing,
+		applying,
+		drawingCount,
+		flaggedCount: reviewCount,
+		conflictCount: preferredIssueSet
+			? packageConflictCount
+			: summary.wdTbConflictCount,
+		warningCount: warnings.length,
+		selectedCount,
+		acceptedCount: acceptedTitleBlockCount,
+	});
+	const scanSummaryFacts = [
+		{ label: "Drawings", value: drawingCount },
+		{
+			label:
+				reviewCount > 0
+					? "Need title block review"
+					: "Selected for sync",
+			value: reviewCount > 0 ? reviewCount : selectedCount,
+		},
+		...(preferredIssueSet
+			? [
+					{
+						label: "Package scope",
+						value: `${preferredIssueSet.issueTag} • ${
+							preferredIssueSet.selectedDrawingPaths.length
+						} drawing${
+							preferredIssueSet.selectedDrawingPaths.length === 1 ? "" : "s"
+						}`,
+					},
+					...(acceptedTitleBlockCount > 0
+						? [
+								{
+									label: "Accepted for package",
+									value: acceptedTitleBlockCount,
+								},
+							]
+						: []),
+				]
+			: []),
+		...(summary.wdTbConflictCount > 0
+			? [{ label: "Conflicts", value: summary.wdTbConflictCount }]
+			: []),
+	];
+	const setupChecklist = [
+		{
+			label: "Project",
+			ready: Boolean(selectedProjectId),
+			value: selectedProject?.name ?? "Choose the project package first.",
+		},
+		{
+			label: "Tracked root",
+			ready: Boolean(profile.projectRootPath?.trim()),
+			value:
+				profile.projectRootPath?.trim() ||
+				"Set the root path Suite should scan for this package.",
+		},
+		{
+			label: "Revision register",
+			ready: !loadingProjectData && revisionEntries.length > 0,
+			value: loadingProjectData
+				? "Loading project revision rows…"
+				: revisionEntries.length > 0
+					? `${revisionEntries.length} revision register entr${
+							revisionEntries.length === 1 ? "y" : "ies"
+						} ready.`
+			: "No revision rows loaded yet.",
+		},
+	];
+	const workflowLinks = selectedProjectId
+		? [
+				{
+					label: "Setup",
+					to: buildProjectDetailHref(selectedProjectId, "setup"),
+				},
+				{
+					label: "Review",
+					to: buildProjectDetailHref(selectedProjectId, "review", {
+						issueSet: preferredIssueSet?.id ?? null,
+					}),
+				},
+				{
+					label: "Issue Sets",
+					to: buildProjectDetailHref(selectedProjectId, "issue-sets", {
+						issueSet: preferredIssueSet?.id ?? null,
+					}),
+				},
+				{
+					label: "Watchdog",
+					to: buildProjectScopedAppHref("/app/watchdog", selectedProjectId),
+				},
+			]
+		: [];
 
 	return (
 		<PageFrame maxWidth="full">
 			<PageContextBand
-				eyebrow="Title block sync"
+				eyebrow="Project title block review"
 				summary={
-					<p className={styles.contextSummary}>
-						Project-wide title block scan, ACADE mapping preview, and Suite
-						second-pass sync from one workspace.
-					</p>
+					<div className={styles.contextCopy}>
+						<p className={styles.contextTitle}>{stage.title}</p>
+						<p className={styles.contextSummary}>{stage.detail}</p>
+					</div>
+				}
+				meta={
+					<div className={styles.contextMeta}>
+						<TrustStateBadge state={stage.state} label={stage.label} />
+						<Badge variant="outline" color="default">
+							{selectedProject?.name ?? "No project selected"}
+						</Badge>
+						{preferredIssueSet ? (
+							<Badge variant="soft" color="warning">
+								{preferredIssueSet.issueTag}
+							</Badge>
+						) : null}
+						<Badge variant="soft" color="accent">
+							{stage.step}
+						</Badge>
+					</div>
 				}
 				actions={
 					<div className={styles.toolbar}>
-						<button
-							type="button"
-							className={styles.secondaryButton}
-							onClick={() => void saveProfile()}
-							disabled={!selectedProjectId || savingProfile}
-						>
-							<Save size={14} />
-							{savingProfile ? "Saving…" : "Save Profile"}
-						</button>
 						<button
 							type="button"
 							className={styles.secondaryButton}
@@ -509,66 +944,44 @@ export function DrawingListManager() {
 							<RefreshCw size={14} />
 							{scanning ? "Scanning…" : "Scan Project"}
 						</button>
-						<button
-							type="button"
-							className={styles.secondaryButton}
-							onClick={() => void handlePreview()}
-							disabled={!canRun || rows.length === 0 || previewing}
-						>
-							<Sparkles size={14} />
-							{previewing ? "Previewing…" : "Preview Sync"}
-						</button>
-						<button
-							type="button"
-							className={styles.primaryButton}
-							onClick={() => void handleApply()}
-							disabled={!canRun || rows.length === 0 || applying}
-						>
-							<Wand2 size={14} />
-							{applying ? "Applying…" : "Apply Sync"}
-						</button>
-						<button
-							type="button"
-							className={styles.secondaryButton}
-							onClick={() => void exportRows()}
-							disabled={rows.length === 0}
-						>
-							<Download size={14} />
-							Export
-						</button>
+						{showPreviewActions ? (
+							<>
+								<button
+									type="button"
+									className={styles.secondaryButton}
+									onClick={() => void handlePreview()}
+									disabled={!canRun || rows.length === 0 || previewing}
+								>
+									<Sparkles size={14} />
+									{previewing ? "Previewing…" : "Preview Sync"}
+								</button>
+								<button
+									type="button"
+									className={styles.primaryButton}
+									onClick={() => void handleApply()}
+									disabled={!canRun || rows.length === 0 || applying}
+								>
+									<Wand2 size={14} />
+									{applying ? "Applying…" : "Apply Sync"}
+								</button>
+							</>
+						) : null}
 					</div>
 				}
-			/>
+			>
+				{showContextStats ? (
+					<div className={styles.contextFacts}>
+						{scanSummaryFacts.map((fact) => (
+							<div key={fact.label} className={styles.contextFact}>
+								<span className={styles.contextFactLabel}>{fact.label}</span>
+								<strong className={styles.contextFactValue}>{fact.value}</strong>
+							</div>
+						))}
+					</div>
+				) : null}
+				<ProjectWorkflowLinks links={workflowLinks} />
+			</PageContextBand>
 			<div className={styles.stack}>
-				<div className={styles.summaryGrid}>
-					<div className={styles.summaryCard}>
-						<span className={styles.summaryLabel}>Files</span>
-						<strong>{summary.totalFiles}</strong>
-					</div>
-					<div className={styles.summaryCard}>
-						<span className={styles.summaryLabel}>Flagged</span>
-						<strong>
-							{Math.max(summary.flaggedFiles, metadataFlaggedCount)}
-						</strong>
-					</div>
-					<div className={styles.summaryCard}>
-						<span className={styles.summaryLabel}>Suite Writes</span>
-						<strong>{summary.suiteWriteCount}</strong>
-					</div>
-					<div className={styles.summaryCard}>
-						<span className={styles.summaryLabel}>ACADE Writes</span>
-						<strong>{summary.acadeWriteCount}</strong>
-					</div>
-					<div className={styles.summaryCard}>
-						<span className={styles.summaryLabel}>WD_TB Conflicts</span>
-						<strong>{summary.wdTbConflictCount}</strong>
-					</div>
-					<div className={styles.summaryCard}>
-						<span className={styles.summaryLabel}>Selected DWGs</span>
-						<strong>{selectedCount}</strong>
-					</div>
-				</div>
-
 				{message ? <div className={styles.message}>{message}</div> : null}
 				{warnings.length > 0 ? (
 					<div className={styles.warningPanel}>
@@ -580,7 +993,9 @@ export function DrawingListManager() {
 
 				<div className={styles.configGrid}>
 					<section className={styles.card}>
-						<h3 className={styles.cardTitle}>Project</h3>
+						<div className={styles.cardHeaderRow}>
+							<h3 className={styles.cardTitle}>Scan setup</h3>
+						</div>
 						<label className={styles.field}>
 							<span className={styles.fieldLabel}>Project</span>
 							<select
@@ -608,184 +1023,147 @@ export function DrawingListManager() {
 								placeholder="C:\\Projects\\R3P-25074"
 							/>
 						</label>
-						<div className={styles.smallMeta}>
-							{loadingProjectData
-								? "Loading profile and revision register…"
-								: `${revisionEntries.length} revision register entr${
-										revisionEntries.length === 1 ? "y" : "ies"
-									} loaded.`}
+						<div className={styles.setupChecklist}>
+							{setupChecklist.map((item) => (
+								<div
+									key={item.label}
+									className={`${styles.setupChecklistItem} ${
+										item.ready
+											? styles.setupChecklistItemReady
+											: styles.setupChecklistItemPending
+									}`}
+								>
+									<div className={styles.setupChecklistLabel}>{item.label}</div>
+									<div className={styles.setupChecklistValue}>{item.value}</div>
+								</div>
+							))}
 						</div>
 					</section>
 
 					<section className={styles.card}>
-						<h3 className={styles.cardTitle}>ACADE Profile</h3>
-						<div className={styles.formGrid}>
-							<label className={styles.field}>
-								<span className={styles.fieldLabel}>Block Name</span>
-								<input
-									className={styles.input}
-									value={profile.blockName}
-									onChange={(event) =>
-										updateProfile("blockName", event.target.value)
-									}
-								/>
-							</label>
-							<label className={styles.field}>
-								<span className={styles.fieldLabel}>LINE1</span>
-								<input
-									className={styles.input}
-									value={profile.acadeLine1}
-									onChange={(event) =>
-										updateProfile("acadeLine1", event.target.value)
-									}
-									placeholder="Client / Utility"
-								/>
-							</label>
-							<label className={styles.field}>
-								<span className={styles.fieldLabel}>LINE2</span>
-								<input
-									className={styles.input}
-									value={profile.acadeLine2}
-									onChange={(event) =>
-										updateProfile("acadeLine2", event.target.value)
-									}
-									placeholder="Facility / Site"
-								/>
-							</label>
-							<label className={styles.field}>
-								<span className={styles.fieldLabel}>LINE4</span>
-								<input
-									className={styles.input}
-									value={profile.acadeLine4}
-									onChange={(event) =>
-										updateProfile("acadeLine4", event.target.value)
-									}
-									placeholder="Project Number"
-								/>
-							</label>
-							<label className={styles.field}>
-								<span className={styles.fieldLabel}>Drawn By Default</span>
-								<input
-									className={styles.input}
-									value={profile.signerDrawnBy}
-									onChange={(event) =>
-										updateProfile("signerDrawnBy", event.target.value)
-									}
-								/>
-							</label>
-							<label className={styles.field}>
-								<span className={styles.fieldLabel}>Checked By Default</span>
-								<input
-									className={styles.input}
-									value={profile.signerCheckedBy}
-									onChange={(event) =>
-										updateProfile("signerCheckedBy", event.target.value)
-									}
-								/>
-							</label>
-							<label className={styles.field}>
-								<span className={styles.fieldLabel}>Engineer Default</span>
-								<input
-									className={styles.input}
-									value={profile.signerEngineer}
-									onChange={(event) =>
-										updateProfile("signerEngineer", event.target.value)
-									}
-								/>
-							</label>
-						</div>
-					</section>
-
-					<section className={styles.card}>
-						<h3 className={styles.cardTitle}>Generated Mapping</h3>
-						<div className={styles.artifactMeta}>
-							<div>
-								<strong>WDT</strong>
-								<span>{artifacts.wdtPath || "Not generated yet"}</span>
-							</div>
-							<div>
-								<strong>WDL</strong>
-								<span>{artifacts.wdlPath || "Not generated yet"}</span>
-							</div>
-						</div>
-						<div className={styles.artifactPanel}>
-							<div>
-								<h4 className={styles.subTitle}>.WDT Preview</h4>
-								<pre className={styles.codeBlock}>
-									{artifacts.wdtText || "BLOCK = R3P-24x36BORDER&TITLE"}
-								</pre>
-							</div>
-							<div>
-								<h4 className={styles.subTitle}>.WDL Preview</h4>
-								<pre className={styles.codeBlock}>
-									{artifacts.wdlText || "LINE1 = Client / Utility"}
-								</pre>
-							</div>
-						</div>
-					</section>
-
-					<section className={styles.card}>
-						<h3 className={styles.cardTitle}>ACADE Report Import</h3>
-						<label className={styles.field}>
-							<span className={styles.fieldLabel}>
-								Drawing List / Automatic Report
-							</span>
-							<div className={styles.filePickerRow}>
+						<div className={styles.cardHeaderRow}>
+							<h3 className={styles.cardTitle}>Title block defaults</h3>
+							{selectedProjectId ? (
 								<button
 									type="button"
 									className={styles.secondaryButton}
-									onClick={() => {
-										if (acadeReportInputRef.current) {
-											acadeReportInputRef.current.value = "";
-											acadeReportInputRef.current.click();
-										}
-									}}
+									onClick={() => void saveProfile()}
+									disabled={!selectedProjectId || savingProfile}
 								>
-									<Upload size={14} />
-									Browse
+									<Save size={14} />
+									{savingProfile ? "Saving…" : "Save defaults"}
 								</button>
-								<div className={styles.filePickerValue}>
-									{acadeReportFile?.name || "No report selected"}
-								</div>
-								<input
-									ref={acadeReportInputRef}
-									type="file"
-									accept=".xlsx,.csv,.tsv"
-									className={styles.hiddenFileInput}
-									onChange={(event) => void handleAcadeReportSelection(event)}
-								/>
-							</div>
-						</label>
-						<div className={styles.smallMeta}>
-							Optional. Imported report rows are merged with title-block scan
-							rows for mismatch detection and export shaping.
+							) : null}
 						</div>
-						<div className={styles.artifactMeta}>
-							<div>
-								<strong>Selected File</strong>
-								<span>{acadeReportFile?.name || "No report selected"}</span>
+						{selectedProjectId ? (
+							<div className={styles.formGrid}>
+								<label className={styles.field}>
+									<span className={styles.fieldLabel}>Block Name</span>
+									<input
+										className={styles.input}
+										value={profile.blockName}
+										onChange={(event) =>
+											updateProfile("blockName", event.target.value)
+										}
+									/>
+								</label>
+								<label className={styles.field}>
+									<span className={styles.fieldLabel}>LINE1</span>
+									<input
+										className={styles.input}
+										value={profile.acadeLine1}
+										onChange={(event) =>
+											updateProfile("acadeLine1", event.target.value)
+										}
+										placeholder="Client / Utility"
+									/>
+								</label>
+								<label className={styles.field}>
+									<span className={styles.fieldLabel}>LINE2</span>
+									<input
+										className={styles.input}
+										value={profile.acadeLine2}
+										onChange={(event) =>
+											updateProfile("acadeLine2", event.target.value)
+										}
+										placeholder="Facility / Site"
+									/>
+								</label>
+								<label className={styles.field}>
+									<span className={styles.fieldLabel}>LINE4</span>
+									<input
+										className={styles.input}
+										value={profile.acadeLine4}
+										onChange={(event) =>
+											updateProfile("acadeLine4", event.target.value)
+										}
+										placeholder="Project Number"
+									/>
+								</label>
+								<label className={styles.field}>
+									<span className={styles.fieldLabel}>Drawn By Default</span>
+									<input
+										className={styles.input}
+										value={profile.signerDrawnBy}
+										onChange={(event) =>
+											updateProfile("signerDrawnBy", event.target.value)
+										}
+									/>
+								</label>
+								<label className={styles.field}>
+									<span className={styles.fieldLabel}>Checked By Default</span>
+									<input
+										className={styles.input}
+										value={profile.signerCheckedBy}
+										onChange={(event) =>
+											updateProfile("signerCheckedBy", event.target.value)
+										}
+									/>
+								</label>
+								<label className={styles.field}>
+									<span className={styles.fieldLabel}>Engineer Default</span>
+									<input
+										className={styles.input}
+										value={profile.signerEngineer}
+										onChange={(event) =>
+											updateProfile("signerEngineer", event.target.value)
+										}
+									/>
+								</label>
 							</div>
-							<div>
-								<strong>Imported Rows</strong>
-								<span>{acadeReportRows.length}</span>
+						) : (
+							<div className={styles.cardPlaceholder}>
+								Choose a project first to load the saved title block defaults
+								for this package.
 							</div>
+						)}
+						<div className={styles.cardFootnote}>
+							Saved defaults feed the next sync preview, not the issued drawing
+							files directly.
 						</div>
-						{acadeReportError ? (
-							<div className={styles.warningPanel}>{acadeReportError}</div>
-						) : null}
 					</section>
+
 				</div>
 
 				<section className={styles.card}>
 					<div className={styles.tableHeader}>
 						<div>
-							<h3 className={styles.cardTitle}>Drawing Rows</h3>
+							<h3 className={styles.cardTitle}>Title block review rows</h3>
 							<div className={styles.smallMeta}>
-								Per-row edits here only affect Suite-owned second-pass
-								attributes.
+								Per-row edits here only affect the title block review lane and
+								Suite-owned second-pass attributes.
 							</div>
 						</div>
 						<div className={styles.selectionActions}>
+							<button
+								type="button"
+								className={styles.secondaryButton}
+								onClick={() => void exportRows()}
+								disabled={rows.length === 0}
+							>
+								<Download size={14} />
+								Export workbook
+							</button>
 							<button
 								type="button"
 								className={styles.secondaryButton}
@@ -831,6 +1209,9 @@ export function DrawingListManager() {
 										row.relativePath,
 									);
 									const metadataRow = metadataRowsById.get(row.id);
+									const acceptedForPackage = acceptedTitleBlockIds.has(
+										`title-block:${row.id}`,
+									);
 									const displayIssues = metadataRow?.issues ?? row.issues;
 									const displayWarnings = metadataRow?.warnings ?? row.warnings;
 									const drawingNumber =
@@ -866,15 +1247,20 @@ export function DrawingListManager() {
 											<td>{row.layoutName || "—"}</td>
 											<td>
 												<div className={styles.issueList}>
+													{acceptedForPackage ? (
+														<span className={styles.packageBadge}>
+															Accepted for package
+														</span>
+													) : null}
 													{displayIssues.length > 0 ? (
 														displayIssues.map((issue) => (
 															<span key={issue} className={styles.issueBadge}>
 																{issue}
 															</span>
 														))
-													) : (
+													) : !acceptedForPackage ? (
 														<span className={styles.okBadge}>Clean</span>
-													)}
+													) : null}
 													{displayWarnings.map((warning) => (
 														<span
 															key={`${row.id}-${warning}`}
@@ -1060,6 +1446,104 @@ export function DrawingListManager() {
 						</table>
 					</div>
 				</section>
+
+				{showGeneratedMapping || showImportPanel ? (
+					<div className={styles.secondaryGrid}>
+						{showGeneratedMapping ? (
+							<section className={styles.card}>
+								<div className={styles.cardHeaderRow}>
+									<div>
+										<h3 className={styles.cardTitle}>Generated mapping</h3>
+										<div className={styles.smallMeta}>
+											WDT and WDL previews for the current sync defaults.
+										</div>
+									</div>
+								</div>
+								<div className={styles.artifactMeta}>
+									<div>
+										<strong>WDT</strong>
+										<span>{artifacts.wdtPath || "Not generated yet"}</span>
+									</div>
+									<div>
+										<strong>WDL</strong>
+										<span>{artifacts.wdlPath || "Not generated yet"}</span>
+									</div>
+								</div>
+								<div className={styles.artifactPanel}>
+									<div>
+										<h4 className={styles.subTitle}>.WDT Preview</h4>
+										<pre className={styles.codeBlock}>
+											{artifacts.wdtText || "BLOCK = R3P-24x36BORDER&TITLE"}
+										</pre>
+									</div>
+									<div>
+										<h4 className={styles.subTitle}>.WDL Preview</h4>
+										<pre className={styles.codeBlock}>
+											{artifacts.wdlText || "LINE1 = Client / Utility"}
+										</pre>
+									</div>
+								</div>
+							</section>
+						) : null}
+
+						{showImportPanel ? (
+							<section className={styles.card}>
+								<div className={styles.cardHeaderRow}>
+									<div>
+										<h3 className={styles.cardTitle}>ACADE report import</h3>
+										<div className={styles.smallMeta}>
+											Optional workbook import for mismatch detection and export
+											shaping.
+										</div>
+									</div>
+								</div>
+								<label className={styles.field}>
+									<span className={styles.fieldLabel}>
+										Drawing list / automatic report
+									</span>
+									<div className={styles.filePickerRow}>
+										<button
+											type="button"
+											className={styles.secondaryButton}
+											onClick={() => {
+												if (acadeReportInputRef.current) {
+													acadeReportInputRef.current.value = "";
+													acadeReportInputRef.current.click();
+												}
+											}}
+										>
+											<Upload size={14} />
+											Browse
+										</button>
+										<div className={styles.filePickerValue}>
+											{acadeReportFile?.name || "No report selected"}
+										</div>
+										<input
+											ref={acadeReportInputRef}
+											type="file"
+											accept=".xlsx,.csv,.tsv"
+											className={styles.hiddenFileInput}
+											onChange={(event) => void handleAcadeReportSelection(event)}
+										/>
+									</div>
+								</label>
+								<div className={styles.artifactMeta}>
+									<div>
+										<strong>Selected file</strong>
+										<span>{acadeReportFile?.name || "No report selected"}</span>
+									</div>
+									<div>
+										<strong>Imported rows</strong>
+										<span>{acadeReportRows.length}</span>
+									</div>
+								</div>
+								{acadeReportError ? (
+									<div className={styles.warningPanel}>{acadeReportError}</div>
+								) : null}
+							</section>
+						) : null}
+					</div>
+				) : null}
 			</div>
 		</PageFrame>
 	);

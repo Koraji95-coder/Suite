@@ -23,13 +23,13 @@
 		monospace;
 
 	/* Backgrounds */
-	--bg: #090d12;
-	--bg-subtle: #090d12;
-	--surface: #121821;
-	--surface-2: #1a2230;
-	--surface-0: #090d12;
-	--surface-elevated: #212b3a;
-	--surface-strong: #263243;
+	--bg: #07090d;
+	--bg-subtle: #090b10;
+	--surface: #11161d;
+	--surface-2: #181f29;
+	--surface-0: #07090d;
+	--surface-elevated: #1f2732;
+	--surface-strong: #263140;
 	/* Compatibility aliases for canonical class suggestions */
 	--background: var(--bg);
 	--bg-base: var(--bg);
@@ -37,23 +37,23 @@
 	--bg-heavy: var(--surface-2);
 
 	/* Borders */
-	--border: rgba(232, 237, 246, 0.1);
-	--border-subtle: rgba(232, 237, 246, 0.05);
-	--border-strong: rgba(232, 237, 246, 0.18);
+	--border: rgba(237, 232, 220, 0.1);
+	--border-subtle: rgba(237, 232, 220, 0.05);
+	--border-strong: rgba(198, 164, 109, 0.22);
 
 	/* Text */
-	--text: #ece7dc;
-	--text-strong: #f5efe4;
-	--text-muted: #a79f92;
+	--text: #efe8dc;
+	--text-strong: #f8f1e5;
+	--text-muted: #a79e91;
 
 	/* Brand Colors */
-	--primary: #c7a05c;
-	--primary-hover: #d4b276;
+	--primary: #c6a46d;
+	--primary-hover: #d5b67f;
 	--primary-contrast: #15110b;
-	--accent: #86663a;
-	--brand-gold: #d9ba7f;
-	--secondary: #6a7788;
-	--tertiary: #8a5f51;
+	--accent: #775c37;
+	--brand-gold: #d8ba84;
+	--secondary: #687483;
+	--tertiary: #835a4d;
 
 	/* Status Colors */
 	--success: #4ea972;
@@ -62,7 +62,7 @@
 	--info: #7390ff;
 
 	/* Effects */
-	--glow: rgba(115, 144, 255, 0.2);
+	--glow: rgba(198, 164, 109, 0.18);
 	--focus-ring: color-mix(in oklab, var(--info) 28%, transparent);
 	--shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
 	--shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);

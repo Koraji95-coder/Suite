@@ -19,6 +19,8 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
+. $runtimeSharedScript
 $statusScript = (Resolve-Path (Join-Path $PSScriptRoot "get-suite-runtime-status.ps1")).Path
 $backendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-backend-startup.ps1")).Path
 $gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-startup.ps1")).Path
@@ -26,55 +28,11 @@ $frontendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-front
 $filesystemInstallScript = (Resolve-Path (Join-Path $PSScriptRoot "install-watchdog-filesystem-collector-startup.ps1")).Path
 $autocadInstallScript = (Resolve-Path (Join-Path $PSScriptRoot "install-watchdog-autocad-collector-startup.ps1")).Path
 $autocadSafetyScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-autocad-safety.ps1")).Path
-$runtimeStatusBase = if ($env:LOCALAPPDATA) {
-    $env:LOCALAPPDATA
-}
-elseif ($env:TEMP) {
-    $env:TEMP
-}
-else {
-    $env:USERPROFILE
-}
-$runtimeStatusDir = Join-Path $runtimeStatusBase "Suite\runtime-bootstrap"
-$frontendLogPath = Join-Path $runtimeStatusDir "frontend.log"
+$runtimePaths = Get-SuiteRuntimePaths
+$runtimeStatusDir = $runtimePaths.RuntimeStatusDir
+$frontendLogPath = $runtimePaths.FrontendLogPath
 
 . $autocadSafetyScript
-
-function Convert-CommandOutputToText {
-    param([object[]]$Output)
-
-    if (-not $Output) {
-        return ""
-    }
-
-    return [string]::Join(
-        [Environment]::NewLine,
-        @(
-            $Output | ForEach-Object {
-                if ($null -eq $_) {
-                    ""
-                }
-                else {
-                    $_.ToString()
-                }
-            }
-        )
-    ).Trim()
-}
-
-function Get-OutputTail {
-    param(
-        [string]$Text,
-        [int]$LineCount = 12
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Text)) {
-        return ""
-    }
-
-    $lines = $Text -split "`r?`n"
-    return [string]::Join([Environment]::NewLine, ($lines | Select-Object -Last $LineCount)).Trim()
-}
 
 function Invoke-ExternalCommand {
     param(
@@ -113,12 +71,6 @@ function Invoke-ExternalCommand {
     }
 }
 
-function Test-PortListening {
-    param([int]$Port)
-
-    return ($null -ne (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1))
-}
-
 function Test-SupabaseOutputIndicatesReady {
     param([string]$Text)
 
@@ -151,42 +103,6 @@ function Test-SupabaseStopped {
 
     $statusResult = Invoke-ExternalCommand -FilePath "node" -Arguments @((Join-Path $resolvedRepoRoot "scripts\run-supabase-cli.mjs"), "status") -WorkingDirectory $resolvedRepoRoot
     return -not ($statusResult.Ok -and (Test-SupabaseOutputIndicatesReady -Text $statusResult.OutputText))
-}
-
-function Invoke-JsonPowerShellFile {
-    param(
-        [Parameter(Mandatory = $true)][string]$ScriptPath,
-        [string[]]$Arguments
-    )
-
-    $result = Invoke-ExternalCommand -FilePath "PowerShell.exe" -Arguments (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $ScriptPath) + $Arguments) -WorkingDirectory $resolvedRepoRoot
-    $payload = $null
-    if (-not [string]::IsNullOrWhiteSpace($result.OutputText)) {
-        try {
-            $payload = $result.OutputText | ConvertFrom-Json
-        }
-        catch {
-            $firstBrace = $result.OutputText.IndexOf("{")
-            $lastBrace = $result.OutputText.LastIndexOf("}")
-            if ($firstBrace -ge 0 -and $lastBrace -gt $firstBrace) {
-                $jsonText = $result.OutputText.Substring($firstBrace, ($lastBrace - $firstBrace) + 1)
-                try {
-                    $payload = $jsonText | ConvertFrom-Json
-                }
-                catch {
-                    $payload = $null
-                }
-            }
-        }
-    }
-
-    [pscustomobject]@{
-        ExitCode = $result.ExitCode
-        Ok = $result.Ok
-        OutputText = $result.OutputText
-        OutputTail = $result.OutputTail
-        Payload = $payload
-    }
 }
 
 function Get-ServiceSnapshot {
@@ -360,7 +276,7 @@ function Stop-ServiceNow {
             foreach ($id in (Stop-ProcessesByCommandTokens -Tokens @("run-agent-gateway.mjs"))) {
                 $stoppedIds.Add([int]$id)
             }
-            foreach ($id in (Stop-ProcessesByCommandTokens -Tokens @("zeroclaw-gateway"))) {
+            foreach ($id in (Stop-ProcessesByCommandTokens -Tokens @("suite-agent-gateway.mjs"))) {
                 if (-not $stoppedIds.Contains([int]$id)) {
                     $stoppedIds.Add([int]$id)
                 }

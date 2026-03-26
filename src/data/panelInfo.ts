@@ -3,32 +3,31 @@ export const dashboardInfo = {
 	colorScheme: "teal" as const,
 	sections: [
 		{
-			title: "Command Center Overview",
+			title: "Mission board overview",
 			content:
-				"The Dashboard is the Suite command center. It combines Watchdog telemetry, architecture hotspots, work ledger history, agent memory, and project operations behind one shared filter model.",
+				"The Dashboard is the product-facing mission board. It focuses on active projects, delivery readiness, transmittal pressure, and Watchdog telemetry that matters to the current workspace scope.",
 		},
 		{
-			title: "Command Modules",
+			title: "What shows here",
 			content: [
-				"Operations and Watchdog telemetry showing collector health, live sessions, and recent events",
-				"Architecture hotspot view highlighting heavy files, module boundaries, and extraction targets",
-				"Work ledger history tied to commits, repo paths, hotspot ids, and project scopes",
-				"Agent memory view combining shared knowledge and profile-specific context",
-				"Project operations summary with direct drill-down into Project Manager",
+				"Delivery board showing package readiness, review pressure, near-term deadlines, and recent project activity",
+				"Watchdog summary showing collector health, live sessions, and recent drawing events in the selected scope",
+				"Project drill-downs that move directly into the project readiness, review, and issue set workspaces",
+				"Project tools stay connected so you can move from readiness into review, issue prep, and transmittal work without leaving the product flow",
 			],
 		},
 		{
-			title: "Using Shared Filters",
+			title: "Using shared filters",
 			content: [
-				"Filter by project, repo area, collector, agent profile, and time range",
-				"Use focus pills to jump directly to Watchdog, architecture, work ledger, agent memory, or project operations",
-				"Open Architecture Graph for deeper repo inspection without leaving the same architecture data model",
-				"Use project deep links to move from Project Manager into the command center with the correct filters applied",
+				"Filter by project and time range to keep delivery readiness and drawing activity in the same scope",
+				"Use focus pills to jump directly to Watchdog or the delivery board without leaving the current dashboard state",
+				"Open Projects to move into readiness, review, issue set, and transmittal work from the same scoped project",
+				"Use the project tabs to move between setup, review, issue sets, and supporting files without losing project context",
 			],
 			tips: [
-				"Use `/app/watchdog` for the dedicated collector and drawing telemetry workspace, or `focus=ledger` when you need the dashboard to land on the work ledger module",
-				"Watchdog telemetry is canonical on the dedicated Watchdog page; project pages only show scoped summaries",
-				"Ledger entries can deep-link back into Architecture Map hotspots when deeper context is required",
+				"Use `/app/watchdog` for the dedicated collector and drawing telemetry workspace when you need deeper session or workstation detail",
+				"Use `/app/projects` when you need the full project readiness, review inbox, and issue set workflow",
+				"Keep the first dashboard view focused on delivery work, then open the deeper tool routes only when a project needs detail",
 			],
 		},
 	],

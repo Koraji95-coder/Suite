@@ -41,7 +41,7 @@ export function SuiteLogo({
 				<span className={styles.labelWrap}>
 					<span className={styles.label}>{label}</span>
 					{showMonogramLabel ? (
-						<span className={styles.subLabel}>Engineering Operations</span>
+						<span className={styles.subLabel}>Drawing production control</span>
 					) : null}
 				</span>
 			) : null}

@@ -117,12 +117,6 @@ $mappings = @(
         Destination = (Join-Path $env:USERPROFILE ".codex\config.toml")
     },
     [pscustomobject]@{
-        Name = "zeroclaw"
-        Type = "directory"
-        Source = (Join-Path $MirrorRoot "zeroclaw")
-        Destination = (Join-Path $env:USERPROFILE ".zeroclaw")
-    },
-    [pscustomobject]@{
         Name = "suite-learning"
         Type = "directory"
         Source = (Join-Path $MirrorRoot "suite\backend\.learning")

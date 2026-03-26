@@ -18,19 +18,21 @@
 	background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
-.trustBandGrid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+.trustBandFacts {
+	display: inline-flex;
+	flex-wrap: wrap;
 	gap: 0.65rem;
 }
 
-.trustBandCard {
+.trustBandFact {
 	display: grid;
-	gap: 0.38rem;
-	padding: 0.78rem 0.88rem;
-	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 70%, transparent);
+	gap: 0.32rem;
+	min-width: 9rem;
+	padding: 0.74rem 0.84rem;
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 70%, transparent);
 	border-radius: var(--radius-3);
-	background: color-mix(in srgb, var(--surface-elevated) 72%, transparent);
+	background: color-mix(in srgb, var(--suite-surface-overlay) 76%, transparent);
 }
 
 .trustBandLabel {
@@ -338,7 +340,8 @@
 	display: grid;
 	gap: 0.7rem;
 	padding: 0.82rem 0.92rem;
-	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 68%, transparent);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 68%, transparent);
 	border-radius: 0.85rem;
 	background: color-mix(in srgb, var(--surface-elevated) 68%, transparent);
 }

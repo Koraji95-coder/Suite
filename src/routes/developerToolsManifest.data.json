@@ -1,0 +1,152 @@
+{
+	"groups": [
+		{
+			"id": "publishing-evidence",
+			"title": "Publishing & Evidence",
+			"description": "Release notes, delivery evidence, and publishing history that stay out of the customer workspace."
+		},
+		{
+			"id": "automation-lab",
+			"title": "Automation Lab",
+			"description": "Future product tools and experimental drafting workflows that still need workshop time before they graduate."
+		},
+		{
+			"id": "agent-lab",
+			"title": "Agent Lab",
+			"description": "Experimental agent workflows, pairing, and orchestration surfaces that stay outside the released product story."
+		},
+		{
+			"id": "architecture-code",
+			"title": "Architecture & Code",
+			"description": "Repo maps, graph views, and refactor tooling for engineering follow-through."
+		},
+		{
+			"id": "developer-docs",
+			"title": "Developer Docs",
+			"description": "Runbooks, sketches, and workshop guidance that support local development and staged rollout work."
+		}
+	],
+	"tools": [
+		{
+			"id": "changelog",
+			"title": "Changelog",
+			"description": "Developer publishing ledger, work evidence, and draft notes.",
+			"route": "/app/changelog",
+			"group": "publishing-evidence",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "autodraft-studio",
+			"title": "AutoDraft Studio",
+			"description": "Markup-driven CAD automation workspace with review-first compare and execution flows.",
+			"route": "/app/apps/autodraft-studio",
+			"group": "automation-lab",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend", "gateway"]
+		},
+		{
+			"id": "autowire",
+			"title": "AutoWire",
+			"description": "Deterministic wire and conduit routing workflows staged as a future customer-facing automation surface.",
+			"route": "/app/apps/autowire",
+			"group": "automation-lab",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend", "gateway"]
+		},
+		{
+			"id": "ground-grid-generation",
+			"title": "Ground Grid Generation",
+			"description": "Grounding geometry capture and generation workflows that still need lab-stage refinement.",
+			"route": "/app/apps/ground-grid-generation",
+			"group": "automation-lab",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "batch-find-replace",
+			"title": "Batch Find & Replace",
+			"description": "Preview-first text remediation and active-drawing cleanup in the local workshop.",
+			"route": "/app/apps/batch-find-replace",
+			"group": "automation-lab",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend", "gateway"]
+		},
+		{
+			"id": "etap-dxf-cleanup",
+			"title": "ETAP DXF Cleanup",
+			"description": "Developer-only bridge for ETAP cleanup commands and local AutoCAD remediation.",
+			"route": "/app/apps/etap-dxf-cleanup",
+			"group": "automation-lab",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend", "gateway"]
+		},
+		{
+			"id": "agent",
+			"title": "Agents",
+			"description": "Experimental profile-driven orchestration and paired-device agent workflows.",
+			"route": "/app/agent",
+			"group": "agent-lab",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend", "backend", "gateway"]
+		},
+		{
+			"id": "architecture-map",
+			"title": "Architecture Map",
+			"description": "Hotspot and refactor map for repo structure, extraction pressure, and module ownership.",
+			"route": "/app/architecture",
+			"group": "architecture-code",
+			"audience": "dev",
+			"releaseState": "lab",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "architecture-graph",
+			"title": "Architecture Graph",
+			"description": "Alternative node-link explorer for the same architecture and memory model used in the map.",
+			"route": "/app/apps/graph",
+			"group": "architecture-code",
+			"audience": "dev",
+			"releaseState": "lab",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "developer-docs",
+			"title": "Developer Docs",
+			"description": "Runbooks, environment notes, and workshop guidance that should not ship as customer-facing knowledge content.",
+			"route": "/app/developer/docs",
+			"group": "developer-docs",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend"]
+		},
+		{
+			"id": "whiteboard",
+			"title": "Whiteboard",
+			"description": "Developer sketching and note capture surface for experiments, workflows, and support callouts.",
+			"route": "/app/knowledge/whiteboard",
+			"group": "developer-docs",
+			"audience": "dev",
+			"releaseState": "lab",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend"]
+		}
+	]
+}

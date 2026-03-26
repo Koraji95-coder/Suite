@@ -41,6 +41,9 @@ function createQueryBuilder(
 	);
 	const fallbackData = options?.fallbackData ?? DEFAULT_BACKUP_DATA(table);
 	const fallbackError = options?.fallbackError ?? null;
+	type QueryPayload =
+		| { data: Record<string, unknown>[] | { id: string }[]; error: null }
+		| { data: null; error: { message: string } };
 
 	const builder = {
 		order: vi.fn(async (column: string) => {
@@ -53,21 +56,15 @@ function createQueryBuilder(
 				error: { message: `column ${table}.${column} does not exist` },
 			};
 		}),
-		then<
-			TResult1 = { data: Record<string, unknown>[]; error: null },
-			TResult2 = never,
-		>(
+		then<TResult1 = QueryPayload, TResult2 = never>(
 			onFulfilled?:
-				| ((value: {
-						data: Record<string, unknown>[];
-						error: null;
-				  }) => TResult1 | PromiseLike<TResult1>)
+				| ((value: QueryPayload) => TResult1 | PromiseLike<TResult1>)
 				| null,
 			onRejected?:
 				| ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
 				| null,
 		) {
-			const payload = fallbackError
+			const payload: Promise<QueryPayload> = fallbackError
 				? Promise.resolve({ data: null, error: fallbackError })
 				: Promise.resolve({ data: fallbackData, error: null });
 			return payload.then(onFulfilled, onRejected);

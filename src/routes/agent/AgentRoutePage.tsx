@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/primitives/Button";
 import { Text } from "@/components/primitives/Text";
 import { logger } from "@/lib/logger";
-import { agentService } from "@/services/agentService";
 import { agentTaskManager } from "@/services/agentTaskManager";
 import { useAgentConnectionStatus } from "@/services/useAgentConnectionStatus";
 import styles from "./AgentRoutePage.module.css";

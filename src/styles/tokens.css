@@ -24,108 +24,113 @@
 	--line-accent: color-mix(in srgb, var(--primary) 34%, transparent);
 
 	/* Shared Suite brand surfaces */
-	--brand-surface-neutral: color-mix(in srgb, var(--surface) 92%, transparent);
+	--brand-surface-neutral: color-mix(in srgb, var(--surface) 94%, transparent);
 	--brand-surface-branded: color-mix(
 		in srgb,
-		var(--surface-2) 84%,
+		var(--surface-2) 88%,
 		transparent
 	);
-	--brand-surface-hero: color-mix(in srgb, var(--surface-2) 74%, transparent);
-	--brand-glass: color-mix(in srgb, var(--surface) 72%, transparent);
+	--brand-surface-hero: color-mix(in srgb, var(--surface-2) 78%, transparent);
+	--brand-glass: color-mix(in srgb, var(--surface) 76%, transparent);
 	--brand-border-soft: color-mix(in srgb, var(--border) 84%, transparent);
 	--brand-border-strong: color-mix(
 		in srgb,
-		var(--primary) 28%,
+		var(--primary) 34%,
 		var(--border) 72%
 	);
-	--brand-border-warm: color-mix(in srgb, var(--accent) 34%, var(--border) 66%);
+	--brand-border-warm: color-mix(in srgb, var(--accent) 40%, var(--border) 60%);
 	--brand-ambient-cool: color-mix(in srgb, var(--info) 12%, transparent);
 	--brand-ambient-cool-strong: color-mix(
 		in srgb,
-		var(--info) 18%,
+		var(--info) 16%,
 		transparent
 	);
-	--brand-ambient-warm: color-mix(in srgb, var(--primary) 18%, transparent);
+	--brand-ambient-warm: color-mix(in srgb, var(--primary) 20%, transparent);
 	--brand-ambient-warm-strong: color-mix(
 		in srgb,
-		var(--accent) 24%,
+		var(--accent) 28%,
 		transparent
 	);
 	--brand-hero-gradient: linear-gradient(
-		152deg,
-		color-mix(in srgb, var(--primary) 17%, transparent),
-		color-mix(in srgb, var(--accent) 18%, transparent) 46%,
-		color-mix(in srgb, var(--info) 8%, transparent) 100%
+		148deg,
+		color-mix(in srgb, var(--primary) 18%, transparent),
+		color-mix(in srgb, var(--accent) 20%, transparent) 48%,
+		color-mix(in srgb, var(--info) 7%, transparent) 100%
 	);
 	--brand-accent-gradient: linear-gradient(
-		136deg,
-		color-mix(in srgb, var(--primary) 86%, #f3d29a 14%),
-		color-mix(in srgb, var(--accent) 74%, #7c6540 26%)
+		138deg,
+		color-mix(in srgb, var(--primary) 84%, #f4d8a6 16%),
+		color-mix(in srgb, var(--accent) 76%, #6d5432 24%)
 	);
 	--brand-accent-gradient-strong: linear-gradient(
-		132deg,
-		color-mix(in srgb, var(--primary) 90%, #ffe0a3 10%),
-		color-mix(in srgb, var(--accent) 78%, #8b6737 22%)
+		134deg,
+		color-mix(in srgb, var(--primary) 90%, #ffe3af 10%),
+		color-mix(in srgb, var(--accent) 80%, #7a5d32 20%)
 	);
 	--brand-chip-cool-bg: color-mix(in srgb, var(--info) 12%, transparent);
 	--brand-chip-cool-border: color-mix(in srgb, var(--info) 28%, transparent);
 	--brand-chip-warm-bg: color-mix(in srgb, var(--primary) 14%, transparent);
 	--brand-chip-warm-border: color-mix(in srgb, var(--primary) 32%, transparent);
-	--brand-shadow: 0 18px 46px rgb(0 0 0 / 34%);
+	--brand-shadow: 0 20px 52px rgb(0 0 0 / 36%);
 	--brand-shadow-hero:
-		0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent),
-		0 24px 60px rgb(0 0 0 / 38%);
+		0 0 0 1px color-mix(in srgb, var(--primary) 14%, transparent),
+		0 26px 64px rgb(0 0 0 / 40%);
 	--suite-shell-backdrop:
 		radial-gradient(
-			135% 125% at 100% -18%,
-			color-mix(in srgb, var(--primary) 28%, transparent),
-			transparent 54%
+			150% 128% at 100% -24%,
+			color-mix(in srgb, var(--primary) 24%, transparent),
+			transparent 56%
 		),
 		radial-gradient(
-			120% 120% at -8% 112%,
-			color-mix(in srgb, var(--accent) 18%, transparent),
-			transparent 56%
+			132% 124% at -12% 112%,
+			color-mix(in srgb, var(--accent) 16%, transparent),
+			transparent 58%
+		),
+		radial-gradient(
+			88% 88% at 52% 14%,
+			color-mix(in srgb, var(--info) 7%, transparent),
+			transparent 68%
 		),
 		linear-gradient(
 			180deg,
 			color-mix(in srgb, var(--bg) 96%, transparent),
-			color-mix(in srgb, var(--surface-2) 20%, var(--bg) 80%)
+			color-mix(in srgb, var(--surface-2) 14%, var(--bg) 86%)
 		),
 		var(--bg);
 	--suite-panel-surface:
 		radial-gradient(
-			115% 125% at 100% 0%,
-			color-mix(in srgb, var(--brand-ambient-cool) 76%, transparent),
-			transparent 60%
+			125% 132% at 100% 0%,
+			color-mix(in srgb, var(--brand-ambient-cool) 60%, transparent),
+			transparent 64%
 		),
 		radial-gradient(
-			95% 125% at 0% 100%,
-			color-mix(in srgb, var(--brand-ambient-warm) 62%, transparent),
-			transparent 64%
+			108% 128% at 0% 100%,
+			color-mix(in srgb, var(--brand-ambient-warm) 66%, transparent),
+			transparent 68%
 		),
 		linear-gradient(
 			180deg,
-			color-mix(in srgb, var(--brand-surface-neutral) 92%, transparent),
-			color-mix(in srgb, var(--brand-surface-branded) 68%, transparent)
+			color-mix(in srgb, var(--brand-surface-neutral) 94%, transparent),
+			color-mix(in srgb, var(--brand-surface-branded) 70%, transparent)
 		),
 		var(--brand-surface-neutral);
 	--suite-panel-surface-strong:
 		radial-gradient(
-			140% 100% at 100% 0%,
-			var(--brand-ambient-cool),
-			transparent 60%
+			140% 106% at 100% 0%,
+			color-mix(in srgb, var(--brand-ambient-cool) 80%, transparent),
+			transparent 62%
 		),
 		radial-gradient(
-			110% 100% at 0% 100%,
-			var(--brand-ambient-warm),
-			transparent 65%
+			118% 110% at 0% 100%,
+			color-mix(in srgb, var(--brand-ambient-warm) 88%, transparent),
+			transparent 68%
 		),
 		var(--brand-hero-gradient), var(--brand-surface-neutral);
 	--suite-panel-surface-soft:
 		linear-gradient(
 			180deg,
-			color-mix(in srgb, var(--brand-surface-neutral) 90%, transparent),
-			color-mix(in srgb, var(--brand-surface-branded) 56%, transparent)
+			color-mix(in srgb, var(--brand-surface-neutral) 92%, transparent),
+			color-mix(in srgb, var(--brand-surface-branded) 60%, transparent)
 		),
 		var(--brand-surface-neutral);
 	--suite-surface-sunken:
@@ -146,24 +151,24 @@
 		var(--brand-glass);
 	--suite-header-surface:
 		radial-gradient(
-			125% 120% at 100% -18%,
-			color-mix(in srgb, var(--primary) 14%, transparent),
-			transparent 62%
+			130% 120% at 100% -18%,
+			color-mix(in srgb, var(--primary) 16%, transparent),
+			transparent 64%
 		),
 		radial-gradient(
-			110% 120% at 0% 0%,
-			color-mix(in srgb, var(--accent) 12%, transparent),
-			transparent 64%
+			112% 124% at 0% 0%,
+			color-mix(in srgb, var(--accent) 14%, transparent),
+			transparent 66%
 		),
 		linear-gradient(
 			180deg,
 			color-mix(in srgb, var(--brand-surface-neutral) 96%, transparent),
-			color-mix(in srgb, var(--brand-surface-branded) 76%, transparent)
+			color-mix(in srgb, var(--brand-surface-branded) 80%, transparent)
 		);
 	--suite-panel-shadow:
-		inset 0 1px 0 rgb(255 255 255 / 4%), 0 26px 46px -40px rgba(0, 0, 0, 0.62);
+		inset 0 1px 0 rgb(255 255 255 / 4%), 0 28px 54px -42px rgba(0, 0, 0, 0.68);
 	--suite-panel-shadow-subtle:
-		0 18px 42px -36px color-mix(in srgb, var(--primary) 32%, transparent),
+		0 22px 46px -38px color-mix(in srgb, var(--primary) 30%, transparent),
 		inset 0 1px 0 rgb(255 255 255 / 4%);
 	--suite-panel-height-tight: clamp(31rem, calc(100dvh - 21rem), 54rem);
 	--suite-panel-height-regular: clamp(32.5rem, 70dvh, 61.25rem);

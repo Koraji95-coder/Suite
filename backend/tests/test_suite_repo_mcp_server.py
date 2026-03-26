@@ -272,7 +272,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("Do not make major auth-flow changes", text)
         self.assertIn("AutoCAD reliability contract", text)
         self.assertIn("npm run gateway:dev", text)
-        self.assertIn("SUITE_GATEWAY_USE_FULL_CLI=1", text)
+        self.assertIn("legacy ZeroClaw CLI fallback is retired", text)
         self.assertIn("repo.check_watchdog_collector_startup", text)
         self.assertIn("repo.check_watchdog_autocad_collector_startup", text)
         self.assertIn("repo.check_watchdog_autocad_plugin", text)
@@ -358,7 +358,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         text = str(content.get("text") or "")
         self.assertIn("Gateway Build State (Required)", text)
         self.assertIn("npm run gateway:dev", text)
-        self.assertIn("SUITE_GATEWAY_USE_FULL_CLI=1", text)
+        self.assertIn("configured mode: <Suite-native>", text)
 
     def test_prompt_get_returns_agent_profile_playbook(self) -> None:
         with _McpServerProcess() as server:

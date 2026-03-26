@@ -4,9 +4,15 @@ import { PageFrame } from "@/components/apps/ui/PageFrame";
 import { useRegisterPageHeader } from "@/components/apps/ui/PageHeaderContext";
 import { Panel } from "@/components/primitives/Panel";
 import styles from "./KnowledgeRoutePage.module.css";
-import { KNOWLEDGE_SECTIONS } from "./modules/knowledgeSections";
+import { CUSTOMER_KNOWLEDGE_SECTIONS } from "./modules/knowledgeSections";
 
 export default function KnowledgeRoutePage() {
+	const referenceSections = CUSTOMER_KNOWLEDGE_SECTIONS;
+	const referenceItemCount = referenceSections.reduce(
+		(total, section) => total + section.items.length,
+		0,
+	);
+
 	useRegisterPageHeader({
 		title: "Knowledge",
 		subtitle: "References, formulas, standards context, and reusable guidance.",
@@ -17,7 +23,7 @@ export default function KnowledgeRoutePage() {
 			<div className={styles.root}>
 				<PageContextBand
 					mode="compact"
-					eyebrow="Workspace directory"
+					eyebrow="Reference library"
 					summary={
 						<p className={styles.bandSummary}>
 							Open the tools, reusable formulas, and field-ready references that
@@ -25,14 +31,18 @@ export default function KnowledgeRoutePage() {
 						</p>
 					}
 					meta={
-						<div className={styles.bandStats}>
-							<div className={styles.bandStat}>
+						<div className={styles.bandFacts}>
+							<div className={styles.bandFact}>
 								<strong>2</strong>
 								<span>Interactive tools</span>
 							</div>
-							<div className={styles.bandStat}>
-								<strong>{KNOWLEDGE_SECTIONS.length}</strong>
+							<div className={styles.bandFact}>
+								<strong>{referenceSections.length}</strong>
 								<span>Reference sets</span>
+							</div>
+							<div className={styles.bandFact}>
+								<strong>{referenceItemCount}</strong>
+								<span>Reference items</span>
 							</div>
 						</div>
 					}
@@ -61,32 +71,24 @@ export default function KnowledgeRoutePage() {
 							padding="lg"
 							className={styles.libraryCard}
 						>
-							<span className={styles.featuredLabel}>Capture surface</span>
-							<h3 className={styles.libraryTitle}>Whiteboard</h3>
+							<span className={styles.featuredLabel}>Workflow reference</span>
+							<h3 className={styles.libraryTitle}>Standards guidance</h3>
 							<p className={styles.libraryDescription}>
-								Sketch, tag, and review whiteboard snapshots alongside active
-								designs.
+								Keep standards context and issue-set reminders close to the
+								active project workflow.
 							</p>
 							<Link
-								to="/app/knowledge/whiteboard"
+								to="/app/apps/standards-checker"
 								className={styles.libraryAction}
 							>
-								Open whiteboard
+								Open standards checker
 							</Link>
 						</Panel>
-					</div>
-					<div className={styles.referenceStrip}>
-						{KNOWLEDGE_SECTIONS.slice(0, 3).map((section) => (
-							<div key={section.title} className={styles.referencePill}>
-								<strong>{section.title}</strong>
-								<span>{section.items[0]}</span>
-							</div>
-						))}
 					</div>
 				</PageContextBand>
 
 				<div className={styles.sectionGrid}>
-					{KNOWLEDGE_SECTIONS.map((section) => (
+					{referenceSections.map((section) => (
 						<Panel
 							key={section.title}
 							variant="support"

@@ -4,7 +4,7 @@
 
 - Do not add or use Tailwind in this repository's main app.
 - Use the existing global CSS + CSS Modules approach already in the project.
-- Keep `zeroclaw-main/` behavior and stack isolated unless explicitly asked.
+- Do not reintroduce removed ZeroClaw subtree code or workshop artifacts into active Suite codepaths.
 
 ## Auth Guardrail
 
@@ -59,13 +59,12 @@
 
 ## Gateway Build/Runtime Guardrail
 
-- `zeroclaw-gateway` is the default gateway path for Suite workflows.
+- The Suite-native gateway is the default gateway path for Suite workflows.
 - Use `npm run gateway:dev` as the canonical command for daily development and handoffs.
-- Full CLI gateway (`zeroclaw gateway`) is incident-only diagnostics, not an equal daily alternative.
-- `SUITE_GATEWAY_USE_FULL_CLI=1` is allowed only for explicit diagnostics and evidence capture.
-- If rustc crashes (`stack overflow`, `0xc0000005`, ICE), capture versions + failure signature once, classify as compiler/toolchain instability, then return to default gateway path.
-- Do not stack speculative build-flag workarounds in-session after a classified compiler/toolchain failure.
-- Escalate upstream only after collecting a minimal reproducible diagnostic capture.
+- Legacy ZeroClaw CLI fallback is retired from active Suite workflows.
+- If the runtime detects an unexpected legacy gateway process, stop it and relaunch the canonical Suite-native path.
+- Do not reintroduce legacy gateway launchers or gateway-mode toggles into active Suite tooling.
+- Historical rust/toolchain failures from the retired legacy path should stay archived as diagnostics, not as an active workaround track.
 
 ## Agent Orchestration Guardrail
 

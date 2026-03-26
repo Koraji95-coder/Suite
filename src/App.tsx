@@ -12,26 +12,39 @@ import { ErrorBoundary } from "./components/notification-system/ErrorBoundary";
 import { ToastContainer } from "./components/notification-system/ToastContainer";
 import { logger } from "./lib/logger";
 import AgentPairingRedirectGate from "./routes/AgentPairingRedirectGate";
+import AppDashboardPage from "./routes/AppDashboardPage";
 import Shell from "./routes/AppShell";
+import AudienceRoute from "./routes/AudienceRoute";
+import AppsRoutePage from "./routes/apps/AppsRoutePage";
+import DrawingListManagerRoutePage from "./routes/apps/drawing-list-manager/DrawingListManagerRoutePage";
+import StandardsCheckerRoutePage from "./routes/apps/standards-checker/StandardsCheckerRoutePage";
+import TransmittalBuilderRoutePage from "./routes/apps/transmittal-builder/TransmittalBuilderRoutePage";
+import CalendarRoutePage from "./routes/CalendarRoutePage";
+import DeveloperDocsRoutePage from "./routes/knowledge/DeveloperDocsRoutePage";
+import KnowledgeRoutePage from "./routes/knowledge/KnowledgeRoutePage";
+import MathToolsLibraryPage from "./routes/knowledge/math-tools/MathToolsLibraryPage";
 import LandingPage from "./routes/LandingPage";
 import LoginPage from "./routes/LoginPage";
 import PrivacyPage from "./routes/PrivacyPage";
+import ProjectsRoutePage from "./routes/ProjectsRoutePage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RouteLoadingFallback from "./routes/RouteLoadingFallback";
 import SignupPage from "./routes/SignupPage";
+import SettingsPage from "./routes/settings/SettingsPage";
+import WatchdogRoutePage from "./routes/watchdog/WatchdogRoutePage";
 
-const AppsRoutePage = lazy(() => import("./routes/apps/AppsRoutePage"));
 const AgentRoutePage = lazy(() => import("./routes/agent/AgentRoutePage"));
+const DeveloperPortalRoutePage = lazy(
+	() => import("./routes/DeveloperPortalRoutePage"),
+);
+const ArchitectureMapRoutePage = lazy(
+	() => import("./routes/architecture/ArchitectureMapRoutePage"),
+);
 const AgentPairingCallbackPage = lazy(
 	() => import("./routes/agent/AgentPairingCallbackPage"),
 );
-const AppDashboardPage = lazy(() => import("./routes/AppDashboardPage"));
-const CalendarRoutePage = lazy(() => import("./routes/CalendarRoutePage"));
 const ChangelogRoutePage = lazy(() => import("./routes/ChangelogRoutePage"));
 const CommandCenterPage = lazy(() => import("./routes/CommandCenterPage"));
-const WatchdogRoutePage = lazy(
-	() => import("./routes/watchdog/WatchdogRoutePage"),
-);
 const GroundGridRoutePage = lazy(
 	() =>
 		import(
@@ -41,13 +54,7 @@ const GroundGridRoutePage = lazy(
 const AutoDraftStudioRoutePage = lazy(
 	() => import("./routes/apps/autodraft-studio/AutoDraftStudioRoutePage"),
 );
-const TransmittalBuilderRoutePage = lazy(
-	() => import("./routes/apps/transmittal-builder/TransmittalBuilderRoutePage"),
-);
 const GraphRoutePage = lazy(() => import("./routes/apps/graph/GraphRoutePage"));
-const StandardsCheckerRoutePage = lazy(
-	() => import("./routes/apps/standards-checker/StandardsCheckerRoutePage"),
-);
 const BatchFindReplaceRoutePage = lazy(
 	() => import("./routes/apps/batch-find-replace/BatchFindReplaceRoutePage"),
 );
@@ -57,27 +64,19 @@ const BlockLibraryRoutePage = lazy(
 const EtapDxfCleanupRoutePage = lazy(
 	() => import("./routes/apps/etap-dxf-cleanup/EtapDxfCleanupRoutePage"),
 );
-const DrawingListManagerRoutePage = lazy(
-	() =>
-		import("./routes/apps/drawing-list-manager/DrawingListManagerRoutePage"),
-);
 const AutoWireRoutePage = lazy(
 	() => import("./routes/apps/autowire/AutoWireRoutePage"),
-);
-const KnowledgeRoutePage = lazy(
-	() => import("./routes/knowledge/KnowledgeRoutePage"),
-);
-const MathToolsLibraryPage = lazy(
-	() => import("./routes/knowledge/math-tools/MathToolsLibraryPage"),
 );
 const WhiteboardKnowledgePage = lazy(
 	() => import("./routes/knowledge/whiteboard/WhiteboardKnowledgePage"),
 );
-const ProjectsRoutePage = lazy(() => import("./routes/ProjectsRoutePage"));
-const SettingsPage = lazy(() => import("./routes/settings/SettingsPage"));
 
 function withRouteSuspense(element: React.ReactNode) {
 	return <Suspense fallback={<RouteLoadingFallback />}>{element}</Suspense>;
+}
+
+function withAudience(element: React.ReactNode, audience: "customer" | "dev") {
+	return <AudienceRoute audience={audience}>{element}</AudienceRoute>;
 }
 
 function EnvDebug() {
@@ -111,7 +110,7 @@ export default function App() {
 							<Route path="/privacy" element={<PrivacyPage />} />
 							<Route
 								path="/roadmap"
-								element={<Navigate to="/app/changelog" replace />}
+								element={<Navigate to="/" replace />}
 							/>
 							<Route
 								path="/agent/pairing-callback"
@@ -137,6 +136,16 @@ export default function App() {
 										element={withRouteSuspense(<WatchdogRoutePage />)}
 									/>
 									<Route
+										path="operations"
+										element={<Navigate to="/app/developer" replace />}
+									/>
+									<Route
+										path="developer"
+										element={withRouteSuspense(
+											withAudience(<DeveloperPortalRoutePage />, "dev"),
+										)}
+									/>
+									<Route
 										path="projects"
 										element={withRouteSuspense(<ProjectsRoutePage />)}
 									/>
@@ -150,7 +159,9 @@ export default function App() {
 									/>
 									<Route
 										path="changelog"
-										element={withRouteSuspense(<ChangelogRoutePage />)}
+										element={withRouteSuspense(
+											withAudience(<ChangelogRoutePage />, "dev"),
+										)}
 									/>
 									<Route
 										path="apps"
@@ -158,11 +169,15 @@ export default function App() {
 									/>
 									<Route
 										path="apps/ground-grid-generation"
-										element={withRouteSuspense(<GroundGridRoutePage />)}
+										element={withRouteSuspense(
+											withAudience(<GroundGridRoutePage />, "dev"),
+										)}
 									/>
 									<Route
 										path="apps/autodraft-studio"
-										element={withRouteSuspense(<AutoDraftStudioRoutePage />)}
+										element={withRouteSuspense(
+											withAudience(<AutoDraftStudioRoutePage />, "dev"),
+										)}
 									/>
 									<Route
 										path="apps/transmittal-builder"
@@ -174,11 +189,15 @@ export default function App() {
 									/>
 									<Route
 										path="apps/autowire"
-										element={withRouteSuspense(<AutoWireRoutePage />)}
+										element={withRouteSuspense(
+											withAudience(<AutoWireRoutePage />, "dev"),
+										)}
 									/>
 									<Route
 										path="apps/graph"
-										element={withRouteSuspense(<GraphRoutePage />)}
+										element={withRouteSuspense(
+											withAudience(<GraphRoutePage />, "dev"),
+										)}
 									/>
 									<Route
 										path="apps/standards-checker"
@@ -186,7 +205,9 @@ export default function App() {
 									/>
 									<Route
 										path="apps/batch-find-replace"
-										element={withRouteSuspense(<BatchFindReplaceRoutePage />)}
+										element={withRouteSuspense(
+											withAudience(<BatchFindReplaceRoutePage />, "dev"),
+										)}
 									/>
 									<Route
 										path="apps/block-library"
@@ -194,15 +215,31 @@ export default function App() {
 									/>
 									<Route
 										path="apps/etap-dxf-cleanup"
-										element={withRouteSuspense(<EtapDxfCleanupRoutePage />)}
+										element={withRouteSuspense(
+											withAudience(<EtapDxfCleanupRoutePage />, "dev"),
+										)}
+									/>
+									<Route
+										path="architecture"
+										element={withRouteSuspense(
+											withAudience(<ArchitectureMapRoutePage />, "dev"),
+										)}
 									/>
 									<Route
 										path="knowledge"
 										element={withRouteSuspense(<KnowledgeRoutePage />)}
 									/>
 									<Route
+										path="developer/docs"
+										element={withRouteSuspense(
+											withAudience(<DeveloperDocsRoutePage />, "dev"),
+										)}
+									/>
+									<Route
 										path="knowledge/whiteboard"
-										element={withRouteSuspense(<WhiteboardKnowledgePage />)}
+										element={withRouteSuspense(
+											withAudience(<WhiteboardKnowledgePage />, "dev"),
+										)}
 									/>
 									<Route
 										path="knowledge/math-tools"
@@ -210,11 +247,15 @@ export default function App() {
 									/>
 									<Route
 										path="agent"
-										element={withRouteSuspense(<AgentRoutePage />)}
+										element={withRouteSuspense(
+											withAudience(<AgentRoutePage />, "dev"),
+										)}
 									/>
 									<Route
 										path="agent/pairing-callback"
-										element={withRouteSuspense(<AgentPairingCallbackPage />)}
+										element={withRouteSuspense(
+											withAudience(<AgentPairingCallbackPage />, "dev"),
+										)}
 									/>
 									<Route
 										path="settings"
@@ -222,7 +263,9 @@ export default function App() {
 									/>
 									<Route
 										path="command-center"
-										element={withRouteSuspense(<CommandCenterPage />)}
+										element={withRouteSuspense(
+											withAudience(<CommandCenterPage />, "dev"),
+										)}
 									/>
 								</Route>
 							</Route>

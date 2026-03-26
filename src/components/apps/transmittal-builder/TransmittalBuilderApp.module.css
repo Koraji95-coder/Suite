@@ -3,9 +3,93 @@
 	gap: 1.5rem;
 }
 
+.contextCopy {
+	display: grid;
+	gap: 0.35rem;
+}
+
+.contextTitle {
+	margin: 0;
+	font-size: clamp(1rem, 0.95rem + 0.35vw, 1.25rem);
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	color: var(--text);
+}
+
 .contextSummary {
 	max-width: 72ch;
 	line-height: 1.6;
+}
+
+.contextFacts {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.8rem 1rem;
+	margin-top: 0.35rem;
+}
+
+.contextFact {
+	display: grid;
+	gap: 0.18rem;
+	min-width: 10rem;
+	padding-right: 1rem;
+	border-right: 1px solid color-mix(in srgb, var(--brand-border-soft) 58%, transparent);
+}
+
+.contextFact:last-child {
+	padding-right: 0;
+	border-right: none;
+}
+
+.contextFactLabel {
+	font-size: 0.67rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.contextFactValue {
+	font-size: 0.86rem;
+	font-weight: 600;
+	color: var(--text);
+}
+
+.contextMeta {
+	display: inline-flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.45rem;
+}
+
+.metricStrip {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+}
+
+.metricPill {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.45rem;
+	padding: 0.5rem 0.72rem;
+	border-radius: 999px;
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 76%, transparent);
+	background: color-mix(in srgb, var(--suite-surface-sunken) 82%, transparent);
+}
+
+.metricLabel {
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: none;
+	color: var(--text-muted);
+}
+
+.metricValue {
+	font-size: 0.9rem;
+	font-weight: 700;
+	color: var(--text);
 }
 
 .sideRail {
@@ -15,5 +99,13 @@
 @media (min-width: 1280px) {
 	.layout {
 		grid-template-columns: minmax(0, 1fr) 340px;
+	}
+}
+
+@media (max-width: 720px) {
+	.contextFact {
+		min-width: 0;
+		padding-right: 0;
+		border-right: none;
 	}
 }

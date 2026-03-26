@@ -15,6 +15,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
+. $runtimeSharedScript
 $daemonScript = (Resolve-Path (Join-Path $PSScriptRoot "watchdog-autocad-collector-daemon.ps1")).Path
 $processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
 . $processUtilsScript
@@ -25,171 +27,6 @@ else {
     Join-Path $env:USERPROFILE "AppData\Local"
 }
 
-function Get-TomlStringValue {
-    param(
-        [string]$Path,
-        [string]$Key
-    )
-
-    if (-not $Path -or -not (Test-Path $Path)) {
-        return $null
-    }
-
-    $pattern = "^\s*$([Regex]::Escape($Key))\s*=\s*""([^""]*)"""
-    foreach ($line in Get-Content $Path) {
-        $match = [Regex]::Match($line, $pattern)
-        if ($match.Success) {
-            return $match.Groups[1].Value.Trim()
-        }
-    }
-
-    return $null
-}
-
-function Get-WorkstationIdentity {
-    param(
-        [string]$TomlPath,
-        [string]$ExplicitWorkstationId
-    )
-
-    $computerName = [string]($env:COMPUTERNAME)
-    $configuredWorkstationId = [string](Get-TomlStringValue -Path $TomlPath -Key "SUITE_WORKSTATION_ID")
-    $resolvedWorkstationId = if ($ExplicitWorkstationId) {
-        $ExplicitWorkstationId
-    }
-    elseif ($configuredWorkstationId) {
-        $configuredWorkstationId
-    }
-    elseif ($computerName) {
-        $computerName
-    }
-    else {
-        [System.Net.Dns]::GetHostName()
-    }
-
-    [pscustomobject]@{
-        WorkstationId = $resolvedWorkstationId.Trim()
-        WorkstationLabel = [string](Get-TomlStringValue -Path $TomlPath -Key "SUITE_WORKSTATION_LABEL")
-        WorkstationRole = [string](Get-TomlStringValue -Path $TomlPath -Key "SUITE_WORKSTATION_ROLE")
-        ComputerName = $computerName.Trim()
-    }
-}
-
-function Convert-ToSlug {
-    param([string]$Value)
-
-    $slug = [Regex]::Replace(([string]$Value).ToLowerInvariant(), "[^a-z0-9]+", "-")
-    return $slug.Trim("-")
-}
-
-function Resolve-AbsolutePath {
-    param([string]$PathValue)
-
-    if ([string]::IsNullOrWhiteSpace($PathValue)) {
-        return $null
-    }
-    if ([System.IO.Path]::IsPathRooted($PathValue)) {
-        return [System.IO.Path]::GetFullPath($PathValue)
-    }
-    return [System.IO.Path]::GetFullPath((Join-Path $repoRoot $PathValue))
-}
-
-function Get-CollectorScheduledTask {
-    param([string]$Name)
-
-    if ([string]::IsNullOrWhiteSpace($Name)) {
-        return $null
-    }
-
-    $command = Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue
-    if (-not $command) {
-        return $null
-    }
-
-    try {
-        return Get-ScheduledTask -TaskName $Name -ErrorAction Stop
-    }
-    catch {
-        return $null
-    }
-}
-
-function Get-RunKeyValue {
-    param([string]$Name)
-
-    if ([string]::IsNullOrWhiteSpace($Name)) {
-        return $null
-    }
-
-    $runKeyPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    try {
-        return [string](Get-ItemPropertyValue -Path $runKeyPath -Name $Name -ErrorAction Stop)
-    }
-    catch {
-        return $null
-    }
-}
-
-function Test-DaemonRunning {
-    param(
-        [string]$DaemonScriptPath,
-        [string]$CollectorConfigPath
-    )
-
-    $daemonToken = [System.IO.Path]::GetFileName($DaemonScriptPath).ToLowerInvariant()
-    $configToken = [string]$CollectorConfigPath
-    if ($configToken) {
-        $configToken = $configToken.ToLowerInvariant()
-    }
-
-    $processes = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe'"
-    foreach ($process in $processes) {
-        $commandLine = [string]$process.CommandLine
-        if ([string]::IsNullOrWhiteSpace($commandLine)) {
-            continue
-        }
-
-        $normalized = $commandLine.ToLowerInvariant()
-        if (-not $normalized.Contains($daemonToken)) {
-            continue
-        }
-        if ($configToken -and -not $normalized.Contains($configToken)) {
-            continue
-        }
-
-        return $true
-    }
-
-    return $false
-}
-
-function Start-CollectorDaemonProcess {
-    param(
-        [string]$DaemonScriptPath,
-        [string]$CollectorConfigPath,
-        [string]$TomlPath,
-        [string]$NamedMutex
-    )
-
-    $arguments = @(
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-WindowStyle",
-        "Hidden",
-        "-File",
-        $DaemonScriptPath,
-        "-ConfigPath",
-        $CollectorConfigPath,
-        "-CodexConfigPath",
-        $TomlPath,
-        "-MutexName",
-        $NamedMutex
-    )
-
-    Start-SuiteDetachedProcess -FilePath "PowerShell.exe" -WorkingDirectory $repoRoot -Arguments $arguments | Out-Null
-}
-
 $identity = Get-WorkstationIdentity -TomlPath $CodexConfigPath -ExplicitWorkstationId $WorkstationId
 $slug = Convert-ToSlug -Value $identity.WorkstationId
 
@@ -198,7 +35,7 @@ if (-not $ConfigPath) {
         (Join-Path $localAppData "Suite\watchdog-autocad-collector\config") `
         "$($identity.WorkstationId)-autocad.json"
 }
-$ConfigPath = Resolve-AbsolutePath -PathValue $ConfigPath
+$ConfigPath = Resolve-AbsolutePath -PathValue $ConfigPath -RepoRoot $repoRoot
 
 if (-not $TaskName) {
     $TaskName = "SuiteWatchdogAutoCADCollector-$($identity.WorkstationId)"
@@ -282,6 +119,7 @@ if (
 
     if (-not $startedNow) {
         Start-CollectorDaemonProcess `
+            -WorkingDirectory $repoRoot `
             -DaemonScriptPath $daemonScript `
             -CollectorConfigPath $ConfigPath `
             -TomlPath $CodexConfigPath `

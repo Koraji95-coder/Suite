@@ -139,6 +139,7 @@ async function runSharedAgentRefresh(options: {
 	pairingCacheKey: string;
 	healthCacheKey: string;
 	includeHealth: boolean;
+	priorTransientRetryCount: number;
 }): Promise<SharedAgentRefreshResult> {
 	const dedupeKey = resolveSharedRefreshKey(
 		options.pairingCacheKey,
@@ -178,7 +179,7 @@ async function runSharedAgentRefresh(options: {
 				}
 				if (result.transient) {
 					transientRetryCount = Math.min(
-						transientRetryCount + 1,
+						options.priorTransientRetryCount + 1,
 						AGENT_TRANSIENT_RETRY_BACKOFF_MS.length,
 					);
 				}
@@ -199,7 +200,7 @@ async function runSharedAgentRefresh(options: {
 			};
 		} catch (cause) {
 			transientRetryCount = Math.min(
-				transientRetryCount + 1,
+				options.priorTransientRetryCount + 1,
 				AGENT_TRANSIENT_RETRY_BACKOFF_MS.length,
 			);
 			nextError =
@@ -271,6 +272,7 @@ export function useAgentConnectionStatus(
 					pairingCacheKey,
 					healthCacheKey,
 					includeHealth: refreshOptions.includeHealth,
+					priorTransientRetryCount: transientRetryCountRef.current,
 				});
 				if (!mountedRef.current) return;
 				setPaired(result.paired);

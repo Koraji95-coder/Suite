@@ -4,7 +4,7 @@ Suite is a local-first engineering operations workspace that combines:
 
 - CAD-integrated workflow apps (AutoWire, AutoDraft, ground grid, ETAP cleanup, etc.)
 - a Flask backend bridge for AutoCAD and orchestration APIs
-- a profile-based multi-agent system (ZeroClaw + Ollama)
+- a profile-based multi-agent system (Suite agent gateway + Ollama)
 - project operations UX (dashboard, projects, calendar, docs, command center)
 
 The app is designed for day-to-day electrical/CAD production work, with emphasis on deterministic execution, review gates, and operator control.
@@ -82,11 +82,14 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
 - `dotnet/named-pipe-bridge` (`net8.0`)
   - local named-pipe bridge for AutoCAD-oriented actions
 
-### ZeroClaw Gateway
+### Suite Agent Gateway
 
-- Included under `zeroclaw-main/`
 - Canonical daily command from this repo:
   - `npm run gateway:dev`
+- Default path:
+  - Suite-native Node gateway in `scripts/suite-agent-gateway.mjs`
+- Legacy ZeroClaw CLI fallback is retired from the active Suite gateway workflow.
+- Historical ZeroClaw extraction notes remain in `docs/development/zeroclaw-*.md`; the old subtree is no longer part of the active repo layout.
 
 ## Tech Stack
 
@@ -94,7 +97,7 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
 - UI primitives: custom primitives + CSS modules/global CSS (no Tailwind)
 - Backend: Flask, Flask-CORS, Flask-Limiter, Flask-Sock, pywin32
 - Auth: Supabase (email-link first, optional passkey rollout paths)
-- Agent runtime: ZeroClaw gateway + Ollama local models
+- Agent runtime: Suite-native gateway + Ollama local models
 - .NET: ASP.NET Core (AutoDraft contract) + named-pipe bridge
 - Quality: Biome, TypeScript typecheck, Vitest, Playwright, pytest, dotnet test
 
@@ -105,7 +108,6 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
 - `dotnet/` - .NET contract + named-pipe bridge projects
 - `docs/` - canonical documentation and runbooks
 - `scripts/` - env sync, architecture model, gateway/dev orchestration helpers
-- `zeroclaw-main/` - vendored/embedded ZeroClaw gateway codebase
 
 ## Local Development
 

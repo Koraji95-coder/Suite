@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/logger";
 import { logActivity } from "@/services/activityService";
+import { projectTitleBlockProfileService } from "@/services/projectTitleBlockProfileService";
 import { syncSharedProjectWatchdogRulesToLocalRuntime } from "@/services/projectWatchdogService";
 import { watchdogService } from "@/services/watchdogService";
 import {
@@ -28,6 +29,7 @@ import {
 	type ProjectStatus,
 	type Task,
 	type TaskCount,
+	type ViewMode,
 } from "./projectmanagertypes";
 import { categoryColor, toDateOnly } from "./projectmanagerutils";
 import { useProjectManagerUiState } from "./useProjectManagerUiState";
@@ -42,6 +44,8 @@ interface TaskSummary {
 
 interface UseProjectManagerStateArgs {
 	initialProjectId?: string;
+	initialIssueSetId?: string;
+	initialViewMode?: ViewMode;
 	externalSelectedDate?: string | null;
 	onCalendarDateChange?: (date: string | null) => void;
 	externalMonth?: Date;
@@ -50,6 +54,8 @@ interface UseProjectManagerStateArgs {
 
 export function useProjectManagerState({
 	initialProjectId,
+	initialIssueSetId,
+	initialViewMode,
 	externalSelectedDate,
 	onCalendarDateChange,
 	externalMonth,
@@ -77,6 +83,8 @@ export function useProjectManagerState({
 		setExpandedTasks,
 		viewMode,
 		setViewMode,
+		activeIssueSetId,
+		setActiveIssueSetId,
 		fileFilter,
 		setFileFilter,
 		projectSearch,
@@ -100,7 +108,7 @@ export function useProjectManagerState({
 		openAddSubtask,
 		requestDeleteProject,
 		requestDeleteTask,
-	} = useProjectManagerUiState();
+	} = useProjectManagerUiState(initialViewMode, initialIssueSetId ?? null);
 	const [internalCurrentMonth, setInternalCurrentMonth] = useState(new Date());
 	const [internalSelectedDate, setInternalSelectedDate] = useState<
 		string | null
@@ -203,10 +211,28 @@ export function useProjectManagerState({
 		if (!initialProjectId || projects.length === 0) return;
 
 		const matched = projects.find((project) => project.id === initialProjectId);
-		if (matched && matched.id !== selectedProject?.id) {
-			setSelectedProject(matched);
+		if (matched) {
+			if (matched.id !== selectedProject?.id) {
+				setSelectedProject(matched);
+			}
+			if (initialViewMode && viewMode !== initialViewMode) {
+				setViewMode(initialViewMode);
+			}
+			if ((initialIssueSetId ?? null) !== activeIssueSetId) {
+				setActiveIssueSetId(initialIssueSetId ?? null);
+			}
 		}
-	}, [initialProjectId, projects, selectedProject?.id]);
+	}, [
+		activeIssueSetId,
+		initialProjectId,
+		initialIssueSetId,
+		initialViewMode,
+		projects,
+		selectedProject?.id,
+		setActiveIssueSetId,
+		setViewMode,
+		viewMode,
+	]);
 
 	const loadTasks = useCallback(
 		async (projectId: string) => {
@@ -434,6 +460,17 @@ export function useProjectManagerState({
 			if (error) throw error;
 
 			if (data) {
+				await projectTitleBlockProfileService.upsertProfile({
+					projectId: data[0].id,
+					blockName: projectForm.titleBlockBlockName,
+					projectRootPath: watchdogRootPath,
+					acadeLine1: projectForm.titleBlockAcadeLine1,
+					acadeLine2: projectForm.titleBlockAcadeLine2,
+					acadeLine4: projectForm.titleBlockAcadeLine4,
+					signerDrawnBy: projectForm.titleBlockDrawnBy,
+					signerCheckedBy: projectForm.titleBlockCheckedBy,
+					signerEngineer: projectForm.titleBlockEngineer,
+				});
 				await logActivity({
 					action: "create",
 					description: `Created project: ${projectForm.name}`,
@@ -441,6 +478,8 @@ export function useProjectManagerState({
 				});
 				setProjects([data[0], ...projects]);
 				setSelectedProject(data[0]);
+				setActiveIssueSetId(null);
+				setViewMode("setup");
 				setShowProjectModal(false);
 				resetProjectForm();
 				await syncWatchdogRulesAfterProjectMutation();
@@ -483,6 +522,18 @@ export function useProjectManagerState({
 
 			if (error) throw error;
 
+			await projectTitleBlockProfileService.upsertProfile({
+				projectId: editingProject.id,
+				blockName: projectForm.titleBlockBlockName,
+				projectRootPath: watchdogRootPath,
+				acadeLine1: projectForm.titleBlockAcadeLine1,
+				acadeLine2: projectForm.titleBlockAcadeLine2,
+				acadeLine4: projectForm.titleBlockAcadeLine4,
+				signerDrawnBy: projectForm.titleBlockDrawnBy,
+				signerCheckedBy: projectForm.titleBlockCheckedBy,
+				signerEngineer: projectForm.titleBlockEngineer,
+			});
+
 			await logActivity({
 				action: "update",
 				description: `Updated project: ${projectForm.name}`,
@@ -497,6 +548,8 @@ export function useProjectManagerState({
 					? ({ ...prev, ...payload } as Project)
 					: prev,
 			);
+			setActiveIssueSetId(null);
+			setViewMode("setup");
 			setShowProjectModal(false);
 			setEditingProject(null);
 			resetProjectForm();
@@ -534,6 +587,10 @@ export function useProjectManagerState({
 
 			if (selectedProject?.id === projectId) {
 				setSelectedProject(remaining.length > 0 ? remaining[0] : null);
+				setActiveIssueSetId(null);
+				if (remaining.length > 0) {
+					setViewMode("setup");
+				}
 			}
 			await syncWatchdogRulesAfterProjectMutation();
 			showToast("success", "Project deleted");
@@ -1079,6 +1136,8 @@ export function useProjectManagerState({
 		expandedTasks,
 		viewMode,
 		setViewMode,
+		activeIssueSetId,
+		setActiveIssueSetId,
 		currentMonth,
 		setCurrentMonth,
 		selectedCalendarDate,

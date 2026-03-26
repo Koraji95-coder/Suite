@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { logger } from "@/lib/logger";
+import { supabase } from "@/supabase/client";
 import {
 	type CheckResult,
 	categories,
@@ -9,17 +11,101 @@ import {
 
 const CHECK_RUN_DELAY_MS = 1500;
 
-export function useStandardsCheckerState() {
+interface StandardsCheckerProjectOption {
+	id: string;
+	name: string;
+}
+
+export function useStandardsCheckerState(preferredProjectId?: string) {
 	const [mode, setMode] = useState<StandardsCheckerMode>("standards");
 	const [activeCategory, setActiveCategory] = useState<StandardsCategory>(
 		categories[0],
 	);
+	const [projectOptions, setProjectOptions] = useState<
+		StandardsCheckerProjectOption[]
+	>([]);
+	const [selectedProjectId, setSelectedProjectId] = useState("");
+	const [loadingProjects, setLoadingProjects] = useState(false);
 	const [selectedStandards, setSelectedStandards] = useState<Set<string>>(
 		new Set(),
 	);
 	const [results, setResults] = useState<CheckResult[]>([]);
 	const [running, setRunning] = useState(false);
 	const runTimeoutRef = useRef<number | null>(null);
+
+	useEffect(() => {
+		let active = true;
+
+		const loadProjects = async () => {
+			setLoadingProjects(true);
+			try {
+				const {
+					data: { user },
+					error: authError,
+				} = await supabase.auth.getUser();
+				if (authError || !user) {
+					if (active) {
+						setProjectOptions([]);
+						setSelectedProjectId("");
+					}
+					return;
+				}
+
+				const { data, error } = await supabase
+					.from("projects")
+					.select("id, name")
+					.eq("user_id", user.id)
+					.order("created_at", { ascending: false });
+
+				if (error) {
+					throw error;
+				}
+
+				if (!active) {
+					return;
+				}
+
+				const nextOptions = (
+					(data ?? []) as Array<{ id: string; name: string }>
+				).map((project) => ({
+					id: project.id,
+					name: project.name,
+				}));
+
+				setProjectOptions(nextOptions);
+				setSelectedProjectId((current) => {
+					if (
+						preferredProjectId &&
+						nextOptions.some((project) => project.id === preferredProjectId)
+					) {
+						return preferredProjectId;
+					}
+					return current && nextOptions.some((project) => project.id === current)
+						? current
+						: "";
+				});
+			} catch (error) {
+				if (!active) {
+					return;
+				}
+				logger.error(
+					"Failed to load project options for standards review",
+					"StandardsChecker",
+					error,
+				);
+				setProjectOptions([]);
+			} finally {
+				if (active) {
+					setLoadingProjects(false);
+				}
+			}
+		};
+
+		void loadProjects();
+		return () => {
+			active = false;
+		};
+	}, [preferredProjectId]);
 
 	useEffect(() => {
 		return () => {
@@ -93,17 +179,27 @@ export function useStandardsCheckerState() {
 		() => results.filter((result) => result.status === "fail").length,
 		[results],
 	);
+	const selectedProject = useMemo(
+		() =>
+			projectOptions.find((project) => project.id === selectedProjectId) ?? null,
+		[projectOptions, selectedProjectId],
+	);
 
 	return {
 		activeCategory,
 		failCount,
 		filteredStandards,
 		getResultForStandard,
+		loadingProjects,
 		mode,
 		passCount,
+		projectOptions,
 		results,
 		running,
+		selectedProjectId,
+		selectedProjectName: selectedProject?.name ?? null,
 		selectedStandards,
+		setSelectedProjectId,
 		setActiveCategory,
 		setMode,
 		toggleStandard,

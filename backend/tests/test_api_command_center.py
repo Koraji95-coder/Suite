@@ -73,6 +73,10 @@ class TestApiCommandCenter(unittest.TestCase):
             "preflight",
         )
         self.assertFalse(bool((payload.get("lastPreflight") or {}).get("pushReady")))
+        self.assertEqual(
+            payload.get("pushReadinessSummary"),
+            "Hosted push is waiting on the latest local preflight confirmation: Local Supabase is unavailable. Gateway health endpoint is unavailable.",
+        )
         self.assertEqual(((payload.get("lastPush") or {}).get("kind")), "push")
         self.assertEqual(len(payload.get("logTail") or []), 2)
 

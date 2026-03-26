@@ -14,6 +14,26 @@
 	gap: 0.5rem;
 }
 
+.generateSummary {
+	display: grid;
+	gap: 0.55rem;
+	padding-top: 0.15rem;
+	border-top: 1px solid color-mix(in srgb, var(--brand-border-soft) 72%, transparent);
+}
+
+.validationStatus {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	font-size: 0.75rem;
+}
+
+.readyNote {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
 .blockTitle {
 	font-size: 0.75rem;
 	font-weight: 600;
@@ -95,10 +115,25 @@
 	font-size: 0.75rem;
 }
 
+.summaryHeader {
+	display: grid;
+	gap: 0.18rem;
+}
+
 .summaryHeading {
 	font-size: 0.875rem;
 	font-weight: 600;
 	color: var(--text);
+}
+
+.summaryList {
+	display: grid;
+	gap: 0.45rem;
+}
+
+.summaryRow {
+	display: grid;
+	gap: 0.12rem;
 }
 
 .text {
@@ -111,15 +146,9 @@
 
 .optionSummaryList {
 	display: grid;
-	gap: 0.25rem;
-}
-
-.validationBody {
-	display: grid;
-	gap: 0.5rem;
-	padding-inline: 0.5rem;
-	font-size: 0.75rem;
-	color: var(--text-muted);
+	gap: 0.45rem;
+	padding-top: 0.15rem;
+	border-top: 1px solid color-mix(in srgb, var(--brand-border-soft) 64%, transparent);
 }
 
 .validationErrors {
@@ -128,10 +157,15 @@
 	color: var(--danger);
 }
 
+.snapshotNote {
+	font-size: 0.78rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}
+
 @media (min-width: 640px) {
 	.sectionBody,
-	.outputBody,
-	.validationBody {
+	.outputBody {
 		padding-inline: 0.75rem;
 	}
 }

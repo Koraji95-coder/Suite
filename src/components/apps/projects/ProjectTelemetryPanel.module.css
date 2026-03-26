@@ -4,6 +4,46 @@
 	gap: 1rem;
 }
 
+.embeddedHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 0.75rem;
+	padding-bottom: 0.35rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--line-soft) 68%, transparent);
+}
+
+.embeddedHeaderCopy {
+	display: flex;
+	flex-direction: column;
+	gap: 0.12rem;
+}
+
+.embeddedEyebrow {
+	margin: 0;
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	color: var(--text-muted);
+}
+
+.embeddedTitle {
+	margin: 0;
+	font-size: 0.92rem;
+	font-weight: 650;
+	color: var(--text);
+}
+
+.embeddedLink {
+	color: color-mix(in srgb, var(--text) 84%, transparent);
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.8rem;
+	font-weight: 600;
+	text-decoration: none;
+}
+
 .header {
 	display: flex;
 	justify-content: space-between;
@@ -521,6 +561,87 @@
 	color: var(--text-muted);
 }
 
+.ruleSummaryButton {
+	width: 100%;
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 1rem;
+	padding: 0.85rem 0.95rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+	color: var(--text);
+	cursor: pointer;
+	text-align: left;
+}
+
+.ruleSummaryMain {
+	display: flex;
+	flex-direction: column;
+	gap: 0.18rem;
+	min-width: 0;
+}
+
+.ruleSummaryValue {
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--text);
+	word-break: break-word;
+}
+
+.ruleSummaryMeta {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.2rem;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.sessionFallback {
+	display: flex;
+	flex-direction: column;
+	gap: 0.85rem;
+	padding: 0.9rem 1rem;
+	border-radius: var(--radius-2);
+	border: 1px dashed var(--line-soft);
+	background: color-mix(in srgb, var(--surface) 90%, transparent);
+}
+
+.sessionFallbackCopy {
+	margin: 0;
+	font-size: 0.84rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
+.compactRoot {
+	padding: 0;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+}
+
+.compactHeader {
+	padding-bottom: 0.2rem;
+	border-bottom: 1px solid color-mix(in srgb, var(--line-soft) 72%, transparent);
+}
+
+.compactDescription {
+	font-size: 0.82rem;
+}
+
+.compactStatsGrid {
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.compactStatCard {
+	padding: 0.75rem;
+	box-shadow: none;
+}
+
 .emptyState {
 	border-radius: var(--radius-2);
 	border: 1px dashed var(--line-soft);
@@ -535,14 +656,20 @@
 	.ruleHeader,
 	.drawingsHeader,
 	.dayGroupHeader,
-	.sessionRow {
+	.sessionRow,
+	.ruleSummaryButton {
 		flex-direction: column;
 		align-items: stretch;
 	}
 
 	.sessionAside,
 	.segmentAside,
-	.dayGroupAside {
+	.dayGroupAside,
+	.ruleSummaryMeta {
 		align-items: flex-start;
+	}
+
+	.compactStatsGrid {
+		grid-template-columns: 1fr;
 	}
 }

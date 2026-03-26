@@ -2,12 +2,8 @@
 import { type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { APP_NAME, APP_TAGLINE } from "@/appMeta";
-import { AgentPixelMark } from "@/components/agent/AgentPixelMark";
-import { AGENT_PROFILES } from "@/components/agent/agentProfiles";
-import type { AgentProfileId } from "@/components/agent/agentProfiles";
 import { SuiteLogo } from "@/components/brand/SuiteLogo";
 import { Button } from "@/components/primitives/Button";
-import { HStack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
 import { cn } from "@/lib/utils";
 import styles from "./AuthShell.module.css";
@@ -20,12 +16,19 @@ type AuthShellProps = {
 	cardStyle?: CSSProperties;
 };
 
-const AUTH_HEADER_AGENT_IDS: AgentProfileId[] = ["koro", "devstral", "forge"];
-
 const ACCESS_SIGNALS = [
-	{ label: "Authentication", value: "Passkeys, email links, and trusted sessions" },
-	{ label: "Verification", value: "Brokered pairing when agent trust is required" },
-	{ label: "Scope", value: "Projects, telemetry, and operations context" },
+	{
+		label: "Authentication",
+		value: "Passkeys, email links, and trusted sessions",
+	},
+	{
+		label: "Verification",
+		value: "Reviewed access to project delivery and workspace controls",
+	},
+	{
+		label: "Scope",
+		value: "Projects, Watchdog telemetry, and issue-set delivery context",
+	},
 ] as const;
 
 export default function AuthShell({
@@ -50,7 +53,7 @@ export default function AuthShell({
 				</Link>
 
 				<div className={styles.navRight}>
-					<span className={styles.navStatus}>Secure auth surface</span>
+					<span className={styles.navStatus}>Secure workspace access</span>
 					{navLink && (
 						<Link to={navLink.to}>
 							<Button variant="secondary" size="sm">
@@ -74,14 +77,16 @@ export default function AuthShell({
 							<div className={styles.leftPanelPattern} />
 
 							<div className={styles.leftPanelContent}>
-								<div className={styles.leftEyebrow}>Operations access</div>
+								<div className={styles.leftEyebrow}>
+									Secure workspace access
+								</div>
 
 								<div className={styles.brandBlock}>
 									<div className={styles.brandLogoWrap}>
 										<SuiteLogo variant="full" size="lg" />
 									</div>
 									<Text size="xl" weight="semibold" block>
-										Operations access
+										Drawing control access
 									</Text>
 									<Text
 										size="sm"
@@ -117,26 +122,12 @@ export default function AuthShell({
 						<div className={styles.rightPanelHeader}>
 							<div>
 								<Text size="xs" color="muted">
-									Workspace authentication
+									Workspace access
 								</Text>
-								<HStack gap={2} className={styles.agentBadgeRow} wrap>
-									{AUTH_HEADER_AGENT_IDS.map((id) => (
-										<div key={id} className={styles.agentBadge}>
-											<AgentPixelMark
-												profileId={id}
-												size={14}
-												detailLevel="hero"
-											/>
-											<Text
-												size="xs"
-												color="muted"
-												className={styles.agentName}
-											>
-												{AGENT_PROFILES[id].name}
-											</Text>
-										</div>
-									))}
-								</HStack>
+								<Text size="xs" color="muted" block>
+									Sign in to manage projects, Watchdog telemetry, and delivery
+									workflows.
+								</Text>
 							</div>
 						</div>
 						<div className={styles.rightPanelBody}>{children}</div>

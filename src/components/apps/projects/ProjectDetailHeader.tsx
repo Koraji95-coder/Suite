@@ -3,7 +3,7 @@ import {
 	ArrowRight,
 	Calendar,
 	Radar,
-	TerminalSquare,
+	Workflow,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -15,7 +15,6 @@ import styles from "./ProjectDetailHeader.module.css";
 import type { Project, Task } from "./projectmanagertypes";
 import type { ProjectWatchdogTelemetry } from "./useProjectWatchdogTelemetry";
 import { formatDateOnly } from "./projectmanagerutils";
-import { ProjectHealthScoreCard } from "./ProjectHealthScoreCard";
 
 interface ProjectDetailHeaderProps {
 	project: Project;
@@ -100,18 +99,18 @@ export function ProjectDetailHeader({
 	const latestTrackedLabel = latestTrackedPath
 		? basenameFromPath(leadRuntime?.activeDrawingName || latestTrackedPath)
 		: null;
-	const commandCenterSummary =
+	const workflowSummary =
 		overdueTaskCount > 0
-			? `${overdueTaskCount} overdue task${overdueTaskCount === 1 ? "" : "s"} need follow-up in Watchdog and Projects.`
+			? `${overdueTaskCount} at-risk work item${overdueTaskCount === 1 ? "" : "s"} still needs follow-up before the next package.`
 			: openTaskCount > 0
-				? `${openTaskCount} active task${openTaskCount === 1 ? "" : "s"} remain for this project. Open Watchdog to review recent drawing and file activity.`
-				: "All tracked tasks are complete. Use Watchdog for live telemetry and recent project activity.";
+				? `${openTaskCount} open work item${openTaskCount === 1 ? "" : "s"} remains in the project. Use Review, Issue Sets, and Watchdog to clear the next delivery.`
+				: "The delivery lane is clear. Use Review, Issue Sets, and Watchdog to confirm the next package.";
 	const telemetrySummary = telemetry?.loading
 		? "Checking collector and AutoCAD session telemetry for this project."
 		: telemetry?.error
 			? "Project telemetry is temporarily unavailable. Use the Watchdog page for a retry."
 			: telemetry?.activeCadSessionCount
-				? `${telemetry.activeCadSessionCount} live AutoCAD session${telemetry.activeCadSessionCount === 1 ? "" : "s"} mapped to this project${latestTrackedLabel ? `, led by ${latestTrackedLabel}` : ""}${telemetry.totalCommandsInWindow ? ` with ${telemetry.totalCommandsInWindow} command${telemetry.totalCommandsInWindow === 1 ? "" : "s"} in range` : ""}.`
+				? `${telemetry.activeCadSessionCount} live AutoCAD session${telemetry.activeCadSessionCount === 1 ? "" : "s"} mapped to this project${latestTrackedLabel ? `, led by ${latestTrackedLabel}` : ""}.`
 				: telemetry?.sessions.length
 					? `${telemetry.sessions.length} recent AutoCAD session${telemetry.sessions.length === 1 ? "" : "s"} recorded for this project${latestTrackedLabel ? `, most recently around ${latestTrackedLabel}` : ""}.`
 					: "No AutoCAD session telemetry has been attributed to this project yet.";
@@ -137,10 +136,9 @@ export function ProjectDetailHeader({
 			: "Rule status unavailable";
 
 	const metrics = [
-		{ label: "Tasks", value: String(tasks.length) },
-		{ label: "Completed", value: String(completedTaskCount) },
-		{ label: "Overdue", value: String(overdueTaskCount) },
-		{ label: "Progress", value: `${completionPercentage}%` },
+		{ label: "Open work", value: String(openTaskCount) },
+		{ label: "At risk", value: String(overdueTaskCount) },
+		{ label: "Completion", value: `${completionPercentage}%` },
 	];
 
 	return (
@@ -175,9 +173,9 @@ export function ProjectDetailHeader({
 
 					<div className={styles.metrics}>
 						{metrics.map((metric) => (
-							<div key={metric.label} className={styles.metricCard}>
-								<p className={styles.metricLabel}>{metric.label}</p>
-								<p className={styles.metricValue}>{metric.value}</p>
+							<div key={metric.label} className={styles.metricItem}>
+								<span className={styles.metricLabel}>{metric.label}</span>
+								<strong className={styles.metricValue}>{metric.value}</strong>
 							</div>
 						))}
 					</div>
@@ -201,61 +199,58 @@ export function ProjectDetailHeader({
 				</div>
 			</div>
 
-			<div className={styles.commandGrid}>
-				<div className={styles.commandCard}>
-					<div className={styles.commandHeader}>
-						<div className={styles.commandIcon}>
-							<TerminalSquare className={styles.commandGlyph} />
+			<div className={styles.signalGrid}>
+				<div className={styles.signalRow}>
+					<div className={styles.signalLead}>
+						<div className={styles.signalIconShell}>
+							<Workflow className={styles.signalIcon} />
 						</div>
 						<div>
-							<p className={styles.commandEyebrow}>Project Ops</p>
-							<h4 className={styles.commandTitle}>Watchdog</h4>
+							<p className={styles.signalEyebrow}>Delivery path</p>
+							<h4 className={styles.signalTitle}>Delivery flow</h4>
 						</div>
 					</div>
-					<p className={styles.commandCopy}>{commandCenterSummary}</p>
-					<div className={styles.commandStats}>
-						<span>{openTaskCount} open</span>
-						<span>
-							{project.deadline
-								? `Due ${formatDateOnly(project.deadline)}`
-								: "No deadline"}
-						</span>
+					<div className={styles.signalContent}>
+						<p className={styles.signalSummary}>{workflowSummary}</p>
+						<div className={styles.signalMeta}>
+							<span>{openTaskCount} open</span>
+							<span>
+								{project.deadline
+									? `Due ${formatDateOnly(project.deadline)}`
+									: "No deadline"}
+							</span>
+						</div>
 					</div>
-					<Link to={watchdogLink} className={styles.commandLink}>
+					<Link to={watchdogLink} className={styles.signalLink}>
 						<span>Open Watchdog</span>
-						<ArrowRight className={styles.commandLinkIcon} />
+						<ArrowRight className={styles.signalLinkIcon} />
 					</Link>
 				</div>
 
-				<div className={`${styles.commandCard} ${styles.telemetryCard}`}>
-					<div className={styles.commandHeader}>
-						<div className={`${styles.commandIcon} ${styles.telemetryIcon}`}>
-							<Activity className={styles.commandGlyph} />
+				<div className={styles.signalRow}>
+					<div className={styles.signalLead}>
+						<div
+							className={`${styles.signalIconShell} ${styles.telemetryIconShell}`}
+						>
+							<Activity className={styles.signalIcon} />
 						</div>
 						<div>
-							<p className={styles.commandEyebrow}>Live CAD</p>
-							<h4 className={styles.commandTitle}>Project telemetry</h4>
+							<p className={styles.signalEyebrow}>Live CAD</p>
+							<h4 className={styles.signalTitle}>Project telemetry</h4>
 						</div>
 					</div>
-					<p className={styles.commandCopy}>{telemetrySummary}</p>
-					<div className={styles.commandStats}>
-						<span>
-							<Radar className={styles.telemetryStatIcon} />
-							{telemetry?.onlineCollectorCount ?? 0} online
-						</span>
-						<span>{telemetry?.overview?.events.inWindow ?? 0} events / 24h</span>
-						<span>{telemetryStatusLabel}</span>
-						<span>{ruleSummary}</span>
+					<div className={styles.signalContent}>
+						<p className={styles.signalSummary}>{telemetrySummary}</p>
+						<div className={styles.signalMeta}>
+							<span>
+								<Radar className={styles.telemetryStatIcon} />
+								{telemetry?.onlineCollectorCount ?? 0} online
+							</span>
+							<span>{telemetryStatusLabel}</span>
+							<span>{ruleSummary}</span>
+						</div>
 					</div>
 				</div>
-			</div>
-			<div className={styles.healthShell}>
-				<ProjectHealthScoreCard
-					tasks={tasks}
-					projectId={project.id}
-					deadline={project.deadline}
-					telemetry={telemetry}
-				/>
 			</div>
 		</section>
 	);

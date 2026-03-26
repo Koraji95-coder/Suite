@@ -15,6 +15,9 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
+. $runtimeSharedScript
+$runtimeStatusScriptPath = (Resolve-Path (Join-Path $PSScriptRoot "get-suite-runtime-status.ps1")).Path
 $startupScript = (Resolve-Path (Join-Path $PSScriptRoot "run-suite-runtime-startup.ps1")).Path
 $stopScript = (Resolve-Path (Join-Path $PSScriptRoot "stop-suite-runtime.ps1")).Path
 $backendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-backend-startup.ps1")).Path
@@ -22,103 +25,11 @@ $gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-star
 $filesystemCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-filesystem-collector-startup.ps1")).Path
 $autocadCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-collector-startup.ps1")).Path
 $pluginCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-plugin.ps1")).Path
-$statusBase = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } elseif ($env:TEMP) { $env:TEMP } else { $env:USERPROFILE }
-$runtimeStatusDir = Join-Path $statusBase "Suite\runtime-bootstrap"
-$runtimeStatusPath = Join-Path $runtimeStatusDir "last-bootstrap.json"
-$runtimeLogPath = Join-Path $runtimeStatusDir "bootstrap.log"
+$runtimePaths = Get-SuiteRuntimePaths
+$runtimeStatusDir = $runtimePaths.RuntimeStatusDir
+$runtimeStatusPath = $runtimePaths.RuntimeStatusPath
+$runtimeLogPath = $runtimePaths.RuntimeLogPath
 New-Item -ItemType Directory -Path $runtimeStatusDir -Force | Out-Null
-
-function Convert-CommandOutputToText {
-    param([object[]]$Output)
-
-    if (-not $Output) {
-        return ""
-    }
-
-    return [string]::Join(
-        [Environment]::NewLine,
-        @(
-            $Output | ForEach-Object {
-                if ($null -eq $_) { "" } else { $_.ToString() }
-            }
-        )
-    ).Trim()
-}
-
-function Get-OutputTail {
-    param(
-        [string]$Text,
-        [int]$LineCount = 8
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Text)) {
-        return ""
-    }
-
-    $lines = $Text -split "`r?`n"
-    return [string]::Join([Environment]::NewLine, ($lines | Select-Object -Last $LineCount)).Trim()
-}
-
-function Invoke-JsonPowerShellFile {
-    param(
-        [Parameter(Mandatory = $true)][string]$ScriptPath,
-        [string[]]$Arguments
-    )
-
-    try {
-        $rawOutput = & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @Arguments 2>&1
-        $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
-        $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
-        $outputText = Convert-CommandOutputToText -Output $rawOutput
-    }
-    catch {
-        $exitCode = 1
-        $outputText = $_.Exception.Message
-    }
-
-    $payload = $null
-    if (-not [string]::IsNullOrWhiteSpace($outputText)) {
-        try {
-            $payload = $outputText | ConvertFrom-Json
-        }
-        catch {
-            $firstBrace = $outputText.IndexOf("{")
-            $lastBrace = $outputText.LastIndexOf("}")
-            if ($firstBrace -ge 0 -and $lastBrace -gt $firstBrace) {
-                $jsonText = $outputText.Substring($firstBrace, ($lastBrace - $firstBrace) + 1)
-                try {
-                    $payload = $jsonText | ConvertFrom-Json
-                }
-                catch {
-                    $payload = $null
-                }
-            }
-        }
-    }
-
-    return [pscustomobject]@{
-        ExitCode = $exitCode
-        Ok = ($exitCode -eq 0)
-        OutputTail = Get-OutputTail -Text $outputText
-        Payload = $payload
-    }
-}
-
-function Test-PortListening {
-    param([int]$Port)
-
-    return ($null -ne (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1))
-}
-
-function Test-DockerReady {
-    try {
-        & docker version | Out-Null
-        return $true
-    }
-    catch {
-        return $false
-    }
-}
 
 function New-ComponentStatus {
     param(
@@ -236,7 +147,203 @@ function Get-LastBootstrapStatus {
     }
 }
 
+function Convert-RuntimeServiceStateToLegacyState {
+    param([string]$State)
+
+    switch ($State) {
+        "running" { return "ready" }
+        "starting" { return "starting" }
+        "stopped" { return "stopped" }
+        "error" { return "failed" }
+        default { return "failed" }
+    }
+}
+
+function Get-LegacyComponentDetails {
+    param($Component)
+
+    if ($null -eq $Component) {
+        return $null
+    }
+
+    $details = New-Object System.Collections.Generic.List[string]
+    if (
+        $Component.PSObject.Properties.Name -contains "details" -and
+        -not [string]::IsNullOrWhiteSpace([string]$Component.details)
+    ) {
+        $details.Add([string]$Component.details)
+    }
+
+    if ($Component.PSObject.Properties.Name -contains "notes" -and $Component.notes) {
+        foreach ($note in @($Component.notes)) {
+            if (
+                $note -and
+                $note.PSObject.Properties.Name -contains "label" -and
+                $note.PSObject.Properties.Name -contains "value" -and
+                -not [string]::IsNullOrWhiteSpace([string]$note.label) -and
+                -not [string]::IsNullOrWhiteSpace([string]$note.value)
+            ) {
+                $details.Add(("{0}: {1}" -f [string]$note.label, [string]$note.value))
+            }
+        }
+    }
+
+    if ($details.Count -eq 0) {
+        return $null
+    }
+
+    return [string]::Join("; ", @($details.ToArray()))
+}
+
+function Find-RuntimeStatusService {
+    param(
+        $RuntimeStatus,
+        [Parameter(Mandatory = $true)][string]$Id
+    )
+
+    if ($null -eq $RuntimeStatus -or -not $RuntimeStatus.services) {
+        return $null
+    }
+
+    return @(
+        $RuntimeStatus.services |
+            Where-Object { [string]$_.id -eq $Id } |
+            Select-Object -First 1
+    )[0]
+}
+
+function New-LegacyComponentFromRuntimeService {
+    param(
+        [Parameter(Mandatory = $true)][string]$Key,
+        [Parameter(Mandatory = $true)][string]$Name,
+        $Service,
+        [Parameter(Mandatory = $true)][string]$FallbackSummary
+    )
+
+    $serviceState = if ($Service) { [string]$Service.state } else { "stopped" }
+    $summary = if ($Service -and -not [string]::IsNullOrWhiteSpace([string]$Service.summary)) {
+        [string]$Service.summary
+    }
+    else {
+        $FallbackSummary
+    }
+
+    return [pscustomobject]@{
+        key = $Key
+        name = $Name
+        state = Convert-RuntimeServiceStateToLegacyState -State $serviceState
+        ok = ($serviceState -eq "running")
+        summary = $summary
+        details = Get-LegacyComponentDetails -Component $Service
+    }
+}
+
+function Convert-RuntimeStatusToLegacySnapshot {
+    param($RuntimeStatus)
+
+    $supabaseService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "supabase"
+    $backendService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "backend"
+    $gatewayService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "gateway"
+    $frontendService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "frontend"
+    $filesystemService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "watchdog-filesystem"
+    $autocadService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "watchdog-autocad"
+    $pluginSubstatus = if (
+        $autocadService -and
+        $autocadService.PSObject.Properties.Name -contains "substatus"
+    ) {
+        $autocadService.substatus
+    }
+    else {
+        $null
+    }
+
+    $dockerReady = $false
+    if (
+        ($supabaseService -and [string]$supabaseService.startupMode -eq "docker") -or
+        ($supabaseService -and @("running", "starting") -contains ([string]$supabaseService.state))
+    ) {
+        $dockerReady = $true
+    }
+    elseif (Test-DockerReady) {
+        $dockerReady = $true
+    }
+
+    $dockerState = if ($dockerReady) { "ready" } else { "failed" }
+    $dockerDetails = if ($supabaseService -and $supabaseService.details) {
+        [string]$supabaseService.details
+    }
+    else {
+        "Start Docker Desktop or wait for it to finish loading."
+    }
+
+    $pluginState = if ($pluginSubstatus) { [string]$pluginSubstatus.state } else { "stopped" }
+    $pluginSummary = if ($pluginSubstatus -and $pluginSubstatus.summary) {
+        [string]$pluginSubstatus.summary
+    }
+    elseif ($autocadService -and $autocadService.summary) {
+        [string]$autocadService.summary
+    }
+    else {
+        "AutoCAD plugin status unavailable."
+    }
+
+    $components = @(
+        New-LegacyComponentFromRuntimeService -Key "frontend" -Name "Frontend" -Service $frontendService -FallbackSummary "Frontend is not running."
+        [pscustomobject]@{
+            key = "docker"
+            name = "Docker"
+            state = $dockerState
+            ok = ($dockerState -eq "ready")
+            summary = if ($dockerReady) { "Docker engine is ready." } else { "Docker engine is not ready." }
+            details = $dockerDetails
+        }
+        New-LegacyComponentFromRuntimeService -Key "supabase" -Name "Supabase" -Service $supabaseService -FallbackSummary "Local Supabase is not running."
+        New-LegacyComponentFromRuntimeService -Key "backend" -Name "Backend" -Service $backendService -FallbackSummary "Backend is not running."
+        New-LegacyComponentFromRuntimeService -Key "gateway" -Name "Gateway" -Service $gatewayService -FallbackSummary "Gateway is not running."
+        New-LegacyComponentFromRuntimeService -Key "watchdogFilesystem" -Name "Watchdog FS" -Service $filesystemService -FallbackSummary "Filesystem collector needs attention."
+        New-LegacyComponentFromRuntimeService -Key "watchdogAutoCad" -Name "Watchdog AutoCAD" -Service $autocadService -FallbackSummary "AutoCAD collector needs attention."
+        [pscustomobject]@{
+            key = "autocadPlugin"
+            name = "AutoCAD Plugin"
+            state = Convert-RuntimeServiceStateToLegacyState -State $pluginState
+            ok = ($pluginState -eq "running")
+            summary = $pluginSummary
+            details = if ($pluginSubstatus) { Get-LegacyComponentDetails -Component $pluginSubstatus } else { $null }
+        }
+    )
+
+    $overallState = if (
+        $RuntimeStatus.PSObject.Properties.Name -contains "overall" -and
+        $RuntimeStatus.overall
+    ) {
+        [string]$RuntimeStatus.overall.state
+    }
+    else {
+        ""
+    }
+
+    return [ordered]@{
+        ok = [bool]$RuntimeStatus.ok
+        timestamp = if ($RuntimeStatus.checkedAt) { [string]$RuntimeStatus.checkedAt } else { (Get-Date).ToString("o") }
+        summary = switch ($overallState) {
+            "healthy" { "Runtime ready." }
+            "booting" { "Runtime booting." }
+            "degraded" { "Runtime needs attention." }
+            "down" { "Runtime offline." }
+            default { "Runtime status unavailable." }
+        }
+        overallState = $overallState
+        components = $components
+        lastBootstrap = if ($RuntimeStatus.runtime) { $RuntimeStatus.runtime.lastBootstrap } else { Get-LastBootstrapStatus }
+    }
+}
+
 function Get-RuntimeSnapshot {
+    $runtimeStatusResult = Invoke-JsonPowerShellFile -ScriptPath $runtimeStatusScriptPath -Arguments @("-RepoRoot", $resolvedRepoRoot, "-Json")
+    if ($runtimeStatusResult.Payload) {
+        return Convert-RuntimeStatusToLegacySnapshot -RuntimeStatus $runtimeStatusResult.Payload
+    }
+
     $components = @(
         Get-FrontendStatus
         Get-DockerStatus
@@ -261,10 +368,11 @@ function Get-RuntimeSnapshot {
         "Runtime offline."
     }
 
-    [ordered]@{
+    return [ordered]@{
         ok = ($readyCount -eq $coreComponents.Count)
         timestamp = (Get-Date).ToString("o")
         summary = $summary
+        overallState = if ($readyCount -eq $coreComponents.Count) { "healthy" } elseif ($readyCount -gt 0) { "booting" } else { "down" }
         components = $components
         lastBootstrap = Get-LastBootstrapStatus
     }
@@ -430,7 +538,13 @@ function Refresh-RuntimeView {
     }
 
     $summaryLabel.Text = $snapshot.summary
-    $summaryLabel.ForeColor = if ($snapshot.ok) { Get-StateColor -State "ready" } else { Get-StateColor -State "starting" }
+    $summaryLabel.ForeColor = switch ([string]$snapshot.overallState) {
+        "healthy" { Get-StateColor -State "ready" }
+        "booting" { Get-StateColor -State "starting" }
+        "degraded" { Get-StateColor -State "failed" }
+        "down" { Get-StateColor -State "stopped" }
+        default { if ($snapshot.ok) { Get-StateColor -State "ready" } else { Get-StateColor -State "starting" } }
+    }
 
     if ($snapshot.lastBootstrap) {
         $timestamp = try { ([datetime]$snapshot.lastBootstrap.timestamp).ToLocalTime().ToString("g") } catch { [string]$snapshot.lastBootstrap.timestamp }

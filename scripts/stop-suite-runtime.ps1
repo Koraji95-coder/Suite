@@ -270,7 +270,7 @@ function Stop-ProcessesByCommandTokens {
 
 Stop-ProcessesByCommandTokens -Tokens @("backend/api_server.py") -Label "backend"
 Stop-ProcessesByCommandTokens -Tokens @("run-agent-gateway.mjs") -Label "gateway-launcher"
-Stop-ProcessesByCommandTokens -Tokens @("zeroclaw-gateway") -Label "gateway-binary"
+Stop-ProcessesByCommandTokens -Tokens @("suite-agent-gateway.mjs") -Label "gateway-native-launcher"
 Stop-PortListeners -Ports @(5000, 3000) -Label "ports"
 Stop-ProcessesByCommandTokens -Tokens @("watchdog-filesystem-collector-daemon.ps1") -Label "watchdog-filesystem-daemon"
 Stop-ProcessesByCommandTokens -Tokens @("run-watchdog-filesystem-collector.py") -Label "watchdog-filesystem-worker"

@@ -34,6 +34,7 @@ export type SupabaseSyncStatusPayload = {
 	};
 	lastPreflight: SupabaseSyncRun | null;
 	lastPush: SupabaseSyncRun | null;
+	pushReadinessSummary?: string | null;
 	logTail: string[];
 };
 

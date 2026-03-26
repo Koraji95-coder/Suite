@@ -8,25 +8,27 @@ import {
 	Terminal,
 } from "lucide-react";
 import { SurfaceSkeleton } from "@/components/apps/ui/SurfaceSkeleton";
-import { ArchitectureMapPanel } from "@/components/architecture/ArchitectureMapPanel";
+import {
+	resolveTrustStateMeta,
+	TrustStateBadge,
+} from "@/components/apps/ui/TrustStateBadge";
 import { Badge } from "@/components/primitives/Badge";
 import { Button } from "@/components/primitives/Button";
 import { Panel } from "@/components/primitives/Panel";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
+import type { SuiteRuntimeDoctorReport } from "@/lib/runtimeDoctor";
+import { buildSuiteDoctorSummaryModel } from "@/lib/suiteDoctorPresentation";
 import { cn } from "@/lib/utils";
 import styles from "../CommandCenterPage.module.css";
 import {
-	type ActiveCommandCenterTab,
 	COMMAND_CENTER_HISTORY_FILTERS,
-	COMMAND_CENTER_TABS,
 	type CommandCenterHistoryEntry,
 	type CommandGroup,
 	type CommandPreset,
 	type HistoryFilter,
 } from "./commandCenterModel";
 import type {
-	SupabaseSyncCheck,
 	SupabaseSyncRun,
 	SupabaseSyncStatusPayload,
 } from "./useSupabaseSyncStatus";
@@ -65,7 +67,7 @@ export function CommandCenterAccessPanel({
 								</>
 							) : (
 								<>
-									Command Center access is scoped to allowlisted operations
+									Command Center access is scoped to allowlisted developer
 									profiles for now. Share your email with the admin team to get
 									invited.
 								</>
@@ -101,51 +103,12 @@ export function CommandCenterAccessPanel({
 	);
 }
 
-interface CommandCenterTabBarProps {
-	activeTab: ActiveCommandCenterTab;
-	onSelect: (tab: ActiveCommandCenterTab) => void;
-}
-
-export function CommandCenterTabBar({
-	activeTab,
-	onSelect,
-}: CommandCenterTabBarProps) {
-	return (
-		<div
-			className={styles.tabStrip}
-			role="tablist"
-			aria-label="Command center tabs"
-		>
-			{COMMAND_CENTER_TABS.map((tab) => {
-				const Icon = tab.icon;
-				return (
-					<button
-						key={tab.id}
-						type="button"
-						role="tab"
-						aria-selected={activeTab === tab.id}
-						className={cn(
-							styles.tabButton,
-							activeTab === tab.id && styles.tabButtonActive,
-						)}
-						onClick={() => onSelect(tab.id)}
-					>
-						<span className={styles.tabIconWrap}>
-							<Icon size={14} />
-						</span>
-						<span className={styles.tabText}>
-							<span className={styles.tabLabel}>{tab.label}</span>
-							<span className={styles.tabHint}>{tab.hint}</span>
-						</span>
-					</button>
-				);
-			})}
-		</div>
-	);
-}
-
 interface CommandCenterCommandsSectionProps {
 	message: string | null;
+	suiteDoctorReport: SuiteRuntimeDoctorReport | null;
+	suiteDoctorLoading: boolean;
+	suiteDoctorRefreshing: boolean;
+	onRefreshSuiteDoctor: () => void;
 	commandGroups: CommandGroup[];
 	supabaseSyncStatus: SupabaseSyncStatusPayload | null;
 	supabaseSyncStatusLoading: boolean;
@@ -165,6 +128,10 @@ interface CommandCenterCommandsSectionProps {
 
 export function CommandCenterCommandsSection({
 	message,
+	suiteDoctorReport,
+	suiteDoctorLoading,
+	suiteDoctorRefreshing,
+	onRefreshSuiteDoctor,
 	commandGroups,
 	supabaseSyncStatus,
 	supabaseSyncStatusLoading,
@@ -191,6 +158,13 @@ export function CommandCenterCommandsSection({
 				</Panel>
 			)}
 
+			<CommandCenterSuiteDoctorPanel
+				report={suiteDoctorReport}
+				loading={suiteDoctorLoading}
+				refreshing={suiteDoctorRefreshing}
+				onRefresh={onRefreshSuiteDoctor}
+			/>
+
 			<CommandCenterSupabaseSyncPanel
 				status={supabaseSyncStatus}
 				loading={supabaseSyncStatusLoading}
@@ -198,6 +172,14 @@ export function CommandCenterCommandsSection({
 				error={supabaseSyncStatusError}
 				onRefresh={onRefreshSupabaseSyncStatus}
 			/>
+
+			<Panel variant="inset" padding="sm">
+				<Text size="xs" color="muted">
+					Runtime Control owns local start, stop, restart, Watchdog plugin ops,
+					and support bundle export. Use Command Center for copied incident
+					commands, hosted push checks, and deeper diagnostics.
+				</Text>
+			</Panel>
 
 			<div className={styles.groupsGrid}>
 				{commandGroups.map((group) => (
@@ -321,69 +303,147 @@ export function CommandCenterCommandsSection({
 	);
 }
 
-export function CommandCenterArchitectureSection() {
+function CommandCenterSuiteDoctorPanel({
+	report,
+	loading,
+	refreshing,
+	onRefresh,
+}: {
+	report: SuiteRuntimeDoctorReport | null;
+	loading: boolean;
+	refreshing: boolean;
+	onRefresh: () => void;
+}) {
+	const summary = buildSuiteDoctorSummaryModel(report, loading);
+	const stateMeta = resolveTrustStateMeta(summary.state);
+
 	return (
-		<Panel variant="support" padding="md" className={styles.architecturePanel}>
-			<ArchitectureMapPanel />
+		<Panel
+			variant="feature"
+			padding="md"
+			className={styles.supabaseStatusPanel}
+		>
+			<Stack gap={4}>
+				<HStack justify="between" align="center" gap={3}>
+					<HStack gap={2} align="center">
+						<div className={styles.groupIcon}>
+							<ShieldAlert size={14} />
+						</div>
+						<Stack gap={1}>
+							<Text size="sm" weight="semibold">
+								Suite Doctor
+							</Text>
+							<Text size="xs" color="muted">
+								Shared runtime truth for Runtime Control, scripts, and developer
+								routes.
+							</Text>
+						</Stack>
+					</HStack>
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						iconLeft={<RefreshCw size={12} />}
+						onClick={onRefresh}
+						disabled={loading || refreshing}
+						aria-busy={loading || refreshing}
+					>
+						{refreshing ? "Refreshing..." : "Refresh doctor"}
+					</Button>
+				</HStack>
+
+				{loading && !report ? (
+					<div className={styles.supabaseStatusGrid} aria-hidden="true">
+						<SurfaceSkeleton tone="support" height="compact" lines={3} />
+						<SurfaceSkeleton tone="support" height="compact" lines={3} />
+						<SurfaceSkeleton tone="support" height="compact" lines={3} />
+					</div>
+				) : (
+					<div className={styles.supabaseStatusGrid}>
+						<Panel
+							variant="inset"
+							padding="sm"
+							className={styles.supabaseStatusCard}
+						>
+							<Stack gap={2}>
+								<HStack justify="between" align="center" gap={2}>
+									<Text size="xs" weight="semibold">
+										Overall
+									</Text>
+									<TrustStateBadge
+										state={summary.state}
+										label={stateMeta.label}
+									/>
+								</HStack>
+								<Text size="xs" color="muted">
+									{summary.summary}
+								</Text>
+								{summary.updatedAtLabel && (
+									<Text size="xs" color="muted">
+										Updated: {summary.updatedAtLabel}
+									</Text>
+								)}
+							</Stack>
+						</Panel>
+						<Panel
+							variant="inset"
+							padding="sm"
+							className={styles.supabaseStatusCard}
+						>
+							<Stack gap={2}>
+								<HStack justify="between" align="center" gap={2}>
+									<Text size="xs" weight="semibold">
+										Actionable issues
+									</Text>
+									<Badge
+										color={
+											summary.actionableIssueCount === 0 ? "success" : "warning"
+										}
+										variant="soft"
+										size="sm"
+									>
+										{summary.actionableIssueCount === 0
+											? "Clear"
+											: "Needs attention"}
+									</Badge>
+								</HStack>
+								<Text size="xs" color="muted">
+									{loading && !report
+										? "Suite Doctor is collecting the current workstation snapshot."
+										: summary.actionableIssueCount === 0
+											? "No actionable drift is active across the local stack."
+											: `${summary.actionableIssueCount} shared check${summary.actionableIssueCount === 1 ? "" : "s"} still need attention.`}
+								</Text>
+								{summary.updatedAtLabel && (
+									<Text size="xs" color="muted">
+										Updated: {summary.updatedAtLabel}
+									</Text>
+								)}
+							</Stack>
+						</Panel>
+						<Panel
+							variant="inset"
+							padding="sm"
+							className={styles.supabaseStatusCard}
+						>
+							<Stack gap={2}>
+								<HStack justify="between" align="center" gap={2}>
+									<Text size="xs" weight="semibold">
+										Lead recommendation
+									</Text>
+									<Badge color="default" variant="soft" size="sm">
+										Shared doctor
+									</Badge>
+								</HStack>
+								<Text size="xs" color="muted">
+									{summary.leadDetail}
+								</Text>
+							</Stack>
+						</Panel>
+					</div>
+				)}
+			</Stack>
 		</Panel>
-	);
-}
-
-function summarizePushReadiness(run: SupabaseSyncRun | null): string | null {
-	if (!run) return null;
-	const checks = (run.checks ?? {}) as Record<
-		string,
-		SupabaseSyncCheck | undefined
-	>;
-	const localSupabaseOk = checks.localSupabase?.ok === true;
-	const gatewayOk = checks.gateway?.ok === true;
-	const cliAuthOk = checks.cliAuth?.ok === true;
-	const linkOk = checks.link?.ok === true;
-	const dryRunOk = checks.dryRun?.ok === true;
-
-	if (run.pushReady) {
-		return run.pushReadinessSummary || "Hosted migration push is ready.";
-	}
-	if (!localSupabaseOk || !gatewayOk) {
-		const runtimeIssues = [
-			!localSupabaseOk
-				? checks.localSupabase?.message || "Local Supabase is unavailable."
-				: null,
-			!gatewayOk
-				? checks.gateway?.message &&
-					checks.gateway.message.trim().toLowerCase() !== "fetch failed"
-					? checks.gateway.message
-					: "Gateway health endpoint is unavailable."
-				: null,
-		].filter((message): message is string =>
-			Boolean(message && message.trim()),
-		);
-		if (runtimeIssues.length > 0) {
-			return `Latest preflight snapshot says the local runtime needs attention: ${runtimeIssues.join(" ")}`;
-		}
-		return "Latest preflight snapshot says the local runtime needs attention before hosted push can continue.";
-	}
-	if (!cliAuthOk) {
-		return (
-			checks.cliAuth?.message ||
-			"Hosted push is blocked until CLI auth is ready."
-		);
-	}
-	if (!linkOk) {
-		return (
-			checks.link?.message ||
-			"Hosted push is blocked until the hosted project link check succeeds."
-		);
-	}
-	if (!dryRunOk) {
-		return (
-			checks.dryRun?.message ||
-			"Hosted push is blocked until the hosted dry-run succeeds."
-		);
-	}
-	return (
-		run.pushReadinessSummary ||
-		"Hosted push stays gated until the latest preflight says it is safe."
 	);
 }
 
@@ -404,7 +464,7 @@ function CommandCenterSupabaseSyncPanel({
 	const lastPush = status?.lastPush ?? null;
 	const isInitialStatusLoading = loading && !status && !error;
 	const pushReadinessSummary =
-		summarizePushReadiness(lastPreflight) ||
+		status?.pushReadinessSummary ||
 		((loading && !status
 			? "Hosted push readiness is being collected."
 			: null) ??
@@ -423,11 +483,12 @@ function CommandCenterSupabaseSyncPanel({
 						</div>
 						<Stack gap={1}>
 							<Text size="sm" weight="semibold">
-								Environment readiness
+								Hosted push readiness
 							</Text>
 							<Text size="xs" color="muted">
-								Check the latest workstation snapshot before you copy commands
-								or push hosted changes.
+								Use this panel for Supabase preflight snapshots only. Suite
+								Doctor above remains the source of truth for overall workstation
+								health.
 							</Text>
 						</Stack>
 					</HStack>

@@ -11,9 +11,13 @@ import { FilesBrowser } from "./FilesBrowser";
 import styles from "./ProjectDetail.module.css";
 import { ProjectDetailGroundGridsView } from "./ProjectDetailGroundGridsView";
 import { ProjectDetailHeader } from "./ProjectDetailHeader";
-import { ProjectTelemetryPanel } from "./ProjectTelemetryPanel";
 import { ProjectDetailViewTabs } from "./ProjectDetailViewTabs";
+import { ProjectIssueSetManager } from "./ProjectIssueSetManager";
+import { ProjectReadinessWorkspace } from "./ProjectReadinessWorkspace";
+import { ProjectReviewInboxWorkspace } from "./ProjectReviewInboxWorkspace";
 import { ProjectRevisionRegisterView } from "./ProjectRevisionRegisterView";
+import { ProjectSetupWorkspace } from "./ProjectSetupWorkspace";
+import { ProjectTelemetryPanel } from "./ProjectTelemetryPanel";
 import {
 	type CalendarEvent,
 	type Project,
@@ -46,6 +50,8 @@ interface ProjectDetailProps {
 	onTaskFilterChange: (filter: TaskFilter) => void;
 	viewMode: ViewMode;
 	onViewModeChange: (mode: ViewMode) => void;
+	activeIssueSetId: string | null;
+	onActiveIssueSetIdChange: (issueSetId: string | null) => void;
 	selectedCalendarDate: string | null;
 	onCalendarDateSelect: (date: string | null) => void;
 	currentMonth: Date;
@@ -80,6 +86,8 @@ export function ProjectDetail({
 	onTaskFilterChange,
 	viewMode,
 	onViewModeChange,
+	activeIssueSetId,
+	onActiveIssueSetIdChange,
 	selectedCalendarDate,
 	onCalendarDateSelect,
 	currentMonth,
@@ -106,16 +114,6 @@ export function ProjectDetail({
 						onExportMarkdown={onExportMarkdown}
 					/>
 				</section>
-
-				<section className={styles.telemetryShell}>
-					<ProjectTelemetryPanel
-						projectId={project.id}
-						telemetry={telemetry}
-						onRootPathChange={(rootPath) =>
-							onProjectWatchdogRootChange(project.id, rootPath)
-						}
-					/>
-				</section>
 			</div>
 
 			<section className={styles.workspaceShell}>
@@ -125,6 +123,42 @@ export function ProjectDetail({
 				/>
 
 				<div className={styles.workspaceContent}>
+					{viewMode === "setup" && (
+						<ProjectSetupWorkspace
+							project={project}
+							telemetry={telemetry}
+							onOpenViewMode={onViewModeChange}
+						/>
+					)}
+
+					{viewMode === "readiness" && (
+						<ProjectReadinessWorkspace
+							project={project}
+							telemetry={telemetry}
+							preferredIssueSetId={activeIssueSetId}
+							onOpenViewMode={onViewModeChange}
+						/>
+					)}
+
+					{viewMode === "review" && (
+						<ProjectReviewInboxWorkspace
+							project={project}
+							telemetry={telemetry}
+							preferredIssueSetId={activeIssueSetId}
+							onOpenViewMode={onViewModeChange}
+						/>
+					)}
+
+					{viewMode === "issue-sets" && (
+						<ProjectIssueSetManager
+							project={project}
+							telemetry={telemetry}
+							preferredIssueSetId={activeIssueSetId}
+							onIssueSetContextChange={onActiveIssueSetIdChange}
+							onOpenViewMode={onViewModeChange}
+						/>
+					)}
+
 					{viewMode === "tasks" && (
 						<section className={styles.tasksPanel}>
 							<div className={styles.tasksHead}>
@@ -197,14 +231,23 @@ export function ProjectDetail({
 					)}
 
 					{viewMode === "files" && (
-						<FilesBrowser
-							files={files}
-							filter={fileFilter}
-							onFilterChange={onFileFilterChange}
-							onUpload={onFileUpload}
-							onDownload={onDownloadFile}
-							projectName={project.name}
-						/>
+						<div className={styles.supportWorkspace}>
+							<ProjectTelemetryPanel
+								projectId={project.id}
+								telemetry={telemetry}
+								onRootPathChange={(rootPath) =>
+									onProjectWatchdogRootChange(project.id, rootPath)
+								}
+							/>
+							<FilesBrowser
+								files={files}
+								filter={fileFilter}
+								onFilterChange={onFileFilterChange}
+								onUpload={onFileUpload}
+								onDownload={onDownloadFile}
+								projectName={project.name}
+							/>
+						</div>
 					)}
 
 					{viewMode === "ground-grids" && (

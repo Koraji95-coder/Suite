@@ -1,19 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import {
-	Bot,
 	BookOpen,
 	CalendarDays,
-	CircuitBoard,
 	FolderKanban,
-	Network,
 	Replace,
-	Route,
-	ScanSearch,
 	ShieldCheck,
 	SquareLibrary,
 	Workflow,
-	Wrench,
 } from "lucide-react";
+import type { AppAudience, AppReleaseState } from "@/lib/audience";
 
 export type AppsCatalogLane = "workspace" | "automation" | "intelligence";
 
@@ -26,6 +21,8 @@ export type AppsCatalogItem = {
 	icon: LucideIcon;
 	lane: AppsCatalogLane;
 	signal: string;
+	audience: AppAudience;
+	releaseState: AppReleaseState;
 };
 
 export const APPS_CATALOG: AppsCatalogItem[] = [
@@ -38,6 +35,8 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		icon: FolderKanban,
 		lane: "workspace",
 		signal: "Project ops",
+		audience: "customer",
+		releaseState: "released",
 	},
 	{
 		id: "calendar",
@@ -48,50 +47,8 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		icon: CalendarDays,
 		lane: "workspace",
 		signal: "Scheduling",
-	},
-	{
-		id: "ground-grid",
-		title: "Ground Grid Generation",
-		description:
-			"Coordinates capture backend and interactive generation in one app.",
-		to: "/app/apps/ground-grid-generation",
-		status: "active",
-		icon: Network,
-		lane: "automation",
-		signal: "Field geometry",
-	},
-	{
-		id: "autodraft-studio",
-		title: "AutoDraft Studio",
-		description:
-			"Recognize Bluebeam markups and generate deterministic CAD action plans.",
-		to: "/app/apps/autodraft-studio",
-		status: "active",
-		icon: ScanSearch,
-		lane: "automation",
-		signal: "Markup automation",
-	},
-	{
-		id: "autowire",
-		title: "AutoWire",
-		description:
-			"Unified conduit/cable routing workspace with terminal workflows, schedule output, and NEC snapshots.",
-		to: "/app/apps/autowire",
-		status: "active",
-		icon: Route,
-		lane: "automation",
-		signal: "Route planning",
-	},
-	{
-		id: "etap-dxf-cleanup",
-		title: "ETAP DXF Cleanup",
-		description:
-			"Trigger ETAPFIX and related AutoCAD cleanup commands through the local bridge.",
-		to: "/app/apps/etap-dxf-cleanup",
-		status: "active",
-		icon: Wrench,
-		lane: "automation",
-		signal: "Cleanup bridge",
+		audience: "customer",
+		releaseState: "released",
 	},
 	{
 		id: "transmittal-builder",
@@ -103,6 +60,8 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		icon: Workflow,
 		lane: "workspace",
 		signal: "Package assembly",
+		audience: "customer",
+		releaseState: "released",
 	},
 	{
 		id: "drawing-list-manager",
@@ -114,28 +73,8 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		icon: Replace,
 		lane: "workspace",
 		signal: "Issued sets",
-	},
-	{
-		id: "graph-explorer",
-		title: "Architecture Graph",
-		description:
-			"Alternate node-link view for architecture modules and agent memory relationships.",
-		to: "/app/apps/graph",
-		status: "active",
-		icon: CircuitBoard,
-		lane: "intelligence",
-		signal: "Architecture graph",
-	},
-	{
-		id: "batch-find-replace",
-		title: "Batch Find and Replace",
-		description:
-			"Run text cleanup and active-drawing remediation through the backend bridge with preview support.",
-		to: "/app/apps/batch-find-replace",
-		status: "active",
-		icon: Replace,
-		lane: "automation",
-		signal: "Batch execution",
+		audience: "customer",
+		releaseState: "released",
 	},
 	{
 		id: "standards-checker",
@@ -147,27 +86,20 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		icon: ShieldCheck,
 		lane: "intelligence",
 		signal: "Standards QA",
-	},
-	{
-		id: "agent",
-		title: "Agents",
-		description:
-			"Pair and run profile-based AI workflows with deterministic model routing.",
-		to: "/app/agent",
-		status: "active",
-		icon: Bot,
-		lane: "intelligence",
-		signal: "Agent orchestration",
+		audience: "customer",
+		releaseState: "released",
 	},
 	{
 		id: "knowledge",
 		title: "Knowledge",
-		description: "Standards, security notes, and implementation docs.",
+		description: "Reference guides, formulas, and delivery notes for the active workspace.",
 		to: "/app/knowledge",
 		status: "active",
 		icon: BookOpen,
 		lane: "intelligence",
-		signal: "Operational memory",
+		signal: "Reference library",
+		audience: "customer",
+		releaseState: "released",
 	},
 	{
 		id: "block-library",
@@ -178,5 +110,7 @@ export const APPS_CATALOG: AppsCatalogItem[] = [
 		icon: SquareLibrary,
 		lane: "workspace",
 		signal: "Reusable assets",
+		audience: "customer",
+		releaseState: "released",
 	},
 ];

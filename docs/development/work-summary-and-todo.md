@@ -10,6 +10,72 @@ This is a restart/handoff doc summarizing what has already been completed and wh
 - Monetization/productization backlog is parked here for later:
   - `docs/development/monetization-readiness-backlog.md`
 
+## March 25, 2026 Structural Reboot Checkpoint
+
+### What Landed In This Tranche
+
+- Suite now follows a two-room structure:
+  - customer product
+  - developer workshop
+- `Internal` was retired from the live app model; active audience shape is now `customer | dev`.
+- `/app/developer` is the web-side Developer Portal, and `/app/operations` is only a compatibility redirect.
+- Apps Hub is now product-only for all users; developer-only and future-product tools live in Developer Portal and Runtime Control instead of customer navigation.
+- Command Center is now a dev-only diagnostics toolshed, not a second workstation-control surface.
+- Runtime Control is now the primary local workshop front door for:
+  - runtime start/stop/restart
+  - Watchdog/plugin/collector operations
+  - doctor/diagnostics entrypoints
+  - support summary/export
+  - launching dev-only web routes
+- Shared Suite Doctor/runtime/support parity landed across:
+  - backend `/api/runtime/status`
+  - frontend shell/Developer Portal/Command Center
+  - PowerShell runtime scripts
+  - Runtime Control desktop shell
+- Support bundle export now writes structured runtime + doctor + workstation context instead of rebuilding that picture ad hoc.
+- Customer routes were rebuilt around the product story:
+  - Dashboard is now a delivery mission board
+  - Projects now anchor the delivery workflow
+  - Watchdog now reads as a manager/operator reporting surface
+  - Drawing List Manager, Standards Checker, and Transmittal Builder now open in project/package context and read as one workflow instead of separate utilities
+- The project delivery flow now has an explicit path:
+  - Setup
+  - Readiness
+  - Review
+  - Issue Sets
+  - Revisions
+  - Files & Telemetry
+- Title-block review is now a first-class lane inside the project delivery workflow rather than a separate app story.
+- Review decisions are now issue-set aware, and issue-set evidence now rolls up:
+  - title block review
+  - standards state
+  - issue set snapshot
+  - transmittal receipt
+  - Watchdog attribution
+- The Suite-native gateway is now the active and canonical gateway path.
+- `zeroclaw-main/` was isolated, then removed from active Suite architecture and runtime flow.
+- ZeroClaw references that remain are intentional historical/policy references only.
+- Structural guards now protect the reboot boundaries:
+  - no Tailwind in Suite app
+  - workshop split guard
+  - ZeroClaw isolation/removed guards
+  - docs manifest and architecture guards
+
+### Current Structural Baseline
+
+- `npm run check`
+- `npx vitest run --pool=threads`
+- `python -m unittest backend.tests.test_api_health backend.tests.test_api_command_center backend.tests.test_api_route_groups backend.tests.test_suite_repo_mcp_server`
+- `dotnet test dotnet/Suite.RuntimeControl.Tests/Suite.RuntimeControl.Tests.csproj --no-build`
+- `npx playwright test tests/e2e/authenticated-shell.spec.ts --project chromium`
+
+### What Is Intentionally Left For Later
+
+- Monetization, org/admin/seats/licensing, and wider rollout/productization remain parked in:
+  - `docs/development/monetization-readiness-backlog.md`
+- Any future graduation of dev-only tools like AutoDraft, AutoWire, Ground Grid, Batch Find & Replace, ETAP DXF Cleanup, Whiteboard, and Agents should happen only after they are explicitly promoted out of the workshop.
+- The next major structural milestone beyond this checkpoint would be a full gateway/runtime archival phase for ZeroClaw-era historical material, not an active Suite product dependency.
+
 ## March 18, 2026 Checkpoint
 
 ### What Landed In This Tranche

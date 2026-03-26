@@ -13,6 +13,22 @@ const mockFetchWorktaleReadiness = vi.hoisted(() => vi.fn());
 const mockListPublishJobs = vi.hoisted(() => vi.fn());
 const mockFetchDraftSuggestions = vi.hoisted(() => vi.fn());
 const mockUseDashboardOverviewData = vi.hoisted(() => vi.fn());
+const mockUseDashboardDeliverySummary = vi.hoisted(() => vi.fn());
+const authState = vi.hoisted(() => ({
+	user: {
+		id: "user-1",
+		email: "admin@example.com",
+		app_metadata: {
+			role: "admin",
+		},
+	},
+}));
+
+vi.mock("@/auth/useAuth", () => ({
+	useAuth: () => ({
+		user: authState.user,
+	}),
+}));
 
 vi.mock("@/services/watchdogService", () => ({
 	watchdogService: {
@@ -40,6 +56,77 @@ vi.mock("./useDashboardOverviewData", () => ({
 	useDashboardOverviewData: mockUseDashboardOverviewData,
 }));
 
+vi.mock("./useDashboardDeliverySummary", () => ({
+	useDashboardDeliverySummary: mockUseDashboardDeliverySummary,
+	summarizeDashboardDeliveryProjects: vi.fn(
+		(
+			projects: Array<{
+				reviewItemCount: number;
+				state: string;
+				issueSetStatus: string | null;
+				transmittalNumber: string | null;
+				transmittalPendingReviewCount: number;
+				needsSetup: boolean;
+				dueSoon: boolean;
+				overdue: boolean;
+				openTaskCount: number;
+			}>,
+		) =>
+			projects.reduce(
+				(acc, project) => {
+					acc.totalProjects += 1;
+					acc.reviewPressureCount += project.reviewItemCount;
+					acc.openTaskCount += project.openTaskCount;
+					if (project.reviewItemCount > 0) {
+						acc.reviewProjectCount += 1;
+					}
+					if (project.issueSetStatus === "ready") {
+						acc.readyCount += 1;
+					}
+					if (project.issueSetStatus === "issued") {
+						acc.issuedCount += 1;
+					}
+					if (
+						project.issueSetStatus === "draft" ||
+						project.issueSetStatus === "review"
+					) {
+						acc.packagesInProgressCount += 1;
+					}
+					if (
+						(project.transmittalNumber &&
+							project.issueSetStatus !== "issued") ||
+						project.transmittalPendingReviewCount > 0
+					) {
+						acc.transmittalQueueCount += 1;
+					}
+					if (project.needsSetup) {
+						acc.setupAttentionCount += 1;
+					}
+					if (project.dueSoon) {
+						acc.dueSoonCount += 1;
+					}
+					if (project.overdue) {
+						acc.overdueCount += 1;
+					}
+					return acc;
+				},
+				{
+					totalProjects: 0,
+					reviewPressureCount: 0,
+					reviewProjectCount: 0,
+					readyCount: 0,
+					issuedCount: 0,
+					packagesInProgressCount: 0,
+					transmittalQueueCount: 0,
+					setupAttentionCount: 0,
+					dueSoonCount: 0,
+					overdueCount: 0,
+					openTaskCount: 0,
+				},
+			),
+	),
+}));
+
 describe("DashboardOverviewPanel", () => {
 	const scrollIntoViewMock = vi.fn();
 	const project = {
@@ -48,9 +135,17 @@ describe("DashboardOverviewPanel", () => {
 		status: "active",
 		priority: "high",
 		category: "Coding",
+		watchdog_root_path: "C:/Projects/Alpha",
 	};
 
 	beforeEach(() => {
+		authState.user = {
+			id: "user-1",
+			email: "admin@example.com",
+			app_metadata: {
+				role: "admin",
+			},
+		};
 		vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
 			callback(0);
 			return 1;
@@ -80,6 +175,52 @@ describe("DashboardOverviewPanel", () => {
 				],
 			]),
 			allProjectsMap: new Map([["project-1", project]]),
+		});
+		mockUseDashboardDeliverySummary.mockReturnValue({
+			loading: false,
+			error: null,
+			projects: [
+				{
+					projectId: "project-1",
+					name: "Project Alpha",
+					deadline: "2026-03-25",
+					nextDue: null,
+					openTaskCount: 2,
+					watchdogRootConfigured: true,
+					needsSetup: false,
+					issueSetId: "issue-1",
+					issueSetName: "Alpha issue set",
+					issueTag: "ISSUE-01",
+					issueSetStatus: "ready",
+					reviewItemCount: 0,
+					selectedDrawingCount: 12,
+					trackedDrawingCount: 8,
+					unresolvedRevisionCount: 0,
+					transmittalReceiptCount: 1,
+					transmittalPendingReviewCount: 0,
+					transmittalNumber: "TR-100",
+					lastReceiptAt: "2026-03-18T03:00:00.000Z",
+					state: "ready",
+					stateLabel: "Ready for issue",
+					summary: "ISSUE-01 is ready to move into issue.",
+					detail: "Transmittal TR-100 is linked to the current package draft.",
+					dueSoon: true,
+					overdue: false,
+				},
+			],
+			metrics: {
+				totalProjects: 1,
+				reviewPressureCount: 0,
+				reviewProjectCount: 0,
+				readyCount: 1,
+				issuedCount: 0,
+				packagesInProgressCount: 0,
+				transmittalQueueCount: 1,
+				setupAttentionCount: 0,
+				dueSoonCount: 1,
+				overdueCount: 0,
+				openTaskCount: 2,
+			},
 		});
 
 		mockGetOverview.mockResolvedValue({
@@ -221,7 +362,8 @@ describe("DashboardOverviewPanel", () => {
 				{
 					id: "ledger-1",
 					title: "Refactor agent service facade",
-					summary: "Split orchestration and catalog concerns behind stable facade calls.",
+					summary:
+						"Split orchestration and catalog concerns behind stable facade calls.",
 					source_kind: "git_checkpoint",
 					commit_refs: ["efc4560"],
 					project_id: "project-1",
@@ -320,7 +462,7 @@ describe("DashboardOverviewPanel", () => {
 		vi.clearAllMocks();
 	});
 
-	it("loads focused watchdog telemetry from the collector endpoints", async () => {
+	it("loads focused watchdog telemetry into the delivery dashboard", async () => {
 		render(
 			<MemoryRouter
 				initialEntries={[
@@ -359,22 +501,19 @@ describe("DashboardOverviewPanel", () => {
 			collectorId: "collector-cad",
 			limit: 8,
 		});
-		expect(screen.getByText("Operations and Watchdog")).toBeTruthy();
+		expect(screen.getByText("Watchdog summary")).toBeTruthy();
+		expect(screen.getByText("Delivery board")).toBeTruthy();
 		expect(screen.getByText("Live AutoCAD sessions")).toBeTruthy();
-		expect(screen.getByText("Session timeline")).toBeTruthy();
+		expect(screen.getByText("Session history")).toBeTruthy();
 		expect(screen.getByText("Seq 1")).toBeTruthy();
-		expect(screen.getAllByText("High-activity projects").length).toBeGreaterThan(0);
-		expect(screen.getByText("Work Ledger")).toBeTruthy();
-		expect(
-			screen.getAllByText("Refactor agent service facade").length,
-		).toBeGreaterThan(0);
-		expect(screen.getByText("Worktale ready")).toBeTruthy();
-		expect(screen.getByText("Open latest receipt")).toBeTruthy();
-		expect(screen.getByText("Hotspot-linked entries")).toBeTruthy();
+		expect(screen.getAllByText("Project activity").length).toBeGreaterThan(0);
+		expect(screen.queryByText("Work Ledger")).toBeNull();
+		expect(screen.queryByText("Worktale ready")).toBeNull();
+		expect(screen.queryByText("Open latest receipt")).toBeNull();
 		expect(screen.getAllByText("Drawing1.dwg").length).toBeGreaterThan(0);
 	});
 
-	it("shows publisher setup messaging when Worktale is unavailable", async () => {
+	it("keeps developer-only ledger and publisher state out of the dashboard even for dev users", async () => {
 		mockFetchWorktaleReadiness.mockResolvedValueOnce({
 			data: null,
 			error: new Error("Sign in to use Worktale publishing."),
@@ -389,12 +528,46 @@ describe("DashboardOverviewPanel", () => {
 		);
 
 		await waitFor(() => {
-			expect(screen.getByText("Worktale unavailable")).toBeTruthy();
+			expect(screen.getByText("Delivery board")).toBeTruthy();
 		});
+		expect(screen.queryByText("Work Ledger")).toBeNull();
+		expect(screen.queryByText("Worktale unavailable")).toBeNull();
+		expect(screen.queryByText("Architecture pressure")).toBeNull();
+		expect(mockLoadMemories).not.toHaveBeenCalled();
+		expect(mockFetchWorkLedgerEntries).not.toHaveBeenCalled();
+		expect(mockFetchWorktaleReadiness).not.toHaveBeenCalled();
+	});
+
+	it("hides workshop-only architecture, work ledger, and memory surfaces for customer users", async () => {
+		authState.user = {
+			id: "user-2",
+			email: "user@example.com",
+			app_metadata: { role: "user" },
+		};
+
+		render(
+			<MemoryRouter initialEntries={["/app/dashboard?focus=architecture"]}>
+				<Routes>
+					<Route path="/app/dashboard" element={<DashboardOverviewPanel />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText("Watchdog summary")).toBeTruthy();
+		});
+		expect(screen.queryByText("Work Ledger")).toBeNull();
+		expect(screen.queryByText("Architecture pressure")).toBeNull();
+		expect(screen.queryByText("Agent memory")).toBeNull();
+		expect(screen.getByText("Delivery board")).toBeTruthy();
+		expect(screen.getAllByText("Packages ready").length).toBeGreaterThan(0);
 		expect(
-			screen.getByText(
-				"This surface requires an authenticated session before it can load.",
-			),
-		).toBeTruthy();
+			screen.queryByRole("button", { name: "Architecture Map" }),
+		).toBeNull();
+		expect(screen.queryByText("Repo area")).toBeNull();
+		expect(screen.queryByText("Agent")).toBeNull();
+		expect(mockLoadMemories).not.toHaveBeenCalled();
+		expect(mockFetchWorkLedgerEntries).not.toHaveBeenCalled();
+		expect(mockFetchWorktaleReadiness).not.toHaveBeenCalled();
 	});
 });

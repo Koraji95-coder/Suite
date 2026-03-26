@@ -13,33 +13,42 @@ const hasStorageState = fs.existsSync(storageStatePath);
 test.use(hasStorageState ? { storageState: storageStatePath } : {});
 
 test.describe("authenticated shell routes", () => {
+	test.describe.configure({ mode: "default" });
 	test.skip(!hasStorageState, "Run `npm run auth:playwright:bootstrap` first.");
 
-	const routes = [
-		{ path: "/app/agent", title: "Agents" },
-		{ path: "/app/apps/autowire", title: "AutoWire" },
+	const customerRoutes = [
 		{ path: "/app/calendar", title: "Calendar" },
-		{ path: "/app/changelog", title: "Changelog" },
-		{ path: "/app/command-center", title: "Command Center" },
 		{ path: "/app/dashboard", title: "Dashboard" },
+		{ path: "/app/apps/drawing-list-manager", title: "Drawing List Manager" },
 		{ path: "/app/knowledge", title: "Knowledge" },
 		{ path: "/app/projects", title: "Projects" },
 		{ path: "/app/settings", title: "Settings" },
+		{ path: "/app/apps/standards-checker", title: "Standards Checker" },
+		{ path: "/app/apps/transmittal-builder", title: "Transmittal Builder" },
 		{ path: "/app/watchdog", title: "Watchdog" },
 	] as const;
 
-	for (const route of routes) {
+	const devRoutes = [
+		"/app/agent",
+		"/app/apps/autowire",
+		"/app/changelog",
+		"/app/command-center",
+		"/app/operations",
+		"/app/developer",
+	] as const;
+
+	for (const route of customerRoutes) {
 		test(`${route.path} renders shell-owned page identity`, async ({
 			page,
 		}) => {
-			await page.goto(route.path);
+			await page.goto(route.path, { waitUntil: "domcontentloaded" });
 
 			await expect(
 				page.getByRole("heading", { level: 1, name: route.title }),
-			).toBeVisible();
+			).toBeVisible({ timeout: 15_000 });
 			await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 			await expect(
-				page.getByText("Operations shell", { exact: true }).first(),
+				page.getByText("Suite workspace", { exact: true }).first(),
 			).toBeVisible();
 			await expect(
 				page.getByText("Area", { exact: true }).first(),
@@ -62,6 +71,20 @@ test.describe("authenticated shell routes", () => {
 				page.getByRole("heading", { name: "Thanks for signing up!" }),
 			).toHaveCount(0);
 			await expect(page.getByPlaceholder("Enter your name")).toHaveCount(0);
+		});
+	}
+
+	for (const route of devRoutes) {
+		test(`${route} redirects customer audience away from developer pages`, async ({
+			page,
+		}) => {
+			await page.goto(route, { waitUntil: "domcontentloaded" });
+			await page.waitForURL("**/app/dashboard");
+
+			await expect(
+				page.getByRole("heading", { level: 1, name: "Dashboard" }),
+			).toBeVisible({ timeout: 15_000 });
+			await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 		});
 	}
 });

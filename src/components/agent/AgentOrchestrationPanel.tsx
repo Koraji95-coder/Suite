@@ -518,15 +518,15 @@ export function AgentOrchestrationPanel({
 				current === snapshotRequestId ? current : snapshotRequestId,
 			);
 		}
-		const snapshotProfiles = Array.isArray(snapshot.profiles)
-			? snapshot.profiles
-					.map((value) =>
+		const snapshotProfiles = Array.isArray(snapshot.steps)
+			? snapshot.steps
+					.map((value: unknown) =>
 						String(value || "")
 							.trim()
 							.toLowerCase(),
 					)
 					.filter(
-						(value): value is AgentProfileId =>
+						(value: string): value is AgentProfileId =>
 							isProfileId(value) && value !== "koro",
 					)
 			: [];
@@ -1050,7 +1050,7 @@ export function AgentOrchestrationPanel({
 					</Text>
 					{runId ? (
 						<Badge color={statusBadgeColor} variant="soft" size="sm">
-							{status.replaceAll("_", " ")}
+							{status.replace(/_/g, " ")}
 						</Badge>
 					) : null}
 				</HStack>

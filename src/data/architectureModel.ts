@@ -74,11 +74,12 @@ export const ARCHITECTURE_DOMAINS: ArchitectureDomain[] = [
 		label: "Agent Platform",
 		group: "agent",
 		summary:
-			"Suite agent UI + transport service mapped to brokered/direct gateway pathways.",
+			"Suite agent UI, broker endpoints, and the Suite-native gateway boundary for brokered/direct workflows.",
 		repoRoots: [
 			"src/routes/agent",
 			"src/services/agentService.ts",
-			"zeroclaw-main",
+			"scripts/suite-agent-gateway.mjs",
+			"scripts/run-agent-gateway.mjs",
 		],
 	},
 	{
@@ -254,19 +255,20 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 			"Pairing challenge-confirm, session health/config, and webhook ingress.",
 	},
 	{
-		id: "zeroclaw-gateway",
+		id: "suite-native-gateway",
 		domainId: "agent",
-		label: "ZeroClaw Gateway",
-		path: "zeroclaw-main/src/gateway",
+		label: "Suite-Native Gateway",
+		path: "scripts/suite-agent-gateway.mjs",
 		summary:
-			"Gateway API surface (pairing/webhook/health/openai-compatible routes).",
+			"Native gateway API surface for pairing, webhook, health, model proxying, and external passkey callback bridging.",
 	},
 	{
-		id: "zeroclaw-runtime",
+		id: "gateway-launch-boundary",
 		domainId: "agent",
-		label: "ZeroClaw Runtime",
-		path: "zeroclaw-main/src/agent_loop",
-		summary: "Core runtime loop and policy-driven agent execution.",
+		label: "Gateway Launch Boundary",
+		path: "scripts/run-agent-gateway.mjs",
+		summary:
+			"Runtime launcher that defaults to the Suite-native gateway and treats any legacy gateway process as stale drift to stop.",
 	},
 	{
 		id: "docs-hub",
@@ -428,13 +430,13 @@ export const ARCHITECTURE_DEPENDENCIES: ArchitectureDependency[] = [
 	},
 	{
 		sourceId: "broker-api",
-		targetId: "zeroclaw-gateway",
+		targetId: "suite-native-gateway",
 		kind: "bridges",
 		weight: 0.86,
 	},
 	{
-		sourceId: "zeroclaw-gateway",
-		targetId: "zeroclaw-runtime",
+		sourceId: "suite-native-gateway",
+		targetId: "gateway-launch-boundary",
 		kind: "powers",
 		weight: 0.9,
 	},
@@ -479,8 +481,8 @@ export const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
 		steps: [
 			"src/routes/agent + src/services/agentService.ts",
 			"backend/api_server.py (/api/agent/*)",
-			"zeroclaw-main/src/gateway",
-			"zeroclaw runtime loop + callback bridge",
+			"scripts/suite-agent-gateway.mjs",
+			"native gateway routes + stale legacy-process detection only",
 		],
 	},
 	{

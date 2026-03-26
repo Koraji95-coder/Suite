@@ -24,31 +24,24 @@
 	align-items: center;
 }
 
-.contextStats {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
-	gap: 0.75rem;
+.contextFacts {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.7rem;
 }
 
-.contextStatCard {
+.contextFact {
 	display: grid;
 	gap: 0.2rem;
 	min-width: 0;
-	padding: 0.88rem 0.95rem;
+	padding: 0.76rem 0.88rem;
 	border-radius: var(--radius-3);
 	border: 1px solid
 		color-mix(in srgb, var(--brand-border-soft) 80%, transparent);
-	background:
-		linear-gradient(
-			180deg,
-			color-mix(in srgb, var(--surface-2) 88%, transparent),
-			color-mix(in srgb, var(--surface) 74%, transparent)
-		),
-		color-mix(in srgb, var(--surface) 92%, transparent);
-	box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+	background: color-mix(in srgb, var(--suite-surface-overlay) 80%, transparent);
 }
 
-.contextStatLabel {
+.contextFactLabel {
 	font-size: 0.67rem;
 	font-weight: 700;
 	letter-spacing: 0.12em;
@@ -56,8 +49,8 @@
 	color: var(--text-muted);
 }
 
-.contextStatValue {
-	font-size: 1.05rem;
+.contextFactValue {
+	font-size: 0.94rem;
 	font-weight: 700;
 	color: var(--text);
 }
@@ -174,6 +167,65 @@
 	gap: 0.7rem;
 }
 
+.activityTabs {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+}
+
+.activityTab {
+	min-height: 2rem;
+	padding: 0.45rem 0.8rem;
+	border-radius: 999px;
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 80%, transparent);
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 84%, transparent),
+			color-mix(in srgb, var(--surface) 72%, transparent)
+		),
+		color-mix(in srgb, var(--surface) 88%, transparent);
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 0.78rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		border-color 160ms ease,
+		color 160ms ease,
+		transform 160ms ease,
+		background-color 160ms ease;
+}
+
+.activityTab:hover {
+	border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+	color: var(--text);
+	transform: translateY(-1px);
+}
+
+.activityTabActive {
+	border-color: color-mix(
+		in srgb,
+		var(--primary) 44%,
+		var(--brand-border-soft)
+	);
+	background:
+		radial-gradient(
+			120% 120% at 100% 0%,
+			color-mix(in srgb, var(--primary) 16%, transparent),
+			transparent 62%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 90%, transparent),
+			color-mix(in srgb, var(--surface) 78%, transparent)
+		),
+		color-mix(in srgb, var(--surface) 92%, transparent);
+	color: var(--text);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
 .eventRow,
 .collectorRow,
 .technicalRow,
@@ -285,6 +337,40 @@
 	align-items: flex-start;
 }
 
+.inlineFocusCard {
+	display: grid;
+	gap: 0.7rem;
+	padding: 0.9rem 0.95rem;
+	border-radius: var(--radius-3);
+	border: 1px solid
+		color-mix(in srgb, var(--primary) 24%, var(--brand-border-soft));
+	background:
+		radial-gradient(
+			120% 120% at 100% 0%,
+			color-mix(in srgb, var(--info) 8%, transparent),
+			transparent 62%
+		),
+		radial-gradient(
+			120% 120% at 0% 100%,
+			color-mix(in srgb, var(--primary) 12%, transparent),
+			transparent 68%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface-2) 90%, transparent),
+			color-mix(in srgb, var(--surface) 78%, transparent)
+		),
+		color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+.inlineFocusHeader {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.65rem;
+}
+
 .rowDetail {
 	font-size: 0.8rem;
 	color: var(--text);
@@ -373,6 +459,10 @@
 	display: flex;
 	flex-wrap: wrap;
 	gap: 0.65rem;
+}
+
+.coverageLead {
+	margin-top: 0.3rem;
 }
 
 .focusInspector {
@@ -478,7 +568,6 @@
 }
 
 @media (max-width: 719px) {
-	.contextStats,
 	.liveSessionGrid {
 		grid-template-columns: 1fr;
 	}

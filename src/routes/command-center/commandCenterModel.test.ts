@@ -1,17 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
 	COMMAND_GROUPS,
-	coerceActiveCommandCenterTab,
 	parseCommandCenterHistory,
 } from "./commandCenterModel";
 
 describe("commandCenterModel", () => {
-	it("normalizes unsupported tabs back to commands", () => {
-		expect(coerceActiveCommandCenterTab("architecture")).toBe("architecture");
-		expect(coerceActiveCommandCenterTab("commands")).toBe("commands");
-		expect(coerceActiveCommandCenterTab(null)).toBe("commands");
-	});
-
 	it("normalizes and deduplicates persisted history", () => {
 		const history = parseCommandCenterHistory([
 			{
@@ -63,38 +56,54 @@ describe("commandCenterModel", () => {
 		});
 	});
 
-	it("includes the expected local workflow command groups", () => {
+	it("keeps command groups focused on diagnostics, hosted push, and evidence", () => {
 		const titles = COMMAND_GROUPS.map((group) => group.title);
-		expect(titles).toContain("Supabase");
-		expect(titles).toContain("Watchdog");
-		expect(titles).toContain("Worktale");
+		expect(titles).toContain("Diagnostics");
+		expect(titles).toContain("Hosted Push");
+		expect(titles).toContain("Evidence & Logs");
+		expect(titles).not.toContain("Repository");
+		expect(titles).not.toContain("Quality");
 	});
 
-	it("includes the workstation runtime control presets", () => {
-		const watchdogGroup = COMMAND_GROUPS.find(
-			(group) => group.title === "Watchdog",
+	it("keeps runtime workstation controls out of copied command presets", () => {
+		const ids = COMMAND_GROUPS.flatMap((group) =>
+			group.presets.map((preset) => preset.id),
 		);
-		const ids = (watchdogGroup?.presets || []).map((preset) => preset.id);
-		expect(ids).toContain("workstation-bootstrap");
-		expect(ids).toContain("workstation-stop");
-		expect(ids).toContain("workstation-control-panel");
-		expect(ids).toContain("workstation-startup-install");
+		expect(ids).not.toContain("workstation-control-panel");
+		expect(ids).not.toContain("watchdog-autocad-doctor");
+	});
+
+	it("keeps workstation start/stop commands out of diagnostic presets", () => {
+		const ids = COMMAND_GROUPS.flatMap((group) =>
+			group.presets.map((preset) => preset.id),
+		);
+		expect(ids).not.toContain("zeroclaw");
+		expect(ids).not.toContain("flask");
+		expect(ids).not.toContain("build");
+		expect(ids).not.toContain("check");
 	});
 
 	it("includes the guarded hosted Supabase workflow presets", () => {
 		const supabaseGroup = COMMAND_GROUPS.find(
-			(group) => group.title === "Supabase",
+			(group) => group.title === "Hosted Push",
 		);
 		const ids = (supabaseGroup?.presets || []).map((preset) => preset.id);
-		expect(ids).toContain("supabase-mode-local");
-		expect(ids).toContain("supabase-mode-hosted");
-		expect(ids).toContain("supabase-mail-gmail");
-		expect(ids).toContain("supabase-mail-mailpit");
 		expect(ids).toContain("supabase-remote-login");
 		expect(ids).toContain("supabase-remote-target-auto");
 		expect(ids).toContain("supabase-remote-preflight");
 		expect(ids).toContain("supabase-remote-push-dry");
 		expect(ids).toContain("supabase-remote-push");
 		expect(ids).toContain("supabase-remote-task-install");
+	});
+
+	it("keeps only probe-safe diagnostics in command presets", () => {
+		const diagnosticsGroup = COMMAND_GROUPS.find(
+			(group) => group.title === "Diagnostics",
+		);
+		const ids = (diagnosticsGroup?.presets || []).map((preset) => preset.id);
+		expect(ids).not.toContain("suite-runtime-status");
+		expect(ids).toContain("gateway-health-probe");
+		expect(ids).toContain("backend-health-probe");
+		expect(ids).toContain("backend-runtime-status");
 	});
 });

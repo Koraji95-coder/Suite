@@ -41,6 +41,7 @@ interface TransmittalBuilderRightRailProps {
 		label: string;
 		value: string;
 	}>;
+	preferredIssueSetSummary?: string | null;
 	lastSavedAt: Date | null;
 	submitAttempted: boolean;
 	validationErrors: string[];
@@ -58,11 +59,46 @@ export function TransmittalBuilderRightRail({
 	completeContactsCount,
 	fileSummary,
 	optionSummary,
+	preferredIssueSetSummary = null,
 	lastSavedAt,
 	submitAttempted,
 	validationErrors,
 	projectMetadataLoadedAt,
 }: TransmittalBuilderRightRailProps) {
+	const showOutputSection =
+		outputs.length > 0 ||
+		generationState.state === "success" ||
+		generationState.state === "error";
+	const hasProjectContext = Boolean(draft.selectedProjectId || draft.projectName);
+	const packageRows = [
+		{
+			label: "Package",
+			value: `${draft.transmittalType === "standard" ? "Standard package" : "CID package"} • ${draft.date || "--"}`,
+		},
+		{
+			label: "From",
+			value: draft.fromName
+				? `${draft.fromName}${draft.fromTitle ? ` • ${draft.fromTitle}` : ""}`
+				: "Sender details not set yet.",
+		},
+		{
+			label: "Contacts",
+			value: `${completeContactsCount} complete`,
+		},
+		{
+			label: "Files",
+			value: `Template ${fileSummary.template} • ${fileSummary.documents}`,
+		},
+		...(preferredIssueSetSummary
+			? [
+					{
+						label: "Issue set",
+						value: preferredIssueSetSummary,
+					},
+				]
+			: []),
+	];
+
 	return (
 		<div className={styles.root}>
 			<TransmittalSection title="Generate">
@@ -119,131 +155,139 @@ export function TransmittalBuilderRightRail({
 						Generate documents
 					</Button>
 
-					<Button type="button" variant="outline" onClick={onResetSession}>
+					<Button type="button" variant="ghost" size="sm" onClick={onResetSession}>
 						Reset session
 					</Button>
+
+					<div className={styles.generateSummary}>
+						<div className={styles.validationStatus}>
+							<span className={styles.muted}>Draft saved</span>
+							<span className={styles.text}>
+								{lastSavedAt?.toLocaleTimeString() || "Not yet"}
+							</span>
+						</div>
+						{submitAttempted && validationErrors.length > 0 ? (
+							<div className={styles.validationErrors}>
+								{validationErrors.map((error) => (
+									<div key={error}>{error}</div>
+								))}
+							</div>
+						) : (
+							<div className={styles.readyNote}>
+								All required package fields look good.
+							</div>
+						)}
+					</div>
 				</div>
 			</TransmittalSection>
 
-			<TransmittalSection title="Output">
-				<div className={styles.outputBody}>
-					<div className={styles.outputStatus}>
-						{generationState.state === "success" ? (
-							<CheckCircle2 size={14} />
-						) : generationState.state === "error" ? (
-							<AlertTriangle size={14} />
+			{showOutputSection ? (
+				<TransmittalSection title="Output">
+					<div className={styles.outputBody}>
+						<div className={styles.outputStatus}>
+							{generationState.state === "success" ? (
+								<CheckCircle2 size={14} />
+							) : generationState.state === "error" ? (
+								<AlertTriangle size={14} />
+							) : (
+								<RefreshCcw size={14} />
+							)}
+							<span>
+								{generationState.message || "Ready to generate transmittal."}
+							</span>
+						</div>
+						{outputs.length === 0 ? (
+							<div>No output yet.</div>
 						) : (
-							<RefreshCcw size={14} />
-						)}
-						<span>
-							{generationState.message || "Ready to generate transmittal."}
-						</span>
-					</div>
-					{outputs.length === 0 ? (
-						<div>No output yet.</div>
-					) : (
-						<div className={styles.outputList}>
-							{outputs.map((output) => (
-								<Panel key={output.id} variant="inset" padding="md">
-									<div className={styles.outputItem}>
-										<div className={styles.outputLabel}>{output.label}</div>
-										<div>{output.filename}</div>
-										<div>
-											{bytesToSize(output.size)} | {output.createdAt}
+							<div className={styles.outputList}>
+								{outputs.map((output) => (
+									<Panel key={output.id} variant="inset" padding="md">
+										<div className={styles.outputItem}>
+											<div className={styles.outputLabel}>{output.label}</div>
+											<div>{output.filename}</div>
+											<div>
+												{bytesToSize(output.size)} | {output.createdAt}
+											</div>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												onClick={() => {
+													const link = document.createElement("a");
+													link.href = output.url;
+													link.download = output.filename;
+													link.click();
+												}}
+											>
+												Download again
+											</Button>
 										</div>
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											onClick={() => {
-												const link = document.createElement("a");
-												link.href = output.url;
-												link.download = output.filename;
-												link.click();
-											}}
-										>
-											Download again
-										</Button>
-									</div>
-								</Panel>
+									</Panel>
+								))}
+							</div>
+						)}
+					</div>
+				</TransmittalSection>
+			) : null}
+
+			<TransmittalSection title="Package snapshot">
+				<Panel variant="inset" padding="lg" className={styles.summaryPanel}>
+					<div className={styles.summaryHeader}>
+						<div className={styles.summaryHeading}>
+							{draft.transmittalNumber || "Draft package"}
+						</div>
+						<div className={styles.muted}>
+							{draft.projectName || "No project selected"}
+							{draft.projectNumber ? ` • ${draft.projectNumber}` : ""}
+						</div>
+					</div>
+
+					{hasProjectContext ? (
+						<div className={styles.summaryList}>
+							{packageRows.map((row) => (
+								<div key={row.label} className={styles.summaryRow}>
+									<span className={styles.muted}>{row.label}</span>
+									<span className={styles.text}>{row.value}</span>
+								</div>
 							))}
+							{draft.transmittalType === "standard" ? (
+								<div className={styles.summaryRow}>
+									<span className={styles.muted}>Review path</span>
+									<span className={styles.text}>
+										{draft.standardDocumentSource === "project_metadata"
+											? projectMetadataLoadedAt
+												? `Project metadata • ${new Date(projectMetadataLoadedAt).toLocaleString()}`
+												: "Project metadata"
+											: "PDF OCR / manual review"}
+									</span>
+								</div>
+							) : null}
+							{draft.transmittalType === "standard" &&
+							fileSummary.report !== "No ACADE report" ? (
+								<div className={styles.summaryRow}>
+									<span className={styles.muted}>ACADE report</span>
+									<span className={styles.text}>{fileSummary.report}</span>
+								</div>
+							) : null}
+						</div>
+					) : (
+						<div className={styles.snapshotNote}>
+							Choose the project package context first to build the delivery
+							snapshot.
 						</div>
 					)}
-				</div>
-			</TransmittalSection>
 
-			<TransmittalSection title="Summary">
-				<Panel variant="inset" padding="lg" className={styles.summaryPanel}>
-					<div>
-						<div className={styles.muted}>Project</div>
-						<div className={styles.summaryHeading}>
-							{draft.projectName || "Untitled project"}
-						</div>
-						<div className={styles.muted}>
-							{draft.projectNumber || "R3P-"} |{" "}
-							{draft.transmittalNumber || "XMTL-"} | {draft.date || "--"}
-						</div>
-					</div>
-
-					<div>
-						<div className={styles.muted}>From</div>
-						<div className={styles.text}>{draft.fromName || "-"}</div>
-						<div className={styles.muted}>{draft.fromTitle || "-"}</div>
-					</div>
-
-					<div>
-						<div className={styles.muted}>Contacts</div>
-						<div className={styles.text}>{completeContactsCount} complete</div>
-					</div>
-
-					<div>
-						<div className={styles.muted}>Files</div>
-						<div className={styles.text}>Template: {fileSummary.template}</div>
-						<div className={styles.muted}>
-							Index: {fileSummary.index} | {fileSummary.documents}
-						</div>
-						{draft.transmittalType === "standard" ? (
-							<div className={styles.muted}>ACADE report: {fileSummary.report}</div>
-						) : null}
-						{draft.transmittalType === "standard" ? (
-							<div className={styles.muted}>
-								Metadata:{" "}
-								{draft.standardDocumentSource === "project_metadata"
-									? projectMetadataLoadedAt
-										? `Project metadata (${new Date(projectMetadataLoadedAt).toLocaleString()})`
-										: "Project metadata"
-									: "PDF OCR / manual review"}
-							</div>
-						) : null}
-					</div>
-
-					<div>
-						<div className={styles.muted}>Options</div>
+					{optionSummary.length > 0 ? (
 						<div className={styles.optionSummaryList}>
 							{optionSummary.map((group) => (
-								<div key={group.label}>
-									<span className={styles.text}>{group.label}:</span>{" "}
-									<span className={styles.muted}>{group.value}</span>
+								<div key={group.label} className={styles.summaryRow}>
+									<span className={styles.muted}>{group.label}</span>
+									<span className={styles.text}>{group.value}</span>
 								</div>
 							))}
 						</div>
-					</div>
+					) : null}
 				</Panel>
-			</TransmittalSection>
-
-			<TransmittalSection title="Validation">
-				<div className={styles.validationBody}>
-					<div>Draft saved: {lastSavedAt?.toLocaleTimeString() || "-"}</div>
-					{submitAttempted && validationErrors.length > 0 ? (
-						<div className={styles.validationErrors}>
-							{validationErrors.map((error) => (
-								<div key={error}>{error}</div>
-							))}
-						</div>
-					) : (
-						<div>All required fields look good.</div>
-					)}
-				</div>
 			</TransmittalSection>
 		</div>
 	);

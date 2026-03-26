@@ -1,4 +1,4 @@
-import { ArrowRight, Bot, FolderKanban } from "lucide-react";
+import { ArrowRight, FolderKanban } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PageContextBand } from "@/components/apps/ui/PageContextBand";
 import { PageFrame, Section } from "@/components/apps/ui/PageFrame";
@@ -9,15 +9,9 @@ import { AppsCatalogGrid } from "./modules/AppsCatalogGrid";
 import { APPS_CATALOG } from "./modules/appsCatalog";
 
 export default function AppsRoutePage() {
-	const activeCount = APPS_CATALOG.filter(
-		(item) => item.status === "active",
-	).length;
-	const automationCount = APPS_CATALOG.filter(
-		(item) => item.lane === "automation",
-	).length;
-	const intelligenceCount = APPS_CATALOG.filter(
-		(item) => item.lane === "intelligence",
-	).length;
+	const visibleItems = APPS_CATALOG.filter(
+		(item) => item.audience === "customer",
+	);
 	useRegisterPageHeader({
 		title: "Apps Hub",
 		subtitle:
@@ -31,8 +25,8 @@ export default function AppsRoutePage() {
 				eyebrow="Engineering apps"
 				summary={
 					<Text size="sm" color="muted" block className={styles.heroCopy}>
-						Use the Apps Hub to jump into delivery work, CAD automation, and
-						agent-backed intelligence without hunting across the shell.
+						Use the Apps Hub to jump into the current delivery tools without
+						hunting across the shell.
 					</Text>
 				}
 				actions={
@@ -41,37 +35,35 @@ export default function AppsRoutePage() {
 							<FolderKanban className={styles.heroLinkIcon} />
 							<span>Open Projects</span>
 						</Link>
-						<Link to="/app/agent" className={styles.heroLinkSecondary}>
-							<Bot className={styles.heroLinkIcon} />
-							<span>Open Agents</span>
+						<Link to="/app/watchdog" className={styles.heroLinkSecondary}>
+							<span>Open Watchdog</span>
 						</Link>
 					</>
 				}
 			>
-				<div className={styles.signalGrid}>
-					<div className={styles.signalCard}>
-						<span className={styles.signalLabel}>Active tools</span>
-						<strong className={styles.signalValue}>{activeCount}</strong>
-						<span className={styles.signalMeta}>Ready to launch now</span>
+				<div className={styles.workflowStrip} aria-label="Product workflow">
+					<div className={styles.workflowFact}>
+						<span className={styles.workflowLabel}>Released tools</span>
+						<strong className={styles.workflowValue}>
+							{visibleItems.length}
+						</strong>
 					</div>
-					<div className={styles.signalCard}>
-						<span className={styles.signalLabel}>Automation lanes</span>
-						<strong className={styles.signalValue}>{automationCount}</strong>
-						<span className={styles.signalMeta}>CAD and backend execution</span>
+					<div className={styles.workflowFact}>
+						<span className={styles.workflowLabel}>Start in</span>
+						<strong className={styles.workflowValue}>Projects</strong>
 					</div>
-					<div className={styles.signalCard}>
-						<span className={styles.signalLabel}>Intelligence lanes</span>
-						<strong className={styles.signalValue}>{intelligenceCount}</strong>
-						<span className={styles.signalMeta}>
-							Graph, knowledge, and agents
-						</span>
+					<div className={styles.workflowFact}>
+						<span className={styles.workflowLabel}>Delivery flow</span>
+						<strong className={styles.workflowValue}>
+							Drawing List → Standards → Transmittals
+						</strong>
 					</div>
 				</div>
 			</PageContextBand>
 
 			<Section
-				title="Launch Stack"
-				description="Route into the current Suite surfaces without leaving the command-center layout."
+				title="Product tools"
+				description="Released tools stay focused on drawing delivery, document control, and project execution."
 				actions={
 					<Link to="/app/dashboard" className={styles.heroLinkSecondary}>
 						<span>Back to Dashboard</span>
@@ -79,12 +71,7 @@ export default function AppsRoutePage() {
 					</Link>
 				}
 			>
-				<p className={styles.sectionCopy}>
-					Each module below is grouped by the role it plays in the workspace:
-					project execution, engineering automation, or operational
-					intelligence.
-				</p>
-				<AppsCatalogGrid items={APPS_CATALOG} />
+				<AppsCatalogGrid items={visibleItems} />
 			</Section>
 		</PageFrame>
 	);

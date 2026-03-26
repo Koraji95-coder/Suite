@@ -20,16 +20,6 @@ internal sealed class RuntimeShellForm : Form
         @"^\[(?<timestamp>[^\]]+)\](?:\s\[(?<tag>[A-Z]+)\])?\s(?<message>.*)$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    private static readonly string[] ServiceOrder =
-    {
-        "supabase",
-        "backend",
-        "gateway",
-        "frontend",
-        "watchdog-filesystem",
-        "watchdog-autocad",
-    };
-
     private readonly AppOptions _options;
     private readonly WebView2 _webView;
     private readonly System.Windows.Forms.Timer _pollTimer;
@@ -39,8 +29,13 @@ internal sealed class RuntimeShellForm : Form
     private readonly string _controlScriptPath;
     private readonly string _bootstrapScriptPath;
     private readonly string _stopScriptPath;
+    private readonly string _supportBundleScriptPath;
+    private readonly string _runtimeCatalogPath;
+    private readonly string _developerToolsManifestPath;
     private readonly string _runtimeStatusDirectory;
     private readonly string _runtimeLogPath;
+    private readonly RuntimeCatalog _runtimeCatalog;
+    private readonly string _runtimeCatalogJson;
     private readonly List<string> _queuedMessages = new();
     private readonly object _queueLock = new();
 
@@ -63,11 +58,15 @@ internal sealed class RuntimeShellForm : Form
         _controlScriptPath = Path.Combine(_repoRoot, "scripts", "control-suite-runtime-service.ps1");
         _bootstrapScriptPath = Path.Combine(_repoRoot, "scripts", "run-suite-runtime-startup.ps1");
         _stopScriptPath = Path.Combine(_repoRoot, "scripts", "stop-suite-runtime.ps1");
+        _supportBundleScriptPath = Path.Combine(_repoRoot, "scripts", "export-suite-support-bundle.ps1");
+        _runtimeCatalogPath = Path.Combine(_assetsDirectory, "runtimeCatalog.json");
+        _developerToolsManifestPath = Path.Combine(_repoRoot, "src", "routes", "developerToolsManifest.data.json");
         _runtimeStatusDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Suite",
             "runtime-bootstrap");
         _runtimeLogPath = Path.Combine(_runtimeStatusDirectory, "bootstrap.log");
+        _runtimeCatalog = RuntimeCatalog.LoadFromFile(_runtimeCatalogPath, JsonOptions, out _runtimeCatalogJson);
 
         Directory.CreateDirectory(_runtimeStatusDirectory);
 
@@ -158,6 +157,8 @@ internal sealed class RuntimeShellForm : Form
         _uiReady = true;
         EnsureVisibleOnDesktop();
         FlushQueuedMessages();
+        PublishRuntimeCatalog();
+        PublishDeveloperToolsManifest();
         SendLog("SYS", "Runtime shell ready.", "sys");
         EmitInitialRuntimeLogTail();
         _runtimeLogOffset = GetCurrentLogLength();
@@ -216,6 +217,24 @@ internal sealed class RuntimeShellForm : Form
                     break;
                 case "runtime.service.open_logs":
                     await OpenLogsAsync(GetPayloadServiceId(root));
+                    break;
+                case "suite.route.open":
+                    await OpenSuiteRouteAsync(
+                        GetPayloadRouteId(root),
+                        GetPayloadRoutePath(root),
+                        GetPayloadRouteTitle(root));
+                    break;
+                case "suite.support.open-bootstrap-log":
+                    await OpenBootstrapLogAsync();
+                    break;
+                case "suite.support.open-status-dir":
+                    await OpenStatusDirectoryAsync();
+                    break;
+                case "suite.support.copy-summary":
+                    CopySupportSummaryToClipboard();
+                    break;
+                case "suite.support.export-bundle":
+                    await ExportSupportBundleAsync();
                     break;
             }
         }
@@ -356,7 +375,7 @@ internal sealed class RuntimeShellForm : Form
             SendLog("START", "Starting all runtime services.", "hi");
             await PublishSnapshotAsync(force: true);
 
-            foreach (var serviceId in ServiceOrder)
+            foreach (var serviceId in _runtimeCatalog.ServiceOrder)
             {
                 var service = FindService(serviceId);
                 if (service is null)
@@ -364,7 +383,7 @@ internal sealed class RuntimeShellForm : Form
                     continue;
                 }
 
-                var serviceName = GetServiceName(service.Value) ?? serviceId;
+                var serviceName = GetServiceName(service.Value, serviceId) ?? serviceId;
                 if (ServiceIsReady(service.Value))
                 {
                     continue;
@@ -496,7 +515,7 @@ internal sealed class RuntimeShellForm : Form
         try
         {
             var existingService = FindService(serviceId);
-            var serviceName = existingService.HasValue ? GetServiceName(existingService.Value) : null;
+            var serviceName = existingService.HasValue ? GetServiceName(existingService.Value, serviceId) : null;
             serviceName ??= serviceId;
             SendLog("START", $"{ToPresentTense(action)} {serviceName}.", "hi");
             SendProgress(visible: true, percent: 35, step: $"{ToPresentTense(action)} {serviceName}.");
@@ -619,6 +638,367 @@ internal sealed class RuntimeShellForm : Form
         }
     }
 
+    private Task OpenSuiteRouteAsync(string? routeId, string? routePath, string? routeTitle)
+    {
+        if (string.IsNullOrWhiteSpace(routeId) && string.IsNullOrWhiteSpace(routePath))
+        {
+            SendError("Open route failed.", "No Suite route was provided.");
+            return Task.CompletedTask;
+        }
+
+        var resolvedRoutePath = routePath;
+        if (string.IsNullOrWhiteSpace(resolvedRoutePath))
+        {
+            if (string.IsNullOrWhiteSpace(routeId) || !_runtimeCatalog.TryResolveRoutePath(routeId, out resolvedRoutePath))
+            {
+                SendError("Open route failed.", $"Route '{routeId}' is not supported.");
+                return Task.CompletedTask;
+            }
+        }
+
+        try
+        {
+            var baseUrl = ResolveSuiteFrontendBaseUrl();
+            var targetUri = BuildSuiteRouteUri(baseUrl, resolvedRoutePath);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = targetUri.ToString(),
+                UseShellExecute = true,
+            });
+
+            var routeLabel = !string.IsNullOrWhiteSpace(routeTitle) ? routeTitle : resolvedRoutePath;
+            SendLog("SYS", $"Opened {routeLabel} in browser.", "sys");
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-open-route", exception);
+            SendError("Open route failed.", exception.Message);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void PublishRuntimeCatalog()
+    {
+        try
+        {
+            PostRawEvent("runtime.catalog", _runtimeCatalogJson);
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-runtime-catalog", exception);
+            PostEvent("runtime.catalog", _runtimeCatalog);
+            SendError("Runtime catalog failed to load.", exception.Message);
+        }
+    }
+
+    private void PublishDeveloperToolsManifest()
+    {
+        try
+        {
+            if (!File.Exists(_developerToolsManifestPath))
+            {
+                PostRawEvent("developer.manifest", "{\"groups\":[],\"tools\":[]}");
+                SendLog("WARN", $"Developer tools manifest is missing: {_developerToolsManifestPath}", "warn");
+                return;
+            }
+
+            var manifestJson = File.ReadAllText(_developerToolsManifestPath);
+            using var _ = JsonDocument.Parse(manifestJson);
+            PostRawEvent("developer.manifest", manifestJson);
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-developer-manifest", exception);
+            PostRawEvent("developer.manifest", "{\"groups\":[],\"tools\":[]}");
+            SendError("Developer tools manifest failed to load.", exception.Message);
+        }
+    }
+
+    private Task OpenBootstrapLogAsync()
+    {
+        try
+        {
+            if (!File.Exists(_runtimeLogPath))
+            {
+                SendError("Open bootstrap log failed.", $"Bootstrap log not found: {_runtimeLogPath}");
+                return Task.CompletedTask;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _runtimeLogPath,
+                UseShellExecute = true,
+            });
+
+            SendLog("SYS", "Opened bootstrap log.", "sys");
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-open-bootstrap-log", exception);
+            SendError("Open bootstrap log failed.", exception.Message);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task OpenStatusDirectoryAsync()
+    {
+        try
+        {
+            Directory.CreateDirectory(_runtimeStatusDirectory);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{_runtimeStatusDirectory}\"",
+                UseShellExecute = true,
+            });
+
+            SendLog("SYS", "Opened runtime status directory.", "sys");
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-open-status-dir", exception);
+            SendError("Open status directory failed.", exception.Message);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void CopySupportSummaryToClipboard()
+    {
+        try
+        {
+            var summary = BuildSupportSummary();
+            Clipboard.SetText(summary);
+            SendLog("SYS", "Copied support summary to clipboard.", "sys");
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-copy-support-summary", exception);
+            SendError("Copy support summary failed.", exception.Message);
+        }
+    }
+
+    private async Task ExportSupportBundleAsync()
+    {
+        try
+        {
+            SendLog("START", "Exporting support bundle.", "hi");
+            var result = await ProcessRunner.RunPowerShellFileAsync(
+                _supportBundleScriptPath,
+                _repoRoot,
+                new[] { "-RepoRoot", _repoRoot, "-Json" });
+
+            if (!TryExtractJsonObject(result.CombinedOutput, out var payloadJson))
+            {
+                SendError("Support bundle export failed.", "The export script did not return JSON.");
+                return;
+            }
+
+            using var document = JsonDocument.Parse(payloadJson);
+            var root = document.RootElement;
+            var ok = root.TryGetProperty("ok", out var okElement) && okElement.ValueKind is JsonValueKind.True;
+            var summary = GetStringProperty(root, "summary") ?? (ok ? "Support bundle exported." : "Support bundle export completed with warnings.");
+            var archivePath = GetStringProperty(root, "archivePath");
+            var bundleDir = GetStringProperty(root, "bundleDir");
+            var warningCount = root.TryGetProperty("warningCount", out var warningCountElement) &&
+                warningCountElement.TryGetInt32(out var warningCountValue)
+                    ? warningCountValue
+                    : 0;
+
+            if (ok)
+            {
+                SendLog("OK", summary, "ok");
+            }
+            else
+            {
+                SendLog("WARN", summary, "warn");
+            }
+
+            if (warningCount > 0)
+            {
+                SendLog("WARN", $"{warningCount} support bundle warning{(warningCount == 1 ? string.Empty : "s")} were recorded. Review the generated manifest for detail.", "warn");
+            }
+
+            if (!string.IsNullOrWhiteSpace(archivePath) && File.Exists(archivePath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{archivePath}\"",
+                    UseShellExecute = true,
+                });
+                SendLog("SYS", $"Opened support bundle location: {archivePath}", "sys");
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(bundleDir) && Directory.Exists(bundleDir))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{bundleDir}\"",
+                    UseShellExecute = true,
+                });
+                SendLog("SYS", $"Opened support bundle directory: {bundleDir}", "sys");
+            }
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-export-support-bundle", exception);
+            SendError("Support bundle export failed.", exception.Message);
+        }
+    }
+
+    private string BuildSupportSummary()
+    {
+        if (_lastSnapshotDocument is not null)
+        {
+            var root = _lastSnapshotDocument.RootElement;
+            if (root.TryGetProperty("support", out var support))
+            {
+                var sharedText = GetStringProperty(support, "text");
+                if (!string.IsNullOrWhiteSpace(sharedText))
+                {
+                    return sharedText;
+                }
+
+                if (support.TryGetProperty("lines", out var sharedLinesElement) && sharedLinesElement.ValueKind == JsonValueKind.Array)
+                {
+                    var sharedLines = sharedLinesElement
+                        .EnumerateArray()
+                        .Where(element => element.ValueKind == JsonValueKind.String)
+                        .Select(element => element.GetString())
+                        .Where(line => !string.IsNullOrWhiteSpace(line))
+                        .ToArray();
+                    if (sharedLines.Length > 0)
+                    {
+                        return string.Join(Environment.NewLine, sharedLines!);
+                    }
+                }
+            }
+        }
+
+        var lines = new List<string>
+        {
+            "Suite Runtime Control Support Summary",
+            $"Generated: {FormatSupportSummaryTimestamp(DateTimeOffset.Now)}",
+            $"Repo: {_repoRoot}",
+            $"Bootstrap log: {_runtimeLogPath}",
+            $"Status directory: {_runtimeStatusDirectory}",
+        };
+
+        if (_lastSnapshotDocument is null)
+        {
+            lines.Add("Runtime snapshot: unavailable");
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        var snapshotRoot = _lastSnapshotDocument.RootElement;
+        var overallState = TryGetNestedStringProperty(snapshotRoot, "overall", "state") ?? "unknown";
+        var overallText = TryGetNestedStringProperty(snapshotRoot, "overall", "text") ?? "Unknown";
+        lines.Add($"Overall: {overallText} ({overallState})");
+
+        if (snapshotRoot.TryGetProperty("doctor", out var doctor))
+        {
+            var doctorState = GetStringProperty(doctor, "overallState") ?? "unknown";
+            var actionableIssueCount = doctor.TryGetProperty("actionableIssueCount", out var actionableCountElement) &&
+                actionableCountElement.TryGetInt32(out var actionableIssueCountValue)
+                    ? actionableIssueCountValue
+                    : 0;
+            lines.Add($"Suite doctor: {doctorState}; actionable issues {actionableIssueCount}");
+
+            if (doctor.TryGetProperty("recommendations", out var recommendations) && recommendations.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var recommendation in recommendations.EnumerateArray().Take(2))
+                {
+                    if (recommendation.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(recommendation.GetString()))
+                    {
+                        lines.Add($"Recommendation: {recommendation.GetString()}");
+                    }
+                }
+            }
+        }
+
+        if (snapshotRoot.TryGetProperty("runtime", out var runtime))
+        {
+            var bootstrapSummary = TryGetNestedStringProperty(runtime, "lastBootstrap", "summary");
+            if (!string.IsNullOrWhiteSpace(bootstrapSummary))
+            {
+                lines.Add($"Last bootstrap: {bootstrapSummary}");
+            }
+        }
+
+        if (snapshotRoot.TryGetProperty("services", out var services) && services.ValueKind == JsonValueKind.Array)
+        {
+            lines.Add("Services:");
+            foreach (var serviceId in _runtimeCatalog.ServiceOrder)
+            {
+                if (!TryFindService(snapshotRoot, serviceId, out var service))
+                {
+                    continue;
+                }
+
+                var serviceName = GetServiceName(service, serviceId) ?? serviceId;
+                var serviceState = GetStringProperty(service, "state") ?? "unknown";
+                var serviceSummary = GetStringProperty(service, "summary") ?? "No summary reported.";
+                lines.Add($"- {serviceName}: {serviceState} — {serviceSummary}");
+            }
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private string ResolveSuiteFrontendBaseUrl()
+    {
+        const string fallbackBaseUrl = "http://127.0.0.1:5173";
+        if (_lastSnapshotDocument is null)
+        {
+            return fallbackBaseUrl;
+        }
+
+        if (!TryFindService(_lastSnapshotDocument.RootElement, "frontend", out var frontendService))
+        {
+            return fallbackBaseUrl;
+        }
+
+        var localUrl = TryGetServiceNoteValue(frontendService, "Local URL");
+        if (!string.IsNullOrWhiteSpace(localUrl) && Uri.TryCreate(localUrl, UriKind.Absolute, out var parsedLocalUrl))
+        {
+            return parsedLocalUrl.GetLeftPart(UriPartial.Authority);
+        }
+
+        var logTargetKind = TryGetNestedStringProperty(frontendService, "logTarget", "kind");
+        var logTargetTarget = TryGetNestedStringProperty(frontendService, "logTarget", "target");
+        if (
+            string.Equals(logTargetKind, "url", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(logTargetTarget) &&
+            Uri.TryCreate(logTargetTarget, UriKind.Absolute, out var parsedLogTarget))
+        {
+            return parsedLogTarget.GetLeftPart(UriPartial.Authority);
+        }
+
+        return fallbackBaseUrl;
+    }
+
+    private static Uri BuildSuiteRouteUri(string baseUrl, string routePath)
+    {
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var parsedBaseUri))
+        {
+            parsedBaseUri = new Uri("http://127.0.0.1:5173/", UriKind.Absolute);
+        }
+
+        var rootUri = new Uri($"{parsedBaseUri.GetLeftPart(UriPartial.Authority)}/", UriKind.Absolute);
+        var normalizedRoute = string.IsNullOrWhiteSpace(routePath) ? "/app/dashboard" : routePath.Trim();
+        if (!normalizedRoute.StartsWith('/'))
+        {
+            normalizedRoute = "/" + normalizedRoute;
+        }
+
+        return new Uri(rootUri, normalizedRoute);
+    }
+
     private bool TryBeginAction(string action, string? serviceId)
     {
         if (_isClosing)
@@ -715,7 +1095,7 @@ internal sealed class RuntimeShellForm : Form
             {
                 var completed = 0;
                 var step = "Starting services.";
-                foreach (var serviceId in ServiceOrder)
+                foreach (var serviceId in _runtimeCatalog.ServiceOrder)
                 {
                     if (!TryFindService(root, serviceId, out var service))
                     {
@@ -729,26 +1109,26 @@ internal sealed class RuntimeShellForm : Form
                     }
 
                     step = ServiceIsActive(service)
-                        ? $"Waiting for {GetServiceName(service) ?? serviceId} to finish starting."
-                        : $"{(_activeAction == "bootstrap_all" ? "Bootstrapping" : "Starting")} {GetServiceName(service) ?? serviceId}.";
+                        ? $"Waiting for {GetServiceName(service, serviceId) ?? serviceId} to finish starting."
+                        : $"{(_activeAction == "bootstrap_all" ? "Bootstrapping" : "Starting")} {GetServiceName(service, serviceId) ?? serviceId}.";
                     break;
                 }
 
-                if (completed >= ServiceOrder.Length)
+                if (completed >= _runtimeCatalog.ServiceOrder.Length)
                 {
                     step = _activeAction == "bootstrap_all" ? "Runtime ready." : "All services started.";
                 }
 
                 var percent = completed == 0
                     ? 8
-                    : Math.Clamp((int)Math.Round((completed * 100.0) / ServiceOrder.Length), 8, 100);
+                    : Math.Clamp((int)Math.Round((completed * 100.0) / _runtimeCatalog.ServiceOrder.Length), 8, 100);
                 SendProgress(true, percent, step);
                 break;
             }
             case "stop_all":
             {
                 var stopped = 0;
-                foreach (var serviceId in ServiceOrder)
+                foreach (var serviceId in _runtimeCatalog.ServiceOrder)
                 {
                     if (!TryFindService(root, serviceId, out var service))
                     {
@@ -763,8 +1143,8 @@ internal sealed class RuntimeShellForm : Form
 
                 var percent = stopped == 0
                     ? 10
-                    : Math.Clamp((int)Math.Round((stopped * 100.0) / ServiceOrder.Length), 10, 100);
-                var step = stopped >= ServiceOrder.Length ? "All services stopped." : "Stopping local services.";
+                    : Math.Clamp((int)Math.Round((stopped * 100.0) / _runtimeCatalog.ServiceOrder.Length), 10, 100);
+                var step = stopped >= _runtimeCatalog.ServiceOrder.Length ? "All services stopped." : "Stopping local services.";
                 SendProgress(true, percent, step);
                 break;
             }
@@ -776,10 +1156,10 @@ internal sealed class RuntimeShellForm : Form
                     var ready = ServiceIsReady(service);
                     var percent = ready ? 100 : 70;
                     var step = ready
-                        ? $"{GetServiceName(service) ?? _activeServiceId} is ready."
+                        ? $"{GetServiceName(service, _activeServiceId) ?? _activeServiceId} is ready."
                         : ServiceIsActive(service)
-                            ? $"Waiting for {GetServiceName(service) ?? _activeServiceId} to finish starting."
-                            : $"Starting {GetServiceName(service) ?? _activeServiceId}.";
+                            ? $"Waiting for {GetServiceName(service, _activeServiceId) ?? _activeServiceId} to finish starting."
+                            : $"Starting {GetServiceName(service, _activeServiceId) ?? _activeServiceId}.";
                     SendProgress(true, percent, step);
                 }
                 break;
@@ -791,8 +1171,8 @@ internal sealed class RuntimeShellForm : Form
                     var stopped = ServiceSatisfiesStop(service);
                     var percent = stopped ? 100 : 40;
                     var step = stopped
-                        ? $"{GetServiceName(service) ?? _activeServiceId} is stopped."
-                        : $"Stopping {GetServiceName(service) ?? _activeServiceId}.";
+                        ? $"{GetServiceName(service, _activeServiceId) ?? _activeServiceId} is stopped."
+                        : $"Stopping {GetServiceName(service, _activeServiceId) ?? _activeServiceId}.";
                     SendProgress(true, percent, step);
                 }
                 break;
@@ -1136,6 +1516,63 @@ internal sealed class RuntimeShellForm : Form
         return GetStringProperty(payload, "serviceId");
     }
 
+    private static string? GetPayloadRouteId(JsonElement root)
+    {
+        if (!root.TryGetProperty("payload", out var payload))
+        {
+            return null;
+        }
+
+        return GetStringProperty(payload, "routeId");
+    }
+
+    private static string? GetPayloadRoutePath(JsonElement root)
+    {
+        if (!root.TryGetProperty("payload", out var payload))
+        {
+            return null;
+        }
+
+        return GetStringProperty(payload, "routePath");
+    }
+
+    private static string? GetPayloadRouteTitle(JsonElement root)
+    {
+        if (!root.TryGetProperty("payload", out var payload))
+        {
+            return null;
+        }
+
+        return GetStringProperty(payload, "routeTitle");
+    }
+
+    private static string? TryGetServiceNoteValue(JsonElement service, string noteLabel)
+    {
+        if (
+            !service.TryGetProperty("notes", out var notes) ||
+            notes.ValueKind != JsonValueKind.Array ||
+            string.IsNullOrWhiteSpace(noteLabel))
+        {
+            return null;
+        }
+
+        foreach (var note in notes.EnumerateArray())
+        {
+            if (!string.Equals(GetStringProperty(note, "label"), noteLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var value = GetStringProperty(note, "value");
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
     private bool TryFindService(JsonElement root, string serviceId, out JsonElement service)
     {
         if (!root.TryGetProperty("services", out var services) || services.ValueKind != JsonValueKind.Array)
@@ -1178,9 +1615,17 @@ internal sealed class RuntimeShellForm : Form
         return TryFindService(root, _activeServiceId, out service);
     }
 
-    private static string? GetServiceName(JsonElement service)
+    private string? GetServiceName(JsonElement service, string? fallbackServiceId = null)
     {
-        return GetStringProperty(service, "name");
+        var serviceName = GetStringProperty(service, "name");
+        if (!string.IsNullOrWhiteSpace(serviceName))
+        {
+            return serviceName;
+        }
+
+        return string.IsNullOrWhiteSpace(fallbackServiceId)
+            ? null
+            : _runtimeCatalog.GetServiceLabel(fallbackServiceId);
     }
 
     private static bool ServiceIsActive(JsonElement service)
@@ -1220,9 +1665,9 @@ internal sealed class RuntimeShellForm : Form
         return FindService(serviceId) is { } finalService && predicate(finalService);
     }
 
-    private static int ComputeStartProgressPercent(string serviceId)
+    private int ComputeStartProgressPercent(string serviceId)
     {
-        var index = Array.IndexOf(ServiceOrder, serviceId);
+        var index = Array.IndexOf(_runtimeCatalog.ServiceOrder, serviceId);
         if (index < 0)
         {
             return 30;
@@ -1305,6 +1750,19 @@ internal sealed class RuntimeShellForm : Form
         catch
         {
             return value.ToLocalTime().ToString("h:mm:ss tt", CultureInfo.InvariantCulture);
+        }
+    }
+
+    private static string FormatSupportSummaryTimestamp(DateTimeOffset value)
+    {
+        try
+        {
+            var localized = TimeZoneInfo.ConvertTime(value, DisplayTimeZone);
+            return localized.ToString("yyyy-MM-dd h:mm:ss tt", CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            return value.ToLocalTime().ToString("yyyy-MM-dd h:mm:ss tt", CultureInfo.InvariantCulture);
         }
     }
 

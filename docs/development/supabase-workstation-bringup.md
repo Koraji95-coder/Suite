@@ -181,6 +181,8 @@ Code moves through GitHub push/pull. Mirror/restore is only for workstation-loca
 - Codex config
 - skills
 - local runtime / learning artifacts
+- a Codex handoff summary
+- recent Codex session metadata and a filtered recent-session subset
 
 Commands:
 
@@ -188,6 +190,8 @@ Commands:
 npm run workstation:mirror
 npm run workstation:restore -- -WorkstationId DUSTIN-WORK
 ```
+
+The mirror intentionally does not copy Codex auth or the full Codex SQLite databases. It is meant to reduce machine-switch friction, not to guarantee that an exact live terminal thread reattaches automatically on another PC.
 
 ## Recommended Cross-PC Flow
 

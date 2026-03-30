@@ -88,6 +88,105 @@ function Restore-File {
     Copy-Item -LiteralPath $Source -Destination $Destination -Force
 }
 
+function Get-RelativePathText {
+    param(
+        [Parameter(Mandatory = $true)][string]$BasePath,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $resolvedBasePath = [System.IO.Path]::GetFullPath($BasePath)
+    if (-not $resolvedBasePath.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $resolvedBasePath += [string][System.IO.Path]::DirectorySeparatorChar
+    }
+
+    $baseUri = New-Object System.Uri($resolvedBasePath)
+    $pathUri = New-Object System.Uri([System.IO.Path]::GetFullPath($Path))
+    return [System.Uri]::UnescapeDataString($baseUri.MakeRelativeUri($pathUri).ToString()).Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+}
+
+function Restore-SelectedFiles {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceRoot,
+        [Parameter(Mandatory = $true)][string]$DestinationRoot
+    )
+
+    if (-not (Test-Path -LiteralPath $SourceRoot)) {
+        Write-Warning "Restore source missing: $SourceRoot"
+        return
+    }
+
+    Ensure-Directory -Path $DestinationRoot
+    foreach ($sourceFile in Get-ChildItem -LiteralPath $SourceRoot -Recurse -File -ErrorAction SilentlyContinue) {
+        $resolvedSourceFile = [System.IO.Path]::GetFullPath($sourceFile.FullName)
+        $relativePath = Get-RelativePathText -BasePath $SourceRoot -Path $resolvedSourceFile
+        $destinationPath = Join-Path $DestinationRoot $relativePath
+        Ensure-Directory -Path (Split-Path -Parent $destinationPath)
+        Copy-Item -LiteralPath $resolvedSourceFile -Destination $destinationPath -Force
+    }
+}
+
+function Merge-CodexSessionIndex {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+
+    if (-not (Test-Path -LiteralPath $Source)) {
+        Write-Warning "Restore source missing: $Source"
+        return
+    }
+
+    $entriesById = @{}
+    $candidateFiles = @()
+    if (Test-Path -LiteralPath $Destination) {
+        $candidateFiles += $Destination
+    }
+    $candidateFiles += $Source
+
+    foreach ($candidateFile in $candidateFiles) {
+        foreach ($line in Get-Content -LiteralPath $candidateFile -ErrorAction SilentlyContinue) {
+            if ([string]::IsNullOrWhiteSpace($line)) {
+                continue
+            }
+
+            try {
+                $entry = $line | ConvertFrom-Json
+            }
+            catch {
+                continue
+            }
+
+            $id = [string]$entry.id
+            if ([string]::IsNullOrWhiteSpace($id)) {
+                continue
+            }
+
+            $updatedAt = [datetimeoffset]::MinValue
+            if (-not [datetimeoffset]::TryParse([string]$entry.updated_at, [ref]$updatedAt)) {
+                $updatedAt = [datetimeoffset]::MinValue
+            }
+
+            if (
+                (-not $entriesById.ContainsKey($id)) -or
+                ($updatedAt -gt $entriesById[$id].updatedAt)
+            ) {
+                $entriesById[$id] = [pscustomobject]@{
+                    updatedAt = $updatedAt
+                    json = ($entry | ConvertTo-Json -Compress -Depth 10)
+                }
+            }
+        }
+    }
+
+    Ensure-Directory -Path (Split-Path -Parent $Destination)
+    $orderedLines = @(
+        $entriesById.GetEnumerator() |
+            Sort-Object { $_.Value.updatedAt } -Descending |
+            ForEach-Object { $_.Value.json }
+    )
+    Set-Content -LiteralPath $Destination -Value $orderedLines -Encoding UTF8
+}
+
 if (-not (Test-Path -LiteralPath $MirrorRoot)) {
     throw "Mirror root does not exist: $MirrorRoot"
 }
@@ -97,6 +196,12 @@ if (-not (Test-Path -LiteralPath $RepoRoot)) {
 }
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+$codexRoot = Join-Path $env:USERPROFILE ".codex"
+$mirroredCodexSessionIndexPath = Join-Path $MirrorRoot "codex\session_index.jsonl"
+$destinationCodexSessionIndexPath = Join-Path $codexRoot "session_index.jsonl"
+$mirroredCodexSessionsRoot = Join-Path $MirrorRoot "codex\sessions"
+$destinationCodexSessionsRoot = Join-Path $codexRoot "sessions"
+$codexHandoffPath = Join-Path $MirrorRoot "codex-handoff.md"
 $resolvedIdentity = Resolve-SuiteWorkstationProfile `
     -ResolvedRepoRoot $resolvedRepoRoot `
     -ExplicitWorkstationId $WorkstationId `
@@ -143,6 +248,13 @@ Update-SuiteCodexConfig `
     -Path $codexConfigPath `
     -ResolvedRepoRoot $resolvedRepoRoot `
     -WorkstationProfile $resolvedIdentity
+
+Merge-CodexSessionIndex `
+    -Source $mirroredCodexSessionIndexPath `
+    -Destination $destinationCodexSessionIndexPath
+Restore-SelectedFiles `
+    -SourceRoot $mirroredCodexSessionsRoot `
+    -DestinationRoot $destinationCodexSessionsRoot
 
 $bootstrapResult = $null
 if (-not $SkipBootstrap) {
@@ -200,6 +312,9 @@ Write-Host (
     "Workstation identity: " +
     "$($resolvedIdentity.WorkstationId) | $($resolvedIdentity.WorkstationLabel) | $($resolvedIdentity.WorkstationRole)"
 )
+if (Test-Path -LiteralPath $codexHandoffPath) {
+    Write-Host "Codex handoff: $codexHandoffPath"
+}
 if ($bootstrapResult) {
     $bootstrapStatus = if ($bootstrapResult.ok) { "ok" } else { "needs_attention" }
     Write-Host "Runtime bootstrap: $bootstrapStatus"

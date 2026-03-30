@@ -9,6 +9,7 @@ Use this when moving active development between Windows workstations and you wan
 - the correct workstation profile
 - the local Office companion path
 - startup tasks and runtime health
+- a Codex handoff summary plus recent session metadata
 
 ## Permanent Workstation IDs
 
@@ -30,6 +31,17 @@ Each physical machine should keep one permanent id. Do not restore the work PC a
 ```powershell
 npm run workstation:mirror
 ```
+
+That mirror now includes:
+
+- Codex config
+- Codex skills
+- Suite local learning state
+- `codex-handoff.md`
+- `session_index.jsonl`
+- a filtered set of recent small Codex session JSONL files
+
+It still does not mirror Codex auth or the full local Codex SQLite state, so exact live terminal attachment is not guaranteed.
 
 4. Confirm the current workstation id:
 
@@ -88,6 +100,8 @@ npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailySourcePath "C:\U
 ```powershell
 npm run workstation:restore -- -WorkstationId DUSTIN-WORK
 ```
+
+After restore, review `C:\Users\<you>\Dropbox\SuiteLocalStateMirror\codex-handoff.md` if you need help finding the last machine's active thread context quickly.
 
 6. If needed, explicitly re-stamp the workstation profile:
 

@@ -151,9 +151,11 @@ function Get-SuitePreferredAutoCadPluginBundleRoot {
 function Convert-ToSuiteWorkstationLabel {
     param([Parameter(Mandatory = $true)][string]$Value)
 
-    $segments = [Regex]::Split($Value.Trim(), "[-_]+") | Where-Object {
-        -not [string]::IsNullOrWhiteSpace($_)
-    }
+    $segments = @(
+        [Regex]::Split($Value.Trim(), "[-_]+") | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_)
+        }
+    )
     if ($segments.Count -eq 0) {
         return "$Value workstation"
     }
@@ -241,6 +243,24 @@ function Get-SuiteFallbackWorkstationProfile {
     }
 }
 
+function Get-SuiteOptionalProfileString {
+    param(
+        [Parameter(Mandatory = $false)]$Profile,
+        [Parameter(Mandatory = $true)][string]$PropertyName
+    )
+
+    if ($null -eq $Profile) {
+        return $null
+    }
+
+    $property = $Profile.PSObject.Properties[$PropertyName]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return [string]$property.Value
+}
+
 function Resolve-SuiteWorkstationProfile {
     param(
         [Parameter(Mandatory = $true)][string]$ResolvedRepoRoot,
@@ -288,7 +308,7 @@ function Resolve-SuiteWorkstationProfile {
     }
 
     $resolvedWorkstationLabel = if ([string]::IsNullOrWhiteSpace($ExplicitWorkstationLabel)) {
-        [string]$baseProfile.label
+        Get-SuiteOptionalProfileString -Profile $baseProfile -PropertyName "label"
     }
     else {
         $ExplicitWorkstationLabel.Trim()
@@ -298,7 +318,7 @@ function Resolve-SuiteWorkstationProfile {
     }
 
     $resolvedWorkstationRole = if ([string]::IsNullOrWhiteSpace($ExplicitWorkstationRole)) {
-        [string]$baseProfile.role
+        Get-SuiteOptionalProfileString -Profile $baseProfile -PropertyName "role"
     }
     else {
         $ExplicitWorkstationRole.Trim()
@@ -312,13 +332,13 @@ function Resolve-SuiteWorkstationProfile {
         WorkstationLabel = $resolvedWorkstationLabel.Trim()
         WorkstationRole = $resolvedWorkstationRole.Trim()
         GitUserName = if ([string]::IsNullOrWhiteSpace($ExplicitGitUserName)) {
-            [string]$baseProfile.gitUserName
+            Get-SuiteOptionalProfileString -Profile $baseProfile -PropertyName "gitUserName"
         }
         else {
             $ExplicitGitUserName.Trim()
         }
         GitUserEmail = if ([string]::IsNullOrWhiteSpace($ExplicitGitUserEmail)) {
-            [string]$baseProfile.gitUserEmail
+            Get-SuiteOptionalProfileString -Profile $baseProfile -PropertyName "gitUserEmail"
         }
         else {
             $ExplicitGitUserEmail.Trim()

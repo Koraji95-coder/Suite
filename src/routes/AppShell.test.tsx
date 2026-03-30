@@ -15,10 +15,17 @@ const mockState = vi.hoisted(() => ({
 				display_name: "Dustin",
 			},
 			app_metadata: {} as Record<string, unknown>,
+		} as {
+			id: string;
+			email: string;
+			user_metadata: { display_name?: string };
+			app_metadata: Record<string, unknown>;
 		},
 		profile: {
 			display_name: "Dustin",
-		},
+		} as { display_name: string | null } | null,
+		loading: false,
+		profileHydrating: false,
 	},
 	allowCommandCenter: false,
 	runtimeReport: {
@@ -39,6 +46,8 @@ vi.mock("@/auth/useAuth", () => ({
 	useAuth: () => ({
 		user: mockState.auth.user,
 		profile: mockState.auth.profile,
+		loading: mockState.auth.loading,
+		profileHydrating: mockState.auth.profileHydrating,
 		sessionAuthMethod: "session",
 		signOut: vi.fn(),
 		updateProfile: vi.fn(),
@@ -108,6 +117,8 @@ describe("AppShell", () => {
 		mockState.auth.profile = {
 			display_name: "Dustin",
 		};
+		mockState.auth.loading = false;
+		mockState.auth.profileHydrating = false;
 		mockState.allowCommandCenter = false;
 		mockState.runtimeReport = {
 			checkedAt: "2026-03-21T18:00:00.000Z",
@@ -298,5 +309,32 @@ describe("AppShell", () => {
 		expect(screen.queryByText("Agents")).toBeNull();
 		expect(screen.queryByText("Architecture")).toBeNull();
 		expect(screen.queryByText("Command Center")).toBeNull();
+	});
+
+	it("does not flash the first-login prompt while the profile is still hydrating", async () => {
+		mockState.auth.user = {
+			id: "user-1",
+			email: "user@example.com",
+			user_metadata: {},
+			app_metadata: {},
+		};
+		mockState.auth.profile = null;
+		mockState.auth.profileHydrating = true;
+
+		render(
+			<MemoryRouter initialEntries={["/app/dashboard"]}>
+				<Routes>
+					<Route path="/app" element={<AppShell />}>
+						<Route path="dashboard" element={<CalendarFallbackFixture />} />
+					</Route>
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => {
+			expect(screen.getByText("Workspace")).toBeTruthy();
+		});
+		expect(screen.queryByText("Thanks for signing up!")).toBeNull();
+		expect(screen.queryByText("What should we call you?")).toBeNull();
 	});
 });

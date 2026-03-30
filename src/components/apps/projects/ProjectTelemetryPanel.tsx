@@ -250,7 +250,7 @@ export function ProjectTelemetryPanel({
 				<div className={styles.embeddedHeader}>
 					<div className={styles.embeddedHeaderCopy}>
 						<p className={styles.embeddedEyebrow}>Tracking journals</p>
-						<h4 className={styles.embeddedTitle}>Project telemetry</h4>
+						<h4 className={styles.embeddedTitle}>Project activity</h4>
 					</div>
 					<Link to={watchdogLink} className={styles.embeddedLink}>
 						<span>Watchdog</span>
@@ -262,12 +262,12 @@ export function ProjectTelemetryPanel({
 					<div>
 						<div className={styles.headerTitle}>
 							<Activity className={styles.headerIcon} />
-							<h4>{compact ? "Tracking and journals" : "Project telemetry"}</h4>
+							<h4>{compact ? "Tracking and journals" : "Project activity"}</h4>
 						</div>
 						<p className={cn(styles.description, compact && styles.compactDescription)}>
 							{compact
 								? "Watchdog sessions, shared mapping rules, and drawing journals for this project."
-								: "Live AutoCAD sessions, shared project mapping, and drawing-day journals for this project."}
+								: "Watchdog sessions, shared project mapping, and drawing-day journals for this project."}
 						</p>
 					</div>
 					<Link to={watchdogLink} className={styles.link}>

@@ -170,6 +170,7 @@ describe("DeveloperPortalRoutePage", () => {
 		expect(screen.getByText("Publishing & Evidence")).toBeTruthy();
 		expect(screen.getAllByText("Suite doctor").length).toBeGreaterThan(0);
 		expect(screen.getAllByText("Agent lab").length).toBeGreaterThan(0);
+		expect(screen.getByText("Automation Studio")).toBeTruthy();
 		expect(screen.getByText("AutoDraft Studio")).toBeTruthy();
 		expect(screen.getByText("Command Center")).toBeTruthy();
 	});

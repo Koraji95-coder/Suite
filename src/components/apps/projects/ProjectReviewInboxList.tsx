@@ -22,6 +22,8 @@ function typeLabel(type: ProjectReviewInboxItem["type"]) {
 	switch (type) {
 		case "title-block":
 			return "title block review";
+		case "deliverable-register":
+			return "deliverable register";
 		case "issue-set":
 			return "issue set";
 		default:

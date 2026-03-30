@@ -46,11 +46,14 @@ interface ProjectFormModalProps {
 	projectId: string | null;
 	onClose: () => void;
 	onSubmit: () => Promise<void> | void;
+	onSubmitAndOpenAcade?: () => Promise<void> | void;
 	formData: ProjectFormData;
 	setFormData: Dispatch<SetStateAction<ProjectFormData>>;
 	isEditing: boolean;
 	onBrowseRootPath: () => Promise<void>;
 	isBrowsingRootPath: boolean;
+	onBrowsePdfRootPath: () => Promise<void>;
+	isBrowsingPdfRootPath: boolean;
 }
 
 type WizardStepId = "basics" | "tracking" | "defaults" | "review";
@@ -59,9 +62,8 @@ interface RootCheckState {
 	status: "idle" | "running" | "ready" | "warning" | "error";
 	rootPath: string | null;
 	drawingFiles: number;
-	flaggedFiles: number;
 	totalFiles: number;
-	sampleFiles: string[];
+	pdfFiles: number;
 	warnings: string[];
 	message: string | null;
 }
@@ -82,8 +84,7 @@ const WIZARD_STEPS: Array<{
 	{
 		id: "tracking",
 		label: "Tracking",
-		description:
-			"Choose the root that Watchdog and drawing-control tools will use.",
+		description: "Choose the root Watchdog and drawing-control tools will use.",
 		icon: FolderTree,
 	},
 	{
@@ -106,12 +107,25 @@ const EMPTY_ROOT_CHECK: RootCheckState = {
 	status: "idle",
 	rootPath: null,
 	drawingFiles: 0,
-	flaggedFiles: 0,
 	totalFiles: 0,
-	sampleFiles: [],
+	pdfFiles: 0,
 	warnings: [],
 	message: null,
 };
+
+function isLowSignalRootValidationWarning(warning: string) {
+	const normalized = warning.trim().toLowerCase();
+	return (
+		normalized.includes("live dwg metadata is unavailable") ||
+		normalized.includes("filename fallback") ||
+		normalized.includes("named pipe") ||
+		normalized.includes("autocad scan bridge unavailable")
+	);
+}
+
+function summarizeRootValidationWarnings(warnings: string[]) {
+	return warnings.filter((warning) => !isLowSignalRootValidationWarning(warning));
+}
 
 function parseDeadlineDate(value: string) {
 	const source = String(value || "").trim();
@@ -154,11 +168,14 @@ export function ProjectFormModal({
 	projectId,
 	onClose,
 	onSubmit,
+	onSubmitAndOpenAcade,
 	formData,
 	setFormData,
 	isEditing,
 	onBrowseRootPath,
 	isBrowsingRootPath,
+	onBrowsePdfRootPath,
+	isBrowsingPdfRootPath,
 }: ProjectFormModalProps) {
 	const [deadlineOpen, setDeadlineOpen] = useState(false);
 	const [stepIndex, setStepIndex] = useState(0);
@@ -259,6 +276,9 @@ export function ProjectFormModal({
 						result.data.block_name ||
 						current.titleBlockBlockName ||
 						DEFAULT_PROJECT_TITLE_BLOCK_NAME,
+					titleBlockAcadeProjectFilePath:
+						result.data.acade_project_file_path ||
+						current.titleBlockAcadeProjectFilePath,
 					titleBlockAcadeLine1:
 						result.data.acade_line1 || current.titleBlockAcadeLine1,
 					titleBlockAcadeLine2:
@@ -326,20 +346,27 @@ export function ProjectFormModal({
 				projectId: validationProjectId,
 				projectRootPath: normalizedRootPath,
 			});
+			const followUpWarnings = summarizeRootValidationWarnings(
+				snapshot.warnings,
+			);
+			const pdfFiles = snapshot.rows.filter(
+				(row) => row.fileType.toLowerCase() === "pdf",
+			).length;
 			setRootCheck({
 				status:
-					snapshot.summary.flaggedFiles > 0 || snapshot.warnings.length > 0
+					snapshot.summary.drawingFiles === 0 || followUpWarnings.length > 0
 						? "warning"
 						: "ready",
 				rootPath: normalizedRootPath,
 				drawingFiles: snapshot.summary.drawingFiles,
-				flaggedFiles: snapshot.summary.flaggedFiles,
 				totalFiles: snapshot.summary.totalFiles,
-				sampleFiles: snapshot.rows.slice(0, 4).map((row) => row.fileName),
-				warnings: snapshot.warnings.slice(0, 3),
+				pdfFiles,
+				warnings: followUpWarnings.slice(0, 3),
 				message:
 					snapshot.summary.drawingFiles > 0
-						? "Root validated. Drawing metadata is available for project setup."
+						? `Root validated. Found ${snapshot.summary.drawingFiles} drawing${
+								snapshot.summary.drawingFiles === 1 ? "" : "s"
+						  }${pdfFiles > 0 ? ` and ${pdfFiles} PDF${pdfFiles === 1 ? "" : "s"}` : ""} for project setup.`
 						: "Root validated, but no drawing files were found yet.",
 			});
 			setFormData((current) => ({
@@ -474,6 +501,47 @@ export function ProjectFormModal({
 									className={styles.textarea}
 									placeholder="Briefly describe the deliverable scope and review context."
 								/>
+							</div>
+							<div className={styles.gridTwo}>
+								<div>
+									<label className={styles.label} htmlFor="project-form-pe">
+										PE
+									</label>
+									<input
+										id="project-form-pe"
+										name="project_form_pe"
+										type="text"
+										value={formData.projectPeName}
+										onChange={(event) =>
+											updateProjectForm(setFormData, {
+												projectPeName: event.target.value,
+											})
+										}
+										className={styles.input}
+										placeholder="Engineer name"
+									/>
+								</div>
+								<div>
+									<label
+										className={styles.label}
+										htmlFor="project-form-firm-number"
+									>
+										Firm number
+									</label>
+									<input
+										id="project-form-firm-number"
+										name="project_form_firm_number"
+										type="text"
+										value={formData.projectFirmNumber}
+										onChange={(event) =>
+											updateProjectForm(setFormData, {
+												projectFirmNumber: event.target.value,
+											})
+										}
+										className={styles.input}
+										placeholder="TX - Firm #00000"
+									/>
+								</div>
 							</div>
 							<div className={styles.gridTwo}>
 								<div>
@@ -643,6 +711,41 @@ export function ProjectFormModal({
 									</button>
 								</div>
 							</div>
+							<div>
+								<label
+									className={styles.label}
+									htmlFor="project-form-pdf-package-root"
+								>
+									PDF package root
+								</label>
+								<div className={styles.rootPathRow}>
+									<input
+										id="project-form-pdf-package-root"
+										name="project_form_pdf_package_root"
+										type="text"
+										value={formData.pdfPackageRootPath}
+										onChange={(event) =>
+											updateProjectForm(setFormData, {
+												pdfPackageRootPath: event.target.value,
+											})
+										}
+										className={styles.input}
+										placeholder="G:\\Shared drives\\Root 3 Power\\Projects\\Nanulak\\Issued PDFs"
+									/>
+									<button
+										type="button"
+										onClick={() => void onBrowsePdfRootPath()}
+										className={styles.browseButton}
+										disabled={isBrowsingPdfRootPath}
+									>
+										{isBrowsingPdfRootPath ? "Browsing..." : "Browse"}
+									</button>
+								</div>
+								<p className={styles.inlineHint}>
+									Use the package PDF root as the default issued-output source
+									for workbook pairing and transmittal package prep.
+								</p>
+							</div>
 
 							<div className={styles.infoCard}>
 								<div className={styles.infoHeader}>
@@ -691,7 +794,7 @@ export function ProjectFormModal({
 								</div>
 								{rootCheck.status !== "idle" &&
 								rootCheck.status !== "running" ? (
-									<div className={styles.validationStats}>
+								<div className={styles.validationStats}>
 										<div className={styles.validationStat}>
 											<span>Files</span>
 											<strong>{rootCheck.totalFiles}</strong>
@@ -701,24 +804,14 @@ export function ProjectFormModal({
 											<strong>{rootCheck.drawingFiles}</strong>
 										</div>
 										<div className={styles.validationStat}>
-											<span>Flagged</span>
-											<strong>{rootCheck.flaggedFiles}</strong>
+											<span>PDFs</span>
+											<strong>{rootCheck.pdfFiles}</strong>
 										</div>
-									</div>
-								) : null}
-								{rootCheck.sampleFiles.length > 0 ? (
-									<div className={styles.previewList}>
-										<span className={styles.previewLabel}>Sample files</span>
-										<ul>
-											{rootCheck.sampleFiles.map((fileName) => (
-												<li key={fileName}>{fileName}</li>
-											))}
-										</ul>
 									</div>
 								) : null}
 								{rootCheck.warnings.length > 0 ? (
 									<div className={styles.previewList}>
-										<span className={styles.previewLabel}>Warnings</span>
+										<span className={styles.previewLabel}>Follow-up</span>
 										<ul>
 											{rootCheck.warnings.map((warning) => (
 												<li key={warning}>{warning}</li>
@@ -739,6 +832,12 @@ export function ProjectFormModal({
 									standards checks, and issue prep should inherit.
 								</p>
 							</div>
+							<p className={styles.mappingNote}>
+								Client / utility maps to ACADE Line 1, facility / site maps to
+								Line 2, and project number maps to the ACADE PROJ value. Drawing
+								titles stay drawing-specific and come from the title block or
+								deliverable row, not from a project default.
+							</p>
 							{profileMessage ? (
 								<div className={styles.inlineNotice}>{profileMessage}</div>
 							) : null}
@@ -778,13 +877,41 @@ export function ProjectFormModal({
 									</span>
 								</div>
 							</div>
+							<div>
+								<label
+									className={styles.label}
+									htmlFor="project-form-acade-project-file"
+								>
+									ACADE project file (.wdp)
+								</label>
+								<input
+									id="project-form-acade-project-file"
+									name="project_form_acade_project_file"
+									type="text"
+									value={formData.titleBlockAcadeProjectFilePath}
+									onChange={(event) =>
+										updateProjectForm(setFormData, {
+											titleBlockAcadeProjectFilePath: event.target.value,
+										})
+									}
+									className={styles.input}
+									placeholder="Optional. Leave blank to scaffold from the project root."
+								/>
+								<p className={styles.inlineHint}>
+									Suite derives a starter .wdp, .wdt, and .wdl from these
+									defaults. If this stays blank, the starter .wdp path is derived
+									from the project root and missing support files are created
+									automatically when project setup is saved or the title block
+									apply/export flow runs.
+								</p>
+							</div>
 							<div className={styles.gridTwo}>
 								<div>
 									<label
 										className={styles.label}
 										htmlFor="project-form-acade-line1"
 									>
-										ACADE line 1
+										Client / utility
 									</label>
 									<input
 										id="project-form-acade-line1"
@@ -797,7 +924,7 @@ export function ProjectFormModal({
 											})
 										}
 										className={styles.input}
-										placeholder="Nanulak 180MW Substation"
+										placeholder="Hunt Energy Network"
 									/>
 								</div>
 								<div>
@@ -805,7 +932,7 @@ export function ProjectFormModal({
 										className={styles.label}
 										htmlFor="project-form-acade-line2"
 									>
-										ACADE line 2
+										Facility / site
 									</label>
 									<input
 										id="project-form-acade-line2"
@@ -818,7 +945,7 @@ export function ProjectFormModal({
 											})
 										}
 										className={styles.input}
-										placeholder="Issued for design review"
+										placeholder="Nanulak 180MW BESS Substation"
 									/>
 								</div>
 							</div>
@@ -828,7 +955,7 @@ export function ProjectFormModal({
 										className={styles.label}
 										htmlFor="project-form-acade-line4"
 									>
-										ACADE line 4
+										Project number
 									</label>
 									<input
 										id="project-form-acade-line4"
@@ -841,7 +968,7 @@ export function ProjectFormModal({
 											})
 										}
 										className={styles.input}
-										placeholder="Client issue package"
+										placeholder="R3P-25074"
 									/>
 								</div>
 								<div />
@@ -929,6 +1056,17 @@ export function ProjectFormModal({
 									<span className={styles.reviewLabel}>Project</span>
 									<strong>{formData.name || "Untitled project"}</strong>
 									<p>{formData.description || "No description added yet."}</p>
+									{formData.projectPeName.trim() ||
+									formData.projectFirmNumber.trim() ? (
+										<p>
+											{formData.projectPeName.trim()
+												? `PE: ${formData.projectPeName.trim()}`
+												: "PE: Not set"}
+											{formData.projectFirmNumber.trim()
+												? ` • Firm: ${formData.projectFirmNumber.trim()}`
+												: ""}
+										</p>
+									) : null}
 								</div>
 								<div className={styles.reviewCard}>
 									<span className={styles.reviewLabel}>Tracking root</span>
@@ -942,6 +1080,17 @@ export function ProjectFormModal({
 									</p>
 								</div>
 								<div className={styles.reviewCard}>
+									<span className={styles.reviewLabel}>PDF package root</span>
+									<strong>
+										{formData.pdfPackageRootPath.trim() || "Not configured"}
+									</strong>
+									<p>
+										{formData.pdfPackageRootPath.trim()
+											? "Issued PDFs and workbook pairing can default to this package output folder."
+											: "Optional, but recommended if the deliverable register should auto-pair against a package output root."}
+									</p>
+								</div>
+								<div className={styles.reviewCard}>
 									<span className={styles.reviewLabel}>
 										Title block defaults
 									</span>
@@ -951,8 +1100,20 @@ export function ProjectFormModal({
 									</strong>
 									<p>
 										{titleBlockDefaultsConfigured
-											? "Project-specific ACADE lines and signer defaults are ready."
-											: "Only the base block name is set. Add signer or line defaults before issue prep."}
+											? "Client / utility, facility / site, project number, and signer defaults are ready for title block review."
+											: "Only the base block name is set. Add signer names or ACADE defaults before issue prep."}
+									</p>
+								</div>
+								<div className={styles.reviewCard}>
+									<span className={styles.reviewLabel}>ACADE setup</span>
+									<strong>
+										{formData.titleBlockAcadeProjectFilePath.trim() ||
+											"Starter .wdp will be derived from the project root"}
+									</strong>
+									<p>
+										Suite scaffolds the .wdp, .wdt, and .wdl support files from
+										these defaults, then title block review verifies the live
+										drawings.
 									</p>
 								</div>
 							</div>
@@ -969,11 +1130,11 @@ export function ProjectFormModal({
 									</ul>
 								) : (
 									<div className={styles.validationBannerReady}>
-										<strong>Ready to create the workspace.</strong>
+										<strong>Ready to save this project setup.</strong>
 										<span>
 											The project root, defaults, and review summary are set.
-											Continue to Projects to finish drawing list, standards,
-											and transmittal work.
+											After you save, open the project workflow to run drawing
+											scan, clear review items, and build the package.
 										</span>
 									</div>
 								)}
@@ -1018,16 +1179,32 @@ export function ProjectFormModal({
 								Next
 							</button>
 						) : (
-							<button
-								type="button"
-								onClick={() => {
-									void Promise.resolve(onSubmit());
-								}}
-								className={styles.buttonPrimary}
-								disabled={!canSubmit}
-							>
-								{submitLabel}
-							</button>
+							<>
+								<button
+									type="button"
+									onClick={() => {
+										void Promise.resolve(onSubmit());
+									}}
+									className={styles.buttonSecondary}
+									disabled={!canSubmit}
+								>
+									{submitLabel}
+								</button>
+								{onSubmitAndOpenAcade ? (
+									<button
+										type="button"
+										onClick={() => {
+											void Promise.resolve(onSubmitAndOpenAcade());
+										}}
+										className={styles.buttonPrimary}
+										disabled={!canSubmit}
+									>
+										{isEditing
+											? "Save and Open in ACADE"
+											: "Create and Open in ACADE"}
+									</button>
+								) : null}
+							</>
 						)}
 					</div>
 				</div>

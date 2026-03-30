@@ -104,12 +104,12 @@ def create_transmittal_render_blueprint(
                 fields["from_phone"] = selected_profile.get("phone", "")
 
             firm_value = str(fields.get("firm") or "").strip()
-            if firm_value and available_firms and firm_value not in available_firms:
-                return jsonify({"success": False, "message": "Invalid firm selection."}), 400
             if not firm_value:
                 default_firm = str(defaults.get("firm") or "").strip()
                 if default_firm:
                     fields["firm"] = default_firm
+            elif available_firms and firm_value not in available_firms:
+                fields["firm"] = firm_value
 
             default_checks = {
                 "trans_pdf": False,

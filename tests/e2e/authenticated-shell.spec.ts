@@ -30,6 +30,7 @@ test.describe("authenticated shell routes", () => {
 
 	const devRoutes = [
 		"/app/agent",
+		"/app/developer/automation-studio",
 		"/app/apps/autowire",
 		"/app/changelog",
 		"/app/command-center",

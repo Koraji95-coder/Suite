@@ -1,7 +1,7 @@
 {
 	"schemaVersion": "suite.developer-docs.v1",
-	"generatedAt": "2026-03-26T03:01:22.742Z",
-	"docCount": 50,
+	"generatedAt": "2026-03-30T10:34:29.724Z",
+	"docCount": 51,
 	"sections": [
 		{
 			"id": "agent-lab",
@@ -162,7 +162,7 @@
 			"id": "developer-workshop",
 			"title": "Developer Workshop",
 			"description": "Runbooks, rollout notes, policies, and workstation guidance for building Suite locally.",
-			"count": 21,
+			"count": 22,
 			"docs": [
 				{
 					"id": "docs-development-autodraft-integration-notes-legacy-md",
@@ -219,6 +219,17 @@
 					"tags": [
 						"developer-workshop",
 						"rollout"
+					],
+					"startHere": false
+				},
+				{
+					"id": "docs-development-electrical-drawing-program-test-readiness-md",
+					"title": "Electrical Drawing Program Test Readiness",
+					"summary": "Use this before the first focused test pass of the new R3P Electrical v1 drawing-program workflow.",
+					"relativePath": "docs/development/electrical-drawing-program-test-readiness.md",
+					"sectionId": "developer-workshop",
+					"tags": [
+						"developer-workshop"
 					],
 					"startHere": false
 				},
@@ -340,18 +351,6 @@
 					"startHere": false
 				},
 				{
-					"id": "docs-development-supabase-workstation-bringup-md",
-					"title": "Supabase Workstation Bring-Up",
-					"summary": "Use this when setting up Suite on a new Windows workstation.",
-					"relativePath": "docs/development/supabase-workstation-bringup.md",
-					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop",
-						"supabase"
-					],
-					"startHere": false
-				},
-				{
 					"id": "docs-development-ui-overhaul-audit-2026-03-18-md",
 					"title": "UI Overhaul Audit",
 					"summary": "Scope: dashboard, changelog, projects, Ground Grid, Coordinates, Conduit, AutoDraft, Graph, Architecture, and agent surfaces",
@@ -359,6 +358,18 @@
 					"sectionId": "developer-workshop",
 					"tags": [
 						"developer-workshop"
+					],
+					"startHere": false
+				},
+				{
+					"id": "docs-development-supabase-workstation-bringup-md",
+					"title": "Windows Workstation Bring-Up",
+					"summary": "Use this when setting up Suite on a new Windows workstation or when standardizing an existing machine onto the cross-workstation layout.",
+					"relativePath": "docs/development/supabase-workstation-bringup.md",
+					"sectionId": "developer-workshop",
+					"tags": [
+						"developer-workshop",
+						"supabase"
 					],
 					"startHere": false
 				},
@@ -376,7 +387,7 @@
 				{
 					"id": "docs-development-workstation-transfer-runbook-md",
 					"title": "Workstation Transfer Runbook",
-					"summary": "Use this when moving the active Suite workspace to another Windows workstation and you want the destination machine to match the source machine's local runtime, Supabase workflow, runtime shell, and AutoCAD Watchdog setu",
+					"summary": "Use this when moving active development between Windows workstations and you want the destination machine to pick up:",
 					"relativePath": "docs/development/workstation-transfer-runbook.md",
 					"sectionId": "developer-workshop",
 					"tags": [

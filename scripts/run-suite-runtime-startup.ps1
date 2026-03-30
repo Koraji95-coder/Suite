@@ -20,6 +20,9 @@ $bootstrapScript = (Resolve-Path (Join-Path $PSScriptRoot "bootstrap-suite-runti
 $bootstrapStateScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-bootstrap-state.ps1")).Path
 $logUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-log-utils.ps1")).Path
 $retentionScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-retention.ps1")).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
+$companionControlScript = (Resolve-Path (Join-Path $PSScriptRoot "control-suite-companion-app.ps1")).Path
+$runtimeStatusScript = (Resolve-Path (Join-Path $PSScriptRoot "get-suite-runtime-status.ps1")).Path
 $notificationScript = Join-Path $PSScriptRoot "show-windows-notification.ps1"
 $statusBase = if ($env:LOCALAPPDATA) {
     $env:LOCALAPPDATA
@@ -39,6 +42,7 @@ New-Item -ItemType Directory -Path $statusDir -Force | Out-Null
 . $bootstrapStateScript
 . $logUtilsScript
 . $retentionScript
+. $runtimeSharedScript
 
 function Write-StatusLog {
     param(
@@ -363,6 +367,86 @@ function Show-Notification {
     }
 }
 
+function Remove-OfficeIndependentStartup {
+	try {
+		if (Remove-SuiteCompanionAppRunKeyEntry -CompanionAppId "office") {
+			Write-StatusLog -Tag "INFO" -Message "Removed independent Office startup entry so Runtime Control remains the single startup owner."
+		}
+	}
+	catch {
+		Write-StatusLog -Tag "WARN" -Message "Office startup cleanup warning: $($_.Exception.Message)"
+	}
+}
+
+function Wait-ForCompanionRuntimeGate {
+	param(
+		[ValidateRange(15, 300)][int]$TimeoutSeconds = 90
+	)
+
+	$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+	do {
+		$statusResult = Invoke-JsonPowerShellFile -ScriptPath $runtimeStatusScript -Arguments @("-RepoRoot", $resolvedRepoRoot, "-Json")
+		if ($statusResult.Ok -and $statusResult.Payload) {
+			$doctorState = [string]$statusResult.Payload.doctor.overallState
+			$backendReady = [bool](@($statusResult.Payload.services | Where-Object { $_.id -eq "backend" -and $_.state -eq "running" }).Count -gt 0)
+			$gatewayReady = [bool](@($statusResult.Payload.services | Where-Object { $_.id -eq "gateway" -and $_.state -eq "running" }).Count -gt 0)
+			if ($backendReady -and $gatewayReady -and $doctorState -ne "unavailable") {
+				return [pscustomobject]@{
+					ok = $true
+					payload = $statusResult.Payload
+				}
+			}
+		}
+
+		Start-Sleep -Seconds 3
+	}
+	while ((Get-Date) -lt $deadline)
+
+	return [pscustomobject]@{
+		ok = $false
+		payload = if ($statusResult) { $statusResult.Payload } else { $null }
+	}
+}
+
+function Launch-ManagedOfficeCompanion {
+	$officeConfig = Get-SuiteCompanionAppConfig -CompanionAppId "office" -RepoRoot $resolvedRepoRoot -TomlPath (Get-SuiteCodexConfigPath)
+	if ($null -eq $officeConfig -or -not [bool]$officeConfig.enabled) {
+		return
+	}
+
+	$gateResult = Wait-ForCompanionRuntimeGate -TimeoutSeconds ([int]$officeConfig.timeoutSeconds)
+	if (-not $gateResult.ok) {
+		Write-SuiteCompanionAppState -CompanionAppId "office" -State ([ordered]@{
+			id = "office"
+			lastLaunchAt = (Get-Date).ToString("o")
+			lastLaunchSource = "suite-runtime-startup"
+			lastLaunchStatus = "runtime_gate_timeout"
+			lastLaunchMessage = "Office launch skipped because the Suite runtime did not become ready in time."
+			lastKnownPid = $null
+		}) | Out-Null
+		Write-StatusLog -Tag "WARN" -Message "Office companion was not launched because the runtime gate never became ready."
+		return
+	}
+
+	$launchResult = Invoke-JsonPowerShellFile -ScriptPath $companionControlScript -Arguments @(
+		"-RepoRoot", $resolvedRepoRoot,
+		"-CompanionAppId", "office",
+		"-Action", "launch",
+		"-LaunchSource", "suite-runtime-startup",
+		"-Json"
+	)
+
+	if ($launchResult.Ok -and $launchResult.Payload -and -not [string]::IsNullOrWhiteSpace([string]$launchResult.Payload.summary)) {
+		Write-StatusLog -Tag "INFO" -Message ([string]$launchResult.Payload.summary)
+	}
+	elseif ($launchResult.Payload -and -not [string]::IsNullOrWhiteSpace([string]$launchResult.Payload.summary)) {
+		Write-StatusLog -Tag "WARN" -Message ([string]$launchResult.Payload.summary)
+	}
+	elseif (-not [string]::IsNullOrWhiteSpace([string]$launchResult.OutputTail)) {
+		Write-StatusLog -Tag "WARN" -Message ([string]$launchResult.OutputTail)
+	}
+}
+
 $attemptPayloads = @()
 $dockerStatus = $null
 $bootstrapResult = $null
@@ -383,6 +467,8 @@ Save-SuiteRuntimeBootstrapState -Path $currentBootstrapPath -State ([ordered]@{
     startedAt = $bootstrapStartedAt
     updatedAt = $bootstrapStartedAt
 }) | Out-Null
+
+Remove-OfficeIndependentStartup
 
 for ($attempt = 1; $attempt -le $BootstrapAttempts; $attempt += 1) {
     Write-StatusLog -Tag "START" -Message "Bootstrap attempt $attempt started."
@@ -549,6 +635,7 @@ $resultTag = if ($overallOk) { "OK" } else { "ERR" }
 Write-StatusLog -Tag $resultTag -Message $summary
 
 if ($overallOk) {
+    Launch-ManagedOfficeCompanion
     Show-Notification `
         -Title "Suite runtime ready" `
         -Message "Supabase, backend, gateway, frontend, and collectors are ready after Windows sign-in." `

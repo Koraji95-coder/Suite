@@ -122,6 +122,11 @@
       "description": "Copy the current runtime, doctor, and service summary for support handoff."
     },
     {
+      "id": "apply-workstation-profile",
+      "label": "Apply workstation profile",
+      "description": "Re-stamp the workstation identity and local MCP env block for this machine."
+    },
+    {
       "id": "export-bundle",
       "label": "Export support bundle",
       "description": "Package the current runtime logs, doctor snapshot, and Watchdog evidence into one support archive."

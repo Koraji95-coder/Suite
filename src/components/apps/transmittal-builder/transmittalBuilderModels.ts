@@ -3,6 +3,7 @@ import {
 	buildProjectMetadataRowsForFiles,
 	type ProjectDocumentMetadataRow,
 } from "@/services/projectDocumentMetadataService";
+import type { ProjectDeliverableRegisterRow } from "@/services/projectDeliverableRegisterService";
 import {
 	DEFAULT_FIRM,
 	DEFAULT_PE,
@@ -77,6 +78,7 @@ export type OptionKey =
 	| "ci_bid"
 	| "ci_preliminary"
 	| "ci_approval"
+	| "ci_fabrication"
 	| "ci_construction"
 	| "ci_asbuilt"
 	| "ci_info"
@@ -190,6 +192,7 @@ export const DEFAULT_OPTIONS: OptionsState = {
 	ci_bid: false,
 	ci_preliminary: false,
 	ci_approval: false,
+	ci_fabrication: false,
 	ci_construction: false,
 	ci_asbuilt: false,
 	ci_info: false,
@@ -228,6 +231,7 @@ export const OPTION_GROUPS: Array<{
 			{ key: "ci_bid", label: "For Bid" },
 			{ key: "ci_preliminary", label: "For Preliminary" },
 			{ key: "ci_approval", label: "For Approval" },
+			{ key: "ci_fabrication", label: "For Fabrication" },
 			{ key: "ci_construction", label: "For Construction" },
 			{ key: "ci_asbuilt", label: "For As-Built" },
 			{ key: "ci_info", label: "For Information Only" },
@@ -285,6 +289,26 @@ export const formatDate = (value: Date) => {
 
 export const safeTrim = (value: string | undefined | null) =>
 	value ? value.trim() : "";
+
+const normalizeDrawingKey = (value: string | undefined | null) =>
+	safeTrim(value).toUpperCase().replace(/[^A-Z0-9]+/g, "");
+
+const normalizeFileStem = (value: string | undefined | null) =>
+	safeTrim(value)
+		.replace(/\.[^/.]+$/, "")
+		.toUpperCase()
+		.replace(/[^A-Z0-9]+/g, "");
+
+const PROJECT_SENDER_ID_PREFIX = "project-pe:";
+
+export const createProjectSenderId = (projectId: string) =>
+	`${PROJECT_SENDER_ID_PREFIX}${safeTrim(projectId)}`;
+
+export const isProjectSenderId = (value: string | undefined | null) =>
+	safeTrim(value).startsWith(PROJECT_SENDER_ID_PREFIX);
+
+const resolvePayloadProfileId = (value: string | undefined | null) =>
+	isProjectSenderId(value) ? "" : safeTrim(value);
 
 export const getProfileById = (profiles: PeProfile[], id: string) =>
 	profiles.find((profile) => profile.id === id);
@@ -500,6 +524,147 @@ export const buildProjectMetadataDocuments = (
 	});
 };
 
+export const buildRegisterBackedDocuments = (
+	registerRows: ProjectDeliverableRegisterRow[],
+	files: File[],
+	metadataRows: ProjectDocumentMetadataRow[],
+	current: StandardDocument[],
+): StandardDocument[] => {
+	const fileByName = new Map(
+		files.map((file) => [safeTrim(file.name).toUpperCase(), file]),
+	);
+	const metadataByDrawingKey = new Map<string, ProjectDocumentMetadataRow>();
+	const metadataByFileKey = new Map<string, ProjectDocumentMetadataRow>();
+
+	for (const row of metadataRows) {
+		const drawingKey = normalizeDrawingKey(row.drawingNumber);
+		if (drawingKey && !metadataByDrawingKey.has(drawingKey)) {
+			metadataByDrawingKey.set(drawingKey, row);
+		}
+		const fileKeys = [
+			normalizeFileStem(row.fileName),
+			normalizeFileStem(row.relativePath),
+		].filter(Boolean);
+		for (const key of fileKeys) {
+			if (!metadataByFileKey.has(key)) {
+				metadataByFileKey.set(key, row);
+			}
+		}
+	}
+
+	return registerRows.map((registerRow) => {
+		const preferredPdfMatch =
+			registerRow.pdfMatches.find(
+				(match) => match.id === registerRow.manualPdfMatchId,
+			) ??
+			(registerRow.pdfMatches.length === 1 ? registerRow.pdfMatches[0] : null);
+		const matchedFile =
+			(preferredPdfMatch
+				? fileByName.get(safeTrim(preferredPdfMatch.fileName).toUpperCase())
+				: null) ??
+			files.find((file) =>
+				normalizeFileStem(file.name).includes(registerRow.drawingKey),
+			) ??
+			null;
+		const attachmentFileName =
+			matchedFile?.name ||
+			preferredPdfMatch?.fileName ||
+			`${registerRow.drawingNumber}.pdf`;
+		const preferredDwgMatch =
+			registerRow.dwgMatches.find(
+				(match) => match.id === registerRow.manualDwgMatchId,
+			) ??
+			(registerRow.dwgMatches.length === 1 ? registerRow.dwgMatches[0] : null);
+		const metadataRow =
+			(preferredDwgMatch
+				? metadataByFileKey.get(normalizeFileStem(preferredDwgMatch.relativePath))
+				: null) ??
+			(preferredDwgMatch
+				? metadataByFileKey.get(normalizeFileStem(preferredDwgMatch.fileName))
+				: null) ??
+			metadataByDrawingKey.get(registerRow.drawingKey) ??
+			null;
+		const metadataWarnings: string[] = [];
+		const appendWarning = (value: string | null | undefined) => {
+			const normalized = safeTrim(value);
+			if (normalized && !metadataWarnings.includes(normalized)) {
+				metadataWarnings.push(normalized);
+			}
+		};
+
+		if (!matchedFile || registerRow.pdfPairingStatus === "missing") {
+			appendWarning("Missing paired PDF for this deliverable register row.");
+		}
+		if (registerRow.pdfPairingStatus === "multiple") {
+			appendWarning("Multiple PDF matches still need review.");
+		}
+		if (registerRow.titleBlockVerificationState !== "matched") {
+			appendWarning(
+				registerRow.titleBlockVerificationDetail ||
+					"Title block metadata still needs package review.",
+			);
+		}
+		if (registerRow.acadeVerificationState !== "matched") {
+			appendWarning(
+				registerRow.acadeVerificationDetail ||
+					"ACADE metadata still needs package review.",
+			);
+		}
+		if (!metadataRow && registerRow.dwgPairingStatus === "missing") {
+			appendWarning("No DWG match was found for title block verification.");
+		}
+
+		const needsReview =
+			registerRow.pdfPairingStatus !== "paired" &&
+			registerRow.pdfPairingStatus !== "manual"
+				? true
+				: registerRow.titleBlockVerificationState !== "matched" ||
+				  registerRow.acadeVerificationState !== "matched" ||
+				  metadataWarnings.length > 0;
+		const existing = current.find(
+			(doc) =>
+				doc.drawingNumber === registerRow.drawingNumber ||
+				doc.attachmentFileName === attachmentFileName,
+		);
+
+		if (
+			existing &&
+			(existing.source === "manual_review" || safeTrim(existing.overrideReason))
+		) {
+			return {
+				...existing,
+				fileName: metadataRow?.fileName || existing.fileName,
+				attachmentFileName,
+				projectRelativePath:
+					metadataRow?.relativePath || existing.projectRelativePath,
+				confidence: metadataRow?.confidence ?? 1,
+				needsReview,
+				accepted: existing.accepted || !needsReview,
+				source: "manual_review",
+				modelVersion: "project-register-v1",
+				metadataWarnings,
+			};
+		}
+
+		return {
+			id: existing?.id ?? createId(),
+			fileName: metadataRow?.fileName || attachmentFileName,
+			attachmentFileName,
+			projectRelativePath: metadataRow?.relativePath,
+			drawingNumber: registerRow.drawingNumber,
+			title: registerRow.drawingDescription || metadataRow?.title || "",
+			revision: registerRow.currentRevision || metadataRow?.revision || "",
+			confidence: metadataRow?.confidence ?? (needsReview ? 0.72 : 0.94),
+			source: "project_register",
+			needsReview,
+			accepted: !needsReview,
+			overrideReason: "",
+			modelVersion: "project-register-v1",
+			metadataWarnings,
+		};
+	});
+};
+
 export const isContactComplete = (contact: Contact) =>
 	Boolean(
 		safeTrim(contact.name) &&
@@ -626,7 +791,7 @@ export const buildPayload = (
 
 	const checks = {
 		...draft.options,
-		ci_fab: false,
+		ci_fab: draft.options.ci_fabrication,
 		ci_const: draft.options.ci_construction,
 		ci_record: false,
 		ci_ref: draft.options.ci_reference,
@@ -640,7 +805,7 @@ export const buildPayload = (
 			transmittal_num: safeTrim(draft.transmittalNumber),
 			client: safeTrim(draft.projectName),
 			project_desc: safeTrim(draft.description),
-			from_profile_id: safeTrim(draft.peName),
+			from_profile_id: resolvePayloadProfileId(draft.peName),
 			from_name: safeTrim(draft.fromName),
 			from_title: safeTrim(draft.fromTitle),
 			from_email: safeTrim(draft.fromEmail),
@@ -760,14 +925,26 @@ export const syncDraftToProfileCatalog = (
 	firms: string[],
 	defaults: { profileId: string; firm: string },
 ): DraftState => {
+	if (isProjectSenderId(draft.peName)) {
+		return {
+			...draft,
+			firmNumber: safeTrim(draft.firmNumber)
+				? draft.firmNumber
+				: firms.includes(defaults.firm)
+					? defaults.firm
+					: (firms[0] ?? DEFAULT_FIRM),
+		};
+	}
+
 	const resolvedProfileId =
 		resolveProfileId(profiles, draft.peName) ||
 		resolveProfileId(profiles, defaults.profileId) ||
 		profiles[0]?.id ||
 		"";
 	const resolvedProfile = getProfileById(profiles, resolvedProfileId);
-	const resolvedFirm = firms.includes(draft.firmNumber)
-		? draft.firmNumber
+	const draftFirm = safeTrim(draft.firmNumber);
+	const resolvedFirm = draftFirm
+		? draftFirm
 		: firms.includes(defaults.firm)
 			? defaults.firm
 			: (firms[0] ?? DEFAULT_FIRM);

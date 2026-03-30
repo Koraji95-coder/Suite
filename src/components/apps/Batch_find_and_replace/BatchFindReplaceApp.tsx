@@ -4,30 +4,13 @@ import { Checkbox } from "@/components/apps/ui/checkbox";
 import { PageContextBand } from "@/components/apps/ui/PageContextBand";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
 import { fetchWithTimeout, mapFetchErrorMessage } from "@/lib/fetchWithTimeout";
+import {
+	type CadPreviewMatch as PreviewMatch,
+	type CadReplaceRule as ReplaceRule,
+	buildCadPreviewKey,
+	cadBatchFindReplaceService,
+} from "@/services/cadBatchFindReplaceService";
 import styles from "./BatchFindReplaceApp.module.css";
-
-type ReplaceRule = {
-	id: string;
-	find: string;
-	replace: string;
-	useRegex: boolean;
-	matchCase: boolean;
-};
-
-type PreviewMatch = {
-	file: string;
-	line: number;
-	before: string;
-	after: string;
-	ruleId: string;
-	handle?: string;
-	entityType?: string;
-	layoutName?: string;
-	blockName?: string | null;
-	attributeTag?: string | null;
-	currentValue?: string;
-	nextValue?: string;
-};
 
 type Mode = "text" | "cad";
 
@@ -49,7 +32,6 @@ export function BatchFindReplaceApp() {
 	const [applying, setApplying] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const [warnings, setWarnings] = useState<string[]>([]);
-	const [sessionReady, setSessionReady] = useState(false);
 
 	const canRunText = useMemo(
 		() => files.length > 0 && rules.some((r) => r.find.trim().length > 0),
@@ -70,35 +52,13 @@ export function BatchFindReplaceApp() {
 		);
 	};
 
-	const ensureBatchSession = async () => {
-		if (sessionReady) return;
-		await fetchWithTimeout("/api/batch-find-replace/session", {
-			method: "POST",
-			credentials: "include",
-			timeoutMs: 15_000,
-			requestName: "Batch session request",
-			throwOnHttpError: true,
-		});
-		setSessionReady(true);
-	};
-
-	const buildPreviewKey = (match: PreviewMatch, index: number) =>
-		[
-			match.file,
-			match.handle || "",
-			match.attributeTag || "",
-			match.ruleId,
-			match.before,
-			index,
-		].join("::");
-
 	const runTextPreview = async () => {
 		if (!canRunText) return;
 		setRunningPreview(true);
 		setMessage(null);
 		setWarnings([]);
 		try {
-			await ensureBatchSession();
+			await cadBatchFindReplaceService.ensureBatchSession();
 			const body = new FormData();
 			files.forEach((f) => body.append("files", f));
 			body.append("rules", JSON.stringify(rules));
@@ -116,9 +76,13 @@ export function BatchFindReplaceApp() {
 				throw new Error(payload?.error || "Preview failed");
 			}
 
-			const matches = Array.isArray(payload?.matches) ? payload.matches : [];
+			const matches = (
+				Array.isArray(payload?.matches) ? payload.matches : []
+			) as PreviewMatch[];
 			setPreview(matches);
-			setSelectedPreviewKeys(matches.map(buildPreviewKey));
+			setSelectedPreviewKeys(
+				matches.map((match, index) => buildCadPreviewKey(match, index)),
+			);
 			setMessage(payload?.message || "Preview completed.");
 		} catch (err) {
 			setMessage(mapFetchErrorMessage(err, "Preview failed."));
@@ -133,34 +97,16 @@ export function BatchFindReplaceApp() {
 		setMessage(null);
 		setWarnings([]);
 		try {
-			await ensureBatchSession();
-			const res = await fetchWithTimeout(
-				"/api/batch-find-replace/cad/preview",
-				{
-					method: "POST",
-					credentials: "include",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						rules,
-						blockNameHint: "R3P-24x36BORDER&TITLE",
-					}),
-					timeoutMs: 120_000,
-					requestName: "CAD batch preview request",
-					throwOnHttpError: true,
-				},
+			const result = await cadBatchFindReplaceService.previewActiveDrawing({
+				rules,
+				blockNameHint: "R3P-24x36BORDER&TITLE",
+			});
+			setPreview(result.matches);
+			setSelectedPreviewKeys(
+				result.matches.map((match, index) => buildCadPreviewKey(match, index)),
 			);
-			const payload = await res.json();
-			if (!payload?.success) {
-				throw new Error(
-					payload?.error || payload?.message || "CAD preview failed",
-				);
-			}
-
-			const matches = Array.isArray(payload?.matches) ? payload.matches : [];
-			setPreview(matches);
-			setSelectedPreviewKeys(matches.map(buildPreviewKey));
-			setWarnings(Array.isArray(payload?.warnings) ? payload.warnings : []);
-			setMessage(payload?.message || "CAD preview completed.");
+			setWarnings(result.warnings);
+			setMessage(result.message);
 		} catch (err) {
 			setMessage(mapFetchErrorMessage(err, "CAD preview failed."));
 		} finally {
@@ -173,7 +119,7 @@ export function BatchFindReplaceApp() {
 		setApplying(true);
 		setMessage(null);
 		try {
-			await ensureBatchSession();
+			await cadBatchFindReplaceService.ensureBatchSession();
 			const body = new FormData();
 			files.forEach((f) => body.append("files", f));
 			body.append("rules", JSON.stringify(rules));
@@ -212,7 +158,7 @@ export function BatchFindReplaceApp() {
 	const applyCadChanges = async () => {
 		if (!canRunCad) return;
 		const selectedMatches = preview.filter((match, index) =>
-			selectedPreviewKeys.includes(buildPreviewKey(match, index)),
+			selectedPreviewKeys.includes(buildCadPreviewKey(match, index)),
 		);
 		if (selectedMatches.length === 0) {
 			setMessage("Select at least one preview row to apply.");
@@ -222,35 +168,11 @@ export function BatchFindReplaceApp() {
 		setApplying(true);
 		setMessage(null);
 		try {
-			await ensureBatchSession();
-			const res = await fetchWithTimeout("/api/batch-find-replace/cad/apply", {
-				method: "POST",
-				credentials: "include",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					matches: selectedMatches,
-					blockNameHint: "R3P-24x36BORDER&TITLE",
-				}),
-				timeoutMs: 120_000,
-				requestName: "CAD batch apply request",
-				throwOnHttpError: true,
+			const result = await cadBatchFindReplaceService.applyActiveDrawing({
+				matches: selectedMatches,
+				blockNameHint: "R3P-24x36BORDER&TITLE",
 			});
-
-			const blob = await res.blob();
-			const cd = res.headers.get("content-disposition") || "";
-			const match = cd.match(/filename="?([^";]+)"?/i);
-			const filename = match?.[1] || "cad_batch_find_replace_changes.xlsx";
-
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement("a");
-			a.href = url;
-			a.download = filename;
-			document.body.appendChild(a);
-			a.click();
-			document.body.removeChild(a);
-			URL.revokeObjectURL(url);
-
-			setMessage("CAD apply completed. Excel change report downloaded.");
+			setMessage(result.message);
 		} catch (err) {
 			setMessage(mapFetchErrorMessage(err, "CAD apply failed."));
 		} finally {
@@ -458,7 +380,11 @@ export function BatchFindReplaceApp() {
 									type="button"
 									className={styles.secondaryButton}
 									onClick={() =>
-										setSelectedPreviewKeys(preview.map(buildPreviewKey))
+										setSelectedPreviewKeys(
+											preview.map((match, index) =>
+												buildCadPreviewKey(match, index),
+											),
+										)
 									}
 								>
 									Select All
@@ -475,7 +401,7 @@ export function BatchFindReplaceApp() {
 					</div>
 					<div className={styles.previewPanel}>
 						{preview.map((match, index) => {
-							const previewKey = buildPreviewKey(match, index);
+							const previewKey = buildCadPreviewKey(match, index);
 							const selected = selectedPreviewKeys.includes(previewKey);
 							return (
 								<div

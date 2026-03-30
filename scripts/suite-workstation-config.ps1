@@ -28,6 +28,70 @@ function Get-SuiteRoamingAppDataRoot {
     return Join-Path $env:USERPROFILE "AppData\Roaming"
 }
 
+function Get-SuitePreferredDevRoot {
+    if (-not [string]::IsNullOrWhiteSpace([string]$env:SystemDrive)) {
+        return Join-Path $env:SystemDrive "Dev"
+    }
+
+    return "C:\Dev"
+}
+
+function Get-SuiteStableSuiteRoot {
+    return Join-Path (Get-SuitePreferredDevRoot) "Suite"
+}
+
+function Get-SuiteStableDailyRoot {
+    return Join-Path (Get-SuitePreferredDevRoot) "Daily"
+}
+
+function Get-SuiteStableOfficeExecutableCandidates {
+    $stableDailyRoot = Get-SuiteStableDailyRoot
+    return @(
+        (Join-Path $stableDailyRoot "artifacts\DailyDesk\publish\DailyDesk.exe"),
+        (Join-Path $stableDailyRoot "DailyDesk\bin\Release\net10.0-windows\DailyDesk.exe")
+    )
+}
+
+function Get-SuiteLegacyDailyRoot {
+    if (-not [string]::IsNullOrWhiteSpace([string]$env:USERPROFILE)) {
+        return Join-Path $env:USERPROFILE "OneDrive\Desktop\Daily"
+    }
+
+    return $null
+}
+
+function Resolve-SuitePreferredDailyRoot {
+    $stableDailyRoot = Get-SuiteStableDailyRoot
+    if (Test-Path -LiteralPath $stableDailyRoot) {
+        return [System.IO.Path]::GetFullPath($stableDailyRoot)
+    }
+
+    $legacyDailyRoot = Get-SuiteLegacyDailyRoot
+    if (-not [string]::IsNullOrWhiteSpace($legacyDailyRoot) -and (Test-Path -LiteralPath $legacyDailyRoot)) {
+        return [System.IO.Path]::GetFullPath($legacyDailyRoot)
+    }
+
+    return [System.IO.Path]::GetFullPath($stableDailyRoot)
+}
+
+function Resolve-SuitePreferredOfficeExecutablePath {
+    foreach ($stableExecutable in (Get-SuiteStableOfficeExecutableCandidates)) {
+        if (Test-Path -LiteralPath $stableExecutable) {
+            return [System.IO.Path]::GetFullPath($stableExecutable)
+        }
+    }
+
+    $legacyDailyRoot = Get-SuiteLegacyDailyRoot
+    if (-not [string]::IsNullOrWhiteSpace($legacyDailyRoot)) {
+        $legacyExecutable = Join-Path $legacyDailyRoot "DailyDesk\bin\Release\net10.0-windows\DailyDesk.exe"
+        if (Test-Path -LiteralPath $legacyExecutable) {
+            return [System.IO.Path]::GetFullPath($legacyExecutable)
+        }
+    }
+
+    return [System.IO.Path]::GetFullPath($stableExecutable)
+}
+
 function Test-SuiteDirectoryWriteAccess {
     param([Parameter(Mandatory = $true)][string]$DirectoryPath)
 
@@ -279,6 +343,9 @@ function Get-SuiteWorkstationMcpEnv {
 
     $localAppData = Get-SuiteLocalAppDataRoot
     $roamingAppData = Get-SuiteRoamingAppDataRoot
+    $preferredSuiteRoot = Get-SuiteStableSuiteRoot
+    $preferredDailyRoot = Resolve-SuitePreferredDailyRoot
+    $preferredOfficeExecutablePath = Resolve-SuitePreferredOfficeExecutablePath
     $filesystemCollectorId = "watchdog-fs-$slug"
     $autocadCollectorId = "autocad-$slug"
     $filesystemTaskName = "SuiteWatchdogFilesystemCollector-$($WorkstationProfile.WorkstationId)"
@@ -311,6 +378,9 @@ function Get-SuiteWorkstationMcpEnv {
         SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-watchdog-backend-startup.ps1")
         SUITE_GATEWAY_STARTUP_CHECK_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\check-gateway-startup.ps1")
         SUITE_RUNTIME_BOOTSTRAP_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\run-suite-runtime-startup.ps1")
+        SUITE_STABLE_SUITE_ROOT = $preferredSuiteRoot
+        SUITE_DAILY_ROOT = $preferredDailyRoot
+        SUITE_OFFICE_EXECUTABLE_PATH = $preferredOfficeExecutablePath
     }
 }
 

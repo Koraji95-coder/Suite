@@ -503,10 +503,10 @@ describe("DashboardOverviewPanel", () => {
 		});
 		expect(screen.getByText("Watchdog summary")).toBeTruthy();
 		expect(screen.getByText("Delivery board")).toBeTruthy();
-		expect(screen.getByText("Live AutoCAD sessions")).toBeTruthy();
-		expect(screen.getByText("Session history")).toBeTruthy();
+		expect(screen.getByText("Live CAD sessions")).toBeTruthy();
+		expect(screen.getByText("Session timeline")).toBeTruthy();
 		expect(screen.getByText("Seq 1")).toBeTruthy();
-		expect(screen.getAllByText("Project activity").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("Project rollup").length).toBeGreaterThan(0);
 		expect(screen.queryByText("Work Ledger")).toBeNull();
 		expect(screen.queryByText("Worktale ready")).toBeNull();
 		expect(screen.queryByText("Open latest receipt")).toBeNull();

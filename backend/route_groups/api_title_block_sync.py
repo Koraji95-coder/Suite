@@ -23,6 +23,31 @@ DEFAULT_WDL_LABELS = {
     "LINE2": "Facility / Site",
     "LINE4": "Project Number",
 }
+LEGACY_SUITE_STARTER_WDP_PREFIX = "; Suite starter AutoCAD Electrical project scaffold"
+DEFAULT_WDP_CONFIG_LINES = (
+    "+[1]%SL_DIR%NFPA/;%SL_DIR%NFPA/1-/;%SL_DIR%pneu_iso125/;%SL_DIR%hyd_iso125/;%SL_DIR%pid/",
+    "+[2]ACE_NFPA_MENU.DAT",
+    "+[3]%SL_DIR%panel/",
+    "+[4]ACE_PANEL_MENU_NFPA.DAT",
+    "+[5]1",
+    "+[9]1,2,3",
+    "+[10]0",
+    "+[11]1",
+    "+[12]0",
+    "+[13]0",
+    "+[14]0",
+    "+[15]0",
+    "+[18]0",
+    "+[21]0",
+    "+[22]",
+    "+[23]0",
+    "+[24]",
+    "+[25]1",
+    "+[26](0.00000 0.03125 0.00000 )",
+    "+[29]0",
+    "+[30]0.00",
+)
+PANEL_DRAWING_TITLE_HINTS = ("PANEL", "ELEVATION", "LAYOUT", "ENCLOSURE", "CABINET")
 ACADE_OWNED_TAGS = ("DWGNO", "TITLE1", "TITLE2", "TITLE3", "PROJ")
 SUITE_OWNED_TAGS = (
     "CADNO",
@@ -284,12 +309,39 @@ def create_title_block_sync_blueprint(
         title = stem[idx + len(drawing_number) :].strip(" _-")
         return title.replace("_", " ").strip()
 
-    def _build_wdt_and_wdl_paths(project_root: Path, discovered_files: Sequence[Path]) -> Tuple[Path, Path]:
+    def _resolve_wdp_path(
+        project_root: Path,
+        discovered_files: Sequence[Path],
+        profile: Dict[str, str | None],
+    ) -> Tuple[Path, bool]:
+        configured_path = _normalize_text(
+            profile.get("acadeProjectFilePath") or profile.get("acade_project_file_path")
+        )
+        if configured_path:
+            candidate = Path(configured_path).expanduser()
+            if not candidate.is_absolute():
+                candidate = project_root / candidate
+            if candidate.exists() and candidate.is_dir():
+                candidate = candidate / f"{project_root.name or 'project'}.wdp"
+            elif candidate.suffix.lower() != ".wdp":
+                candidate = candidate.with_suffix(".wdp")
+            return candidate, candidate.exists()
+
         wdp_files = [path for path in discovered_files if path.suffix.lower() == ".wdp"]
         if wdp_files:
-            stem = wdp_files[0].stem
-            return project_root / f"{stem}.wdt", project_root / f"{stem}.wdl"
-        return project_root / "default.wdt", project_root / "default.wdl"
+            return wdp_files[0], True
+
+        stem = re.sub(r"[^A-Za-z0-9._-]+", "-", project_root.name).strip("-._") or "project"
+        candidate = project_root / f"{stem}.wdp"
+        return candidate, candidate.exists()
+
+    def _build_mapping_paths(
+        project_root: Path,
+        discovered_files: Sequence[Path],
+        profile: Dict[str, str | None],
+    ) -> Tuple[Path, Path, Path, bool]:
+        wdp_path, wdp_exists = _resolve_wdp_path(project_root, discovered_files, profile)
+        return wdp_path, wdp_path.with_suffix(".wdt"), wdp_path.with_suffix(".wdl"), wdp_exists
 
     def _read_profile(payload: Dict[str, Any], project_root: Path) -> Dict[str, str | None]:
         raw_profile = payload.get("profile")
@@ -298,6 +350,9 @@ def create_title_block_sync_blueprint(
             "blockName": _normalize_text(profile.get("blockName") or profile.get("block_name")) or DEFAULT_BLOCK_NAME,
             "projectRootPath": _normalize_text(profile.get("projectRootPath") or profile.get("project_root_path"))
             or str(project_root),
+            "acadeProjectFilePath": _normalize_text(
+                profile.get("acadeProjectFilePath") or profile.get("acade_project_file_path")
+            ),
             "acadeLine1": _normalize_text(profile.get("acadeLine1") or profile.get("acade_line1")),
             "acadeLine2": _normalize_text(profile.get("acadeLine2") or profile.get("acade_line2")),
             "acadeLine4": _normalize_text(profile.get("acadeLine4") or profile.get("acade_line4")),
@@ -315,6 +370,98 @@ def create_title_block_sync_blueprint(
     def _build_wdl_text() -> str:
         lines = [f"{key} = {value}" for key, value in DEFAULT_WDL_LABELS.items()]
         return "\n".join(lines) + "\n"
+
+    def _build_wdp_text(
+        *,
+        project_root: Path,
+        discovered_files: Sequence[Path],
+        profile: Dict[str, str | None],
+        wdp_path: Path,
+        wdt_path: Path,
+        wdl_path: Path,
+    ) -> str:
+        project_name = wdp_path.stem or project_root.name or "Project"
+        project_desc = _normalize_text(profile.get("acadeLine2")) or project_name
+        project_owner = _normalize_text(profile.get("acadeLine1")) or project_name
+        project_number = _normalize_text(profile.get("acadeLine4"))
+        drawing_paths = [
+            _relative_path(project_root, path)
+            for path in discovered_files
+            if path.suffix.lower() == ".dwg"
+        ]
+        lines: List[str] = [f"*[1]{project_owner}"]
+        if project_desc:
+            lines.append(f"*[2]{project_desc}")
+        if project_number:
+            lines.append(f"*[4]{project_number}")
+        lines.extend(DEFAULT_WDP_CONFIG_LINES)
+        if drawing_paths:
+            for relative_path in drawing_paths:
+                stem = Path(relative_path).stem
+                drawing_number = _find_filename_drawing_number(stem)
+                drawing_title = _derive_filename_title(stem, drawing_number) or stem.replace("_", " ").strip()
+                subtype_context = f"{relative_path} {drawing_title}".upper()
+                subtype = (
+                    "PANEL"
+                    if any(hint in subtype_context for hint in PANEL_DRAWING_TITLE_HINTS)
+                    else "SCHEMATIC"
+                )
+                lines.append(f"==={drawing_title}")
+                lines.append(f"=====SUB={subtype}")
+                lines.append(relative_path)
+        return "\n".join(lines) + "\n"
+
+    def _is_legacy_suite_starter_wdp(text: str | None) -> bool:
+        normalized = (text or "").lstrip()
+        return normalized.startswith(LEGACY_SUITE_STARTER_WDP_PREFIX)
+
+    def _normalize_text_for_compare(text: str | None) -> str:
+        if text is None:
+            return ""
+        return text.replace("\r\n", "\n").replace("\r", "\n").strip()
+
+    def _read_optional_text(path: Path) -> str | None:
+        if not path.exists() or not path.is_file():
+            return None
+        try:
+            return path.read_text(encoding="utf-8")
+        except Exception:
+            return None
+
+    def _resolve_wdp_state(path: Path, existing_text: str | None, generated_text: str | None = None) -> str:
+        if not path.exists():
+            return "starter"
+        if _is_legacy_suite_starter_wdp(existing_text):
+            return "starter"
+        if generated_text and _normalize_text_for_compare(existing_text) == _normalize_text_for_compare(generated_text):
+            return "starter"
+        return "existing"
+
+    def _resolve_existing_or_generated_text(path: Path, generated_text: str) -> str:
+        return _read_optional_text(path) or generated_text
+
+    def _resolve_wdp_preview_text(
+        *,
+        project_root: Path,
+        discovered_files: Sequence[Path],
+        profile: Dict[str, str | None],
+        wdp_path: Path,
+        wdt_path: Path,
+        wdl_path: Path,
+        wdp_exists: bool,
+    ) -> str:
+        if wdp_exists:
+            existing_text = _read_optional_text(wdp_path)
+            if existing_text is not None and not _is_legacy_suite_starter_wdp(existing_text):
+                return existing_text
+        return _build_wdp_text(
+            project_root=project_root,
+            discovered_files=discovered_files,
+            profile=profile,
+            wdp_path=wdp_path,
+            wdt_path=wdt_path,
+            wdl_path=wdl_path,
+        )
 
     def _read_revision_entries(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         raw = payload.get("revisionEntries") or payload.get("revision_entries")
@@ -549,6 +696,11 @@ def create_title_block_sync_blueprint(
             if filename_drawing_number and title_block_dwgno:
                 if _normalize_drawing_key(filename_drawing_number) != _normalize_drawing_key(title_block_dwgno):
                     issues.append("Filename drawing number does not match title block DWGNO.")
+            title_block_project_number = _normalize_text(current_attributes.get("PROJ"))
+            expected_project_number = _normalize_text(profile.get("acadeLine4"))
+            if title_block_project_number and expected_project_number:
+                if title_block_project_number != expected_project_number:
+                    issues.append("Project number does not match the configured ACADE PROJ value.")
             if file_type == "pdf":
                 issues.append("PDF rows are filename-only in v1.")
 
@@ -658,16 +810,65 @@ def create_title_block_sync_blueprint(
         discovered_files: Sequence[Path],
         profile: Dict[str, str | None],
     ) -> Dict[str, Any]:
-        wdt_path, wdl_path = _build_wdt_and_wdl_paths(project_root, discovered_files)
+        wdp_path, wdt_path, wdl_path, _ = _build_mapping_paths(project_root, discovered_files, profile)
+        wdp_text = _build_wdp_text(
+            project_root=project_root,
+            discovered_files=discovered_files,
+            profile=profile,
+            wdp_path=wdp_path,
+            wdt_path=wdt_path,
+            wdl_path=wdl_path,
+        )
         wdt_text = _build_wdt_text(profile)
         wdl_text = _build_wdl_text()
+        wdp_path.write_text(wdp_text, encoding="utf-8", newline="\n")
         wdt_path.write_text(wdt_text, encoding="utf-8", newline="\n")
         wdl_path.write_text(wdl_text, encoding="utf-8", newline="\n")
         return {
+            "wdpPath": str(wdp_path),
             "wdtPath": str(wdt_path),
             "wdlPath": str(wdl_path),
+            "wdpText": wdp_text,
             "wdtText": wdt_text,
             "wdlText": wdl_text,
+            "wdpState": "starter",
+        }
+
+    def _ensure_project_mapping_files(
+        *,
+        project_root: Path,
+        discovered_files: Sequence[Path],
+        profile: Dict[str, str | None],
+    ) -> Dict[str, Any]:
+        wdp_path, wdt_path, wdl_path, _ = _build_mapping_paths(project_root, discovered_files, profile)
+        generated_wdp_text = _build_wdp_text(
+            project_root=project_root,
+            discovered_files=discovered_files,
+            profile=profile,
+            wdp_path=wdp_path,
+            wdt_path=wdt_path,
+            wdl_path=wdl_path,
+        )
+        generated_wdt_text = _build_wdt_text(profile)
+        generated_wdl_text = _build_wdl_text()
+        current_wdp_text = _read_optional_text(wdp_path)
+
+        if not wdp_path.exists() or _is_legacy_suite_starter_wdp(current_wdp_text):
+            wdp_path.write_text(generated_wdp_text, encoding="utf-8", newline="\n")
+            current_wdp_text = generated_wdp_text
+        if not wdt_path.exists():
+            wdt_path.write_text(generated_wdt_text, encoding="utf-8", newline="\n")
+        if not wdl_path.exists():
+            wdl_path.write_text(generated_wdl_text, encoding="utf-8", newline="\n")
+
+        return {
+            "wdpPath": str(wdp_path),
+            "wdtPath": str(wdt_path),
+            "wdlPath": str(wdl_path),
+            "wdpText": current_wdp_text or generated_wdp_text,
+            "wdtText": _resolve_existing_or_generated_text(wdt_path, generated_wdt_text),
+            "wdlText": _resolve_existing_or_generated_text(wdl_path, generated_wdl_text),
+            "wdpState": _resolve_wdp_state(wdp_path, current_wdp_text, generated_wdp_text),
         }
 
     def _build_mapping_artifact_preview(
@@ -676,12 +877,35 @@ def create_title_block_sync_blueprint(
         discovered_files: Sequence[Path],
         profile: Dict[str, str | None],
     ) -> Dict[str, Any]:
-        wdt_path, wdl_path = _build_wdt_and_wdl_paths(project_root, discovered_files)
+        wdp_path, wdt_path, wdl_path, wdp_exists = _build_mapping_paths(project_root, discovered_files, profile)
+        existing_wdp_text = _read_optional_text(wdp_path) if wdp_exists else None
+        generated_wdp_text = _build_wdp_text(
+            project_root=project_root,
+            discovered_files=discovered_files,
+            profile=profile,
+            wdp_path=wdp_path,
+            wdt_path=wdt_path,
+            wdl_path=wdl_path,
+        )
+        generated_wdt_text = _build_wdt_text(profile)
+        generated_wdl_text = _build_wdl_text()
         return {
+            "wdpPath": str(wdp_path),
             "wdtPath": str(wdt_path),
             "wdlPath": str(wdl_path),
-            "wdtText": _build_wdt_text(profile),
-            "wdlText": _build_wdl_text(),
+            "wdpText": existing_wdp_text
+            or _resolve_wdp_preview_text(
+                project_root=project_root,
+                discovered_files=discovered_files,
+                profile=profile,
+                wdp_path=wdp_path,
+                wdt_path=wdt_path,
+                wdl_path=wdl_path,
+                wdp_exists=wdp_exists,
+            ),
+            "wdtText": _resolve_existing_or_generated_text(wdt_path, generated_wdt_text),
+            "wdlText": _resolve_existing_or_generated_text(wdl_path, generated_wdl_text),
+            "wdpState": _resolve_wdp_state(wdp_path, existing_wdp_text, generated_wdp_text),
         }
 
     def _build_bridge_scan_payload(rows: Sequence[Path], profile: Dict[str, str | None]) -> Dict[str, Any]:
@@ -733,13 +957,25 @@ def create_title_block_sync_blueprint(
                         ]
                     )
                 except Exception as exc:
+                    logger.warning(
+                        "Title block scan bridge fell back to filename metadata (request_id=%s, remote=%s, auth_mode=%s, detail=%s)",
+                        request_id,
+                        remote_addr,
+                        auth_mode,
+                        autocad_exception_message(exc),
+                    )
                     warnings.append(
-                        "AutoCAD scan bridge unavailable; using filename-only fallback for DWG metadata. "
-                        + autocad_exception_message(exc)
+                        "Live DWG metadata is unavailable right now, so Suite is using filename fallback for drawing rows."
                     )
             elif dwg_files:
+                logger.warning(
+                    "Title block scan bridge is not configured; using filename metadata fallback (request_id=%s, remote=%s, auth_mode=%s)",
+                    request_id,
+                    remote_addr,
+                    auth_mode,
+                )
                 warnings.append(
-                    "AutoCAD bridge is not configured; using filename-only fallback for DWG metadata."
+                    "Live DWG metadata is unavailable right now, so Suite is using filename fallback for drawing rows."
                 )
 
             rows = _build_scan_rows(
@@ -900,7 +1136,7 @@ def create_title_block_sync_blueprint(
                 )
 
             discovered_files = _discover_project_files(project_root)
-            artifacts = _write_project_mapping_files(
+            artifacts = _ensure_project_mapping_files(
                 project_root=project_root,
                 discovered_files=discovered_files,
                 profile=profile,
@@ -1007,6 +1243,113 @@ def create_title_block_sync_blueprint(
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "apply", "providerPath": "dotnet"},
+            )
+
+    @bp.route("/ensure-artifacts", methods=["POST"])
+    @require_supabase_user
+    @limiter.limit("240 per hour")
+    def api_title_block_ensure_artifacts():
+        request_id = _request_id()
+        payload = _parse_json_body()
+        try:
+            project_root = _resolve_project_root(payload)
+            profile = _read_profile(payload, project_root)
+            artifacts = _ensure_project_mapping_files(
+                project_root=project_root,
+                discovered_files=_discover_project_files(project_root),
+                profile=profile,
+            )
+            return jsonify(
+                {
+                    "success": True,
+                    "code": "",
+                    "message": "ACADE support artifacts are ready.",
+                    "requestId": request_id,
+                    "data": {
+                        "projectRootPath": str(project_root),
+                        "profile": profile,
+                        "drawings": [],
+                        "summary": _summarize_rows([]),
+                        "artifacts": artifacts,
+                    },
+                    "warnings": [],
+                    "meta": {
+                        "stage": "ensure-artifacts",
+                    },
+                }
+            ), 200
+        except ValueError as exc:
+            return _error_response(
+                code="INVALID_REQUEST",
+                message=str(exc),
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "ensure-artifacts.validate"},
+            )
+        except Exception as exc:
+            return _error_response(
+                code="TITLE_BLOCK_ARTIFACTS_FAILED",
+                message=f"ACADE support artifact creation failed: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "ensure-artifacts"},
+            )
+
+    @bp.route("/open-project", methods=["POST"])
+    @require_supabase_user
+    @limiter.limit("240 per hour")
+    def api_title_block_open_project():
+        request_id = _request_id()
+        payload = _parse_json_body()
+        try:
+            project_root = _resolve_project_root(payload)
+            profile = _read_profile(payload, project_root)
+            artifacts = _ensure_project_mapping_files(
+                project_root=project_root,
+                discovered_files=_discover_project_files(project_root),
+                profile=profile,
+            )
+            wdp_path = Path(str(artifacts.get("wdpPath") or "")).expanduser()
+            if not wdp_path.exists():
+                raise ValueError("ACADE project file could not be created.")
+            if not hasattr(os, "startfile"):
+                raise RuntimeError("Opening an ACADE project file is only supported on Windows.")
+            os.startfile(str(wdp_path))
+            return jsonify(
+                {
+                    "success": True,
+                    "code": "",
+                    "message": "ACADE project open requested.",
+                    "requestId": request_id,
+                    "data": {
+                        "projectRootPath": str(project_root),
+                        "profile": profile,
+                        "drawings": [],
+                        "summary": _summarize_rows([]),
+                        "artifacts": artifacts,
+                        "launchedPath": str(wdp_path),
+                    },
+                    "warnings": [],
+                    "meta": {
+                        "stage": "open-project",
+                    },
+                }
+            ), 200
+        except ValueError as exc:
+            return _error_response(
+                code="INVALID_REQUEST",
+                message=str(exc),
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "open-project.validate"},
+            )
+        except Exception as exc:
+            return _error_response(
+                code="TITLE_BLOCK_OPEN_PROJECT_FAILED",
+                message=f"Unable to open the ACADE project file: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "open-project"},
             )
 
     return bp

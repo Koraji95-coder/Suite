@@ -20,12 +20,14 @@ $frontendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-front
 $filesystemCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-filesystem-collector-startup.ps1")).Path
 $autocadCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-collector-startup.ps1")).Path
 $pluginCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-plugin.ps1")).Path
+$cadAuthoringPluginCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-cad-authoring-plugin.ps1")).Path
 $runtimePaths = Get-SuiteRuntimePaths
 $runtimeStatusDir = $runtimePaths.RuntimeStatusDir
 $runtimeStatusPath = $runtimePaths.RuntimeStatusPath
 $currentBootstrapPath = $runtimePaths.CurrentBootstrapPath
 $runtimeLogPath = $runtimePaths.RuntimeLogPath
 $frontendLogPath = $runtimePaths.FrontendLogPath
+$codexConfigPath = Get-SuiteCodexConfigPath
 
 function Invoke-ExternalCommand {
     param(
@@ -650,6 +652,8 @@ $autocadHealthy = [bool]($autocadResult.Payload -and $autocadResult.Payload.heal
 $autocadDaemonRunning = [bool]($autocadResult.Payload -and $autocadResult.Payload.daemonRunning)
 $pluginResult = Invoke-JsonPowerShellFile -ScriptPath $pluginCheckScript -Arguments @("-Json")
 $pluginHealthy = [bool]($pluginResult.Payload -and $pluginResult.Payload.ok)
+$cadAuthoringPluginResult = Invoke-JsonPowerShellFile -ScriptPath $cadAuthoringPluginCheckScript -Arguments @("-Json")
+$cadAuthoringPluginHealthy = [bool]($cadAuthoringPluginResult.Payload -and $cadAuthoringPluginResult.Payload.ok)
 $autocadWarnings = if ($autocadResult.Payload -and $autocadResult.Payload.warnings) {
     [string]::Join("; ", @($autocadResult.Payload.warnings))
 }
@@ -671,39 +675,56 @@ elseif ($pluginResult.Payload -and $pluginResult.Payload.errors) {
 else {
     $pluginResult.OutputTail
 }
+$cadAuthoringPluginDetails = if ($cadAuthoringPluginHealthy) {
+    [string]$cadAuthoringPluginResult.Payload.bundleRoot
+}
+elseif ($cadAuthoringPluginResult.Payload -and $cadAuthoringPluginResult.Payload.errors) {
+    [string]::Join("; ", @($cadAuthoringPluginResult.Payload.errors))
+}
+else {
+    $cadAuthoringPluginResult.OutputTail
+}
 $autocadDetails = @($autocadWarnings, $autocadErrors) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-$autocadState = if ($autocadHealthy) {
+$autocadState = if ($autocadHealthy -and $pluginHealthy -and $cadAuthoringPluginHealthy) {
     "running"
 }
-elseif ($autocadDaemonRunning -or $pluginHealthy) {
+elseif ($autocadDaemonRunning -or $pluginHealthy -or $cadAuthoringPluginHealthy) {
     "error"
 }
 else {
     "stopped"
 }
-$autocadSummary = if ($autocadHealthy -and $pluginHealthy) {
-    "AutoCAD collector and plugin are healthy."
+$autocadSummary = if ($autocadHealthy -and $pluginHealthy -and $cadAuthoringPluginHealthy) {
+    "AutoCAD collector and plugins are healthy."
 }
-elseif ($autocadDaemonRunning -or $pluginHealthy) {
-    "AutoCAD collector needs attention."
+elseif ($autocadDaemonRunning -or $pluginHealthy -or $cadAuthoringPluginHealthy) {
+    "AutoCAD tooling needs attention."
 }
 else {
     "AutoCAD collector is not running."
 }
 $autocadStartupMode = if ($autocadResult.Payload) { [string]$autocadResult.Payload.startupMode } else { $null }
-$pluginState = if ($pluginHealthy) { "running" } else { "error" }
-$pluginSummary = if ($pluginHealthy) { "Plugin healthy." } else { "Plugin needs attention." }
+$pluginState = if ($pluginHealthy -and $cadAuthoringPluginHealthy) { "running" } else { "error" }
+$pluginSummary = if ($pluginHealthy -and $cadAuthoringPluginHealthy) {
+    "Watchdog and CAD authoring plugins are healthy."
+}
+elseif ($pluginHealthy -or $cadAuthoringPluginHealthy) {
+    "One AutoCAD plugin is healthy and one needs attention."
+}
+else {
+    "AutoCAD plugins need attention."
+}
 $autocadNotes = @()
-if ($autocadHealthy) {
+if ($autocadHealthy -and $pluginHealthy -and $cadAuthoringPluginHealthy) {
     $autocadNotes += [pscustomobject]@{
         label = "Collector"
-        value = "Startup registration and AutoCAD collector heartbeat both look healthy."
+        value = "Startup registration, watchdog plugin, and CAD authoring plugin all look healthy."
     }
 }
-elseif ($autocadDaemonRunning -or $pluginHealthy) {
+elseif ($autocadDaemonRunning -or $pluginHealthy -or $cadAuthoringPluginHealthy) {
     $autocadNotes += [pscustomobject]@{
         label = "Collector"
-        value = "The collector is partially healthy. Review the plugin detail and any warnings below."
+        value = "The AutoCAD toolchain is partially healthy. Review the plugin detail and any warnings below."
     }
 }
 else {
@@ -727,21 +748,39 @@ if (-not [string]::IsNullOrWhiteSpace($autocadErrors)) {
 $pluginNotes = @()
 if ($pluginHealthy -and $pluginResult.Payload -and $pluginResult.Payload.bundleRoot) {
     $pluginNotes += [pscustomobject]@{
-        label = "Bundle"
+        label = "Watchdog bundle"
         value = [string]$pluginResult.Payload.bundleRoot
     }
 }
 elseif ($pluginResult.Payload -and $pluginResult.Payload.errors -and @($pluginResult.Payload.errors).Count -gt 0) {
     $pluginNotes += [pscustomobject]@{
-        label = "Errors"
+        label = "Watchdog errors"
         value = [string]::Join("; ", @($pluginResult.Payload.errors))
+    }
+}
+if ($cadAuthoringPluginHealthy -and $cadAuthoringPluginResult.Payload -and $cadAuthoringPluginResult.Payload.bundleRoot) {
+    $pluginNotes += [pscustomobject]@{
+        label = "CAD authoring bundle"
+        value = [string]$cadAuthoringPluginResult.Payload.bundleRoot
+    }
+}
+elseif ($cadAuthoringPluginResult.Payload -and $cadAuthoringPluginResult.Payload.errors -and @($cadAuthoringPluginResult.Payload.errors).Count -gt 0) {
+    $pluginNotes += [pscustomobject]@{
+        label = "CAD authoring errors"
+        value = [string]::Join("; ", @($cadAuthoringPluginResult.Payload.errors))
+    }
+}
+if (-not $cadAuthoringPluginHealthy) {
+    $pluginNotes += [pscustomobject]@{
+        label = "Recovery"
+        value = "Run scripts/install-suite-cad-authoring-plugin.ps1 to restore the apply-time CAD authoring bundle."
     }
 }
 $services += (New-ServiceStatus `
     -Id "watchdog-autocad" `
     -Name "AutoCAD Collector" `
     -State $autocadState `
-    -Ok ($autocadHealthy -and $pluginHealthy) `
+    -Ok ($autocadHealthy -and $pluginHealthy -and $cadAuthoringPluginHealthy) `
     -Summary $autocadSummary `
     -Details $(([string]::Join("; ", @($autocadDetails))).Trim()) `
     -Port 0 `
@@ -750,11 +789,11 @@ $services += (New-ServiceStatus `
     -StartupMode $autocadStartupMode `
     -Notes $autocadNotes `
     -Substatus ([pscustomobject]@{
-        id = "autocad-plugin"
-        name = "Plugin"
+        id = "autocad-plugins"
+        name = "Plugins"
         state = $pluginState
         summary = $pluginSummary
-        details = $pluginDetails
+        details = @($pluginDetails, $cadAuthoringPluginDetails) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1
         notes = @($pluginNotes)
     }) `
     -LogTarget ([pscustomobject]@{
@@ -766,6 +805,7 @@ $services += (New-ServiceStatus `
 $runningCount = @($services | Where-Object { $_.state -eq "running" }).Count
 $hasStarting = @($services | Where-Object { $_.state -eq "starting" }).Count -gt 0
 $hasError = @($services | Where-Object { $_.state -eq "error" }).Count -gt 0
+$companionApps = Get-SuiteCompanionAppsSnapshot -RepoRoot $resolvedRepoRoot -TomlPath $codexConfigPath
 
 $overall = if ($runningCount -eq $services.Count) {
     [pscustomobject]@{
@@ -853,12 +893,14 @@ $result = [ordered]@{
         statusDir = $runtimeStatusDir
         statusPath = $runtimeStatusPath
         currentBootstrapPath = $currentBootstrapPath
+        companionStateDir = $runtimePaths.CompanionStateDir
         logPath = $runtimeLogPath
         frontendLogPath = $frontendLogPath
         supportRoot = $runtimePaths.SupportRoot
         lastBootstrap = Get-LastBootstrapStatus
         currentBootstrap = Get-CurrentBootstrapStatus
     }
+    companionApps = @($companionApps)
     services = @($services)
 }
 

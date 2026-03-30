@@ -123,6 +123,92 @@ function Get-StepLogLevel {
     return "OK"
 }
 
+function Get-NormalizedStepFallbackLines {
+    param([string]$Text)
+
+    return @(Get-SuiteRuntimeTranscriptLines -Text $Text)
+}
+
+function Get-ReadableSupabaseLogLines {
+    param([string]$Text)
+
+    $normalizedLines = @(Get-NormalizedStepFallbackLines -Text $Text)
+    if ($normalizedLines.Count -eq 0) {
+        return @()
+    }
+
+    $readableLines = New-Object System.Collections.Generic.List[string]
+    $section = $null
+
+    foreach ($line in $normalizedLines) {
+        $trimmed = [string]$line
+        if ([string]::IsNullOrWhiteSpace($trimmed)) {
+            continue
+        }
+
+        switch -Regex ($trimmed) {
+            "^(Development Tools|APIs|Database|Storage \(S3\)|Authentication Keys)$" {
+                $section = $matches[1]
+                continue
+            }
+            "^(Publishable|Secret|Access Key|Secret Key)\b" {
+                continue
+            }
+            "^Try rerunning the command with --debug\b" {
+                continue
+            }
+            "^.+container is not ready:\s*.+$" {
+                continue
+            }
+            "^Using workdir\s+(.+)$" {
+                $readableLines.Add(("Using workdir {0}" -f $matches[1])) | Out-Null
+                continue
+            }
+            "^(supabase .*running\.)$" {
+                $readableLines.Add($matches[1]) | Out-Null
+                continue
+            }
+            "^(Stopped services:\s+.+)$" {
+                $readableLines.Add($matches[1]) | Out-Null
+                continue
+            }
+            "^(Studio|Mailpit|MCP|Project URL|REST|GraphQL)\s+(.+)$" {
+                $readableLines.Add(("{0}: {1}" -f $matches[1], $matches[2])) | Out-Null
+                continue
+            }
+            "^URL\s+(.+)$" {
+                $value = $matches[1]
+                if ($section -eq "Database" -or $value -match "^(?i)postgresql://") {
+                    $readableLines.Add(("Database URL: {0}" -f $value)) | Out-Null
+                }
+                elseif ($section -eq "Storage (S3)" -or $value -match "(?i)/storage/v1/s3\b") {
+                    $readableLines.Add(("Storage URL: {0}" -f $value)) | Out-Null
+                }
+                else {
+                    $readableLines.Add(("URL: {0}" -f $value)) | Out-Null
+                }
+                continue
+            }
+            "^Region\s+(.+)$" {
+                if ($section -eq "Storage (S3)") {
+                    $readableLines.Add(("Storage region: {0}" -f $matches[1])) | Out-Null
+                }
+                continue
+            }
+            default {
+                if (
+                    $trimmed -notmatch "^(Development Tools|APIs|Database|Storage \(S3\)|Authentication Keys)$" -and
+                    $trimmed -match "[A-Za-z]"
+                ) {
+                    $readableLines.Add($trimmed) | Out-Null
+                }
+            }
+        }
+    }
+
+    return @($readableLines | Select-Object -Unique)
+}
+
 function Get-StepLogLines {
     param(
         [Parameter(Mandatory = $true)][psobject]$Step,
@@ -134,14 +220,10 @@ function Get-StepLogLines {
 
     switch ($Step.name) {
         "supabase-start" {
-            if (-not [string]::IsNullOrWhiteSpace($FallbackText)) {
-                $lines += ($FallbackText -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-            }
+            $lines += Get-ReadableSupabaseLogLines -Text $FallbackText
         }
         "supabase-env" {
-            if (-not [string]::IsNullOrWhiteSpace($FallbackText)) {
-                $lines += ($FallbackText -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-            }
+            $lines += Get-NormalizedStepFallbackLines -Text $FallbackText
         }
         "watchdog-filesystem" {
             if ($payload) {
@@ -185,12 +267,25 @@ function Get-StepLogLines {
         }
         "watchdog-autocad-plugin" {
             if ($payload) {
-                if ($payload.bundleRoot) {
-                    $lines += "Bundle root: $($payload.bundleRoot)"
+                if ($payload.watchdogPlugin) {
+                    if ($payload.watchdogPlugin.bundleRoot) {
+                        $lines += "Watchdog bundle root: $($payload.watchdogPlugin.bundleRoot)"
+                    }
+                    foreach ($errorMessage in @($payload.watchdogPlugin.errors)) {
+                        if (-not [string]::IsNullOrWhiteSpace([string]$errorMessage)) {
+                            $lines += "Watchdog error: $errorMessage"
+                        }
+                    }
                 }
-                foreach ($errorMessage in @($payload.errors)) {
-                    if (-not [string]::IsNullOrWhiteSpace([string]$errorMessage)) {
-                        $lines += "Error: $errorMessage"
+
+                if ($payload.cadAuthoringPlugin) {
+                    if ($payload.cadAuthoringPlugin.bundleRoot) {
+                        $lines += "CAD authoring bundle root: $($payload.cadAuthoringPlugin.bundleRoot)"
+                    }
+                    foreach ($errorMessage in @($payload.cadAuthoringPlugin.errors)) {
+                        if (-not [string]::IsNullOrWhiteSpace([string]$errorMessage)) {
+                            $lines += "CAD authoring error: $errorMessage"
+                        }
                     }
                 }
             }
@@ -248,7 +343,7 @@ function Get-StepLogLines {
     }
 
     if ($lines.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($FallbackText)) {
-        $lines += ($FallbackText -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        $lines += Get-NormalizedStepFallbackLines -Text $FallbackText
     }
 
     return @($lines | ForEach-Object { $_.Trim() } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
@@ -572,14 +667,21 @@ else {
         $supabaseStatusCheck = Wait-ForSupabaseRuntimeReady
         $supabaseStartReady = [bool]$supabaseStatusCheck.Ready
     }
-    $supabaseDetailsParts = @($supabaseStart.OutputTail)
-    if ($supabaseStatusCheck -and $supabaseStatusCheck.Probe -and $supabaseStatusCheck.Probe.OutputTail) {
-        $supabaseDetailsParts += $supabaseStatusCheck.Probe.OutputTail
+    $supabaseDetailsParts = @($supabaseStart.OutputText)
+    if ($supabaseStatusCheck -and $supabaseStatusCheck.Probe -and $supabaseStatusCheck.Probe.OutputText) {
+        $supabaseDetailsParts += $supabaseStatusCheck.Probe.OutputText
     }
-    $supabaseDetails = [string]::Join(
+    $supabaseRawDetails = [string]::Join(
         [Environment]::NewLine,
         @($supabaseDetailsParts | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     ).Trim()
+    $supabaseDetails = [string]::Join(
+        [Environment]::NewLine,
+        @(Get-ReadableSupabaseLogLines -Text $supabaseRawDetails)
+    ).Trim()
+    if ([string]::IsNullOrWhiteSpace($supabaseDetails)) {
+        $supabaseDetails = $supabaseRawDetails
+    }
     if ($supabaseStartReady) {
         $supabaseStartStep = New-StepResult -Name "supabase-start" -State "ready" -Ok $true -Summary "Local Supabase stack is running." -Details $supabaseDetails
         $steps += $supabaseStartStep
@@ -675,8 +777,16 @@ else {
     $autocadInstall = Invoke-PowerShellScript -ScriptRelativePath "scripts\install-watchdog-autocad-collector-startup.ps1" -Arguments @()
     $autocadCheck = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-watchdog-autocad-collector-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
     $autocadPlugin = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-watchdog-autocad-plugin.ps1" -Arguments @("-Json")
+    $cadAuthoringPlugin = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-suite-cad-authoring-plugin.ps1" -Arguments @("-Json")
+    $cadAuthoringPluginInstall = $null
+    if (-not ($cadAuthoringPlugin.Result.Ok -and $cadAuthoringPlugin.Payload -and [bool]$cadAuthoringPlugin.Payload.ok)) {
+        $cadAuthoringPluginInstall = Invoke-PowerShellScript -ScriptRelativePath "scripts\install-suite-cad-authoring-plugin.ps1" -Arguments @()
+        $cadAuthoringPlugin = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-suite-cad-authoring-plugin.ps1" -Arguments @("-Json")
+    }
     $autocadStartupReady = $autocadCheck.Result.Ok -and $autocadCheck.Payload -and [bool]$autocadCheck.Payload.healthy
-    $pluginReady = $autocadPlugin.Result.Ok -and $autocadPlugin.Payload -and [bool]$autocadPlugin.Payload.ok
+    $watchdogPluginReady = $autocadPlugin.Result.Ok -and $autocadPlugin.Payload -and [bool]$autocadPlugin.Payload.ok
+    $cadAuthoringPluginReady = $cadAuthoringPlugin.Result.Ok -and $cadAuthoringPlugin.Payload -and [bool]$cadAuthoringPlugin.Payload.ok
+    $pluginReady = $watchdogPluginReady -and $cadAuthoringPluginReady
     $autocadDetails = if ((-not $autocadInstall.Ok) -and $autocadInstall.OutputTail) {
         (@($autocadInstall.OutputTail, $autocadCheck.Result.OutputTail) | Where-Object { $_ }) -join [Environment]::NewLine
     }
@@ -707,28 +817,41 @@ else {
 
     Set-CurrentBootstrapStepStarted `
         -StepId "watchdog-autocad-plugin" `
-        -StepLabel "Verifying AutoCAD plugin install." `
-        -Summary "Verifying AutoCAD plugin install."
+        -StepLabel "Verifying AutoCAD plugin installs." `
+        -Summary "Verifying AutoCAD plugin installs."
+    $pluginDetails = @()
+    if ($autocadPlugin.Result.OutputTail) {
+        $pluginDetails += $autocadPlugin.Result.OutputTail
+    }
+    if ($cadAuthoringPluginInstall -and $cadAuthoringPluginInstall.OutputTail) {
+        $pluginDetails += $cadAuthoringPluginInstall.OutputTail
+    }
+    if ($cadAuthoringPlugin.Result.OutputTail) {
+        $pluginDetails += $cadAuthoringPlugin.Result.OutputTail
+    }
     $autocadPluginStep = New-StepResult `
         -Name "watchdog-autocad-plugin" `
         -State $(if ($pluginReady) { "ready" } else { "failed" }) `
         -Ok $pluginReady `
-        -Summary $(if ($pluginReady) { "AutoCAD plugin install is healthy." } else { "AutoCAD plugin install needs attention." }) `
-        -Details $autocadPlugin.Result.OutputTail `
-        -Payload $autocadPlugin.Payload
+        -Summary $(if ($pluginReady) { "AutoCAD plugin installs are healthy." } else { "AutoCAD plugin installs need attention." }) `
+        -Details ([string]::Join([Environment]::NewLine, @($pluginDetails))) `
+        -Payload ([pscustomobject]@{
+            watchdogPlugin = $autocadPlugin.Payload
+            cadAuthoringPlugin = $cadAuthoringPlugin.Payload
+        })
     $steps += $autocadPluginStep
     Write-StepLog -Step $autocadPluginStep
     if ($pluginReady) {
         Complete-CurrentBootstrapStep `
             -StepId "watchdog-autocad-plugin" `
-            -StepLabel "AutoCAD plugin is ready." `
-            -Summary "AutoCAD plugin install is healthy."
+            -StepLabel "AutoCAD plugins are ready." `
+            -Summary "AutoCAD plugin installs are healthy."
     }
     else {
         Fail-CurrentBootstrapStep `
             -StepId "watchdog-autocad-plugin" `
-            -StepLabel "AutoCAD plugin needs attention." `
-            -Summary "AutoCAD plugin install needs attention."
+            -StepLabel "AutoCAD plugins need attention." `
+            -Summary "AutoCAD plugin installs need attention."
     }
 }
 

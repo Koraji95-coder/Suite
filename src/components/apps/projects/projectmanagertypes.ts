@@ -55,8 +55,12 @@ export interface ProjectFormData {
 	priority: Priority;
 	status: ProjectStatus;
 	category: string;
+	projectPeName: string;
+	projectFirmNumber: string;
 	watchdogRootPath: string;
+	pdfPackageRootPath: string;
 	titleBlockBlockName: string;
+	titleBlockAcadeProjectFilePath: string;
 	titleBlockAcadeLine1: string;
 	titleBlockAcadeLine2: string;
 	titleBlockAcadeLine4: string;

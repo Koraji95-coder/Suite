@@ -39,6 +39,17 @@
 			"runtimeRequirements": ["frontend", "backend"]
 		},
 		{
+			"id": "automation-studio",
+			"title": "Automation Studio",
+			"description": "Combined review bench for markup intent, terminal routing, and package-scoped automation receipts.",
+			"route": "/app/developer/automation-studio",
+			"group": "automation-lab",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend", "gateway"]
+		},
+		{
 			"id": "autodraft-studio",
 			"title": "AutoDraft Studio",
 			"description": "Markup-driven CAD automation workspace with review-first compare and execution flows.",

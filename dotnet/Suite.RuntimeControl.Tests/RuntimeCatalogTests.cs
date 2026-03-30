@@ -30,7 +30,8 @@ public sealed class RuntimeCatalogTests
                     "developer-portal": { "title": "Developer Portal", "path": "/app/developer", "description": "Portal" }
                   },
                   "supportActions": [
-                    { "id": "copy-summary", "label": "Copy summary", "description": "Copy support summary." }
+                    { "id": "copy-summary", "label": "Copy summary", "description": "Copy support summary." },
+                    { "id": "apply-workstation-profile", "label": "Apply workstation profile", "description": "Re-stamp the workstation profile." }
                   ]
                 }
                 """);
@@ -42,7 +43,8 @@ public sealed class RuntimeCatalogTests
             Assert.Equal("Suite Frontend", catalog.GetServiceLabel("frontend"));
             Assert.True(catalog.TryResolveRoutePath("developer-portal", out var routePath));
             Assert.Equal("/app/developer", routePath);
-            Assert.Single(catalog.SupportActions);
+            Assert.Equal(2, catalog.SupportActions.Length);
+            Assert.Contains(catalog.SupportActions, action => action.Id == "apply-workstation-profile");
         }
         finally
         {
@@ -61,6 +63,7 @@ public sealed class RuntimeCatalogTests
         Assert.Contains("supabase", catalog.ServiceOrder);
         Assert.True(catalog.TryResolveRoutePath("command-center", out var routePath));
         Assert.Equal("/app/command-center", routePath);
-        Assert.True(catalog.SupportActions.Length >= 4);
+        Assert.True(catalog.SupportActions.Length >= 5);
+        Assert.Contains(catalog.SupportActions, action => action.Id == "apply-workstation-profile");
     }
 }

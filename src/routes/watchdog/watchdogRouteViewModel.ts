@@ -9,6 +9,8 @@ import {
 	presentWatchdogOperatorEvent,
 } from "./watchdogPresentation";
 
+const DRAWING_TARGET_EXTENSIONS = new Set([".dwg", ".dxf", ".pdf"]);
+
 export interface WatchdogDaybookRow {
 	drawingKey: string;
 	drawingLabel: string;
@@ -32,6 +34,8 @@ export interface WatchdogAttentionRow {
 	label: string;
 	detail: string;
 	tone: "ready" | "background" | "needs-attention" | "unavailable";
+	actionKey?: "runtime-control" | "project-setup" | "project-list";
+	actionLabel?: string;
 }
 
 export interface WatchdogWorkstationRow {
@@ -107,6 +111,18 @@ export function resolveEventTargetPath(
 	event: Pick<WatchdogCollectorEvent, "drawingPath" | "path">,
 ): string | null {
 	return event.drawingPath || event.path || null;
+}
+
+function isDrawingTargetPath(value: string | null | undefined): boolean {
+	if (!value) {
+		return false;
+	}
+	const normalized = value.replace(/\\/g, "/").trim().toLowerCase();
+	const extensionIndex = normalized.lastIndexOf(".");
+	if (extensionIndex < 0) {
+		return false;
+	}
+	return DRAWING_TARGET_EXTENSIONS.has(normalized.slice(extensionIndex));
 }
 
 function getStatusRank(
@@ -218,7 +234,10 @@ export function buildDaybookRows(args: {
 	};
 
 	for (const session of sessions) {
-		const targetPath = session.drawingPath || `session:${session.sessionId}`;
+		if (!isDrawingTargetPath(session.drawingPath)) {
+			continue;
+		}
+		const targetPath = session.drawingPath;
 		const key =
 			normalizeTargetKey(targetPath) ?? `session:${session.sessionId}`;
 		const collectorName =
@@ -244,7 +263,7 @@ export function buildDaybookRows(args: {
 	for (const event of events) {
 		const targetPath = resolveEventTargetPath(event);
 		const key = normalizeTargetKey(targetPath);
-		if (!key || !targetPath) {
+		if (!key || !targetPath || !isDrawingTargetPath(targetPath)) {
 			continue;
 		}
 		const collectorName =
@@ -400,25 +419,29 @@ export function buildAttentionRows(args: {
 	if (collectorAttentionCount > 0) {
 		rows.push({
 			key: "collectors",
-			label: "Collector health needs attention",
-			detail: `${collectorAttentionCount} collector${collectorAttentionCount === 1 ? "" : "s"} need a check.`,
+			label: "CAD tracker check",
+			detail: `${collectorAttentionCount} CAD tracker${collectorAttentionCount === 1 ? " needs" : "s need"} to be checked before coverage is fully reliable.`,
 			tone: "needs-attention",
+			actionKey: "runtime-control",
+			actionLabel: "Open Runtime Control",
 		});
 	}
 	if (unassignedCadCount > 0) {
 		rows.push({
 			key: "unassigned",
-			label: "Unassigned drawing activity",
-			detail: `${unassignedCadCount} drawing${unassignedCadCount === 1 ? "" : "s"} are not linked to a project yet.`,
+			label: "Unlinked drawing activity",
+			detail: `${unassignedCadCount} drawing${unassignedCadCount === 1 ? " has" : "s have"} tracked activity but ${unassignedCadCount === 1 ? "isn't" : "aren't"} linked to a project yet.`,
 			tone: "background",
+			actionKey: "project-setup",
+			actionLabel: "Review project link",
 		});
 	}
 	if (visibleLiveSessionCount === 0 && cadCollectorsOnline > 0) {
 		rows.push({
 			key: "idle",
-			label: "No live CAD sessions right now",
+			label: "No active sessions",
 			detail:
-				"Collectors are online, but there is no active drawing session in this scope.",
+				"CAD trackers are online, but no drawing is active in this scope right now.",
 			tone: "background",
 		});
 	}

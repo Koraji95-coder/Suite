@@ -299,11 +299,18 @@ export const projectRevisionRegisterService = {
 					message.includes("not found") ||
 					message.includes("could not find"))
 			) {
+				logger.warn(
+					"ProjectRevisionRegisterService",
+					"Hosted revision register storage is unavailable; using local fallback.",
+					{
+						projectId: normalizedProjectId,
+						userId,
+						error: result.error.message,
+					},
+				);
 				return {
 					data: localFallback,
-					error: new Error(
-						"Supabase schema is missing `drawing_revision_register_entries`. Apply the latest consolidated migration to enable hosted revision register storage.",
-					),
+					error: null,
 				};
 			}
 			return {

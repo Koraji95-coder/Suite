@@ -25,6 +25,7 @@ function Normalize-SuiteRuntimeTranscriptLine {
     $text = Remove-SuiteRuntimeAnsiCodes -Text $text
     $text = [Regex]::Replace($text, "[\u0000-\u0008\u000B\u000C\u000E-\u001F]", "")
     $text = [Regex]::Replace($text, "[\u2500-\u257F\u2580-\u259F\u25A0-\u25FF\uFFFD]", " ")
+    $text = [Regex]::Replace($text, "[^\u0020-\u007E]", " ")
     $text = [Regex]::Replace($text, "(^|\s)G(?=\s|$)", '$1')
     $text = [Regex]::Replace($text, "(?i)\b(sb_publishable_[A-Za-z0-9._-]+)\b", "[redacted]")
     $text = [Regex]::Replace($text, "(?i)\b(sb_secret_[A-Za-z0-9._-]+)\b", "[redacted]")
@@ -35,6 +36,10 @@ function Normalize-SuiteRuntimeTranscriptLine {
     $text = [Regex]::Replace($text, "\s+", " ").Trim()
 
     if ([string]::IsNullOrWhiteSpace($text)) {
+        return $null
+    }
+
+    if ($text -eq "System.Management.Automation.RemoteException") {
         return $null
     }
 

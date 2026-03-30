@@ -41,6 +41,7 @@ interface AuthContextValue {
 	user: User | null;
 	profile: Profile | null;
 	loading: boolean;
+	profileHydrating: boolean;
 	sessionAuthMethod: SessionAuthMethod;
 	signIn: (email: string, options?: EmailAuthRequestOptions) => Promise<void>;
 	signUp: (email: string, options?: EmailAuthRequestOptions) => Promise<void>;
@@ -133,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const [sessionAuthMethod, setSessionAuthMethod] =
 		useState<SessionAuthMethod>("email_link");
 	const [loading, setLoading] = useState(true);
+	const [profileHydrating, setProfileHydrating] = useState(false);
 	const lastSignedInTelemetryKeyRef = useRef<string>("");
 
 	useEffect(() => {
@@ -176,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			} else {
 				setSessionAuthMethod("email_link");
 				setProfile(null);
+				setProfileHydrating(false);
 				clearSessionAuthMarkers();
 				lastSignedInTelemetryKeyRef.current = "";
 				lastBootstrapSessionKey = "";
@@ -196,6 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				return;
 			}
 			lastBootstrapSessionKey = sessionKey;
+			setProfileHydrating(true);
 
 			void (async () => {
 				await restoreAgentPairing(context);
@@ -210,6 +214,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					userId: currentUser.id,
 					error,
 				});
+			}).finally(() => {
+				if (isActive) {
+					setProfileHydrating(false);
+				}
 			});
 		};
 
@@ -455,6 +463,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 				user,
 				profile,
 				loading,
+				profileHydrating,
 				sessionAuthMethod,
 				signIn,
 				signUp,

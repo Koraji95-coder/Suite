@@ -123,37 +123,23 @@ function Resolve-AbsolutePath {
 function Install-RunKeyFallback {
     param(
         [string]$RunKeyEntryName,
+        [string]$LauncherPath,
         [string]$DaemonConfigPath,
         [string]$TomlPath,
         [string]$NamedMutex
     )
 
     $runKeyPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    $runValue = (
-        "PowerShell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass " +
-        "-File `"$daemonScript`" -ConfigPath `"$DaemonConfigPath`" " +
-        "-CodexConfigPath `"$TomlPath`" -MutexName `"$NamedMutex`""
-    )
+    $runValue = (ConvertTo-SuiteProcessArgument -Value (Get-SuiteWindowsScriptHostExecutablePath)) + " " +
+        (ConvertTo-SuiteProcessArgument -Value $LauncherPath)
 
     if (-not (Test-Path $runKeyPath)) {
         New-Item -Path $runKeyPath -Force | Out-Null
     }
     New-ItemProperty -Path $runKeyPath -Name $RunKeyEntryName -Value $runValue -PropertyType String -Force | Out-Null
 
-    Start-SuiteDetachedProcess -FilePath "PowerShell.exe" -WorkingDirectory $repoRoot -Arguments @(
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-WindowStyle",
-        "Hidden",
-        "-File",
-        $daemonScript,
-        "-ConfigPath",
-        $DaemonConfigPath,
-        "-CodexConfigPath",
-        $TomlPath,
-        "-MutexName",
-        $NamedMutex
+    Start-SuiteDetachedProcess -FilePath (Get-SuiteWindowsScriptHostExecutablePath) -WorkingDirectory $repoRoot -Arguments @(
+        $LauncherPath
     ) | Out-Null
 
     Write-Host "Installed HKCU Run startup entry '$RunKeyEntryName'."
@@ -256,6 +242,39 @@ $configPayload = [ordered]@{
 }
 $configPayload | ConvertTo-Json -Depth 8 | Set-Content -Path $ConfigPath -Encoding UTF8
 
+$launcherDir = Join-Path (Join-Path $localAppData "Suite\watchdog-collector") "launchers"
+$daemonLauncherPath = Write-SuiteHiddenPowerShellLauncher `
+    -LauncherPath (Join-Path $launcherDir "$TaskName.vbs") `
+    -PowerShellScriptPath $daemonScript `
+    -WorkingDirectory $repoRoot `
+    -Arguments @(
+        "-ConfigPath",
+        $ConfigPath,
+        "-CodexConfigPath",
+        $CodexConfigPath,
+        "-MutexName",
+        $mutexName
+    )
+$checkLauncherPath = Write-SuiteHiddenPowerShellLauncher `
+    -LauncherPath (Join-Path $launcherDir "$CheckTaskName.vbs") `
+    -PowerShellScriptPath $checkScript `
+    -WorkingDirectory $repoRoot `
+    -Arguments @(
+        "-ConfigPath",
+        $ConfigPath,
+        "-CodexConfigPath",
+        $CodexConfigPath,
+        "-TaskName",
+        $TaskName,
+        "-CheckTaskName",
+        $CheckTaskName,
+        "-RunKeyName",
+        $RunKeyName,
+        "-MutexName",
+        $mutexName,
+        "-StartIfMissing"
+    )
+
 if (-not $ForceRunKey) {
     $userId = if ($env:USERDOMAIN) {
         "$($env:USERDOMAIN)\$($env:USERNAME)"
@@ -264,21 +283,10 @@ if (-not $ForceRunKey) {
         $env:USERNAME
     }
 
-    $daemonArgs = (
-        "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass " +
-        "-File `"$daemonScript`" -ConfigPath `"$ConfigPath`" " +
-        "-CodexConfigPath `"$CodexConfigPath`" -MutexName `"$mutexName`""
-    )
-    $checkArgs = (
-        "-WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass " +
-        "-File `"$checkScript`" -ConfigPath `"$ConfigPath`" " +
-        "-CodexConfigPath `"$CodexConfigPath`" -TaskName `"$TaskName`" " +
-        "-CheckTaskName `"$CheckTaskName`" -RunKeyName `"$RunKeyName`" " +
-        "-MutexName `"$mutexName`" -StartIfMissing"
-    )
-
     try {
-        $daemonAction = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument $daemonArgs
+        $daemonAction = New-ScheduledTaskAction `
+            -Execute (Get-SuiteWindowsScriptHostExecutablePath) `
+            -Argument (ConvertTo-SuiteProcessArgument -Value $daemonLauncherPath)
         $daemonTrigger = New-ScheduledTaskTrigger -AtLogOn
         $daemonPrincipal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
         $daemonSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew
@@ -299,7 +307,9 @@ if (-not $ForceRunKey) {
             -RepetitionInterval (New-TimeSpan -Minutes $CheckIntervalMinutes) `
             -RepetitionDuration (New-TimeSpan -Days 3650)
         $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
-        $checkAction = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument $checkArgs
+        $checkAction = New-ScheduledTaskAction `
+            -Execute (Get-SuiteWindowsScriptHostExecutablePath) `
+            -Argument (ConvertTo-SuiteProcessArgument -Value $checkLauncherPath)
         $checkSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew
 
         Register-ScheduledTask `
@@ -327,6 +337,7 @@ if (-not $ForceRunKey) {
         Unregister-ScheduledTask -TaskName $CheckTaskName -Confirm:$false -ErrorAction SilentlyContinue
         Install-RunKeyFallback `
             -RunKeyEntryName $RunKeyName `
+            -LauncherPath $daemonLauncherPath `
             -DaemonConfigPath $ConfigPath `
             -TomlPath $CodexConfigPath `
             -NamedMutex $mutexName
@@ -335,6 +346,7 @@ if (-not $ForceRunKey) {
 else {
     Install-RunKeyFallback `
         -RunKeyEntryName $RunKeyName `
+        -LauncherPath $daemonLauncherPath `
         -DaemonConfigPath $ConfigPath `
         -TomlPath $CodexConfigPath `
         -NamedMutex $mutexName

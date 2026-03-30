@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildDefaultDraft,
+	buildRegisterBackedDocuments,
 	buildProjectMetadataDocuments,
 	buildPayload,
 	buildStandardDocuments,
+	createProjectSenderId,
 	validateDraft,
 	type FileState,
 } from "./transmittalBuilderModels";
@@ -147,6 +149,53 @@ describe("transmittalBuilderModels", () => {
 		]);
 	});
 
+	it("keeps project-assigned sender values while clearing the catalog profile id in the payload", () => {
+		const draft = buildDefaultDraft();
+		const files = makeStandardFiles();
+		draft.projectName = "Project Atlas";
+		draft.projectNumber = "23001";
+		draft.transmittalNumber = "XMTL-001";
+		draft.peName = createProjectSenderId("project-1");
+		draft.fromName = "Jamie River, PE";
+		draft.fromTitle = "Professional Engineer";
+		draft.fromEmail = "jamie.river@example.com";
+		draft.fromPhone = "555-0199";
+		draft.firmNumber = "AB - Firm #99887";
+		draft.options.ci_fabrication = true;
+		draft.contacts[0] = {
+			...draft.contacts[0],
+			name: "Client Contact",
+			company: "Client Co",
+			email: "client@example.com",
+			phone: "555-0100",
+		};
+		draft.standardDocuments = [
+			{
+				id: "doc-1",
+				fileName: "sheet-01.pdf",
+				attachmentFileName: "sheet-01.pdf",
+				projectRelativePath: "",
+				drawingNumber: "E1-100",
+				title: "One-Line Diagram",
+				revision: "3",
+				confidence: 0.92,
+				source: "embedded_text",
+				needsReview: false,
+				accepted: true,
+				overrideReason: "",
+				modelVersion: "deterministic-v1",
+				metadataWarnings: [],
+			},
+		];
+
+		const payload = buildPayload(draft, files);
+
+		expect(payload.fields.from_profile_id).toBe("");
+		expect(payload.fields.from_name).toBe("Jamie River, PE");
+		expect(payload.fields.firm).toBe("AB - Firm #99887");
+		expect(payload.checks.ci_fab).toBe(true);
+	});
+
 	it("builds standard rows from project metadata without OCR", () => {
 		const files = [new File(["pdf"], "R3P-25074-E6-0001.pdf", { type: "application/pdf" })];
 		const documents = buildProjectMetadataDocuments(
@@ -233,7 +282,107 @@ describe("transmittalBuilderModels", () => {
 		expect(documents[0].attachmentFileName).toBe("R3P-25074-E6-0001.pdf");
 		expect(documents[0].drawingNumber).toBe("R3P-25074-E6-0001");
 		expect(documents[0].title).toBe("Overall Single Line Diagram");
-		expect(documents[0].revision).toBe("C");
-		expect(documents[0].source).toBe("title_block_sync");
+	expect(documents[0].revision).toBe("C");
+	expect(documents[0].source).toBe("title_block_sync");
+	});
+
+	it("builds package-backed documents from deliverable register rows", () => {
+		const files = [
+			new File(["pdf"], "R3P-25074-E6-0001 - RELAY ONE LINE.pdf", {
+				type: "application/pdf",
+			}),
+		];
+		const documents = buildRegisterBackedDocuments(
+			[
+				{
+					id: "register-row-1",
+					snapshotId: "register-1",
+					sheetName: "P&C",
+					setName: "P&C",
+					drawingNumber: "R3P-25074-E6-0001",
+					drawingKey: "R3P25074E60001",
+					drawingDescription: "Relay One Line",
+					currentRevision: "0",
+					revisionHistory: [{ revision: "0", date: "2026-03-11", order: 0 }],
+					notes: null,
+					status: "READY FOR SUBMITTAL",
+					readinessState: "package-ready",
+					pdfPairingStatus: "paired",
+					pdfMatches: [
+						{
+							id: "file-1",
+							fileId: "file-1",
+							fileName: "R3P-25074-E6-0001 - RELAY ONE LINE.pdf",
+							filePath: "project-1/R3P-25074-E6-0001 - RELAY ONE LINE.pdf",
+							relativePath: "R3P-25074-E6-0001 - RELAY ONE LINE.pdf",
+							matchKind: "project-file",
+							manual: false,
+							title: null,
+							revision: null,
+						},
+					],
+					manualPdfMatchId: null,
+					dwgPairingStatus: "paired",
+					dwgMatches: [
+						{
+							id: "meta-1",
+							fileId: null,
+							fileName: "R3P-25074-E6-0001 - RELAY ONE LINE.dwg",
+							filePath: "C:/Issued/R3P-25074-E6-0001 - RELAY ONE LINE.dwg",
+							relativePath: "Issued/R3P-25074-E6-0001 - RELAY ONE LINE.dwg",
+							matchKind: "metadata-row",
+							manual: false,
+							title: "Relay One Line",
+							revision: "0",
+						},
+					],
+					manualDwgMatchId: null,
+					titleBlockVerificationState: "matched",
+					titleBlockVerificationDetail: null,
+					acadeVerificationState: "matched",
+					acadeVerificationDetail: null,
+					issueSetEligible: true,
+				},
+			],
+			files,
+			[
+				{
+					id: "meta-1",
+					projectId: "project-1",
+					fileName: "R3P-25074-E6-0001 - RELAY ONE LINE.dwg",
+					relativePath: "Issued/R3P-25074-E6-0001 - RELAY ONE LINE.dwg",
+					absolutePath: "C:/Issued/R3P-25074-E6-0001 - RELAY ONE LINE.dwg",
+					fileType: "dwg",
+					drawingNumber: "R3P-25074-E6-0001",
+					title: "Relay One Line",
+					revision: "0",
+					confidence: 1,
+					source: "title_block_sync",
+					reviewState: "ready",
+					titleBlockFound: true,
+					hasWdTbConflict: false,
+					currentAttributes: {},
+					acadeValues: {},
+					suiteUpdates: {},
+					revisionRows: [],
+					issues: [],
+					warnings: [],
+					rawRow: {} as never,
+				},
+			],
+			[],
+		);
+
+		expect(documents).toHaveLength(1);
+		expect(documents[0].attachmentFileName).toBe(
+			"R3P-25074-E6-0001 - RELAY ONE LINE.pdf",
+		);
+		expect(documents[0].projectRelativePath).toBe(
+			"Issued/R3P-25074-E6-0001 - RELAY ONE LINE.dwg",
+		);
+		expect(documents[0].drawingNumber).toBe("R3P-25074-E6-0001");
+		expect(documents[0].title).toBe("Relay One Line");
+		expect(documents[0].source).toBe("project_register");
+		expect(documents[0].needsReview).toBe(false);
 	});
 });

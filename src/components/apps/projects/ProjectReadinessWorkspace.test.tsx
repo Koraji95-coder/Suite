@@ -45,6 +45,12 @@ vi.mock("@/services/projectDeliveryEvidenceService", () => ({
 	fetchProjectStandardsEvidence: vi.fn(),
 }));
 
+vi.mock("./ProjectDeliverableRegisterPanel", () => ({
+	ProjectDeliverableRegisterPanel: () => (
+		<div data-testid="deliverable-register-panel" />
+	),
+}));
+
 function createProject(overrides: Partial<Project> = {}): Project {
 	return {
 		id: "project-1",
@@ -134,12 +140,12 @@ describe("ProjectReadinessWorkspace", () => {
 		);
 		expect(screen.getByText(/No project root configured/i)).toBeTruthy();
 		expect(projectDocumentMetadataService.loadSnapshot).not.toHaveBeenCalled();
-		fireEvent.click(screen.getByRole("button", { name: /issue set manager/i }));
+		fireEvent.click(screen.getByRole("button", { name: /open issue sets/i }));
 		expect(openViewMode).toHaveBeenCalledWith("issue-sets");
 		fireEvent.click(screen.getByRole("button", { name: /open review inbox/i }));
 		expect(openViewMode).toHaveBeenCalledWith("review");
 		fireEvent.click(
-			screen.getByRole("button", { name: /open files & telemetry/i }),
+			screen.getByRole("button", { name: /open files & activity/i }),
 		);
 		expect(openViewMode).toHaveBeenCalledWith("files");
 	});
@@ -188,11 +194,16 @@ describe("ProjectReadinessWorkspace", () => {
 					targetDate: "2026-03-31",
 					transmittalNumber: "XMTL-001",
 					transmittalDocumentName: "IFC package",
+					registerSnapshotId: null,
+					terminalScheduleSnapshotId: null,
 					summary: "Ready for final review.",
 					notes: null,
 					selectedDrawingPaths: [
 						"Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
 					],
+					selectedRegisterRowIds: [],
+					selectedDrawingNumbers: [],
+					selectedPdfFileIds: [],
 					snapshot: {
 						drawingCount: 8,
 						selectedDrawingCount: 1,
@@ -252,6 +263,7 @@ describe("ProjectReadinessWorkspace", () => {
 			profile: {
 				blockName: "R3P-24x36BORDER&TITLE",
 				projectRootPath: "C:/Projects/Nanulak",
+				acadeProjectFilePath: null,
 				acadeLine1: "Nanulak 180MW Substation",
 				acadeLine2: "Issue for review",
 				acadeLine4: "",
@@ -268,10 +280,13 @@ describe("ProjectReadinessWorkspace", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
+				wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
 				wdtPath: "C:/Projects/Nanulak/_suite/scan.wdt",
 				wdlPath: "C:/Projects/Nanulak/_suite/scan.wdl",
+				wdpText: "",
 				wdtText: "",
 				wdlText: "",
+				wdpState: "starter",
 			},
 			rows: [
 				{
@@ -367,7 +382,7 @@ describe("ProjectReadinessWorkspace", () => {
 		);
 
 		await waitFor(() =>
-			expect(screen.getByText(/shared review inbox/i)).toBeTruthy(),
+			expect(screen.getAllByText(/review inbox/i).length).toBeGreaterThan(0),
 		);
 		expect(
 			screen.getAllByText(/Revision mismatch needs review/i).length,
@@ -376,6 +391,9 @@ describe("ProjectReadinessWorkspace", () => {
 		expect(screen.getByText(/Layer naming issue/i)).toBeTruthy();
 		expect(
 			screen.getByText(/transmittal, but no generated receipt is linked yet/i),
+		).toBeTruthy();
+		expect(
+			screen.getByText(/\.wdp\/\.wdt\/\.wdl files before package work starts/i),
 		).toBeTruthy();
 		fireEvent.click(screen.getByRole("button", { name: /open revisions/i }));
 		expect(openViewMode).toHaveBeenCalledWith("revisions");

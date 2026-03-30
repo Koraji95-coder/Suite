@@ -204,6 +204,185 @@ public sealed class PipeRouterTests
         );
     }
 
+    [Fact]
+    public void Project_cad_preview_returns_invalid_request_before_autocad_when_scope_is_missing()
+    {
+        PipeRouter.Configure(null);
+
+        var response = PipeRouter.Handle(
+            BuildRequestJson(
+                id: "bridge-req-6",
+                action: "suite_batch_find_replace_project_preview",
+                payload: new JsonObject
+                {
+                    ["requestId"] = "req-cad-project-preview",
+                    ["rules"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["id"] = "rule-1",
+                            ["find"] = "OLD",
+                            ["replace"] = "NEW",
+                        },
+                    },
+                }
+            )
+        );
+
+        Assert.True(response["ok"]?.GetValue<bool>() ?? false);
+        var result = Assert.IsType<JsonObject>(response["result"]);
+        Assert.False(result["success"]?.GetValue<bool>() ?? true);
+        Assert.Equal("INVALID_REQUEST", result["code"]?.GetValue<string>());
+        var meta = Assert.IsType<JsonObject>(result["meta"]);
+        Assert.Equal("req-cad-project-preview", meta["requestId"]?.GetValue<string>());
+        Assert.Equal("suite_batch_find_replace_project_preview", meta["action"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public void Project_cad_apply_returns_invalid_request_before_autocad_when_matches_are_missing()
+    {
+        PipeRouter.Configure(null);
+
+        var response = PipeRouter.Handle(
+            BuildRequestJson(
+                id: "bridge-req-7",
+                action: "suite_batch_find_replace_project_apply",
+                payload: new JsonObject
+                {
+                    ["requestId"] = "req-cad-project-apply",
+                }
+            )
+        );
+
+        Assert.True(response["ok"]?.GetValue<bool>() ?? false);
+        var result = Assert.IsType<JsonObject>(response["result"]);
+        Assert.False(result["success"]?.GetValue<bool>() ?? true);
+        Assert.Equal("INVALID_REQUEST", result["code"]?.GetValue<string>());
+        var meta = Assert.IsType<JsonObject>(result["meta"]);
+        Assert.Equal("req-cad-project-apply", meta["requestId"]?.GetValue<string>());
+        Assert.Equal("suite_batch_find_replace_project_apply", meta["action"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public void Terminal_authoring_preview_returns_invalid_request_before_autocad_when_scope_is_missing()
+    {
+        PipeRouter.Configure(null);
+
+        var response = PipeRouter.Handle(
+            BuildRequestJson(
+                id: "bridge-req-8",
+                action: "suite_terminal_authoring_project_preview",
+                payload: new JsonObject
+                {
+                    ["requestId"] = "req-terminal-project-preview",
+                    ["projectId"] = "project-1",
+                    ["issueSetId"] = "issue-1",
+                    ["scheduleSnapshotId"] = "schedule-1",
+                    ["stripRows"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["id"] = "strip-row-1",
+                            ["stripId"] = "TB1",
+                            ["terminalCount"] = 3,
+                            ["labels"] = new JsonArray("1", "2", "3"),
+                        },
+                    },
+                }
+            )
+        );
+
+        Assert.True(response["ok"]?.GetValue<bool>() ?? false);
+        var result = Assert.IsType<JsonObject>(response["result"]);
+        Assert.False(result["success"]?.GetValue<bool>() ?? true);
+        Assert.Equal("INVALID_REQUEST", result["code"]?.GetValue<string>());
+        var meta = Assert.IsType<JsonObject>(result["meta"]);
+        Assert.Equal("req-terminal-project-preview", meta["requestId"]?.GetValue<string>());
+        Assert.Equal("suite_terminal_authoring_project_preview", meta["action"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public void Terminal_authoring_apply_returns_invalid_request_before_plugin_when_operations_are_missing()
+    {
+        PipeRouter.Configure(null);
+
+        var response = PipeRouter.Handle(
+            BuildRequestJson(
+                id: "bridge-req-9",
+                action: "suite_terminal_authoring_project_apply",
+                payload: new JsonObject
+                {
+                    ["requestId"] = "req-terminal-project-apply",
+                    ["projectId"] = "project-1",
+                    ["issueSetId"] = "issue-1",
+                    ["scheduleSnapshotId"] = "schedule-1",
+                }
+            )
+        );
+
+        Assert.True(response["ok"]?.GetValue<bool>() ?? false);
+        var result = Assert.IsType<JsonObject>(response["result"]);
+        Assert.False(result["success"]?.GetValue<bool>() ?? true);
+        Assert.Equal("INVALID_REQUEST", result["code"]?.GetValue<string>());
+        var meta = Assert.IsType<JsonObject>(result["meta"]);
+        Assert.Equal("req-terminal-project-apply", meta["requestId"]?.GetValue<string>());
+        Assert.Equal("suite_terminal_authoring_project_apply", meta["action"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public void Markup_authoring_preview_returns_invalid_request_before_autocad_when_operations_are_missing()
+    {
+        PipeRouter.Configure(null);
+
+        var response = PipeRouter.Handle(
+            BuildRequestJson(
+                id: "bridge-req-10",
+                action: "suite_markup_authoring_project_preview",
+                payload: new JsonObject
+                {
+                    ["requestId"] = "req-markup-project-preview",
+                    ["projectId"] = "project-1",
+                    ["issueSetId"] = "issue-1",
+                }
+            )
+        );
+
+        Assert.True(response["ok"]?.GetValue<bool>() ?? false);
+        var result = Assert.IsType<JsonObject>(response["result"]);
+        Assert.False(result["success"]?.GetValue<bool>() ?? true);
+        Assert.Equal("INVALID_REQUEST", result["code"]?.GetValue<string>());
+        var meta = Assert.IsType<JsonObject>(result["meta"]);
+        Assert.Equal("req-markup-project-preview", meta["requestId"]?.GetValue<string>());
+        Assert.Equal("suite_markup_authoring_project_preview", meta["action"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public void Markup_authoring_apply_returns_invalid_request_before_plugin_when_operations_are_missing()
+    {
+        PipeRouter.Configure(null);
+
+        var response = PipeRouter.Handle(
+            BuildRequestJson(
+                id: "bridge-req-11",
+                action: "suite_markup_authoring_project_apply",
+                payload: new JsonObject
+                {
+                    ["requestId"] = "req-markup-project-apply",
+                    ["projectId"] = "project-1",
+                    ["issueSetId"] = "issue-1",
+                }
+            )
+        );
+
+        Assert.True(response["ok"]?.GetValue<bool>() ?? false);
+        var result = Assert.IsType<JsonObject>(response["result"]);
+        Assert.False(result["success"]?.GetValue<bool>() ?? true);
+        Assert.Equal("INVALID_REQUEST", result["code"]?.GetValue<string>());
+        var meta = Assert.IsType<JsonObject>(result["meta"]);
+        Assert.Equal("req-markup-project-apply", meta["requestId"]?.GetValue<string>());
+        Assert.Equal("suite_markup_authoring_project_apply", meta["action"]?.GetValue<string>());
+    }
+
     private static string BuildRequestJson(
         string id,
         string action,

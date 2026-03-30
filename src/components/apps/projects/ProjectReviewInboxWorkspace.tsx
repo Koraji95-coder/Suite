@@ -99,10 +99,10 @@ export function ProjectReviewInboxWorkspace({
 		reviewInbox.metrics.issueSetAttentionCount;
 	const summaryNote =
 		reviewInbox.issueSets.length === 0
-			? "No issue sets are saved yet. Keep the inbox clean, then capture the first package snapshot from Issue Sets."
+			? "No issue sets are saved yet. Clear the inbox, then capture the first package snapshot."
 			: `${reviewInbox.issueSets.length} issue set${
 					reviewInbox.issueSets.length === 1 ? "" : "s"
-				} already capture package snapshots, with ${linkedReceiptCount} linked receipt${
+				} saved, with ${linkedReceiptCount} linked receipt${
 					linkedReceiptCount === 1 ? "" : "s"
 				}. ${scannedDrawingCount} scanned drawing${
 					scannedDrawingCount === 1 ? "" : "s"
@@ -150,7 +150,7 @@ export function ProjectReviewInboxWorkspace({
 				detail:
 					reviewInbox.metrics.setupAttentionCount > 0
 						? "Root path or shared setup still needs attention."
-						: "Project setup is aligned for this package window.",
+						: "Project setup is ready for this package.",
 			},
 			{
 				id: "title-block",
@@ -274,11 +274,11 @@ export function ProjectReviewInboxWorkspace({
 		<section className={styles.root}>
 			<div className={styles.header}>
 				<div className={styles.headerCopy}>
-					<p className={styles.eyebrow}>Project review flow</p>
-					<h4 className={styles.title}>Shared review inbox</h4>
+					<p className={styles.eyebrow}>Review</p>
+					<h4 className={styles.title}>Review inbox</h4>
 					<p className={styles.description}>
 						Setup blockers, title block drift, standards follow-up, revision
-						items, and issue-set package work all land here before issue.
+						items, and package work all land here before issue.
 					</p>
 				</div>
 				<TrustStateBadge state={reviewInbox.overallState} />

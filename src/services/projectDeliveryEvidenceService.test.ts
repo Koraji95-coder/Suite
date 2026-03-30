@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import type { Project } from "@/components/apps/projects/projectmanagertypes";
 import type { ProjectWatchdogTelemetry } from "@/components/apps/projects/useProjectWatchdogTelemetry";
 import type { DrawingAnnotation } from "@/components/apps/standards-checker/standardsDrawingModels";
+import type { ProjectDeliverableRegisterSnapshot } from "@/services/projectDeliverableRegisterService";
+import type { ProjectAutomationReceiptRecord } from "@/services/projectAutomationReceiptService";
 import type { ProjectDocumentMetadataRow } from "@/services/projectDocumentMetadataService";
 import type { ProjectIssueSetRecord } from "@/services/projectIssueSetService";
 import type { ProjectReviewDecisionRecord } from "@/services/projectReviewDecisionService";
 import type { DrawingRevisionRegisterRow } from "@/services/projectRevisionRegisterService";
 import type { ProjectTransmittalReceiptRecord } from "@/services/projectTransmittalReceiptService";
+import type {
+	TitleBlockSyncArtifacts,
+	TitleBlockSyncProfile,
+} from "@/services/titleBlockSyncService";
 import {
 	buildProjectIssueSetEvidencePacket,
 	renderProjectIssueSetEvidencePacketMarkdown,
@@ -38,9 +44,14 @@ function createIssueSet(): ProjectIssueSetRecord {
 		targetDate: "2026-03-31",
 		transmittalNumber: "XMTL-001",
 		transmittalDocumentName: "IFC package",
+		registerSnapshotId: "register-1",
+		terminalScheduleSnapshotId: null,
 		summary: "Ready for final review.",
 		notes: null,
 		selectedDrawingPaths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+		selectedRegisterRowIds: ["register-row-1"],
+		selectedDrawingNumbers: ["R3P-25074-E0-0001"],
+		selectedPdfFileIds: ["file-1"],
 		snapshot: {
 			drawingCount: 2,
 			selectedDrawingCount: 1,
@@ -56,6 +67,46 @@ function createIssueSet(): ProjectIssueSetRecord {
 		createdAt: "2026-03-20T00:00:00.000Z",
 		updatedAt: "2026-03-21T00:00:00.000Z",
 		issuedAt: null,
+	};
+}
+
+function createRegisterSnapshot(): ProjectDeliverableRegisterSnapshot {
+	return {
+		id: "register-1",
+		projectId: "project-1",
+		workbookFileName: "Master Deliverable List.xlsx",
+		importedAt: "2026-03-20T00:00:00.000Z",
+		dwgRootPath: "C:/Projects/Nanulak",
+		pdfSourceSummary: "Issued package",
+		sheetNames: ["Overall"],
+		rowCount: 1,
+		rows: [
+			{
+				id: "register-row-1",
+				snapshotId: "register-1",
+				sheetName: "Overall",
+				setName: "BESS",
+				drawingNumber: "R3P-25074-E0-0001",
+				drawingKey: "R3P25074E00001",
+				drawingDescription: "Drawing Index",
+				currentRevision: "A",
+				revisionHistory: [{ revision: "A", date: "2026-03-20", order: 0 }],
+				notes: "READY FOR SUBMITTAL",
+				status: "READY FOR SUBMITTAL",
+				readinessState: "package-ready",
+				pdfPairingStatus: "paired",
+				pdfMatches: [],
+				manualPdfMatchId: null,
+				dwgPairingStatus: "paired",
+				dwgMatches: [],
+				manualDwgMatchId: null,
+				titleBlockVerificationState: "matched",
+				titleBlockVerificationDetail: null,
+				acadeVerificationState: "matched",
+				acadeVerificationDetail: null,
+				issueSetEligible: true,
+			},
+		],
 	};
 }
 
@@ -227,6 +278,42 @@ function createReceipts(): ProjectTransmittalReceiptRecord[] {
 	];
 }
 
+function createAutomationReceipts(): ProjectAutomationReceiptRecord[] {
+	return [
+		{
+			id: "automation-1",
+			projectId: "project-1",
+			issueSetId: "issue-set-1",
+			registerSnapshotId: "register-1",
+			mode: "combined",
+			summary: "Applied markup cleanup and terminal plan preview.",
+			preparedMarkupCount: 3,
+			reviewItemCount: 2,
+			routeCount: 1,
+			affectedDrawingCount: 1,
+			noteInsertCount: 0,
+			revisionCloudUpsertCount: 1,
+			deltaNoteUpsertCount: 1,
+			issueTagUpsertCount: 0,
+			titleBlockUpdateCount: 0,
+			textReplacementCount: 1,
+			textDeleteCount: 0,
+			textSwapCount: 0,
+			dimensionOverrideCount: 0,
+			terminalStripUpdateCount: 2,
+			managedRouteUpsertCount: 1,
+			markupSnapshotIds: ["markup-snapshot-1"],
+			terminalScheduleSnapshotId: "schedule-1",
+			reportId: "report-1",
+			cadUtilityChangedDrawingCount: 0,
+			cadUtilityChangedItemCount: 0,
+			requestId: "req-123",
+			drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+			createdAt: "2026-03-21T00:10:00.000Z",
+		},
+	];
+}
+
 function createTelemetry(): ProjectWatchdogTelemetry {
 	return {
 		loading: false,
@@ -276,6 +363,32 @@ function createTelemetry(): ProjectWatchdogTelemetry {
 	};
 }
 
+function createScanProfile(): TitleBlockSyncProfile {
+	return {
+		blockName: "R3P-24x36BORDER&TITLE",
+		projectRootPath: "C:/Projects/Nanulak",
+		acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
+		acadeLine1: "Nanulak 180MW Substation",
+		acadeLine2: "Issued for design review",
+		acadeLine4: "R3P-25074",
+		signerDrawnBy: "KD",
+		signerCheckedBy: "QA",
+		signerEngineer: "APS",
+	};
+}
+
+function createArtifacts(): TitleBlockSyncArtifacts {
+	return {
+		wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
+		wdtPath: "C:/Projects/Nanulak/Nanulak.wdt",
+		wdlPath: "C:/Projects/Nanulak/Nanulak.wdl",
+		wdpText: "",
+		wdtText: "",
+		wdlText: "",
+		wdpState: "existing",
+	};
+}
+
 function createDecisions(): ProjectReviewDecisionRecord[] {
 	return [
 		{
@@ -310,12 +423,16 @@ describe("projectDeliveryEvidenceService", () => {
 		const packet = buildProjectIssueSetEvidencePacket({
 			project: createProject(),
 			issueSet: createIssueSet(),
+			registerSnapshot: createRegisterSnapshot(),
 			scanRows: createScanRows(),
+			scanProfile: createScanProfile(),
+			scanArtifacts: createArtifacts(),
 			revisions: createRevisions(),
 			telemetry: createTelemetry(),
 			standardsChecks: createStandardsChecks(),
 			decisions: createDecisions(),
 			transmittalReceipts: createReceipts(),
+			automationReceipts: createAutomationReceipts(),
 		});
 
 		expect(packet.selectedDrawings).toHaveLength(1);
@@ -331,6 +448,9 @@ describe("projectDeliveryEvidenceService", () => {
 		expect(packet.reviewDecisions.acceptedTitleBlockCount).toBe(1);
 		expect(packet.titleBlock.drawings[0]?.acceptedForPackage).toBe(true);
 		expect(packet.reviewDecisions.waivedStandardsCount).toBe(1);
+		expect(packet.deliverableRegister.includedRowCount).toBe(1);
+		expect(packet.deliverableRegister.pairedPdfCount).toBe(1);
+		expect(packet.deliverableRegister.rows[0]?.sheetName).toBe("Overall");
 		expect(packet.reviewDecisions.items).toEqual([
 			{
 				itemType: "title-block",
@@ -343,28 +463,45 @@ describe("projectDeliveryEvidenceService", () => {
 				label: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
 			},
 		]);
+		expect(packet.acadeSetup.projectNumber).toBe("R3P-25074");
+		expect(packet.acadeSetup.wdpPath).toBe("C:/Projects/Nanulak/Nanulak.wdp");
+		expect(packet.acadeSetup.wdpState).toBe("existing");
+		expect(packet.automation.linkedReceiptCount).toBe(1);
+		expect(packet.automation.latestReceipt?.mode).toBe("combined");
+		expect(packet.automation.latestReceipt?.requestId).toBe("req-123");
 	});
 
 	it("renders a readable markdown evidence packet", () => {
 		const packet = buildProjectIssueSetEvidencePacket({
 			project: createProject(),
 			issueSet: createIssueSet(),
+			registerSnapshot: createRegisterSnapshot(),
 			scanRows: createScanRows(),
+			scanProfile: createScanProfile(),
+			scanArtifacts: createArtifacts(),
 			revisions: createRevisions(),
 			telemetry: createTelemetry(),
 			standardsChecks: createStandardsChecks(),
 			decisions: createDecisions(),
 			transmittalReceipts: createReceipts(),
+			automationReceipts: createAutomationReceipts(),
 		});
 
 		const markdown = renderProjectIssueSetEvidencePacketMarkdown(packet);
 
 		expect(markdown).toContain("# Nanulak IFC package");
 		expect(markdown).toContain("accepted for package");
+		expect(markdown).toContain("## ACADE Setup");
+		expect(markdown).toContain("Project number: R3P-25074");
+		expect(markdown).toContain("ACADE project file: C:/Projects/Nanulak/Nanulak.wdp");
+		expect(markdown).toContain("## Deliverable Register");
+		expect(markdown).toContain("Overall / BESS | R3P-25074-E0-0001");
 		expect(markdown).toContain("## Review Decisions");
 		expect(markdown).toContain("Title block review | accepted");
 		expect(markdown).toContain("## Standards Evidence");
 		expect(markdown).toContain("## Transmittal Evidence");
+		expect(markdown).toContain("## Automation Evidence");
+		expect(markdown).toContain("Applied markup cleanup and terminal plan preview.");
 		expect(markdown).toContain("R3P-25074-E0-0001 - DRAWING INDEX.dwg");
 		expect(markdown).not.toContain("Other drawing revision");
 	});

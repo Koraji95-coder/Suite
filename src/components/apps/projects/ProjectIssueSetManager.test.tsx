@@ -12,6 +12,10 @@ import {
 	type ProjectIssueSetRecord,
 	projectIssueSetService,
 } from "@/services/projectIssueSetService";
+import {
+	type ProjectAutomationReceiptRecord,
+	projectAutomationReceiptService,
+} from "@/services/projectAutomationReceiptService";
 import { projectReviewDecisionService } from "@/services/projectReviewDecisionService";
 import { projectRevisionRegisterService } from "@/services/projectRevisionRegisterService";
 import {
@@ -41,6 +45,12 @@ vi.mock("@/services/projectIssueSetService", () => ({
 		fetchIssueSets: vi.fn(),
 		saveIssueSet: vi.fn(),
 		deleteIssueSet: vi.fn(),
+	},
+}));
+
+vi.mock("@/services/projectAutomationReceiptService", () => ({
+	projectAutomationReceiptService: {
+		fetchReceipts: vi.fn(),
 	},
 }));
 
@@ -128,7 +138,7 @@ function createTelemetry(
 function createSavedIssueSet(
 	overrides: Partial<ProjectIssueSetRecord> = {},
 ): ProjectIssueSetRecord {
-	return {
+	const base: ProjectIssueSetRecord = {
 		id: "issue-set-1",
 		projectId: "project-1",
 		name: "Nanulak IFC package",
@@ -137,9 +147,14 @@ function createSavedIssueSet(
 		targetDate: "2026-03-31",
 		transmittalNumber: "XMTL-001",
 		transmittalDocumentName: "IFC package",
+		registerSnapshotId: null,
+		terminalScheduleSnapshotId: null,
 		summary: "Ready for final review.",
 		notes: "Keep substation index and SLD together.",
 		selectedDrawingPaths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+		selectedRegisterRowIds: [],
+		selectedDrawingNumbers: [],
+		selectedPdfFileIds: [],
 		snapshot: {
 			drawingCount: 4,
 			selectedDrawingCount: 1,
@@ -155,7 +170,19 @@ function createSavedIssueSet(
 		createdAt: "2026-03-20T00:00:00.000Z",
 		updatedAt: "2026-03-21T00:00:00.000Z",
 		issuedAt: null,
+	};
+	return {
+		...base,
 		...overrides,
+		registerSnapshotId: overrides.registerSnapshotId ?? base.registerSnapshotId,
+		terminalScheduleSnapshotId:
+			overrides.terminalScheduleSnapshotId ?? base.terminalScheduleSnapshotId,
+		selectedRegisterRowIds:
+			overrides.selectedRegisterRowIds ?? base.selectedRegisterRowIds,
+		selectedDrawingNumbers:
+			overrides.selectedDrawingNumbers ?? base.selectedDrawingNumbers,
+		selectedPdfFileIds:
+			overrides.selectedPdfFileIds ?? base.selectedPdfFileIds,
 	};
 }
 
@@ -241,6 +268,35 @@ function createEvidencePacket(
 				},
 			],
 		},
+		deliverableRegister: {
+			snapshotId: "register-1",
+			includedRowCount: 1,
+			pairedPdfCount: 1,
+			rows: [
+				{
+					sheetName: "Overall",
+					setName: "BESS",
+					drawingNumber: "R3P-25074-E0-0001",
+					drawingDescription: "Drawing Index",
+					currentRevision: "A",
+					readinessState: "package-ready",
+					pdfPairingStatus: "paired",
+					titleBlockVerificationState: "matched",
+					acadeVerificationState: "matched",
+				},
+			],
+		},
+		acadeSetup: {
+			blockName: "R3P-24x36BORDER&TITLE",
+			clientOrUtility: "Nanulak 180MW Substation",
+			facilityOrSite: "Issue for review",
+			projectNumber: "R3P-25074",
+			acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
+			wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
+			wdtPath: "C:/Projects/Nanulak/Nanulak.wdt",
+			wdlPath: "C:/Projects/Nanulak/Nanulak.wdl",
+			wdpState: "existing",
+		},
 		reviewDecisions: {
 			acceptedTitleBlockCount: 0,
 			waivedStandardsCount: 0,
@@ -273,6 +329,47 @@ function createEvidencePacket(
 			documentName: issueSet.transmittalDocumentName,
 			source: receipt?.standardDocumentSource ?? null,
 		},
+		automation: {
+			linkedReceiptCount: 1,
+			latestReceipt: {
+				id: "automation-1",
+				mode: "combined",
+				summary: "Automation receipt recorded.",
+				preparedMarkupCount: 2,
+				reviewItemCount: 1,
+				routeCount: 1,
+				affectedDrawingCount: 1,
+				cadUtilityChangedDrawingCount: 0,
+				cadUtilityChangedItemCount: 0,
+				terminalStripUpdateCount: 0,
+				managedRouteUpsertCount: 0,
+				terminalScheduleSnapshotId: null,
+				reportId: null,
+				requestId: "req-123",
+				drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+				createdAt: "2026-03-21T02:00:00.000Z",
+			},
+			receipts: [
+				{
+					id: "automation-1",
+					mode: "combined",
+					summary: "Automation receipt recorded.",
+					preparedMarkupCount: 2,
+					reviewItemCount: 1,
+					routeCount: 1,
+					affectedDrawingCount: 1,
+					cadUtilityChangedDrawingCount: 0,
+					cadUtilityChangedItemCount: 0,
+					terminalStripUpdateCount: 0,
+					managedRouteUpsertCount: 0,
+					terminalScheduleSnapshotId: null,
+					reportId: null,
+					requestId: "req-123",
+					drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					createdAt: "2026-03-21T02:00:00.000Z",
+				},
+			],
+		},
 		watchdog: {
 			matchedTrackedCount: 1,
 			drawings: [
@@ -289,6 +386,7 @@ function createEvidencePacket(
 function mockProjectData(
 	issueSets: ProjectIssueSetRecord[] = [],
 	receipts: ProjectTransmittalReceiptRecord[] = [],
+	automationReceipts: ProjectAutomationReceiptRecord[] = [],
 ) {
 	vi.mocked(projectIssueSetService.fetchIssueSets).mockResolvedValue({
 		data: issueSets,
@@ -304,6 +402,10 @@ function mockProjectData(
 	});
 	vi.mocked(projectTransmittalReceiptService.fetchReceipts).mockResolvedValue({
 		data: receipts,
+		error: null,
+	});
+	vi.mocked(projectAutomationReceiptService.fetchReceipts).mockResolvedValue({
+		data: automationReceipts,
 		error: null,
 	});
 	vi.mocked(fetchProjectStandardsEvidence).mockResolvedValue({
@@ -323,6 +425,7 @@ function mockProjectData(
 		profile: {
 			blockName: "R3P-24x36BORDER&TITLE",
 			projectRootPath: "C:/Projects/Nanulak",
+			acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
 			acadeLine1: "Nanulak 180MW Substation",
 			acadeLine2: "Issue for review",
 			acadeLine4: "",
@@ -339,10 +442,13 @@ function mockProjectData(
 			wdTbConflictCount: 0,
 		},
 		artifacts: {
+			wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
 			wdtPath: "C:/Projects/Nanulak/_suite/scan.wdt",
 			wdlPath: "C:/Projects/Nanulak/_suite/scan.wdl",
+			wdpText: "",
 			wdtText: "",
 			wdlText: "",
+			wdpState: "existing",
 		},
 		rows: [
 			{
@@ -435,9 +541,11 @@ describe("ProjectIssueSetManager", () => {
 		expect(screen.getByText("IFC-01")).toBeTruthy();
 		expect(screen.getByText(/1 ready/i)).toBeTruthy();
 		expect(screen.getByText(/1 pass/i)).toBeTruthy();
+		expect(screen.getByText(/1 receipt/i)).toBeTruthy();
 		expect(screen.getAllByText(/XMTL-001/i).length).toBeGreaterThan(0);
 		fireEvent.click(screen.getByRole("button", { name: /view details/i }));
 		expect(screen.getByText(/Package scope/i)).toBeTruthy();
+		expect(screen.getAllByText(/^Automation$/i).length).toBeGreaterThan(0);
 		expect(screen.getByText(/R3P-25074-E0-0001/i)).toBeTruthy();
 		expect(fetchProjectStandardsEvidence).toHaveBeenCalledWith("project-1", [
 			"Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",

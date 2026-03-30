@@ -7,6 +7,7 @@ import os
 import re
 import tempfile
 import time
+import uuid
 from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -37,6 +38,7 @@ def create_batch_find_replace_blueprint(
 ) -> Blueprint:
     """Create /api/batch-find-replace route group blueprint."""
     bp = Blueprint("batch_find_replace_api", __name__, url_prefix="/api/batch-find-replace")
+    generated_reports: Dict[str, Dict[str, str]] = {}
 
     def _create_batch_session_token() -> str:
         timestamp = int(time.time())
@@ -292,6 +294,162 @@ def create_batch_find_replace_blueprint(
         if not rules:
             raise ValueError("No valid rules provided")
         return rules
+
+    def _is_absolute_windows_path(path: str) -> bool:
+        normalized = path.strip()
+        return bool(re.match(r"^[A-Za-z]:[\\/]", normalized)) or normalized.startswith("\\\\")
+
+    def _resolve_project_drawings(payload: Dict[str, Any]) -> List[Dict[str, str]]:
+        raw_selected = payload.get("selectedDrawingPaths")
+        if not isinstance(raw_selected, list) or len(raw_selected) == 0:
+            raise ValueError("selectedDrawingPaths must contain at least one drawing path.")
+        if len(raw_selected) > MAX_BATCH_FILES:
+            raise ValueError(f"Too many selected drawings. Maximum is {MAX_BATCH_FILES}")
+
+        drawing_root_raw = str(payload.get("drawingRootPath") or "").strip()
+        drawing_root = os.path.abspath(drawing_root_raw) if drawing_root_raw else ""
+        drawings: List[Dict[str, str]] = []
+        seen_paths: set[str] = set()
+
+        for item in raw_selected:
+            raw_path = str(item or "").strip()
+            if not raw_path:
+                continue
+
+            if _is_absolute_windows_path(raw_path):
+                absolute_path = os.path.abspath(raw_path)
+                relative_path = raw_path
+                if drawing_root:
+                    try:
+                        candidate_relative = os.path.relpath(absolute_path, drawing_root)
+                        if not candidate_relative.startswith(".."):
+                            relative_path = candidate_relative
+                    except ValueError:
+                        pass
+            else:
+                if not drawing_root:
+                    raise ValueError(
+                        "drawingRootPath is required when selectedDrawingPaths are relative."
+                    )
+                absolute_path = os.path.abspath(os.path.join(drawing_root, raw_path))
+                try:
+                    if os.path.commonpath([drawing_root, absolute_path]) != drawing_root:
+                        raise ValueError(
+                            f"Drawing path '{raw_path}' resolves outside the drawing root."
+                        )
+                except ValueError:
+                    raise ValueError(
+                        f"Drawing path '{raw_path}' could not be resolved under the drawing root."
+                    )
+                relative_path = raw_path
+
+            normalized_key = absolute_path.lower()
+            if normalized_key in seen_paths:
+                continue
+            seen_paths.add(normalized_key)
+            drawings.append(
+                {
+                    "path": absolute_path,
+                    "relativePath": relative_path,
+                    "drawingName": os.path.basename(absolute_path) or absolute_path,
+                }
+            )
+
+        if not drawings:
+            raise ValueError("No valid project drawings were resolved from the issue set.")
+
+        return drawings
+
+    def _build_project_preview_drawings(
+        drawings: List[Dict[str, str]],
+        matches: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        counts: Dict[str, int] = {}
+        for match in matches:
+            drawing_path = str(match.get("drawingPath") or "").strip()
+            if not drawing_path:
+                continue
+            counts[drawing_path] = counts.get(drawing_path, 0) + 1
+
+        result: List[Dict[str, Any]] = []
+        for drawing in drawings:
+            drawing_path = drawing["path"]
+            result.append(
+                {
+                    "drawingPath": drawing_path,
+                    "drawingName": drawing["drawingName"],
+                    "relativePath": drawing["relativePath"],
+                    "matchCount": counts.get(drawing_path, 0),
+                }
+            )
+        return result
+
+    def _normalize_project_preview_matches(
+        matches: List[Any],
+        drawings: List[Dict[str, str]],
+    ) -> List[Dict[str, Any]]:
+        drawing_meta = {
+            drawing["path"].lower(): drawing for drawing in drawings if drawing.get("path")
+        }
+        normalized: List[Dict[str, Any]] = []
+
+        for index, item in enumerate(matches):
+            if not isinstance(item, dict):
+                continue
+            drawing_path = str(item.get("drawingPath") or "").strip()
+            drawing_name = str(item.get("drawingName") or "").strip()
+            relative_path = str(item.get("relativePath") or "").strip()
+            meta = drawing_meta.get(drawing_path.lower()) if drawing_path else None
+            if meta:
+                if not drawing_path:
+                    drawing_path = meta["path"]
+                if not drawing_name:
+                    drawing_name = meta["drawingName"]
+                if not relative_path:
+                    relative_path = meta["relativePath"]
+
+            file_name = str(item.get("file") or "").strip() or drawing_name or "Drawing"
+            rule_id = str(item.get("ruleId") or "").strip()
+            handle = str(item.get("handle") or "").strip()
+            attribute_tag = str(item.get("attributeTag") or "").strip()
+            before = str(item.get("before") or "")
+            after = str(item.get("after") or "")
+            group_key = str(item.get("groupKey") or drawing_path or file_name).strip()
+            match_key = str(item.get("matchKey") or "").strip() or "::".join(
+                [
+                    group_key,
+                    handle,
+                    attribute_tag,
+                    rule_id,
+                    before,
+                    after,
+                    str(index),
+                ]
+            )
+
+            normalized.append(
+                {
+                    **item,
+                    "file": file_name,
+                    "drawingPath": drawing_path or None,
+                    "drawingName": drawing_name or file_name,
+                    "relativePath": relative_path or None,
+                    "groupKey": group_key,
+                    "matchKey": match_key,
+                }
+            )
+
+        return normalized
+
+    def _register_generated_report(report_path: str, report_dir: str) -> Tuple[str, str]:
+        report_id = uuid.uuid4().hex
+        report_filename = os.path.basename(report_path)
+        generated_reports[report_id] = {
+            "path": report_path,
+            "dir": report_dir,
+            "filename": report_filename,
+        }
+        return report_id, report_filename
 
     def export_batch_changes_to_excel(changes: List[Dict[str, Any]]) -> Tuple[str, str]:
         """Export batch find/replace changes to a styled Excel report."""
@@ -626,5 +784,127 @@ def create_batch_find_replace_blueprint(
         except Exception as exc:
             logger.exception("CAD batch apply failed")
             return jsonify({"success": False, "error": str(exc)}), 500
+
+    @bp.route("/cad/project-preview", methods=["POST"])
+    @require_batch_session_or_api_key
+    @limiter.limit("20 per hour")
+    def api_batch_find_replace_cad_project_preview():
+        try:
+            payload = request.get_json(silent=True) or {}
+            rules = _parse_batch_rules_from_json(payload)
+            drawings = _resolve_project_drawings(payload)
+            bridge_result = _call_dotnet_bridge_action(
+                "suite_batch_find_replace_project_preview",
+                {
+                    "rules": rules,
+                    "drawings": drawings,
+                    "blockNameHint": str(payload.get("blockNameHint") or "").strip(),
+                },
+            )
+            if not bridge_result.get("success", False):
+                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(bridge_result), status_code
+
+            data = bridge_result.get("data") or {}
+            matches = _normalize_project_preview_matches(data.get("matches") or [], drawings)
+            drawing_summaries = _build_project_preview_drawings(drawings, matches)
+            affected_drawings = sum(
+                1 for summary in drawing_summaries if int(summary.get("matchCount") or 0) > 0
+            )
+            return jsonify(
+                {
+                    "success": True,
+                    "requestId": bridge_result.get("meta", {}).get("requestId"),
+                    "matches": matches,
+                    "matchCount": len(matches),
+                    "drawings": drawing_summaries,
+                    "warnings": bridge_result.get("warnings") or [],
+                    "message": bridge_result.get("message")
+                    or (
+                        f"Project CAD preview completed: {len(matches)} replacement(s) "
+                        f"across {affected_drawings} drawing(s)."
+                    ),
+                }
+            )
+        except ValueError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+        except Exception as exc:
+            logger.exception("Project CAD batch preview failed")
+            return jsonify({"success": False, "error": str(exc)}), 500
+
+    @bp.route("/cad/project-apply", methods=["POST"])
+    @require_batch_session_or_api_key
+    @limiter.limit("15 per hour")
+    def api_batch_find_replace_cad_project_apply():
+        try:
+            payload = request.get_json(silent=True) or {}
+            matches = payload.get("matches")
+            if not isinstance(matches, list) or len(matches) == 0:
+                raise ValueError("matches must contain at least one project preview row.")
+            if len(matches) > MAX_APPLY_CHANGE_ROWS:
+                raise ValueError(
+                    f"Too many project CAD apply rows. Maximum is {MAX_APPLY_CHANGE_ROWS}"
+                )
+
+            bridge_result = _call_dotnet_bridge_action(
+                "suite_batch_find_replace_project_apply",
+                {
+                    "matches": matches,
+                    "blockNameHint": str(payload.get("blockNameHint") or "").strip(),
+                },
+            )
+            if not bridge_result.get("success", False):
+                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(bridge_result), status_code
+
+            data = bridge_result.get("data") or {}
+            change_rows = data.get("changes") or []
+            report_path, report_dir = export_batch_changes_to_excel(change_rows)
+            schedule_cleanup(report_dir)
+            report_id, report_filename = _register_generated_report(report_path, report_dir)
+
+            return jsonify(
+                {
+                    "success": True,
+                    "requestId": bridge_result.get("meta", {}).get("requestId"),
+                    "updated": int(data.get("updated") or 0),
+                    "changedDrawingCount": int(data.get("changedDrawingCount") or 0),
+                    "changedItemCount": int(
+                        data.get("changedItemCount") or data.get("updated") or 0
+                    ),
+                    "drawings": data.get("drawings") or [],
+                    "warnings": bridge_result.get("warnings") or [],
+                    "reportId": report_id,
+                    "reportFilename": report_filename,
+                    "downloadUrl": f"/api/batch-find-replace/reports/{report_id}",
+                    "message": bridge_result.get("message")
+                    or "Project CAD apply completed.",
+                }
+            )
+        except ValueError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+        except Exception as exc:
+            logger.exception("Project CAD batch apply failed")
+            return jsonify({"success": False, "error": str(exc)}), 500
+
+    @bp.route("/reports/<report_id>", methods=["GET"])
+    @require_batch_session_or_api_key
+    @limiter.limit("40 per hour")
+    def api_batch_find_replace_report_download(report_id: str):
+        report = generated_reports.get(report_id)
+        if not report:
+            return jsonify({"success": False, "error": "Report not found."}), 404
+
+        report_path = report.get("path") or ""
+        if not report_path or not os.path.exists(report_path):
+            generated_reports.pop(report_id, None)
+            return jsonify({"success": False, "error": "Report is no longer available."}), 404
+
+        return send_file(
+            report_path,
+            as_attachment=True,
+            download_name=report.get("filename") or os.path.basename(report_path),
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
     return bp

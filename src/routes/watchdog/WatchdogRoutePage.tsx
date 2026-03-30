@@ -1,6 +1,14 @@
-import { ArrowUpRight, RefreshCw, TimerReset } from "lucide-react";
+import {
+	Activity,
+	ArrowUpRight,
+	Building2,
+	Monitor,
+	RefreshCw,
+	TimerReset,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNotification } from "@/auth/NotificationContext";
 import { useAuth } from "@/auth/useAuth";
 import {
 	formatDuration,
@@ -24,8 +32,8 @@ import { Panel } from "@/components/primitives/Panel";
 import { Text } from "@/components/primitives/Text";
 import { isDevAudience } from "@/lib/audience";
 import { logger } from "@/lib/errorLogger";
+import { buildProjectDetailHref } from "@/lib/projectWorkflowNavigation";
 import {
-	basenameFromPath,
 	isAutoCadCollector,
 	isAutoCadEvent,
 	readWatchdogCollectorRuntimeState,
@@ -34,6 +42,7 @@ import {
 	type ProjectIssueSetRecord,
 	projectIssueSetService,
 } from "@/services/projectIssueSetService";
+import { openRuntimeControlShell } from "@/services/runtimeControlService";
 import {
 	type WatchdogCollector,
 	type WatchdogCollectorEvent,
@@ -43,11 +52,7 @@ import {
 } from "@/services/watchdogService";
 import { supabase } from "@/supabase/client";
 import styles from "./WatchdogRoutePage.module.css";
-import {
-	formatWatchdogTechnicalLabel,
-	getWatchdogTechnicalSourceLabel,
-	presentWatchdogOperatorFeed,
-} from "./watchdogPresentation";
+import { presentWatchdogOperatorFeed } from "./watchdogPresentation";
 import {
 	buildAttentionRows,
 	buildDaybookRows,
@@ -55,7 +60,6 @@ import {
 	buildWorkstationRows,
 	getOperatorSessionLabel,
 	normalizeTargetKey,
-	readCommandName,
 	resolveEventTargetPath,
 	resolveProjectDisplayName,
 	type WatchdogAttentionRow,
@@ -161,12 +165,11 @@ export default function WatchdogRoutePage() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const requestIdRef = useRef(0);
 	const { user } = useAuth();
-	const [activityView, setActivityView] = useState<"actions" | "technical">(
-		"actions",
-	);
+	const notification = useNotification();
 	const [coverageView, setCoverageView] = useState<"workstations" | "projects">(
 		"workstations",
 	);
+	const [openingRuntimeControl, setOpeningRuntimeControl] = useState(false);
 
 	useRegisterPageHeader({
 		title: "Watchdog",
@@ -317,12 +320,6 @@ export default function WatchdogRoutePage() {
 	}, [loadWatchdogSnapshot]);
 
 	useEffect(() => {
-		if (!showTechnicalPanels) {
-			setActivityView("actions");
-		}
-	}, [showTechnicalPanels]);
-
-	useEffect(() => {
 		let cancelled = false;
 		if (selectedProjectId === "all" || !selectedIssueSetId) {
 			setSelectedIssueSet(null);
@@ -425,84 +422,27 @@ export default function WatchdogRoutePage() {
 			}),
 		[collectors, issueSetScopedSessions, projectNameMap, routeEvents],
 	);
-	const selectedDrawingRow = useMemo(
-		() =>
-			selectedDrawingKey
-				? (allDaybookRows.find(
-						(row) => row.drawingKey === selectedDrawingKey,
-					) ?? null)
-				: null,
-		[allDaybookRows, selectedDrawingKey],
+	const daybookRows = useMemo(() => allDaybookRows.slice(0, 10), [allDaybookRows]);
+	const operatorFeedRows = useMemo(() => operatorFeed.slice(0, 10), [operatorFeed]);
+	const scopedLiveSessionCards = liveSessionCards;
+	const scopedTimelineRows = sessionTimelineRows;
+	const selectedWindowLabel =
+		WINDOW_OPTIONS.find((option) => option.value === selectedWindowHours)
+			?.label ?? `${selectedWindowHours} hours`;
+	const cadCollectors = visibleCollectors.filter((collector) =>
+		isAutoCadCollector(collector),
 	);
-	const daybookRows = useMemo(() => {
-		if (!selectedDrawingRow) {
-			return allDaybookRows.slice(0, 10);
-		}
-		const visibleRows = allDaybookRows.slice(0, 10);
-		if (
-			visibleRows.some(
-				(row) => row.drawingKey === selectedDrawingRow.drawingKey,
-			)
-		) {
-			return visibleRows;
-		}
-		return [
-			selectedDrawingRow,
-			...allDaybookRows
-				.filter((row) => row.drawingKey !== selectedDrawingRow.drawingKey)
-				.slice(0, 9),
-		];
-	}, [allDaybookRows, selectedDrawingRow]);
-	const operatorFeedRows = useMemo(
-		() =>
-			(selectedDrawingKey
-				? operatorFeed.filter((event) => event.targetKey === selectedDrawingKey)
-				: operatorFeed
-			).slice(0, 10),
-		[operatorFeed, selectedDrawingKey],
-	);
-	const scopedTechnicalEvents = useMemo(
-		() =>
-			(selectedDrawingKey
-				? issueSetScopedEvents.filter(
-						(event) =>
-							normalizeTargetKey(resolveEventTargetPath(event)) ===
-							selectedDrawingKey,
-					)
-				: issueSetScopedEvents
-			).slice(0, 10),
-		[issueSetScopedEvents, selectedDrawingKey],
-	);
-	const scopedLiveSessionCards = useMemo(
-		() =>
-			selectedDrawingKey
-				? liveSessionCards.filter(
-						(card) =>
-							normalizeTargetKey(card.session.drawingPath) ===
-							selectedDrawingKey,
-					)
-				: liveSessionCards,
-		[liveSessionCards, selectedDrawingKey],
-	);
-	const scopedTimelineRows = useMemo(
-		() =>
-			selectedDrawingKey
-				? sessionTimelineRows.filter(
-						(row) =>
-							normalizeTargetKey(row.session.drawingPath) ===
-							selectedDrawingKey,
-					)
-				: sessionTimelineRows,
-		[sessionTimelineRows, selectedDrawingKey],
-	);
+	const coverageCollectors = showTechnicalPanels
+		? visibleCollectors
+		: cadCollectors;
 	const workstationRows = useMemo(
 		() =>
 			buildWorkstationRows({
-				collectors: visibleCollectors,
+				collectors: coverageCollectors,
 				projectNameMap,
 				sessions: issueSetScopedSessions,
 			}),
-		[issueSetScopedSessions, projectNameMap, visibleCollectors],
+		[coverageCollectors, issueSetScopedSessions, projectNameMap],
 	);
 	const projectRollupRows = useMemo<WatchdogProjectRollupRow[]>(
 		() => buildProjectRollupRows({ daybookRows: allDaybookRows }).slice(0, 6),
@@ -519,21 +459,13 @@ export default function WatchdogRoutePage() {
 	const scopedProjectCount = projectRollupRows.filter(
 		(row) => row.projectId,
 	).length;
-	const selectedWindowLabel =
-		WINDOW_OPTIONS.find((option) => option.value === selectedWindowHours)
-			?.label ?? `${selectedWindowHours} hours`;
-	const cadCollectors = visibleCollectors.filter((collector) =>
-		isAutoCadCollector(collector),
-	);
 	const cadCollectorsOnline = cadCollectors.filter(
 		(collector) => collector.status === "online",
 	).length;
 	const trustState = getTrustState(errorMessage, visibleCollectors);
 	const focusedDrawingCount = allDaybookRows.length;
-	const visibleLiveSessionCount = selectedDrawingKey
-		? scopedLiveSessionCards.length
-		: activeCadSessionCount;
-	const collectorAttentionCount = visibleCollectors.filter((collector) => {
+	const visibleLiveSessionCount = activeCadSessionCount;
+	const collectorAttentionCount = coverageCollectors.filter((collector) => {
 		const runtime = readWatchdogCollectorRuntimeState(collector);
 		return (
 			collector.status !== "online" ||
@@ -559,70 +491,39 @@ export default function WatchdogRoutePage() {
 			visibleLiveSessionCount,
 		],
 	);
-	const daybookTitle = selectedProject ? "Project drawings" : "Drawings";
-	const rawDrawingParam = searchParams.get("drawing");
+	const daybookTitle = selectedProject
+		? "Project drawing list"
+		: "Drawing list";
 	const selectedIssueSetLabel = selectedIssueSet?.issueTag ?? null;
-	const focusedDrawingLabel = selectedDrawingRow?.drawingLabel
-		? selectedDrawingRow.drawingLabel
-		: rawDrawingParam
-			? basenameFromPath(rawDrawingParam)
-			: null;
-	const daybookDescription = focusedDrawingLabel
-		? `Grouped by drawing. ${focusedDrawingLabel} gets one row with tracked time, session count, and the latest drawing-level summary.`
-		: selectedProject
-			? "Grouped by drawing for the selected project, so you can scan work volume without dropping into raw events."
-			: "Grouped by drawing across the current view, with tracked time, sessions, and the last meaningful drawing update.";
-	const actionsDescription = selectedDrawingRow
-		? `Time-ordered user-facing drawing actions for ${selectedDrawingRow.drawingLabel}, like opened, saved, and closed drawing activity.`
-		: focusedDrawingLabel
-			? `Time-ordered user-facing drawing actions for ${focusedDrawingLabel}, like opened, saved, and closed drawing activity.`
-			: "A chronological feed of the latest user-facing drawing actions across this scope, like opened, saved, and closed drawing activity.";
-	const timelineDescription = selectedDrawingRow
-		? `Window-relative session bars for ${selectedDrawingRow.drawingLabel}.`
-		: focusedDrawingLabel
-			? `Window-relative session bars for ${focusedDrawingLabel}.`
-			: "Window-relative session bars for the current scope.";
-	const technicalDescription = selectedDrawingRow
-		? `Low-level CAD and filesystem collector events for ${selectedDrawingRow.drawingLabel}. Use this only when you need diagnostics.`
-		: focusedDrawingLabel
-			? `Low-level CAD and filesystem collector events for ${focusedDrawingLabel}. Use this only when you need diagnostics.`
-			: "Low-level CAD and filesystem collector events for deeper diagnostics. This is the raw tracker/folder stream, not the cleaned operator view.";
+	const selectedProjectLabel = selectedProject?.name ?? "All projects";
+	const daybookDescription = selectedProject
+		? "Tracked time, sessions, and the latest update for each drawing in the selected project."
+		: "Tracked time, sessions, and the latest update for each drawing in this scope.";
+	const actionsDescription = "Recent drawing activity in this scope.";
+	const timelineDescription = "Session timing in this scope.";
 	const firstViewportLoaded =
 		hasLoadedOnce ||
 		Boolean(overview) ||
 		events.length > 0 ||
 		sessions.length > 0 ||
 		collectors.length > 0;
-	const activityCount =
-		activityView === "technical"
-			? scopedTechnicalEvents.length
-			: operatorFeedRows.length;
+	const activityCount = operatorFeedRows.length;
 	const showLiveSessionsPanel =
 		showTechnicalPanels || scopedLiveSessionCards.length > 0;
 	const showRecentActivityPanel =
 		showTechnicalPanels || operatorFeedRows.length > 0;
 	const showSessionHistoryPanel =
 		showTechnicalPanels || scopedTimelineRows.length > 0;
-	const showFocusedDrawingPanel = Boolean(
-		selectedDrawingRow || selectedDrawingKey,
-	);
-	const showInlineFocusedDrawing =
-		!showTechnicalPanels && showFocusedDrawingPanel;
 	const showWorkstationsPanel =
-		showTechnicalPanels || (!selectedDrawingKey && workstationRows.length > 0);
+		showTechnicalPanels || workstationRows.length > 0;
 	const showHotProjectsPanel =
-		showTechnicalPanels ||
-		(!selectedProject && !selectedDrawingKey && projectRollupRows.length > 1);
+		showTechnicalPanels || (!selectedProject && projectRollupRows.length > 1);
 	const showCoveragePanel = showWorkstationsPanel || showHotProjectsPanel;
 	const coverageDescription =
 		coverageView === "projects"
-			? "Recent drawing time grouped by project in the current scope."
-			: "Tracking health and recent drawing coverage by workstation.";
-	const coverageLead =
-		attentionRows[0]?.detail ??
-		(coverageView === "projects"
-			? "Compare tracked drawing time, live work, and recent project activity in one place."
-			: "Review tracker health and recent workstation activity without dropping into raw collector detail.");
+			? "Project coverage for the current scope."
+			: "Workstation coverage for the current scope.";
+	const coverageLead = "Check tracker health, project links, and live activity.";
 	const coverageState = attentionRows.some(
 		(row) => row.tone === "needs-attention",
 	)
@@ -630,10 +531,81 @@ export default function WatchdogRoutePage() {
 		: attentionRows.length > 0
 			? "background"
 			: "ready";
-	const activityPanelTitle =
-		activityView === "technical" && showTechnicalPanels
-			? "Raw collector events"
-			: "Latest actions";
+	const activityPanelTitle = "Recent activity";
+
+	const handleOpenRuntimeControl = useCallback(async () => {
+		if (openingRuntimeControl) {
+			return;
+		}
+		setOpeningRuntimeControl(true);
+		try {
+			await openRuntimeControlShell();
+			notification.success(
+				"Opening Runtime Control",
+				"Suite Runtime Control is starting so you can verify the CAD tracker.",
+			);
+		} catch (error) {
+			const message =
+				error instanceof Error && error.message
+					? error.message
+					: "Runtime Control could not be opened right now.";
+			logger.warn(
+				"WatchdogRoutePage",
+				"Failed to open Runtime Control from coverage panel.",
+				{ error },
+			);
+			notification.warning("Runtime Control did not open", message);
+		} finally {
+			setOpeningRuntimeControl(false);
+		}
+	}, [notification, openingRuntimeControl]);
+
+	const handleOpenProjectSetup = useCallback(() => {
+		if (selectedProject) {
+			navigate(buildProjectDetailHref(selectedProject.id, "setup"));
+			return;
+		}
+		navigate("/app/projects");
+	}, [navigate, selectedProject]);
+
+	const getCoverageAction = useCallback(
+		(row: WatchdogAttentionRow) => {
+			switch (row.actionKey) {
+				case "runtime-control":
+					return {
+						label: row.actionLabel || "Open Runtime Control",
+						onClick: handleOpenRuntimeControl,
+						disabled: openingRuntimeControl,
+					};
+				case "project-setup":
+					return {
+						label:
+							selectedProject && row.actionLabel
+								? row.actionLabel
+								: selectedProject
+									? "Open project setup"
+									: "Open project list",
+						onClick: handleOpenProjectSetup,
+						disabled: false,
+					};
+				case "project-list":
+					return {
+						label: row.actionLabel || "Open project list",
+						onClick: () => navigate("/app/projects"),
+						disabled: false,
+					};
+				default:
+					return null;
+			}
+		},
+		[
+			handleOpenProjectSetup,
+			handleOpenRuntimeControl,
+			navigate,
+			openingRuntimeControl,
+			selectedProject,
+		],
+	);
 
 	useEffect(() => {
 		if (!showCoveragePanel) {
@@ -672,9 +644,8 @@ export default function WatchdogRoutePage() {
 						eyebrow="Drawing telemetry"
 						summary={
 							<Text size="sm" color="muted" block>
-								Track live CAD work, project attribution, and the drawing
-								actions that matter without bouncing through engineering-only
-								tooling.
+								Follow live CAD work, project coverage, and recent drawing
+								activity without digging through diagnostics.
 								{selectedIssueSetLabel
 									? ` Package ${selectedIssueSetLabel} is scoped to ${
 											selectedIssueSet?.selectedDrawingPaths.length ?? 0
@@ -695,11 +666,6 @@ export default function WatchdogRoutePage() {
 								{selectedIssueSetLabel ? (
 									<Badge color="warning" variant="soft" size="sm">
 										Package {selectedIssueSetLabel}
-									</Badge>
-								) : null}
-								{focusedDrawingLabel ? (
-									<Badge color="primary" variant="soft" size="sm">
-										Drawing {focusedDrawingLabel}
 									</Badge>
 								) : null}
 								<Badge color="accent" variant="soft" size="sm">
@@ -738,15 +704,6 @@ export default function WatchdogRoutePage() {
 										Open project
 									</Button>
 								) : null}
-								{selectedDrawingKey ? (
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => updateFilters({ drawing: "" })}
-									>
-										Clear drawing focus
-									</Button>
-								) : null}
 								{selectedIssueSetId ? (
 									<Button
 										variant="ghost"
@@ -768,14 +725,10 @@ export default function WatchdogRoutePage() {
 							</div>
 							<div className={styles.contextFact}>
 								<span className={styles.contextFactLabel}>
-									{selectedProject || selectedDrawingKey
-										? "Drawings in view"
-										: "Projects active"}
+									{selectedProject ? "Drawings in view" : "Projects active"}
 								</span>
 								<strong className={styles.contextFactValue}>
-									{selectedProject || selectedDrawingKey
-										? focusedDrawingCount
-										: scopedProjectCount}
+									{selectedProject ? focusedDrawingCount : scopedProjectCount}
 								</strong>
 							</div>
 							<div className={styles.contextFact}>
@@ -806,23 +759,20 @@ export default function WatchdogRoutePage() {
 							{showLiveSessionsPanel ? (
 								<Panel variant="feature" padding="lg" className={styles.panel}>
 									<div className={styles.panelHeader}>
-										<div>
-											<Text size="sm" weight="semibold" block>
-												Live activity
-											</Text>
-											<Text size="xs" color="muted" block>
-												Current drawing activity from the AutoCAD collectors
-												that match this scope.
-											</Text>
-										</div>
+									<div>
+										<Text size="sm" weight="semibold" block>
+											Live CAD sessions
+										</Text>
+										<Text size="xs" color="muted" block>
+											Drawings that are active right now in this scope.
+										</Text>
 									</div>
+								</div>
 
 									<div className={styles.liveSessionGrid}>
 										{scopedLiveSessionCards.length === 0 ? (
 											<div className={styles.emptyState}>
-												{selectedDrawingRow
-													? "No live AutoCAD sessions matched the selected drawing."
-													: "No live AutoCAD sessions matched the current filters."}
+												No drawing is active in this scope right now.
 											</div>
 										) : (
 											scopedLiveSessionCards.slice(0, 6).map((card) => (
@@ -903,82 +853,6 @@ export default function WatchdogRoutePage() {
 									</Badge>
 								</div>
 
-								{showInlineFocusedDrawing ? (
-									selectedDrawingRow ? (
-										<div className={styles.inlineFocusCard}>
-											<div className={styles.inlineFocusHeader}>
-												<div>
-													<div className={styles.rowTitle}>
-														{selectedDrawingRow.drawingLabel}
-													</div>
-													<div className={styles.rowMeta}>
-														{selectedDrawingRow.projectLabel} •{" "}
-														{selectedDrawingRow.workstationIds.join(", ") ||
-															"Unknown workstation"}
-													</div>
-												</div>
-												<div className={styles.daybookBadges}>
-													<Badge
-														color={
-															selectedDrawingRow.status === "activity"
-																? "default"
-																: getSessionTone(selectedDrawingRow.status)
-														}
-														variant="soft"
-														size="sm"
-													>
-														{getOperatorSessionLabel(selectedDrawingRow.status)}
-													</Badge>
-												</div>
-											</div>
-											<div className={styles.focusInspectorMeta}>
-												<span>
-													{selectedDrawingRow.sessionCount} session(s)
-												</span>
-												<span>
-													{formatDuration(selectedDrawingRow.totalDurationMs)}
-												</span>
-												<span>
-													Last activity{" "}
-													{formatRelativeTime(
-														selectedDrawingRow.lastActivityAt,
-													)}
-												</span>
-											</div>
-											<div className={styles.filterActions}>
-												<Button
-													variant="outline"
-													size="sm"
-													onClick={() => updateFilters({ drawing: "" })}
-												>
-													Clear drawing focus
-												</Button>
-												{selectedDrawingRow.projectId ? (
-													<Button
-														variant="ghost"
-														size="sm"
-														iconRight={<ArrowUpRight size={14} />}
-														onClick={() =>
-															navigate(
-																`/app/projects/${selectedDrawingRow.projectId}`,
-															)
-														}
-													>
-														Open project
-													</Button>
-												) : null}
-											</div>
-										</div>
-									) : selectedDrawingKey ? (
-										<div className={styles.inlineFocusCard}>
-											<div className={styles.emptyState}>
-												The selected drawing is outside the current scope. Clear
-												the drawing focus or widen your filters.
-											</div>
-										</div>
-									) : null
-								) : null}
-
 								<div className={styles.rowList}>
 									{daybookRows.length === 0 ? (
 										<div className={styles.emptyState}>
@@ -988,14 +862,7 @@ export default function WatchdogRoutePage() {
 										daybookRows.map((row) => (
 											<div
 												key={row.drawingKey}
-												className={[
-													styles.daybookRow,
-													selectedDrawingKey === row.drawingKey
-														? styles.daybookRowSelected
-														: "",
-												]
-													.filter(Boolean)
-													.join(" ")}
+												className={styles.daybookRow}
 											>
 												<div className={styles.daybookMain}>
 													<div className={styles.daybookHeader}>
@@ -1044,21 +911,6 @@ export default function WatchdogRoutePage() {
 													) : null}
 												</div>
 												<div className={styles.daybookActions}>
-													<Button
-														variant={
-															selectedDrawingKey === row.drawingKey
-																? "secondary"
-																: "ghost"
-														}
-														size="sm"
-														onClick={() =>
-															updateFilters({ drawing: row.drawingKey })
-														}
-													>
-														{selectedDrawingKey === row.drawingKey
-															? "In view"
-															: "Inspect drawing"}
-													</Button>
 													{row.projectId && selectedProjectId === "all" ? (
 														<Button
 															variant="ghost"
@@ -1094,119 +946,25 @@ export default function WatchdogRoutePage() {
 							{showRecentActivityPanel ? (
 								<Panel variant="support" padding="lg" className={styles.panel}>
 									<div className={styles.panelHeader}>
-										<div>
-											<Text size="sm" weight="semibold" block>
-												{activityPanelTitle}
-											</Text>
-											<Text size="xs" color="muted" block>
-												{activityView === "technical"
-													? technicalDescription
-													: actionsDescription}
-											</Text>
-										</div>
-										<Badge color="accent" variant="soft" size="sm">
-											{activityCount} visible
-										</Badge>
+									<div>
+										<Text size="sm" weight="semibold" block>
+											{activityPanelTitle}
+										</Text>
+										<Text size="xs" color="muted" block>
+											{actionsDescription}
+										</Text>
 									</div>
+									<Badge color="accent" variant="soft" size="sm">
+										{activityCount} visible
+									</Badge>
+								</div>
 
-									{showTechnicalPanels ? (
-										<div className={styles.activityTabs}>
-											<button
-												type="button"
-												className={[
-													styles.activityTab,
-													activityView === "actions"
-														? styles.activityTabActive
-														: "",
-												]
-													.filter(Boolean)
-													.join(" ")}
-												onClick={() => setActivityView("actions")}
-											>
-												Latest actions
-											</button>
-											<button
-												type="button"
-												className={[
-													styles.activityTab,
-													activityView === "technical"
-														? styles.activityTabActive
-														: "",
-												]
-													.filter(Boolean)
-													.join(" ")}
-												onClick={() => setActivityView("technical")}
-											>
-												Raw collector events
-											</button>
+								<div className={styles.rowList}>
+									{operatorFeedRows.length === 0 ? (
+										<div className={styles.emptyState}>
+											No recent drawing activity matched this time range.
 										</div>
-									) : null}
-
-									<div className={styles.rowList}>
-										{activityView === "technical" && showTechnicalPanels ? (
-											scopedTechnicalEvents.length === 0 ? (
-												<div className={styles.emptyState}>
-													{selectedDrawingRow
-														? "No raw collector events are available for the selected drawing."
-														: "No raw collector events are available in this scope."}
-												</div>
-											) : (
-												scopedTechnicalEvents.map((event) => (
-													<div
-														key={event.eventId}
-														className={styles.technicalRow}
-													>
-														<div>
-															<div className={styles.technicalBadges}>
-																<Badge
-																	color={
-																		event.sourceType === "autocad"
-																			? "primary"
-																			: "default"
-																	}
-																	variant="outline"
-																	size="sm"
-																>
-																	{getWatchdogTechnicalSourceLabel(event)}
-																</Badge>
-																{readCommandName(event) ? (
-																	<Badge
-																		color="accent"
-																		variant="soft"
-																		size="sm"
-																	>
-																		{readCommandName(event)}
-																	</Badge>
-																) : null}
-															</div>
-															<div className={styles.rowTitle}>
-																{formatWatchdogTechnicalLabel(event)}
-															</div>
-															<div className={styles.rowMeta}>
-																{basenameFromPath(
-																	event.drawingPath || event.path,
-																)}
-															</div>
-															<div className={styles.rowMeta}>
-																{projectNameMap.get(event.projectId || "")
-																	?.name ||
-																	event.projectId ||
-																	event.workstationId}
-															</div>
-														</div>
-														<div className={styles.eventAside}>
-															<span>{formatRelativeTime(event.timestamp)}</span>
-														</div>
-													</div>
-												))
-											)
-										) : operatorFeedRows.length === 0 ? (
-											<div className={styles.emptyState}>
-												{selectedDrawingRow
-													? "No recent drawing actions matched the selected drawing."
-													: "No recent drawing actions matched the current window."}
-											</div>
-										) : (
+									) : (
 											operatorFeedRows.map((event) => (
 												<div key={event.eventId} className={styles.eventRow}>
 													<div className={styles.eventRowMain}>
@@ -1256,9 +1014,7 @@ export default function WatchdogRoutePage() {
 									<div className={styles.timelineList}>
 										{scopedTimelineRows.length === 0 ? (
 											<div className={styles.emptyState}>
-												{selectedDrawingRow
-													? "No session timeline data is available for the selected drawing."
-													: "No session timeline data is available in the selected window."}
+												No session history is available in this time range.
 											</div>
 										) : (
 											scopedTimelineRows.map((row) => (
@@ -1312,100 +1068,6 @@ export default function WatchdogRoutePage() {
 				</div>
 
 				<aside className={styles.rightRail}>
-					{showTechnicalPanels && showFocusedDrawingPanel ? (
-						<Panel variant="support" padding="lg" className={styles.panel}>
-							<div className={styles.panelHeader}>
-								<div>
-									<Text size="sm" weight="semibold" block>
-										Focused drawing
-									</Text>
-									<Text size="xs" color="muted" block>
-										Use the daybook to keep the page centered on one drawing
-										when you need to validate activity closely.
-									</Text>
-								</div>
-							</div>
-
-							{selectedDrawingRow ? (
-								<div className={styles.focusInspector}>
-									<div>
-										<div className={styles.rowTitle}>
-											{selectedDrawingRow.drawingLabel}
-										</div>
-										<div className={styles.rowMeta}>
-											{selectedDrawingRow.projectLabel} •{" "}
-											{selectedDrawingRow.workstationIds.join(", ") ||
-												"Unknown workstation"}
-										</div>
-									</div>
-									<div className={styles.daybookBadges}>
-										<Badge
-											color={
-												selectedDrawingRow.status === "activity"
-													? "default"
-													: getSessionTone(selectedDrawingRow.status)
-											}
-											variant="soft"
-											size="sm"
-										>
-											{getOperatorSessionLabel(selectedDrawingRow.status)}
-										</Badge>
-										<Badge color="default" variant="outline" size="sm">
-											{selectedDrawingRow.collectorNames.join(", ") ||
-												"Collector pending"}
-										</Badge>
-									</div>
-									<div className={styles.focusInspectorMeta}>
-										<span>{selectedDrawingRow.sessionCount} session(s)</span>
-										<span>
-											{formatDuration(selectedDrawingRow.totalDurationMs)}
-										</span>
-										{showTechnicalPanels ? (
-											<span>{selectedDrawingRow.totalCommands} command(s)</span>
-										) : null}
-										<span>
-											Last activity{" "}
-											{formatRelativeTime(selectedDrawingRow.lastActivityAt)}
-										</span>
-									</div>
-									{showTechnicalPanels && selectedDrawingRow.targetPath ? (
-										<div className={styles.focusInspectorPath}>
-											{selectedDrawingRow.targetPath}
-										</div>
-									) : null}
-									<div className={styles.filterActions}>
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => updateFilters({ drawing: "" })}
-										>
-											Clear drawing focus
-										</Button>
-										{selectedDrawingRow.projectId ? (
-											<Button
-												variant="ghost"
-												size="sm"
-												iconRight={<ArrowUpRight size={14} />}
-												onClick={() =>
-													navigate(
-														`/app/projects/${selectedDrawingRow.projectId}`,
-													)
-												}
-											>
-												Open project
-											</Button>
-										) : null}
-									</div>
-								</div>
-							) : selectedDrawingKey ? (
-								<div className={styles.emptyState}>
-									The selected drawing is outside the current scope. Clear the
-									drawing focus or widen your filters.
-								</div>
-							) : null}
-						</Panel>
-					) : null}
-
 					<Panel variant="support" padding="lg" className={styles.panel}>
 						<div className={styles.panelHeader}>
 							<div>
@@ -1413,8 +1075,29 @@ export default function WatchdogRoutePage() {
 									Scope
 								</Text>
 								<Text size="xs" color="muted" block>
-									Project, collector, and time window for this Watchdog view.
+									Project, package, and time range for this view.
 								</Text>
+							</div>
+						</div>
+
+						<div className={styles.scopeSummary}>
+							<div className={styles.scopeChip}>
+								<span className={styles.scopeChipLabel}>Project</span>
+								<strong className={styles.scopeChipValue}>
+									{selectedProjectLabel}
+								</strong>
+							</div>
+							<div className={styles.scopeChip}>
+								<span className={styles.scopeChipLabel}>Package</span>
+								<strong className={styles.scopeChipValue}>
+									{selectedIssueSetLabel ? `IFC ${selectedIssueSetLabel}` : "All"}
+								</strong>
+							</div>
+							<div className={styles.scopeChip}>
+								<span className={styles.scopeChipLabel}>Window</span>
+								<strong className={styles.scopeChipValue}>
+									{selectedWindowLabel}
+								</strong>
 							</div>
 						</div>
 
@@ -1465,7 +1148,10 @@ export default function WatchdogRoutePage() {
 								</select>
 							</label>
 
-							<label htmlFor="watchdog-window-filter" className={styles.field}>
+							<label
+								htmlFor="watchdog-window-filter"
+								className={`${styles.field} ${styles.fieldWide}`}
+							>
 								<span className={styles.fieldLabel}>Window</span>
 								<select
 									id="watchdog-window-filter"
@@ -1500,7 +1186,7 @@ export default function WatchdogRoutePage() {
 									!selectedDrawingKey
 								}
 							>
-								Clear filters
+								Reset scope
 							</Button>
 							{selectedProject ? (
 								<Button
@@ -1539,6 +1225,60 @@ export default function WatchdogRoutePage() {
 								<TrustStateBadge state={coverageState} size="sm" />
 							</div>
 
+							{attentionRows.length > 0 ? (
+								<div className={styles.coverageAlertList}>
+									{attentionRows.map((row) => {
+										const action = getCoverageAction(row);
+										return (
+											<div
+												key={row.key}
+												className={styles.coverageAlert}
+												data-tone={row.tone}
+											>
+												<div className={styles.coverageAlertHeader}>
+													<Activity className={styles.coverageAlertIcon} size={14} />
+													<span>{row.label}</span>
+												</div>
+												<p className={styles.coverageAlertDetail}>{row.detail}</p>
+												{action ? (
+													<div className={styles.coverageAlertActions}>
+														<Button
+															variant="ghost"
+															size="sm"
+															onClick={action.onClick}
+															disabled={action.disabled}
+														>
+															{action.label}
+														</Button>
+													</div>
+												) : null}
+											</div>
+										);
+									})}
+								</div>
+							) : null}
+
+							<div className={styles.coverageFactStrip}>
+								<div className={styles.coverageFact}>
+									<span className={styles.coverageFactLabel}>Projects</span>
+									<strong className={styles.coverageFactValue}>
+										{projectRollupRows.filter((row) => row.projectId).length}
+									</strong>
+								</div>
+								<div className={styles.coverageFact}>
+									<span className={styles.coverageFactLabel}>Workstations</span>
+									<strong className={styles.coverageFactValue}>
+										{workstationRows.length}
+									</strong>
+								</div>
+								<div className={styles.coverageFact}>
+									<span className={styles.coverageFactLabel}>Live</span>
+									<strong className={styles.coverageFactValue}>
+										{visibleLiveSessionCount}
+									</strong>
+								</div>
+							</div>
+
 							{showWorkstationsPanel && showHotProjectsPanel ? (
 								<div className={styles.filterRow}>
 									<button
@@ -1550,7 +1290,8 @@ export default function WatchdogRoutePage() {
 										}
 										onClick={() => setCoverageView("workstations")}
 									>
-										Workstations
+										<Monitor size={14} />
+										<span>Workstations</span>
 									</button>
 									<button
 										type="button"
@@ -1561,7 +1302,8 @@ export default function WatchdogRoutePage() {
 										}
 										onClick={() => setCoverageView("projects")}
 									>
-										Projects
+										<Building2 size={14} />
+										<span>Projects</span>
 									</button>
 								</div>
 							) : null}
@@ -1570,7 +1312,7 @@ export default function WatchdogRoutePage() {
 								{coverageView === "projects" ? (
 									projectRollupRows.length === 0 ? (
 										<div className={styles.emptyState}>
-											No project attribution has been recorded in this window.
+											No project attribution has been recorded in this time range.
 										</div>
 									) : (
 										projectRollupRows.map((entry) => (
@@ -1585,16 +1327,23 @@ export default function WatchdogRoutePage() {
 												}
 												disabled={!entry.projectId}
 											>
-												<div>
-													<div className={styles.rowTitle}>
-														{entry.projectLabel}
+												<div className={styles.coverageRowMain}>
+													<div className={styles.coverageRowHeader}>
+														<div className={styles.coverageIconShell}>
+															<Building2 size={16} />
+														</div>
+														<div className={styles.rowTitle}>
+															{entry.projectLabel}
+														</div>
 													</div>
 													<div className={styles.rowMeta}>
 														{entry.drawingCount} drawing
 														{entry.drawingCount === 1 ? "" : "s"} •{" "}
 														{formatDuration(entry.totalDurationMs)} tracked •{" "}
-														{entry.activeDrawingCount} live • Updated{" "}
-														{formatRelativeTime(entry.lastActivityAt)}
+														{entry.activeDrawingCount} live
+													</div>
+													<div className={styles.rowMeta}>
+														Updated {formatRelativeTime(entry.lastActivityAt)}
 													</div>
 												</div>
 												<div className={styles.projectRowAside}>
@@ -1605,19 +1354,24 @@ export default function WatchdogRoutePage() {
 									)
 								) : workstationRows.length === 0 ? (
 									<div className={styles.emptyState}>
-										No workstations matched the current scope.
+										No workstations matched this scope.
 									</div>
 								) : (
-									workstationRows.slice(0, 8).map((row) => {
+									workstationRows.slice(0, 6).map((row) => {
 										return (
 											<div
 												key={row.workstationId}
 												className={styles.collectorRow}
 											>
 												<div className={styles.collectorHeader}>
-													<div>
-														<div className={styles.rowTitle}>
-															{row.workstationId}
+													<div className={styles.coverageRowMain}>
+														<div className={styles.coverageRowHeader}>
+															<div className={styles.coverageIconShell}>
+																<Monitor size={16} />
+															</div>
+															<div className={styles.rowTitle}>
+																{row.workstationId}
+															</div>
 														</div>
 														<div className={styles.rowMeta}>
 															{row.roleLabels.join(" • ")}

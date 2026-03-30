@@ -19,6 +19,7 @@ import { buildWatchdogHref } from "@/lib/watchdogNavigation";
 import { cn } from "@/lib/utils";
 import styles from "./ProjectReadinessWorkspace.module.css";
 import { ProjectReviewInboxList } from "./ProjectReviewInboxList";
+import { ProjectDeliverableRegisterPanel } from "./ProjectDeliverableRegisterPanel";
 import type { Project, ViewMode } from "./projectmanagertypes";
 import {
 	type ProjectReviewInboxData,
@@ -109,7 +110,7 @@ function buildReadinessCards(args: {
 							? `${metrics.revisionAttentionCount} revision item${
 									metrics.revisionAttentionCount === 1 ? "" : "s"
 								} remain open.`
-							: "Project setup, title block review, standards follow-up, and revision tracking are currently calm.",
+							: "Setup, title blocks, standards, and revisions are clear.",
 		},
 		{
 			id: "delivery-path",
@@ -189,8 +190,8 @@ export function ProjectReadinessWorkspace({
 					<p className={styles.eyebrow}>Issue readiness</p>
 					<h4 className={styles.title}>Project readiness</h4>
 					<p className={styles.description}>
-						See whether the project is actually ready for review and package
-						work, then act on the blockers from one shared inbox.
+						Check whether the project is ready for package work, then clear
+						blockers from one inbox.
 					</p>
 				</div>
 				<TrustStateBadge state={overallState} />
@@ -240,7 +241,7 @@ export function ProjectReadinessWorkspace({
 							onClick={() => onOpenViewMode("issue-sets")}
 						>
 							<ClipboardCheck className={styles.linkIcon} />
-							<span>Issue Set Manager</span>
+							<span>Open issue sets</span>
 						</button>
 					</div>
 					<div className={styles.utilityLinks}>
@@ -282,10 +283,10 @@ export function ProjectReadinessWorkspace({
 			<Panel variant="support" padding="lg" className={styles.inboxPanel}>
 				<div className={styles.inboxHeader}>
 					<div>
-						<h5 className={styles.inboxTitle}>Shared review inbox</h5>
+						<h5 className={styles.inboxTitle}>Review inbox</h5>
 						<p className={styles.inboxCopy}>
-							Setup blockers, title block review follow-up, standards drift, and
-							revision-review work land here first.
+							Setup blockers, title block review, standards drift, and
+							revision work land here first.
 						</p>
 					</div>
 				</div>
@@ -309,6 +310,14 @@ export function ProjectReadinessWorkspace({
 				) : null}
 			</Panel>
 
+			<ProjectDeliverableRegisterPanel
+				projectId={project.id}
+				projectName={project.name}
+				projectRootPath={project.watchdog_root_path}
+				metadataRows={inbox.scan?.rows ?? []}
+				onSnapshotChange={inbox.refresh}
+			/>
+
 			{inbox.messages.length > 0 ? (
 				<div className={styles.noticeList}>
 					{inbox.messages.map((message) => (
@@ -322,59 +331,56 @@ export function ProjectReadinessWorkspace({
 			<Panel variant="support" padding="lg" className={styles.supportPanel}>
 				<div className={styles.supportPanelHeader}>
 					<div>
-						<p className={styles.supportPanelEyebrow}>Support details</p>
-						<h5 className={styles.supportPanelTitle}>Setup and support</h5>
+						<p className={styles.supportPanelEyebrow}>Support lanes</p>
+						<h5 className={styles.supportPanelTitle}>Setup and files</h5>
 						<p className={styles.supportPanelCopy}>
-						Keep the project root, title block defaults, shared mapping
-						rules, and file records aligned so review and package work do not
-						drift.
-					</p>
-				</div>
-			</div>
-			<div className={styles.supportPanelGrid}>
-				<div className={styles.supportCard}>
-					<div className={styles.supportCardCopy}>
-						<p className={styles.supportCardEyebrow}>Setup checklist</p>
-						<h6 className={styles.supportCardTitle}>Project setup</h6>
-						<p className={styles.supportCardDescription}>
-							Use the dedicated Setup lane to confirm the tracked root, title
-							block defaults, and revision groundwork before title block review
-							and package issue work.
+							Keep setup, mapping, and file records aligned so package work
+							does not drift.
 						</p>
 					</div>
-					<div className={styles.supportCardActions}>
-						<Link to={setupHref} className={styles.utilityLink}>
-							<FolderTree className={styles.linkIcon} />
-							<span>Open Setup</span>
-						</Link>
+				</div>
+				<div className={styles.supportPanelGrid}>
+					<div className={styles.supportCard}>
+						<div className={styles.supportCardCopy}>
+							<p className={styles.supportCardEyebrow}>Setup checklist</p>
+							<h6 className={styles.supportCardTitle}>Project setup</h6>
+							<p className={styles.supportCardDescription}>
+								Confirm the root, title block defaults, and derived
+								.wdp/.wdt/.wdl files before package work starts.
+							</p>
+						</div>
+						<div className={styles.supportCardActions}>
+							<Link to={setupHref} className={styles.utilityLink}>
+								<FolderTree className={styles.linkIcon} />
+								<span>Open Setup</span>
+							</Link>
+						</div>
+					</div>
+					<div className={styles.supportCard}>
+						<div className={styles.supportCardCopy}>
+							<p className={styles.supportCardEyebrow}>Files and journals</p>
+							<h6 className={styles.supportCardTitle}>Files & activity</h6>
+							<p className={styles.supportCardDescription}>
+								Open file records, mapping rules, drawing journals, and recent
+								CAD activity from one support lane.
+							</p>
+						</div>
+						<div className={styles.supportCardActions}>
+							<button
+								type="button"
+								className={styles.secondaryButton}
+								onClick={() => onOpenViewMode("files")}
+							>
+								Open files & activity
+							</button>
+							<Link to={watchdogHref} className={styles.utilityLink}>
+								<Workflow className={styles.linkIcon} />
+								<span>Open Watchdog</span>
+							</Link>
+						</div>
 					</div>
 				</div>
-				<div className={styles.supportCard}>
-					<div className={styles.supportCardCopy}>
-						<p className={styles.supportCardEyebrow}>Files and journals</p>
-						<h6 className={styles.supportCardTitle}>Files & telemetry</h6>
-						<p className={styles.supportCardDescription}>
-							Open the detailed file archive, mapping rules, drawing journals,
-							and recent CAD sessions from one support lane instead of keeping
-							telemetry embedded in readiness.
-						</p>
-					</div>
-					<div className={styles.supportCardActions}>
-						<button
-							type="button"
-							className={styles.secondaryButton}
-							onClick={() => onOpenViewMode("files")}
-						>
-							Open files & telemetry
-						</button>
-						<Link to={watchdogHref} className={styles.utilityLink}>
-							<Workflow className={styles.linkIcon} />
-							<span>Open Watchdog</span>
-						</Link>
-					</div>
-				</div>
-			</div>
-		</Panel>
+			</Panel>
 	</section>
 	);
 }

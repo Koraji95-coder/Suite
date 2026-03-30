@@ -114,7 +114,9 @@ function buildTrackedDrawingSummaries(
 	const todayKey = toLocalDateKey();
 	const drawingMap = new Map<
 		string,
-		ProjectTrackedDrawingSummary & { _dayMap: Map<string, ProjectTrackedDrawingDayGroup> }
+		ProjectTrackedDrawingSummary & {
+			_dayMap: Map<string, ProjectTrackedDrawingDayGroup>;
+		}
 	>();
 
 	const ensureDrawing = (
@@ -128,7 +130,8 @@ function buildTrackedDrawingSummaries(
 		}
 		current = {
 			drawingPath,
-			drawingName: drawingName?.trim() || drawingPath.split(/[\\/]/).pop() || "Unknown",
+			drawingName:
+				drawingName?.trim() || drawingPath.split(/[\\/]/).pop() || "Unknown",
 			lifetimeTrackedMs: 0,
 			todayTrackedMs: 0,
 			lastWorkedAt: null,
@@ -300,12 +303,18 @@ export function useProjectWatchdogTelemetry(
 	projectId: string,
 	timeWindowMs: number = DEFAULT_WINDOW_MS,
 ): ProjectWatchdogTelemetry {
-	const [overview, setOverview] = useState<WatchdogOverviewResponse | null>(null);
-	const [recentEvents, setRecentEvents] = useState<WatchdogCollectorEvent[]>([]);
+	const [overview, setOverview] = useState<WatchdogOverviewResponse | null>(
+		null,
+	);
+	const [recentEvents, setRecentEvents] = useState<WatchdogCollectorEvent[]>(
+		[],
+	);
 	const [sessions, setSessions] = useState<WatchdogSessionSummary[]>([]);
 	const [allCollectors, setAllCollectors] = useState<WatchdogCollector[]>([]);
 	const [rule, setRule] = useState<WatchdogProjectRule | null>(null);
-	const [trackedDrawings, setTrackedDrawings] = useState<ProjectTrackedDrawingSummary[]>([]);
+	const [trackedDrawings, setTrackedDrawings] = useState<
+		ProjectTrackedDrawingSummary[]
+	>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
@@ -313,25 +322,42 @@ export function useProjectWatchdogTelemetry(
 		let cancelled = false;
 
 		const run = async () => {
+			if (!projectId.trim()) {
+				setOverview(null);
+				setRecentEvents([]);
+				setSessions([]);
+				setAllCollectors([]);
+				setRule(null);
+				setTrackedDrawings([]);
+				setLoading(false);
+				setError(null);
+				return;
+			}
+
 			setLoading(true);
 			setError(null);
 
-			const [overviewResult, eventsResult, sessionsResult, collectorsResult, ruleResult] =
-				await Promise.allSettled([
-					watchdogService.getProjectOverview(projectId, {
-						timeWindowMs,
-					}),
-					watchdogService.getProjectEvents(projectId, {
-						limit: 6,
-						sinceMs: Date.now() - timeWindowMs,
-					}),
-					watchdogService.getProjectSessions(projectId, {
-						limit: 6,
-						timeWindowMs,
-					}),
-					watchdogService.listCollectors(),
-					loadSharedProjectWatchdogRule(projectId),
-				]);
+			const [
+				overviewResult,
+				eventsResult,
+				sessionsResult,
+				collectorsResult,
+				ruleResult,
+			] = await Promise.allSettled([
+				watchdogService.getProjectOverview(projectId, {
+					timeWindowMs,
+				}),
+				watchdogService.getProjectEvents(projectId, {
+					limit: 6,
+					sinceMs: Date.now() - timeWindowMs,
+				}),
+				watchdogService.getProjectSessions(projectId, {
+					limit: 6,
+					timeWindowMs,
+				}),
+				watchdogService.listCollectors(),
+				loadSharedProjectWatchdogRule(projectId),
+			]);
 
 			let segmentRows: ProjectDrawingWorkSegmentRow[] = [];
 			try {
@@ -366,19 +392,23 @@ export function useProjectWatchdogTelemetry(
 
 			const resolvedSessions =
 				sessionsResult.status === "fulfilled"
-					? sessionsResult.value.sessions ?? []
+					? (sessionsResult.value.sessions ?? [])
 					: [];
 
 			setRecentEvents(
-				eventsResult.status === "fulfilled" ? eventsResult.value.events ?? [] : [],
+				eventsResult.status === "fulfilled"
+					? (eventsResult.value.events ?? [])
+					: [],
 			);
 			setSessions(resolvedSessions);
 			setAllCollectors(
 				collectorsResult.status === "fulfilled"
-					? collectorsResult.value.collectors ?? []
+					? (collectorsResult.value.collectors ?? [])
 					: [],
 			);
-			setRule(ruleResult.status === "fulfilled" ? ruleResult.value ?? null : null);
+			setRule(
+				ruleResult.status === "fulfilled" ? (ruleResult.value ?? null) : null,
+			);
 			setTrackedDrawings(
 				buildTrackedDrawingSummaries(
 					segmentRows,

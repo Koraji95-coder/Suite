@@ -11,16 +11,11 @@ import { TrustStateBadge } from "@/components/apps/ui/TrustStateBadge";
 import { Badge } from "@/components/primitives/Badge";
 import { Panel } from "@/components/primitives/Panel";
 import { Text } from "@/components/primitives/Text";
-import {
-	basenameFromPath,
-	summarizeWatchdogTarget,
-} from "@/lib/watchdogTelemetry";
 import type { ActivityLogRow } from "@/services/activityService";
 import type {
 	WatchdogCollector,
 	WatchdogCollectorEvent,
 	WatchdogOverviewResponse,
-	WatchdogSessionSummary,
 } from "@/services/watchdogService";
 import styles from "./DashboardOverviewPanel.module.css";
 import { formatDuration, formatRelativeTime } from "./dashboardOverviewFormatters";
@@ -33,6 +28,7 @@ import type {
 	DashboardDeliveryProjectSummary,
 	DashboardDeliverySummaryMetrics,
 } from "./useDashboardDeliverySummary";
+import { presentWatchdogOperatorFeed } from "@/routes/watchdog/watchdogPresentation";
 
 export interface DashboardOverviewStatCard {
 	key: string;
@@ -319,7 +315,6 @@ interface DashboardWatchdogSectionProps {
 	sessionTimelineRows: DashboardSessionTimelineRow[];
 	selectedProjectId: string;
 	selectedCollectorId: string;
-	watchdogSessions: WatchdogSessionSummary[];
 	telemetryHotspotProjects: Array<{ projectId: string; eventCount: number }>;
 	allProjectsMap: ReadonlyMap<string, DashboardProject>;
 	updateFilter: (key: string, value: string) => void;
@@ -341,28 +336,35 @@ export function DashboardWatchdogSection({
 	sessionTimelineRows,
 	selectedProjectId,
 	selectedCollectorId,
-	watchdogSessions,
 	telemetryHotspotProjects,
 	allProjectsMap,
 	updateFilter,
 	updateFilters,
 }: DashboardWatchdogSectionProps) {
+	const watchdogProjectNameMap = new Map(
+		Array.from(allProjectsMap.entries()).map(([projectId, project]) => [
+			projectId,
+			{ name: project.name },
+		]),
+	);
+	const watchdogActivityRows = presentWatchdogOperatorFeed(
+		watchdogEvents,
+		watchdogProjectNameMap,
+	).slice(0, 8);
 	const onlineCollectors = visibleCollectors.filter(
 		(collector) => collector.status === "online",
 	).length;
 	const hasTrendData = (watchdogOverview?.trendBuckets ?? []).some(
 		(bucket) => bucket.eventCount > 0,
 	);
-	const showRecentActivityPanel = watchdogEvents.length > 0;
+	const showRecentActivityPanel = watchdogActivityRows.length > 0;
 	const showCollectorsPanel = visibleCollectors.length > 0;
 	const showTimelinePanel = sessionTimelineRows.length > 0;
-	const showSessionSummaryPanel = watchdogSessions.length > 0;
 	const showProjectActivityPanel = telemetryHotspotProjects.length > 0;
 	const showWatchdogDetailPanels =
 		showRecentActivityPanel ||
 		showCollectorsPanel ||
 		showTimelinePanel ||
-		showSessionSummaryPanel ||
 		showProjectActivityPanel;
 
 	return (
@@ -379,8 +381,8 @@ export function DashboardWatchdogSection({
 						Watchdog summary
 					</Text>
 					<Text size="xs" color="muted" block>
-						Collector health, recent drawing activity, and tracked sessions in
-						the current workspace scope.
+						Drawing activity, tracker health, and recent CAD sessions in the
+						current scope.
 					</Text>
 				</div>
 			</div>
@@ -391,7 +393,7 @@ export function DashboardWatchdogSection({
 				<>
 					<div className={styles.watchdogMeta}>
 						<div>
-							<span className={styles.metaLabel}>Project focus</span>
+							<span className={styles.metaLabel}>Project</span>
 							<strong>{selectedProject?.name || "All projects"}</strong>
 						</div>
 						<div>
@@ -399,25 +401,25 @@ export function DashboardWatchdogSection({
 							<strong>{selectedWindowLabel}</strong>
 						</div>
 						<div>
-							<span className={styles.metaLabel}>Collectors online</span>
+							<span className={styles.metaLabel}>CAD trackers online</span>
 							<strong>
 								{onlineCollectors}/{visibleCollectors.length}
 							</strong>
 						</div>
 						<div>
-							<span className={styles.metaLabel}>Live drawings</span>
+							<span className={styles.metaLabel}>Live sessions</span>
 							<strong>{activeCadSessionCount}</strong>
 						</div>
 					</div>
 
 					<div className={styles.sectionBlock}>
 						<Text size="xs" color="muted" className={styles.subpanelLabel}>
-							Live AutoCAD sessions
+							Live CAD sessions
 						</Text>
 						<div className={styles.sessionGrid}>
 							{liveSessionCards.length === 0 ? (
 								<div className={styles.emptyStateCompact}>
-									No live AutoCAD sessions matched the current filters.
+									No live CAD sessions matched the current scope.
 								</div>
 							) : (
 								liveSessionCards.slice(0, 4).map((card) => {
@@ -487,21 +489,26 @@ export function DashboardWatchdogSection({
 					) : null}
 
 					{showWatchdogDetailPanels ? (
-						<div className={styles.panelSubgrid}>
+						<div className={styles.watchdogSubgrid}>
 							{showRecentActivityPanel ? (
-								<div className={styles.subpanel}>
+								<div
+									className={`${styles.subpanel} ${styles.watchdogActivityPanel}`}
+								>
 									<Text size="xs" color="muted" className={styles.subpanelLabel}>
 										Recent activity
 									</Text>
 									<div className={styles.rowList}>
-										{watchdogEvents.map((event) => (
+										{watchdogActivityRows.map((event) => (
 											<div key={event.eventId} className={styles.dataRow}>
 												<div>
 													<div className={styles.dataRowTitle}>
-														{event.eventType}
+														{event.label}
 													</div>
 													<div className={styles.dataRowMeta}>
-														{summarizeWatchdogTarget(event)}
+														{event.detail}
+													</div>
+													<div className={styles.dataRowMeta}>
+														{event.context}
 													</div>
 												</div>
 												<div className={styles.dataRowAside}>
@@ -514,9 +521,11 @@ export function DashboardWatchdogSection({
 							) : null}
 
 							{showCollectorsPanel ? (
-								<div className={styles.subpanel}>
+								<div
+									className={`${styles.subpanel} ${styles.watchdogCoveragePanel}`}
+								>
 									<Text size="xs" color="muted" className={styles.subpanelLabel}>
-										Tracking coverage
+										Tracker status
 									</Text>
 									<div className={styles.rowList}>
 										{visibleCollectors.slice(0, 6).map((collector) => (
@@ -548,9 +557,11 @@ export function DashboardWatchdogSection({
 							) : null}
 
 							{showTimelinePanel ? (
-								<div className={styles.subpanel}>
+								<div
+									className={`${styles.subpanel} ${styles.watchdogTimelinePanel}`}
+								>
 									<Text size="xs" color="muted" className={styles.subpanelLabel}>
-										Session history
+										Session timeline
 									</Text>
 									<div className={styles.sessionTimeline}>
 										{sessionTimelineRows.map((row) => {
@@ -653,50 +664,12 @@ export function DashboardWatchdogSection({
 								</div>
 							) : null}
 
-							{showSessionSummaryPanel ? (
-								<div className={styles.subpanel}>
-									<Text size="xs" color="muted" className={styles.subpanelLabel}>
-										Recent drawing sessions
-									</Text>
-									<div className={styles.rowList}>
-										{watchdogSessions.slice(0, 6).map((session) => (
-											<div key={session.sessionId} className={styles.dataRow}>
-												<div>
-													<div className={styles.dataRowTitle}>
-														{basenameFromPath(session.drawingPath)}
-													</div>
-													<div className={styles.dataRowMeta}>
-														{session.workstationId} • {session.commandCount}{" "}
-														command(s)
-														{" • "}
-														{session.lastEventType || session.status}
-													</div>
-												</div>
-												<div className={styles.dataRowAside}>
-													<Badge
-														color={
-															session.status === "live"
-																? "primary"
-																: session.status === "paused"
-																	? "warning"
-																	: "accent"
-														}
-														variant="soft"
-													>
-														{session.status}
-													</Badge>
-													<span>{formatDuration(session.durationMs)}</span>
-												</div>
-											</div>
-										))}
-									</div>
-								</div>
-							) : null}
-
 							{showProjectActivityPanel ? (
-								<div className={styles.subpanel}>
+								<div
+									className={`${styles.subpanel} ${styles.watchdogProjectPanel}`}
+								>
 									<Text size="xs" color="muted" className={styles.subpanelLabel}>
-										Project activity
+										Project rollup
 									</Text>
 									<div className={styles.rowList}>
 										{telemetryHotspotProjects.map((entry) => (
@@ -712,7 +685,7 @@ export function DashboardWatchdogSection({
 															entry.projectId}
 													</div>
 													<div className={styles.dataRowMeta}>
-														{entry.projectId}
+														Recent tracked drawing activity in this scope
 													</div>
 												</div>
 												<div className={styles.projectRowAside}>

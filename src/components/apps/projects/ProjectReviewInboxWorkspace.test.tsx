@@ -134,11 +134,16 @@ describe("ProjectReviewInboxWorkspace", () => {
 					targetDate: "2026-03-31",
 					transmittalNumber: "XMTL-001",
 					transmittalDocumentName: "IFC package",
+					registerSnapshotId: null,
+					terminalScheduleSnapshotId: null,
 					summary: "Ready for final review.",
 					notes: null,
 					selectedDrawingPaths: [
 						"Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
 					],
+					selectedRegisterRowIds: [],
+					selectedDrawingNumbers: [],
+					selectedPdfFileIds: [],
 					snapshot: {
 						drawingCount: 8,
 						selectedDrawingCount: 1,
@@ -278,7 +283,7 @@ describe("ProjectReviewInboxWorkspace", () => {
 			</MemoryRouter>,
 		);
 
-		expect(await screen.findByText(/shared review inbox/i)).toBeTruthy();
+		expect(await screen.findByText(/review inbox/i)).toBeTruthy();
 		expect(screen.getAllByText("IFC-01").length).toBeGreaterThan(0);
 		expect(screen.getByText(/Layer naming issue/i)).toBeTruthy();
 
@@ -321,11 +326,16 @@ describe("ProjectReviewInboxWorkspace", () => {
 					targetDate: "2026-03-31",
 					transmittalNumber: "XMTL-001",
 					transmittalDocumentName: "IFC package",
+					registerSnapshotId: null,
+					terminalScheduleSnapshotId: null,
 					summary: "Ready for final review.",
 					notes: null,
 					selectedDrawingPaths: [
 						"Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
 					],
+					selectedRegisterRowIds: [],
+					selectedDrawingNumbers: [],
+					selectedPdfFileIds: [],
 					snapshot: {
 						drawingCount: 8,
 						selectedDrawingCount: 1,
@@ -351,11 +361,16 @@ describe("ProjectReviewInboxWorkspace", () => {
 					targetDate: "2026-04-07",
 					transmittalNumber: "XMTL-002",
 					transmittalDocumentName: "Final IFC package",
+					registerSnapshotId: null,
+					terminalScheduleSnapshotId: null,
 					summary: "Ready for issue.",
 					notes: null,
 					selectedDrawingPaths: [
 						"Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
 					],
+					selectedRegisterRowIds: [],
+					selectedDrawingNumbers: [],
+					selectedPdfFileIds: [],
 					snapshot: {
 						drawingCount: 8,
 						selectedDrawingCount: 1,

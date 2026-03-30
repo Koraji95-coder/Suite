@@ -193,6 +193,189 @@
 	gap: 0.45rem;
 }
 
+.supportPanel {
+	display: grid;
+	gap: 0.9rem;
+	padding: 1rem;
+	border-radius: var(--radius-2);
+	border: 1px solid var(--line-soft);
+	background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+}
+
+.supportHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.8rem;
+}
+
+.supportHeaderCopy {
+	display: grid;
+	gap: 0.22rem;
+	max-width: 54rem;
+}
+
+.supportEyebrow,
+.supportCardEyebrow {
+	margin: 0;
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.supportTitle {
+	margin: 0;
+	font-size: 0.96rem;
+	font-weight: 650;
+	color: var(--text);
+}
+
+.supportDescription,
+.supportDetail,
+.supportCardCopy {
+	margin: 0;
+	font-size: 0.82rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.supportGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+	gap: 0.8rem;
+	align-items: start;
+}
+
+.supportCard {
+	display: grid;
+	grid-template-rows: auto auto 1fr;
+	gap: 0.7rem;
+	align-content: start;
+	padding: 0.9rem;
+	border-radius: var(--radius-2);
+	border: 1px solid color-mix(in srgb, var(--line-soft) 78%, transparent);
+	background: color-mix(in srgb, var(--surface) 84%, transparent);
+}
+
+.supportCardHeader {
+	display: grid;
+	gap: 0.18rem;
+	min-height: 3rem;
+	align-content: start;
+}
+
+.definitionList {
+	display: grid;
+	gap: 0.55rem;
+	margin: 0;
+}
+
+.definitionList div {
+	display: grid;
+	gap: 0.14rem;
+}
+
+.definitionList dt {
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.definitionList dd {
+	margin: 0;
+	font-size: 0.84rem;
+	line-height: 1.45;
+	color: var(--text);
+	word-break: break-word;
+}
+
+.artifactStatus {
+	display: grid;
+	gap: 0.28rem;
+	padding: 0.72rem 0.8rem;
+	border-radius: var(--radius-2);
+	border: 1px solid color-mix(in srgb, var(--line-soft) 82%, transparent);
+	background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+
+.artifactStatus strong {
+	font-size: 0.78rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--text);
+}
+
+.artifactStatus p {
+	margin: 0;
+	font-size: 0.81rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.artifactStatusExisting {
+	border-color: color-mix(in srgb, var(--success) 24%, var(--line-soft));
+	background: color-mix(in srgb, var(--success) 10%, var(--surface-2));
+}
+
+.artifactStatusStarter {
+	border-color: color-mix(in srgb, var(--primary) 24%, var(--line-soft));
+	background: color-mix(in srgb, var(--primary) 9%, var(--surface-2));
+}
+
+.artifactStatusPending {
+	border-color: color-mix(in srgb, var(--warning) 24%, var(--line-soft));
+	background: color-mix(in srgb, var(--warning) 9%, var(--surface-2));
+}
+
+.supportActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+}
+
+.supportActionButton {
+	border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line-soft));
+	background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+	color: var(--text);
+	border-radius: 999px;
+	padding: 0.52rem 0.9rem;
+	font-size: 0.8rem;
+	font-weight: 650;
+	line-height: 1.1;
+	cursor: pointer;
+	transition:
+		background-color 140ms ease,
+		border-color 140ms ease,
+		transform 140ms ease;
+}
+
+.supportActionButton:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--primary) 18%, var(--surface));
+	border-color: color-mix(in srgb, var(--primary) 44%, var(--line-soft));
+	transform: translateY(-1px);
+}
+
+.supportActionButton:disabled {
+	cursor: not-allowed;
+	opacity: 0.58;
+	transform: none;
+}
+
+.artifactGuide {
+	display: grid;
+	gap: 0.4rem;
+	padding-left: 1rem;
+	margin: 0;
+	font-size: 0.8rem;
+	line-height: 1.45;
+	color: var(--text-muted);
+}
+
 .notice {
 	margin: 0;
 	padding: 0.68rem 0.8rem;

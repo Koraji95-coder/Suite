@@ -478,6 +478,23 @@
 	color: var(--text-muted);
 }
 
+.compareInlineField {
+	display: grid;
+	gap: 0.35rem;
+	min-width: min(22rem, 100%);
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+
+.compareInlineField select {
+	width: 100%;
+	padding: 0.45rem 0.55rem;
+	border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+	border-radius: var(--radius-2);
+	background: color-mix(in srgb, #0f172a 82%, transparent);
+	color: var(--text);
+}
+
 .compareSummary {
 	display: grid;
 	gap: 0.25rem;

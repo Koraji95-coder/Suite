@@ -34,6 +34,8 @@ function Get-SuiteRuntimePaths {
 		RuntimeLogPath = Join-Path $runtimeStatusDir "bootstrap.log"
 		FrontendLogPath = Join-Path $runtimeStatusDir "frontend.log"
 		RuntimeShellLogPath = Join-Path $runtimeStatusDir "runtime-shell.log"
+		CompanionConfigDir = Join-Path $runtimeStatusDir "companion-config"
+		CompanionStateDir = Join-Path $runtimeStatusDir "companions"
 		SupportRoot = Join-Path $StatusBase "Suite\support-bundles"
 	}
 }
@@ -158,6 +160,15 @@ function Convert-ToSuiteSupportSummaryLines {
 		}
 		if (-not [string]::IsNullOrWhiteSpace([string]$supportContext.Config.CodexConfigPath)) {
 			$lines.Add(("Codex config: {0}" -f [string]$supportContext.Config.CodexConfigPath))
+		}
+		if (-not [string]::IsNullOrWhiteSpace([string]$supportContext.Config.StableSuiteRoot)) {
+			$lines.Add(("Stable Suite root: {0}" -f [string]$supportContext.Config.StableSuiteRoot))
+		}
+		if (-not [string]::IsNullOrWhiteSpace([string]$supportContext.Config.DailyRoot)) {
+			$lines.Add(("Daily root: {0}" -f [string]$supportContext.Config.DailyRoot))
+		}
+		if (-not [string]::IsNullOrWhiteSpace([string]$supportContext.Config.OfficeExecutablePath)) {
+			$lines.Add(("Office executable: {0}" -f [string]$supportContext.Config.OfficeExecutablePath))
 		}
 		if (-not [string]::IsNullOrWhiteSpace([string]$supportContext.Config.SupabaseConfigPath)) {
 			$lines.Add(("Supabase config: {0}" -f [string]$supportContext.Config.SupabaseConfigPath))
@@ -454,18 +465,72 @@ function New-SuiteSupportConfigSnapshot {
 		$null
 	}
 
-	$filesystemCollectorConfig = Get-TomlStringValue -Path $resolvedTomlPath -Key "SUITE_WATCHDOG_COLLECTOR_CONFIG"
-	$filesystemCheckScript = Get-TomlStringValue -Path $resolvedTomlPath -Key "SUITE_WATCHDOG_STARTUP_CHECK_SCRIPT"
-	$autocadCollectorConfig = Get-TomlStringValue -Path $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_COLLECTOR_CONFIG"
-	$autocadStatePath = Get-TomlStringValue -Path $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_STATE_PATH"
-	$autocadPluginBundleRoot = Get-TomlStringValue -Path $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_PLUGIN_BUNDLE_ROOT"
-	$autocadStartupCheckScript = Get-TomlStringValue -Path $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_STARTUP_CHECK_SCRIPT"
-	$watchdogBackendCheckScript = Get-TomlStringValue -Path $resolvedTomlPath -Key "SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT"
-	$gatewayStartupCheckScript = Get-TomlStringValue -Path $resolvedTomlPath -Key "SUITE_GATEWAY_STARTUP_CHECK_SCRIPT"
-	$runtimeBootstrapScript = Get-TomlStringValue -Path $resolvedTomlPath -Key "SUITE_RUNTIME_BOOTSTRAP_SCRIPT"
+	$filesystemCollectorConfig = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_COLLECTOR_CONFIG"
+	$filesystemCheckScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_STARTUP_CHECK_SCRIPT"
+	$autocadCollectorConfig = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_COLLECTOR_CONFIG"
+	$autocadStatePath = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_STATE_PATH"
+	$autocadPluginBundleRoot = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_PLUGIN_BUNDLE_ROOT"
+	$autocadStartupCheckScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_STARTUP_CHECK_SCRIPT"
+	$watchdogBackendCheckScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT"
+	$gatewayStartupCheckScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_GATEWAY_STARTUP_CHECK_SCRIPT"
+	$runtimeBootstrapScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_RUNTIME_BOOTSTRAP_SCRIPT"
+	$dailyRoot = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_DAILY_ROOT"
+	$officeExecutablePath = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_OFFICE_EXECUTABLE_PATH"
+	$stableSuiteRoot = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_STABLE_SUITE_ROOT"
+	$stableOfficeExecutableCandidates = @(Get-SuiteStableOfficeExecutableCandidates)
+	$existingStableOfficeExecutable = @(
+		$stableOfficeExecutableCandidates |
+			Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf } |
+			Select-Object -First 1
+	)
+	$legacyDailyRoot = Get-SuiteLegacyDailyRoot
+	$legacyOfficeExecutableCandidates = if (-not [string]::IsNullOrWhiteSpace($legacyDailyRoot)) {
+		@(
+			(Join-Path $legacyDailyRoot "artifacts\DailyDesk\publish\DailyDesk.exe"),
+			(Join-Path $legacyDailyRoot "DailyDesk\bin\Release\net10.0-windows\DailyDesk.exe")
+		)
+	}
+	else {
+		@()
+	}
+	$existingLegacyOfficeExecutable = @(
+		$legacyOfficeExecutableCandidates |
+			Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf } |
+			Select-Object -First 1
+	)
+	$resolvedStableSuiteRoot = if (-not [string]::IsNullOrWhiteSpace($stableSuiteRoot)) {
+		Resolve-OptionalAbsolutePath -PathValue $stableSuiteRoot -RepoRoot $resolvedRepoRoot
+	}
+	else {
+		[System.IO.Path]::GetFullPath((Join-Path (Get-SuiteStableDevRoot) "Suite"))
+	}
+	$resolvedDailyRoot = if (-not [string]::IsNullOrWhiteSpace($dailyRoot)) {
+		Resolve-OptionalAbsolutePath -PathValue $dailyRoot -RepoRoot $resolvedRepoRoot
+	}
+	elseif ($existingLegacyOfficeExecutable.Count -gt 0) {
+		Resolve-OptionalAbsolutePath -PathValue $legacyDailyRoot -RepoRoot $resolvedRepoRoot
+	}
+	else {
+		[System.IO.Path]::GetFullPath((Get-SuiteStableDailyRoot))
+	}
+	$resolvedOfficeExecutablePath = if (-not [string]::IsNullOrWhiteSpace($officeExecutablePath)) {
+		Resolve-OptionalAbsolutePath -PathValue $officeExecutablePath -RepoRoot $resolvedRepoRoot
+	}
+	elseif ($existingStableOfficeExecutable.Count -gt 0) {
+		Resolve-OptionalAbsolutePath -PathValue ([string]$existingStableOfficeExecutable[0]) -RepoRoot $resolvedRepoRoot
+	}
+	elseif ($existingLegacyOfficeExecutable.Count -gt 0) {
+		Resolve-OptionalAbsolutePath -PathValue ([string]$existingLegacyOfficeExecutable[0]) -RepoRoot $resolvedRepoRoot
+	}
+	else {
+		Resolve-OptionalAbsolutePath -PathValue ([string]$stableOfficeExecutableCandidates[0]) -RepoRoot $resolvedRepoRoot
+	}
 
 	[pscustomobject]@{
 		repoRoot = $resolvedRepoRoot
+		stableSuiteRoot = $resolvedStableSuiteRoot
+		dailyRoot = $resolvedDailyRoot
+		officeExecutablePath = $resolvedOfficeExecutablePath
 		codexConfigPath = $resolvedTomlPath
 		codexConfigPresent = [bool]($resolvedTomlPath -and (Test-Path -LiteralPath $resolvedTomlPath))
 		supabaseConfigPath = $resolvedSupabaseConfigPath
@@ -581,12 +646,157 @@ function Get-RunKeyValue {
 		return $null
 	}
 
-	$runKeyPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+	$runKey = $null
 	try {
-		return [string](Get-ItemPropertyValue -Path $runKeyPath -Name $Name -ErrorAction Stop)
+		$runKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\Microsoft\Windows\CurrentVersion\Run", $false)
+		if ($null -eq $runKey) {
+			return $null
+		}
+
+		$value = $runKey.GetValue($Name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+		if ($null -eq $value) {
+			return $null
+		}
+
+		return [string]$value
 	}
 	catch {
 		return $null
+	}
+	finally {
+		if ($null -ne $runKey) {
+			$runKey.Dispose()
+		}
+	}
+}
+
+function Get-SuiteConfigStringOverride {
+	param(
+		[string]$TomlPath,
+		[Parameter(Mandatory = $true)][string]$Key
+	)
+
+	$envEntry = Get-Item -Path ("Env:{0}" -f $Key) -ErrorAction SilentlyContinue
+	if ($null -ne $envEntry) {
+		$envValue = [string]$envEntry.Value
+		if (-not [string]::IsNullOrWhiteSpace($envValue)) {
+			return $envValue.Trim()
+		}
+	}
+
+	$tomlValue = [string](Get-TomlStringValue -Path $TomlPath -Key $Key)
+	if (-not [string]::IsNullOrWhiteSpace($tomlValue)) {
+		return $tomlValue.Trim()
+	}
+
+	return $null
+}
+
+function Get-SuiteStableDevRoot {
+	if (-not [string]::IsNullOrWhiteSpace([string]$env:SystemDrive)) {
+		return Join-Path $env:SystemDrive "Dev"
+	}
+
+	return "C:\Dev"
+}
+
+function Get-SuiteStableDailyRoot {
+	return Join-Path (Get-SuiteStableDevRoot) "Daily"
+}
+
+function Get-SuiteStableOfficeExecutableCandidates {
+	$stableDailyRoot = Get-SuiteStableDailyRoot
+	return @(
+		(Join-Path $stableDailyRoot "artifacts\DailyDesk\publish\DailyDesk.exe"),
+		(Join-Path $stableDailyRoot "DailyDesk\bin\Release\net10.0-windows\DailyDesk.exe")
+	)
+}
+
+function Get-SuiteLegacyDailyRoot {
+	if (-not [string]::IsNullOrWhiteSpace([string]$env:USERPROFILE)) {
+		return Join-Path $env:USERPROFILE "OneDrive\Desktop\Daily"
+	}
+
+	return $null
+}
+
+function Get-SuiteCompanionAppConfigPath {
+	param([Parameter(Mandatory = $true)][string]$CompanionAppId)
+
+	$runtimePaths = Get-SuiteRuntimePaths
+	$configDir = $runtimePaths.CompanionConfigDir
+	New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+	return Join-Path $configDir ("{0}.json" -f $CompanionAppId.Trim().ToLowerInvariant())
+}
+
+function Read-SuiteCompanionAppLocalConfig {
+	param([Parameter(Mandatory = $true)][string]$CompanionAppId)
+
+	$configPath = Get-SuiteCompanionAppConfigPath -CompanionAppId $CompanionAppId
+	if (-not (Test-Path -LiteralPath $configPath)) {
+		return $null
+	}
+
+	try {
+		return (Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json)
+	}
+	catch {
+		return $null
+	}
+}
+
+function Write-SuiteCompanionAppLocalConfig {
+	param(
+		[Parameter(Mandatory = $true)][string]$CompanionAppId,
+		[Parameter(Mandatory = $true)][object]$Config
+	)
+
+	$configPath = Get-SuiteCompanionAppConfigPath -CompanionAppId $CompanionAppId
+	$Config | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $configPath -Encoding UTF8
+	return $configPath
+}
+
+function Remove-SuiteCompanionAppLocalConfig {
+	param([Parameter(Mandatory = $true)][string]$CompanionAppId)
+
+	$configPath = Get-SuiteCompanionAppConfigPath -CompanionAppId $CompanionAppId
+	if (-not (Test-Path -LiteralPath $configPath)) {
+		return $false
+	}
+
+	Remove-Item -LiteralPath $configPath -Force -ErrorAction SilentlyContinue
+	return $true
+}
+
+function Remove-RunKeyValue {
+	param([string]$Name)
+
+	if ([string]::IsNullOrWhiteSpace($Name)) {
+		return $false
+	}
+
+	$runKey = $null
+	try {
+		$runKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\Microsoft\Windows\CurrentVersion\Run", $true)
+		if ($null -eq $runKey) {
+			return $false
+		}
+
+		$existingValue = $runKey.GetValue($Name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+		if ([string]::IsNullOrWhiteSpace([string]$existingValue)) {
+			return $false
+		}
+
+		$runKey.DeleteValue($Name, $false)
+		return $true
+	}
+	catch {
+		return $false
+	}
+	finally {
+		if ($null -ne $runKey) {
+			$runKey.Dispose()
+		}
 	}
 }
 
@@ -649,4 +859,307 @@ function Start-CollectorDaemonProcess {
 	)
 
 	Start-SuiteDetachedProcess -FilePath "PowerShell.exe" -WorkingDirectory $WorkingDirectory -Arguments $arguments | Out-Null
+}
+
+function Get-SuiteCompanionAppRunValueName {
+	param([Parameter(Mandatory = $true)][string]$CompanionAppId)
+
+	switch ($CompanionAppId.Trim().ToLowerInvariant()) {
+		"office" { return "DailyDeskOffice" }
+		default { return $null }
+	}
+}
+
+function Get-SuiteCompanionAppStatePath {
+	param([Parameter(Mandatory = $true)][string]$CompanionAppId)
+
+	$runtimePaths = Get-SuiteRuntimePaths
+	$stateDir = $runtimePaths.CompanionStateDir
+	New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+	return Join-Path $stateDir ("{0}.json" -f $CompanionAppId.Trim().ToLowerInvariant())
+}
+
+function Get-SuiteCompanionAppConfig {
+	param(
+		[Parameter(Mandatory = $true)][string]$CompanionAppId,
+		[string]$RepoRoot,
+		[string]$TomlPath
+	)
+
+	$normalizedId = $CompanionAppId.Trim().ToLowerInvariant()
+	switch ($normalizedId) {
+		"office" {
+			$localConfig = Read-SuiteCompanionAppLocalConfig -CompanionAppId $normalizedId
+			$stableDailyRoot = Get-SuiteStableDailyRoot
+			$stableExecutableCandidates = @(Get-SuiteStableOfficeExecutableCandidates)
+			$stableExecutable = [string]$stableExecutableCandidates[0]
+			$legacyDailyRoot = Get-SuiteLegacyDailyRoot
+			$legacyExecutableCandidates = if (-not [string]::IsNullOrWhiteSpace($legacyDailyRoot)) {
+				@(
+					(Join-Path $legacyDailyRoot "artifacts\DailyDesk\publish\DailyDesk.exe"),
+					(Join-Path $legacyDailyRoot "DailyDesk\bin\Release\net10.0-windows\DailyDesk.exe")
+				)
+			}
+			else {
+				@()
+			}
+
+			$configuredExecutablePath = if ($localConfig -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.executablePath)) {
+				[string]$localConfig.executablePath
+			}
+			else {
+				Get-SuiteConfigStringOverride -TomlPath $TomlPath -Key "SUITE_OFFICE_EXECUTABLE_PATH"
+			}
+			$configuredRootDirectory = if ($localConfig -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.rootDirectory)) {
+				[string]$localConfig.rootDirectory
+			}
+			else {
+				Get-SuiteConfigStringOverride -TomlPath $TomlPath -Key "SUITE_DAILY_ROOT"
+			}
+
+			$configSource = if ($localConfig -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.executablePath)) {
+				"local_config"
+			}
+			elseif (-not [string]::IsNullOrWhiteSpace($configuredExecutablePath) -or -not [string]::IsNullOrWhiteSpace($configuredRootDirectory)) {
+				"env_or_toml_override"
+			}
+			elseif (@($stableExecutableCandidates | Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf }).Count -gt 0) {
+				"stable_default"
+			}
+			elseif (@($legacyExecutableCandidates | Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf }).Count -gt 0) {
+				"legacy_default"
+			}
+			else {
+				"stable_default"
+			}
+
+			$executablePath = if (-not [string]::IsNullOrWhiteSpace($configuredExecutablePath)) {
+				$configuredExecutablePath
+			}
+			elseif ($configSource -eq "legacy_default") {
+				$firstLegacyExecutable = @($legacyExecutableCandidates | Select-Object -First 1)
+				if ($firstLegacyExecutable.Count -gt 0) {
+					[string]$firstLegacyExecutable[0]
+				}
+				else {
+					$null
+				}
+			}
+			elseif ($configSource -eq "stable_default") {
+				$firstStableExecutable = @($stableExecutableCandidates | Select-Object -First 1)
+				if ($firstStableExecutable.Count -gt 0) {
+					[string]$firstStableExecutable[0]
+				}
+				else {
+					$stableExecutable
+				}
+			}
+			else {
+				$stableExecutable
+			}
+			if ([string]::IsNullOrWhiteSpace($configuredExecutablePath)) {
+				if ($configSource -eq "stable_default") {
+					$existingStableExecutable = @(
+						$stableExecutableCandidates |
+							Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf } |
+							Select-Object -First 1
+					)
+					if ($existingStableExecutable.Count -gt 0) {
+						$executablePath = [string]$existingStableExecutable[0]
+					}
+				}
+				elseif ($configSource -eq "legacy_default") {
+					$existingLegacyExecutable = @(
+						$legacyExecutableCandidates |
+							Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf } |
+							Select-Object -First 1
+					)
+					if ($existingLegacyExecutable.Count -gt 0) {
+						$executablePath = [string]$existingLegacyExecutable[0]
+					}
+				}
+			}
+			$resolvedExecutablePath = Resolve-OptionalAbsolutePath -PathValue $executablePath -RepoRoot $RepoRoot
+			$workingDirectory = if (-not [string]::IsNullOrWhiteSpace($resolvedExecutablePath)) {
+				Split-Path -Parent $resolvedExecutablePath
+			}
+			else {
+				$null
+			}
+			$rootDirectory = if (-not [string]::IsNullOrWhiteSpace($configuredRootDirectory)) {
+				Resolve-OptionalAbsolutePath -PathValue $configuredRootDirectory -RepoRoot $RepoRoot
+			}
+			elseif ($configSource -eq "legacy_default") {
+				Resolve-OptionalAbsolutePath -PathValue $legacyDailyRoot -RepoRoot $RepoRoot
+			}
+			else {
+				Resolve-OptionalAbsolutePath -PathValue $stableDailyRoot -RepoRoot $RepoRoot
+			}
+			$timeoutSeconds = 90
+
+			return [pscustomobject]@{
+				id = "office"
+				title = "Office"
+				enabled = $true
+				executablePath = $resolvedExecutablePath
+				workingDirectory = $workingDirectory
+				rootDirectory = $rootDirectory
+				configSource = $configSource
+				configPath = Get-SuiteCompanionAppConfigPath -CompanionAppId $normalizedId
+				launchAfterRuntimeReady = $true
+				timeoutSeconds = $timeoutSeconds
+				launchMode = "managed_companion"
+				processName = "DailyDesk"
+			}
+		}
+		default {
+			return $null
+		}
+	}
+}
+
+function Read-SuiteCompanionAppState {
+	param([Parameter(Mandatory = $true)][string]$CompanionAppId)
+
+	$statePath = Get-SuiteCompanionAppStatePath -CompanionAppId $CompanionAppId
+	if (-not (Test-Path -LiteralPath $statePath)) {
+		return $null
+	}
+
+	try {
+		return (Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json)
+	}
+	catch {
+		return $null
+	}
+}
+
+function Write-SuiteCompanionAppState {
+	param(
+		[Parameter(Mandatory = $true)][string]$CompanionAppId,
+		[Parameter(Mandatory = $true)][object]$State
+	)
+
+	$statePath = Get-SuiteCompanionAppStatePath -CompanionAppId $CompanionAppId
+	$State | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $statePath -Encoding UTF8
+	return $statePath
+}
+
+function Get-SuiteCompanionAppProcessInfo {
+	param(
+		[Parameter(Mandatory = $true)][string]$CompanionAppId,
+		[Parameter(Mandatory = $true)][object]$Config
+	)
+
+	$processName = [string]$Config.processName
+	$expectedPath = if (-not [string]::IsNullOrWhiteSpace([string]$Config.executablePath)) {
+		([string]$Config.executablePath).ToLowerInvariant()
+	}
+	else {
+		$null
+	}
+
+	$processes = @()
+	if (-not [string]::IsNullOrWhiteSpace($processName)) {
+		$processes = @(Get-CimInstance Win32_Process -Filter ("Name = '{0}.exe'" -f $processName) -ErrorAction SilentlyContinue)
+	}
+
+	foreach ($process in $processes) {
+		$commandLine = [string]$process.CommandLine
+		if ($expectedPath -and -not [string]::IsNullOrWhiteSpace($commandLine)) {
+			if (-not $commandLine.ToLowerInvariant().Contains($expectedPath)) {
+				continue
+			}
+		}
+
+		return [pscustomobject]@{
+			running = $true
+			pid = [int]$process.ProcessId
+			commandLine = $commandLine
+		}
+	}
+
+	return [pscustomobject]@{
+		running = $false
+		pid = $null
+		commandLine = $null
+	}
+}
+
+function Get-SuiteCompanionAppSnapshot {
+	param(
+		[Parameter(Mandatory = $true)][string]$CompanionAppId,
+		[string]$RepoRoot,
+		[string]$TomlPath
+	)
+
+	$config = Get-SuiteCompanionAppConfig -CompanionAppId $CompanionAppId -RepoRoot $RepoRoot -TomlPath $TomlPath
+	if ($null -eq $config) {
+		return $null
+	}
+
+	$state = Read-SuiteCompanionAppState -CompanionAppId $CompanionAppId
+	$processInfo = Get-SuiteCompanionAppProcessInfo -CompanionAppId $CompanionAppId -Config $config
+	$executableFound = -not [string]::IsNullOrWhiteSpace([string]$config.executablePath) -and (Test-Path -LiteralPath ([string]$config.executablePath))
+	$stateKnownPid = if ($state -and $state.PSObject.Properties.Name -contains "lastKnownPid" -and $null -ne $state.lastKnownPid) {
+		[int]$state.lastKnownPid
+	}
+	else {
+		$null
+	}
+	$lastLaunchSource = if ($state -and $state.PSObject.Properties.Name -contains "lastLaunchSource" -and -not [string]::IsNullOrWhiteSpace([string]$state.lastLaunchSource)) {
+		[string]$state.lastLaunchSource
+	}
+	else {
+		$null
+	}
+	$startedOutsideRuntimeControl = [bool]($processInfo.running -and $stateKnownPid -and $processInfo.pid -ne $stateKnownPid)
+
+	[pscustomobject]@{
+		id = [string]$config.id
+		title = [string]$config.title
+		enabled = [bool]$config.enabled
+		executablePath = [string]$config.executablePath
+		executableFound = $executableFound
+		workingDirectory = [string]$config.workingDirectory
+		rootDirectory = [string]$config.rootDirectory
+		configSource = if ($config.PSObject.Properties.Name -contains "configSource") { [string]$config.configSource } else { $null }
+		configPath = if ($config.PSObject.Properties.Name -contains "configPath") { [string]$config.configPath } else { $null }
+		launchAfterRuntimeReady = [bool]$config.launchAfterRuntimeReady
+		timeoutSeconds = [int]$config.timeoutSeconds
+		launchMode = [string]$config.launchMode
+		running = [bool]$processInfo.running
+		pid = if ($processInfo.running) { [int]$processInfo.pid } else { $null }
+		launchSource = if ($startedOutsideRuntimeControl) { "outside-runtime-control" } else { $lastLaunchSource }
+		lastLaunchAt = if ($state -and $state.PSObject.Properties.Name -contains "lastLaunchAt") { [string]$state.lastLaunchAt } else { $null }
+		lastLaunchStatus = if ($state -and $state.PSObject.Properties.Name -contains "lastLaunchStatus") { [string]$state.lastLaunchStatus } else { $null }
+		lastLaunchMessage = if ($state -and $state.PSObject.Properties.Name -contains "lastLaunchMessage") { [string]$state.lastLaunchMessage } else { $null }
+		lastKnownPid = $stateKnownPid
+		startedOutsideRuntimeControl = $startedOutsideRuntimeControl
+	}
+}
+
+function Get-SuiteCompanionAppsSnapshot {
+	param(
+		[string]$RepoRoot,
+		[string]$TomlPath
+	)
+
+	$officeSnapshot = Get-SuiteCompanionAppSnapshot -CompanionAppId "office" -RepoRoot $RepoRoot -TomlPath $TomlPath
+	if ($null -eq $officeSnapshot) {
+		return @()
+	}
+
+	return @($officeSnapshot)
+}
+
+function Remove-SuiteCompanionAppRunKeyEntry {
+	param([Parameter(Mandatory = $true)][string]$CompanionAppId)
+
+	$runValueName = Get-SuiteCompanionAppRunValueName -CompanionAppId $CompanionAppId
+	if ([string]::IsNullOrWhiteSpace($runValueName)) {
+		return $false
+	}
+
+	return Remove-RunKeyValue -Name $runValueName
 }

@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Panel, Stack, Text } from "@/components/primitives";
+import type {
+	AutoWireAutomationSnapshot,
+	AutomationQueueItem,
+} from "@/components/apps/automation-studio/automationStudioModels";
 import { cn } from "@/lib/utils";
 import styles from "./ConduitTerminalWorkflow.module.css";
 import {
@@ -583,7 +587,15 @@ function buildJumperRoutes(
 	return { routes, unresolved, nextRef };
 }
 
-export function ConduitTerminalWorkflow() {
+interface ConduitTerminalWorkflowProps {
+	onAutomationSnapshotChange?: (
+		snapshot: AutoWireAutomationSnapshot,
+	) => void;
+}
+
+export function ConduitTerminalWorkflow({
+	onAutomationSnapshotChange,
+}: ConduitTerminalWorkflowProps = {}) {
 	const [connected, setConnected] = useState(false);
 	const [scanning, setScanning] = useState(false);
 	const [scanData, setScanData] = useState<TerminalScanData | null>(null);
@@ -778,11 +790,105 @@ export function ConduitTerminalWorkflow() {
 			wireFunction,
 		],
 	);
+	const automationQueueItems = useMemo<AutomationQueueItem[]>(() => {
+		const items: AutomationQueueItem[] = [];
+		if (cadStatus?.error) {
+			items.push({
+				id: "autowire:cad-status",
+				source: "autowire",
+				status: "warning",
+				bindingKind: "terminal-wiring",
+				label: "CAD runtime needs attention",
+				detail: cadStatus.error,
+				suggestedTarget: cadStatus.drawing_name || null,
+				drawingNumber: null,
+			});
+		}
+		if (routeStats.failed > 0) {
+			items.push({
+				id: "autowire:failed-routes",
+				source: "autowire",
+				status: "needs-review",
+				bindingKind: "terminal-wiring",
+				label: `${routeStats.failed} route${routeStats.failed === 1 ? "" : "s"} failed CAD sync`,
+				detail:
+					"Resync failed routes or adjust the terminal layout before commit.",
+				suggestedTarget: selectedRoute?.ref || null,
+				drawingNumber: null,
+			});
+		}
+		if (routeStats.pending > 0) {
+			items.push({
+				id: "autowire:pending-routes",
+				source: "autowire",
+				status: "planned",
+				bindingKind: "schedule-row",
+				label: `${routeStats.pending} route${routeStats.pending === 1 ? "" : "s"} still need sync`,
+				detail: "Pending routes should be included in the next schedule refresh.",
+				suggestedTarget: `${routeStats.pending} pending`,
+				drawingNumber: null,
+			});
+		}
+		if (routes.length === 0 && scanData) {
+			items.push({
+				id: "autowire:no-routes",
+				source: "autowire",
+				status: "needs-review",
+				bindingKind: "terminal-wiring",
+				label: "No terminal routes committed yet",
+				detail:
+					"Scan strips and sketch the first conductor or jumper before building the combined plan.",
+				suggestedTarget: null,
+				drawingNumber: null,
+			});
+		}
+		return items;
+	}, [
+		cadStatus?.drawing_name,
+		cadStatus?.error,
+		routeStats.failed,
+		routeStats.pending,
+		routes.length,
+		scanData,
+		selectedRoute?.ref,
+	]);
 
 	useEffect(() => {
 		routesRef.current = routes;
 	}, [routes]);
 	runScanRef.current = runScan;
+
+	useEffect(() => {
+		onAutomationSnapshotChange?.({
+			drawingName: cadStatus?.drawing_name || null,
+			terminalCount: layout.terminals.length,
+			stripCount: layout.strips.length,
+			routeCount: routeStats.total,
+			syncedRouteCount: routeStats.synced,
+			pendingRouteCount: routeStats.pending,
+			failedRouteCount: routeStats.failed,
+			diagnosticCount: cadDiagnostics.length,
+			readyForPlan: Boolean(scanData && (routeStats.total > 0 || routeStats.pending > 0)),
+			summary: scanData
+				? `${layout.terminals.length} terminals across ${layout.strips.length} strips with ${routeStats.total} routed connection${
+						routeStats.total === 1 ? "" : "s"
+					}.`
+				: "Run a terminal scan to load strip geometry and start the wiring plan.",
+			queueItems: automationQueueItems,
+		});
+	}, [
+		automationQueueItems,
+		cadDiagnostics.length,
+		cadStatus?.drawing_name,
+		layout.strips.length,
+		layout.terminals.length,
+		onAutomationSnapshotChange,
+		routeStats.failed,
+		routeStats.pending,
+		routeStats.synced,
+		routeStats.total,
+		scanData,
+	]);
 
 	useEffect(() => {
 		if (!AUTO_CONNECT_ON_MOUNT || autoScanStartedRef.current) {

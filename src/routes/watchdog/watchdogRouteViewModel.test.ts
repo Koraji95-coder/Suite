@@ -105,6 +105,30 @@ describe("watchdogRouteViewModel", () => {
 		expect(rows[0].latestActionLabel).toMatch(/saved|qsave/i);
 	});
 
+	it("ignores non-drawing collector paths in the drawing rollup", () => {
+		const rows = buildDaybookRows({
+			collectors: [createCollector()],
+			events: [
+				createEvent(),
+				createEvent({
+					eventId: 2,
+					collectorType: "filesystem",
+					sourceType: "filesystem",
+					eventType: "modified",
+					drawingPath: null,
+					path: "C:/Suite/logs/api_server.log",
+					projectId: null,
+					sessionId: null,
+				}),
+			],
+			sessions: [createSession()],
+			projectNameMap: PROJECT_MAP,
+		});
+
+		expect(rows).toHaveLength(1);
+		expect(rows[0].drawingLabel).toBe("Drawing1.dwg");
+	});
+
 	it("builds workstation and attention rows from collector health", () => {
 		const collectors = [
 			createCollector({
@@ -135,6 +159,23 @@ describe("watchdogRouteViewModel", () => {
 		expect(attentionRows.map((row) => row.key)).toEqual(
 			expect.arrayContaining(["collectors", "idle"]),
 		);
+		expect(
+			attentionRows.find((row) => row.key === "collectors")?.actionKey,
+		).toBe("runtime-control");
+	});
+
+	it("marks unlinked drawing activity with a project-setup action", () => {
+		const attentionRows = buildAttentionRows({
+			cadCollectorsOnline: 1,
+			collectorAttentionCount: 0,
+			unassignedCadCount: 1,
+			visibleLiveSessionCount: 0,
+		});
+
+	expect(attentionRows.find((row) => row.key === "unassigned")).toMatchObject({
+		actionKey: "project-setup",
+		actionLabel: "Review project link",
+	});
 	});
 
 	it("builds project rollups from daybook rows", () => {

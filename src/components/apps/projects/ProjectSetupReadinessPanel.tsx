@@ -8,6 +8,7 @@ import {
 	type TrustState,
 	TrustStateBadge,
 } from "@/components/apps/ui/TrustStateBadge";
+import { useToast } from "@/components/notification-system/ToastProvider";
 import { cn } from "@/lib/utils";
 import {
 	type DrawingRevisionRegisterRow,
@@ -18,6 +19,11 @@ import {
 	type ProjectTitleBlockProfileRow,
 	projectTitleBlockProfileService,
 } from "@/services/projectTitleBlockProfileService";
+import { projectDocumentMetadataService } from "@/services/projectDocumentMetadataService";
+import {
+	type TitleBlockSyncArtifacts,
+	titleBlockSyncService,
+} from "@/services/titleBlockSyncService";
 import styles from "./ProjectSetupReadinessPanel.module.css";
 import type { Project } from "./projectmanagertypes";
 import type { ProjectWatchdogTelemetry } from "./useProjectWatchdogTelemetry";
@@ -32,6 +38,8 @@ interface ProjectSetupReadinessPanelProps {
 interface SetupReadinessState {
 	profile: ProjectTitleBlockProfileRow | null;
 	revisions: DrawingRevisionRegisterRow[];
+	artifacts: TitleBlockSyncArtifacts | null;
+	scanWarnings: string[];
 	loading: boolean;
 	messages: string[];
 }
@@ -47,6 +55,8 @@ interface SetupStatusCard {
 const EMPTY_STATE: SetupReadinessState = {
 	profile: null,
 	revisions: [],
+	artifacts: null,
+	scanWarnings: [],
 	loading: true,
 	messages: [],
 };
@@ -193,13 +203,84 @@ function getRevisionCard(
 	};
 }
 
+function getAcadeProjectFileSummary(
+	profile: ProjectTitleBlockProfileRow | null,
+	artifacts: TitleBlockSyncArtifacts | null,
+) {
+	if (artifacts?.wdpPath) {
+		return {
+			path: artifacts.wdpPath,
+			state:
+				artifacts.wdpState === "existing"
+					? "Existing .wdp detected. Suite will keep using it as the project file."
+					: "Starter .wdp derived from the current project setup.",
+		};
+	}
+	if (profile?.acade_project_file_path?.trim()) {
+		return {
+			path: profile.acade_project_file_path.trim(),
+			state:
+				"Configured .wdp path. Suite will write starter support files here only if the project file is missing.",
+		};
+	}
+	return {
+		path: "Starter .wdp path will be derived from the project root.",
+		state:
+			"No explicit .wdp path is set yet. Suite will derive one from the project root and create it if it is missing.",
+	};
+}
+
+function getAcadeSupportStatus(
+	profile: ProjectTitleBlockProfileRow | null,
+	artifacts: TitleBlockSyncArtifacts | null,
+) {
+	if (artifacts?.wdpState === "existing") {
+		return {
+			label: "Existing ACADE project file",
+			detail:
+				"Suite detected an existing .wdp and will preserve it while keeping the companion support files aligned.",
+			tone: "existing" as const,
+		};
+	}
+
+	if (artifacts?.wdpPath || profile?.acade_project_file_path?.trim()) {
+		return {
+			label: "Suite starter scaffold active",
+			detail:
+				"Suite is using a starter .wdp scaffold and companion .wdt/.wdl files until you replace them with a confirmed ACADE project file.",
+			tone: "starter" as const,
+		};
+	}
+
+	return {
+		label: "ACADE scaffold not written yet",
+		detail:
+			"Save the project once with a valid root and Suite will create the starter .wdp/.wdt/.wdl files automatically.",
+		tone: "pending" as const,
+	};
+}
+
+function isLowSignalSetupWarning(message: string) {
+	const normalized = String(message || "").trim().toLowerCase();
+	return (
+		normalized.includes("live dwg metadata is unavailable right now") ||
+		normalized.includes("live drawing metadata is not connected right now") ||
+		(normalized.includes("filename fallback") &&
+			normalized.includes("drawing rows")) ||
+		(normalized.includes("pairing drawing rows by filename") &&
+			normalized.includes("dwg bridge"))
+	);
+}
+
 export function ProjectSetupReadinessPanel({
 	project,
 	telemetry,
 	compact = false,
 	embedded = false,
 }: ProjectSetupReadinessPanelProps) {
+	const { showToast } = useToast();
 	const [state, setState] = useState<SetupReadinessState>(EMPTY_STATE);
+	const [isOpeningAcadeProject, setIsOpeningAcadeProject] = useState(false);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -211,11 +292,36 @@ export function ProjectSetupReadinessPanel({
 				messages: [],
 			}));
 
-			const [profileResult, revisionsResult] = await Promise.all([
-				projectTitleBlockProfileService.fetchProfile(project.id, {
+			const profileResult = await projectTitleBlockProfileService.fetchProfile(
+				project.id,
+				{
 					projectRootPath: project.watchdog_root_path,
-				}),
+				},
+			);
+			const effectiveProjectRoot =
+				profileResult.data.project_root_path?.trim() ||
+				project.watchdog_root_path?.trim() ||
+				"";
+			const [revisionsResult, snapshotResult] = await Promise.all([
 				projectRevisionRegisterService.fetchEntries(project.id),
+				effectiveProjectRoot
+					? projectDocumentMetadataService
+							.loadSnapshot({
+								projectId: project.id,
+								projectRootPath: effectiveProjectRoot,
+							})
+							.then((data) => ({ data, error: null as Error | null }))
+							.catch((error) => ({
+								data: null,
+								error:
+									error instanceof Error
+										? error
+										: new Error("Unable to preview ACADE support artifacts."),
+							}))
+					: Promise.resolve({
+							data: null,
+							error: null as Error | null,
+						}),
 			]);
 
 			if (cancelled) {
@@ -225,10 +331,13 @@ export function ProjectSetupReadinessPanel({
 			setState({
 				profile: profileResult.data,
 				revisions: revisionsResult.data,
+				artifacts: snapshotResult.data?.artifacts ?? null,
+				scanWarnings: snapshotResult.data?.warnings ?? [],
 				loading: false,
 				messages: [
 					...(profileResult.error ? [profileResult.error.message] : []),
 					...(revisionsResult.error ? [revisionsResult.error.message] : []),
+					...(snapshotResult.error ? [snapshotResult.error.message] : []),
 				],
 			});
 		};
@@ -257,6 +366,86 @@ export function ProjectSetupReadinessPanel({
 		}
 		return "ready";
 	}, [cards]);
+	const acadeProjectFile = useMemo(
+		() => getAcadeProjectFileSummary(state.profile, state.artifacts),
+		[state.artifacts, state.profile],
+	);
+	const acadeSupportStatus = useMemo(
+		() => getAcadeSupportStatus(state.profile, state.artifacts),
+		[state.artifacts, state.profile],
+	);
+	const effectiveProjectRoot = useMemo(
+		() =>
+			state.profile?.project_root_path?.trim() ||
+			project.watchdog_root_path?.trim() ||
+			"",
+		[state.profile?.project_root_path, project.watchdog_root_path],
+	);
+	const canOpenAcadeProject = Boolean(effectiveProjectRoot) && !state.loading;
+	const visibleNotices = useMemo(
+		() =>
+			[...state.messages, ...state.scanWarnings].filter(
+				(message) => !isLowSignalSetupWarning(message),
+			),
+		[state.messages, state.scanWarnings],
+	);
+
+	const handleOpenAcadeProject = async () => {
+		if (!effectiveProjectRoot) {
+			showToast(
+				"warning",
+				"Set the project root first so Suite knows where to open the ACADE project.",
+			);
+			return;
+		}
+		if (!state.profile) {
+			showToast("warning", "Project setup is still loading.");
+			return;
+		}
+
+		setIsOpeningAcadeProject(true);
+		try {
+			const result = await titleBlockSyncService.openProject({
+				projectId: project.id,
+				projectRootPath: effectiveProjectRoot,
+				profile: {
+					blockName:
+						state.profile.block_name || DEFAULT_PROJECT_TITLE_BLOCK_NAME,
+					projectRootPath: effectiveProjectRoot,
+					acadeProjectFilePath: state.profile.acade_project_file_path,
+					acadeLine1: state.profile.acade_line1,
+					acadeLine2: state.profile.acade_line2,
+					acadeLine4: state.profile.acade_line4,
+					signerDrawnBy: state.profile.signer_drawn_by,
+					signerCheckedBy: state.profile.signer_checked_by,
+					signerEngineer: state.profile.signer_engineer,
+				},
+				revisionEntries: state.revisions,
+				rows: [],
+				selectedRelativePaths: [],
+				triggerAcadeUpdate: false,
+			});
+
+			if (!result.success || !result.data) {
+				throw new Error(result.message || "Unable to open the ACADE project.");
+			}
+
+			setState((current) => ({
+				...current,
+				artifacts: result.data?.artifacts ?? current.artifacts,
+			}));
+			showToast("success", result.message || "ACADE project open requested.");
+		} catch (error) {
+			showToast(
+				"error",
+				error instanceof Error
+					? error.message
+					: "Unable to open the ACADE project.",
+			);
+		} finally {
+			setIsOpeningAcadeProject(false);
+		}
+	};
 
 	return (
 		<section className={cn(styles.root, compact && styles.compactRoot)}>
@@ -277,8 +466,8 @@ export function ProjectSetupReadinessPanel({
 						</h4>
 						<p className={cn(styles.description, compact && styles.compactDescription)}>
 							{compact
-								? "Tracking roots, title block defaults, and revision history for this delivery flow."
-								: "Tracking roots, title block defaults, and revision history that feed the project review and package flow."}
+								? "Tracking roots, title block defaults, and revision history for this project workflow."
+								: "Tracking roots, title block defaults, and revision history that feed review and package work."}
 						</p>
 					</div>
 					<TrustStateBadge state={overallState} />
@@ -317,9 +506,147 @@ export function ProjectSetupReadinessPanel({
 				))}
 			</div>
 
-			{state.messages.length > 0 ? (
+			<div className={styles.supportPanel}>
+				<div className={styles.supportHeader}>
+					<div className={styles.supportHeaderCopy}>
+						<p className={styles.supportEyebrow}>ACADE setup</p>
+						<h5 className={styles.supportTitle}>ACADE project setup</h5>
+						<p className={styles.supportDescription}>
+							Suite uses the project root and project defaults to derive the
+							ACADE support files. Drawing titles stay drawing-specific and
+							come from the title block scan or workbook rows.
+						</p>
+					</div>
+				</div>
+
+				<div className={styles.supportGrid}>
+					<div className={styles.supportCard}>
+						<div className={styles.supportCardHeader}>
+							<p className={styles.supportCardEyebrow}>Defaults and mapping</p>
+							<p className={styles.supportCardCopy}>
+								Project defaults that feed the support files.
+							</p>
+						</div>
+						<dl className={styles.definitionList}>
+							<div>
+								<dt>Block name</dt>
+								<dd>
+									{state.profile?.block_name || DEFAULT_PROJECT_TITLE_BLOCK_NAME}
+								</dd>
+							</div>
+							<div>
+								<dt>Client / Utility</dt>
+								<dd>{state.profile?.acade_line1 || "Not set"}</dd>
+							</div>
+							<div>
+								<dt>Facility / Site</dt>
+								<dd>{state.profile?.acade_line2 || "Not set"}</dd>
+							</div>
+							<div>
+								<dt>Project number</dt>
+								<dd>{state.profile?.acade_line4 || "Not set"}</dd>
+							</div>
+							<div>
+								<dt>Drawing title</dt>
+								<dd>Comes from each drawing row and TITLE3 / DWGDESC.</dd>
+							</div>
+						</dl>
+					</div>
+
+					<div className={styles.supportCard}>
+						<div className={styles.supportCardHeader}>
+							<p className={styles.supportCardEyebrow}>Support files</p>
+							<p className={styles.supportCardCopy}>
+								Current project file and companion files.
+							</p>
+						</div>
+						<div
+							className={cn(
+								styles.artifactStatus,
+								acadeSupportStatus.tone === "existing" &&
+									styles.artifactStatusExisting,
+								acadeSupportStatus.tone === "starter" &&
+									styles.artifactStatusStarter,
+								acadeSupportStatus.tone === "pending" &&
+									styles.artifactStatusPending,
+							)}
+						>
+							<strong>{acadeSupportStatus.label}</strong>
+							<p>{acadeSupportStatus.detail}</p>
+						</div>
+						<dl className={styles.definitionList}>
+							<div>
+								<dt>.wdp</dt>
+								<dd>{acadeProjectFile.path}</dd>
+							</div>
+							<div>
+								<dt>.wdt</dt>
+								<dd>{state.artifacts?.wdtPath || "Will derive from the .wdp stem."}</dd>
+							</div>
+							<div>
+								<dt>.wdl</dt>
+								<dd>{state.artifacts?.wdlPath || "Will derive from the .wdp stem."}</dd>
+							</div>
+						</dl>
+						<p className={styles.supportDetail}>{acadeProjectFile.state}</p>
+						<div className={styles.supportActions}>
+							<button
+								type="button"
+								className={styles.supportActionButton}
+								onClick={() => void handleOpenAcadeProject()}
+								disabled={!canOpenAcadeProject || isOpeningAcadeProject}
+							>
+								{isOpeningAcadeProject
+									? "Opening ACADE..."
+									: "Open in ACADE"}
+							</button>
+						</div>
+						<ul className={styles.artifactGuide}>
+							<li>
+								<strong>.wdp</strong> keeps the AutoCAD Electrical project
+								scaffold and drawing list.
+							</li>
+							<li>
+								<strong>.wdt</strong> maps title block attribute tags.
+							</li>
+							<li>
+								<strong>.wdl</strong> stores the line labels ACADE uses for
+								project defaults.
+							</li>
+						</ul>
+					</div>
+
+					<div className={styles.supportCard}>
+						<div className={styles.supportCardHeader}>
+							<p className={styles.supportCardEyebrow}>Setup flow</p>
+							<p className={styles.supportCardCopy}>
+								Recommended order before issue sets and transmittals.
+							</p>
+						</div>
+						<p className={styles.supportDetail}>
+							Create the support files first, then verify the live drawings
+							before you build the package.
+						</p>
+						<ul className={styles.artifactGuide}>
+							<li>Set the DWG root, PDF package root, and signer defaults first.</li>
+							<li>
+								Review the derived <strong>.wdp</strong>, <strong>.wdt</strong>,
+								and <strong>.wdl</strong> before you rely on ACADE report
+								checks.
+							</li>
+							<li>Run title block scan to capture the live drawing truth.</li>
+							<li>
+								Import an ACADE report only as verification, then clear the
+								review lane before issue sets and transmittals.
+							</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+
+			{visibleNotices.length > 0 ? (
 				<div className={styles.noticeList}>
-					{state.messages.map((message) => (
+					{visibleNotices.map((message) => (
 						<p key={message} className={styles.notice}>
 							{message}
 						</p>

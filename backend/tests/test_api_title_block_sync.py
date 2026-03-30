@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from flask import Flask, g
 from flask_limiter import Limiter
@@ -131,7 +132,106 @@ class TestApiTitleBlockSync(unittest.TestCase):
         self.assertEqual((data.get("summary") or {}).get("totalFiles"), 3)
         drawings = data.get("drawings") or []
         self.assertEqual(len(drawings), 3)
+        self.assertTrue(str((data.get("artifacts") or {}).get("wdpPath")).endswith("demo.wdp"))
         self.assertTrue(str((data.get("artifacts") or {}).get("wdtPath")).endswith("demo.wdt"))
+        self.assertEqual((data.get("artifacts") or {}).get("wdpState"), "existing")
+
+    def test_ensure_artifacts_creates_missing_support_files(self) -> None:
+        starter_wdp = self.project_root / "starter.wdp"
+        starter_wdt = self.project_root / "starter.wdt"
+        starter_wdl = self.project_root / "starter.wdl"
+        for path in (starter_wdp, starter_wdt, starter_wdl):
+            if path.exists():
+                path.unlink()
+
+        response = self.client.post(
+            "/api/title-block-sync/ensure-artifacts",
+            json={
+                "projectId": "project-1",
+                "projectRootPath": str(self.project_root),
+                "profile": {
+                    "blockName": "R3P-24x36BORDER&TITLE",
+                    "projectRootPath": str(self.project_root),
+                    "acadeProjectFilePath": str(starter_wdp),
+                    "acadeLine1": "CLIENT",
+                    "acadeLine2": "SITE",
+                    "acadeLine4": "R3P-25074",
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        artifacts = (payload.get("data") or {}).get("artifacts") or {}
+        self.assertEqual(artifacts.get("wdpState"), "starter")
+        self.assertTrue(starter_wdp.exists())
+        self.assertTrue(starter_wdt.exists())
+        self.assertTrue(starter_wdl.exists())
+        starter_text = starter_wdp.read_text(encoding="utf-8")
+        self.assertIn("*[1]CLIENT", starter_text)
+        self.assertIn("*[2]SITE", starter_text)
+        self.assertIn("*[4]R3P-25074", starter_text)
+        self.assertIn("=====SUB=SCHEMATIC", starter_text)
+
+    def test_ensure_artifacts_preserves_existing_wdp(self) -> None:
+        existing_text = "*[1]Existing project\n+[1]%SL_DIR%NFPA/\n===Demo drawing\ndemo01.dwg\n"
+        wdp_path = self.project_root / "demo.wdp"
+        wdp_path.write_text(existing_text, encoding="utf-8")
+
+        response = self.client.post(
+            "/api/title-block-sync/ensure-artifacts",
+            json={
+                "projectId": "project-1",
+                "projectRootPath": str(self.project_root),
+                "profile": {
+                    "blockName": "R3P-24x36BORDER&TITLE",
+                    "projectRootPath": str(self.project_root),
+                    "acadeProjectFilePath": str(wdp_path),
+                    "acadeLine1": "CLIENT",
+                    "acadeLine2": "SITE",
+                    "acadeLine4": "R3P-25074",
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        artifacts = (payload.get("data") or {}).get("artifacts") or {}
+        self.assertEqual(artifacts.get("wdpState"), "existing")
+        self.assertEqual(wdp_path.read_text(encoding="utf-8"), existing_text)
+
+    def test_open_project_launches_wdp_after_ensuring_support_files(self) -> None:
+        starter_wdp = self.project_root / "starter.wdp"
+        with patch(
+            "backend.route_groups.api_title_block_sync.os.startfile",
+            create=True,
+        ) as startfile_mock:
+            response = self.client.post(
+                "/api/title-block-sync/open-project",
+                json={
+                    "projectId": "project-1",
+                    "projectRootPath": str(self.project_root),
+                    "profile": {
+                        "blockName": "R3P-24x36BORDER&TITLE",
+                        "projectRootPath": str(self.project_root),
+                        "acadeProjectFilePath": str(starter_wdp),
+                        "acadeLine1": "CLIENT",
+                        "acadeLine2": "SITE",
+                        "acadeLine4": "R3P-25074",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertTrue(starter_wdp.exists())
+        startfile_mock.assert_called_once_with(str(starter_wdp))
+        self.assertEqual(
+            ((payload.get("data") or {}).get("artifacts") or {}).get("wdpPath"),
+            str(starter_wdp),
+        )
 
     def test_preview_derives_cadno_and_revision_rows(self) -> None:
         response = self.client.post(
@@ -229,6 +329,57 @@ class TestApiTitleBlockSync(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertFalse(payload.get("success", True))
         self.assertEqual(payload.get("code"), "INVALID_REQUEST")
+
+    def test_scan_uses_customer_safe_warning_when_bridge_is_unavailable(self) -> None:
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        limiter = Limiter(
+            app=app,
+            key_func=lambda: "test-client",
+            default_limits=[],
+            storage_uri="memory://",
+            strategy="fixed-window",
+        )
+
+        def require_supabase_user(f):
+            def wrapped(*args, **kwargs):
+                g.supabase_user = {"id": "user-1", "email": "user@example.com"}
+                return f(*args, **kwargs)
+
+            wrapped.__name__ = getattr(f, "__name__", "wrapped")
+            return wrapped
+
+        app.register_blueprint(
+            create_title_block_sync_blueprint(
+                limiter=limiter,
+                logger=app.logger,
+                require_supabase_user=require_supabase_user,
+                send_autocad_dotnet_command=None,
+            )
+        )
+        client = app.test_client()
+
+        response = client.post(
+            "/api/title-block-sync/scan",
+            json={
+                "projectId": "project-1",
+                "projectRootPath": str(self.project_root),
+                "profile": {
+                    "blockName": "R3P-24x36BORDER&TITLE",
+                    "projectRootPath": str(self.project_root),
+                },
+                "revisionEntries": [],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertEqual(
+            payload.get("warnings"),
+            [
+                "Live DWG metadata is unavailable right now, so Suite is using filename fallback for drawing rows."
+            ],
+        )
 
 
 if __name__ == "__main__":

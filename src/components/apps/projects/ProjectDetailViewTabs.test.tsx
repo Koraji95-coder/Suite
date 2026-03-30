@@ -16,7 +16,7 @@ describe("ProjectDetailViewTabs", () => {
 		expect(screen.getByText("Review")).toBeTruthy();
 		expect(screen.getByText("Issue Sets")).toBeTruthy();
 		expect(screen.getByText("Revisions")).toBeTruthy();
-		expect(screen.getByText("Files & telemetry")).toBeTruthy();
+		expect(screen.getByText("Files & activity")).toBeTruthy();
 
 		expect(screen.queryByText("Tasks")).toBeNull();
 		expect(screen.queryByText("Calendar")).toBeNull();

@@ -103,17 +103,17 @@ export function ProjectDetailHeader({
 		overdueTaskCount > 0
 			? `${overdueTaskCount} at-risk work item${overdueTaskCount === 1 ? "" : "s"} still needs follow-up before the next package.`
 			: openTaskCount > 0
-				? `${openTaskCount} open work item${openTaskCount === 1 ? "" : "s"} remains in the project. Use Review, Issue Sets, and Watchdog to clear the next delivery.`
-				: "The delivery lane is clear. Use Review, Issue Sets, and Watchdog to confirm the next package.";
+				? `${openTaskCount} open work item${openTaskCount === 1 ? "" : "s"} remain. Review them before the next package.`
+				: "Ready for the next package. Review the issue set and Watchdog before you issue.";
 	const telemetrySummary = telemetry?.loading
-		? "Checking collector and AutoCAD session telemetry for this project."
+		? "Checking project activity."
 		: telemetry?.error
-			? "Project telemetry is temporarily unavailable. Use the Watchdog page for a retry."
+			? "Project activity is temporarily unavailable. Use Watchdog to retry."
 			: telemetry?.activeCadSessionCount
 				? `${telemetry.activeCadSessionCount} live AutoCAD session${telemetry.activeCadSessionCount === 1 ? "" : "s"} mapped to this project${latestTrackedLabel ? `, led by ${latestTrackedLabel}` : ""}.`
 				: telemetry?.sessions.length
 					? `${telemetry.sessions.length} recent AutoCAD session${telemetry.sessions.length === 1 ? "" : "s"} recorded for this project${latestTrackedLabel ? `, most recently around ${latestTrackedLabel}` : ""}.`
-					: "No AutoCAD session telemetry has been attributed to this project yet.";
+					: "No AutoCAD activity is linked to this project yet.";
 	const telemetryStatusLabel = telemetry?.loading
 		? "Checking"
 		: leadSession
@@ -206,14 +206,14 @@ export function ProjectDetailHeader({
 							<Workflow className={styles.signalIcon} />
 						</div>
 						<div>
-							<p className={styles.signalEyebrow}>Delivery path</p>
-							<h4 className={styles.signalTitle}>Delivery flow</h4>
+							<p className={styles.signalEyebrow}>Delivery</p>
+							<h4 className={styles.signalTitle}>Next package</h4>
 						</div>
 					</div>
 					<div className={styles.signalContent}>
 						<p className={styles.signalSummary}>{workflowSummary}</p>
 						<div className={styles.signalMeta}>
-							<span>{openTaskCount} open</span>
+							<span>Open work {openTaskCount}</span>
 							<span>
 								{project.deadline
 									? `Due ${formatDateOnly(project.deadline)}`
@@ -235,8 +235,8 @@ export function ProjectDetailHeader({
 							<Activity className={styles.signalIcon} />
 						</div>
 						<div>
-							<p className={styles.signalEyebrow}>Live CAD</p>
-							<h4 className={styles.signalTitle}>Project telemetry</h4>
+							<p className={styles.signalEyebrow}>Watchdog</p>
+							<h4 className={styles.signalTitle}>Project activity</h4>
 						</div>
 					</div>
 					<div className={styles.signalContent}>

@@ -21,6 +21,14 @@ import { Button } from "@/components/primitives/Button";
 import { HStack, Stack } from "@/components/primitives/Stack";
 import { Text } from "@/components/primitives/Text";
 import { logger } from "@/lib/logger";
+import {
+	projectMarkupSnapshotService,
+	type ProjectMarkupSnapshotRecord,
+} from "@/services/projectMarkupSnapshotService";
+import type {
+	AutoDraftAutomationSnapshot,
+	AutomationQueueItem,
+} from "@/components/apps/automation-studio/automationStudioModels";
 import styles from "./AutoDraftStudioApp.module.css";
 import {
 	type AutoDraftCalibrationMode,
@@ -152,7 +160,21 @@ function toSafeIdToken(value: string): string {
 	return normalized || "item";
 }
 
-export function AutoDraftComparePanel() {
+interface AutoDraftComparePanelProps {
+	onAutomationSnapshotChange?: (
+		snapshot: AutoDraftAutomationSnapshot,
+	) => void;
+	projectId?: string | null;
+	issueSetId?: string | null;
+	selectedDrawingPaths?: string[];
+}
+
+export function AutoDraftComparePanel({
+	onAutomationSnapshotChange,
+	projectId = null,
+	issueSetId = null,
+	selectedDrawingPaths = [],
+}: AutoDraftComparePanelProps = {}) {
 	const [pdfFile, setPdfFile] = useState<File | null>(null);
 	const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
 	const [pageIndex, setPageIndex] = useState(0);
@@ -216,6 +238,10 @@ export function AutoDraftComparePanel() {
 	const [zoom, setZoom] = useState<number>(1);
 	const [pan, setPan] = useState<PanOffset>({ x: 0, y: 0 });
 	const [isPanning, setIsPanning] = useState(false);
+	const [publishingSnapshot, setPublishingSnapshot] = useState(false);
+	const [selectedDrawingPath, setSelectedDrawingPath] = useState<string>("");
+	const [publishedSnapshot, setPublishedSnapshot] =
+		useState<ProjectMarkupSnapshotRecord | null>(null);
 
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const previewGridRef = useRef<HTMLDivElement | null>(null);
@@ -270,6 +296,18 @@ export function AutoDraftComparePanel() {
 		() => buildPrepareColorSourcesSummary(prepareResult),
 		[prepareResult],
 	);
+	const previewOperations = useMemo(
+		() => compareResult?.preview_operations ?? [],
+		[compareResult],
+	);
+	const commitReadyCount = useMemo(
+		() => previewOperations.filter((operation) => operation.approved !== false).length,
+		[previewOperations],
+	);
+	const commitBlockedCount = useMemo(() => {
+		const totalPlanned = compareResult?.plan.actions.length ?? 0;
+		return Math.max(0, totalPlanned - previewOperations.length);
+	}, [compareResult?.plan.actions.length, previewOperations.length]);
 	const prepareTextFallbackSummary = useMemo(
 		() => buildPrepareTextFallbackSummary(prepareResult),
 		[prepareResult],
@@ -284,6 +322,130 @@ export function AutoDraftComparePanel() {
 			}),
 		[loadingPdf, loadingPrepare, prepareError, prepareResult],
 	);
+	const automationQueueItems = useMemo<AutomationQueueItem[]>(
+		() => [
+			...markupReviewQueue.map((item) => {
+				const action = compareActionById.get(item.action_id);
+				const predictedCategory = String(
+					item.predicted_category || action?.category || "",
+				).toLowerCase();
+				let bindingKind: AutomationQueueItem["bindingKind"] = "drawing-row";
+				if (
+					predictedCategory.includes("title") ||
+					String(item.message || "").toLowerCase().includes("title block")
+				) {
+					bindingKind = "title-block";
+				} else if (
+					predictedCategory.includes("terminal") ||
+					predictedCategory.includes("wire")
+				) {
+					bindingKind = "terminal-wiring";
+				} else if (predictedCategory.includes("schedule")) {
+					bindingKind = "schedule-row";
+				} else if (predictedCategory.includes("note")) {
+					bindingKind = "note-only";
+				}
+				return {
+					id: `autodraft-markup:${String(item.action_id || item.id)}`,
+					source: "autodraft",
+					status: "needs-review",
+					bindingKind,
+					label: String(item.message || "Markup review item"),
+					detail: item.predicted_category
+						? `Predicted ${item.predicted_category} • confidence ${item.confidence.toFixed(2)}`
+						: `Confidence ${item.confidence.toFixed(2)}`,
+					suggestedTarget: action?.category || item.predicted_category || null,
+					drawingNumber: null,
+				} satisfies AutomationQueueItem;
+			}),
+			...reviewQueue.map((item) => ({
+				id: `autodraft-replacement:${String(item.action_id || item.id)}`,
+				source: "autodraft",
+				status: item.status === "resolved" ? "planned" : "needs-review",
+				bindingKind: "drawing-row",
+				label: String(item.message || "Replacement review item"),
+				detail: `New text ${item.new_text || "unknown"} • confidence ${item.confidence.toFixed(2)}`,
+				suggestedTarget: item.selected_entity_id || null,
+				drawingNumber: null,
+			} satisfies AutomationQueueItem)),
+		],
+		[compareActionById, markupReviewQueue, reviewQueue],
+	);
+
+	useEffect(() => {
+		const nextSelected =
+			selectedDrawingPath && selectedDrawingPaths.includes(selectedDrawingPath)
+				? selectedDrawingPath
+				: selectedDrawingPaths[0] || "";
+		if (nextSelected !== selectedDrawingPath) {
+			setSelectedDrawingPath(nextSelected);
+		}
+	}, [selectedDrawingPath, selectedDrawingPaths]);
+
+	useEffect(() => {
+		onAutomationSnapshotChange?.({
+			sourceName: pdfFile?.name || null,
+			requestId: compareResult?.requestId || null,
+			markupSnapshotId: publishedSnapshot?.id ?? null,
+			markupSnapshotIds: publishedSnapshot ? [publishedSnapshot.id] : [],
+			drawingPath:
+				publishedSnapshot?.drawingPath ?? (selectedDrawingPath || null),
+			drawingName:
+				publishedSnapshot?.drawingName ??
+				(selectedDrawingPath
+					? selectedDrawingPath.split(/[\\/]/).pop() || selectedDrawingPath
+					: null),
+			contractVersion:
+				publishedSnapshot?.contractVersion ?? "bluebeam-default.v1",
+			preparedMarkupCount: prepareResult?.markups.length ?? 0,
+			markupReviewCount: markupReviewQueue.length,
+			replacementReviewCount: reviewQueue.length,
+			commitReadyCount,
+			commitBlockedCount,
+			selectedActionIds: compareResult?.plan.actions.map((action) => action.id) ?? [],
+			selectedOperationIds: previewOperations.map((operation) => operation.id),
+			previewOperations,
+			warnings: [
+				...(prepareResult?.warnings ?? []),
+				...(compareResult?.backcheck.warnings ?? []),
+			],
+			reviewedRunBundle: publishedSnapshot?.reviewedBundleJson ?? null,
+			publishedSnapshots: publishedSnapshot ? [publishedSnapshot] : [],
+			warningCount:
+				(prepareResult?.warnings.length ?? 0) +
+				(compareResult?.backcheck.warnings.length ?? 0) +
+				(compareError ? 1 : 0) +
+				(prepareError ? 1 : 0),
+			readyForPlan: Boolean(compareResult),
+			summary: compareResult
+				? `${
+						previewOperations.length
+					} managed write operation${
+						previewOperations.length === 1 ? "" : "s"
+					} staged from ${pdfFile?.name || "the current compare run"}${
+						publishedSnapshot ? ` and published to ${publishedSnapshot.drawingName || publishedSnapshot.drawingPath}.` : "."
+					}`
+				: prepareResult
+					? `${prepareResult.markups.length} markups prepared and ready for compare.`
+					: "Load a marked PDF and run prepare to build markup intents.",
+			queueItems: automationQueueItems,
+		});
+	}, [
+		automationQueueItems,
+		commitBlockedCount,
+		commitReadyCount,
+		compareError,
+		compareResult,
+		markupReviewQueue.length,
+		onAutomationSnapshotChange,
+		pdfFile?.name,
+		previewOperations,
+		prepareError,
+		prepareResult,
+		publishedSnapshot,
+		reviewQueue.length,
+		selectedDrawingPath,
+	]);
 
 	const fitPreviewToViewport = useCallback(() => {
 		const viewportElement = previewViewportRef.current;
@@ -1374,6 +1536,92 @@ export function AutoDraftComparePanel() {
 		}
 	}, [compareResult, pdfFile, prepareResult]);
 
+	const publishReviewedRun = useCallback(async () => {
+		if (!projectId || !prepareResult || !compareResult || !selectedDrawingPath) {
+			setFeedbackTransferState({
+				color: "warning",
+				message:
+					"Publishing requires a project, a selected drawing binding, and a completed compare run.",
+			});
+			return;
+		}
+		try {
+			setPublishingSnapshot(true);
+			setFeedbackTransferState({
+				color: "muted",
+				message: "Publishing reviewed Bluebeam bundle to the project...",
+			});
+			const bundle = await autoDraftService.exportReviewedRunBundle({
+				prepare: prepareResult,
+				compare: compareResult,
+				label: pdfFile?.name || compareResult.requestId,
+			});
+			const drawingName =
+				selectedDrawingPath.split(/[\\/]/).pop() || selectedDrawingPath;
+			const boundOperations = previewOperations.map((operation) => ({
+				...operation,
+				drawingPath: selectedDrawingPath,
+				drawingName,
+				relativePath: selectedDrawingPath,
+				managedKey: operation.managedKey
+					? {
+							...operation.managedKey,
+							drawingPath: selectedDrawingPath,
+					  }
+					: operation.managedKey,
+			}));
+			const comparePayload = {
+				...(compareResult as unknown as Record<string, unknown>),
+				preview_operations: boundOperations,
+			};
+			const saveResult = await projectMarkupSnapshotService.saveSnapshot({
+				projectId,
+				issueSetId,
+				drawingPath: selectedDrawingPath,
+				drawingName,
+				sourcePdfName: pdfFile?.name || "Marked drawing.pdf",
+				pageIndex: prepareResult.page.index,
+				contractVersion: "bluebeam-default.v1",
+				preparePayload: prepareResult as unknown as Record<string, unknown>,
+				comparePayload,
+				selectedActionIds: compareResult.plan.actions.map((action) => action.id),
+				selectedOperationIds: boundOperations.map((operation) => operation.id),
+				reviewedBundleJson: bundle,
+				revisionContext: {},
+				warnings: [
+					...(prepareResult.warnings ?? []),
+					...(compareResult.backcheck.warnings ?? []),
+				],
+			});
+			if (saveResult.error) {
+				throw saveResult.error;
+			}
+			setPublishedSnapshot(saveResult.data);
+			setFeedbackTransferState({
+				color: "success",
+				message: `Published ${drawingName} page ${prepareResult.page.index + 1} to project markup snapshots.`,
+			});
+		} catch (error) {
+			setFeedbackTransferState({
+				color: "warning",
+				message:
+					error instanceof Error && error.message.trim().length > 0
+						? error.message
+						: "Failed to publish the reviewed run bundle.",
+			});
+		} finally {
+			setPublishingSnapshot(false);
+		}
+	}, [
+		compareResult,
+		issueSetId,
+		pdfFile?.name,
+		prepareResult,
+		previewOperations,
+		projectId,
+		selectedDrawingPath,
+	]);
+
 	const triggerFeedbackImport = useCallback(() => {
 		feedbackImportInputRef.current?.click();
 	}, []);
@@ -2239,6 +2487,49 @@ export function AutoDraftComparePanel() {
 								Replacement review queue ({reviewQueue.length})
 							</Text>
 							<HStack gap={1} align="center" wrap>
+								{projectId && selectedDrawingPaths.length > 0 ? (
+									<>
+										<label
+											htmlFor="autodraft-compare-drawing-binding"
+											className={styles.compareInlineField}
+										>
+											<Text size="xs" color="muted">
+												Drawing binding
+											</Text>
+											<select
+												id="autodraft-compare-drawing-binding"
+												name="autodraftCompareDrawingBinding"
+												value={selectedDrawingPath}
+												onChange={(event) =>
+													setSelectedDrawingPath(event.target.value)
+												}
+											>
+												{selectedDrawingPaths.map((drawingPath) => (
+													<option key={drawingPath} value={drawingPath}>
+														{drawingPath}
+													</option>
+												))}
+											</select>
+										</label>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => {
+												void publishReviewedRun();
+											}}
+											disabled={
+												!compareResult ||
+												!prepareResult ||
+												!selectedDrawingPath ||
+												publishingSnapshot
+											}
+										>
+											{publishingSnapshot
+												? "Publishing..."
+												: "Publish reviewed bundle"}
+										</Button>
+									</>
+								) : null}
 								<Button
 									variant="ghost"
 									size="sm"

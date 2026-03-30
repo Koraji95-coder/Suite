@@ -51,7 +51,7 @@ describe("watchdogPresentation", () => {
 		expect(presentWatchdogOperatorEvent(event, projectNameById)).toBeNull();
 	});
 
-	it("keeps filesystem changes visible with cleaner labels", () => {
+	it("drops non-drawing filesystem changes from the operator feed", () => {
 		const event = createEvent({
 			eventId: 2,
 			eventType: "modified",
@@ -61,11 +61,7 @@ describe("watchdogPresentation", () => {
 			metadata: {},
 		});
 
-		expect(presentWatchdogOperatorEvent(event, projectNameById)).toMatchObject({
-			label: "Updated file",
-			detail: "index.xlsx",
-			context: "Nanulak • DUSTIN-HOME",
-		});
+		expect(presentWatchdogOperatorEvent(event, projectNameById)).toBeNull();
 	});
 
 	it("builds a filtered operator feed and preserves technical labels", () => {

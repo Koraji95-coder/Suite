@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DrawingListManager } from "./DrawingListManager";
@@ -10,9 +10,14 @@ const mockEq = vi.hoisted(() => vi.fn());
 const mockSelect = vi.hoisted(() => vi.fn());
 const mockFrom = vi.hoisted(() => vi.fn());
 const mockFetchProfile = vi.hoisted(() => vi.fn());
+const mockUpsertProfile = vi.hoisted(() => vi.fn());
 const mockFetchEntries = vi.hoisted(() => vi.fn());
 const mockFetchDecisions = vi.hoisted(() => vi.fn());
 const mockFetchIssueSet = vi.hoisted(() => vi.fn());
+const mockDrawingProgramPanel = vi.hoisted(() => vi.fn());
+const mockTitleBlockScan = vi.hoisted(() => vi.fn());
+const mockTitleBlockPreview = vi.hoisted(() => vi.fn());
+const mockTitleBlockApply = vi.hoisted(() => vi.fn());
 
 vi.mock("@/components/notification-system/ToastProvider", () => ({
 	useToast: () => ({
@@ -32,7 +37,7 @@ vi.mock("@/supabase/client", () => ({
 vi.mock("@/services/projectTitleBlockProfileService", () => ({
 	projectTitleBlockProfileService: {
 		fetchProfile: mockFetchProfile,
-		upsertProfile: vi.fn(),
+		upsertProfile: mockUpsertProfile,
 	},
 }));
 
@@ -51,6 +56,21 @@ vi.mock("@/services/projectReviewDecisionService", () => ({
 vi.mock("@/services/projectIssueSetService", () => ({
 	projectIssueSetService: {
 		fetchIssueSet: mockFetchIssueSet,
+	},
+}));
+
+vi.mock("./DrawingProgramPanel", () => ({
+	DrawingProgramPanel: (props: Record<string, unknown>) => {
+		mockDrawingProgramPanel(props);
+		return <div>Drawing program panel</div>;
+	},
+}));
+
+vi.mock("@/services/titleBlockSyncService", () => ({
+	titleBlockSyncService: {
+		scan: mockTitleBlockScan,
+		preview: mockTitleBlockPreview,
+		apply: mockTitleBlockApply,
 	},
 }));
 
@@ -87,7 +107,8 @@ describe("DrawingListManager", () => {
 				project_id: "project-1",
 				user_id: "user-1",
 				block_name: "R3P-24x36BORDER&TITLE",
-				project_root_path: "C:/Projects/Nanulak",
+				project_root_path: "",
+				acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
 				acade_line1: "",
 				acade_line2: "",
 				acade_line4: "",
@@ -98,6 +119,20 @@ describe("DrawingListManager", () => {
 				updated_at: "2026-03-23T00:00:00.000Z",
 			},
 			error: null,
+		});
+		mockUpsertProfile.mockResolvedValue({
+			id: "profile-1",
+			project_id: "project-1",
+			user_id: "user-1",
+			block_name: "R3P-24x36BORDER&TITLE",
+			project_root_path: "C:/Projects/Nanulak",
+			acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
+			acade_line1: "",
+			acade_line2: "",
+			acade_line4: "",
+			signer_drawn_by: "",
+			signer_checked_by: "",
+			signer_engineer: "",
 		});
 		mockFetchEntries.mockResolvedValue({
 			data: [
@@ -143,6 +178,43 @@ describe("DrawingListManager", () => {
 			},
 			error: null,
 		});
+		mockTitleBlockScan.mockResolvedValue({
+			success: true,
+			message: "Scan complete.",
+			data: {
+				projectRootPath: "C:/Projects/Nanulak",
+				profile: {
+					blockName: "R3P-24x36BORDER&TITLE",
+					projectRootPath: "C:/Projects/Nanulak",
+					acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
+					acadeLine1: "",
+					acadeLine2: "",
+					acadeLine4: "",
+					signerDrawnBy: "",
+					signerCheckedBy: "",
+					signerEngineer: "",
+				},
+				drawings: [],
+				summary: {
+					totalFiles: 0,
+					drawingFiles: 0,
+					flaggedFiles: 0,
+					suiteWriteCount: 0,
+					acadeWriteCount: 0,
+					wdTbConflictCount: 0,
+				},
+				artifacts: {
+					wdtPath: "",
+					wdlPath: "",
+					wdpPath: "",
+					wdtText: "",
+					wdlText: "",
+					wdpText: "",
+					wdpState: "starter",
+				},
+			},
+			warnings: [],
+		});
 
 		render(
 			<MemoryRouter>
@@ -154,18 +226,114 @@ describe("DrawingListManager", () => {
 		);
 
 		await waitFor(() =>
-			expect(
-				screen.getByText("Run the first drawing scan for Nanulak • IFC-01."),
-			).toBeTruthy(),
+			expect(screen.getByText("Project title block review")).toBeTruthy(),
 		);
 		expect(screen.getByText("Project title block review")).toBeTruthy();
-		expect(screen.getByText("Scan")).toBeTruthy();
+		expect(
+			screen.getByRole("button", { name: /scan project/i }),
+		).toBeTruthy();
 		expect(screen.getByRole("button", { name: /save defaults/i })).toBeTruthy();
 		expect(
 			screen.getByRole("link", { name: /^Setup$/i }).getAttribute("href"),
 		).toBe("/app/projects/project-1?view=setup");
-		expect(
-			screen.getByRole("link", { name: /^Review$/i }).getAttribute("href"),
-		).toBe("/app/projects/project-1?view=review&issueSet=issue-set-1");
+		await waitFor(() =>
+			expect(
+				screen.getByRole("link", { name: /^Review$/i }).getAttribute("href"),
+			).toBe("/app/projects/project-1?view=review&issueSet=issue-set-1"),
+		);
+	});
+
+	it("surfaces a pending title block review staged by the drawing program", async () => {
+		mockGetUser.mockResolvedValue({
+			data: {
+				user: {
+					id: "user-1",
+				},
+			},
+			error: null,
+		});
+		mockOrder.mockResolvedValue({
+			data: [
+				{
+					id: "project-1",
+					name: "Nanulak",
+					watchdog_root_path: "C:/Projects/Nanulak",
+				},
+			],
+			error: null,
+		});
+		mockEq.mockReturnValue({ order: mockOrder });
+		mockSelect.mockReturnValue({ eq: mockEq });
+		mockFrom.mockReturnValue({ select: mockSelect });
+		mockFetchProfile.mockResolvedValue({
+			data: {
+				id: "profile-1",
+				project_id: "project-1",
+				user_id: "user-1",
+				block_name: "R3P-24x36BORDER&TITLE",
+				project_root_path: "C:/Projects/Nanulak",
+				acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
+				acade_line1: "",
+				acade_line2: "",
+				acade_line4: "",
+				signer_drawn_by: "",
+				signer_checked_by: "",
+				signer_engineer: "",
+				created_at: "2026-03-23T00:00:00.000Z",
+				updated_at: "2026-03-23T00:00:00.000Z",
+			},
+			error: null,
+		});
+		mockUpsertProfile.mockResolvedValue({
+			id: "profile-1",
+			project_id: "project-1",
+			user_id: "user-1",
+			block_name: "R3P-24x36BORDER&TITLE",
+			project_root_path: "C:/Projects/Nanulak",
+			acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
+			acade_line1: "",
+			acade_line2: "",
+			acade_line4: "",
+			signer_drawn_by: "",
+			signer_checked_by: "",
+			signer_engineer: "",
+		});
+		mockFetchEntries.mockResolvedValue({ data: [], error: null });
+		mockFetchDecisions.mockResolvedValue({ data: [], error: null });
+		mockFetchIssueSet.mockResolvedValue({ data: null, error: null });
+		render(
+			<MemoryRouter>
+				<DrawingListManager preferredProjectId="project-1" />
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => expect(mockDrawingProgramPanel).toHaveBeenCalled());
+		const latestProps = (
+			mockDrawingProgramPanel.mock.calls[
+				mockDrawingProgramPanel.mock.calls.length - 1
+			]?.[0] ?? null
+		) as
+			| {
+					onPendingTitleBlockSyncChange?: (pending: {
+						paths: string[];
+						at: string | null;
+					} | null) => void;
+			  }
+			| null;
+		expect(latestProps).toBeTruthy();
+
+		await act(async () => {
+			latestProps?.onPendingTitleBlockSyncChange?.({
+				paths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+				at: "2026-03-30T04:00:00.000Z",
+			});
+		});
+
+		await waitFor(() =>
+			expect(
+				screen.getByText(/Review pending title block sync for 1 drawing/i),
+			).toBeTruthy(),
+		);
+		expect(mockTitleBlockScan).toHaveBeenCalled();
 	});
 });

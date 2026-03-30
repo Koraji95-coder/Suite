@@ -25,6 +25,7 @@ $gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-star
 $filesystemCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-filesystem-collector-startup.ps1")).Path
 $autocadCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-collector-startup.ps1")).Path
 $pluginCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-plugin.ps1")).Path
+$cadAuthoringPluginCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-cad-authoring-plugin.ps1")).Path
 $runtimePaths = Get-SuiteRuntimePaths
 $runtimeStatusDir = $runtimePaths.RuntimeStatusDir
 $runtimeStatusPath = $runtimePaths.RuntimeStatusPath
@@ -125,13 +126,34 @@ function Get-AutoCadCollectorStatus {
 }
 
 function Get-PluginStatus {
-    $result = Invoke-JsonPowerShellFile -ScriptPath $pluginCheckScript -Arguments @("-Json")
-    if ($result.Payload -and [bool]$result.Payload.ok) {
-        return New-ComponentStatus -Key "autocadPlugin" -Name "AutoCAD Plugin" -State "ready" -Ok $true -Summary "AutoCAD plugin bundle is healthy." -Details $result.Payload.bundleRoot
+    $watchdogResult = Invoke-JsonPowerShellFile -ScriptPath $pluginCheckScript -Arguments @("-Json")
+    $cadAuthoringResult = Invoke-JsonPowerShellFile -ScriptPath $cadAuthoringPluginCheckScript -Arguments @("-Json")
+    $watchdogHealthy = [bool]($watchdogResult.Payload -and $watchdogResult.Payload.ok)
+    $cadAuthoringHealthy = [bool]($cadAuthoringResult.Payload -and $cadAuthoringResult.Payload.ok)
+
+    if ($watchdogHealthy -and $cadAuthoringHealthy) {
+        $bundleRoots = @(
+            [string]$watchdogResult.Payload.bundleRoot
+            [string]$cadAuthoringResult.Payload.bundleRoot
+        ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        return New-ComponentStatus -Key "autocadPlugin" -Name "AutoCAD Plugin" -State "ready" -Ok $true -Summary "AutoCAD plugin bundles are healthy." -Details ([string]::Join("; ", $bundleRoots))
     }
 
-    $details = if ($result.Payload -and $result.Payload.errors) { [string]::Join("; ", @($result.Payload.errors)) } else { $result.OutputTail }
-    return New-ComponentStatus -Key "autocadPlugin" -Name "AutoCAD Plugin" -State "failed" -Summary "AutoCAD plugin needs attention." -Details $details
+    $details = @()
+    if ($watchdogResult.Payload -and $watchdogResult.Payload.errors) {
+        $details += "Watchdog: " + [string]::Join("; ", @($watchdogResult.Payload.errors))
+    }
+    elseif ($watchdogResult.OutputTail) {
+        $details += "Watchdog: $($watchdogResult.OutputTail)"
+    }
+    if ($cadAuthoringResult.Payload -and $cadAuthoringResult.Payload.errors) {
+        $details += "CAD authoring: " + [string]::Join("; ", @($cadAuthoringResult.Payload.errors))
+    }
+    elseif ($cadAuthoringResult.OutputTail) {
+        $details += "CAD authoring: $($cadAuthoringResult.OutputTail)"
+    }
+
+    return New-ComponentStatus -Key "autocadPlugin" -Name "AutoCAD Plugin" -State "failed" -Summary "AutoCAD plugins need attention." -Details ([string]::Join("; ", @($details)))
 }
 
 function Get-LastBootstrapStatus {

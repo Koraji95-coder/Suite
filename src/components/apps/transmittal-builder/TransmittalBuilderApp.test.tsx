@@ -125,6 +125,8 @@ describe("TransmittalBuilderApp", () => {
 						id: "project-1",
 						name: "Nanulak",
 						description: "Substation package",
+						projectPeName: "Jamie River, PE",
+						firmNumber: "AB - Firm #99887",
 						watchdogRootPath: "C:/Projects/Nanulak",
 					},
 				],
@@ -175,9 +177,13 @@ describe("TransmittalBuilderApp", () => {
 					targetDate: "2026-03-31",
 					transmittalNumber: "XMTL-001",
 					transmittalDocumentName: "IFC package",
+					registerSnapshotId: "register-1",
 					summary: "Ready for final review.",
 					notes: null,
 					selectedDrawingPaths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+					selectedRegisterRowIds: ["register-row-1"],
+					selectedDrawingNumbers: ["R3P-25074-E0-0001"],
+					selectedPdfFileIds: ["file-1"],
 					snapshot: {
 						drawingCount: 1,
 						selectedDrawingCount: 1,
@@ -208,7 +214,7 @@ describe("TransmittalBuilderApp", () => {
 		).toBeTruthy();
 		expect(screen.getByText("Nanulak")).toBeTruthy();
 		expect(screen.getByText("Project metadata ready")).toBeTruthy();
-		expect(screen.getByText(/IFC-01 • 1 drawing/i)).toBeTruthy();
+		expect(screen.getByText(/IFC-01 • 1 row/i)).toBeTruthy();
 		expect(
 			screen.getByRole("link", { name: /review/i }).getAttribute("href"),
 		).toBe("/app/projects/project-1?view=review&issueSet=issue-set-1");

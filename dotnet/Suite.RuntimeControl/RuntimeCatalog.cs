@@ -251,7 +251,7 @@ internal sealed class RuntimeCatalog
                 ["gateway"] = new() { ShortLabel = "GW", BootLabel = "API Gateway", Description = "Local transport and auth edge" },
                 ["frontend"] = new() { ShortLabel = "UI", BootLabel = "Suite Frontend", Description = "Vite shell and local app routes" },
                 ["watchdog-filesystem"] = new() { ShortLabel = "FS", BootLabel = "Filesystem Collector", Description = "Filesystem watcher and activity intake" },
-                ["watchdog-autocad"] = new() { ShortLabel = "AC", BootLabel = "AutoCAD Collector", Description = "Drawing tracker and plugin heartbeat" },
+                ["watchdog-autocad"] = new() { ShortLabel = "AC", BootLabel = "AutoCAD Collector", Description = "Drawing tracker and AutoCAD plugin readiness" },
             },
             BootstrapStepOrder =
             [
@@ -272,7 +272,7 @@ internal sealed class RuntimeCatalog
                 ["supabase-env"] = new() { Label = "Supabase Env", ShortLabel = "SE" },
                 ["watchdog-filesystem"] = new() { Label = "Filesystem Collector", ShortLabel = "FS" },
                 ["watchdog-autocad-startup"] = new() { Label = "AutoCAD Collector", ShortLabel = "AC" },
-                ["watchdog-autocad-plugin"] = new() { Label = "AutoCAD Plugin", ShortLabel = "AP" },
+                ["watchdog-autocad-plugin"] = new() { Label = "AutoCAD Plugins", ShortLabel = "AP" },
                 ["backend"] = new() { Label = "Watchdog Backend", ShortLabel = "BE" },
                 ["gateway"] = new() { Label = "API Gateway", ShortLabel = "GW" },
                 ["frontend"] = new() { Label = "Suite Frontend", ShortLabel = "UI" },
@@ -288,6 +288,7 @@ internal sealed class RuntimeCatalog
                 new() { Id = "open-bootstrap-log", Label = "Open bootstrap log", Description = "Open the live bootstrap transcript for the current workstation runtime." },
                 new() { Id = "open-status-dir", Label = "Open status folder", Description = "Open the local runtime status directory that stores bootstrap snapshots and logs." },
                 new() { Id = "copy-summary", Label = "Copy support summary", Description = "Copy the current runtime, doctor, and service summary for support handoff." },
+                new() { Id = "apply-workstation-profile", Label = "Apply workstation profile", Description = "Re-stamp the workstation identity and local MCP env block for this machine." },
                 new() { Id = "export-bundle", Label = "Export support bundle", Description = "Package the current runtime logs, doctor snapshot, and Watchdog evidence into one support archive." },
             ],
         };

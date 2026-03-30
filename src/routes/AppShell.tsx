@@ -99,7 +99,7 @@ const developerNavItems: ShellNavItem[] = [
 ];
 
 function FirstLoginNamePrompt() {
-	const { user, profile, updateProfile } = useAuth();
+	const { user, profile, loading, profileHydrating, updateProfile } = useAuth();
 	const [value, setValue] = useState("");
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState("");
@@ -110,7 +110,9 @@ function FirstLoginNamePrompt() {
 			? user.user_metadata.display_name.trim()
 			: "");
 
-	const shouldShow = Boolean(user && !currentName);
+	const shouldShow = Boolean(
+		!loading && !profileHydrating && user && !currentName,
+	);
 	if (!shouldShow) return null;
 
 	const submit = async (event: React.FormEvent) => {

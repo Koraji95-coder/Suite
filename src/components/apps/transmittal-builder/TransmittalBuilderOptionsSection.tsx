@@ -39,7 +39,7 @@ export function TransmittalBuilderOptionsSection({
 											handleOptionToggle(option.key, checked === true)
 										}
 									/>
-									<span>{option.label}</span>
+									<span className={styles.optionText}>{option.label}</span>
 								</div>
 							))}
 						</div>

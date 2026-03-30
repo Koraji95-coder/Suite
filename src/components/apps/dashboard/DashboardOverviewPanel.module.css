@@ -344,6 +344,7 @@
 
 .watchdogMeta,
 .panelSubgrid,
+.watchdogSubgrid,
 .domainGrid,
 .memoryStats,
 .sessionGrid {
@@ -401,6 +402,34 @@
 
 .panelSubgrid {
 	grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+	align-items: start;
+}
+
+.watchdogSubgrid {
+	display: grid;
+	grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+	grid-template-areas:
+		"activity coverage"
+		"timeline timeline"
+		"projects projects";
+	align-items: start;
+	gap: 0.75rem;
+}
+
+.watchdogActivityPanel {
+	grid-area: activity;
+}
+
+.watchdogCoveragePanel {
+	grid-area: coverage;
+}
+
+.watchdogTimelinePanel {
+	grid-area: timeline;
+}
+
+.watchdogProjectPanel {
+	grid-area: projects;
 }
 
 .architectureActions,
@@ -548,6 +577,7 @@
 .sectionBlock {
 	display: grid;
 	gap: 0.65rem;
+	min-width: 0;
 }
 
 .deliverySummaryGrid {
@@ -732,12 +762,22 @@
 	justify-content: space-between;
 	gap: 0.75rem;
 	padding: 0.85rem 0.9rem;
+	min-width: 0;
+}
+
+.dataRow > :first-child,
+.projectRow > :first-child,
+.memoryRow > :first-child,
+.sessionCardHead > :first-child,
+.sessionTimelineHeading > :last-child {
+	min-width: 0;
 }
 
 .dataRowTitle {
 	font-size: 0.85rem;
 	font-weight: 700;
 	color: var(--text);
+	overflow-wrap: anywhere;
 }
 
 .dataRowMeta {
@@ -745,6 +785,7 @@
 	font-size: 0.73rem;
 	line-height: 1.45;
 	color: var(--text-muted);
+	overflow-wrap: anywhere;
 }
 
 .dataRowAside,
@@ -939,10 +980,19 @@
 	.deliverySummaryGrid,
 	.watchdogMeta,
 	.panelSubgrid,
+	.watchdogSubgrid,
 	.domainGrid,
 	.memoryStats,
 	.sessionGrid {
 		grid-template-columns: 1fr;
+	}
+
+	.watchdogSubgrid {
+		grid-template-areas:
+			"activity"
+			"coverage"
+			"timeline"
+			"projects";
 	}
 
 	.deliveryRowBody {

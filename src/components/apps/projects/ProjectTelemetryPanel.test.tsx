@@ -122,6 +122,7 @@ describe("ProjectTelemetryPanel", () => {
 			</MemoryRouter>,
 		);
 
+		expect(screen.getByText("Project activity")).toBeTruthy();
 		expect(screen.getByText("Recent CAD sessions")).toBeTruthy();
 		expect(screen.getAllByText("Drawing1.dwg").length).toBeGreaterThan(0);
 		expect(screen.getAllByText("Tracked drawings").length).toBeGreaterThan(0);

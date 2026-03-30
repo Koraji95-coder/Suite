@@ -55,7 +55,8 @@ export function FilesBrowser({
 					</div>
 					<p className={styles.description}>
 						Keep package files, issued PDFs, and supporting deliverables
-						available from one lane for {projectName}.
+						available from one lane for {projectName}. Uploaded issued PDFs are
+						also used to pair workbook rows in the deliverable register.
 					</p>
 					<div className={styles.signalRow}>
 						<span className={styles.signalChip}>{files.length} total files</span>
@@ -84,9 +85,10 @@ export function FilesBrowser({
 					</div>
 					<label className={styles.uploadButton}>
 						<Upload className={styles.uploadIcon} />
-						<span>Upload</span>
+						<span>Upload files</span>
 						<input
 							type="file"
+							multiple
 							onChange={onUpload}
 							className={styles.hiddenInput}
 							name="filesbrowser_input_47"

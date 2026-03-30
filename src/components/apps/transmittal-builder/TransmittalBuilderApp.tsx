@@ -194,12 +194,14 @@ export function TransmittalBuilderApp({
 	const contextMetrics = useMemo<ContextMetric[]>(() => {
 		const metrics: ContextMetric[] = [];
 		if (state.preferredIssueSet) {
+			const packageRowCount =
+				state.preferredIssueSet.selectedRegisterRowIds.length > 0
+					? state.preferredIssueSet.selectedRegisterRowIds.length
+					: state.preferredIssueSet.selectedDrawingPaths.length;
 			metrics.push({
 				label: "Issue set",
-				value: `${state.preferredIssueSet.issueTag} • ${
-					state.preferredIssueSet.selectedDrawingPaths.length
-				} drawing${
-					state.preferredIssueSet.selectedDrawingPaths.length === 1 ? "" : "s"
+				value: `${state.preferredIssueSet.issueTag} • ${packageRowCount} row${
+					packageRowCount === 1 ? "" : "s"
 				}`,
 			});
 		}

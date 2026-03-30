@@ -973,6 +973,24 @@ input {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.companion-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.companion-card {
+  gap: 10px;
+}
+
+.companion-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.companion-notes .notes-list {
+  gap: 6px;
+}
+
 .launch-card {
   appearance: none;
   width: 100%;

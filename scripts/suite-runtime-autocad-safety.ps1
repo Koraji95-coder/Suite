@@ -74,6 +74,24 @@ function Get-SuiteRuntimeRunningAutoCadProcessSummary {
     }) -join ", "
 }
 
+function Get-SuiteRuntimeOptionalPropertyValue {
+    param(
+        [AllowNull()]$InputObject,
+        [Parameter(Mandatory = $true)][string]$PropertyName
+    )
+
+    if ($null -eq $InputObject -or [string]::IsNullOrWhiteSpace($PropertyName)) {
+        return $null
+    }
+
+    $property = $InputObject.PSObject.Properties[$PropertyName]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
 function Get-SuiteRuntimeAutoCadStopSafety {
     param(
         [string]$CodexConfigPath = (Join-Path $env:USERPROFILE ".codex\config.toml"),
@@ -130,27 +148,33 @@ function Get-SuiteRuntimeAutoCadStopSafety {
     $collectorFresh = [bool]($collector -and $collector.healthy)
 
     $drawingPath = $null
-    if ($collector -and -not [string]::IsNullOrWhiteSpace([string]$collector.activeDrawingPath)) {
-        $drawingPath = [string]$collector.activeDrawingPath
+    $collectorActiveDrawingPath = [string](Get-SuiteRuntimeOptionalPropertyValue -InputObject $collector -PropertyName "activeDrawingPath")
+    $trackerActiveDrawingPath = [string](Get-SuiteRuntimeOptionalPropertyValue -InputObject $tracker -PropertyName "activeDrawingPath")
+    $trackerActiveDrawing = [string](Get-SuiteRuntimeOptionalPropertyValue -InputObject $tracker -PropertyName "activeDrawing")
+    $collectorCurrentSessionId = [string](Get-SuiteRuntimeOptionalPropertyValue -InputObject $collector -PropertyName "currentSessionId")
+    $trackerCurrentSessionId = [string](Get-SuiteRuntimeOptionalPropertyValue -InputObject $tracker -PropertyName "currentSessionId")
+
+    if (-not [string]::IsNullOrWhiteSpace($collectorActiveDrawingPath)) {
+        $drawingPath = $collectorActiveDrawingPath
     }
-    elseif ($tracker -and -not [string]::IsNullOrWhiteSpace([string]$tracker.activeDrawingPath)) {
-        $drawingPath = [string]$tracker.activeDrawingPath
+    elseif (-not [string]::IsNullOrWhiteSpace($trackerActiveDrawingPath)) {
+        $drawingPath = $trackerActiveDrawingPath
     }
 
     $drawingName = $null
-    if ($tracker -and -not [string]::IsNullOrWhiteSpace([string]$tracker.activeDrawing)) {
-        $drawingName = [string]$tracker.activeDrawing
+    if (-not [string]::IsNullOrWhiteSpace($trackerActiveDrawing)) {
+        $drawingName = $trackerActiveDrawing
     }
     elseif (-not [string]::IsNullOrWhiteSpace($drawingPath)) {
         $drawingName = Split-Path -Leaf $drawingPath
     }
 
     $currentSessionId = $null
-    if ($collector -and -not [string]::IsNullOrWhiteSpace([string]$collector.currentSessionId)) {
-        $currentSessionId = [string]$collector.currentSessionId
+    if (-not [string]::IsNullOrWhiteSpace($collectorCurrentSessionId)) {
+        $currentSessionId = $collectorCurrentSessionId
     }
-    elseif ($tracker -and -not [string]::IsNullOrWhiteSpace([string]$tracker.currentSessionId)) {
-        $currentSessionId = [string]$tracker.currentSessionId
+    elseif (-not [string]::IsNullOrWhiteSpace($trackerCurrentSessionId)) {
+        $currentSessionId = $trackerCurrentSessionId
     }
 
     $hasActivitySignal = (

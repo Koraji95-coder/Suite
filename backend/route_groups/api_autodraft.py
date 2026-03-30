@@ -1063,6 +1063,476 @@ def _prepare_autodraft_execute_actions(
     return prepared_actions
 
 
+def _clone_json_value(value: Any) -> Any:
+    try:
+        return json.loads(json.dumps(value))
+    except Exception:
+        return None
+
+
+def _normalize_string_handle_list(value: Any) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    handles: List[str] = []
+    seen: Set[str] = set()
+    for entry in value:
+        normalized = str(entry or "").strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        handles.append(normalized)
+    return handles
+
+
+def _build_autodraft_operation(
+    *,
+    operation_id: str,
+    operation_type: str,
+    entity_kind: str,
+    managed_value: str,
+    detail: str,
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    target_handle_refs: Optional[List[str]] = None,
+    warnings: Optional[List[str]] = None,
+    approved: bool = True,
+    native_payload: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    return {
+        "id": operation_id,
+        "operationType": operation_type,
+        "drawingPath": None,
+        "drawingName": None,
+        "relativePath": None,
+        "managedKey": {
+            "source": "autodraft",
+            "entityKind": entity_kind,
+            "value": managed_value,
+            "drawingPath": None,
+        },
+        "targetHandleRefs": list(target_handle_refs or []),
+        "before": before,
+        "after": after,
+        "detail": detail,
+        "warnings": list(dict.fromkeys(warnings or [])),
+        "artifactRefs": [],
+        "approved": approved,
+        "nativePayload": native_payload or {},
+    }
+
+
+def _markup_feature_source(markup: Dict[str, Any]) -> str:
+    recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    return _normalize_text(
+        recognition.get("input_feature_source")
+        or recognition.get("feature_source")
+        or meta.get("feature_source")
+    )
+
+
+def _markup_extraction_source(markup: Dict[str, Any]) -> str:
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    return _normalize_text(meta.get("extraction_source"))
+
+
+def _markup_apply_blockers(markup: Dict[str, Any]) -> List[str]:
+    warnings: List[str] = []
+    feature_source = _markup_feature_source(markup)
+    extraction_source = _markup_extraction_source(markup)
+    if "pdf_text_fallback" in feature_source:
+        warnings.append(
+            "Flattened/OCR-derived markup is preview-only in this tranche and cannot write to AutoCAD."
+        )
+    if extraction_source in {"ocr", "embedded_text"}:
+        warnings.append(
+            "Text fallback markup requires review and remains preview-only for apply."
+        )
+    recognition = markup.get("recognition") if isinstance(markup.get("recognition"), dict) else {}
+    if bool(recognition.get("needs_review")):
+        warnings.append("Markup recognition still needs operator review before apply.")
+    return list(dict.fromkeys(warnings))
+
+
+def _build_closed_polyline_points_from_bounds(bounds: Dict[str, float]) -> List[Dict[str, float]]:
+    x0 = float(bounds["x"])
+    y0 = float(bounds["y"])
+    x1 = x0 + float(bounds["width"])
+    y1 = y0 + float(bounds["height"])
+    return [
+        {"x": x0, "y": y0},
+        {"x": x1, "y": y0},
+        {"x": x1, "y": y1},
+        {"x": x0, "y": y1},
+        {"x": x0, "y": y0},
+    ]
+
+
+def _extract_markup_geometry_payload(markup: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    subtype = _normalize_text(meta.get("subtype"))
+    line_points = _normalize_point_list(meta.get("line_points"))
+    vertices = _normalize_point_list(meta.get("vertices"))
+    ink_strokes = [
+        _normalize_point_list(stroke)
+        for stroke in (meta.get("ink_strokes") if isinstance(meta.get("ink_strokes"), list) else [])
+        if _normalize_point_list(stroke)
+    ]
+    bounds = _normalize_bounds(markup.get("bounds")) or _normalize_bounds(meta.get("geometry_bounds"))
+
+    if subtype == "/line" and len(line_points) >= 2:
+        return {
+            "kind": "line",
+            "points": [line_points[0], line_points[-1]],
+        }
+
+    if subtype in {"/polyline", "/polygon"} and vertices:
+        points = list(vertices)
+        if subtype == "/polygon" and vertices[0] != vertices[-1]:
+            points = [*vertices, vertices[0]]
+        return {
+            "kind": "polyline",
+            "points": points,
+            "closed": subtype == "/polygon",
+        }
+
+    if subtype == "/ink" and ink_strokes:
+        return {
+            "kind": "ink",
+            "strokes": ink_strokes,
+        }
+
+    if subtype == "/square" and bounds:
+        return {
+            "kind": "polyline",
+            "points": _build_closed_polyline_points_from_bounds(bounds),
+            "closed": True,
+        }
+
+    if subtype == "/circle" and bounds:
+        radius = min(float(bounds["width"]), float(bounds["height"])) / 2.0
+        if radius > 0:
+            return {
+                "kind": "circle",
+                "center": _resolve_bounds_center(bounds),
+                "radius": radius,
+            }
+
+    return None
+
+
+def _resolve_markup_anchor_point(markup: Dict[str, Any]) -> Optional[Dict[str, float]]:
+    callout_target, _source = _extract_callout_target_point(markup)
+    if callout_target:
+        return callout_target
+    bounds = _normalize_bounds(markup.get("bounds"))
+    if bounds:
+        return _resolve_bounds_center(bounds)
+    return None
+
+
+def _collect_geometric_delete_targets(
+    markup: Dict[str, Any],
+    cad_context: Optional[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    cad_context_obj = cad_context if isinstance(cad_context, dict) else {}
+    bounds = _normalize_bounds(markup.get("bounds"))
+    if not bounds:
+        return []
+    matches: List[Dict[str, Any]] = []
+    for entity in _extract_entities(cad_context_obj):
+        entity_id = str(entity.get("id") or "").strip()
+        entity_bounds = _normalize_bounds(entity.get("bounds"))
+        entity_type = _normalize_text(entity.get("entity_type") or entity.get("type"))
+        if not entity_id or not entity_bounds or not entity_type:
+            continue
+        if not _bounds_overlap(entity_bounds, bounds):
+            continue
+        if any(token in entity_type for token in ["text", "attribute", "dimension", "leader"]):
+            continue
+        if not any(
+            token in entity_type
+            for token in ["line", "polyline", "arc", "circle", "ellipse", "spline", "solid"]
+        ):
+            continue
+        matches.append(entity)
+    return matches
+
+
+def _is_issue_tag_markup(markup: Dict[str, Any]) -> bool:
+    semantic_text = _normalize_text(_collect_markup_semantic_text(markup) or markup.get("text"))
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    subject = _normalize_text(meta.get("subject"))
+    intent = _normalize_text(meta.get("intent"))
+    combined = " ".join(entry for entry in [semantic_text, subject, intent] if entry)
+    return any(token in combined for token in ["issue", "tag", "delta", "rev"])
+
+
+def _is_revision_cloud_markup(action: Dict[str, Any], markup: Dict[str, Any]) -> bool:
+    category = _normalize_text(action.get("category"))
+    if category == "delete":
+        return False
+    meta = markup.get("meta") if isinstance(markup.get("meta"), dict) else {}
+    subtype = _normalize_text(meta.get("subtype"))
+    markup_type = _normalize_text(markup.get("type"))
+    semantic_text = _normalize_text(_collect_markup_semantic_text(markup) or markup.get("text"))
+    if subtype in {"/square", "/circle", "/polygon", "/polyline", "/ink"} and markup_type in {
+        "cloud",
+        "rectangle",
+    }:
+        return True
+    return any(token in semantic_text for token in ["revision", "rev", "delta"])
+
+
+def _build_autodraft_preview_operations(
+    *,
+    actions: List[Dict[str, Any]],
+    cad_context: Optional[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    operations: List[Dict[str, Any]] = []
+    for action in actions:
+        if not isinstance(action, dict):
+            continue
+        action_id = str(action.get("id") or "").strip()
+        if not action_id:
+            continue
+        markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
+        if not markup:
+            continue
+        markup_id = str(markup.get("id") or action_id).strip() or action_id
+        category = _normalize_text(action.get("category"))
+        execute_target = (
+            action.get("execute_target") if isinstance(action.get("execute_target"), dict) else {}
+        )
+        apply_blockers = _markup_apply_blockers(markup)
+        base_native_payload = {
+            "actionId": action_id,
+            "markupId": markup_id,
+            "category": category,
+            "markup": _clone_json_value(markup) or {},
+            "executeTarget": _clone_json_value(execute_target) or {},
+            "previewOnly": len(apply_blockers) > 0,
+            "contractVersion": "bluebeam-default.v1",
+        }
+
+        execute_kind = _normalize_text(execute_target.get("kind"))
+        if execute_kind == "title_block_attribute":
+            field_key = str(execute_target.get("field_key") or "field").strip() or "field"
+            operations.append(
+                _build_autodraft_operation(
+                    operation_id=f"{action_id}:title-block-update",
+                    operation_type="title-block-update",
+                    entity_kind="title-block-attribute",
+                    managed_value=f"{markup_id}:title-block:{field_key}",
+                    before=None,
+                    after=str(execute_target.get("target_value") or "").strip() or None,
+                    detail=f"Update title block field '{field_key}'.",
+                    warnings=apply_blockers,
+                    approved=len(apply_blockers) == 0,
+                    native_payload={
+                        **base_native_payload,
+                        "fieldKey": field_key,
+                    },
+                )
+            )
+            continue
+
+        if execute_kind == "text_replacement":
+            target_entity_id = str(execute_target.get("target_entity_id") or "").strip()
+            target_value = str(execute_target.get("target_value") or "").strip()
+            current_value = str(execute_target.get("current_value") or "").strip()
+            if target_entity_id and target_value:
+                operations.append(
+                    _build_autodraft_operation(
+                        operation_id=f"{action_id}:text-replace",
+                        operation_type="text-replace",
+                        entity_kind="text",
+                        managed_value=f"{markup_id}:text:{target_entity_id}",
+                        before=current_value or None,
+                        after=target_value,
+                        target_handle_refs=[target_entity_id],
+                        detail=f"Replace text on CAD target {target_entity_id}.",
+                        warnings=apply_blockers,
+                        approved=len(apply_blockers) == 0,
+                        native_payload=base_native_payload,
+                    )
+                )
+                continue
+
+        if execute_kind == "text_delete":
+            target_entity_id = str(execute_target.get("target_entity_id") or "").strip()
+            current_value = str(execute_target.get("current_value") or "").strip()
+            if target_entity_id:
+                operations.append(
+                    _build_autodraft_operation(
+                        operation_id=f"{action_id}:text-delete",
+                        operation_type="text-delete",
+                        entity_kind="text",
+                        managed_value=f"{markup_id}:text-delete:{target_entity_id}",
+                        before=current_value or None,
+                        after=None,
+                        target_handle_refs=[target_entity_id],
+                        detail=f"Delete text target {target_entity_id}.",
+                        warnings=apply_blockers,
+                        approved=len(apply_blockers) == 0,
+                        native_payload=base_native_payload,
+                    )
+                )
+                continue
+
+        if execute_kind == "dimension_text_override":
+            target_entity_id = str(execute_target.get("target_entity_id") or "").strip()
+            target_value = str(execute_target.get("target_value") or "").strip()
+            current_value = str(execute_target.get("current_value") or "").strip()
+            if target_entity_id and target_value:
+                operations.append(
+                    _build_autodraft_operation(
+                        operation_id=f"{action_id}:dimension-override",
+                        operation_type="dimension-override",
+                        entity_kind="dimension",
+                        managed_value=f"{markup_id}:dimension:{target_entity_id}",
+                        before=current_value or None,
+                        after=target_value,
+                        target_handle_refs=[target_entity_id],
+                        detail=f"Override dimension text on {target_entity_id}.",
+                        warnings=apply_blockers,
+                        approved=len(apply_blockers) == 0,
+                        native_payload=base_native_payload,
+                    )
+                )
+                continue
+
+        if execute_kind == "text_swap":
+            first_target_entity_id = str(execute_target.get("first_target_entity_id") or "").strip()
+            second_target_entity_id = str(execute_target.get("second_target_entity_id") or "").strip()
+            first_current_value = str(execute_target.get("first_current_value") or "").strip()
+            second_current_value = str(execute_target.get("second_current_value") or "").strip()
+            if first_target_entity_id and second_target_entity_id:
+                operations.append(
+                    _build_autodraft_operation(
+                        operation_id=f"{action_id}:text-swap",
+                        operation_type="text-swap",
+                        entity_kind="text-pair",
+                        managed_value=f"{markup_id}:swap:{first_target_entity_id}:{second_target_entity_id}",
+                        before=f"{first_current_value} <-> {second_current_value}".strip(),
+                        after=f"{second_current_value} <-> {first_current_value}".strip(),
+                        target_handle_refs=[first_target_entity_id, second_target_entity_id],
+                        detail=f"Swap text between {first_target_entity_id} and {second_target_entity_id}.",
+                        warnings=apply_blockers,
+                        approved=len(apply_blockers) == 0,
+                        native_payload=base_native_payload,
+                    )
+                )
+                continue
+
+        semantic_text = _normalize_display_text(_collect_markup_semantic_text(markup) or markup.get("text"), max_length=500)
+        anchor_point = _resolve_markup_anchor_point(markup)
+
+        if semantic_text and anchor_point:
+            note_operation_type = "issue-tag-upsert" if _is_issue_tag_markup(markup) else "delta-note-upsert"
+            operations.append(
+                _build_autodraft_operation(
+                    operation_id=f"{action_id}:{note_operation_type}",
+                    operation_type=note_operation_type,
+                    entity_kind="note" if note_operation_type == "delta-note-upsert" else "issue-tag",
+                    managed_value=f"{markup_id}:{note_operation_type}",
+                    before=None,
+                    after=semantic_text,
+                    detail="Insert or update markup callout note in CAD space.",
+                    warnings=apply_blockers,
+                    approved=len(apply_blockers) == 0,
+                    native_payload={
+                        **base_native_payload,
+                        "anchorPoint": anchor_point,
+                        "text": semantic_text,
+                    },
+                )
+            )
+
+        if _is_revision_cloud_markup(action, markup):
+            bounds = _normalize_bounds(markup.get("bounds"))
+            if bounds:
+                operations.append(
+                    _build_autodraft_operation(
+                        operation_id=f"{action_id}:revision-cloud-upsert",
+                        operation_type="revision-cloud-upsert",
+                        entity_kind="revision-cloud",
+                        managed_value=f"{markup_id}:revision-cloud",
+                        before=None,
+                        after="Revision cloud",
+                        detail="Insert or update Suite-managed revision cloud.",
+                        warnings=apply_blockers,
+                        approved=len(apply_blockers) == 0,
+                        native_payload={
+                            **base_native_payload,
+                            "bounds": _clone_json_value(bounds),
+                            "geometry": _extract_markup_geometry_payload(markup),
+                        },
+                    )
+                )
+
+        geometry_payload = _extract_markup_geometry_payload(markup)
+        if category == "add" and geometry_payload:
+            operations.append(
+                _build_autodraft_operation(
+                    operation_id=f"{action_id}:geometry-add",
+                    operation_type="geometry-add",
+                    entity_kind="geometry",
+                    managed_value=f"{markup_id}:geometry-add",
+                    before=None,
+                    after=str(geometry_payload.get("kind") or "geometry"),
+                    detail="Create explicit CAD geometry from Bluebeam annotation geometry.",
+                    warnings=apply_blockers,
+                    approved=len(apply_blockers) == 0,
+                    native_payload={
+                        **base_native_payload,
+                        "geometry": _clone_json_value(geometry_payload),
+                    },
+                )
+            )
+
+        if category == "delete" and not execute_kind:
+            delete_targets = _collect_geometric_delete_targets(markup, cad_context)
+            delete_handles = [
+                str(entry.get("id") or "").strip()
+                for entry in delete_targets
+                if str(entry.get("id") or "").strip()
+            ]
+            delete_warnings = list(apply_blockers)
+            if len(delete_handles) == 0:
+                delete_warnings.append(
+                    "Delete markup did not resolve explicit CAD geometry targets and will stay preview-only."
+                )
+            elif len(delete_handles) > 12:
+                delete_warnings.append(
+                    "Delete markup resolved too many geometry targets for safe apply; narrow the markup and retry."
+                )
+            if delete_handles:
+                operations.append(
+                    _build_autodraft_operation(
+                        operation_id=f"{action_id}:geometry-delete",
+                        operation_type="geometry-delete",
+                        entity_kind="geometry",
+                        managed_value=f"{markup_id}:geometry-delete",
+                        before=f"{len(delete_handles)} geometric target(s)",
+                        after="delete",
+                        target_handle_refs=delete_handles,
+                        detail="Delete explicitly resolved CAD geometry targets under the approved delete markup.",
+                        warnings=delete_warnings,
+                        approved=len(delete_warnings) == 0,
+                        native_payload={
+                            **base_native_payload,
+                            "deleteTargets": _clone_json_value(delete_targets) or [],
+                        },
+                    )
+                )
+
+    return operations
+
+
 def _infer_page_position_zone(
     bounds: Dict[str, float],
     *,
@@ -8136,6 +8606,36 @@ def create_autodraft_blueprint(
                     meta_obj["callout_points"] = [
                         _transform_point_to_cad(point, transform) for point in callout_points
                     ]
+                line_points = _normalize_point_list(meta_obj.get("line_points"))
+                if line_points:
+                    meta_obj["line_points"] = [
+                        _transform_point_to_cad(point, transform) for point in line_points
+                    ]
+                vertices = _normalize_point_list(meta_obj.get("vertices"))
+                if vertices:
+                    meta_obj["vertices"] = [
+                        _transform_point_to_cad(point, transform) for point in vertices
+                    ]
+                ink_strokes = (
+                    meta_obj.get("ink_strokes") if isinstance(meta_obj.get("ink_strokes"), list) else []
+                )
+                if ink_strokes:
+                    transformed_strokes: List[List[Dict[str, float]]] = []
+                    for stroke in ink_strokes:
+                        stroke_points = _normalize_point_list(stroke)
+                        if not stroke_points:
+                            continue
+                        transformed_strokes.append(
+                            [_transform_point_to_cad(point, transform) for point in stroke_points]
+                        )
+                    if transformed_strokes:
+                        meta_obj["ink_strokes"] = transformed_strokes
+                geometry_bounds = _normalize_bounds(meta_obj.get("geometry_bounds"))
+                if geometry_bounds:
+                    meta_obj["geometry_bounds"] = _transform_bounds_to_cad(
+                        geometry_bounds,
+                        transform,
+                    )
                 page_position = (
                     meta_obj.get("page_position")
                     if isinstance(meta_obj.get("page_position"), dict)
@@ -8306,6 +8806,12 @@ def create_autodraft_blueprint(
                 cad_context=cad_context_for_compare,
             )
             compare_result["plan"] = plan_obj
+            compare_result["preview_operations"] = _build_autodraft_preview_operations(
+                actions=plan_obj["actions"],
+                cad_context=cad_context_for_compare,
+            )
+        else:
+            compare_result["preview_operations"] = []
         markup_review_queue = _apply_markup_review_requirements(
             compare_result=compare_result,
             request_id=request_id,

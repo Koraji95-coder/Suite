@@ -11,6 +11,7 @@ import type { DrawingRevisionRegisterRow } from "@/services/projectRevisionRegis
 export interface TitleBlockSyncProfile {
 	blockName: string;
 	projectRootPath: string | null;
+	acadeProjectFilePath?: string | null;
 	acadeLine1: string;
 	acadeLine2: string;
 	acadeLine4: string;
@@ -83,8 +84,11 @@ export interface TitleBlockSyncSummary {
 export interface TitleBlockSyncArtifacts {
 	wdtPath: string;
 	wdlPath: string;
+	wdpPath?: string;
 	wdtText: string;
 	wdlText: string;
+	wdpText?: string;
+	wdpState?: "existing" | "starter";
 }
 
 export interface TitleBlockSyncPayload {
@@ -113,6 +117,44 @@ export interface TitleBlockSyncResponse {
 	};
 	warnings?: string[];
 	meta?: Record<string, unknown>;
+}
+
+function normalizeTitleBlockWorkflowMessage(message: string) {
+	const normalized = String(message || "").trim();
+	if (!normalized) {
+		return "";
+	}
+
+	const lower = normalized.toLowerCase();
+
+	if (
+		lower.includes("autocad scan bridge unavailable") ||
+		lower.includes("autocad bridge is not configured") ||
+		(lower.includes("filename-only fallback") && lower.includes("dwg metadata"))
+	) {
+		return "Live drawing metadata is not connected right now, so Suite is pairing drawing rows by filename until the DWG bridge is available.";
+	}
+
+	if (lower.includes("project_title_block_profiles")) {
+		return "";
+	}
+
+	if (lower.includes("drawing_revision_register_entries")) {
+		return "Hosted revision history is unavailable right now, so Suite is using local revision data where available.";
+	}
+
+	return normalized;
+}
+
+export function normalizeTitleBlockWorkflowWarnings(warnings: string[]) {
+	const uniqueWarnings = new Set<string>();
+	for (const warning of warnings) {
+		const normalized = normalizeTitleBlockWorkflowMessage(warning);
+		if (normalized) {
+			uniqueWarnings.add(normalized);
+		}
+	}
+	return Array.from(uniqueWarnings);
 }
 
 class TitleBlockSyncService {
@@ -193,21 +235,26 @@ class TitleBlockSyncService {
 				return {
 					success: false,
 					code: parsed?.code || "REQUEST_FAILED",
-					message:
+					message: normalizeTitleBlockWorkflowMessage(
 						parsed?.message ||
 						(await parseResponseErrorMessage(
 							response,
 							`Title block sync request failed (${response.status})`,
 						)),
+					),
 					requestId: parsed?.requestId,
-					warnings: parsed?.warnings || [],
+					warnings: normalizeTitleBlockWorkflowWarnings(parsed?.warnings || []),
 					meta: parsed?.meta,
 					data: parsed?.data,
 				};
 			}
 
 			if (parsed && typeof parsed.success === "boolean") {
-				return parsed;
+				return {
+					...parsed,
+					message: normalizeTitleBlockWorkflowMessage(parsed.message),
+					warnings: normalizeTitleBlockWorkflowWarnings(parsed.warnings || []),
+				};
 			}
 
 			return {
@@ -237,6 +284,14 @@ class TitleBlockSyncService {
 
 	preview(payload: TitleBlockSyncPayload) {
 		return this.requestJson("/api/title-block-sync/preview", payload);
+	}
+
+	ensureArtifacts(payload: TitleBlockSyncPayload) {
+		return this.requestJson("/api/title-block-sync/ensure-artifacts", payload);
+	}
+
+	openProject(payload: TitleBlockSyncPayload) {
+		return this.requestJson("/api/title-block-sync/open-project", payload);
 	}
 
 	apply(payload: TitleBlockSyncPayload) {

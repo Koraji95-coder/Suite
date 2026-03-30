@@ -37,6 +37,12 @@ const AgentRoutePage = lazy(() => import("./routes/agent/AgentRoutePage"));
 const DeveloperPortalRoutePage = lazy(
 	() => import("./routes/DeveloperPortalRoutePage"),
 );
+const AutomationStudioRoutePage = lazy(
+	() =>
+		import(
+			"./routes/developer/automation-studio/AutomationStudioRoutePage"
+		),
+);
 const ArchitectureMapRoutePage = lazy(
 	() => import("./routes/architecture/ArchitectureMapRoutePage"),
 );
@@ -143,6 +149,12 @@ export default function App() {
 										path="developer"
 										element={withRouteSuspense(
 											withAudience(<DeveloperPortalRoutePage />, "dev"),
+										)}
+									/>
+									<Route
+										path="developer/automation-studio"
+										element={withRouteSuspense(
+											withAudience(<AutomationStudioRoutePage />, "dev"),
 										)}
 									/>
 									<Route

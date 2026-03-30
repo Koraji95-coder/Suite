@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NotificationProvider } from "@/auth/NotificationContext";
 import type {
 	WatchdogCollector,
 	WatchdogCollectorEvent,
@@ -23,6 +24,7 @@ const mockListEvents = vi.hoisted(() => vi.fn());
 const mockListSessions = vi.hoisted(() => vi.fn());
 const mockListCollectors = vi.hoisted(() => vi.fn());
 const mockFetchIssueSet = vi.hoisted(() => vi.fn());
+const mockOpenRuntimeControlShell = vi.hoisted(() => vi.fn());
 
 vi.mock("@/auth/useAuth", () => ({
 	useAuth: () => ({
@@ -62,6 +64,10 @@ vi.mock("@/services/projectIssueSetService", () => ({
 	projectIssueSetService: {
 		fetchIssueSet: mockFetchIssueSet,
 	},
+}));
+
+vi.mock("@/services/runtimeControlService", () => ({
+	openRuntimeControlShell: mockOpenRuntimeControlShell,
 }));
 
 function createCollector(
@@ -142,6 +148,18 @@ function createSession(
 		trackerUpdatedAt: Date.now(),
 		...overrides,
 	};
+}
+
+function renderWatchdog(initialEntry: string) {
+	return render(
+		<NotificationProvider>
+			<MemoryRouter initialEntries={[initialEntry]}>
+				<Routes>
+					<Route path="/app/watchdog" element={<WatchdogRoutePage />} />
+				</Routes>
+			</MemoryRouter>
+		</NotificationProvider>,
+	);
 }
 
 describe("WatchdogRoutePage", () => {
@@ -293,6 +311,7 @@ describe("WatchdogRoutePage", () => {
 			},
 			error: null,
 		});
+		mockOpenRuntimeControlShell.mockResolvedValue(undefined);
 	});
 
 	afterEach(() => {
@@ -300,17 +319,7 @@ describe("WatchdogRoutePage", () => {
 	});
 
 	it("scopes customer reporting to the selected issue-set drawings", async () => {
-		render(
-			<MemoryRouter
-				initialEntries={[
-					"/app/watchdog?project=project-1&issueSet=issue-set-1",
-				]}
-			>
-				<Routes>
-					<Route path="/app/watchdog" element={<WatchdogRoutePage />} />
-				</Routes>
-			</MemoryRouter>,
-		);
+		renderWatchdog("/app/watchdog?project=project-1&issueSet=issue-set-1");
 
 		await waitFor(() =>
 			expect(screen.getAllByText(/Package IFC-01/i).length).toBeGreaterThan(0),
@@ -322,17 +331,7 @@ describe("WatchdogRoutePage", () => {
 	});
 
 	it("loads scoped watchdog data and renders the cleaned operator feed", async () => {
-		render(
-			<MemoryRouter
-				initialEntries={[
-					"/app/watchdog?project=project-1&collector=collector-cad&window=4",
-				]}
-			>
-				<Routes>
-					<Route path="/app/watchdog" element={<WatchdogRoutePage />} />
-				</Routes>
-			</MemoryRouter>,
-		);
+		renderWatchdog("/app/watchdog?project=project-1&collector=collector-cad&window=4");
 
 		await waitFor(() => {
 			expect(mockGetOverview).toHaveBeenCalledWith({
@@ -359,19 +358,17 @@ describe("WatchdogRoutePage", () => {
 		});
 
 		expect(
-			(await screen.findAllByText("Live activity")).length,
+			(await screen.findAllByText("Live CAD sessions")).length,
 		).toBeGreaterThanOrEqual(1);
-		expect(screen.getAllByText("Project drawings").length).toBeGreaterThanOrEqual(
-			1,
-		);
-		expect(screen.getAllByText("Latest actions").length).toBeGreaterThanOrEqual(
+		expect(
+			screen.getAllByText("Project drawing list").length,
+		).toBeGreaterThanOrEqual(1);
+		expect(screen.getAllByText("Recent activity").length).toBeGreaterThanOrEqual(
 			1,
 		);
 		expect(screen.queryByText("Attention")).toBeNull();
-		expect(screen.getAllByText("Coverage").length).toBeGreaterThanOrEqual(
-			1,
-		);
-		expect(screen.queryByText("Raw collector events")).toBeNull();
+		expect(screen.getAllByText("Coverage").length).toBeGreaterThanOrEqual(1);
+		expect(screen.queryByText("Technical stream")).toBeNull();
 		expect(screen.queryByText("Updated file")).toBeNull();
 		expect(screen.getAllByText("Saved drawing").length).toBeGreaterThanOrEqual(
 			1,
@@ -385,7 +382,7 @@ describe("WatchdogRoutePage", () => {
 		expect(screen.getByDisplayValue("Nanulak")).toBeTruthy();
 	});
 
-	it("shows the technical stream for dev users", async () => {
+	it("uses the same cleaned activity stream for dev users", async () => {
 		authState.user = {
 			id: "user-1",
 			email: "dev@example.com",
@@ -395,59 +392,86 @@ describe("WatchdogRoutePage", () => {
 		};
 		authState.allowCommandCenter = true;
 
-		render(
-			<MemoryRouter initialEntries={["/app/watchdog"]}>
-				<Routes>
-					<Route path="/app/watchdog" element={<WatchdogRoutePage />} />
-				</Routes>
-			</MemoryRouter>,
-		);
+		renderWatchdog("/app/watchdog");
 
-		expect(
-			await screen.findByRole("button", {
-				name: "Latest actions",
-			}),
-		).toBeTruthy();
-		fireEvent.click(
-			screen.getByRole("button", {
-				name: "Raw collector events",
-			}),
-		);
-		expect(
-			(await screen.findAllByText("Raw collector events")).length,
-		).toBeGreaterThanOrEqual(1);
-		expect(
-			screen.getAllByText("Filesystem • Modified").length,
-		).toBeGreaterThanOrEqual(
-			1,
-		);
+		expect(await screen.findAllByText("Recent activity")).toBeTruthy();
+		expect(screen.queryByText("Technical stream")).toBeNull();
+		expect(screen.queryByText("Operator view")).toBeNull();
+		expect(screen.queryByText("Filesystem • Modified")).toBeNull();
+		expect(screen.getAllByText("Saved drawing").length).toBeGreaterThanOrEqual(1);
 	});
 
-	it("scopes the operator surfaces to the selected drawing", async () => {
-		render(
-			<MemoryRouter
-				initialEntries={[
-					"/app/watchdog?project=project-1&collector=collector-cad&window=4&drawing=c:/projects/nanulak/drawing-02.dwg",
-				]}
-			>
-				<Routes>
-					<Route path="/app/watchdog" element={<WatchdogRoutePage />} />
-				</Routes>
-			</MemoryRouter>,
+	it("keeps the standard operator surfaces even when a stale drawing filter is present", async () => {
+		renderWatchdog(
+			"/app/watchdog?project=project-1&collector=collector-cad&window=4&drawing=c:/projects/nanulak/drawing-02.dwg",
 		);
 
-		expect(
-			await screen.findByText(
-				"Time-ordered user-facing drawing actions for Drawing-02.dwg, like opened, saved, and closed drawing activity.",
-			),
-		).toBeTruthy();
+		expect(await screen.findAllByText("Recent activity")).toBeTruthy();
 		expect(screen.queryByText("Focused drawing")).toBeNull();
 		expect(
-			screen.getAllByRole("button", { name: /clear drawing focus/i }).length,
-		).toBeGreaterThanOrEqual(1);
-		expect(screen.queryByText("Raw collector events")).toBeNull();
+			screen.queryByRole("button", { name: /clear drawing focus/i }),
+		).toBeNull();
+		expect(screen.queryByText("Technical stream")).toBeNull();
 		expect(screen.getAllByText("Drawing-02.dwg").length).toBeGreaterThanOrEqual(
 			2,
 		);
+	});
+
+	it("opens Runtime Control from the coverage alert", async () => {
+		mockListCollectors.mockResolvedValue({
+			ok: true,
+			count: 1,
+			collectors: [
+				createCollector({
+					metadata: {
+						sourceAvailable: false,
+						activeDrawingPath: null,
+						activeDrawingName: null,
+						currentSessionId: null,
+						trackerUpdatedAt: Date.now(),
+						pendingCount: 0,
+					},
+				}),
+			],
+		});
+		mockListSessions.mockResolvedValue({
+			ok: true,
+			generatedAt: Date.now(),
+			timeWindowMs: 4 * 60 * 60 * 1000,
+			projectId: "project-1",
+			collectorId: "collector-cad",
+			count: 1,
+			sessions: [
+				createSession({
+					projectId: null,
+					active: false,
+					status: "completed",
+				}),
+			],
+		});
+		mockListEvents.mockResolvedValue({
+			ok: true,
+			events: [
+				createEvent({
+					projectId: null,
+					sessionId: null,
+				}),
+			],
+			count: 1,
+			afterEventId: 0,
+			lastEventId: 1,
+			nextEventId: 2,
+		});
+
+		renderWatchdog("/app/watchdog");
+
+		const button = await screen.findByRole("button", {
+			name: "Open Runtime Control",
+		});
+		fireEvent.click(button);
+
+		await waitFor(() => {
+			expect(mockOpenRuntimeControlShell).toHaveBeenCalledTimes(1);
+		});
 	});
 });

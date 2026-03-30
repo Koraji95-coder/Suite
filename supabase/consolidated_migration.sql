@@ -130,6 +130,7 @@ create table if not exists public.projects (
 	status public.project_status not null default 'active',
 	category text not null default 'Uncategorized',
 	watchdog_root_path text null,
+	pdf_package_root_path text null,
 	created_at timestamptz not null default timezone('utc', now()),
 	updated_at timestamptz not null default timezone('utc', now()),
 	user_id uuid not null references auth.users (id) on delete cascade
@@ -249,6 +250,7 @@ create table if not exists public.project_title_block_profiles (
 	user_id uuid not null references auth.users (id) on delete cascade,
 	block_name text not null default 'R3P-24x36BORDER&TITLE',
 	project_root_path text null,
+	acade_project_file_path text null,
 	acade_line1 text not null default '',
 	acade_line2 text not null default '',
 	acade_line4 text not null default '',
@@ -511,6 +513,9 @@ create index if not exists idx_projects_created_at on public.projects (created_a
 create index if not exists idx_projects_watchdog_root_path
 	on public.projects (watchdog_root_path)
 	where watchdog_root_path is not null;
+create index if not exists idx_projects_pdf_package_root_path
+	on public.projects (pdf_package_root_path)
+	where pdf_package_root_path is not null;
 
 create index if not exists idx_tasks_user_id on public.tasks (user_id);
 create index if not exists idx_tasks_project_id on public.tasks (project_id);
@@ -702,3 +707,7 @@ end;
 $$;
 
 grant execute on function public.upsert_user_setting(uuid, text, jsonb, uuid) to authenticated;
+alter table if exists public.projects
+	add column if not exists pe_name text not null default '',
+	add column if not exists firm_number text not null default '',
+	add column if not exists pdf_package_root_path text null;

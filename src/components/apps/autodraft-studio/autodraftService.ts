@@ -322,6 +322,23 @@ export type AutoDraftPreparedMarkup = {
 	recognition?: AutoDraftRecognitionMetadata;
 };
 
+export type AutoDraftPreviewOperation = {
+	id: string;
+	operationType: string;
+	drawingPath?: string | null;
+	drawingName?: string | null;
+	relativePath?: string | null;
+	managedKey?: Record<string, unknown> | null;
+	targetHandleRefs?: string[];
+	before?: string | null;
+	after?: string | null;
+	detail: string;
+	warnings: string[];
+	artifactRefs: string[];
+	approved: boolean;
+	nativePayload?: Record<string, unknown> | null;
+};
+
 export type AutoDraftComparePrepareResponse = {
 	ok: boolean;
 	success: boolean;
@@ -469,6 +486,7 @@ export type AutoDraftCompareResponse = {
 			rationale?: string | null;
 		}>;
 	};
+	preview_operations?: AutoDraftPreviewOperation[];
 };
 
 export type AutoDraftCompareFeedbackResponse = {
@@ -1774,6 +1792,49 @@ const normalizeShadowAdvisor = (
 	};
 };
 
+const normalizePreviewOperation = (
+	value: unknown,
+	index: number,
+): AutoDraftPreviewOperation | null => {
+	if (!isRecord(value)) return null;
+	const id = toNonEmptyString(value.id, `preview-operation-${index + 1}`);
+	const operationType = toNonEmptyString(value.operationType, "preview");
+	return {
+		id,
+		operationType,
+		drawingPath:
+			typeof value.drawingPath === "string" ? value.drawingPath : null,
+		drawingName:
+			typeof value.drawingName === "string" ? value.drawingName : null,
+		relativePath:
+			typeof value.relativePath === "string" ? value.relativePath : null,
+		managedKey: isRecord(value.managedKey) ? value.managedKey : null,
+		targetHandleRefs: Array.isArray(value.targetHandleRefs)
+			? value.targetHandleRefs.filter(
+					(entry): entry is string =>
+						typeof entry === "string" && entry.trim().length > 0,
+				)
+			: [],
+		before: typeof value.before === "string" ? value.before : null,
+		after: typeof value.after === "string" ? value.after : null,
+		detail: toNonEmptyString(value.detail, operationType),
+		warnings: Array.isArray(value.warnings)
+			? value.warnings.filter(
+					(entry): entry is string =>
+						typeof entry === "string" && entry.trim().length > 0,
+				)
+			: [],
+		artifactRefs: Array.isArray(value.artifactRefs)
+			? value.artifactRefs.filter(
+					(entry): entry is string =>
+						typeof entry === "string" && entry.trim().length > 0,
+				)
+			: [],
+		approved: value.approved !== false,
+		nativePayload: isRecord(value.nativePayload) ? value.nativePayload : null,
+	};
+};
+
 const normalizeAgentPreReview = (
 	value: unknown,
 ): AutoDraftCompareResponse["agent_pre_review"] => {
@@ -1906,6 +1967,14 @@ const normalizeComparePayload = (
 	const markupReviewQueue = markupReviewQueueRaw
 		.map((entry, index) => normalizeMarkupReviewItem(entry, index))
 		.filter((entry): entry is AutoDraftMarkupReviewItem => entry !== null);
+	const previewOperationsRaw = Array.isArray(payload.preview_operations)
+		? payload.preview_operations
+		: Array.isArray(payload.previewOperations)
+			? payload.previewOperations
+			: [];
+	const previewOperations = previewOperationsRaw
+		.map((entry, index) => normalizePreviewOperation(entry, index))
+		.filter((entry): entry is AutoDraftPreviewOperation => entry !== null);
 
 	const requestedEngine = toNonEmptyString(engineRaw.requested, "auto");
 	const usedEngine = toNonEmptyString(engineRaw.used, "python");
@@ -1993,6 +2062,7 @@ const normalizeComparePayload = (
 		review_queue: reviewQueue,
 		agent_pre_review: normalizeAgentPreReview(payload.agent_pre_review),
 		shadow_advisor: normalizeShadowAdvisor(payload.shadow_advisor),
+		preview_operations: previewOperations,
 	};
 };
 

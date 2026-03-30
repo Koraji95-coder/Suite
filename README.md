@@ -122,6 +122,8 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
 Optional but recommended:
 
 - Redis-compatible runtime for limiter state (Memurai on Windows is recommended)
+- DailyDesk / Office source available in its own local workspace or repo
+  - preferred root: `C:\Dev\Daily`
 
 ## 1) Install Dependencies
 
@@ -134,7 +136,9 @@ python -m pip install -r backend/requirements-api.lock.txt
 ```
 
 ```bash
-dotnet restore Suite.sln
+dotnet restore dotnet/Suite.RuntimeControl/Suite.RuntimeControl.csproj
+dotnet restore dotnet/named-pipe-bridge/NamedPipeServer.csproj
+dotnet restore dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj
 ```
 
 ## 2) Environment Setup
@@ -236,6 +240,45 @@ dotnet run --project dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj
 - Frontend: `http://localhost:5173`
 - Backend health: `http://127.0.0.1:5000/health`
 - Gateway health: `http://127.0.0.1:3000/health`
+
+## Cross-Workstation Bring-Up
+
+Suite and Office are intentionally kept separate:
+
+- `Suite` repo preferred local root: `C:\Dev\Suite`
+- `DailyDesk` / Office preferred local root: `C:\Dev\Daily`
+- `Suite Runtime Control` stays inside the `Suite` repo
+
+Use the new workstation bootstrap flow when setting up another Windows PC:
+
+```bash
+npm run workstation:bringup:validate
+npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailyRepoUrl <YOUR_DAILY_REPO_URL>
+```
+
+If both repos are already cloned into the standard roots, that is the preferred path:
+
+```bash
+git clone https://github.com/<YOUR_GITHUB_USER>/Suite.git C:\Dev\Suite
+git clone https://github.com/<YOUR_GITHUB_USER>/Daily.git C:\Dev\Daily
+cd C:\Dev\Suite
+npm run workstation:bringup:validate
+npm run workstation:bringup -- -WorkstationId DUSTIN-WORK
+```
+
+In that layout, bootstrap will detect the existing `C:\Dev\Daily` workspace automatically and use it without needing `-DailyRepoUrl`.
+
+If the Daily workspace is not yet in its own Git repo, you can temporarily hydrate it from an existing local source path:
+
+```bash
+npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailySourcePath "C:\\Users\\koraj\\OneDrive\\Desktop\\Daily"
+```
+
+Related docs:
+
+- `docs/development/supabase-workstation-bringup.md`
+- `docs/development/workstation-transfer-runbook.md`
+- `docs/development/electrical-drawing-program-test-readiness.md`
 
 ## Agent System Summary
 

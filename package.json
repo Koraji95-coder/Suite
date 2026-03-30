@@ -32,6 +32,8 @@
 		"workstation:mirror": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-local-state.ps1",
 		"workstation:restore": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/restore-suite-local-state.ps1",
 		"workstation:bootstrap": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/run-suite-runtime-startup.ps1",
+		"workstation:bringup": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap-suite-workstation.ps1",
+		"workstation:bringup:validate": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/bootstrap-suite-workstation.ps1 -ValidateOnly",
 		"workstation:stop": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/stop-suite-runtime.ps1 -IncludeFrontend",
 		"workstation:prune": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/prune-suite-runtime.ps1",
 		"workstation:control-panel": "PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/launch-suite-runtime-control.ps1",

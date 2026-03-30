@@ -9,6 +9,7 @@ import {
 	type TitleBlockSyncProfile,
 	type TitleBlockSyncRow,
 	type TitleBlockSyncSummary,
+	normalizeTitleBlockWorkflowWarnings,
 } from "@/services/titleBlockSyncService";
 
 export type ProjectDocumentMetadataSource =
@@ -25,7 +26,10 @@ export interface ProjectDocumentMetadataProjectOption {
 	id: string;
 	name: string;
 	description: string;
+	projectPeName: string;
+	firmNumber: string;
 	watchdogRootPath: string | null;
+	pdfPackageRootPath: string | null;
 }
 
 export interface ProjectDocumentMetadataRow {
@@ -606,6 +610,7 @@ export const projectDocumentMetadataService = {
 		const profile = {
 			blockName: profileResult.data.block_name,
 			projectRootPath: profileResult.data.project_root_path,
+			acadeProjectFilePath: profileResult.data.acade_project_file_path,
 			acadeLine1: profileResult.data.acade_line1,
 			acadeLine2: profileResult.data.acade_line2,
 			acadeLine4: profileResult.data.acade_line4,
@@ -645,7 +650,7 @@ export const projectDocumentMetadataService = {
 				scanResponse.data.drawings,
 				args.reportRows || [],
 			),
-			warnings,
+			warnings: normalizeTitleBlockWorkflowWarnings(warnings),
 		};
 	},
 

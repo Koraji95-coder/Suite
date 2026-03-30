@@ -28,6 +28,7 @@ import {
 	type ProjectDocumentMetadataRow,
 	parseAcadeDocumentReportFile,
 } from "@/services/projectDocumentMetadataService";
+import { projectDrawingProgramService } from "@/services/projectDrawingProgramService";
 import {
 	type DrawingRevisionRegisterRow,
 	projectRevisionRegisterService,
@@ -49,6 +50,7 @@ import {
 import { supabase } from "@/supabase/client";
 import styles from "./DrawingListManager.module.css";
 import { buildWorkbook, type DrawingEntry } from "./drawingListManagerModels";
+import { DrawingProgramPanel } from "./DrawingProgramPanel";
 
 interface ProjectOption {
 	id: string;
@@ -71,16 +73,20 @@ const EMPTY_SUMMARY: TitleBlockSyncSummary = {
 };
 
 const EMPTY_ARTIFACTS: TitleBlockSyncArtifacts = {
+	wdpPath: "",
 	wdtPath: "",
 	wdlPath: "",
+	wdpText: "",
 	wdtText: "",
 	wdlText: "",
+	wdpState: "starter",
 };
 
 function toProfileInput(profile: TitleBlockSyncProfile) {
 	return {
 		blockName: profile.blockName,
 		projectRootPath: profile.projectRootPath,
+		acadeProjectFilePath: profile.acadeProjectFilePath,
 		acadeLine1: profile.acadeLine1,
 		acadeLine2: profile.acadeLine2,
 		acadeLine4: profile.acadeLine4,
@@ -98,6 +104,7 @@ function mapProfileRowToState(
 	return {
 		blockName: row.block_name,
 		projectRootPath: row.project_root_path,
+		acadeProjectFilePath: row.acade_project_file_path,
 		acadeLine1: row.acade_line1,
 		acadeLine2: row.acade_line2,
 		acadeLine4: row.acade_line4,
@@ -276,6 +283,7 @@ export function DrawingListManager({
 	const [profile, setProfile] = useState<TitleBlockSyncProfile>({
 		blockName: "R3P-24x36BORDER&TITLE",
 		projectRootPath: "",
+		acadeProjectFilePath: "",
 		acadeLine1: "",
 		acadeLine2: "",
 		acadeLine4: "",
@@ -305,6 +313,10 @@ export function DrawingListManager({
 	const [selectedRelativePaths, setSelectedRelativePaths] = useState<string[]>(
 		[],
 	);
+	const [pendingTitleBlockReview, setPendingTitleBlockReview] = useState<{
+		paths: string[];
+		at: string | null;
+	} | null>(null);
 	const [loadingProjects, setLoadingProjects] = useState(false);
 	const [loadingProjectData, setLoadingProjectData] = useState(false);
 	const [savingProfile, setSavingProfile] = useState(false);
@@ -313,6 +325,7 @@ export function DrawingListManager({
 	const [applying, setApplying] = useState(false);
 	const acadeReportInputRef = useRef<HTMLInputElement | null>(null);
 	const appliedIssueSetRef = useRef<string | null>(null);
+	const autoPendingScanRef = useRef<string | null>(null);
 
 	const selectedProject = useMemo(
 		() => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -568,6 +581,13 @@ export function DrawingListManager({
 		appliedIssueSetRef.current = preferredIssueSet.id;
 	}, [preferredIssueSet, rows]);
 
+	useEffect(() => {
+		if (!selectedProjectId) {
+			setPendingTitleBlockReview(null);
+			autoPendingScanRef.current = null;
+		}
+	}, [selectedProjectId]);
+
 	const buildPayload = (nextRows?: TitleBlockSyncRow[]) => {
 		if (!selectedProjectId) {
 			throw new Error("Select a project first.");
@@ -615,7 +635,32 @@ export function DrawingListManager({
 		}
 	};
 
-	const handleScan = async () => {
+	const clearPendingTitleBlockReview = async () => {
+		if (!selectedProjectId) {
+			setPendingTitleBlockReview(null);
+			return;
+		}
+		const result = await projectDrawingProgramService.fetchProgram(selectedProjectId);
+		const program = result.data;
+		if (!program) {
+			setPendingTitleBlockReview(null);
+			return;
+		}
+		const saveError = await projectDrawingProgramService.saveProgram({
+			...program,
+			pendingTitleBlockSyncPaths: [],
+			pendingTitleBlockSyncAt: null,
+		});
+		if (saveError) {
+			throw saveError;
+		}
+		setPendingTitleBlockReview(null);
+	};
+
+	const handleScan = async (options?: {
+		preferredSelectedRelativePaths?: string[];
+		stagedMessage?: string | null;
+	}) => {
 		setScanning(true);
 		setMessage(null);
 		try {
@@ -629,12 +674,24 @@ export function DrawingListManager({
 			setSummary(response.data.summary);
 			setArtifacts(response.data.artifacts);
 			setWarnings(response.warnings || []);
-			setSelectedRelativePaths(
+			const availableRelativePaths = new Set(
 				response.data.drawings
 					.filter((row) => row.fileType === "dwg")
 					.map((row) => row.relativePath),
 			);
-			setMessage(response.message);
+			const nextSelected =
+				options?.preferredSelectedRelativePaths?.filter((path) =>
+					availableRelativePaths.has(path),
+				) ??
+				response.data.drawings
+					.filter((row) => row.fileType === "dwg")
+					.map((row) => row.relativePath);
+			setSelectedRelativePaths(nextSelected);
+			setMessage(
+				options?.stagedMessage && nextSelected.length > 0
+					? options.stagedMessage
+					: response.message,
+			);
 		} catch (error) {
 			const nextMessage =
 				error instanceof Error ? error.message : "Title block scan failed.";
@@ -680,6 +737,13 @@ export function DrawingListManager({
 			setSummary(response.data.summary);
 			setArtifacts(response.data.artifacts);
 			setWarnings(response.warnings || []);
+			await clearPendingTitleBlockReview().catch((clearError) => {
+				logger.warn(
+					"Title block apply completed, but the pending drawing-program follow-up marker could not be cleared.",
+					"DrawingListManager",
+					clearError,
+				);
+			});
 			setMessage(response.message);
 		} catch (error) {
 			const nextMessage =
@@ -690,6 +754,51 @@ export function DrawingListManager({
 			setApplying(false);
 		}
 	};
+
+	useEffect(() => {
+		if (!pendingTitleBlockReview?.paths.length || !selectedProjectId) {
+			return;
+		}
+		const token = `${selectedProjectId}:${pendingTitleBlockReview.at || pendingTitleBlockReview.paths.join("|")}`;
+		const normalizedPaths = pendingTitleBlockReview.paths
+			.map((path) => path.replace(/\\/g, "/"))
+			.filter(Boolean);
+		if (rows.length > 0) {
+			const available = new Set(rows.map((row) => row.relativePath));
+			const nextSelected = normalizedPaths.filter((path) => available.has(path));
+			if (nextSelected.length > 0) {
+				setSelectedRelativePaths(nextSelected);
+			}
+			return;
+		}
+		if (!profile.projectRootPath?.trim()) {
+			return;
+		}
+		if (loadingProjectData || scanning || previewing || applying) {
+			return;
+		}
+		if (autoPendingScanRef.current === token) {
+			return;
+		}
+		autoPendingScanRef.current = token;
+		void handleScan({
+			preferredSelectedRelativePaths: normalizedPaths,
+			stagedMessage:
+				normalizedPaths.length === 1
+					? "Review pending title block sync for the drawing-program changes."
+					: `Review pending title block sync for ${normalizedPaths.length} drawing-program changes.`,
+		});
+	}, [
+		applying,
+		handleScan,
+		loadingProjectData,
+		pendingTitleBlockReview,
+		previewing,
+		profile.projectRootPath,
+		rows,
+		scanning,
+		selectedProjectId,
+	]);
 
 	const updateProfile = (field: keyof TitleBlockSyncProfile, value: string) => {
 		setProfile((current) => ({
@@ -801,8 +910,10 @@ export function DrawingListManager({
 	const showGeneratedMapping =
 		Boolean(selectedProjectId) &&
 		(hasScanRows ||
+			Boolean(artifacts.wdpPath) ||
 			Boolean(artifacts.wdtPath) ||
 			Boolean(artifacts.wdlPath) ||
+			Boolean(artifacts.wdpText) ||
 			Boolean(artifacts.wdtText) ||
 			Boolean(artifacts.wdlText));
 	const showImportPanel = Boolean(selectedProjectId);
@@ -990,6 +1101,51 @@ export function DrawingListManager({
 						))}
 					</div>
 				) : null}
+				{pendingTitleBlockReview?.paths.length ? (
+					<div className={styles.warningPanel}>
+						<div>
+							Review pending title block sync for{" "}
+							{pendingTitleBlockReview.paths.length} drawing
+							{pendingTitleBlockReview.paths.length === 1 ? "" : "s"} staged by
+							the electrical drawing program.
+						</div>
+						<div className={styles.selectionActions}>
+							<button
+								type="button"
+								className={styles.secondaryButton}
+								onClick={() =>
+									void handleScan({
+										preferredSelectedRelativePaths:
+											pendingTitleBlockReview.paths,
+										stagedMessage:
+											pendingTitleBlockReview.paths.length === 1
+												? "Review pending title block sync for the drawing-program changes."
+												: `Review pending title block sync for ${pendingTitleBlockReview.paths.length} drawing-program changes.`,
+									})
+								}
+								disabled={!canRun || scanning}
+							>
+								<RefreshCw size={14} />
+								Refresh pending review
+							</button>
+							<button
+								type="button"
+								className={styles.secondaryButton}
+								onClick={() =>
+									void clearPendingTitleBlockReview().catch((error) => {
+										const nextMessage =
+											error instanceof Error
+												? error.message
+												: "Unable to clear the pending title block review.";
+										showToast("error", nextMessage);
+									})
+								}
+							>
+								Clear pending review
+							</button>
+						</div>
+					</div>
+				) : null}
 
 				<div className={styles.configGrid}>
 					<section className={styles.card}>
@@ -1042,7 +1198,13 @@ export function DrawingListManager({
 
 					<section className={styles.card}>
 						<div className={styles.cardHeaderRow}>
-							<h3 className={styles.cardTitle}>Title block defaults</h3>
+							<div>
+								<h3 className={styles.cardTitle}>ACADE and title block defaults</h3>
+								<div className={styles.smallMeta}>
+									Project-scoped defaults that feed the starter .wdp/.wdt/.wdl
+									support files and the title block review lane.
+								</div>
+							</div>
 							{selectedProjectId ? (
 								<button
 									type="button"
@@ -1068,7 +1230,7 @@ export function DrawingListManager({
 									/>
 								</label>
 								<label className={styles.field}>
-									<span className={styles.fieldLabel}>LINE1</span>
+									<span className={styles.fieldLabel}>Client / Utility</span>
 									<input
 										className={styles.input}
 										value={profile.acadeLine1}
@@ -1079,7 +1241,7 @@ export function DrawingListManager({
 									/>
 								</label>
 								<label className={styles.field}>
-									<span className={styles.fieldLabel}>LINE2</span>
+									<span className={styles.fieldLabel}>Facility / Site</span>
 									<input
 										className={styles.input}
 										value={profile.acadeLine2}
@@ -1090,7 +1252,7 @@ export function DrawingListManager({
 									/>
 								</label>
 								<label className={styles.field}>
-									<span className={styles.fieldLabel}>LINE4</span>
+									<span className={styles.fieldLabel}>Project number</span>
 									<input
 										className={styles.input}
 										value={profile.acadeLine4}
@@ -1098,6 +1260,22 @@ export function DrawingListManager({
 											updateProfile("acadeLine4", event.target.value)
 										}
 										placeholder="Project Number"
+									/>
+								</label>
+								<label className={styles.field}>
+									<span className={styles.fieldLabel}>
+										ACADE project file (.wdp)
+									</span>
+									<input
+										className={styles.input}
+										value={profile.acadeProjectFilePath || ""}
+										onChange={(event) =>
+											updateProfile(
+												"acadeProjectFilePath",
+												event.target.value,
+											)
+										}
+										placeholder="C:\\Projects\\Nanulak\\Nanulak.wdp"
 									/>
 								</label>
 								<label className={styles.field}>
@@ -1137,13 +1315,52 @@ export function DrawingListManager({
 								for this package.
 							</div>
 						)}
+						<div className={styles.artifactMeta}>
+							<div>
+								<strong>Client / Utility</strong>
+								<span>ACADE TITLE1 / LINE1</span>
+							</div>
+							<div>
+								<strong>Facility / Site</strong>
+								<span>ACADE TITLE2 / LINE2</span>
+							</div>
+							<div>
+								<strong>Project number</strong>
+								<span>ACADE PROJ / LINE4</span>
+							</div>
+							<div>
+								<strong>Drawing title</strong>
+								<span>Comes from each drawing row and TITLE3 / DWGDESC.</span>
+							</div>
+						</div>
 						<div className={styles.cardFootnote}>
-							Saved defaults feed the next sync preview, not the issued drawing
-							files directly.
+							Saved defaults feed the ACADE support-file preview and title block
+							review lane. They do not overwrite issued drawings until an
+							approved sync is applied.
 						</div>
 					</section>
 
 				</div>
+
+				<DrawingProgramPanel
+					projectId={selectedProjectId}
+					projectName={selectedProject?.name ?? null}
+					profile={profile}
+					pendingTitleBlockSyncOverride={pendingTitleBlockReview}
+					onPendingTitleBlockSyncChange={setPendingTitleBlockReview}
+					onStageTitleBlockReview={async (relativePaths) => {
+						if (!relativePaths.length) {
+							return;
+						}
+						await handleScan({
+							preferredSelectedRelativePaths: relativePaths,
+							stagedMessage:
+								relativePaths.length === 1
+									? "Review pending title block sync for the drawing-program changes."
+									: `Review pending title block sync for ${relativePaths.length} drawing-program changes.`,
+						});
+					}}
+				/>
 
 				<section className={styles.card}>
 					<div className={styles.tableHeader}>
@@ -1453,13 +1670,30 @@ export function DrawingListManager({
 							<section className={styles.card}>
 								<div className={styles.cardHeaderRow}>
 									<div>
-										<h3 className={styles.cardTitle}>Generated mapping</h3>
+										<h3 className={styles.cardTitle}>ACADE support artifacts</h3>
 										<div className={styles.smallMeta}>
-											WDT and WDL previews for the current sync defaults.
+											Suite derives a project-scoped .wdp, .wdt, and .wdl from
+											the current defaults. Existing .wdp files are detected and
+											previewed instead of treated like blank setup.
 										</div>
 									</div>
 								</div>
 								<div className={styles.artifactMeta}>
+									<div>
+										<strong>.wdp</strong>
+										<span>
+											{artifacts.wdpPath ||
+												profile.acadeProjectFilePath ||
+												"Starter path will be derived from the project root"}
+										</span>
+										{artifacts.wdpState ? (
+											<span>
+												{artifacts.wdpState === "existing"
+													? "Existing ACADE project file detected."
+													: "Starter ACADE project scaffold from current defaults."}
+											</span>
+										) : null}
+									</div>
 									<div>
 										<strong>WDT</strong>
 										<span>{artifacts.wdtPath || "Not generated yet"}</span>
@@ -1470,6 +1704,13 @@ export function DrawingListManager({
 									</div>
 								</div>
 								<div className={styles.artifactPanel}>
+									<div>
+										<h4 className={styles.subTitle}>.WDP Preview</h4>
+										<pre className={styles.codeBlock}>
+											{artifacts.wdpText ||
+												"*[1]Project Name"}
+										</pre>
+									</div>
 									<div>
 										<h4 className={styles.subTitle}>.WDT Preview</h4>
 										<pre className={styles.codeBlock}>
@@ -1483,6 +1724,12 @@ export function DrawingListManager({
 										</pre>
 									</div>
 								</div>
+								<div className={styles.cardFootnote}>
+									Workflow: confirm the project defaults, review the starter or
+									existing .wdp/.wdt/.wdl artifacts, run the live title block
+									scan, and only then use an ACADE report as verification before
+									applying updates.
+								</div>
 							</section>
 						) : null}
 
@@ -1492,15 +1739,14 @@ export function DrawingListManager({
 									<div>
 										<h3 className={styles.cardTitle}>ACADE report import</h3>
 										<div className={styles.smallMeta}>
-											Optional workbook import for mismatch detection and export
-											shaping.
+											Optional verification from an exported ACADE report.
+											Suite still treats the live DWG/title block scan as the
+											primary drawing truth.
 										</div>
 									</div>
 								</div>
 								<label className={styles.field}>
-									<span className={styles.fieldLabel}>
-										Drawing list / automatic report
-									</span>
+									<span className={styles.fieldLabel}>ACADE report</span>
 									<div className={styles.filePickerRow}>
 										<button
 											type="button"

@@ -60,6 +60,16 @@ $configMatchesWorkstation = $false
 $errors = New-Object System.Collections.Generic.List[string]
 $warnings = New-Object System.Collections.Generic.List[string]
 
+if ($task -and -not [string]::IsNullOrWhiteSpace($runKeyValue)) {
+    if (Remove-RunKeyValue -Name $RunKeyName) {
+        $warnings.Add("Removed redundant HKCU Run startup entry because the scheduled startup task is installed.")
+        $runKeyValue = $null
+    }
+    else {
+        $warnings.Add("Collector has both a scheduled startup task and HKCU Run entry. Remove the redundant Run entry if it persists.")
+    }
+}
+
 if ($configExists) {
     try {
         $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json

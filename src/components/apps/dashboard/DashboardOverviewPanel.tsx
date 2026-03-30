@@ -823,7 +823,6 @@ export function DashboardOverviewPanel({
 						sessionTimelineRows={sessionTimelineRows}
 						selectedProjectId={selectedProjectId}
 						selectedCollectorId={selectedCollectorId}
-						watchdogSessions={watchdogSessions}
 						telemetryHotspotProjects={telemetryHotspotProjects}
 						allProjectsMap={allProjectsMap}
 						updateFilter={updateFilter}

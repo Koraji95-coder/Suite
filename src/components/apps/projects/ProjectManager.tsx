@@ -72,7 +72,9 @@ export function ProjectManager({
 		taskForm,
 		setTaskForm,
 		createProject,
+		createProjectAndOpenAcade,
 		updateProject,
+		updateProjectAndOpenAcade,
 		requestDeleteProject,
 		confirmDeleteProject,
 		toggleArchiveProject,
@@ -87,6 +89,8 @@ export function ProjectManager({
 		downloadFile,
 		pickProjectRootPath,
 		isPickingProjectRoot,
+		pickProjectPdfPackageRootPath,
+		isPickingPdfPackageRoot,
 		updateProjectWatchdogRootPath,
 		resetProjectForm,
 		resetTaskForm,
@@ -136,11 +140,18 @@ export function ProjectManager({
 					resetProjectForm();
 				}}
 				onSubmit={editingProject ? updateProject : createProject}
+				onSubmitAndOpenAcade={
+					editingProject
+						? updateProjectAndOpenAcade
+						: createProjectAndOpenAcade
+				}
 				formData={projectForm}
 				setFormData={setProjectForm}
 				isEditing={Boolean(editingProject)}
 				onBrowseRootPath={pickProjectRootPath}
 				isBrowsingRootPath={isPickingProjectRoot}
+				onBrowsePdfRootPath={pickProjectPdfPackageRootPath}
+				isBrowsingPdfRootPath={isPickingPdfPackageRoot}
 			/>
 
 			<TaskFormModal
@@ -162,11 +173,11 @@ export function ProjectManager({
 				<div className={styles.listPaneShell}>
 					<div className={styles.listPaneHeader}>
 						<div>
-							<p className={styles.listPaneEyebrow}>Project queue</p>
-							<h3 className={styles.listPaneTitle}>Active portfolio</h3>
+							<p className={styles.listPaneEyebrow}>Projects</p>
+							<h3 className={styles.listPaneTitle}>Project list</h3>
 							<p className={styles.listPaneCopy}>
-								Select a project to open setup, review, files, telemetry, and
-								the delivery workflow.
+								Open a project to manage setup, readiness, review, issue
+								sets, and files.
 							</p>
 						</div>
 					</div>
@@ -237,8 +248,8 @@ export function ProjectManager({
 								Select a project to view details
 							</p>
 							<p className={styles.emptyCopy}>
-								Pick one from the queue to open setup, review, issue sets, and
-								project telemetry.
+								Pick a project to open setup, review, issue sets, and project
+								activity.
 							</p>
 						</div>
 					)}

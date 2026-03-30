@@ -39,9 +39,9 @@ function resolveSetupAction(project: Project, telemetry: ProjectWatchdogTelemetr
 	}
 
 	return {
-		title: "Move into readiness and package prep.",
+		title: "Open readiness and clear blockers.",
 		detail:
-			"Tracking, title block defaults, and revision groundwork are in place. Continue into Readiness to clear blockers and prepare the next issue set.",
+			"Project setup is in place. Open Readiness to clear blockers before the next issue set.",
 		label: "Open Readiness",
 		mode: "readiness" as ViewMode,
 		icon: FileCheck2,
@@ -70,12 +70,11 @@ export function ProjectSetupWorkspace({
 		<section className={styles.root}>
 			<div className={styles.header}>
 				<div className={styles.headerCopy}>
-					<p className={styles.eyebrow}>Delivery setup</p>
+					<p className={styles.eyebrow}>Setup</p>
 					<h4 className={styles.title}>Project setup</h4>
 					<p className={styles.description}>
-						Keep the tracked root, title block defaults, revision groundwork,
-						and drawing-control lane aligned before the project moves into
-						review and package prep.
+						Keep the project root, title block defaults, and issue prep aligned
+						before package work begins.
 					</p>
 				</div>
 			</div>
@@ -110,7 +109,7 @@ export function ProjectSetupWorkspace({
 					<div className={styles.utilityLinks}>
 						<Link to={drawingListHref} className={styles.utilityLink}>
 							<FileCheck2 className={styles.linkIcon} />
-							<span>Drawing List Manager</span>
+							<span>Title block review</span>
 						</Link>
 						<Link to={watchdogHref} className={styles.utilityLink}>
 							<Radar className={styles.linkIcon} />
@@ -122,7 +121,7 @@ export function ProjectSetupWorkspace({
 							onClick={() => onOpenViewMode("files")}
 						>
 							<FolderUp className={styles.linkIcon} />
-							<span>Files & telemetry</span>
+							<span>Files & activity</span>
 						</button>
 					</div>
 				</div>

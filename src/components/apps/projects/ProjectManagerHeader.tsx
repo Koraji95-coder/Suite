@@ -31,26 +31,17 @@ export function ProjectManagerHeader({
 		"on-hold",
 		"archived",
 	];
-	const currentFilterLabel =
-		statusFilter === "all"
-			? "All tracked projects"
-			: statusFilter === "archived"
-				? "Archived projects"
-				: statusFilter === "on-hold"
-					? "On-hold projects"
-					: "Active projects";
-
 	return (
 		<PageContextBand
-			eyebrow="Project delivery"
+			eyebrow="Projects"
 			summary={
 				<div>
 					<p className={styles.subtitle}>
-						Track projects, issue timing, and delivery readiness in one place.
+						Manage setup, review, issue sets, and package readiness in one
+						place.
 					</p>
 					<p className={styles.summary}>
-						{currentFilterLabel} with {activeProjects} active and{" "}
-						{archivedProjects} archived projects tracked.
+						{activeProjects} active • {archivedProjects} archived
 					</p>
 				</div>
 			}
@@ -67,7 +58,7 @@ export function ProjectManagerHeader({
 				<div className={styles.statusSection}>
 					<div className={styles.sectionLabel}>
 						<Target className={styles.iconSm} />
-						<span>Queue focus</span>
+						<span>Filter</span>
 					</div>
 					<div className={styles.statusChips}>
 						{statusOptions.map((status) => (

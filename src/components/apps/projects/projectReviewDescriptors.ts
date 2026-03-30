@@ -39,7 +39,7 @@ export function buildTitleBlockReviewDescriptor(
 		row.issues[0] ||
 		row.warnings[0] ||
 		(row.reviewState === "fallback"
-			? "This drawing is still relying on filename fallback metadata."
+			? "This drawing is using filename-based metadata and still needs title block confirmation."
 			: "This drawing still needs title block review.");
 	const detail = row.drawingNumber
 		? `${row.drawingNumber} • ${row.title || "Untitled drawing"}`

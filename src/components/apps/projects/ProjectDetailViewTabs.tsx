@@ -22,7 +22,7 @@ const primaryTabs: { mode: ViewMode; label: string; icon: typeof CheckSquare }[]
 	{ mode: "review", label: "Review", icon: ShieldAlert },
 	{ mode: "issue-sets", label: "Issue Sets", icon: FileCheck2 },
 	{ mode: "revisions", label: "Revisions", icon: FilePenLine },
-	{ mode: "files", label: "Files & telemetry", icon: FileDown },
+	{ mode: "files", label: "Files & activity", icon: FileDown },
 ];
 
 function renderTab(
@@ -53,7 +53,7 @@ export function ProjectDetailViewTabs({
 	return (
 		<div className={styles.root}>
 			<div className={styles.group}>
-				<div className={styles.groupLabel}>Delivery flow</div>
+				<div className={styles.groupLabel}>Project workflow</div>
 				<div className={styles.tabRow}>
 					{primaryTabs.map(({ mode, label, icon }) =>
 						renderTab(mode, label, icon, viewMode, onViewModeChange),

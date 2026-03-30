@@ -11,6 +11,7 @@ import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/logger";
 import { logActivity } from "@/services/activityService";
 import { projectTitleBlockProfileService } from "@/services/projectTitleBlockProfileService";
+import { titleBlockSyncService } from "@/services/titleBlockSyncService";
 import { syncSharedProjectWatchdogRulesToLocalRuntime } from "@/services/projectWatchdogService";
 import { watchdogService } from "@/services/watchdogService";
 import {
@@ -26,6 +27,7 @@ import {
 	type CalendarEvent,
 	type Project,
 	type ProjectFile,
+	type ProjectFormData,
 	type ProjectStatus,
 	type Task,
 	type TaskCount,
@@ -50,6 +52,67 @@ interface UseProjectManagerStateArgs {
 	onCalendarDateChange?: (date: string | null) => void;
 	externalMonth?: Date;
 	onCalendarMonthChange?: (month: Date) => void;
+}
+
+const OPTIONAL_PROJECT_SETUP_COLUMNS = [
+	"pe_name",
+	"firm_number",
+	"pdf_package_root_path",
+] as const;
+
+function getMissingProjectSetupColumns(error: unknown) {
+	const message =
+		error instanceof Error
+			? error.message
+			: typeof error === "object" && error && "message" in error
+				? String((error as { message?: unknown }).message || "")
+				: String(error || "");
+	const normalized = message.toLowerCase();
+
+	if (
+		!(
+			normalized.includes("column") ||
+			normalized.includes("schema cache") ||
+			normalized.includes("not found") ||
+			normalized.includes("does not exist")
+		)
+	) {
+		return [];
+	}
+
+	return OPTIONAL_PROJECT_SETUP_COLUMNS.filter((column) =>
+		normalized.includes(column),
+	);
+}
+
+function stripProjectSetupColumns<
+	T extends Database["public"]["Tables"]["projects"]["Insert"] | Database["public"]["Tables"]["projects"]["Update"],
+>(payload: T, columns: readonly string[]) {
+	if (columns.length === 0) {
+		return payload;
+	}
+	const nextPayload = { ...payload };
+	for (const column of columns) {
+		delete nextPayload[column as keyof typeof nextPayload];
+	}
+	return nextPayload;
+}
+
+function buildTitleBlockSyncProfile(
+	form: ProjectFormData,
+	projectRootPath: string | null,
+) {
+	return {
+		blockName: form.titleBlockBlockName,
+		projectRootPath,
+		acadeProjectFilePath: form.titleBlockAcadeProjectFilePath,
+		acadeLine1: form.titleBlockAcadeLine1,
+		acadeLine2: form.titleBlockAcadeLine2,
+		acadeLine4: form.titleBlockAcadeLine4,
+		signerDrawnBy: form.titleBlockDrawnBy,
+		signerCheckedBy: form.titleBlockCheckedBy,
+		signerEngineer: form.titleBlockEngineer,
+	};
 }
 
 export function useProjectManagerState({
@@ -117,6 +180,7 @@ export function useProjectManagerState({
 		Map<string, TaskCount>
 	>(new Map());
 	const [isPickingProjectRoot, setIsPickingProjectRoot] = useState(false);
+	const [isPickingPdfPackageRoot, setIsPickingPdfPackageRoot] = useState(false);
 
 	const normalizeWatchdogRootPath = useCallback(
 		(value: string): string | null => {
@@ -138,6 +202,72 @@ export function useProjectManagerState({
 		}
 	}, []);
 
+	const ensureProjectAcadeSupportArtifacts = useCallback(
+		async (args: {
+			projectId: string;
+			projectRootPath: string | null;
+			form: typeof projectForm;
+		}) => {
+			if (!args.projectRootPath) {
+				return;
+			}
+			const result = await titleBlockSyncService.ensureArtifacts({
+				projectId: args.projectId,
+				projectRootPath: args.projectRootPath,
+				profile: buildTitleBlockSyncProfile(args.form, args.projectRootPath),
+				revisionEntries: [],
+				rows: [],
+				selectedRelativePaths: [],
+				triggerAcadeUpdate: false,
+			});
+			if (!result.success) {
+				const message =
+					result.message ||
+					"Project saved, but Suite could not prepare ACADE support files.";
+				showToast("warning", message);
+			}
+		},
+		[showToast],
+	);
+
+	const openProjectInAcade = useCallback(
+		async (args: {
+			projectId: string;
+			projectRootPath: string | null;
+			form: typeof projectForm;
+		}) => {
+			if (!args.projectRootPath) {
+				showToast(
+					"warning",
+					"Project saved, but no project root is set for opening the ACADE project.",
+				);
+				return false;
+			}
+			const result = await titleBlockSyncService.openProject({
+				projectId: args.projectId,
+				projectRootPath: args.projectRootPath,
+				profile: buildTitleBlockSyncProfile(args.form, args.projectRootPath),
+				revisionEntries: [],
+				rows: [],
+				selectedRelativePaths: [],
+				triggerAcadeUpdate: false,
+			});
+			if (!result.success) {
+				const message =
+					result.message ||
+					"Project saved, but Suite could not open the ACADE project.";
+				showToast("warning", message);
+				return false;
+			}
+			showToast(
+				"success",
+				result.message || "ACADE project open requested.",
+			);
+			return true;
+		},
+		[showToast],
+	);
+
 	const getCurrentUserId = useCallback(async (): Promise<string | null> => {
 		const {
 			data: { user },
@@ -151,6 +281,45 @@ export function useProjectManagerState({
 
 		return user.id;
 	}, [showToast]);
+
+	const writeProjectRecord = useCallback(
+		async <
+			T extends Database["public"]["Tables"]["projects"]["Insert"] | Database["public"]["Tables"]["projects"]["Update"],
+			R,
+		>(
+			payload: T,
+			run: (nextPayload: T) => Promise<{ data?: R; error: unknown }>,
+		) => {
+			let nextPayload = payload;
+			let result = await run(nextPayload);
+
+			if (result.error) {
+				const missingColumns = getMissingProjectSetupColumns(result.error);
+				if (missingColumns.length > 0) {
+					logger.warn(
+						"Projects",
+						"Projects table is missing newer setup columns; retrying with the legacy payload.",
+						{
+							missingColumns,
+							error:
+								result.error instanceof Error
+									? result.error.message
+									: String(result.error),
+						},
+					);
+					nextPayload = stripProjectSetupColumns(nextPayload, missingColumns);
+					result = await run(nextPayload);
+				}
+			}
+
+			return {
+				payload: nextPayload,
+				data: result.data,
+				error: result.error,
+			};
+		},
+		[],
+	);
 
 	// Calendar sync
 	const currentMonth = externalMonth ?? internalCurrentMonth;
@@ -429,61 +598,87 @@ export function useProjectManagerState({
 	}, [projects, loadAllProjectTaskCounts]);
 
 	// CRUD operations for projects
-	const createProject = async () => {
+	const createProject = async (options?: { openAcadeAfter?: boolean }) => {
 		if (!projectForm.name) return;
 		try {
 			const userId = await getCurrentUserId();
 			if (!userId) return;
 
+			const formSnapshot = { ...projectForm };
 			const watchdogRootPath = normalizeWatchdogRootPath(
-				projectForm.watchdogRootPath,
+				formSnapshot.watchdogRootPath,
 			);
 			const payload: Database["public"]["Tables"]["projects"]["Insert"] = {
-				name: projectForm.name,
-				description: projectForm.description,
-				deadline: toDateOnly(projectForm.deadline) || null,
-				priority: projectForm.priority,
-				status: projectForm.status,
-				category: projectForm.category || "Other",
-				color: projectForm.category
-					? categoryColor(projectForm.category)
+				name: formSnapshot.name,
+				description: formSnapshot.description,
+				deadline: toDateOnly(formSnapshot.deadline) || null,
+				priority: formSnapshot.priority,
+				status: formSnapshot.status,
+				category: formSnapshot.category || "Other",
+				pe_name: formSnapshot.projectPeName.trim(),
+				firm_number: formSnapshot.projectFirmNumber.trim(),
+				color: formSnapshot.category
+					? categoryColor(formSnapshot.category)
 					: categoryColor(null),
 				watchdog_root_path: watchdogRootPath,
+				pdf_package_root_path:
+					normalizeWatchdogRootPath(formSnapshot.pdfPackageRootPath) ?? null,
 				user_id: userId,
 			};
 
-			const { data, error } = await supabase
-				.from("projects")
-				.insert([payload])
-				.select();
+			const { data, error, payload: persistedPayload } =
+				await writeProjectRecord(payload, async (nextPayload) => {
+					const { data, error } = await supabase
+						.from("projects")
+						.insert([nextPayload])
+						.select();
+					return { data, error };
+				});
 
 			if (error) throw error;
 
 			if (data) {
 				await projectTitleBlockProfileService.upsertProfile({
 					projectId: data[0].id,
-					blockName: projectForm.titleBlockBlockName,
+					blockName: formSnapshot.titleBlockBlockName,
 					projectRootPath: watchdogRootPath,
-					acadeLine1: projectForm.titleBlockAcadeLine1,
-					acadeLine2: projectForm.titleBlockAcadeLine2,
-					acadeLine4: projectForm.titleBlockAcadeLine4,
-					signerDrawnBy: projectForm.titleBlockDrawnBy,
-					signerCheckedBy: projectForm.titleBlockCheckedBy,
-					signerEngineer: projectForm.titleBlockEngineer,
+					acadeProjectFilePath: formSnapshot.titleBlockAcadeProjectFilePath,
+					acadeLine1: formSnapshot.titleBlockAcadeLine1,
+					acadeLine2: formSnapshot.titleBlockAcadeLine2,
+					acadeLine4: formSnapshot.titleBlockAcadeLine4,
+					signerDrawnBy: formSnapshot.titleBlockDrawnBy,
+					signerCheckedBy: formSnapshot.titleBlockCheckedBy,
+					signerEngineer: formSnapshot.titleBlockEngineer,
+				});
+				await ensureProjectAcadeSupportArtifacts({
+					projectId: data[0].id,
+					projectRootPath: watchdogRootPath,
+					form: formSnapshot,
 				});
 				await logActivity({
 					action: "create",
-					description: `Created project: ${projectForm.name}`,
+					description: `Created project: ${formSnapshot.name}`,
 					projectId: data[0].id,
 				});
-				setProjects([data[0], ...projects]);
-				setSelectedProject(data[0]);
+				const createdProject = {
+					...data[0],
+					...persistedPayload,
+				} as Project;
+				setProjects([createdProject, ...projects]);
+				setSelectedProject(createdProject);
 				setActiveIssueSetId(null);
 				setViewMode("setup");
 				setShowProjectModal(false);
 				resetProjectForm();
 				await syncWatchdogRulesAfterProjectMutation();
-				showToast("success", `Project "${projectForm.name}" created`);
+				showToast("success", `Project "${formSnapshot.name}" created`);
+				if (options?.openAcadeAfter) {
+					await openProjectInAcade({
+						projectId: data[0].id,
+						projectRootPath: watchdogRootPath,
+						form: formSnapshot,
+					});
+				}
 				triggerAutoBackup();
 			}
 		} catch (err) {
@@ -492,60 +687,77 @@ export function useProjectManagerState({
 		}
 	};
 
-	const updateProject = async () => {
+	const updateProject = async (options?: { openAcadeAfter?: boolean }) => {
 		if (!editingProject) return;
 		try {
 			const userId = await getCurrentUserId();
 			if (!userId) return;
 
+			const formSnapshot = { ...projectForm };
 			const watchdogRootPath = normalizeWatchdogRootPath(
-				projectForm.watchdogRootPath,
+				formSnapshot.watchdogRootPath,
 			);
 			const payload: Database["public"]["Tables"]["projects"]["Update"] = {
-				name: projectForm.name,
-				description: projectForm.description,
-				deadline: toDateOnly(projectForm.deadline) || null,
-				category: projectForm.category || "Other",
-				color: projectForm.category
-					? categoryColor(projectForm.category)
+				name: formSnapshot.name,
+				description: formSnapshot.description,
+				deadline: toDateOnly(formSnapshot.deadline) || null,
+				category: formSnapshot.category || "Other",
+				pe_name: formSnapshot.projectPeName.trim(),
+				firm_number: formSnapshot.projectFirmNumber.trim(),
+				color: formSnapshot.category
+					? categoryColor(formSnapshot.category)
 					: categoryColor(null),
-				priority: projectForm.priority,
-				status: projectForm.status,
+				priority: formSnapshot.priority,
+				status: formSnapshot.status,
 				watchdog_root_path: watchdogRootPath,
+				pdf_package_root_path:
+					normalizeWatchdogRootPath(formSnapshot.pdfPackageRootPath) ?? null,
 			};
 
-			const { error } = await supabase
-				.from("projects")
-				.update(payload)
-				.eq("id", editingProject.id)
-				.eq("user_id", userId);
+			const { error, payload: persistedPayload } = await writeProjectRecord(
+				payload,
+				async (nextPayload) => {
+					const { error } = await supabase
+						.from("projects")
+						.update(nextPayload)
+						.eq("id", editingProject.id)
+						.eq("user_id", userId);
+					return { error };
+				},
+			);
 
 			if (error) throw error;
 
 			await projectTitleBlockProfileService.upsertProfile({
 				projectId: editingProject.id,
-				blockName: projectForm.titleBlockBlockName,
+				blockName: formSnapshot.titleBlockBlockName,
 				projectRootPath: watchdogRootPath,
-				acadeLine1: projectForm.titleBlockAcadeLine1,
-				acadeLine2: projectForm.titleBlockAcadeLine2,
-				acadeLine4: projectForm.titleBlockAcadeLine4,
-				signerDrawnBy: projectForm.titleBlockDrawnBy,
-				signerCheckedBy: projectForm.titleBlockCheckedBy,
-				signerEngineer: projectForm.titleBlockEngineer,
+				acadeProjectFilePath: formSnapshot.titleBlockAcadeProjectFilePath,
+				acadeLine1: formSnapshot.titleBlockAcadeLine1,
+				acadeLine2: formSnapshot.titleBlockAcadeLine2,
+				acadeLine4: formSnapshot.titleBlockAcadeLine4,
+				signerDrawnBy: formSnapshot.titleBlockDrawnBy,
+				signerCheckedBy: formSnapshot.titleBlockCheckedBy,
+				signerEngineer: formSnapshot.titleBlockEngineer,
+			});
+			await ensureProjectAcadeSupportArtifacts({
+				projectId: editingProject.id,
+				projectRootPath: watchdogRootPath,
+				form: formSnapshot,
 			});
 
 			await logActivity({
 				action: "update",
-				description: `Updated project: ${projectForm.name}`,
+				description: `Updated project: ${formSnapshot.name}`,
 				projectId: editingProject.id,
 			});
 			const updatedProjects = projects.map((p) =>
-				p.id === editingProject.id ? { ...p, ...payload } : p,
+				p.id === editingProject.id ? { ...p, ...persistedPayload } : p,
 			);
 			setProjects(updatedProjects);
 			setSelectedProject((prev) =>
 				prev?.id === editingProject.id
-					? ({ ...prev, ...payload } as Project)
+					? ({ ...prev, ...persistedPayload } as Project)
 					: prev,
 			);
 			setActiveIssueSetId(null);
@@ -555,11 +767,26 @@ export function useProjectManagerState({
 			resetProjectForm();
 			await syncWatchdogRulesAfterProjectMutation();
 			showToast("success", `Project updated`);
+			if (options?.openAcadeAfter) {
+				await openProjectInAcade({
+					projectId: editingProject.id,
+					projectRootPath: watchdogRootPath,
+					form: formSnapshot,
+				});
+			}
 			triggerAutoBackup();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : "An error occurred";
 			showToast("error", `Failed to update project: ${message}`);
 		}
+	};
+
+	const createProjectAndOpenAcade = async () => {
+		await createProject({ openAcadeAfter: true });
+	};
+
+	const updateProjectAndOpenAcade = async () => {
+		await updateProject({ openAcadeAfter: true });
 	};
 
 	const confirmDeleteProject = async () => {
@@ -972,47 +1199,56 @@ export function useProjectManagerState({
 
 	const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
 		if (!selectedProject || !event.target.files?.length) return;
-		const file = event.target.files[0];
+		const selectedFiles = Array.from(event.target.files);
 
 		try {
 			const userId = await getCurrentUserId();
 			if (!userId) return;
 
-			const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-			const fileName = `${userId}/${selectedProject.id}/${Date.now()}_${safeFileName}`;
+			for (const file of selectedFiles) {
+				const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+				const fileName = `${userId}/${selectedProject.id}/${Date.now()}_${safeFileName}`;
 
-			const { data: uploadData, error: uploadError } = await supabase.storage
-				.from("project-files")
-				.upload(fileName, file);
+				const { data: uploadData, error: uploadError } = await supabase.storage
+					.from("project-files")
+					.upload(fileName, file);
 
-			if (uploadError) throw uploadError;
+				if (uploadError) throw uploadError;
 
-			if (uploadData) {
-				const payload: Database["public"]["Tables"]["files"]["Insert"] = {
-					project_id: selectedProject.id,
-					name: file.name,
-					file_path: uploadData.path,
-					size: file.size,
-					mime_type: file.type,
-					user_id: userId,
-				};
+				if (uploadData) {
+					const payload: Database["public"]["Tables"]["files"]["Insert"] = {
+						project_id: selectedProject.id,
+						name: file.name,
+						file_path: uploadData.path,
+						size: file.size,
+						mime_type: file.type,
+						user_id: userId,
+					};
 
-				const { error: dbError } = await supabase.from("files").insert(payload);
+					const { error: dbError } = await supabase.from("files").insert(payload);
 
-				if (dbError) throw dbError;
+					if (dbError) throw dbError;
 
-				await logActivity({
-					action: "upload",
-					description: `Uploaded file: ${file.name}`,
-					projectId: selectedProject.id,
-				});
-				loadFiles(selectedProject.id);
-				showToast("success", `File "${file.name}" uploaded`);
-				triggerAutoBackup();
+					await logActivity({
+						action: "upload",
+						description: `Uploaded file: ${file.name}`,
+						projectId: selectedProject.id,
+					});
+				}
 			}
+			loadFiles(selectedProject.id);
+			showToast(
+				"success",
+				selectedFiles.length === 1
+					? `File "${selectedFiles[0]?.name}" uploaded`
+					: `${selectedFiles.length} files uploaded`,
+			);
+			triggerAutoBackup();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : "An error occurred";
 			showToast("error", `Failed to upload file: ${message}`);
+		} finally {
+			event.target.value = "";
 		}
 	};
 
@@ -1055,6 +1291,36 @@ export function useProjectManagerState({
 	}, [
 		isPickingProjectRoot,
 		projectForm.watchdogRootPath,
+		setProjectForm,
+		showToast,
+	]);
+
+	const pickProjectPdfPackageRootPath = useCallback(async () => {
+		if (isPickingPdfPackageRoot) return;
+		setIsPickingPdfPackageRoot(true);
+		try {
+			const result = await watchdogService.pickRoot(
+				projectForm.pdfPackageRootPath || null,
+			);
+			if (result.cancelled || !result.path) {
+				return;
+			}
+			setProjectForm((current) => ({
+				...current,
+				pdfPackageRootPath: result.path || "",
+			}));
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Unable to browse for a PDF package folder.";
+			showToast("error", message);
+		} finally {
+			setIsPickingPdfPackageRoot(false);
+		}
+	}, [
+		isPickingPdfPackageRoot,
+		projectForm.pdfPackageRootPath,
 		setProjectForm,
 		showToast,
 	]);
@@ -1160,7 +1426,9 @@ export function useProjectManagerState({
 		taskForm,
 		setTaskForm,
 		createProject,
+		createProjectAndOpenAcade,
 		updateProject,
+		updateProjectAndOpenAcade,
 		requestDeleteProject,
 		confirmDeleteProject,
 		toggleArchiveProject,
@@ -1175,6 +1443,8 @@ export function useProjectManagerState({
 		downloadFile,
 		pickProjectRootPath,
 		isPickingProjectRoot,
+		pickProjectPdfPackageRootPath,
+		isPickingPdfPackageRoot,
 		updateProjectWatchdogRootPath,
 		resetProjectForm,
 		resetTaskForm,

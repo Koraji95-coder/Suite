@@ -25,9 +25,16 @@ export interface ProjectIssueSetRecord {
 	targetDate: string | null;
 	transmittalNumber: string | null;
 	transmittalDocumentName: string | null;
+	registerSnapshotId: string | null;
+	terminalScheduleSnapshotId: string | null;
+	workPackageId?: string | null;
+	recipeSnapshotId?: string | null;
 	summary: string;
 	notes: string | null;
 	selectedDrawingPaths: string[];
+	selectedRegisterRowIds: string[];
+	selectedDrawingNumbers: string[];
+	selectedPdfFileIds: string[];
 	snapshot: ProjectIssueSetSnapshot;
 	createdAt: string;
 	updatedAt: string;
@@ -42,9 +49,16 @@ export interface ProjectIssueSetInput {
 	targetDate?: string | null;
 	transmittalNumber?: string | null;
 	transmittalDocumentName?: string | null;
+	registerSnapshotId?: string | null;
+	terminalScheduleSnapshotId?: string | null;
+	workPackageId?: string | null;
+	recipeSnapshotId?: string | null;
 	summary?: string;
 	notes?: string | null;
 	selectedDrawingPaths?: string[];
+	selectedRegisterRowIds?: string[];
+	selectedDrawingNumbers?: string[];
+	selectedPdfFileIds?: string[];
 	snapshot: ProjectIssueSetSnapshot;
 }
 
@@ -128,6 +142,23 @@ function normalizePaths(values: unknown): string[] {
 	return normalized;
 }
 
+function normalizeStrings(values: unknown): string[] {
+	if (!Array.isArray(values)) {
+		return [];
+	}
+	const seen = new Set<string>();
+	const normalized: string[] = [];
+	for (const value of values) {
+		const trimmed = normalizeText(value);
+		if (!trimmed) continue;
+		const key = trimmed.toLowerCase();
+		if (seen.has(key)) continue;
+		seen.add(key);
+		normalized.push(trimmed);
+	}
+	return normalized;
+}
+
 function normalizeRecord(value: unknown): ProjectIssueSetRecord | null {
 	if (!value || typeof value !== "object") {
 		return null;
@@ -151,9 +182,18 @@ function normalizeRecord(value: unknown): ProjectIssueSetRecord | null {
 		targetDate: normalizeDate(candidate.targetDate),
 		transmittalNumber: normalizeDate(candidate.transmittalNumber),
 		transmittalDocumentName: normalizeDate(candidate.transmittalDocumentName),
+		registerSnapshotId: normalizeDate(candidate.registerSnapshotId),
+		terminalScheduleSnapshotId: normalizeDate(
+			candidate.terminalScheduleSnapshotId,
+		),
+		workPackageId: normalizeDate(candidate.workPackageId),
+		recipeSnapshotId: normalizeDate(candidate.recipeSnapshotId),
 		summary: normalizeText(candidate.summary),
 		notes: normalizeDate(candidate.notes),
 		selectedDrawingPaths: normalizePaths(candidate.selectedDrawingPaths),
+		selectedRegisterRowIds: normalizeStrings(candidate.selectedRegisterRowIds),
+		selectedDrawingNumbers: normalizeStrings(candidate.selectedDrawingNumbers),
+		selectedPdfFileIds: normalizeStrings(candidate.selectedPdfFileIds),
 		snapshot: normalizeSnapshot(candidate.snapshot),
 		createdAt,
 		updatedAt,
@@ -349,9 +389,28 @@ export const projectIssueSetService = {
 			targetDate: normalizeDate(input.targetDate),
 			transmittalNumber: normalizeDate(input.transmittalNumber),
 			transmittalDocumentName: normalizeDate(input.transmittalDocumentName),
+			registerSnapshotId:
+				normalizeDate(input.registerSnapshotId) ??
+				existing?.registerSnapshotId ??
+				null,
+			terminalScheduleSnapshotId:
+				normalizeDate(input.terminalScheduleSnapshotId) ??
+				existing?.terminalScheduleSnapshotId ??
+				null,
+			workPackageId:
+				normalizeDate(input.workPackageId) ??
+				existing?.workPackageId ??
+				null,
+			recipeSnapshotId:
+				normalizeDate(input.recipeSnapshotId) ??
+				existing?.recipeSnapshotId ??
+				null,
 			summary: normalizeText(input.summary),
 			notes: normalizeDate(input.notes),
 			selectedDrawingPaths: normalizePaths(input.selectedDrawingPaths),
+			selectedRegisterRowIds: normalizeStrings(input.selectedRegisterRowIds),
+			selectedDrawingNumbers: normalizeStrings(input.selectedDrawingNumbers),
+			selectedPdfFileIds: normalizeStrings(input.selectedPdfFileIds),
 			snapshot: normalizeSnapshot(input.snapshot),
 			createdAt: existing?.createdAt || timestamp,
 			updatedAt: timestamp,

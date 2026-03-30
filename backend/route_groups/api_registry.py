@@ -14,10 +14,13 @@ from .api_autocad import create_autocad_blueprint
 from .api_backup import create_backup_blueprint
 from .api_auth_email import create_auth_email_blueprint
 from .api_batch_find_replace import create_batch_find_replace_blueprint
+from .api_automation_recipes import create_automation_recipe_blueprint
+from .api_drawing_program import create_drawing_program_blueprint
 from .api_watchdog import create_watchdog_blueprint
 from .api_health import create_health_blueprint
 from .api_dashboard import create_dashboard_blueprint
 from .api_command_center import create_command_center_blueprint
+from .api_terminal_authoring import create_terminal_authoring_blueprint
 from .api_work_ledger import create_work_ledger_blueprint
 from .api_transmittal import create_transmittal_blueprint
 from .api_transmittal_render import create_transmittal_render_blueprint
@@ -111,6 +114,15 @@ def register_route_groups(
         )
     )
     app.register_blueprint(
+        create_automation_recipe_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
+            is_valid_api_key=is_valid_api_key,
+            send_autocad_dotnet_command=send_autocad_dotnet_command,
+        )
+    )
+    app.register_blueprint(
         create_auth_email_blueprint(
             limiter=limiter,
             logger=logger,
@@ -175,11 +187,28 @@ def register_route_groups(
         )
     )
     app.register_blueprint(
+        create_terminal_authoring_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
+            is_valid_api_key=is_valid_api_key,
+            schedule_cleanup=schedule_cleanup,
+            send_autocad_dotnet_command=send_autocad_dotnet_command,
+        )
+    )
+    app.register_blueprint(
         create_title_block_sync_blueprint(
             limiter=limiter,
             logger=logger,
             require_supabase_user=require_supabase_user,
             send_autocad_dotnet_command=send_autocad_dotnet_command,
+        )
+    )
+    app.register_blueprint(
+        create_drawing_program_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
         )
     )
     app.register_blueprint(

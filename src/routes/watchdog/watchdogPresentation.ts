@@ -28,6 +28,7 @@ const HIDDEN_COMMANDS = new Set([
 ]);
 
 const SAVE_COMMANDS = new Set(["QSAVE", "SAVE", "SAVEALL", "SAVEAS"]);
+const DRAWING_TARGET_EXTENSIONS = new Set([".dwg", ".dxf", ".pdf"]);
 
 function readCommandName(event: WatchdogCollectorEvent): string | null {
 	const value = event.metadata?.commandName;
@@ -61,6 +62,18 @@ function resolveTargetLabel(event: WatchdogCollectorEvent): string {
 
 function resolveTargetPath(event: WatchdogCollectorEvent): string | null {
 	return event.drawingPath || event.path || null;
+}
+
+function isDrawingTargetPath(value: string | null | undefined): boolean {
+	if (!value) {
+		return false;
+	}
+	const normalized = value.replace(/\\/g, "/").trim().toLowerCase();
+	const extensionIndex = normalized.lastIndexOf(".");
+	if (extensionIndex < 0) {
+		return false;
+	}
+	return DRAWING_TARGET_EXTENSIONS.has(normalized.slice(extensionIndex));
 }
 
 function resolveTargetKey(event: WatchdogCollectorEvent): string | null {
@@ -126,6 +139,11 @@ export function presentWatchdogOperatorEvent(
 	const commandName = readCommandName(event);
 	const targetPath = resolveTargetPath(event);
 	const targetKey = resolveTargetKey(event);
+	const isDrawingTarget = isDrawingTargetPath(targetPath);
+
+	if (!isDrawingTarget) {
+		return null;
+	}
 
 	switch (event.eventType) {
 		case "drawing_opened":

@@ -38,6 +38,12 @@ import {
 	projectIssueSetService,
 } from "@/services/projectIssueSetService";
 import {
+	type ProjectDeliverableRegisterRow,
+	type ProjectDeliverableRegisterSnapshot,
+	projectDeliverableRegisterService,
+} from "@/services/projectDeliverableRegisterService";
+import { projectAutomationReceiptService } from "@/services/projectAutomationReceiptService";
+import {
 	type ProjectReviewDecisionRecord,
 	projectReviewDecisionService,
 } from "@/services/projectReviewDecisionService";
@@ -73,6 +79,7 @@ interface ProjectIssueSetManagerState {
 	loading: boolean;
 	saving: boolean;
 	scan: ProjectDocumentMetadataSnapshot | null;
+	registerSnapshot: ProjectDeliverableRegisterSnapshot | null;
 	revisions: DrawingRevisionRegisterRow[];
 	issueSets: ProjectIssueSetRecord[];
 	standardsChecks: Awaited<
@@ -81,6 +88,9 @@ interface ProjectIssueSetManagerState {
 	decisions: ProjectReviewDecisionRecord[];
 	transmittalReceipts: Awaited<
 		ReturnType<typeof projectTransmittalReceiptService.fetchReceipts>
+	>["data"];
+	automationReceipts: Awaited<
+		ReturnType<typeof projectAutomationReceiptService.fetchReceipts>
 	>["data"];
 	messages: string[];
 }
@@ -95,17 +105,22 @@ interface IssueSetFormState {
 	summary: string;
 	notes: string;
 	selectedDrawingPaths: string[];
+	selectedRegisterRowIds: string[];
+	selectedDrawingNumbers: string[];
+	selectedPdfFileIds: string[];
 }
 
 const EMPTY_STATE: ProjectIssueSetManagerState = {
 	loading: true,
 	saving: false,
 	scan: null,
+	registerSnapshot: null,
 	revisions: [],
 	issueSets: [],
 	standardsChecks: [],
 	decisions: [],
 	transmittalReceipts: [],
+	automationReceipts: [],
 	messages: [],
 };
 
@@ -132,6 +147,48 @@ function buildEmptyForm(): IssueSetFormState {
 		summary: "",
 		notes: "",
 		selectedDrawingPaths: [],
+		selectedRegisterRowIds: [],
+		selectedDrawingNumbers: [],
+		selectedPdfFileIds: [],
+	};
+}
+
+function getPreferredMatchedFileId(row: ProjectDeliverableRegisterRow) {
+	if (
+		row.pdfPairingStatus !== "paired" &&
+		row.pdfPairingStatus !== "manual"
+	) {
+		return null;
+	}
+	return row.pdfMatches[0]?.fileId ?? null;
+}
+
+function getPreferredMatchedDrawingPath(row: ProjectDeliverableRegisterRow) {
+	if (
+		row.dwgPairingStatus !== "paired" &&
+		row.dwgPairingStatus !== "manual"
+	) {
+		return null;
+	}
+	return row.dwgMatches[0]?.relativePath || null;
+}
+
+function buildRegisterSelection(rows: ProjectDeliverableRegisterRow[]) {
+	const selectedRegisterRowIds = rows.map((row) => row.id);
+	const selectedDrawingNumbers = rows
+		.map((row) => normalizeText(row.drawingNumber))
+		.filter(Boolean);
+	const selectedPdfFileIds = rows
+		.map((row) => getPreferredMatchedFileId(row))
+		.filter((value): value is string => Boolean(value));
+	const selectedDrawingPaths = rows
+		.map((row) => getPreferredMatchedDrawingPath(row))
+		.filter((value): value is string => Boolean(value));
+	return {
+		selectedRegisterRowIds,
+		selectedDrawingNumbers,
+		selectedPdfFileIds,
+		selectedDrawingPaths,
 	};
 }
 
@@ -309,6 +366,7 @@ function buildDefaultDraft(args: {
 	project: Project;
 	issueSetCount: number;
 	scan: ProjectDocumentMetadataSnapshot | null;
+	registerSnapshot: ProjectDeliverableRegisterSnapshot | null;
 	revisions: DrawingRevisionRegisterRow[];
 	standardsChecks: Awaited<
 		ReturnType<typeof fetchProjectStandardsEvidence>
@@ -316,9 +374,14 @@ function buildDefaultDraft(args: {
 	decisions: ProjectReviewDecisionRecord[];
 	telemetry: ProjectWatchdogTelemetry;
 }): IssueSetFormState {
-	const selectedDrawingPaths = (args.scan?.rows ?? []).map(
-		(row) => row.relativePath,
+	const selectedRegisterRows = (args.registerSnapshot?.rows ?? []).filter(
+		(row) => row.issueSetEligible,
 	);
+	const registerSelection = buildRegisterSelection(selectedRegisterRows);
+	const selectedDrawingPaths =
+		registerSelection.selectedDrawingPaths.length > 0
+			? registerSelection.selectedDrawingPaths
+			: (args.scan?.rows ?? []).map((row) => row.relativePath);
 	const snapshot = buildSnapshot({
 		project: args.project,
 		telemetry: args.telemetry,
@@ -344,6 +407,9 @@ function buildDefaultDraft(args: {
 				: "Project package draft is ready to move into standards review and transmittal assembly.",
 		notes: "",
 		selectedDrawingPaths,
+		selectedRegisterRowIds: registerSelection.selectedRegisterRowIds,
+		selectedDrawingNumbers: registerSelection.selectedDrawingNumbers,
+		selectedPdfFileIds: registerSelection.selectedPdfFileIds,
 	};
 }
 
@@ -394,13 +460,17 @@ export function ProjectIssueSetManager({
 				issueSetsResult,
 				revisionsResult,
 				receiptsResult,
+				automationReceiptsResult,
 				decisionsResult,
+				registerResult,
 				snapshotResult,
 			] = await Promise.all([
 					projectIssueSetService.fetchIssueSets(project.id),
 					projectRevisionRegisterService.fetchEntries(project.id),
 					projectTransmittalReceiptService.fetchReceipts(project.id),
+					projectAutomationReceiptService.fetchReceipts(project.id),
 					projectReviewDecisionService.fetchDecisions(project.id),
+					projectDeliverableRegisterService.fetchSnapshot(project.id),
 					project.watchdog_root_path?.trim()
 						? projectDocumentMetadataService
 								.loadSnapshot({
@@ -435,16 +505,22 @@ export function ProjectIssueSetManager({
 				...current,
 				loading: false,
 				scan: snapshotResult.data,
+				registerSnapshot: registerResult.data,
 				revisions: revisionsResult.data,
 				issueSets: issueSetsResult.data,
 				standardsChecks: standardsResult.data,
 				decisions: decisionsResult.data,
 				transmittalReceipts: receiptsResult.data,
+				automationReceipts: automationReceiptsResult.data,
 				messages: [
 					...(issueSetsResult.error ? [issueSetsResult.error.message] : []),
 					...(revisionsResult.error ? [revisionsResult.error.message] : []),
 					...(receiptsResult.error ? [receiptsResult.error.message] : []),
+					...(automationReceiptsResult.error
+						? [automationReceiptsResult.error.message]
+						: []),
 					...(decisionsResult.error ? [decisionsResult.error.message] : []),
+					...(registerResult.error ? [registerResult.error.message] : []),
 					...(standardsResult.error ? [standardsResult.error.message] : []),
 					...(snapshotResult.error ? [snapshotResult.error.message] : []),
 				],
@@ -468,8 +544,11 @@ export function ProjectIssueSetManager({
 		editingIssueSetId ?? preferredIssueSet?.id ?? state.issueSets[0]?.id ?? null;
 
 	const currentSnapshot = useMemo(
-		() =>
-			buildSnapshot({
+		() => {
+			const registerSelection = buildRegisterSelection(
+				(state.registerSnapshot?.rows ?? []).filter((row) => row.issueSetEligible),
+			);
+			return buildSnapshot({
 				project,
 				telemetry,
 				scan: state.scan,
@@ -477,14 +556,17 @@ export function ProjectIssueSetManager({
 				standardsChecks: state.standardsChecks,
 				decisions: state.decisions,
 				issueSetId: activeIssueSetContextId,
-				selectedDrawingPaths: (state.scan?.rows ?? []).map(
-					(row) => row.relativePath,
-				),
-			}),
+				selectedDrawingPaths:
+					registerSelection.selectedDrawingPaths.length > 0
+						? registerSelection.selectedDrawingPaths
+						: (state.scan?.rows ?? []).map((row) => row.relativePath),
+			});
+		},
 		[
 			activeIssueSetContextId,
 			project,
 			state.decisions,
+			state.registerSnapshot,
 			state.revisions,
 			state.scan,
 			state.standardsChecks,
@@ -498,6 +580,8 @@ export function ProjectIssueSetManager({
 	);
 
 	const availableDrawingRows = state.scan?.rows ?? [];
+	const availableRegisterRows = state.registerSnapshot?.rows ?? [];
+	const hasRegisterRows = availableRegisterRows.length > 0;
 
 	const openDraftFromCurrentProject = () => {
 		setEditingIssueSetId(null);
@@ -507,6 +591,7 @@ export function ProjectIssueSetManager({
 				project,
 				issueSetCount: state.issueSets.length,
 				scan: state.scan,
+				registerSnapshot: state.registerSnapshot,
 				revisions: state.revisions,
 				standardsChecks: state.standardsChecks,
 				decisions: state.decisions,
@@ -519,17 +604,20 @@ export function ProjectIssueSetManager({
 	const openEditIssueSet = (issueSet: ProjectIssueSetRecord) => {
 		setEditingIssueSetId(issueSet.id);
 		onIssueSetContextChange?.(issueSet.id);
-		setForm({
-			name: issueSet.name,
-			issueTag: issueSet.issueTag,
-			status: issueSet.status,
-			targetDate: issueSet.targetDate ?? "",
-			transmittalNumber: issueSet.transmittalNumber ?? "",
-			transmittalDocumentName: issueSet.transmittalDocumentName ?? "",
-			summary: issueSet.summary,
-			notes: issueSet.notes ?? "",
-			selectedDrawingPaths: issueSet.selectedDrawingPaths,
-		});
+			setForm({
+				name: issueSet.name,
+				issueTag: issueSet.issueTag,
+				status: issueSet.status,
+				targetDate: issueSet.targetDate ?? "",
+				transmittalNumber: issueSet.transmittalNumber ?? "",
+				transmittalDocumentName: issueSet.transmittalDocumentName ?? "",
+				summary: issueSet.summary,
+				notes: issueSet.notes ?? "",
+				selectedDrawingPaths: issueSet.selectedDrawingPaths,
+				selectedRegisterRowIds: issueSet.selectedRegisterRowIds ?? [],
+				selectedDrawingNumbers: issueSet.selectedDrawingNumbers ?? [],
+				selectedPdfFileIds: issueSet.selectedPdfFileIds ?? [],
+			});
 		setShowForm(true);
 	};
 
@@ -547,6 +635,59 @@ export function ProjectIssueSetManager({
 				selectedDrawingPaths: exists
 					? current.selectedDrawingPaths.filter((path) => path !== relativePath)
 					: [...current.selectedDrawingPaths, relativePath],
+			};
+		});
+	};
+
+	const toggleSelectedRegisterRow = (row: ProjectDeliverableRegisterRow) => {
+		setForm((current) => {
+			const exists = current.selectedRegisterRowIds.includes(row.id);
+			if (exists) {
+				const nextRegisterRowIds = current.selectedRegisterRowIds.filter(
+					(id) => id !== row.id,
+				);
+				const nextDrawingNumbers = current.selectedDrawingNumbers.filter(
+					(value) => value !== row.drawingNumber,
+				);
+				const matchedPdfId = getPreferredMatchedFileId(row);
+				const matchedDrawingPath = getPreferredMatchedDrawingPath(row);
+				return {
+					...current,
+					selectedRegisterRowIds: nextRegisterRowIds,
+					selectedDrawingNumbers: nextDrawingNumbers,
+					selectedPdfFileIds: matchedPdfId
+						? current.selectedPdfFileIds.filter((id) => id !== matchedPdfId)
+						: current.selectedPdfFileIds,
+					selectedDrawingPaths: matchedDrawingPath
+						? current.selectedDrawingPaths.filter((path) => path !== matchedDrawingPath)
+						: current.selectedDrawingPaths,
+				};
+			}
+			return {
+				...current,
+				selectedRegisterRowIds: [...current.selectedRegisterRowIds, row.id],
+				selectedDrawingNumbers: current.selectedDrawingNumbers.includes(
+					row.drawingNumber,
+				)
+					? current.selectedDrawingNumbers
+					: [...current.selectedDrawingNumbers, row.drawingNumber],
+				selectedPdfFileIds: (() => {
+					const matchedPdfId = getPreferredMatchedFileId(row);
+					if (!matchedPdfId || current.selectedPdfFileIds.includes(matchedPdfId)) {
+						return current.selectedPdfFileIds;
+					}
+					return [...current.selectedPdfFileIds, matchedPdfId];
+				})(),
+				selectedDrawingPaths: (() => {
+					const matchedDrawingPath = getPreferredMatchedDrawingPath(row);
+					if (
+						!matchedDrawingPath ||
+						current.selectedDrawingPaths.includes(matchedDrawingPath)
+					) {
+						return current.selectedDrawingPaths;
+					}
+					return [...current.selectedDrawingPaths, matchedDrawingPath];
+				})(),
 			};
 		});
 	};
@@ -576,9 +717,16 @@ export function ProjectIssueSetManager({
 			targetDate: form.targetDate || null,
 			transmittalNumber: form.transmittalNumber || null,
 			transmittalDocumentName: form.transmittalDocumentName || null,
+			registerSnapshotId: state.registerSnapshot?.id ?? null,
+			terminalScheduleSnapshotId:
+				state.issueSets.find((issueSet) => issueSet.id === editingIssueSetId)
+					?.terminalScheduleSnapshotId ?? null,
 			summary: form.summary,
 			notes: form.notes || null,
 			selectedDrawingPaths: form.selectedDrawingPaths,
+			selectedRegisterRowIds: form.selectedRegisterRowIds,
+			selectedDrawingNumbers: form.selectedDrawingNumbers,
+			selectedPdfFileIds: form.selectedPdfFileIds,
 			snapshot,
 		};
 		const result = await projectIssueSetService.saveIssueSet(
@@ -653,9 +801,14 @@ export function ProjectIssueSetManager({
 				targetDate: issueSet.targetDate,
 				transmittalNumber: issueSet.transmittalNumber,
 				transmittalDocumentName: issueSet.transmittalDocumentName,
+				registerSnapshotId: issueSet.registerSnapshotId,
+				terminalScheduleSnapshotId: issueSet.terminalScheduleSnapshotId,
 				summary: issueSet.summary,
 				notes: issueSet.notes,
 				selectedDrawingPaths: issueSet.selectedDrawingPaths,
+				selectedRegisterRowIds: issueSet.selectedRegisterRowIds ?? [],
+				selectedDrawingNumbers: issueSet.selectedDrawingNumbers ?? [],
+				selectedPdfFileIds: issueSet.selectedPdfFileIds ?? [],
 				snapshot: issueSet.snapshot,
 			},
 			issueSet.id,
@@ -694,13 +847,39 @@ export function ProjectIssueSetManager({
 			return Boolean(number && receiptNumbers.has(number));
 		}).length;
 	}, [state.issueSets, state.transmittalReceipts]);
-	const summaryNote =
-		linkedReceiptCount > 0 || state.standardsChecks.length > 0
-			? `${linkedReceiptCount} linked receipt${
+	const linkedAutomationReceiptCount = useMemo(
+		() =>
+			state.issueSets.filter((issueSet) =>
+				state.automationReceipts.some(
+					(receipt) => (receipt.issueSetId || null) === issueSet.id,
+				),
+			).length,
+		[state.automationReceipts, state.issueSets],
+	);
+	const evidenceSourceSummary = [
+		linkedReceiptCount > 0
+			? `${linkedReceiptCount} linked transmittal receipt${
 					linkedReceiptCount === 1 ? "" : "s"
-				} and ${state.standardsChecks.length} standards result${
+				}`
+			: null,
+		linkedAutomationReceiptCount > 0
+			? `${linkedAutomationReceiptCount} automation receipt${
+					linkedAutomationReceiptCount === 1 ? "" : "s"
+				}`
+			: null,
+		state.standardsChecks.length > 0
+			? `${state.standardsChecks.length} standards result${
 					state.standardsChecks.length === 1 ? "" : "s"
-				} already feed package evidence. ${currentSnapshot.unresolvedRevisionCount} open revision${
+				}`
+			: null,
+	]
+		.filter((value): value is string => Boolean(value))
+		.join(", ");
+	const summaryNote =
+		linkedReceiptCount > 0 ||
+		linkedAutomationReceiptCount > 0 ||
+		state.standardsChecks.length > 0
+			? `${evidenceSourceSummary} already feed package evidence. ${currentSnapshot.unresolvedRevisionCount} open revision${
 					currentSnapshot.unresolvedRevisionCount === 1 ? "" : "s"
 				} remain, along with ${
 					currentSnapshot.titleBlockReviewCount +
@@ -741,12 +920,16 @@ export function ProjectIssueSetManager({
 					buildProjectIssueSetEvidencePacket({
 						project,
 						issueSet,
+						registerSnapshot: state.registerSnapshot,
 						scanRows: availableDrawingRows,
+						scanProfile: state.scan?.profile ?? null,
+						scanArtifacts: state.scan?.artifacts ?? null,
 						revisions: state.revisions,
 						telemetry,
 						standardsChecks: state.standardsChecks,
 						decisions: state.decisions,
 						transmittalReceipts: state.transmittalReceipts,
+						automationReceipts: state.automationReceipts,
 					}),
 				]),
 			),
@@ -755,8 +938,10 @@ export function ProjectIssueSetManager({
 			project,
 			state.decisions,
 			state.issueSets,
+			state.registerSnapshot,
 			state.revisions,
 			state.standardsChecks,
+			state.automationReceipts,
 			state.transmittalReceipts,
 			telemetry,
 		],
@@ -808,8 +993,8 @@ export function ProjectIssueSetManager({
 					<p className={styles.eyebrow}>Issue package workflow</p>
 					<h4 className={styles.title}>Issue set manager</h4>
 					<p className={styles.description}>
-						Capture a package draft from the current project state, then track
-						what was ready, selected, and issued without leaving the project.
+						Capture the current package, then track what was ready, selected,
+						and issued without leaving the project.
 					</p>
 				</div>
 				<TrustStateBadge state={currentSnapshotState} />
@@ -930,6 +1115,9 @@ export function ProjectIssueSetManager({
 										packet.watchdog.drawings[0].lastWorkedAt,
 								  )}`
 								: "No tracked drawing history yet";
+							const selectedRegisterCount =
+								issueSet.selectedRegisterRowIds?.length ?? 0;
+							const selectedPdfCount = issueSet.selectedPdfFileIds?.length ?? 0;
 
 							return (
 								<div key={issueSet.id} className={styles.issueSetCard}>
@@ -997,15 +1185,25 @@ export function ProjectIssueSetManager({
 
 									<div className={styles.issueSetFactRow}>
 										<span className={styles.issueSetFact}>
-											<strong>{issueSet.snapshot.selectedDrawingCount}</strong>{" "}
-											drawing{issueSet.snapshot.selectedDrawingCount === 1 ? "" : "s"}
+											<strong>
+												{selectedRegisterCount ||
+													issueSet.snapshot.selectedDrawingCount}
+											</strong>{" "}
+											{selectedRegisterCount ? "register row" : "drawing"}
+											{(selectedRegisterCount ||
+												issueSet.snapshot.selectedDrawingCount) === 1
+												? ""
+												: "s"}
 										</span>
 										<span className={styles.issueSetFact}>
 											<strong>{issueSet.snapshot.reviewItemCount}</strong>{" "}
 											blocker{issueSet.snapshot.reviewItemCount === 1 ? "" : "s"}
 										</span>
 										<span className={styles.issueSetFact}>
-											<strong>{receiptSummary}</strong> receipt
+											<strong>
+												{selectedPdfCount > 0 ? selectedPdfCount : receiptSummary}
+											</strong>{" "}
+											{selectedPdfCount > 0 ? "PDFs" : "receipt"}
 										</span>
 									</div>
 
@@ -1044,6 +1242,16 @@ export function ProjectIssueSetManager({
 														: "No linked receipt yet"}
 											</span>
 											<span>
+												<strong>Automation</strong>{" "}
+												{packet.automation.latestReceipt
+													? `${packet.automation.linkedReceiptCount} receipt${
+															packet.automation.linkedReceiptCount === 1
+																? ""
+																: "s"
+														} • ${packet.automation.latestReceipt.mode} mode`
+													: "No automation receipt yet"}
+											</span>
+											<span>
 												<strong>Watchdog</strong>{" "}
 												{packet.watchdog.matchedTrackedCount > 0
 													? `${packet.watchdog.matchedTrackedCount} tracked drawing${
@@ -1064,7 +1272,13 @@ export function ProjectIssueSetManager({
 													Package scope
 												</span>
 												<span className={styles.issueSetDetailValue}>
-													{selectedDrawingSummary ||
+													{selectedRegisterCount > 0
+														? `${selectedRegisterCount} workbook row${
+																selectedRegisterCount === 1 ? "" : "s"
+														  } • ${selectedPdfCount} paired PDF${
+																selectedPdfCount === 1 ? "" : "s"
+														  }${selectedDrawingSummary ? ` • ${selectedDrawingSummary}` : ""}`
+														: selectedDrawingSummary ||
 														"No selected drawings captured."}
 												</span>
 											</div>
@@ -1102,6 +1316,29 @@ export function ProjectIssueSetManager({
 														  }`
 														: issueSet.transmittalDocumentName ||
 															"No linked receipt yet"}
+												</span>
+											</div>
+											<div className={styles.issueSetDetailRow}>
+												<span className={styles.issueSetDetailLabel}>
+													Automation
+												</span>
+												<span className={styles.issueSetDetailValue}>
+													{packet.automation.latestReceipt
+														? `${packet.automation.linkedReceiptCount} receipt${
+																packet.automation.linkedReceiptCount === 1
+																	? ""
+																	: "s"
+														  } • ${
+																packet.automation.latestReceipt.mode
+														  } mode • ${
+																packet.automation.latestReceipt.affectedDrawingCount
+														  } affected drawing${
+																packet.automation.latestReceipt
+																	.affectedDrawingCount === 1
+																	? ""
+																	: "s"
+														  }`
+														: "No linked automation receipt yet"}
 												</span>
 											</div>
 											<div className={styles.issueSetDetailRow}>
@@ -1242,12 +1479,55 @@ export function ProjectIssueSetManager({
 						/>
 						<div className={cn(styles.fieldWide, styles.selectedSummary)}>
 							<div className={styles.selectedSummaryHeader}>
-								<span className={styles.label}>Included drawings</span>
+								<span className={styles.label}>
+									{hasRegisterRows ? "Included register rows" : "Included drawings"}
+								</span>
 								<Badge color="accent" variant="soft">
-									{form.selectedDrawingPaths.length} selected
+									{hasRegisterRows
+										? form.selectedRegisterRowIds.length
+										: form.selectedDrawingPaths.length} selected
 								</Badge>
 							</div>
-							{availableDrawingRows.length === 0 ? (
+							{hasRegisterRows ? (
+								<>
+									<p className={styles.inlineHint}>
+										Build the package from workbook rows first. Suite will carry
+										the paired PDFs, DWG paths, and drawing numbers forward into
+										the issue set.
+									</p>
+									<div className={styles.checkboxGrid}>
+										{availableRegisterRows.map((row) => (
+											<label
+												key={row.id}
+												className={styles.checkboxRow}
+												htmlFor={`issue-set-register-${row.id}`}
+											>
+												<input
+													id={`issue-set-register-${row.id}`}
+													type="checkbox"
+													checked={form.selectedRegisterRowIds.includes(row.id)}
+													onChange={() => toggleSelectedRegisterRow(row)}
+												/>
+												<span>
+													<strong>{row.drawingNumber}</strong>
+													{" • "}
+													{row.drawingDescription || "No drawing description"}
+													{row.currentRevision
+														? ` • Rev ${row.currentRevision}`
+														: ""}
+													{" • "}
+													{row.pdfPairingStatus === "paired" ||
+													row.pdfPairingStatus === "manual"
+														? "PDF paired"
+														: row.pdfPairingStatus === "multiple"
+															? "Resolve PDF match"
+															: "Missing PDF"}
+												</span>
+											</label>
+										))}
+									</div>
+								</>
+							) : availableDrawingRows.length === 0 ? (
 								<p className={styles.inlineHint}>
 									Run the drawing scan first to select package drawings.
 								</p>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -14,6 +15,9 @@ _runtime_status_cache_payload: Dict[str, Any] | None = None
 _runtime_status_cache_checked_at = 0.0
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _RUNTIME_STATUS_SCRIPT_PATH = _REPO_ROOT / "scripts" / "get-suite-runtime-status.ps1"
+_RUNTIME_CONTROL_LAUNCHER_PATH = (
+    _REPO_ROOT / "scripts" / "launch-suite-runtime-control.ps1"
+)
 
 
 def _limiter_health_payload() -> Dict[str, Any]:
@@ -327,6 +331,42 @@ def _load_runtime_status_snapshot() -> Dict[str, Any]:
     return payload
 
 
+def _launch_runtime_control() -> tuple[bool, str]:
+    if not _RUNTIME_CONTROL_LAUNCHER_PATH.exists():
+        return (
+            False,
+            f"Runtime Control launcher was not found at {_RUNTIME_CONTROL_LAUNCHER_PATH}.",
+        )
+
+    creation_flags = 0
+    creation_flags |= int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    creation_flags |= int(getattr(subprocess, "DETACHED_PROCESS", 0))
+
+    try:
+        subprocess.Popen(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(_RUNTIME_CONTROL_LAUNCHER_PATH),
+                "-RepoRoot",
+                str(_REPO_ROOT),
+            ],
+            cwd=str(_REPO_ROOT),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creation_flags,
+        )
+    except FileNotFoundError:
+        return False, "PowerShell is unavailable on this workstation."
+    except Exception as exc:  # pragma: no cover - defensive launcher wrapper
+        return False, f"Runtime Control could not start: {exc}"
+
+    return True, "Suite Runtime Control is starting."
+
+
 def create_health_blueprint() -> Blueprint:
     """Create /health route blueprint."""
     bp = Blueprint("health_api", __name__)
@@ -391,5 +431,20 @@ def create_health_blueprint() -> Blueprint:
         else:
             payload = _load_runtime_status_snapshot()
         return jsonify(payload)
+
+    @bp.route("/api/runtime/open-control", methods=["POST"])
+    def open_runtime_control():
+        launched, message = _launch_runtime_control()
+        status_code = 202 if launched else 500
+        return (
+            jsonify(
+                {
+                    "ok": launched,
+                    "message": message,
+                    "launchedAt": _checked_at_iso(),
+                }
+            ),
+            status_code,
+        )
 
     return bp

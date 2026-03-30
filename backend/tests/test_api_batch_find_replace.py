@@ -98,6 +98,75 @@ class TestApiBatchFindReplace(unittest.TestCase):
                     "meta": {"requestId": "req-apply"},
                 },
             }
+        if action == "suite_batch_find_replace_project_preview":
+            return {
+                "ok": True,
+                "id": "bridge-project-preview",
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "project preview ready",
+                    "data": {
+                        "matches": [
+                            {
+                                "file": "A-100.dwg",
+                                "line": 0,
+                                "ruleId": "rule-1",
+                                "handle": "ABCD",
+                                "entityType": "AttributeReference",
+                                "attributeTag": "TITLE1",
+                                "before": "OLD",
+                                "after": "NEW",
+                                "currentValue": "OLD",
+                                "nextValue": "NEW",
+                                "drawingPath": r"C:\dwg\A-100.dwg",
+                                "drawingName": "A-100.dwg",
+                            }
+                        ],
+                    },
+                    "warnings": [],
+                    "meta": {"requestId": "req-project-preview"},
+                },
+            }
+        if action == "suite_batch_find_replace_project_apply":
+            return {
+                "ok": True,
+                "id": "bridge-project-apply",
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "project apply complete",
+                    "data": {
+                        "updated": 1,
+                        "changedDrawingCount": 1,
+                        "changedItemCount": 1,
+                        "drawings": [
+                            {
+                                "drawingPath": r"C:\dwg\A-100.dwg",
+                                "drawingName": "A-100.dwg",
+                                "relativePath": "A-100.dwg",
+                                "updated": 1,
+                                "skipped": 0,
+                                "warnings": [],
+                            }
+                        ],
+                        "changes": [
+                            {
+                                "file": "A-100.dwg",
+                                "line": 0,
+                                "ruleId": "rule-1",
+                                "before": "OLD",
+                                "after": "NEW",
+                                "drawingPath": r"C:\dwg\A-100.dwg",
+                                "drawingName": "A-100.dwg",
+                                "relativePath": "A-100.dwg",
+                            }
+                        ],
+                    },
+                    "warnings": [],
+                    "meta": {"requestId": "req-project-apply"},
+                },
+            }
         raise AssertionError(f"Unexpected bridge action {action}")
 
     def test_preview_requires_api_key_or_batch_session(self) -> None:
@@ -192,6 +261,71 @@ class TestApiBatchFindReplace(unittest.TestCase):
         )
         self.assertIn("suite_batch_find_replace_apply", self.bridge_actions)
         response.close()
+
+    def test_project_cad_preview_resolves_issue_set_drawings(self) -> None:
+        response = self.client.post(
+            "/api/batch-find-replace/cad/project-preview",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "rules": [
+                    {
+                        "id": "rule-1",
+                        "find": "OLD",
+                        "replace": "NEW",
+                        "useRegex": False,
+                        "matchCase": True,
+                    }
+                ],
+                "selectedDrawingPaths": ["A-100.dwg"],
+                "drawingRootPath": r"C:\dwg",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(payload.get("matchCount"), 1)
+        self.assertEqual(payload.get("drawings")[0]["matchCount"], 1)
+        self.assertEqual(payload.get("matches")[0]["relativePath"], "A-100.dwg")
+        self.assertIn("suite_batch_find_replace_project_preview", self.bridge_actions)
+
+    def test_project_cad_apply_returns_downloadable_report_metadata(self) -> None:
+        response = self.client.post(
+            "/api/batch-find-replace/cad/project-apply",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "matches": [
+                    {
+                        "ruleId": "rule-1",
+                        "handle": "ABCD",
+                        "entityType": "AttributeReference",
+                        "attributeTag": "TITLE1",
+                        "currentValue": "OLD",
+                        "nextValue": "NEW",
+                        "drawingPath": r"C:\dwg\A-100.dwg",
+                        "drawingName": "A-100.dwg",
+                        "relativePath": "A-100.dwg",
+                    }
+                ]
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(payload.get("changedDrawingCount"), 1)
+        self.assertTrue(payload.get("reportId"))
+        self.assertIn("/api/batch-find-replace/reports/", payload.get("downloadUrl", ""))
+        self.assertIn("suite_batch_find_replace_project_apply", self.bridge_actions)
+
+        download = self.client.get(
+            f"/api/batch-find-replace/reports/{payload['reportId']}",
+            headers={"X-API-Key": "valid-key"},
+        )
+        self.assertEqual(download.status_code, 200)
+        self.assertEqual(
+            download.mimetype,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        download.close()
 
 
 if __name__ == "__main__":

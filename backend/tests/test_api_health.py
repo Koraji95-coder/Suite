@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 from flask import Flask
 
@@ -148,6 +149,35 @@ class TestApiHealth(unittest.TestCase):
         services = payload.get("services") or []
         self.assertEqual(len(services), 1)
         self.assertEqual((services[0] or {}).get("id"), "supabase")
+
+    @patch("backend.route_groups.api_health._launch_runtime_control")
+    def test_runtime_control_launcher_endpoint(self, mock_launch) -> None:
+        mock_launch.return_value = (True, "Suite Runtime Control is starting.")
+
+        response = self.client.post("/api/runtime/open-control")
+        self.assertEqual(response.status_code, 202)
+
+        payload = response.get_json() or {}
+        self.assertTrue(bool(payload.get("ok")))
+        self.assertEqual(
+            payload.get("message"),
+            "Suite Runtime Control is starting.",
+        )
+        self.assertIsInstance(payload.get("launchedAt"), str)
+
+    @patch("backend.route_groups.api_health._launch_runtime_control")
+    def test_runtime_control_launcher_endpoint_reports_failure(self, mock_launch) -> None:
+        mock_launch.return_value = (False, "PowerShell is unavailable on this workstation.")
+
+        response = self.client.post("/api/runtime/open-control")
+        self.assertEqual(response.status_code, 500)
+
+        payload = response.get_json() or {}
+        self.assertFalse(bool(payload.get("ok")))
+        self.assertEqual(
+            payload.get("message"),
+            "PowerShell is unavailable on this workstation.",
+        )
 
 
 if __name__ == "__main__":

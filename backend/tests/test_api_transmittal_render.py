@@ -209,6 +209,45 @@ class TestApiTransmittalRender(unittest.TestCase):
         self.assertFalse(payload.get("success", True))
         self.assertIn("requires review before render", str(payload.get("message")))
 
+    def test_render_standard_allows_custom_firm_value(self) -> None:
+        response = self.client.post(
+            "/api/transmittal/render",
+            headers={"X-API-Key": "valid-key"},
+            data={
+                "template": (io.BytesIO(b"template"), "template.docx"),
+                "documents": (io.BytesIO(b"doc"), "drawing1.pdf"),
+                "fields": json.dumps(
+                    {
+                        "job_num": "23001",
+                        "firm": "AB - Firm #99887",
+                    }
+                ),
+                "pdf_document_data": json.dumps(
+                    [
+                        {
+                            "file_name": "drawing1.pdf",
+                            "drawing_number": "E1-100",
+                            "title": "Floor Plan",
+                            "revision": "2",
+                            "confidence": 0.91,
+                            "source": "embedded_text",
+                            "needs_review": False,
+                            "accepted": True,
+                            "override_reason": "",
+                        }
+                    ]
+                ),
+            },
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(self.render_calls), 1)
+        self.assertEqual(
+            self.render_calls[0]["fields"].get("firm"),
+            "AB - Firm #99887",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

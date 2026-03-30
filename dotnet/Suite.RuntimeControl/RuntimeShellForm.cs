@@ -27,9 +27,11 @@ internal sealed class RuntimeShellForm : Form
     private readonly string _assetsDirectory;
     private readonly string _statusScriptPath;
     private readonly string _controlScriptPath;
+    private readonly string _companionControlScriptPath;
     private readonly string _bootstrapScriptPath;
     private readonly string _stopScriptPath;
     private readonly string _supportBundleScriptPath;
+    private readonly string _workstationProfileScriptPath;
     private readonly string _runtimeCatalogPath;
     private readonly string _developerToolsManifestPath;
     private readonly string _runtimeStatusDirectory;
@@ -56,9 +58,11 @@ internal sealed class RuntimeShellForm : Form
         _assetsDirectory = Path.Combine(AppContext.BaseDirectory, "Assets");
         _statusScriptPath = Path.Combine(_repoRoot, "scripts", "get-suite-runtime-status.ps1");
         _controlScriptPath = Path.Combine(_repoRoot, "scripts", "control-suite-runtime-service.ps1");
+        _companionControlScriptPath = Path.Combine(_repoRoot, "scripts", "control-suite-companion-app.ps1");
         _bootstrapScriptPath = Path.Combine(_repoRoot, "scripts", "run-suite-runtime-startup.ps1");
         _stopScriptPath = Path.Combine(_repoRoot, "scripts", "stop-suite-runtime.ps1");
         _supportBundleScriptPath = Path.Combine(_repoRoot, "scripts", "export-suite-support-bundle.ps1");
+        _workstationProfileScriptPath = Path.Combine(_repoRoot, "scripts", "sync-suite-workstation-profile.ps1");
         _runtimeCatalogPath = Path.Combine(_assetsDirectory, "runtimeCatalog.json");
         _developerToolsManifestPath = Path.Combine(_repoRoot, "src", "routes", "developerToolsManifest.data.json");
         _runtimeStatusDirectory = Path.Combine(
@@ -233,8 +237,20 @@ internal sealed class RuntimeShellForm : Form
                 case "suite.support.copy-summary":
                     CopySupportSummaryToClipboard();
                     break;
+                case "suite.support.apply-workstation-profile":
+                    await ApplyWorkstationProfileAsync();
+                    break;
                 case "suite.support.export-bundle":
                     await ExportSupportBundleAsync();
+                    break;
+                case "suite.companion.launch":
+                    await RunCompanionActionAsync(GetPayloadCompanionAppId(root), "launch");
+                    break;
+                case "suite.companion.relaunch":
+                    await RunCompanionActionAsync(GetPayloadCompanionAppId(root), "relaunch");
+                    break;
+                case "suite.companion.open-folder":
+                    await RunCompanionActionAsync(GetPayloadCompanionAppId(root), "open-folder");
                     break;
             }
         }
@@ -780,6 +796,75 @@ internal sealed class RuntimeShellForm : Form
         }
     }
 
+    private async Task ApplyWorkstationProfileAsync()
+    {
+        if (!TryBeginAction("support.apply-workstation-profile", null))
+        {
+            return;
+        }
+
+        try
+        {
+            SendLog("START", "Applying workstation profile.", "hi");
+            var result = await ProcessRunner.RunPowerShellFileAsync(
+                _workstationProfileScriptPath,
+                _repoRoot,
+                new[] { "-RepoRoot", _repoRoot, "-Json" });
+
+            string? summary = null;
+            string? details = null;
+            var ok = result.Succeeded;
+            if (TryExtractJsonObject(result.CombinedOutput, out var payloadJson))
+            {
+                using var document = JsonDocument.Parse(payloadJson);
+                var root = document.RootElement;
+                ok = root.TryGetProperty("ok", out var okElement) && okElement.ValueKind is JsonValueKind.True;
+                var workstationId = GetStringProperty(root, "workstationId");
+                var workstationLabel = GetStringProperty(root, "workstationLabel");
+                var workstationRole = GetStringProperty(root, "workstationRole");
+                summary = ok
+                    ? "Applied the workstation profile."
+                    : "Workstation profile apply failed.";
+                details = string.Join(
+                    " | ",
+                    new[] { workstationId, workstationLabel, workstationRole }
+                        .Where(static part => !string.IsNullOrWhiteSpace(part)));
+            }
+            else
+            {
+                details = result.CombinedOutput;
+            }
+
+            await PublishSnapshotAsync(force: true);
+
+            if (ok)
+            {
+                SendLog("OK", summary ?? "Applied the workstation profile.", "ok");
+                if (!string.IsNullOrWhiteSpace(details))
+                {
+                    SendLog("INFO", details, "info");
+                }
+                SendLog("INFO", "Restart Codex if you need MCP/workstation env changes to reload immediately.", "info");
+                return;
+            }
+
+            SendLog("ERR", summary ?? "Workstation profile apply failed.", "err");
+            if (!string.IsNullOrWhiteSpace(details))
+            {
+                SendLog("WARN", details, "warn");
+            }
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-apply-workstation-profile", exception);
+            SendError("Apply workstation profile failed.", exception.Message);
+        }
+        finally
+        {
+            EndAction();
+        }
+    }
+
     private async Task ExportSupportBundleAsync()
     {
         try
@@ -848,6 +933,73 @@ internal sealed class RuntimeShellForm : Form
         {
             RuntimeShellLogger.LogException("runtime-shell-export-support-bundle", exception);
             SendError("Support bundle export failed.", exception.Message);
+        }
+    }
+
+    private async Task RunCompanionActionAsync(string? companionAppId, string action)
+    {
+        if (string.IsNullOrWhiteSpace(companionAppId))
+        {
+            SendError("Companion action failed.", "No companion app id was provided.");
+            return;
+        }
+
+        if (!TryBeginAction($"companion.{action}", companionAppId))
+        {
+            return;
+        }
+
+        try
+        {
+            SendLog("START", $"{ToPresentTense(action)} {companionAppId}.", "hi");
+
+            var result = await ProcessRunner.RunPowerShellFileAsync(
+                _companionControlScriptPath,
+                _repoRoot,
+                new[] { "-CompanionAppId", companionAppId, "-Action", action, "-RepoRoot", _repoRoot, "-LaunchSource", "runtime-control", "-Json" });
+
+            string? summary = null;
+            string? details = null;
+            var ok = result.Succeeded;
+            if (TryExtractJsonObject(result.CombinedOutput, out var payloadJson))
+            {
+                using var document = JsonDocument.Parse(payloadJson);
+                var root = document.RootElement;
+                ok = root.TryGetProperty("ok", out var okElement) && okElement.ValueKind is JsonValueKind.True;
+                summary = GetStringProperty(root, "summary");
+                details = GetStringProperty(root, "details");
+            }
+            else
+            {
+                details = result.CombinedOutput;
+            }
+
+            await PublishSnapshotAsync(force: true);
+
+            if (ok)
+            {
+                SendLog("OK", summary ?? $"{companionAppId} {action} completed.", "ok");
+                if (!string.IsNullOrWhiteSpace(details))
+                {
+                    SendLog("INFO", details, "info");
+                }
+                return;
+            }
+
+            SendLog("ERR", summary ?? $"{companionAppId} {action} failed.", "err");
+            if (!string.IsNullOrWhiteSpace(details))
+            {
+                SendLog("WARN", details, "warn");
+            }
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException($"runtime-shell-companion-{action}", exception);
+            SendError("Companion action failed.", exception.Message);
+        }
+        finally
+        {
+            EndAction();
         }
     }
 
@@ -1536,6 +1688,16 @@ internal sealed class RuntimeShellForm : Form
         return GetStringProperty(payload, "routePath");
     }
 
+    private static string? GetPayloadCompanionAppId(JsonElement root)
+    {
+        if (!root.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return GetStringProperty(payload, "companionAppId");
+    }
+
     private static string? GetPayloadRouteTitle(JsonElement root)
     {
         if (!root.TryGetProperty("payload", out var payload))
@@ -1683,6 +1845,9 @@ internal sealed class RuntimeShellForm : Form
             "start" => "Starting",
             "stop" => "Stopping",
             "restart" => "Restarting",
+            "launch" => "Opening",
+            "relaunch" => "Relaunching",
+            "open-folder" => "Opening",
             _ => action,
         };
     }

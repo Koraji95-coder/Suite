@@ -8,7 +8,10 @@ import {
 } from "@/components/apps/ui/select";
 import { Input, TextArea } from "@/components/primitives/Input";
 import styles from "./TransmittalBuilderProjectAndSenderSection.module.css";
-import type { DraftState } from "./transmittalBuilderModels";
+import {
+	isProjectSenderId,
+	type DraftState,
+} from "./transmittalBuilderModels";
 import type { PeProfile } from "./transmittalConfig";
 
 const TransmittalSection = Section;
@@ -137,7 +140,9 @@ export function TransmittalBuilderProjectAndSenderSection({
 								<SelectContent>
 									{profileOptions.map((profile) => (
 										<SelectItem key={profile.id} value={profile.id}>
-											{profile.name}
+											{isProjectSenderId(profile.id)
+												? `Project PE — ${profile.name}`
+												: profile.name}
 										</SelectItem>
 									))}
 								</SelectContent>
@@ -146,7 +151,8 @@ export function TransmittalBuilderProjectAndSenderSection({
 								<div className={styles.errorText}>{profileOptionsError}</div>
 							) : (
 								<div className={styles.helperText}>
-									Sender values are managed by the selected profile.
+									Profiles and project-assigned PEs seed sender values. Title,
+									email, and phone can be refined here before rendering.
 								</div>
 							)}
 						</div>
@@ -158,9 +164,11 @@ export function TransmittalBuilderProjectAndSenderSection({
 								id="transmittal-from-title"
 								name="transmittal_from_title"
 								value={draft.fromTitle}
-								readOnly
+								onChange={(event) =>
+									updateDraft("fromTitle", event.target.value)
+								}
 								className={isInvalid("fromTitle") ? styles.invalidField : ""}
-								placeholder="Managed from profile"
+								placeholder="Professional Engineer"
 							/>
 						</div>
 					</div>
@@ -174,9 +182,11 @@ export function TransmittalBuilderProjectAndSenderSection({
 								id="transmittal-from-email"
 								name="transmittal_from_email"
 								value={draft.fromEmail}
-								readOnly
+								onChange={(event) =>
+									updateDraft("fromEmail", event.target.value)
+								}
 								className={isInvalid("fromEmail") ? styles.invalidField : ""}
-								placeholder="Managed from profile"
+								placeholder="name@firm.com"
 							/>
 						</div>
 						<div className={styles.field}>
@@ -187,8 +197,10 @@ export function TransmittalBuilderProjectAndSenderSection({
 								id="transmittal-from-phone"
 								name="transmittal_from_phone"
 								value={draft.fromPhone}
-								readOnly
-								placeholder="Managed from profile"
+								onChange={(event) =>
+									updateDraft("fromPhone", event.target.value)
+								}
+								placeholder="(000) 000-0000"
 							/>
 						</div>
 					</div>
@@ -200,7 +212,7 @@ export function TransmittalBuilderProjectAndSenderSection({
 							onValueChange={(value) => updateDraft("firmNumber", value)}
 						>
 							<SelectTrigger>
-								<SelectValue placeholder="Select firm" />
+								<SelectValue placeholder="Select firm number" />
 							</SelectTrigger>
 							<SelectContent>
 								{firmOptions.map((firm) => (
@@ -210,6 +222,10 @@ export function TransmittalBuilderProjectAndSenderSection({
 								))}
 							</SelectContent>
 						</Select>
+						<div className={styles.helperText}>
+							Project-assigned firm numbers appear here alongside the standard
+							sender catalog.
+						</div>
 					</div>
 				</div>
 			</TransmittalSection>

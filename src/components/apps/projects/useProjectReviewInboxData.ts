@@ -17,6 +17,10 @@ import {
 	projectIssueSetService,
 } from "@/services/projectIssueSetService";
 import {
+	type ProjectDeliverableRegisterSnapshot,
+	projectDeliverableRegisterService,
+} from "@/services/projectDeliverableRegisterService";
+import {
 	type ProjectReviewDecisionItemType,
 	type ProjectReviewDecisionRecord,
 	type ProjectReviewDecisionStatus,
@@ -41,6 +45,7 @@ import type { ProjectWatchdogTelemetry } from "./useProjectWatchdogTelemetry";
 export type ProjectReviewInboxItemType =
 	| "setup"
 	| "title-block"
+	| "deliverable-register"
 	| "revision"
 	| "standards"
 	| "issue-set";
@@ -76,6 +81,7 @@ export interface ProjectReviewInboxItem {
 interface ProjectReviewInboxState {
 	loading: boolean;
 	scan: ProjectDocumentMetadataSnapshot | null;
+	deliverableRegister: ProjectDeliverableRegisterSnapshot | null;
 	revisions: DrawingRevisionRegisterRow[];
 	standardsChecks: DrawingAnnotation[];
 	issueSets: ProjectIssueSetRecord[];
@@ -89,6 +95,7 @@ export interface ProjectReviewInboxMetrics {
 	highPriorityCount: number;
 	setupAttentionCount: number;
 	titleBlockAttentionCount: number;
+	deliverableRegisterAttentionCount: number;
 	acceptedTitleBlockCount: number;
 	revisionAttentionCount: number;
 	standardsAttentionCount: number;
@@ -99,6 +106,7 @@ export interface ProjectReviewInboxMetrics {
 export interface ProjectReviewInboxData {
 	loading: boolean;
 	scan: ProjectDocumentMetadataSnapshot | null;
+	deliverableRegister: ProjectDeliverableRegisterSnapshot | null;
 	revisions: DrawingRevisionRegisterRow[];
 	standardsChecks: DrawingAnnotation[];
 	issueSets: ProjectIssueSetRecord[];
@@ -116,6 +124,7 @@ export interface ProjectReviewInboxData {
 const EMPTY_STATE: ProjectReviewInboxState = {
 	loading: true,
 	scan: null,
+	deliverableRegister: null,
 	revisions: [],
 	standardsChecks: [],
 	issueSets: [],
@@ -241,6 +250,30 @@ function getSetupItems(
 			quickActions: [],
 		});
 	}
+	if (
+		projectRoot &&
+		scan &&
+		(scan.artifacts.wdpState !== "existing" || !scan.artifacts.wdpPath)
+	) {
+		items.push({
+			id: "setup:acade-project",
+			type: "setup",
+			priority: "low",
+			title: "Confirm ACADE project scaffold",
+			summary:
+				"Suite is still using a starter .wdp scaffold instead of a confirmed AutoCAD Electrical project file.",
+			detail:
+				"Review the derived .wdp, .wdt, and .wdl in Setup before treating ACADE report verification as final package truth.",
+			actionType: "view",
+			actionLabel: "Open setup",
+			actionTarget: "setup",
+			issueSetId: null,
+			issueSetLabel: null,
+			entityId: "setup:acade-project",
+			fingerprint: "",
+			quickActions: [],
+		});
+	}
 	return items;
 }
 
@@ -288,6 +321,128 @@ function getTitleBlockItems(
 				],
 			};
 		});
+}
+
+function getDeliverableRegisterItems(args: {
+	snapshot: ProjectDeliverableRegisterSnapshot | null;
+	projectId: string;
+	issueSet?: ProjectIssueSetRecord | null;
+}): ProjectReviewInboxItem[] {
+	const scopedRows = (args.snapshot?.rows ?? []).filter((row) => {
+		if (!args.issueSet || args.issueSet.selectedRegisterRowIds.length === 0) {
+			return true;
+		}
+		return args.issueSet.selectedRegisterRowIds.includes(row.id);
+	});
+
+	return scopedRows.flatMap((row) => {
+		const base = {
+			type: "deliverable-register" as const,
+			issueSetId: args.issueSet?.id ?? null,
+			issueSetLabel: args.issueSet?.issueTag ?? null,
+			entityId: row.id,
+			quickActions: [],
+		};
+		const items: ProjectReviewInboxItem[] = [];
+
+		if (
+			row.readinessState === "package-ready" &&
+			row.pdfPairingStatus === "missing"
+		) {
+			items.push({
+				id: `deliverable-register:missing-pdf:${row.id}`,
+				priority: "high",
+				title: row.drawingNumber,
+				summary:
+					"Workbook row is package-ready, but no issued PDF is paired yet.",
+				detail: `${row.sheetName}${row.setName ? ` • ${row.setName}` : ""} • ${row.drawingDescription || "No drawing description"}`,
+				actionType: "view",
+				actionLabel: "Open Files & activity",
+				actionTarget: "files",
+				fingerprint: `deliverable-register::missing-pdf::${row.id}::${row.currentRevision}`,
+				...base,
+			});
+		}
+
+		if (row.pdfPairingStatus === "multiple") {
+			items.push({
+				id: `deliverable-register:multiple-pdf:${row.id}`,
+				priority: "medium",
+				title: row.drawingNumber,
+				summary:
+					"Workbook row matches more than one issued PDF and needs pairing review.",
+				detail: `${row.pdfMatches.length} PDF candidates matched this row.`,
+				actionType: "view",
+				actionLabel: "Open Files & activity",
+				actionTarget: "files",
+				fingerprint: `deliverable-register::multiple-pdf::${row.id}::${row.pdfMatches.length}`,
+				...base,
+			});
+		}
+
+		if (row.titleBlockVerificationState === "mismatch") {
+			items.push({
+				id: `deliverable-register:title-mismatch:${row.id}`,
+				priority: "high",
+				title: row.drawingNumber,
+				summary:
+					row.titleBlockVerificationDetail ||
+					"Workbook metadata does not match the title block scan.",
+				detail: `${row.drawingDescription || "No title"} • Rev ${row.currentRevision || "—"}`,
+				actionType: "link",
+				actionLabel: "Open title block review",
+				actionTarget: buildProjectIssueSetAppHref(
+					"/app/apps/drawing-list-manager",
+					args.projectId,
+					args.issueSet?.id,
+				),
+				fingerprint: `deliverable-register::title-mismatch::${row.id}::${row.titleBlockVerificationDetail || ""}`,
+				...base,
+			});
+		}
+
+		if (row.acadeVerificationState === "mismatch") {
+			items.push({
+				id: `deliverable-register:acade-mismatch:${row.id}`,
+				priority: "medium",
+				title: row.drawingNumber,
+				summary:
+					row.acadeVerificationDetail ||
+					"Workbook metadata does not match the ACADE report.",
+				detail: `${row.sheetName}${row.setName ? ` • ${row.setName}` : ""} • ${row.drawingDescription || "No title"}`,
+				actionType: "link",
+				actionLabel: "Open title block review",
+				actionTarget: buildProjectIssueSetAppHref(
+					"/app/apps/drawing-list-manager",
+					args.projectId,
+					args.issueSet?.id,
+				),
+				fingerprint: `deliverable-register::acade-mismatch::${row.id}::${row.acadeVerificationDetail || ""}`,
+				...base,
+			});
+		}
+
+		if (
+			row.readinessState === "blocked" &&
+			(row.pdfMatches.length > 0 || row.dwgMatches.length > 0)
+		) {
+			items.push({
+				id: `deliverable-register:status-drift:${row.id}`,
+				priority: "high",
+				title: row.drawingNumber,
+				summary:
+					"Workbook says this drawing is not created yet, but project files already exist.",
+				detail: `${row.sheetName}${row.setName ? ` • ${row.setName}` : ""} • ${row.drawingDescription || "No title"}`,
+				actionType: "view",
+				actionLabel: "Open Files & activity",
+				actionTarget: "files",
+				fingerprint: `deliverable-register::status-drift::${row.id}`,
+				...base,
+			});
+		}
+
+		return items;
+	});
 }
 
 function getRevisionItems(
@@ -529,12 +684,14 @@ export function useProjectReviewInboxData(
 				issueSetsResult,
 				receiptsResult,
 				decisionsResult,
+				registerResult,
 				snapshotResult,
 			] = await Promise.all([
 				projectRevisionRegisterService.fetchEntries(project.id),
 				projectIssueSetService.fetchIssueSets(project.id),
 				projectTransmittalReceiptService.fetchReceipts(project.id),
 				projectReviewDecisionService.fetchDecisions(project.id),
+				projectDeliverableRegisterService.fetchSnapshot(project.id),
 				project.watchdog_root_path?.trim()
 					? projectDocumentMetadataService
 							.loadSnapshot({
@@ -569,6 +726,7 @@ export function useProjectReviewInboxData(
 			setState({
 				loading: false,
 				scan: snapshotResult.data,
+				deliverableRegister: registerResult.data,
 				revisions: revisionsResult.data,
 				standardsChecks: standardsResult.data,
 				issueSets: issueSetsResult.data,
@@ -579,6 +737,7 @@ export function useProjectReviewInboxData(
 					...(issueSetsResult.error ? [issueSetsResult.error.message] : []),
 					...(receiptsResult.error ? [receiptsResult.error.message] : []),
 					...(decisionsResult.error ? [decisionsResult.error.message] : []),
+					...(registerResult.error ? [registerResult.error.message] : []),
 					...(standardsResult.error ? [standardsResult.error.message] : []),
 					...(snapshotResult.error ? [snapshotResult.error.message] : []),
 				],
@@ -604,6 +763,11 @@ export function useProjectReviewInboxData(
 		const scanRows = state.scan?.rows ?? [];
 		return sortItems([
 			...getSetupItems(project, telemetry, state.scan),
+			...getDeliverableRegisterItems({
+				snapshot: state.deliverableRegister,
+				projectId: project.id,
+				issueSet: currentIssueSet,
+			}),
 			...getTitleBlockItems(scanRows, project.id, currentIssueSet),
 			...getRevisionItems(state.revisions),
 			...getStandardsItems(
@@ -623,6 +787,7 @@ export function useProjectReviewInboxData(
 		state.issueSets,
 		state.revisions,
 		state.scan,
+		state.deliverableRegister,
 		state.standardsChecks,
 		state.transmittalReceipts,
 		telemetry,
@@ -653,6 +818,9 @@ export function useProjectReviewInboxData(
 			setupAttentionCount: items.filter((item) => item.type === "setup").length,
 			titleBlockAttentionCount: items.filter(
 				(item) => item.type === "title-block",
+			).length,
+			deliverableRegisterAttentionCount: items.filter(
+				(item) => item.type === "deliverable-register",
 			).length,
 			acceptedTitleBlockCount: scopedDecisions.filter(
 				(decision) =>
@@ -697,6 +865,7 @@ export function useProjectReviewInboxData(
 	return {
 		loading: state.loading,
 		scan: state.scan,
+		deliverableRegister: state.deliverableRegister,
 		revisions: state.revisions,
 		standardsChecks: state.standardsChecks,
 		issueSets: state.issueSets,

@@ -444,6 +444,7 @@ export type Database = {
       }
       project_title_block_profiles: {
         Row: {
+          acade_project_file_path: string | null
           acade_line1: string
           acade_line2: string
           acade_line4: string
@@ -459,6 +460,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          acade_project_file_path?: string | null
           acade_line1?: string
           acade_line2?: string
           acade_line4?: string
@@ -474,6 +476,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          acade_project_file_path?: string | null
           acade_line1?: string
           acade_line2?: string
           acade_line4?: string
@@ -491,6 +494,222 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "project_title_block_profiles_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_markup_snapshots: {
+        Row: {
+          compare_payload: Json
+          contract_version: string
+          created_at: string
+          drawing_name: string | null
+          drawing_path: string
+          id: string
+          issue_set_id: string | null
+          page_index: number
+          prepare_payload: Json
+          project_id: string
+          reviewed_bundle_json: Json
+          revision_context: Json | null
+          selected_action_ids: string[]
+          selected_operation_ids: string[]
+          source_pdf_name: string
+          updated_at: string
+          user_id: string
+          warnings: string[]
+        }
+        Insert: {
+          compare_payload?: Json
+          contract_version?: string
+          created_at?: string
+          drawing_name?: string | null
+          drawing_path: string
+          id?: string
+          issue_set_id?: string | null
+          page_index?: number
+          prepare_payload?: Json
+          project_id: string
+          reviewed_bundle_json?: Json
+          revision_context?: Json | null
+          selected_action_ids?: string[]
+          selected_operation_ids?: string[]
+          source_pdf_name: string
+          updated_at?: string
+          user_id: string
+          warnings?: string[]
+        }
+        Update: {
+          compare_payload?: Json
+          contract_version?: string
+          created_at?: string
+          drawing_name?: string | null
+          drawing_path?: string
+          id?: string
+          issue_set_id?: string | null
+          page_index?: number
+          prepare_payload?: Json
+          project_id?: string
+          reviewed_bundle_json?: Json
+          revision_context?: Json | null
+          selected_action_ids?: string[]
+          selected_operation_ids?: string[]
+          source_pdf_name?: string
+          updated_at?: string
+          user_id?: string
+          warnings?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_markup_snapshots_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_automation_runs: {
+        Row: {
+          artifacts: Json
+          changed_drawing_count: number
+          changed_item_count: number
+          created_at: string
+          download_url: string | null
+          id: string
+          issue_set_id: string | null
+          operations: Json
+          project_id: string
+          recipe_id: string | null
+          report_filename: string | null
+          report_id: string | null
+          request_id: string | null
+          simulate_on_copy: boolean
+          status: string
+          updated_at: string
+          user_id: string
+          verification_artifacts: Json
+          warnings: string[]
+          work_package_id: string | null
+        }
+        Insert: {
+          artifacts?: Json
+          changed_drawing_count?: number
+          changed_item_count?: number
+          created_at?: string
+          download_url?: string | null
+          id?: string
+          issue_set_id?: string | null
+          operations?: Json
+          project_id: string
+          recipe_id?: string | null
+          report_filename?: string | null
+          report_id?: string | null
+          request_id?: string | null
+          simulate_on_copy?: boolean
+          status?: string
+          updated_at?: string
+          user_id: string
+          verification_artifacts?: Json
+          warnings?: string[]
+          work_package_id?: string | null
+        }
+        Update: {
+          artifacts?: Json
+          changed_drawing_count?: number
+          changed_item_count?: number
+          created_at?: string
+          download_url?: string | null
+          id?: string
+          issue_set_id?: string | null
+          operations?: Json
+          project_id?: string
+          recipe_id?: string | null
+          report_filename?: string | null
+          report_id?: string | null
+          request_id?: string | null
+          simulate_on_copy?: boolean
+          status?: string
+          updated_at?: string
+          user_id?: string
+          verification_artifacts?: Json
+          warnings?: string[]
+          work_package_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_automation_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_cad_write_passes: {
+        Row: {
+          after_json: Json | null
+          artifact_refs: Json
+          before_json: Json | null
+          created_at: string
+          drawing_path: string
+          handle_refs: string[]
+          id: string
+          managed_key: string | null
+          operation_type: string
+          project_id: string
+          run_id: string | null
+          snapshot_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          warnings: string[]
+          writer_kind: string
+        }
+        Insert: {
+          after_json?: Json | null
+          artifact_refs?: Json
+          before_json?: Json | null
+          created_at?: string
+          drawing_path: string
+          handle_refs?: string[]
+          id?: string
+          managed_key?: string | null
+          operation_type: string
+          project_id: string
+          run_id?: string | null
+          snapshot_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          warnings?: string[]
+          writer_kind: string
+        }
+        Update: {
+          after_json?: Json | null
+          artifact_refs?: Json
+          before_json?: Json | null
+          created_at?: string
+          drawing_path?: string
+          handle_refs?: string[]
+          id?: string
+          managed_key?: string | null
+          operation_type?: string
+          project_id?: string
+          run_id?: string | null
+          snapshot_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          warnings?: string[]
+          writer_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_cad_write_passes_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -835,8 +1054,11 @@ export type Database = {
           created_at: string
           deadline: string | null
           description: string
+          firm_number: string
           id: string
           name: string
+          pdf_package_root_path: string | null
+          pe_name: string
           priority: Database["public"]["Enums"]["project_priority"]
           status: Database["public"]["Enums"]["project_status"]
           updated_at: string
@@ -849,8 +1071,11 @@ export type Database = {
           created_at?: string
           deadline?: string | null
           description?: string
+          firm_number?: string
           id?: string
           name: string
+          pdf_package_root_path?: string | null
+          pe_name?: string
           priority?: Database["public"]["Enums"]["project_priority"]
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
@@ -863,8 +1088,11 @@ export type Database = {
           created_at?: string
           deadline?: string | null
           description?: string
+          firm_number?: string
           id?: string
           name?: string
+          pdf_package_root_path?: string | null
+          pe_name?: string
           priority?: Database["public"]["Enums"]["project_priority"]
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string

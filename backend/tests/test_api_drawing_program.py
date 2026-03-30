@@ -1,0 +1,217 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from flask import Flask, g
+from flask_limiter import Limiter
+from openpyxl import load_workbook
+
+from backend.route_groups.api_drawing_program import create_drawing_program_blueprint
+
+
+class TestApiDrawingProgram(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.project_root = Path(self.temp_dir.name)
+        (self.project_root / "Templates").mkdir(parents=True, exist_ok=True)
+        (self.project_root / "Templates" / "sheet-template.dwg").write_text(
+            "template", encoding="utf-8"
+        )
+        (self.project_root / "R3P-25074-E3-0001 - Existing.dwg").write_text(
+            "existing", encoding="utf-8"
+        )
+
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        limiter = Limiter(
+            app=app,
+            key_func=lambda: "test-client",
+            default_limits=[],
+            storage_uri="memory://",
+            strategy="fixed-window",
+        )
+
+        def require_supabase_user(f):
+            def wrapped(*args, **kwargs):
+                g.supabase_user = {"id": "user-1", "email": "user@example.com"}
+                return f(*args, **kwargs)
+
+            wrapped.__name__ = getattr(f, "__name__", "wrapped")
+            return wrapped
+
+        app.register_blueprint(
+            create_drawing_program_blueprint(
+                limiter=limiter,
+                logger=app.logger,
+                require_supabase_user=require_supabase_user,
+            )
+        )
+        self.client = app.test_client()
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def test_apply_plan_copies_templates_renames_drawings_and_writes_artifacts(self) -> None:
+        response = self.client.post(
+            "/api/drawing-program/apply-plan",
+            json={
+                "projectId": "project-1",
+                "projectRootPath": str(self.project_root),
+                "profile": {
+                    "acadeLine1": "Client",
+                    "acadeLine2": "Site",
+                    "acadeLine4": "R3P-25074",
+                    "acadeProjectFilePath": str(self.project_root / "Test.wdp"),
+                },
+                "program": {"rows": []},
+                "plan": {
+                    "updatedProgram": {
+                        "id": "program-1",
+                        "projectId": "project-1",
+                        "workbookMirror": {
+                            "workbookRelativePath": "Drawing Index.xlsx",
+                        },
+                        "rows": [
+                            {
+                                "id": "row-new",
+                                "drawingNumber": "R3P-25074-E3-0002",
+                                "title": "New Three Line",
+                                "status": "planned",
+                                "provisionState": "provisioned",
+                                "dwgRelativePath": "R3P-25074-E3-0002 - New Three Line.dwg",
+                                "templateKey": "3LINE",
+                                "sheetFamily": "Three-Line Diagram",
+                                "discipline": "E",
+                                "acadeSection": "SCHEMATIC",
+                                "acadeGroup": "",
+                            },
+                            {
+                                "id": "row-existing",
+                                "drawingNumber": "R3P-25074-E3-0003",
+                                "title": "Existing",
+                                "status": "planned",
+                                "provisionState": "provisioned",
+                                "dwgRelativePath": "R3P-25074-E3-0003 - Existing.dwg",
+                                "templateKey": "3LINE",
+                                "sheetFamily": "Three-Line Diagram",
+                                "discipline": "E",
+                                "acadeSection": "SCHEMATIC",
+                                "acadeGroup": "",
+                            },
+                        ],
+                    },
+                    "fileActions": [
+                        {
+                            "kind": "copy-template",
+                            "rowId": "row-new",
+                            "toRelativePath": "R3P-25074-E3-0002 - New Three Line.dwg",
+                            "templatePath": "Templates/sheet-template.dwg",
+                            "blocked": False,
+                        },
+                        {
+                            "kind": "rename-dwg",
+                            "rowId": "row-existing",
+                            "fromRelativePath": "R3P-25074-E3-0001 - Existing.dwg",
+                            "toRelativePath": "R3P-25074-E3-0003 - Existing.dwg",
+                            "blocked": False,
+                        },
+                    ],
+                    "workbookRows": [
+                        {
+                            "suiteRowId": "row-new",
+                            "sortOrder": 10,
+                            "drawingNumber": "R3P-25074-E3-0002",
+                            "title": "New Three Line",
+                            "status": "planned",
+                            "discipline": "E",
+                            "sheetFamily": "Three-Line Diagram",
+                            "templateKey": "3LINE",
+                            "provisionState": "provisioned",
+                            "dwgRelativePath": "R3P-25074-E3-0002 - New Three Line.dwg",
+                            "acadeSection": "SCHEMATIC",
+                            "acadeGroup": "",
+                        },
+                        {
+                            "suiteRowId": "row-existing",
+                            "sortOrder": 20,
+                            "drawingNumber": "R3P-25074-E3-0003",
+                            "title": "Existing",
+                            "status": "planned",
+                            "discipline": "E",
+                            "sheetFamily": "Three-Line Diagram",
+                            "templateKey": "3LINE",
+                            "provisionState": "provisioned",
+                            "dwgRelativePath": "R3P-25074-E3-0003 - Existing.dwg",
+                            "acadeSection": "SCHEMATIC",
+                            "acadeGroup": "",
+                        },
+                    ],
+                    "warnings": [],
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertTrue(
+            (self.project_root / "R3P-25074-E3-0002 - New Three Line.dwg").exists()
+        )
+        self.assertTrue(
+            (self.project_root / "R3P-25074-E3-0003 - Existing.dwg").exists()
+        )
+        self.assertFalse(
+            (self.project_root / "R3P-25074-E3-0001 - Existing.dwg").exists()
+        )
+        workbook = load_workbook(self.project_root / "Drawing Index.xlsx")
+        self.assertEqual(workbook.sheetnames, ["Drawing Index"])
+        sheet = workbook["Drawing Index"]
+        self.assertEqual(sheet["A2"].value, "row-new")
+        wdp_text = (self.project_root / "Test.wdp").read_text(encoding="utf-8")
+        self.assertIn("R3P-25074-E3-0002 - New Three Line.dwg", wdp_text)
+        self.assertIn("R3P-25074-E3-0003 - Existing.dwg", wdp_text)
+
+    def test_sync_acade_writes_current_program_stack(self) -> None:
+        response = self.client.post(
+            "/api/drawing-program/sync-acade",
+            json={
+                "projectId": "project-1",
+                "projectRootPath": str(self.project_root),
+                "profile": {
+                    "acadeLine1": "Client",
+                    "acadeLine2": "Site",
+                    "acadeLine4": "R3P-25074",
+                    "acadeProjectFilePath": str(self.project_root / "SyncOnly.wdp"),
+                },
+                "program": {
+                    "id": "program-1",
+                    "projectId": "project-1",
+                    "workbookMirror": {
+                        "workbookRelativePath": "Drawing Index.xlsx",
+                    },
+                    "rows": [
+                        {
+                            "id": "row-existing",
+                            "drawingNumber": "R3P-25074-E3-0001",
+                            "title": "Existing",
+                            "status": "planned",
+                            "provisionState": "provisioned",
+                            "dwgRelativePath": "R3P-25074-E3-0001 - Existing.dwg",
+                            "templateKey": "3LINE",
+                            "sheetFamily": "Three-Line Diagram",
+                            "discipline": "E",
+                            "acadeSection": "SCHEMATIC",
+                            "acadeGroup": "",
+                        }
+                    ],
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        wdp_text = (self.project_root / "SyncOnly.wdp").read_text(encoding="utf-8")
+        self.assertIn("R3P-25074-E3-0001 - Existing.dwg", wdp_text)
+

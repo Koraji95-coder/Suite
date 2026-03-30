@@ -288,6 +288,12 @@ static class PipeRouter
                 "suite_title_block_apply" => SuiteTitleBlockApplyAction.Handle(payload),
                 "suite_batch_find_replace_preview" => SuiteBatchFindReplacePreviewAction.Handle(payload),
                 "suite_batch_find_replace_apply" => SuiteBatchFindReplaceApplyAction.Handle(payload),
+                "suite_batch_find_replace_project_preview" => SuiteBatchFindReplaceProjectPreviewAction.Handle(payload),
+                "suite_batch_find_replace_project_apply" => SuiteBatchFindReplaceProjectApplyAction.Handle(payload),
+                "suite_markup_authoring_project_preview" => SuiteMarkupAuthoringProjectPreviewAction.Handle(payload),
+                "suite_markup_authoring_project_apply" => SuiteMarkupAuthoringProjectApplyAction.Handle(payload),
+                "suite_terminal_authoring_project_preview" => SuiteTerminalAuthoringProjectPreviewAction.Handle(payload),
+                "suite_terminal_authoring_project_apply" => SuiteTerminalAuthoringProjectApplyAction.Handle(payload),
                 _ => BuildActionNotImplementedResult(normalizedAction),
             };
             actionStopwatch.Stop();

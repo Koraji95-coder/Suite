@@ -3,11 +3,17 @@ import type { ProjectWatchdogTelemetry } from "@/components/apps/projects/usePro
 import type { DrawingAnnotation } from "@/components/apps/standards-checker/standardsDrawingModels";
 import type { StandardDocumentSourceMode } from "@/components/apps/transmittal-builder/transmittalBuilderModels";
 import { logger } from "@/lib/logger";
+import type { ProjectDeliverableRegisterSnapshot } from "@/services/projectDeliverableRegisterService";
+import type { ProjectAutomationReceiptRecord } from "@/services/projectAutomationReceiptService";
 import type { ProjectDocumentMetadataRow } from "@/services/projectDocumentMetadataService";
 import type { ProjectIssueSetRecord } from "@/services/projectIssueSetService";
 import type { ProjectReviewDecisionRecord } from "@/services/projectReviewDecisionService";
 import type { DrawingRevisionRegisterRow } from "@/services/projectRevisionRegisterService";
 import type { ProjectTransmittalReceiptRecord } from "@/services/projectTransmittalReceiptService";
+import type {
+	TitleBlockSyncArtifacts,
+	TitleBlockSyncProfile,
+} from "@/services/titleBlockSyncService";
 import { supabase } from "@/supabase/client";
 
 export interface ProjectIssueSetEvidencePacket {
@@ -42,6 +48,33 @@ export interface ProjectIssueSetEvidencePacket {
 			issues: string[];
 			warnings: string[];
 		}>;
+	};
+	deliverableRegister: {
+		snapshotId: string | null;
+		includedRowCount: number;
+		pairedPdfCount: number;
+		rows: Array<{
+			sheetName: string;
+			setName: string | null;
+			drawingNumber: string;
+			drawingDescription: string;
+			currentRevision: string;
+			readinessState: string;
+			pdfPairingStatus: string;
+			titleBlockVerificationState: string;
+			acadeVerificationState: string;
+		}>;
+	};
+	acadeSetup: {
+		blockName: string;
+		clientOrUtility: string;
+		facilityOrSite: string;
+		projectNumber: string;
+		acadeProjectFilePath: string | null;
+		wdpPath: string | null;
+		wdtPath: string | null;
+		wdlPath: string | null;
+		wdpState: "existing" | "starter" | null;
 	};
 	reviewDecisions: {
 		acceptedTitleBlockCount: number;
@@ -88,6 +121,45 @@ export interface ProjectIssueSetEvidencePacket {
 		documentName: string | null;
 		source: StandardDocumentSourceMode | null;
 	};
+	automation: {
+		linkedReceiptCount: number;
+		latestReceipt: {
+			id: string;
+			mode: ProjectAutomationReceiptRecord["mode"];
+			summary: string;
+			preparedMarkupCount: number;
+			reviewItemCount: number;
+			routeCount: number;
+			affectedDrawingCount: number;
+			terminalStripUpdateCount: number;
+			managedRouteUpsertCount: number;
+			terminalScheduleSnapshotId: string | null;
+			reportId: string | null;
+			cadUtilityChangedDrawingCount: number;
+			cadUtilityChangedItemCount: number;
+			requestId: string | null;
+			drawingName: string | null;
+			createdAt: string;
+		} | null;
+		receipts: Array<{
+			id: string;
+			mode: ProjectAutomationReceiptRecord["mode"];
+			summary: string;
+			preparedMarkupCount: number;
+			reviewItemCount: number;
+			routeCount: number;
+			affectedDrawingCount: number;
+			terminalStripUpdateCount: number;
+			managedRouteUpsertCount: number;
+			terminalScheduleSnapshotId: string | null;
+			reportId: string | null;
+			cadUtilityChangedDrawingCount: number;
+			cadUtilityChangedItemCount: number;
+			requestId: string | null;
+			drawingName: string | null;
+			createdAt: string;
+		}>;
+	};
 	watchdog: {
 		matchedTrackedCount: number;
 		drawings: Array<{
@@ -95,6 +167,23 @@ export interface ProjectIssueSetEvidencePacket {
 			lifetimeTrackedMs: number;
 			lastWorkedAt: string | null;
 		}>;
+	};
+}
+
+function buildAcadeSetupSnapshot(
+	profile: TitleBlockSyncProfile | null | undefined,
+	artifacts: TitleBlockSyncArtifacts | null | undefined,
+) {
+	return {
+		blockName: normalizeText(profile?.blockName) || "Not set",
+		clientOrUtility: normalizeText(profile?.acadeLine1) || "Not set",
+		facilityOrSite: normalizeText(profile?.acadeLine2) || "Not set",
+		projectNumber: normalizeText(profile?.acadeLine4) || "Not set",
+		acadeProjectFilePath: normalizeText(profile?.acadeProjectFilePath) || null,
+		wdpPath: normalizeText(artifacts?.wdpPath) || null,
+		wdtPath: normalizeText(artifacts?.wdtPath) || null,
+		wdlPath: normalizeText(artifacts?.wdlPath) || null,
+		wdpState: artifacts?.wdpState ?? null,
 	};
 }
 
@@ -167,6 +256,31 @@ function findMatchedTransmittalReceipt(
 			return false;
 		}) ?? null
 	);
+}
+
+function findLinkedAutomationReceipts(
+	issueSet: ProjectIssueSetRecord,
+	receipts: ProjectAutomationReceiptRecord[],
+) {
+	const normalizedIssueSetId = normalizeText(issueSet.id);
+	const normalizedSnapshotId = normalizeText(issueSet.registerSnapshotId);
+
+	return receipts.filter((receipt) => {
+		if (
+			normalizedIssueSetId &&
+			normalizeText(receipt.issueSetId) === normalizedIssueSetId
+		) {
+			return true;
+		}
+		if (
+			!normalizeText(receipt.issueSetId) &&
+			normalizedSnapshotId &&
+			normalizeText(receipt.registerSnapshotId) === normalizedSnapshotId
+		) {
+			return true;
+		}
+		return false;
+	});
 }
 
 export async function fetchProjectStandardsEvidence(
@@ -284,21 +398,42 @@ export async function fetchProjectStandardsEvidence(
 export function buildProjectIssueSetEvidencePacket(args: {
 	project: Project;
 	issueSet: ProjectIssueSetRecord;
+	registerSnapshot: ProjectDeliverableRegisterSnapshot | null;
 	scanRows: ProjectDocumentMetadataRow[];
+	scanProfile?: TitleBlockSyncProfile | null;
+	scanArtifacts?: TitleBlockSyncArtifacts | null;
 	revisions: DrawingRevisionRegisterRow[];
 	telemetry: ProjectWatchdogTelemetry;
 	standardsChecks: DrawingAnnotation[];
 	decisions: ProjectReviewDecisionRecord[];
 	transmittalReceipts: ProjectTransmittalReceiptRecord[];
+	automationReceipts: ProjectAutomationReceiptRecord[];
 }): ProjectIssueSetEvidencePacket {
+	const selectedRegisterRowIds = args.issueSet.selectedRegisterRowIds ?? [];
+	const selectedRegisterRows =
+		args.registerSnapshot?.rows.filter((row) =>
+			selectedRegisterRowIds.includes(row.id),
+		) ?? [];
 	const selectedRows = args.scanRows.filter((row) =>
 		args.issueSet.selectedDrawingPaths.includes(row.relativePath),
 	);
 	const selectedDrawingNumbers = new Set(
-		selectedRows.map((row) => normalizeText(row.drawingNumber).toUpperCase()),
+		[
+			...selectedRows.map((row) =>
+				normalizeText(row.drawingNumber).toUpperCase(),
+			),
+			...selectedRegisterRows.map((row) =>
+				normalizeText(row.drawingNumber).toUpperCase(),
+			),
+		].filter(Boolean),
 	);
 	const selectedDrawingKeys = new Set(
-		args.issueSet.selectedDrawingPaths.map((path) => normalizeDrawingKey(path)),
+		[
+			...args.issueSet.selectedDrawingPaths.map((path) =>
+				normalizeDrawingKey(path),
+			),
+			...selectedRegisterRows.map((row) => row.drawingKey),
+		].filter(Boolean),
 	);
 	const revisionEntries = args.revisions
 		.filter((entry) => {
@@ -329,6 +464,11 @@ export function buildProjectIssueSetEvidencePacket(args: {
 		args.issueSet,
 		args.transmittalReceipts,
 	);
+	const linkedAutomationReceipts = findLinkedAutomationReceipts(
+		args.issueSet,
+		args.automationReceipts,
+	);
+	const latestAutomationReceipt = linkedAutomationReceipts[0] ?? null;
 	const scopedDecisions = args.decisions.filter(
 		(decision) => (decision.issueSetId || null) === args.issueSet.id,
 	);
@@ -336,8 +476,7 @@ export function buildProjectIssueSetEvidencePacket(args: {
 		scopedDecisions
 			.filter(
 				(decision) =>
-					decision.itemType === "title-block" &&
-					decision.status === "accepted",
+					decision.itemType === "title-block" && decision.status === "accepted",
 			)
 			.map((decision) => decision.itemId),
 	);
@@ -414,6 +553,30 @@ export function buildProjectIssueSetEvidencePacket(args: {
 			).length,
 			drawings: titleBlockRows,
 		},
+		deliverableRegister: {
+			snapshotId: args.registerSnapshot?.id ?? null,
+			includedRowCount: selectedRegisterRows.length,
+			pairedPdfCount: selectedRegisterRows.filter(
+				(row) =>
+					row.pdfPairingStatus === "paired" ||
+					row.pdfPairingStatus === "manual",
+			).length,
+			rows: selectedRegisterRows.map((row) => ({
+				sheetName: row.sheetName,
+				setName: row.setName,
+				drawingNumber: row.drawingNumber,
+				drawingDescription: row.drawingDescription,
+				currentRevision: row.currentRevision,
+				readinessState: row.readinessState,
+				pdfPairingStatus: row.pdfPairingStatus,
+				titleBlockVerificationState: row.titleBlockVerificationState,
+				acadeVerificationState: row.acadeVerificationState,
+			})),
+		},
+		acadeSetup: buildAcadeSetupSnapshot(
+			args.scanProfile ?? null,
+			args.scanArtifacts ?? null,
+		),
 		reviewDecisions: {
 			acceptedTitleBlockCount,
 			waivedStandardsCount,
@@ -459,6 +622,52 @@ export function buildProjectIssueSetEvidencePacket(args: {
 			number: args.issueSet.transmittalNumber,
 			documentName: args.issueSet.transmittalDocumentName,
 			source: linkedReceipt?.standardDocumentSource ?? null,
+		},
+		automation: {
+			linkedReceiptCount: linkedAutomationReceipts.length,
+			latestReceipt: latestAutomationReceipt
+				? {
+						id: latestAutomationReceipt.id,
+						mode: latestAutomationReceipt.mode,
+						summary: latestAutomationReceipt.summary,
+						preparedMarkupCount: latestAutomationReceipt.preparedMarkupCount,
+						reviewItemCount: latestAutomationReceipt.reviewItemCount,
+						routeCount: latestAutomationReceipt.routeCount,
+						affectedDrawingCount: latestAutomationReceipt.affectedDrawingCount,
+						terminalStripUpdateCount:
+							latestAutomationReceipt.terminalStripUpdateCount,
+						managedRouteUpsertCount:
+							latestAutomationReceipt.managedRouteUpsertCount,
+						terminalScheduleSnapshotId:
+							latestAutomationReceipt.terminalScheduleSnapshotId,
+						reportId: latestAutomationReceipt.reportId,
+						cadUtilityChangedDrawingCount:
+							latestAutomationReceipt.cadUtilityChangedDrawingCount,
+						cadUtilityChangedItemCount:
+							latestAutomationReceipt.cadUtilityChangedItemCount,
+						requestId: latestAutomationReceipt.requestId,
+						drawingName: latestAutomationReceipt.drawingName,
+						createdAt: latestAutomationReceipt.createdAt,
+					}
+				: null,
+			receipts: linkedAutomationReceipts.map((receipt) => ({
+				id: receipt.id,
+				mode: receipt.mode,
+				summary: receipt.summary,
+				preparedMarkupCount: receipt.preparedMarkupCount,
+				reviewItemCount: receipt.reviewItemCount,
+				routeCount: receipt.routeCount,
+				affectedDrawingCount: receipt.affectedDrawingCount,
+				terminalStripUpdateCount: receipt.terminalStripUpdateCount,
+				managedRouteUpsertCount: receipt.managedRouteUpsertCount,
+				terminalScheduleSnapshotId: receipt.terminalScheduleSnapshotId,
+				reportId: receipt.reportId,
+				cadUtilityChangedDrawingCount: receipt.cadUtilityChangedDrawingCount,
+				cadUtilityChangedItemCount: receipt.cadUtilityChangedItemCount,
+				requestId: receipt.requestId,
+				drawingName: receipt.drawingName,
+				createdAt: receipt.createdAt,
+			})),
 		},
 		watchdog: {
 			matchedTrackedCount: watchdogDrawings.length,
@@ -530,6 +739,51 @@ export function renderProjectIssueSetEvidencePacketMarkdown(
 	}
 	lines.push("");
 
+	lines.push("## Deliverable Register");
+	lines.push(
+		`- Snapshot: ${packet.deliverableRegister.snapshotId || "Not linked"}`,
+	);
+	lines.push(`- Included rows: ${packet.deliverableRegister.includedRowCount}`);
+	lines.push(`- Paired PDFs: ${packet.deliverableRegister.pairedPdfCount}`);
+	if (packet.deliverableRegister.rows.length === 0) {
+		lines.push("- No register rows linked.");
+	} else {
+		for (const row of packet.deliverableRegister.rows) {
+			lines.push(
+				`- ${row.sheetName}${row.setName ? ` / ${row.setName}` : ""} | ${row.drawingNumber} | ${row.currentRevision || "No revision"} | ${row.readinessState} | PDF ${row.pdfPairingStatus} | Title block ${row.titleBlockVerificationState} | ACADE ${row.acadeVerificationState}`,
+			);
+			if (row.drawingDescription) {
+				lines.push(`  - ${row.drawingDescription}`);
+			}
+		}
+	}
+	lines.push("");
+
+	lines.push("## ACADE Setup");
+	lines.push(`- Block name: ${packet.acadeSetup.blockName}`);
+	lines.push(`- Client / Utility: ${packet.acadeSetup.clientOrUtility}`);
+	lines.push(`- Facility / Site: ${packet.acadeSetup.facilityOrSite}`);
+	lines.push(`- Project number: ${packet.acadeSetup.projectNumber}`);
+	lines.push(
+		`- ACADE project file: ${packet.acadeSetup.wdpPath || packet.acadeSetup.acadeProjectFilePath || "Starter .wdp path will be derived from the project root."}`,
+	);
+	if (packet.acadeSetup.wdpState) {
+		lines.push(
+			`- Project file state: ${
+				packet.acadeSetup.wdpState === "existing"
+					? "Existing ACADE project file detected"
+					: "Starter ACADE project scaffold"
+			}`,
+		);
+	}
+	lines.push(
+		`- Support artifacts: ${packet.acadeSetup.wdtPath || "No .wdt path yet"} | ${packet.acadeSetup.wdlPath || "No .wdl path yet"}`,
+	);
+	lines.push(
+		"- Drawing titles remain drawing-specific and are verified from workbook rows and title block scan results.",
+	);
+	lines.push("");
+
 	lines.push("## Review Decisions");
 	lines.push(
 		`- Accepted title blocks: ${packet.reviewDecisions.acceptedTitleBlockCount}`,
@@ -593,6 +847,28 @@ export function renderProjectIssueSetEvidencePacketMarkdown(
 		lines.push(
 			`- Document name: ${packet.transmittal.documentName || "Not set"}`,
 		);
+	}
+	lines.push("");
+
+	lines.push("## Automation Evidence");
+	lines.push(`- Linked receipts: ${packet.automation.linkedReceiptCount}`);
+	if (packet.automation.receipts.length === 0) {
+		lines.push("- No automation receipts linked to this package yet.");
+	} else {
+		for (const receipt of packet.automation.receipts) {
+			lines.push(
+				`- ${formatTimestamp(receipt.createdAt)} | ${receipt.mode} | ${receipt.summary}`,
+			);
+			lines.push(
+				`  - Markups ${receipt.preparedMarkupCount} | Review items ${receipt.reviewItemCount} | Routes ${receipt.routeCount} | Strip writes ${receipt.terminalStripUpdateCount} | Managed route upserts ${receipt.managedRouteUpsertCount} | CAD drawings ${receipt.cadUtilityChangedDrawingCount} | CAD items ${receipt.cadUtilityChangedItemCount} | Affected drawings ${receipt.affectedDrawingCount}`,
+			);
+			if (receipt.drawingName) {
+				lines.push(`  - Drawing: ${receipt.drawingName}`);
+			}
+			if (receipt.requestId) {
+				lines.push(`  - Request: ${receipt.requestId}`);
+			}
+		}
 	}
 	lines.push("");
 

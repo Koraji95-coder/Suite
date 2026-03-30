@@ -14,6 +14,7 @@ export interface ProjectTitleBlockProfileInput {
 	projectId: string;
 	blockName?: string;
 	projectRootPath?: string | null;
+	acadeProjectFilePath?: string | null;
 	acadeLine1?: string;
 	acadeLine2?: string;
 	acadeLine4?: string;
@@ -36,6 +37,23 @@ const createId = () =>
 
 function normalizeText(value: string | null | undefined) {
 	return String(value || "").trim();
+}
+
+function isMissingAcadeProjectFilePathColumn(error: unknown) {
+	const message =
+		error instanceof Error
+			? error.message
+			: typeof error === "object" && error && "message" in error
+				? String((error as { message?: unknown }).message || "")
+				: String(error || "");
+	const normalized = message.toLowerCase();
+	return (
+		normalized.includes("acade_project_file_path") &&
+		(normalized.includes("column") ||
+			normalized.includes("schema cache") ||
+			normalized.includes("not found") ||
+			normalized.includes("does not exist"))
+	);
 }
 
 function readLocalProfiles(): ProjectTitleBlockProfileRow[] {
@@ -87,6 +105,7 @@ function buildDefaultProfile(
 		user_id: userId ?? "local",
 		block_name: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
 		project_root_path: normalizeText(defaults?.projectRootPath) || null,
+		acade_project_file_path: null,
 		acade_line1: "",
 		acade_line2: "",
 		acade_line4: "",
@@ -180,11 +199,18 @@ export const projectTitleBlockProfileService = {
 					message.includes("not found") ||
 					message.includes("could not find"))
 			) {
+				logger.warn(
+					"ProjectTitleBlockProfileService",
+					"Hosted title block profile storage is unavailable; using local fallback.",
+					{
+						projectId: normalizedProjectId,
+						userId,
+						error: result.error.message,
+					},
+				);
 				return {
 					data: mergeProfileDefaults(localProfile, defaults),
-					error: new Error(
-						"Supabase schema is missing `project_title_block_profiles`. Apply the latest consolidated migration to enable hosted title block profiles.",
-					),
+					error: null,
 				};
 			}
 			return {
@@ -215,6 +241,8 @@ export const projectTitleBlockProfileService = {
 			block_name:
 				normalizeText(input.blockName) || DEFAULT_PROJECT_TITLE_BLOCK_NAME,
 			project_root_path: normalizeText(input.projectRootPath) || null,
+			acade_project_file_path:
+				normalizeText(input.acadeProjectFilePath) || null,
 			acade_line1: normalizeText(input.acadeLine1),
 			acade_line2: normalizeText(input.acadeLine2),
 			acade_line4: normalizeText(input.acadeLine4),
@@ -247,15 +275,35 @@ export const projectTitleBlockProfileService = {
 			user_id: userId,
 		};
 
-		const result = await safeSupabaseQuery(
-			async () =>
-				await supabase
-					.from("project_title_block_profiles")
-					.upsert(payload, { onConflict: "project_id" })
-					.select("*")
-					.maybeSingle(),
-			"ProjectTitleBlockProfileService",
-		);
+		const runUpsert = (nextPayload: ProjectTitleBlockProfileInsert) =>
+			safeSupabaseQuery(
+				async () =>
+					await supabase
+						.from("project_title_block_profiles")
+						.upsert(nextPayload, { onConflict: "project_id" })
+						.select("*")
+						.maybeSingle(),
+				"ProjectTitleBlockProfileService",
+			);
+
+		let result = await runUpsert(payload);
+		if (result.error && isMissingAcadeProjectFilePathColumn(result.error)) {
+			logger.warn(
+				"ProjectTitleBlockProfileService",
+				"Hosted title block profile storage is missing acade_project_file_path; retrying with the legacy payload.",
+				{
+					projectId: normalizedProjectId,
+					userId,
+					error:
+						result.error instanceof Error
+							? result.error.message
+							: String(result.error),
+				},
+			);
+			const legacyPayload = { ...payload };
+			delete legacyPayload.acade_project_file_path;
+			result = await runUpsert(legacyPayload);
+		}
 
 		if (result.data) {
 			return result.data as ProjectTitleBlockProfileRow;

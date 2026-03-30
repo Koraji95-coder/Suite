@@ -25,7 +25,7 @@ const SECTION_META = {
   },
   support: {
     title: "Support",
-    subtitle: "Support exports, logs, and workstation-ready help surfaces.",
+    subtitle: "Support exports, logs, and companion apps like Office.",
   },
 };
 
@@ -71,6 +71,7 @@ const state = {
   doctor: null,
   runtimeMeta: null,
   supportMeta: null,
+  companionApps: [],
   runtimeCatalog: EMPTY_RUNTIME_CATALOG,
   developerToolsManifest: { groups: [], tools: [] },
   hasSnapshot: false,
@@ -289,6 +290,89 @@ function renderSubstatusCard(substatus) {
         </div>
       </div>
       ${renderNotesPanel(substatusNotes, `${substatus.name || "Detail"} Notes`, "plugin-notes")}
+    </section>`;
+}
+
+function presentCompanionStatus(companion) {
+  if (!companion?.enabled) {
+    return { label: "Disabled", className: "stopped" };
+  }
+  if (!companion?.executableFound) {
+    return { label: "Missing executable", className: "error" };
+  }
+  if (companion?.running) {
+    return {
+      label: companion.startedOutsideRuntimeControl ? "Started outside Runtime Control" : "Running",
+      className: companion.startedOutsideRuntimeControl ? "pending" : "running",
+    };
+  }
+
+  switch (companion?.lastLaunchStatus) {
+    case "runtime_gate_timeout":
+      return { label: "Waiting on Suite runtime", className: "pending" };
+    case "launch_failed":
+    case "relaunch_failed":
+      return { label: "Launch failed", className: "error" };
+    case "launch_requested":
+    case "relaunch_requested":
+      return { label: "Launch requested", className: "pending" };
+    default:
+      return { label: "Not running", className: "stopped" };
+  }
+}
+
+function renderCompanionAppCards() {
+  const companionApps = Array.isArray(state.companionApps) ? state.companionApps : [];
+  if (!companionApps.length) {
+    return "";
+  }
+
+  const cards = companionApps
+    .map((companion) => {
+      const status = presentCompanionStatus(companion);
+      const executableText = companion.executableFound
+        ? companion.executablePath || "Executable path not reported."
+        : companion.executablePath || "Executable path not configured.";
+      const details = [
+        companion.launchMode ? { label: "Launch mode", value: String(companion.launchMode).replaceAll("_", " ") } : null,
+        companion.configSource ? { label: "Config source", value: String(companion.configSource).replaceAll("_", " ") } : null,
+        companion.configPath ? { label: "Config path", value: String(companion.configPath) } : null,
+        companion.rootDirectory ? { label: "Daily root", value: String(companion.rootDirectory) } : null,
+        companion.pid ? { label: "PID", value: String(companion.pid) } : null,
+        companion.launchSource ? { label: "Launch source", value: String(companion.launchSource).replaceAll("_", " ") } : null,
+        companion.lastLaunchAt ? { label: "Last event", value: formatHeaderTimestamp(companion.lastLaunchAt) || companion.lastLaunchAt } : null,
+      ].filter(Boolean);
+
+      return `
+        <section class="support-card companion-card">
+          <div class="support-header">
+            <div>
+              <div class="support-label">${escapeHtml(companion.title || companion.id || "Companion app")}</div>
+              <div class="detail-text">${escapeHtml(companion.lastLaunchMessage || "Managed by Runtime Control after the Suite runtime is ready.")}</div>
+            </div>
+            <div class="status-pill ${escapeHtml(status.className)}">
+              <span class="service-dot"></span>
+              ${escapeHtml(status.label)}
+            </div>
+          </div>
+          <div class="support-value mono">${escapeHtml(executableText)}</div>
+          ${details.length ? renderNotesPanel(details, "Companion Details", "companion-notes") : ""}
+          <div class="companion-action-row">
+            <button type="button" class="shell-btn small" data-companion-action="launch" data-companion-id="${escapeHtml(companion.id)}">Open Office</button>
+            <button type="button" class="shell-btn small subtle" data-companion-action="relaunch" data-companion-id="${escapeHtml(companion.id)}">Relaunch Office</button>
+            <button type="button" class="shell-btn small subtle" data-companion-action="open-folder" data-companion-id="${escapeHtml(companion.id)}">Open Daily folder</button>
+          </div>
+        </section>`;
+    })
+    .join("");
+
+  return `
+    <section class="launch-group">
+      <div class="launch-group-title">Companion Apps</div>
+      <div class="launch-group-description">Managed desktop companions launch after Suite is ready so they do not race the local runtime at sign-in.</div>
+      <div class="detail-support-grid companion-grid">
+        ${cards}
+      </div>
     </section>`;
 }
 
@@ -803,11 +887,15 @@ function renderWorkshopSection(orderedServices) {
           { mono: false },
         )}
         ${renderSupportCard("Codex config", supportMeta.config?.codexConfigPath || supportMeta.workstation?.codexConfigPath || "", { mono: true })}
+        ${renderSupportCard("Stable Suite root", supportMeta.config?.stableSuiteRoot || "", { mono: true })}
+        ${renderSupportCard("Daily root", supportMeta.config?.dailyRoot || "", { mono: true })}
+        ${renderSupportCard("Office executable", supportMeta.config?.officeExecutablePath || "", { mono: true })}
         ${renderSupportCard("Bootstrap log", supportMeta.paths?.bootstrapLogPath || runtimeMeta.logPath, { mono: true })}
         ${renderSupportCard("Status directory", supportMeta.paths?.statusDir || runtimeMeta.statusDir, { mono: true })}
         ${renderSupportCard("Last bootstrap", runtimeMeta.lastBootstrap?.summary || "", { mono: false })}
         ${renderSupportCard("Supabase config", supportMeta.config?.supabaseConfigPath || "", { mono: true })}
       </section>
+      ${renderCompanionAppCards()}
       <section class="launch-group">
         <div class="launch-group-title">Support Actions</div>
         <div class="launch-group-description">Open the local runtime evidence directly or copy a concise support handoff without leaving the desktop shell.</div>
@@ -1308,6 +1396,7 @@ function handleHostMessage(message) {
       state.doctor = payload.doctor || null;
       state.runtimeMeta = payload.runtime || null;
       state.supportMeta = payload.support || null;
+      state.companionApps = Array.isArray(payload.companionApps) ? payload.companionApps : [];
       state.services = Array.isArray(payload.services) ? payload.services : [];
       state.hasSnapshot = true;
       const lastBootstrap = payload.runtime?.lastBootstrap;
@@ -1396,6 +1485,16 @@ dom.workshopContent?.addEventListener("click", (event) => {
     const supportAction = supportButton.getAttribute("data-support-action");
     if (supportAction) {
       hostPost(`suite.support.${supportAction}`);
+    }
+    return;
+  }
+
+  const companionButton = event.target.closest("button[data-companion-action]");
+  if (companionButton) {
+    const companionAction = companionButton.getAttribute("data-companion-action");
+    const companionId = companionButton.getAttribute("data-companion-id");
+    if (companionAction && companionId) {
+      hostPost(`suite.companion.${companionAction}`, { companionAppId: companionId });
     }
     return;
   }

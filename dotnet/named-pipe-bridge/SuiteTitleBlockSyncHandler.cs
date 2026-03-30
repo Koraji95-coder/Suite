@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -21,6 +22,12 @@ static partial class ConduitRouteStubHandlers
         string BlockName,
         string AttributeTag,
         string CurrentValue
+    );
+
+    private readonly record struct SuiteCadProjectDrawing(
+        string DrawingPath,
+        string RelativePath,
+        string DrawingName
     );
 
     private readonly record struct SuiteTitleBlockCandidate(
@@ -580,6 +587,12 @@ static partial class ConduitRouteStubHandlers
 
         using var session = ConnectAutoCad();
         var drawingName = StringOrDefault(ReadProperty(session.Document, "Name"), "Unknown.dwg");
+        var drawingPath = StringOrDefault(ReadProperty(session.Document, "FullName"), drawingName);
+        var drawing = new SuiteCadProjectDrawing(
+            DrawingPath: drawingPath,
+            RelativePath: "",
+            DrawingName: drawingName
+        );
         var matches = new JsonArray();
 
         foreach (var target in EnumerateSuiteCadTextTargets(session.Document))
@@ -593,23 +606,7 @@ static partial class ConduitRouteStubHandlers
                     continue;
                 }
 
-                matches.Add(
-                    new JsonObject
-                    {
-                        ["file"] = drawingName,
-                        ["line"] = 0,
-                        ["ruleId"] = rule.Id,
-                        ["handle"] = target.Handle,
-                        ["entityType"] = target.EntityType,
-                        ["layoutName"] = target.LayoutName,
-                        ["blockName"] = string.IsNullOrWhiteSpace(target.BlockName) ? null : target.BlockName,
-                        ["attributeTag"] = string.IsNullOrWhiteSpace(target.AttributeTag) ? null : target.AttributeTag,
-                        ["before"] = currentValue,
-                        ["after"] = nextValue,
-                        ["currentValue"] = currentValue,
-                        ["nextValue"] = nextValue,
-                    }
-                );
+                matches.Add(BuildSuiteCadBatchPreviewMatch(drawing, target, rule, currentValue, nextValue));
                 currentValue = nextValue;
             }
         }
@@ -622,6 +619,16 @@ static partial class ConduitRouteStubHandlers
             ["data"] = new JsonObject
             {
                 ["drawingName"] = drawingName,
+                ["drawings"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["drawingPath"] = drawing.DrawingPath,
+                        ["drawingName"] = drawing.DrawingName,
+                        ["relativePath"] = null,
+                        ["matchCount"] = matches.Count,
+                    },
+                },
                 ["matches"] = matches,
             },
             ["meta"] = new JsonObject
@@ -644,6 +651,12 @@ static partial class ConduitRouteStubHandlers
 
         using var session = ConnectAutoCad();
         var drawingName = StringOrDefault(ReadProperty(session.Document, "Name"), "Unknown.dwg");
+        var drawingPath = StringOrDefault(ReadProperty(session.Document, "FullName"), drawingName);
+        var drawing = new SuiteCadProjectDrawing(
+            DrawingPath: drawingPath,
+            RelativePath: "",
+            DrawingName: drawingName
+        );
         var warnings = new List<string>();
         var changeRows = new JsonArray();
         var updated = 0;
@@ -680,17 +693,15 @@ static partial class ConduitRouteStubHandlers
             {
                 updated += 1;
                 changeRows.Add(
-                    new JsonObject
-                    {
-                        ["file"] = drawingName,
-                        ["line"] = 0,
-                        ["ruleId"] = ruleId,
-                        ["before"] = currentValue,
-                        ["after"] = nextValue,
-                        ["handle"] = handle,
-                        ["entityType"] = entityType,
-                        ["attributeTag"] = string.IsNullOrWhiteSpace(attributeTag) ? null : attributeTag,
-                    }
+                    BuildSuiteCadBatchChangeRow(
+                        drawing,
+                        ruleId,
+                        currentValue,
+                        nextValue,
+                        handle,
+                        entityType,
+                        attributeTag
+                    )
                 );
             }
         }
@@ -716,6 +727,8 @@ static partial class ConduitRouteStubHandlers
             {
                 ["drawingName"] = drawingName,
                 ["updated"] = updated,
+                ["changedDrawingCount"] = updated > 0 ? 1 : 0,
+                ["changedItemCount"] = updated,
                 ["changes"] = changeRows,
             },
             ["meta"] = new JsonObject
@@ -723,6 +736,309 @@ static partial class ConduitRouteStubHandlers
                 ["source"] = "dotnet",
                 ["providerPath"] = "dotnet",
                 ["action"] = "suite_batch_find_replace_apply",
+                ["updated"] = updated,
+            },
+            ["warnings"] = ToJsonArray(warnings),
+        };
+    }
+
+    public static JsonObject HandleSuiteBatchFindReplaceProjectPreview(JsonObject payload)
+    {
+        var rules = ReadSuiteCadBatchRules(payload, out var validationError);
+        if (validationError.Length > 0)
+        {
+            return BuildSuiteInvalidRequestResult(validationError);
+        }
+
+        var drawings = ReadSuiteCadProjectDrawings(payload, out validationError);
+        if (validationError.Length > 0)
+        {
+            return BuildSuiteInvalidRequestResult(validationError);
+        }
+
+        using var session = ConnectAutoCad();
+        var warnings = new List<string>();
+        var matches = new JsonArray();
+        var drawingsArray = new JsonArray();
+
+        foreach (var drawing in drawings)
+        {
+            var drawingWarnings = new List<string>();
+            var drawingMatchCount = 0;
+            try
+            {
+                using var documentScope = OpenSuiteDocument(
+                    session.Application,
+                    session.Document,
+                    drawing.DrawingPath,
+                    readOnly: true
+                );
+                TryActivateSuiteDocument(documentScope.Document);
+
+                foreach (var target in EnumerateSuiteCadTextTargets(documentScope.Document))
+                {
+                    var currentValue = target.CurrentValue;
+                    foreach (var rule in rules)
+                    {
+                        var nextValue = rule.Pattern.Replace(currentValue, rule.Replacement);
+                        if (string.Equals(currentValue, nextValue, StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        matches.Add(
+                            BuildSuiteCadBatchPreviewMatch(
+                                drawing,
+                                target,
+                                rule,
+                                currentValue,
+                                nextValue
+                            )
+                        );
+                        drawingMatchCount += 1;
+                        currentValue = nextValue;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                drawingWarnings.Add(
+                    $"Preview failed for '{drawing.DrawingPath}': {ex.Message}"
+                );
+            }
+
+            foreach (var warning in drawingWarnings)
+            {
+                warnings.Add(warning);
+            }
+
+            drawingsArray.Add(
+                new JsonObject
+                {
+                    ["drawingPath"] = drawing.DrawingPath,
+                    ["drawingName"] = drawing.DrawingName,
+                    ["relativePath"] = string.IsNullOrWhiteSpace(drawing.RelativePath)
+                        ? null
+                        : drawing.RelativePath,
+                    ["matchCount"] = drawingMatchCount,
+                    ["warnings"] = ToJsonArray(drawingWarnings),
+                }
+            );
+        }
+
+        TryActivateSuiteDocument(session.Document);
+
+        return new JsonObject
+        {
+            ["success"] = true,
+            ["code"] = "",
+            ["message"] = "Project CAD batch preview completed.",
+            ["data"] = new JsonObject
+            {
+                ["matches"] = matches,
+                ["drawings"] = drawingsArray,
+            },
+            ["meta"] = new JsonObject
+            {
+                ["source"] = "dotnet",
+                ["providerPath"] = "dotnet",
+                ["action"] = "suite_batch_find_replace_project_preview",
+                ["drawingCount"] = drawings.Count,
+                ["matchCount"] = matches.Count,
+            },
+            ["warnings"] = ToJsonArray(warnings),
+        };
+    }
+
+    public static JsonObject HandleSuiteBatchFindReplaceProjectApply(JsonObject payload)
+    {
+        if (payload["matches"] is not JsonArray matchesArray || matchesArray.Count <= 0)
+        {
+            return BuildSuiteInvalidRequestResult("matches must contain at least one preview row.");
+        }
+
+        var groupedMatches = new Dictionary<string, List<JsonObject>>(StringComparer.OrdinalIgnoreCase);
+        var drawingContextByPath = new Dictionary<string, SuiteCadProjectDrawing>(StringComparer.OrdinalIgnoreCase);
+        var warnings = new List<string>();
+
+        foreach (var node in matchesArray)
+        {
+            if (node is not JsonObject match)
+            {
+                continue;
+            }
+
+            var drawingPath = ReadStringValue(match, "drawingPath", "").Trim();
+            if (string.IsNullOrWhiteSpace(drawingPath))
+            {
+                warnings.Add("Skipped one project CAD apply row because it was missing drawingPath.");
+                continue;
+            }
+
+            if (!groupedMatches.TryGetValue(drawingPath, out var drawingMatches))
+            {
+                drawingMatches = new List<JsonObject>();
+                groupedMatches[drawingPath] = drawingMatches;
+            }
+            drawingMatches.Add(match);
+
+            if (!drawingContextByPath.ContainsKey(drawingPath))
+            {
+                var relativePath = ReadStringValue(match, "relativePath", "").Trim();
+                var drawingName = ReadStringValue(match, "drawingName", "").Trim();
+                if (string.IsNullOrWhiteSpace(drawingName))
+                {
+                    drawingName = ReadStringValue(match, "file", "").Trim();
+                }
+                if (string.IsNullOrWhiteSpace(drawingName))
+                {
+                    drawingName = Path.GetFileName(drawingPath);
+                }
+
+                drawingContextByPath[drawingPath] = new SuiteCadProjectDrawing(
+                    DrawingPath: drawingPath,
+                    RelativePath: relativePath,
+                    DrawingName: drawingName
+                );
+            }
+        }
+
+        if (groupedMatches.Count <= 0)
+        {
+            return BuildSuiteInvalidRequestResult(
+                "matches must contain at least one preview row with drawingPath."
+            );
+        }
+
+        using var session = ConnectAutoCad();
+        var changeRows = new JsonArray();
+        var drawingResults = new JsonArray();
+        var updated = 0;
+        var changedDrawingCount = 0;
+
+        foreach (var drawingPath in groupedMatches.Keys.OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            var drawing = drawingContextByPath[drawingPath];
+            var drawingWarnings = new List<string>();
+            var drawingUpdated = 0;
+            var drawingSkipped = 0;
+            var drawingMatches = groupedMatches[drawingPath];
+
+            try
+            {
+                using var documentScope = OpenSuiteDocument(
+                    session.Application,
+                    session.Document,
+                    drawing.DrawingPath,
+                    readOnly: false
+                );
+                TryActivateSuiteDocument(documentScope.Document);
+
+                foreach (var match in drawingMatches)
+                {
+                    var handle = ReadStringValue(match, "handle", "").Trim().ToUpperInvariant();
+                    var entityType = ReadStringValue(match, "entityType", "").Trim();
+                    var attributeTag = ReadStringValue(match, "attributeTag", "").Trim().ToUpperInvariant();
+                    var currentValue = ReadStringValue(match, "currentValue", "");
+                    var nextValue = ReadStringValue(match, "nextValue", "");
+                    var ruleId = ReadStringValue(match, "ruleId", "");
+
+                    if (string.IsNullOrWhiteSpace(handle))
+                    {
+                        drawingWarnings.Add(
+                            $"Skipped one row for '{drawing.DrawingName}' because handle was missing."
+                        );
+                        drawingSkipped += 1;
+                        continue;
+                    }
+
+                    var result = ApplySuiteCadBatchMatch(
+                        documentScope.Document,
+                        handle,
+                        entityType,
+                        attributeTag,
+                        currentValue,
+                        nextValue,
+                        drawingWarnings
+                    );
+
+                    if (result.Applied)
+                    {
+                        drawingUpdated += 1;
+                        updated += 1;
+                        documentScope.MarkDirty();
+                        changeRows.Add(
+                            BuildSuiteCadBatchChangeRow(
+                                drawing,
+                                ruleId,
+                                currentValue,
+                                nextValue,
+                                handle,
+                                entityType,
+                                attributeTag
+                            )
+                        );
+                    }
+                    else
+                    {
+                        drawingSkipped += 1;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                drawingWarnings.Add(
+                    $"Apply failed for '{drawing.DrawingPath}': {ex.Message}"
+                );
+                drawingSkipped += drawingMatches.Count;
+            }
+
+            if (drawingUpdated > 0)
+            {
+                changedDrawingCount += 1;
+            }
+
+            foreach (var warning in drawingWarnings)
+            {
+                warnings.Add(warning);
+            }
+
+            drawingResults.Add(
+                new JsonObject
+                {
+                    ["drawingPath"] = drawing.DrawingPath,
+                    ["drawingName"] = drawing.DrawingName,
+                    ["relativePath"] = string.IsNullOrWhiteSpace(drawing.RelativePath)
+                        ? null
+                        : drawing.RelativePath,
+                    ["updated"] = drawingUpdated,
+                    ["skipped"] = drawingSkipped,
+                    ["warnings"] = ToJsonArray(drawingWarnings),
+                }
+            );
+        }
+
+        TryActivateSuiteDocument(session.Document);
+
+        return new JsonObject
+        {
+            ["success"] = true,
+            ["code"] = "",
+            ["message"] = "Project CAD batch apply completed.",
+            ["data"] = new JsonObject
+            {
+                ["updated"] = updated,
+                ["changedDrawingCount"] = changedDrawingCount,
+                ["changedItemCount"] = updated,
+                ["drawings"] = drawingResults,
+                ["changes"] = changeRows,
+            },
+            ["meta"] = new JsonObject
+            {
+                ["source"] = "dotnet",
+                ["providerPath"] = "dotnet",
+                ["action"] = "suite_batch_find_replace_project_apply",
+                ["drawingCount"] = groupedMatches.Count,
                 ["updated"] = updated,
             },
             ["warnings"] = ToJsonArray(warnings),
@@ -1376,6 +1692,142 @@ static partial class ConduitRouteStubHandlers
             validationError = "No valid rules provided.";
         }
         return rules;
+    }
+
+    private static List<SuiteCadProjectDrawing> ReadSuiteCadProjectDrawings(
+        JsonObject payload,
+        out string validationError
+    )
+    {
+        validationError = "";
+        if (payload["drawings"] is not JsonArray drawingsArray || drawingsArray.Count <= 0)
+        {
+            validationError = "drawings must contain at least one project drawing.";
+            return [];
+        }
+
+        var drawings = new List<SuiteCadProjectDrawing>();
+        foreach (var node in drawingsArray)
+        {
+            if (node is not JsonObject drawingObj)
+            {
+                continue;
+            }
+
+            var drawingPath = ReadStringValue(drawingObj, "path", "").Trim();
+            if (string.IsNullOrWhiteSpace(drawingPath))
+            {
+                continue;
+            }
+
+            var relativePath = ReadStringValue(drawingObj, "relativePath", "").Trim();
+            var drawingName = ReadStringValue(drawingObj, "drawingName", "").Trim();
+            if (string.IsNullOrWhiteSpace(drawingName))
+            {
+                drawingName = Path.GetFileName(drawingPath);
+            }
+
+            drawings.Add(
+                new SuiteCadProjectDrawing(
+                    DrawingPath: drawingPath,
+                    RelativePath: relativePath,
+                    DrawingName: drawingName
+                )
+            );
+        }
+
+        if (drawings.Count <= 0)
+        {
+            validationError = "No valid project drawings provided.";
+        }
+        return drawings;
+    }
+
+    private static JsonObject BuildSuiteCadBatchPreviewMatch(
+        SuiteCadProjectDrawing drawing,
+        SuiteCadTextTarget target,
+        SuiteCadBatchRule rule,
+        string before,
+        string after
+    )
+    {
+        var groupKey = drawing.DrawingPath.Trim();
+        var matchKey = string.Join(
+            "::",
+            [
+                groupKey,
+                target.Handle,
+                target.AttributeTag,
+                rule.Id,
+                before,
+                after,
+            ]
+        );
+
+        return new JsonObject
+        {
+            ["file"] = drawing.DrawingName,
+            ["line"] = 0,
+            ["ruleId"] = rule.Id,
+            ["handle"] = target.Handle,
+            ["entityType"] = target.EntityType,
+            ["layoutName"] = target.LayoutName,
+            ["blockName"] = string.IsNullOrWhiteSpace(target.BlockName) ? null : target.BlockName,
+            ["attributeTag"] = string.IsNullOrWhiteSpace(target.AttributeTag) ? null : target.AttributeTag,
+            ["before"] = before,
+            ["after"] = after,
+            ["currentValue"] = before,
+            ["nextValue"] = after,
+            ["drawingPath"] = drawing.DrawingPath,
+            ["drawingName"] = drawing.DrawingName,
+            ["relativePath"] = string.IsNullOrWhiteSpace(drawing.RelativePath) ? null : drawing.RelativePath,
+            ["groupKey"] = groupKey,
+            ["matchKey"] = matchKey,
+        };
+    }
+
+    private static JsonObject BuildSuiteCadBatchChangeRow(
+        SuiteCadProjectDrawing drawing,
+        string ruleId,
+        string before,
+        string after,
+        string handle,
+        string entityType,
+        string attributeTag
+    )
+    {
+        return new JsonObject
+        {
+            ["file"] = drawing.DrawingName,
+            ["line"] = 0,
+            ["ruleId"] = ruleId,
+            ["before"] = before,
+            ["after"] = after,
+            ["handle"] = handle,
+            ["entityType"] = entityType,
+            ["attributeTag"] = string.IsNullOrWhiteSpace(attributeTag) ? null : attributeTag,
+            ["drawingPath"] = drawing.DrawingPath,
+            ["drawingName"] = drawing.DrawingName,
+            ["relativePath"] = string.IsNullOrWhiteSpace(drawing.RelativePath) ? null : drawing.RelativePath,
+        };
+    }
+
+    private static bool TryActivateSuiteDocument(object? document)
+    {
+        if (document is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            ((dynamic)document).Activate();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static IEnumerable<SuiteCadTextTarget> EnumerateSuiteCadTextTargets(object document)

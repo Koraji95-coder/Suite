@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from backend.route_groups.api_local_learning_runtime import LocalModelPrediction
 from backend.route_groups.api_autodraft import (
+    _build_autodraft_preview_operations,
     _build_local_backcheck,
     _build_local_plan,
     _extract_annotation_color,
@@ -12,6 +13,102 @@ from backend.route_groups.api_autodraft import (
 
 
 class TestAutoDraftCompareSemantics(unittest.TestCase):
+    def test_build_preview_operations_promotes_native_line_markup_to_geometry_add(self) -> None:
+        operations = _build_autodraft_preview_operations(
+            actions=[
+                {
+                    "id": "action-add-line",
+                    "category": "ADD",
+                    "markup": {
+                        "id": "annot-line-1",
+                        "type": "line",
+                        "text": "",
+                        "bounds": {"x": 10.0, "y": 20.0, "width": 40.0, "height": 0.5},
+                        "meta": {
+                            "subtype": "/Line",
+                            "line_points": [
+                                {"x": 10.0, "y": 20.0},
+                                {"x": 50.0, "y": 20.0},
+                            ],
+                            "callout_points": [
+                                {"x": 10.0, "y": 20.0},
+                                {"x": 50.0, "y": 20.0},
+                            ],
+                        },
+                        "recognition": {
+                            "feature_source": "pdf_annotations",
+                            "needs_review": False,
+                        },
+                    },
+                }
+            ],
+            cad_context=None,
+        )
+
+        geometry_add = next(
+            operation
+            for operation in operations
+            if (operation or {}).get("operationType") == "geometry-add"
+        )
+        self.assertTrue(geometry_add.get("approved"))
+        self.assertEqual((geometry_add.get("nativePayload") or {}).get("contractVersion"), "bluebeam-default.v1")
+        self.assertEqual(
+            ((geometry_add.get("nativePayload") or {}).get("geometry") or {}).get("kind"),
+            "line",
+        )
+
+    def test_build_preview_operations_deletes_only_explicit_geometric_targets(self) -> None:
+        operations = _build_autodraft_preview_operations(
+            actions=[
+                {
+                    "id": "action-delete-geometry",
+                    "category": "DELETE",
+                    "markup": {
+                        "id": "annot-delete-1",
+                        "type": "cloud",
+                        "text": "delete old line",
+                        "bounds": {"x": 95.0, "y": 95.0, "width": 25.0, "height": 25.0},
+                        "meta": {
+                            "subtype": "/Square",
+                            "callout_points": [
+                                {"x": 95.0, "y": 95.0},
+                                {"x": 120.0, "y": 120.0},
+                            ],
+                        },
+                        "recognition": {
+                            "feature_source": "pdf_annotations",
+                            "needs_review": False,
+                        },
+                    },
+                }
+            ],
+            cad_context={
+                "entities": [
+                    {
+                        "id": "ABCD",
+                        "entity_type": "Polyline",
+                        "bounds": {"x": 100.0, "y": 100.0, "width": 10.0, "height": 5.0},
+                    },
+                    {
+                        "id": "TEXT1",
+                        "entity_type": "DBText",
+                        "bounds": {"x": 102.0, "y": 102.0, "width": 8.0, "height": 2.0},
+                    },
+                ]
+            },
+        )
+
+        geometry_delete = next(
+            operation
+            for operation in operations
+            if (operation or {}).get("operationType") == "geometry-delete"
+        )
+        self.assertTrue(geometry_delete.get("approved"))
+        self.assertEqual(geometry_delete.get("targetHandleRefs"), ["ABCD"])
+        delete_targets = ((geometry_delete.get("nativePayload") or {}).get("deleteTargets") or [])
+        self.assertEqual(len(delete_targets), 1)
+        self.assertEqual((delete_targets[0] or {}).get("id"), "ABCD")
+
     def test_extract_annotation_color_prefers_c_over_other_sources(self) -> None:
         color_name, rgb, color_hex, color_source = _extract_annotation_color(
             {

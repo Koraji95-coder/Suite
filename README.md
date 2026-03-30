@@ -253,14 +253,14 @@ Use the new workstation bootstrap flow when setting up another Windows PC:
 
 ```bash
 npm run workstation:bringup:validate
-npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailyRepoUrl <YOUR_DAILY_REPO_URL>
+npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailyRepoUrl https://github.com/Koraji95-coder/Office.git
 ```
 
 If both repos are already cloned into the standard roots, that is the preferred path:
 
 ```bash
-git clone https://github.com/<YOUR_GITHUB_USER>/Suite.git C:\Dev\Suite
-git clone https://github.com/<YOUR_GITHUB_USER>/Daily.git C:\Dev\Daily
+git clone https://github.com/Koraji95-coder/Suite.git C:\Dev\Suite
+git clone https://github.com/Koraji95-coder/Office.git C:\Dev\Daily
 cd C:\Dev\Suite
 npm run workstation:bringup:validate
 npm run workstation:bringup -- -WorkstationId DUSTIN-WORK

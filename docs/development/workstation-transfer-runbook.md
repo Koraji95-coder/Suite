@@ -66,8 +66,8 @@ Runtime Control is expected to launch Office from the workstation-local companio
 Recommended commands:
 
 ```powershell
-git clone https://github.com/<YOUR_GITHUB_USER>/Suite.git C:\Dev\Suite
-git clone https://github.com/<YOUR_GITHUB_USER>/Daily.git C:\Dev\Daily
+git clone https://github.com/Koraji95-coder/Suite.git C:\Dev\Suite
+git clone https://github.com/Koraji95-coder/Office.git C:\Dev\Daily
 cd C:\Dev\Suite
 ```
 
@@ -86,7 +86,7 @@ npm run workstation:bringup -- -WorkstationId DUSTIN-WORK
 If you want bootstrap to perform the Daily clone itself instead of cloning `Daily` manually first, use:
 
 ```powershell
-npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailyRepoUrl <YOUR_DAILY_REPO_URL>
+npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailyRepoUrl https://github.com/Koraji95-coder/Office.git
 ```
 
 If the Daily workspace is not yet in its own repo, use a local source path instead:

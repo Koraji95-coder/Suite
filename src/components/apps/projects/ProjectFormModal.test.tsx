@@ -219,6 +219,79 @@ describe("ProjectFormModal", () => {
 	);
 
 	it(
+		"derives the ACADE project file path from project name when the field is blank",
+		async () => {
+			vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
+				projectId: "project-setup-test",
+				projectRootPath: "C:/Projects/Nanulak",
+				profile: {
+					blockName: "R3P-24x36BORDER&TITLE",
+					projectRootPath: "C:/Projects/Nanulak",
+					acadeProjectFilePath: "",
+					acadeLine1: "",
+					acadeLine2: "",
+					acadeLine4: "",
+					signerDrawnBy: "",
+					signerCheckedBy: "",
+					signerEngineer: "",
+				},
+				summary: {
+					totalFiles: 8,
+					drawingFiles: 6,
+					flaggedFiles: 0,
+					suiteWriteCount: 0,
+					acadeWriteCount: 0,
+					wdTbConflictCount: 0,
+				},
+				artifacts: {
+					wdpPath: "",
+					wdtPath: "",
+					wdlPath: "",
+					wdpText: "",
+					wdtText: "",
+					wdlText: "",
+					wdpState: "starter",
+				},
+				rows: [],
+				titleBlockRows: [],
+				warnings: [],
+			});
+
+			render(<TestHarness onSubmit={vi.fn()} />);
+
+			fireEvent.change(screen.getByLabelText("Project name"), {
+				target: { value: "Nanulak 180MW Substation" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+			fireEvent.change(screen.getByLabelText("Project root folder"), {
+				target: { value: "C:/Projects/Nanulak" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: /validate root/i }));
+
+			await waitFor(() =>
+				expect(
+					screen.getByText(
+						"Root validated. Found 6 drawings for project setup.",
+					),
+				).toBeTruthy(),
+			);
+			fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+			await waitFor(() =>
+				expect(
+					(
+						screen.getByLabelText(
+							"ACADE project file (.wdp)",
+						) as HTMLInputElement
+					).value,
+				).toBe("C:/Projects/Nanulak/Nanulak 180MW Substation.wdp"),
+			);
+		},
+		15_000,
+	);
+
+	it(
 		"supports creating the project and opening it in ACADE from the review step",
 		async () => {
 			const submitSpy = vi.fn();

@@ -11,7 +11,10 @@ import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/logger";
 import { logActivity } from "@/services/activityService";
 import { projectTitleBlockProfileService } from "@/services/projectTitleBlockProfileService";
-import { titleBlockSyncService } from "@/services/titleBlockSyncService";
+import {
+	buildTitleBlockSyncFailureMessage,
+	titleBlockSyncService,
+} from "@/services/titleBlockSyncService";
 import { syncSharedProjectWatchdogRulesToLocalRuntime } from "@/services/projectWatchdogService";
 import { watchdogService } from "@/services/watchdogService";
 import {
@@ -33,7 +36,11 @@ import {
 	type TaskCount,
 	type ViewMode,
 } from "./projectmanagertypes";
-import { categoryColor, toDateOnly } from "./projectmanagerutils";
+import {
+	categoryColor,
+	deriveAcadeProjectFilePath,
+	toDateOnly,
+} from "./projectmanagerutils";
 import { useProjectManagerUiState } from "./useProjectManagerUiState";
 
 interface TaskSummary {
@@ -103,6 +110,7 @@ function buildTitleBlockSyncProfile(
 	projectRootPath: string | null,
 ) {
 	return {
+		projectName: form.name,
 		blockName: form.titleBlockBlockName,
 		projectRootPath,
 		acadeProjectFilePath: form.titleBlockAcadeProjectFilePath,
@@ -112,6 +120,25 @@ function buildTitleBlockSyncProfile(
 		signerDrawnBy: form.titleBlockDrawnBy,
 		signerCheckedBy: form.titleBlockCheckedBy,
 		signerEngineer: form.titleBlockEngineer,
+	};
+}
+
+function withDerivedAcadeProjectFilePath(
+	form: ProjectFormData,
+	projectRootPath: string | null,
+): ProjectFormData {
+	if (form.titleBlockAcadeProjectFilePath.trim()) {
+		return form;
+	}
+
+	const derivedPath = deriveAcadeProjectFilePath(form.name, projectRootPath);
+	if (!derivedPath) {
+		return form;
+	}
+
+	return {
+		...form,
+		titleBlockAcadeProjectFilePath: derivedPath,
 	};
 }
 
@@ -221,9 +248,10 @@ export function useProjectManagerState({
 				triggerAcadeUpdate: false,
 			});
 			if (!result.success) {
-				const message =
-					result.message ||
-					"Project saved, but Suite could not prepare ACADE support files.";
+				const message = buildTitleBlockSyncFailureMessage(
+					result,
+					"Project saved, but Suite could not prepare ACADE support files.",
+				);
 				showToast("warning", message);
 			}
 		},
@@ -253,15 +281,16 @@ export function useProjectManagerState({
 				triggerAcadeUpdate: false,
 			});
 			if (!result.success) {
-				const message =
-					result.message ||
-					"Project saved, but Suite could not open the ACADE project.";
+				const message = buildTitleBlockSyncFailureMessage(
+					result,
+					"Support files are ready, but ACADE did not register/open the project.",
+				);
 				showToast("warning", message);
 				return false;
 			}
 			showToast(
 				"success",
-				result.message || "ACADE project open requested.",
+				result.message || "ACADE opened and project activated.",
 			);
 			return true;
 		},
@@ -604,9 +633,13 @@ export function useProjectManagerState({
 			const userId = await getCurrentUserId();
 			if (!userId) return;
 
-			const formSnapshot = { ...projectForm };
+			const rawFormSnapshot = { ...projectForm };
 			const watchdogRootPath = normalizeWatchdogRootPath(
-				formSnapshot.watchdogRootPath,
+				rawFormSnapshot.watchdogRootPath,
+			);
+			const formSnapshot = withDerivedAcadeProjectFilePath(
+				rawFormSnapshot,
+				watchdogRootPath,
 			);
 			const payload: Database["public"]["Tables"]["projects"]["Insert"] = {
 				name: formSnapshot.name,
@@ -693,9 +726,13 @@ export function useProjectManagerState({
 			const userId = await getCurrentUserId();
 			if (!userId) return;
 
-			const formSnapshot = { ...projectForm };
+			const rawFormSnapshot = { ...projectForm };
 			const watchdogRootPath = normalizeWatchdogRootPath(
-				formSnapshot.watchdogRootPath,
+				rawFormSnapshot.watchdogRootPath,
+			);
+			const formSnapshot = withDerivedAcadeProjectFilePath(
+				rawFormSnapshot,
+				watchdogRootPath,
 			);
 			const payload: Database["public"]["Tables"]["projects"]["Update"] = {
 				name: formSnapshot.name,

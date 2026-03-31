@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from backend import dotnet_bridge
@@ -65,6 +66,55 @@ class TestDotNetBridgeContract(unittest.TestCase):
         payload = captured.get("payload") or {}
         self.assertEqual(payload.get("token"), None)
         self.assertEqual(payload.get("action"), "conduit_route_obstacle_scan")
+
+    def test_pipe_client_autostarts_bridge_when_pipe_is_missing(self) -> None:
+        captured: dict[str, object] = {"create_calls": 0}
+        handle = object()
+
+        def create_file(*_args, **_kwargs):
+            captured["create_calls"] = int(captured["create_calls"]) + 1
+            if captured["create_calls"] == 1:
+                raise OSError(2, "pipe missing")
+            return handle
+
+        def write_file(_handle, payload_bytes):
+            captured["request_bytes"] = payload_bytes
+            return 0, None
+
+        def read_file(_handle, _size):
+            return 0, b'{"id":"bridge-1","ok":true,"result":{"success":true}}\n'
+
+        file_stub = SimpleNamespace(
+            GENERIC_READ=1,
+            GENERIC_WRITE=2,
+            OPEN_EXISTING=3,
+            CreateFile=create_file,
+            WriteFile=write_file,
+            ReadFile=read_file,
+            CloseHandle=lambda _handle: None,
+        )
+        pipe_stub = SimpleNamespace(
+            PIPE_READMODE_MESSAGE=4,
+            SetNamedPipeHandleState=lambda *_args, **_kwargs: None,
+        )
+
+        with patch.object(dotnet_bridge, "win32file", file_stub):
+            with patch.object(dotnet_bridge, "win32pipe", pipe_stub):
+                with patch.object(
+                    dotnet_bridge,
+                    "_autostart_named_pipe_bridge",
+                    return_value=True,
+                ) as autostart_mock:
+                    client = dotnet_bridge.DotNetPipeClient(
+                        pipe_name="TEST_PIPE",
+                        timeout_ms=30_000,
+                    )
+                    response = client.send_request({"id": "job-1", "action": "ping"})
+
+        autostart_mock.assert_called_once_with("TEST_PIPE")
+        self.assertEqual(captured.get("create_calls"), 2)
+        self.assertEqual(response.get("ok"), True)
+        self.assertIn(b'"action":"ping"', captured.get("request_bytes") or b"")
 
 
 if __name__ == "__main__":

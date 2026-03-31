@@ -50,6 +50,32 @@ export const formatDateMMDDYYYY = (isoOrDateLike: string): string => {
 export const toDateOnly = (datetimeLocal: string): string =>
 	datetimeLocal ? datetimeLocal.split("T")[0] : "";
 
+export const deriveAcadeProjectFilePath = (
+	projectName: string | null | undefined,
+	projectRootPath: string | null | undefined,
+): string => {
+	const normalizedProjectName = String(projectName || "").trim();
+	const normalizedProjectRoot = String(projectRootPath || "").trim();
+	if (!normalizedProjectName || !normalizedProjectRoot) {
+		return "";
+	}
+
+	const sanitizedStem =
+		normalizedProjectName
+			.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, "-")
+			.replace(/\s+/g, " ")
+			.trim()
+			.replace(/[ .]+$/g, "") || "project";
+
+	const rootWithoutTrailingSlashes = normalizedProjectRoot.replace(/[\\/]+$/g, "");
+	if (!rootWithoutTrailingSlashes) {
+		return "";
+	}
+
+	const separator = rootWithoutTrailingSlashes.includes("\\") ? "\\" : "/";
+	return `${rootWithoutTrailingSlashes}${separator}${sanitizedStem}.wdp`;
+};
+
 /** Returns a CSS variable string for the priority's semantic color. */
 export const getPriorityColor = (priority: string): string => {
 	switch (priority) {

@@ -113,6 +113,18 @@ WDT_FIELD_MAP = {
     "TITLE3": "DWGDESC",
     "PROJ": "LINE4",
 }
+ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE = (
+    "Support files are ready, but ACADE did not register/open the project."
+)
+ACADE_OPEN_PROJECT_UNAVAILABLE_CODES = {
+    "AUTOCAD_COMMAND_TIMEOUT",
+    "AUTOCAD_LAUNCH_FAILED",
+    "AUTOCAD_LAUNCH_TIMEOUT",
+    "AUTOCAD_NOT_AVAILABLE",
+    "PLUGIN_NOT_READY",
+    "PLUGIN_RESULT_INVALID",
+    "PLUGIN_RESULT_MISSING",
+}
 
 
 def create_title_block_sync_blueprint(
@@ -166,6 +178,14 @@ def create_title_block_sync_blueprint(
 
     def _normalize_drawing_key(value: Any) -> str:
         return re.sub(r"[^A-Z0-9]+", "", _normalize_upper(value))
+
+    def _sanitize_acade_project_stem(value: Any) -> str:
+        normalized = _normalize_text(value)
+        if not normalized:
+            return ""
+        normalized = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "-", normalized)
+        normalized = re.sub(r"\s+", " ", normalized).strip().rstrip(". ")
+        return normalized or "project"
 
     def _derive_cadno(dwgno: Any) -> str:
         return _normalize_drawing_key(dwgno)
@@ -245,12 +265,13 @@ def create_title_block_sync_blueprint(
         }
 
         logger.info(
-            "Title block .NET bridge action succeeded (request_id=%s, action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s)",
+            "Title block .NET bridge action completed (request_id=%s, action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s, result_success=%s)",
             request_id,
             action,
             remote_addr,
             auth_mode,
             elapsed_ms,
+            bool(result_payload.get("success")),
         )
         return result_payload
 
@@ -331,7 +352,7 @@ def create_title_block_sync_blueprint(
         if wdp_files:
             return wdp_files[0], True
 
-        stem = re.sub(r"[^A-Za-z0-9._-]+", "-", project_root.name).strip("-._") or "project"
+        stem = _sanitize_acade_project_stem(profile.get("projectName")) or _sanitize_acade_project_stem(project_root.name)
         candidate = project_root / f"{stem}.wdp"
         return candidate, candidate.exists()
 
@@ -347,6 +368,12 @@ def create_title_block_sync_blueprint(
         raw_profile = payload.get("profile")
         profile = raw_profile if isinstance(raw_profile, dict) else {}
         return {
+            "projectName": _normalize_text(
+                profile.get("projectName")
+                or profile.get("project_name")
+                or payload.get("projectName")
+                or payload.get("project_name")
+            ),
             "blockName": _normalize_text(profile.get("blockName") or profile.get("block_name")) or DEFAULT_BLOCK_NAME,
             "projectRootPath": _normalize_text(profile.get("projectRootPath") or profile.get("project_root_path"))
             or str(project_root),
@@ -1300,10 +1327,19 @@ def create_title_block_sync_blueprint(
     @limiter.limit("240 per hour")
     def api_title_block_open_project():
         request_id = _request_id()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = "supabase"
         payload = _parse_json_body()
         try:
             project_root = _resolve_project_root(payload)
             profile = _read_profile(payload, project_root)
+            logger.info(
+                "Title block open project ensuring artifacts (request_id=%s, remote=%s, auth_mode=%s, stage=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+                "ensure-artifacts",
+            )
             artifacts = _ensure_project_mapping_files(
                 project_root=project_root,
                 discovered_files=_discover_project_files(project_root),
@@ -1311,27 +1347,171 @@ def create_title_block_sync_blueprint(
             )
             wdp_path = Path(str(artifacts.get("wdpPath") or "")).expanduser()
             if not wdp_path.exists():
-                raise ValueError("ACADE project file could not be created.")
-            if not hasattr(os, "startfile"):
-                raise RuntimeError("Opening an ACADE project file is only supported on Windows.")
-            os.startfile(str(wdp_path))
+                raise ValueError("ACADE project definition could not be created.")
+            response_data = {
+                "projectRootPath": str(project_root),
+                "profile": profile,
+                "drawings": [],
+                "summary": _summarize_rows([]),
+                "artifacts": artifacts,
+            }
+            if send_autocad_dotnet_command is None:
+                return _error_response(
+                    code="ACADE_PROJECT_OPEN_UNAVAILABLE",
+                    message=ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=503,
+                    request_id=request_id,
+                    meta={
+                        "stage": "bridge-open-project",
+                        "providerPath": "dotnet",
+                    },
+                    extra={
+                        "warnings": ["AutoCAD .NET bridge is not configured."],
+                        "data": response_data,
+                    },
+                )
+
+            logger.info(
+                "Title block open project dispatching bridge action (request_id=%s, remote=%s, auth_mode=%s, stage=%s, wdp_path=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+                "bridge-open-project",
+                str(wdp_path),
+            )
+            try:
+                bridge_result = _call_dotnet_bridge_action(
+                    action="suite_acade_project_open",
+                    payload={
+                        "projectRootPath": str(project_root),
+                        "wdpPath": str(wdp_path),
+                        "launchIfNeeded": True,
+                        "uiMode": "project_manager_only",
+                    },
+                    request_id=request_id,
+                    remote_addr=remote_addr,
+                    auth_mode=auth_mode,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Title block open project bridge unavailable (request_id=%s, remote=%s, auth_mode=%s, stage=%s, detail=%s)",
+                    request_id,
+                    remote_addr,
+                    auth_mode,
+                    "bridge-open-project",
+                    autocad_exception_message(exc),
+                )
+                return _error_response(
+                    code="ACADE_PROJECT_OPEN_UNAVAILABLE",
+                    message=ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=503,
+                    request_id=request_id,
+                    meta={
+                        "stage": "bridge-open-project",
+                        "providerPath": "dotnet",
+                    },
+                    extra={
+                        "warnings": [autocad_exception_message(exc)],
+                        "data": response_data,
+                    },
+                )
+
+            bridge_warnings = [
+                _normalize_text(item)
+                for item in bridge_result.get("warnings") or []
+                if _normalize_text(item)
+            ]
+            bridge_data = bridge_result.get("data")
+            open_project = bridge_data if isinstance(bridge_data, dict) else {}
+            if open_project:
+                response_data["openProject"] = open_project
+            bridge_code = _normalize_upper(bridge_result.get("code"))
+            bridge_meta = {
+                **(bridge_result.get("meta") or {}),
+                "stage": "bridge-open-project",
+                "providerPath": "dotnet",
+            }
+            if not bridge_result.get("success", False):
+                detail = _normalize_text(bridge_result.get("message"))
+                warnings = list(dict.fromkeys([
+                    *(bridge_warnings or []),
+                    *( [detail] if detail else [] ),
+                ]))
+                status_code = 400
+                error_code = bridge_code or "INVALID_REQUEST"
+                if bridge_code != "INVALID_REQUEST":
+                    status_code = (
+                        503
+                        if bridge_code in ACADE_OPEN_PROJECT_UNAVAILABLE_CODES
+                        else 502
+                    )
+                    error_code = bridge_code or (
+                        "ACADE_PROJECT_OPEN_UNAVAILABLE"
+                        if status_code == 503
+                        else "ACADE_PROJECT_OPEN_FAILED"
+                    )
+                return _error_response(
+                    code=error_code,
+                    message=ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=status_code,
+                    request_id=request_id,
+                    meta=bridge_meta,
+                    extra={
+                        "warnings": warnings,
+                        "data": response_data,
+                    },
+                )
+
+            verification = open_project.get("verification")
+            verification_data = verification if isinstance(verification, dict) else {}
+            command_completed = bool(verification_data.get("commandCompleted"))
+            aepx_observed = bool(verification_data.get("aepxObserved"))
+            last_proj_observed = bool(verification_data.get("lastProjObserved"))
+            logger.info(
+                "Title block open project verification completed (request_id=%s, remote=%s, auth_mode=%s, stage=%s, command_completed=%s, aepx_observed=%s, lastproj_observed=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+                "verify-open-project",
+                command_completed,
+                aepx_observed,
+                last_proj_observed,
+            )
+            if (
+                not bool(open_project.get("projectActivated"))
+                or not command_completed
+                or not (aepx_observed or last_proj_observed)
+            ):
+                warnings = list(dict.fromkeys([
+                    *(bridge_warnings or []),
+                    "ACADE did not produce a verified project-open side effect.",
+                ]))
+                return _error_response(
+                    code="ACADE_PROJECT_NOT_VERIFIED",
+                    message=ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=502,
+                    request_id=request_id,
+                    meta={
+                        **bridge_meta,
+                        "stage": "verify-open-project",
+                    },
+                    extra={
+                        "warnings": warnings,
+                        "data": response_data,
+                    },
+                )
+
             return jsonify(
                 {
                     "success": True,
                     "code": "",
-                    "message": "ACADE project open requested.",
+                    "message": "ACADE opened and project activated.",
                     "requestId": request_id,
-                    "data": {
-                        "projectRootPath": str(project_root),
-                        "profile": profile,
-                        "drawings": [],
-                        "summary": _summarize_rows([]),
-                        "artifacts": artifacts,
-                        "launchedPath": str(wdp_path),
-                    },
-                    "warnings": [],
+                    "data": response_data,
+                    "warnings": bridge_warnings,
                     "meta": {
                         "stage": "open-project",
+                        "providerPath": "dotnet",
                     },
                 }
             ), 200
@@ -1344,9 +1524,19 @@ def create_title_block_sync_blueprint(
                 meta={"stage": "open-project.validate"},
             )
         except Exception as exc:
+            autocad_log_exception(
+                logger=logger,
+                message="Title block open project failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="title_block_open_project",
+                code="TITLE_BLOCK_OPEN_PROJECT_FAILED",
+                provider="dotnet",
+            )
             return _error_response(
                 code="TITLE_BLOCK_OPEN_PROJECT_FAILED",
-                message=f"Unable to open the ACADE project file: {autocad_exception_message(exc)}",
+                message=f"Unable to launch ACADE and activate the project: {autocad_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "open-project"},

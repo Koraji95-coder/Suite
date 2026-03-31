@@ -173,11 +173,12 @@ static partial class ConduitRouteStubHandlers
             );
 
             using var session = ConnectAutoCad();
-            var escapedPluginPath = pluginDllPath.Replace("\"", "\"\"");
-            var escapedPayloadPath = payloadPath.Replace("\"", "\"\"");
-            var escapedResultPath = resultPath.Replace("\"", "\"\"");
-            var commandScript =
-                $"_.NETLOAD \"{escapedPluginPath}\" _.{SuiteMarkupAuthoringPluginCommand} \"{escapedPayloadPath}\" \"{escapedResultPath}\"\n";
+            var commandScript = BuildSuitePluginCommandScript(
+                pluginDllPath,
+                SuiteMarkupAuthoringPluginCommand,
+                payloadPath,
+                resultPath
+            );
 
             ReadWithTransientComRetry(
                 () =>

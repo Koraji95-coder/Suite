@@ -202,7 +202,7 @@ describe("ProjectSetupReadinessPanel", () => {
 		).toBeTruthy();
 		expect(
 			screen.getByText(
-				/Create the support files first, then verify the live drawings before you build the package/i,
+				/Create the support files first, then launch ACADE to activate the project before you verify the live drawings/i,
 			),
 		).toBeTruthy();
 		expect(
@@ -423,11 +423,11 @@ describe("ProjectSetupReadinessPanel", () => {
 		expect(screen.getByText("R3P-25074")).toBeTruthy();
 		expect(screen.getByText("C:/Projects/Nanulak/Nanulak.wdp")).toBeTruthy();
 		expect(
-			screen.getAllByText(/Existing ACADE project file/i).length,
+			screen.getAllByText(/Existing ACADE project definition/i).length,
 		).toBeGreaterThan(0);
 		expect(
 			screen.getByText(
-				/Suite detected an existing \.wdp and will preserve it/i,
+				/Suite detected an existing \.wdp project definition and will preserve it/i,
 			),
 		).toBeTruthy();
 	});
@@ -435,7 +435,7 @@ describe("ProjectSetupReadinessPanel", () => {
 	it("opens the derived ACADE project from the support files card", async () => {
 		projectSetupReadinessMocks.openProjectMock.mockResolvedValue({
 			success: true,
-			message: "ACADE project open requested.",
+			message: "ACADE opened and project activated.",
 			data: {
 				projectRootPath: "C:/Projects/Nanulak",
 				profile: {
@@ -549,6 +549,7 @@ describe("ProjectSetupReadinessPanel", () => {
 				projectId: "project-1",
 				projectRootPath: "C:/Projects/Nanulak",
 				profile: {
+					projectName: "Nanulak",
 					blockName: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
 					projectRootPath: "C:/Projects/Nanulak",
 					acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
@@ -567,7 +568,7 @@ describe("ProjectSetupReadinessPanel", () => {
 		);
 		expect(projectSetupReadinessMocks.showToastMock).toHaveBeenCalledWith(
 			"success",
-			"ACADE project open requested.",
+			"ACADE opened and project activated.",
 		);
 		expect(titleBlockSyncService.openProject).toBe(
 			projectSetupReadinessMocks.openProjectMock,

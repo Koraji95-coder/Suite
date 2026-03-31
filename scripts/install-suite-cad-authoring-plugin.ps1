@@ -396,7 +396,7 @@ $packageContents = @'
     SchemaVersion="1.0"
     AutodeskProduct="AutoCAD"
     Name="Suite CAD Authoring"
-    Description="Suite terminal authoring plugin for project-aware CAD writes."
+    Description="Suite CAD authoring plugin for project-aware CAD writes and ACADE project activation."
     AppVersion="0.1.0"
     FriendlyVersion="0.1.0"
     ProductType="Application"
@@ -405,11 +405,13 @@ $packageContents = @'
     UpgradeCode="__UPGRADE_CODE__">
   <CompanyDetails Name="Suite" Url="local" Email="local" />
   <RuntimeRequirements OS="Win64" Platform="AutoCAD*" __SERIES_REQUIREMENTS__ />
-  <Components Description="Suite terminal authoring plugin">
+  <Components Description="Suite CAD authoring plugin">
     <RuntimeRequirements OS="Win64" Platform="AutoCAD*" __SERIES_REQUIREMENTS__ />
-    <ComponentEntry AppName="SuiteCadAuthoring" AppDescription="Suite terminal authoring plugin." AppType=".Net" Version="0.1.0" ModuleName="./Contents/Win64/SuiteCadAuthoring.dll" LoadOnAutoCADStartup="False">
+    <ComponentEntry AppName="SuiteCadAuthoring" AppDescription="Suite CAD authoring plugin." AppType=".Net" Version="0.1.0" ModuleName="./Contents/Win64/SuiteCadAuthoring.dll" LoadOnAutoCADStartup="True">
       <Commands GroupName="SUITE_CAD_AUTHORING">
         <Command Local="SUITETERMINALAUTHORAPPLY" Global="SUITETERMINALAUTHORAPPLY" />
+        <Command Local="SUITEMARKUPAUTHORAPPLY" Global="SUITEMARKUPAUTHORAPPLY" />
+        <Command Local="SUITEACADEPROJECTOPEN" Global="SUITEACADEPROJECTOPEN" />
       </Commands>
     </ComponentEntry>
   </Components>

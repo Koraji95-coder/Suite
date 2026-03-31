@@ -40,6 +40,7 @@ import {
 	type ProjectFormData,
 	type ProjectStatus,
 } from "./projectmanagertypes";
+import { deriveAcadeProjectFilePath } from "./projectmanagerutils";
 
 interface ProjectFormModalProps {
 	isOpen: boolean;
@@ -193,6 +194,10 @@ export function ProjectFormModal({
 	const activeStep = WIZARD_STEPS[stepIndex];
 	const validationProjectId = projectId ?? draftProjectId;
 	const normalizedRootPath = formData.watchdogRootPath.trim();
+	const derivedAcadeProjectFilePath = useMemo(
+		() => deriveAcadeProjectFilePath(formData.name, normalizedRootPath),
+		[formData.name, normalizedRootPath],
+	);
 	const titleBlockDefaultsConfigured =
 		hasMeaningfulTitleBlockDefaults(formData);
 	const reviewBlockers = useMemo(() => {
@@ -249,6 +254,26 @@ export function ProjectFormModal({
 			setRootCheck(EMPTY_ROOT_CHECK);
 		}
 	}, [normalizedRootPath, rootCheck.rootPath, rootCheck.status]);
+
+	useEffect(() => {
+		if (!isOpen) {
+			return;
+		}
+		if (formData.titleBlockAcadeProjectFilePath.trim()) {
+			return;
+		}
+		if (!derivedAcadeProjectFilePath) {
+			return;
+		}
+		updateProjectForm(setFormData, {
+			titleBlockAcadeProjectFilePath: derivedAcadeProjectFilePath,
+		});
+	}, [
+		derivedAcadeProjectFilePath,
+		formData.titleBlockAcadeProjectFilePath,
+		isOpen,
+		setFormData,
+	]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -829,7 +854,7 @@ export function ProjectFormModal({
 								<h3 className={styles.sectionTitle}>Title block defaults</h3>
 								<p className={styles.sectionCopy}>
 									Seed the project with the title block profile that scans,
-									standards checks, and issue prep should inherit.
+									standards checker, and issue prep should inherit.
 								</p>
 							</div>
 							<p className={styles.mappingNote}>
@@ -899,10 +924,12 @@ export function ProjectFormModal({
 								/>
 								<p className={styles.inlineHint}>
 									Suite derives a starter .wdp, .wdt, and .wdl from these
-									defaults. If this stays blank, the starter .wdp path is derived
-									from the project root and missing support files are created
-									automatically when project setup is saved or the title block
-									apply/export flow runs.
+									defaults. If this stays blank, Suite now defaults to the project
+									name inside the root folder, then creates any missing support
+									files automatically when project setup is saved or the title
+									block apply/export flow runs. ACADE reads this project
+									definition through Project Manager; drawings still open as
+									.dwg files.
 								</p>
 							</div>
 							<div className={styles.gridTwo}>
@@ -1111,9 +1138,10 @@ export function ProjectFormModal({
 											"Starter .wdp will be derived from the project root"}
 									</strong>
 									<p>
-										Suite scaffolds the .wdp, .wdt, and .wdl support files from
-										these defaults, then title block review verifies the live
-										drawings.
+										Suite scaffolds the ACADE project definition (.wdp) and
+										companion .wdt/.wdl support files from these defaults. Open
+										in ACADE then launches ACADE and activates the project in
+										Project Manager before you review live drawings.
 									</p>
 								</div>
 							</div>

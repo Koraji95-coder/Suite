@@ -117,7 +117,7 @@ export function useStandardsDrawingCheckerState() {
 							error: userError,
 						} = await supabase.auth.getUser();
 						if (userError || !user) {
-							showToast("error", "Sign in to run standards checks.");
+							showToast("error", "Sign in to run standards checker.");
 							return;
 						}
 

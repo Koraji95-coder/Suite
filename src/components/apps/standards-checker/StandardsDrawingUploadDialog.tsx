@@ -40,7 +40,7 @@ export function StandardsDrawingUploadDialog({
 				</DialogHeader>
 				{checkingDrawing ? (
 					<div className={styles.loadingBox}>
-						<p>Running standards checks...</p>
+						<p>Running standards checker...</p>
 						<p className={styles.subtitle}>Applying {enabledRuleCount} rules</p>
 					</div>
 				) : (

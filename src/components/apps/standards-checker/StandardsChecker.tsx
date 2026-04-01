@@ -76,7 +76,7 @@ function resolveStandardsReviewStage(args: {
 			state: "background",
 			label: "Running checks",
 			step: "Run",
-			title: `Running the selected standards checks for ${projectLabel}.`,
+			title: `Running the selected standards checker for ${projectLabel}.`,
 			detail:
 				"Suite is evaluating the current standards pack and preparing the review summary.",
 		} satisfies StandardsReviewStage;
@@ -113,7 +113,7 @@ function resolveStandardsReviewStage(args: {
 			detail:
 				warningCount > 0
 					? `${warningCount} warning${warningCount === 1 ? " also needs" : " also need"} review before the package is cleared.`
-					: "Resolve the failed standards checks or document a waiver before moving forward.",
+					: "Resolve the failed standards checker or document a waiver before moving forward.",
 		} satisfies StandardsReviewStage;
 	}
 

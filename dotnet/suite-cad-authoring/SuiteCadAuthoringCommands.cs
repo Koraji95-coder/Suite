@@ -18,9 +18,28 @@ namespace SuiteCadAuthoring
 {
     public sealed class SuiteCadAuthoringExtension : IExtensionApplication
     {
-        public void Initialize() { }
+        public void Initialize()
+        {
+            SuiteCadPipeHost.StartIfEligible();
+        }
 
-        public void Terminate() { }
+        public void Terminate()
+        {
+            SuiteCadPipeHost.Stop();
+        }
+    }
+
+    internal sealed class SuiteCadPipeStatusResult
+    {
+        public bool HostEligible { get; set; }
+
+        public bool HostStarted { get; set; }
+
+        public string PipeName { get; set; } = string.Empty;
+
+        public string ActiveProfile { get; set; } = string.Empty;
+
+        public string Message { get; set; } = string.Empty;
     }
 
     internal sealed class TerminalAuthoringApplyPayload

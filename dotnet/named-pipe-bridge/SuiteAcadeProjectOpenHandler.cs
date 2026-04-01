@@ -1,15 +1,23 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices.ComTypes;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Win32;
 
 static partial class ConduitRouteStubHandlers
 {
     private const string SuiteAcadeProjectOpenPluginCommand = "SUITEACADEPROJECTOPEN";
+    private const string SuiteAcadeProjectOpenPluginLispFunction = "SUITEACADEPROJECTOPENRUN";
+    private const string SuiteAcadeProfileName = "<<ACADE>>";
+    private const string SuiteAcadeProductCode = "ACADE";
+    private const string SuiteAcadeLanguageCode = "en-US";
     private static readonly string[] SuiteAcadeExecutablePathCandidates =
     {
+        @"C:\Program Files (x86)\Autodesk\AutoCAD 2026\acad.exe",
         @"C:\Program Files\Autodesk\AutoCAD Electrical 2026\acad.exe",
         @"C:\Program Files\Autodesk\AutoCAD 2026\acad.exe",
+        @"C:\Program Files (x86)\Autodesk\AutoCAD 2025\acad.exe",
         @"C:\Program Files\Autodesk\AutoCAD Electrical 2025\acad.exe",
         @"C:\Program Files\Autodesk\AutoCAD 2025\acad.exe",
     };
@@ -31,7 +39,13 @@ static partial class ConduitRouteStubHandlers
             object? modelspace,
             bool acadeLaunched,
             bool temporaryDocumentCreated,
-            string executablePath
+            string executablePath,
+            string activeProfile = "",
+            string profileSource = "",
+            string sessionClassification = "",
+            string sessionMode = "",
+            int processId = 0,
+            IntPtr windowHandle = default
         )
         {
             Application = application;
@@ -40,14 +54,47 @@ static partial class ConduitRouteStubHandlers
             AcadeLaunched = acadeLaunched;
             TemporaryDocumentCreated = temporaryDocumentCreated;
             ExecutablePath = executablePath ?? "";
+            ActiveProfile = activeProfile ?? "";
+            ProfileSource = profileSource ?? "";
+            SessionClassification = sessionClassification ?? "";
+            SessionMode = sessionMode ?? "";
+            ProcessId = processId;
+            WindowHandle = windowHandle;
         }
 
         public object Application { get; }
-        public object Document { get; }
-        public object? Modelspace { get; }
+        public object Document { get; private set; }
+        public object? Modelspace { get; private set; }
         public bool AcadeLaunched { get; }
-        public bool TemporaryDocumentCreated { get; }
+        public bool TemporaryDocumentCreated { get; private set; }
+        public bool TemporaryDocumentClosed { get; private set; }
         public string ExecutablePath { get; }
+        public string ActiveProfile { get; }
+        public string ProfileSource { get; }
+        public string SessionClassification { get; }
+        public string SessionMode { get; }
+        public int ProcessId { get; }
+        public IntPtr WindowHandle { get; }
+
+        public void AdoptDocument(object document, object? modelspace, bool temporaryDocumentCreated)
+        {
+            if (document is null)
+            {
+                throw new ArgumentNullException(nameof(document));
+            }
+
+            ReleaseSuiteComObjectSafely(Modelspace);
+            ReleaseSuiteComObjectSafely(Document);
+
+            Document = document;
+            Modelspace = modelspace;
+            TemporaryDocumentCreated = TemporaryDocumentCreated || temporaryDocumentCreated;
+        }
+
+        public void MarkTemporaryDocumentClosed()
+        {
+            TemporaryDocumentClosed = true;
+        }
 
         public void Dispose()
         {
@@ -56,25 +103,63 @@ static partial class ConduitRouteStubHandlers
                 return;
             }
 
-            foreach (var comObject in new object?[] { Modelspace, Document, Application })
-            {
-                if (comObject is null)
-                {
-                    continue;
-                }
+            ReleaseSuiteComObjectSafely(Modelspace);
+            ReleaseSuiteComObjectSafely(Document);
+            ReleaseSuiteComObjectSafely(Application);
+        }
+    }
 
-                try
-                {
-                    if (Marshal.IsComObject(comObject))
-                    {
-                        Marshal.ReleaseComObject(comObject);
-                    }
-                }
-                catch
-                {
-                    // Best effort cleanup.
-                }
+    internal sealed class SuiteAcadeProjectOpenConnectResult
+    {
+        public SuiteAcadeProjectOpenSession? Session { get; init; }
+        public string FailureCode { get; init; } = "";
+        public string FailureMessage { get; init; } = "";
+        public JsonObject Meta { get; init; } = new JsonObject();
+    }
+
+    internal readonly record struct SuiteAcadeRunningSessionCandidateSnapshot(
+        string RotDisplayName,
+        string ExecutablePath,
+        string ActiveProfile,
+        bool DocumentManagerAvailable,
+        string ActiveDocumentPath,
+        int ProcessId,
+        int WindowHandle,
+        string SessionClassification,
+        bool ElectricalRuntimeDetected = false
+    );
+
+    private sealed class SuiteAcadeRunningSessionCandidate : IDisposable
+    {
+        private object? _application;
+
+        public SuiteAcadeRunningSessionCandidate(
+            object application,
+            SuiteAcadeRunningSessionCandidateSnapshot snapshot
+        )
+        {
+            _application = application ?? throw new ArgumentNullException(nameof(application));
+            Snapshot = snapshot;
+        }
+
+        public SuiteAcadeRunningSessionCandidateSnapshot Snapshot { get; }
+
+        public object? DetachApplication()
+        {
+            var application = _application;
+            _application = null;
+            return application;
+        }
+
+        public void Dispose()
+        {
+            if (_application is null)
+            {
+                return;
             }
+
+            ReleaseSuiteComObjectSafely(_application);
+            _application = null;
         }
     }
 
@@ -122,18 +207,33 @@ static partial class ConduitRouteStubHandlers
         public bool PreviousAepxExists { get; init; }
         public DateTime? PreviousAepxLastWriteUtc { get; init; }
         public bool PreviousLastProjObserved { get; init; }
+        public DateTime? PreviousLastProjLastWriteUtc { get; init; }
         public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(15);
     }
 
     internal readonly record struct SuiteAcadeProjectOpenVerificationResult(
         bool AepxObserved,
-        bool LastProjObserved
+        bool LastProjObserved,
+        bool ActiveProjectObserved = false,
+        string ActiveProjectPath = ""
+    );
+
+    private readonly record struct SuiteAcadeProjectSwitchRetryCommandCandidate(
+        string Strategy,
+        string CommandScript
+    );
+
+    private readonly record struct SuiteAcadeProjectSwitchRetryResult(
+        SuiteAcadeProjectOpenCommandExecutionResult CommandExecution,
+        SuiteAcadeProjectOpenVerificationResult Verification,
+        bool ProjectActivated
     );
 
     private readonly record struct SuiteAcadeProjectOpenObservation(
         bool AepxExists,
         DateTime? AepxLastWriteUtc,
-        bool LastProjObserved
+        bool LastProjObserved,
+        DateTime? LastProjLastWriteUtc
     );
 
     private readonly record struct SuiteAcadeDocumentContext(
@@ -145,7 +245,7 @@ static partial class ConduitRouteStubHandlers
     internal static Func<
         SuiteAcadeProjectOpenRequest,
         List<string>,
-        (SuiteAcadeProjectOpenSession? Session, string FailureCode, string FailureMessage)
+        SuiteAcadeProjectOpenConnectResult
     >? SuiteAcadeProjectOpenConnectHook;
 
     internal static Func<
@@ -168,12 +268,19 @@ static partial class ConduitRouteStubHandlers
         SuiteAcadeProjectOpenCommandExecutionResult
     >? SuiteAcadeProjectOpenBuiltInCommandHook;
 
+    internal static Func<
+        SuiteAcadeProjectOpenSession,
+        List<string>,
+        SuiteAcadeProjectOpenCommandExecutionResult
+    >? SuiteAcadeProjectOpenCloseCurrentProjectHook;
+
     internal static void ResetSuiteAcadeProjectOpenTestHooks()
     {
         SuiteAcadeProjectOpenConnectHook = null;
         SuiteAcadeProjectOpenPluginHook = null;
         SuiteAcadeProjectOpenVerifyHook = null;
         SuiteAcadeProjectOpenBuiltInCommandHook = null;
+        SuiteAcadeProjectOpenCloseCurrentProjectHook = null;
     }
 
     public static JsonObject HandleSuiteAcadeProjectOpen(JsonObject payload)
@@ -196,6 +303,15 @@ static partial class ConduitRouteStubHandlers
             : AcquireSuiteAcadeProjectOpenSession(request, warnings);
         if (connectResult.Session is null)
         {
+            var failureMeta = new JsonObject
+            {
+                ["source"] = "dotnet",
+                ["providerPath"] = "dotnet",
+                ["action"] = "suite_acade_project_open",
+                ["requestId"] = request.RequestId,
+                ["stage"] = "launch-acade",
+            };
+            MergeSuiteJsonObject(failureMeta, connectResult.Meta, overwrite: false);
             return BuildSuiteAcadeProjectOpenFailure(
                 code: string.IsNullOrWhiteSpace(connectResult.FailureCode)
                     ? "AUTOCAD_NOT_AVAILABLE"
@@ -210,145 +326,29 @@ static partial class ConduitRouteStubHandlers
                 commandCompleted: false,
                 aepxObserved: false,
                 lastProjObserved: false,
+                activeProjectObserved: false,
+                activeProjectPath: "",
                 temporaryDocumentCreated: false,
-                meta: new JsonObject
-                {
-                    ["source"] = "dotnet",
-                    ["providerPath"] = "dotnet",
-                    ["action"] = "suite_acade_project_open",
-                    ["stage"] = "launch-acade",
-                }
+                temporaryDocumentClosed: false,
+                meta: failureMeta
             );
         }
 
         using var session = connectResult.Session;
         TryActivateSuiteDocument(session.Document);
+        WarnIfSuiteAcadeProfileLooksWrong(session.Application, warnings);
 
         BridgeLog.Info(
             $"suite_acade_project_open bridge-open-project start (request_id={request.RequestId}, acade_launched={session.AcadeLaunched}, temporary_document_created={session.TemporaryDocumentCreated})."
         );
 
-        var commandExecution = SuiteAcadeProjectOpenBuiltInCommandHook is not null
-            ? SuiteAcadeProjectOpenBuiltInCommandHook(request, session, warnings)
-            : ExecuteSuiteAcadeProjectOpenBuiltInCommand(request, session, warnings);
-
-        var commandCompleted = commandExecution.CommandCompleted;
+        var commandCompleted = false;
         var projectActivated = false;
-        var activationFailed = !string.IsNullOrWhiteSpace(commandExecution.FailureCode);
-        var activationFailureCode = (commandExecution.FailureCode ?? "").Trim();
-        var activationFailureMessage = (commandExecution.FailureMessage ?? "").Trim();
-        var bridgeOpenMeta = BuildSuiteAcadeProjectOpenCommandMeta(
-            stage: "bridge-open-project",
-            session: session,
-            commandExecution: commandExecution
-        );
-
-        if (activationFailed)
-        {
-            warnings.Add(
-                $"Built-in ACADE project command failed ({activationFailureCode}); trying the SuiteCadAuthoring fallback."
-            );
-            var pluginExecution = SuiteAcadeProjectOpenPluginHook is not null
-                ? SuiteAcadeProjectOpenPluginHook(
-                    new SuiteAcadeProjectOpenPluginInvocation
-                    {
-                        RequestId = request.RequestId,
-                        ProjectRootPath = request.ProjectRootPath,
-                        WdpPath = request.WdpPath,
-                        UiMode = request.UiMode,
-                    },
-                    session,
-                    warnings
-                )
-                : ExecuteSuiteAcadeProjectOpenPlugin(payload, request, session, warnings);
-            commandCompleted = commandCompleted || pluginExecution.CommandCompleted;
-            bridgeOpenMeta["fallbackAttempted"] = true;
-            bridgeOpenMeta["fallbackProviderPath"] = string.IsNullOrWhiteSpace(
-                pluginExecution.PluginDllPath
-            )
-                ? "dotnet"
-                : "dotnet+plugin";
-            bridgeOpenMeta["fallbackCommandCompleted"] = pluginExecution.CommandCompleted;
-            bridgeOpenMeta["fallbackCommandStateAvailable"] = pluginExecution.CommandStateAvailable;
-            bridgeOpenMeta["fallbackSawActiveCommand"] = pluginExecution.SawActiveCommand;
-            bridgeOpenMeta["fallbackLastCommandMask"] = pluginExecution.LastCommandMask;
-            bridgeOpenMeta["fallbackPluginDllPath"] = string.IsNullOrWhiteSpace(
-                pluginExecution.PluginDllPath
-            )
-                ? null
-                : pluginExecution.PluginDllPath;
-            bridgeOpenMeta["fallbackPayloadPath"] = string.IsNullOrWhiteSpace(
-                pluginExecution.PayloadPath
-            )
-                ? null
-                : pluginExecution.PayloadPath;
-            bridgeOpenMeta["fallbackResultPath"] = string.IsNullOrWhiteSpace(
-                pluginExecution.ResultPath
-            )
-                ? null
-                : pluginExecution.ResultPath;
-
-            var pluginResult = pluginExecution.PluginResult;
-            if (pluginResult is not null)
-            {
-                warnings.AddRange(ReadJsonStringArray(pluginResult["warnings"] as JsonArray));
-                var pluginMeta = CloneJsonObject(pluginResult["meta"] as JsonObject);
-                var pluginData = pluginResult["data"] as JsonObject ?? new JsonObject();
-                var fallbackStrategy = ReadStringValue(pluginMeta, "strategy", "");
-                if (string.IsNullOrWhiteSpace(fallbackStrategy))
-                {
-                    fallbackStrategy = ReadStringValue(pluginData, "strategy", "");
-                }
-                if (!string.IsNullOrWhiteSpace(fallbackStrategy))
-                {
-                    bridgeOpenMeta["fallbackStrategy"] = fallbackStrategy;
-                }
-
-                var pluginSuccess = pluginResult["success"]?.GetValue<bool>() ?? false;
-                projectActivated = ReadBool(pluginData, "projectActivated", pluginSuccess);
-                activationFailed = !pluginSuccess;
-                activationFailureCode = pluginSuccess
-                    ? ""
-                    : ReadStringValue(pluginResult, "code", "ACADE_PROJECT_OPEN_FAILED");
-                activationFailureMessage = pluginSuccess
-                    ? ""
-                    : ReadStringValue(pluginResult, "message", "ACADE project open failed.");
-            }
-            else
-            {
-                activationFailed = true;
-                activationFailureCode = string.IsNullOrWhiteSpace(pluginExecution.FailureCode)
-                    ? "PLUGIN_RESULT_MISSING"
-                    : pluginExecution.FailureCode;
-                activationFailureMessage = string.IsNullOrWhiteSpace(
-                    pluginExecution.FailureMessage
-                )
-                    ? "SuiteCadAuthoring did not return a result payload."
-                    : pluginExecution.FailureMessage;
-            }
-
-            if (activationFailed)
-            {
-                return BuildSuiteAcadeProjectOpenFailure(
-                    code: activationFailureCode,
-                    message: activationFailureMessage,
-                    request: request,
-                    warnings: warnings,
-                    acadeLaunched: session.AcadeLaunched,
-                    projectActivated: false,
-                    commandCompleted: commandCompleted,
-                    aepxObserved: false,
-                    lastProjObserved: false,
-                    temporaryDocumentCreated: session.TemporaryDocumentCreated,
-                    meta: bridgeOpenMeta
-                );
-            }
-        }
-
-        BridgeLog.Info(
-            $"suite_acade_project_open verify-open-project start (request_id={request.RequestId}, wdp_path={request.WdpPath})."
-        );
-
+        var activeProjectObserved = false;
+        var activeProjectPath = "";
+        var activationFailed = false;
+        var activationFailureCode = "";
+        var activationFailureMessage = "";
         var verificationContext = new SuiteAcadeProjectOpenVerificationContext
         {
             RequestId = request.RequestId,
@@ -356,18 +356,356 @@ static partial class ConduitRouteStubHandlers
             PreviousAepxExists = preOpenObservation.AepxExists,
             PreviousAepxLastWriteUtc = preOpenObservation.AepxLastWriteUtc,
             PreviousLastProjObserved = preOpenObservation.LastProjObserved,
+            PreviousLastProjLastWriteUtc = preOpenObservation.LastProjLastWriteUtc,
             Timeout = TimeSpan.FromSeconds(15),
         };
-        var verification = SuiteAcadeProjectOpenVerifyHook is not null
-            ? SuiteAcadeProjectOpenVerifyHook(verificationContext, warnings)
-            : VerifySuiteAcadeProjectOpen(verificationContext, warnings);
-        if (!projectActivated && (verification.AepxObserved || verification.LastProjObserved))
+        var verification = new SuiteAcadeProjectOpenVerificationResult(
+            AepxObserved: false,
+            LastProjObserved: false
+        );
+        var pluginExecution = SuiteAcadeProjectOpenPluginHook is not null
+            ? SuiteAcadeProjectOpenPluginHook(
+                new SuiteAcadeProjectOpenPluginInvocation
+                {
+                    RequestId = request.RequestId,
+                    ProjectRootPath = request.ProjectRootPath,
+                    WdpPath = request.WdpPath,
+                    UiMode = request.UiMode,
+                },
+                session,
+                warnings
+            )
+            : ExecuteSuiteAcadeProjectOpenPlugin(payload, request, session, warnings);
+        commandCompleted = pluginExecution.CommandCompleted;
+        var bridgeOpenMeta = BuildSuiteAcadeProjectOpenMeta(
+            stage: "bridge-open-project",
+            session: session,
+            pluginExecution: pluginExecution,
+            requestId: request.RequestId
+        );
+        MergeSuiteJsonObject(bridgeOpenMeta, connectResult.Meta, overwrite: false);
+        bridgeOpenMeta["pluginAttempted"] = true;
+
+        var pluginResult = pluginExecution.PluginResult;
+        if (pluginResult is not null)
+        {
+            warnings.AddRange(ReadJsonStringArray(pluginResult["warnings"] as JsonArray));
+            var pluginMeta = CloneJsonObject(pluginResult["meta"] as JsonObject);
+            var pluginData = pluginResult["data"] as JsonObject ?? new JsonObject();
+            MergeSuiteJsonObject(bridgeOpenMeta, pluginMeta, overwrite: false);
+
+            var pluginStrategy = ReadStringValue(pluginMeta, "strategy", "");
+            if (string.IsNullOrWhiteSpace(pluginStrategy))
+            {
+                pluginStrategy = ReadStringValue(pluginData, "strategy", "");
+            }
+            if (!string.IsNullOrWhiteSpace(pluginStrategy))
+            {
+                bridgeOpenMeta["strategy"] = pluginStrategy;
+            }
+
+            var pluginSwitchAttempted = ReadBool(pluginMeta, "switchAttempted", false);
+            if (!pluginSwitchAttempted)
+            {
+                pluginSwitchAttempted = ReadBool(pluginData, "switchAttempted", false);
+            }
+            bridgeOpenMeta["switchAttempted"] = pluginSwitchAttempted;
+
+            var pluginActiveProjectPath = ReadStringValue(pluginMeta, "activeProjectPath", "");
+            if (string.IsNullOrWhiteSpace(pluginActiveProjectPath))
+            {
+                pluginActiveProjectPath = ReadStringValue(pluginData, "activeProjectPath", "");
+            }
+            if (!string.IsNullOrWhiteSpace(pluginActiveProjectPath))
+            {
+                activeProjectPath = pluginActiveProjectPath;
+                bridgeOpenMeta["activeProjectPath"] = pluginActiveProjectPath;
+            }
+
+            activeProjectObserved = LooksLikeSameSuiteAcadeProjectPath(
+                pluginActiveProjectPath,
+                request.WdpPath
+            );
+            var pluginSuccess = pluginResult["success"]?.GetValue<bool>() ?? false;
+            projectActivated =
+                ReadBool(pluginData, "projectActivated", pluginSuccess)
+                || activeProjectObserved;
+            activationFailed = !pluginSuccess;
+            activationFailureCode = pluginSuccess
+                ? ""
+                : ReadStringValue(pluginResult, "code", "ACADE_PROJECT_OPEN_FAILED");
+            activationFailureMessage = pluginSuccess
+                ? ""
+                : ReadStringValue(pluginResult, "message", "ACADE project open failed.");
+        }
+        else
+        {
+            activationFailed = true;
+            activationFailureCode = string.IsNullOrWhiteSpace(pluginExecution.FailureCode)
+                ? "PLUGIN_RESULT_MISSING"
+                : pluginExecution.FailureCode;
+            activationFailureMessage = string.IsNullOrWhiteSpace(pluginExecution.FailureMessage)
+                ? "SuiteCadAuthoring did not return a result payload."
+                : pluginExecution.FailureMessage;
+        }
+
+        if (!activationFailed)
+        {
+            BridgeLog.Info(
+                $"suite_acade_project_open verify-open-project start (request_id={request.RequestId}, wdp_path={request.WdpPath}, pass=primary)."
+            );
+
+            verification = SuiteAcadeProjectOpenVerifyHook is not null
+                ? SuiteAcadeProjectOpenVerifyHook(verificationContext, warnings)
+                : VerifySuiteAcadeProjectOpen(verificationContext, warnings);
+            if (verification.AepxObserved || verification.LastProjObserved || verification.ActiveProjectObserved)
+            {
+                projectActivated = true;
+                activeProjectObserved = activeProjectObserved || verification.ActiveProjectObserved;
+                if (!string.IsNullOrWhiteSpace(verification.ActiveProjectPath))
+                {
+                    activeProjectPath = verification.ActiveProjectPath;
+                }
+            }
+        }
+
+        var commandExecution = new SuiteAcadeProjectOpenCommandExecutionResult();
+        if (activationFailed || !projectActivated)
+        {
+            warnings.Add(
+                activationFailed
+                    ? $"SuiteCadAuthoring project open failed ({activationFailureCode}); trying the built-in ACADE command fallback."
+                    : "SuiteCadAuthoring completed without a verified project switch; trying the built-in ACADE command fallback."
+            );
+            bridgeOpenMeta["fallbackAttempted"] = true;
+            bridgeOpenMeta["fallbackProviderPath"] = "dotnet+command";
+
+            var fallbackVerified = false;
+            if (SuiteAcadeProjectOpenBuiltInCommandHook is not null)
+            {
+                commandExecution = SuiteAcadeProjectOpenBuiltInCommandHook(request, session, warnings);
+            }
+            else
+            {
+                TryWarmSuiteAcadeProjectFunctions(session, warnings);
+                var fallbackOpenResult = ExecuteSuiteAcadeProjectOpenCommandCandidates(
+                    request,
+                    session,
+                    verificationContext,
+                    warnings,
+                    BuildSuiteAcadeProjectOpenCommandCandidates(request.WdpPath)
+                );
+                commandExecution = fallbackOpenResult.CommandExecution;
+                verification = fallbackOpenResult.Verification;
+                fallbackVerified = fallbackOpenResult.ProjectActivated;
+            }
+
+            commandCompleted = commandCompleted || commandExecution.CommandCompleted;
+            bridgeOpenMeta["fallbackCommandCompleted"] = commandExecution.CommandCompleted;
+            bridgeOpenMeta["fallbackCommandStateAvailable"] = commandExecution.CommandStateAvailable;
+            bridgeOpenMeta["fallbackSawActiveCommand"] = commandExecution.SawActiveCommand;
+            bridgeOpenMeta["fallbackLastCommandMask"] = commandExecution.LastCommandMask;
+            if (!string.IsNullOrWhiteSpace(commandExecution.Strategy))
+            {
+                bridgeOpenMeta["fallbackStrategy"] = commandExecution.Strategy;
+            }
+
+            activationFailed = !string.IsNullOrWhiteSpace(commandExecution.FailureCode);
+            activationFailureCode = (commandExecution.FailureCode ?? "").Trim();
+            activationFailureMessage = (commandExecution.FailureMessage ?? "").Trim();
+            if (!activationFailed)
+            {
+                if (!fallbackVerified)
+                {
+                    BridgeLog.Info(
+                        $"suite_acade_project_open verify-open-project start (request_id={request.RequestId}, wdp_path={request.WdpPath}, pass=fallback-primary)."
+                    );
+
+                    verification = SuiteAcadeProjectOpenVerifyHook is not null
+                        ? SuiteAcadeProjectOpenVerifyHook(verificationContext, warnings)
+                        : VerifySuiteAcadeProjectOpen(verificationContext, warnings);
+                    fallbackVerified =
+                        verification.AepxObserved
+                        || verification.LastProjObserved
+                        || verification.ActiveProjectObserved;
+                }
+
+                if (fallbackVerified)
+                {
+                    projectActivated = true;
+                    activeProjectObserved = activeProjectObserved || verification.ActiveProjectObserved;
+                    if (!string.IsNullOrWhiteSpace(verification.ActiveProjectPath))
+                    {
+                        activeProjectPath = verification.ActiveProjectPath;
+                    }
+                }
+            }
+
+            if (!activationFailed && !projectActivated)
+            {
+                BridgeLog.Info(
+                    $"suite_acade_project_open switch-retry start (request_id={request.RequestId}, wdp_path={request.WdpPath})."
+                );
+                bridgeOpenMeta["switchRetryAttempted"] = true;
+
+                var switchRetryWarningsBefore = warnings.Count;
+                var switchRetryCloseExecution = TryPrepareSuiteAcadeProjectSwitchRetry(session, warnings);
+                commandCompleted = commandCompleted || switchRetryCloseExecution.CommandCompleted;
+                bridgeOpenMeta["switchRetryCloseStrategy"] = switchRetryCloseExecution.Strategy;
+                bridgeOpenMeta["switchRetryCloseCommandCompleted"] = switchRetryCloseExecution.CommandCompleted;
+                bridgeOpenMeta["switchRetryCloseCommandStateAvailable"] =
+                    switchRetryCloseExecution.CommandStateAvailable;
+                bridgeOpenMeta["switchRetryCloseSawActiveCommand"] = switchRetryCloseExecution.SawActiveCommand;
+                bridgeOpenMeta["switchRetryCloseLastCommandMask"] = switchRetryCloseExecution.LastCommandMask;
+
+                if (!string.IsNullOrWhiteSpace(switchRetryCloseExecution.FailureCode))
+                {
+                    bridgeOpenMeta["switchRetryCloseFailureCode"] = switchRetryCloseExecution.FailureCode;
+                    bridgeOpenMeta["switchRetryCloseFailureMessage"] =
+                        switchRetryCloseExecution.FailureMessage;
+                    warnings.Add(
+                        $"Close-and-reopen switch retry could not close the current active ACADE project: {switchRetryCloseExecution.FailureMessage}"
+                    );
+                }
+                else
+                {
+                    var switchRetryOpenExecution = new SuiteAcadeProjectOpenCommandExecutionResult();
+                    var switchRetryVerified = false;
+                    if (SuiteAcadeProjectOpenBuiltInCommandHook is not null)
+                    {
+                        switchRetryOpenExecution = SuiteAcadeProjectOpenBuiltInCommandHook(
+                            request,
+                            session,
+                            warnings
+                        );
+                    }
+                    else
+                    {
+                        var switchRetryResult = ExecuteSuiteAcadeProjectSwitchRetryOpen(
+                            request,
+                            session,
+                            verificationContext,
+                            warnings
+                        );
+                        switchRetryOpenExecution = switchRetryResult.CommandExecution;
+                        verification = switchRetryResult.Verification;
+                        switchRetryVerified = switchRetryResult.ProjectActivated;
+                    }
+                    commandExecution = switchRetryOpenExecution;
+                    commandCompleted = commandCompleted || switchRetryOpenExecution.CommandCompleted;
+                    bridgeOpenMeta["switchRetryOpenStrategy"] = switchRetryOpenExecution.Strategy;
+                    bridgeOpenMeta["switchRetryOpenCommandCompleted"] = switchRetryOpenExecution.CommandCompleted;
+                    bridgeOpenMeta["switchRetryOpenCommandStateAvailable"] =
+                        switchRetryOpenExecution.CommandStateAvailable;
+                    bridgeOpenMeta["switchRetryOpenSawActiveCommand"] = switchRetryOpenExecution.SawActiveCommand;
+                    bridgeOpenMeta["switchRetryOpenLastCommandMask"] = switchRetryOpenExecution.LastCommandMask;
+
+                    if (!string.IsNullOrWhiteSpace(switchRetryOpenExecution.FailureCode))
+                    {
+                        bridgeOpenMeta["switchRetryOpenFailureCode"] =
+                            switchRetryOpenExecution.FailureCode;
+                        bridgeOpenMeta["switchRetryOpenFailureMessage"] =
+                            switchRetryOpenExecution.FailureMessage;
+                        warnings.Add(
+                            $"Close-and-reopen switch retry failed to open the requested ACADE project: {switchRetryOpenExecution.FailureMessage}"
+                        );
+                    }
+                    else
+                    {
+                        if (!switchRetryVerified)
+                        {
+                            BridgeLog.Info(
+                                $"suite_acade_project_open verify-open-project start (request_id={request.RequestId}, wdp_path={request.WdpPath}, pass=switch-retry)."
+                            );
+
+                            verification = SuiteAcadeProjectOpenVerifyHook is not null
+                                ? SuiteAcadeProjectOpenVerifyHook(verificationContext, warnings)
+                                : VerifySuiteAcadeProjectOpen(verificationContext, warnings);
+                            switchRetryVerified =
+                                verification.AepxObserved
+                                || verification.LastProjObserved
+                                || verification.ActiveProjectObserved;
+                        }
+
+                        if (switchRetryVerified)
+                        {
+                            projectActivated = true;
+                            activeProjectObserved =
+                                activeProjectObserved || verification.ActiveProjectObserved;
+                            if (!string.IsNullOrWhiteSpace(verification.ActiveProjectPath))
+                            {
+                                activeProjectPath = verification.ActiveProjectPath;
+                            }
+                            bridgeOpenMeta["switchRetrySucceeded"] = true;
+                        }
+                    }
+                }
+
+                if (!projectActivated && warnings.Count == switchRetryWarningsBefore)
+                {
+                    warnings.Add(
+                        "Close-and-reopen switch retry did not produce a verified ACADE project switch."
+                    );
+                }
+            }
+
+            if (projectActivated)
+            {
+                activationFailed = false;
+                activationFailureCode = "";
+                activationFailureMessage = "";
+                bridgeOpenMeta["providerPath"] = "dotnet+command";
+                if (!string.IsNullOrWhiteSpace(commandExecution.Strategy))
+                {
+                    bridgeOpenMeta["strategy"] = commandExecution.Strategy;
+                }
+            }
+        }
+
+        if (activationFailed)
+        {
+            return BuildSuiteAcadeProjectOpenFailure(
+                code: activationFailureCode,
+                message: activationFailureMessage,
+                request: request,
+                warnings: warnings,
+                acadeLaunched: session.AcadeLaunched,
+                projectActivated: false,
+                commandCompleted: commandCompleted,
+                aepxObserved: false,
+                lastProjObserved: false,
+                activeProjectObserved: activeProjectObserved,
+                activeProjectPath: activeProjectPath,
+                temporaryDocumentCreated: session.TemporaryDocumentCreated,
+                temporaryDocumentClosed: session.TemporaryDocumentClosed,
+                meta: bridgeOpenMeta
+            );
+        }
+
+        activeProjectObserved = activeProjectObserved || verification.ActiveProjectObserved;
+        if (!string.IsNullOrWhiteSpace(verification.ActiveProjectPath))
+        {
+            activeProjectPath = verification.ActiveProjectPath;
+        }
+        if (!projectActivated && (verification.AepxObserved || verification.LastProjObserved || activeProjectObserved))
         {
             projectActivated = true;
         }
+        if (!string.IsNullOrWhiteSpace(activeProjectPath))
+        {
+            bridgeOpenMeta["activeProjectPath"] = activeProjectPath;
+        }
+        bridgeOpenMeta["activeProjectObserved"] = activeProjectObserved;
         bridgeOpenMeta["source"] = "dotnet";
         bridgeOpenMeta["action"] = "suite_acade_project_open";
         bridgeOpenMeta["stage"] = "verify-open-project";
+
+        if (projectActivated)
+        {
+            TryCloseSuiteAcadeTemporaryDocumentIfSafe(session, warnings);
+            _ = TryBringSuiteAcadeWindowToForeground(session);
+        }
+        bridgeOpenMeta["temporaryDocumentClosed"] = session.TemporaryDocumentClosed;
 
         var resultData = BuildSuiteAcadeProjectOpenData(
             request: request,
@@ -376,9 +714,12 @@ static partial class ConduitRouteStubHandlers
             commandCompleted: commandCompleted,
             aepxObserved: verification.AepxObserved,
             lastProjObserved: verification.LastProjObserved,
-            temporaryDocumentCreated: session.TemporaryDocumentCreated
+            activeProjectObserved: activeProjectObserved,
+            activeProjectPath: activeProjectPath,
+            temporaryDocumentCreated: session.TemporaryDocumentCreated,
+            temporaryDocumentClosed: session.TemporaryDocumentClosed
         );
-        if (!projectActivated || !(verification.AepxObserved || verification.LastProjObserved))
+        if (!projectActivated || !(verification.AepxObserved || verification.LastProjObserved || activeProjectObserved))
         {
             warnings.Add("ACADE did not produce a verified project-open side effect.");
             return new JsonObject
@@ -470,159 +811,1195 @@ static partial class ConduitRouteStubHandlers
         };
     }
 
-    private static (
-        SuiteAcadeProjectOpenSession? Session,
-        string FailureCode,
-        string FailureMessage
-    ) AcquireSuiteAcadeProjectOpenSession(
+    private static SuiteAcadeProjectOpenConnectResult AcquireSuiteAcadeProjectOpenSession(
         SuiteAcadeProjectOpenRequest request,
         List<string> warnings
     )
     {
         if (!OperatingSystem.IsWindows())
         {
-            return (
-                null,
-                "AUTOCAD_NOT_AVAILABLE",
-                "AutoCAD project activation is only available on Windows."
+            return new SuiteAcadeProjectOpenConnectResult
+            {
+                FailureCode = "AUTOCAD_NOT_AVAILABLE",
+                FailureMessage = "AutoCAD project activation is only available on Windows.",
+            };
+        }
+
+        var expectedProfileName = ResolveSuiteAcadeProfileName(out var profileSource);
+        var runningCandidates = EnumerateSuiteAcadeRunningSessionCandidates(
+            expectedProfileName,
+            warnings
+        );
+        var selectedRunningCandidate = TakeBestSuiteAcadeRunningSessionCandidate(
+            runningCandidates,
+            request,
+            expectedProfileName,
+            out var hasElectricalNotReadySession,
+            out var hasVanillaSession
+        );
+
+        if (selectedRunningCandidate is not null)
+        {
+            var reusedResult = CreateSuiteAcadeProjectOpenConnectResultFromCandidate(
+                request,
+                selectedRunningCandidate,
+                acadeLaunched: false,
+                profileSource: "application",
+                warnings: warnings,
+                connectMeta: new JsonObject
+                {
+                    ["expectedProfileName"] = expectedProfileName,
+                    ["profileSource"] = profileSource,
+                    ["sessionMode"] = "reused-electrical",
+                }
+            );
+            if (
+                reusedResult.Session is not null
+                || !request.LaunchIfNeeded
+                || !string.Equals(
+                    reusedResult.FailureCode,
+                    "AUTOCAD_ELECTRICAL_NOT_READY",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return reusedResult;
+            }
+
+            warnings.Add(
+                "The running AutoCAD Electrical session did not provide a usable drawing context; launching a dedicated ACADe session instead."
             );
         }
 
-        object? application = null;
-        var executablePath = "";
-        var acadeLaunched = false;
-        if (!TryFindRunningAutoCadApplication(out application, out _))
+        if (!request.LaunchIfNeeded)
         {
-            if (!request.LaunchIfNeeded)
+            return new SuiteAcadeProjectOpenConnectResult
             {
-                return (
-                    null,
-                    "AUTOCAD_NOT_AVAILABLE",
-                    "AutoCAD is not running and launchIfNeeded was false."
-                );
+                FailureCode = hasElectricalNotReadySession
+                    ? "AUTOCAD_ELECTRICAL_NOT_READY"
+                    : "AUTOCAD_ELECTRICAL_NOT_AVAILABLE",
+                FailureMessage = hasElectricalNotReadySession
+                    ? $"AutoCAD Electrical is running, but the '{expectedProfileName}' profile is not ready for project activation."
+                    : $"AutoCAD Electrical is not running under the '{expectedProfileName}' profile.",
+                Meta = new JsonObject
+                {
+                    ["expectedProfileName"] = expectedProfileName,
+                    ["profileSource"] = profileSource,
+                    ["sessionMode"] = "reused-electrical",
+                    ["sessionClassification"] = hasElectricalNotReadySession
+                        ? "electrical-not-ready"
+                        : hasVanillaSession
+                            ? "vanilla"
+                            : "missing",
+                },
+            };
+        }
+
+        var executablePath = ResolveSuiteAcadeExecutablePath();
+        var launchTemplatePath = ResolveSuiteAcadeLaunchTemplatePath();
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            return new SuiteAcadeProjectOpenConnectResult
+            {
+                FailureCode = "AUTOCAD_LAUNCH_FAILED",
+                FailureMessage = "Unable to locate acad.exe for AutoCAD Electrical.",
+                Meta = new JsonObject
+                {
+                    ["expectedProfileName"] = expectedProfileName,
+                    ["profileSource"] = profileSource,
+                    ["sessionMode"] = "launched-dedicated-electrical",
+                    ["templatePath"] = string.IsNullOrWhiteSpace(launchTemplatePath)
+                        ? null
+                        : launchTemplatePath,
+                },
+            };
+        }
+
+        var preLaunchAcadProcessIds = CaptureSuiteAcadProcessIds();
+        Process? launchedProcess = null;
+        try
+        {
+            launchedProcess = Process.Start(
+                new ProcessStartInfo
+                {
+                    FileName = executablePath,
+                    Arguments = BuildSuiteAcadeLaunchArguments(
+                        expectedProfileName,
+                        launchTemplatePath
+                    ),
+                    UseShellExecute = true,
+                    WorkingDirectory = Path.GetDirectoryName(executablePath) ?? "",
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            return new SuiteAcadeProjectOpenConnectResult
+            {
+                FailureCode = "AUTOCAD_LAUNCH_FAILED",
+                FailureMessage =
+                    $"Failed to launch AutoCAD from '{executablePath}': {DescribeException(ex)}",
+                Meta = new JsonObject
+                {
+                    ["expectedProfileName"] = expectedProfileName,
+                    ["profileSource"] = profileSource,
+                    ["sessionMode"] = "launched-dedicated-electrical",
+                    ["executablePath"] = executablePath,
+                    ["templatePath"] = string.IsNullOrWhiteSpace(launchTemplatePath)
+                        ? null
+                        : launchTemplatePath,
+                },
+            };
+        }
+
+        if (launchedProcess is null)
+        {
+            return new SuiteAcadeProjectOpenConnectResult
+            {
+                FailureCode = "AUTOCAD_LAUNCH_FAILED",
+                FailureMessage = $"Failed to start AutoCAD from '{executablePath}'.",
+                Meta = new JsonObject
+                {
+                    ["expectedProfileName"] = expectedProfileName,
+                    ["profileSource"] = profileSource,
+                    ["sessionMode"] = "launched-dedicated-electrical",
+                    ["executablePath"] = executablePath,
+                    ["templatePath"] = string.IsNullOrWhiteSpace(launchTemplatePath)
+                        ? null
+                        : launchTemplatePath,
+                },
+            };
+        }
+
+        var launchedProcessId = launchedProcess.Id;
+        var launchMeta = new JsonObject
+        {
+            ["expectedProfileName"] = expectedProfileName,
+            ["profileSource"] = profileSource,
+            ["sessionMode"] = "launched-dedicated-electrical",
+            ["executablePath"] = executablePath,
+            ["templatePath"] = string.IsNullOrWhiteSpace(launchTemplatePath)
+                ? null
+                : launchTemplatePath,
+            ["launchedProcessId"] = launchedProcessId,
+        };
+        var launchedCandidate = WaitForSuiteAcadeLaunchedSessionCandidate(
+            request,
+            expectedProfileName,
+            preLaunchAcadProcessIds,
+            launchedProcessId,
+            warnings,
+            launchMeta,
+            out var launchTimeoutStage
+        );
+
+        if (launchedCandidate is null)
+        {
+            launchMeta["launchTimeoutStage"] = launchTimeoutStage;
+            return new SuiteAcadeProjectOpenConnectResult
+            {
+                FailureCode = "AUTOCAD_LAUNCH_TIMEOUT",
+                FailureMessage =
+                    $"Timed out waiting for AutoCAD Electrical to become ready after launching '{executablePath}'.",
+                Meta = launchMeta,
+            };
+        }
+
+        return CreateSuiteAcadeProjectOpenConnectResultFromCandidate(
+            request,
+            launchedCandidate,
+            acadeLaunched: true,
+            profileSource: profileSource,
+            warnings: warnings,
+            connectMeta: launchMeta
+        );
+    }
+
+    private static SuiteAcadeProjectOpenConnectResult CreateSuiteAcadeProjectOpenConnectResultFromCandidate(
+        SuiteAcadeProjectOpenRequest request,
+        SuiteAcadeRunningSessionCandidate candidate,
+        bool acadeLaunched,
+        string profileSource,
+        List<string> warnings,
+        JsonObject connectMeta
+    )
+    {
+        using (candidate)
+        {
+            connectMeta["electricalRuntimeDetected"] = candidate.Snapshot.ElectricalRuntimeDetected;
+            var application = candidate.DetachApplication();
+            if (application is null)
+            {
+                return new SuiteAcadeProjectOpenConnectResult
+                {
+                    FailureCode = "AUTOCAD_ELECTRICAL_NOT_AVAILABLE",
+                    FailureMessage =
+                        "Suite selected an AutoCAD Electrical session, but the COM application was unavailable.",
+                    Meta = connectMeta,
+                };
             }
 
-            executablePath = ResolveSuiteAcadeExecutablePath();
-            if (string.IsNullOrWhiteSpace(executablePath))
+            try
             {
-                return (
-                    null,
-                    "AUTOCAD_LAUNCH_FAILED",
-                    "Unable to locate acad.exe for AutoCAD Electrical."
+                ReadWithTransientComRetry(
+                    () =>
+                    {
+                        ((dynamic)application).Visible = true;
+                        return true;
+                    },
+                    "Application.Visible=true"
+                );
+            }
+            catch (Exception ex)
+            {
+                warnings.Add(
+                    $"AutoCAD launched, but Suite could not force the UI visible: {DescribeException(ex)}"
                 );
             }
 
             try
             {
-                var process = Process.Start(
-                    new ProcessStartInfo
-                    {
-                        FileName = executablePath,
-                        UseShellExecute = true,
-                        WorkingDirectory = Path.GetDirectoryName(executablePath) ?? "",
-                    }
+                var documentContextTimeout = acadeLaunched
+                    ? TimeSpan.FromSeconds(90)
+                    : TimeSpan.FromSeconds(20);
+                var documentContext = WaitForSuiteAcadeDocumentContext(
+                    application,
+                    documentContextTimeout,
+                    warnings
                 );
-                if (process is null)
+                if (
+                    documentContext is null
+                    && TryReconnectSuiteAcadeDocumentContextViaRot(
+                        candidate.Snapshot,
+                        ref application,
+                        documentContextTimeout,
+                        warnings,
+                        out var reconnectedDocumentContext
+                    )
+                )
                 {
-                    return (
-                        null,
-                        "AUTOCAD_LAUNCH_FAILED",
-                        $"Failed to start AutoCAD from '{executablePath}'."
-                    );
+                    documentContext = reconnectedDocumentContext;
                 }
+                if (documentContext is null)
+                {
+                    ReleaseSuiteComObjectSafely(application);
+                    return new SuiteAcadeProjectOpenConnectResult
+                    {
+                        FailureCode = "AUTOCAD_ELECTRICAL_NOT_READY",
+                        FailureMessage =
+                            "AutoCAD Electrical did not provide a document context for project activation.",
+                        Meta = connectMeta,
+                    };
+                }
+
+                var modelspace = ReadProperty(documentContext.Value.Document, "ModelSpace");
+                return new SuiteAcadeProjectOpenConnectResult
+                {
+                    Session = new SuiteAcadeProjectOpenSession(
+                        application: application,
+                        document: documentContext.Value.Document,
+                        modelspace: modelspace,
+                        acadeLaunched: acadeLaunched,
+                        temporaryDocumentCreated: documentContext.Value.TemporaryDocumentCreated,
+                        executablePath: candidate.Snapshot.ExecutablePath,
+                        activeProfile: candidate.Snapshot.ActiveProfile,
+                        profileSource: profileSource,
+                        sessionClassification: candidate.Snapshot.SessionClassification,
+                        sessionMode: acadeLaunched
+                            ? "launched-dedicated-electrical"
+                            : "reused-electrical",
+                        processId: candidate.Snapshot.ProcessId,
+                        windowHandle: new IntPtr(candidate.Snapshot.WindowHandle)
+                    ),
+                    Meta = connectMeta,
+                };
             }
             catch (Exception ex)
             {
-                return (
-                    null,
-                    "AUTOCAD_LAUNCH_FAILED",
-                    $"Failed to launch AutoCAD from '{executablePath}': {DescribeException(ex)}"
-                );
+                ReleaseSuiteComObjectSafely(application);
+                return new SuiteAcadeProjectOpenConnectResult
+                {
+                    FailureCode = "AUTOCAD_ELECTRICAL_NOT_READY",
+                    FailureMessage =
+                        $"Failed to establish an AutoCAD document context: {DescribeException(ex)}",
+                    Meta = connectMeta,
+                };
+            }
+        }
+    }
+
+    private static bool TryReconnectSuiteAcadeDocumentContextViaRot(
+        SuiteAcadeRunningSessionCandidateSnapshot snapshot,
+        ref object application,
+        TimeSpan timeout,
+        List<string> warnings,
+        out SuiteAcadeDocumentContext? documentContext
+    )
+    {
+        documentContext = null;
+        if (snapshot.WindowHandle <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var windowHandle = new IntPtr(snapshot.WindowHandle);
+            ShowWindowAsync(windowHandle, SuiteShowWindowRestore);
+            SetForegroundWindow(windowHandle);
+            Thread.Sleep(750);
+        }
+        catch
+        {
+            // Best effort only.
+        }
+
+        var candidates = EnumerateSuiteAcadeRunningSessionCandidates(snapshot.ActiveProfile, warnings);
+        SuiteAcadeRunningSessionCandidate? matchedCandidate = null;
+        foreach (var candidate in candidates)
+        {
+            if (
+                matchedCandidate is null
+                && IsSameSuiteAcadeRunningSessionCandidateSnapshot(candidate.Snapshot, snapshot)
+            )
+            {
+                matchedCandidate = candidate;
+                continue;
             }
 
-            acadeLaunched = true;
-            var launchStopwatch = Stopwatch.StartNew();
-            while (launchStopwatch.Elapsed < TimeSpan.FromSeconds(120))
+            candidate.Dispose();
+        }
+
+        if (matchedCandidate is not null)
+        {
+            var activeApplication = matchedCandidate.DetachApplication();
+            matchedCandidate.Dispose();
+            if (activeApplication is not null)
             {
-                if (TryFindRunningAutoCadApplication(out application, out _))
+                try
                 {
-                    break;
+                    var activeProfile = ReadSuiteAcadeActiveProfile(activeApplication);
+                    if (IsSuiteAcadeProfileMatch(activeProfile, snapshot.ActiveProfile))
+                    {
+                        var reconnectedDocumentContext = WaitForSuiteAcadeDocumentContext(
+                            activeApplication,
+                            timeout,
+                            warnings
+                        );
+                        if (reconnectedDocumentContext is not null)
+                        {
+                            ReleaseSuiteComObjectSafely(application);
+                            application = activeApplication;
+                            documentContext = reconnectedDocumentContext;
+                            return true;
+                        }
+                    }
                 }
-                Thread.Sleep(1000);
-            }
-
-            if (application is null)
-            {
-                return (
-                    null,
-                    "AUTOCAD_LAUNCH_TIMEOUT",
-                    $"Timed out waiting for AutoCAD to become ready after launching '{executablePath}'."
-                );
-            }
-        }
-
-        if (application is null)
-        {
-            return (
-                null,
-                "AUTOCAD_NOT_AVAILABLE",
-                "Unable to connect to a running AutoCAD COM instance."
-            );
-        }
-
-        try
-        {
-            ReadWithTransientComRetry(
-                () =>
+                catch
                 {
-                    ((dynamic)application).Visible = true;
-                    return true;
-                },
-                "Application.Visible=true"
-            );
+                    // Fall through to verified active-object recovery.
+                }
+
+                ReleaseSuiteComObjectSafely(activeApplication);
+            }
         }
-        catch (Exception ex)
+
+        if (
+            !TryReconnectSuiteAcadeDocumentContextViaVerifiedActiveObject(
+                snapshot,
+                timeout,
+                warnings,
+                out var verifiedApplication,
+                out var verifiedDocumentContext
+            )
+        )
         {
-            warnings.Add($"AutoCAD launched, but Suite could not force the UI visible: {DescribeException(ex)}");
+            return false;
+        }
+
+        ReleaseSuiteComObjectSafely(application);
+        application = verifiedApplication!;
+        documentContext = verifiedDocumentContext;
+        return true;
+    }
+
+    private static bool IsSameSuiteAcadeRunningSessionCandidateSnapshot(
+        SuiteAcadeRunningSessionCandidateSnapshot left,
+        SuiteAcadeRunningSessionCandidateSnapshot right
+    )
+    {
+        if (left.ProcessId > 0 && right.ProcessId > 0)
+        {
+            return left.ProcessId == right.ProcessId;
+        }
+
+        if (left.WindowHandle > 0 && right.WindowHandle > 0)
+        {
+            return left.WindowHandle == right.WindowHandle;
+        }
+
+        return string.Equals(
+            (left.RotDisplayName ?? "").Trim(),
+            (right.RotDisplayName ?? "").Trim(),
+            StringComparison.OrdinalIgnoreCase
+        );
+    }
+
+    private static bool TryReconnectSuiteAcadeDocumentContextViaVerifiedActiveObject(
+        SuiteAcadeRunningSessionCandidateSnapshot snapshot,
+        TimeSpan timeout,
+        List<string> warnings,
+        out object? application,
+        out SuiteAcadeDocumentContext? documentContext
+    )
+    {
+        application = null;
+        documentContext = null;
+        if (!TryFindRunningAutoCadApplication(out var activeApplication, out _))
+        {
+            return false;
+        }
+
+        if (activeApplication is null)
+        {
+            return false;
         }
 
         try
         {
-            var documentContext = WaitForSuiteAcadeDocumentContext(
-                application,
-                acadeLaunched ? TimeSpan.FromSeconds(45) : TimeSpan.FromSeconds(15),
+            if (!IsSameSuiteAcadeApplicationIdentity(activeApplication, snapshot))
+            {
+                return false;
+            }
+
+            var activeProfile = ReadSuiteAcadeActiveProfile(activeApplication);
+            if (!IsSuiteAcadeProfileMatch(activeProfile, snapshot.ActiveProfile))
+            {
+                return false;
+            }
+
+            var reconnectedDocumentContext = WaitForSuiteAcadeDocumentContext(
+                activeApplication,
+                timeout,
                 warnings
             );
-            if (documentContext is null)
+            if (reconnectedDocumentContext is null)
             {
-                return (
-                    null,
-                    "AUTOCAD_NOT_AVAILABLE",
-                    "AutoCAD did not provide a document context for project activation."
-                );
+                return false;
             }
 
-            var modelspace = ReadProperty(documentContext.Value.Document, "ModelSpace");
-            return (
-                new SuiteAcadeProjectOpenSession(
-                    application: application,
-                    document: documentContext.Value.Document,
-                    modelspace: modelspace,
-                    acadeLaunched: acadeLaunched,
-                    temporaryDocumentCreated: documentContext.Value.TemporaryDocumentCreated,
-                    executablePath: executablePath
+            application = activeApplication;
+            documentContext = reconnectedDocumentContext;
+            activeApplication = null;
+            return true;
+        }
+        finally
+        {
+            ReleaseSuiteComObjectSafely(activeApplication);
+        }
+    }
+
+    private static bool IsSameSuiteAcadeApplicationIdentity(
+        object application,
+        SuiteAcadeRunningSessionCandidateSnapshot snapshot
+    )
+    {
+        try
+        {
+            var hwnd = SafeInt(ReadProperty(application, "HWND")) ?? 0;
+            var processId = hwnd > 0 ? TryGetSuiteCadProcessId(new IntPtr(hwnd)) : 0;
+            var candidateSnapshot = new SuiteAcadeRunningSessionCandidateSnapshot(
+                RotDisplayName: "",
+                ExecutablePath: NormalizeSuiteExecutablePath(
+                    Convert.ToString(ReadProperty(application, "FullName")) ?? ""
                 ),
-                "",
-                ""
+                ActiveProfile: ReadSuiteAcadeActiveProfile(application),
+                DocumentManagerAvailable: TrySuiteAcadeHasDocumentsCollection(application),
+                ActiveDocumentPath: ReadSuiteAcadeActiveDocumentPath(application),
+                ProcessId: processId,
+                WindowHandle: hwnd,
+                SessionClassification: "",
+                ElectricalRuntimeDetected: DetectSuiteAcadeRuntime(processId, "")
             );
+            return IsSameSuiteAcadeRunningSessionCandidateSnapshot(candidateSnapshot, snapshot);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static List<SuiteAcadeRunningSessionCandidate> EnumerateSuiteAcadeRunningSessionCandidates(
+        string expectedProfileName,
+        List<string> warnings
+    )
+    {
+        var output = new List<SuiteAcadeRunningSessionCandidate>();
+        if (!OperatingSystem.IsWindows())
+        {
+            return output;
+        }
+
+        IRunningObjectTable? runningObjectTable = null;
+        IEnumMoniker? enumMoniker = null;
+        try
+        {
+            if (GetRunningObjectTable(0, out runningObjectTable) != 0 || runningObjectTable is null)
+            {
+                return output;
+            }
+
+            runningObjectTable.EnumRunning(out enumMoniker);
+            if (enumMoniker is null)
+            {
+                return output;
+            }
+
+            var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var monikers = new IMoniker[1];
+            while (enumMoniker.Next(1, monikers, IntPtr.Zero) == 0)
+            {
+                var moniker = monikers[0];
+                monikers[0] = null!;
+                if (moniker is null)
+                {
+                    continue;
+                }
+
+                IBindCtx? bindContext = null;
+                object? application = null;
+                try
+                {
+                    CreateBindCtx(0, out bindContext);
+                    string rotDisplayName = "";
+                    try
+                    {
+                        moniker.GetDisplayName(bindContext, null, out rotDisplayName);
+                    }
+                    catch
+                    {
+                        rotDisplayName = "";
+                    }
+
+                    runningObjectTable.GetObject(moniker, out application);
+                    if (application is null)
+                    {
+                        continue;
+                    }
+
+                    if (
+                        !TryCreateSuiteAcadeRunningSessionCandidate(
+                            application,
+                            rotDisplayName,
+                            expectedProfileName,
+                            out var candidate
+                        )
+                    )
+                    {
+                        ReleaseSuiteComObjectSafely(application);
+                        application = null;
+                        continue;
+                    }
+
+                    var snapshot = candidate.Snapshot;
+                    var dedupeKey = snapshot.ProcessId > 0
+                        ? $"pid:{snapshot.ProcessId}"
+                        : snapshot.WindowHandle > 0
+                            ? $"hwnd:{snapshot.WindowHandle}"
+                            : $"rot:{snapshot.RotDisplayName}";
+                    if (!seenKeys.Add(dedupeKey))
+                    {
+                        candidate.Dispose();
+                        continue;
+                    }
+
+                    output.Add(candidate);
+                    application = null;
+                }
+                catch (Exception ex)
+                {
+                    if (warnings.Count < 8)
+                    {
+                        warnings.Add(
+                            $"Suite skipped one running AutoCAD COM object while discovering ACADE sessions: {DescribeException(ex)}"
+                        );
+                    }
+                }
+                finally
+                {
+                    ReleaseSuiteComObjectSafely(application);
+                    ReleaseSuiteComObjectSafely(bindContext);
+                    ReleaseSuiteComObjectSafely(moniker);
+                }
+            }
         }
         catch (Exception ex)
         {
-            return (
-                null,
-                "AUTOCAD_NOT_AVAILABLE",
-                $"Failed to establish an AutoCAD document context: {DescribeException(ex)}"
+            warnings.Add(
+                $"Suite could not enumerate running AutoCAD COM sessions from the ROT: {DescribeException(ex)}"
             );
+        }
+        finally
+        {
+            ReleaseSuiteComObjectSafely(enumMoniker);
+            ReleaseSuiteComObjectSafely(runningObjectTable);
+        }
+
+        return output;
+    }
+
+    private static bool TryCreateSuiteAcadeRunningSessionCandidate(
+        object application,
+        string rotDisplayName,
+        string expectedProfileName,
+        out SuiteAcadeRunningSessionCandidate candidate
+    )
+    {
+        candidate = null!;
+        var executablePath = NormalizeSuiteExecutablePath(
+            Convert.ToString(ReadProperty(application, "FullName")) ?? ""
+        );
+        var hwnd = SafeInt(ReadProperty(application, "HWND")) ?? 0;
+        var processId = hwnd > 0 ? TryGetSuiteCadProcessId(new IntPtr(hwnd)) : 0;
+        if (string.IsNullOrWhiteSpace(executablePath) && processId > 0)
+        {
+            executablePath = NormalizeSuiteExecutablePath(TryReadSuiteCadProcessPath(processId));
+        }
+
+        if (!LooksLikeSuiteAutoCadExecutablePath(executablePath))
+        {
+            return false;
+        }
+
+        var activeProfile = ReadSuiteAcadeActiveProfile(application);
+        var activeDocumentPath = ReadSuiteAcadeActiveDocumentPath(application);
+        var documentsAvailable = TrySuiteAcadeHasDocumentsCollection(application);
+        var electricalRuntimeDetected = DetectSuiteAcadeRuntime(processId, executablePath);
+        var sessionClassification = ClassifySuiteAcadeRunningSessionCandidate(
+            activeProfile,
+            documentsAvailable,
+            expectedProfileName
+        );
+        if (
+            string.Equals(
+                sessionClassification,
+                "electrical-ready",
+                StringComparison.OrdinalIgnoreCase
+            )
+            && !electricalRuntimeDetected
+            && !LooksLikeSuiteAcadeInstallPath(executablePath)
+        )
+        {
+            sessionClassification = "electrical-not-ready";
+        }
+
+        var snapshot = new SuiteAcadeRunningSessionCandidateSnapshot(
+            RotDisplayName: rotDisplayName ?? "",
+            ExecutablePath: executablePath,
+            ActiveProfile: activeProfile,
+            DocumentManagerAvailable: documentsAvailable,
+            ActiveDocumentPath: activeDocumentPath,
+            ProcessId: processId,
+            WindowHandle: hwnd,
+            SessionClassification: sessionClassification,
+            ElectricalRuntimeDetected: electricalRuntimeDetected
+        );
+        candidate = new SuiteAcadeRunningSessionCandidate(application, snapshot);
+        return true;
+    }
+
+    internal static string ClassifySuiteAcadeRunningSessionCandidate(
+        string activeProfile,
+        bool documentManagerAvailable,
+        string expectedProfileName
+    )
+    {
+        if (!IsSuiteAcadeProfileMatch(activeProfile, expectedProfileName))
+        {
+            return "vanilla";
+        }
+
+        return documentManagerAvailable ? "electrical-ready" : "electrical-not-ready";
+    }
+
+    internal static SuiteAcadeRunningSessionCandidateSnapshot? SelectBestSuiteAcadeRunningSessionCandidate(
+        IEnumerable<SuiteAcadeRunningSessionCandidateSnapshot> candidates,
+        SuiteAcadeProjectOpenRequest request,
+        string expectedProfileName
+    )
+    {
+        var orderedCandidates = candidates
+            .Where(
+                candidate =>
+                    string.Equals(
+                        candidate.SessionClassification,
+                        "electrical-ready",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                    && IsSuiteAcadeProfileMatch(candidate.ActiveProfile, expectedProfileName)
+            )
+            .OrderBy(candidate => GetSuiteAcadeRunningSessionCandidatePreference(candidate, request))
+            .ThenBy(candidate => candidate.ProcessId > 0 ? candidate.ProcessId : int.MaxValue)
+            .ToList();
+        return orderedCandidates.Count == 0 ? null : orderedCandidates[0];
+    }
+
+    private static SuiteAcadeRunningSessionCandidate? TakeBestSuiteAcadeRunningSessionCandidate(
+        List<SuiteAcadeRunningSessionCandidate> candidates,
+        SuiteAcadeProjectOpenRequest request,
+        string expectedProfileName,
+        out bool hasElectricalNotReadySession,
+        out bool hasVanillaSession
+    )
+    {
+        hasElectricalNotReadySession = candidates.Any(
+            candidate =>
+                string.Equals(
+                    candidate.Snapshot.SessionClassification,
+                    "electrical-not-ready",
+                    StringComparison.OrdinalIgnoreCase
+                )
+        );
+        hasVanillaSession = candidates.Any(
+            candidate =>
+                string.Equals(
+                    candidate.Snapshot.SessionClassification,
+                    "vanilla",
+                    StringComparison.OrdinalIgnoreCase
+                )
+        );
+
+        var selectedSnapshot = SelectBestSuiteAcadeRunningSessionCandidate(
+            candidates.Select(candidate => candidate.Snapshot),
+            request,
+            expectedProfileName
+        );
+        SuiteAcadeRunningSessionCandidate? selectedCandidate = null;
+        foreach (var candidate in candidates)
+        {
+            if (selectedCandidate is null && selectedSnapshot.HasValue && candidate.Snapshot.Equals(selectedSnapshot.Value))
+            {
+                selectedCandidate = candidate;
+                continue;
+            }
+
+            candidate.Dispose();
+        }
+
+        return selectedCandidate;
+    }
+
+    private static SuiteAcadeRunningSessionCandidate? WaitForSuiteAcadeLaunchedSessionCandidate(
+        SuiteAcadeProjectOpenRequest request,
+        string expectedProfileName,
+        HashSet<int> preLaunchAcadProcessIds,
+        int launchedProcessId,
+        List<string> warnings,
+        JsonObject connectMeta,
+        out string launchTimeoutStage
+    )
+    {
+        launchTimeoutStage = "process-start";
+        var deadlineUtc = DateTime.UtcNow.AddSeconds(90);
+        var targetProcessId = launchedProcessId;
+
+        while (DateTime.UtcNow <= deadlineUtc)
+        {
+            if (targetProcessId <= 0)
+            {
+                targetProcessId = FindNewSuiteAcadProcessId(preLaunchAcadProcessIds);
+                if (targetProcessId > 0)
+                {
+                    connectMeta["launchedProcessId"] = targetProcessId;
+                }
+            }
+
+            if (targetProcessId > 0)
+            {
+                launchTimeoutStage = "rot-candidate";
+            }
+
+            var candidates = EnumerateSuiteAcadeRunningSessionCandidates(expectedProfileName, warnings);
+            var targetCandidates = candidates
+                .Where(
+                    candidate =>
+                        candidate.Snapshot.ProcessId == targetProcessId
+                        || (
+                            targetProcessId <= 0
+                            && candidate.Snapshot.ProcessId > 0
+                            && !preLaunchAcadProcessIds.Contains(candidate.Snapshot.ProcessId)
+                        )
+                )
+                .ToList();
+
+            if (targetCandidates.Count > 0)
+            {
+                var selectedCandidate = TakeBestSuiteAcadeRunningSessionCandidate(
+                    targetCandidates,
+                    request,
+                    expectedProfileName,
+                    out _,
+                    out _
+                );
+                foreach (var candidate in candidates.Except(targetCandidates))
+                {
+                    candidate.Dispose();
+                }
+
+                if (selectedCandidate is not null)
+                {
+                    return selectedCandidate;
+                }
+
+                launchTimeoutStage = targetCandidates.Any(
+                    candidate =>
+                        IsSuiteAcadeProfileMatch(
+                            candidate.Snapshot.ActiveProfile,
+                            expectedProfileName
+                        )
+                )
+                    ? "document-context"
+                    : "profile-readiness";
+
+                foreach (var candidate in targetCandidates)
+                {
+                    candidate.Dispose();
+                }
+            }
+            else
+            {
+                foreach (var candidate in candidates)
+                {
+                    candidate.Dispose();
+                }
+            }
+
+            Thread.Sleep(1000);
+        }
+
+        return null;
+    }
+
+    private static HashSet<int> CaptureSuiteAcadProcessIds()
+    {
+        try
+        {
+            return Process
+                .GetProcessesByName("acad")
+                .Select(process => process.Id)
+                .ToHashSet();
+        }
+        catch
+        {
+            return new HashSet<int>();
+        }
+    }
+
+    private static int FindNewSuiteAcadProcessId(HashSet<int> preLaunchAcadProcessIds)
+    {
+        try
+        {
+            return Process
+                .GetProcessesByName("acad")
+                .OrderByDescending(process => process.StartTime)
+                .FirstOrDefault(process => !preLaunchAcadProcessIds.Contains(process.Id))
+                ?.Id ?? 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private static int GetSuiteAcadeRunningSessionCandidatePreference(
+        SuiteAcadeRunningSessionCandidateSnapshot candidate,
+        SuiteAcadeProjectOpenRequest request
+    )
+    {
+        var basePreference = candidate.ElectricalRuntimeDetected ? 0 : 3;
+        if (IsPathWithinRoot(candidate.ActiveDocumentPath, request.ProjectRootPath))
+        {
+            return basePreference;
+        }
+
+        if (string.IsNullOrWhiteSpace(candidate.ActiveDocumentPath))
+        {
+            return basePreference + 1;
+        }
+
+        return basePreference + 2;
+    }
+
+    private static bool IsPathWithinRoot(string candidatePath, string rootPath)
+    {
+        if (string.IsNullOrWhiteSpace(candidatePath) || string.IsNullOrWhiteSpace(rootPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var normalizedCandidate = Path.GetFullPath(candidatePath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var normalizedRoot = Path.GetFullPath(rootPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return normalizedCandidate.StartsWith(
+                normalizedRoot + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase
+            ) || string.Equals(normalizedCandidate, normalizedRoot, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string ResolveSuiteAcadeProfileName(out string profileSource)
+    {
+        profileSource = "fallback";
+        try
+        {
+            using var root = Registry.CurrentUser.OpenSubKey(@"Software\Autodesk\AutoCAD", writable: false);
+            if (root is null)
+            {
+                return SuiteAcadeProfileName;
+            }
+
+            foreach (var majorKeyName in root.GetSubKeyNames().OrderByDescending(value => value, StringComparer.OrdinalIgnoreCase))
+            {
+                using var majorKey = root.OpenSubKey(majorKeyName, writable: false);
+                if (majorKey is null)
+                {
+                    continue;
+                }
+
+                foreach (var flavorKeyName in majorKey.GetSubKeyNames())
+                {
+                    using var profilesKey = majorKey.OpenSubKey(
+                        $"{flavorKeyName}\\Profiles",
+                        writable: false
+                    );
+                    if (profilesKey is null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var profileName in profilesKey.GetSubKeyNames())
+                    {
+                        if (
+                            string.Equals(
+                                profileName,
+                                SuiteAcadeProfileName,
+                                StringComparison.OrdinalIgnoreCase
+                            )
+                        )
+                        {
+                            profileSource = "registry";
+                            return profileName;
+                        }
+                    }
+
+                    foreach (var profileName in profilesKey.GetSubKeyNames())
+                    {
+                        if (profileName.IndexOf("ACADE", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            profileSource = "registry";
+                            return profileName;
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Registry lookup is best effort only; fall back to the default ACADE profile name.
+        }
+
+        return SuiteAcadeProfileName;
+    }
+
+    private static string ReadSuiteAcadeActiveProfile(object application)
+    {
+        try
+        {
+            var preferences = ReadProperty(application, "Preferences");
+            var profiles = ReadProperty(preferences, "Profiles");
+            return Convert.ToString(ReadProperty(profiles, "ActiveProfile"))?.Trim() ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private static string ReadSuiteAcadeActiveDocumentPath(object application)
+    {
+        try
+        {
+            var document = ReadProperty(application, "ActiveDocument");
+            var fullName = (Convert.ToString(ReadProperty(document, "FullName")) ?? "").Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(fullName) || !Path.IsPathRooted(fullName))
+            {
+                return "";
+            }
+
+            return NormalizeSuiteExecutablePath(fullName);
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private static bool TrySuiteAcadeHasDocumentsCollection(object application)
+    {
+        try
+        {
+            return ReadProperty(application, "Documents") is not null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsSuiteAcadeProfileMatch(string activeProfile, string expectedProfileName)
+    {
+        var normalizedActiveProfile = (activeProfile ?? "").Trim();
+        var normalizedExpectedProfile = (expectedProfileName ?? "").Trim();
+        if (
+            !string.IsNullOrWhiteSpace(normalizedActiveProfile)
+            && !string.IsNullOrWhiteSpace(normalizedExpectedProfile)
+            && string.Equals(
+                normalizedActiveProfile,
+                normalizedExpectedProfile,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            return true;
+        }
+
+        return
+            !string.IsNullOrWhiteSpace(normalizedActiveProfile)
+            && string.IsNullOrWhiteSpace(normalizedExpectedProfile)
+            && normalizedActiveProfile.IndexOf("ACADE", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static bool LooksLikeSuiteAutoCadExecutablePath(string executablePath)
+    {
+        return string.Equals(
+            Path.GetFileName((executablePath ?? "").Trim()),
+            "acad.exe",
+            StringComparison.OrdinalIgnoreCase
+        );
+    }
+
+    private static string NormalizeSuiteExecutablePath(string path)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                return Path.GetFullPath(path.Trim().Trim('"'));
+            }
+        }
+        catch
+        {
+            // Keep the original token when normalization fails.
+        }
+
+        return (path ?? "").Trim().Trim('"');
+    }
+
+    private static string TryReadSuiteCadProcessPath(int processId)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return process.MainModule?.FileName ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private static bool DetectSuiteAcadeRuntime(int processId, string executablePath)
+    {
+        if (LooksLikeSuiteAcadeInstallPath(executablePath))
+        {
+            return true;
+        }
+
+        if (processId <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            foreach (ProcessModule? module in process.Modules)
+            {
+                var modulePath = NormalizeSuiteExecutablePath(module?.FileName ?? "");
+                var moduleName = Path.GetFileName(modulePath);
+                if (
+                    string.Equals(
+                        moduleName,
+                        "AcePageManMgd.dll",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                    || modulePath.IndexOf(
+                        $"{Path.DirectorySeparatorChar}Acade{Path.DirectorySeparatorChar}",
+                        StringComparison.OrdinalIgnoreCase
+                    ) >= 0
+                    || modulePath.IndexOf(
+                        $"{Path.AltDirectorySeparatorChar}Acade{Path.AltDirectorySeparatorChar}",
+                        StringComparison.OrdinalIgnoreCase
+                    ) >= 0
+                )
+                {
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+            // Best effort only. Profile checks remain the primary classifier.
+        }
+
+        return false;
+    }
+
+    private static bool LooksLikeSuiteAcadeInstallPath(string executablePath)
+    {
+        var normalizedPath = NormalizeSuiteExecutablePath(executablePath);
+        return normalizedPath.IndexOf("AutoCAD Electrical", StringComparison.OrdinalIgnoreCase) >= 0
+            || normalizedPath.IndexOf(
+                $"{Path.DirectorySeparatorChar}Acade{Path.DirectorySeparatorChar}",
+                StringComparison.OrdinalIgnoreCase
+            ) >= 0
+            || normalizedPath.IndexOf(
+                $"{Path.AltDirectorySeparatorChar}Acade{Path.AltDirectorySeparatorChar}",
+                StringComparison.OrdinalIgnoreCase
+            ) >= 0;
+    }
+
+    private static int TryGetSuiteCadProcessId(IntPtr windowHandle)
+    {
+        if (windowHandle == IntPtr.Zero)
+        {
+            return 0;
+        }
+
+        try
+        {
+            return GetWindowThreadProcessId(windowHandle, out var processId) == 0 ? 0 : (int)processId;
+        }
+        catch
+        {
+            return 0;
         }
     }
 
@@ -637,6 +2014,7 @@ static partial class ConduitRouteStubHandlers
         Exception? lastDocumentsError = null;
         Exception? lastAddError = null;
         bool warnedWaiting = false;
+        var templatePath = ResolveSuiteAcadeLaunchTemplatePath();
 
         while (stopwatch.Elapsed < timeout)
         {
@@ -694,10 +2072,23 @@ static partial class ConduitRouteStubHandlers
                     lastAddAttemptUtc = nowUtc;
                     try
                     {
-                        var createdDocument = ReadWithTransientComRetry(
-                            () => ((dynamic)documents).Add(),
-                            "Documents.Add()"
-                        );
+                        object? createdDocument = null;
+                        if (!string.IsNullOrWhiteSpace(templatePath))
+                        {
+                            createdDocument = ReadWithTransientComRetry(
+                                () => ((dynamic)documents).Add(templatePath),
+                                "Documents.Add(template)"
+                            );
+                        }
+
+                        if (createdDocument is null)
+                        {
+                            createdDocument = ReadWithTransientComRetry(
+                                () => ((dynamic)documents).Add(),
+                                "Documents.Add()"
+                            );
+                        }
+
                         if (createdDocument is not null)
                         {
                             TryActivateSuiteDocument(createdDocument);
@@ -792,6 +2183,98 @@ static partial class ConduitRouteStubHandlers
         }
 
         return "";
+    }
+
+    private static string ResolveSuiteAcadeLaunchTemplatePath()
+    {
+        var explicitTemplatePath = (Environment.GetEnvironmentVariable("AUTOCAD_TEMPLATE_PATH") ?? "")
+            .Trim()
+            .Trim('"');
+        if (!string.IsNullOrWhiteSpace(explicitTemplatePath))
+        {
+            try
+            {
+                var normalizedTemplatePath = Path.GetFullPath(explicitTemplatePath);
+                if (File.Exists(normalizedTemplatePath))
+                {
+                    return normalizedTemplatePath;
+                }
+            }
+            catch
+            {
+                // Ignore invalid explicit template overrides.
+            }
+        }
+
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var candidates = new[]
+        {
+            Path.Combine(
+                localAppData,
+                "Autodesk",
+                "AutoCAD Electrical 2026",
+                "R25.1",
+                "enu",
+                "Template",
+                "ACAD_ELECTRICAL.dwt"
+            ),
+            Path.Combine(
+                localAppData,
+                "Autodesk",
+                "AutoCAD Electrical 2026",
+                "R25.1",
+                "enu",
+                "Template",
+                "acad.dwt"
+            ),
+            Path.Combine(
+                localAppData,
+                "Autodesk",
+                "AutoCAD Electrical 2025",
+                "R24.3",
+                "enu",
+                "Template",
+                "ACAD_ELECTRICAL.dwt"
+            ),
+            Path.Combine(
+                localAppData,
+                "Autodesk",
+                "AutoCAD Electrical 2025",
+                "R24.3",
+                "enu",
+                "Template",
+                "acad.dwt"
+            ),
+            @"C:\Program Files\Autodesk\AutoCAD 2026\Acade\UserDataCache\en-US\Template\ACAD_ELECTRICAL.dwt",
+            @"C:\Program Files\Autodesk\AutoCAD 2026\Acade\UserDataCache\en-US\Template\acad.dwt",
+            @"C:\Program Files\Autodesk\AutoCAD 2025\Acade\UserDataCache\en-US\Template\ACAD_ELECTRICAL.dwt",
+            @"C:\Program Files\Autodesk\AutoCAD 2025\Acade\UserDataCache\en-US\Template\acad.dwt",
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return "";
+    }
+
+    private static string BuildSuiteAcadeLaunchArguments(string profileName, string templatePath)
+    {
+        var normalizedProfileName = string.IsNullOrWhiteSpace(profileName)
+            ? SuiteAcadeProfileName
+            : profileName.Trim();
+        var baseArguments =
+            $"/language \"{SuiteAcadeLanguageCode}\" /product \"{SuiteAcadeProductCode}\" /p \"{normalizedProfileName}\"";
+        if (string.IsNullOrWhiteSpace(templatePath))
+        {
+            return baseArguments;
+        }
+
+        return $"{baseArguments} /t \"{templatePath.Trim()}\"";
     }
 
     private static SuiteAcadeProjectOpenPluginExecutionResult ExecuteSuiteAcadeProjectOpenPlugin(
@@ -903,17 +2386,21 @@ static partial class ConduitRouteStubHandlers
         bool loadViaNetLoad
     )
     {
+        var lispPayloadPath = EscapeSuiteAcadeAutoLispString(invocation.PayloadPath);
+        var lispResultPath = EscapeSuiteAcadeAutoLispString(invocation.ResultPath);
         var commandScript = loadViaNetLoad
-            ? BuildSuitePluginCommandScript(
+            ? BuildSuitePluginLispInvocationScript(
                 invocation.PluginDllPath,
-                SuiteAcadeProjectOpenPluginCommand,
-                invocation.PayloadPath,
-                invocation.ResultPath
+                SuiteAcadeProjectOpenPluginLispFunction,
+                lispPayloadPath,
+                lispResultPath
             )
-            : BuildAutoCadCommandScript(
-                $"_.{SuiteAcadeProjectOpenPluginCommand}",
-                invocation.PayloadPath,
-                invocation.ResultPath
+            : BuildAutoCadLispInvocationScript(
+                BuildAutoCadLispExpression(
+                    SuiteAcadeProjectOpenPluginLispFunction,
+                    lispPayloadPath,
+                    lispResultPath
+                )
             );
 
         ReadWithTransientComRetry(
@@ -923,8 +2410,8 @@ static partial class ConduitRouteStubHandlers
                 return true;
             },
             loadViaNetLoad
-                ? $"SendCommand(NETLOAD+{SuiteAcadeProjectOpenPluginCommand})"
-                : $"SendCommand({SuiteAcadeProjectOpenPluginCommand})"
+                ? $"SendCommand(NETLOAD+{SuiteAcadeProjectOpenPluginLispFunction})"
+                : $"SendCommand({SuiteAcadeProjectOpenPluginLispFunction})"
         );
 
         var (completed, sawActiveCommand, commandStateAvailable, lastCommandMask) =
@@ -942,7 +2429,7 @@ static partial class ConduitRouteStubHandlers
                 ResultPath = invocation.ResultPath,
                 FailureCode = "AUTOCAD_COMMAND_TIMEOUT",
                 FailureMessage =
-                    $"Timed out waiting for AutoCAD to finish '{SuiteAcadeProjectOpenPluginCommand}'.",
+                    $"Timed out waiting for AutoCAD to finish '{SuiteAcadeProjectOpenPluginLispFunction}'.",
             };
         }
 
@@ -1000,58 +2487,18 @@ static partial class ConduitRouteStubHandlers
         List<string> warnings
     )
     {
-        var commandScript = BuildAutoCadCommandScript("_.AEPROJECT", request.WdpPath);
-        try
-        {
-            TryActivateSuiteDocument(session.Document);
-            ReadWithTransientComRetry(
-                () =>
-                {
-                    ((dynamic)session.Document).SendCommand(commandScript);
-                    return true;
-                },
-                "SendCommand(AEPROJECT)"
-            );
-        }
-        catch (Exception ex)
-        {
-            return new SuiteAcadeProjectOpenCommandExecutionResult
-            {
-                Attempted = true,
-                FailureCode = "ACADE_PROJECT_OPEN_FAILED",
-                FailureMessage = $"ACADE built-in project command failed: {DescribeException(ex)}",
-                Strategy = "_.AEPROJECT <wdpPath>",
-            };
-        }
-
-        var (completed, sawActiveCommand, commandStateAvailable, lastCommandMask) =
-            WaitForSuiteAcadeCommandCompletion(session, 45_000);
-        if (!completed)
-        {
-            TryCancelSuiteAcadeCommand(session, warnings);
-            return new SuiteAcadeProjectOpenCommandExecutionResult
-            {
-                Attempted = true,
-                CommandCompleted = false,
-                CommandStateAvailable = commandStateAvailable,
-                SawActiveCommand = sawActiveCommand,
-                LastCommandMask = lastCommandMask,
-                FailureCode = "AUTOCAD_COMMAND_TIMEOUT",
-                FailureMessage =
-                    "Timed out waiting for AutoCAD to finish the built-in ACADE project command.",
-                Strategy = "_.AEPROJECT <wdpPath>",
-            };
-        }
-
-        return new SuiteAcadeProjectOpenCommandExecutionResult
-        {
-            Attempted = true,
-            CommandCompleted = true,
-            CommandStateAvailable = commandStateAvailable,
-            SawActiveCommand = sawActiveCommand,
-            LastCommandMask = lastCommandMask,
-            Strategy = "_.AEPROJECT <wdpPath>",
-        };
+        var fallbackCandidate = BuildSuiteAcadeProjectOpenCommandCandidates(request.WdpPath)[0];
+        return ExecuteSuiteAcadeCommandScript(
+            session,
+            fallbackCandidate.CommandScript,
+            strategy: fallbackCandidate.Strategy,
+            sendOperationLabel: $"SendCommand({fallbackCandidate.Strategy})",
+            failureCode: "ACADE_PROJECT_OPEN_FAILED",
+            failureMessagePrefix: "ACADE built-in project command failed",
+            timeoutMessage:
+                $"Timed out waiting for AutoCAD to finish the built-in ACADE project command '{fallbackCandidate.Strategy}'.",
+            warnings: warnings
+        );
     }
 
     private static void TryCancelSuiteAcadeCommand(
@@ -1074,6 +2521,303 @@ static partial class ConduitRouteStubHandlers
         {
             warnings.Add($"Suite could not cancel the active AutoCAD command cleanly: {DescribeException(ex)}");
         }
+    }
+
+    private static SuiteAcadeProjectOpenCommandExecutionResult TryPrepareSuiteAcadeProjectSwitchRetry(
+        SuiteAcadeProjectOpenSession session,
+        List<string> warnings
+    )
+    {
+        TryEnsureSuiteAcadeScratchDocument(session, warnings);
+        TryWarmSuiteAcadeProjectFunctions(session, warnings);
+        return SuiteAcadeProjectOpenCloseCurrentProjectHook is not null
+            ? SuiteAcadeProjectOpenCloseCurrentProjectHook(session, warnings)
+            : ExecuteSuiteAcadeProjectCloseCurrentProjectCommand(session, warnings);
+    }
+
+    private static void WarnIfSuiteAcadeProfileLooksWrong(object application, List<string> warnings)
+    {
+        try
+        {
+            var preferences = ReadProperty(application, "Preferences");
+            var profiles = ReadProperty(preferences, "Profiles");
+            var activeProfile = Convert.ToString(ReadProperty(profiles, "ActiveProfile"))?.Trim() ?? "";
+            if (
+                !string.IsNullOrWhiteSpace(activeProfile)
+                && !string.Equals(activeProfile, SuiteAcadeProfileName, StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                warnings.Add(
+                    $"AutoCAD is running under profile '{activeProfile}', not '{SuiteAcadeProfileName}'. Electrical project functions may be unavailable until the ACADE profile is loaded."
+                );
+            }
+        }
+        catch
+        {
+            // Best-effort only; missing COM profile properties should not block project activation.
+        }
+    }
+
+    private static void TryWarmSuiteAcadeProjectFunctions(
+        SuiteAcadeProjectOpenSession session,
+        List<string> warnings
+    )
+    {
+        var warmupScript = BuildAutoCadCommandScript(
+            "(progn (if (not (and (fboundp 'PmOpenProject) (fboundp 'PmCloseProject))) (if (fboundp 'wd_load_arx) (wd_load_arx))) (if (not (and (fboundp 'PmOpenProject) (fboundp 'PmCloseProject))) (if (fboundp 'wd_load) (wd_load))))"
+        );
+
+        var warmupResult = ExecuteSuiteAcadeCommandScript(
+            session,
+            warmupScript,
+            strategy: "Electrical function warmup",
+            sendOperationLabel: "SendCommand(Electrical function warmup)",
+            failureCode: "ACADE_FUNCTION_WARMUP_FAILED",
+            failureMessagePrefix: "ACADE Electrical function warmup failed",
+            timeoutMessage:
+                "Timed out waiting for AutoCAD Electrical function warmup to finish.",
+            warnings: warnings
+        );
+
+        if (!string.IsNullOrWhiteSpace(warmupResult.FailureCode))
+        {
+            warnings.Add(
+                $"Suite could not warm the AutoCAD Electrical project functions before switching projects: {warmupResult.FailureMessage}"
+            );
+        }
+    }
+
+    private static void TryEnsureSuiteAcadeScratchDocument(
+        SuiteAcadeProjectOpenSession session,
+        List<string> warnings
+    )
+    {
+        if (session.TemporaryDocumentCreated)
+        {
+            return;
+        }
+
+        try
+        {
+            var documents = ReadProperty(session.Application, "Documents");
+            var createdDocument = ReadWithTransientComRetry(
+                () => ((dynamic)documents).Add(),
+                "Documents.Add() for switch retry"
+            );
+            if (createdDocument is null)
+            {
+                return;
+            }
+
+            TryActivateSuiteDocument(createdDocument);
+            var modelspace = ReadProperty(createdDocument, "ModelSpace");
+            session.AdoptDocument(createdDocument, modelspace, temporaryDocumentCreated: true);
+            warnings.Add(
+                "Suite created a temporary blank AutoCAD drawing before switching ACADE projects."
+            );
+        }
+        catch (Exception ex)
+        {
+            warnings.Add(
+                $"Suite could not create a temporary AutoCAD drawing before switching projects: {DescribeException(ex)}"
+            );
+        }
+    }
+
+    private static SuiteAcadeProjectOpenCommandExecutionResult ExecuteSuiteAcadeProjectCloseCurrentProjectCommand(
+        SuiteAcadeProjectOpenSession session,
+        List<string> warnings
+    )
+    {
+        return ExecuteSuiteAcadeCommandScript(
+            session,
+            BuildAutoCadCommandScript("(PmCloseProject)"),
+            strategy: "(PmCloseProject)",
+            sendOperationLabel: "SendCommand(PmCloseProject)",
+            failureCode: "ACADE_PROJECT_CLOSE_FAILED",
+            failureMessagePrefix: "ACADE close-project command failed",
+            timeoutMessage:
+                "Timed out waiting for AutoCAD to finish the active-project close command.",
+            warnings: warnings
+        );
+    }
+
+    private static SuiteAcadeProjectSwitchRetryResult ExecuteSuiteAcadeProjectSwitchRetryOpen(
+        SuiteAcadeProjectOpenRequest request,
+        SuiteAcadeProjectOpenSession session,
+        SuiteAcadeProjectOpenVerificationContext verificationContext,
+        List<string> warnings
+    )
+    {
+        return ExecuteSuiteAcadeProjectOpenCommandCandidates(
+            request,
+            session,
+            verificationContext,
+            warnings,
+            BuildSuiteAcadeProjectOpenCommandCandidates(request.WdpPath)
+        );
+    }
+
+    private static SuiteAcadeProjectSwitchRetryResult ExecuteSuiteAcadeProjectOpenCommandCandidates(
+        SuiteAcadeProjectOpenRequest request,
+        SuiteAcadeProjectOpenSession session,
+        SuiteAcadeProjectOpenVerificationContext verificationContext,
+        List<string> warnings,
+        IReadOnlyList<SuiteAcadeProjectSwitchRetryCommandCandidate> candidates
+    )
+    {
+        var lastCommandExecution = new SuiteAcadeProjectOpenCommandExecutionResult
+        {
+            Attempted = true,
+            CommandCompleted = false,
+            FailureCode = "ACADE_PROJECT_OPEN_FAILED",
+            FailureMessage = "ACADE switch retry did not produce a verified project switch.",
+            Strategy = "(PmOpenProject <wdpPath> nil nil)",
+        };
+        var lastVerification = new SuiteAcadeProjectOpenVerificationResult(
+            AepxObserved: false,
+            LastProjObserved: false
+        );
+
+        foreach (var candidate in candidates)
+        {
+            var commandExecution = ExecuteSuiteAcadeCommandScript(
+                session,
+                candidate.CommandScript,
+                strategy: candidate.Strategy,
+                sendOperationLabel: $"SendCommand({candidate.Strategy})",
+                failureCode: "ACADE_PROJECT_OPEN_FAILED",
+                failureMessagePrefix: "ACADE switch-retry project command failed",
+                timeoutMessage:
+                    $"Timed out waiting for AutoCAD to finish the switch-retry project command '{candidate.Strategy}'.",
+                warnings: warnings
+            );
+            lastCommandExecution = commandExecution;
+
+            if (!string.IsNullOrWhiteSpace(commandExecution.FailureCode))
+            {
+                continue;
+            }
+
+            var verification = VerifySuiteAcadeProjectOpen(verificationContext, warnings);
+            lastVerification = verification;
+            if (
+                verification.AepxObserved
+                || verification.LastProjObserved
+                || verification.ActiveProjectObserved
+            )
+            {
+                return new SuiteAcadeProjectSwitchRetryResult(
+                    CommandExecution: commandExecution,
+                    Verification: verification,
+                    ProjectActivated: true
+                );
+            }
+
+            warnings.Add(
+                $"{candidate.Strategy} completed without a verified ACADE project switch."
+            );
+        }
+
+        return new SuiteAcadeProjectSwitchRetryResult(
+            CommandExecution: lastCommandExecution,
+            Verification: lastVerification,
+            ProjectActivated: false
+        );
+    }
+
+    private static IReadOnlyList<SuiteAcadeProjectSwitchRetryCommandCandidate> BuildSuiteAcadeProjectOpenCommandCandidates(
+        string wdpPath
+    )
+    {
+        var lispPath = EscapeSuiteAcadeAutoLispString(wdpPath);
+        return new[]
+        {
+            new SuiteAcadeProjectSwitchRetryCommandCandidate(
+                Strategy: "(PmOpenProject <wdpPath> nil nil)",
+                CommandScript: BuildAutoCadCommandScript($"(PmOpenProject \"{lispPath}\" nil nil)")
+            ),
+            new SuiteAcadeProjectSwitchRetryCommandCandidate(
+                Strategy: "(PmOpenProject <wdpPath> T nil)",
+                CommandScript: BuildAutoCadCommandScript($"(PmOpenProject \"{lispPath}\" T nil)")
+            ),
+            new SuiteAcadeProjectSwitchRetryCommandCandidate(
+                Strategy: "(PmOpenProject <wdpPath> nil T)",
+                CommandScript: BuildAutoCadCommandScript($"(PmOpenProject \"{lispPath}\" nil T)")
+            ),
+            new SuiteAcadeProjectSwitchRetryCommandCandidate(
+                Strategy: "(PmOpenProject <wdpPath> T T)",
+                CommandScript: BuildAutoCadCommandScript($"(PmOpenProject \"{lispPath}\" T T)")
+            ),
+        };
+    }
+
+    private static string EscapeSuiteAcadeAutoLispString(string value)
+    {
+        return (value ?? "").Replace("\\", "/").Replace("\"", "\\\"");
+    }
+
+    private static SuiteAcadeProjectOpenCommandExecutionResult ExecuteSuiteAcadeCommandScript(
+        SuiteAcadeProjectOpenSession session,
+        string commandScript,
+        string strategy,
+        string sendOperationLabel,
+        string failureCode,
+        string failureMessagePrefix,
+        string timeoutMessage,
+        List<string> warnings
+    )
+    {
+        try
+        {
+            TryActivateSuiteDocument(session.Document);
+            ReadWithTransientComRetry(
+                () =>
+                {
+                    ((dynamic)session.Document).SendCommand(commandScript);
+                    return true;
+                },
+                sendOperationLabel
+            );
+        }
+        catch (Exception ex)
+        {
+            return new SuiteAcadeProjectOpenCommandExecutionResult
+            {
+                Attempted = true,
+                FailureCode = failureCode,
+                FailureMessage = $"{failureMessagePrefix}: {DescribeException(ex)}",
+                Strategy = strategy,
+            };
+        }
+
+        var (completed, sawActiveCommand, commandStateAvailable, lastCommandMask) =
+            WaitForSuiteAcadeCommandCompletion(session, 45_000);
+        if (!completed)
+        {
+            TryCancelSuiteAcadeCommand(session, warnings);
+            return new SuiteAcadeProjectOpenCommandExecutionResult
+            {
+                Attempted = true,
+                CommandCompleted = false,
+                CommandStateAvailable = commandStateAvailable,
+                SawActiveCommand = sawActiveCommand,
+                LastCommandMask = lastCommandMask,
+                FailureCode = "AUTOCAD_COMMAND_TIMEOUT",
+                FailureMessage = timeoutMessage,
+                Strategy = strategy,
+            };
+        }
+
+        return new SuiteAcadeProjectOpenCommandExecutionResult
+        {
+            Attempted = true,
+            CommandCompleted = true,
+            CommandStateAvailable = commandStateAvailable,
+            SawActiveCommand = sawActiveCommand,
+            LastCommandMask = lastCommandMask,
+            Strategy = strategy,
+        };
     }
 
     private static (
@@ -1167,9 +2911,12 @@ static partial class ConduitRouteStubHandlers
         }
 
         var lastProjObserved = false;
+        DateTime? lastProjLastWriteUtc = null;
         try
         {
-            lastProjObserved = SuiteAcadeLastProjContainsTarget(wdpPath);
+            var lastProjObservation = ObserveSuiteAcadeLastProjTarget(wdpPath);
+            lastProjObserved = lastProjObservation.ContainsTarget;
+            lastProjLastWriteUtc = lastProjObservation.LastWriteUtc;
         }
         catch (Exception ex)
         {
@@ -1179,7 +2926,8 @@ static partial class ConduitRouteStubHandlers
         return new SuiteAcadeProjectOpenObservation(
             AepxExists: aepxExists,
             AepxLastWriteUtc: aepxLastWriteUtc,
-            LastProjObserved: lastProjObserved
+            LastProjObserved: lastProjObserved,
+            LastProjLastWriteUtc: lastProjLastWriteUtc
         );
     }
 
@@ -1190,7 +2938,7 @@ static partial class ConduitRouteStubHandlers
     {
         var stopwatch = Stopwatch.StartNew();
         var aepxObserved = false;
-        var lastProjObserved = context.PreviousLastProjObserved;
+        var lastProjObserved = false;
         var aepxPath = Path.ChangeExtension(context.WdpPath, ".aepx");
 
         while (stopwatch.Elapsed < context.Timeout)
@@ -1228,7 +2976,18 @@ static partial class ConduitRouteStubHandlers
             {
                 try
                 {
-                    lastProjObserved = SuiteAcadeLastProjContainsTarget(context.WdpPath);
+                    var lastProjObservation = ObserveSuiteAcadeLastProjTarget(context.WdpPath);
+                    if (lastProjObservation.ContainsTarget)
+                    {
+                        lastProjObserved =
+                            !context.PreviousLastProjObserved
+                            || !context.PreviousLastProjLastWriteUtc.HasValue
+                            || (
+                                lastProjObservation.LastWriteUtc.HasValue
+                                && lastProjObservation.LastWriteUtc.Value
+                                    > context.PreviousLastProjLastWriteUtc.Value
+                            );
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1260,7 +3019,10 @@ static partial class ConduitRouteStubHandlers
         bool commandCompleted,
         bool aepxObserved,
         bool lastProjObserved,
+        bool activeProjectObserved,
+        string activeProjectPath,
         bool temporaryDocumentCreated,
+        bool temporaryDocumentClosed,
         JsonObject meta
     )
     {
@@ -1278,7 +3040,10 @@ static partial class ConduitRouteStubHandlers
                 commandCompleted: commandCompleted,
                 aepxObserved: aepxObserved,
                 lastProjObserved: lastProjObserved,
-                temporaryDocumentCreated: temporaryDocumentCreated
+                activeProjectObserved: activeProjectObserved,
+                activeProjectPath: activeProjectPath,
+                temporaryDocumentCreated: temporaryDocumentCreated,
+                temporaryDocumentClosed: temporaryDocumentClosed
             ),
             ["meta"] = CloneJsonObject(meta),
             ["warnings"] = ToJsonArray(warnings.Distinct(StringComparer.OrdinalIgnoreCase)),
@@ -1292,7 +3057,10 @@ static partial class ConduitRouteStubHandlers
         bool commandCompleted,
         bool aepxObserved,
         bool lastProjObserved,
-        bool temporaryDocumentCreated
+        bool activeProjectObserved,
+        string activeProjectPath,
+        bool temporaryDocumentCreated,
+        bool temporaryDocumentClosed
     )
     {
         return new JsonObject
@@ -1301,19 +3069,25 @@ static partial class ConduitRouteStubHandlers
             ["acadeLaunched"] = acadeLaunched,
             ["projectActivated"] = projectActivated,
             ["temporaryDocumentCreated"] = temporaryDocumentCreated,
+            ["temporaryDocumentClosed"] = temporaryDocumentClosed,
             ["verification"] = new JsonObject
             {
                 ["commandCompleted"] = commandCompleted,
                 ["aepxObserved"] = aepxObserved,
                 ["lastProjObserved"] = lastProjObserved,
+                ["activeProjectObserved"] = activeProjectObserved,
             },
+            ["activeProjectPath"] = string.IsNullOrWhiteSpace(activeProjectPath)
+                ? null
+                : activeProjectPath,
         };
     }
 
     private static JsonObject BuildSuiteAcadeProjectOpenCommandMeta(
         string stage,
         SuiteAcadeProjectOpenSession session,
-        SuiteAcadeProjectOpenCommandExecutionResult commandExecution
+        SuiteAcadeProjectOpenCommandExecutionResult commandExecution,
+        string requestId
     )
     {
         return new JsonObject
@@ -1321,6 +3095,7 @@ static partial class ConduitRouteStubHandlers
             ["source"] = "dotnet",
             ["providerPath"] = "dotnet+command",
             ["action"] = "suite_acade_project_open",
+            ["requestId"] = requestId,
             ["stage"] = stage,
             ["strategy"] = string.IsNullOrWhiteSpace(commandExecution.Strategy)
                 ? null
@@ -1330,6 +3105,23 @@ static partial class ConduitRouteStubHandlers
                 : session.ExecutablePath,
             ["acadeLaunched"] = session.AcadeLaunched,
             ["temporaryDocumentCreated"] = session.TemporaryDocumentCreated,
+            ["temporaryDocumentClosed"] = session.TemporaryDocumentClosed,
+            ["sessionClassification"] = string.IsNullOrWhiteSpace(session.SessionClassification)
+                ? null
+                : session.SessionClassification,
+            ["sessionMode"] = string.IsNullOrWhiteSpace(session.SessionMode)
+                ? null
+                : session.SessionMode,
+            ["activeProfile"] = string.IsNullOrWhiteSpace(session.ActiveProfile)
+                ? null
+                : session.ActiveProfile,
+            ["profileSource"] = string.IsNullOrWhiteSpace(session.ProfileSource)
+                ? null
+                : session.ProfileSource,
+            ["processId"] = session.ProcessId > 0 ? session.ProcessId : null,
+            ["windowHandle"] = session.WindowHandle != IntPtr.Zero
+                ? session.WindowHandle.ToInt64()
+                : null,
             ["commandStateAvailable"] = commandExecution.CommandStateAvailable,
             ["sawActiveCommand"] = commandExecution.SawActiveCommand,
             ["lastCommandMask"] = commandExecution.LastCommandMask,
@@ -1339,7 +3131,8 @@ static partial class ConduitRouteStubHandlers
     private static JsonObject BuildSuiteAcadeProjectOpenMeta(
         string stage,
         SuiteAcadeProjectOpenSession session,
-        SuiteAcadeProjectOpenPluginExecutionResult pluginExecution
+        SuiteAcadeProjectOpenPluginExecutionResult pluginExecution,
+        string requestId
     )
     {
         return new JsonObject
@@ -1349,6 +3142,7 @@ static partial class ConduitRouteStubHandlers
                 ? "dotnet"
                 : "dotnet+plugin",
             ["action"] = "suite_acade_project_open",
+            ["requestId"] = requestId,
             ["stage"] = stage,
             ["pluginDllPath"] = string.IsNullOrWhiteSpace(pluginExecution.PluginDllPath)
                 ? null
@@ -1364,10 +3158,151 @@ static partial class ConduitRouteStubHandlers
                 : session.ExecutablePath,
             ["acadeLaunched"] = session.AcadeLaunched,
             ["temporaryDocumentCreated"] = session.TemporaryDocumentCreated,
+            ["temporaryDocumentClosed"] = session.TemporaryDocumentClosed,
+            ["sessionClassification"] = string.IsNullOrWhiteSpace(session.SessionClassification)
+                ? null
+                : session.SessionClassification,
+            ["sessionMode"] = string.IsNullOrWhiteSpace(session.SessionMode)
+                ? null
+                : session.SessionMode,
+            ["activeProfile"] = string.IsNullOrWhiteSpace(session.ActiveProfile)
+                ? null
+                : session.ActiveProfile,
+            ["profileSource"] = string.IsNullOrWhiteSpace(session.ProfileSource)
+                ? null
+                : session.ProfileSource,
+            ["processId"] = session.ProcessId > 0 ? session.ProcessId : null,
+            ["windowHandle"] = session.WindowHandle != IntPtr.Zero
+                ? session.WindowHandle.ToInt64()
+                : null,
             ["commandStateAvailable"] = pluginExecution.CommandStateAvailable,
             ["sawActiveCommand"] = pluginExecution.SawActiveCommand,
             ["lastCommandMask"] = pluginExecution.LastCommandMask,
         };
+    }
+
+    private static void MergeSuiteJsonObject(
+        JsonObject target,
+        JsonObject? source,
+        bool overwrite = true
+    )
+    {
+        if (source is null)
+        {
+            return;
+        }
+
+        foreach (var property in source)
+        {
+            if (!overwrite && target.ContainsKey(property.Key))
+            {
+                continue;
+            }
+
+            target[property.Key] = property.Value?.DeepClone();
+        }
+    }
+
+    private static void ReleaseSuiteComObjectSafely(object? comObject)
+    {
+        if (!OperatingSystem.IsWindows() || comObject is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (Marshal.IsComObject(comObject))
+            {
+                Marshal.ReleaseComObject(comObject);
+            }
+        }
+        catch
+        {
+            // Best effort cleanup.
+        }
+    }
+
+    private static bool TryBringSuiteAcadeWindowToForeground(SuiteAcadeProjectOpenSession session)
+    {
+        if (!OperatingSystem.IsWindows() || session.WindowHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            ShowWindowAsync(session.WindowHandle, SuiteShowWindowRestore);
+            return SetForegroundWindow(session.WindowHandle);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void TryCloseSuiteAcadeTemporaryDocumentIfSafe(
+        SuiteAcadeProjectOpenSession session,
+        List<string> warnings
+    )
+    {
+        if (!session.TemporaryDocumentCreated || session.TemporaryDocumentClosed)
+        {
+            return;
+        }
+
+        try
+        {
+            var documentFullName = NormalizeSuiteExecutablePath(
+                Convert.ToString(ReadProperty(session.Document, "FullName")) ?? ""
+            );
+            var documentName = (Convert.ToString(ReadProperty(session.Document, "Name")) ?? "")
+                .Trim();
+            var saved = TryReadBoolLike(ReadProperty(session.Document, "Saved"), fallback: false);
+            var isScratchDocument =
+                string.IsNullOrWhiteSpace(documentFullName)
+                && !string.IsNullOrWhiteSpace(documentName)
+                && documentName.StartsWith("Drawing", StringComparison.OrdinalIgnoreCase);
+            if (!isScratchDocument)
+            {
+                return;
+            }
+
+            object? documents = null;
+            try
+            {
+                documents = ReadProperty(session.Application, "Documents");
+                var documentCount = ReadCount(documents);
+                if (documentCount <= 1)
+                {
+                    return;
+                }
+            }
+            catch
+            {
+                return;
+            }
+            finally
+            {
+                ReleaseSuiteComObjectSafely(documents);
+            }
+
+            ReadWithTransientComRetry(
+                () =>
+                {
+                    ((dynamic)session.Document).Close(saved);
+                    return true;
+                },
+                "Document.Close() for Suite scratch document"
+            );
+            session.MarkTemporaryDocumentClosed();
+        }
+        catch (Exception ex)
+        {
+            warnings.Add(
+                $"Suite could not close the temporary AutoCAD drawing after project activation: {DescribeException(ex)}"
+            );
+        }
     }
 
     private static List<string> ReadJsonStringArray(JsonArray? items)
@@ -1395,9 +3330,41 @@ static partial class ConduitRouteStubHandlers
         return source?.DeepClone() as JsonObject ?? new JsonObject();
     }
 
-    private static bool SuiteAcadeLastProjContainsTarget(string wdpPath)
+    private readonly record struct SuiteAcadeLastProjObservation(
+        bool ContainsTarget,
+        DateTime? LastWriteUtc
+    );
+
+    private const int SuiteShowWindowRestore = 9;
+
+    [DllImport("ole32.dll")]
+    private static extern int GetRunningObjectTable(
+        int reserved,
+        out IRunningObjectTable? pprot
+    );
+
+    [DllImport("ole32.dll")]
+    private static extern int CreateBindCtx(int reserved, out IBindCtx? ppbc);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(
+        IntPtr windowHandle,
+        out uint processId
+    );
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindowAsync(IntPtr windowHandle, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr windowHandle);
+
+    private static SuiteAcadeLastProjObservation ObserveSuiteAcadeLastProjTarget(string wdpPath)
     {
         var normalizedTarget = NormalizeSuiteAcadePathToken(wdpPath);
+        var containsTarget = false;
+        DateTime? lastWriteUtc = null;
         foreach (var candidate in EnumerateSuiteAcadeLastProjFileCandidates())
         {
             string content;
@@ -1413,11 +3380,26 @@ static partial class ConduitRouteStubHandlers
             var normalizedContent = content.Replace('\\', '/').Trim().ToUpperInvariant();
             if (normalizedContent.Contains(normalizedTarget, StringComparison.Ordinal))
             {
-                return true;
+                containsTarget = true;
+                try
+                {
+                    var candidateWriteUtc = File.GetLastWriteTimeUtc(candidate);
+                    if (!lastWriteUtc.HasValue || candidateWriteUtc > lastWriteUtc.Value)
+                    {
+                        lastWriteUtc = candidateWriteUtc;
+                    }
+                }
+                catch
+                {
+                    // Best effort timestamp capture.
+                }
             }
         }
 
-        return false;
+        return new SuiteAcadeLastProjObservation(
+            ContainsTarget: containsTarget,
+            LastWriteUtc: lastWriteUtc
+        );
     }
 
     private static IEnumerable<string> EnumerateSuiteAcadeLastProjFileCandidates()
@@ -1472,5 +3454,54 @@ static partial class ConduitRouteStubHandlers
         }
 
         return path.Replace('\\', '/').Trim().ToUpperInvariant();
+    }
+
+    private static bool PathsEqual(string left, string right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return false;
+        }
+
+        return string.Equals(
+            NormalizeSuiteAcadePathToken(left),
+            NormalizeSuiteAcadePathToken(right),
+            StringComparison.OrdinalIgnoreCase
+        );
+    }
+
+    private static bool LooksLikeSameSuiteAcadeProjectPath(string left, string right)
+    {
+        if (PathsEqual(left, right))
+        {
+            return true;
+        }
+
+        try
+        {
+            var leftExtension = Path.GetExtension(left ?? "").Trim();
+            var rightExtension = Path.GetExtension(right ?? "").Trim();
+            if (
+                (string.Equals(leftExtension, ".mdb", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(rightExtension, ".wdp", StringComparison.OrdinalIgnoreCase))
+                || (
+                    string.Equals(leftExtension, ".wdp", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(rightExtension, ".mdb", StringComparison.OrdinalIgnoreCase)
+                )
+            )
+            {
+                return string.Equals(
+                    Path.GetFileNameWithoutExtension(left ?? ""),
+                    Path.GetFileNameWithoutExtension(right ?? ""),
+                    StringComparison.OrdinalIgnoreCase
+                );
+            }
+        }
+        catch
+        {
+            // Best effort only.
+        }
+
+        return false;
     }
 }

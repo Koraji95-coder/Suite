@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -8,6 +10,10 @@ from backend import dotnet_bridge
 
 
 class TestDotNetBridgeContract(unittest.TestCase):
+    def setUp(self) -> None:
+        dotnet_bridge._AUTO_STARTED_BRIDGE_PROCESS = None
+        dotnet_bridge._AUTO_STARTED_ACADE_PROCESS = None
+
     def test_send_dotnet_command_builds_expected_request_payload(self) -> None:
         captured: dict[str, object] = {}
 
@@ -115,6 +121,48 @@ class TestDotNetBridgeContract(unittest.TestCase):
         self.assertEqual(captured.get("create_calls"), 2)
         self.assertEqual(response.get("ok"), True)
         self.assertIn(b'"action":"ping"', captured.get("request_bytes") or b"")
+
+    def test_inprocess_acade_pipe_autostarts_autocad_and_marks_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            acad_exe = Path(temp_dir) / "acad.exe"
+            acad_exe.write_text("", encoding="utf-8")
+
+            captured: dict[str, object] = {}
+
+            class _ProcessStub:
+                def __init__(self) -> None:
+                    self.returncode = None
+
+                def poll(self):
+                    return self.returncode
+
+            process_stub = _ProcessStub()
+
+            with patch.dict(
+                dotnet_bridge.os.environ,
+                {
+                    "AUTOCAD_DOTNET_ACADE_PIPE_NAME": "SUITE_ACADE_PIPE",
+                    "AUTOCAD_DOTNET_ACADE_EXE_PATH": str(acad_exe),
+                },
+                clear=False,
+            ):
+                with patch.object(
+                    dotnet_bridge.subprocess,
+                    "Popen",
+                    side_effect=lambda *args, **kwargs: captured.update(
+                        {"args": args, "kwargs": kwargs}
+                    )
+                    or process_stub,
+                ):
+                    started = dotnet_bridge._autostart_named_pipe_bridge("SUITE_ACADE_PIPE")
+
+            self.assertTrue(started)
+            command = list(captured.get("args", [()])[0])
+            self.assertEqual(command[0], str(acad_exe.resolve()))
+            self.assertIn("/product", command)
+            self.assertIn("ACADE", command)
+            launch_env = captured.get("kwargs", {}).get("env") or {}
+            self.assertEqual(launch_env.get("AUTOCAD_DOTNET_ACADE_PIPE_NAME"), "SUITE_ACADE_PIPE")
 
 
 if __name__ == "__main__":

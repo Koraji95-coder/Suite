@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import copy
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from flask import Flask, g
 from flask_limiter import Limiter
 
+from backend.route_groups import api_title_block_sync as title_block_sync_module
 from backend.route_groups.api_title_block_sync import create_title_block_sync_blueprint
 
 
@@ -15,12 +18,20 @@ class TestApiTitleBlockSync(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.project_root = Path(self.temp_dir.name)
+        self.user_home = self.project_root / "fake-user-home"
+        (self.user_home / "Documents").mkdir(parents=True, exist_ok=True)
+        (self.user_home / "My Documents").mkdir(parents=True, exist_ok=True)
+        self.previous_userprofile = os.environ.get("USERPROFILE")
+        self.previous_home = os.environ.get("HOME")
+        os.environ["USERPROFILE"] = str(self.user_home)
+        os.environ["HOME"] = str(self.user_home)
         (self.project_root / "sub").mkdir(exist_ok=True)
         (self.project_root / "R3P-25074-E6-0001 MAIN.dwg").write_text("", encoding="utf-8")
         (self.project_root / "sub" / "R3P-25074-E6-0002 AUX.pdf").write_text("", encoding="utf-8")
         (self.project_root / "demo.wdp").write_text("", encoding="utf-8")
         self.bridge_calls: list[tuple[str, dict[str, object]]] = []
         self.open_project_bridge_error: Exception | None = None
+        self.create_project_bridge_error: Exception | None = None
         self.open_project_bridge_result: dict[str, object] = {
             "ok": True,
             "id": "bridge-3",
@@ -37,6 +48,31 @@ class TestApiTitleBlockSync(unittest.TestCase):
                         "commandCompleted": True,
                         "aepxObserved": True,
                         "lastProjObserved": False,
+                    },
+                },
+                "warnings": [],
+                "meta": {},
+            },
+        }
+        self.create_project_bridge_result: dict[str, object] = {
+            "ok": True,
+            "id": "bridge-5",
+            "result": {
+                "success": True,
+                "code": "",
+                "message": "ACADE project create completed.",
+                "data": {
+                    "wdpPath": "",
+                    "templateWdpPath": "C:/Users/Public/Documents/Autodesk/Acade 2026/AeData/Proj/Demo/Demo01.wdp",
+                    "acadeLaunched": True,
+                    "projectCreated": True,
+                    "projectActivated": True,
+                    "temporaryDocumentCreated": True,
+                    "verification": {
+                        "commandCompleted": True,
+                        "aepxObserved": True,
+                        "lastProjObserved": False,
+                        "activeProjectObserved": True,
                     },
                 },
                 "warnings": [],
@@ -129,6 +165,18 @@ class TestApiTitleBlockSync(unittest.TestCase):
                     result_data["wdpPath"] = str(payload.get("wdpPath") or "")
                 return response
 
+            if action == "suite_acade_project_create":
+                if self.create_project_bridge_error is not None:
+                    raise self.create_project_bridge_error
+                response = copy.deepcopy(self.create_project_bridge_result)
+                result = response.get("result") if isinstance(response, dict) else None
+                result_data = result.get("data") if isinstance(result, dict) else None
+                if isinstance(result_data, dict) and not result_data.get("wdpPath"):
+                    result_data["wdpPath"] = str(payload.get("wdpPath") or "")
+                if isinstance(result_data, dict) and payload.get("templateWdpPath"):
+                    result_data["templateWdpPath"] = str(payload.get("templateWdpPath") or "")
+                return response
+
             raise AssertionError(f"Unexpected bridge action {action}")
 
         self.app.register_blueprint(
@@ -142,7 +190,24 @@ class TestApiTitleBlockSync(unittest.TestCase):
         self.client = self.app.test_client()
 
     def tearDown(self) -> None:
+        if self.previous_userprofile is None:
+            os.environ.pop("USERPROFILE", None)
+        else:
+            os.environ["USERPROFILE"] = self.previous_userprofile
+        if self.previous_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = self.previous_home
         self.temp_dir.cleanup()
+
+    def _write_wd_env(self, docs_root_name: str, profile_folder_name: str) -> Path:
+        wd_env_path = self.user_home / docs_root_name / profile_folder_name / "AeData" / "wd.env"
+        wd_env_path.parent.mkdir(parents=True, exist_ok=True)
+        wd_env_path.write_text(
+            '*WD_PICKPRJDLG,x:/some path/,to override starting subdir for "PICK PROJ" button\n',
+            encoding="utf-8",
+        )
+        return wd_env_path
 
     def test_scan_builds_rows_and_artifact_preview(self) -> None:
         response = self.client.post(
@@ -209,6 +274,35 @@ class TestApiTitleBlockSync(unittest.TestCase):
         self.assertIn("*[4]R3P-25074", starter_text)
         self.assertIn("=====SUB=SCHEMATIC", starter_text)
 
+    def test_ensure_artifacts_updates_wd_pickprjdlg_to_project_folder(self) -> None:
+        wd_env_path = self._write_wd_env("Documents", "Acade 2026")
+
+        response = self.client.post(
+            "/api/title-block-sync/ensure-artifacts",
+            json={
+                "projectId": "project-1",
+                "projectRootPath": str(self.project_root),
+                "profile": {
+                    "projectName": "Nanulak",
+                    "blockName": "R3P-24x36BORDER&TITLE",
+                    "projectRootPath": str(self.project_root),
+                    "acadeLine1": "CLIENT",
+                    "acadeLine2": "SITE",
+                    "acadeLine4": "R3P-25074",
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        artifacts = (payload.get("data") or {}).get("artifacts") or {}
+        self.assertEqual(artifacts.get("wdPickPrjDlgFolder"), str(self.project_root))
+        self.assertEqual(artifacts.get("wdPickPrjDlgUpdatedPaths"), [str(wd_env_path)])
+        self.assertIn(
+            f"WD_PICKPRJDLG,{self.project_root.as_posix().rstrip('/')}/",
+            wd_env_path.read_text(encoding="utf-8"),
+        )
+
     def test_ensure_artifacts_preserves_existing_wdp(self) -> None:
         existing_text = "*[1]Existing project\n+[1]%SL_DIR%NFPA/\n===Demo drawing\ndemo01.dwg\n"
         wdp_path = self.project_root / "demo.wdp"
@@ -270,8 +364,69 @@ class TestApiTitleBlockSync(unittest.TestCase):
         )
         self.assertTrue((self.project_root / "Nanulak.wdp").exists())
 
+    def test_create_project_uses_local_root_and_inprocess_bridge(self) -> None:
+        template_wdp = self.project_root / "templates" / "Demo01.wdp"
+        template_wdp.parent.mkdir(parents=True, exist_ok=True)
+        template_wdp.write_text("*[1]Demo\n", encoding="utf-8")
+
+        with patch.object(
+            title_block_sync_module,
+            "ACADE_LOCAL_TEMPLATE_WDP",
+            str(template_wdp),
+        ):
+            response = self.client.post(
+                "/api/title-block-sync/create-project",
+                json={
+                    "requestId": "req-create-success",
+                    "projectId": "project-1",
+                    "profile": {
+                        "projectName": "Suite Local Test",
+                        "blockName": "R3P-24x36BORDER&TITLE",
+                        "acadeLine1": "CLIENT",
+                        "acadeLine2": "SITE",
+                        "acadeLine4": "R3P-25074",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        data = payload.get("data") or {}
+        expected_root = (
+            self.user_home
+            / "Documents"
+            / "Acade 2026"
+            / "AeData"
+            / "Proj"
+            / "Suite Local Test"
+        )
+        self.assertEqual(data.get("projectRootPath"), str(expected_root))
+        create_project = data.get("createProject") or {}
+        self.assertEqual(
+            create_project.get("templateWdpPath"),
+            str(template_wdp),
+        )
+        self.assertTrue(create_project.get("projectCreated"))
+        self.assertTrue(create_project.get("projectActivated"))
+        self.assertIn(
+            (
+                "suite_acade_project_create",
+                {
+                    "projectRootPath": str(expected_root),
+                    "wdpPath": str(expected_root / "Suite Local Test.wdp"),
+                    "templateWdpPath": str(template_wdp),
+                    "launchIfNeeded": True,
+                    "uiMode": "project_manager_only",
+                    "requestId": "req-create-success",
+                },
+            ),
+            self.bridge_calls,
+        )
+
     def test_open_project_returns_verified_bridge_data(self) -> None:
         starter_wdp = self.project_root / "starter.wdp"
+        wd_env_path = self._write_wd_env("My Documents", "AcadE 2026")
         response = self.client.post(
             "/api/title-block-sync/open-project",
             json={
@@ -294,6 +449,8 @@ class TestApiTitleBlockSync(unittest.TestCase):
         self.assertTrue(payload.get("success"))
         self.assertEqual(payload.get("requestId"), "req-open-success")
         self.assertTrue(starter_wdp.exists())
+        artifacts = ((payload.get("data") or {}).get("artifacts") or {})
+        self.assertIn(str(wd_env_path), artifacts.get("wdPickPrjDlgUpdatedPaths") or [])
         open_project = ((payload.get("data") or {}).get("openProject") or {})
         self.assertEqual(open_project.get("wdpPath"), str(starter_wdp))
         self.assertTrue(open_project.get("acadeLaunched"))
@@ -314,6 +471,59 @@ class TestApiTitleBlockSync(unittest.TestCase):
             ),
             self.bridge_calls,
         )
+
+    def test_open_project_accepts_active_project_observed_without_side_effect_files(self) -> None:
+        starter_wdp = self.project_root / "starter-active-only.wdp"
+        self.open_project_bridge_result = {
+            "ok": True,
+            "id": "bridge-4",
+            "result": {
+                "success": True,
+                "code": "",
+                "message": "ACADE project open completed.",
+                "data": {
+                    "wdpPath": str(starter_wdp),
+                    "acadeLaunched": False,
+                    "projectActivated": True,
+                    "temporaryDocumentCreated": False,
+                    "verification": {
+                        "commandCompleted": True,
+                        "aepxObserved": False,
+                        "lastProjObserved": False,
+                        "activeProjectObserved": True,
+                    },
+                    "activeProjectPath": str(starter_wdp),
+                },
+                "warnings": [],
+                "meta": {},
+            },
+        }
+
+        response = self.client.post(
+            "/api/title-block-sync/open-project",
+            json={
+                "requestId": "req-open-active-only",
+                "projectId": "project-1",
+                "projectRootPath": str(self.project_root),
+                "profile": {
+                    "blockName": "R3P-24x36BORDER&TITLE",
+                    "projectRootPath": str(self.project_root),
+                    "acadeProjectFilePath": str(starter_wdp),
+                    "acadeLine1": "CLIENT",
+                    "acadeLine2": "SITE",
+                    "acadeLine4": "R3P-25074",
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        open_project = ((payload.get("data") or {}).get("openProject") or {})
+        verification = open_project.get("verification") or {}
+        self.assertTrue(verification.get("activeProjectObserved"))
+        self.assertFalse(verification.get("aepxObserved"))
+        self.assertFalse(verification.get("lastProjObserved"))
 
     def test_open_project_returns_503_when_bridge_raises(self) -> None:
         starter_wdp = self.project_root / "starter.wdp"

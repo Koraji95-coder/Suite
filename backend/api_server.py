@@ -552,7 +552,13 @@ if _is_dotnet_provider(CONDUIT_ROUTE_AUTOCAD_PROVIDER):
         )
 
 
-def _send_autocad_dotnet_command(action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+def _send_autocad_dotnet_command(
+    action: str,
+    payload: Dict[str, Any],
+    *,
+    pipe_name: str | None = None,
+    timeout_ms: int | None = None,
+) -> Dict[str, Any]:
     if dotnet_send_command_helper is None:
         raise RuntimeError(
             "dotnet_bridge is unavailable. Install pywin32 and ensure backend/dotnet_bridge.py loads."
@@ -561,8 +567,8 @@ def _send_autocad_dotnet_command(action: str, payload: Dict[str, Any]) -> Dict[s
         action=action,
         payload=payload,
         token=AUTOCAD_DOTNET_TOKEN or None,
-        pipe_name=AUTOCAD_DOTNET_PIPE_NAME,
-        timeout_ms=AUTOCAD_DOTNET_TIMEOUT_MS,
+        pipe_name=pipe_name or AUTOCAD_DOTNET_PIPE_NAME,
+        timeout_ms=timeout_ms or AUTOCAD_DOTNET_TIMEOUT_MS,
     )
 
 

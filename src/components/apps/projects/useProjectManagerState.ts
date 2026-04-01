@@ -297,6 +297,38 @@ export function useProjectManagerState({
 		[showToast],
 	);
 
+	const createProjectInAcade = useCallback(
+		async (args: {
+			projectId: string;
+			projectRootPath: string | null;
+			form: typeof projectForm;
+		}) => {
+			const result = await titleBlockSyncService.createProject({
+				projectId: args.projectId,
+				projectRootPath: args.projectRootPath || "",
+				profile: buildTitleBlockSyncProfile(args.form, args.projectRootPath),
+				revisionEntries: [],
+				rows: [],
+				selectedRelativePaths: [],
+				triggerAcadeUpdate: false,
+			});
+			if (!result.success) {
+				const message = buildTitleBlockSyncFailureMessage(
+					result,
+					"Support files are ready, but ACADE did not create/register the project.",
+				);
+				showToast("warning", message);
+				return result;
+			}
+			showToast(
+				"success",
+				result.message || "ACADE created and activated the project.",
+			);
+			return result;
+		},
+		[showToast],
+	);
+
 	const getCurrentUserId = useCallback(async (): Promise<string | null> => {
 		const {
 			data: { user },
@@ -671,6 +703,10 @@ export function useProjectManagerState({
 			if (error) throw error;
 
 			if (data) {
+				let resolvedProjectRootPath = watchdogRootPath;
+				let resolvedAcadeProjectFilePath =
+					formSnapshot.titleBlockAcadeProjectFilePath.trim() || null;
+
 				await projectTitleBlockProfileService.upsertProfile({
 					projectId: data[0].id,
 					blockName: formSnapshot.titleBlockBlockName,
@@ -683,11 +719,70 @@ export function useProjectManagerState({
 					signerCheckedBy: formSnapshot.titleBlockCheckedBy,
 					signerEngineer: formSnapshot.titleBlockEngineer,
 				});
-				await ensureProjectAcadeSupportArtifacts({
-					projectId: data[0].id,
-					projectRootPath: watchdogRootPath,
-					form: formSnapshot,
-				});
+
+				if (options?.openAcadeAfter) {
+					const createResult = await createProjectInAcade({
+						projectId: data[0].id,
+						projectRootPath: watchdogRootPath,
+						form: formSnapshot,
+					});
+
+					if (createResult.success) {
+						const nativeProjectRootPath =
+							createResult.data?.projectRootPath?.trim() || null;
+						const nativeWdpPath =
+							createResult.data?.createProject?.wdpPath?.trim() ||
+							createResult.data?.artifacts?.wdpPath?.trim() ||
+							null;
+
+						if (nativeProjectRootPath) {
+							resolvedProjectRootPath = nativeProjectRootPath;
+						}
+						if (nativeWdpPath) {
+							resolvedAcadeProjectFilePath = nativeWdpPath;
+						}
+
+						if (
+							resolvedProjectRootPath &&
+							resolvedProjectRootPath !== watchdogRootPath
+						) {
+							const { error: projectRootUpdateError } = await supabase
+								.from("projects")
+								.update({ watchdog_root_path: resolvedProjectRootPath })
+								.eq("id", data[0].id)
+								.eq("user_id", userId);
+
+							if (projectRootUpdateError) {
+								showToast(
+									"warning",
+									`ACADE created the project, but Suite could not persist the resolved local project root: ${projectRootUpdateError.message}`,
+								);
+							}
+						}
+
+						await projectTitleBlockProfileService.upsertProfile({
+							projectId: data[0].id,
+							blockName: formSnapshot.titleBlockBlockName,
+							projectRootPath: resolvedProjectRootPath,
+							acadeProjectFilePath:
+								resolvedAcadeProjectFilePath ||
+								formSnapshot.titleBlockAcadeProjectFilePath,
+							acadeLine1: formSnapshot.titleBlockAcadeLine1,
+							acadeLine2: formSnapshot.titleBlockAcadeLine2,
+							acadeLine4: formSnapshot.titleBlockAcadeLine4,
+							signerDrawnBy: formSnapshot.titleBlockDrawnBy,
+							signerCheckedBy: formSnapshot.titleBlockCheckedBy,
+							signerEngineer: formSnapshot.titleBlockEngineer,
+						});
+					}
+				} else {
+					await ensureProjectAcadeSupportArtifacts({
+						projectId: data[0].id,
+						projectRootPath: watchdogRootPath,
+						form: formSnapshot,
+					});
+				}
+
 				await logActivity({
 					action: "create",
 					description: `Created project: ${formSnapshot.name}`,
@@ -696,6 +791,7 @@ export function useProjectManagerState({
 				const createdProject = {
 					...data[0],
 					...persistedPayload,
+					watchdog_root_path: resolvedProjectRootPath,
 				} as Project;
 				setProjects([createdProject, ...projects]);
 				setSelectedProject(createdProject);
@@ -705,13 +801,6 @@ export function useProjectManagerState({
 				resetProjectForm();
 				await syncWatchdogRulesAfterProjectMutation();
 				showToast("success", `Project "${formSnapshot.name}" created`);
-				if (options?.openAcadeAfter) {
-					await openProjectInAcade({
-						projectId: data[0].id,
-						projectRootPath: watchdogRootPath,
-						form: formSnapshot,
-					});
-				}
 				triggerAutoBackup();
 			}
 		} catch (err) {

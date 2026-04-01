@@ -412,6 +412,9 @@ $packageContents = @'
         <Command Local="SUITETERMINALAUTHORAPPLY" Global="SUITETERMINALAUTHORAPPLY" />
         <Command Local="SUITEMARKUPAUTHORAPPLY" Global="SUITEMARKUPAUTHORAPPLY" />
         <Command Local="SUITEACADEPROJECTOPEN" Global="SUITEACADEPROJECTOPEN" />
+        <Command Local="SUITEACADEPROJECTCREATE" Global="SUITEACADEPROJECTCREATE" />
+        <Command Local="SUITEACADEDEBUGSTATUS" Global="SUITEACADEDEBUGSTATUS" />
+        <Command Local="SUITEPIPESTATUS" Global="SUITEPIPESTATUS" />
       </Commands>
     </ComponentEntry>
   </Components>

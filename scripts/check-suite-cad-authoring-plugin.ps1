@@ -186,7 +186,10 @@ if (-not $trustedPathSummary.registered) {
 $expectedCommands = @(
     "SUITETERMINALAUTHORAPPLY",
     "SUITEMARKUPAUTHORAPPLY",
-    "SUITEACADEPROJECTOPEN"
+    "SUITEACADEPROJECTOPEN",
+    "SUITEACADEPROJECTCREATE",
+    "SUITEACADEDEBUGSTATUS",
+    "SUITEPIPESTATUS"
 )
 $missingCommands = @(
     $expectedCommands |

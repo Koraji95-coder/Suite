@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { looksLikeUuid } from "@/lib/uuid";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
 import { safeSupabaseQuery } from "@/supabase/utils";
@@ -265,6 +266,15 @@ export const projectRevisionRegisterService = {
 		}
 
 		const userId = await getCurrentUserId();
+		if (!looksLikeUuid(normalizedProjectId)) {
+			return {
+				data: readLocalEntries()
+					.filter((entry) => entry.project_id === normalizedProjectId)
+					.map(normalizeRow)
+					.sort((left, right) => right.updated_at.localeCompare(left.updated_at)),
+				error: null,
+			};
+		}
 		if (!userId) {
 			return {
 				data: readLocalEntries()

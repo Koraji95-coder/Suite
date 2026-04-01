@@ -3,6 +3,36 @@ using Xunit;
 public class AutoCadCommandScriptHelpersTests
 {
     [Fact]
+    public void BuildAutoCadLispInvocationScript_appends_trailing_newline()
+    {
+        var script = ConduitRouteStubHandlers.BuildAutoCadLispInvocationScript(
+            "(SUITEACADEPROJECTOPENRUN \"C:/Temp/payload.json\" \"C:/Temp/result.json\")"
+        );
+
+        Assert.Equal(
+            "(SUITEACADEPROJECTOPENRUN \"C:/Temp/payload.json\" \"C:/Temp/result.json\")\n",
+            script
+        );
+    }
+
+    [Fact]
+    public void BuildSuitePluginLispInvocationScript_netloads_then_invokes_lisp_entrypoint()
+    {
+        var script = ConduitRouteStubHandlers.BuildSuitePluginLispInvocationScript(
+            @"C:\Suite\SuiteCadAuthoring.dll",
+            "SUITEACADEPROJECTOPENRUN",
+            @"C:/Temp/payload.json",
+            @"C:/Temp/result.json"
+        );
+
+        var expected =
+            "_.NETLOAD \"C:\\Suite\\SuiteCadAuthoring.dll\"\n"
+            + "(SUITEACADEPROJECTOPENRUN \"C:/Temp/payload.json\" \"C:/Temp/result.json\")\n";
+
+        Assert.Equal(expected, script);
+    }
+
+    [Fact]
     public void BuildSuitePluginCommandScript_uses_inline_command_arguments()
     {
         var script = ConduitRouteStubHandlers.BuildSuitePluginCommandScript(

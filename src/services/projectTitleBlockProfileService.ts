@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { looksLikeUuid } from "@/lib/uuid";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
 import { safeSupabaseQuery } from "@/supabase/utils";
@@ -155,6 +156,16 @@ export const projectTitleBlockProfileService = {
 		}
 
 		const userId = await getCurrentUserId();
+		if (!looksLikeUuid(normalizedProjectId)) {
+			const localProfile =
+				readLocalProfiles().find(
+					(entry) => entry.project_id === normalizedProjectId,
+				) ?? buildDefaultProfile(normalizedProjectId, userId, defaults);
+			return {
+				data: mergeProfileDefaults(localProfile, defaults),
+				error: null,
+			};
+		}
 		if (!userId) {
 			const localProfile =
 				readLocalProfiles().find(

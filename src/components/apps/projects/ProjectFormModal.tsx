@@ -11,6 +11,7 @@ import {
 	type SetStateAction,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 import {
@@ -184,6 +185,7 @@ export function ProjectFormModal({
 	const [profileLoading, setProfileLoading] = useState(false);
 	const [profileMessage, setProfileMessage] = useState<string | null>(null);
 	const [draftProjectId, setDraftProjectId] = useState(createDraftProjectId);
+	const autoDerivedAcadePathRef = useRef("");
 
 	const safeCategory = PROJECT_CATEGORIES.some(
 		(category) => category.key === formData.category,
@@ -230,6 +232,7 @@ export function ProjectFormModal({
 	useEffect(() => {
 		if (!isOpen) {
 			setDeadlineOpen(false);
+			autoDerivedAcadePathRef.current = "";
 			return;
 		}
 		setStepIndex(0);
@@ -259,14 +262,22 @@ export function ProjectFormModal({
 		if (!isOpen) {
 			return;
 		}
-		if (formData.titleBlockAcadeProjectFilePath.trim()) {
+		const currentPath = formData.titleBlockAcadeProjectFilePath.trim();
+		const previousAutoDerivedPath = autoDerivedAcadePathRef.current.trim();
+		const nextDerivedPath = derivedAcadeProjectFilePath.trim();
+		const shouldAutoUpdate =
+			!currentPath ||
+			(Boolean(previousAutoDerivedPath) &&
+				currentPath === previousAutoDerivedPath);
+		if (!shouldAutoUpdate) {
 			return;
 		}
-		if (!derivedAcadeProjectFilePath) {
+		autoDerivedAcadePathRef.current = nextDerivedPath;
+		if (currentPath === nextDerivedPath) {
 			return;
 		}
 		updateProjectForm(setFormData, {
-			titleBlockAcadeProjectFilePath: derivedAcadeProjectFilePath,
+			titleBlockAcadeProjectFilePath: nextDerivedPath,
 		});
 	}, [
 		derivedAcadeProjectFilePath,
@@ -434,7 +445,7 @@ export function ProjectFormModal({
 		setStepIndex((current) => Math.max(current - 1, 0));
 	};
 
-	const submitLabel = isEditing ? "Update Project Setup" : "Create Project";
+	const reviewSubmitLabel = isEditing ? "Save Changes Only" : "Save Setup Only";
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -907,29 +918,28 @@ export function ProjectFormModal({
 									className={styles.label}
 									htmlFor="project-form-acade-project-file"
 								>
-									ACADE project file (.wdp)
+									ACADE project target (.wdp)
 								</label>
 								<input
 									id="project-form-acade-project-file"
 									name="project_form_acade_project_file"
 									type="text"
 									value={formData.titleBlockAcadeProjectFilePath}
-									onChange={(event) =>
+									onChange={(event) => {
+										autoDerivedAcadePathRef.current = "";
 										updateProjectForm(setFormData, {
 											titleBlockAcadeProjectFilePath: event.target.value,
-										})
-									}
+										});
+									}}
 									className={styles.input}
-									placeholder="Optional. Leave blank to scaffold from the project root."
+									placeholder="Optional override. Leave blank to derive from the project name and root."
 								/>
 								<p className={styles.inlineHint}>
-									Suite derives a starter .wdp, .wdt, and .wdl from these
-									defaults. If this stays blank, Suite now defaults to the project
-									name inside the root folder, then creates any missing support
-									files automatically when project setup is saved or the title
-									block apply/export flow runs. ACADE reads this project
-									definition through Project Manager; drawings still open as
-									.dwg files.
+									This is the target .wdp path ACADE will create or activate.
+									If this stays blank, the wizard derives it from the project
+									name and root folder. Save Setup Only stores the path and
+									support defaults; Create and Open in ACADE asks ACADE to use
+									this exact path in Project Manager.
 								</p>
 							</div>
 							<div className={styles.gridTwo}>
@@ -1138,10 +1148,10 @@ export function ProjectFormModal({
 											"Starter .wdp will be derived from the project root"}
 									</strong>
 									<p>
-										Suite scaffolds the ACADE project definition (.wdp) and
-										companion .wdt/.wdl support files from these defaults. Open
-										in ACADE then launches ACADE and activates the project in
-										Project Manager before you review live drawings.
+										Save Setup Only keeps the target path and support defaults
+										aligned. Create and Open in ACADE launches ACADE and asks it
+										to create or activate the live project at that path in
+										Project Manager before you review drawings.
 									</p>
 								</div>
 							</div>
@@ -1216,7 +1226,7 @@ export function ProjectFormModal({
 									className={styles.buttonSecondary}
 									disabled={!canSubmit}
 								>
-									{submitLabel}
+									{reviewSubmitLabel}
 								</button>
 								{onSubmitAndOpenAcade ? (
 									<button

@@ -456,6 +456,9 @@
 .reviewCard strong {
 	font-size: 0.9rem;
 	color: var(--text);
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+	word-break: break-word;
 }
 
 .reviewCard p {

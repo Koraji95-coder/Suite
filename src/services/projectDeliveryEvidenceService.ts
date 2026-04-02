@@ -771,7 +771,7 @@ export function renderProjectIssueSetEvidencePacketMarkdown(
 		lines.push(
 			`- Project file state: ${
 				packet.acadeSetup.wdpState === "existing"
-					? "Existing ACADE project file detected"
+					? "Existing ACADE project definition detected"
 					: "Starter ACADE project scaffold"
 			}`,
 		);

@@ -212,8 +212,144 @@ describe("ProjectFormModal", () => {
 		).toBeTruthy();
 		expect(screen.getByText("C:/Projects/Nanulak/Issued PDF")).toBeTruthy();
 
-		fireEvent.click(screen.getByRole("button", { name: "Create Project" }));
+		fireEvent.click(screen.getByRole("button", { name: "Save Setup Only" }));
 		await waitFor(() => expect(submitSpy).toHaveBeenCalledTimes(1));
+		},
+		15_000,
+	);
+
+	it(
+		"derives the ACADE project file path from project name when the field is blank",
+		async () => {
+			vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
+				projectId: "project-setup-test",
+				projectRootPath: "C:/Projects/Nanulak",
+				profile: {
+					blockName: "R3P-24x36BORDER&TITLE",
+					projectRootPath: "C:/Projects/Nanulak",
+					acadeProjectFilePath: "",
+					acadeLine1: "",
+					acadeLine2: "",
+					acadeLine4: "",
+					signerDrawnBy: "",
+					signerCheckedBy: "",
+					signerEngineer: "",
+				},
+				summary: {
+					totalFiles: 8,
+					drawingFiles: 6,
+					flaggedFiles: 0,
+					suiteWriteCount: 0,
+					acadeWriteCount: 0,
+					wdTbConflictCount: 0,
+				},
+				artifacts: {
+					wdpPath: "",
+					wdtPath: "",
+					wdlPath: "",
+					wdpText: "",
+					wdtText: "",
+					wdlText: "",
+					wdpState: "starter",
+				},
+				rows: [],
+				titleBlockRows: [],
+				warnings: [],
+			});
+
+			render(<TestHarness onSubmit={vi.fn()} />);
+
+			fireEvent.change(screen.getByLabelText("Project name"), {
+				target: { value: "Nanulak 180MW Substation" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+			fireEvent.change(screen.getByLabelText("Project root folder"), {
+				target: { value: "C:/Projects/Nanulak" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: /validate root/i }));
+
+			await waitFor(() =>
+				expect(
+					screen.getByText(
+						"Root validated. Found 6 drawings for project setup.",
+					),
+				).toBeTruthy(),
+			);
+			fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+			await waitFor(() =>
+				expect(
+					(
+						screen.getByLabelText(
+							"ACADE project target (.wdp)",
+						) as HTMLInputElement
+					).value,
+				).toBe("C:/Projects/Nanulak/Nanulak 180MW Substation.wdp"),
+			);
+		},
+		15_000,
+	);
+
+	it(
+		"keeps the derived ACADE project file path aligned with root changes until manually overridden",
+		async () => {
+			render(<TestHarness onSubmit={vi.fn()} />);
+
+			fireEvent.change(screen.getByLabelText("Project name"), {
+				target: { value: "SuiteIntegrationSmoke" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+			fireEvent.change(screen.getByLabelText("Project root folder"), {
+				target: { value: "C:/Projects/SuiteCleanTest" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+			await waitFor(() =>
+				expect(
+					(
+						screen.getByLabelText(
+							"ACADE project target (.wdp)",
+						) as HTMLInputElement
+					).value,
+				).toBe("C:/Projects/SuiteCleanTest/SuiteIntegrationSmoke.wdp"),
+			);
+
+			fireEvent.click(screen.getByRole("button", { name: "Back" }));
+			fireEvent.change(screen.getByLabelText("Project root folder"), {
+				target: { value: "C:/Projects/SuiteTest" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+			await waitFor(() =>
+				expect(
+					(
+						screen.getByLabelText(
+							"ACADE project target (.wdp)",
+						) as HTMLInputElement
+					).value,
+				).toBe("C:/Projects/SuiteTest/SuiteIntegrationSmoke.wdp"),
+			);
+
+			fireEvent.change(screen.getByLabelText("ACADE project target (.wdp)"), {
+				target: { value: "C:/Custom/ManualProject.wdp" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: "Back" }));
+			fireEvent.change(screen.getByLabelText("Project root folder"), {
+				target: { value: "C:/Projects/AnotherRoot" },
+			});
+			fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+			await waitFor(() =>
+				expect(
+					(
+						screen.getByLabelText(
+							"ACADE project target (.wdp)",
+						) as HTMLInputElement
+					).value,
+				).toBe("C:/Custom/ManualProject.wdp"),
+			);
 		},
 		15_000,
 	);

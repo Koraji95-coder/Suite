@@ -36,7 +36,7 @@ Agents can be the premium orchestration layer even later.
 
 - Scan drawing list.
 - Review title block mismatches.
-- Run standards checks.
+- Run standards checker.
 - Build the issue package/transmittal.
 - Link work back to project and drawing activity.
 

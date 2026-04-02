@@ -21,6 +21,7 @@ import {
 } from "@/services/projectTitleBlockProfileService";
 import { projectDocumentMetadataService } from "@/services/projectDocumentMetadataService";
 import {
+	buildTitleBlockSyncFailureMessage,
 	type TitleBlockSyncArtifacts,
 	titleBlockSyncService,
 } from "@/services/titleBlockSyncService";
@@ -212,7 +213,7 @@ function getAcadeProjectFileSummary(
 			path: artifacts.wdpPath,
 			state:
 				artifacts.wdpState === "existing"
-					? "Existing .wdp detected. Suite will keep using it as the project file."
+					? "Existing .wdp detected. Suite will keep using it as the ACADE project definition."
 					: "Starter .wdp derived from the current project setup.",
 		};
 	}
@@ -220,7 +221,7 @@ function getAcadeProjectFileSummary(
 		return {
 			path: profile.acade_project_file_path.trim(),
 			state:
-				"Configured .wdp path. Suite will write starter support files here only if the project file is missing.",
+				"Configured .wdp path. Suite will activate this project in ACADE and only write starter support files here if the project definition is missing.",
 		};
 	}
 	return {
@@ -236,9 +237,9 @@ function getAcadeSupportStatus(
 ) {
 	if (artifacts?.wdpState === "existing") {
 		return {
-			label: "Existing ACADE project file",
+			label: "Existing ACADE project definition",
 			detail:
-				"Suite detected an existing .wdp and will preserve it while keeping the companion support files aligned.",
+				"Suite detected an existing .wdp project definition and will preserve it while keeping the companion support files aligned.",
 			tone: "existing" as const,
 		};
 	}
@@ -247,7 +248,7 @@ function getAcadeSupportStatus(
 		return {
 			label: "Suite starter scaffold active",
 			detail:
-				"Suite is using a starter .wdp scaffold and companion .wdt/.wdl files until you replace them with a confirmed ACADE project file.",
+				"Suite is using a starter .wdp scaffold and companion .wdt/.wdl files until you replace them with a confirmed ACADE project definition.",
 			tone: "starter" as const,
 		};
 	}
@@ -409,6 +410,7 @@ export function ProjectSetupReadinessPanel({
 				projectId: project.id,
 				projectRootPath: effectiveProjectRoot,
 				profile: {
+					projectName: project.name,
 					blockName:
 						state.profile.block_name || DEFAULT_PROJECT_TITLE_BLOCK_NAME,
 					projectRootPath: effectiveProjectRoot,
@@ -427,14 +429,22 @@ export function ProjectSetupReadinessPanel({
 			});
 
 			if (!result.success || !result.data) {
-				throw new Error(result.message || "Unable to open the ACADE project.");
+				throw new Error(
+					buildTitleBlockSyncFailureMessage(
+						result,
+						"Unable to open the ACADE project.",
+					),
+				);
 			}
 
 			setState((current) => ({
 				...current,
 				artifacts: result.data?.artifacts ?? current.artifacts,
 			}));
-			showToast("success", result.message || "ACADE project open requested.");
+			showToast(
+				"success",
+				result.message || "ACADE opened and project activated.",
+			);
 		} catch (error) {
 			showToast(
 				"error",
@@ -557,7 +567,7 @@ export function ProjectSetupReadinessPanel({
 						<div className={styles.supportCardHeader}>
 							<p className={styles.supportCardEyebrow}>Support files</p>
 							<p className={styles.supportCardCopy}>
-								Current project file and companion files.
+								Current project definition and companion files.
 							</p>
 						</div>
 						<div
@@ -603,8 +613,10 @@ export function ProjectSetupReadinessPanel({
 						</div>
 						<ul className={styles.artifactGuide}>
 							<li>
-								<strong>.wdp</strong> keeps the AutoCAD Electrical project
-								scaffold and drawing list.
+								<strong>.wdp</strong> is the AutoCAD Electrical project
+								definition and drawing list. Drawings themselves still open as
+								{" "}
+								<strong>.dwg</strong> files.
 							</li>
 							<li>
 								<strong>.wdt</strong> maps title block attribute tags.
@@ -624,8 +636,8 @@ export function ProjectSetupReadinessPanel({
 							</p>
 						</div>
 						<p className={styles.supportDetail}>
-							Create the support files first, then verify the live drawings
-							before you build the package.
+							Create the support files first, then launch ACADE to activate the
+							project before you verify the live drawings.
 						</p>
 						<ul className={styles.artifactGuide}>
 							<li>Set the DWG root, PDF package root, and signer defaults first.</li>

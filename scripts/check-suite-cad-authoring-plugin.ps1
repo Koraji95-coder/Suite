@@ -176,12 +176,20 @@ if ($packageExists -and [string]::IsNullOrWhiteSpace($productCode)) {
 if ($packageExists -and [string]::IsNullOrWhiteSpace($upgradeCode)) {
     Add-UniqueError -ErrorList $errors -Message "PackageContents.xml is missing UpgradeCode."
 }
+if (-not $loadOnStartup) {
+    Add-UniqueError -ErrorList $errors -Message "PackageContents.xml does not enable LoadOnAutoCADStartup."
+}
 if (-not $trustedPathSummary.registered) {
     Add-UniqueError -ErrorList $errors -Message "AutoCAD trusted path registration is missing for the plugin bundle."
 }
 
 $expectedCommands = @(
-    "SUITETERMINALAUTHORAPPLY"
+    "SUITETERMINALAUTHORAPPLY",
+    "SUITEMARKUPAUTHORAPPLY",
+    "SUITEACADEPROJECTOPEN",
+    "SUITEACADEPROJECTCREATE",
+    "SUITEACADEDEBUGSTATUS",
+    "SUITEPIPESTATUS"
 )
 $missingCommands = @(
     $expectedCommands |

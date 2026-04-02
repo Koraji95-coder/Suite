@@ -5,6 +5,113 @@ Branch: `main`
 
 This is a restart/handoff doc summarizing what has already been completed and what to do next.
 
+## March 31, 2026 ACADE Stabilization Checkpoint
+
+### April 1, 2026 Clean Test Root
+
+- Use this as the clean local Suite/ACADE test root on this workstation:
+  - `C:\Users\koraj\Documents\Acade 2026\AeData\Proj\<TestProjectName>`
+- Current recommended throwaway project path for live smoke tests:
+  - `C:\Users\koraj\Documents\Acade 2026\AeData\Proj\suite1\suite1.wdp`
+- Avoid `G:` and other network-backed paths while the project switch path is still being stabilized.
+- Avoid using Autodesk demo projects such as `WDDEMO`, `IECDEMO`, or `EXTRA LIBRARY DEMO` as the target project-under-test:
+  - ACADE is still exposing those active projects primarily as `%APPDATA%\...\Support\user\*.mdb`
+  - Suite now closes them successfully, but they are still a noisy baseline for open/switch validation
+  - the cleanest smoke path is a local Suite-created test project under `Documents\Acade 2026\AeData\Proj`
+
+### April 1, 2026 Switch-Path Follow-Up
+
+- ACADE active-project discovery is now `.wdp`-first instead of `.mdb`-first:
+  - `GetActiveProjectFileName` / project-file accessors are preferred
+  - `.mdb` remains captured as secondary diagnostic state
+- Suite now uses an explicit switch-if-clean pipeline when another ACADE project is active:
+  - evaluate switch eligibility
+  - close current project first
+  - then open the requested target `.wdp`
+- Fast blocked failures now short-circuit project switching when:
+  - `CMDNAMES` is not idle
+  - `DBMOD` is non-zero
+  - another Suite create/open operation is still marked active
+  - a temporary scratch drawing is still pending cleanup
+- Request traces now record:
+  - active project `.wdp`
+  - active project `.mdb`
+  - switch blocked reason
+  - close-stage and open-stage warning details
+- `SUITEACADEDEBUGSTATUS` now prints:
+  - active `.wdp`
+  - active `.mdb`
+  - `DBMOD`
+  - switch eligibility / blocked reason
+- Focused helper tests now live in `dotnet/suite-cad-authoring.Tests/` and cover:
+  - `.wdp` preferred over `.mdb`
+  - `.wdp`/`.mdb` same-project comparison
+  - switch-eligibility blocking rules
+
+### April 1, 2026 Close-Path Follow-Up
+
+- When ACADE only exposes the active project as `%APPDATA%\\...\\Support\\user\\*.mdb`, Suite now tries to reconstruct the real project definition path from known ACADE project roots:
+  - `%USERPROFILE%\\Documents\\Acade 2026\\AeData\\Proj`
+  - `%PUBLIC%\\Documents\\Autodesk\\Acade 2026\\AeData\\Proj`
+- The reconstruction is display-name aware and cached, so demo projects such as `IECDEMO` and `EXTRA LIBRARY DEMO` can resolve back to their `.wdp` definitions instead of staying `.mdb`-only.
+- Close-current-project strategies now try the best available identifiers in this order:
+  - derived / discovered `.wdp`
+  - project display name
+  - internal `.mdb`
+- The latest live blocker is no longer pipe access or startup readiness:
+  - ACADE session is healthy
+  - `wd_load` is ready
+  - Suite can now close the current active demo project
+  - the remaining failure is the open-stage handoff after close when ACADE still reports the old active project as `%APPDATA%\...\Support\user\*.mdb`
+  - root scanning now includes Autodesk default local project roots:
+    - `%USERPROFILE%\Documents\Acade 2026\AeData\Proj`
+    - `%USERPROFILE%\Documents\AcadE 2026\AeData\proj`
+    - `%USERPROFILE%\My Documents\AcadE 2026\AeData\proj`
+    - `%PUBLIC%\Documents\Autodesk\Acade 2026\AeData\Proj`
+
+### What Landed In This Tranche
+
+- Watchdog is now intentionally isolated from `<<ACADE>>` sessions at runtime:
+  - no ACADE autostart
+  - no ACADE startup banner
+  - `STARTTRACKER` reports isolation in ACADE
+  - `TRACKERSTATUS` reports suppression in ACADE
+- Plain AutoCAD Watchdog behavior is unchanged.
+- The Suite ACADE authoring bundle no longer queues `fboundp` warm-up expressions into the AutoCAD command line.
+- ACADE project open/create now waits for a quieter readiness window before attempting project work.
+- `wd_load` is the primary readiness signal for the Electrical runtime; if it never becomes available, Suite returns a structured not-ready failure instead of spamming the command line.
+- The in-process ACADE pipe host no longer runs the entire open/create workflow on AutoCAD's UI thread; long readiness and verification waits now stay on the background pipe thread and only short AutoCAD API operations are marshaled onto the application thread.
+- Direct `SendStringToExecute(...)` project fallbacks remain available, but only after in-process readiness checks pass, and they are no longer the main create/open path.
+- Request-scoped diagnostics are now wired for ACADE create/open:
+  - backend bridge logs include `requestId`, action timing, and plugin `tracePath`
+  - the authoring bundle writes JSONL traces under `%LOCALAPPDATA%\Suite\logs\acade\YYYY-MM-DD\<requestId>.jsonl`
+  - `SUITEACADEDEBUGSTATUS` prints current profile, active document, command state, `wd_load` readiness, active project path, and trace root
+
+### Why This Was Necessary
+
+- The repeated `; error: no function definition: FBOUNDP` failures were coming from Suite's old ACADE warm-up/open fallback path, not from the Watchdog tracker.
+- AutoCAD Electrical can appear visually ready while its Electrical Lisp/ARX runtime is still initializing.
+- The 120-second browser timeout / “blank grinding” ACADE window was caused by UI-thread sleep loops inside the old pipe-host execution model.
+- Isolating Watchdog in ACADE removes one timing variable and gives a cleaner baseline while the authoring path is stabilized.
+
+### What Still Needs Live Validation
+
+- Fresh ACADE launch:
+  - no Watchdog banner in ACADE
+  - `TRACKERSTATUS` reports isolation
+  - `SUITEPIPESTATUS` reports the in-process ACADE pipe host
+- Suite-driven `Create and Open in ACADE`:
+  - no command-line `FBOUNDP` spam
+  - target project appears in Project Manager
+  - temporary scratch drawing closes when safe
+- New observability path:
+  - reproduce one failing request
+  - capture the frontend `requestId`
+  - run `SUITEACADEDEBUGSTATUS`
+  - inspect the request trace under `%LOCALAPPDATA%\Suite\logs\acade\...`
+- Plain AutoCAD:
+  - Watchdog still auto-starts and tracks normally outside `<<ACADE>>`
+
 ## Later Track
 
 - Monetization/productization backlog is parked here for later:

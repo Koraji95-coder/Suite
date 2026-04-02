@@ -259,58 +259,53 @@ class TestAutoCadStateCollector(unittest.TestCase):
                 "MOVE",
             )
 
-            api_client.send_calls.clear()
+    def test_tracker_state_exposes_create_operation_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_path = Path(temp_dir) / "tracker-state.json"
+            api_client = FakeCollectorApiClient()
+            collector = AutoCadStateCollector(
+                make_config(temp_dir, state_path),
+                api_client=api_client,
+                autocad_process_checker=lambda: True,
+            )
+
             write_tracker_state(
                 state_path,
                 {
-                    "activeDrawing": "None",
-                    "activeDrawingPath": None,
+                    "activeDrawing": "Drawing1.dwg",
+                    "activeDrawingPath": r"C:\Projects\Test\Drawing1.dwg",
                     "isTracking": True,
                     "isPaused": False,
+                    "isCreating": True,
+                    "operationType": "acade_project_create",
+                    "operationRequestId": "req-create-1",
+                    "operationTargetPath": r"C:\Projects\Test\Test.wdp",
+                    "operationStartedAt": "2026-03-31T20:00:00Z",
                     "idleTimeoutSeconds": 180,
-                    "recentCommands": ["MOVE", "ZOOM", "LINE"],
-                    "lastActivityAt": "2026-03-18T10:06:00Z",
-                    "lastUpdated": "2026-03-18T10:06:05Z",
-                    "currentSession": None,
-                    "sessions": [
-                        {
-                            "sessionId": "session-1",
-                            "drawingName": "sheet-1.dwg",
-                            "fullPath": r"C:\Projects\Alpha\sheet-1.dwg",
-                            "startedAt": "2026-03-18T10:00:00Z",
-                            "endedAt": "2026-03-18T10:06:05Z",
-                            "commandCount": 3,
-                            "activeTime": "00:04:00",
-                            "idleTime": "00:01:00",
-                            "isActive": False,
-                        }
-                    ],
+                    "recentCommands": [],
+                    "lastActivityAt": "2026-03-31T20:00:01Z",
+                    "lastUpdated": "2026-03-31T20:00:02Z",
+                    "currentSession": {
+                        "sessionId": "session-1",
+                        "drawingName": "Drawing1.dwg",
+                        "fullPath": r"C:\Projects\Test\Drawing1.dwg",
+                        "startedAt": "2026-03-31T20:00:00Z",
+                        "commandCount": 0,
+                        "activeTime": "00:00:10",
+                        "idleTime": "00:00:00",
+                        "isActive": True,
+                    },
+                    "sessions": [],
                 },
             )
 
-            collector.scan_once()
-            collector.flush_pending_events()
-            third_event_types = [
-                str(event.get("eventType") or "")
-                for event in api_client.send_calls[0]
-            ]
-            self.assertEqual(third_event_types, ["idle_resumed", "drawing_closed"])
-            self.assertEqual(
-                str(api_client.send_calls[0][1].get("sessionId") or ""),
-                "session-1",
-            )
-            self.assertEqual(
-                int(api_client.send_calls[0][1].get("durationMs") or 0),
-                240000,
-            )
-            self.assertEqual(
-                int(api_client.send_calls[0][1].get("metadata", {}).get("trackedMs") or 0),
-                240000,
-            )
-            self.assertEqual(
-                int(api_client.send_calls[0][1].get("metadata", {}).get("idleMs") or 0),
-                60000,
-            )
+            collector.run_once()
+
+            heartbeat = api_client.heartbeat_calls[-1]["metadata"]
+            self.assertTrue(heartbeat["isCreating"])
+            self.assertEqual(heartbeat["operationType"], "acade_project_create")
+            self.assertEqual(heartbeat["operationRequestId"], "req-create-1")
+            self.assertEqual(heartbeat["operationTargetPath"], r"C:\Projects\Test\Test.wdp")
 
     def test_failed_flush_replays_buffered_events_without_changing_event_keys(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -1,6 +1,6 @@
 {
 	"schemaVersion": "suite.developer-docs.v1",
-	"generatedAt": "2026-04-02T06:30:14.619Z",
+	"generatedAt": "2026-04-02T07:30:58.029Z",
 	"docCount": 53,
 	"sections": [
 		{
@@ -15,7 +15,10 @@
 					"summary": "This is the primary operator manual for coordinating the Suite multi-agent system.",
 					"relativePath": "docs/agent/README.md",
 					"sectionId": "agent-lab",
-					"tags": ["agent-lab", "agents"],
+					"tags": [
+						"agent-lab",
+						"agents"
+					],
 					"startHere": true
 				},
 				{
@@ -24,7 +27,11 @@
 					"summary": "Backend-led orchestration runs agents in parallel stages and stores all progress in a persistent run ledger.",
 					"relativePath": "docs/agent/orchestration-runbook.md",
 					"sectionId": "agent-lab",
-					"tags": ["agent-lab", "agents", "runbook"],
+					"tags": [
+						"agent-lab",
+						"agents",
+						"runbook"
+					],
 					"startHere": false
 				},
 				{
@@ -33,7 +40,10 @@
 					"summary": "This is the canonical operator runbook for broker-first pairing in Suite.",
 					"relativePath": "docs/agent/pairing-lifecycle.md",
 					"sectionId": "agent-lab",
-					"tags": ["agent-lab", "agents"],
+					"tags": [
+						"agent-lab",
+						"agents"
+					],
 					"startHere": false
 				},
 				{
@@ -42,7 +52,10 @@
 					"summary": "This repo uses deterministic profile-based model routing for Suite Agent.",
 					"relativePath": "docs/agent/ollama-profile-model-pack.md",
 					"sectionId": "agent-lab",
-					"tags": ["agent-lab", "agents"],
+					"tags": [
+						"agent-lab",
+						"agents"
+					],
 					"startHere": false
 				},
 				{
@@ -51,7 +64,10 @@
 					"summary": "This playbook defines runtime intent for the six active Suite agent profiles.",
 					"relativePath": "docs/agent/profile-playbook.md",
 					"sectionId": "agent-lab",
-					"tags": ["agent-lab", "agents"],
+					"tags": [
+						"agent-lab",
+						"agents"
+					],
 					"startHere": false
 				}
 			]
@@ -68,7 +84,10 @@
 					"summary": "This folder tracks the migration from a one-off Python COM script to a staged",
 					"relativePath": "docs/autodraft/README.md",
 					"sectionId": "automation-lab",
-					"tags": ["automation", "automation-lab"],
+					"tags": [
+						"automation",
+						"automation-lab"
+					],
 					"startHere": true
 				},
 				{
@@ -77,7 +96,10 @@
 					"summary": "Developer documentation for Suite.",
 					"relativePath": "docs/autodraft/todo-color-semantics-swap.md",
 					"sectionId": "automation-lab",
-					"tags": ["automation", "automation-lab"],
+					"tags": [
+						"automation",
+						"automation-lab"
+					],
 					"startHere": false
 				},
 				{
@@ -86,7 +108,10 @@
 					"summary": "This document defines when to switch from current staged AutoDraft behavior to",
 					"relativePath": "docs/autodraft/execute-cutover.md",
 					"sectionId": "automation-lab",
-					"tags": ["automation", "automation-lab"],
+					"tags": [
+						"automation",
+						"automation-lab"
+					],
 					"startHere": false
 				},
 				{
@@ -95,7 +120,10 @@
 					"summary": "Developer documentation for Suite.",
 					"relativePath": "docs/autodraft/autodrawingcleaner-readme.md",
 					"sectionId": "automation-lab",
-					"tags": ["automation", "automation-lab"],
+					"tags": [
+						"automation",
+						"automation-lab"
+					],
 					"startHere": false
 				}
 			]
@@ -112,7 +140,9 @@
 					"summary": "This Flask backend bridges the React web interface to AutoCAD's COM interface, enabling real-time AutoCAD detection and interaction from the browser.",
 					"relativePath": "docs/backend/coordinates-grabber-api.md",
 					"sectionId": "backend-integration",
-					"tags": ["backend-integration"],
+					"tags": [
+						"backend-integration"
+					],
 					"startHere": false
 				},
 				{
@@ -121,7 +151,9 @@
 					"summary": "This guide describes a safe, robust local bridge between the existing backend and a .NET AutoCAD automation service using Windows named pipes. It keeps the TSX UI intact and does not require exposing network ports.",
 					"relativePath": "docs/backend/named-pipe-bridge.md",
 					"sectionId": "backend-integration",
-					"tags": ["backend-integration"],
+					"tags": [
+						"backend-integration"
+					],
 					"startHere": false
 				}
 			]
@@ -138,7 +170,9 @@
 					"summary": "The AutoCAD Electrical 2026 API entry point list consists of a series of entry points into the AutoCAD Electrical software executable. This API allows a user to create custom applications such as automatic schematic gene",
 					"relativePath": "docs/development/AutoCAD Electrical 2026 AutoLISP Reference API Documentation.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -147,7 +181,9 @@
 					"summary": "Generated from allowlisted wrapped Autodesk Offline Help payloads under C:\\Program Files\\Autodesk\\Offline Help for AutoCAD Electrical 2026 - English. This focused reference is the authoritative Suite-side doc for ACADE p",
 					"relativePath": "docs/development/autocad-electrical-2026-project-flow-reference.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -156,7 +192,10 @@
 					"summary": "You've got a solid foundation — the Flask proxy pattern with local fallback is clean, and the service layer is well-structured. Here's how I'd think about expanding this with deeper AutoCAD .NET connectivity:",
 					"relativePath": "docs/development/autodraft-integration-notes-legacy.md",
 					"sectionId": "developer-workshop",
-					"tags": ["automation", "developer-workshop"],
+					"tags": [
+						"automation",
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -165,7 +204,10 @@
 					"summary": "This note archives the legacy prototype files that previously lived under",
 					"relativePath": "docs/development/autowire-legacy-artifacts-archive.md",
 					"sectionId": "developer-workshop",
-					"tags": ["automation", "developer-workshop"],
+					"tags": [
+						"automation",
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -174,7 +216,9 @@
 					"summary": "Right now your data flow is: Supabase metadata → React UI. You'd want to move to: DWG files on disk → .NET AutoCAD backend extracts real data → API serves it → React renders it.",
 					"relativePath": "docs/development/block-library-reference.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -183,7 +227,9 @@
 					"summary": "Command Center is the developer-only diagnostics toolshed for Suite.",
 					"relativePath": "docs/development/command-center.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -192,7 +238,10 @@
 					"summary": "This runbook describes how to move terminal label sync from the legacy COM endpoint to the new bridge endpoint with a controlled rollback path.",
 					"relativePath": "docs/development/conduit-terminal-label-sync-rollout.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop", "rollout"],
+					"tags": [
+						"developer-workshop",
+						"rollout"
+					],
 					"startHere": false
 				},
 				{
@@ -201,7 +250,9 @@
 					"summary": "Use this before the first focused test pass of the new R3P Electrical v1 drawing-program workflow.",
 					"relativePath": "docs/development/electrical-drawing-program-test-readiness.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -210,7 +261,9 @@
 					"summary": "This AutoCAD .NET plugin loads DXF files exported from ETAP and automatically fixes common issues: misaligned text, overlapping labels, improperly scaled blocks, and messy layer organization. It runs inside AutoCAD as a ",
 					"relativePath": "docs/development/dxfer-reference.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -219,7 +272,11 @@
 					"summary": "Lock one stable operational path for gateway work so MCP/Codex sessions stop re-deciding launch strategy and stop accumulating speculative workarounds.",
 					"relativePath": "docs/development/gateway-stability-policy.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop", "gateway", "policy"],
+					"tags": [
+						"developer-workshop",
+						"gateway",
+						"policy"
+					],
 					"startHere": false
 				},
 				{
@@ -228,7 +285,9 @@
 					"summary": "Canonical workstation profile data lives in tools/suite-repo-mcp/workstation-profiles.json.",
 					"relativePath": "docs/development/mcp-workstation-matrix.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -237,7 +296,9 @@
 					"summary": "This is the \"for later\" backlog for turning Suite into something customers can pay for.",
 					"relativePath": "docs/development/monetization-readiness-backlog.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -246,7 +307,10 @@
 					"summary": "Use this when automation needs access to protected /app/ routes without",
 					"relativePath": "docs/development/playwright-auth-bootstrap.md",
 					"sectionId": "developer-workshop",
-					"tags": ["auth", "developer-workshop"],
+					"tags": [
+						"auth",
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -255,7 +319,10 @@
 					"summary": "Use this checklist before exposing the app to non-dev users.",
 					"relativePath": "docs/development/public-rollout-readiness.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop", "rollout"],
+					"tags": [
+						"developer-workshop",
+						"rollout"
+					],
 					"startHere": false
 				},
 				{
@@ -264,7 +331,11 @@
 					"summary": "This document captures how the system behaves in real time right now, after the latest stabilization and backcheck passes.",
 					"relativePath": "docs/development/realtime-agent-autowire-autodraft-state.md",
 					"sectionId": "developer-workshop",
-					"tags": ["agents", "automation", "developer-workshop"],
+					"tags": [
+						"agents",
+						"automation",
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -273,7 +344,9 @@
 					"summary": "This playbook cleans tracked build artifacts from git history going forward without deleting your local working files.",
 					"relativePath": "docs/development/repo-hygiene-playbook.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -282,7 +355,9 @@
 					"summary": "This is a restart/handoff doc summarizing what has already been completed and what to do next.",
 					"relativePath": "docs/development/work-summary-and-todo.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -291,7 +366,10 @@
 					"summary": "Suite now treats local and hosted Supabase as explicit targets instead of one blended runtime.",
 					"relativePath": "docs/development/supabase-local-hosted-workflow.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop", "supabase"],
+					"tags": [
+						"developer-workshop",
+						"supabase"
+					],
 					"startHere": false
 				},
 				{
@@ -300,7 +378,9 @@
 					"summary": "Scope: dashboard, changelog, projects, Ground Grid, Coordinates, Conduit, AutoDraft, Graph, Architecture, and agent surfaces",
 					"relativePath": "docs/development/ui-overhaul-audit-2026-03-18.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -309,7 +389,10 @@
 					"summary": "Use this when setting up Suite on a new Windows workstation or when standardizing an existing machine onto the cross-workstation layout.",
 					"relativePath": "docs/development/supabase-workstation-bringup.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop", "supabase"],
+					"tags": [
+						"developer-workshop",
+						"supabase"
+					],
 					"startHere": false
 				},
 				{
@@ -318,7 +401,9 @@
 					"summary": "This is the handoff checklist for resuming on the other workstation after restoring local state.",
 					"relativePath": "docs/development/tomorrow-todo-2026-03-19.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -327,7 +412,10 @@
 					"summary": "Use this when moving active development between Windows workstations and you want the destination machine to pick up:",
 					"relativePath": "docs/development/workstation-transfer-runbook.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop", "runbook"],
+					"tags": [
+						"developer-workshop",
+						"runbook"
+					],
 					"startHere": false
 				},
 				{
@@ -336,7 +424,9 @@
 					"summary": "Historical record of what Suite extracted, referenced, or intentionally left behind from the removed zeroclaw-main subtree.",
 					"relativePath": "docs/development/zeroclaw-adoption-matrix.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop"],
+					"tags": [
+						"developer-workshop"
+					],
 					"startHere": false
 				},
 				{
@@ -345,7 +435,10 @@
 					"summary": "The old zeroclaw-main subtree has been removed from the active Suite repo.",
 					"relativePath": "docs/development/zeroclaw-isolation-policy.md",
 					"sectionId": "developer-workshop",
-					"tags": ["developer-workshop", "policy"],
+					"tags": [
+						"developer-workshop",
+						"policy"
+					],
 					"startHere": false
 				}
 			]
@@ -362,7 +455,10 @@
 					"summary": "1. POST /api/agent/pairing-challenge",
 					"relativePath": "docs/security/auth-landing-conversation-README.md",
 					"sectionId": "security-auth",
-					"tags": ["auth", "security-auth"],
+					"tags": [
+						"auth",
+						"security-auth"
+					],
 					"startHere": false
 				},
 				{
@@ -371,7 +467,10 @@
 					"summary": "This note records auth work that was intentionally left out of the dead-UI cleanup and local-artifact pruning tranche.",
 					"relativePath": "docs/security/auth-hardening-follow-up.md",
 					"sectionId": "security-auth",
-					"tags": ["auth", "security-auth"],
+					"tags": [
+						"auth",
+						"security-auth"
+					],
 					"startHere": false
 				},
 				{
@@ -380,7 +479,11 @@
 					"summary": "2. Auth method telemetry expansion",
 					"relativePath": "docs/security/auth-readiness-checklist.md",
 					"sectionId": "security-auth",
-					"tags": ["auth", "checklist", "security-auth"],
+					"tags": [
+						"auth",
+						"checklist",
+						"security-auth"
+					],
 					"startHere": false
 				},
 				{
@@ -389,7 +492,10 @@
 					"summary": "Auth method telemetry is written to activitylog.action with this format:",
 					"relativePath": "docs/security/auth-telemetry.md",
 					"sectionId": "security-auth",
-					"tags": ["auth", "security-auth"],
+					"tags": [
+						"auth",
+						"security-auth"
+					],
 					"startHere": false
 				},
 				{
@@ -398,7 +504,9 @@
 					"summary": "This project uses environment variables for runtime configuration and keeps secrets out of source control.",
 					"relativePath": "docs/security/environment-and-secrets.md",
 					"sectionId": "security-auth",
-					"tags": ["security-auth"],
+					"tags": [
+						"security-auth"
+					],
 					"startHere": false
 				},
 				{
@@ -407,7 +515,10 @@
 					"summary": "Passkeys are the target primary login method, but rollout should avoid lockout risk and preserve operational stability.",
 					"relativePath": "docs/security/passkey-rollout-plan.md",
 					"sectionId": "security-auth",
-					"tags": ["rollout", "security-auth"],
+					"tags": [
+						"rollout",
+						"security-auth"
+					],
 					"startHere": false
 				},
 				{
@@ -416,7 +527,10 @@
 					"summary": "This is the canonical auth reference for Suite, including frontend, backend broker, and gateway boundaries.",
 					"relativePath": "docs/security/auth-architecture-canonical.md",
 					"sectionId": "security-auth",
-					"tags": ["auth", "security-auth"],
+					"tags": [
+						"auth",
+						"security-auth"
+					],
 					"startHere": false
 				},
 				{
@@ -425,7 +539,9 @@
 					"summary": "This document is the Suite-side source of truth for external passkey callback wiring.",
 					"relativePath": "docs/security/passkey-external-callback-contract.md",
 					"sectionId": "security-auth",
-					"tags": ["security-auth"],
+					"tags": [
+						"security-auth"
+					],
 					"startHere": false
 				},
 				{
@@ -434,7 +550,10 @@
 					"summary": "This is the execution flow to apply Suite database/storage hardening and verify isolation.",
 					"relativePath": "docs/security/supabase-apply-and-verify.md",
 					"sectionId": "security-auth",
-					"tags": ["security-auth", "supabase"],
+					"tags": [
+						"security-auth",
+						"supabase"
+					],
 					"startHere": false
 				},
 				{
@@ -443,7 +562,11 @@
 					"summary": "Browser or terminal logs can repeat:",
 					"relativePath": "docs/security/supabase-clock-skew-runbook.md",
 					"sectionId": "security-auth",
-					"tags": ["runbook", "security-auth", "supabase"],
+					"tags": [
+						"runbook",
+						"security-auth",
+						"supabase"
+					],
 					"startHere": false
 				},
 				{
@@ -452,7 +575,11 @@
 					"summary": "Use this when Supabase returns 429 email rate limit exceeded for auth emails.",
 					"relativePath": "docs/security/supabase-custom-smtp-runbook.md",
 					"sectionId": "security-auth",
-					"tags": ["runbook", "security-auth", "supabase"],
+					"tags": [
+						"runbook",
+						"security-auth",
+						"supabase"
+					],
 					"startHere": false
 				},
 				{
@@ -461,7 +588,10 @@
 					"summary": "This runbook applies row-level security hardening for user-owned records (projects, tasks, files, calendar events, activity logs, settings).",
 					"relativePath": "docs/security/supabase-rls-hardening.md",
 					"sectionId": "security-auth",
-					"tags": ["security-auth", "supabase"],
+					"tags": [
+						"security-auth",
+						"supabase"
+					],
 					"startHere": false
 				}
 			]
@@ -478,7 +608,9 @@
 					"summary": "This index is the canonical entry point for repository documentation.",
 					"relativePath": "docs/README.md",
 					"sectionId": "workspace-docs",
-					"tags": ["workspace-docs"],
+					"tags": [
+						"workspace-docs"
+					],
 					"startHere": true
 				},
 				{
@@ -487,7 +619,10 @@
 					"summary": "1. Stop any old bridge/backend/frontend processes.",
 					"relativePath": "docs/autowire-todo-list.md",
 					"sectionId": "workspace-docs",
-					"tags": ["automation", "workspace-docs"],
+					"tags": [
+						"automation",
+						"workspace-docs"
+					],
 					"startHere": false
 				},
 				{
@@ -496,7 +631,9 @@
 					"summary": "This backlog captures the deep-scan findings for frontend/backend/.NET and",
 					"relativePath": "docs/deep-repo-hardening-backlog.md",
 					"sectionId": "workspace-docs",
-					"tags": ["workspace-docs"],
+					"tags": [
+						"workspace-docs"
+					],
 					"startHere": false
 				},
 				{
@@ -505,7 +642,9 @@
 					"summary": "https://apps.autodesk.com/ACD/en/Detail/Index?id=5349251522304654929&appLang=en&os=Win3264",
 					"relativePath": "docs/info.md",
 					"sectionId": "workspace-docs",
-					"tags": ["workspace-docs"],
+					"tags": [
+						"workspace-docs"
+					],
 					"startHere": false
 				},
 				{
@@ -514,7 +653,9 @@
 					"summary": "Date captured: March 10, 2026",
 					"relativePath": "docs/performance-baseline.md",
 					"sectionId": "workspace-docs",
-					"tags": ["workspace-docs"],
+					"tags": [
+						"workspace-docs"
+					],
 					"startHere": false
 				},
 				{
@@ -523,7 +664,9 @@
 					"summary": "This document captures the exact root causes and code changes made to stop repeated websocket connect/disconnect behavior in Ground Grid Generation, and to harden API key alignment between Vite frontend and Python backen",
 					"relativePath": "docs/websocket-mount-dismount-fix.md",
 					"sectionId": "workspace-docs",
-					"tags": ["workspace-docs"],
+					"tags": [
+						"workspace-docs"
+					],
 					"startHere": false
 				}
 			]

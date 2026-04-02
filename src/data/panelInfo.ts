@@ -100,7 +100,7 @@ export const appsInfo = {
 				"Generates detailed compliance reports",
 			],
 			tips: [
-				"Run standards checks before submitting drawings",
+				"Run standards checker before submitting drawings",
 				"Configure custom rules based on your standards",
 				"Export reports for quality documentation",
 				"Use to train team on drafting standards",
@@ -349,7 +349,7 @@ export const standardsInfo = {
 				"Keep standards up-to-date with latest versions",
 				"Use descriptive names including year and version number",
 				"Create project-specific standards folders",
-				"Regularly run standards checks before final delivery",
+				"Regularly run standards checker before final delivery",
 				"Maintain a standards update log",
 			],
 		},

@@ -9,6 +9,7 @@ import { supabase } from "@/supabase/client";
 import type { DrawingRevisionRegisterRow } from "@/services/projectRevisionRegisterService";
 
 export interface TitleBlockSyncProfile {
+	projectName?: string | null;
 	blockName: string;
 	projectRootPath: string | null;
 	acadeProjectFilePath?: string | null;
@@ -112,6 +113,34 @@ export interface TitleBlockSyncResponse {
 		drawings: TitleBlockSyncRow[];
 		summary: TitleBlockSyncSummary;
 		artifacts: TitleBlockSyncArtifacts;
+		openProject?: {
+			wdpPath: string;
+			acadeLaunched: boolean;
+			projectActivated: boolean;
+			temporaryDocumentCreated?: boolean;
+			temporaryDocumentClosed?: boolean;
+			verification: {
+				commandCompleted: boolean;
+				aepxObserved: boolean;
+				lastProjObserved: boolean;
+				activeProjectObserved?: boolean;
+			};
+		};
+		createProject?: {
+			wdpPath: string;
+			templateWdpPath: string;
+			acadeLaunched: boolean;
+			projectCreated: boolean;
+			projectActivated: boolean;
+			temporaryDocumentCreated?: boolean;
+			temporaryDocumentClosed?: boolean;
+			verification: {
+				commandCompleted: boolean;
+				aepxObserved: boolean;
+				lastProjObserved: boolean;
+				activeProjectObserved?: boolean;
+			};
+		};
 		apply?: Record<string, unknown>;
 		selectedRelativePaths?: string[];
 	};
@@ -155,6 +184,30 @@ export function normalizeTitleBlockWorkflowWarnings(warnings: string[]) {
 		}
 	}
 	return Array.from(uniqueWarnings);
+}
+
+export function buildTitleBlockSyncFailureMessage(
+	response:
+		| Pick<TitleBlockSyncResponse, "message" | "warnings">
+		| null
+		| undefined,
+	fallback: string,
+) {
+	const base =
+		normalizeTitleBlockWorkflowMessage(response?.message || fallback) || fallback;
+	const detail = normalizeTitleBlockWorkflowWarnings(response?.warnings || []).find(
+		(warning) => warning && warning !== base,
+	);
+	if (!detail) {
+		return base;
+	}
+	if (!base) {
+		return detail;
+	}
+	if (base.includes(detail)) {
+		return base;
+	}
+	return `${base} ${detail}`;
 }
 
 class TitleBlockSyncService {
@@ -288,6 +341,10 @@ class TitleBlockSyncService {
 
 	ensureArtifacts(payload: TitleBlockSyncPayload) {
 		return this.requestJson("/api/title-block-sync/ensure-artifacts", payload);
+	}
+
+	createProject(payload: TitleBlockSyncPayload) {
+		return this.requestJson("/api/title-block-sync/create-project", payload);
 	}
 
 	openProject(payload: TitleBlockSyncPayload) {

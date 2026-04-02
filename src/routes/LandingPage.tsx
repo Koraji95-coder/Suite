@@ -47,7 +47,7 @@ const HERO_SUMMARY_ITEMS = [
 		icon: Boxes,
 		label: "Drawing control",
 		value:
-			"Drawing lists, standards checks, and package prep stay tied to the same project workflow.",
+			"Drawing lists, standards checker, and package prep stay tied to the same project workflow.",
 	},
 	{
 		icon: Activity,

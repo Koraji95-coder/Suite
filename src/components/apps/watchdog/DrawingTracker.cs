@@ -87,6 +87,12 @@ namespace CadCommandCenter
         {
             try
             {
+                if (DrawingTracker.IsAcadeIsolationModeActive())
+                {
+                    WriteLifecycleEvent("tracker_autostart_suppressed", "profile=<<ACADE>>");
+                    return;
+                }
+
                 var started = DrawingTracker.TryAutoStart();
                 WriteLifecycleEvent(started ? "tracker_autostart_started" : "tracker_autostart_skipped");
             }
@@ -161,6 +167,11 @@ namespace CadCommandCenter
         public string ActiveDrawingPath { get; set; }
         public bool IsTracking { get; set; }
         public bool IsPaused { get; set; }
+        public bool IsCreating { get; set; }
+        public string OperationType { get; set; }
+        public string OperationRequestId { get; set; }
+        public string OperationTargetPath { get; set; }
+        public string OperationStartedAt { get; set; }
         public double ActiveTimeSeconds { get; set; }
         public double IdleTimeSeconds { get; set; }
         public int IdleTimeoutSeconds { get; set; }
@@ -179,6 +190,10 @@ namespace CadCommandCenter
 
     public class DrawingTracker
     {
+        private const string AcadeProfileName = "<<ACADE>>";
+        private const string AcadeIsolationMessage =
+            "\n[CAD Tracker] Disabled in AutoCAD Electrical isolation mode while Suite ACADE project automation is being stabilized.\n";
+
         // --- State ---
         private static bool _initialized = false;
         private static TrackerConfig _config;
@@ -223,10 +238,12 @@ namespace CadCommandCenter
 
         // JSON output
         private static string _jsonOutputPath;
+        private static string _trackerOperationStatePath;
         private static bool _pendingAutoloadAnnouncement = false;
         private static bool _autoloadAnnouncementHooked = false;
         private static DateTime _autoloadAnnouncementReadyAtUtc = DateTime.MinValue;
         private static readonly TimeSpan AutoloadAnnouncementDelay = TimeSpan.FromSeconds(8);
+        private static readonly TimeSpan TrackerOperationFreshnessWindow = TimeSpan.FromMinutes(5);
         private const string AutoloadAnnouncementMessage =
             "\n[CAD Tracker] Watchdog auto-loaded on startup. Tracking is active. Use TRACKERSTATUS for details.\n";
 
@@ -237,7 +254,39 @@ namespace CadCommandCenter
 
         internal static bool TryAutoStart()
         {
+            if (IsAcadeIsolationModeActive())
+            {
+                return false;
+            }
+
             return new DrawingTracker().StartTrackerCore(silent: true, startReason: "autoload");
+        }
+
+        internal static bool IsAcadeIsolationModeActive()
+        {
+            try
+            {
+                return string.Equals(
+                    Convert.ToString(Application.GetSystemVariable("CPROFILE"))?.Trim(),
+                    AcadeProfileName,
+                    StringComparison.OrdinalIgnoreCase
+                );
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryReportAcadeIsolation(Editor ed)
+        {
+            if (!IsAcadeIsolationModeActive())
+            {
+                return false;
+            }
+
+            ed?.WriteMessage(AcadeIsolationMessage);
+            return true;
         }
 
         private static void TryWritePendingAutoloadAnnouncement(Editor ed = null, bool force = false)
@@ -333,6 +382,16 @@ namespace CadCommandCenter
         private bool StartTrackerCore(bool silent, string startReason)
         {
             var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
+            if (IsAcadeIsolationModeActive())
+            {
+                if (!silent)
+                {
+                    TryReportAcadeIsolation(ed);
+                }
+
+                return false;
+            }
+
             if (_initialized)
             {
                 if (!silent)
@@ -348,6 +407,7 @@ namespace CadCommandCenter
             Directory.CreateDirectory(baseDir);
             _configPath = Path.Combine(baseDir, "tracker-config.json");
             _jsonOutputPath = Path.Combine(baseDir, "tracker-state.json");
+            _trackerOperationStatePath = Path.Combine(baseDir, "tracker-operation-state.json");
             _config = TrackerConfig.LoadOrDefault(_configPath);
             var configChanged = false;
 
@@ -457,6 +517,15 @@ namespace CadCommandCenter
         public void TrackerStatus()
         {
             var ed = Application.DocumentManager.MdiActiveDocument?.Editor;
+            if (IsAcadeIsolationModeActive())
+            {
+                ed?.WriteMessage("\n═══ CAD TRACKER STATUS ═══");
+                ed?.WriteMessage("\n  Status:     Suppressed in AutoCAD Electrical");
+                ed?.WriteMessage($"\n  Profile:    {AcadeProfileName}");
+                ed?.WriteMessage("\n  Reason:     Watchdog is isolated from ACADE project automation.\n");
+                return;
+            }
+
             if (!_initialized) { ed?.WriteMessage("\n[CAD Tracker] Not running. Use STARTTRACKER.\n"); return; }
 
             var session = _currentSession;
@@ -1046,8 +1115,71 @@ namespace CadCommandCenter
             }
         }
 
+        private sealed class TrackerOperationStateSidecar
+        {
+            public bool IsCreating { get; set; }
+            public string OperationType { get; set; }
+            public string RequestId { get; set; }
+            public string TargetPath { get; set; }
+            public string StartedAt { get; set; }
+        }
+
+        private static TrackerOperationStateSidecar ReadTrackerOperationState()
+        {
+            if (string.IsNullOrWhiteSpace(_trackerOperationStatePath))
+            {
+                return null;
+            }
+
+            try
+            {
+                if (!File.Exists(_trackerOperationStatePath))
+                {
+                    return null;
+                }
+
+                var json = File.ReadAllText(_trackerOperationStatePath);
+                return JsonSerializer.Deserialize<TrackerOperationStateSidecar>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static bool IsTrackerCreateStateActive(TrackerOperationStateSidecar sidecar)
+        {
+            if (sidecar == null || !sidecar.IsCreating)
+            {
+                return false;
+            }
+
+            if (DateTimeOffset.TryParse(sidecar.StartedAt, out var startedAt))
+            {
+                return DateTimeOffset.UtcNow - startedAt <= TrackerOperationFreshnessWindow;
+            }
+
+            return true;
+        }
+
         private void RecordFolderEvent(string type, string fileName, string folderPath, string alias)
         {
+            var extension = Path.GetExtension(fileName ?? string.Empty);
+            if (
+                !string.IsNullOrWhiteSpace(extension)
+                && (
+                    string.Equals(extension, ".wdp", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(extension, ".dwg", StringComparison.OrdinalIgnoreCase)
+                )
+            )
+            {
+                var sidecar = ReadTrackerOperationState();
+                if (IsTrackerCreateStateActive(sidecar))
+                {
+                    return;
+                }
+            }
+
             lock (_eventLock)
             {
                 _folderEvents.Insert(0, new FolderEvent
@@ -1099,6 +1231,16 @@ namespace CadCommandCenter
                     CurrentSessionIdleMilliseconds = _currentSession?.IdleMilliseconds ?? 0,
                     CurrentSessionStartedAt = _currentSession?.StartedAt.ToString("O"),
                 };
+
+                var sidecar = ReadTrackerOperationState();
+                if (IsTrackerCreateStateActive(sidecar))
+                {
+                    state.IsCreating = true;
+                    state.OperationType = sidecar.OperationType;
+                    state.OperationRequestId = sidecar.RequestId;
+                    state.OperationTargetPath = sidecar.TargetPath;
+                    state.OperationStartedAt = sidecar.StartedAt;
+                }
 
                 lock (_eventLock)
                 {

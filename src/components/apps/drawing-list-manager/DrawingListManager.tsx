@@ -1689,7 +1689,7 @@ export function DrawingListManager({
 										{artifacts.wdpState ? (
 											<span>
 												{artifacts.wdpState === "existing"
-													? "Existing ACADE project file detected."
+													? "Existing ACADE project definition detected."
 													: "Starter ACADE project scaffold from current defaults."}
 											</span>
 										) : null}

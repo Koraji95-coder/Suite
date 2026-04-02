@@ -113,6 +113,34 @@ WDT_FIELD_MAP = {
     "TITLE3": "DWGDESC",
     "PROJ": "LINE4",
 }
+ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE = (
+    "Support files are ready, but ACADE did not register/open the project."
+)
+ACADE_CREATE_PROJECT_UNAVAILABLE_MESSAGE = (
+    "Support files are ready, but ACADE did not create/register the project."
+)
+ACADE_OPEN_PROJECT_UNAVAILABLE_CODES = {
+    "AUTOCAD_COMMAND_TIMEOUT",
+    "AUTOCAD_ELECTRICAL_NOT_AVAILABLE",
+    "AUTOCAD_ELECTRICAL_NOT_READY",
+    "AUTOCAD_LAUNCH_FAILED",
+    "AUTOCAD_LAUNCH_TIMEOUT",
+    "AUTOCAD_NOT_AVAILABLE",
+    "PLUGIN_NOT_READY",
+    "PLUGIN_RESULT_INVALID",
+    "PLUGIN_RESULT_MISSING",
+}
+ACADE_INPROC_PIPE_NAME = (
+    os.environ.get("AUTOCAD_DOTNET_ACADE_PIPE_NAME") or "SUITE_ACADE_PIPE"
+).strip() or "SUITE_ACADE_PIPE"
+ACADE_INPROC_TIMEOUT_MS = max(
+    30_000,
+    int(os.environ.get("AUTOCAD_DOTNET_ACADE_TIMEOUT_MS") or 120_000),
+)
+ACADE_LOCAL_TEMPLATE_WDP = (
+    os.environ.get("AUTOCAD_DOTNET_ACADE_TEMPLATE_WDP")
+    or "C:/Users/Public/Documents/Autodesk/Acade 2026/AeData/Proj/Demo/Demo01.wdp"
+).strip()
 
 
 def create_title_block_sync_blueprint(
@@ -167,6 +195,14 @@ def create_title_block_sync_blueprint(
     def _normalize_drawing_key(value: Any) -> str:
         return re.sub(r"[^A-Z0-9]+", "", _normalize_upper(value))
 
+    def _sanitize_acade_project_stem(value: Any) -> str:
+        normalized = _normalize_text(value)
+        if not normalized:
+            return ""
+        normalized = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "-", normalized)
+        normalized = re.sub(r"\s+", " ", normalized).strip().rstrip(". ")
+        return normalized or "project"
+
     def _derive_cadno(dwgno: Any) -> str:
         return _normalize_drawing_key(dwgno)
 
@@ -208,18 +244,42 @@ def create_title_block_sync_blueprint(
         request_id: str,
         remote_addr: str,
         auth_mode: str,
+        pipe_name: Optional[str] = None,
+        timeout_ms: Optional[int] = None,
     ) -> Dict[str, Any]:
         if send_autocad_dotnet_command is None:
             raise RuntimeError("AutoCAD .NET bridge is not configured.")
 
         started_at = time.time()
-        response = send_autocad_dotnet_command(
+        bridge_payload = {
+            **payload,
+            "requestId": request_id,
+        }
+        logger.info(
+            "Title block bridge action start (request_id=%s, remote=%s, auth_mode=%s, action=%s, pipe_name=%s, timeout_ms=%s, payload_keys=%s, project_root=%s, wdp_path=%s, template_wdp_path=%s)",
+            request_id,
+            remote_addr,
+            auth_mode,
             action,
-            {
-                **payload,
-                "requestId": request_id,
-            },
+            pipe_name or "default",
+            timeout_ms or "default",
+            sorted(bridge_payload.keys()),
+            bridge_payload.get("projectRootPath"),
+            bridge_payload.get("wdpPath"),
+            bridge_payload.get("templateWdpPath"),
         )
+        if pipe_name or timeout_ms:
+            try:
+                response = send_autocad_dotnet_command(
+                    action,
+                    bridge_payload,
+                    pipe_name=pipe_name,
+                    timeout_ms=timeout_ms,
+                )
+            except TypeError:
+                response = send_autocad_dotnet_command(action, bridge_payload)
+        else:
+            response = send_autocad_dotnet_command(action, bridge_payload)
         elapsed_ms = int((time.time() - started_at) * 1000)
 
         if not isinstance(response, dict):
@@ -245,12 +305,15 @@ def create_title_block_sync_blueprint(
         }
 
         logger.info(
-            "Title block .NET bridge action succeeded (request_id=%s, action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s)",
+            "Title block .NET bridge action completed (request_id=%s, action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s, result_success=%s, result_code=%s, trace_path=%s)",
             request_id,
             action,
             remote_addr,
             auth_mode,
             elapsed_ms,
+            bool(result_payload.get("success")),
+            _normalize_text(result_payload.get("code")),
+            _normalize_text((result_payload.get("meta", {}) or {}).get("tracePath")),
         )
         return result_payload
 
@@ -271,6 +334,94 @@ def create_title_block_sync_blueprint(
         if not project_root.exists() or not project_root.is_dir():
             raise ValueError(f"projectRootPath does not exist or is not a directory: {project_root}")
         return project_root
+
+    def _default_local_acade_project_root(project_name: str) -> Path:
+        user_home = Path(
+            _normalize_text(os.environ.get("USERPROFILE"))
+            or _normalize_text(os.environ.get("HOME"))
+            or str(Path.home())
+        ).expanduser()
+        return (
+            user_home
+            / "Documents"
+            / "Acade 2026"
+            / "AeData"
+            / "Proj"
+            / (_sanitize_acade_project_stem(project_name) or "Suite Test Project")
+        )
+
+    def _resolve_native_create_root(payload: Dict[str, Any]) -> Path:
+        try:
+            return _resolve_project_root(payload)
+        except ValueError:
+            raw_profile = payload.get("profile")
+            profile = raw_profile if isinstance(raw_profile, dict) else {}
+            project_name = _normalize_text(
+                profile.get("projectName")
+                or profile.get("project_name")
+                or payload.get("projectName")
+                or payload.get("project_name")
+            )
+            if not project_name:
+                raise
+            project_root = _default_local_acade_project_root(project_name)
+            project_root.mkdir(parents=True, exist_ok=True)
+            return project_root
+
+    def _resolve_acade_template_wdp() -> Path:
+        candidate_strings: List[str] = []
+        configured = _normalize_text(ACADE_LOCAL_TEMPLATE_WDP)
+        if configured:
+            candidate_strings.append(configured)
+
+        user_home = Path(
+            _normalize_text(os.environ.get("USERPROFILE"))
+            or _normalize_text(os.environ.get("HOME"))
+            or str(Path.home())
+        ).expanduser()
+        candidate_strings.extend(
+            [
+                str(user_home / "Documents" / "Acade 2026" / "AeData" / "Proj" / "Demo" / "Demo01.wdp"),
+                str(user_home / "Documents" / "Acade 2026" / "AeData" / "Proj" / "Demo" / "wddemo.wdp"),
+                "C:/Users/Public/Documents/Autodesk/Acade 2026/AeData/Proj/Demo/Demo01.wdp",
+                "C:/Users/Public/Documents/Autodesk/Acade 2026/AeData/Proj/Demo/wddemo.wdp",
+            ]
+        )
+
+        seen: set[str] = set()
+        for raw_candidate in candidate_strings:
+            normalized_candidate = _normalize_text(raw_candidate)
+            if not normalized_candidate:
+                continue
+            candidate = Path(normalized_candidate).expanduser()
+            candidate_key = str(candidate).lower()
+            if candidate_key in seen:
+                continue
+            seen.add(candidate_key)
+            if candidate.is_absolute() and candidate.exists() and candidate.is_file():
+                return candidate
+
+        demo_roots = [
+            user_home / "Documents" / "Acade 2026" / "AeData" / "Proj" / "Demo",
+            Path("C:/Users/Public/Documents/Autodesk/Acade 2026/AeData/Proj/Demo"),
+        ]
+        for demo_root in demo_roots:
+            if not demo_root.exists() or not demo_root.is_dir():
+                continue
+            demo_candidates = sorted(
+                (
+                    path
+                    for path in demo_root.glob("*.wdp")
+                    if path.is_file()
+                ),
+                key=lambda item: item.name.lower(),
+            )
+            if demo_candidates:
+                return demo_candidates[0]
+
+        raise ValueError(
+            "ACADE template WDP was not found. Checked the configured template path and the installed local Demo project folder."
+        )
 
     def _discover_project_files(project_root: Path) -> List[Path]:
         files: List[Path] = []
@@ -331,7 +482,7 @@ def create_title_block_sync_blueprint(
         if wdp_files:
             return wdp_files[0], True
 
-        stem = re.sub(r"[^A-Za-z0-9._-]+", "-", project_root.name).strip("-._") or "project"
+        stem = _sanitize_acade_project_stem(profile.get("projectName")) or _sanitize_acade_project_stem(project_root.name)
         candidate = project_root / f"{stem}.wdp"
         return candidate, candidate.exists()
 
@@ -347,6 +498,12 @@ def create_title_block_sync_blueprint(
         raw_profile = payload.get("profile")
         profile = raw_profile if isinstance(raw_profile, dict) else {}
         return {
+            "projectName": _normalize_text(
+                profile.get("projectName")
+                or profile.get("project_name")
+                or payload.get("projectName")
+                or payload.get("project_name")
+            ),
             "blockName": _normalize_text(profile.get("blockName") or profile.get("block_name")) or DEFAULT_BLOCK_NAME,
             "projectRootPath": _normalize_text(profile.get("projectRootPath") or profile.get("project_root_path"))
             or str(project_root),
@@ -871,6 +1028,154 @@ def create_title_block_sync_blueprint(
             "wdpState": _resolve_wdp_state(wdp_path, current_wdp_text, generated_wdp_text),
         }
 
+    def _ensure_project_support_files_without_wdp(
+        *,
+        project_root: Path,
+        discovered_files: Sequence[Path],
+        profile: Dict[str, str | None],
+    ) -> Dict[str, Any]:
+        wdp_path, wdt_path, wdl_path, wdp_exists = _build_mapping_paths(project_root, discovered_files, profile)
+        generated_wdt_text = _build_wdt_text(profile)
+        generated_wdl_text = _build_wdl_text()
+        if not wdt_path.exists():
+            wdt_path.write_text(generated_wdt_text, encoding="utf-8", newline="\n")
+        if not wdl_path.exists():
+            wdl_path.write_text(generated_wdl_text, encoding="utf-8", newline="\n")
+
+        existing_wdp_text = _read_optional_text(wdp_path)
+        generated_wdp_text = _build_wdp_text(
+            project_root=project_root,
+            discovered_files=discovered_files,
+            profile=profile,
+            wdp_path=wdp_path,
+            wdt_path=wdt_path,
+            wdl_path=wdl_path,
+        )
+        return {
+            "wdpPath": str(wdp_path),
+            "wdtPath": str(wdt_path),
+            "wdlPath": str(wdl_path),
+            "wdpText": existing_wdp_text or generated_wdp_text,
+            "wdtText": _resolve_existing_or_generated_text(wdt_path, generated_wdt_text),
+            "wdlText": _resolve_existing_or_generated_text(wdl_path, generated_wdl_text),
+            "wdpState": _resolve_wdp_state(wdp_path, existing_wdp_text, generated_wdp_text),
+        }
+
+    def _candidate_wd_env_roots() -> List[Path]:
+        roots: List[Path] = []
+        seen: set[str] = set()
+        for env_name in ("USERPROFILE", "HOME"):
+            value = _normalize_text(os.environ.get(env_name))
+            if not value:
+                continue
+            candidate = Path(value).expanduser()
+            key = str(candidate).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            roots.append(candidate)
+        try:
+            home = Path.home()
+        except Exception:
+            home = None
+        if home is not None:
+            key = str(home).lower()
+            if key not in seen:
+                seen.add(key)
+                roots.append(home)
+        return roots
+
+    def _enumerate_wd_env_candidates() -> List[Path]:
+        output: List[Path] = []
+        seen: set[str] = set()
+        for root in _candidate_wd_env_roots():
+            docs_roots = [root, root / "Documents", root / "My Documents"]
+            for docs_root in docs_roots:
+                try:
+                    if not docs_root.exists():
+                        continue
+                except Exception:
+                    continue
+                for pattern in ("Acade*", "AcadE*"):
+                    for candidate in docs_root.glob(f"{pattern}/AeData/wd.env"):
+                        try:
+                            if not candidate.is_file():
+                                continue
+                        except Exception:
+                            continue
+                        key = str(candidate).lower()
+                        if key in seen:
+                            continue
+                        seen.add(key)
+                        output.append(candidate)
+        return output
+
+    def _format_wd_pickprjdlg_line(project_directory: Path) -> str:
+        directory_text = str(project_directory).replace("\\", "/").rstrip("/") + "/"
+        return f"WD_PICKPRJDLG,{directory_text}"
+
+    def _update_wd_pickprjdlg_line(wd_env_path: Path, project_directory: Path) -> bool:
+        existing_text = wd_env_path.read_text(encoding="utf-8", errors="ignore")
+        target_line = _format_wd_pickprjdlg_line(project_directory)
+        updated_lines: List[str] = []
+        inserted = False
+
+        for line in existing_text.replace("\r\n", "\n").split("\n"):
+            normalized = line.lstrip()
+            normalized_upper = normalized.upper()
+            if normalized_upper.startswith("WD_PICKPRJDLG,"):
+                if not inserted:
+                    updated_lines.append(target_line)
+                    inserted = True
+                continue
+
+            updated_lines.append(line)
+            if not inserted and normalized_upper.startswith("*WD_PICKPRJDLG,"):
+                updated_lines.append(target_line)
+                inserted = True
+
+        if not inserted:
+            if updated_lines and updated_lines[-1] != "":
+                updated_lines.append("")
+            updated_lines.append(target_line)
+
+        new_text = "\n".join(updated_lines).rstrip("\n") + "\n"
+        if existing_text.replace("\r\n", "\n") == new_text:
+            return False
+
+        wd_env_path.write_text(new_text, encoding="utf-8", newline="\n")
+        return True
+
+    def _update_acade_picker_folder(wdp_path: Path) -> List[str]:
+        updated_paths: List[str] = []
+        project_directory = wdp_path.parent
+        for wd_env_path in _enumerate_wd_env_candidates():
+            try:
+                if _update_wd_pickprjdlg_line(wd_env_path, project_directory):
+                    updated_paths.append(str(wd_env_path))
+            except Exception:
+                continue
+        return updated_paths
+
+    def _decorate_artifacts_with_picker_folder(artifacts: Dict[str, Any]) -> Dict[str, Any]:
+        enriched = dict(artifacts)
+        wdp_path_text = _normalize_text(enriched.get("wdpPath"))
+        if not wdp_path_text:
+            enriched["wdPickPrjDlgFolder"] = ""
+            enriched["wdPickPrjDlgUpdatedPaths"] = []
+            return enriched
+
+        try:
+            wdp_path = Path(wdp_path_text).expanduser()
+        except Exception:
+            enriched["wdPickPrjDlgFolder"] = ""
+            enriched["wdPickPrjDlgUpdatedPaths"] = []
+            return enriched
+
+        enriched["wdPickPrjDlgFolder"] = str(wdp_path.parent)
+        enriched["wdPickPrjDlgUpdatedPaths"] = _update_acade_picker_folder(wdp_path)
+        return enriched
+
     def _build_mapping_artifact_preview(
         *,
         project_root: Path,
@@ -1259,6 +1564,7 @@ def create_title_block_sync_blueprint(
                 discovered_files=_discover_project_files(project_root),
                 profile=profile,
             )
+            artifacts = _decorate_artifacts_with_picker_folder(artifacts)
             return jsonify(
                 {
                     "success": True,
@@ -1295,43 +1601,405 @@ def create_title_block_sync_blueprint(
                 meta={"stage": "ensure-artifacts"},
             )
 
+    @bp.route("/create-project", methods=["POST"])
+    @require_supabase_user
+    @limiter.limit("120 per hour")
+    def api_title_block_create_project():
+        request_id = _request_id()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = "supabase"
+        payload = _parse_json_body()
+        try:
+            project_root = _resolve_native_create_root(payload)
+            profile = _read_profile(payload, project_root)
+            discovered_files = _discover_project_files(project_root)
+            artifacts = _ensure_project_support_files_without_wdp(
+                project_root=project_root,
+                discovered_files=discovered_files,
+                profile=profile,
+            )
+            artifacts = _decorate_artifacts_with_picker_folder(artifacts)
+            wdp_path = Path(str(artifacts.get("wdpPath") or "")).expanduser()
+            template_wdp_path = _resolve_acade_template_wdp()
+
+            response_data = {
+                "projectRootPath": str(project_root),
+                "profile": profile,
+                "drawings": [],
+                "summary": _summarize_rows([]),
+                "artifacts": artifacts,
+            }
+            if send_autocad_dotnet_command is None:
+                return _error_response(
+                    code="ACADE_PROJECT_CREATE_UNAVAILABLE",
+                    message=ACADE_CREATE_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=503,
+                    request_id=request_id,
+                    meta={
+                        "stage": "bridge-create-project",
+                        "providerPath": "dotnet+inproc",
+                    },
+                    extra={
+                        "warnings": ["AutoCAD .NET bridge is not configured."],
+                        "data": response_data,
+                    },
+                )
+
+            try:
+                bridge_result = _call_dotnet_bridge_action(
+                    action="suite_acade_project_create",
+                    payload={
+                        "projectRootPath": str(project_root),
+                        "wdpPath": str(wdp_path),
+                        "templateWdpPath": str(template_wdp_path),
+                        "launchIfNeeded": True,
+                        "uiMode": "project_manager_only",
+                    },
+                    request_id=request_id,
+                    remote_addr=remote_addr,
+                    auth_mode=auth_mode,
+                    pipe_name=ACADE_INPROC_PIPE_NAME,
+                    timeout_ms=ACADE_INPROC_TIMEOUT_MS,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Title block create project bridge unavailable (request_id=%s, remote=%s, auth_mode=%s, stage=%s, detail=%s)",
+                    request_id,
+                    remote_addr,
+                    auth_mode,
+                    "bridge-create-project",
+                    autocad_exception_message(exc),
+                )
+                return _error_response(
+                    code="ACADE_PROJECT_CREATE_UNAVAILABLE",
+                    message=ACADE_CREATE_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=503,
+                    request_id=request_id,
+                    meta={
+                        "stage": "bridge-create-project",
+                        "providerPath": "dotnet+inproc",
+                    },
+                    extra={
+                        "warnings": [autocad_exception_message(exc)],
+                        "data": response_data,
+                    },
+                )
+
+            bridge_warnings = [
+                _normalize_text(item)
+                for item in bridge_result.get("warnings") or []
+                if _normalize_text(item)
+            ]
+            bridge_data = bridge_result.get("data")
+            create_project = bridge_data if isinstance(bridge_data, dict) else {}
+            if create_project:
+                response_data["createProject"] = create_project
+            bridge_code = _normalize_upper(bridge_result.get("code"))
+            bridge_meta = {
+                **(bridge_result.get("meta") or {}),
+                "stage": "bridge-create-project",
+                "providerPath": "dotnet+inproc",
+            }
+            if not bridge_result.get("success", False):
+                detail = _normalize_text(bridge_result.get("message"))
+                warnings = list(dict.fromkeys([
+                    *(bridge_warnings or []),
+                    *( [detail] if detail else [] ),
+                ]))
+                status_code = 400
+                error_code = bridge_code or "INVALID_REQUEST"
+                if bridge_code != "INVALID_REQUEST":
+                    status_code = (
+                        503
+                        if bridge_code in ACADE_OPEN_PROJECT_UNAVAILABLE_CODES
+                        else 502
+                    )
+                    error_code = bridge_code or (
+                        "ACADE_PROJECT_CREATE_UNAVAILABLE"
+                        if status_code == 503
+                        else "ACADE_PROJECT_CREATE_FAILED"
+                    )
+                return _error_response(
+                    code=error_code,
+                    message=ACADE_CREATE_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=status_code,
+                    request_id=request_id,
+                    meta=bridge_meta,
+                    extra={
+                        "warnings": warnings,
+                        "data": response_data,
+                    },
+                )
+
+            verification = create_project.get("verification")
+            verification_data = verification if isinstance(verification, dict) else {}
+            command_completed = bool(verification_data.get("commandCompleted"))
+            aepx_observed = bool(verification_data.get("aepxObserved"))
+            last_proj_observed = bool(verification_data.get("lastProjObserved"))
+            active_project_observed = bool(verification_data.get("activeProjectObserved"))
+            if (
+                not bool(create_project.get("projectCreated"))
+                or not bool(create_project.get("projectActivated"))
+                or not command_completed
+                or not (aepx_observed or last_proj_observed or active_project_observed)
+            ):
+                warnings = list(dict.fromkeys([
+                    *(bridge_warnings or []),
+                    "ACADE did not produce a verified create-project side effect.",
+                ]))
+                return _error_response(
+                    code="ACADE_PROJECT_NOT_VERIFIED",
+                    message=ACADE_CREATE_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=502,
+                    request_id=request_id,
+                    meta={
+                        **bridge_meta,
+                        "stage": "verify-create-project",
+                    },
+                    extra={
+                        "warnings": warnings,
+                        "data": response_data,
+                    },
+                )
+
+            return jsonify(
+                {
+                    "success": True,
+                    "code": "",
+                    "message": "ACADE created and activated the project.",
+                    "requestId": request_id,
+                    "data": response_data,
+                    "warnings": bridge_warnings,
+                    "meta": {
+                        **bridge_meta,
+                        "stage": "create-project",
+                        "providerPath": "dotnet+inproc",
+                    },
+                }
+            ), 200
+        except ValueError as exc:
+            return _error_response(
+                code="INVALID_REQUEST",
+                message=str(exc),
+                status_code=400,
+                request_id=request_id,
+                meta={"stage": "create-project.validate"},
+            )
+        except Exception as exc:
+            autocad_log_exception(
+                logger=logger,
+                message="Title block create project failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="title_block_create_project",
+                code="TITLE_BLOCK_CREATE_PROJECT_FAILED",
+                provider="dotnet+inproc",
+            )
+            return _error_response(
+                code="TITLE_BLOCK_CREATE_PROJECT_FAILED",
+                message=f"Unable to launch ACADE and create the project: {autocad_exception_message(exc)}",
+                status_code=500,
+                request_id=request_id,
+                meta={"stage": "create-project"},
+            )
+
     @bp.route("/open-project", methods=["POST"])
     @require_supabase_user
     @limiter.limit("240 per hour")
     def api_title_block_open_project():
         request_id = _request_id()
+        remote_addr = str(request.remote_addr or "unknown")
+        auth_mode = "supabase"
         payload = _parse_json_body()
         try:
             project_root = _resolve_project_root(payload)
             profile = _read_profile(payload, project_root)
+            logger.info(
+                "Title block open project ensuring artifacts (request_id=%s, remote=%s, auth_mode=%s, stage=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+                "ensure-artifacts",
+            )
             artifacts = _ensure_project_mapping_files(
                 project_root=project_root,
                 discovered_files=_discover_project_files(project_root),
                 profile=profile,
             )
+            artifacts = _decorate_artifacts_with_picker_folder(artifacts)
             wdp_path = Path(str(artifacts.get("wdpPath") or "")).expanduser()
             if not wdp_path.exists():
-                raise ValueError("ACADE project file could not be created.")
-            if not hasattr(os, "startfile"):
-                raise RuntimeError("Opening an ACADE project file is only supported on Windows.")
-            os.startfile(str(wdp_path))
+                raise ValueError("ACADE project definition could not be created.")
+            response_data = {
+                "projectRootPath": str(project_root),
+                "profile": profile,
+                "drawings": [],
+                "summary": _summarize_rows([]),
+                "artifacts": artifacts,
+            }
+            if send_autocad_dotnet_command is None:
+                return _error_response(
+                    code="ACADE_PROJECT_OPEN_UNAVAILABLE",
+                    message=ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=503,
+                    request_id=request_id,
+                    meta={
+                        "stage": "bridge-open-project",
+                        "providerPath": "dotnet+inproc",
+                    },
+                    extra={
+                        "warnings": ["AutoCAD .NET bridge is not configured."],
+                        "data": response_data,
+                    },
+                )
+
+            logger.info(
+                "Title block open project dispatching bridge action (request_id=%s, remote=%s, auth_mode=%s, stage=%s, wdp_path=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+                "bridge-open-project",
+                str(wdp_path),
+            )
+            try:
+                bridge_result = _call_dotnet_bridge_action(
+                    action="suite_acade_project_open",
+                    payload={
+                        "projectRootPath": str(project_root),
+                        "wdpPath": str(wdp_path),
+                        "launchIfNeeded": True,
+                        "uiMode": "project_manager_only",
+                    },
+                    request_id=request_id,
+                    remote_addr=remote_addr,
+                    auth_mode=auth_mode,
+                    pipe_name=ACADE_INPROC_PIPE_NAME,
+                    timeout_ms=ACADE_INPROC_TIMEOUT_MS,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Title block open project bridge unavailable (request_id=%s, remote=%s, auth_mode=%s, stage=%s, detail=%s)",
+                    request_id,
+                    remote_addr,
+                    auth_mode,
+                    "bridge-open-project",
+                    autocad_exception_message(exc),
+                )
+                return _error_response(
+                    code="ACADE_PROJECT_OPEN_UNAVAILABLE",
+                    message=ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=503,
+                    request_id=request_id,
+                    meta={
+                        "stage": "bridge-open-project",
+                        "providerPath": "dotnet+inproc",
+                    },
+                    extra={
+                        "warnings": [autocad_exception_message(exc)],
+                        "data": response_data,
+                    },
+                )
+
+            bridge_warnings = [
+                _normalize_text(item)
+                for item in bridge_result.get("warnings") or []
+                if _normalize_text(item)
+            ]
+            bridge_data = bridge_result.get("data")
+            open_project = bridge_data if isinstance(bridge_data, dict) else {}
+            if open_project:
+                response_data["openProject"] = open_project
+            bridge_code = _normalize_upper(bridge_result.get("code"))
+            bridge_meta = {
+                **(bridge_result.get("meta") or {}),
+                "stage": "bridge-open-project",
+                "providerPath": "dotnet+inproc",
+            }
+            if not bridge_result.get("success", False):
+                detail = _normalize_text(bridge_result.get("message"))
+                warnings = list(dict.fromkeys([
+                    *(bridge_warnings or []),
+                    *( [detail] if detail else [] ),
+                ]))
+                status_code = 400
+                error_code = bridge_code or "INVALID_REQUEST"
+                if bridge_code != "INVALID_REQUEST":
+                    status_code = (
+                        503
+                        if bridge_code in ACADE_OPEN_PROJECT_UNAVAILABLE_CODES
+                        else 502
+                    )
+                    error_code = bridge_code or (
+                        "ACADE_PROJECT_OPEN_UNAVAILABLE"
+                        if status_code == 503
+                        else "ACADE_PROJECT_OPEN_FAILED"
+                    )
+                return _error_response(
+                    code=error_code,
+                    message=ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=status_code,
+                    request_id=request_id,
+                    meta=bridge_meta,
+                    extra={
+                        "warnings": warnings,
+                        "data": response_data,
+                    },
+                )
+
+            verification = open_project.get("verification")
+            verification_data = verification if isinstance(verification, dict) else {}
+            command_completed = bool(verification_data.get("commandCompleted"))
+            aepx_observed = bool(verification_data.get("aepxObserved"))
+            last_proj_observed = bool(verification_data.get("lastProjObserved"))
+            active_project_observed = bool(verification_data.get("activeProjectObserved"))
+            logger.info(
+                "Title block open project verification completed (request_id=%s, remote=%s, auth_mode=%s, stage=%s, command_completed=%s, aepx_observed=%s, lastproj_observed=%s, active_project_observed=%s)",
+                request_id,
+                remote_addr,
+                auth_mode,
+                "verify-open-project",
+                command_completed,
+                aepx_observed,
+                last_proj_observed,
+                active_project_observed,
+            )
+            if (
+                not bool(open_project.get("projectActivated"))
+                or not command_completed
+                or not (aepx_observed or last_proj_observed or active_project_observed)
+            ):
+                warnings = list(dict.fromkeys([
+                    *(bridge_warnings or []),
+                    "ACADE did not produce a verified project-open side effect.",
+                ]))
+                return _error_response(
+                    code="ACADE_PROJECT_NOT_VERIFIED",
+                    message=ACADE_OPEN_PROJECT_UNAVAILABLE_MESSAGE,
+                    status_code=502,
+                    request_id=request_id,
+                    meta={
+                        **bridge_meta,
+                        "stage": "verify-open-project",
+                    },
+                    extra={
+                        "warnings": warnings,
+                        "data": response_data,
+                    },
+                )
+
             return jsonify(
                 {
                     "success": True,
                     "code": "",
-                    "message": "ACADE project open requested.",
+                    "message": "ACADE opened and project activated.",
                     "requestId": request_id,
-                    "data": {
-                        "projectRootPath": str(project_root),
-                        "profile": profile,
-                        "drawings": [],
-                        "summary": _summarize_rows([]),
-                        "artifacts": artifacts,
-                        "launchedPath": str(wdp_path),
-                    },
-                    "warnings": [],
+                    "data": response_data,
+                    "warnings": bridge_warnings,
                     "meta": {
+                        **bridge_meta,
                         "stage": "open-project",
+                        "providerPath": "dotnet+inproc",
                     },
                 }
             ), 200
@@ -1344,9 +2012,19 @@ def create_title_block_sync_blueprint(
                 meta={"stage": "open-project.validate"},
             )
         except Exception as exc:
+            autocad_log_exception(
+                logger=logger,
+                message="Title block open project failed",
+                request_id=request_id,
+                remote_addr=remote_addr,
+                auth_mode=auth_mode,
+                stage="title_block_open_project",
+                code="TITLE_BLOCK_OPEN_PROJECT_FAILED",
+                provider="dotnet+inproc",
+            )
             return _error_response(
                 code="TITLE_BLOCK_OPEN_PROJECT_FAILED",
-                message=f"Unable to open the ACADE project file: {autocad_exception_message(exc)}",
+                message=f"Unable to launch ACADE and activate the project: {autocad_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "open-project"},

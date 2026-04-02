@@ -2621,7 +2621,7 @@ Notes: ${notes}
 
 3. sentinel
 - Mission: risk/compliance review.
-- Use for: regression analysis, standards checks, failure-mode audits.
+- Use for: regression analysis, standards checker, failure-mode audits.
 - Avoid: approving behavior changes without evidence.
 
 4. forge
@@ -2636,7 +2636,7 @@ Notes: ${notes}
 
 6. gridsage
 - Mission: electrical systems analysis and implementation constraints.
-- Use for: load/protection assumptions, electrical standards checks, implementation boundaries.
+- Use for: load/protection assumptions, electrical standards checker, implementation boundaries.
 - Avoid: ambiguous recommendations without stated assumptions.
 `,
 	},

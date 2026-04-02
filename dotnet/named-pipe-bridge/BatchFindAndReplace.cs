@@ -294,6 +294,7 @@ static class PipeRouter
                 "suite_markup_authoring_project_apply" => SuiteMarkupAuthoringProjectApplyAction.Handle(payload),
                 "suite_terminal_authoring_project_preview" => SuiteTerminalAuthoringProjectPreviewAction.Handle(payload),
                 "suite_terminal_authoring_project_apply" => SuiteTerminalAuthoringProjectApplyAction.Handle(payload),
+                "suite_acade_project_open" => SuiteAcadeProjectOpenAction.Handle(payload),
                 _ => BuildActionNotImplementedResult(normalizedAction),
             };
             actionStopwatch.Stop();

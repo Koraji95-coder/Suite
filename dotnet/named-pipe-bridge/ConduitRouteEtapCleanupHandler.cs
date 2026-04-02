@@ -143,25 +143,13 @@ static partial class ConduitRouteStubHandlers
 
         using var session = ConnectAutoCad();
         var drawingName = StringOrDefault(ReadProperty(session.Document, "Name"), "Unknown.dwg");
-        var commandSegments = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(pluginDllPath))
-        {
-            var escapedPluginPath = pluginDllPath.Replace("\"", "\"\"");
-            commandSegments.Add($"_.NETLOAD \"{escapedPluginPath}\"");
-        }
-
-        commandSegments.Add(command);
+        var commandScript = !string.IsNullOrWhiteSpace(pluginDllPath)
+            ? BuildSuitePluginCommandScript(pluginDllPath, command)
+            : $"{command}\n";
 
         if (saveDrawing)
         {
-            commandSegments.Add("_.QSAVE");
-        }
-
-        var commandScript = string.Join(" ", commandSegments).Trim();
-        if (!commandScript.EndsWith("\n", StringComparison.Ordinal))
-        {
-            commandScript += "\n";
+            commandScript += "_.QSAVE\n";
         }
 
         ReadWithTransientComRetry(

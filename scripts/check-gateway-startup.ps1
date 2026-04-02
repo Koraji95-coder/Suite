@@ -14,10 +14,65 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
 . $runtimeSharedScript
 $gatewayLaunchScript = (Resolve-Path (Join-Path $PSScriptRoot "run-agent-gateway.mjs")).Path
+$runtimeCoreComposeScript = Join-Path $PSScriptRoot "runtime-core-compose.ps1"
 $processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
 . $processUtilsScript
+$runtimePaths = Get-SuiteRuntimePaths
+$gatewayLogPath = $runtimePaths.GatewayLogPath
+New-Item -ItemType Directory -Path (Split-Path -Parent $gatewayLogPath) -Force | Out-Null
 $dotenvPath = Join-Path $repoRoot ".env"
 $localDotenvPath = Join-Path $repoRoot ".env.local"
+
+function Invoke-RuntimeCoreComposeJson {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("ps", "up")][string]$Action,
+        [string[]]$Services = @()
+    )
+
+    if (-not (Test-Path -LiteralPath $runtimeCoreComposeScript -PathType Leaf)) {
+        return $null
+    }
+
+    $arguments = @(
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        $runtimeCoreComposeScript,
+        $Action,
+        "-RepoRoot",
+        $repoRoot
+    )
+    if (@($Services).Count -gt 0) {
+        $arguments += @("-Services") + @($Services)
+    }
+    $arguments += "-Json"
+
+    $rawOutput = & PowerShell.exe -WindowStyle Hidden @arguments 2>$null
+    $outputText = [string]::Join([Environment]::NewLine, @($rawOutput | ForEach-Object { if ($null -eq $_) { "" } else { $_.ToString() } })).Trim()
+    if ([string]::IsNullOrWhiteSpace($outputText)) {
+        return $null
+    }
+
+    try {
+        return $outputText | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-RuntimeCoreGatewayEntry {
+    $composePayload = Invoke-RuntimeCoreComposeJson -Action "ps"
+    if ($null -eq $composePayload -or -not $composePayload.ok -or $null -eq $composePayload.payload) {
+        return $null
+    }
+
+    return @($composePayload.payload | Where-Object {
+        $serviceName = if ($_.PSObject.Properties.Name -contains "Service") { [string]$_.Service } elseif ($_.PSObject.Properties.Name -contains "service") { [string]$_.service } else { "" }
+        $serviceName.Trim().ToLowerInvariant() -eq "gateway"
+    }) | Select-Object -First 1
+}
 
 function Get-DotEnvValue {
     param(
@@ -74,10 +129,10 @@ function Resolve-GatewayEndpoint {
         [string](Get-RepoEnvValue -Key "AGENT_GATEWAY_PORT")
     }
     if ([string]::IsNullOrWhiteSpace($configuredPort)) {
-        $configuredPort = "3000"
+        $configuredPort = "3001"
     }
 
-    $port = 3000
+    $port = 3001
     [int]::TryParse($configuredPort, [ref]$port) | Out-Null
 
     $probeHost = switch ($configuredHost.ToLowerInvariant()) {
@@ -200,7 +255,7 @@ function Test-GatewayHealth {
     param([string]$HealthUrl)
 
     try {
-        $response = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 3
+        $response = Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing -TimeoutSec 2
         return ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300)
     }
     catch {
@@ -222,103 +277,166 @@ function Resolve-NodeExecutable {
     return $null
 }
 
+function Convert-ToPowerShellQuotedValue {
+    param([Parameter(Mandatory = $true)][string]$Value)
+
+    return "'" + $Value.Replace("'", "''") + "'"
+}
+
 function Start-GatewayProcess {
-    param([Parameter(Mandatory = $true)][string]$NodeExecutable)
+    param(
+        [Parameter(Mandatory = $true)][string]$NodeExecutable,
+        [Parameter(Mandatory = $true)][string]$LogPath
+    )
+
+    $launchCommand = [string]::Join(
+        " ",
+        @(
+            "&"
+            (Convert-ToPowerShellQuotedValue -Value $NodeExecutable)
+            (Convert-ToPowerShellQuotedValue -Value $gatewayLaunchScript)
+            "*>>"
+            (Convert-ToPowerShellQuotedValue -Value $LogPath)
+        )
+    )
 
     Start-SuiteDetachedProcess `
-        -FilePath $NodeExecutable `
+        -FilePath "PowerShell.exe" `
         -WorkingDirectory $repoRoot `
-        -Arguments @($gatewayLaunchScript) | Out-Null
+        -Arguments @(
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            $launchCommand
+        ) | Out-Null
 }
 
 $identity = Get-WorkstationIdentity -TomlPath $CodexConfigPath -ExplicitWorkstationId $WorkstationId
 $endpoint = Resolve-GatewayEndpoint
 $gatewayMode = Get-SuiteGatewayMode
 $gatewayModeLabel = Get-SuiteGatewayModeLabel -GatewayMode $gatewayMode
-
 $gatewayProcess = Get-ListeningGatewayProcess -Port $endpoint.Port
 if (-not $gatewayProcess) {
     $gatewayProcess = Get-GatewayCandidateProcess
 }
-$healthy = Test-GatewayHealth -HealthUrl $endpoint.HealthUrl
-$listening = $null -ne (Get-ListeningGatewayProcess -Port $endpoint.Port)
-$gatewayProcessMode = Get-GatewayProcessMode -Process $gatewayProcess
+$gatewayContainer = Get-RuntimeCoreGatewayEntry
+$gatewayContainerRunning = $false
+if ($gatewayContainer) {
+    $containerStateText = [string]::Join(" ", @(
+        if ($gatewayContainer.PSObject.Properties.Name -contains "State") { [string]$gatewayContainer.State } else { "" }
+        if ($gatewayContainer.PSObject.Properties.Name -contains "Status") { [string]$gatewayContainer.Status } else { "" }
+    )).Trim().ToLowerInvariant()
+    $gatewayContainerRunning = (
+        $containerStateText.Contains("running") -or
+        $containerStateText.Contains("healthy")
+    )
+}
+$gatewayCommandLine = if ($gatewayContainerRunning) { "docker compose service gateway" } else { if ($gatewayProcess) { [string]$gatewayProcess.CommandLine } else { $null } }
+$gatewayEndpointReady = Test-GatewayHealth -HealthUrl $endpoint.HealthUrl
+$listeningProcess = Get-ListeningGatewayProcess -Port $endpoint.Port
+$listening = $null -ne $listeningProcess
+if ($listeningProcess) {
+    $gatewayProcess = $listeningProcess
+    if (-not $gatewayContainerRunning) {
+        $gatewayCommandLine = [string]$listeningProcess.CommandLine
+    }
+}
+$gatewayProcessMode = if ($gatewayContainerRunning) { "suite_native" } else { Get-GatewayProcessMode -Process $gatewayProcess }
 $gatewayModeMatches = [string]::IsNullOrWhiteSpace([string]$gatewayProcessMode) -or ($gatewayProcessMode -eq $gatewayMode)
-$runningCandidate = $healthy -or $listening -or $null -ne $gatewayProcess
 $startAttempted = $false
+$ownershipDrift = $false
+$healthy = $gatewayContainerRunning -and $gatewayEndpointReady -and $gatewayModeMatches
+$running = $gatewayContainerRunning -or $listening -or $null -ne $gatewayProcess
 $errorMessage = $null
 
-if ($runningCandidate -and -not $gatewayModeMatches -and $StartIfMissing) {
-    $stoppedProcessIds = Stop-GatewayProcesses
-    Start-Sleep -Seconds 2
-    $gatewayProcess = $null
-    $healthy = $false
-    $listening = $null -ne (Get-ListeningGatewayProcess -Port $endpoint.Port)
-    $gatewayProcessMode = $null
-    $gatewayModeMatches = $true
-}
-
-if (-not $healthy -and $StartIfMissing) {
-    $nodeExecutable = Resolve-NodeExecutable
-    if (-not $nodeExecutable) {
-        $errorMessage = "Node executable not available."
+if (-not $gatewayContainerRunning -and $StartIfMissing) {
+    if ($listening -or $null -ne $gatewayProcess) {
+        $ownershipDrift = $true
+        $errorMessage = "Native gateway process detected outside runtime-core Docker ownership. Stop the native gateway and rerun bootstrap."
     }
     else {
-        $startAttempted = $true
-        try {
-            Start-GatewayProcess -NodeExecutable $nodeExecutable
+        $composeStart = Invoke-RuntimeCoreComposeJson -Action "up" -Services @("gateway")
+        if ($composeStart -and $composeStart.ok) {
+            $startAttempted = $true
             $deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
             do {
                 Start-Sleep -Seconds 2
-                $healthy = Test-GatewayHealth -HealthUrl $endpoint.HealthUrl
-                $listeningProcess = Get-ListeningGatewayProcess -Port $endpoint.Port
-                $listening = $null -ne $listeningProcess
-                if ($listeningProcess) {
-                    $gatewayProcess = $listeningProcess
+                $gatewayContainer = Get-RuntimeCoreGatewayEntry
+                if ($gatewayContainer) {
+                    $containerStateText = [string]::Join(" ", @(
+                        if ($gatewayContainer.PSObject.Properties.Name -contains "State") { [string]$gatewayContainer.State } else { "" }
+                        if ($gatewayContainer.PSObject.Properties.Name -contains "Status") { [string]$gatewayContainer.Status } else { "" }
+                    )).Trim().ToLowerInvariant()
+                    $gatewayContainerRunning = (
+                        $containerStateText.Contains("running") -or
+                        $containerStateText.Contains("healthy")
+                    )
                 }
-                elseif (-not $gatewayProcess) {
-                    $gatewayProcess = Get-GatewayCandidateProcess
+                else {
+                    $gatewayContainerRunning = $false
                 }
-                $gatewayProcessMode = Get-GatewayProcessMode -Process $gatewayProcess
-                $gatewayModeMatches = [string]::IsNullOrWhiteSpace([string]$gatewayProcessMode) -or ($gatewayProcessMode -eq $gatewayMode)
-                if ($healthy -and -not $gatewayModeMatches) {
-                    $healthy = $false
+
+                $gatewayEndpointReady = Test-GatewayHealth -HealthUrl $endpoint.HealthUrl
+                $healthy = $gatewayContainerRunning -and $gatewayEndpointReady
+                if ($gatewayContainerRunning) {
+                    $gatewayCommandLine = "docker compose service gateway"
+                    $gatewayProcessMode = "suite_native"
+                    $gatewayModeMatches = $true
                 }
             } while ((Get-Date) -lt $deadline -and -not $healthy)
         }
-        catch {
-            $errorMessage = $_.Exception.Message
+        else {
+            $startAttempted = $true
+            $errorMessage = if ($composeStart -and -not [string]::IsNullOrWhiteSpace([string]$composeStart.outputText)) {
+                [string]$composeStart.outputText
+            }
+            else {
+                "Gateway compose start failed. Native gateway fallback is disabled for runtime-core ownership."
+            }
         }
     }
 }
 
 if (-not $gatewayProcess) {
     $gatewayProcess = Get-GatewayCandidateProcess
+    if ($gatewayProcess -and -not $gatewayContainerRunning) {
+        $gatewayCommandLine = [string]$gatewayProcess.CommandLine
+    }
 }
-if (-not $listening) {
-    $listening = $null -ne (Get-ListeningGatewayProcess -Port $endpoint.Port)
+$listeningProcess = Get-ListeningGatewayProcess -Port $endpoint.Port
+$listening = $null -ne $listeningProcess
+if ($listeningProcess) {
+    $gatewayProcess = $listeningProcess
+    if (-not $gatewayContainerRunning) {
+        $gatewayCommandLine = [string]$listeningProcess.CommandLine
+    }
 }
-$gatewayProcessMode = Get-GatewayProcessMode -Process $gatewayProcess
+$gatewayProcessMode = if ($gatewayContainerRunning) { "suite_native" } else { Get-GatewayProcessMode -Process $gatewayProcess }
 $gatewayModeMatches = [string]::IsNullOrWhiteSpace([string]$gatewayProcessMode) -or ($gatewayProcessMode -eq $gatewayMode)
+$gatewayEndpointReady = Test-GatewayHealth -HealthUrl $endpoint.HealthUrl
+$healthy = $gatewayContainerRunning -and $gatewayEndpointReady -and $gatewayModeMatches
+$running = $gatewayContainerRunning -or $listening -or $null -ne $gatewayProcess
+$ownershipDrift = $ownershipDrift -or ($running -and -not $gatewayContainerRunning)
 
-if ($healthy -and -not $gatewayModeMatches) {
-    $healthy = $false
-}
-
-$running = $healthy -or $listening -or $null -ne $gatewayProcess
 if (-not $healthy -and [string]::IsNullOrWhiteSpace($errorMessage)) {
-    if ($running -and -not $gatewayModeMatches) {
+    if ($ownershipDrift) {
+        $errorMessage = "Gateway is responding outside runtime-core Docker ownership."
+    }
+    elseif ($running -and -not $gatewayModeMatches) {
         $actualGatewayModeLabel = Get-SuiteGatewayModeLabel -GatewayMode $gatewayProcessMode
         $errorMessage = "Gateway is running in $actualGatewayModeLabel mode while $gatewayModeLabel is configured."
     }
     elseif (-not $running) {
-        $errorMessage = "Gateway process not running."
+        $errorMessage = "Gateway is not running."
     }
     elseif ($startAttempted) {
-        $errorMessage = "Gateway start attempted but health check did not pass within $StartupTimeoutSeconds seconds."
+        $errorMessage = "Gateway compose start was requested but the health endpoint did not become ready within $StartupTimeoutSeconds seconds."
     }
     else {
-        $errorMessage = "Gateway process is running but the health endpoint is not ready."
+        $errorMessage = "Gateway container is running but the health endpoint is not ready."
     }
 }
 
@@ -361,8 +479,12 @@ $result = [pscustomobject]@{
     Listening = $listening
     Healthy = $healthy
     ProcessId = if ($gatewayProcess) { $gatewayProcess.ProcessId } else { $null }
-    CommandLine = if ($gatewayProcess) { $gatewayProcess.CommandLine } else { $null }
+    CommandLine = $gatewayCommandLine
     StartAttempted = $startAttempted
+    StartupMode = if ($gatewayContainerRunning) { "docker_compose" } elseif ($gatewayProcess) { "native_process" } else { $null }
+    ExpectedStartupMode = "docker_compose"
+    OwnershipDrift = $ownershipDrift
+    LogPath = $gatewayLogPath
     Error = $errorMessage
     service = [pscustomobject]@{
         id = "gateway"
@@ -397,11 +519,15 @@ if ($Json) {
     $result | ConvertTo-Json -Depth 5
 }
 else {
-    Write-Host "Gateway startup healthy: $($result.Healthy)"
+    Write-Host "Gateway running: $($result.Running)"
+    Write-Host "Managed health ready: $($result.Healthy)"
     Write-Host "Listening: $($result.Listening)"
     Write-Host "Process ID: $($result.ProcessId)"
     Write-Host "Health URL: $($result.HealthUrl)"
+    Write-Host "Log path: $($result.LogPath)"
     Write-Host "Gateway mode: $($result.GatewayModeLabel)"
+    Write-Host "Startup mode: $($result.StartupMode)"
+    Write-Host "Ownership drift: $($result.OwnershipDrift)"
     if ($result.GatewayProcessMode) {
         Write-Host "Gateway process mode: $(Get-SuiteGatewayModeLabel -GatewayMode $result.GatewayProcessMode)"
     }
@@ -409,7 +535,7 @@ else {
         Write-Host "Command: $($result.CommandLine)"
     }
     if ($result.StartAttempted) {
-        Write-Host "Start requested via node scripts/run-agent-gateway.mjs."
+        Write-Host "Start requested via runtime-core Docker ownership."
     }
     if ($result.Error) {
         Write-Host "Error: $($result.Error)"

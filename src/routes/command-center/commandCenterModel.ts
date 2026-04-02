@@ -45,7 +45,7 @@ export const COMMAND_GROUPS: CommandGroup[] = [
 				id: "gateway-health-probe",
 				name: "Gateway Health Probe",
 				description: "Check the local gateway health endpoint directly.",
-				command: "curl -sS http://127.0.0.1:3000/health | cat",
+				command: "curl -sS http://127.0.0.1:3001/health | cat",
 			},
 			{
 				id: "backend-health-probe",

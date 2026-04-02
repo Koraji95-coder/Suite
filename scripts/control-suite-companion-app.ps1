@@ -99,6 +99,11 @@ function Open-CompanionFolder {
 function Launch-Companion {
 	param([switch]$Relaunch)
 
+	$summary = if ($Relaunch) { "Legacy Office relaunch is no longer supported." } else { "Legacy Office launch is no longer supported." }
+	$details = "Office now runs inside the shared Suite Runtime shell through the local broker. Use Suite Runtime Control instead of DailyDesk.exe."
+	Save-LaunchState -Status "retired_legacy_client" -Message $summary -ProcessId $null
+	return New-CompanionResult -Ok $false -Summary $summary -Details $details -Snapshot (Get-CurrentSnapshot)
+
 	$currentSnapshot = Get-CurrentSnapshot
 	if (-not [bool]$config.enabled) {
 		Save-LaunchState -Status "disabled" -Message "Office companion is disabled." -ProcessId $null

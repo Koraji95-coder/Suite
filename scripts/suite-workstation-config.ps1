@@ -5,6 +5,43 @@ function Convert-ToSuiteTomlString {
     return '"' + $escaped + '"'
 }
 
+function Get-SuiteCodexConfigPath {
+    if (-not [string]::IsNullOrWhiteSpace([string]$env:CODEX_HOME)) {
+        return Join-Path $env:CODEX_HOME "config.toml"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace([string]$env:USERPROFILE)) {
+        return Join-Path $env:USERPROFILE ".codex\config.toml"
+    }
+
+    return $null
+}
+
+function Get-SuiteTomlStringValue {
+    param(
+        [string]$Path,
+        [string]$Key
+    )
+
+    if (
+        [string]::IsNullOrWhiteSpace($Path) -or
+        [string]::IsNullOrWhiteSpace($Key) -or
+        -not (Test-Path -LiteralPath $Path)
+    ) {
+        return $null
+    }
+
+    $pattern = "^\s*$([Regex]::Escape($Key))\s*=\s*""([^""]*)"""
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        $match = [Regex]::Match($line, $pattern)
+        if ($match.Success) {
+            return $match.Groups[1].Value.Trim()
+        }
+    }
+
+    return $null
+}
+
 function Convert-ToSuiteSlug {
     param([Parameter(Mandatory = $true)][string]$Value)
 
@@ -29,11 +66,11 @@ function Get-SuiteRoamingAppDataRoot {
 }
 
 function Get-SuitePreferredDevRoot {
-    if (-not [string]::IsNullOrWhiteSpace([string]$env:SystemDrive)) {
-        return Join-Path $env:SystemDrive "Dev"
+    if (-not [string]::IsNullOrWhiteSpace([string]$env:USERPROFILE)) {
+        return Join-Path $env:USERPROFILE "Documents\GitHub"
     }
 
-    return "C:\Dev"
+    return "C:\Users\DustinWard\Documents\GitHub"
 }
 
 function Get-SuiteStableSuiteRoot {
@@ -41,15 +78,51 @@ function Get-SuiteStableSuiteRoot {
 }
 
 function Get-SuiteStableDailyRoot {
-    return Join-Path (Get-SuitePreferredDevRoot) "Daily"
+    return Join-Path (Get-SuitePreferredDevRoot) "Office"
+}
+
+function Get-SuiteDropboxWorkspaceRoot {
+    if (-not [string]::IsNullOrWhiteSpace([string]$env:USERPROFILE)) {
+        return Join-Path $env:USERPROFILE "Dropbox\SuiteWorkspace"
+    }
+
+    return "C:\Users\DustinWard\Dropbox\SuiteWorkspace"
+}
+
+function Get-SuiteOfficeWorkspaceRoot {
+    return Join-Path (Get-SuiteDropboxWorkspaceRoot) "Office"
+}
+
+function Get-SuiteOfficeKnowledgeRoot {
+    return Join-Path (Get-SuiteOfficeWorkspaceRoot) "Knowledge"
+}
+
+function Get-SuiteOfficeStateRoot {
+    return Join-Path (Get-SuiteOfficeWorkspaceRoot) "State"
+}
+
+function Ensure-SuiteOfficeWorkspaceRoots {
+    $workspaceRoot = Get-SuiteOfficeWorkspaceRoot
+    $knowledgeRoot = Get-SuiteOfficeKnowledgeRoot
+    $stateRoot = Get-SuiteOfficeStateRoot
+
+    foreach ($path in @($workspaceRoot, $knowledgeRoot, $stateRoot)) {
+        if ([string]::IsNullOrWhiteSpace($path)) {
+            continue
+        }
+
+        New-Item -ItemType Directory -Path $path -Force | Out-Null
+    }
+
+    return [pscustomobject]@{
+        workspaceRoot = $workspaceRoot
+        knowledgeRoot = $knowledgeRoot
+        stateRoot = $stateRoot
+    }
 }
 
 function Get-SuiteStableOfficeExecutableCandidates {
-    $stableDailyRoot = Get-SuiteStableDailyRoot
-    return @(
-        (Join-Path $stableDailyRoot "artifacts\DailyDesk\publish\DailyDesk.exe"),
-        (Join-Path $stableDailyRoot "DailyDesk\bin\Release\net10.0-windows\DailyDesk.exe")
-    )
+    return @()
 }
 
 function Get-SuiteLegacyDailyRoot {
@@ -75,21 +148,7 @@ function Resolve-SuitePreferredDailyRoot {
 }
 
 function Resolve-SuitePreferredOfficeExecutablePath {
-    foreach ($stableExecutable in (Get-SuiteStableOfficeExecutableCandidates)) {
-        if (Test-Path -LiteralPath $stableExecutable) {
-            return [System.IO.Path]::GetFullPath($stableExecutable)
-        }
-    }
-
-    $legacyDailyRoot = Get-SuiteLegacyDailyRoot
-    if (-not [string]::IsNullOrWhiteSpace($legacyDailyRoot)) {
-        $legacyExecutable = Join-Path $legacyDailyRoot "DailyDesk\bin\Release\net10.0-windows\DailyDesk.exe"
-        if (Test-Path -LiteralPath $legacyExecutable) {
-            return [System.IO.Path]::GetFullPath($legacyExecutable)
-        }
-    }
-
-    return [System.IO.Path]::GetFullPath($stableExecutable)
+    return $null
 }
 
 function Test-SuiteDirectoryWriteAccess {
@@ -279,10 +338,23 @@ function Resolve-SuiteWorkstationProfile {
     else {
         $computerName.Trim()
     }
+    $codexConfigPath = Get-SuiteCodexConfigPath
+    $configuredWorkstationId = [string](Get-SuiteTomlStringValue -Path $codexConfigPath -Key "SUITE_WORKSTATION_ID")
 
     $match = Find-SuiteWorkstationProfileMatch `
         -Profiles $profileSet.Profiles `
         -Value $ExplicitWorkstationId
+    if ($null -eq $match) {
+        $match = Find-SuiteWorkstationProfileMatch `
+            -Profiles $profileSet.Profiles `
+            -Value $configuredWorkstationId
+        if ($null -ne $match) {
+            $match = [pscustomobject]@{
+                Profile = $match.Profile
+                MatchSource = "codex_config"
+            }
+        }
+    }
     if ($null -eq $match) {
         $match = Find-SuiteWorkstationProfileMatch `
             -Profiles $profileSet.Profiles `
@@ -293,11 +365,14 @@ function Resolve-SuiteWorkstationProfile {
         $match.Profile
     }
     else {
-        $fallbackWorkstationId = if ([string]::IsNullOrWhiteSpace($ExplicitWorkstationId)) {
-            $resolvedComputerName
+        $fallbackWorkstationId = if (-not [string]::IsNullOrWhiteSpace($ExplicitWorkstationId)) {
+            $ExplicitWorkstationId.Trim()
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($configuredWorkstationId)) {
+            $configuredWorkstationId.Trim()
         }
         else {
-            $ExplicitWorkstationId.Trim()
+            $resolvedComputerName
         }
         Get-SuiteFallbackWorkstationProfile -ResolvedWorkstationId $fallbackWorkstationId
     }
@@ -366,12 +441,14 @@ function Get-SuiteWorkstationMcpEnv {
     $preferredSuiteRoot = Get-SuiteStableSuiteRoot
     $preferredDailyRoot = Resolve-SuitePreferredDailyRoot
     $preferredOfficeExecutablePath = Resolve-SuitePreferredOfficeExecutablePath
+    $preferredOfficeKnowledgeRoot = Get-SuiteOfficeKnowledgeRoot
+    $preferredOfficeStateRoot = Get-SuiteOfficeStateRoot
     $filesystemCollectorId = "watchdog-fs-$slug"
     $autocadCollectorId = "autocad-$slug"
     $filesystemTaskName = "SuiteWatchdogFilesystemCollector-$($WorkstationProfile.WorkstationId)"
     $autocadTaskName = "SuiteWatchdogAutoCADCollector-$($WorkstationProfile.WorkstationId)"
 
-    return [ordered]@{
+    $envValues = [ordered]@{
         SUITE_MCP_ENV_STAMPED_BY = "scripts/sync-suite-workstation-profile.ps1"
         SUITE_WORKSTATION_ID = $WorkstationProfile.WorkstationId
         SUITE_WORKSTATION_LABEL = $WorkstationProfile.WorkstationLabel
@@ -400,8 +477,18 @@ function Get-SuiteWorkstationMcpEnv {
         SUITE_RUNTIME_BOOTSTRAP_SCRIPT = (Join-Path $ResolvedRepoRoot "scripts\run-suite-runtime-startup.ps1")
         SUITE_STABLE_SUITE_ROOT = $preferredSuiteRoot
         SUITE_DAILY_ROOT = $preferredDailyRoot
-        SUITE_OFFICE_EXECUTABLE_PATH = $preferredOfficeExecutablePath
+        SUITE_OFFICE_BROKER_BASE_URL = "http://127.0.0.1:57420"
+        SUITE_OFFICE_KNOWLEDGE_ROOT = $preferredOfficeKnowledgeRoot
+        SUITE_OFFICE_STATE_ROOT = $preferredOfficeStateRoot
+        SUITE_RUNTIME_CORE_COMPOSE_PATH = (Join-Path $ResolvedRepoRoot "docker\runtime-core\runtime-core.compose.yml")
+        SUITE_RUNTIME_CORE_PROJECT_NAME = "suite-runtime-core"
     }
+
+    if (-not [string]::IsNullOrWhiteSpace($preferredOfficeExecutablePath)) {
+        $envValues["SUITE_OFFICE_EXECUTABLE_PATH"] = $preferredOfficeExecutablePath
+    }
+
+    return $envValues
 }
 
 function Set-SuiteTomlKeyInSection {
@@ -520,7 +607,7 @@ function Update-SuiteCodexConfig {
     $content = Remove-SuiteTomlKeysInSection `
         -Content $content `
         -SectionName "mcp_servers.suite_repo_mcp.env" `
-        -Keys @($mcpEnvValues.Keys)
+        -Keys (@($mcpEnvValues.Keys) + @("SUITE_OFFICE_EXECUTABLE_PATH"))
 
     foreach ($key in $mcpEnvValues.Keys) {
         $content = Set-SuiteTomlKeyInSection `

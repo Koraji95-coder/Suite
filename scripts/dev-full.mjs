@@ -43,9 +43,13 @@ const limiterMode =
 		.trim();
 const limiterStrictMode =
 	limiterRequireSharedStorage || limiterMode === "production" || limiterMode === "prod";
-const redisWindowsService = (process.env.SUITE_REDIS_WINDOWS_SERVICE || "").trim() || "Memurai";
+const redisContainerName =
+	(process.env.SUITE_REDIS_CONTAINER_NAME || "").trim() || "suite-redis-local";
+const redisDataVolume =
+	(process.env.SUITE_REDIS_DATA_VOLUME || "").trim() || "suite_redis_local_data";
+const redisImage = (process.env.SUITE_REDIS_IMAGE || "").trim() || "redis:7-alpine";
 const gatewayPort = Number.parseInt(
-	(process.env.AGENT_GATEWAY_PORT || "").trim() || "3000",
+	(process.env.AGENT_GATEWAY_PORT || "").trim() || "3001",
 	10,
 );
 const backendPort = Number.parseInt(
@@ -281,95 +285,6 @@ async function waitForPortReady(host, port, attempts = 20, timeoutMs = 500, dela
 	return false;
 }
 
-function splitWindowsServiceCandidates(rawValue) {
-	return String(rawValue || "")
-		.split(/[;,]/)
-		.map((entry) => entry.trim())
-		.filter(Boolean);
-}
-
-function isWindowsServiceAutostartDisabled(rawValue) {
-	const normalized = String(rawValue || "").trim().toLowerCase();
-	return ["off", "none", "disabled", "skip", "false", "0"].includes(normalized);
-}
-
-function discoverWindowsRedisServiceCandidates() {
-	if (process.platform !== "win32") return [];
-	if (!commandExists("powershell")) return [];
-	const probe = spawnSync(
-		"powershell",
-		[
-			"-NoProfile",
-			"-Command",
-			"Get-Service | Where-Object { $_.Name -match 'memurai|redis' -or $_.DisplayName -match 'memurai|redis' } | Select-Object -ExpandProperty Name",
-		],
-		{ encoding: "utf8" },
-	);
-	if (probe.status !== 0) return [];
-	return String(probe.stdout || "")
-		.split(/\r?\n/)
-		.map((entry) => entry.trim())
-		.filter(Boolean);
-}
-
-function resolveWindowsRedisServiceCandidates() {
-	const configuredRaw = String(redisWindowsService || "").trim();
-	if (isWindowsServiceAutostartDisabled(configuredRaw)) {
-		return [];
-	}
-
-	const configured = splitWindowsServiceCandidates(configuredRaw || "Memurai").filter(
-		(entry) => entry.toLowerCase() !== "auto",
-	);
-	const discovered = discoverWindowsRedisServiceCandidates();
-	const defaults = ["Memurai", "memurai", "Redis", "redis"];
-	const deduped = [];
-	const seen = new Set();
-
-	for (const candidate of [...configured, ...discovered, ...defaults]) {
-		const normalized = String(candidate || "").trim();
-		if (!normalized) continue;
-		const key = normalized.toLowerCase();
-		if (seen.has(key)) continue;
-		seen.add(key);
-		deduped.push(normalized);
-	}
-	return deduped;
-}
-
-function startWindowsService(serviceName) {
-	if (process.platform !== "win32") {
-		return { ok: false, reason: "not_windows" };
-	}
-	const service = String(serviceName || "").trim();
-	if (!service) {
-		return { ok: false, reason: "service_name_empty" };
-	}
-	const query = spawnSync("sc", ["query", service], { encoding: "utf8" });
-	if (query.status !== 0) {
-		return {
-			ok: false,
-			reason: `service_not_found:${service}`,
-			detail: String(query.stderr || query.stdout || "").trim(),
-		};
-	}
-	const start = spawnSync("sc", ["start", service], { encoding: "utf8" });
-	const startText = `${String(start.stdout || "")}\n${String(start.stderr || "")}`;
-	const normalizedText = startText.toUpperCase();
-	if (
-		start.status === 0 ||
-		normalizedText.includes("ALREADY RUNNING") ||
-		normalizedText.includes("FAILED 1056")
-	) {
-		return { ok: true, reason: `windows_service:${service}` };
-	}
-	return {
-		ok: false,
-		reason: `service_start_failed:${service}`,
-		detail: startText.trim(),
-	};
-}
-
 function limiterModeSummary() {
 	return `strict_mode=${limiterStrictMode}, dev_degrade=${limiterDevDegradeOnRedisFailure}`;
 }
@@ -387,6 +302,93 @@ function resolveRedisUnavailableStatus(detail) {
 	}
 	console.error(`[dev-full] Redis is required: ${message}`);
 	process.exit(1);
+}
+
+function normalizeDockerPublishHost(host) {
+	return isLoopbackHost(host) ? "127.0.0.1" : String(host || "").trim();
+}
+
+function dockerContainerExists(containerName) {
+	if (!commandExists("docker")) return false;
+	const probe = spawnSync("docker", ["inspect", containerName], {
+		stdio: "ignore",
+	});
+	return probe.status === 0;
+}
+
+function startDockerRedisContainer(endpoint) {
+	if (!commandExists("docker")) {
+		return {
+			ok: false,
+			reason: "docker_not_available",
+			detail: "docker is not available on PATH",
+		};
+	}
+
+	if (!isLoopbackHost(endpoint.host)) {
+		return {
+			ok: false,
+			reason: "unsupported_non_local_host",
+			detail: `Docker Redis autostart only supports loopback hosts; got ${endpoint.host}`,
+		};
+	}
+
+	if (dockerContainerExists(redisContainerName)) {
+		const startResult = spawnSync("docker", ["start", redisContainerName], {
+			encoding: "utf8",
+		});
+		const startText =
+			`${String(startResult.stdout || "")}\n${String(startResult.stderr || "")}`.trim();
+		if (
+			startResult.status === 0 ||
+			startText.toLowerCase().includes("already running")
+		) {
+			return {
+				ok: true,
+				reason: `docker_container:${redisContainerName}`,
+			};
+		}
+		return {
+			ok: false,
+			reason: "docker_start_failed",
+			detail: startText,
+		};
+	}
+
+	const publishHost = normalizeDockerPublishHost(endpoint.host);
+	const createResult = spawnSync(
+		"docker",
+		[
+			"run",
+			"-d",
+			"--name",
+			redisContainerName,
+			"--restart",
+			"unless-stopped",
+			"-p",
+			`${publishHost}:${endpoint.port}:6379`,
+			"-v",
+			`${redisDataVolume}:/data`,
+			redisImage,
+			"redis-server",
+			"--appendonly",
+			"yes",
+		],
+		{ encoding: "utf8" },
+	);
+	const createText =
+		`${String(createResult.stdout || "")}\n${String(createResult.stderr || "")}`.trim();
+	if (createResult.status === 0) {
+		return {
+			ok: true,
+			reason: `docker_container:${redisContainerName}`,
+		};
+	}
+	return {
+		ok: false,
+		reason: "docker_run_failed",
+		detail: createText,
+	};
 }
 
 function forwardOutput(stream, label, write) {
@@ -429,7 +431,7 @@ function run(name, command, args = [], options = {}) {
 	return child;
 }
 
-async function ensureRedis(label = "redis") {
+async function ensureRedis() {
 	const endpoint = parseRedisEndpoint(limiterStorageUri);
 	if (!endpoint) {
 		console.log(
@@ -461,110 +463,15 @@ async function ensureRedis(label = "redis") {
 		);
 	}
 
-	if (process.platform === "win32" && isLoopbackHost(endpoint.host)) {
-		const serviceCandidates = resolveWindowsRedisServiceCandidates();
-		if (serviceCandidates.length === 0) {
-			console.log(
-				`[dev-full] Windows service startup skipped (SUITE_REDIS_WINDOWS_SERVICE=${redisWindowsService || "<empty>"}).`,
-			);
-		} else {
-			console.log(
-				`[dev-full] Attempting Redis startup via Windows service candidate(s): ${serviceCandidates.join(", ")}...`,
-			);
-			const serviceFailures = [];
-			for (const candidate of serviceCandidates) {
-				const serviceStart = startWindowsService(candidate);
-				if (!serviceStart.ok) {
-					serviceFailures.push({
-						service: candidate,
-						reason: serviceStart.reason,
-						detail: serviceStart.detail || "",
-					});
-					continue;
-				}
-				if (await waitForPortReady(endpoint.host, endpoint.port, 20, 500, 250)) {
-					console.log(
-						`[dev-full] Redis is ready at ${endpointLabel} via Windows service '${candidate}'.`,
-					);
-					return {
-						mode: "redis",
-						available: true,
-						storageUri: limiterStorageUri,
-						reason: serviceStart.reason,
-					};
-				}
-				serviceFailures.push({
-					service: candidate,
-					reason: "service_started_port_not_ready",
-					detail: "",
-				});
-			}
-
-			if (serviceFailures.length > 0) {
-				const summary = serviceFailures
-					.slice(0, 4)
-					.map((entry) => `${entry.service}:${entry.reason}`)
-					.join(", ");
-				console.log(
-					`[dev-full] Windows service startup unavailable (${summary}${serviceFailures.length > 4 ? ", ..." : ""}); trying fallback providers.`,
-				);
-				const withDetail = serviceFailures.find((entry) => entry.detail);
-				if (withDetail) {
-					console.log(
-						`[dev-full] Service detail (${withDetail.service}): ${withDetail.detail}`,
-					);
-				}
-			}
-		}
-	}
-
-	const redisBin =
-		(process.env.SUITE_REDIS_BIN || "").trim() ||
-		(process.platform === "win32" ? "redis-server.exe" : "redis-server");
-
-	let command = "";
-	let args = [];
-	let reason = "";
-
-	if (commandExists(redisBin)) {
-		command = redisBin;
-		args = [
-			"--bind",
-			endpoint.host,
-			"--port",
-			String(endpoint.port),
-			"--save",
-			"",
-			"--appendonly",
-			"no",
-		];
-		reason = redisBin;
-	} else if (commandExists("docker")) {
-		command = "docker";
-		args = [
-			"run",
-			"--rm",
-			"--name",
-			`suite-dev-redis-${endpoint.port}-${process.pid}`,
-			"-p",
-			`${endpoint.host}:${endpoint.port}:6379`,
-			"redis:7-alpine",
-			"--save",
-			"",
-			"--appendonly",
-			"no",
-		];
-		reason = "docker redis:7-alpine";
-	}
-
-	if (!command) {
+	console.log(
+		`[dev-full] Ensuring Docker Redis container '${redisContainerName}' is running at ${endpointLabel}...`,
+	);
+	const dockerStart = startDockerRedisContainer(endpoint);
+	if (!dockerStart.ok) {
 		return resolveRedisUnavailableStatus(
-			"Unable to autostart Redis (tried Windows service, redis-server binary, and Docker)",
+			`Unable to autostart Redis via Docker (${dockerStart.detail || dockerStart.reason})`,
 		);
 	}
-
-	console.log(`[dev-full] Starting Redis via ${reason} at ${endpointLabel}...`);
-	run(label, command, args);
 
 	if (await waitForPortReady(endpoint.host, endpoint.port, 20, 500, 250)) {
 		console.log(`[dev-full] Redis is ready at ${endpointLabel}.`);
@@ -572,12 +479,12 @@ async function ensureRedis(label = "redis") {
 			mode: "redis",
 			available: true,
 			storageUri: limiterStorageUri,
-			reason: reason || "redis_started",
+			reason: dockerStart.reason,
 		};
 	}
 
 	return resolveRedisUnavailableStatus(
-		`Redis did not become reachable at ${endpointLabel}`,
+		`Redis Docker container '${redisContainerName}' did not become reachable at ${endpointLabel}`,
 	);
 }
 
@@ -657,7 +564,7 @@ async function main() {
 
 	console.log(`[dev-full] Limiter mode: ${limiterModeSummary()}.`);
 	ensureRequiredPortsAvailable();
-	const redisStatus = await ensureRedis("redis");
+	const redisStatus = await ensureRedis();
 	console.log(
 		`[dev-full] Redis mode: ${redisStatus.mode} (storage=${redisStatus.storageUri}, reason=${redisStatus.reason}).`,
 	);

@@ -325,7 +325,7 @@ function Write-CodexHandoff {
 
     $lines += "## Destination Machine"
     $lines += ""
-    $lines += '1. Clone Suite and Daily into `C:\Dev\Suite` and `C:\Dev\Daily`.'
+    $lines += '1. Clone Suite and Office into `C:\Users\DustinWard\Documents\GitHub\Suite` and `C:\Users\DustinWard\Documents\GitHub\Office`.'
     $lines += '2. Run `npm run workstation:bringup:validate` then `npm run workstation:bringup -- -WorkstationId <TARGET_ID>` from the Suite repo.'
     $lines += '3. Run `npm run workstation:restore -- -WorkstationId <TARGET_ID>`.'
     $lines += '4. Review this handoff file and the mirrored `codex\session_index.jsonl` if you need to locate the last thread quickly.'
@@ -367,9 +367,11 @@ function Write-MirrorReadme {
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+. (Join-Path $repoRoot "scripts\suite-workstation-config.ps1")
+. (Join-Path $repoRoot "scripts\lib\suite-workstation-diagnostics.ps1")
 $codexRoot = Join-Path $env:USERPROFILE ".codex"
 $sessionIndexPath = Join-Path $codexRoot "session_index.jsonl"
-$stableDailyRoot = "C:\Dev\Daily"
+$stableDailyRoot = Get-SuiteStableDailyRoot
 $legacyDailyRoot = Join-Path $env:USERPROFILE "OneDrive\Desktop\Daily"
 $dailyRepoRoot = if (Test-Path -LiteralPath (Join-Path $stableDailyRoot ".git")) {
     $stableDailyRoot
@@ -482,8 +484,57 @@ $manifest = [pscustomobject]@{
 }
 
 $manifestPath = Join-Path $MirrorRoot "mirror-manifest.json"
+$envFingerprintManifestPath = Join-Path $MirrorRoot "env-fingerprint-manifest.json"
+$mcpSkillsManifestPath = Join-Path $MirrorRoot "mcp-skills-manifest.json"
+$runtimeBootstrapManifestPath = Join-Path $MirrorRoot "runtime-bootstrap-manifest.json"
+$workstationDoctorManifestPath = Join-Path $MirrorRoot "workstation-doctor-manifest.json"
 $readmePath = Join-Path $MirrorRoot "README.txt"
 $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+
+$envFingerprintManifest = Get-SuiteEnvFingerprintSummary -RepoRoot $repoRoot
+$envFingerprintManifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $envFingerprintManifestPath -Encoding UTF8
+
+$mcpSkillsManifest = [pscustomobject]@{
+    generated_utc = (Get-Date).ToUniversalTime().ToString("o")
+    codex_config_path = (Join-Path $env:USERPROFILE ".codex\config.toml")
+    mcp_servers = @(Get-SuiteCodexMcpInventory -CodexConfigPath (Join-Path $env:USERPROFILE ".codex\config.toml"))
+    skills = @(Get-SuiteSkillInventory)
+}
+$mcpSkillsManifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $mcpSkillsManifestPath -Encoding UTF8
+
+$runtimeStatusScript = Join-Path $repoRoot "scripts\get-suite-runtime-status.ps1"
+if (Test-Path -LiteralPath $runtimeStatusScript) {
+    try {
+        $runtimeStatusRaw = & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File $runtimeStatusScript -RepoRoot $repoRoot -Json 2>$null
+        $runtimeStatusText = [string]::Join([Environment]::NewLine, @($runtimeStatusRaw | ForEach-Object { if ($null -eq $_) { "" } else { $_.ToString() } })).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($runtimeStatusText)) {
+            $runtimeStatusPayload = $runtimeStatusText | ConvertFrom-Json
+            ([pscustomobject]@{
+                generated_utc = (Get-Date).ToUniversalTime().ToString("o")
+                overall = $runtimeStatusPayload.overall
+                workstation = if ($runtimeStatusPayload.support) { $runtimeStatusPayload.support.workstation } else { $null }
+                runtime = $runtimeStatusPayload.runtime
+                services = $runtimeStatusPayload.services
+            } | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath $runtimeBootstrapManifestPath -Encoding UTF8
+        }
+    }
+    catch {
+    }
+}
+
+$workstationDoctorScript = Join-Path $repoRoot "scripts\workstation-doctor.ps1"
+if (Test-Path -LiteralPath $workstationDoctorScript) {
+    try {
+        $doctorRaw = & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File $workstationDoctorScript -RepoRoot $repoRoot -Json 2>$null
+        $doctorText = [string]::Join([Environment]::NewLine, @($doctorRaw | ForEach-Object { if ($null -eq $_) { "" } else { $_.ToString() } })).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($doctorText)) {
+            $doctorText | Set-Content -LiteralPath $workstationDoctorManifestPath -Encoding UTF8
+        }
+    }
+    catch {
+    }
+}
+
 Write-MirrorReadme -Path $readmePath -Mappings $mappings
 
 Write-Host "Mirrored Suite local state to $MirrorRoot"

@@ -32,11 +32,111 @@ function Get-SuiteRuntimePaths {
 		RuntimeStatusPath = Join-Path $runtimeStatusDir "last-bootstrap.json"
 		CurrentBootstrapPath = Join-Path $runtimeStatusDir "current-bootstrap.json"
 		RuntimeLogPath = Join-Path $runtimeStatusDir "bootstrap.log"
+		BackendLogPath = Join-Path $runtimeStatusDir "backend.log"
+		GatewayLogPath = Join-Path $runtimeStatusDir "gateway.log"
 		FrontendLogPath = Join-Path $runtimeStatusDir "frontend.log"
+		RuntimeLauncherLogPath = Join-Path $runtimeStatusDir "runtime-launcher.log"
 		RuntimeShellLogPath = Join-Path $runtimeStatusDir "runtime-shell.log"
+		OfficeBrokerLogPath = Join-Path $runtimeStatusDir "office-broker.log"
+		ShellWindowStatePath = Join-Path $runtimeStatusDir "shell-window-state.json"
+		FilesystemCollectorLogDir = Join-Path $StatusBase "Suite\watchdog-collector\logs"
+		AutoCadCollectorLogDir = Join-Path $StatusBase "Suite\watchdog-autocad-collector\logs"
 		CompanionConfigDir = Join-Path $runtimeStatusDir "companion-config"
 		CompanionStateDir = Join-Path $runtimeStatusDir "companions"
 		SupportRoot = Join-Path $StatusBase "Suite\support-bundles"
+	}
+}
+
+function Get-SuiteRuntimeShellInstanceKey {
+	param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+	$root = if ([string]::IsNullOrWhiteSpace($RepoRoot)) { "." } else { $RepoRoot }
+	$normalizedPath = [System.IO.Path]::GetFullPath($root).TrimEnd('\', '/').Trim().ToLowerInvariant()
+	$hashBytes = [System.Security.Cryptography.SHA256]::Create().ComputeHash(
+		[System.Text.Encoding]::UTF8.GetBytes($normalizedPath)
+	)
+	return ([System.BitConverter]::ToString($hashBytes, 0, 8)).Replace("-", "")
+}
+
+function Get-SuiteRuntimeShellPaths {
+	param(
+		[Parameter(Mandatory = $true)][string]$RepoRoot,
+		[string]$StatusBase = (Get-SuiteStatusBasePath)
+	)
+
+	$runtimePaths = Get-SuiteRuntimePaths -StatusBase $StatusBase
+	$instanceKey = Get-SuiteRuntimeShellInstanceKey -RepoRoot $RepoRoot
+	$lockDirectory = Join-Path $runtimePaths.RuntimeStatusDir "locks"
+
+	[pscustomobject]@{
+		InstanceKey = $instanceKey
+		LockDirectory = $lockDirectory
+		LockPath = Join-Path $lockDirectory ("runtime-shell-{0}.lock" -f $instanceKey)
+		PrimaryStatePath = Join-Path $lockDirectory ("runtime-shell-{0}.primary.json" -f $instanceKey)
+		ActivationRequestPath = Join-Path $lockDirectory ("runtime-shell-{0}.activation.json" -f $instanceKey)
+		StartupManifestPath = Join-Path $runtimePaths.RuntimeStatusDir "startup-owner.json"
+	}
+}
+
+function Get-SuiteRuntimeStartupManifestPath {
+	param([string]$StatusBase = (Get-SuiteStatusBasePath))
+
+	$runtimePaths = Get-SuiteRuntimePaths -StatusBase $StatusBase
+	return Join-Path $runtimePaths.RuntimeStatusDir "startup-owner.json"
+}
+
+function Read-SuiteRuntimeStartupManifest {
+	param([string]$StatusBase = (Get-SuiteStatusBasePath))
+
+	$manifestPath = Get-SuiteRuntimeStartupManifestPath -StatusBase $StatusBase
+	if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+		return $null
+	}
+
+	try {
+		return Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+	}
+	catch {
+		return $null
+	}
+}
+
+function Write-SuiteRuntimeStartupManifest {
+	param(
+		[Parameter(Mandatory = $true)][object]$Manifest,
+		[string]$StatusBase = (Get-SuiteStatusBasePath)
+	)
+
+	$manifestPath = Get-SuiteRuntimeStartupManifestPath -StatusBase $StatusBase
+	$manifestDirectory = Split-Path -Parent $manifestPath
+	if (-not [string]::IsNullOrWhiteSpace($manifestDirectory)) {
+		New-Item -ItemType Directory -Path $manifestDirectory -Force | Out-Null
+	}
+
+	$Manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+	return $manifestPath
+}
+
+function Ensure-SuiteOfficeWorkspaceRoots {
+	$workspaceRoot = Get-SuiteOfficeWorkspaceRoot
+	$knowledgeRoot = Get-SuiteOfficeKnowledgeRoot
+	$stateRoot = Get-SuiteOfficeStateRoot
+
+	foreach ($path in @($workspaceRoot, $knowledgeRoot, $stateRoot)) {
+		if ([string]::IsNullOrWhiteSpace($path)) {
+			continue
+		}
+
+		New-Item -ItemType Directory -Path $path -Force | Out-Null
+	}
+
+	return [pscustomobject]@{
+		workspaceRoot = $workspaceRoot
+		workspaceRootExists = (Test-Path -LiteralPath $workspaceRoot -PathType Container)
+		knowledgeRoot = $knowledgeRoot
+		knowledgeRootExists = (Test-Path -LiteralPath $knowledgeRoot -PathType Container)
+		stateRoot = $stateRoot
+		stateRootExists = (Test-Path -LiteralPath $stateRoot -PathType Container)
 	}
 }
 
@@ -126,6 +226,31 @@ function Convert-ToSuiteSupportSummaryLines {
 		}
 		if (-not [string]::IsNullOrWhiteSpace($overallText) -or -not [string]::IsNullOrWhiteSpace($overallState)) {
 			$lines.Add(("Overall: {0} ({1})" -f $overallText, $overallState))
+		}
+	}
+
+	$shell = $RuntimeStatus.shell
+	if ($shell) {
+		$shellStatus = [string]$shell.status
+		if ([string]::IsNullOrWhiteSpace($shellStatus)) {
+			$shellStatus = "unknown"
+		}
+
+		$shellPhase = [string]$shell.phase
+		$shellDetail = [string]$shell.detail
+		$parts = @()
+		if (-not [string]::IsNullOrWhiteSpace($shellPhase)) {
+			$parts += "phase $shellPhase"
+		}
+		if (-not [string]::IsNullOrWhiteSpace($shellDetail)) {
+			$parts += $shellDetail
+		}
+
+		if ($parts.Count -gt 0) {
+			$lines.Add(("Shared shell: {0}; {1}" -f $shellStatus, [string]::Join(" | ", $parts)))
+		}
+		else {
+			$lines.Add(("Shared shell: {0}" -f $shellStatus))
 		}
 	}
 
@@ -428,6 +553,173 @@ function Resolve-OptionalAbsolutePath {
 	}
 }
 
+function Get-TomlSectionIntegerValue {
+	param(
+		[string]$Path,
+		[string]$SectionName,
+		[string]$Key
+	)
+
+	if (
+		[string]::IsNullOrWhiteSpace($Path) -or
+		[string]::IsNullOrWhiteSpace($SectionName) -or
+		[string]::IsNullOrWhiteSpace($Key) -or
+		-not (Test-Path -LiteralPath $Path)
+	) {
+		return $null
+	}
+
+	$currentSection = $null
+	foreach ($line in Get-Content -LiteralPath $Path) {
+		$trimmedLine = $line.Trim()
+		if ($trimmedLine -match '^\[(.+)\]$') {
+			$currentSection = $Matches[1].Trim()
+			continue
+		}
+
+		if (
+			$currentSection -eq $SectionName -and
+			$trimmedLine -match ('^{0}\s*=\s*(\d+)\b' -f [Regex]::Escape($Key))
+		) {
+			return [int]$Matches[1]
+		}
+	}
+
+	return $null
+}
+
+function Get-DotEnvStringValue {
+	param(
+		[string]$Path,
+		[string]$Key
+	)
+
+	if (-not $Path -or -not (Test-Path -LiteralPath $Path)) {
+		return $null
+	}
+
+	$pattern = "^\s*$([Regex]::Escape($Key))\s*=(.*)$"
+	foreach ($line in Get-Content -LiteralPath $Path) {
+		$match = [Regex]::Match($line, $pattern)
+		if (-not $match.Success) {
+			continue
+		}
+
+		$value = $match.Groups[1].Value.Trim()
+		if (
+			($value.StartsWith('"') -and $value.EndsWith('"')) -or
+			($value.StartsWith("'") -and $value.EndsWith("'"))
+		) {
+			$value = $value.Substring(1, $value.Length - 2)
+		}
+
+		return $value
+	}
+
+	return $null
+}
+
+function Get-SuiteSupabaseLocalPorts {
+	param([string]$RepoRoot)
+
+	$ports = [ordered]@{
+		api = 54321
+		db = 54322
+		shadowDb = 54320
+		pooler = 54329
+		studio = 54323
+		inbucket = 54324
+		smtp = 2500
+		edgeInspector = 8083
+		analytics = 54327
+	}
+
+	if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+		return [pscustomobject]$ports
+	}
+
+	$configPath = Join-Path ([System.IO.Path]::GetFullPath($RepoRoot)) "supabase\config.toml"
+	if (-not (Test-Path -LiteralPath $configPath)) {
+		return [pscustomobject]$ports
+	}
+
+	$apiPort = Get-TomlSectionIntegerValue -Path $configPath -SectionName "api" -Key "port"
+	if ($apiPort) {
+		$ports.api = $apiPort
+	}
+
+	$dbPort = Get-TomlSectionIntegerValue -Path $configPath -SectionName "db" -Key "port"
+	if ($dbPort) {
+		$ports.db = $dbPort
+	}
+
+	$shadowDbPort = Get-TomlSectionIntegerValue -Path $configPath -SectionName "db" -Key "shadow_port"
+	if ($shadowDbPort) {
+		$ports.shadowDb = $shadowDbPort
+	}
+
+	$poolerPort = Get-TomlSectionIntegerValue -Path $configPath -SectionName "db.pooler" -Key "port"
+	if ($poolerPort) {
+		$ports.pooler = $poolerPort
+	}
+
+	$studioPort = Get-TomlSectionIntegerValue -Path $configPath -SectionName "studio" -Key "port"
+	if ($studioPort) {
+		$ports.studio = $studioPort
+	}
+
+	$inbucketPort = Get-TomlSectionIntegerValue -Path $configPath -SectionName "inbucket" -Key "port"
+	if ($inbucketPort) {
+		$ports.inbucket = $inbucketPort
+	}
+
+	$smtpPort = Get-TomlSectionIntegerValue -Path $configPath -SectionName "auth.email.smtp" -Key "port"
+	if ($smtpPort) {
+		$ports.smtp = $smtpPort
+	}
+
+	$edgeInspectorPort = Get-TomlSectionIntegerValue -Path $configPath -SectionName "edge_runtime" -Key "inspector_port"
+	if ($edgeInspectorPort) {
+		$ports.edgeInspector = $edgeInspectorPort
+	}
+
+	$analyticsPort = Get-TomlSectionIntegerValue -Path $configPath -SectionName "analytics" -Key "port"
+	if ($analyticsPort) {
+		$ports.analytics = $analyticsPort
+	}
+
+	$dotenvPaths = @(
+		(Join-Path ([System.IO.Path]::GetFullPath($RepoRoot)) ".env.local"),
+		(Join-Path ([System.IO.Path]::GetFullPath($RepoRoot)) ".env")
+	)
+	$overrideMap = [ordered]@{
+		api = "SUITE_SUPABASE_LOCAL_API_PORT"
+		db = "SUITE_SUPABASE_LOCAL_DB_PORT"
+		shadowDb = "SUITE_SUPABASE_LOCAL_SHADOW_PORT"
+		pooler = "SUITE_SUPABASE_LOCAL_POOLER_PORT"
+		studio = "SUITE_SUPABASE_LOCAL_STUDIO_PORT"
+		inbucket = "SUITE_SUPABASE_LOCAL_INBUCKET_PORT"
+		smtp = "SUPABASE_LOCAL_SMTP_PORT"
+		analytics = "SUITE_SUPABASE_LOCAL_ANALYTICS_PORT"
+	}
+	foreach ($portKey in $overrideMap.Keys) {
+		foreach ($dotenvPath in $dotenvPaths) {
+			$rawOverride = Get-DotEnvStringValue -Path $dotenvPath -Key $overrideMap[$portKey]
+			if ([string]::IsNullOrWhiteSpace($rawOverride)) {
+				continue
+			}
+
+			$parsedOverride = 0
+			if ([int]::TryParse($rawOverride, [ref]$parsedOverride) -and $parsedOverride -gt 0) {
+				$ports[$portKey] = $parsedOverride
+				break
+			}
+		}
+	}
+
+	return [pscustomobject]$ports
+}
+
 function New-SuiteWorkstationIdentityPayload {
 	param(
 		[string]$TomlPath,
@@ -476,6 +768,11 @@ function New-SuiteSupportConfigSnapshot {
 	$runtimeBootstrapScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_RUNTIME_BOOTSTRAP_SCRIPT"
 	$dailyRoot = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_DAILY_ROOT"
 	$officeExecutablePath = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_OFFICE_EXECUTABLE_PATH"
+	$officeKnowledgeRoot = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_OFFICE_KNOWLEDGE_ROOT"
+	$officeStateRoot = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_OFFICE_STATE_ROOT"
+	$officeBrokerBaseUrl = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_OFFICE_BROKER_BASE_URL"
+	$runtimeCoreComposePath = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_RUNTIME_CORE_COMPOSE_PATH"
+	$runtimeCoreProjectName = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_RUNTIME_CORE_PROJECT_NAME"
 	$stableSuiteRoot = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_STABLE_SUITE_ROOT"
 	$stableOfficeExecutableCandidates = @(Get-SuiteStableOfficeExecutableCandidates)
 	$existingStableOfficeExecutable = @(
@@ -502,7 +799,7 @@ function New-SuiteSupportConfigSnapshot {
 		Resolve-OptionalAbsolutePath -PathValue $stableSuiteRoot -RepoRoot $resolvedRepoRoot
 	}
 	else {
-		[System.IO.Path]::GetFullPath((Join-Path (Get-SuiteStableDevRoot) "Suite"))
+		[System.IO.Path]::GetFullPath((Get-SuiteStableSuiteRoot))
 	}
 	$resolvedDailyRoot = if (-not [string]::IsNullOrWhiteSpace($dailyRoot)) {
 		Resolve-OptionalAbsolutePath -PathValue $dailyRoot -RepoRoot $resolvedRepoRoot
@@ -525,12 +822,112 @@ function New-SuiteSupportConfigSnapshot {
 	else {
 		Resolve-OptionalAbsolutePath -PathValue ([string]$stableOfficeExecutableCandidates[0]) -RepoRoot $resolvedRepoRoot
 	}
+	$resolvedOfficeKnowledgeRoot = if (-not [string]::IsNullOrWhiteSpace($officeKnowledgeRoot)) {
+		Resolve-OptionalAbsolutePath -PathValue $officeKnowledgeRoot -RepoRoot $resolvedRepoRoot
+	}
+	else {
+		Resolve-OptionalAbsolutePath -PathValue (Get-SuiteOfficeKnowledgeRoot) -RepoRoot $resolvedRepoRoot
+	}
+	$resolvedOfficeStateRoot = if (-not [string]::IsNullOrWhiteSpace($officeStateRoot)) {
+		Resolve-OptionalAbsolutePath -PathValue $officeStateRoot -RepoRoot $resolvedRepoRoot
+	}
+	else {
+		Resolve-OptionalAbsolutePath -PathValue (Get-SuiteOfficeStateRoot) -RepoRoot $resolvedRepoRoot
+	}
+	$resolvedOfficeBrokerBaseUrl = if (-not [string]::IsNullOrWhiteSpace($officeBrokerBaseUrl)) {
+		[string]$officeBrokerBaseUrl
+	}
+	else {
+		"http://127.0.0.1:57420"
+	}
+	$resolvedRuntimeCoreComposePath = if (-not [string]::IsNullOrWhiteSpace($runtimeCoreComposePath)) {
+		Resolve-OptionalAbsolutePath -PathValue $runtimeCoreComposePath -RepoRoot $resolvedRepoRoot
+	}
+	else {
+		Resolve-OptionalAbsolutePath -PathValue "docker\runtime-core\runtime-core.compose.yml" -RepoRoot $resolvedRepoRoot
+	}
+	$resolvedRuntimeCoreProjectName = if (-not [string]::IsNullOrWhiteSpace($runtimeCoreProjectName)) {
+		[string]$runtimeCoreProjectName
+	}
+	else {
+		"suite-runtime-core"
+	}
+	$officeLocalConfig = Read-SuiteCompanionAppLocalConfig -CompanionAppId "office"
+	if ($officeLocalConfig) {
+		$localDailyRoot = @(
+			if ($officeLocalConfig.PSObject.Properties.Name -contains "dailyRoot") { [string]$officeLocalConfig.dailyRoot } else { $null }
+			if ($officeLocalConfig.PSObject.Properties.Name -contains "rootDirectory") { [string]$officeLocalConfig.rootDirectory } else { $null }
+		) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1
+		if (-not [string]::IsNullOrWhiteSpace($localDailyRoot)) {
+			$resolvedDailyRoot = Resolve-OptionalAbsolutePath -PathValue $localDailyRoot -RepoRoot $resolvedRepoRoot
+		}
+
+		$localOfficeExecutablePath = if ($officeLocalConfig.PSObject.Properties.Name -contains "executablePath") {
+			[string]$officeLocalConfig.executablePath
+		}
+		else {
+			$null
+		}
+		if (-not [string]::IsNullOrWhiteSpace($localOfficeExecutablePath)) {
+			$resolvedOfficeExecutablePath = Resolve-OptionalAbsolutePath -PathValue $localOfficeExecutablePath -RepoRoot $resolvedRepoRoot
+		}
+
+		$localSuiteRoot = if ($officeLocalConfig.PSObject.Properties.Name -contains "suiteRoot") {
+			[string]$officeLocalConfig.suiteRoot
+		}
+		else {
+			$null
+		}
+		if (-not [string]::IsNullOrWhiteSpace($localSuiteRoot)) {
+			$resolvedStableSuiteRoot = Resolve-OptionalAbsolutePath -PathValue $localSuiteRoot -RepoRoot $resolvedRepoRoot
+		}
+
+		$localKnowledgeRoot = @(
+			if ($officeLocalConfig.PSObject.Properties.Name -contains "knowledgeLibraryPath") { [string]$officeLocalConfig.knowledgeLibraryPath } else { $null }
+			if ($officeLocalConfig.PSObject.Properties.Name -contains "knowledgeRoot") { [string]$officeLocalConfig.knowledgeRoot } else { $null }
+		) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1
+		if (-not [string]::IsNullOrWhiteSpace($localKnowledgeRoot)) {
+			$resolvedOfficeKnowledgeRoot = Resolve-OptionalAbsolutePath -PathValue $localKnowledgeRoot -RepoRoot $resolvedRepoRoot
+		}
+
+		$localStateRoot = @(
+			if ($officeLocalConfig.PSObject.Properties.Name -contains "stateRootPath") { [string]$officeLocalConfig.stateRootPath } else { $null }
+			if ($officeLocalConfig.PSObject.Properties.Name -contains "stateRoot") { [string]$officeLocalConfig.stateRoot } else { $null }
+		) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -First 1
+		if (-not [string]::IsNullOrWhiteSpace($localStateRoot)) {
+			$resolvedOfficeStateRoot = Resolve-OptionalAbsolutePath -PathValue $localStateRoot -RepoRoot $resolvedRepoRoot
+		}
+
+		$localLaunchMode = if ($officeLocalConfig.PSObject.Properties.Name -contains "launchMode") {
+			[string]$officeLocalConfig.launchMode
+		}
+		else {
+			$null
+		}
+		$localLegacyClientRetired = if ($officeLocalConfig.PSObject.Properties.Name -contains "legacyClientRetired") {
+			[bool]$officeLocalConfig.legacyClientRetired
+		}
+		else {
+			$false
+		}
+		if ($localLaunchMode -eq "embedded_shell" -or $localLegacyClientRetired) {
+			$resolvedOfficeExecutablePath = $null
+		}
+	}
+	elseif (-not [string]::IsNullOrWhiteSpace($resolvedRepoRoot)) {
+		$resolvedStableSuiteRoot = $resolvedRepoRoot
+	}
 
 	[pscustomobject]@{
 		repoRoot = $resolvedRepoRoot
 		stableSuiteRoot = $resolvedStableSuiteRoot
 		dailyRoot = $resolvedDailyRoot
-		officeExecutablePath = $resolvedOfficeExecutablePath
+		officeExecutablePath = if (-not [string]::IsNullOrWhiteSpace([string]$resolvedOfficeExecutablePath)) { $resolvedOfficeExecutablePath } else { "" }
+		officeKnowledgeRoot = $resolvedOfficeKnowledgeRoot
+		officeStateRoot = $resolvedOfficeStateRoot
+		officeBrokerBaseUrl = $resolvedOfficeBrokerBaseUrl
+		runtimeCoreComposePath = $resolvedRuntimeCoreComposePath
+		runtimeCoreProjectName = $resolvedRuntimeCoreProjectName
 		codexConfigPath = $resolvedTomlPath
 		codexConfigPresent = [bool]($resolvedTomlPath -and (Test-Path -LiteralPath $resolvedTomlPath))
 		supabaseConfigPath = $resolvedSupabaseConfigPath
@@ -560,6 +957,13 @@ function New-SuiteSupportPathSnapshot {
 		currentBootstrapPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.currentBootstrapPath)) { [string]$runtime.currentBootstrapPath } else { $null }
 		bootstrapLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.logPath)) { [string]$runtime.logPath } else { $null }
 		frontendLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.frontendLogPath)) { [string]$runtime.frontendLogPath } else { $null }
+		backendLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.backendLogPath)) { [string]$runtime.backendLogPath } else { $null }
+		gatewayLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.gatewayLogPath)) { [string]$runtime.gatewayLogPath } else { $null }
+		runtimeLauncherLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.runtimeLauncherLogPath)) { [string]$runtime.runtimeLauncherLogPath } else { $null }
+		runtimeShellLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.runtimeShellLogPath)) { [string]$runtime.runtimeShellLogPath } else { $null }
+		officeBrokerLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.officeBrokerLogPath)) { [string]$runtime.officeBrokerLogPath } else { $null }
+		filesystemCollectorLogDir = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.filesystemCollectorLogDir)) { [string]$runtime.filesystemCollectorLogDir } else { $null }
+		autocadCollectorLogDir = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.autocadCollectorLogDir)) { [string]$runtime.autocadCollectorLogDir } else { $null }
 		supportRoot = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.supportRoot)) { [string]$runtime.supportRoot } else { $null }
 	}
 }
@@ -693,23 +1097,30 @@ function Get-SuiteConfigStringOverride {
 }
 
 function Get-SuiteStableDevRoot {
-	if (-not [string]::IsNullOrWhiteSpace([string]$env:SystemDrive)) {
-		return Join-Path $env:SystemDrive "Dev"
+	if (-not [string]::IsNullOrWhiteSpace([string]$env:USERPROFILE)) {
+		return Join-Path $env:USERPROFILE "Documents\GitHub"
 	}
 
-	return "C:\Dev"
+	if (
+		-not [string]::IsNullOrWhiteSpace([string]$env:HOMEDRIVE) -and
+		-not [string]::IsNullOrWhiteSpace([string]$env:HOMEPATH)
+	) {
+		return Join-Path (Join-Path $env:HOMEDRIVE $env:HOMEPATH) "Documents\GitHub"
+	}
+
+	return "C:\Users\Public\Documents\GitHub"
+}
+
+function Get-SuiteStableSuiteRoot {
+	return Join-Path (Get-SuiteStableDevRoot) "Suite"
 }
 
 function Get-SuiteStableDailyRoot {
-	return Join-Path (Get-SuiteStableDevRoot) "Daily"
+	return Join-Path (Get-SuiteStableDevRoot) "Office"
 }
 
 function Get-SuiteStableOfficeExecutableCandidates {
-	$stableDailyRoot = Get-SuiteStableDailyRoot
-	return @(
-		(Join-Path $stableDailyRoot "artifacts\DailyDesk\publish\DailyDesk.exe"),
-		(Join-Path $stableDailyRoot "DailyDesk\bin\Release\net10.0-windows\DailyDesk.exe")
-	)
+	return @()
 }
 
 function Get-SuiteLegacyDailyRoot {
@@ -718,6 +1129,41 @@ function Get-SuiteLegacyDailyRoot {
 	}
 
 	return $null
+}
+
+function Get-SuiteDropboxWorkspaceRoot {
+	if (-not [string]::IsNullOrWhiteSpace([string]$env:USERPROFILE)) {
+		return Join-Path $env:USERPROFILE "Dropbox\SuiteWorkspace"
+	}
+
+	return $null
+}
+
+function Get-SuiteOfficeWorkspaceRoot {
+	$dropboxWorkspaceRoot = Get-SuiteDropboxWorkspaceRoot
+	if ([string]::IsNullOrWhiteSpace($dropboxWorkspaceRoot)) {
+		return $null
+	}
+
+	return Join-Path $dropboxWorkspaceRoot "Office"
+}
+
+function Get-SuiteOfficeKnowledgeRoot {
+	$officeWorkspaceRoot = Get-SuiteOfficeWorkspaceRoot
+	if ([string]::IsNullOrWhiteSpace($officeWorkspaceRoot)) {
+		return $null
+	}
+
+	return Join-Path $officeWorkspaceRoot "Knowledge"
+}
+
+function Get-SuiteOfficeStateRoot {
+	$officeWorkspaceRoot = Get-SuiteOfficeWorkspaceRoot
+	if ([string]::IsNullOrWhiteSpace($officeWorkspaceRoot)) {
+		return $null
+	}
+
+	return Join-Path $officeWorkspaceRoot "State"
 }
 
 function Get-SuiteCompanionAppConfigPath {
@@ -797,6 +1243,41 @@ function Remove-RunKeyValue {
 		if ($null -ne $runKey) {
 			$runKey.Dispose()
 		}
+	}
+}
+
+function Remove-SuiteScheduledTaskIfPresent {
+	param([string]$TaskName)
+
+	if ([string]::IsNullOrWhiteSpace($TaskName)) {
+		return $false
+	}
+
+	try {
+		$task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+		if ($null -eq $task) {
+			return $false
+		}
+
+		Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction Stop | Out-Null
+		return $true
+	}
+	catch {
+		return $false
+	}
+}
+
+function Remove-SuiteSupabaseRemotePreflightStartup {
+	param([string]$TaskName = "SuiteSupabaseRemotePreflight")
+
+	$removedScheduledTask = Remove-SuiteScheduledTaskIfPresent -TaskName $TaskName
+	$removedRunKey = Remove-RunKeyValue -Name $TaskName
+
+	[pscustomobject]@{
+		taskName = $TaskName
+		removedScheduledTask = $removedScheduledTask
+		removedRunKey = $removedRunKey
+		removed = ($removedScheduledTask -or $removedRunKey)
 	}
 }
 
@@ -890,94 +1371,122 @@ function Get-SuiteCompanionAppConfig {
 	switch ($normalizedId) {
 		"office" {
 			$localConfig = Read-SuiteCompanionAppLocalConfig -CompanionAppId $normalizedId
-			$stableDailyRoot = Get-SuiteStableDailyRoot
-			$stableExecutableCandidates = @(Get-SuiteStableOfficeExecutableCandidates)
-			$stableExecutable = [string]$stableExecutableCandidates[0]
-			$legacyDailyRoot = Get-SuiteLegacyDailyRoot
-			$legacyExecutableCandidates = if (-not [string]::IsNullOrWhiteSpace($legacyDailyRoot)) {
-				@(
-					(Join-Path $legacyDailyRoot "artifacts\DailyDesk\publish\DailyDesk.exe"),
-					(Join-Path $legacyDailyRoot "DailyDesk\bin\Release\net10.0-windows\DailyDesk.exe")
-				)
+			$localBrokerConfig = if ($localConfig -and $localConfig.PSObject.Properties.Name -contains "broker") {
+				$localConfig.broker
 			}
 			else {
-				@()
+				$null
 			}
+			$stableDailyRoot = Get-SuiteStableDailyRoot
+			$legacyDailyRoot = Get-SuiteLegacyDailyRoot
 
-			$configuredExecutablePath = if ($localConfig -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.executablePath)) {
+			$configuredExecutablePath = if ($localConfig -and $localConfig.PSObject.Properties.Name -contains "executablePath" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.executablePath)) {
 				[string]$localConfig.executablePath
 			}
 			else {
 				Get-SuiteConfigStringOverride -TomlPath $TomlPath -Key "SUITE_OFFICE_EXECUTABLE_PATH"
 			}
-			$configuredRootDirectory = if ($localConfig -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.rootDirectory)) {
+			$configuredRootDirectory = if ($localConfig -and $localConfig.PSObject.Properties.Name -contains "rootDirectory" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.rootDirectory)) {
 				[string]$localConfig.rootDirectory
 			}
 			else {
 				Get-SuiteConfigStringOverride -TomlPath $TomlPath -Key "SUITE_DAILY_ROOT"
 			}
+			$configuredKnowledgeRoot = if ($localConfig -and $localConfig.PSObject.Properties.Name -contains "knowledgeLibraryPath" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.knowledgeLibraryPath)) {
+				[string]$localConfig.knowledgeLibraryPath
+			}
+			elseif ($localConfig -and $localConfig.PSObject.Properties.Name -contains "knowledgeRoot" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.knowledgeRoot)) {
+				[string]$localConfig.knowledgeRoot
+			}
+			else {
+				Get-SuiteConfigStringOverride -TomlPath $TomlPath -Key "SUITE_OFFICE_KNOWLEDGE_ROOT"
+			}
+			$configuredStateRoot = if ($localConfig -and $localConfig.PSObject.Properties.Name -contains "stateRootPath" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.stateRootPath)) {
+				[string]$localConfig.stateRootPath
+			}
+			elseif ($localConfig -and $localConfig.PSObject.Properties.Name -contains "stateRoot" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.stateRoot)) {
+				[string]$localConfig.stateRoot
+			}
+			else {
+				Get-SuiteConfigStringOverride -TomlPath $TomlPath -Key "SUITE_OFFICE_STATE_ROOT"
+			}
+			$configuredBrokerBaseUrl = if ($localBrokerConfig -and -not [string]::IsNullOrWhiteSpace([string]$localBrokerConfig.baseUrl)) {
+				[string]$localBrokerConfig.baseUrl
+			}
+			elseif ($localConfig -and $localConfig.PSObject.Properties.Name -contains "brokerBaseUrl" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.brokerBaseUrl)) {
+				[string]$localConfig.brokerBaseUrl
+			}
+			elseif (-not [string]::IsNullOrWhiteSpace([string](Get-SuiteConfigStringOverride -TomlPath $TomlPath -Key "SUITE_OFFICE_BROKER_BASE_URL"))) {
+				[string](Get-SuiteConfigStringOverride -TomlPath $TomlPath -Key "SUITE_OFFICE_BROKER_BASE_URL")
+			}
+			else {
+				"http://127.0.0.1:57420"
+			}
+			$configuredBrokerPublishPath = if ($localBrokerConfig -and -not [string]::IsNullOrWhiteSpace([string]$localBrokerConfig.publishPath)) {
+				[string]$localBrokerConfig.publishPath
+			}
+			elseif ($localConfig -and $localConfig.PSObject.Properties.Name -contains "brokerPublishPath" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.brokerPublishPath)) {
+				[string]$localConfig.brokerPublishPath
+			}
+			else {
+				$null
+			}
+			$configuredBrokerHealthPath = if ($localBrokerConfig -and -not [string]::IsNullOrWhiteSpace([string]$localBrokerConfig.healthPath)) {
+				[string]$localBrokerConfig.healthPath
+			}
+			elseif ($localConfig -and $localConfig.PSObject.Properties.Name -contains "brokerHealthPath" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.brokerHealthPath)) {
+				[string]$localConfig.brokerHealthPath
+			}
+			else {
+				"/health"
+			}
+			$configuredBrokerStatePath = if ($localBrokerConfig -and -not [string]::IsNullOrWhiteSpace([string]$localBrokerConfig.statePath)) {
+				[string]$localBrokerConfig.statePath
+			}
+			elseif ($localConfig -and $localConfig.PSObject.Properties.Name -contains "brokerStatePath" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.brokerStatePath)) {
+				[string]$localConfig.brokerStatePath
+			}
+			else {
+				"/state"
+			}
+			$brokerEnabled = if ($localBrokerConfig -and $localBrokerConfig.PSObject.Properties.Name -contains "enabled") {
+				[bool]$localBrokerConfig.enabled
+			}
+			elseif ($localConfig -and $localConfig.PSObject.Properties.Name -contains "brokerEnabled") {
+				[bool]$localConfig.brokerEnabled
+			}
+			else {
+				$true
+			}
+			$brokerPrefixes = if ($localBrokerConfig -and $localBrokerConfig.PSObject.Properties.Name -contains "prefixes" -and $localBrokerConfig.prefixes) {
+				@($localBrokerConfig.prefixes | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+			}
+			elseif ($localConfig -and $localConfig.PSObject.Properties.Name -contains "brokerPrefixes" -and $localConfig.brokerPrefixes) {
+				@($localConfig.brokerPrefixes | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+			}
+			else {
+				@("", "/api", "/api/office", "/office")
+			}
 
-			$configSource = if ($localConfig -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.executablePath)) {
+			$configSource = if ($localConfig -and (
+				($localConfig.PSObject.Properties.Name -contains "executablePath" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.executablePath)) -or
+				($localConfig.PSObject.Properties.Name -contains "rootDirectory" -and -not [string]::IsNullOrWhiteSpace([string]$localConfig.rootDirectory)) -or
+				($localConfig.PSObject.Properties.Name -contains "brokerEnabled")
+			)) {
 				"local_config"
 			}
 			elseif (-not [string]::IsNullOrWhiteSpace($configuredExecutablePath) -or -not [string]::IsNullOrWhiteSpace($configuredRootDirectory)) {
 				"env_or_toml_override"
 			}
-			elseif (@($stableExecutableCandidates | Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf }).Count -gt 0) {
-				"stable_default"
-			}
-			elseif (@($legacyExecutableCandidates | Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf }).Count -gt 0) {
-				"legacy_default"
-			}
 			else {
-				"stable_default"
+				"broker_only"
 			}
 
 			$executablePath = if (-not [string]::IsNullOrWhiteSpace($configuredExecutablePath)) {
 				$configuredExecutablePath
 			}
-			elseif ($configSource -eq "legacy_default") {
-				$firstLegacyExecutable = @($legacyExecutableCandidates | Select-Object -First 1)
-				if ($firstLegacyExecutable.Count -gt 0) {
-					[string]$firstLegacyExecutable[0]
-				}
-				else {
-					$null
-				}
-			}
-			elseif ($configSource -eq "stable_default") {
-				$firstStableExecutable = @($stableExecutableCandidates | Select-Object -First 1)
-				if ($firstStableExecutable.Count -gt 0) {
-					[string]$firstStableExecutable[0]
-				}
-				else {
-					$stableExecutable
-				}
-			}
 			else {
-				$stableExecutable
-			}
-			if ([string]::IsNullOrWhiteSpace($configuredExecutablePath)) {
-				if ($configSource -eq "stable_default") {
-					$existingStableExecutable = @(
-						$stableExecutableCandidates |
-							Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf } |
-							Select-Object -First 1
-					)
-					if ($existingStableExecutable.Count -gt 0) {
-						$executablePath = [string]$existingStableExecutable[0]
-					}
-				}
-				elseif ($configSource -eq "legacy_default") {
-					$existingLegacyExecutable = @(
-						$legacyExecutableCandidates |
-							Where-Object { Test-Path -LiteralPath $_ -ErrorAction SilentlyContinue -PathType Leaf } |
-							Select-Object -First 1
-					)
-					if ($existingLegacyExecutable.Count -gt 0) {
-						$executablePath = [string]$existingLegacyExecutable[0]
-					}
-				}
+				$null
 			}
 			$resolvedExecutablePath = Resolve-OptionalAbsolutePath -PathValue $executablePath -RepoRoot $RepoRoot
 			$workingDirectory = if (-not [string]::IsNullOrWhiteSpace($resolvedExecutablePath)) {
@@ -995,7 +1504,33 @@ function Get-SuiteCompanionAppConfig {
 			else {
 				Resolve-OptionalAbsolutePath -PathValue $stableDailyRoot -RepoRoot $RepoRoot
 			}
+			$resolvedKnowledgeRoot = if (-not [string]::IsNullOrWhiteSpace($configuredKnowledgeRoot)) {
+				Resolve-OptionalAbsolutePath -PathValue $configuredKnowledgeRoot -RepoRoot $RepoRoot
+			}
+			else {
+				Resolve-OptionalAbsolutePath -PathValue (Get-SuiteOfficeKnowledgeRoot) -RepoRoot $RepoRoot
+			}
+			$resolvedStateRoot = if (-not [string]::IsNullOrWhiteSpace($configuredStateRoot)) {
+				Resolve-OptionalAbsolutePath -PathValue $configuredStateRoot -RepoRoot $RepoRoot
+			}
+			else {
+				Resolve-OptionalAbsolutePath -PathValue (Get-SuiteOfficeStateRoot) -RepoRoot $RepoRoot
+			}
 			$timeoutSeconds = 90
+			$resolvedBrokerPublishPath = if (-not [string]::IsNullOrWhiteSpace($configuredBrokerPublishPath)) {
+				Resolve-OptionalAbsolutePath -PathValue $configuredBrokerPublishPath -RepoRoot $RepoRoot
+			}
+			else {
+				$null
+			}
+			$brokerDetails = [ordered]@{
+				enabled = [bool]$brokerEnabled
+				baseUrl = [string]$configuredBrokerBaseUrl
+				publishPath = $resolvedBrokerPublishPath
+				healthPath = [string]$configuredBrokerHealthPath
+				statePath = [string]$configuredBrokerStatePath
+				prefixes = @($brokerPrefixes)
+			}
 
 			return [pscustomobject]@{
 				id = "office"
@@ -1004,12 +1539,21 @@ function Get-SuiteCompanionAppConfig {
 				executablePath = $resolvedExecutablePath
 				workingDirectory = $workingDirectory
 				rootDirectory = $rootDirectory
+				knowledgeLibraryPath = $resolvedKnowledgeRoot
+				stateRootPath = $resolvedStateRoot
 				configSource = $configSource
 				configPath = Get-SuiteCompanionAppConfigPath -CompanionAppId $normalizedId
-				launchAfterRuntimeReady = $true
+				launchAfterRuntimeReady = $false
 				timeoutSeconds = $timeoutSeconds
-				launchMode = "managed_companion"
-				processName = "DailyDesk"
+				launchMode = "embedded_shell"
+				processName = $null
+				legacyClientRetired = $true
+				brokerBaseUrl = [string]$configuredBrokerBaseUrl
+				brokerPublishPath = $resolvedBrokerPublishPath
+				brokerHealthPath = [string]$configuredBrokerHealthPath
+				brokerStatePath = [string]$configuredBrokerStatePath
+				brokerEnabled = [bool]$brokerEnabled
+				broker = [pscustomobject]$brokerDetails
 			}
 		}
 		default {
@@ -1052,8 +1596,14 @@ function Get-SuiteCompanionAppProcessInfo {
 	)
 
 	$processName = [string]$Config.processName
-	$expectedPath = if (-not [string]::IsNullOrWhiteSpace([string]$Config.executablePath)) {
-		([string]$Config.executablePath).ToLowerInvariant()
+	$configExecutablePath = if ($Config.PSObject.Properties.Name -contains "executablePath") {
+		[string]$Config.executablePath
+	}
+	else {
+		$null
+	}
+	$expectedPath = if (-not [string]::IsNullOrWhiteSpace($configExecutablePath)) {
+		$configExecutablePath.ToLowerInvariant()
 	}
 	else {
 		$null
@@ -1100,7 +1650,13 @@ function Get-SuiteCompanionAppSnapshot {
 
 	$state = Read-SuiteCompanionAppState -CompanionAppId $CompanionAppId
 	$processInfo = Get-SuiteCompanionAppProcessInfo -CompanionAppId $CompanionAppId -Config $config
-	$executableFound = -not [string]::IsNullOrWhiteSpace([string]$config.executablePath) -and (Test-Path -LiteralPath ([string]$config.executablePath))
+	$configExecutablePath = if ($config.PSObject.Properties.Name -contains "executablePath") {
+		[string]$config.executablePath
+	}
+	else {
+		$null
+	}
+	$executableFound = -not [string]::IsNullOrWhiteSpace($configExecutablePath) -and (Test-Path -LiteralPath $configExecutablePath)
 	$stateKnownPid = if ($state -and $state.PSObject.Properties.Name -contains "lastKnownPid" -and $null -ne $state.lastKnownPid) {
 		[int]$state.lastKnownPid
 	}
@@ -1119,7 +1675,7 @@ function Get-SuiteCompanionAppSnapshot {
 		id = [string]$config.id
 		title = [string]$config.title
 		enabled = [bool]$config.enabled
-		executablePath = [string]$config.executablePath
+		executablePath = $configExecutablePath
 		executableFound = $executableFound
 		workingDirectory = [string]$config.workingDirectory
 		rootDirectory = [string]$config.rootDirectory
@@ -1128,6 +1684,24 @@ function Get-SuiteCompanionAppSnapshot {
 		launchAfterRuntimeReady = [bool]$config.launchAfterRuntimeReady
 		timeoutSeconds = [int]$config.timeoutSeconds
 		launchMode = [string]$config.launchMode
+		brokerBaseUrl = if ($config.PSObject.Properties.Name -contains "brokerBaseUrl") { [string]$config.brokerBaseUrl } else { "http://127.0.0.1:57420" }
+		brokerPublishPath = if ($config.PSObject.Properties.Name -contains "brokerPublishPath") { [string]$config.brokerPublishPath } else { $null }
+		brokerHealthPath = if ($config.PSObject.Properties.Name -contains "brokerHealthPath") { [string]$config.brokerHealthPath } else { "/health" }
+		brokerStatePath = if ($config.PSObject.Properties.Name -contains "brokerStatePath") { [string]$config.brokerStatePath } else { "/state" }
+		brokerEnabled = if ($config.PSObject.Properties.Name -contains "brokerEnabled") { [bool]$config.brokerEnabled } else { $true }
+		broker = if ($config.PSObject.Properties.Name -contains "broker" -and $config.broker) {
+			$config.broker
+		}
+		else {
+			[pscustomobject]@{
+				enabled = if ($config.PSObject.Properties.Name -contains "brokerEnabled") { [bool]$config.brokerEnabled } else { $true }
+				baseUrl = if ($config.PSObject.Properties.Name -contains "brokerBaseUrl") { [string]$config.brokerBaseUrl } else { "http://127.0.0.1:57420" }
+				publishPath = if ($config.PSObject.Properties.Name -contains "brokerPublishPath") { [string]$config.brokerPublishPath } else { $null }
+				healthPath = if ($config.PSObject.Properties.Name -contains "brokerHealthPath") { [string]$config.brokerHealthPath } else { "/health" }
+				statePath = if ($config.PSObject.Properties.Name -contains "brokerStatePath") { [string]$config.brokerStatePath } else { "/state" }
+				prefixes = @("", "/api", "/api/office", "/office")
+			}
+		}
 		running = [bool]$processInfo.running
 		pid = if ($processInfo.running) { [int]$processInfo.pid } else { $null }
 		launchSource = if ($startedOutsideRuntimeControl) { "outside-runtime-control" } else { $lastLaunchSource }

@@ -17,6 +17,7 @@ $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
 . $runtimeSharedScript
 $workerScriptPath = (Resolve-Path (Join-Path $PSScriptRoot "run-suite-frontend-dev.ps1")).Path
+$runtimeCoreComposeScript = Join-Path $PSScriptRoot "runtime-core-compose.ps1"
 $processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
 . $processUtilsScript
 $runtimePaths = Get-SuiteRuntimePaths
@@ -24,6 +25,89 @@ $runtimeStatusDir = $runtimePaths.RuntimeStatusDir
 $frontendLogPath = $runtimePaths.FrontendLogPath
 $bootstrapLogPath = $runtimePaths.RuntimeLogPath
 $frontendUrl = "http://127.0.0.1:5173"
+
+function Invoke-RuntimeCoreComposeJson {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("ps", "up")][string]$Action,
+        [string[]]$Services = @()
+    )
+
+    if (-not (Test-Path -LiteralPath $runtimeCoreComposeScript -PathType Leaf)) {
+        return $null
+    }
+
+    $arguments = @(
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        $runtimeCoreComposeScript,
+        $Action,
+        "-RepoRoot",
+        $resolvedRepoRoot
+    )
+    if (@($Services).Count -gt 0) {
+        $arguments += @("-Services") + @($Services)
+    }
+    $arguments += "-Json"
+
+    $rawOutput = & PowerShell.exe -WindowStyle Hidden @arguments 2>$null
+    $outputText = [string]::Join([Environment]::NewLine, @($rawOutput | ForEach-Object { if ($null -eq $_) { "" } else { $_.ToString() } })).Trim()
+    if ([string]::IsNullOrWhiteSpace($outputText)) {
+        return $null
+    }
+
+    try {
+        return $outputText | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-RuntimeCoreFrontendEntry {
+    $composePayload = Invoke-RuntimeCoreComposeJson -Action "ps"
+    if ($null -eq $composePayload -or -not $composePayload.ok -or $null -eq $composePayload.payload) {
+        return $null
+    }
+
+    return @($composePayload.payload | Where-Object {
+        $serviceName = if ($_.PSObject.Properties.Name -contains "Service") { [string]$_.Service } elseif ($_.PSObject.Properties.Name -contains "service") { [string]$_.service } else { "" }
+        $serviceName.Trim().ToLowerInvariant() -eq "frontend"
+    }) | Select-Object -First 1
+}
+
+function Get-ComposeServiceHealthState {
+    param($ComposeEntry)
+
+    if ($null -eq $ComposeEntry) {
+        return $null
+    }
+
+    $health = if ($ComposeEntry.PSObject.Properties.Name -contains "Health") {
+        [string]$ComposeEntry.Health
+    }
+    else {
+        $null
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($health)) {
+        return $health.Trim().ToLowerInvariant()
+    }
+
+    $statusText = if ($ComposeEntry.PSObject.Properties.Name -contains "Status") {
+        [string]$ComposeEntry.Status
+    }
+    else {
+        ""
+    }
+
+    if ($statusText -match "\((?<health>[A-Za-z]+)\)") {
+        return [string]$matches["health"].Trim().ToLowerInvariant()
+    }
+
+    return $null
+}
 
 function Get-ListeningFrontendProcess {
     $command = Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue
@@ -72,7 +156,7 @@ function Get-FrontendWorkerProcess {
 
 function Test-FrontendHealth {
     try {
-        $response = Invoke-WebRequest -Uri $frontendUrl -UseBasicParsing -TimeoutSec 3
+        $response = Invoke-WebRequest -Uri $frontendUrl -UseBasicParsing -TimeoutSec 2
         return ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500)
     }
     catch {
@@ -116,60 +200,136 @@ function Start-FrontendWorker {
 }
 
 $workerProcess = Get-FrontendWorkerProcess
+$frontendContainer = Get-RuntimeCoreFrontendEntry
+$frontendContainerRunning = $false
+$frontendContainerHealth = $null
+$frontendContainerHealthy = $false
+if ($frontendContainer) {
+    $containerStateText = [string]::Join(" ", @(
+        if ($frontendContainer.PSObject.Properties.Name -contains "State") { [string]$frontendContainer.State } else { "" }
+        if ($frontendContainer.PSObject.Properties.Name -contains "Status") { [string]$frontendContainer.Status } else { "" }
+    )).Trim().ToLowerInvariant()
+    $frontendContainerRunning = (
+        $containerStateText.Contains("running") -or
+        $containerStateText.Contains("healthy")
+    )
+    $frontendContainerHealth = Get-ComposeServiceHealthState -ComposeEntry $frontendContainer
+    $frontendContainerHealthy = $frontendContainerRunning -and ($frontendContainerHealth -eq "healthy")
+}
 $listeningProcess = Get-ListeningFrontendProcess
 $listening = $null -ne $listeningProcess
-$healthy = $listening -or (Test-FrontendHealth)
-$running = $healthy -or $listening -or $null -ne $workerProcess
+$frontendEndpointReady = Test-FrontendHealth
+$healthy = ($frontendContainerRunning -and $frontendEndpointReady) -or $frontendContainerHealthy
+$running = $frontendContainerRunning -or $listening -or $null -ne $workerProcess
 $startAttempted = $false
 $errorMessage = $null
+$warningMessage = $null
+$ownershipDrift = $false
+$startupMode = if ($frontendContainerRunning) { "docker_compose" } else { $null }
+$healthSource = if ($frontendContainerHealthy) {
+    "docker_compose_healthcheck"
+}
+elseif ($frontendContainerRunning -and $frontendEndpointReady) {
+    "host_http_probe"
+}
+else {
+    $null
+}
 
-if (-not $running -and $StartIfMissing) {
-    $npmExecutable = Resolve-NpmExecutable
-    if (-not $npmExecutable) {
-        $errorMessage = "npm is not available on PATH."
+if (-not $frontendContainerRunning -and $StartIfMissing) {
+    if ($listening -or $null -ne $workerProcess) {
+        $ownershipDrift = $true
+        $errorMessage = "Native frontend dev server detected outside runtime-core Docker ownership. Stop the native frontend and rerun bootstrap."
     }
     else {
-        $startAttempted = $true
-        try {
-            Start-FrontendWorker
+        $composeStart = Invoke-RuntimeCoreComposeJson -Action "up" -Services @("frontend")
+        if ($composeStart -and $composeStart.ok) {
+            $startAttempted = $true
             $deadline = (Get-Date).AddSeconds($StartupTimeoutSeconds)
             do {
                 Start-Sleep -Seconds 2
-                $listeningProcess = Get-ListeningFrontendProcess
-                $workerProcess = if ($listeningProcess) { $null } else { Get-FrontendWorkerProcess }
-                $listening = $null -ne $listeningProcess
-                $healthy = $listening -or (Test-FrontendHealth)
-                $running = $healthy -or $listening -or $null -ne $workerProcess
-            } while ((Get-Date) -lt $deadline -and -not $healthy -and $running)
+                $frontendContainer = Get-RuntimeCoreFrontendEntry
+                if ($frontendContainer) {
+                    $containerStateText = [string]::Join(" ", @(
+                        if ($frontendContainer.PSObject.Properties.Name -contains "State") { [string]$frontendContainer.State } else { "" }
+                        if ($frontendContainer.PSObject.Properties.Name -contains "Status") { [string]$frontendContainer.Status } else { "" }
+                    )).Trim().ToLowerInvariant()
+                    $frontendContainerRunning = (
+                        $containerStateText.Contains("running") -or
+                        $containerStateText.Contains("healthy")
+                    )
+                    $frontendContainerHealth = Get-ComposeServiceHealthState -ComposeEntry $frontendContainer
+                    $frontendContainerHealthy = $frontendContainerRunning -and ($frontendContainerHealth -eq "healthy")
+                }
+                else {
+                    $frontendContainerRunning = $false
+                    $frontendContainerHealth = $null
+                    $frontendContainerHealthy = $false
+                }
+
+                $frontendEndpointReady = Test-FrontendHealth
+                $healthy = ($frontendContainerRunning -and $frontendEndpointReady) -or $frontendContainerHealthy
+                if ($frontendContainerRunning) {
+                    $startupMode = "docker_compose"
+                }
+            } while ((Get-Date) -lt $deadline -and -not $healthy)
         }
-        catch {
-            $errorMessage = $_.Exception.Message
+        else {
+            $startAttempted = $true
+            $errorMessage = if ($composeStart -and -not [string]::IsNullOrWhiteSpace([string]$composeStart.outputText)) {
+                [string]$composeStart.outputText
+            }
+            else {
+                "Frontend compose start failed. Native frontend fallback is disabled for runtime-core ownership."
+            }
         }
     }
 }
 
-if (-not $listeningProcess) {
+if (-not $frontendContainerRunning -and -not $listeningProcess) {
     $listeningProcess = Get-ListeningFrontendProcess
 }
-if (-not $workerProcess -and -not $listeningProcess) {
+if (-not $frontendContainerRunning -and -not $workerProcess -and -not $listeningProcess) {
     $workerProcess = Get-FrontendWorkerProcess
 }
-if (-not $healthy) {
-    $healthy = $listening -or (Test-FrontendHealth)
-}
 $listening = $null -ne $listeningProcess
-$running = $healthy -or $listening -or $null -ne $workerProcess
-$process = if ($listeningProcess) { $listeningProcess } else { $workerProcess }
+$frontendEndpointReady = Test-FrontendHealth
+$healthy = ($frontendContainerRunning -and $frontendEndpointReady) -or $frontendContainerHealthy
+$running = $frontendContainerRunning -or $listening -or $null -ne $workerProcess
+if (-not $startupMode -and $frontendContainerRunning) {
+    $startupMode = "docker_compose"
+}
+elseif (-not $startupMode -and ($listeningProcess -or $workerProcess)) {
+    $startupMode = "native_process"
+}
+$healthSource = if ($frontendContainerHealthy) {
+    "docker_compose_healthcheck"
+}
+elseif ($frontendContainerRunning -and $frontendEndpointReady) {
+    "host_http_probe"
+}
+else {
+    $null
+}
+$process = if ($frontendContainerRunning) { $null } elseif ($listeningProcess) { $listeningProcess } else { $workerProcess }
+$ownershipDrift = $ownershipDrift -or ($running -and -not $frontendContainerRunning)
+
+if ($healthy -and $frontendContainerHealthy -and -not $frontendEndpointReady) {
+    $warningMessage = "Frontend Docker healthcheck passed even though the host HTTP probe to $frontendUrl timed out."
+}
 
 if (-not $healthy -and [string]::IsNullOrWhiteSpace($errorMessage)) {
-    if (-not $running) {
-        $errorMessage = "Frontend dev server is not running."
+    if ($ownershipDrift) {
+        $errorMessage = "Frontend is responding outside runtime-core Docker ownership."
     }
     elseif ($startAttempted) {
-        $errorMessage = "Frontend start attempted but the Vite server did not become ready within $StartupTimeoutSeconds seconds."
+        $errorMessage = "Frontend compose start was requested but the Vite server did not become ready within $StartupTimeoutSeconds seconds."
+    }
+    elseif (-not $running) {
+        $errorMessage = "Frontend dev server is not running."
     }
     else {
-        $errorMessage = "Frontend process is running but the dev server is not ready."
+        $errorMessage = "Frontend container is running but the dev server is not ready."
     }
 }
 
@@ -180,26 +340,42 @@ $result = [pscustomobject]@{
     Listening = $listening
     Healthy = $healthy
     ProcessId = if ($process) { $process.ProcessId } else { $null }
-    CommandLine = if ($process) { $process.CommandLine } else { $null }
+    CommandLine = if ($frontendContainerRunning) { "docker compose service frontend" } elseif ($process) { $process.CommandLine } else { $null }
     StartAttempted = $startAttempted
     Error = $errorMessage
+    Warning = $warningMessage
     LogPath = $frontendLogPath
+    StartupMode = $startupMode
+    ExpectedStartupMode = "docker_compose"
+    OwnershipDrift = $ownershipDrift
+    EndpointReachable = $frontendEndpointReady
+    ContainerHealth = $frontendContainerHealth
+    HealthSource = $healthSource
 }
 
 if ($Json) {
     $result | ConvertTo-Json -Depth 5
 }
 else {
-    Write-Host "Frontend startup healthy: $($result.Healthy)"
+    Write-Host "Frontend running: $($result.Running)"
+    Write-Host "Managed health ready: $($result.Healthy)"
     Write-Host "Listening: $($result.Listening)"
     Write-Host "Process ID: $($result.ProcessId)"
     Write-Host "URL: $($result.Url)"
     Write-Host "Log path: $($result.LogPath)"
+    Write-Host "Startup mode: $($result.StartupMode)"
+    Write-Host "Ownership drift: $($result.OwnershipDrift)"
+    Write-Host "Endpoint reachable: $($result.EndpointReachable)"
+    Write-Host "Container health: $($result.ContainerHealth)"
+    Write-Host "Health source: $($result.HealthSource)"
     if ($result.CommandLine) {
         Write-Host "Command: $($result.CommandLine)"
     }
     if ($result.StartAttempted) {
-        Write-Host "Start requested via the Suite frontend worker."
+        Write-Host "Start requested via runtime-core Docker ownership."
+    }
+    if ($result.Warning) {
+        Write-Host "Warning: $($result.Warning)"
     }
     if ($result.Error) {
         Write-Host "Error: $($result.Error)"

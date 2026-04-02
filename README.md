@@ -121,9 +121,10 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
 
 Optional but recommended:
 
-- Redis-compatible runtime for limiter state (Memurai on Windows is recommended)
+- Redis-compatible runtime for limiter state (the repo defaults to Docker Redis locally)
 - DailyDesk / Office source available in its own local workspace or repo
-  - preferred root: `C:\Dev\Daily`
+  - preferred root: `C:\Users\<you>\Documents\GitHub\Office`
+  - live knowledge/state: `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\Knowledge` and `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\State`
 
 ## 1) Install Dependencies
 
@@ -176,7 +177,7 @@ This orchestrates:
 - gateway (`npm run gateway:dev`)
 - AutoDraft .NET API (`dotnet run --project dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj`)
 - named-pipe bridge (`dotnet run --project dotnet/named-pipe-bridge/NamedPipeServer.csproj`)
-- Redis startup (`SUITE_REDIS_WINDOWS_SERVICE`/Memurai on Windows, then `redis-server`, then Docker fallback)
+- Redis startup via Docker (`suite-redis-local` on `127.0.0.1:6379` by default)
 
 To disable AutoDraft .NET API autostart in full mode:
 
@@ -185,9 +186,11 @@ To disable AutoDraft .NET API autostart in full mode:
 ### Redis + limiter startup behavior
 
 - Limiter URI precedence stays: `API_LIMITER_STORAGE_URI`, then `REDIS_URL`.
-- `dev:full` Windows Redis service startup now tries discovered candidates (Memurai/Redis service names) before binary/Docker fallback.
-  - Override candidates with `SUITE_REDIS_WINDOWS_SERVICE` (comma-separated values supported, for example `Memurai,Redis`).
-  - Set `SUITE_REDIS_WINDOWS_SERVICE=off` to skip Windows service startup attempts.
+- `dev:full` ensures a Docker Redis container is running for local limiter/session storage.
+  - Default container: `suite-redis-local`
+  - Default volume: `suite_redis_local_data`
+  - Default image: `redis:7-alpine`
+  - Optional overrides: `SUITE_REDIS_CONTAINER_NAME`, `SUITE_REDIS_DATA_VOLUME`, `SUITE_REDIS_IMAGE`
 - Strict shared-storage mode is enabled when either:
   - `API_REQUIRE_SHARED_LIMITER_STORAGE=true`, or
   - `API_ENV`/`FLASK_ENV` is `production` or `prod`.
@@ -199,12 +202,13 @@ To disable AutoDraft .NET API autostart in full mode:
   - `AGENT_SESSION_REDIS_URL` (optional override; otherwise uses limiter/`REDIS_URL` Redis URI)
   - `AGENT_SESSION_TTL_SECONDS` (set `604800` for a 7-day session window)
 - `/health` includes agent session store status under `agent_session_store.mode` and `agent_session_store.reason`.
+- `runtime:core` uses an internal Compose Redis service for the backend container path.
 
-Windows Memurai checks:
+Docker Redis checks:
 
 ```bash
-sc query Memurai
-sc start Memurai
+docker ps --filter "name=^/suite-redis-local$"
+docker exec suite-redis-local redis-cli ping
 ```
 
 If the browser reports CORS/preflight failures, verify backend startup logs first. A limiter bootstrap failure can return backend `500` before request handlers execute, which often appears as a CORS error in the browser.
@@ -239,14 +243,15 @@ dotnet run --project dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj
 
 - Frontend: `http://localhost:5173`
 - Backend health: `http://127.0.0.1:5000/health`
-- Gateway health: `http://127.0.0.1:3000/health`
+- Gateway health: `http://127.0.0.1:3001/health`
 
 ## Cross-Workstation Bring-Up
 
 Suite and Office are intentionally kept separate:
 
-- `Suite` repo preferred local root: `C:\Dev\Suite`
-- `DailyDesk` / Office preferred local root: `C:\Dev\Daily`
+- `Suite` repo preferred local root: `C:\Users\<you>\Documents\GitHub\Suite`
+- `DailyDesk` / Office preferred local root: `C:\Users\<you>\Documents\GitHub\Office`
+- Office live knowledge/state roots: `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\Knowledge` and `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\State`
 - `Suite Runtime Control` stays inside the `Suite` repo
 
 Use the new workstation bootstrap flow when setting up another Windows PC:
@@ -259,14 +264,14 @@ npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailyRepoUrl https://
 If both repos are already cloned into the standard roots, that is the preferred path:
 
 ```bash
-git clone https://github.com/Koraji95-coder/Suite.git C:\Dev\Suite
-git clone https://github.com/Koraji95-coder/Office.git C:\Dev\Daily
-cd C:\Dev\Suite
+git clone https://github.com/Koraji95-coder/Suite.git C:\Users\<you>\Documents\GitHub\Suite
+git clone https://github.com/Koraji95-coder/Office.git C:\Users\<you>\Documents\GitHub\Office
+cd C:\Users\<you>\Documents\GitHub\Suite
 npm run workstation:bringup:validate
 npm run workstation:bringup -- -WorkstationId DUSTIN-WORK
 ```
 
-In that layout, bootstrap will detect the existing `C:\Dev\Daily` workspace automatically and use it without needing `-DailyRepoUrl`.
+In that layout, bootstrap will detect the existing `Documents\GitHub\Office` workspace automatically and use it without needing `-DailyRepoUrl`.
 
 If the Daily workspace is not yet in its own Git repo, you can temporarily hydrate it from an existing local source path:
 

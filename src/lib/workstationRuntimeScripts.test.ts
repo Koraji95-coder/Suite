@@ -36,6 +36,8 @@ describe("workstation runtime PowerShell contracts", () => {
 			expect(typeof payload.support?.config?.stableSuiteRoot).toBe("string");
 			expect(typeof payload.support?.config?.dailyRoot).toBe("string");
 			expect(typeof payload.support?.config?.officeExecutablePath).toBe("string");
+			expect(typeof payload.shell?.status).toBe("string");
+			expect(typeof payload.shell?.detail).toBe("string");
 			expect(Array.isArray(payload.companionApps)).toBe(true);
 			expect(payload.companionApps.some((app: { id: string }) => app.id === "office")).toBe(true);
 			const office = payload.companionApps.find(
@@ -63,6 +65,20 @@ describe("workstation runtime PowerShell contracts", () => {
 			expect(typeof gateway?.notes?.find((note: { label: string }) => note.label === "Gateway mode")?.value).toBe(
 				"string",
 			);
+		},
+		20_000,
+	);
+
+	test.runIf(process.platform === "win32")(
+		"workstation-doctor returns shared shell health",
+		() => {
+			const payload = runPowerShellJson("scripts/workstation-doctor.ps1", [
+				"-Json",
+			]);
+			expect(typeof payload.workstation?.workstationId).toBe("string");
+			expect(typeof payload.shell?.status).toBe("string");
+			expect(typeof payload.shell?.detail).toBe("string");
+			expect(typeof payload.startupOwner?.owner).toBe("string");
 		},
 		20_000,
 	);

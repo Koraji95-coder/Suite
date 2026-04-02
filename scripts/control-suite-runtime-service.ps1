@@ -22,6 +22,7 @@ $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
 . $runtimeSharedScript
 $statusScript = (Resolve-Path (Join-Path $PSScriptRoot "get-suite-runtime-status.ps1")).Path
+$runtimeCoreComposeScript = Join-Path $PSScriptRoot "runtime-core-compose.ps1"
 $backendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-backend-startup.ps1")).Path
 $gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-startup.ps1")).Path
 $frontendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-frontend-startup.ps1")).Path
@@ -30,9 +31,58 @@ $autocadInstallScript = (Resolve-Path (Join-Path $PSScriptRoot "install-watchdog
 $autocadSafetyScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-autocad-safety.ps1")).Path
 $runtimePaths = Get-SuiteRuntimePaths
 $runtimeStatusDir = $runtimePaths.RuntimeStatusDir
+$backendLogPath = $runtimePaths.BackendLogPath
+$gatewayLogPath = $runtimePaths.GatewayLogPath
 $frontendLogPath = $runtimePaths.FrontendLogPath
+$officeBrokerLogPath = $runtimePaths.OfficeBrokerLogPath
+$filesystemCollectorLogDir = $runtimePaths.FilesystemCollectorLogDir
+$autocadCollectorLogDir = $runtimePaths.AutoCadCollectorLogDir
 
 . $autocadSafetyScript
+
+function Invoke-RuntimeCoreComposeJson {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("ps", "up", "stop", "logs")][string]$Action,
+        [string[]]$Services = @(),
+        [int]$Tail = 200
+    )
+
+    if (-not (Test-Path -LiteralPath $runtimeCoreComposeScript -PathType Leaf)) {
+        return $null
+    }
+
+    $arguments = @(
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        $runtimeCoreComposeScript,
+        $Action,
+        "-RepoRoot",
+        $resolvedRepoRoot
+    )
+    if (@($Services).Count -gt 0) {
+        $arguments += @("-Services") + @($Services)
+    }
+
+    if ($Action -eq "logs") {
+        $arguments += @("-Tail", [string]$Tail)
+    }
+    $arguments += "-Json"
+
+    $rawOutput = & PowerShell.exe @arguments 2>$null
+    $outputText = [string]::Join([Environment]::NewLine, @($rawOutput | ForEach-Object { if ($null -eq $_) { "" } else { $_.ToString() } })).Trim()
+    if ([string]::IsNullOrWhiteSpace($outputText)) {
+        return $null
+    }
+
+    try {
+        return $outputText | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+}
 
 function Invoke-ExternalCommand {
     param(
@@ -93,9 +143,10 @@ function Test-SupabaseOutputIndicatesReady {
 }
 
 function Test-SupabaseStopped {
-    $apiListening = Test-PortListening -Port 54321
-    $dbListening = Test-PortListening -Port 54322
-    $studioListening = Test-PortListening -Port 54323
+    $supabasePorts = Get-SuiteSupabaseLocalPorts -RepoRoot $resolvedRepoRoot
+    $apiListening = Test-PortListening -Port $supabasePorts.api
+    $dbListening = Test-PortListening -Port $supabasePorts.db
+    $studioListening = Test-PortListening -Port $supabasePorts.studio
 
     if ($apiListening -or $dbListening -or $studioListening) {
         return $false
@@ -117,6 +168,66 @@ function Get-ServiceSnapshot {
         Payload = $statusResult.Payload
         Result = $statusResult
     }
+}
+
+function Get-RuntimeCoreServiceName {
+    param([string]$ServiceName)
+
+    switch ($ServiceName) {
+        "backend" { return "backend" }
+        "gateway" { return "gateway" }
+        "frontend" { return "frontend" }
+        default { return $null }
+    }
+}
+
+function Get-RuntimeCoreServiceEntry {
+    param([string]$ServiceName)
+
+    $composePayload = Invoke-RuntimeCoreComposeJson -Action "ps"
+    if ($null -eq $composePayload -or -not $composePayload.ok -or $null -eq $composePayload.payload) {
+        return $null
+    }
+
+    return @($composePayload.payload | Where-Object {
+        $candidate = if ($_.PSObject.Properties.Name -contains "Service") { [string]$_.Service } elseif ($_.PSObject.Properties.Name -contains "service") { [string]$_.service } else { "" }
+        $candidate.Trim().ToLowerInvariant() -eq $ServiceName.Trim().ToLowerInvariant()
+    }) | Select-Object -First 1
+}
+
+function Test-RuntimeCoreServiceRunning {
+    param([string]$ServiceName)
+
+    $entry = Get-RuntimeCoreServiceEntry -ServiceName $ServiceName
+    if ($null -eq $entry) {
+        return $false
+    }
+
+    $containerStateText = [string]::Join(" ", @(
+        if ($entry.PSObject.Properties.Name -contains "State") { [string]$entry.State } else { "" }
+        if ($entry.PSObject.Properties.Name -contains "Status") { [string]$entry.Status } else { "" }
+    )).Trim().ToLowerInvariant()
+
+    return (
+        $containerStateText.Contains("running") -or
+        $containerStateText.Contains("healthy")
+    )
+}
+
+function Test-ServiceUsesRuntimeCoreCompose {
+    param([string]$ServiceName)
+
+    $serviceStatus = (Get-ServiceSnapshot).Status
+    if ($serviceStatus -and [string]$serviceStatus.startupMode -eq "docker_compose") {
+        return $true
+    }
+
+    $runtimeCoreServiceName = Get-RuntimeCoreServiceName -ServiceName $ServiceName
+    if ([string]::IsNullOrWhiteSpace($runtimeCoreServiceName)) {
+        return $false
+    }
+
+    return (Test-RuntimeCoreServiceRunning -ServiceName $runtimeCoreServiceName)
 }
 
 function Stop-PortListeners {
@@ -261,6 +372,18 @@ function Stop-ServiceNow {
             }
         }
         "backend" {
+            if (Test-ServiceUsesRuntimeCoreCompose -ServiceName "backend") {
+                $composeStop = Invoke-RuntimeCoreComposeJson -Action "stop" -Services @("backend")
+                if ($composeStop) {
+                    return [pscustomobject]@{
+                        ExitCode = if ($composeStop.ok) { 0 } else { 1 }
+                        Ok = [bool]$composeStop.ok
+                        OutputText = [string]$composeStop.outputText
+                        OutputTail = [string]$composeStop.outputText
+                    }
+                }
+            }
+
             $stoppedIds = Stop-ProcessesByCommandTokens -Tokens @("backend/api_server.py")
             Stop-PortListeners -Ports @(5000) | Out-Null
             $message = Format-StoppedProcessMessage -Name "backend processes" -StoppedIds $stoppedIds
@@ -272,6 +395,18 @@ function Stop-ServiceNow {
             }
         }
         "gateway" {
+            if (Test-ServiceUsesRuntimeCoreCompose -ServiceName "gateway") {
+                $composeStop = Invoke-RuntimeCoreComposeJson -Action "stop" -Services @("gateway")
+                if ($composeStop) {
+                    return [pscustomobject]@{
+                        ExitCode = if ($composeStop.ok) { 0 } else { 1 }
+                        Ok = [bool]$composeStop.ok
+                        OutputText = [string]$composeStop.outputText
+                        OutputTail = [string]$composeStop.outputText
+                    }
+                }
+            }
+
             $stoppedIds = New-Object System.Collections.Generic.List[int]
             foreach ($id in (Stop-ProcessesByCommandTokens -Tokens @("run-agent-gateway.mjs"))) {
                 $stoppedIds.Add([int]$id)
@@ -281,7 +416,7 @@ function Stop-ServiceNow {
                     $stoppedIds.Add([int]$id)
                 }
             }
-            Stop-PortListeners -Ports @(3000) | Out-Null
+            Stop-PortListeners -Ports @(3000, 3001) | Out-Null
             $message = Format-StoppedProcessMessage -Name "gateway processes" -StoppedIds $stoppedIds.ToArray()
             return [pscustomobject]@{
                 ExitCode = 0
@@ -291,6 +426,18 @@ function Stop-ServiceNow {
             }
         }
         "frontend" {
+            if (Test-ServiceUsesRuntimeCoreCompose -ServiceName "frontend") {
+                $composeStop = Invoke-RuntimeCoreComposeJson -Action "stop" -Services @("frontend")
+                if ($composeStop) {
+                    return [pscustomobject]@{
+                        ExitCode = if ($composeStop.ok) { 0 } else { 1 }
+                        Ok = [bool]$composeStop.ok
+                        OutputText = [string]$composeStop.outputText
+                        OutputTail = [string]$composeStop.outputText
+                    }
+                }
+            }
+
             $stoppedIds = New-Object System.Collections.Generic.List[int]
             foreach ($id in (Stop-ProcessesByCommandTokens -Tokens @("run-suite-frontend-dev.ps1", "-frontendlogpath"))) {
                 $stoppedIds.Add([int]$id)
@@ -394,10 +541,11 @@ function Start-ServiceNow {
 function Get-LogTarget {
     switch ($Service) {
         "supabase" {
+            $supabasePorts = Get-SuiteSupabaseLocalPorts -RepoRoot $resolvedRepoRoot
             return [pscustomobject]@{
                 kind = "url"
                 label = "Supabase Studio"
-                target = "http://127.0.0.1:54323"
+                target = "http://127.0.0.1:$($supabasePorts.studio)"
             }
         }
         "frontend" {
@@ -405,6 +553,34 @@ function Get-LogTarget {
                 kind = "path"
                 label = "Frontend Log"
                 target = $frontendLogPath
+            }
+        }
+        "backend" {
+            return [pscustomobject]@{
+                kind = "path"
+                label = "Backend Log"
+                target = $backendLogPath
+            }
+        }
+        "gateway" {
+            return [pscustomobject]@{
+                kind = "path"
+                label = "Gateway Log"
+                target = $gatewayLogPath
+            }
+        }
+        "watchdog-filesystem" {
+            return [pscustomobject]@{
+                kind = "path"
+                label = "Filesystem Collector Logs"
+                target = $filesystemCollectorLogDir
+            }
+        }
+        "watchdog-autocad" {
+            return [pscustomobject]@{
+                kind = "path"
+                label = "AutoCAD Collector Logs"
+                target = $autocadCollectorLogDir
             }
         }
         default {
@@ -540,6 +716,10 @@ else {
     if ($result.details) {
         Write-Host $result.details
     }
+}
+
+if ($Action -in @("status", "logs")) {
+    exit 0
 }
 
 if ($result.ok) {

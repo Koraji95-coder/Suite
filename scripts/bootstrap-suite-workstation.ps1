@@ -36,14 +36,14 @@ else {
 
 $steps = New-Object System.Collections.Generic.List[object]
 $warnings = New-Object System.Collections.Generic.List[string]
-$dailyPublishRoot = Join-Path $resolvedDailyRoot "artifacts\DailyDesk\publish"
-$plannedOfficeExecutablePath = Join-Path $dailyPublishRoot "DailyDesk.exe"
-$resolvedOfficeExecutablePath = $plannedOfficeExecutablePath
+$dailyBrokerPublishRoot = Join-Path $resolvedDailyRoot "artifacts\DailyDesk.Broker\publish"
 $resolvedSuiteRepoUrl = $SuiteRepoUrl
 $resolvedDailyRepoUrl = $DailyRepoUrl
 $runtimeStatusPayload = $null
 $suiteSyncMode = $null
 $dailySyncMode = $null
+$plannedOfficeExecutablePath = ""
+$resolvedOfficeExecutablePath = ""
 
 function Add-Warning {
     param([string]$Message)
@@ -631,9 +631,10 @@ function Invoke-SuitePowerShellScript {
     )
 
     $scriptPath = Join-Path $SuiteRepoRoot $ScriptRelativePath
+    $scriptArguments = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath) + @($Arguments)
     return Invoke-ExternalCommand `
         -FilePath "PowerShell.exe" `
-        -Arguments @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath) + @($Arguments) `
+        -Arguments $scriptArguments `
         -WorkingDirectory $SuiteRepoRoot
 }
 
@@ -739,22 +740,23 @@ if (-not $ValidateOnly -and $canContinue) {
         }
     }
 
-    $dailyProjectPath = Join-Path $resolvedDailyRoot "DailyDesk\DailyDesk.csproj"
-    if ($canContinue -and (Test-Path -LiteralPath $dailyProjectPath)) {
-        $publishResult = Invoke-ExternalCommand `
+    $dailyBrokerProjectPath = Join-Path $resolvedDailyRoot "DailyDesk.Broker\DailyDesk.Broker.csproj"
+    if ($canContinue) {
+        Add-StepResult -Id "publish-dailydesk" -Label "Legacy Office client" -Ok $true -Summary "Skipped DailyDesk.exe publish because Office now runs inside the shared shell through the broker." -Details $null
+    }
+
+    if ($canContinue -and (Test-Path -LiteralPath $dailyBrokerProjectPath)) {
+        $brokerPublishResult = Invoke-ExternalCommand `
             -FilePath "dotnet" `
-            -Arguments @("publish", $dailyProjectPath, "-c", "Release", "-o", $dailyPublishRoot, "-v", "minimal") `
+            -Arguments @("publish", $dailyBrokerProjectPath, "-c", "Release", "-o", $dailyBrokerPublishRoot, "-v", "minimal") `
             -WorkingDirectory $resolvedDailyRoot
-        if (Test-Path -LiteralPath $plannedOfficeExecutablePath) {
-            $resolvedOfficeExecutablePath = [System.IO.Path]::GetFullPath($plannedOfficeExecutablePath)
-        }
-        Add-StepResult -Id "publish-dailydesk" -Label "Publish Office" -Ok $publishResult.Ok -Summary $(if ($publishResult.Ok) { "Published DailyDesk.exe for Runtime Control." } else { "DailyDesk publish failed." }) -Details $publishResult.OutputTail
-        if (-not $publishResult.Ok) {
+        Add-StepResult -Id "publish-office-broker" -Label "Publish Office broker" -Ok $brokerPublishResult.Ok -Summary $(if ($brokerPublishResult.Ok) { "Published DailyDesk.Broker for the shared shell." } else { "DailyDesk.Broker publish failed." }) -Details $brokerPublishResult.OutputTail
+        if (-not $brokerPublishResult.Ok) {
             $canContinue = $false
         }
     }
     elseif ($canContinue) {
-        Add-StepResult -Id "publish-dailydesk" -Label "Publish Office" -Ok $false -Summary "DailyDesk project was not found in the configured Daily root." -Details $dailyProjectPath
+        Add-StepResult -Id "publish-office-broker" -Label "Publish Office broker" -Ok $false -Summary "DailyDesk.Broker project was not found in the configured Daily root." -Details $dailyBrokerProjectPath
         $canContinue = $false
     }
 
@@ -779,22 +781,57 @@ if (-not $ValidateOnly -and $canContinue) {
     }
 
     if ($canContinue) {
+        $officeBrokerBaseUrl = "http://127.0.0.1:57420"
+        $officeBrokerPublishPath = if (-not [string]::IsNullOrWhiteSpace($dailyBrokerPublishRoot)) { $dailyBrokerPublishRoot } else { $null }
+        $officeKnowledgeRoot = Get-SuiteOfficeKnowledgeRoot
+        $officeStateRoot = Get-SuiteOfficeStateRoot
+        foreach ($officeRootPath in @($officeKnowledgeRoot, $officeStateRoot) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) {
+            New-Item -ItemType Directory -Path $officeRootPath -Force | Out-Null
+        }
+
         $officeConfigPath = Write-SuiteCompanionAppLocalConfig -CompanionAppId "office" -Config ([ordered]@{
-            executablePath = $resolvedOfficeExecutablePath
-            workingDirectory = Split-Path -Parent $resolvedOfficeExecutablePath
             rootDirectory = $resolvedDailyRoot
             configuredAt = (Get-Date).ToString("o")
             configuredBy = "scripts/bootstrap-suite-workstation.ps1"
             suiteRoot = $resolvedSuiteRoot
             dailyRoot = $resolvedDailyRoot
             syncMode = $dailySyncMode
+            launchMode = "embedded_shell"
+            legacyClientRetired = $true
+            executablePath = $null
+            brokerBaseUrl = $officeBrokerBaseUrl
+            brokerPublishPath = $officeBrokerPublishPath
+            brokerHealthPath = "/health"
+            brokerStatePath = "/state"
+            brokerEnabled = $true
+            knowledgeLibraryPath = $officeKnowledgeRoot
+            stateRootPath = $officeStateRoot
+            broker = [ordered]@{
+                enabled = $true
+                baseUrl = $officeBrokerBaseUrl
+                publishPath = $officeBrokerPublishPath
+                healthPath = "/health"
+                statePath = "/state"
+                prefixes = @("", "/api", "/api/office", "/office")
+            }
         })
 
-        Add-StepResult -Id "office-config" -Label "Office companion config" -Ok $true -Summary "Wrote the workstation-local Office launch config." -Details $officeConfigPath
+        Add-StepResult -Id "office-config" -Label "Office shell config" -Ok $true -Summary "Wrote the workstation-local Office broker config for the shared shell." -Details $officeConfigPath
+
+        $dailyDeskSettingsDirectory = Join-Path $resolvedDailyRoot "DailyDesk"
+        $dailyDeskLocalSettingsPath = Join-Path $dailyDeskSettingsDirectory "dailydesk.settings.local.json"
+        New-Item -ItemType Directory -Path $dailyDeskSettingsDirectory -Force | Out-Null
+        ([ordered]@{
+            suiteRepoPath = $resolvedSuiteRoot
+            knowledgeLibraryPath = $officeKnowledgeRoot
+            stateRootPath = $officeStateRoot
+            additionalKnowledgePaths = @()
+        } | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $dailyDeskLocalSettingsPath -Encoding UTF8
+        Add-StepResult -Id "office-local-settings" -Label "Office local settings" -Ok $true -Summary "Wrote the workstation-local Office settings override." -Details $dailyDeskLocalSettingsPath
     }
 
     if ($canContinue) {
-        $startupInstall = Invoke-SuitePowerShellScript -SuiteRepoRoot $resolvedSuiteRoot -ScriptRelativePath "scripts\install-suite-runtime-startup.ps1" -Arguments @("-RunNow:`$false")
+        $startupInstall = Invoke-SuitePowerShellScript -SuiteRepoRoot $resolvedSuiteRoot -ScriptRelativePath "scripts\install-suite-runtime-startup.ps1" -Arguments @("-RunNow", "0")
         Add-StepResult -Id "runtime-startup-install" -Label "Runtime startup install" -Ok $startupInstall.Ok -Summary $(if ($startupInstall.Ok) { "Installed Suite Runtime startup." } else { "Runtime startup install failed." }) -Details $startupInstall.OutputTail
     }
 
@@ -829,14 +866,14 @@ elseif ($ValidateOnly) {
     Add-StepResult -Id "validation-only" -Label "Validation only" -Ok $canContinue -Summary "Validation completed without cloning, building, or installing startup tasks." -Details "Run without -ValidateOnly to clone/update repos, build DailyDesk, stamp the workstation profile, install startup tasks, and run health checks."
 }
 
-$effectiveOfficeExecutablePath = if (Test-Path -LiteralPath $plannedOfficeExecutablePath) {
+$effectiveOfficeExecutablePath = if (-not [string]::IsNullOrWhiteSpace($plannedOfficeExecutablePath) -and (Test-Path -LiteralPath $plannedOfficeExecutablePath)) {
     [System.IO.Path]::GetFullPath($plannedOfficeExecutablePath)
 }
 elseif (-not [string]::IsNullOrWhiteSpace($resolvedOfficeExecutablePath)) {
     [System.IO.Path]::GetFullPath($resolvedOfficeExecutablePath)
 }
 else {
-    $null
+    ""
 }
 
 $allWarnings = @(
@@ -864,6 +901,8 @@ $result = [pscustomobject]@{
     suiteSyncMode = $suiteSyncMode
     dailySyncMode = $dailySyncMode
     officeExecutablePath = $effectiveOfficeExecutablePath
+    officeBrokerBaseUrl = "http://127.0.0.1:57420"
+    officeBrokerPublishPath = $dailyBrokerPublishRoot
     codexConfigPath = $CodexConfigPath
     prerequisites = @($prerequisites | ForEach-Object { $_ })
     steps = @($steps | ForEach-Object { $_ })

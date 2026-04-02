@@ -209,6 +209,53 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("repo.check_suite_workstation", tool_names)
         self.assertIn("repo.verify_agent_routing_guardrails", tool_names)
 
+    def test_initialize_and_list_resources(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            resources_response = server.request("resources/list", {})
+
+        resources = resources_response.get("result", {}).get("resources", [])
+        resource_by_uri = {
+            str(entry.get("uri")): entry for entry in resources if isinstance(entry, dict)
+        }
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-project-flow",
+            resource_by_uri,
+        )
+        resource = resource_by_uri[
+            "repo://docs/development/autocad-electrical-2026-project-flow"
+        ]
+        self.assertEqual(
+            resource.get("name"),
+            "AutoCAD Electrical 2026 Project Flow Reference",
+        )
+        self.assertEqual(resource.get("mimeType"), "text/markdown")
+
+    def test_resources_read_returns_autodesk_project_flow_markdown(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "resources/read",
+                {
+                    "uri": "repo://docs/development/autocad-electrical-2026-project-flow",
+                },
+            )
+
+        contents = response.get("result", {}).get("contents", [])
+        self.assertTrue(contents)
+        content = contents[0] if isinstance(contents[0], dict) else {}
+        self.assertEqual(
+            content.get("uri"),
+            "repo://docs/development/autocad-electrical-2026-project-flow",
+        )
+        self.assertEqual(content.get("mimeType"), "text/markdown")
+        text = str(content.get("text") or "")
+        self.assertIn("AEPROJECT / Project Manager entrypoints", text)
+        self.assertIn(
+            "GetProjectFilePath / SetProjectFilePath are not ACADE project-creation APIs",
+            text,
+        )
+
     def test_tool_call_repo_search_returns_text(self) -> None:
         with _McpServerProcess() as server:
             server.initialize()
@@ -285,6 +332,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
                 "SUITE_WORKSTATION_ID": "suite-secondary",
                 "SUITE_WORKSTATION_LABEL": "Dustin travel workstation",
                 "SUITE_WORKSTATION_ROLE": "secondary",
+                "SUITE_AUTODESK_OFFLINE_HELP_ROOT": "C:\\Autodesk\\OfflineHelp",
                 "COMPUTERNAME": "TEST-WS",
             }
         ) as server:
@@ -306,6 +354,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("Role: secondary", text)
         self.assertIn("Computer Name: TEST-WS", text)
         self.assertIn("Source: mcp_env", text)
+        self.assertIn("Autodesk Offline Help Root: C:/Autodesk/OfflineHelp", text)
         self.assertIn("Collector ID: watchdog-fs-suite-secondary", text)
         self.assertIn(
             "Startup Task: SuiteWatchdogFilesystemCollector-suite-secondary",
@@ -404,6 +453,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
                 "SUITE_WORKSTATION_ID": "suite-main",
                 "SUITE_WORKSTATION_LABEL": "Dustin main workstation",
                 "SUITE_WORKSTATION_ROLE": "primary",
+                "SUITE_AUTODESK_OFFLINE_HELP_ROOT": "D:\\Docs\\Autodesk",
                 "COMPUTERNAME": "MAIN-WS",
             }
         ) as server:
@@ -427,6 +477,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("Role: primary", text)
         self.assertIn("Computer Name: MAIN-WS", text)
         self.assertIn("Source: mcp_env", text)
+        self.assertIn("Autodesk Offline Help Root: D:/Docs/Autodesk", text)
         self.assertIn("Collector ID: watchdog-fs-suite-main", text)
         self.assertIn(
             "Startup Task: SuiteWatchdogFilesystemCollector-suite-main",
@@ -445,6 +496,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
                 "SUITE_WORKSTATION_ID": "suite-main",
                 "SUITE_WORKSTATION_LABEL": "Dustin main workstation",
                 "SUITE_WORKSTATION_ROLE": "primary",
+                "SUITE_AUTODESK_OFFLINE_HELP_ROOT": "E:\\Autodesk\\OfflineHelp",
                 "SUITE_MCP_ENV_STAMPED_BY": "scripts/sync-suite-workstation-profile.ps1",
                 "COMPUTERNAME": "MAIN-WS",
             }
@@ -473,6 +525,10 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("autocadReadiness", payload)
         self.assertIn("issues", payload)
         self.assertIn("recommendedActions", payload)
+        self.assertEqual(
+            payload.get("workstation", {}).get("autodeskOfflineHelpRoot"),
+            "E:\\Autodesk\\OfflineHelp",
+        )
 
     @unittest.skipUnless(os.name == "nt", "Startup check tools are only available on Windows.")
     def test_tool_check_watchdog_autocad_collector_startup_reports_missing_script(self) -> None:

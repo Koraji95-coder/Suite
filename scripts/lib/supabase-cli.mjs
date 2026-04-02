@@ -30,6 +30,108 @@ function resolveSupabaseSmtpPort(envMap = process.env) {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : 2500;
 }
 
+function resolveSupabasePortOverride(envMap = process.env, key, fallback = null) {
+	const raw = String(envMap[key] || "").trim();
+	const parsed = Number.parseInt(raw, 10);
+	if (Number.isFinite(parsed) && parsed > 0) {
+		return parsed;
+	}
+	return fallback;
+}
+
+function parseBooleanEnvValue(value) {
+	const normalized = String(value ?? "").trim().toLowerCase();
+	if (!normalized) {
+		return null;
+	}
+	if (["1", "true", "yes", "y", "on"].includes(normalized)) {
+		return true;
+	}
+	if (["0", "false", "no", "n", "off"].includes(normalized)) {
+		return false;
+	}
+	return null;
+}
+
+export function resolveSupabaseAnalyticsEnabled(
+	envMap = process.env,
+	platform = process.platform,
+) {
+	const explicitValue = parseBooleanEnvValue(
+		envMap.SUITE_SUPABASE_LOCAL_ANALYTICS_ENABLED,
+	);
+	if (explicitValue !== null) {
+		return explicitValue;
+	}
+
+	// Supabase's local analytics sidecar uses DOCKER_HOST=http://host.docker.internal:2375
+	// on Windows. Docker Desktop does not expose that insecure endpoint by default, so
+	// the Vector container exits immediately unless the user opts in explicitly.
+	if (platform === "win32") {
+		return false;
+	}
+
+	return null;
+}
+
+function escapeRegExp(value) {
+	return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function replaceTomlSectionIntegerValue(configText, sectionName, key, value) {
+	const sectionPattern = new RegExp(
+		`(\\[${escapeRegExp(sectionName)}\\][\\s\\S]*?\\n${escapeRegExp(key)}\\s*=\\s*)\\d+`,
+		"m",
+	);
+	return configText.replace(sectionPattern, `$1${value}`);
+}
+
+function replaceTomlSectionBooleanValue(configText, sectionName, key, value) {
+	const sectionPattern = new RegExp(
+		`(\\[${escapeRegExp(sectionName)}\\][\\s\\S]*?\\n${escapeRegExp(key)}\\s*=\\s*)(true|false)`,
+		"m",
+	);
+	return configText.replace(sectionPattern, `$1${value ? "true" : "false"}`);
+}
+
+function applySupabaseConfigOverrides(configText, envMap = process.env) {
+	const overrides = [
+		["api", "port", resolveSupabasePortOverride(envMap, "SUITE_SUPABASE_LOCAL_API_PORT")],
+		["db", "port", resolveSupabasePortOverride(envMap, "SUITE_SUPABASE_LOCAL_DB_PORT")],
+		["db", "shadow_port", resolveSupabasePortOverride(envMap, "SUITE_SUPABASE_LOCAL_SHADOW_PORT")],
+		["db.pooler", "port", resolveSupabasePortOverride(envMap, "SUITE_SUPABASE_LOCAL_POOLER_PORT")],
+		["studio", "port", resolveSupabasePortOverride(envMap, "SUITE_SUPABASE_LOCAL_STUDIO_PORT")],
+		["inbucket", "port", resolveSupabasePortOverride(envMap, "SUITE_SUPABASE_LOCAL_INBUCKET_PORT")],
+		["auth.email.smtp", "port", resolveSupabaseSmtpPort(envMap)],
+		["analytics", "port", resolveSupabasePortOverride(envMap, "SUITE_SUPABASE_LOCAL_ANALYTICS_PORT")],
+	];
+
+	let nextConfigText = configText;
+	for (const [sectionName, key, value] of overrides) {
+		if (!Number.isFinite(value) || value <= 0) {
+			continue;
+		}
+		nextConfigText = replaceTomlSectionIntegerValue(
+			nextConfigText,
+			sectionName,
+			key,
+			value,
+		);
+	}
+
+	const analyticsEnabled = resolveSupabaseAnalyticsEnabled(envMap);
+	if (analyticsEnabled !== null) {
+		nextConfigText = replaceTomlSectionBooleanValue(
+			nextConfigText,
+			"analytics",
+			"enabled",
+			analyticsEnabled,
+		);
+	}
+
+	return nextConfigText;
+}
+
 function ensureGeneratedSupabaseWorkdir(
 	repoRoot = process.cwd(),
 	envMap = process.env,
@@ -55,10 +157,10 @@ function ensureGeneratedSupabaseWorkdir(
 
 	const smtpPort = resolveSupabaseSmtpPort(envMap);
 	const configText = fs.readFileSync(sourceConfigPath, "utf8");
-	const generatedConfigText = configText.replace(
-		/(\[auth\.email\.smtp\][\s\S]*?\nport = )\d+/m,
-		`$1${smtpPort}`,
-	);
+	const generatedConfigText = applySupabaseConfigOverrides(configText, {
+		...envMap,
+		SUPABASE_LOCAL_SMTP_PORT: smtpPort,
+	});
 	fs.writeFileSync(generatedConfigPath, generatedConfigText, "utf8");
 
 	return generatedRoot;

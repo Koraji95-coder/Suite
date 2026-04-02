@@ -24,6 +24,7 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $bootstrapStateScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-bootstrap-state.ps1")).Path
 $logUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-log-utils.ps1")).Path
+$runtimeCoreComposeScriptRelativePath = "scripts\runtime-core-compose.ps1"
 
 . $bootstrapStateScript
 . $logUtilsScript
@@ -427,7 +428,7 @@ function Invoke-PowerShellScript {
     $argumentText = Format-CommandArguments -Arguments $Arguments
     $commandSuffix = if ([string]::IsNullOrWhiteSpace($argumentText)) { "" } else { " $argumentText" }
     Write-BootstrapLog -Tag "INFO" -Message ("Running PowerShell {0}{1}" -f $ScriptRelativePath, $commandSuffix)
-    return Invoke-ExternalCommand -FilePath "PowerShell.exe" -Arguments (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $scriptPath) + $Arguments) -WorkingDirectory $resolvedRepoRoot
+    return Invoke-ExternalCommand -FilePath "PowerShell.exe" -Arguments (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", $scriptPath) + $Arguments) -WorkingDirectory $resolvedRepoRoot
 }
 
 function Invoke-JsonPowerShellScript {
@@ -729,6 +730,68 @@ else {
     }
 }
 
+$runtimeCoreServicesToStart = @()
+if (-not $SkipBackend) {
+    $runtimeCoreServicesToStart += "backend"
+}
+if (-not $SkipGateway) {
+    $runtimeCoreServicesToStart += "gateway"
+}
+if (-not $SkipFrontend) {
+    $runtimeCoreServicesToStart += "frontend"
+}
+
+if ($runtimeCoreServicesToStart.Count -eq 0) {
+    $runtimeCoreSkippedStep = New-StepResult -Name "runtime-core-up" -State "skipped" -Ok $true -Summary "Skipped runtime core compose bring-up."
+    $steps += $runtimeCoreSkippedStep
+    Write-StepLog -Step $runtimeCoreSkippedStep
+}
+else {
+    $runtimeCoreLabel = [string]::Join(", ", @($runtimeCoreServicesToStart))
+    Set-CurrentBootstrapStepStarted `
+        -StepId "runtime-core-up" `
+        -StepLabel "Starting runtime core services through Docker." `
+        -Summary "Starting runtime core services through Docker."
+    $runtimeCoreUpArguments = @(
+        "up",
+        "-Services",
+        [string]::Join(",", @($runtimeCoreServicesToStart))
+    ) + @(
+        "-Json"
+    )
+    $runtimeCoreUp = Invoke-JsonPowerShellScript `
+        -ScriptRelativePath $runtimeCoreComposeScriptRelativePath `
+        -Arguments $runtimeCoreUpArguments
+    $runtimeCoreUpOk = $runtimeCoreUp.Result.Ok -and $runtimeCoreUp.Payload -and [bool]$runtimeCoreUp.Payload.ok
+    $runtimeCoreUpDetails = if ($runtimeCoreUp.Payload -and -not [string]::IsNullOrWhiteSpace([string]$runtimeCoreUp.Payload.outputText)) {
+        [string]$runtimeCoreUp.Payload.outputText
+    }
+    else {
+        [string]$runtimeCoreUp.Result.OutputTail
+    }
+    $runtimeCoreStep = New-StepResult `
+        -Name "runtime-core-up" `
+        -State $(if ($runtimeCoreUpOk) { "ready" } else { "failed" }) `
+        -Ok $runtimeCoreUpOk `
+        -Summary $(if ($runtimeCoreUpOk) { "Runtime core Docker services are up: $runtimeCoreLabel." } else { "Runtime core Docker bring-up failed for: $runtimeCoreLabel." }) `
+        -Details $runtimeCoreUpDetails `
+        -Payload $runtimeCoreUp.Payload
+    $steps += $runtimeCoreStep
+    Write-StepLog -Step $runtimeCoreStep -FallbackText $runtimeCoreUpDetails
+    if ($runtimeCoreUpOk) {
+        Complete-CurrentBootstrapStep `
+            -StepId "runtime-core-up" `
+            -StepLabel "Runtime core Docker services are ready to verify." `
+            -Summary "Runtime core Docker services are up."
+    }
+    else {
+        Fail-CurrentBootstrapStep `
+            -StepId "runtime-core-up" `
+            -StepLabel "Runtime core Docker bring-up failed." `
+            -Summary "Runtime core Docker bring-up failed."
+    }
+}
+
 if ($SkipWatchdog) {
     $watchdogSkippedStep = New-StepResult -Name "watchdog" -State "skipped" -Ok $true -Summary "Skipped Watchdog runtime bootstrap."
     $steps += $watchdogSkippedStep
@@ -866,27 +929,49 @@ else {
         -StepLabel "Ensuring Watchdog backend availability." `
         -Summary "Ensuring Watchdog backend availability."
     $backendStart = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-watchdog-backend-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
-    $backendReady = $backendStart.Result.Ok -and $backendStart.Payload -and [bool]$backendStart.Payload.Running
+    $backendReady = $backendStart.Result.Ok -and $backendStart.Payload -and [bool]$backendStart.Payload.Healthy -and ([string]$backendStart.Payload.StartupMode -eq "docker_compose")
+    $backendStarting = $backendStart.Result.Ok -and $backendStart.Payload -and (-not [bool]$backendStart.Payload.Healthy) -and ([string]$backendStart.Payload.StartupMode -eq "docker_compose") -and [bool]$backendStart.Payload.Running
+    $backendStatusCheck = $null
+    if (-not $backendReady -and $backendStarting) {
+        Write-BootstrapLog -Tag "INFO" -Message "Backend did not report healthy immediately; verifying Docker readiness."
+        $backendStatusCheck = Wait-ForJsonServiceReady `
+            -StepId "backend" `
+            -VerificationLabel "backend" `
+            -ScriptRelativePath "scripts\check-watchdog-backend-startup.ps1" `
+            -IsReady {
+                param($probe)
+                return $probe.Result.Ok -and $probe.Payload -and [bool]$probe.Payload.Healthy -and ([string]$probe.Payload.StartupMode -eq "docker_compose")
+            }
+        $backendReady = [bool]$backendStatusCheck.Ready
+    }
+    $backendDetailsParts = @($backendStart.Result.OutputTail)
+    if ($backendStatusCheck -and $backendStatusCheck.Probe -and $backendStatusCheck.Probe.Result.OutputTail) {
+        $backendDetailsParts += $backendStatusCheck.Probe.Result.OutputTail
+    }
+    $backendDetails = [string]::Join(
+        [Environment]::NewLine,
+        @($backendDetailsParts | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    ).Trim()
     $backendStep = New-StepResult `
         -Name "backend" `
         -State $(if ($backendReady) { "ready" } else { "failed" }) `
         -Ok $backendReady `
-        -Summary $(if ($backendReady) { "Backend is running." } else { "Backend is not running." }) `
-        -Details $backendStart.Result.OutputTail `
-        -Payload $backendStart.Payload
+        -Summary $(if ($backendReady) { "Backend Docker service is healthy." } else { "Backend Docker service is not healthy." }) `
+        -Details $backendDetails `
+        -Payload $(if ($backendStatusCheck -and $backendStatusCheck.Probe -and $backendStatusCheck.Probe.Payload) { $backendStatusCheck.Probe.Payload } else { $backendStart.Payload })
     $steps += $backendStep
-    Write-StepLog -Step $backendStep
+    Write-StepLog -Step $backendStep -FallbackText $backendDetails
     if ($backendReady) {
         Complete-CurrentBootstrapStep `
             -StepId "backend" `
             -StepLabel "Watchdog backend is ready." `
-            -Summary "Backend is running."
+            -Summary "Backend Docker service is healthy."
     }
     else {
         Fail-CurrentBootstrapStep `
             -StepId "backend" `
-            -StepLabel "Watchdog backend is not running." `
-            -Summary "Backend is not running."
+            -StepLabel "Watchdog backend is not healthy." `
+            -Summary "Backend Docker service is not healthy."
     }
 }
 

@@ -42,8 +42,9 @@ class TestApiHttpHardening(unittest.TestCase):
     def test_default_allowed_origins(self) -> None:
         origins = default_allowed_origins()
         self.assertIn("http://localhost:5173", origins)
+        self.assertIn("http://127.0.0.1:3001", origins)
         self.assertIn("http://127.0.0.1:3000", origins)
-        self.assertEqual(len(origins), 4)
+        self.assertEqual(len(origins), 6)
 
     def test_configure_cors(self) -> None:
         recorder = _CorsRecorder()

@@ -352,7 +352,7 @@ function resolvePasskeyBridgeConfig(env) {
 
 function resolveGatewayConfig({ repoRoot, env }) {
 	const host = envString(env, "AGENT_GATEWAY_HOST", "127.0.0.1");
-	const port = envInt(env, "AGENT_GATEWAY_PORT", 3000);
+	const port = envInt(env, "AGENT_GATEWAY_PORT", 3001);
 	const pairingRequired = envFlag(env, "SUITE_GATEWAY_REQUIRE_PAIRING", true);
 	const requireWebhookSecret =
 		envFlag(env, "AGENT_REQUIRE_WEBHOOK_SECRET", false) ||

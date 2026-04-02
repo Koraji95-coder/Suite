@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.Json.Nodes;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -19,8 +20,23 @@ internal sealed class RuntimeShellForm : Form
     private static readonly Regex StructuredLogRegex = new(
         @"^\[(?<timestamp>[^\]]+)\](?:\s\[(?<tag>[A-Z]+)\])?\s(?<message>.*)$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly HashSet<string> KnownLogSourceIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "transcript",
+        "bootstrap",
+        "runtime-launcher",
+        "runtime-shell",
+        "frontend",
+        "backend",
+        "gateway",
+        "office-broker",
+        "filesystem-collector",
+        "autocad-collector",
+        "docker",
+    };
 
     private readonly AppOptions _options;
+    private readonly RuntimeShellInstanceCoordinator _instanceCoordinator;
     private readonly WebView2 _webView;
     private readonly System.Windows.Forms.Timer _pollTimer;
     private readonly string _repoRoot;
@@ -31,29 +47,61 @@ internal sealed class RuntimeShellForm : Form
     private readonly string _bootstrapScriptPath;
     private readonly string _stopScriptPath;
     private readonly string _supportBundleScriptPath;
+    private readonly string _workstationDoctorScriptPath;
     private readonly string _workstationProfileScriptPath;
     private readonly string _runtimeCatalogPath;
     private readonly string _developerToolsManifestPath;
     private readonly string _runtimeStatusDirectory;
     private readonly string _runtimeLogPath;
+    private readonly string _frontendLogPath;
+    private readonly string _backendLogPath;
+    private readonly string _gatewayLogPath;
+    private readonly string _runtimeLauncherLogPath;
+    private readonly string _runtimeShellLogPath;
+    private readonly string _officeBrokerLogPath;
+    private readonly string _filesystemCollectorLogDir;
+    private readonly string _autocadCollectorLogDir;
+    private readonly string _shellWindowStatePath;
+    private readonly string _autodeskProjectFlowReferencePath;
     private readonly RuntimeCatalog _runtimeCatalog;
     private readonly string _runtimeCatalogJson;
     private readonly List<string> _queuedMessages = new();
     private readonly object _queueLock = new();
+    private readonly OfficeBrokerClient _officeBrokerClient = new();
 
     private bool _isClosing;
     private bool _uiReady;
     private bool _snapshotInFlight;
     private bool _snapshotRefreshPending;
+    private bool _officeSnapshotInFlight;
+    private bool _officeSnapshotRefreshPending;
     private bool _actionBusy;
+    private bool _pendingExternalAutoBootstrap;
     private string? _activeAction;
     private string? _activeServiceId;
     private long _runtimeLogOffset;
+    private string _selectedLogSourceId = "transcript";
+    private string _selectedLogSourcePath = string.Empty;
+    private string _selectedUtilityTab = "context";
+    private int _utilityPaneWidth = 400;
+    private string? _lastOfficeSnapshotJson;
+    private DateTimeOffset _lastOfficeSnapshotPublishedAt = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastOfficeBrokerLaunchAttemptAt = DateTimeOffset.MinValue;
+    private JsonObject? _lastWorkstationContextNode;
+    private DateTimeOffset _lastWorkstationContextPublishedAt = DateTimeOffset.MinValue;
+    private string? _lastSnapshotJson;
+    private string? _lastSnapshotFailureSignature;
+    private string? _lastRuntimeLogReadFailureSignature;
+    private string _lastSupabaseStudioUrl = "http://127.0.0.1:54323";
     private JsonDocument? _lastSnapshotDocument;
 
-    public RuntimeShellForm(AppOptions options)
+    internal int ExitCode { get; private set; } = RuntimeShellExitCodes.Success;
+
+    public RuntimeShellForm(AppOptions options, RuntimeShellInstanceCoordinator instanceCoordinator)
     {
+        RuntimeShellLogger.Log("runtime-shell-form-constructor-start");
         _options = options;
+        _instanceCoordinator = instanceCoordinator;
         _repoRoot = options.RepoRoot;
         _assetsDirectory = Path.Combine(AppContext.BaseDirectory, "Assets");
         _statusScriptPath = Path.Combine(_repoRoot, "scripts", "get-suite-runtime-status.ps1");
@@ -62,6 +110,7 @@ internal sealed class RuntimeShellForm : Form
         _bootstrapScriptPath = Path.Combine(_repoRoot, "scripts", "run-suite-runtime-startup.ps1");
         _stopScriptPath = Path.Combine(_repoRoot, "scripts", "stop-suite-runtime.ps1");
         _supportBundleScriptPath = Path.Combine(_repoRoot, "scripts", "export-suite-support-bundle.ps1");
+        _workstationDoctorScriptPath = Path.Combine(_repoRoot, "scripts", "workstation-doctor.ps1");
         _workstationProfileScriptPath = Path.Combine(_repoRoot, "scripts", "sync-suite-workstation-profile.ps1");
         _runtimeCatalogPath = Path.Combine(_assetsDirectory, "runtimeCatalog.json");
         _developerToolsManifestPath = Path.Combine(_repoRoot, "src", "routes", "developerToolsManifest.data.json");
@@ -70,36 +119,93 @@ internal sealed class RuntimeShellForm : Form
             "Suite",
             "runtime-bootstrap");
         _runtimeLogPath = Path.Combine(_runtimeStatusDirectory, "bootstrap.log");
+        _frontendLogPath = Path.Combine(_runtimeStatusDirectory, "frontend.log");
+        _backendLogPath = Path.Combine(_runtimeStatusDirectory, "backend.log");
+        _gatewayLogPath = Path.Combine(_runtimeStatusDirectory, "gateway.log");
+        _runtimeLauncherLogPath = Path.Combine(_runtimeStatusDirectory, "runtime-launcher.log");
+        _runtimeShellLogPath = Path.Combine(_runtimeStatusDirectory, "runtime-shell.log");
+        _officeBrokerLogPath = Path.Combine(_runtimeStatusDirectory, "office-broker.log");
+        _filesystemCollectorLogDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Suite",
+            "watchdog-collector",
+            "logs");
+        _autocadCollectorLogDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Suite",
+            "watchdog-autocad-collector",
+            "logs");
+        _shellWindowStatePath = Path.Combine(_runtimeStatusDirectory, "shell-window-state.json");
+        _autodeskProjectFlowReferencePath = Path.Combine(
+            _repoRoot,
+            "docs",
+            "development",
+            "autocad-electrical-2026-project-flow-reference.md");
         _runtimeCatalog = RuntimeCatalog.LoadFromFile(_runtimeCatalogPath, JsonOptions, out _runtimeCatalogJson);
+        RuntimeShellLogger.Log("runtime-shell-form-runtime-catalog-loaded");
 
         Directory.CreateDirectory(_runtimeStatusDirectory);
+        RuntimeShellLogger.Log("runtime-shell-form-status-dir-ready");
 
-        Text = "Suite Runtime Control";
-        StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new System.Drawing.Size(1220, 780);
-        Size = new System.Drawing.Size(1460, 900);
+        Text = "Suite Operator Shell";
+        AutoScaleMode = AutoScaleMode.None;
+        StartPosition = FormStartPosition.Manual;
+        MinimumSize = new System.Drawing.Size(960, 700);
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MinimizeBox = true;
+        MaximizeBox = true;
         BackColor = System.Drawing.ColorTranslator.FromHtml("#08131b");
-
+        UpdateWebViewInset();
+        RuntimeShellLogger.Log("runtime-shell-form-window-configured");
+        RuntimeShellLogger.Log("runtime-shell-webview-create-start");
         _webView = new WebView2
         {
             Dock = DockStyle.Fill,
             DefaultBackgroundColor = System.Drawing.ColorTranslator.FromHtml("#08131b"),
         };
         Controls.Add(_webView);
+        RuntimeShellLogger.Log("runtime-shell-webview-create-complete");
 
         _pollTimer = new System.Windows.Forms.Timer
         {
             Interval = 2500,
         };
         _pollTimer.Tick += async (_, _) => await OnPollTickAsync();
+        RuntimeShellLogger.Log("runtime-shell-form-poll-timer-ready");
+        DpiChanged += (_, _) =>
+        {
+            UpdateWebViewInset();
+            ApplyWebViewDpiZoom();
+        };
 
         Shown += async (_, _) =>
         {
             EnsureVisibleOnDesktop();
+            _instanceCoordinator.ReportPhase(
+                RuntimeShellPhases.Shown,
+                activatable: IsHandleCreated,
+                statusMessage: "Shell window shown.");
+            PersistShellWindowState();
+            RuntimeShellLogger.Log("runtime-shell-shown");
             await OnShownAsync();
+        };
+        ResizeEnd += (_, _) => PersistShellWindowState();
+        SizeChanged += (_, _) =>
+        {
+            if (!_isClosing && (WindowState == FormWindowState.Maximized || WindowState == FormWindowState.Normal))
+            {
+                PersistShellWindowState();
+            }
         };
         FormClosing += OnFormClosing;
         FormClosed += OnFormClosed;
+
+        RuntimeShellLogger.Log("runtime-shell-form-window-state-apply-start");
+        ApplyInitialShellWindowState();
+        RuntimeShellLogger.Log("runtime-shell-form-window-state-apply-complete");
+        PersistShellWindowState();
+        RuntimeShellLogger.Log("runtime-shell-form-window-state-persisted");
+        RuntimeShellLogger.Log("runtime-shell-form-constructor-complete");
     }
 
     private async Task OnShownAsync()
@@ -117,9 +223,14 @@ internal sealed class RuntimeShellForm : Form
         catch (Exception exception)
         {
             RuntimeShellLogger.LogException("runtime-shell-init", exception);
+            _instanceCoordinator.ReportPhase(
+                RuntimeShellPhases.Closing,
+                activatable: false,
+                statusMessage: $"Shell initialization failed. {exception.Message}");
+            ExitCode = RuntimeShellExitCodes.InitializationFailed;
             MessageBox.Show(
                 this,
-                "The HTML runtime shell could not start. Use the legacy runtime control panel for this workstation.",
+                "The HTML runtime shell could not start. Close this window and relaunch Runtime Control after checking the shell log.",
                 "Suite Runtime Control",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
@@ -140,12 +251,15 @@ internal sealed class RuntimeShellForm : Form
         core.Settings.AreDefaultContextMenusEnabled = false;
         core.Settings.AreBrowserAcceleratorKeysEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
+        core.Settings.IsZoomControlEnabled = false;
+        core.Settings.IsPinchZoomEnabled = false;
         core.WebMessageReceived += async (_, eventArgs) => await OnWebMessageReceivedAsync(eventArgs);
         core.NavigationCompleted += async (_, eventArgs) => await OnNavigationCompletedAsync(eventArgs);
         core.SetVirtualHostNameToFolderMapping(
             "suite-runtime.local",
             _assetsDirectory,
             CoreWebView2HostResourceAccessKind.Allow);
+        ApplyWebViewDpiZoom();
 
         _webView.Source = new Uri("https://suite-runtime.local/index.html");
     }
@@ -159,10 +273,17 @@ internal sealed class RuntimeShellForm : Form
 
         RuntimeShellLogger.Log($"runtime-shell-navigation-complete: autoBootstrap={_options.AutoBootstrap}");
         _uiReady = true;
+        _instanceCoordinator.ReportPhase(
+            RuntimeShellPhases.UiReady,
+            activatable: true,
+            statusMessage: "Shell UI ready.");
         EnsureVisibleOnDesktop();
         FlushQueuedMessages();
         PublishRuntimeCatalog();
         PublishDeveloperToolsManifest();
+        PersistShellWindowState();
+        PublishShellWindowState();
+        PublishLogSources();
         SendLog("SYS", "Runtime shell ready.", "sys");
         EmitInitialRuntimeLogTail();
         _runtimeLogOffset = GetCurrentLogLength();
@@ -177,7 +298,78 @@ internal sealed class RuntimeShellForm : Form
             return;
         }
 
+        if (_pendingExternalAutoBootstrap)
+        {
+            _pendingExternalAutoBootstrap = false;
+            RuntimeShellLogger.Log("runtime-shell-external-auto-bootstrap-prime");
+            PrimeAutoBootstrapUiState();
+            RuntimeShellLogger.Log("runtime-shell-external-auto-bootstrap-queue");
+            _ = RunBootstrapAllAsync(autoTriggered: true);
+            _ = PublishSnapshotAsync();
+            return;
+        }
+
         await PublishSnapshotAsync();
+        await PublishSelectedLogSourceAsync(force: true);
+    }
+
+    internal void HandleExternalActivationRequest(RuntimeShellActivationRequest request)
+    {
+        if (_isClosing || IsDisposed)
+        {
+            return;
+        }
+
+        void ActivateExistingShell()
+        {
+            EnsureVisibleOnDesktop();
+            _instanceCoordinator.ReportHeartbeat(
+                activatable: true,
+                statusMessage: request.AutoBootstrap
+                    ? "Activated existing shell after external bootstrap request."
+                    : "Activated existing shell.");
+            SendLog("SYS", "Focused the existing Suite Operator Shell instance.", "sys");
+            _ = PublishSnapshotAsync(force: true);
+            _ = PublishSelectedLogSourceAsync(force: true);
+
+            if (!request.AutoBootstrap)
+            {
+                return;
+            }
+
+            if (!_uiReady)
+            {
+                _pendingExternalAutoBootstrap = true;
+                RuntimeShellLogger.Log("runtime-shell-external-auto-bootstrap-pending");
+                return;
+            }
+
+            if (_actionBusy)
+            {
+                SendLog("INFO", "Auto-bootstrap was requested on the existing shell, but another runtime action is already running.", "info");
+                return;
+            }
+
+            RuntimeShellLogger.Log("runtime-shell-external-auto-bootstrap-start");
+            PrimeAutoBootstrapUiState();
+            _ = RunBootstrapAllAsync(autoTriggered: true);
+        }
+
+        try
+        {
+            if (IsHandleCreated)
+            {
+                BeginInvoke((MethodInvoker)ActivateExistingShell);
+            }
+            else
+            {
+                _pendingExternalAutoBootstrap = _pendingExternalAutoBootstrap || request.AutoBootstrap;
+            }
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-external-activation", exception);
+        }
     }
 
     private async Task OnWebMessageReceivedAsync(CoreWebView2WebMessageReceivedEventArgs eventArgs)
@@ -206,9 +398,43 @@ internal sealed class RuntimeShellForm : Form
                 case "runtime.refresh":
                     await PublishSnapshotAsync(force: true);
                     break;
+                case "office.refresh":
+                case "office.state.refresh":
+                    await PublishOfficeSnapshotAsync(force: true);
+                    break;
+                case "office.broker.start":
+                    await RunOfficeBrokerLifecycleAsync(restart: false);
+                    break;
+                case "office.broker.restart":
+                    await RunOfficeBrokerLifecycleAsync(restart: true);
+                    break;
+                case "office.chat.send":
+                case "office.chat.set_route":
+                case "office.chat.list_threads":
+                case "office.study.start":
+                case "office.study.generate_practice":
+                case "office.study.score_practice":
+                case "office.study.generate_defense":
+                case "office.study.score_defense":
+                case "office.study.save_reflection":
+                case "office.research.run":
+                case "office.research.save":
+                case "office.watchlist.run":
+                case "office.inbox.list":
+                case "office.inbox.resolve":
+                case "office.inbox.queue":
+                case "office.history.reset":
+                case "office.workspace.reset":
+                case "office.library.import":
+                    await HandleOfficeBrokerMessageAsync(messageType!, GetPayload(root));
+                    break;
                 case "runtime.clear_log":
                     PostEvent("runtime.log", new { reset = true });
                     SendLog("SYS", "Log view cleared.", "sys");
+                    if (_selectedLogSourceId.Equals("transcript", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await PublishSelectedLogSourceAsync(force: true);
+                    }
                     break;
                 case "runtime.service.start":
                     await RunServiceActionAsync(GetPayloadServiceId(root), "start");
@@ -221,6 +447,20 @@ internal sealed class RuntimeShellForm : Form
                     break;
                 case "runtime.service.open_logs":
                     await OpenLogsAsync(GetPayloadServiceId(root));
+                    break;
+                case "runtime.logs.select_source":
+                case "shell.logs.select_source":
+                    await SelectLogSourceAsync(GetPayloadString(root, "sourceId"), fromServiceAction: false);
+                    break;
+                case "runtime.logs.open_external":
+                    await OpenSelectedLogSourceExternallyAsync(GetPayloadString(root, "sourceId"));
+                    break;
+                case "shell.window_state.update":
+                case "shell.ui_state.update":
+                    UpdateShellPreferences(GetPayload(root));
+                    break;
+                case "shell.copy_text":
+                    CopyTextToClipboard(GetPayloadString(root, "text"));
                     break;
                 case "suite.route.open":
                     await OpenSuiteRouteAsync(
@@ -251,6 +491,12 @@ internal sealed class RuntimeShellForm : Form
                     break;
                 case "suite.companion.open-folder":
                     await RunCompanionActionAsync(GetPayloadCompanionAppId(root), "open-folder");
+                    break;
+                case "shell.open_path":
+                    await OpenShellPathAsync(GetPayloadPath(root));
+                    break;
+                case "shell.open_external":
+                    await OpenExternalTargetAsync(GetPayloadString(root, "target"));
                     break;
             }
         }
@@ -288,6 +534,9 @@ internal sealed class RuntimeShellForm : Form
                 Focus();
                 TopMost = true;
                 TopMost = false;
+                _instanceCoordinator.ReportHeartbeat(
+                    activatable: true,
+                    statusMessage: _uiReady ? "Shell window activated." : "Shell window is visible.");
             }
             catch (Exception exception)
             {
@@ -319,6 +568,7 @@ internal sealed class RuntimeShellForm : Form
         {
             PumpRuntimeLog();
             await PublishSnapshotAsync();
+            await PublishSelectedLogSourceAsync();
         }
         catch (Exception exception)
         {
@@ -614,38 +864,8 @@ internal sealed class RuntimeShellForm : Form
                 SendError("Open logs failed.", result.Summary ?? "No log target is available.");
                 return;
             }
-
-            if (string.Equals(result.LogTargetKind, "url", StringComparison.OrdinalIgnoreCase))
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = result.LogTargetTarget!,
-                    UseShellExecute = true,
-                });
-            }
-            else
-            {
-                if (File.Exists(result.LogTargetTarget))
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "notepad.exe",
-                        Arguments = $"\"{result.LogTargetTarget}\"",
-                        UseShellExecute = true,
-                    });
-                }
-                else
-                {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "explorer.exe",
-                    Arguments = $"\"{result.LogTargetTarget}\"",
-                    UseShellExecute = true,
-                });
-                }
-            }
-
-            SendLog("SYS", $"Opened logs for {serviceId}.", "sys");
+            await FocusLogSourceAsync(serviceId, result.LogTargetTarget);
+            SendLog("SYS", $"Focused logs for {serviceId}.", "sys");
         }
         catch (Exception exception)
         {
@@ -694,6 +914,105 @@ internal sealed class RuntimeShellForm : Form
         return Task.CompletedTask;
     }
 
+    private Task OpenShellPathAsync(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            SendError("Open path failed.", "No local path was provided.");
+            return Task.CompletedTask;
+        }
+
+        var resolvedPath = path.Equals("autodesk-project-flow-reference", StringComparison.OrdinalIgnoreCase)
+            ? _autodeskProjectFlowReferencePath
+            : path;
+
+        try
+        {
+            if (resolvedPath.StartsWith("shell:", StringComparison.OrdinalIgnoreCase))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = resolvedPath,
+                    UseShellExecute = true,
+                });
+                SendLog("SYS", $"Opened {resolvedPath}.", "sys");
+                return Task.CompletedTask;
+            }
+
+            if (Directory.Exists(resolvedPath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{resolvedPath}\"",
+                    UseShellExecute = true,
+                });
+                SendLog("SYS", $"Opened {resolvedPath}.", "sys");
+                return Task.CompletedTask;
+            }
+
+            if (File.Exists(resolvedPath))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = resolvedPath,
+                    UseShellExecute = true,
+                });
+                SendLog("SYS", $"Opened {resolvedPath}.", "sys");
+                return Task.CompletedTask;
+            }
+
+            if (Uri.TryCreate(resolvedPath, UriKind.Absolute, out var uri) &&
+                (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+                 uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = resolvedPath,
+                    UseShellExecute = true,
+                });
+                SendLog("SYS", $"Opened {resolvedPath}.", "sys");
+                return Task.CompletedTask;
+            }
+
+            SendError("Open path failed.", $"The path was not found: {resolvedPath}");
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-open-path", exception);
+            SendError("Open path failed.", exception.Message);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task OpenExternalTargetAsync(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            SendError("Open external target failed.", "No external target was provided.");
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = target,
+                UseShellExecute = true,
+            });
+            SendLog("SYS", $"Opened {target}.", "sys");
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-open-external", exception);
+            SendError("Open external target failed.", exception.Message);
+        }
+
+        return Task.CompletedTask;
+    }
+
     private void PublishRuntimeCatalog()
     {
         try
@@ -735,19 +1054,7 @@ internal sealed class RuntimeShellForm : Form
     {
         try
         {
-            if (!File.Exists(_runtimeLogPath))
-            {
-                SendError("Open bootstrap log failed.", $"Bootstrap log not found: {_runtimeLogPath}");
-                return Task.CompletedTask;
-            }
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = _runtimeLogPath,
-                UseShellExecute = true,
-            });
-
-            SendLog("SYS", "Opened bootstrap log.", "sys");
+            return SelectLogSourceAsync("bootstrap", fromServiceAction: true);
         }
         catch (Exception exception)
         {
@@ -1204,16 +1511,40 @@ internal sealed class RuntimeShellForm : Form
                     _repoRoot,
                     new[] { "-RepoRoot", _repoRoot, "-Json" });
 
-                if (!TryExtractJsonObject(result.CombinedOutput, out var payloadJson))
+                var noiseLines = CollectSnapshotNoiseLines(result);
+                foreach (var noiseLine in noiseLines)
                 {
-                    SendError("Runtime snapshot failed.", "The status script did not return JSON.");
-                    return;
+                    EmitLogLine(noiseLine);
                 }
 
+                if (!TryExtractStructuredJson(result, out var payloadJson, out var parseError))
+                {
+                    PublishStaleSnapshot(parseError ?? "The status script did not return JSON.");
+                    await PublishOfficeSnapshotAsync(force);
+                    continue;
+                }
+
+                var payloadNode = JsonNode.Parse(payloadJson) as JsonObject;
+                if (payloadNode is null)
+                {
+                    PublishStaleSnapshot("The runtime snapshot payload was not a JSON object.");
+                    await PublishOfficeSnapshotAsync(force);
+                    continue;
+                }
+
+                await EnrichRuntimeSnapshotAsync(payloadNode, force);
+                var finalJson = payloadNode.ToJsonString(JsonOptions);
+
+                _lastSnapshotJson = finalJson;
+                _lastSnapshotFailureSignature = null;
                 _lastSnapshotDocument?.Dispose();
-                _lastSnapshotDocument = JsonDocument.Parse(payloadJson);
-                PostRawEvent("runtime.snapshot", payloadJson);
+                _lastSnapshotDocument = JsonDocument.Parse(finalJson);
+                PostRawEvent("runtime.snapshot", finalJson);
+                PublishLogSources();
                 PublishBootstrapStateFromSnapshot();
+                PublishShellWindowState();
+                await PublishSelectedLogSourceAsync(force: true);
+                await PublishOfficeSnapshotAsync(force);
 
                 if (_actionBusy)
                 {
@@ -1231,6 +1562,1090 @@ internal sealed class RuntimeShellForm : Form
         {
             _snapshotInFlight = false;
         }
+    }
+
+    private void ApplyInitialShellWindowState()
+    {
+        var shellState = LoadShellWindowState();
+
+        _utilityPaneWidth = Math.Clamp(shellState?.UtilityPaneWidth ?? 400, 320, 640);
+        _selectedUtilityTab = NormalizeUtilityTab(shellState?.UtilityPaneTab);
+        _selectedLogSourceId = ResolveValidLogSourceId(shellState?.ActiveLogSourceId);
+
+        var workingArea = GetPreferredWorkingArea(shellState);
+        var initialBounds = ResolveInitialShellBounds(shellState, workingArea, MinimumSize);
+
+        StartPosition = FormStartPosition.Manual;
+        Bounds = initialBounds;
+        WindowState = shellState is not null &&
+            shellState.WindowState.Equals("Maximized", StringComparison.OrdinalIgnoreCase)
+                ? FormWindowState.Maximized
+                : FormWindowState.Normal;
+    }
+
+    private static System.Drawing.Rectangle GetPreferredWorkingArea(RuntimeShellWindowState? shellState)
+    {
+        if (shellState is not null && shellState.Width > 0 && shellState.Height > 0)
+        {
+            var center = new System.Drawing.Point(
+                shellState.Left + Math.Max(shellState.Width / 2, 0),
+                shellState.Top + Math.Max(shellState.Height / 2, 0));
+            return Screen.FromPoint(center).WorkingArea;
+        }
+
+        return Screen.FromPoint(Cursor.Position).WorkingArea;
+    }
+
+    private static System.Drawing.Rectangle ResolveInitialShellBounds(
+        RuntimeShellWindowState? shellState,
+        System.Drawing.Rectangle workingArea,
+        System.Drawing.Size minimumSize)
+    {
+        var defaultSize = new System.Drawing.Size(1560, 980);
+        var desiredBounds = shellState is not null && shellState.Width > 0 && shellState.Height > 0
+            ? new System.Drawing.Rectangle(shellState.Left, shellState.Top, shellState.Width, shellState.Height)
+            : CenterShellBoundsInWorkingArea(workingArea, defaultSize, minimumSize);
+
+        return ClampShellBoundsToWorkingArea(desiredBounds, workingArea, minimumSize);
+    }
+
+    private static System.Drawing.Rectangle CenterShellBoundsInWorkingArea(
+        System.Drawing.Rectangle workingArea,
+        System.Drawing.Size desiredSize,
+        System.Drawing.Size minimumSize)
+    {
+        var width = ClampShellDimension(desiredSize.Width, workingArea.Width, minimumSize.Width);
+        var height = ClampShellDimension(desiredSize.Height, workingArea.Height, minimumSize.Height);
+        var left = workingArea.Left + Math.Max((workingArea.Width - width) / 2, 0);
+        var top = workingArea.Top + Math.Max((workingArea.Height - height) / 2, 0);
+        return new System.Drawing.Rectangle(left, top, width, height);
+    }
+
+    private static System.Drawing.Rectangle ClampShellBoundsToWorkingArea(
+        System.Drawing.Rectangle bounds,
+        System.Drawing.Rectangle workingArea,
+        System.Drawing.Size minimumSize)
+    {
+        var width = ClampShellDimension(bounds.Width, workingArea.Width, minimumSize.Width);
+        var height = ClampShellDimension(bounds.Height, workingArea.Height, minimumSize.Height);
+        var maxLeft = Math.Max(workingArea.Left, workingArea.Right - width);
+        var maxTop = Math.Max(workingArea.Top, workingArea.Bottom - height);
+        var left = Math.Clamp(bounds.Left, workingArea.Left, maxLeft);
+        var top = Math.Clamp(bounds.Top, workingArea.Top, maxTop);
+        return new System.Drawing.Rectangle(left, top, width, height);
+    }
+
+    private static int ClampShellDimension(int desired, int available, int minimum)
+    {
+        if (available <= 0)
+        {
+            return Math.Max(desired, minimum);
+        }
+
+        if (desired <= 0)
+        {
+            desired = Math.Min(available, Math.Max(minimum, 1));
+        }
+
+        if (available < minimum)
+        {
+            return available;
+        }
+
+        return Math.Clamp(desired, minimum, available);
+    }
+
+    private RuntimeShellWindowState? LoadShellWindowState()
+    {
+        try
+        {
+            if (!File.Exists(_shellWindowStatePath))
+            {
+                return null;
+            }
+
+            var payload = File.ReadAllText(_shellWindowStatePath);
+            return JsonSerializer.Deserialize<RuntimeShellWindowState>(payload, JsonOptions);
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-window-state-load", exception);
+            return null;
+        }
+    }
+
+    private void PersistShellWindowState()
+    {
+        try
+        {
+            Directory.CreateDirectory(_runtimeStatusDirectory);
+            var bounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+            {
+                return;
+            }
+
+            var payload = new RuntimeShellWindowState
+            {
+                Left = bounds.Left,
+                Top = bounds.Top,
+                Width = bounds.Width,
+                Height = bounds.Height,
+                WindowState = WindowState == FormWindowState.Maximized ? "Maximized" : "Normal",
+                UtilityPaneWidth = Math.Clamp(_utilityPaneWidth, 320, 640),
+                UtilityPaneTab = NormalizeUtilityTab(_selectedUtilityTab),
+                ActiveLogSourceId = ResolveValidLogSourceId(_selectedLogSourceId),
+            };
+
+            File.WriteAllText(
+                _shellWindowStatePath,
+                JsonSerializer.Serialize(payload, JsonOptions));
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-window-state-save", exception);
+        }
+    }
+
+    private void ApplyWebViewDpiZoom()
+    {
+        try
+        {
+            var dpi = DeviceDpi > 0 ? DeviceDpi : 96;
+            var zoomFactor = Math.Clamp(96d / dpi, 0.4d, 1d);
+            if (Math.Abs(_webView.ZoomFactor - zoomFactor) > 0.001d)
+            {
+                _webView.ZoomFactor = zoomFactor;
+            }
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-webview-dpi-zoom", exception);
+        }
+    }
+
+    private void UpdateWebViewInset()
+    {
+        try
+        {
+            var topInset = Math.Max(SystemInformation.CaptionHeight, 24);
+            if (Padding.Top != topInset || Padding.Left != 0 || Padding.Right != 0 || Padding.Bottom != 0)
+            {
+                Padding = new Padding(0, topInset, 0, 0);
+            }
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-webview-inset", exception);
+        }
+    }
+
+    private async Task PublishOfficeSnapshotAsync(bool force = false)
+    {
+        if (_isClosing || (!_uiReady && !force))
+        {
+            return;
+        }
+
+        if (_officeSnapshotInFlight)
+        {
+            _officeSnapshotRefreshPending = true;
+            return;
+        }
+
+        if (!force &&
+            !string.IsNullOrWhiteSpace(_lastOfficeSnapshotJson) &&
+            (DateTimeOffset.UtcNow - _lastOfficeSnapshotPublishedAt) < TimeSpan.FromSeconds(30))
+        {
+            PostRawEvent("office.snapshot", _lastOfficeSnapshotJson);
+            return;
+        }
+
+        _officeSnapshotInFlight = true;
+        try
+        {
+            do
+            {
+                _officeSnapshotRefreshPending = false;
+                _lastOfficeSnapshotJson = await BuildOfficeSnapshotPayloadJsonAsync();
+                _lastOfficeSnapshotPublishedAt = DateTimeOffset.UtcNow;
+                PostRawEvent("office.snapshot", _lastOfficeSnapshotJson);
+            }
+            while (_officeSnapshotRefreshPending && !_isClosing);
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-office-snapshot", exception);
+            SendError("Office snapshot failed.", exception.Message);
+        }
+        finally
+        {
+            _officeSnapshotInFlight = false;
+        }
+    }
+
+    private static IReadOnlyList<string> CollectSnapshotNoiseLines(ProcessRunResult result)
+    {
+        var lines = new List<string>();
+        AddNoiseFromText(lines, result.StandardError);
+
+        if (!TryExtractJsonRegion(result.StandardOutput, out _, out var outputPrefix, out var outputSuffix))
+        {
+            AddNoiseFromText(lines, result.StandardOutput);
+        }
+        else
+        {
+            AddNoiseFromText(lines, outputPrefix);
+            AddNoiseFromText(lines, outputSuffix);
+        }
+
+        return lines
+            .Where(static line => !string.IsNullOrWhiteSpace(line))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static bool TryExtractStructuredJson(
+        ProcessRunResult result,
+        out string payloadJson,
+        out string? parseError)
+    {
+        payloadJson = string.Empty;
+        parseError = null;
+
+        if (TryExtractJsonRegion(result.StandardOutput, out payloadJson, out _, out _))
+        {
+            return true;
+        }
+
+        if (TryExtractJsonRegion(result.StandardError, out payloadJson, out _, out _))
+        {
+            return true;
+        }
+
+        if (TryExtractJsonRegion(result.CombinedOutput, out payloadJson, out _, out _))
+        {
+            return true;
+        }
+
+        parseError = !string.IsNullOrWhiteSpace(result.StandardError)
+            ? result.StandardError
+            : "The status script did not return JSON.";
+        return false;
+    }
+
+    private void PublishStaleSnapshot(string errorText)
+    {
+        var signature = errorText.Trim();
+        if (!string.IsNullOrWhiteSpace(_lastSnapshotJson))
+        {
+            var snapshotNode = JsonNode.Parse(_lastSnapshotJson) as JsonObject;
+            if (snapshotNode is not null)
+            {
+                snapshotNode["snapshotStale"] = true;
+                snapshotNode["snapshotError"] = TruncateMessage(errorText, 360);
+                snapshotNode["snapshotCheckedAt"] = DateTimeOffset.Now.ToString("o");
+                PostRawEvent("runtime.snapshot", snapshotNode.ToJsonString(JsonOptions));
+            }
+        }
+
+        if (!string.Equals(signature, _lastSnapshotFailureSignature, StringComparison.Ordinal))
+        {
+            _lastSnapshotFailureSignature = signature;
+            SendError("Runtime snapshot failed.", TruncateMessage(errorText, 360));
+        }
+    }
+
+    private async Task EnrichRuntimeSnapshotAsync(JsonObject payloadNode, bool force)
+    {
+        payloadNode["snapshotStale"] = false;
+        payloadNode["snapshotError"] = null;
+        payloadNode["snapshotCheckedAt"] = DateTimeOffset.Now.ToString("o");
+        _lastSupabaseStudioUrl = ResolveSupabaseStudioUrl(payloadNode);
+        payloadNode["dockerSummary"] = JsonSerializer.SerializeToNode(await BuildDockerSummaryAsync(payloadNode), JsonOptions);
+        payloadNode["logSources"] = JsonSerializer.SerializeToNode(BuildLogSources(), JsonOptions);
+        payloadNode["toolingSummary"] = JsonSerializer.SerializeToNode(BuildToolingSummary(), JsonOptions);
+        if (await BuildWorkstationContextNodeAsync(force) is JsonObject workstationContextNode)
+        {
+            payloadNode["workstationContext"] = workstationContextNode;
+        }
+
+        if (payloadNode["runtime"] is JsonObject runtimeNode)
+        {
+            runtimeNode["backendLogPath"] = _backendLogPath;
+            runtimeNode["gatewayLogPath"] = _gatewayLogPath;
+            runtimeNode["frontendLogPath"] = _frontendLogPath;
+            runtimeNode["runtimeLauncherLogPath"] = _runtimeLauncherLogPath;
+            runtimeNode["runtimeShellLogPath"] = _runtimeShellLogPath;
+            runtimeNode["officeBrokerLogPath"] = _officeBrokerLogPath;
+            runtimeNode["filesystemCollectorLogDir"] = _filesystemCollectorLogDir;
+            runtimeNode["autocadCollectorLogDir"] = _autocadCollectorLogDir;
+        }
+
+        if (payloadNode["support"] is JsonObject supportNode)
+        {
+            ApplySupportOverrides(supportNode);
+        }
+    }
+
+    private void ApplySupportOverrides(JsonObject supportNode)
+    {
+        if (supportNode["config"] is not JsonObject configNode)
+        {
+            return;
+        }
+
+        var officeConfig = ReadOfficeCompanionConfig();
+        configNode["stableSuiteRoot"] = _repoRoot;
+
+        var dailyRoot = TryGetJsonString(officeConfig, "dailyRoot")
+            ?? TryGetJsonString(officeConfig, "rootDirectory");
+        var officeExecutablePath = TryGetJsonString(officeConfig, "executablePath")
+            ?? TryGetJsonString(officeConfig, "officeExecutablePath");
+
+        if (!string.IsNullOrWhiteSpace(dailyRoot))
+        {
+            configNode["dailyRoot"] = dailyRoot;
+        }
+
+        if (!string.IsNullOrWhiteSpace(officeExecutablePath))
+        {
+            configNode["officeExecutablePath"] = officeExecutablePath;
+        }
+
+        if (supportNode["paths"] is JsonObject pathsNode)
+        {
+            pathsNode["backendLogPath"] = _backendLogPath;
+            pathsNode["gatewayLogPath"] = _gatewayLogPath;
+            pathsNode["runtimeLauncherLogPath"] = _runtimeLauncherLogPath;
+            pathsNode["runtimeShellLogPath"] = _runtimeShellLogPath;
+            pathsNode["officeBrokerLogPath"] = _officeBrokerLogPath;
+            pathsNode["filesystemCollectorLogDir"] = _filesystemCollectorLogDir;
+            pathsNode["autocadCollectorLogDir"] = _autocadCollectorLogDir;
+        }
+
+        if (supportNode["lines"] is JsonArray linesNode)
+        {
+            ReplaceSupportLine(linesNode, "Stable Suite root:", _repoRoot);
+            if (!string.IsNullOrWhiteSpace(dailyRoot))
+            {
+                ReplaceSupportLine(linesNode, "Daily root:", dailyRoot);
+            }
+
+            if (!string.IsNullOrWhiteSpace(officeExecutablePath))
+            {
+                ReplaceSupportLine(linesNode, "Office executable:", officeExecutablePath);
+            }
+        }
+    }
+
+    private JsonObject? ReadOfficeCompanionConfig()
+    {
+        try
+        {
+            var companionConfigPath = Path.Combine(_runtimeStatusDirectory, "companion-config", "office.json");
+            if (!File.Exists(companionConfigPath))
+            {
+                return null;
+            }
+
+            return JsonNode.Parse(File.ReadAllText(companionConfigPath)) as JsonObject;
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-office-companion-read", exception);
+            return null;
+        }
+    }
+
+    private async Task<JsonObject?> BuildWorkstationContextNodeAsync(bool force)
+    {
+        if (!force &&
+            _lastWorkstationContextNode is not null &&
+            (DateTimeOffset.Now - _lastWorkstationContextPublishedAt) < TimeSpan.FromSeconds(30))
+        {
+            return (JsonObject?)_lastWorkstationContextNode.DeepClone();
+        }
+
+        try
+        {
+            var result = await ProcessRunner.RunPowerShellFileAsync(
+                _workstationDoctorScriptPath,
+                _repoRoot,
+                new[] { "-RepoRoot", _repoRoot, "-SkipRuntimeStatus", "-Json" });
+
+            if (!TryExtractStructuredJson(result, out var payloadJson, out _))
+            {
+                return _lastWorkstationContextNode is null
+                    ? null
+                    : (JsonObject?)_lastWorkstationContextNode.DeepClone();
+            }
+
+            if (JsonNode.Parse(payloadJson) is not JsonObject payloadNode)
+            {
+                return _lastWorkstationContextNode is null
+                    ? null
+                    : (JsonObject?)_lastWorkstationContextNode.DeepClone();
+            }
+
+            var contextNode = new JsonObject
+            {
+                ["generatedAt"] = payloadNode["generatedAt"]?.DeepClone(),
+                ["workstation"] = payloadNode["workstation"]?.DeepClone(),
+                ["repoRoots"] = payloadNode["repoRoots"]?.DeepClone(),
+                ["shell"] = payloadNode["shell"]?.DeepClone(),
+                ["startupOwner"] = payloadNode["startupOwner"]?.DeepClone(),
+                ["dropbox"] = payloadNode["dropbox"]?.DeepClone(),
+                ["codex"] = payloadNode["codex"]?.DeepClone(),
+                ["envDrift"] = payloadNode["envDrift"]?.DeepClone(),
+                ["adminContinuity"] = payloadNode["adminContinuity"]?.DeepClone(),
+                ["runtimeCore"] = payloadNode["runtimeCore"]?.DeepClone(),
+            };
+
+            _lastWorkstationContextNode = (JsonObject?)contextNode.DeepClone();
+            _lastWorkstationContextPublishedAt = DateTimeOffset.Now;
+            return contextNode;
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-workstation-context", exception);
+            return _lastWorkstationContextNode is null
+                ? null
+                : (JsonObject?)_lastWorkstationContextNode.DeepClone();
+        }
+    }
+
+    private async Task<DockerObservabilitySummary> BuildDockerSummaryAsync(JsonObject payloadNode)
+    {
+        _lastSupabaseStudioUrl = ResolveSupabaseStudioUrl(payloadNode);
+        var containersTask = TryReadDockerContainersAsync();
+        var importantVolumesTask = TryReadDockerVolumesAsync();
+        await Task.WhenAll(containersTask, importantVolumesTask);
+        var containers = await containersTask;
+        var importantVolumes = await importantVolumesTask;
+        return new DockerObservabilitySummary
+        {
+            Available = true,
+            DockerDesktopHint = "Docker Desktop",
+            DockerDesktopPath = "shell:AppsFolder\\Docker.DockerDesktop",
+            SupabaseStudioUrl = _lastSupabaseStudioUrl,
+            Containers = containers,
+            ImportantVolumes = importantVolumes,
+        };
+    }
+
+    private async Task<IReadOnlyList<DockerContainerSummary>> TryReadDockerContainersAsync()
+    {
+        try
+        {
+            using var cancellationSource = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+            var result = await ProcessRunner.RunAsync(
+                "docker",
+                _repoRoot,
+                new[] { "ps", "-a", "--format", "{{json .}}" },
+                cancellationSource.Token);
+            if (!result.Succeeded && string.IsNullOrWhiteSpace(result.StandardOutput))
+            {
+                return Array.Empty<DockerContainerSummary>();
+            }
+
+            return result.StandardOutput
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(static line =>
+                {
+                    try
+                    {
+                        using var document = JsonDocument.Parse(line);
+                        var root = document.RootElement;
+                        return new DockerContainerSummary
+                        {
+                            Name = GetStringProperty(root, "Names") ?? "container",
+                            Image = GetStringProperty(root, "Image") ?? string.Empty,
+                            State = GetStringProperty(root, "State") ?? string.Empty,
+                            Status = GetStringProperty(root, "Status") ?? string.Empty,
+                            Ports = GetStringProperty(root, "Ports") ?? string.Empty,
+                            Health = InferContainerHealth(GetStringProperty(root, "Status")),
+                        };
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                })
+                .Where(static item => item is not null)
+                .Cast<DockerContainerSummary>()
+                .OrderBy(item => item.Name)
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<DockerContainerSummary>();
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> TryReadDockerVolumesAsync()
+    {
+        try
+        {
+            using var cancellationSource = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+            var result = await ProcessRunner.RunAsync(
+                "docker",
+                _repoRoot,
+                new[] { "volume", "ls", "--format", "{{.Name}}" },
+                cancellationSource.Token);
+            return result.StandardOutput
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(static line =>
+                    line.Contains("supabase", StringComparison.OrdinalIgnoreCase)
+                    || line.Contains("suite", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(static item => item)
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private string ResolveSupabaseStudioUrl(JsonObject payloadNode)
+    {
+        try
+        {
+            if (payloadNode["services"] is not JsonArray servicesNode)
+            {
+                return "http://127.0.0.1:54323";
+            }
+
+            foreach (var serviceNode in servicesNode)
+            {
+                if (serviceNode is not JsonObject service
+                    || !string.Equals(service["id"]?.GetValue<string>(), "supabase", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var portValue = TryGetServiceNoteValue(service, "Studio")
+                    ?? TryGetServiceNoteValue(service, "Port")
+                    ?? "54323";
+                var studioPort = new string(portValue.Where(char.IsDigit).ToArray());
+                return string.IsNullOrWhiteSpace(studioPort)
+                    ? "http://127.0.0.1:54323"
+                    : $"http://127.0.0.1:{studioPort}";
+            }
+        }
+        catch
+        {
+        }
+
+        return "http://127.0.0.1:54323";
+    }
+
+    private ToolingSummary BuildToolingSummary()
+    {
+        return new ToolingSummary
+        {
+            ActiveMcpServers = LoadCodexMcpServerIds(),
+            RecommendedSkills =
+            [
+                "playwright-interactive",
+                "pdf",
+                "doc",
+                "slides",
+                "spreadsheet",
+                "transcribe",
+            ],
+        };
+    }
+
+    private IReadOnlyList<string> LoadCodexMcpServerIds()
+    {
+        try
+        {
+            var configPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".codex",
+                "config.toml");
+            if (!File.Exists(configPath))
+            {
+                return Array.Empty<string>();
+            }
+
+            return File.ReadLines(configPath)
+                .Select(static line => line.Trim())
+                .Where(static line => line.StartsWith("[mcp_servers.", StringComparison.Ordinal))
+                .Select(static line => line.Replace("[mcp_servers.", string.Empty).TrimEnd(']'))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(static item => item)
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private static string InferContainerHealth(string? statusText)
+    {
+        if (string.IsNullOrWhiteSpace(statusText))
+        {
+            return "unknown";
+        }
+
+        if (statusText.Contains("Restarting", StringComparison.OrdinalIgnoreCase))
+        {
+            return "restarting";
+        }
+
+        if (statusText.Contains("healthy", StringComparison.OrdinalIgnoreCase))
+        {
+            return "healthy";
+        }
+
+        if (statusText.Contains("unhealthy", StringComparison.OrdinalIgnoreCase))
+        {
+            return "unhealthy";
+        }
+
+        if (statusText.Contains("Up", StringComparison.OrdinalIgnoreCase))
+        {
+            return "running";
+        }
+
+        return "stopped";
+    }
+
+    private static void ReplaceSupportLine(JsonArray linesNode, string prefix, string newValue)
+    {
+        for (var index = 0; index < linesNode.Count; index += 1)
+        {
+            if (linesNode[index]?.GetValue<string>()?.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) == true)
+            {
+                linesNode[index] = $"{prefix} {newValue}";
+            }
+        }
+    }
+
+    private static void AddNoiseFromText(ICollection<string> lines, string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        foreach (var line in text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            lines.Add(line.Trim());
+        }
+    }
+
+    private static bool TryExtractJsonRegion(
+        string? text,
+        out string json,
+        out string prefix,
+        out string suffix)
+    {
+        json = string.Empty;
+        prefix = string.Empty;
+        suffix = string.Empty;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var start = text.IndexOf('{');
+        var end = text.LastIndexOf('}');
+        if (start < 0 || end <= start)
+        {
+            return false;
+        }
+
+        json = text[start..(end + 1)].Trim();
+        prefix = text[..start].Trim();
+        suffix = text[(end + 1)..].Trim();
+        return true;
+    }
+
+    private static string? TryGetJsonString(JsonObject? node, string propertyName)
+    {
+        return node?[propertyName]?.GetValue<string>();
+    }
+
+    private static string TruncateMessage(string value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length <= maxLength)
+        {
+            return value;
+        }
+
+        return $"{value[..maxLength].Trim()}...";
+    }
+
+    private async Task<string> BuildOfficeSnapshotPayloadJsonAsync()
+    {
+        var fallbackSnapshot = await OfficeWorkspaceSnapshotBuilder.BuildAsync(_repoRoot);
+        var payloadNode = JsonSerializer.SerializeToNode(fallbackSnapshot, JsonOptions) as JsonObject ?? new JsonObject();
+        payloadNode["schemaVersion"] = "suite.operator-shell.office.v2";
+        payloadNode["generatedAt"] = DateTimeOffset.Now.ToString("o");
+
+        var brokerConfiguration = OfficeBrokerConfigResolver.Resolve(_repoRoot);
+        var healthResult = await _officeBrokerClient.GetHealthAsync(brokerConfiguration);
+        var stateResult = await _officeBrokerClient.GetStateAsync(brokerConfiguration);
+        if (brokerConfiguration.Enabled && !stateResult.Success)
+        {
+            var started = await EnsureOfficeBrokerRunningAsync(brokerConfiguration, restart: false, forceLaunch: false);
+            if (started)
+            {
+                await Task.Delay(900);
+                healthResult = await _officeBrokerClient.GetHealthAsync(brokerConfiguration);
+                stateResult = await _officeBrokerClient.GetStateAsync(brokerConfiguration);
+            }
+        }
+        var brokerNode = BuildBrokerSnapshotNode(brokerConfiguration, healthResult, stateResult);
+        payloadNode["broker"] = brokerNode;
+        payloadNode["source"] = stateResult.Success ? "broker" : "snapshot";
+        payloadNode["liveState"] = null;
+
+        if (!stateResult.Success || string.IsNullOrWhiteSpace(stateResult.ResponseJson))
+        {
+            return payloadNode.ToJsonString(JsonOptions);
+        }
+
+        try
+        {
+            var liveStateNode = JsonNode.Parse(stateResult.ResponseJson);
+            payloadNode["liveState"] = liveStateNode;
+            if (liveStateNode is JsonObject liveStateObject)
+            {
+                MergeLiveOfficeSections(payloadNode, liveStateObject);
+            }
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-office-state-parse", exception);
+            payloadNode["source"] = "snapshot";
+            payloadNode["liveState"] = null;
+            payloadNode["broker"] = BuildBrokerSnapshotNode(
+                brokerConfiguration,
+                healthResult,
+                OfficeBrokerRequestResult.HttpFailure(
+                    statusCode: stateResult.StatusCode,
+                    requestUri: stateResult.RequestUri,
+                    error: "Office broker state payload could not be parsed."));
+        }
+
+        return payloadNode.ToJsonString(JsonOptions);
+    }
+
+    private static JsonObject BuildBrokerSnapshotNode(
+        OfficeBrokerConfiguration configuration,
+        OfficeBrokerRequestResult health,
+        OfficeBrokerRequestResult state)
+    {
+        var errorMessage = state.Error ?? health.Error;
+        return new JsonObject
+        {
+            ["enabled"] = configuration.Enabled,
+            ["configExists"] = configuration.ConfigExists,
+            ["configPath"] = configuration.ConfigPath,
+            ["baseUrl"] = configuration.BaseUrl,
+            ["healthPath"] = configuration.HealthPath,
+            ["statePath"] = configuration.StatePath,
+            ["publishPath"] = configuration.PublishPath,
+            ["healthy"] = health.Success,
+            ["reachable"] = health.BrokerReachable || state.BrokerReachable,
+            ["stateAvailable"] = state.Success,
+            ["lastCheckedAt"] = DateTimeOffset.Now.ToString("o"),
+            ["requestUri"] = state.RequestUri ?? health.RequestUri,
+            ["statusCode"] = state.StatusCode ?? health.StatusCode,
+            ["lastError"] = string.IsNullOrWhiteSpace(errorMessage) ? null : errorMessage,
+        };
+    }
+
+    private static void MergeLiveOfficeSections(JsonObject target, JsonObject source)
+    {
+        foreach (var key in new[] { "provider", "suite", "chat", "study", "library", "growth", "inbox", "research", "suiteContext", "suggestedMoves", "context" })
+        {
+            if (source.TryGetPropertyValue(key, out var value) && value is not null)
+            {
+                target[key] = value.DeepClone();
+            }
+        }
+
+        if (source.TryGetPropertyValue("workspaceTitle", out var workspaceTitle) && workspaceTitle is not null)
+        {
+            target["title"] = workspaceTitle.DeepClone();
+        }
+    }
+
+    private async Task HandleOfficeBrokerMessageAsync(string messageType, JsonElement? payload)
+    {
+        try
+        {
+            var brokerConfiguration = OfficeBrokerConfigResolver.Resolve(_repoRoot);
+            if (brokerConfiguration.Enabled)
+            {
+                var health = await _officeBrokerClient.GetHealthAsync(brokerConfiguration);
+                if (!health.Success)
+                {
+                    var started = await EnsureOfficeBrokerRunningAsync(brokerConfiguration, restart: false, forceLaunch: false);
+                    if (started)
+                    {
+                        await Task.Delay(900);
+                    }
+                }
+            }
+            var result = await _officeBrokerClient.SendMessageAsync(
+                brokerConfiguration,
+                messageType,
+                payload);
+
+            if (result.Success)
+            {
+                SendLog("OK", $"Office broker action completed: {messageType}.", "ok");
+                PostEvent("office.action.result", new
+                {
+                    messageType,
+                    ok = true,
+                    statusCode = result.StatusCode,
+                    brokerReachable = result.BrokerReachable,
+                    details = (string?)null,
+                });
+                await PublishOfficeSnapshotAsync(force: true);
+                return;
+            }
+
+            var details = result.Error ?? "Office broker action was not completed.";
+            if (result.Unsupported)
+            {
+                SendLog("WARN", details, "warn");
+            }
+            else if (!result.BrokerReachable)
+            {
+                SendLog("WARN", $"Office broker is unavailable. Falling back to snapshot-only mode. {details}".Trim(), "warn");
+            }
+            else
+            {
+                SendLog("WARN", $"Office broker action failed: {messageType}. {details}".Trim(), "warn");
+            }
+
+            PostEvent("office.action.result", new
+            {
+                messageType,
+                ok = false,
+                statusCode = result.StatusCode,
+                brokerReachable = result.BrokerReachable,
+                details,
+            });
+            await PublishOfficeSnapshotAsync(force: true);
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-office-broker-action", exception);
+            SendError("Office broker action failed.", exception.Message);
+        }
+    }
+
+    private async Task RunOfficeBrokerLifecycleAsync(bool restart)
+    {
+        var actionName = restart ? "office.broker.restart" : "office.broker.start";
+        if (!TryBeginAction(actionName, null))
+        {
+            return;
+        }
+
+        try
+        {
+            var configuration = OfficeBrokerConfigResolver.Resolve(_repoRoot);
+            if (!configuration.Enabled)
+            {
+                SendLog("WARN", "Office broker is disabled in local companion config.", "warn");
+                return;
+            }
+
+            var started = await EnsureOfficeBrokerRunningAsync(configuration, restart, forceLaunch: true);
+            await Task.Delay(started ? 900 : 200);
+            await PublishOfficeSnapshotAsync(force: true);
+
+            var health = await _officeBrokerClient.GetHealthAsync(configuration);
+            if (health.Success)
+            {
+                SendLog("OK", restart ? "Office broker restarted." : "Office broker is available.", "ok");
+                return;
+            }
+
+            var warningText = !string.IsNullOrWhiteSpace(health.Error)
+                ? health.Error
+                : restart
+                    ? "Office broker restart was requested, but health is still not green."
+                    : "Office broker start was requested, but health is still not green.";
+            SendLog(
+                "WARN",
+                warningText,
+                "warn");
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-office-broker-lifecycle", exception);
+            SendError(restart ? "Office broker restart failed." : "Office broker start failed.", exception.Message);
+        }
+        finally
+        {
+            EndAction();
+        }
+    }
+
+    private async Task<bool> EnsureOfficeBrokerRunningAsync(
+        OfficeBrokerConfiguration configuration,
+        bool restart,
+        bool forceLaunch)
+    {
+        if (!configuration.Enabled)
+        {
+            return false;
+        }
+
+        if (!forceLaunch &&
+            !restart &&
+            (DateTimeOffset.UtcNow - _lastOfficeBrokerLaunchAttemptAt) < TimeSpan.FromSeconds(12))
+        {
+            return false;
+        }
+
+        var executablePath = ResolveOfficeBrokerExecutablePath(configuration);
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            return false;
+        }
+
+        if (restart)
+        {
+            StopOfficeBrokerProcesses(executablePath);
+        }
+        else if (IsOfficeBrokerRunning(executablePath))
+        {
+            return false;
+        }
+
+        _lastOfficeBrokerLaunchAttemptAt = DateTimeOffset.UtcNow;
+        StartOfficeBrokerProcess(executablePath);
+        await Task.CompletedTask;
+        return true;
+    }
+
+    private static string? ResolveOfficeBrokerExecutablePath(OfficeBrokerConfiguration configuration)
+    {
+        if (string.IsNullOrWhiteSpace(configuration.PublishPath))
+        {
+            return null;
+        }
+
+        if (File.Exists(configuration.PublishPath))
+        {
+            return configuration.PublishPath;
+        }
+
+        if (!Directory.Exists(configuration.PublishPath))
+        {
+            return null;
+        }
+
+        var candidates = new[]
+        {
+            Path.Combine(configuration.PublishPath, "DailyDesk.Broker.exe"),
+            Path.Combine(configuration.PublishPath, "DailyDesk.Broker.dll"),
+        };
+
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static bool IsOfficeBrokerRunning(string executablePath)
+    {
+        var expectedPath = Path.GetFullPath(executablePath);
+        var processName = Path.GetFileNameWithoutExtension(expectedPath);
+        foreach (var process in Process.GetProcessesByName(processName))
+        {
+            try
+            {
+                if (string.Equals(process.MainModule?.FileName, expectedPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // Ignore inaccessible process metadata and continue checking other candidates.
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        return false;
+    }
+
+    private static void StopOfficeBrokerProcesses(string executablePath)
+    {
+        var expectedPath = Path.GetFullPath(executablePath);
+        var processName = Path.GetFileNameWithoutExtension(expectedPath);
+        foreach (var process in Process.GetProcessesByName(processName))
+        {
+            try
+            {
+                if (!string.Equals(process.MainModule?.FileName, expectedPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(4000);
+            }
+            catch
+            {
+                // Ignore stop failures here; a fresh launch attempt still happens after this.
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    private void StartOfficeBrokerProcess(string executablePath)
+    {
+        var fullPath = Path.GetFullPath(executablePath);
+        var workingDirectory = Path.GetDirectoryName(fullPath) ?? _repoRoot;
+        Directory.CreateDirectory(_runtimeStatusDirectory);
+        var redirectTarget = "'" + _officeBrokerLogPath.Replace("'", "''") + "'";
+        ProcessStartInfo startInfo;
+
+        if (fullPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        {
+            var launchCommand = $"& dotnet '{fullPath.Replace("'", "''")}' *>> {redirectTarget}";
+            startInfo = new ProcessStartInfo
+            {
+                FileName = "PowerShell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"{launchCommand}\"",
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+            };
+        }
+        else
+        {
+            var launchCommand = $"& '{fullPath.Replace("'", "''")}' *>> {redirectTarget}";
+            startInfo = new ProcessStartInfo
+            {
+                FileName = "PowerShell.exe",
+                Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"{launchCommand}\"",
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+            };
+        }
+
+        Process.Start(startInfo);
+        SendLog("INFO", $"Office broker start requested from {workingDirectory}.", "info");
     }
 
     private void PublishProgressFromSnapshot()
@@ -1387,6 +2802,388 @@ internal sealed class RuntimeShellForm : Form
             LogTargetTarget: TryGetNestedStringProperty(root, "logTarget", "target"));
     }
 
+    private async Task FocusLogSourceAsync(string serviceId, string? explicitTarget)
+    {
+        var sourceId = ResolveLogSourceId(serviceId, explicitTarget);
+        await SelectLogSourceAsync(sourceId, fromServiceAction: true);
+    }
+
+    private async Task SelectLogSourceAsync(string? sourceId, bool fromServiceAction)
+    {
+        _selectedLogSourceId = ResolveValidLogSourceId(sourceId);
+        _selectedUtilityTab = "logs";
+        PersistShellWindowState();
+        PublishShellWindowState();
+        await PublishSelectedLogSourceAsync(force: true);
+
+        if (fromServiceAction)
+        {
+            PostEvent("runtime.log_focus", new
+            {
+                sourceId = _selectedLogSourceId,
+                utilityTab = _selectedUtilityTab,
+            });
+        }
+    }
+
+    private async Task PublishSelectedLogSourceAsync(bool force = false)
+    {
+        if (_isClosing || !_uiReady)
+        {
+            return;
+        }
+
+        var sources = BuildLogSources();
+        var source = sources.FirstOrDefault(item =>
+            item.Id.Equals(_selectedLogSourceId, StringComparison.OrdinalIgnoreCase))
+            ?? sources.First();
+
+        _selectedLogSourceId = source.Id;
+        _selectedLogSourcePath = source.Path ?? string.Empty;
+        PublishLogSources();
+
+        if (string.Equals(source.Id, "transcript", StringComparison.OrdinalIgnoreCase))
+        {
+            PublishLogView(source, Array.Empty<string>(), force, stale: false);
+            return;
+        }
+
+        if (string.Equals(source.Kind, "url", StringComparison.OrdinalIgnoreCase))
+        {
+            PublishLogView(
+                source,
+                new[]
+                {
+                    $"External surface: {source.Path}",
+                    "Use Open external to launch the linked UI outside the operator shell.",
+                },
+                force,
+                stale: false);
+            return;
+        }
+
+        var lines = await Task.Run(() => ReadLogTail(source.Path, 320));
+        PublishLogView(source, lines, force, stale: false);
+    }
+
+    private async Task OpenSelectedLogSourceExternallyAsync(string? sourceId)
+    {
+        var source = BuildLogSources().FirstOrDefault(item =>
+            item.Id.Equals(ResolveValidLogSourceId(sourceId), StringComparison.OrdinalIgnoreCase));
+        if (source is null)
+        {
+            SendError("Open logs failed.", "Requested log source was not found.");
+            return;
+        }
+
+        if (string.Equals(source.Kind, "virtual", StringComparison.OrdinalIgnoreCase))
+        {
+            SendLog("WARN", "The shell transcript lives inside the operator shell and has no external file target.", "warn");
+            return;
+        }
+
+        if (string.Equals(source.Kind, "url", StringComparison.OrdinalIgnoreCase))
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = source.Path!,
+                UseShellExecute = true,
+            });
+            SendLog("SYS", $"Opened {source.Label}.", "sys");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(source.Path))
+        {
+            SendError("Open logs failed.", $"No external path is available for {source.Label}.");
+            return;
+        }
+
+        if (File.Exists(source.Path))
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "notepad.exe",
+                Arguments = $"\"{source.Path}\"",
+                UseShellExecute = true,
+            });
+            SendLog("SYS", $"Opened {source.Label}.", "sys");
+            return;
+        }
+
+        if (Directory.Exists(source.Path))
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{source.Path}\"",
+                UseShellExecute = true,
+            });
+            SendLog("SYS", $"Opened {source.Label}.", "sys");
+            return;
+        }
+
+        SendError("Open logs failed.", $"The selected log source path is missing: {source.Path}");
+    }
+
+    private void PublishShellWindowState()
+    {
+        var payload = new
+        {
+            utilityPaneWidth = Math.Clamp(_utilityPaneWidth, 320, 640),
+            activeUtilityTab = NormalizeUtilityTab(_selectedUtilityTab),
+            utilityPaneTab = NormalizeUtilityTab(_selectedUtilityTab),
+            activeLogSourceId = ResolveValidLogSourceId(_selectedLogSourceId),
+        };
+        PostEvent("shell.window_state", payload);
+        PostEvent("shell.preferences", payload);
+    }
+
+    private void UpdateShellPreferences(JsonElement? payload)
+    {
+        if (!payload.HasValue || payload.Value.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        if (payload.Value.TryGetProperty("utilityPaneWidth", out var widthElement)
+            && widthElement.ValueKind == JsonValueKind.Number
+            && widthElement.TryGetInt32(out var utilityPaneWidth))
+        {
+            _utilityPaneWidth = Math.Clamp(utilityPaneWidth, 320, 640);
+        }
+
+        if (payload.Value.TryGetProperty("utilityPaneTab", out var tabElement)
+            && tabElement.ValueKind == JsonValueKind.String)
+        {
+            _selectedUtilityTab = NormalizeUtilityTab(tabElement.GetString());
+        }
+        else if (payload.Value.TryGetProperty("activeUtilityTab", out var activeTabElement)
+            && activeTabElement.ValueKind == JsonValueKind.String)
+        {
+            _selectedUtilityTab = NormalizeUtilityTab(activeTabElement.GetString());
+        }
+
+        if (payload.Value.TryGetProperty("activeLogSourceId", out var activeLogSourceElement)
+            && activeLogSourceElement.ValueKind == JsonValueKind.String)
+        {
+            _selectedLogSourceId = ResolveValidLogSourceId(activeLogSourceElement.GetString());
+        }
+
+        PersistShellWindowState();
+        PublishShellWindowState();
+        _ = PublishSelectedLogSourceAsync(force: true);
+    }
+
+    private void CopyTextToClipboard(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(text);
+            SendLog("SYS", "Copied selection to clipboard.", "sys");
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-copy-text", exception);
+            SendError("Clipboard copy failed.", exception.Message);
+        }
+    }
+
+    private string ResolveValidLogSourceId(string? sourceId)
+    {
+        var normalized = string.IsNullOrWhiteSpace(sourceId) ? "transcript" : sourceId.Trim();
+        return KnownLogSourceIds.Contains(normalized)
+            ? normalized
+            : "transcript";
+    }
+
+    private string ResolveLogSourceId(string serviceId, string? explicitTarget)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitTarget))
+        {
+            var exactMatch = BuildLogSources().FirstOrDefault(item =>
+                string.Equals(item.Path, explicitTarget, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch is not null)
+            {
+                return exactMatch.Id;
+            }
+        }
+
+        return serviceId switch
+        {
+            "supabase" => "docker",
+            "frontend" => "frontend",
+            "backend" => "backend",
+            "gateway" => "gateway",
+            "watchdog-filesystem" => "filesystem-collector",
+            "watchdog-autocad" => "autocad-collector",
+            _ => "transcript",
+        };
+    }
+
+    private void PublishLogSources()
+    {
+        PostEvent("runtime.log_sources", new
+        {
+            sources = BuildLogSources(),
+        });
+    }
+
+    private void PublishLogView(
+        RuntimeLogSourceDescriptor source,
+        IReadOnlyList<string> lines,
+        bool force,
+        bool stale)
+    {
+        var body = lines.Count == 0 ? string.Empty : string.Join(Environment.NewLine, lines);
+        var payload = new
+        {
+            sourceId = source.Id,
+            id = source.Id,
+            label = source.Label,
+            kind = source.Kind,
+            path = source.Path,
+            target = source.Path,
+            exists = source.Exists,
+            updatedAt = DateTimeOffset.Now.ToString("o"),
+            lines,
+            body,
+            text = body,
+            forced = force,
+            stale,
+        };
+        PostEvent("runtime.log_view", payload);
+        PostEvent("runtime.log_source", payload);
+    }
+
+    private IReadOnlyList<RuntimeLogSourceDescriptor> BuildLogSources()
+    {
+        var sources = new List<RuntimeLogSourceDescriptor>
+        {
+            new()
+            {
+                Id = "transcript",
+                Label = "Shell Transcript",
+                Kind = "virtual",
+                Description = "Action and status events emitted inside the operator shell.",
+                Exists = true,
+            },
+            BuildFileLogSource("bootstrap", "Bootstrap Runtime", _runtimeLogPath, "Bootstrap and runtime startup transcript."),
+            BuildFileLogSource("runtime-launcher", "Runtime Launcher", _runtimeLauncherLogPath, "Runtime launcher and staging decisions."),
+            BuildFileLogSource("runtime-shell", "Runtime Shell", _runtimeShellLogPath, "Desktop host and WebView bridge log."),
+            BuildFileLogSource("frontend", "Suite Frontend", _frontendLogPath, "Frontend dev shell output."),
+            BuildFileLogSource("backend", "Watchdog Backend", _backendLogPath, "Backend API and runtime jobs."),
+            BuildFileLogSource("gateway", "API Gateway", _gatewayLogPath, "Suite-native gateway output."),
+            BuildFileLogSource("office-broker", "Office Broker", _officeBrokerLogPath, "Live Office broker process output."),
+            BuildFileLogSource("filesystem-collector", "Filesystem Collector", ResolveNewestLogFile(_filesystemCollectorLogDir), "Filesystem collector daemon log."),
+            BuildFileLogSource("autocad-collector", "AutoCAD Collector", ResolveNewestLogFile(_autocadCollectorLogDir), "AutoCAD collector daemon log."),
+        };
+
+        if (!string.IsNullOrWhiteSpace(_lastSupabaseStudioUrl))
+        {
+            sources.Add(new RuntimeLogSourceDescriptor
+            {
+                Id = "docker",
+                Label = "Supabase Studio",
+                Kind = "url",
+                Path = _lastSupabaseStudioUrl,
+                Description = "Read-only jump to local Supabase Studio.",
+                Exists = true,
+            });
+        }
+
+        return sources;
+    }
+
+    private static RuntimeLogSourceDescriptor BuildFileLogSource(
+        string id,
+        string label,
+        string? path,
+        string description)
+    {
+        var exists = !string.IsNullOrWhiteSpace(path) && (File.Exists(path) || Directory.Exists(path));
+        return new RuntimeLogSourceDescriptor
+        {
+            Id = id,
+            Label = label,
+            Kind = "file",
+            Path = path,
+            Description = description,
+            Exists = exists,
+        };
+    }
+
+    private static string ResolveNewestLogFile(string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath) || !Directory.Exists(directoryPath))
+        {
+            return directoryPath;
+        }
+
+        var newest = new DirectoryInfo(directoryPath)
+            .EnumerateFiles("*.log", SearchOption.TopDirectoryOnly)
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .FirstOrDefault();
+        return newest?.FullName ?? directoryPath;
+    }
+
+    private static string[] ReadLogTail(string? path, int lineLimit)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return ["No log path reported yet."];
+            }
+
+            if (Directory.Exists(path))
+            {
+                return new[] { $"Directory: {path}" }
+                    .Concat(new DirectoryInfo(path)
+                        .EnumerateFiles("*.log", SearchOption.TopDirectoryOnly)
+                        .OrderByDescending(file => file.LastWriteTimeUtc)
+                        .Take(12)
+                        .Select(file => $"{file.LastWriteTime:yyyy-MM-dd HH:mm:ss} | {file.Name}"))
+                    .ToArray();
+            }
+
+            if (!File.Exists(path))
+            {
+                return [$"Log path is not available yet: {path}"];
+            }
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            return reader
+                .ReadToEnd()
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+                .TakeLast(Math.Max(40, lineLimit))
+                .ToArray();
+        }
+        catch (IOException exception)
+        {
+            var label = string.IsNullOrWhiteSpace(path) ? "log source" : Path.GetFileName(path);
+            return
+            [
+                $"Log source is currently busy: {label}",
+                exception.Message,
+            ];
+        }
+        catch (Exception exception)
+        {
+            return
+            [
+                $"Log source could not be read: {path}",
+                exception.Message,
+            ];
+        }
+    }
+
     private void EmitInitialRuntimeLogTail()
     {
         try
@@ -1440,6 +3237,7 @@ internal sealed class RuntimeShellForm : Form
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             var text = reader.ReadToEnd();
             _runtimeLogOffset = currentLength;
+            _lastRuntimeLogReadFailureSignature = null;
 
             foreach (var line in text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
             {
@@ -1449,8 +3247,18 @@ internal sealed class RuntimeShellForm : Form
                 }
             }
         }
+        catch (IOException exception)
+        {
+            var signature = exception.Message.Trim();
+            if (!string.Equals(signature, _lastRuntimeLogReadFailureSignature, StringComparison.Ordinal))
+            {
+                _lastRuntimeLogReadFailureSignature = signature;
+                RuntimeShellLogger.Log($"runtime-shell-pump-log-busy: {signature}");
+            }
+        }
         catch (Exception exception)
         {
+            _lastRuntimeLogReadFailureSignature = null;
             RuntimeShellLogger.LogException("runtime-shell-pump-log", exception);
         }
     }
@@ -1660,52 +3468,89 @@ internal sealed class RuntimeShellForm : Form
 
     private static string? GetPayloadServiceId(JsonElement root)
     {
-        if (!root.TryGetProperty("payload", out var payload))
+        var payload = GetPayload(root);
+        if (!payload.HasValue)
         {
             return null;
         }
 
-        return GetStringProperty(payload, "serviceId");
+        return GetStringProperty(payload.Value, "serviceId");
     }
 
     private static string? GetPayloadRouteId(JsonElement root)
     {
-        if (!root.TryGetProperty("payload", out var payload))
+        var payload = GetPayload(root);
+        if (!payload.HasValue)
         {
             return null;
         }
 
-        return GetStringProperty(payload, "routeId");
+        return GetStringProperty(payload.Value, "routeId");
     }
 
     private static string? GetPayloadRoutePath(JsonElement root)
     {
-        if (!root.TryGetProperty("payload", out var payload))
+        var payload = GetPayload(root);
+        if (!payload.HasValue)
         {
             return null;
         }
 
-        return GetStringProperty(payload, "routePath");
+        return GetStringProperty(payload.Value, "routePath");
     }
 
     private static string? GetPayloadCompanionAppId(JsonElement root)
     {
-        if (!root.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
+        var payload = GetPayload(root);
+        if (!payload.HasValue || payload.Value.ValueKind != JsonValueKind.Object)
         {
             return null;
         }
 
-        return GetStringProperty(payload, "companionAppId");
+        return GetStringProperty(payload.Value, "companionAppId");
+    }
+
+    private static string? GetPayloadPath(JsonElement root)
+    {
+        var payload = GetPayload(root);
+        if (!payload.HasValue || payload.Value.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return GetStringProperty(payload.Value, "path");
+    }
+
+    private static string? GetPayloadString(JsonElement root, string propertyName)
+    {
+        var payload = GetPayload(root);
+        if (!payload.HasValue || payload.Value.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return GetStringProperty(payload.Value, propertyName);
     }
 
     private static string? GetPayloadRouteTitle(JsonElement root)
+    {
+        var payload = GetPayload(root);
+        if (!payload.HasValue)
+        {
+            return null;
+        }
+
+        return GetStringProperty(payload.Value, "routeTitle");
+    }
+
+    private static JsonElement? GetPayload(JsonElement root)
     {
         if (!root.TryGetProperty("payload", out var payload))
         {
             return null;
         }
 
-        return GetStringProperty(payload, "routeTitle");
+        return payload.Clone();
     }
 
     private static string? TryGetServiceNoteValue(JsonElement service, string noteLabel)
@@ -1733,6 +3578,42 @@ internal sealed class RuntimeShellForm : Form
         }
 
         return null;
+    }
+
+    private static string? TryGetServiceNoteValue(JsonObject service, string noteLabel)
+    {
+        if (service["notes"] is not JsonArray notes || string.IsNullOrWhiteSpace(noteLabel))
+        {
+            return null;
+        }
+
+        foreach (var noteNode in notes)
+        {
+            if (noteNode is not JsonObject note)
+            {
+                continue;
+            }
+
+            var label = note["label"]?.GetValue<string>();
+            if (!string.Equals(label, noteLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return note["value"]?.GetValue<string>();
+        }
+
+        return null;
+    }
+
+    private static string NormalizeUtilityTab(string? utilityTab)
+    {
+        return utilityTab?.Trim().ToLowerInvariant() switch
+        {
+            "logs" => "logs",
+            "inbox" => "inbox",
+            _ => "context",
+        };
     }
 
     private bool TryFindService(JsonElement root, string serviceId, out JsonElement service)
@@ -1947,6 +3828,11 @@ internal sealed class RuntimeShellForm : Form
     {
         _isClosing = true;
         _pollTimer.Stop();
+        _instanceCoordinator.ReportPhase(
+            RuntimeShellPhases.Closing,
+            activatable: false,
+            statusMessage: "Shell window is closing.");
+        PersistShellWindowState();
     }
 
     private void OnFormClosed(object? sender, FormClosedEventArgs eventArgs)

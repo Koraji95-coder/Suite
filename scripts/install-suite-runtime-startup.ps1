@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$TaskName = "SuiteRuntimeBootstrap",
-    [bool]$RunNow = $true,
+    [object]$RunNow = $true,
     [switch]$Headless
 )
 
@@ -15,31 +15,16 @@ $startupLauncherScript = if ($Headless) {
 else {
     (Resolve-Path (Join-Path $PSScriptRoot "launch-suite-runtime-control.vbs")).Path
 }
-$runtimeControlExecutable = Join-Path $repoRoot "dotnet\Suite.RuntimeControl\bin\Debug\net8.0-windows\Suite.RuntimeControl.exe"
-$useDirectDesktopShell = (-not $Headless) -and (Test-Path $runtimeControlExecutable)
 $userId = if ($env:USERDOMAIN) { "$($env:USERDOMAIN)\$($env:USERNAME)" } else { $env:USERNAME }
 $startupMode = if ($Headless) {
     "headless"
 }
-elseif ($useDirectDesktopShell) {
-    "desktop_shell_direct"
-}
 else {
-    "desktop_shell"
+    "login_orchestrator"
 }
-$actionExecute = if ($useDirectDesktopShell) { $runtimeControlExecutable } else { "WScript.exe" }
-$actionArgs = if ($useDirectDesktopShell) {
-    "--repo-root `"$repoRoot`" --auto-bootstrap"
-}
-else {
-    "`"$startupLauncherScript`""
-}
-$actionWorkingDirectory = if ($useDirectDesktopShell) {
-    Split-Path -Parent $runtimeControlExecutable
-}
-else {
-    $null
-}
+$actionExecute = "WScript.exe"
+$actionArgs = "`"$startupLauncherScript`""
+$actionWorkingDirectory = $null
 $statusBase = if ($env:LOCALAPPDATA) {
     $env:LOCALAPPDATA
 }
@@ -53,26 +38,94 @@ $statusRoot = Join-Path $statusBase "Suite\runtime-bootstrap"
 $runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
 . $runtimeSharedScript
 
-function Invoke-BootstrapNow {
-    if ($useDirectDesktopShell) {
-        Start-Process `
-            -FilePath $runtimeControlExecutable `
-            -WorkingDirectory $actionWorkingDirectory `
-            -ArgumentList @("--repo-root", $repoRoot, "--auto-bootstrap") | Out-Null
-        return
+function Resolve-BooleanArgument {
+    param(
+        [AllowNull()][object]$Value,
+        [bool]$Default = $true,
+        [string]$ParameterName = "value"
+    )
+
+    if ($null -eq $Value) {
+        return $Default
     }
 
+    if ($Value -is [bool]) {
+        return [bool]$Value
+    }
+
+    $text = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $Default
+    }
+
+    switch -Regex ($text.Trim().ToLowerInvariant()) {
+        "^(1|true|yes|y|on)$" { return $true }
+        "^(0|false|no|n|off)$" { return $false }
+        default { throw "Parameter '$ParameterName' expects a boolean value (true/false/1/0)." }
+    }
+}
+
+$RunNow = Resolve-BooleanArgument -Value $RunNow -Default $true -ParameterName "RunNow"
+
+function Invoke-BootstrapNow {
     Start-Process -FilePath "WScript.exe" -ArgumentList @($startupLauncherScript) | Out-Null
+}
+
+function Remove-SecondaryStartupOwners {
+    $officeRemoved = $false
+    try {
+        $officeRemoved = Remove-SuiteCompanionAppRunKeyEntry -CompanionAppId "office"
+    }
+    catch {
+        $officeRemoved = $false
+    }
+
+    $preflightResult = $null
+    try {
+        $preflightResult = Remove-SuiteSupabaseRemotePreflightStartup
+    }
+    catch {
+        $preflightResult = [pscustomobject]@{
+            taskName = "SuiteSupabaseRemotePreflight"
+            removedScheduledTask = $false
+            removedRunKey = $false
+            removed = $false
+        }
+    }
+
+    return [pscustomobject]@{
+        officeRemoved = $officeRemoved
+        supabaseRemotePreflight = $preflightResult
+    }
+}
+
+function Write-StartupInstallManifest {
+    param(
+        [Parameter(Mandatory = $true)][string]$Owner,
+        [string]$FallbackReason,
+        [bool]$UsedExistingTask = $false,
+        [object]$SecondaryOwnerCleanup
+    )
+
+    $manifest = [ordered]@{
+        generatedAt = (Get-Date).ToString("o")
+        taskName = $TaskName
+        preferredOwner = "scheduled_task"
+        owner = $Owner
+        startupMode = $startupMode
+        launcherPath = $startupLauncherScript
+        runNow = [bool]$RunNow
+        usedExistingTask = $UsedExistingTask
+        fallbackReason = if ([string]::IsNullOrWhiteSpace($FallbackReason)) { $null } else { $FallbackReason }
+        secondaryOwnerCleanup = $SecondaryOwnerCleanup
+    }
+
+    Write-SuiteRuntimeStartupManifest -Manifest $manifest -StatusBase $statusBase | Out-Null
 }
 
 function Install-RunKeyFallback {
     $runKeyPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-    $runValue = if ($useDirectDesktopShell) {
-        "`"$runtimeControlExecutable`" --repo-root `"$repoRoot`" --auto-bootstrap"
-    }
-    else {
-        "WScript.exe $actionArgs"
-    }
+    $runValue = "WScript.exe $actionArgs"
 
     if (-not (Test-Path $runKeyPath)) {
         New-Item -Path $runKeyPath -Force | Out-Null
@@ -122,23 +175,6 @@ function Test-ScheduledTaskMatchesStartup {
     foreach ($candidateAction in @($Task.Actions)) {
         $execute = [string]$candidateAction.Execute
         $arguments = [string]$candidateAction.Arguments
-        if ($useDirectDesktopShell) {
-            if (
-                [string]::Equals(
-                    ([string]$execute).Trim(),
-                    $runtimeControlExecutable,
-                    [System.StringComparison]::OrdinalIgnoreCase
-                ) -and
-                $arguments -like "*--repo-root*" -and
-                $arguments -like "*$repoRoot*" -and
-                $arguments -like "*--auto-bootstrap*"
-            ) {
-                return $true
-            }
-
-            continue
-        }
-
         if (
             $execute -match "(?i)wscript(?:\.exe)?$" -and
             $arguments -like "*$startupLauncherScript*"
@@ -151,12 +187,7 @@ function Test-ScheduledTaskMatchesStartup {
 }
 
 try {
-    $action = if ($useDirectDesktopShell) {
-        New-ScheduledTaskAction -Execute $actionExecute -Argument $actionArgs -WorkingDirectory $actionWorkingDirectory
-    }
-    else {
-        New-ScheduledTaskAction -Execute $actionExecute -Argument $actionArgs
-    }
+    $action = New-ScheduledTaskAction -Execute $actionExecute -Argument $actionArgs
     $trigger = New-ScheduledTaskTrigger -AtLogOn
     $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew
@@ -172,7 +203,8 @@ try {
         -Force | Out-Null
 
     Remove-RunKeyFallback
-    Remove-SuiteCompanionAppRunKeyEntry -CompanionAppId "office" | Out-Null
+    $secondaryOwnerCleanup = Remove-SecondaryStartupOwners
+    Write-StartupInstallManifest -Owner "scheduled_task" -SecondaryOwnerCleanup $secondaryOwnerCleanup
 
     if ($RunNow) {
         Invoke-BootstrapNow
@@ -187,7 +219,12 @@ catch {
     if ($existingTask -and (Test-ScheduledTaskMatchesStartup -Task $existingTask)) {
         Write-Warning "Scheduled task registration failed, but a matching runtime bootstrap task already exists. Skipping HKCU Run fallback. $($_.Exception.Message)"
         Remove-RunKeyFallback
-        Remove-SuiteCompanionAppRunKeyEntry -CompanionAppId "office" | Out-Null
+        $secondaryOwnerCleanup = Remove-SecondaryStartupOwners
+        Write-StartupInstallManifest `
+            -Owner "scheduled_task" `
+            -FallbackReason $_.Exception.Message `
+            -UsedExistingTask $true `
+            -SecondaryOwnerCleanup $secondaryOwnerCleanup
 
         if ($RunNow) {
             Invoke-BootstrapNow
@@ -200,6 +237,10 @@ catch {
     else {
         Write-Warning "Scheduled task install failed; falling back to HKCU Run runtime bootstrap. $($_.Exception.Message)"
         Install-RunKeyFallback
-        Remove-SuiteCompanionAppRunKeyEntry -CompanionAppId "office" | Out-Null
+        $secondaryOwnerCleanup = Remove-SecondaryStartupOwners
+        Write-StartupInstallManifest `
+            -Owner "hkcu_run" `
+            -FallbackReason $_.Exception.Message `
+            -SecondaryOwnerCleanup $secondaryOwnerCleanup
     }
 }

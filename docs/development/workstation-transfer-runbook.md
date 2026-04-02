@@ -53,22 +53,25 @@ npm run workstation:sync -- -PrintToml
 
 Preferred local roots:
 
-- `C:\Dev\Suite`
-- `C:\Dev\Daily`
+- `C:\Users\<you>\Documents\GitHub\Suite`
+- `C:\Users\<you>\Documents\GitHub\Office`
+- Office live data:
+  - `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\Knowledge`
+  - `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\State`
 
-Runtime Control is expected to launch Office from the workstation-local companion config first, then env/toml overrides, then the stable `C:\Dev\Daily` layout.
+Runtime Control is expected to launch Office from the workstation-local companion config first, then the canonical `Documents\GitHub\Office` repo root. Office live data belongs under Dropbox, not under the repo root.
 
 ## Destination Machine Bring-Up
 
-1. Clone or pull `Suite` into `C:\Dev\Suite`.
-2. Clone or pull `DailyDesk` into `C:\Dev\Daily`.
+1. Clone or pull `Suite` into `C:\Users\<you>\Documents\GitHub\Suite`.
+2. Clone or pull `Office` into `C:\Users\<you>\Documents\GitHub\Office`.
 
 Recommended commands:
 
 ```powershell
-git clone https://github.com/Koraji95-coder/Suite.git C:\Dev\Suite
-git clone https://github.com/Koraji95-coder/Office.git C:\Dev\Daily
-cd C:\Dev\Suite
+git clone https://github.com/Koraji95-coder/Suite.git C:\Users\<you>\Documents\GitHub\Suite
+git clone https://github.com/Koraji95-coder/Office.git C:\Users\<you>\Documents\GitHub\Office
+cd C:\Users\<you>\Documents\GitHub\Suite
 ```
 
 3. Validate the workstation before running the real bootstrap:
@@ -156,6 +159,12 @@ npm run supabase:remote:target:auto
 npm run supabase:remote:login
 npm run supabase:remote:preflight
 ```
+
+Windows note:
+
+- Leave local Supabase analytics off unless you are actively debugging Supabase container logs.
+- The analytics lane uses the Vector/Logflare sidecar and expects Docker's insecure TCP daemon export on `host.docker.internal:2375`.
+- If you truly need it, opt in with `SUITE_SUPABASE_LOCAL_ANALYTICS_ENABLED=true` after enabling Docker's insecure daemon export. Otherwise keep the default Windows behavior and rely on Suite/runtime/backend logs.
 
 ## Fast Recovery Cases
 

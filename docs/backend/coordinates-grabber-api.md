@@ -193,7 +193,7 @@ Broker env vars (backend-only):
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` (preferred) or `SUPABASE_JWT_SECRET`
 - If using new ECC JWT keys, leave `SUPABASE_JWT_SECRET` empty and rely on JWKS via `SUPABASE_URL`
-- `AGENT_GATEWAY_URL` (default `http://127.0.0.1:3000`)
+- `AGENT_GATEWAY_URL` (default `http://127.0.0.1:3001`)
 - `AGENT_WEBHOOK_SECRET`
 - `AGENT_SESSION_TTL_SECONDS`
 - `AGENT_SESSION_REDIS_ENABLED` (default `true`; enable Redis-backed broker session persistence)

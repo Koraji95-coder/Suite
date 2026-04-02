@@ -21,7 +21,9 @@ $bootstrapStateScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-bo
 $logUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-log-utils.ps1")).Path
 $retentionScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-retention.ps1")).Path
 $runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
-$companionControlScript = (Resolve-Path (Join-Path $PSScriptRoot "control-suite-companion-app.ps1")).Path
+$processUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-process-utils.ps1")).Path
+$workstationConfigScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-workstation-config.ps1")).Path
+$workstationProfileScript = (Resolve-Path (Join-Path $PSScriptRoot "sync-suite-workstation-profile.ps1")).Path
 $runtimeStatusScript = (Resolve-Path (Join-Path $PSScriptRoot "get-suite-runtime-status.ps1")).Path
 $notificationScript = Join-Path $PSScriptRoot "show-windows-notification.ps1"
 $statusBase = if ($env:LOCALAPPDATA) {
@@ -43,6 +45,8 @@ New-Item -ItemType Directory -Path $statusDir -Force | Out-Null
 . $logUtilsScript
 . $retentionScript
 . $runtimeSharedScript
+. $processUtilsScript
+. $workstationConfigScript
 
 function Write-StatusLog {
     param(
@@ -233,7 +237,7 @@ function Ensure-DockerRuntime {
             }
 
             try {
-                Start-Process -FilePath $desktopExecutable | Out-Null
+                Start-SuiteDetachedProcess -FilePath $desktopExecutable | Out-Null
                 $desktopLaunched = $true
                 Write-StatusLog -Tag "INFO" -Message "Docker Desktop launch requested."
             }
@@ -309,7 +313,7 @@ function Invoke-JsonPowerShellFile {
     )
 
     try {
-        $rawOutput = & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @Arguments 2>&1
+        $rawOutput = & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $ScriptPath @Arguments 2>&1
         $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
         $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
         $outputText = [string]::Join(
@@ -357,7 +361,7 @@ function Show-Notification {
     }
 
     try {
-        & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File $notificationScript `
+        & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $notificationScript `
             -Title $Title `
             -Message $Message `
             -Level $Level | Out-Null
@@ -375,6 +379,18 @@ function Remove-OfficeIndependentStartup {
 	}
 	catch {
 		Write-StatusLog -Tag "WARN" -Message "Office startup cleanup warning: $($_.Exception.Message)"
+	}
+}
+
+function Remove-SupabaseRemotePreflightStartup {
+	try {
+		$result = Remove-SuiteSupabaseRemotePreflightStartup
+		if ($result.removed) {
+			Write-StatusLog -Tag "INFO" -Message "Removed SuiteSupabaseRemotePreflight from Windows login startup so Runtime Control remains the single startup owner."
+		}
+	}
+	catch {
+		Write-StatusLog -Tag "WARN" -Message "Supabase remote preflight startup cleanup warning: $($_.Exception.Message)"
 	}
 }
 
@@ -409,48 +425,75 @@ function Wait-ForCompanionRuntimeGate {
 }
 
 function Launch-ManagedOfficeCompanion {
-	$officeConfig = Get-SuiteCompanionAppConfig -CompanionAppId "office" -RepoRoot $resolvedRepoRoot -TomlPath (Get-SuiteCodexConfigPath)
-	if ($null -eq $officeConfig -or -not [bool]$officeConfig.enabled) {
-		return
-	}
+	Write-StatusLog -Tag "INFO" -Message "Legacy Office standalone startup is retired. Office now runs inside Suite Runtime Control through the local broker."
+}
 
-	$gateResult = Wait-ForCompanionRuntimeGate -TimeoutSeconds ([int]$officeConfig.timeoutSeconds)
-	if (-not $gateResult.ok) {
-		Write-SuiteCompanionAppState -CompanionAppId "office" -State ([ordered]@{
-			id = "office"
-			lastLaunchAt = (Get-Date).ToString("o")
-			lastLaunchSource = "suite-runtime-startup"
-			lastLaunchStatus = "runtime_gate_timeout"
-			lastLaunchMessage = "Office launch skipped because the Suite runtime did not become ready in time."
-			lastKnownPid = $null
-		}) | Out-Null
-		Write-StatusLog -Tag "WARN" -Message "Office companion was not launched because the runtime gate never became ready."
-		return
-	}
+function Sync-OfficeWorkspaceConfiguration {
+    $officeRoots = Ensure-SuiteOfficeWorkspaceRoots
+    $resolvedOfficeRoot = Resolve-SuitePreferredDailyRoot
+    if ([string]::IsNullOrWhiteSpace($resolvedOfficeRoot) -or -not (Test-Path -LiteralPath $resolvedOfficeRoot -PathType Container)) {
+        throw "Office repository root was not found: $resolvedOfficeRoot"
+    }
 
-	$launchResult = Invoke-JsonPowerShellFile -ScriptPath $companionControlScript -Arguments @(
-		"-RepoRoot", $resolvedRepoRoot,
-		"-CompanionAppId", "office",
-		"-Action", "launch",
-		"-LaunchSource", "suite-runtime-startup",
-		"-Json"
-	)
+    $dailyDeskSettingsDirectory = Join-Path $resolvedOfficeRoot "DailyDesk"
+    $dailyDeskLocalSettingsPath = Join-Path $dailyDeskSettingsDirectory "dailydesk.settings.local.json"
+    New-Item -ItemType Directory -Path $dailyDeskSettingsDirectory -Force | Out-Null
+    ([ordered]@{
+        suiteRepoPath = $resolvedRepoRoot
+        knowledgeLibraryPath = $officeRoots.knowledgeRoot
+        stateRootPath = $officeRoots.stateRoot
+        additionalKnowledgePaths = @()
+    } | ConvertTo-Json -Depth 6) | Set-Content -LiteralPath $dailyDeskLocalSettingsPath -Encoding UTF8
 
-	if ($launchResult.Ok -and $launchResult.Payload -and -not [string]::IsNullOrWhiteSpace([string]$launchResult.Payload.summary)) {
-		Write-StatusLog -Tag "INFO" -Message ([string]$launchResult.Payload.summary)
-	}
-	elseif ($launchResult.Payload -and -not [string]::IsNullOrWhiteSpace([string]$launchResult.Payload.summary)) {
-		Write-StatusLog -Tag "WARN" -Message ([string]$launchResult.Payload.summary)
-	}
-	elseif (-not [string]::IsNullOrWhiteSpace([string]$launchResult.OutputTail)) {
-		Write-StatusLog -Tag "WARN" -Message ([string]$launchResult.OutputTail)
-	}
+    $existingOfficeConfig = Read-SuiteCompanionAppLocalConfig -CompanionAppId "office"
+    $brokerPublishPath = if ($existingOfficeConfig -and -not [string]::IsNullOrWhiteSpace([string]$existingOfficeConfig.brokerPublishPath)) {
+        [string]$existingOfficeConfig.brokerPublishPath
+    }
+    else {
+        $null
+    }
+    $officeConfigPath = Write-SuiteCompanionAppLocalConfig -CompanionAppId "office" -Config ([ordered]@{
+        rootDirectory = $resolvedOfficeRoot
+        configuredAt = (Get-Date).ToString("o")
+        configuredBy = "scripts/run-suite-runtime-startup.ps1"
+        suiteRoot = $resolvedRepoRoot
+        dailyRoot = $resolvedOfficeRoot
+        launchMode = "embedded_shell"
+        legacyClientRetired = $true
+        executablePath = $null
+        brokerBaseUrl = "http://127.0.0.1:57420"
+        brokerPublishPath = $brokerPublishPath
+        brokerHealthPath = "/health"
+        brokerStatePath = "/state"
+        brokerEnabled = $true
+        knowledgeLibraryPath = $officeRoots.knowledgeRoot
+        stateRootPath = $officeRoots.stateRoot
+        broker = [ordered]@{
+            enabled = $true
+            baseUrl = "http://127.0.0.1:57420"
+            publishPath = $brokerPublishPath
+            healthPath = "/health"
+            statePath = "/state"
+            prefixes = @("", "/api", "/api/office", "/office")
+        }
+    })
+
+    return [pscustomobject]@{
+        officeRoot = $resolvedOfficeRoot
+        knowledgeRoot = $officeRoots.knowledgeRoot
+        stateRoot = $officeRoots.stateRoot
+        localSettingsPath = $dailyDeskLocalSettingsPath
+        companionConfigPath = $officeConfigPath
+    }
 }
 
 $attemptPayloads = @()
 $dockerStatus = $null
 $bootstrapResult = $null
 $bootstrapStartedAt = (Get-Date).ToString("o")
+$preflightOk = $true
+$preflightFailedStep = $null
+$preflightSummary = $null
 
 Save-SuiteRuntimeBootstrapState -Path $currentBootstrapPath -State ([ordered]@{
     running = $true
@@ -469,8 +512,62 @@ Save-SuiteRuntimeBootstrapState -Path $currentBootstrapPath -State ([ordered]@{
 }) | Out-Null
 
 Remove-OfficeIndependentStartup
+Remove-SupabaseRemotePreflightStartup
 
-for ($attempt = 1; $attempt -le $BootstrapAttempts; $attempt += 1) {
+try {
+    $workstationSync = Invoke-JsonPowerShellFile -ScriptPath $workstationProfileScript -Arguments @(
+        "-RepoRoot", $resolvedRepoRoot,
+        "-Json"
+    )
+    $workstationSyncOk = $workstationSync.Ok -and $workstationSync.Payload -and [bool]$workstationSync.Payload.ok
+    if ($workstationSyncOk) {
+        $workstationLabelParts = @(
+            [string]$workstationSync.Payload.workstationId
+            [string]$workstationSync.Payload.workstationLabel
+            [string]$workstationSync.Payload.workstationRole
+        ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        $workstationLabel = if ($workstationLabelParts.Count -gt 0) {
+            [string]::Join(" | ", $workstationLabelParts)
+        }
+        else {
+            "Workstation profile applied."
+        }
+        Write-StatusLog -Tag "OK" -Message "Workstation identity stamped: $workstationLabel"
+    }
+    else {
+        $preflightOk = $false
+        $preflightFailedStep = "workstation-profile"
+        $preflightSummary = if (-not [string]::IsNullOrWhiteSpace([string]$workstationSync.OutputTail)) {
+            "Workstation profile apply failed. $([string]$workstationSync.OutputTail)"
+        }
+        else {
+            "Workstation profile apply failed."
+        }
+        Write-StatusLog -Tag "ERR" -Message $preflightSummary
+    }
+}
+catch {
+    $preflightOk = $false
+    $preflightFailedStep = "workstation-profile"
+    $preflightSummary = "Workstation profile apply failed. $($_.Exception.Message)"
+    Write-StatusLog -Tag "ERR" -Message $preflightSummary
+}
+
+if ($preflightOk) {
+    try {
+        $officeWorkspace = Sync-OfficeWorkspaceConfiguration
+        Write-StatusLog -Tag "OK" -Message "Office workspace roots ready: $($officeWorkspace.knowledgeRoot) | $($officeWorkspace.stateRoot)"
+        Write-StatusLog -Tag "INFO" -Message "Office settings override synced: $($officeWorkspace.localSettingsPath)"
+    }
+    catch {
+        $preflightOk = $false
+        $preflightFailedStep = "office-roots"
+        $preflightSummary = "Office Dropbox workspace roots could not be prepared. $($_.Exception.Message)"
+        Write-StatusLog -Tag "ERR" -Message $preflightSummary
+    }
+}
+
+for ($attempt = 1; $preflightOk -and $attempt -le $BootstrapAttempts; $attempt += 1) {
     Write-StatusLog -Tag "START" -Message "Bootstrap attempt $attempt started."
     $attemptSummary = if ($attempt -gt 1) {
         "Retrying bootstrap (attempt $attempt/$BootstrapAttempts)."
@@ -570,9 +667,27 @@ if ($bootstrapPayload -and $bootstrapPayload.steps) {
     )
 }
 
-$overallOk = [bool]($dockerStatus -and $dockerStatus.ok -and $bootstrapResult -and $bootstrapResult.Ok -and $bootstrapPayload -and [bool]$bootstrapPayload.ok)
+$statusFailedSteps = if (-not $preflightOk -and -not [string]::IsNullOrWhiteSpace([string]$preflightFailedStep)) {
+    @([string]$preflightFailedStep)
+}
+else {
+    @($failedSteps)
+}
+
+$overallOk = [bool](
+    $preflightOk -and
+    $dockerStatus -and
+    $dockerStatus.ok -and
+    $bootstrapResult -and
+    $bootstrapResult.Ok -and
+    $bootstrapPayload -and
+    [bool]$bootstrapPayload.ok
+)
 $summary = if ($overallOk) {
     "Suite runtime booted successfully."
+}
+elseif (-not $preflightOk -and -not [string]::IsNullOrWhiteSpace([string]$preflightSummary)) {
+    [string]$preflightSummary
 }
 elseif ($failedSteps.Count -gt 0) {
     "Suite runtime needs attention: $([string]::Join(', ', $failedSteps))."
@@ -585,7 +700,10 @@ else {
 }
 
 $bootstrapFailedStepIds = @()
-if ($failedSteps.Count -gt 0) {
+if (-not $preflightOk -and -not [string]::IsNullOrWhiteSpace([string]$preflightFailedStep)) {
+    $bootstrapFailedStepIds = @([string]$preflightFailedStep)
+}
+elseif ($failedSteps.Count -gt 0) {
     $bootstrapFailedStepIds = @($failedSteps)
 }
 elseif ($dockerStatus -and -not $dockerStatus.ok) {
@@ -603,6 +721,12 @@ else {
 }
 $finalStepLabel = if ([string]::IsNullOrWhiteSpace($finalStepId)) {
     $null
+}
+elseif ($finalStepId -eq "workstation-profile") {
+    "Workstation profile"
+}
+elseif ($finalStepId -eq "office-roots") {
+    "Office Dropbox roots"
 }
 else {
     Get-SuiteRuntimeBootstrapStepLabel -StepId $finalStepId
@@ -625,7 +749,7 @@ $statusPayload = [ordered]@{
     statusDir = $statusDir
     logPath = $logPath
     docker = $dockerStatus
-    failedSteps = @($failedSteps)
+    failedSteps = @($statusFailedSteps)
     bootstrap = $bootstrapPayload
     bootstrapOutputTail = if ($bootstrapResult) { $bootstrapResult.OutputTail } else { $null }
 }

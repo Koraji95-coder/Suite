@@ -39,6 +39,9 @@ Server name (to avoid conflicts): `suite_repo_mcp`
 ### Verification
 - `repo.verify_agent_routing_guardrails`
 
+### Resources
+- `repo://docs/development/autocad-electrical-2026-project-flow`
+
 ## Location
 
 - Server entry: `tools/suite-repo-mcp/server.mjs`
@@ -76,6 +79,7 @@ Then restart Codex.
 - The server only operates inside this repo root (`/workspaces/Suite`).
 - Tooling is aligned to your stack (`Biome`, `TypeScript`, `Flask`, `Supabase SQL`).
 - Optional workstation identity env vars are supported: `SUITE_WORKSTATION_ID`, `SUITE_WORKSTATION_LABEL`, `SUITE_WORKSTATION_ROLE`.
+- Optional Autodesk offline help env var is supported: `SUITE_AUTODESK_OFFLINE_HELP_ROOT`.
 - `repo.check_suite_workstation` provides a combined workstation doctor payload (`ok/workstation/backend/filesystemCollector/autocadCollector/autocadPlugin/autocadReadiness/issues/recommendedActions`).
 - The sync helper also stamps explicit Watchdog filesystem, AutoCAD, plugin, readiness, and backend startup metadata into `mcp_servers.suite_repo_mcp.env`.
 - No Git push/commit automation is included.

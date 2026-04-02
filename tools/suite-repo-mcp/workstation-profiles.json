@@ -1,14 +1,6 @@
 {
   "profiles": [
     {
-      "id": "DUSTINWARD",
-      "label": "Dustin workstation",
-      "role": "active",
-      "computerNames": ["DUSTINWARD"],
-      "gitUserName": "koraji95-coder",
-      "gitUserEmail": "dustinwardelectricalengineer@outlook.com"
-    },
-    {
       "id": "DUSTIN-HOME",
       "label": "Dustin Home station",
       "role": "home",
@@ -20,7 +12,7 @@
       "id": "DUSTIN-WORK",
       "label": "Dustin Work station",
       "role": "work",
-      "computerNames": ["DUSTIN-WORK"],
+      "computerNames": ["DUSTIN-WORK", "DUSTINWARD"],
       "gitUserName": "koraji95-coder",
       "gitUserEmail": "dustinwardelectricalengineer@outlook.com"
     }

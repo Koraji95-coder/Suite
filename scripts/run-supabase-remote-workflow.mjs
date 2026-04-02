@@ -116,11 +116,11 @@ function runCli(args) {
 
 async function checkGatewayHealth() {
 	const host = readSetting(mergedEnv, "AGENT_GATEWAY_HOST", "127.0.0.1");
-	const configuredPort = readSetting(mergedEnv, "AGENT_GATEWAY_PORT", "3000");
+	const configuredPort = readSetting(mergedEnv, "AGENT_GATEWAY_PORT", "3001");
 	const port = Number.parseInt(configuredPort, 10);
 	const probeHost =
 		host === "0.0.0.0" || host === "::" || host === "*" ? "127.0.0.1" : host;
-	const url = `http://${probeHost}:${Number.isFinite(port) ? port : 3000}/health`;
+	const url = `http://${probeHost}:${Number.isFinite(port) ? port : 3001}/health`;
 
 	try {
 		const response = await fetch(url, {

@@ -1,5 +1,9 @@
 declare module "../../scripts/lib/supabase-cli.mjs" {
 	export function isRetriableSupabaseStartFailure(outputText?: string): boolean;
+	export function resolveSupabaseAnalyticsEnabled(
+		envMap?: Record<string, string | undefined>,
+		platform?: string,
+	): boolean | null;
 	export function runSupabaseStartWithRetry(
 		runOnce: () => Promise<{
 			status?: number | null;

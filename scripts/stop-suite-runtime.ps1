@@ -14,7 +14,10 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
 $autocadSafetyScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-autocad-safety.ps1")).Path
+$runtimeCoreComposeScript = Join-Path $PSScriptRoot "runtime-core-compose.ps1"
+. $runtimeSharedScript
 . $autocadSafetyScript
 $errors = New-Object System.Collections.Generic.List[string]
 $warnings = New-Object System.Collections.Generic.List[string]
@@ -92,6 +95,100 @@ function Invoke-ExternalCommand {
     }
 }
 
+function Invoke-RuntimeCoreComposeJson {
+    param(
+        [Parameter(Mandatory = $true)][ValidateSet("ps", "stop")][string]$Action,
+        [string[]]$Services = @()
+    )
+
+    if (-not (Test-Path -LiteralPath $runtimeCoreComposeScript -PathType Leaf)) {
+        return $null
+    }
+
+    $arguments = @(
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        $runtimeCoreComposeScript,
+        $Action,
+        "-RepoRoot",
+        $resolvedRepoRoot
+    )
+    if (@($Services).Count -gt 0) {
+        $arguments += @("-Services") + @($Services)
+    }
+    $arguments += "-Json"
+
+    $rawOutput = & PowerShell.exe @arguments 2>$null
+    $outputText = [string]::Join([Environment]::NewLine, @($rawOutput | ForEach-Object { if ($null -eq $_) { "" } else { $_.ToString() } })).Trim()
+    if ([string]::IsNullOrWhiteSpace($outputText)) {
+        return $null
+    }
+
+    try {
+        return $outputText | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-RuntimeCoreServiceEntry {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+
+    $composePayload = Invoke-RuntimeCoreComposeJson -Action "ps"
+    if ($null -eq $composePayload -or -not $composePayload.ok -or $null -eq $composePayload.payload) {
+        return $null
+    }
+
+    return @($composePayload.payload | Where-Object {
+        $candidate = if ($_.PSObject.Properties.Name -contains "Service") { [string]$_.Service } elseif ($_.PSObject.Properties.Name -contains "service") { [string]$_.service } else { "" }
+        $candidate.Trim().ToLowerInvariant() -eq $ServiceName.Trim().ToLowerInvariant()
+    }) | Select-Object -First 1
+}
+
+function Test-RuntimeCoreServiceRunning {
+    param([Parameter(Mandatory = $true)][string]$ServiceName)
+
+    $entry = Get-RuntimeCoreServiceEntry -ServiceName $ServiceName
+    if ($null -eq $entry) {
+        return $false
+    }
+
+    $containerStateText = [string]::Join(" ", @(
+        if ($entry.PSObject.Properties.Name -contains "State") { [string]$entry.State } else { "" }
+        if ($entry.PSObject.Properties.Name -contains "Status") { [string]$entry.Status } else { "" }
+    )).Trim().ToLowerInvariant()
+
+    return (
+        $containerStateText.Contains("running") -or
+        $containerStateText.Contains("healthy")
+    )
+}
+
+function Stop-RuntimeCoreService {
+    param(
+        [Parameter(Mandatory = $true)][string]$ServiceName,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    if (-not (Test-RuntimeCoreServiceRunning -ServiceName $ServiceName)) {
+        Set-StoppedEntry -Label $Label -Status "already_stopped"
+        return
+    }
+
+    $composeStop = Invoke-RuntimeCoreComposeJson -Action "stop" -Services @($ServiceName)
+    if ($composeStop -and $composeStop.ok) {
+        Set-StoppedEntry -Label $Label -Status "stopped"
+        return
+    }
+
+    $reason = if ($composeStop -and -not [string]::IsNullOrWhiteSpace([string]$composeStop.outputText)) { [string]$composeStop.outputText } else { "docker compose stop failed." }
+    $errors.Add("$Label could not be stopped: $reason")
+    Set-StoppedEntry -Label $Label -Status "already_stopped" -Reason $reason
+}
+
 function Test-PortListening {
     param([int]$Port)
 
@@ -120,9 +217,10 @@ function Test-SupabaseOutputIndicatesReady {
 }
 
 function Test-SupabaseStopped {
-    $apiListening = Test-PortListening -Port 54321
-    $dbListening = Test-PortListening -Port 54322
-    $studioListening = Test-PortListening -Port 54323
+    $supabasePorts = Get-SuiteSupabaseLocalPorts -RepoRoot $resolvedRepoRoot
+    $apiListening = Test-PortListening -Port $supabasePorts.api
+    $dbListening = Test-PortListening -Port $supabasePorts.db
+    $studioListening = Test-PortListening -Port $supabasePorts.studio
 
     if ($apiListening -or $dbListening -or $studioListening) {
         return $false
@@ -268,10 +366,16 @@ function Stop-ProcessesByCommandTokens {
         -Status $(if ($stoppedIds.Count -gt 0) { "stopped" } else { "already_stopped" })
 }
 
+Stop-RuntimeCoreService -ServiceName "backend" -Label "runtime-core-backend"
+Stop-RuntimeCoreService -ServiceName "gateway" -Label "runtime-core-gateway"
+if ($IncludeFrontend) {
+    Stop-RuntimeCoreService -ServiceName "frontend" -Label "runtime-core-frontend"
+}
+
 Stop-ProcessesByCommandTokens -Tokens @("backend/api_server.py") -Label "backend"
 Stop-ProcessesByCommandTokens -Tokens @("run-agent-gateway.mjs") -Label "gateway-launcher"
 Stop-ProcessesByCommandTokens -Tokens @("suite-agent-gateway.mjs") -Label "gateway-native-launcher"
-Stop-PortListeners -Ports @(5000, 3000) -Label "ports"
+Stop-PortListeners -Ports @(5000, 3000, 3001) -Label "ports"
 Stop-ProcessesByCommandTokens -Tokens @("watchdog-filesystem-collector-daemon.ps1") -Label "watchdog-filesystem-daemon"
 Stop-ProcessesByCommandTokens -Tokens @("run-watchdog-filesystem-collector.py") -Label "watchdog-filesystem-worker"
 

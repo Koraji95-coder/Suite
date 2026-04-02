@@ -13,7 +13,9 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
+$workstationDiagnosticsScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-workstation-diagnostics.ps1")).Path
 . $runtimeSharedScript
+. $workstationDiagnosticsScript
 $backendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-backend-startup.ps1")).Path
 $gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-startup.ps1")).Path
 $frontendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-frontend-startup.ps1")).Path
@@ -26,8 +28,16 @@ $runtimeStatusDir = $runtimePaths.RuntimeStatusDir
 $runtimeStatusPath = $runtimePaths.RuntimeStatusPath
 $currentBootstrapPath = $runtimePaths.CurrentBootstrapPath
 $runtimeLogPath = $runtimePaths.RuntimeLogPath
+$backendLogPath = $runtimePaths.BackendLogPath
+$gatewayLogPath = $runtimePaths.GatewayLogPath
 $frontendLogPath = $runtimePaths.FrontendLogPath
+$runtimeLauncherLogPath = $runtimePaths.RuntimeLauncherLogPath
+$runtimeShellLogPath = $runtimePaths.RuntimeShellLogPath
+$officeBrokerLogPath = $runtimePaths.OfficeBrokerLogPath
+$filesystemCollectorLogDir = $runtimePaths.FilesystemCollectorLogDir
+$autocadCollectorLogDir = $runtimePaths.AutoCadCollectorLogDir
 $codexConfigPath = Get-SuiteCodexConfigPath
+$shell = Get-SuiteRuntimeShellSummary -RepoRoot $resolvedRepoRoot
 
 function Invoke-ExternalCommand {
     param(
@@ -64,6 +74,131 @@ function Invoke-ExternalCommand {
         OutputText = $outputText
         OutputTail = Get-OutputTail -Text $outputText
     }
+}
+
+function Invoke-JsonPowerShellFilesParallel {
+    param(
+        [Parameter(Mandatory = $true)][object[]]$Tasks,
+        [ValidateRange(5, 120)][int]$TimeoutSeconds = 20
+    )
+
+    $jobs = @()
+    foreach ($task in @($Tasks)) {
+        $taskName = [string]$task.Name
+        $scriptPath = [string]$task.ScriptPath
+        $arguments = @($task.Arguments)
+        $workingDirectory = if ($task.PSObject.Properties.Name -contains "WorkingDirectory" -and -not [string]::IsNullOrWhiteSpace([string]$task.WorkingDirectory)) {
+            [string]$task.WorkingDirectory
+        }
+        else {
+            $resolvedRepoRoot
+        }
+
+        $jobs += Start-Job -Name $taskName -ScriptBlock {
+            param(
+                [string]$TaskName,
+                [string]$ScriptPath,
+                [string[]]$Arguments,
+                [string]$WorkingDirectory
+            )
+
+            Set-StrictMode -Version Latest
+            $ErrorActionPreference = "Stop"
+
+            Push-Location $WorkingDirectory
+            try {
+                $previousErrorActionPreference = $ErrorActionPreference
+                try {
+                    $ErrorActionPreference = "Continue"
+                    $rawOutput = & PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @Arguments 2>&1
+                    $exitCodeVariable = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
+                    $exitCode = if ($exitCodeVariable) { [int]$exitCodeVariable.Value } else { 0 }
+                    $outputText = [string]::Join(
+                        [Environment]::NewLine,
+                        @(
+                            $rawOutput | ForEach-Object {
+                                if ($null -eq $_) { "" } else { $_.ToString() }
+                            }
+                        )
+                    ).Trim()
+                }
+                catch {
+                    $exitCode = 1
+                    $outputText = $_.Exception.Message
+                }
+                finally {
+                    $ErrorActionPreference = $previousErrorActionPreference
+                }
+            }
+            finally {
+                Pop-Location
+            }
+
+            $payload = $null
+            if (-not [string]::IsNullOrWhiteSpace($outputText)) {
+                try {
+                    $payload = $outputText | ConvertFrom-Json
+                }
+                catch {
+                    $payload = $null
+                }
+            }
+
+            [pscustomobject]@{
+                Name = $TaskName
+                ExitCode = $exitCode
+                Ok = ($exitCode -eq 0)
+                OutputText = $outputText
+                OutputTail = if ([string]::IsNullOrWhiteSpace($outputText)) {
+                    ""
+                }
+                else {
+                    [string]::Join([Environment]::NewLine, (($outputText -split "`r?`n") | Select-Object -Last 10)).Trim()
+                }
+                Payload = $payload
+            }
+        } -ArgumentList $taskName, $scriptPath, $arguments, $workingDirectory
+    }
+
+    if ($jobs.Count -eq 0) {
+        return @{}
+    }
+
+    Wait-Job -Job $jobs -Timeout $TimeoutSeconds | Out-Null
+
+    $results = @{}
+    foreach ($job in $jobs) {
+        $taskResult = $null
+        if ($job.State -eq "Running") {
+            Stop-Job -Job $job -ErrorAction SilentlyContinue | Out-Null
+            $taskResult = [pscustomobject]@{
+                Name = $job.Name
+                ExitCode = 1
+                Ok = $false
+                OutputText = "Timed out after $TimeoutSeconds seconds."
+                OutputTail = "Timed out after $TimeoutSeconds seconds."
+                Payload = $null
+            }
+        }
+        else {
+            $taskResult = Receive-Job -Job $job -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($null -eq $taskResult) {
+                $taskResult = [pscustomobject]@{
+                    Name = $job.Name
+                    ExitCode = 1
+                    Ok = $false
+                    OutputText = "No output was returned."
+                    OutputTail = "No output was returned."
+                    Payload = $null
+                }
+            }
+        }
+
+        $results[[string]$job.Name] = $taskResult
+        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue | Out-Null
+    }
+
+    return $results
 }
 
 function Get-PortOwningProcessId {
@@ -238,6 +373,7 @@ function New-ServiceStatus {
         processLabel = $resolvedProcessLabel
         uptimeSeconds = $UptimeSeconds
         startupMode = $resolvedStartupMode
+        ownershipType = $resolvedStartupMode
         notes = if ($resolvedNotes.Count -gt 0) { @($resolvedNotes) } else { @() }
         substatus = $Substatus
         logTarget = $LogTarget
@@ -251,11 +387,12 @@ function New-ServiceStatus {
 $services = @()
 
 $supabaseStatusResult = Invoke-ExternalCommand -FilePath "node" -Arguments @((Join-Path $resolvedRepoRoot "scripts\run-supabase-cli.mjs"), "status") -WorkingDirectory $resolvedRepoRoot
+$supabasePorts = Get-SuiteSupabaseLocalPorts -RepoRoot $resolvedRepoRoot
 $supabaseStatusReady = $supabaseStatusResult.Ok -and (Test-SupabaseOutputIndicatesReady -Text $supabaseStatusResult.OutputText)
-$supabaseApiListening = Test-PortListening -Port 54321
-$supabaseDbListening = Test-PortListening -Port 54322
-$supabaseStudioListening = Test-PortListening -Port 54323
-$supabaseProcessId = Get-PortOwningProcessId -Port 54321
+$supabaseApiListening = Test-PortListening -Port $supabasePorts.api
+$supabaseDbListening = Test-PortListening -Port $supabasePorts.db
+$supabaseStudioListening = Test-PortListening -Port $supabasePorts.studio
+$supabaseProcessId = Get-PortOwningProcessId -Port $supabasePorts.api
 $supabaseState = if ($supabaseStatusReady -or ($supabaseApiListening -and $supabaseDbListening)) {
     "running"
 }
@@ -274,15 +411,15 @@ $supabaseSummary = switch ($supabaseState) {
     "starting" { "Local Supabase is partially online."; break }
     default { "Local Supabase is not running."; break }
 }
-$supabaseStartupMode = if (Test-DockerReady) { "docker" } else { $null }
+$supabaseStartupMode = "supabase_cli"
 $supabaseDetails = if ($supabaseState -eq "running" -and $supabaseStudioListening) {
-    "API 54321, DB 54322, Studio 54323."
+    "API $($supabasePorts.api), DB $($supabasePorts.db), Studio $($supabasePorts.studio)."
 }
 elseif ($supabaseState -eq "running" -and $supabaseStatusReady) {
     "Supabase CLI reports the local stack is running."
 }
 elseif ($supabaseState -eq "starting") {
-    "API 54321: $supabaseApiListening. DB 54322: $supabaseDbListening."
+    "API $($supabasePorts.api): $supabaseApiListening. DB $($supabasePorts.db): $supabaseDbListening."
 }
 else {
     "Start Docker Desktop and run npm run supabase:start if the stack should be available."
@@ -291,11 +428,11 @@ $supabaseNotes = @()
 if ($supabaseState -eq "running" -and $supabaseStudioListening) {
     $supabaseNotes += [pscustomobject]@{
         label = "Endpoints"
-        value = "API 54321, DB 54322, Studio 54323"
+        value = "API $($supabasePorts.api), DB $($supabasePorts.db), Studio $($supabasePorts.studio)"
     }
     $supabaseNotes += [pscustomobject]@{
         label = "Console"
-        value = "Supabase Studio is available at http://127.0.0.1:54323."
+        value = "Supabase Studio is available at http://127.0.0.1:$($supabasePorts.studio)."
     }
 }
 elseif ($supabaseState -eq "running" -and $supabaseStatusReady) {
@@ -307,7 +444,7 @@ elseif ($supabaseState -eq "running" -and $supabaseStatusReady) {
 elseif ($supabaseState -eq "starting") {
     $supabaseNotes += [pscustomobject]@{
         label = "Readiness"
-        value = "API 54321 listening: $supabaseApiListening. DB 54322 listening: $supabaseDbListening."
+        value = "API $($supabasePorts.api) listening: $supabaseApiListening. DB $($supabasePorts.db) listening: $supabaseDbListening."
     }
 }
 else {
@@ -323,7 +460,7 @@ $services += (New-ServiceStatus `
     -Ok ($supabaseState -eq "running") `
     -Summary $supabaseSummary `
     -Details $supabaseDetails `
-    -Port 54321 `
+    -Port $supabasePorts.api `
     -ProcessId $supabaseProcessId `
     -UptimeSeconds (Get-ProcessUptimeSeconds -ProcessId $supabaseProcessId) `
     -StartupMode $supabaseStartupMode `
@@ -332,14 +469,49 @@ $services += (New-ServiceStatus `
     -LogTarget ([pscustomobject]@{
         kind = "url"
         label = "Supabase Studio"
-        target = "http://127.0.0.1:54323"
+        target = "http://127.0.0.1:$($supabasePorts.studio)"
     }))
 
-$backendResult = Invoke-JsonPowerShellFile -ScriptPath $backendCheckScript -Arguments @("-Json")
+$parallelCheckResults = Invoke-JsonPowerShellFilesParallel -Tasks @(
+    [pscustomobject]@{ Name = "backend"; ScriptPath = $backendCheckScript; Arguments = @("-Json") },
+    [pscustomobject]@{ Name = "gateway"; ScriptPath = $gatewayCheckScript; Arguments = @("-Json") },
+    [pscustomobject]@{ Name = "frontend"; ScriptPath = $frontendCheckScript; Arguments = @("-Json") },
+    [pscustomobject]@{ Name = "filesystem"; ScriptPath = $filesystemCheckScript; Arguments = @("-Json") },
+    [pscustomobject]@{ Name = "autocad"; ScriptPath = $autocadCheckScript; Arguments = @("-Json") },
+    [pscustomobject]@{ Name = "autocadPlugin"; ScriptPath = $pluginCheckScript; Arguments = @("-Json") },
+    [pscustomobject]@{ Name = "cadAuthoringPlugin"; ScriptPath = $cadAuthoringPluginCheckScript; Arguments = @("-Json") }
+) -TimeoutSeconds 20
+
+$backendResult = $parallelCheckResults["backend"]
 $backendRunning = [bool]($backendResult.Payload -and $backendResult.Payload.Running)
-$backendProcessId = if ($backendRunning) { [int]$backendResult.Payload.ProcessId } else { $null }
-$backendState = if ($backendRunning) { "running" } else { "stopped" }
-$backendSummary = if ($backendRunning) { "Backend is running." } else { "Backend is not running." }
+$backendHealthy = [bool]($backendResult.Payload -and $backendResult.Payload.Healthy)
+$backendStartupMode = if ($backendResult.Payload -and $backendResult.Payload.PSObject.Properties.Name -contains "StartupMode") { [string]$backendResult.Payload.StartupMode } else { $null }
+$backendOwnershipDrift = ($backendResult.Payload -and $backendResult.Payload.PSObject.Properties.Name -contains "OwnershipDrift" -and [bool]$backendResult.Payload.OwnershipDrift) -or ($backendRunning -and $backendStartupMode -eq "native_process")
+$backendProcessId = if ($backendRunning -or $backendHealthy) { [int]$backendResult.Payload.ProcessId } else { $null }
+$backendState = if ($backendHealthy -and $backendStartupMode -eq "docker_compose") {
+    "running"
+}
+elseif ($backendOwnershipDrift) {
+    "error"
+}
+elseif ($backendRunning -and $backendStartupMode -eq "docker_compose") {
+    "starting"
+}
+else {
+    "stopped"
+}
+$backendSummary = if ($backendHealthy -and $backendStartupMode -eq "docker_compose") {
+    "Backend is healthy through runtime-core Docker."
+}
+elseif ($backendOwnershipDrift) {
+    "Backend ownership drift needs attention."
+}
+elseif ($backendRunning -and $backendStartupMode -eq "docker_compose") {
+    "Backend container is running and still warming up."
+}
+else {
+    "Backend is not running."
+}
 $backendDetails = if ($backendRunning) {
     [string]$backendResult.Payload.CommandLine
 }
@@ -350,10 +522,28 @@ else {
     $backendResult.OutputTail
 }
 $backendNotes = @()
+if ($backendStartupMode -eq "docker_compose") {
+    $backendNotes += [pscustomobject]@{
+        label = "Owner"
+        value = "Docker runtime core"
+    }
+}
+elseif ($backendOwnershipDrift) {
+    $backendNotes += [pscustomobject]@{
+        label = "Owner"
+        value = "Native process detected. Expected Docker runtime core."
+    }
+}
 if ($backendRunning -and $backendResult.Payload -and $backendResult.Payload.CommandLine) {
     $backendNotes += [pscustomobject]@{
         label = "Command"
         value = [string]$backendResult.Payload.CommandLine
+    }
+}
+if (-not [string]::IsNullOrWhiteSpace($backendLogPath)) {
+    $backendNotes += [pscustomobject]@{
+        label = "Log file"
+        value = $backendLogPath
     }
 }
 elseif ($backendResult.Payload -and $backendResult.Payload.Error) {
@@ -365,7 +555,7 @@ elseif ($backendResult.Payload -and $backendResult.Payload.Error) {
 else {
     $backendNotes += [pscustomobject]@{
         label = "Recovery"
-        value = "Use Bootstrap All or Start to launch the Watchdog API server."
+        value = "Use Bootstrap All or Start to restore the backend through Docker runtime core."
     }
 }
 $services += (New-ServiceStatus `
@@ -378,18 +568,19 @@ $services += (New-ServiceStatus `
     -Port 5000 `
     -ProcessId $backendProcessId `
     -UptimeSeconds (Get-ProcessUptimeSeconds -ProcessId $backendProcessId) `
-    -StartupMode "background" `
+    -StartupMode $backendStartupMode `
     -Notes $backendNotes `
     -Substatus $null `
     -LogTarget ([pscustomobject]@{
         kind = "path"
-        label = "Runtime Log Folder"
-        target = $runtimeStatusDir
+        label = "Backend Log"
+        target = $backendLogPath
     }))
 
-$gatewayResult = Invoke-JsonPowerShellFile -ScriptPath $gatewayCheckScript -Arguments @("-Json")
+$gatewayResult = $parallelCheckResults["gateway"]
 $gatewayRunning = [bool]($gatewayResult.Payload -and $gatewayResult.Payload.Running)
 $gatewayHealthy = [bool]($gatewayResult.Payload -and $gatewayResult.Payload.Healthy)
+$gatewayStartupMode = if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "StartupMode") { [string]$gatewayResult.Payload.StartupMode } else { $null }
 $gatewayModeMatches = if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "GatewayModeMatches") {
     [bool]$gatewayResult.Payload.GatewayModeMatches
 }
@@ -397,8 +588,18 @@ else {
     $true
 }
 $gatewayProcessId = if ($gatewayRunning -or $gatewayHealthy) { [int]$gatewayResult.Payload.ProcessId } else { $null }
+$gatewayPort = if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "Port" -and $gatewayResult.Payload.Port) {
+    [int]$gatewayResult.Payload.Port
+}
+else {
+    3001
+}
+$gatewayOwnershipDrift = ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "OwnershipDrift" -and [bool]$gatewayResult.Payload.OwnershipDrift) -or ($gatewayRunning -and $gatewayStartupMode -eq "native_process")
 $gatewayState = if ($gatewayHealthy) {
     "running"
+}
+elseif ($gatewayOwnershipDrift) {
+    "error"
 }
 elseif ($gatewayRunning -and -not $gatewayModeMatches) {
     "error"
@@ -419,7 +620,10 @@ else {
     $gatewayResult.OutputTail
 }
 $gatewaySummary = if ($gatewayHealthy) {
-    "Gateway is healthy."
+    "Gateway is healthy through runtime-core Docker."
+}
+elseif ($gatewayOwnershipDrift) {
+    "Gateway ownership drift needs attention."
 }
 elseif ($gatewayRunning -and -not $gatewayModeMatches) {
     "Gateway mode needs attention."
@@ -431,6 +635,18 @@ else {
     "Gateway is not running."
 }
 $gatewayNotes = @()
+if ($gatewayStartupMode -eq "docker_compose") {
+    $gatewayNotes += [pscustomobject]@{
+        label = "Owner"
+        value = "Docker runtime core"
+    }
+}
+elseif ($gatewayOwnershipDrift) {
+    $gatewayNotes += [pscustomobject]@{
+        label = "Owner"
+        value = "Native process detected. Expected Docker runtime core."
+    }
+}
 if (($gatewayHealthy -or $gatewayRunning) -and $gatewayResult.Payload -and $gatewayResult.Payload.CommandLine) {
     $gatewayNotes += [pscustomobject]@{
         label = "Command"
@@ -449,6 +665,12 @@ if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name 
         value = Get-SuiteGatewayModeLabel -GatewayMode ([string]$gatewayResult.Payload.GatewayProcessMode)
     }
 }
+if (-not [string]::IsNullOrWhiteSpace($gatewayLogPath)) {
+    $gatewayNotes += [pscustomobject]@{
+        label = "Log file"
+        value = $gatewayLogPath
+    }
+}
 if ($gatewayResult.Payload -and $gatewayResult.Payload.Error) {
     $gatewayNotes += [pscustomobject]@{
         label = "Status"
@@ -458,7 +680,7 @@ if ($gatewayResult.Payload -and $gatewayResult.Payload.Error) {
 if ($gatewayNotes.Count -eq 0) {
     $gatewayNotes += [pscustomobject]@{
         label = "Recovery"
-        value = "Use Bootstrap All or Start to restore the local gateway."
+        value = "Use Bootstrap All or Start to restore the gateway through Docker runtime core."
     }
 }
 $services += (New-ServiceStatus `
@@ -468,25 +690,30 @@ $services += (New-ServiceStatus `
     -Ok $gatewayHealthy `
     -Summary $gatewaySummary `
     -Details $gatewayDetails `
-    -Port 3000 `
+    -Port $gatewayPort `
     -ProcessId $gatewayProcessId `
     -UptimeSeconds (Get-ProcessUptimeSeconds -ProcessId $gatewayProcessId) `
-    -StartupMode "background" `
+    -StartupMode $gatewayStartupMode `
     -Notes $gatewayNotes `
     -Substatus $null `
     -LogTarget ([pscustomobject]@{
         kind = "path"
-        label = "Runtime Log Folder"
-        target = $runtimeStatusDir
+        label = "Gateway Log"
+        target = $gatewayLogPath
     }))
 
-$frontendResult = Invoke-JsonPowerShellFile -ScriptPath $frontendCheckScript -Arguments @("-Json")
+$frontendResult = $parallelCheckResults["frontend"]
 $frontendRunning = [bool]($frontendResult.Payload -and $frontendResult.Payload.Running)
 $frontendHealthy = [bool]($frontendResult.Payload -and $frontendResult.Payload.Healthy)
 $frontendListening = [bool]($frontendResult.Payload -and $frontendResult.Payload.Listening)
+$frontendStartupMode = if ($frontendResult.Payload -and $frontendResult.Payload.PSObject.Properties.Name -contains "StartupMode") { [string]$frontendResult.Payload.StartupMode } else { $null }
+$frontendOwnershipDrift = ($frontendResult.Payload -and $frontendResult.Payload.PSObject.Properties.Name -contains "OwnershipDrift" -and [bool]$frontendResult.Payload.OwnershipDrift) -or ($frontendRunning -and $frontendStartupMode -eq "native_process")
 $frontendProcessId = if ($frontendRunning -or $frontendHealthy) { [int]$frontendResult.Payload.ProcessId } else { $null }
 $frontendState = if ($frontendHealthy) {
     "running"
+}
+elseif ($frontendOwnershipDrift) {
+    "error"
 }
 elseif ($frontendRunning -or $frontendListening) {
     "starting"
@@ -504,7 +731,10 @@ else {
     $frontendResult.OutputTail
 }
 $frontendSummary = if ($frontendHealthy) {
-    "Frontend dev server is ready."
+    "Frontend dev server is ready through runtime-core Docker."
+}
+elseif ($frontendOwnershipDrift) {
+    "Frontend ownership drift needs attention."
 }
 elseif ($frontendRunning -or $frontendListening) {
     "Frontend process is running and still warming up."
@@ -513,6 +743,18 @@ else {
     "Frontend dev server is not running."
 }
 $frontendNotes = @()
+if ($frontendStartupMode -eq "docker_compose") {
+    $frontendNotes += [pscustomobject]@{
+        label = "Owner"
+        value = "Docker runtime core"
+    }
+}
+elseif ($frontendOwnershipDrift) {
+    $frontendNotes += [pscustomobject]@{
+        label = "Owner"
+        value = "Native process detected. Expected Docker runtime core."
+    }
+}
 if ($frontendResult.Payload -and $frontendResult.Payload.Url) {
     $frontendNotes += [pscustomobject]@{
         label = "Local URL"
@@ -540,7 +782,7 @@ elseif ($frontendResult.Payload -and $frontendResult.Payload.Error) {
 else {
     $frontendNotes += [pscustomobject]@{
         label = "Recovery"
-        value = "Use Bootstrap All or Start to launch the local Vite frontend."
+        value = "Use Bootstrap All or Start to restore the frontend through Docker runtime core."
     }
 }
 $services += (New-ServiceStatus `
@@ -553,7 +795,7 @@ $services += (New-ServiceStatus `
     -Port 5173 `
     -ProcessId $frontendProcessId `
     -UptimeSeconds (Get-ProcessUptimeSeconds -ProcessId $frontendProcessId) `
-    -StartupMode "background" `
+    -StartupMode $frontendStartupMode `
     -Notes $frontendNotes `
     -Substatus $null `
     -LogTarget ([pscustomobject]@{
@@ -562,7 +804,7 @@ $services += (New-ServiceStatus `
         target = $frontendLogPath
     }))
 
-$filesystemResult = Invoke-JsonPowerShellFile -ScriptPath $filesystemCheckScript -Arguments @("-Json")
+$filesystemResult = $parallelCheckResults["filesystem"]
 $filesystemHealthy = [bool]($filesystemResult.Payload -and $filesystemResult.Payload.healthy)
 $filesystemDaemonRunning = [bool]($filesystemResult.Payload -and $filesystemResult.Payload.daemonRunning)
 $filesystemWarnings = if ($filesystemResult.Payload -and $filesystemResult.Payload.warnings) {
@@ -628,6 +870,12 @@ if (-not [string]::IsNullOrWhiteSpace($filesystemErrors)) {
         value = $filesystemErrors
     }
 }
+if (-not [string]::IsNullOrWhiteSpace($filesystemCollectorLogDir)) {
+    $filesystemNotes += [pscustomobject]@{
+        label = "Log directory"
+        value = $filesystemCollectorLogDir
+    }
+}
 $services += (New-ServiceStatus `
     -Id "watchdog-filesystem" `
     -Name "Filesystem Collector" `
@@ -643,16 +891,16 @@ $services += (New-ServiceStatus `
     -Substatus $null `
     -LogTarget ([pscustomobject]@{
         kind = "path"
-        label = "Runtime Log Folder"
-        target = $runtimeStatusDir
+        label = "Filesystem Collector Logs"
+        target = $filesystemCollectorLogDir
     }))
 
-$autocadResult = Invoke-JsonPowerShellFile -ScriptPath $autocadCheckScript -Arguments @("-Json")
+$autocadResult = $parallelCheckResults["autocad"]
 $autocadHealthy = [bool]($autocadResult.Payload -and $autocadResult.Payload.healthy)
 $autocadDaemonRunning = [bool]($autocadResult.Payload -and $autocadResult.Payload.daemonRunning)
-$pluginResult = Invoke-JsonPowerShellFile -ScriptPath $pluginCheckScript -Arguments @("-Json")
+$pluginResult = $parallelCheckResults["autocadPlugin"]
 $pluginHealthy = [bool]($pluginResult.Payload -and $pluginResult.Payload.ok)
-$cadAuthoringPluginResult = Invoke-JsonPowerShellFile -ScriptPath $cadAuthoringPluginCheckScript -Arguments @("-Json")
+$cadAuthoringPluginResult = $parallelCheckResults["cadAuthoringPlugin"]
 $cadAuthoringPluginHealthy = [bool]($cadAuthoringPluginResult.Payload -and $cadAuthoringPluginResult.Payload.ok)
 $autocadWarnings = if ($autocadResult.Payload -and $autocadResult.Payload.warnings) {
     [string]::Join("; ", @($autocadResult.Payload.warnings))
@@ -745,6 +993,12 @@ if (-not [string]::IsNullOrWhiteSpace($autocadErrors)) {
         value = $autocadErrors
     }
 }
+if (-not [string]::IsNullOrWhiteSpace($autocadCollectorLogDir)) {
+    $autocadNotes += [pscustomobject]@{
+        label = "Log directory"
+        value = $autocadCollectorLogDir
+    }
+}
 $pluginNotes = @()
 if ($pluginHealthy -and $pluginResult.Payload -and $pluginResult.Payload.bundleRoot) {
     $pluginNotes += [pscustomobject]@{
@@ -798,28 +1052,31 @@ $services += (New-ServiceStatus `
     }) `
     -LogTarget ([pscustomobject]@{
         kind = "path"
-        label = "Runtime Log Folder"
-        target = $runtimeStatusDir
+        label = "AutoCAD Collector Logs"
+        target = $autocadCollectorLogDir
     }))
 
 $runningCount = @($services | Where-Object { $_.state -eq "running" }).Count
 $hasStarting = @($services | Where-Object { $_.state -eq "starting" }).Count -gt 0
 $hasError = @($services | Where-Object { $_.state -eq "error" }).Count -gt 0
+$shellStarting = $shell.status -eq "starting"
+$shellHealthy = [bool]$shell.healthy
+$shellNeedsAttention = -not $shellHealthy -and $shell.status -in @("stale", "missing")
 $companionApps = Get-SuiteCompanionAppsSnapshot -RepoRoot $resolvedRepoRoot -TomlPath $codexConfigPath
 
-$overall = if ($runningCount -eq $services.Count) {
+$overall = if ($runningCount -eq $services.Count -and $shellHealthy) {
     [pscustomobject]@{
         state = "healthy"
         text = "ALL SYSTEMS UP"
     }
 }
-elseif ($hasStarting) {
+elseif ($hasStarting -or $shellStarting) {
     [pscustomobject]@{
         state = "booting"
         text = "BOOTING"
     }
 }
-elseif ($hasError) {
+elseif ($hasError -or $shellNeedsAttention) {
     [pscustomobject]@{
         state = "degraded"
         text = "DEGRADED"
@@ -841,10 +1098,11 @@ else {
 $result = [ordered]@{
     schemaVersion = "suite.runtime.v1"
     checkedAt = (Get-Date).ToString("o")
-    ok = ($runningCount -eq $services.Count)
+    ok = ($runningCount -eq $services.Count -and $shellHealthy)
     timestamp = (Get-Date).ToString("o")
     repoRoot = $resolvedRepoRoot
     overall = $overall
+    shell = $shell
     doctor = [ordered]@{
         overallState = switch ($overall.state) {
             "healthy" { "ready"; break }
@@ -887,6 +1145,12 @@ $result = [ordered]@{
             if ($overall.state -ne "healthy") {
                 "Use Runtime Control or Bootstrap All to reconcile the local stack before relying on workstation-sensitive flows."
             }
+            if ($shellNeedsAttention) {
+                "Re-run scripts/launch-suite-runtime-control.ps1 -AutoBootstrap to replace the stale shared shell and restore the visible client."
+            }
+            elseif ($shellStarting) {
+                "The shared shell is still warming up. Wait briefly before assuming login startup is stuck."
+            }
         )
     }
     runtime = [ordered]@{
@@ -895,7 +1159,14 @@ $result = [ordered]@{
         currentBootstrapPath = $currentBootstrapPath
         companionStateDir = $runtimePaths.CompanionStateDir
         logPath = $runtimeLogPath
+        backendLogPath = $backendLogPath
+        gatewayLogPath = $gatewayLogPath
         frontendLogPath = $frontendLogPath
+        runtimeLauncherLogPath = $runtimeLauncherLogPath
+        runtimeShellLogPath = $runtimeShellLogPath
+        officeBrokerLogPath = $officeBrokerLogPath
+        filesystemCollectorLogDir = $filesystemCollectorLogDir
+        autocadCollectorLogDir = $autocadCollectorLogDir
         supportRoot = $runtimePaths.SupportRoot
         lastBootstrap = Get-LastBootstrapStatus
         currentBootstrap = Get-CurrentBootstrapStatus
@@ -911,6 +1182,7 @@ if ($Json) {
 }
 else {
     Write-Host "Suite runtime status: $($overall.text)"
+    Write-Host "- [shell:$($shell.status)] Shared Shell: $($shell.detail)"
     foreach ($service in $services) {
         Write-Host "- [$($service.state)] $($service.name): $($service.summary)"
         if ($service.details) {

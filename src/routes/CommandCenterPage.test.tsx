@@ -137,7 +137,7 @@ describe("CommandCenterPage", () => {
 		expect(screen.getByText("Diagnostics")).toBeTruthy();
 		expect(screen.getByText("Gateway Health Probe")).toBeTruthy();
 		expect(
-			screen.getByText("curl -sS http://127.0.0.1:3000/health | cat"),
+			screen.getByText("curl -sS http://127.0.0.1:3001/health | cat"),
 		).toBeTruthy();
 		expect(screen.getByText("Backend Health Probe")).toBeTruthy();
 		expect(screen.getByText("Backend Runtime Snapshot")).toBeTruthy();

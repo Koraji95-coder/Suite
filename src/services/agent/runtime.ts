@@ -42,7 +42,7 @@ export function createAgentServiceRuntimeState(): AgentServiceRuntimeState {
 	const gatewayUrl =
 		import.meta.env.VITE_AGENT_GATEWAY_URL ||
 		import.meta.env.VITE_AGENT_URL ||
-		"http://127.0.0.1:3000";
+		"http://127.0.0.1:3001";
 	const baseUrl = gatewayUrl.replace(/\/+$/, "");
 
 	if (!useBroker && typeof window !== "undefined") {

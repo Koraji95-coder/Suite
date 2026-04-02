@@ -14,6 +14,24 @@ const SERVER_INFO = {
 	name: "suite-repo-mcp",
 	version: "0.1.0",
 };
+const AUTODESK_PROJECT_FLOW_RESOURCE_URI =
+	"repo://docs/development/autocad-electrical-2026-project-flow";
+const AUTODESK_PROJECT_FLOW_RESOURCE_PATH = path.join(
+	REPO_ROOT,
+	"docs",
+	"development",
+	"autocad-electrical-2026-project-flow-reference.md",
+);
+const STATIC_RESOURCES = [
+	{
+		uri: AUTODESK_PROJECT_FLOW_RESOURCE_URI,
+		name: "AutoCAD Electrical 2026 Project Flow Reference",
+		description:
+			"Curated AutoCAD Electrical project-flow reference generated from Autodesk offline help.",
+		mimeType: "text/markdown",
+		filePath: AUTODESK_PROJECT_FLOW_RESOURCE_PATH,
+	},
+];
 const LATEST_PROTOCOL_VERSION = "2026-01-26";
 const SUPPORTED_PROTOCOL_VERSIONS = new Set([
 	LATEST_PROTOCOL_VERSION,
@@ -53,6 +71,9 @@ function createTextResult(text, isError = false) {
 
 function getWorkstationContext() {
 	const computerName = String(process.env.COMPUTERNAME || os.hostname() || "").trim();
+	const offlineHelpRoot = String(
+		process.env.SUITE_AUTODESK_OFFLINE_HELP_ROOT || "",
+	).trim();
 	const workstationId =
 		String(process.env.SUITE_WORKSTATION_ID || "").trim() ||
 		computerName ||
@@ -75,6 +96,7 @@ function getWorkstationContext() {
 		platform: process.platform,
 		repoRoot: REPO_ROOT,
 		source,
+		autodeskOfflineHelpRoot: offlineHelpRoot || null,
 		envStampedBy:
 			String(process.env.SUITE_MCP_ENV_STAMPED_BY || "").trim() || null,
 	};
@@ -99,6 +121,13 @@ function formatWorkstationContext() {
 	lines.push(`- Platform: ${context.platform}`);
 	lines.push(`- Repo Root: ${toPosix(context.repoRoot)}`);
 	lines.push(`- Source: ${context.source}`);
+	if (context.autodeskOfflineHelpRoot) {
+		lines.push(
+			`- Autodesk Offline Help Root: ${toPosix(
+				path.normalize(context.autodeskOfflineHelpRoot),
+			)}`,
+		);
+	}
 	if (context.envStampedBy) {
 		lines.push(`- MCP Env Stamp: ${context.envStampedBy}`);
 	}
@@ -162,6 +191,7 @@ function formatWorkstationContext() {
 	lines.push("- `SUITE_WATCHDOG_AUTOCAD_PLUGIN_CHECK_SCRIPT`");
 	lines.push("- `SUITE_WATCHDOG_AUTOCAD_READINESS_CHECK_SCRIPT`");
 	lines.push("- `SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT`");
+	lines.push("- `SUITE_AUTODESK_OFFLINE_HELP_ROOT`");
 	lines.push("- `SUITE_MCP_ENV_STAMPED_BY`");
 	return lines.join("\n");
 }
@@ -2052,6 +2082,7 @@ async function toolCheckSuiteWorkstation(args = {}) {
 			computerName: workstation.computerName,
 			platform: workstation.platform,
 			source: workstation.source,
+			autodeskOfflineHelpRoot: workstation.autodeskOfflineHelpRoot,
 			envStampedBy: workstation.envStampedBy,
 		},
 		backend: {
@@ -3043,6 +3074,9 @@ const TOOLS = [
 ];
 
 const TOOL_MAP = new Map(TOOLS.map((tool) => [tool.name, tool]));
+const RESOURCE_MAP = new Map(
+	STATIC_RESOURCES.map((resource) => [resource.uri, resource]),
+);
 
 function promptList() {
 	return Object.entries(PROMPTS).map(([name, value]) => ({
@@ -3067,6 +3101,28 @@ function promptGet(name, args = {}) {
 					type: "text",
 					text,
 				},
+			},
+		],
+	};
+}
+
+function resourceList() {
+	return STATIC_RESOURCES.map(({ filePath, ...resource }) => resource);
+}
+
+async function resourceRead(uri) {
+	const resource = RESOURCE_MAP.get(uri);
+	if (!resource) {
+		throw new Error(`Unknown resource: ${uri}`);
+	}
+
+	const text = await fs.readFile(resource.filePath, "utf8");
+	return {
+		contents: [
+			{
+				uri: resource.uri,
+				mimeType: resource.mimeType,
+				text,
 			},
 		],
 	};
@@ -3146,7 +3202,7 @@ async function handleRequest(message) {
 
 		if (method === "resources/list") {
 			return sendResponse(id, {
-				resources: [],
+				resources: resourceList(),
 			});
 		}
 
@@ -3154,6 +3210,22 @@ async function handleRequest(message) {
 			return sendResponse(id, {
 				resourceTemplates: [],
 			});
+		}
+
+		if (method === "resources/read") {
+			const uri = params?.uri;
+			if (typeof uri !== "string") {
+				return sendError(id, -32602, "resources/read requires a string uri");
+			}
+			try {
+				return sendResponse(id, await resourceRead(uri));
+			} catch (error) {
+				return sendError(
+					id,
+					-32602,
+					String(error?.message || error),
+				);
+			}
 		}
 
 		if (method === "tools/call") {

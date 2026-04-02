@@ -1,0 +1,14 @@
+.git
+.vscode
+node_modules
+dist
+coverage
+playwright-report
+test-results
+backend/.venv
+backend/__pycache__
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+*.log

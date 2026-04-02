@@ -1,0 +1,135 @@
+{
+  "serviceOrder": [
+    "supabase",
+    "backend",
+    "gateway",
+    "frontend",
+    "watchdog-filesystem",
+    "watchdog-autocad"
+  ],
+  "services": {
+    "supabase": {
+      "shortLabel": "SB",
+      "bootLabel": "Supabase",
+      "description": "PostgreSQL, Auth, Storage, and local APIs"
+    },
+    "backend": {
+      "shortLabel": "BE",
+      "bootLabel": "Watchdog Backend",
+      "description": "API server and runtime jobs"
+    },
+    "gateway": {
+      "shortLabel": "GW",
+      "bootLabel": "API Gateway",
+      "description": "Local transport and auth edge"
+    },
+    "frontend": {
+      "shortLabel": "UI",
+      "bootLabel": "Suite Frontend",
+      "description": "Vite shell and local app routes"
+    },
+    "watchdog-filesystem": {
+      "shortLabel": "FS",
+      "bootLabel": "Filesystem Collector",
+      "description": "Filesystem watcher and activity intake"
+    },
+    "watchdog-autocad": {
+      "shortLabel": "AC",
+      "bootLabel": "AutoCAD Collector",
+      "description": "Drawing tracker and plugin heartbeat"
+    }
+  },
+  "bootstrapStepOrder": [
+    "docker-ready",
+    "supabase-start",
+    "supabase-env",
+    "watchdog-filesystem",
+    "watchdog-autocad-startup",
+    "watchdog-autocad-plugin",
+    "backend",
+    "gateway",
+    "frontend"
+  ],
+  "bootstrapSteps": {
+    "docker-ready": {
+      "label": "Docker Engine",
+      "shortLabel": "DK"
+    },
+    "supabase-start": {
+      "label": "Supabase",
+      "shortLabel": "SB"
+    },
+    "supabase-env": {
+      "label": "Supabase Env",
+      "shortLabel": "SE"
+    },
+    "watchdog-filesystem": {
+      "label": "Filesystem Collector",
+      "shortLabel": "FS"
+    },
+    "watchdog-autocad-startup": {
+      "label": "AutoCAD Collector",
+      "shortLabel": "AC"
+    },
+    "watchdog-autocad-plugin": {
+      "label": "AutoCAD Plugin",
+      "shortLabel": "AP"
+    },
+    "backend": {
+      "label": "Watchdog Backend",
+      "shortLabel": "BE"
+    },
+    "gateway": {
+      "label": "API Gateway",
+      "shortLabel": "GW"
+    },
+    "frontend": {
+      "label": "Suite Frontend",
+      "shortLabel": "UI"
+    }
+  },
+  "workshopRouteShortcuts": {
+    "developer-portal": {
+      "title": "Developer Portal",
+      "path": "/app/developer",
+      "description": "Developer workshop launcher for staged tools, publishing context, and lab surfaces."
+    },
+    "command-center": {
+      "title": "Command Center",
+      "path": "/app/command-center",
+      "description": "Developer diagnostics toolshed for Suite Doctor, hosted push, and incident evidence."
+    },
+    "watchdog": {
+      "title": "Watchdog",
+      "path": "/app/watchdog",
+      "description": "Drawing activity and workstation reporting route."
+    }
+  },
+  "supportActions": [
+    {
+      "id": "open-bootstrap-log",
+      "label": "Open bootstrap log",
+      "description": "Open the live bootstrap transcript for the current workstation runtime."
+    },
+    {
+      "id": "open-status-dir",
+      "label": "Open status folder",
+      "description": "Open the local runtime status directory that stores bootstrap snapshots and logs."
+    },
+    {
+      "id": "copy-summary",
+      "label": "Copy support summary",
+      "description": "Copy the current runtime, doctor, and service summary for support handoff."
+    },
+    {
+      "id": "apply-workstation-profile",
+      "label": "Apply workstation profile",
+      "description": "Re-stamp the workstation identity and local MCP env block for this machine."
+    },
+    {
+      "id": "export-bundle",
+      "label": "Export support bundle",
+      "description": "Package the current runtime logs, doctor snapshot, and Watchdog evidence into one support archive."
+    }
+  ]
+}

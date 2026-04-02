@@ -48,7 +48,7 @@ internal static class ProcessRunner
 
         try
         {
-            await process.WaitForExitAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -56,8 +56,8 @@ internal static class ProcessRunner
             throw;
         }
 
-        var standardOutput = await stdOutTask;
-        var standardError = await stdErrTask;
+        var standardOutput = await stdOutTask.ConfigureAwait(false);
+        var standardError = await stdErrTask.ConfigureAwait(false);
 
         return new ProcessRunResult(process.ExitCode, standardOutput.Trim(), standardError.Trim());
     }

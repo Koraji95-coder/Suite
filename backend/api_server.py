@@ -602,7 +602,7 @@ _SUPABASE_JWKS_CLIENT: Optional[PyJWKClient] = None
 AGENT_GATEWAY_URL = (
     (os.environ.get("AGENT_GATEWAY_URL") or "").strip()
     or (os.environ.get("VITE_AGENT_GATEWAY_URL") or "").strip()
-    or "http://127.0.0.1:3000"
+    or "http://127.0.0.1:3001"
 )
 AGENT_WEBHOOK_SECRET = runtime_config_resolve_agent_webhook_secret_helper(
     os_module=os,

@@ -69,14 +69,15 @@ function Get-DockerStatus {
 }
 
 function Get-SupabaseStatus {
-    $apiListening = Test-PortListening -Port 54321
-    $dbListening = Test-PortListening -Port 54322
+    $supabasePorts = Get-SuiteSupabaseLocalPorts -RepoRoot $resolvedRepoRoot
+    $apiListening = Test-PortListening -Port $supabasePorts.api
+    $dbListening = Test-PortListening -Port $supabasePorts.db
 
     if ($apiListening -and $dbListening) {
-        return New-ComponentStatus -Key "supabase" -Name "Supabase" -State "ready" -Ok $true -Summary "API and DB ports are listening." -Details "API 54321, DB 54322."
+        return New-ComponentStatus -Key "supabase" -Name "Supabase" -State "ready" -Ok $true -Summary "API and DB ports are listening." -Details "API $($supabasePorts.api), DB $($supabasePorts.db)."
     }
     if ($apiListening -or $dbListening) {
-        return New-ComponentStatus -Key "supabase" -Name "Supabase" -State "starting" -Summary "Supabase is partially online." -Details "API 54321: $apiListening. DB 54322: $dbListening."
+        return New-ComponentStatus -Key "supabase" -Name "Supabase" -State "starting" -Summary "Supabase is partially online." -Details "API $($supabasePorts.api): $apiListening. DB $($supabasePorts.db): $dbListening."
     }
 
     return New-ComponentStatus -Key "supabase" -Name "Supabase" -State "stopped" -Summary "Local Supabase is not running."

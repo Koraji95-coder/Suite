@@ -4,6 +4,10 @@ async function loadSupabaseCli() {
 	const modulePath = "../../scripts/lib/supabase-cli.mjs";
 	return (await import(modulePath)) as {
 		isRetriableSupabaseStartFailure: (outputText?: string) => boolean;
+		resolveSupabaseAnalyticsEnabled: (
+			envMap?: Record<string, string | undefined>,
+			platform?: string,
+		) => boolean | null;
 		runSupabaseStartWithRetry: (
 			runOnce: () => Promise<{
 				status?: number | null;
@@ -50,6 +54,38 @@ describe("isRetriableSupabaseStartFailure", () => {
 	it("ignores non-transient startup failures", async () => {
 		const { isRetriableSupabaseStartFailure } = await loadSupabaseCli();
 		expect(isRetriableSupabaseStartFailure("Docker Desktop is not running.")).toBe(false);
+	});
+});
+
+describe("resolveSupabaseAnalyticsEnabled", () => {
+	it("disables analytics by default on Windows", async () => {
+		const { resolveSupabaseAnalyticsEnabled } = await loadSupabaseCli();
+		expect(resolveSupabaseAnalyticsEnabled({}, "win32")).toBe(false);
+	});
+
+	it("preserves the checked-in config on non-Windows when no override is set", async () => {
+		const { resolveSupabaseAnalyticsEnabled } = await loadSupabaseCli();
+		expect(resolveSupabaseAnalyticsEnabled({}, "linux")).toBeNull();
+	});
+
+	it("honors an explicit opt-in override on Windows", async () => {
+		const { resolveSupabaseAnalyticsEnabled } = await loadSupabaseCli();
+		expect(
+			resolveSupabaseAnalyticsEnabled(
+				{ SUITE_SUPABASE_LOCAL_ANALYTICS_ENABLED: "true" },
+				"win32",
+			),
+		).toBe(true);
+	});
+
+	it("honors an explicit opt-out override on non-Windows", async () => {
+		const { resolveSupabaseAnalyticsEnabled } = await loadSupabaseCli();
+		expect(
+			resolveSupabaseAnalyticsEnabled(
+				{ SUITE_SUPABASE_LOCAL_ANALYTICS_ENABLED: "false" },
+				"linux",
+			),
+		).toBe(false);
 	});
 });
 

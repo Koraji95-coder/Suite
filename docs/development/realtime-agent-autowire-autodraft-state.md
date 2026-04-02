@@ -7,7 +7,7 @@ This document captures how the system behaves in real time right now, after the 
 ## 1) Runtime Topology (Current)
 
 - Frontend: Vite app (`http://localhost:5173`)
-- Agent gateway: Suite-native gateway (`npm run gateway:dev`, typically `http://127.0.0.1:3000`)
+- Agent gateway: Suite-native gateway (`npm run gateway:dev`, typically `http://127.0.0.1:3001`)
 - Backend API: Flask app (`/api/*`)
 - Local model runtime: Ollama
 

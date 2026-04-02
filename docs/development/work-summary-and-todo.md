@@ -137,14 +137,14 @@ Current local MCP server config is in `%USERPROFILE%\.codex\config.toml` under `
 
 Current live workstation assumptions:
 
-- workstation id: `DUSTINWARD`
-- workstation label: `Dustin workstation`
-- workstation role: `active`
+- workstation id: `DUSTIN-WORK`
+- workstation label: `Dustin Work station`
+- workstation role: `work`
 - current explicit MCP env includes workstation identity plus filesystem collector, AutoCAD collector, plugin, readiness, and backend startup metadata
 - `tools/suite-repo-mcp/workstation-profiles.json` is the versioned workstation profile source-of-truth
 - `scripts/sync-suite-workstation-profile.ps1` is the only supported path to stamp `mcp_servers.suite_repo_mcp.env`
 - `scripts/restore-suite-local-state.ps1` now reuses the shared workstation profile sync helper
-- local watchdog startup/install state on `DUSTINWARD` is expected to use HKCU `Run` fallback when scheduled-task registration is denied
+- local watchdog startup/install state on `DUSTIN-WORK` is expected to use HKCU `Run` fallback when scheduled-task registration is denied
 - AutoCAD readiness can still report `awaiting_autocad` until `tracker-state.json` is emitted on this workstation
 
 MCP workstation prep closeout status:

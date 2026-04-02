@@ -4,18 +4,21 @@ Use this when setting up Suite on a new Windows workstation or when standardizin
 
 This bring-up keeps:
 
-- `Suite` as its own repo at `C:\Dev\Suite`
-- `Office / DailyDesk` as its own repo or workspace at `C:\Dev\Daily`
+- `Suite` as its own repo at `C:\Users\<you>\Documents\GitHub\Suite`
+- `Office / DailyDesk` as its own repo or workspace at `C:\Users\<you>\Documents\GitHub\Office`
+- Office live knowledge/state in Dropbox:
+  - `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\Knowledge`
+  - `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\State`
 - `Suite Runtime Control` inside the `Suite` repo
 
 The bootstrap is intentionally **repo + bootstrap**, not MSI/installer. Runtime Control is the front door after bring-up.
 
 ## Standard Local Roots
 
-- `C:\Dev\Suite`
-- `C:\Dev\Daily`
+- `C:\Users\<you>\Documents\GitHub\Suite`
+- `C:\Users\<you>\Documents\GitHub\Office`
 
-Legacy OneDrive Daily paths are still supported as a compatibility fallback, but they are no longer the preferred default.
+Legacy OneDrive and `C:\Dev\*` layouts are still compatibility fallbacks, but they are no longer the preferred default.
 
 ## Required Prerequisites
 
@@ -39,9 +42,8 @@ Optional:
 - `DailyDesk` remains separate from `Suite`.
 - Runtime Control resolves Office in this order:
   1. workstation-local companion config
-  2. env / Codex config override
-  3. stable `C:\Dev\Daily` default
-  4. legacy OneDrive fallback
+  2. canonical `Documents\GitHub\Office` repo root
+  3. compatibility overrides / legacy fallbacks
 
 ## First-Time Bring-Up
 
@@ -55,7 +57,7 @@ That does a no-side-effects validation pass and reports:
 
 - prerequisites
 - target Suite and Daily roots
-- Office executable target path
+- Office broker/runtime shell target paths
 - what bootstrap would do next
 
 For the real bootstrap:
@@ -67,14 +69,14 @@ npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailyRepoUrl https://
 If both repos are already cloned into the preferred roots, use that instead:
 
 ```powershell
-git clone https://github.com/Koraji95-coder/Suite.git C:\Dev\Suite
-git clone https://github.com/Koraji95-coder/Office.git C:\Dev\Daily
-cd C:\Dev\Suite
+git clone https://github.com/Koraji95-coder/Suite.git C:\Users\<you>\Documents\GitHub\Suite
+git clone https://github.com/Koraji95-coder/Office.git C:\Users\<you>\Documents\GitHub\Office
+cd C:\Users\<you>\Documents\GitHub\Suite
 npm run workstation:bringup:validate
 npm run workstation:bringup -- -WorkstationId DUSTIN-WORK
 ```
 
-That is the preferred path. The bootstrap script will detect the existing `C:\Dev\Daily` workspace and use it without needing `-DailyRepoUrl`.
+That is the preferred path. The bootstrap script will detect the existing `Documents\GitHub\Office` workspace and use it without needing `-DailyRepoUrl`.
 
 If `DailyDesk` is not yet in its own Git repo, you can hydrate the Daily workspace from an existing local source path instead:
 
@@ -90,9 +92,9 @@ The bootstrap script will:
 4. run `npm install`
 5. install Python API dependencies
 6. build Suite .NET projects needed for Runtime Control
-7. publish `DailyDesk.exe`
+7. publish the local Office broker for the shared shell
 8. stamp the workstation profile
-9. write the workstation-local Office path config
+9. auto-create the Dropbox Office Knowledge/State roots and write workstation-local Office config
 10. install Runtime Control and watchdog startup tasks
 11. run Suite runtime bootstrap and status checks
 
@@ -110,6 +112,12 @@ After bootstrap, keep the workstation in explicit local mode:
 npm run supabase:mode:local
 npm run supabase:mail:gmail
 ```
+
+Windows note:
+
+- Keep local Supabase analytics disabled for normal Suite workstation use.
+- On Windows, the Supabase analytics sidecar starts Vector/Logflare and expects Docker's insecure TCP daemon export on `host.docker.internal:2375`.
+- Suite now disables that sidecar by default on Windows. Only opt in by setting `SUITE_SUPABASE_LOCAL_ANALYTICS_ENABLED=true` if you explicitly need centralized local Supabase container log ingestion and have also enabled Docker's insecure daemon export.
 
 Hosted auth / project targeting still remains explicit:
 
@@ -164,15 +172,53 @@ npm run workstation:control-panel
 Expected checks:
 
 - Runtime Control opens
-- the support panel shows the stable Suite root, Daily root, and Office executable path
-- Office appears under `Companion Apps`
-- `Open Office` launches `DailyDesk.exe`
+- the support panel shows workstation identity, startup owner, Docker ownership, env drift, and admin continuity
+- the support panel shows the stable Suite root, Daily root, and Dropbox Office roots
+- Office is embedded through the local broker inside the shared shell
 
 If WebView2 is missing or blocked, use the legacy fallback temporarily:
 
 ```powershell
 npm run workstation:control-panel:legacy
 ```
+
+## Recovery-Only Local Supabase Snapshot Lane
+
+This lane is optional and should not be part of normal workstation switching.
+
+- Local Supabase remains machine-local and disposable by default.
+- Schema continuity stays Git + repo migrations.
+- This snapshot lane only exists for special-case local data/auth recovery.
+
+List existing local snapshots:
+
+```powershell
+npm run supabase:snapshot:list
+```
+
+Export a local recovery snapshot:
+
+```powershell
+npm run supabase:snapshot:export -- --name before-runtime-reconcile
+```
+
+Preview a restore plan without changing the local database:
+
+```powershell
+npm run supabase:snapshot:import -- --snapshot latest --dry-run
+```
+
+Run a destructive local restore from a snapshot:
+
+```powershell
+npm run supabase:snapshot:import -- --snapshot latest --force
+```
+
+Notes:
+
+- Import resets the local database first, then replays the data-only dump.
+- Local storage object blobs and Docker volumes are not included.
+- If repo migrations changed since the snapshot was created, import will stop unless you explicitly allow migration drift.
 
 ## Local State Mirror / Restore
 
@@ -197,9 +243,9 @@ The mirror intentionally does not copy Codex auth or the full Codex SQLite datab
 
 1. Commit and push both repos.
 2. Mirror workstation-local state if needed.
-3. Clone or pull `Suite` into `C:\Dev\Suite`.
-4. Clone or pull `Daily` into `C:\Dev\Daily`.
-5. Run `npm run workstation:bringup -- -WorkstationId ...` from `C:\Dev\Suite`.
+3. Clone or pull `Suite` into `C:\Users\<you>\Documents\GitHub\Suite`.
+4. Clone or pull `Office` into `C:\Users\<you>\Documents\GitHub\Office`.
+5. Run `npm run workstation:bringup -- -WorkstationId ...` from `C:\Users\<you>\Documents\GitHub\Suite`.
 6. Run `npm run workstation:restore -- ...` if you carried local-only state.
 7. Open Runtime Control and confirm Office + runtime + watchdog health.
 

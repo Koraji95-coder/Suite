@@ -601,7 +601,6 @@ export function useTransmittalBuilderState(
 		draft.standardDocumentSource,
 		draft.transmittalType,
 		files.pdfs,
-		packageRegisterRows,
 		projectMetadataRows,
 		projectMetadataWarnings,
 	]);

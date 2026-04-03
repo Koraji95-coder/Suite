@@ -201,7 +201,10 @@ namespace SuiteCadAuthoring
         private const string RegAppName = "SUITE_CAD_AUTHORING";
         private const string ConductorLayerName = "SUITE_TERM_ROUTE";
         private const string JumperLayerName = "SUITE_TERM_JUMPER";
-        private static readonly Regex TerminalLabelTagRegex = new Regex("^T(?:ERMINAL)?_?(\\d+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex TerminalLabelTagRegex = new Regex(
+            "^(?:T(?:ERMINAL)?|TERM)[_-]?0*(\\d+)(?:[_-]?LABEL)?$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase
+        );
         private static readonly string[] StripIdKeys = { "STRIP_ID", "STRIP", "TERMINAL_STRIP", "TB_ID", "TS_ID" };
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {

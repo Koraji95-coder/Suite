@@ -2,7 +2,7 @@
 
 Suite is a local-first engineering operations workspace that combines:
 
-- CAD-integrated workflow apps (AutoWire, AutoDraft, ground grid, ETAP cleanup, etc.)
+- CAD-integrated workflow apps (AutoWire, AutoDraft, ground grid, Drawing Cleanup, etc.)
 - a Flask backend bridge for AutoCAD and orchestration APIs
 - a profile-based multi-agent system (Suite agent gateway + Ollama)
 - project operations UX (dashboard, projects, calendar, docs, command center)
@@ -31,12 +31,13 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
   - controlled execute path with override reason on failing backchecks
 - **Ground Grid Generation** (`/app/apps/ground-grid-generation`)
   - coordinate workflows + plotting/export support
-- **ETAP DXF Cleanup** (`/app/apps/etap-dxf-cleanup`)
-  - bridge-driven cleanup command execution
+- **Batch Find & Replace** (`/app/apps/batch-find-replace`)
+  - review-first Drawing Cleanup for dirty imports and noisy active drawings
+  - active-drawing CAD replacement
+  - file-based replacement
 - Additional active tools:
   - Drawing List Manager
   - Transmittal Builder
-  - Batch Find and Replace
   - Standards Checker
   - Graph Explorer
 
@@ -79,11 +80,11 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
 ### .NET Services
 
 - `dotnet/suite-cad-authoring` (`net8.0-windows`)
-  - in-process ACADE host for project setup, title-block apply, standards review, and other native CAD actions
+  - in-process ACADE host for project setup, standards review, batch/terminal authoring, conduit-route dotnet-provider actions, and other native CAD actions
 - `dotnet/autodraft-api-contract` (`net8.0`)
   - AutoDraft contract service (`/api/autodraft/*`)
 - `dotnet/named-pipe-bridge` (`net8.0`)
-  - local named-pipe bridge for remaining bridge-backed AutoCAD actions
+  - local named-pipe bridge kept for explicit diagnostics and manual validation against `SUITE_AUTOCAD_PIPE`
 
 ### Suite Agent Gateway
 
@@ -101,14 +102,14 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
 - Backend: Flask, Flask-CORS, Flask-Limiter, Flask-Sock, pywin32
 - Auth: Supabase (email-link first, optional passkey rollout paths)
 - Agent runtime: Suite-native gateway + Ollama local models
-- .NET: ASP.NET Core (AutoDraft contract) + `suite-cad-authoring` + named-pipe bridge for remaining bridge-backed CAD flows
+- .NET: ASP.NET Core (AutoDraft contract) + `suite-cad-authoring` + optional named-pipe bridge for explicit diagnostics or bridge-mode AutoDraft fallback
 - Quality: Biome, TypeScript typecheck, Vitest, Playwright, pytest, dotnet test
 
 ## Repository Layout
 
 - `src/` - frontend app, routes, components, services
 - `backend/` - Flask API bridge and route groups
-- `dotnet/` - Runtime Control, CAD host, contract, and remaining bridge transport projects
+- `dotnet/` - Runtime Control, CAD host, contract, and diagnostic bridge projects
 - `docs/` - canonical documentation and runbooks
 - `scripts/` - env sync, architecture model, gateway/dev orchestration helpers
 
@@ -142,8 +143,13 @@ python -m pip install -r backend/requirements-api.lock.txt
 ```bash
 dotnet restore dotnet/Suite.RuntimeControl/Suite.RuntimeControl.csproj
 dotnet restore dotnet/suite-cad-authoring/SuiteCadAuthoring.csproj
-dotnet restore dotnet/named-pipe-bridge/NamedPipeServer.csproj
 dotnet restore dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj
+```
+
+Optional manual restore for legacy pipe diagnostics:
+
+```bash
+dotnet restore dotnet/named-pipe-bridge/NamedPipeServer.csproj
 ```
 
 ## 2) Environment Setup
@@ -180,12 +186,17 @@ This orchestrates:
 - backend (`npm run backend:coords:dev`)
 - gateway (`npm run gateway:dev`)
 - AutoDraft .NET API (`dotnet run --project dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj`)
-- named-pipe bridge for remaining bridge-backed CAD flows (`dotnet run --project dotnet/named-pipe-bridge/NamedPipeServer.csproj`)
 - Redis startup via Docker (`suite-redis-local` on `127.0.0.1:6379` by default)
+
+The named-pipe bridge is not started by default. Start it manually only for explicit diagnostics/manual validation against `SUITE_AUTOCAD_PIPE`, or for an intentional bridge-mode AutoDraft fallback.
 
 To disable AutoDraft .NET API autostart in full mode:
 
 - `SUITE_DEV_AUTOSTART_AUTODRAFT_DOTNET=false`
+
+To opt into legacy named-pipe bridge autostart in full mode:
+
+- `SUITE_DEV_AUTOSTART_NAMED_PIPE_BRIDGE=true`
 
 ### Redis + limiter startup behavior
 
@@ -332,6 +343,7 @@ Related docs:
 - `POST /api/conduit-route/terminal-routes/draw`
 - `POST /api/conduit-route/terminal-labels/sync`
 - `POST /api/conduit-route/bridge/terminal-labels/sync`
+  - compatibility alias; dotnet-backed conduit routing now uses the in-process ACADE host rather than the named-pipe bridge
 
 ### AutoDraft
 

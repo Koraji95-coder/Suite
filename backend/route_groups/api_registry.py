@@ -80,6 +80,7 @@ def register_route_groups(
     send_autocad_dotnet_command: Optional[Callable[[str, dict[str, Any]], dict[str, Any]]],
     validate_layer_config: Callable[[Any], dict[str, Any]],
     traceback_module: Any,
+    send_autocad_acade_command: Optional[Callable[[str, dict[str, Any]], dict[str, Any]]] = None,
 ) -> None:
     """Register extracted route groups on the Flask app."""
     app.register_blueprint(
@@ -113,6 +114,7 @@ def register_route_groups(
             batch_session_cookie=batch_session_cookie,
             batch_session_ttl_seconds=batch_session_ttl_seconds,
             send_autocad_dotnet_command=send_autocad_dotnet_command,
+            send_autocad_acade_command=send_autocad_acade_command,
         )
     )
     app.register_blueprint(
@@ -122,6 +124,7 @@ def register_route_groups(
             require_supabase_user=require_supabase_user,
             is_valid_api_key=is_valid_api_key,
             send_autocad_dotnet_command=send_autocad_dotnet_command,
+            send_autocad_acade_command=send_autocad_acade_command,
         )
     )
     app.register_blueprint(
@@ -216,6 +219,7 @@ def register_route_groups(
             is_valid_api_key=is_valid_api_key,
             schedule_cleanup=schedule_cleanup,
             send_autocad_dotnet_command=send_autocad_dotnet_command,
+            send_autocad_acade_command=send_autocad_acade_command,
         )
     )
     app.register_blueprint(
@@ -269,6 +273,7 @@ def register_route_groups(
             pythoncom=pythoncom,
             conduit_route_autocad_provider=conduit_route_autocad_provider,
             send_autocad_dotnet_command=send_autocad_dotnet_command,
+            send_autocad_acade_command=send_autocad_acade_command,
             validate_layer_config=validate_layer_config,
             traceback_module=traceback_module,
         )

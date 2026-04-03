@@ -184,7 +184,7 @@ This is a restart/handoff doc summarizing what has already been completed and wh
 
 - Monetization, org/admin/seats/licensing, and wider rollout/productization remain parked in:
   - `docs/development/monetization-readiness-backlog.md`
-- Any future graduation of dev-only tools like AutoDraft, AutoWire, Ground Grid, Batch Find & Replace, ETAP DXF Cleanup, Whiteboard, and Agents should happen only after they are explicitly promoted out of the workshop.
+- Any future graduation of dev-only tools like AutoDraft, AutoWire, Ground Grid, Batch Find & Replace, Drawing Cleanup, Whiteboard, and Agents should happen only after they are explicitly promoted out of the workshop.
 - The next major structural milestone beyond this checkpoint would be a full gateway/runtime archival phase for ZeroClaw-era historical material, not an active Suite product dependency.
 
 ## March 18, 2026 Checkpoint

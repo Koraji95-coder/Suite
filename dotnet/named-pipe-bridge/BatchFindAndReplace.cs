@@ -283,7 +283,6 @@ static class PipeRouter
                 "conduit_route_obstacle_scan" => ObstacleScanAction.Handle(payload),
                 "conduit_route_terminal_routes_draw" => TerminalRouteDrawAction.Handle(payload),
                 "conduit_route_terminal_labels_sync" => TerminalLabelSyncAction.Handle(payload),
-                "etap_dxf_cleanup_run" => EtapCleanupAction.Handle(payload),
                 "suite_drawing_list_scan" => SuiteDrawingListScanAction.Handle(payload),
                 "suite_title_block_apply" => SuiteTitleBlockApplyAction.Handle(payload),
                 "suite_batch_find_replace_preview" => SuiteBatchFindReplacePreviewAction.Handle(payload),
@@ -468,23 +467,6 @@ static partial class ConduitRouteStubHandlers
     private const double ArcQuarterTurnTolerance = 1e-6;
     private const int DefaultComReadRetryAttempts = 3;
     private const int DefaultComReadRetryDelayMs = 35;
-    private const int DefaultEtapCleanupTimeoutMs = 90_000;
-    private static readonly HashSet<string> EtapCleanupCommandAllowList = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "ETAPFIX",
-        "ETAPTEXT",
-        "ETAPBLOCKS",
-        "ETAPLAYERFIX",
-        "ETAPOVERLAP",
-        "ETAPIMPORT",
-    };
-    private static readonly string[] EtapPluginRelativePathCandidates =
-    {
-        Path.Combine("src", "components", "apps", "dxfer", "bin", "Debug", "net8.0-windows", "EtapDxfCleanup.dll"),
-        Path.Combine("src", "components", "apps", "dxfer", "bin", "Release", "net8.0-windows", "EtapDxfCleanup.dll"),
-        Path.Combine("src", "components", "apps", "dxfer", "bin", "Debug", "net48", "EtapDxfCleanup.dll"),
-        Path.Combine("src", "components", "apps", "dxfer", "bin", "Release", "net48", "EtapDxfCleanup.dll"),
-    };
     private const string RouteGeometryVersion = "v1.2";
 
     static ConduitRouteStubHandlers()
@@ -654,92 +636,6 @@ static partial class ConduitRouteStubHandlers
         public int Failed { get; init; }
     }
 
-
-
-
-
-
-    private static string TryResolveDefaultEtapPluginDllPath()
-    {
-        var envPath = (Environment.GetEnvironmentVariable("AUTOCAD_ETAP_PLUGIN_DLL_PATH") ?? "")
-            .Trim()
-            .Trim('"');
-        if (!string.IsNullOrWhiteSpace(envPath))
-        {
-            try
-            {
-                return Path.GetFullPath(envPath);
-            }
-            catch
-            {
-                return envPath;
-            }
-        }
-
-        foreach (var root in EnumerateSearchRoots())
-        {
-            foreach (var relativePath in EtapPluginRelativePathCandidates)
-            {
-                string candidatePath;
-                try
-                {
-                    candidatePath = Path.GetFullPath(Path.Combine(root, relativePath));
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if (File.Exists(candidatePath))
-                {
-                    return candidatePath;
-                }
-            }
-        }
-
-        return "";
-    }
-
-    private static IEnumerable<string> EnumerateSearchRoots()
-    {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var startPoints = new[]
-        {
-            Directory.GetCurrentDirectory(),
-            AppContext.BaseDirectory,
-        };
-
-        foreach (var start in startPoints)
-        {
-            if (string.IsNullOrWhiteSpace(start))
-            {
-                continue;
-            }
-
-            DirectoryInfo? current;
-            try
-            {
-                current = new DirectoryInfo(Path.GetFullPath(start));
-            }
-            catch
-            {
-                continue;
-            }
-
-            var depth = 0;
-            while (current is not null && depth < 12)
-            {
-                var fullPath = current.FullName;
-                if (seen.Add(fullPath))
-                {
-                    yield return fullPath;
-                }
-
-                current = current.Parent;
-                depth += 1;
-            }
-        }
-    }
 
     private static (bool Completed, bool SawActiveCommand, bool CommandStateAvailable, int LastCommandMask)
         WaitForAutoCadCommandCompletion(AutoCadSession session, int timeoutMs)

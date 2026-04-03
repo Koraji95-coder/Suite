@@ -173,36 +173,33 @@ export function AutomationRecipePanel({
     );
     setRecipeId(selectedIssueSet?.recipeSnapshotId || createLocalId("recipe"));
   }, [
-    selectedIssueSet?.id,
     selectedIssueSet?.recipeSnapshotId,
     selectedIssueSet?.workPackageId,
   ]);
 
+  const hasMarkupSnapshots = Boolean(autoDraftSnapshot?.markupSnapshotIds?.length);
+  const hasPublishedSnapshots = Boolean(
+    autoDraftSnapshot?.publishedSnapshots?.length,
+  );
+  const hasAutoWireSnapshot = Boolean(
+    autoWireSnapshot?.scheduleSnapshotId &&
+      (autoWireSnapshot?.stripRows?.length ?? 0) > 0,
+  );
+  const hasCadUtilityRules = Boolean(
+    cadUtilitySnapshot?.rules?.some((rule) => rule.find.trim().length > 0),
+  );
+
   useEffect(() => {
     setEnabledSources((current) => ({
-      autodraft:
-        current.autodraft ||
-        Boolean(autoDraftSnapshot?.markupSnapshotIds?.length) ||
-        Boolean(autoDraftSnapshot?.publishedSnapshots?.length),
-      autowire:
-        current.autowire ||
-        Boolean(
-          autoWireSnapshot?.scheduleSnapshotId &&
-          (autoWireSnapshot?.stripRows?.length ?? 0) > 0,
-        ),
-      cadUtils:
-        current.cadUtils ||
-        Boolean(
-          cadUtilitySnapshot?.rules?.some(
-            (rule) => rule.find.trim().length > 0,
-          ),
-        ),
+      autodraft: current.autodraft || hasMarkupSnapshots || hasPublishedSnapshots,
+      autowire: current.autowire || hasAutoWireSnapshot,
+      cadUtils: current.cadUtils || hasCadUtilityRules,
     }));
   }, [
-    autoDraftSnapshot?.queueItems.length,
-    autoWireSnapshot?.scheduleSnapshotId,
-    autoWireSnapshot?.stripRows,
-    cadUtilitySnapshot?.rules,
+    hasAutoWireSnapshot,
+    hasCadUtilityRules,
+    hasMarkupSnapshots,
+    hasPublishedSnapshots,
   ]);
 
   useEffect(() => {

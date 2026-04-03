@@ -326,7 +326,7 @@ function buildFilenameFromDisposition(
   contentDisposition: string | null,
   fallbackFilename: string,
 ) {
-  const match = contentDisposition?.match(/filename=\"?([^\";]+)\"?/i);
+  const match = contentDisposition?.match(/filename="?([^";]+)"?/i);
   return match?.[1] || fallbackFilename;
 }
 

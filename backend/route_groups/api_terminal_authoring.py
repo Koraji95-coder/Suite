@@ -30,6 +30,7 @@ def create_terminal_authoring_blueprint(
     is_valid_api_key: Callable[[Optional[str]], bool],
     schedule_cleanup: Callable[[str], None],
     send_autocad_dotnet_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
+    send_autocad_acade_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
 ) -> Blueprint:
     """Create project terminal authoring routes under /api/conduit-route."""
 
@@ -98,6 +99,38 @@ def create_terminal_authoring_blueprint(
         result_payload = response.get("result")
         if not isinstance(result_payload, dict):
             raise RuntimeError("Invalid .NET bridge result payload.")
+        return result_payload
+
+    def _call_acade_host_action(
+        *,
+        action: str,
+        payload: Dict[str, Any],
+        request_id: str,
+    ) -> Dict[str, Any]:
+        if send_autocad_acade_command is None:
+            raise RuntimeError("AutoCAD in-process ACADE host is not configured.")
+
+        response = send_autocad_acade_command(
+            action,
+            {
+                **payload,
+                "requestId": request_id,
+            },
+        )
+        if not isinstance(response, dict):
+            raise RuntimeError("Malformed response from the AutoCAD in-process ACADE host.")
+        if not response.get("ok"):
+            raise RuntimeError(
+                str(
+                    response.get("error")
+                    or response.get("message")
+                    or "Unknown in-process ACADE host error."
+                )
+            )
+
+        result_payload = response.get("result")
+        if not isinstance(result_payload, dict):
+            raise RuntimeError("Invalid in-process ACADE host result payload.")
         return result_payload
 
     def _is_absolute_windows_path(path: str) -> bool:
@@ -422,7 +455,7 @@ def create_terminal_authoring_blueprint(
                     "No AutoCAD Electrical .wdp project file was found under the project root. ACAD writes can continue, but ACADE context could not be verified."
                 )
 
-            bridge_result = _call_dotnet_bridge_action(
+            host_result = _call_acade_host_action(
                 action="suite_terminal_authoring_project_preview",
                 payload={
                     "projectId": _normalize_text(payload.get("projectId")),
@@ -434,15 +467,15 @@ def create_terminal_authoring_blueprint(
                 },
                 request_id=request_id,
             )
-            if not bridge_result.get("success", False):
-                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
-                return jsonify(bridge_result), status_code
+            if not host_result.get("success", False):
+                status_code = 400 if host_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(host_result), status_code
 
-            data = bridge_result.get("data") or {}
-            bridge_warnings = bridge_result.get("warnings") or []
+            data = host_result.get("data") or {}
+            host_warnings = host_result.get("warnings") or []
             response_warnings = warnings + [
                 _normalize_text(entry)
-                for entry in bridge_warnings
+                for entry in host_warnings
                 if _normalize_text(entry)
             ]
             drawings_summary = _build_preview_drawings(data.get("drawings") or [])
@@ -450,7 +483,7 @@ def create_terminal_authoring_blueprint(
             return jsonify(
                 {
                     "success": True,
-                    "requestId": (bridge_result.get("meta") or {}).get("requestId") or request_id,
+                    "requestId": (host_result.get("meta") or {}).get("requestId") or request_id,
                     "scheduleSnapshotId": _normalize_text(payload.get("scheduleSnapshotId")),
                     "operationCount": max(0, int(data.get("operationCount") or len(operations))),
                     "stripUpdateCount": max(0, int(data.get("stripUpdateCount") or 0)),
@@ -459,7 +492,7 @@ def create_terminal_authoring_blueprint(
                     "warnings": response_warnings,
                     "drawings": drawings_summary,
                     "operations": operations,
-                    "message": bridge_result.get("message") or "Project terminal authoring preview completed.",
+                    "message": host_result.get("message") or "Project terminal authoring preview completed.",
                 }
             )
         except ValueError as exc:
@@ -486,7 +519,7 @@ def create_terminal_authoring_blueprint(
                     "No AutoCAD Electrical .wdp project file was found under the project root. ACAD writes can continue, but ACADE context could not be verified."
                 )
 
-            bridge_result = _call_dotnet_bridge_action(
+            host_result = _call_acade_host_action(
                 action="suite_terminal_authoring_project_apply",
                 payload={
                     "projectId": _normalize_text(payload.get("projectId")),
@@ -497,15 +530,15 @@ def create_terminal_authoring_blueprint(
                 },
                 request_id=request_id,
             )
-            if not bridge_result.get("success", False):
-                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
-                return jsonify(bridge_result), status_code
+            if not host_result.get("success", False):
+                status_code = 400 if host_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(host_result), status_code
 
-            data = bridge_result.get("data") or {}
-            bridge_warnings = bridge_result.get("warnings") or []
+            data = host_result.get("data") or {}
+            host_warnings = host_result.get("warnings") or []
             response_warnings = warnings + [
                 _normalize_text(entry)
-                for entry in bridge_warnings
+                for entry in host_warnings
                 if _normalize_text(entry)
             ]
             report_path, report_dir = export_terminal_authoring_report_to_excel(
@@ -519,7 +552,7 @@ def create_terminal_authoring_blueprint(
             return jsonify(
                 {
                     "success": True,
-                    "requestId": (bridge_result.get("meta") or {}).get("requestId") or request_id,
+                    "requestId": (host_result.get("meta") or {}).get("requestId") or request_id,
                     "changedDrawingCount": max(0, int(data.get("changedDrawingCount") or 0)),
                     "terminalStripUpdateCount": max(0, int(data.get("terminalStripUpdateCount") or 0)),
                     "managedRouteUpsertCount": max(0, int(data.get("managedRouteUpsertCount") or 0)),
@@ -528,7 +561,7 @@ def create_terminal_authoring_blueprint(
                     "downloadUrl": f"/api/conduit-route/reports/{report_id}",
                     "warnings": response_warnings,
                     "drawings": data.get("drawings") or [],
-                    "message": bridge_result.get("message") or "Project terminal authoring apply completed.",
+                    "message": host_result.get("message") or "Project terminal authoring apply completed.",
                 }
             )
         except ValueError as exc:

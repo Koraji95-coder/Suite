@@ -367,7 +367,6 @@ export interface TerminalCadSyncDiagnostic {
 		| "delete"
 		| "reset"
 		| "preflight"
-		| "etap_cleanup"
 		| "backcheck";
 	success: boolean;
 	routeId?: string;
@@ -384,36 +383,4 @@ export interface TerminalCadSyncDiagnostic {
 	filletAppliedCorners?: number;
 	filletSkippedCorners?: number;
 	geometryVersion?: string;
-}
-
-export type EtapCleanupCommand =
-	| "ETAPFIX"
-	| "ETAPTEXT"
-	| "ETAPBLOCKS"
-	| "ETAPLAYERFIX"
-	| "ETAPOVERLAP"
-	| "ETAPIMPORT";
-
-export interface EtapCleanupRunRequest {
-	command?: EtapCleanupCommand;
-	pluginDllPath?: string;
-	waitForCompletion?: boolean;
-	timeoutMs?: number;
-	saveDrawing?: boolean;
-}
-
-export interface EtapCleanupRunResponse {
-	success: boolean;
-	code?: string;
-	message?: string;
-	data?: {
-		drawing?: TerminalDrawingMeta;
-		command?: string;
-		commandScript?: string;
-		pluginDllPath?: string | null;
-		saveDrawing?: boolean;
-		waitForCompletion?: boolean;
-	};
-	meta?: Record<string, unknown>;
-	warnings?: string[];
 }

@@ -42,7 +42,6 @@ import {
   worldPointToCanvas,
 } from "./conduitTerminalEngine";
 import type {
-  EtapCleanupCommand,
   TerminalCadRouteRecord,
   TerminalJumperDefinition,
   TerminalLabelSyncRequest,
@@ -56,7 +55,6 @@ import {
   AUTO_CONNECT_ON_MOUNT,
   DEFAULT_TERMINAL_SCAN_PROFILE,
   EMPTY_LAYOUT,
-  ETAP_CLEANUP_COMMANDS,
   JUMPER_COLOR,
   TERMINAL_CAD_BACKCHECK_REQUIRED,
   backcheckStatusLabel,
@@ -618,13 +616,6 @@ export function ConduitTerminalWorkflow({
   );
   const [nextRef, setNextRef] = useState<Record<string, number>>({});
   const [nextJumperRef, setNextJumperRef] = useState(1);
-  const [etapCleanupCommand, setEtapCleanupCommand] =
-    useState<EtapCleanupCommand>("ETAPFIX");
-  const [etapCleanupPluginDllPath, setEtapCleanupPluginDllPath] = useState("");
-  const [etapCleanupWaitForCompletion, setEtapCleanupWaitForCompletion] =
-    useState(true);
-  const [etapCleanupSaveDrawing, setEtapCleanupSaveDrawing] = useState(false);
-  const [etapCleanupTimeoutMs, setEtapCleanupTimeoutMs] = useState(90000);
   const cadSessionId = useMemo(() => makeCadSessionId(), []);
   const routesRef = useRef<TerminalRouteRecord[]>([]);
   const autoScanStartedRef = useRef(false);
@@ -679,22 +670,6 @@ export function ConduitTerminalWorkflow({
       path: worldPath,
     };
   };
-  const etapCleanupConfig = useMemo(
-    () => ({
-      command: etapCleanupCommand,
-      pluginDllPath: etapCleanupPluginDllPath,
-      saveDrawing: etapCleanupSaveDrawing,
-      timeoutMs: etapCleanupTimeoutMs,
-      waitForCompletion: etapCleanupWaitForCompletion,
-    }),
-    [
-      etapCleanupCommand,
-      etapCleanupPluginDllPath,
-      etapCleanupSaveDrawing,
-      etapCleanupTimeoutMs,
-      etapCleanupWaitForCompletion,
-    ],
-  );
   const {
     cadBackcheckOverrideReason,
     cadDiagnostics,
@@ -702,13 +677,11 @@ export function ConduitTerminalWorkflow({
     clearRoutes,
     connectAndScan,
     disconnect,
-    etapCleanupRunning,
     preflightChecking,
     rescan,
     rescanOverlay,
     resyncFailedRoutes,
     resyncingFailed,
-    runEtapCleanupNow,
     runScan,
     setCadBackcheckOverrideReason,
     syncRouteToCad,
@@ -720,7 +693,6 @@ export function ConduitTerminalWorkflow({
     buildTerminalLabelSyncRequest,
     cadSessionId,
     connected,
-    etapCleanupConfig,
     overlayObstacles,
     overlaySyncing,
     routes,
@@ -1223,7 +1195,7 @@ export function ConduitTerminalWorkflow({
                 </small>
               </div>
               <label
-                className={styles.etapField}
+                className={styles.controlField}
                 htmlFor="terminal-cad-backcheck-override"
               >
                 <span>
@@ -1233,7 +1205,7 @@ export function ConduitTerminalWorkflow({
                   id="terminal-cad-backcheck-override"
                   name="terminalCadBackcheckOverrideReason"
                   rows={2}
-                  className={styles.etapInput}
+                  className={styles.controlInput}
                   value={cadBackcheckOverrideReason}
                   onChange={(event) =>
                     setCadBackcheckOverrideReason(event.target.value)
@@ -1241,108 +1213,6 @@ export function ConduitTerminalWorkflow({
                   placeholder="Document why CAD sync is safe despite fail findings..."
                 />
               </label>
-            </div>
-
-            <div className={styles.controlGroup}>
-              <Text size="xs" color="muted">
-                ETAP DXF Cleanup
-              </Text>
-              <div className={styles.etapCard}>
-                <label className={styles.etapField}>
-                  <span>Command</span>
-                  <select
-                    className={styles.etapSelect}
-                    value={etapCleanupCommand}
-                    onChange={(event) =>
-                      setEtapCleanupCommand(
-                        event.target.value as EtapCleanupCommand,
-                      )
-                    }
-                    disabled={etapCleanupRunning || scanning}
-                    name="conduitterminalworkflow_select_2002"
-                  >
-                    {ETAP_CLEANUP_COMMANDS.map((command) => (
-                      <option key={command} value={command}>
-                        {command}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={styles.etapField}>
-                  <span>Plugin DLL (optional)</span>
-                  <input
-                    type="text"
-                    className={styles.etapInput}
-                    placeholder="C:\\AutoCAD\\Plugins\\EtapDxfCleanup.dll"
-                    value={etapCleanupPluginDllPath}
-                    onChange={(event) =>
-                      setEtapCleanupPluginDllPath(event.target.value)
-                    }
-                    disabled={etapCleanupRunning || scanning}
-                    name="conduitterminalworkflow_input_2021"
-                  />
-                </label>
-                <label className={styles.etapField}>
-                  <span>Timeout (ms)</span>
-                  <input
-                    type="number"
-                    min={1000}
-                    max={600000}
-                    step={1000}
-                    className={styles.etapInput}
-                    value={etapCleanupTimeoutMs}
-                    onChange={(event) =>
-                      setEtapCleanupTimeoutMs(
-                        Number(event.target.value) || 90000,
-                      )
-                    }
-                    disabled={etapCleanupRunning || scanning}
-                    name="conduitterminalworkflow_input_2034"
-                  />
-                </label>
-                <div className={styles.etapToggleRow}>
-                  <label className={styles.etapToggle}>
-                    <input
-                      type="checkbox"
-                      checked={etapCleanupWaitForCompletion}
-                      onChange={(event) =>
-                        setEtapCleanupWaitForCompletion(event.target.checked)
-                      }
-                      disabled={etapCleanupRunning || scanning}
-                      name="conduitterminalworkflow_input_2049"
-                    />
-                    <span>Wait for completion</span>
-                  </label>
-                  <label className={styles.etapToggle}>
-                    <input
-                      type="checkbox"
-                      checked={etapCleanupSaveDrawing}
-                      onChange={(event) =>
-                        setEtapCleanupSaveDrawing(event.target.checked)
-                      }
-                      disabled={etapCleanupRunning || scanning}
-                      name="conduitterminalworkflow_input_2060"
-                    />
-                    <span>Save drawing after run</span>
-                  </label>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={runEtapCleanupNow}
-                  disabled={!connected || scanning || etapCleanupRunning}
-                  loading={etapCleanupRunning}
-                  iconLeft={
-                    etapCleanupRunning ? (
-                      <LoaderCircle size={14} />
-                    ) : (
-                      <PlugZap size={14} />
-                    )
-                  }
-                >
-                  Run ETAP Cleanup
-                </Button>
-              </div>
             </div>
 
             <div className={styles.controlGroup}>

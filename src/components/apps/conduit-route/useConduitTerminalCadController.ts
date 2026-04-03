@@ -4,7 +4,6 @@ import type { ConduitObstacleScanMeta, Obstacle } from "./conduitRouteTypes";
 import { buildTerminalLayout } from "./conduitTerminalEngine";
 import { conduitTerminalService } from "./conduitTerminalService";
 import type {
-	EtapCleanupCommand,
 	TerminalCadRouteRecord,
 	TerminalCadRuntimeStatus,
 	TerminalCadSyncDiagnostic,
@@ -34,14 +33,6 @@ interface JumpScanSummary {
 	unresolved: number;
 }
 
-interface EtapCleanupRuntimeConfig {
-	command: EtapCleanupCommand;
-	pluginDllPath: string;
-	saveDrawing: boolean;
-	timeoutMs: number;
-	waitForCompletion: boolean;
-}
-
 interface UseConduitTerminalCadControllerArgs {
 	buildCadRoutePayload: (route: TerminalRouteRecord) => TerminalCadRouteRecord;
 	buildTerminalLabelSyncRequest: (
@@ -49,7 +40,6 @@ interface UseConduitTerminalCadControllerArgs {
 	) => TerminalLabelSyncRequest;
 	cadSessionId: string;
 	connected: boolean;
-	etapCleanupConfig: EtapCleanupRuntimeConfig;
 	overlayObstacles: Obstacle[];
 	overlaySyncing: boolean;
 	routes: TerminalRouteRecord[];
@@ -93,7 +83,6 @@ export function useConduitTerminalCadController({
 	buildTerminalLabelSyncRequest,
 	cadSessionId,
 	connected,
-	etapCleanupConfig,
 	overlayObstacles,
 	overlaySyncing,
 	routes,
@@ -118,7 +107,6 @@ export function useConduitTerminalCadController({
 	summarizeJumperScan,
 }: UseConduitTerminalCadControllerArgs) {
 	const [syncingTerminalLabels, setSyncingTerminalLabels] = useState(false);
-	const [etapCleanupRunning, setEtapCleanupRunning] = useState(false);
 	const [resyncingFailed, setResyncingFailed] = useState(false);
 	const [preflightChecking, setPreflightChecking] = useState(false);
 	const [cadBackcheckOverrideReason, setCadBackcheckOverrideReason] =
@@ -468,82 +456,6 @@ export function useConduitTerminalCadController({
 				return;
 			}
 			setStatusMessage(`Terminal label sync failed: ${result.message}`);
-		})();
-	};
-
-	const runEtapCleanupNow = () => {
-		if (!connected) {
-			setStatusMessage("Connect and scan before running ETAP cleanup.");
-			return;
-		}
-		if (etapCleanupRunning) {
-			return;
-		}
-
-		const timeoutMs = Math.max(
-			1000,
-			Math.min(600000, Math.trunc(etapCleanupConfig.timeoutMs || 90000)),
-		);
-		const pluginDllPath = etapCleanupConfig.pluginDllPath.trim();
-		setEtapCleanupRunning(true);
-		setStatusMessage(
-			`Running ${etapCleanupConfig.command} through AutoCAD bridge...`,
-		);
-
-		void (async () => {
-			try {
-				const response = await conduitTerminalService.runEtapCleanup({
-					command: etapCleanupConfig.command,
-					pluginDllPath: pluginDllPath.length > 0 ? pluginDllPath : undefined,
-					waitForCompletion: etapCleanupConfig.waitForCompletion,
-					timeoutMs,
-					saveDrawing: etapCleanupConfig.saveDrawing,
-				});
-				const providerPath = resolveCadProviderPath(response.meta);
-				const requestId =
-					typeof response.meta?.requestId === "string"
-						? response.meta.requestId
-						: "";
-				const bridgeRequestId =
-					typeof response.meta?.bridgeRequestId === "string"
-						? response.meta.bridgeRequestId
-						: "";
-
-				appendCadDiagnostic({
-					operation: "etap_cleanup",
-					success: Boolean(response.success),
-					code: response.code || "",
-					message:
-						response.message ||
-						(response.success
-							? `${etapCleanupConfig.command} completed.`
-							: `${etapCleanupConfig.command} failed.`),
-					warnings: response.warnings ?? [],
-					requestId,
-					bridgeRequestId,
-					providerPath,
-					providerConfigured:
-						typeof response.meta?.providerConfigured === "string"
-							? response.meta.providerConfigured
-							: providerPath,
-				});
-
-				if (response.success) {
-					const drawingName = response.data?.drawing?.name || "";
-					setStatusMessage(
-						drawingName
-							? `${etapCleanupConfig.command} completed for ${drawingName}.`
-							: (response.message || `${etapCleanupConfig.command} completed.`),
-					);
-					return;
-				}
-
-				setStatusMessage(
-					`${etapCleanupConfig.command} failed (${response.code || "unknown"}): ${response.message || "Request failed."}`,
-				);
-			} finally {
-				setEtapCleanupRunning(false);
-			}
 		})();
 	};
 
@@ -1045,7 +957,6 @@ export function useConduitTerminalCadController({
 		if (routesRef.current.length > 0) {
 			void resetCadSessionRoutes();
 		}
-		setEtapCleanupRunning(false);
 		setConnected(false);
 		setCadStatus(null);
 		setScanning(false);
@@ -1097,13 +1008,11 @@ export function useConduitTerminalCadController({
 		clearRoutes,
 		connectAndScan,
 		disconnect,
-		etapCleanupRunning,
 		preflightChecking,
 		rescan,
 		rescanOverlay,
 		resyncFailedRoutes,
 		resyncingFailed,
-		runEtapCleanupNow,
 		runScan,
 		setCadBackcheckOverrideReason,
 		syncRouteToCad,

@@ -11,7 +11,7 @@ This is the canonical entry point for repository documentation. Humans and agent
 - [Runtime Control](./runtime-control/README.md)
   - Workstation-local companion, bring-up, transfer, MCP workstation stamping, and local action ownership.
 - [CAD](./cad/README.md)
-  - AutoCAD execution, `suite-cad-authoring` ownership, and remaining bridge-backed transport references.
+  - AutoCAD execution, `suite-cad-authoring` ownership, Drawing Cleanup, and bridge diagnostic references.
 
 ## Domain Sections
 

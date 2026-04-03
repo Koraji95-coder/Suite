@@ -73,6 +73,17 @@ class TestDotNetBridgeContract(unittest.TestCase):
         self.assertEqual(payload.get("token"), None)
         self.assertEqual(payload.get("action"), "conduit_route_obstacle_scan")
 
+    def test_named_pipe_bridge_autostart_is_disabled_by_default(self) -> None:
+        with patch.dict(dotnet_bridge.os.environ, {}, clear=True):
+            self.assertFalse(dotnet_bridge._named_pipe_bridge_autostart_enabled())
+
+        with patch.dict(
+            dotnet_bridge.os.environ,
+            {"AUTOCAD_DOTNET_AUTOSTART_BRIDGE": "true"},
+            clear=True,
+        ):
+            self.assertTrue(dotnet_bridge._named_pipe_bridge_autostart_enabled())
+
     def test_pipe_client_autostarts_bridge_when_pipe_is_missing(self) -> None:
         captured: dict[str, object] = {"create_calls": 0}
         handle = object()

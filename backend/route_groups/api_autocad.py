@@ -34,19 +34,13 @@ def create_autocad_blueprint(
     pythoncom: Any,
     conduit_route_autocad_provider: str,
     send_autocad_dotnet_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]],
+    send_autocad_acade_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
     validate_layer_config: Callable[[Any], Dict[str, Any]],
     traceback_module: Any,
 ) -> Blueprint:
     """Create AutoCAD backend route group blueprint under /api."""
     bp = Blueprint("autocad_api", __name__, url_prefix="/api")
     backend_exports_dir = Path(__file__).resolve().parents[1] / "exports"
-    repo_root_dir = Path(__file__).resolve().parents[2]
-    etap_plugin_relative_candidates = (
-        Path("src/components/apps/dxfer/bin/Debug/net8.0-windows/EtapDxfCleanup.dll"),
-        Path("src/components/apps/dxfer/bin/Release/net8.0-windows/EtapDxfCleanup.dll"),
-        Path("src/components/apps/dxfer/bin/Debug/net48/EtapDxfCleanup.dll"),
-        Path("src/components/apps/dxfer/bin/Release/net48/EtapDxfCleanup.dll"),
-    )
 
     def _is_under_dir(path_value: Path, root_dir: Path) -> bool:
         try:
@@ -54,23 +48,6 @@ def create_autocad_blueprint(
             return True
         except Exception:
             return False
-
-    def _resolve_default_etap_plugin_dll_path() -> str:
-        env_path_raw = str(os.getenv("AUTOCAD_ETAP_PLUGIN_DLL_PATH", "") or "").strip().strip('"')
-        if env_path_raw:
-            try:
-                env_path = Path(env_path_raw).expanduser().resolve()
-            except Exception:
-                env_path = Path(env_path_raw)
-            if env_path.is_file():
-                return str(env_path)
-
-        for relative_candidate in etap_plugin_relative_candidates:
-            candidate_path = (repo_root_dir / relative_candidate).resolve()
-            if candidate_path.is_file():
-                return str(candidate_path)
-
-        return ""
 
     def _is_safe_export_path(path_value: Path, manager: Any) -> bool:
         name_lower = path_value.name.lower()
@@ -197,11 +174,12 @@ def create_autocad_blueprint(
     }
 
     logger.info(
-        "Conduit route AutoCAD provider initialized (provider=%s, dotnet_enabled=%s, com_fallback=%s, dotnet_sender_ready=%s)",
+        "Conduit route AutoCAD provider initialized (provider=%s, dotnet_enabled=%s, com_fallback=%s, dotnet_sender_ready=%s, acade_sender_ready=%s)",
         conduit_provider,
         conduit_dotnet_enabled,
         conduit_allow_com_fallback,
         bool(send_autocad_dotnet_command),
+        bool(send_autocad_acade_command),
     )
 
     def _normalize_layer_names(raw_value: Any) -> list[str]:
@@ -684,7 +662,7 @@ def create_autocad_blueprint(
             response.mimetype = "application/json"
         return response
 
-    def _call_dotnet_bridge_action(
+    def _call_acade_host_action(
         *,
         action: str,
         payload: Dict[str, Any],
@@ -692,14 +670,14 @@ def create_autocad_blueprint(
         auth_mode: str,
         request_id: str,
     ) -> Dict[str, Any]:
-        if send_autocad_dotnet_command is None:
+        if send_autocad_acade_command is None:
             raise RuntimeError(
-                "AutoCAD .NET command sender is not configured. "
-                "Set CONDUIT_ROUTE_AUTOCAD_PROVIDER=com or configure AUTOCAD_DOTNET_* backend settings."
+                "AutoCAD in-process ACADE host is not configured. "
+                "Configure AUTOCAD_DOTNET_ACADE_* backend settings."
             )
 
         started_at = time.time()
-        response = send_autocad_dotnet_command(
+        response = send_autocad_acade_command(
             action,
             {
                 **payload,
@@ -709,22 +687,26 @@ def create_autocad_blueprint(
         elapsed_ms = int((time.time() - started_at) * 1000)
 
         if not isinstance(response, dict):
-            raise RuntimeError("Malformed response from .NET bridge (expected JSON object).")
+            raise RuntimeError(
+                "Malformed response from the AutoCAD in-process ACADE host (expected JSON object)."
+            )
 
         if not response.get("ok"):
             error_message = str(
                 response.get("error")
                 or response.get("message")
-                or "Unknown .NET bridge error."
+                or "Unknown AutoCAD in-process ACADE host error."
             )
             raise RuntimeError(error_message)
 
         result_payload = response.get("result")
         if not isinstance(result_payload, dict):
-            raise RuntimeError(".NET bridge returned invalid 'result' payload.")
+            raise RuntimeError("In-process ACADE host returned invalid 'result' payload.")
 
         if not isinstance(result_payload.get("success"), bool):
-            raise RuntimeError(".NET bridge result missing boolean 'success' field.")
+            raise RuntimeError(
+                "In-process ACADE host result missing boolean 'success' field."
+            )
 
         result_payload["meta"] = {
             **(result_payload.get("meta", {}) or {}),
@@ -734,7 +716,7 @@ def create_autocad_blueprint(
             "bridgeRequestId": str(response.get("id") or ""),
         }
         logger.info(
-            ".NET bridge action succeeded (request_id=%s, action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s)",
+            "In-process ACADE host action succeeded (request_id=%s, action=%s, remote=%s, auth_mode=%s, elapsed_ms=%s)",
             request_id,
             action,
             remote_addr,
@@ -757,6 +739,7 @@ def create_autocad_blueprint(
             "dotnet_enabled": conduit_dotnet_enabled,
             "com_fallback": conduit_allow_com_fallback,
             "dotnet_sender_ready": bool(send_autocad_dotnet_command),
+            "acade_sender_ready": bool(send_autocad_acade_command),
         }
 
         http_code = 200 if status.get("autocad_running") else 503
@@ -1441,7 +1424,7 @@ def create_autocad_blueprint(
                 "terminalProfile": terminal_profile,
             }
             try:
-                result = _call_dotnet_bridge_action(
+                result = _call_acade_host_action(
                     action="conduit_route_terminal_scan",
                     payload=dotnet_payload,
                     remote_addr=remote_addr,
@@ -1451,7 +1434,7 @@ def create_autocad_blueprint(
                 return jsonify(result), 200
             except Exception as exc:
                 logger.warning(
-                    "Terminal scan .NET provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    "Terminal scan in-process ACADE provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
                     request_id,
                     remote_addr,
                     auth_mode,
@@ -1462,7 +1445,7 @@ def create_autocad_blueprint(
                 if not conduit_allow_com_fallback:
                     return _error_response(
                         code="DOTNET_BRIDGE_FAILED",
-                        message=f".NET terminal scan failed: {str(exc)}",
+                        message=f".NET terminal scan via the in-process ACADE host failed: {str(exc)}",
                         status_code=503,
                         request_id=request_id,
                         meta={
@@ -1698,7 +1681,7 @@ def create_autocad_blueprint(
                     "layerPreset": layer_rules_meta.get("appliedPreset") or "",
                 }
                 try:
-                    obstacle_scan_result = _call_dotnet_bridge_action(
+                    obstacle_scan_result = _call_acade_host_action(
                         action="conduit_route_obstacle_scan",
                         payload=dotnet_payload,
                         remote_addr=remote_addr,
@@ -1729,7 +1712,7 @@ def create_autocad_blueprint(
                     )
                 except Exception as exc:
                     logger.warning(
-                        "Conduit route compute .NET obstacle scan failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                        "Conduit route compute in-process ACADE obstacle scan failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
                         request_id,
                         remote_addr,
                         auth_mode,
@@ -1740,7 +1723,7 @@ def create_autocad_blueprint(
                     if not conduit_allow_com_fallback:
                         return _error_response(
                             code="DOTNET_BRIDGE_FAILED",
-                            message=f".NET obstacle scan failed: {str(exc)}",
+                            message=f".NET obstacle scan via the in-process ACADE host failed: {str(exc)}",
                             status_code=503,
                             request_id=request_id,
                             meta={
@@ -2433,7 +2416,7 @@ def create_autocad_blueprint(
         provider_path = "com"
         if conduit_dotnet_enabled:
             try:
-                result = _call_dotnet_bridge_action(
+                result = _call_acade_host_action(
                     action="conduit_route_terminal_routes_draw",
                     payload=normalized_payload,
                     remote_addr=remote_addr,
@@ -2462,7 +2445,7 @@ def create_autocad_blueprint(
                 return jsonify(result), status_code
             except Exception as exc:
                 logger.warning(
-                    "Terminal route draw .NET provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    "Terminal route draw in-process ACADE provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
                     request_id,
                     remote_addr,
                     auth_mode,
@@ -2473,7 +2456,7 @@ def create_autocad_blueprint(
                 if not conduit_allow_com_fallback:
                     return _error_response(
                         code="DOTNET_BRIDGE_FAILED",
-                        message=f".NET terminal route draw failed: {str(exc)}",
+                        message=f".NET terminal route draw via the in-process ACADE host failed: {str(exc)}",
                         status_code=503,
                         request_id=request_id,
                         meta={
@@ -2563,163 +2546,19 @@ def create_autocad_blueprint(
                 },
             )
 
-    @bp.route("/etap/cleanup/run", methods=["POST"])
-    @require_autocad_auth
-    @limiter.limit("300 per hour")
-    def api_etap_cleanup_run():
-        """
-        Queue ETAP DXF cleanup command execution through the local .NET bridge.
-
-        This endpoint is intended for in-app orchestration of AutoCAD-hosted ETAP cleanup commands
-        (for example ETAPFIX) with optional plugin NETLOAD and completion wait.
-        """
-        remote_addr = str(request.remote_addr or "unknown")
-        auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
-        request_id = _request_correlation_id()
-
-        if send_autocad_dotnet_command is None:
-            return _error_response(
-                code="DOTNET_BRIDGE_UNAVAILABLE",
-                message="AutoCAD .NET bridge command sender is not configured.",
-                status_code=503,
-                request_id=request_id,
-                meta={"stage": "etap_cleanup.status", "providerPath": "dotnet"},
-            )
-
-        payload = request.get_json(silent=True) if request.is_json else {}
-        if payload is None:
-            payload = {}
-        if not isinstance(payload, dict):
-            return _error_response(
-                code="INVALID_REQUEST",
-                message="Request payload must be a JSON object.",
-                status_code=400,
-                request_id=request_id,
-                meta={"stage": "etap_cleanup.validation", "providerPath": "dotnet"},
-            )
-
-        command = str(payload.get("command") or "ETAPFIX").strip().upper()
-        if not command:
-            command = "ETAPFIX"
-
-        plugin_dll_path_raw = payload.get("pluginDllPath", payload.get("plugin_dll_path"))
-        plugin_dll_path = (
-            str(plugin_dll_path_raw).strip()
-            if plugin_dll_path_raw is not None
-            else ""
-        )
-
-        wait_for_completion = _normalize_terminal_profile_bool(
-            payload.get("waitForCompletion", payload.get("wait_for_completion", True)),
-            fallback=True,
-        )
-        save_drawing = _normalize_terminal_profile_bool(
-            payload.get("saveDrawing", payload.get("save_drawing", False)),
-            fallback=False,
-        )
-
-        timeout_ms_raw = payload.get("timeoutMs", payload.get("timeout_ms", 90000))
-        try:
-            timeout_ms = int(timeout_ms_raw)
-        except Exception:
-            return _error_response(
-                code="INVALID_REQUEST",
-                message="timeoutMs must be an integer.",
-                status_code=400,
-                request_id=request_id,
-                meta={"stage": "etap_cleanup.validation", "providerPath": "dotnet"},
-            )
-        timeout_ms = max(1000, min(600000, timeout_ms))
-
-        dotnet_payload: Dict[str, Any] = {
-            "command": command,
-            "waitForCompletion": wait_for_completion,
-            "timeoutMs": timeout_ms,
-            "saveDrawing": save_drawing,
-        }
-        resolved_plugin_dll_path = plugin_dll_path or _resolve_default_etap_plugin_dll_path()
-        plugin_dll_auto_discovered = bool(resolved_plugin_dll_path and not plugin_dll_path)
-
-        if resolved_plugin_dll_path:
-            dotnet_payload["pluginDllPath"] = resolved_plugin_dll_path
-
-        logger.info(
-            "ETAP cleanup run request received (request_id=%s, remote=%s, auth_mode=%s, command=%s, wait_for_completion=%s, timeout_ms=%s, plugin_dll_provided=%s, plugin_dll_auto_discovered=%s)",
-            request_id,
-            remote_addr,
-            auth_mode,
-            command,
-            wait_for_completion,
-            timeout_ms,
-            bool(plugin_dll_path),
-            plugin_dll_auto_discovered,
-        )
-
-        try:
-            result = _call_dotnet_bridge_action(
-                action="etap_dxf_cleanup_run",
-                payload=dotnet_payload,
-                remote_addr=remote_addr,
-                auth_mode=auth_mode,
-                request_id=request_id,
-            )
-            result["meta"] = {
-                **(result.get("meta", {}) or {}),
-                "providerPath": "dotnet",
-                "providerConfigured": conduit_provider,
-                "command": command,
-                "waitForCompletion": wait_for_completion,
-                "timeoutMs": timeout_ms,
-                "pluginDllPath": resolved_plugin_dll_path or "",
-                "pluginDllAutoDiscovered": plugin_dll_auto_discovered,
-            }
-            if result.get("success"):
-                return jsonify(result), 200
-
-            code = str(result.get("code") or "").strip().upper()
-            if code == "INVALID_REQUEST":
-                status_code = 400
-            elif code == "PLUGIN_DLL_NOT_FOUND":
-                status_code = 404
-            elif code == "AUTOCAD_COMMAND_TIMEOUT":
-                status_code = 504
-            else:
-                status_code = 422
-            return jsonify(result), status_code
-        except Exception as exc:
-            logger.warning(
-                "ETAP cleanup .NET bridge failed (request_id=%s, remote=%s, auth_mode=%s, error=%s)",
-                request_id,
-                remote_addr,
-                auth_mode,
-                str(exc),
-            )
-            return _error_response(
-                code="DOTNET_BRIDGE_FAILED",
-                message=f".NET ETAP cleanup action failed: {str(exc)}",
-                status_code=503,
-                request_id=request_id,
-                meta={
-                    "source": "dotnet",
-                    "providerPath": "dotnet",
-                    "providerConfigured": conduit_provider,
-                    "stage": "etap_cleanup.dotnet",
-                },
-            )
-
     @bp.route("/conduit-route/bridge/terminal-labels/sync", methods=["POST"])
     @require_autocad_auth
     @limiter.limit("300 per hour")
     def api_conduit_route_bridge_terminal_labels_sync():
-        """Sync terminal label attribute values through the .NET bridge path."""
+        """Compatibility alias for terminal label sync through the in-process ACADE host."""
         remote_addr = str(request.remote_addr or "unknown")
         auth_mode = str(getattr(g, "autocad_auth_mode", "unknown") or "unknown")
         request_id = _request_correlation_id()
 
-        if send_autocad_dotnet_command is None:
+        if send_autocad_acade_command is None:
             return _error_response(
                 code="DOTNET_BRIDGE_UNAVAILABLE",
-                message="AutoCAD .NET bridge command sender is not configured.",
+                message="AutoCAD in-process ACADE host command sender is not configured.",
                 status_code=503,
                 request_id=request_id,
                 meta={"stage": "bridge_terminal_label_sync.status", "providerPath": "dotnet"},
@@ -2820,7 +2659,7 @@ def create_autocad_blueprint(
         }
 
         logger.info(
-            "Bridge terminal label sync request received (request_id=%s, remote=%s, auth_mode=%s, strips=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
+            "Compatibility terminal label sync request received (request_id=%s, remote=%s, auth_mode=%s, strips=%s, selection_only=%s, include_modelspace=%s, max_entities=%s)",
             request_id,
             remote_addr,
             auth_mode,
@@ -2830,19 +2669,8 @@ def create_autocad_blueprint(
             max_entities,
         )
 
-        manager = get_manager()
-        status = manager.get_status()
-        if not status.get("drawing_open"):
-            return _error_response(
-                code="AUTOCAD_DRAWING_NOT_OPEN",
-                message="No drawing open in AutoCAD.",
-                status_code=503,
-                request_id=request_id,
-                meta={"stage": "bridge_terminal_label_sync.status", "providerPath": "dotnet"},
-            )
-
         try:
-            result = _call_dotnet_bridge_action(
+            result = _call_acade_host_action(
                 action="conduit_route_terminal_labels_sync",
                 payload=normalized_payload,
                 remote_addr=remote_addr,
@@ -2865,7 +2693,7 @@ def create_autocad_blueprint(
             return jsonify(result), status_code
         except Exception as exc:
             logger.warning(
-                "Bridge terminal label sync failed (request_id=%s, remote=%s, auth_mode=%s, stage=%s, code=%s, error=%s)",
+                "Compatibility terminal label sync via in-process ACADE host failed (request_id=%s, remote=%s, auth_mode=%s, stage=%s, code=%s, error=%s)",
                 request_id,
                 remote_addr,
                 auth_mode,
@@ -2875,7 +2703,7 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="DOTNET_BRIDGE_FAILED",
-                message=f".NET terminal label sync failed: {autocad_exception_message(exc)}",
+                message=f".NET terminal label sync via the in-process ACADE host failed: {autocad_exception_message(exc)}",
                 status_code=503,
                 request_id=request_id,
                 meta={
@@ -3002,6 +2830,56 @@ def create_autocad_blueprint(
             include_modelspace,
             max_entities,
         )
+
+        if conduit_dotnet_enabled:
+            try:
+                result = _call_acade_host_action(
+                    action="conduit_route_terminal_labels_sync",
+                    payload=normalized_payload,
+                    remote_addr=remote_addr,
+                    auth_mode=auth_mode,
+                    request_id=request_id,
+                )
+                result["meta"] = {
+                    **(result.get("meta", {}) or {}),
+                    "source": "dotnet",
+                    "requestId": request_id,
+                    "providerPath": "dotnet",
+                    "providerConfigured": conduit_provider,
+                    "selectionOnly": selection_only,
+                    "includeModelspace": include_modelspace,
+                    "targetStrips": len(normalized_strips),
+                }
+                if result.get("success"):
+                    return jsonify(result), 200
+                status_code = 400 if result.get("code") == "INVALID_REQUEST" else 422
+                return jsonify(result), status_code
+            except Exception as exc:
+                logger.warning(
+                    "Terminal label sync in-process ACADE provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    request_id,
+                    remote_addr,
+                    auth_mode,
+                    conduit_provider,
+                    conduit_allow_com_fallback,
+                    autocad_exception_message(exc),
+                )
+                if not conduit_allow_com_fallback:
+                    return _error_response(
+                        code="DOTNET_BRIDGE_FAILED",
+                        message=f".NET terminal label sync via the in-process ACADE host failed: {autocad_exception_message(exc)}",
+                        status_code=503,
+                        request_id=request_id,
+                        meta={
+                            "source": "dotnet",
+                            "providerPath": "dotnet",
+                            "providerConfigured": conduit_provider,
+                            "selectionOnly": selection_only,
+                            "includeModelspace": include_modelspace,
+                            "targetStrips": len(normalized_strips),
+                            "stage": "terminal_label_sync.dotnet",
+                        },
+                    )
 
         manager = get_manager()
         status = manager.get_status()
@@ -3150,7 +3028,7 @@ def create_autocad_blueprint(
                 "layerPreset": layer_rules_meta.get("appliedPreset") or "",
             }
             try:
-                result = _call_dotnet_bridge_action(
+                result = _call_acade_host_action(
                     action="conduit_route_obstacle_scan",
                     payload=dotnet_payload,
                     remote_addr=remote_addr,
@@ -3165,7 +3043,7 @@ def create_autocad_blueprint(
                 return jsonify(result), 200
             except Exception as exc:
                 logger.warning(
-                    "Conduit obstacle scan .NET provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
+                    "Conduit obstacle scan in-process ACADE provider failed (request_id=%s, remote=%s, auth_mode=%s, provider=%s, fallback_to_com=%s, error=%s)",
                     request_id,
                     remote_addr,
                     auth_mode,
@@ -3176,7 +3054,7 @@ def create_autocad_blueprint(
                 if not conduit_allow_com_fallback:
                     return _error_response(
                         code="DOTNET_BRIDGE_FAILED",
-                        message=f".NET obstacle scan failed: {str(exc)}",
+                        message=f".NET obstacle scan via the in-process ACADE host failed: {str(exc)}",
                         status_code=503,
                         request_id=request_id,
                         meta={

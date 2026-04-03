@@ -45,6 +45,14 @@ What was finished:
 - `docs/development/post-overhaul-feature-backlog.md` was created as the deferred execution queue
 - architecture metadata and generated documentation manifests were refreshed
 - the conservative cleanup for this tranche targeted tracked stale references and generated artifacts rather than ignored local `bin`, `obj`, and `__pycache__` folders
+- the first follow-on runtime/CAD cleanup slice moved AutoDraft / automation-recipe markup apply to the in-process ACADE host; `suite_markup_authoring_project_apply` is no longer bridge-backed
+- the second follow-on runtime/CAD cleanup slice moved terminal authoring apply to the in-process ACADE host; `suite_terminal_authoring_project_apply` is no longer bridge-backed, while preview remains on the bridge pending a dedicated preview-port tranche
+- the third follow-on runtime/CAD cleanup slice moved batch find/replace apply to the in-process ACADE host; `suite_batch_find_replace_apply` and `suite_batch_find_replace_project_apply` are no longer bridge-backed, while preview remains on the bridge pending a dedicated preview-port tranche
+- the fourth follow-on runtime/CAD cleanup slice moved batch find/replace preview to the in-process ACADE host; `suite_batch_find_replace_preview` and `suite_batch_find_replace_project_preview` are no longer bridge-backed
+- the fifth follow-on runtime/CAD cleanup slice moved terminal authoring preview to the in-process ACADE host; `suite_terminal_authoring_project_preview` is no longer bridge-backed
+- the sixth follow-on runtime/CAD cleanup slice moved conduit-route dotnet-provider actions to the in-process ACADE host; terminal scan, obstacle scan, route draw, terminal label sync, and the compatibility alias now bypass `SUITE_AUTOCAD_PIPE`
+- the seventh follow-on runtime/CAD cleanup slice collapsed the old standalone DXF cleanup lane into Drawing Cleanup inside Batch Find & Replace, added `suite_drawing_cleanup_preview` / `suite_drawing_cleanup_apply`, removed the separate cleanup route/app, and deleted the old cleanup-specific named-pipe bridge action
+- the bridge reclassification slice stopped default named-pipe startup in `npm run dev:full` and workstation bring-up, disabled backend bridge autostart by default, and narrowed `SUITE_AUTOCAD_PIPE` to manual diagnostics plus any intentionally enabled AutoDraft bridge fallback
 
 ## What Is Not Finished Yet
 
@@ -52,8 +60,6 @@ The broader overhaul is not done yet.
 
 The main unfinished areas are:
 
-- broader backend/runtime/CAD cleanup outside the project/title-block slice
-- named-pipe bridge reclassification from remaining transport to diagnostic-only
 - conservative tracked cleanup for other legacy support files, tests, and stale assets
 - UI/design system overhaul
 - future release/install/hosted-lane work
@@ -62,44 +68,7 @@ The main unfinished areas are:
 
 ## Immediate Next Tranche
 
-### 1. Broader runtime/CAD cleanup beyond project setup
-
-Goal:
-
-- reduce remaining bridge-backed CAD execution paths and make ownership explicit outside the project-setup/title-block slice
-
-Tasks:
-
-- audit the remaining bridge-backed consumers across:
-  - AutoDraft
-  - batch find/replace
-  - terminal authoring
-  - conduit-route / broader `api_autocad` flows
-- decide the target owner per slice:
-  - hosted core
-  - Runtime Control
-  - `suite-cad-authoring`
-- cut over the next highest-value slice without changing CAD business behavior
-- preserve backward-compatible AutoCAD error envelopes:
-  - `success`
-  - `code`
-  - `message`
-  - `requestId`
-  - optional `meta`
-
-### 2. Reclassify named-pipe bridge toward diagnostic-only
-
-Goal:
-
-- stop treating the bridge as a default path once the remaining consumers are explicitly mapped
-
-Tasks:
-
-- document the exact remaining bridge-backed consumers
-- remove default/canonical wording as each slice is migrated
-- keep the bridge available only where still required until each slice has a replacement
-
-### 3. Finish conservative tracked cleanup
+### 1. Finish conservative tracked cleanup
 
 Goal:
 
@@ -110,8 +79,24 @@ Tasks:
 - delete tracked legacy tests/docs/assets that only existed for retired compatibility paths
 - keep ignored local `bin`, `obj`, and `__pycache__` folders out of repo-cleanup work
 - do not normalize `backend/Transmittal-Builder` yet
+- keep the bridge in its new manual-only posture:
+  - explicit diagnostics against `SUITE_AUTOCAD_PIPE`
+  - intentional AutoDraft bridge fallback only when the operator enables it
 
-### 4. Hold backlog execution until the runtime/CAD lane is clearer
+### 2. Start the UI and design overhaul
+
+Goal:
+
+- improve the Suite and Runtime Control visual system without reintroducing Tailwind-style sprawl
+
+Tasks:
+
+- refine semantic tokens and surface hierarchy
+- normalize shell/layout patterns
+- clean page-level rhythm and spacing
+- unify Suite + Runtime Control visual language without forcing identical implementations
+
+### 3. Hold backlog execution until the runtime/CAD lane is clearer
 
 Goal:
 
@@ -209,10 +194,8 @@ If the new conversation is specifically about APS / ML staging, use:
 
 ## Recommended Priority Order
 
-1. Move into the broader runtime/CAD cleanup lane
-2. Reclassify named-pipe bridge toward diagnostic-only
-3. Finish conservative tracked cleanup
-4. Plan the UI/design overhaul
-5. Stage release-ready architecture
-6. Revisit ML and APS integration
-7. Execute backlog items from `docs/development/post-overhaul-feature-backlog.md`
+1. Finish conservative tracked cleanup
+2. Plan the UI/design overhaul
+3. Stage release-ready architecture
+4. Revisit ML and APS integration
+5. Execute backlog items from `docs/development/post-overhaul-feature-backlog.md`

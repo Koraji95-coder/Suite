@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import tempfile
 import unittest
 from typing import Any, Dict, List, Tuple
 
@@ -121,6 +119,7 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         *,
         provider: str,
         sender: Any,
+        acade_sender: Any = _UNSET,
         manager_status: Dict[str, Any] | None = None,
         connect_autocad_fn: Any = None,
         pythoncom_override: Any = _UNSET,
@@ -168,6 +167,7 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
             return config
 
         pythoncom_value = _PythonComStub() if pythoncom_override is _UNSET else pythoncom_override
+        acade_sender_value = sender if acade_sender is _UNSET else acade_sender
 
         blueprint = create_autocad_blueprint(
             require_autocad_auth=require_autocad_auth,
@@ -180,6 +180,7 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
             pythoncom=pythoncom_value,
             conduit_route_autocad_provider=provider,
             send_autocad_dotnet_command=sender,
+            send_autocad_acade_command=acade_sender_value,
             validate_layer_config=validate_layer_config,
             traceback_module=_TracebackStub(),
         )
@@ -187,10 +188,15 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         return app.test_client()
 
     def test_terminal_scan_uses_dotnet_action(self) -> None:
-        calls: list[tuple[str, dict[str, Any]]] = []
+        bridge_calls: list[tuple[str, dict[str, Any]]] = []
+        acade_calls: list[tuple[str, dict[str, Any]]] = []
 
-        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
-            calls.append((action, payload))
+        def legacy_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            bridge_calls.append((action, payload))
+            raise AssertionError(f"Legacy bridge sender should not be used: {action}")
+
+        def acade_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            acade_calls.append((action, payload))
             return {
                 "ok": True,
                 "result": {
@@ -204,7 +210,11 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
                 "error": None,
             }
 
-        client = self._build_client(provider="dotnet", sender=sender)
+        client = self._build_client(
+            provider="dotnet",
+            sender=legacy_sender,
+            acade_sender=acade_sender,
+        )
 
         response = client.post(
             "/api/conduit-route/terminal-scan",
@@ -230,12 +240,13 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         self.assertTrue(payload.get("success"))
         self.assertEqual(payload.get("meta", {}).get("source"), "dotnet")
         self.assertIn("bridgeMs", payload.get("meta", {}))
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0][0], "conduit_route_terminal_scan")
-        self.assertEqual(calls[0][1]["selectionOnly"], True)
-        self.assertEqual(calls[0][1]["includeModelspace"], False)
-        self.assertEqual(calls[0][1]["maxEntities"], 1234)
-        terminal_profile = calls[0][1].get("terminalProfile") or {}
+        self.assertEqual(bridge_calls, [])
+        self.assertEqual(len(acade_calls), 1)
+        self.assertEqual(acade_calls[0][0], "conduit_route_terminal_scan")
+        self.assertEqual(acade_calls[0][1]["selectionOnly"], True)
+        self.assertEqual(acade_calls[0][1]["includeModelspace"], False)
+        self.assertEqual(acade_calls[0][1]["maxEntities"], 1234)
+        terminal_profile = acade_calls[0][1].get("terminalProfile") or {}
         self.assertEqual(terminal_profile.get("panelIdKeys"), ["PANEL_TAG"])
         self.assertEqual(terminal_profile.get("stripIdKeys"), ["STRIP_TAG"])
         self.assertEqual(terminal_profile.get("blockNameAllowList"), ["TB_STRIP_META_SIDE"])
@@ -246,10 +257,15 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         self.assertEqual(terminal_profile.get("defaultTerminalCount"), 12)
 
     def test_obstacle_scan_uses_dotnet_action(self) -> None:
-        calls: list[tuple[str, dict[str, Any]]] = []
+        bridge_calls: list[tuple[str, dict[str, Any]]] = []
+        acade_calls: list[tuple[str, dict[str, Any]]] = []
 
-        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
-            calls.append((action, payload))
+        def legacy_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            bridge_calls.append((action, payload))
+            raise AssertionError(f"Legacy bridge sender should not be used: {action}")
+
+        def acade_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            acade_calls.append((action, payload))
             return {
                 "ok": True,
                 "result": {
@@ -263,7 +279,11 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
                 "error": None,
             }
 
-        client = self._build_client(provider="dotnet", sender=sender)
+        client = self._build_client(
+            provider="dotnet",
+            sender=legacy_sender,
+            acade_sender=acade_sender,
+        )
         response = client.post(
             "/api/conduit-route/obstacles/scan",
             json={
@@ -281,17 +301,23 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         payload = response.get_json()
         self.assertTrue(payload.get("success"))
         self.assertEqual(payload.get("meta", {}).get("source"), "dotnet")
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0][0], "conduit_route_obstacle_scan")
-        self.assertEqual(calls[0][1]["canvasWidth"], 980.0)
-        self.assertEqual(calls[0][1]["canvasHeight"], 560.0)
-        self.assertEqual(calls[0][1]["layerNames"], ["S-FNDN-PRIMARY"])
+        self.assertEqual(bridge_calls, [])
+        self.assertEqual(len(acade_calls), 1)
+        self.assertEqual(acade_calls[0][0], "conduit_route_obstacle_scan")
+        self.assertEqual(acade_calls[0][1]["canvasWidth"], 980.0)
+        self.assertEqual(acade_calls[0][1]["canvasHeight"], 560.0)
+        self.assertEqual(acade_calls[0][1]["layerNames"], ["S-FNDN-PRIMARY"])
 
     def test_terminal_route_draw_uses_dotnet_action(self) -> None:
-        calls: list[tuple[str, dict[str, Any]]] = []
+        bridge_calls: list[tuple[str, dict[str, Any]]] = []
+        acade_calls: list[tuple[str, dict[str, Any]]] = []
 
-        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
-            calls.append((action, payload))
+        def legacy_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            bridge_calls.append((action, payload))
+            raise AssertionError(f"Legacy bridge sender should not be used: {action}")
+
+        def acade_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            acade_calls.append((action, payload))
             return {
                 "ok": True,
                 "result": {
@@ -311,7 +337,11 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
                 "error": None,
             }
 
-        client = self._build_client(provider="dotnet", sender=sender)
+        client = self._build_client(
+            provider="dotnet",
+            sender=legacy_sender,
+            acade_sender=acade_sender,
+        )
         response = client.post(
             "/api/conduit-route/terminal-routes/draw",
             json={
@@ -341,9 +371,10 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         self.assertTrue(payload.get("success"))
         self.assertEqual(payload.get("meta", {}).get("source"), "dotnet")
         self.assertEqual(payload.get("meta", {}).get("providerPath"), "dotnet")
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0][0], "conduit_route_terminal_routes_draw")
-        dotnet_payload = calls[0][1]
+        self.assertEqual(bridge_calls, [])
+        self.assertEqual(len(acade_calls), 1)
+        self.assertEqual(acade_calls[0][0], "conduit_route_terminal_routes_draw")
+        dotnet_payload = acade_calls[0][1]
         self.assertEqual(dotnet_payload.get("operation"), "upsert")
         self.assertEqual(dotnet_payload.get("sessionId"), "cad-session-1")
         self.assertEqual(dotnet_payload.get("clientRouteId"), "route-1")
@@ -385,44 +416,16 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         self.assertEqual(len(manager.draw_payloads), 1)
         self.assertEqual(manager.draw_payloads[0].get("requestId"), "req-route-fallback-1")
 
-    def test_terminal_label_sync_uses_manager_com_path(self) -> None:
-        client = self._build_client(provider="dotnet", sender=lambda *_args, **_kwargs: {})
-        response = client.post(
-            "/api/conduit-route/terminal-labels/sync",
-            headers={"X-Request-ID": "req-label-sync-1"},
-            json={
-                "selectionOnly": False,
-                "includeModelspace": True,
-                "maxEntities": 50000,
-                "strips": [
-                    {
-                        "stripId": "RP1L1",
-                        "terminalCount": 12,
-                        "labels": [str(index) for index in range(1, 13)],
-                    }
-                ],
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        payload = response.get_json() or {}
-        self.assertTrue(payload.get("success"))
-        self.assertEqual(payload.get("meta", {}).get("providerPath"), "com")
-        manager = self._manager
-        self.assertEqual(len(manager.label_sync_payloads), 1)
-        self.assertEqual(
-            manager.label_sync_payloads[0]["strips"][0]["stripId"],
-            "RP1L1",
-        )
-        self.assertEqual(
-            manager.label_sync_payloads[0].get("requestId"),
-            "req-label-sync-1",
-        )
+    def test_terminal_label_sync_uses_acade_action(self) -> None:
+        bridge_calls: list[tuple[str, dict[str, Any]]] = []
+        acade_calls: list[tuple[str, dict[str, Any]]] = []
 
-    def test_bridge_terminal_label_sync_uses_dotnet_action(self) -> None:
-        calls: list[tuple[str, dict[str, Any]]] = []
+        def legacy_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            bridge_calls.append((action, payload))
+            raise AssertionError(f"Legacy bridge sender should not be used: {action}")
 
-        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
-            calls.append((action, payload))
+        def acade_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            acade_calls.append((action, payload))
             return {
                 "ok": True,
                 "result": {
@@ -447,7 +450,84 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
                 "error": None,
             }
 
-        client = self._build_client(provider="dotnet", sender=sender)
+        client = self._build_client(
+            provider="dotnet",
+            sender=legacy_sender,
+            acade_sender=acade_sender,
+        )
+        response = client.post(
+            "/api/conduit-route/terminal-labels/sync",
+            headers={"X-Request-ID": "req-label-sync-1"},
+            json={
+                "selectionOnly": False,
+                "includeModelspace": True,
+                "maxEntities": 50000,
+                "strips": [
+                    {
+                        "stripId": "RP1L1",
+                        "terminalCount": 12,
+                        "labels": [str(index) for index in range(1, 13)],
+                    }
+                ],
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertEqual(payload.get("meta", {}).get("providerPath"), "dotnet")
+        self.assertEqual(bridge_calls, [])
+        self.assertEqual(len(acade_calls), 1)
+        self.assertEqual(acade_calls[0][0], "conduit_route_terminal_labels_sync")
+        manager = self._manager
+        self.assertEqual(len(manager.label_sync_payloads), 0)
+        self.assertEqual(
+            ((acade_calls[0][1].get("strips") or [{}])[0] or {}).get("stripId"),
+            "RP1L1",
+        )
+        self.assertEqual(
+            acade_calls[0][1].get("requestId"),
+            "req-label-sync-1",
+        )
+
+    def test_bridge_terminal_label_sync_uses_acade_action(self) -> None:
+        bridge_calls: list[tuple[str, dict[str, Any]]] = []
+        acade_calls: list[tuple[str, dict[str, Any]]] = []
+
+        def legacy_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            bridge_calls.append((action, payload))
+            raise AssertionError(f"Legacy bridge sender should not be used: {action}")
+
+        def acade_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            acade_calls.append((action, payload))
+            return {
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "labels synced",
+                    "data": {
+                        "drawing": {"name": "stub.dwg", "units": "Feet"},
+                        "updatedStrips": 1,
+                        "matchedStrips": 1,
+                        "targetStrips": 1,
+                        "matchedBlocks": 1,
+                        "updatedBlocks": 1,
+                        "updatedAttributes": 12,
+                        "unchangedAttributes": 0,
+                        "missingAttributes": 0,
+                        "failedAttributes": 0,
+                    },
+                    "meta": {},
+                    "warnings": [],
+                },
+                "error": None,
+            }
+
+        client = self._build_client(
+            provider="dotnet",
+            sender=legacy_sender,
+            acade_sender=acade_sender,
+        )
         response = client.post(
             "/api/conduit-route/bridge/terminal-labels/sync",
             json={
@@ -469,13 +549,14 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         self.assertTrue(payload.get("success"))
         self.assertEqual(payload.get("meta", {}).get("source"), "dotnet")
         self.assertEqual(payload.get("meta", {}).get("providerPath"), "dotnet")
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0][0], "conduit_route_terminal_labels_sync")
-        self.assertEqual(calls[0][1].get("selectionOnly"), False)
-        self.assertEqual(calls[0][1].get("includeModelspace"), True)
-        self.assertEqual(calls[0][1].get("maxEntities"), 50000)
+        self.assertEqual(bridge_calls, [])
+        self.assertEqual(len(acade_calls), 1)
+        self.assertEqual(acade_calls[0][0], "conduit_route_terminal_labels_sync")
+        self.assertEqual(acade_calls[0][1].get("selectionOnly"), False)
+        self.assertEqual(acade_calls[0][1].get("includeModelspace"), True)
+        self.assertEqual(acade_calls[0][1].get("maxEntities"), 50000)
         self.assertEqual(
-            ((calls[0][1].get("strips") or [{}])[0] or {}).get("stripId"),
+            ((acade_calls[0][1].get("strips") or [{}])[0] or {}).get("stripId"),
             "RP1L1",
         )
         manager = self._manager
@@ -652,10 +733,15 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         )
 
     def test_route_compute_layer_preset_expands_for_dotnet_obstacle_scan_payload(self) -> None:
-        calls: list[tuple[str, dict[str, Any]]] = []
+        bridge_calls: list[tuple[str, dict[str, Any]]] = []
+        acade_calls: list[tuple[str, dict[str, Any]]] = []
 
-        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
-            calls.append((action, payload))
+        def legacy_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            bridge_calls.append((action, payload))
+            raise AssertionError(f"Legacy bridge sender should not be used: {action}")
+
+        def acade_sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
+            acade_calls.append((action, payload))
             if action == "conduit_route_obstacle_scan":
                 return {
                     "ok": True,
@@ -671,7 +757,11 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
                 }
             raise AssertionError(f"Unexpected action: {action}")
 
-        client = self._build_client(provider="dotnet", sender=sender)
+        client = self._build_client(
+            provider="dotnet",
+            sender=legacy_sender,
+            acade_sender=acade_sender,
+        )
         response = client.post(
             "/api/conduit-route/route/compute",
             json={
@@ -686,10 +776,11 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json().get("success"))
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0][0], "conduit_route_obstacle_scan")
-        self.assertEqual(calls[0][1].get("layerPreset"), "utility_yard")
-        self.assertIn("U-FOUND", calls[0][1].get("layerNames") or [])
+        self.assertEqual(bridge_calls, [])
+        self.assertEqual(len(acade_calls), 1)
+        self.assertEqual(acade_calls[0][0], "conduit_route_obstacle_scan")
+        self.assertEqual(acade_calls[0][1].get("layerPreset"), "utility_yard")
+        self.assertIn("U-FOUND", acade_calls[0][1].get("layerNames") or [])
 
     def test_dotnet_terminal_scan_returns_503_when_sender_missing(self) -> None:
         client = self._build_client(provider="dotnet", sender=None)
@@ -698,145 +789,6 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         payload = response.get_json()
         self.assertFalse(payload.get("success", True))
         self.assertEqual(payload.get("code"), "DOTNET_BRIDGE_FAILED")
-
-    def test_etap_cleanup_run_uses_dotnet_action(self) -> None:
-        calls: list[tuple[str, dict[str, Any]]] = []
-
-        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
-            calls.append((action, payload))
-            return {
-                "id": "bridge-etap-123",
-                "ok": True,
-                "result": {
-                    "success": True,
-                    "code": "",
-                    "message": "queued",
-                    "data": {
-                        "drawing": {"name": "stub.dwg"},
-                        "command": "ETAPFIX",
-                    },
-                    "meta": {},
-                    "warnings": [],
-                },
-                "error": None,
-            }
-
-        client = self._build_client(provider="dotnet", sender=sender)
-        response = client.post(
-            "/api/etap/cleanup/run",
-            headers={"X-Request-ID": "req-etap-123"},
-            json={
-                "command": "ETAPFIX",
-                "pluginDllPath": "C:\\AutoCAD\\Plugins\\EtapDxfCleanup.dll",
-                "waitForCompletion": False,
-                "timeoutMs": 120000,
-            },
-        )
-        self.assertEqual(response.status_code, 200)
-        payload = response.get_json() or {}
-        self.assertTrue(payload.get("success"))
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(calls[0][0], "etap_dxf_cleanup_run")
-        self.assertEqual(calls[0][1].get("requestId"), "req-etap-123")
-        self.assertEqual(calls[0][1].get("command"), "ETAPFIX")
-        self.assertEqual(
-            calls[0][1].get("pluginDllPath"),
-            "C:\\AutoCAD\\Plugins\\EtapDxfCleanup.dll",
-        )
-        self.assertEqual(calls[0][1].get("waitForCompletion"), False)
-        self.assertEqual(calls[0][1].get("timeoutMs"), 120000)
-        self.assertEqual((payload.get("meta") or {}).get("requestId"), "req-etap-123")
-        self.assertEqual((payload.get("meta") or {}).get("bridgeRequestId"), "bridge-etap-123")
-
-    def test_etap_cleanup_run_returns_503_when_sender_missing(self) -> None:
-        client = self._build_client(provider="dotnet", sender=None)
-        response = client.post("/api/etap/cleanup/run", json={})
-        self.assertEqual(response.status_code, 503)
-        payload = response.get_json() or {}
-        self.assertFalse(payload.get("success", True))
-        self.assertEqual(payload.get("code"), "DOTNET_BRIDGE_UNAVAILABLE")
-
-    def test_etap_cleanup_run_maps_plugin_not_found_to_404(self) -> None:
-        def sender(_action: str, _payload: dict[str, Any]) -> dict[str, Any]:
-            return {
-                "ok": True,
-                "result": {
-                    "success": False,
-                    "code": "PLUGIN_DLL_NOT_FOUND",
-                    "message": "missing plugin",
-                    "data": {},
-                    "meta": {},
-                    "warnings": [],
-                },
-                "error": None,
-            }
-
-        client = self._build_client(provider="dotnet", sender=sender)
-        response = client.post(
-            "/api/etap/cleanup/run",
-            json={"pluginDllPath": "C:\\missing\\EtapDxfCleanup.dll"},
-        )
-        self.assertEqual(response.status_code, 404)
-        payload = response.get_json() or {}
-        self.assertFalse(payload.get("success", True))
-        self.assertEqual(payload.get("code"), "PLUGIN_DLL_NOT_FOUND")
-
-    def test_etap_cleanup_run_uses_env_default_plugin_path_when_not_provided(self) -> None:
-        calls: list[tuple[str, dict[str, Any]]] = []
-
-        def sender(action: str, payload: dict[str, Any]) -> dict[str, Any]:
-            calls.append((action, payload))
-            return {
-                "id": "bridge-etap-auto-path",
-                "ok": True,
-                "result": {
-                    "success": True,
-                    "code": "",
-                    "message": "queued",
-                    "data": {
-                        "drawing": {"name": "stub.dwg"},
-                        "command": "ETAPFIX",
-                    },
-                    "meta": {},
-                    "warnings": [],
-                },
-                "error": None,
-            }
-
-        fd, dll_path = tempfile.mkstemp(suffix=".dll")
-        os.close(fd)
-        previous_env = os.environ.get("AUTOCAD_ETAP_PLUGIN_DLL_PATH")
-        os.environ["AUTOCAD_ETAP_PLUGIN_DLL_PATH"] = dll_path
-        try:
-            client = self._build_client(provider="dotnet", sender=sender)
-            response = client.post(
-                "/api/etap/cleanup/run",
-                json={"command": "ETAPFIX"},
-            )
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(len(calls), 1)
-            self.assertEqual(calls[0][0], "etap_dxf_cleanup_run")
-            payload_plugin_path = str(calls[0][1].get("pluginDllPath") or "")
-            self.assertTrue(payload_plugin_path)
-            self.assertTrue(os.path.exists(payload_plugin_path))
-            self.assertTrue(os.path.samefile(payload_plugin_path, dll_path))
-
-            payload = response.get_json() or {}
-            meta = payload.get("meta") or {}
-            meta_plugin_path = str(meta.get("pluginDllPath") or "")
-            self.assertTrue(meta_plugin_path)
-            self.assertTrue(os.path.exists(meta_plugin_path))
-            self.assertTrue(os.path.samefile(meta_plugin_path, dll_path))
-            self.assertTrue(meta.get("pluginDllAutoDiscovered"))
-        finally:
-            if previous_env is None:
-                os.environ.pop("AUTOCAD_ETAP_PLUGIN_DLL_PATH", None)
-            else:
-                os.environ["AUTOCAD_ETAP_PLUGIN_DLL_PATH"] = previous_env
-            try:
-                os.remove(dll_path)
-            except OSError:
-                pass
 
     def test_terminal_scan_propagates_request_id_to_dotnet_and_response_meta(self) -> None:
         calls: list[tuple[str, dict[str, Any]]] = []
@@ -1009,6 +961,7 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         self.assertTrue(provider.get("dotnet_enabled"))
         self.assertTrue(provider.get("com_fallback"))
         self.assertFalse(provider.get("dotnet_sender_ready"))
+        self.assertFalse(provider.get("acade_sender_ready"))
 
     def test_obstacle_presets_endpoint_returns_catalog(self) -> None:
         client = self._build_client(provider="com", sender=None)

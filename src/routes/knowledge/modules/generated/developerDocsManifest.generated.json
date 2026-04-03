@@ -1,7 +1,7 @@
 {
 	"schemaVersion": "suite.developer-docs.v1",
-	"generatedAt": "2026-04-03T13:24:11.877Z",
-	"docCount": 86,
+	"generatedAt": "2026-04-03T19:40:19.792Z",
+	"docCount": 87,
 	"sections": [
 		{
 			"id": "frontend-app",
@@ -400,7 +400,7 @@
 			"id": "cad-local",
 			"title": "CAD",
 			"description": "AutoCAD execution, named-pipe transport, and local CAD integration references.",
-			"count": 5,
+			"count": 6,
 			"docs": [
 				{
 					"id": "docs-cad-readme-md",
@@ -450,9 +450,20 @@
 					"startHere": false
 				},
 				{
+					"id": "docs-cad-drawing-cleanup-md",
+					"title": "Drawing Cleanup",
+					"summary": "This is the canonical runtime note for the Drawing Cleanup workflow that now lives inside Batch Find & Replace.",
+					"relativePath": "docs/cad/drawing-cleanup.md",
+					"sectionId": "cad-local",
+					"tags": [
+						"cad-local"
+					],
+					"startHere": false
+				},
+				{
 					"id": "docs-cad-named-pipe-bridge-md",
 					"title": "Named Pipe Bridge (CAD Local IPC)",
-					"summary": "Status: this is the canonical low-level CAD transport reference. Active project setup/title block flows now go through browser - hosted core - Runtime Control localhost actions first, and Runtime Control may dispatch int",
+					"summary": "Status: this is the canonical low-level reference for explicit diagnostic/manual bridge validation. Project setup/title block, project standards review, AutoDraft / automation-recipe markup apply, terminal authoring prev",
 					"relativePath": "docs/cad/named-pipe-bridge.md",
 					"sectionId": "cad-local",
 					"tags": [
@@ -583,7 +594,7 @@
 				{
 					"id": "docs-development-conduit-terminal-label-sync-rollout-md",
 					"title": "Conduit Terminal Label Sync Rollout",
-					"summary": "This runbook describes how to move terminal label sync from the legacy COM endpoint to the new bridge endpoint with a controlled rollback path.",
+					"summary": "This runbook now documents the post-cutover state for conduit terminal label sync. The staged bridge rollout is complete; dotnet-backed label sync now uses the in-process ACADE host, and the old bridge endpoint remains o",
 					"relativePath": "docs/development/conduit-terminal-label-sync-rollout.md",
 					"sectionId": "developer-workshop",
 					"tags": [
@@ -612,17 +623,6 @@
 					"tags": [
 						"developer-workshop",
 						"electrical"
-					],
-					"startHere": false
-				},
-				{
-					"id": "docs-development-dxfer-reference-md",
-					"title": "ETAP DXF Cleanup Tool — AutoCAD .NET Plugin",
-					"summary": "This AutoCAD .NET plugin loads DXF files exported from ETAP and automatically fixes common issues: misaligned text, overlapping labels, improperly scaled blocks, and messy layer organization. It runs inside AutoCAD as a ",
-					"relativePath": "docs/development/dxfer-reference.md",
-					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
 					],
 					"startHere": false
 				},
@@ -669,6 +669,17 @@
 					"sectionId": "developer-workshop",
 					"tags": [
 						"auth",
+						"developer-workshop"
+					],
+					"startHere": false
+				},
+				{
+					"id": "docs-development-post-bridge-tranche-handoff-2026-04-03-md",
+					"title": "Post-Bridge Tranche Handoff (2026-04-03)",
+					"summary": "Use this note to start the next chat without depending on thread memory.",
+					"relativePath": "docs/development/post-bridge-tranche-handoff-2026-04-03.md",
+					"sectionId": "developer-workshop",
+					"tags": [
 						"developer-workshop"
 					],
 					"startHere": false
@@ -1027,7 +1038,7 @@
 				{
 					"id": "docs-autowire-todo-list-md",
 					"title": "AutoWire TODO List",
-					"summary": "1. Stop any old bridge/backend/frontend processes.",
+					"summary": "Historical note (2026-04-03): conduit-route dotnet-provider actions now use the",
 					"relativePath": "docs/autowire-todo-list.md",
 					"sectionId": "workspace-docs",
 					"tags": [

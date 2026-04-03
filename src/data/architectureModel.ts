@@ -210,10 +210,10 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 	{
 		id: "dotnet-bridge",
 		domainId: "backend",
-		label: "Remaining CAD Pipe Bridge",
+		label: "Diagnostic CAD Pipe Bridge",
 		path: "backend/dotnet_bridge.py + dotnet/named-pipe-bridge",
 		summary:
-			"Remaining named-pipe transport for CAD flows that have not yet moved into suite-cad-authoring.",
+			"Manual named-pipe validation plus any explicitly enabled bridge fallback that still targets SUITE_AUTOCAD_PIPE.",
 	},
 	{
 		id: "supabase-client",

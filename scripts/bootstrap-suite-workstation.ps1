@@ -721,7 +721,6 @@ if (-not $ValidateOnly -and $canContinue) {
     if ($canContinue) {
         foreach ($project in @(
             @{ Id = "suite-runtime-control"; Label = "Suite Runtime Control"; Path = "dotnet\\Suite.RuntimeControl\\Suite.RuntimeControl.csproj" },
-            @{ Id = "suite-pipe-bridge"; Label = "Named Pipe Bridge (remaining bridge-backed CAD flows)"; Path = "dotnet\\named-pipe-bridge\\NamedPipeServer.csproj" },
             @{ Id = "suite-autodraft-contract"; Label = "AutoDraft API Contract"; Path = "dotnet\\autodraft-api-contract\\AutoDraft.ApiContract.csproj" }
         )) {
             $restoreResult = Invoke-ExternalCommand -FilePath "dotnet" -Arguments @("restore", $project.Path) -WorkingDirectory $resolvedSuiteRoot
@@ -737,6 +736,15 @@ if (-not $ValidateOnly -and $canContinue) {
                 $canContinue = $false
                 break
             }
+        }
+
+        if ($canContinue) {
+            Add-StepResult `
+                -Id "suite-pipe-bridge" `
+                -Label "Named Pipe Bridge" `
+                -Ok $true `
+                -Summary "Skipped named-pipe bridge build because it is diagnostic-only and not part of default workstation bring-up." `
+                -Details "Build manually only when validating legacy SUITE_AUTOCAD_PIPE flows: dotnet build dotnet\\named-pipe-bridge\\NamedPipeServer.csproj -c Debug -v minimal"
         }
     }
 

@@ -51,6 +51,11 @@ export const formatDateMMDDYYYY = (isoOrDateLike: string): string => {
 export const toDateOnly = (datetimeLocal: string): string =>
 	datetimeLocal ? datetimeLocal.split("T")[0] : "";
 
+const replaceControlCharacters = (value: string, replacement: string): string =>
+	Array.from(value, (char) => (char.charCodeAt(0) < 32 ? replacement : char)).join(
+		"",
+	);
+
 export const deriveAcadeProjectFilePath = (
 	projectName: string | null | undefined,
 	projectRootPath: string | null | undefined,
@@ -62,8 +67,8 @@ export const deriveAcadeProjectFilePath = (
 	}
 
 	const sanitizedStem =
-		normalizedProjectName
-			.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, "-")
+		replaceControlCharacters(normalizedProjectName, "-")
+			.replace(/[<>:"/\\|?*]+/g, "-")
 			.replace(/\s+/g, " ")
 			.trim()
 			.replace(/[ .]+$/g, "") || "project";

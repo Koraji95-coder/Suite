@@ -143,28 +143,18 @@
 	line-height: 1.35;
 }
 
-.etapCard {
-	display: grid;
-	gap: var(--space-2);
-	padding: 0.52rem 0.6rem;
-	border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
-	border-radius: var(--radius-1);
-	background: color-mix(in srgb, #0f1c31 64%, transparent);
-}
-
-.etapField {
+.controlField {
 	display: grid;
 	gap: 0.24rem;
 }
 
-.etapField span {
+.controlField span {
 	color: var(--text-muted);
 	font-size: 0.64rem;
 	letter-spacing: 0.02em;
 }
 
-.etapSelect,
-.etapInput {
+.controlInput {
 	width: 100%;
 	padding: 0.42rem 0.5rem;
 	border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
@@ -174,28 +164,10 @@
 	font-size: 0.7rem;
 }
 
-.etapSelect:focus-visible,
-.etapInput:focus-visible {
+.controlInput:focus-visible {
 	outline: none;
 	border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
 	box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent);
-}
-
-.etapToggleRow {
-	display: grid;
-	gap: var(--space-1);
-}
-
-.etapToggle {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.42rem;
-	color: color-mix(in srgb, var(--text) 94%, transparent);
-	font-size: 0.68rem;
-}
-
-.etapToggle input {
-	margin: 0;
 }
 
 .panelList {

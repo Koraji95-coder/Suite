@@ -615,8 +615,12 @@ function normalizeCatalogKey(value: unknown) {
 }
 
 function sanitizePathSegment(value: string) {
-	return value
-		.replace(/[<>:"/\\|?*\u0000-\u001F]+/g, " ")
+	const withoutControlCharacters = Array.from(value, (char) =>
+		char.charCodeAt(0) < 32 ? " " : char,
+	).join("");
+
+	return withoutControlCharacters
+		.replace(/[<>:"/\\|?*]+/g, " ")
 		.replace(/\s+/g, " ")
 		.trim();
 }

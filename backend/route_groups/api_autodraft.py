@@ -8108,7 +8108,7 @@ def create_autodraft_blueprint(
     ) -> Dict[str, Any]:
         if send_autodraft_dotnet_command is None:
             raise RuntimeError(
-                "AutoDraft .NET bridge is unavailable. Install pywin32 and ensure the named-pipe bridge is running."
+                "AutoDraft .NET bridge is unavailable. Install pywin32 and either start the named-pipe bridge manually for explicit fallback use or switch to the AutoDraft .NET API provider."
             )
 
         started_at = time.time()

@@ -17,6 +17,10 @@ const autocadPipeName =
 	(process.env.AUTOCAD_DOTNET_PIPE_NAME || "").trim() || "SUITE_AUTOCAD_PIPE";
 const namedPipeServerProject = "dotnet/named-pipe-bridge/NamedPipeServer.csproj";
 const autodraftApiProject = "dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj";
+const namedPipeBridgeAutostartEnabled = parseBoolEnv(
+	process.env.SUITE_DEV_AUTOSTART_NAMED_PIPE_BRIDGE,
+	false,
+);
 const autodraftApiAutostartDisabled = !parseBoolEnv(
 	process.env.SUITE_DEV_AUTOSTART_AUTODRAFT_DOTNET,
 	true,
@@ -569,17 +573,22 @@ async function main() {
 		`[dev-full] Redis mode: ${redisStatus.mode} (storage=${redisStatus.storageUri}, reason=${redisStatus.reason}).`,
 	);
 	await ensureAutoDraftApi(sharedEnv);
-	killStaleNamedPipeBridgeHosts();
-
-	console.log(
-		`[dev-full] Starting named-pipe bridge for remaining bridge-backed CAD flows on '${autocadPipeName}'. Project setup/title-block now runs through the in-process suite-cad-authoring host.`,
-	);
-	run(
-		"pipe-bridge",
-		"dotnet",
-		["run", "--project", namedPipeServerProject, "--", autocadPipeName],
-		{ env: sharedEnv },
-	);
+	if (namedPipeBridgeAutostartEnabled) {
+		killStaleNamedPipeBridgeHosts();
+		console.log(
+			`[dev-full] Starting named-pipe bridge on '${autocadPipeName}' because SUITE_DEV_AUTOSTART_NAMED_PIPE_BRIDGE=true. This is for explicit diagnostics or manual legacy bridge fallback only.`,
+		);
+		run(
+			"pipe-bridge",
+			"dotnet",
+			["run", "--project", namedPipeServerProject, "--", autocadPipeName],
+			{ env: sharedEnv },
+		);
+	} else {
+		console.log(
+			"[dev-full] Named-pipe bridge autostart disabled. Default CAD traffic stays on suite-cad-authoring and the AutoDraft .NET API; start dotnet/named-pipe-bridge manually only for explicit diagnostics.",
+		);
+	}
 	const frontendNpm = npmInvocation(["run", "dev"]);
 	const backendNpm = npmInvocation(["run", "backend:coords:dev"]);
 	const gatewayNpm = npmInvocation(["run", "gateway:dev"]);

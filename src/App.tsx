@@ -84,9 +84,6 @@ const BatchFindReplaceRoutePage = lazy(
 const BlockLibraryRoutePage = lazy(
 	() => import("./routes/apps/block-library/BlockLibraryRoutePage"),
 );
-const EtapDxfCleanupRoutePage = lazy(
-	() => import("./routes/apps/etap-dxf-cleanup/EtapDxfCleanupRoutePage"),
-);
 const AutoWireRoutePage = lazy(
 	() => import("./routes/apps/autowire/AutoWireRoutePage"),
 );
@@ -253,12 +250,6 @@ export default function App() {
 									<Route
 										path="apps/block-library"
 										element={withRouteSuspense(<BlockLibraryRoutePage />)}
-									/>
-									<Route
-										path="apps/etap-dxf-cleanup"
-										element={withRouteSuspense(
-											withAudience(<EtapDxfCleanupRoutePage />, "dev"),
-										)}
 									/>
 									<Route
 										path="architecture"

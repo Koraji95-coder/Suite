@@ -57,6 +57,7 @@ class TestApiAutomationRecipes(unittest.TestCase):
         os.environ["APPDATA"] = os.path.join(self.temp_dir, "Roaming")
 
         self.bridge_actions: list[str] = []
+        self.acade_actions: list[str] = []
         self.client = self._create_client()
 
     def tearDown(self) -> None:
@@ -96,6 +97,7 @@ class TestApiAutomationRecipes(unittest.TestCase):
                 require_supabase_user=require_supabase_user,
                 is_valid_api_key=is_valid_api_key,
                 send_autocad_dotnet_command=self._send_autocad_dotnet_command,
+                send_autocad_acade_command=self._send_autocad_acade_command,
             )
         )
         return app.test_client()
@@ -258,48 +260,8 @@ class TestApiAutomationRecipes(unittest.TestCase):
             },
         }
 
-    def _send_autocad_dotnet_command(self, action: str, payload: dict[str, object]):
-        self.bridge_actions.append(action)
-        if action == "suite_markup_authoring_project_apply":
-            operation = (payload.get("operations") or [])[0]
-            drawing_path = str((operation or {}).get("drawingPath") or self.drawing_path)
-            return {
-                "ok": True,
-                "result": {
-                    "success": True,
-                    "message": "Bluebeam markup apply completed.",
-                    "data": {
-                        "changedDrawingCount": 1,
-                        "changedItemCount": 1,
-                        "drawings": [
-                            {
-                                "drawingPath": drawing_path,
-                                "drawingName": "A-100.dwg",
-                                "relativePath": "A-100.dwg",
-                                "updated": 1,
-                                "warnings": [],
-                            }
-                        ],
-                        "changes": [
-                            {
-                                "drawingPath": drawing_path,
-                                "drawingName": "A-100.dwg",
-                                "relativePath": "A-100.dwg",
-                                "markupSnapshotId": "markup-snapshot-1",
-                                "operationId": "markup-op-1",
-                                "operationType": "delta-note-upsert",
-                                "managedKey": "markup-1:delta-note-upsert",
-                                "before": "",
-                                "after": "Install new disconnect at MCC section A.",
-                                "detail": "Insert Bluebeam callout note in CAD space.",
-                                "status": "applied",
-                            }
-                        ],
-                    },
-                    "warnings": [],
-                    "meta": {"requestId": "markup-apply"},
-                },
-            }
+    def _send_autocad_acade_command(self, action: str, payload: dict[str, object]):
+        self.acade_actions.append(action)
         if action == "suite_terminal_authoring_project_preview":
             drawing = (payload.get("drawings") or [])[0]
             drawing_path = str((drawing or {}).get("path") or self.drawing_path)
@@ -358,6 +320,46 @@ class TestApiAutomationRecipes(unittest.TestCase):
                     },
                     "warnings": [],
                     "meta": {"requestId": "cad-preview"},
+                },
+            }
+        if action == "suite_markup_authoring_project_apply":
+            operation = (payload.get("operations") or [])[0]
+            drawing_path = str((operation or {}).get("drawingPath") or self.drawing_path)
+            return {
+                "ok": True,
+                "result": {
+                    "success": True,
+                    "message": "Bluebeam markup apply completed.",
+                    "data": {
+                        "changedDrawingCount": 1,
+                        "changedItemCount": 1,
+                        "drawings": [
+                            {
+                                "drawingPath": drawing_path,
+                                "drawingName": "A-100.dwg",
+                                "relativePath": "A-100.dwg",
+                                "updated": 1,
+                                "warnings": [],
+                            }
+                        ],
+                        "changes": [
+                            {
+                                "drawingPath": drawing_path,
+                                "drawingName": "A-100.dwg",
+                                "relativePath": "A-100.dwg",
+                                "markupSnapshotId": "markup-snapshot-1",
+                                "operationId": "markup-op-1",
+                                "operationType": "delta-note-upsert",
+                                "managedKey": "markup-1:delta-note-upsert",
+                                "before": "",
+                                "after": "Install new disconnect at MCC section A.",
+                                "detail": "Insert Bluebeam callout note in CAD space.",
+                                "status": "applied",
+                            }
+                        ],
+                    },
+                    "warnings": [],
+                    "meta": {"requestId": "markup-apply"},
                 },
             }
         if action == "suite_terminal_authoring_project_apply":
@@ -439,6 +441,10 @@ class TestApiAutomationRecipes(unittest.TestCase):
                     "meta": {"requestId": "cad-apply"},
                 },
             }
+        raise AssertionError(f"Unexpected ACADE action {action}")
+
+    def _send_autocad_dotnet_command(self, action: str, payload: dict[str, object]):
+        self.bridge_actions.append(action)
         raise AssertionError(f"Unexpected bridge action {action}")
 
     def test_preflight_reports_ready_scope(self) -> None:
@@ -482,8 +488,10 @@ class TestApiAutomationRecipes(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertTrue(payload.get("success"))
         self.assertEqual(len(payload.get("operations") or []), 3)
-        self.assertIn("suite_terminal_authoring_project_preview", self.bridge_actions)
-        self.assertIn("suite_batch_find_replace_project_preview", self.bridge_actions)
+        self.assertIn("suite_terminal_authoring_project_preview", self.acade_actions)
+        self.assertIn("suite_batch_find_replace_project_preview", self.acade_actions)
+        self.assertNotIn("suite_terminal_authoring_project_preview", self.bridge_actions)
+        self.assertNotIn("suite_batch_find_replace_project_preview", self.bridge_actions)
 
     def test_recipe_apply_verify_and_download_report(self) -> None:
         preview = self.client.post(
@@ -504,7 +512,12 @@ class TestApiAutomationRecipes(unittest.TestCase):
         self.assertTrue(apply_payload.get("success"))
         self.assertTrue(apply_payload.get("runId"))
         self.assertTrue(apply_payload.get("reportId"))
-        self.assertIn("suite_markup_authoring_project_apply", self.bridge_actions)
+        self.assertIn("suite_markup_authoring_project_apply", self.acade_actions)
+        self.assertNotIn("suite_markup_authoring_project_apply", self.bridge_actions)
+        self.assertIn("suite_terminal_authoring_project_apply", self.acade_actions)
+        self.assertNotIn("suite_terminal_authoring_project_apply", self.bridge_actions)
+        self.assertIn("suite_batch_find_replace_project_apply", self.acade_actions)
+        self.assertNotIn("suite_batch_find_replace_project_apply", self.bridge_actions)
 
         verify_response = self.client.post(
             "/api/automation-recipes/verify",

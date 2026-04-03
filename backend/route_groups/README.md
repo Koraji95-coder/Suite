@@ -75,11 +75,15 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
 - `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
 - `api_transmittal_render.py`: `/api/transmittal/render`
-- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/terminal-routes/draw`, `/api/conduit-route/terminal-labels/sync`, `/api/conduit-route/bridge/terminal-labels/sync`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`, `/api/etap/cleanup/run`
+- `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/terminal-routes/draw`, `/api/conduit-route/terminal-labels/sync`, `/api/conduit-route/bridge/terminal-labels/sync`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`
 - `api_autocad_reference_catalog.py`: `/api/autocad/reference/menu-index`, `/api/autocad/reference/standards`, `/api/autocad/reference/lookups/summary`, `/api/autocad/reference/lookups/<lookup_id>`
 - `api_watchdog.py`: `/api/watchdog/config`, `/api/watchdog/status`, `/api/watchdog/heartbeat` (`/api/watchdog/pick-root` is retired; project setup now uses the Runtime Control localhost bridge)
 - `api_health.py`: `/health`
 - `api_registry.py`: central route-group registration for the Flask app
+
+Transport ownership note:
+
+- `api_autocad.py` now uses the in-process ACADE sender for conduit-route dotnet-provider actions and keeps `/api/conduit-route/bridge/terminal-labels/sync` only as a compatibility alias. Drawing Cleanup moved into `api_batch_find_replace.py`, and the named-pipe bridge is now a manual diagnostic/explicit-fallback lane instead of a default product transport.
 
 Removed route groups:
 

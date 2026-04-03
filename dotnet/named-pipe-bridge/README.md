@@ -1,7 +1,11 @@
 # Named Pipe Server (.NET)
 
 This project hosts a local Windows named-pipe server used by the Python backend
-for AutoCAD bridge actions.
+for AutoCAD bridge diagnostics, manual validation against legacy pipe actions,
+and any explicitly enabled bridge-mode AutoDraft fallback.
+
+It is not started by `npm run dev:full` by default, and backend bridge autostart
+is disabled unless `AUTOCAD_DOTNET_AUTOSTART_BRIDGE=true`.
 
 ## Run
 
@@ -17,11 +21,13 @@ Optional custom pipe name:
 dotnet run --project dotnet/named-pipe-bridge/NamedPipeServer.csproj -- MyCustomPipeName
 ```
 
-Backend env must match:
+Backend env must match the bridge lane you are intentionally validating:
 
-- `CONDUIT_ROUTE_AUTOCAD_PROVIDER=dotnet` or `dotnet_fallback_com`
 - `AUTOCAD_DOTNET_PIPE_NAME=SUITE_AUTOCAD_PIPE` (or custom name)
 - `AUTOCAD_DOTNET_TIMEOUT_MS=30000`
+- `AUTOCAD_DOTNET_AUTOSTART_BRIDGE=false` (default; start manually unless you explicitly want backend autostart)
+- optional AutoDraft execute bridge mode:
+  - `AUTODRAFT_EXECUTE_PROVIDER=dotnet_bridge` or `dotnet_bridge_fallback_api`
 - `AUTOCAD_DOTNET_TOKEN=` (optional)
   - when set, requests must provide the same token in the payload
   - mismatches return `AUTH_INVALID_TOKEN`
@@ -67,7 +73,6 @@ If routing fails internally:
 - `conduit_route_obstacle_scan`
 - `conduit_route_terminal_routes_draw`
 - `conduit_route_terminal_labels_sync`
-- `etap_dxf_cleanup_run` (queues ETAP plugin cleanup commands such as `ETAPFIX`)
 
 Action handlers are now split out of the monolithic file into dedicated partials:
 
@@ -75,19 +80,6 @@ Action handlers are now split out of the monolithic file into dedicated partials
 - `ConduitRouteObstacleScanHandler.cs`
 - `ConduitRouteTerminalRouteDrawHandler.cs`
 - `ConduitRouteTerminalLabelSyncHandler.cs`
-- `ConduitRouteEtapCleanupHandler.cs`
-
-For `etap_dxf_cleanup_run`, when `pluginDllPath` is omitted the bridge tries to
-auto-discover `EtapDxfCleanup.dll` from common repo build locations:
-
-- `src/components/apps/dxfer/bin/Debug/net8.0-windows/EtapDxfCleanup.dll`
-- `src/components/apps/dxfer/bin/Release/net8.0-windows/EtapDxfCleanup.dll`
-- `src/components/apps/dxfer/bin/Debug/net48/EtapDxfCleanup.dll`
-- `src/components/apps/dxfer/bin/Release/net48/EtapDxfCleanup.dll`
-
-You can override discovery with:
-
-- `AUTOCAD_ETAP_PLUGIN_DLL_PATH=C:\absolute\path\EtapDxfCleanup.dll`
 
 These actions now perform live AutoCAD scans through COM from the .NET bridge
 process and return the same normalized payload shape expected by the backend/UI.

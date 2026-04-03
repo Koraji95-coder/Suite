@@ -6,8 +6,6 @@ import {
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import type {
-	EtapCleanupRunRequest,
-	EtapCleanupRunResponse,
 	TerminalCadRuntimeStatus,
 	TerminalCadStatusResponse,
 	TerminalCadDrawRequest,
@@ -49,7 +47,7 @@ export function resolveTerminalLabelSyncEndpointPath(options?: {
 		(providerConfigured === "dotnet" ||
 			providerConfigured === "dotnet_fallback_com")
 	) {
-		return "/api/conduit-route/bridge/terminal-labels/sync";
+		return "/api/conduit-route/terminal-labels/sync";
 	}
 	return "/api/conduit-route/terminal-labels/sync";
 }
@@ -301,70 +299,6 @@ class ConduitTerminalService {
 				"ConduitTerminalService",
 				err,
 			);
-			return {
-				success: false,
-				code: mapFetchErrorCode(err, "NETWORK_ERROR"),
-				message,
-			};
-		}
-	}
-
-	async runEtapCleanup(
-		request: EtapCleanupRunRequest = {},
-	): Promise<EtapCleanupRunResponse> {
-		try {
-			const requestId = this.createRequestId();
-			const headers = await this.getHeaders(requestId);
-			const timeoutMs = Math.max(
-				1000,
-				Math.min(600000, Math.trunc(request.timeoutMs ?? 90000)),
-			);
-			const response = await fetchWithTimeout(`${this.baseUrl}/api/etap/cleanup/run`, {
-				method: "POST",
-				headers,
-				body: JSON.stringify({
-					command: request.command ?? "ETAPFIX",
-					pluginDllPath: request.pluginDllPath || undefined,
-					waitForCompletion: request.waitForCompletion ?? true,
-					timeoutMs,
-					saveDrawing: request.saveDrawing ?? false,
-				}),
-				timeoutMs: timeoutMs + 10_000,
-				requestName: "ETAP cleanup request",
-			});
-
-			const payload = (await response
-				.json()
-				.catch(() => null)) as EtapCleanupRunResponse | null;
-
-			if (!response.ok) {
-				return {
-					success: false,
-					code: payload?.code || "REQUEST_FAILED",
-					message:
-						payload?.message ||
-						(await this.parseErrorMessage(
-							response,
-							`ETAP cleanup failed (${response.status})`,
-						)),
-					data: payload?.data,
-					meta: payload?.meta,
-					warnings: payload?.warnings,
-				};
-			}
-
-			if (payload && typeof payload.success === "boolean") {
-				return payload;
-			}
-
-			return {
-				success: false,
-				code: "INVALID_RESPONSE",
-				message: "ETAP cleanup returned an unexpected payload.",
-			};
-		} catch (err) {
-			const message = mapFetchErrorMessage(err, "ETAP cleanup request failed");
-			logger.error("ETAP cleanup request failed", "ConduitTerminalService", err);
 			return {
 				success: false,
 				code: mapFetchErrorCode(err, "NETWORK_ERROR"),

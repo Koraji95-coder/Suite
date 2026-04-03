@@ -2,6 +2,10 @@
 
 Last updated: 2026-03-05
 
+Historical note (2026-04-03): conduit-route dotnet-provider actions now use the
+in-process ACADE host. Any named-pipe bridge steps below are legacy diagnostic
+instructions only and are not part of the default daily runtime.
+
 ## Handoff Snapshot (2026-03-05 Evening)
 
 - Status: **core terminal strip scan pipeline is working** with strict metadata filtering and AutoCAD bridge connectivity.
@@ -22,7 +26,7 @@ What was validated today:
    - If the .NET bridge is still running, stop it first (it can lock build outputs).
 2. Start backend.
    - From repo root: `python backend/api_server.py`
-3. Start .NET named pipe bridge.
+3. Start the legacy .NET named pipe bridge only if you are intentionally doing pipe diagnostics.
    - From repo root: `dotnet run --project dotnet/named-pipe-bridge/NamedPipeServer.csproj`
 4. Start frontend.
    - From repo root: `npm run dev`
@@ -61,7 +65,7 @@ What was validated today:
   - `CONDUIT_ROUTE_AUTOCAD_PROVIDER=dotnet_fallback_com`
   - `AUTOCAD_DOTNET_PIPE_NAME=SUITE_AUTOCAD_PIPE`
   - `AUTOCAD_DOTNET_TIMEOUT_MS=30000`
-- [x] Start the .NET named-pipe server and verify both actions respond:
+- [x] Legacy diagnostic step: start the .NET named-pipe server and verify both actions respond:
   - `conduit_route_terminal_scan`
   - `conduit_route_obstacle_scan`
   - Validation snapshot (2026-03-05):

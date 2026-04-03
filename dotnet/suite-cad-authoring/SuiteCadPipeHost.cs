@@ -310,6 +310,36 @@ namespace SuiteCadAuthoring
                 return projectStandardsResult;
             }
 
+            var markupAuthoringResult = SuiteCadMarkupAuthoringPipeActions.HandleAction(action, payload);
+            if (markupAuthoringResult is not null)
+            {
+                return markupAuthoringResult;
+            }
+
+            var terminalAuthoringResult = SuiteCadTerminalAuthoringPipeActions.HandleAction(action, payload);
+            if (terminalAuthoringResult is not null)
+            {
+                return terminalAuthoringResult;
+            }
+
+            var batchFindReplaceResult = SuiteCadBatchFindReplacePipeActions.HandleAction(action, payload);
+            if (batchFindReplaceResult is not null)
+            {
+                return batchFindReplaceResult;
+            }
+
+            var drawingCleanupResult = SuiteCadDrawingCleanupPipeActions.HandleAction(action, payload);
+            if (drawingCleanupResult is not null)
+            {
+                return drawingCleanupResult;
+            }
+
+            var conduitRouteResult = SuiteCadConduitRoutePipeActions.HandleAction(action, payload);
+            if (conduitRouteResult is not null)
+            {
+                return conduitRouteResult;
+            }
+
             return action switch
             {
                 "suite_pipe_status" => BuildStatusEnvelope(),

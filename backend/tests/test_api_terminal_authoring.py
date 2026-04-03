@@ -24,6 +24,7 @@ class TestApiTerminalAuthoring(unittest.TestCase):
         )
 
         self.bridge_actions: list[str] = []
+        self.acade_actions: list[str] = []
 
         def require_supabase_user(f):
             def wrapped(*args, **kwargs):
@@ -44,6 +45,7 @@ class TestApiTerminalAuthoring(unittest.TestCase):
                 is_valid_api_key=is_valid_api_key,
                 schedule_cleanup=lambda _path: None,
                 send_autocad_dotnet_command=self._send_autocad_dotnet_command,
+                send_autocad_acade_command=self._send_autocad_acade_command,
             )
         )
 
@@ -137,9 +139,100 @@ class TestApiTerminalAuthoring(unittest.TestCase):
                 },
             }
         if action == "suite_terminal_authoring_project_apply":
+            raise AssertionError("Terminal authoring apply should not be routed through the bridge sender.")
+        raise AssertionError(f"Unexpected bridge action {action}")
+
+    def _send_autocad_acade_command(self, action: str, payload: dict[str, object]):
+        self.acade_actions.append(action)
+        if action == "suite_terminal_authoring_project_preview":
+            drawings = payload.get("drawings") or []
+            drawing = drawings[0] if isinstance(drawings, list) else {}
+            drawing_path = str((drawing or {}).get("path") or r"C:\dwg\A-100.dwg")
+            drawing_name = str((drawing or {}).get("drawingName") or "A-100.dwg")
+            relative_path = str((drawing or {}).get("relativePath") or "A-100.dwg")
             return {
                 "ok": True,
-                "id": "bridge-apply",
+                "id": "acade-preview",
+                "result": {
+                    "success": True,
+                    "code": "",
+                    "message": "project terminal preview ready",
+                    "data": {
+                        "operationCount": 2,
+                        "stripUpdateCount": 1,
+                        "routeUpsertCount": 1,
+                        "unresolvedCount": 0,
+                        "drawings": [
+                            {
+                                "drawingPath": drawing_path,
+                                "drawingName": drawing_name,
+                                "relativePath": relative_path,
+                                "operationCount": 2,
+                                "stripUpdateCount": 1,
+                                "routeUpsertCount": 1,
+                                "unresolvedCount": 0,
+                                "warnings": [],
+                            }
+                        ],
+                        "operations": [
+                            {
+                                "operationId": "strip-op-1",
+                                "rowId": "strip-row-1",
+                                "source": "strip",
+                                "operationType": "label-upsert",
+                                "drawingPath": drawing_path,
+                                "drawingName": drawing_name,
+                                "relativePath": relative_path,
+                                "panelId": "P1",
+                                "side": "L",
+                                "stripId": "TB1",
+                                "terminalCount": 3,
+                                "labels": ["1", "2", "3"],
+                                "stripKey": "A100::TB1",
+                                "before": "1 | 2 | 4",
+                                "after": "1 | 2 | 3",
+                                "detail": "Update strip TB1 labels.",
+                                "warning": None,
+                                "path": [],
+                            },
+                            {
+                                "operationId": "route-op-1",
+                                "rowId": "conn-row-1",
+                                "source": "connection",
+                                "operationType": "route-insert",
+                                "drawingPath": drawing_path,
+                                "drawingName": drawing_name,
+                                "relativePath": relative_path,
+                                "routeRef": "W1",
+                                "routeType": "conductor",
+                                "cableType": "CT",
+                                "wireFunction": "Trip",
+                                "annotateRef": True,
+                                "fromStripId": "TB1",
+                                "fromTerminal": 1,
+                                "toStripId": "TB2",
+                                "toTerminal": 1,
+                                "routeKey": "project-1::A100::CONDUCTOR::W1",
+                                "before": None,
+                                "after": "Route W1",
+                                "detail": "Insert managed route W1.",
+                                "warning": None,
+                                "path": [
+                                    {"x": 0.0, "y": 0.0},
+                                    {"x": 5.0, "y": 0.0},
+                                    {"x": 5.0, "y": 5.0},
+                                ],
+                            },
+                        ],
+                    },
+                    "warnings": [],
+                    "meta": {"requestId": "req-preview"},
+                },
+            }
+        if action == "suite_terminal_authoring_project_apply":
+            return {
+                "ok": True,
+                "id": "acade-apply",
                 "result": {
                     "success": True,
                     "code": "",
@@ -190,7 +283,7 @@ class TestApiTerminalAuthoring(unittest.TestCase):
                     "meta": {"requestId": "req-apply"},
                 },
             }
-        raise AssertionError(f"Unexpected bridge action {action}")
+        raise AssertionError(f"Unexpected ACADE action {action}")
 
     def test_preview_rejects_missing_schedule_snapshot(self) -> None:
         response = self.client.post(
@@ -239,7 +332,8 @@ class TestApiTerminalAuthoring(unittest.TestCase):
         self.assertTrue(payload.get("success"))
         self.assertEqual(payload.get("operationCount"), 2)
         self.assertEqual(payload.get("drawings")[0]["operationCount"], 2)
-        self.assertIn("suite_terminal_authoring_project_preview", self.bridge_actions)
+        self.assertIn("suite_terminal_authoring_project_preview", self.acade_actions)
+        self.assertNotIn("suite_terminal_authoring_project_preview", self.bridge_actions)
 
     def test_apply_rejects_missing_operations(self) -> None:
         response = self.client.post(
@@ -280,7 +374,8 @@ class TestApiTerminalAuthoring(unittest.TestCase):
         self.assertEqual(payload.get("changedDrawingCount"), 1)
         self.assertTrue(payload.get("reportId"))
         self.assertIn("/api/conduit-route/reports/", payload.get("downloadUrl", ""))
-        self.assertIn("suite_terminal_authoring_project_apply", self.bridge_actions)
+        self.assertIn("suite_terminal_authoring_project_apply", self.acade_actions)
+        self.assertNotIn("suite_terminal_authoring_project_apply", self.bridge_actions)
 
         download = self.client.get(
             f"/api/conduit-route/reports/{payload['reportId']}",

@@ -493,6 +493,10 @@ AUTOCAD_DOTNET_PIPE_NAME = (
     (os.environ.get("AUTOCAD_DOTNET_PIPE_NAME") or "SUITE_AUTOCAD_PIPE").strip()
     or "SUITE_AUTOCAD_PIPE"
 )
+AUTOCAD_DOTNET_ACADE_PIPE_NAME = (
+    (os.environ.get("AUTOCAD_DOTNET_ACADE_PIPE_NAME") or "SUITE_ACADE_PIPE").strip()
+    or "SUITE_ACADE_PIPE"
+)
 AUTOCAD_DOTNET_TIMEOUT_MS = _parse_int_env(
     "AUTOCAD_DOTNET_TIMEOUT_MS",
     30000,
@@ -500,6 +504,10 @@ AUTOCAD_DOTNET_TIMEOUT_MS = _parse_int_env(
 )
 AUTOCAD_DOTNET_TOKEN = (
     (os.environ.get("AUTOCAD_DOTNET_TOKEN") or "").strip()
+)
+AUTOCAD_DOTNET_AUTOSTART_BRIDGE = _parse_bool_env(
+    "AUTOCAD_DOTNET_AUTOSTART_BRIDGE",
+    False,
 )
 
 
@@ -509,18 +517,25 @@ def _is_dotnet_provider(value: str) -> bool:
 
 
 def _validate_conduit_provider_startup_settings() -> None:
-    pipe_has_whitespace = any(char.isspace() for char in AUTOCAD_DOTNET_PIPE_NAME)
-    if pipe_has_whitespace:
+    bridge_pipe_has_whitespace = any(char.isspace() for char in AUTOCAD_DOTNET_PIPE_NAME)
+    if bridge_pipe_has_whitespace:
         logger.error(
-            "AUTOCAD_DOTNET_PIPE_NAME=%s contains whitespace. Use a simple token-like pipe name.",
+            "AUTOCAD_DOTNET_PIPE_NAME=%s contains whitespace. Use a simple token-like pipe name for manual bridge diagnostics.",
             AUTOCAD_DOTNET_PIPE_NAME,
+        )
+
+    acade_pipe_has_whitespace = any(char.isspace() for char in AUTOCAD_DOTNET_ACADE_PIPE_NAME)
+    if acade_pipe_has_whitespace:
+        logger.error(
+            "AUTOCAD_DOTNET_ACADE_PIPE_NAME=%s contains whitespace. Use a simple token-like pipe name.",
+            AUTOCAD_DOTNET_ACADE_PIPE_NAME,
         )
 
     if _is_dotnet_provider(CONDUIT_ROUTE_AUTOCAD_PROVIDER):
         logger.info(
-            "Validated conduit provider settings (provider=%s, pipe=%s, timeout_ms=%s, token_configured=%s).",
+            "Validated conduit provider settings (provider=%s, acade_pipe=%s, timeout_ms=%s, token_configured=%s).",
             CONDUIT_ROUTE_AUTOCAD_PROVIDER,
-            AUTOCAD_DOTNET_PIPE_NAME,
+            AUTOCAD_DOTNET_ACADE_PIPE_NAME,
             AUTOCAD_DOTNET_TIMEOUT_MS,
             bool(AUTOCAD_DOTNET_TOKEN),
         )
@@ -545,9 +560,9 @@ if _is_dotnet_provider(CONDUIT_ROUTE_AUTOCAD_PROVIDER):
         )
     else:
         logger.info(
-            "Conduit route AutoCAD provider set to %s (pipe=%s, timeout_ms=%s).",
+            "Conduit route AutoCAD provider set to %s (acade_pipe=%s, timeout_ms=%s).",
             CONDUIT_ROUTE_AUTOCAD_PROVIDER,
-            AUTOCAD_DOTNET_PIPE_NAME,
+            AUTOCAD_DOTNET_ACADE_PIPE_NAME,
             AUTOCAD_DOTNET_TIMEOUT_MS,
         )
 
@@ -572,8 +587,25 @@ def _send_autocad_dotnet_command(
     )
 
 
+def _send_autocad_acade_command(
+    action: str,
+    payload: Dict[str, Any],
+    *,
+    timeout_ms: int | None = None,
+) -> Dict[str, Any]:
+    return _send_autocad_dotnet_command(
+        action,
+        payload,
+        pipe_name=AUTOCAD_DOTNET_ACADE_PIPE_NAME,
+        timeout_ms=timeout_ms or AUTOCAD_DOTNET_TIMEOUT_MS,
+    )
+
+
 AUTOCAD_DOTNET_COMMAND_SENDER = (
     _send_autocad_dotnet_command if dotnet_send_command_helper is not None else None
+)
+AUTOCAD_DOTNET_ACADE_COMMAND_SENDER = (
+    _send_autocad_acade_command if dotnet_send_command_helper is not None else None
 )
 
 logger.info(
@@ -581,6 +613,17 @@ logger.info(
     AUTODRAFT_EXECUTE_PROVIDER,
     bool(AUTODRAFT_DOTNET_API_URL),
     bool(AUTOCAD_DOTNET_COMMAND_SENDER),
+)
+logger.info(
+    "Legacy named-pipe bridge sender configured (pipe=%s, sender_ready=%s, autostart_default=%s).",
+    AUTOCAD_DOTNET_PIPE_NAME,
+    bool(AUTOCAD_DOTNET_COMMAND_SENDER),
+    AUTOCAD_DOTNET_AUTOSTART_BRIDGE,
+)
+logger.info(
+    "AutoCAD in-process ACADE sender configured (pipe=%s, sender_ready=%s).",
+    AUTOCAD_DOTNET_ACADE_PIPE_NAME,
+    bool(AUTOCAD_DOTNET_ACADE_COMMAND_SENDER),
 )
 
 # ── Agent Broker + Supabase Auth ────────────────────────────────
@@ -1962,6 +2005,7 @@ register_route_groups(
     dyn=dyn,
     pythoncom=pythoncom,
     send_autocad_dotnet_command=AUTOCAD_DOTNET_COMMAND_SENDER,
+    send_autocad_acade_command=AUTOCAD_DOTNET_ACADE_COMMAND_SENDER,
     validate_layer_config=validate_layer_config,
     traceback_module=traceback,
 )

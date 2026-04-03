@@ -6,7 +6,14 @@ import {
 	Upload,
 	Wand2,
 } from "lucide-react";
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type ChangeEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { PageContextBand } from "@/components/apps/ui/PageContextBand";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
 import { ProjectWorkflowLinks } from "@/components/apps/ui/ProjectWorkflowLinks";
@@ -588,7 +595,7 @@ export function DrawingListManager({
 		}
 	}, [selectedProjectId]);
 
-	const buildPayload = (nextRows?: TitleBlockSyncRow[]) => {
+	const buildPayload = useCallback((nextRows?: TitleBlockSyncRow[]) => {
 		if (!selectedProjectId) {
 			throw new Error("Select a project first.");
 		}
@@ -605,9 +612,9 @@ export function DrawingListManager({
 			selectedRelativePaths,
 			triggerAcadeUpdate: true,
 		};
-	};
+	}, [profile, revisionEntries, rows, selectedProjectId, selectedRelativePaths]);
 
-	const saveProfile = async () => {
+	const saveProfile = useCallback(async () => {
 		if (!selectedProjectId) {
 			showToast("warning", "Select a project first.");
 			return;
@@ -633,7 +640,7 @@ export function DrawingListManager({
 		} finally {
 			setSavingProfile(false);
 		}
-	};
+	}, [selectedProjectId, profile, showToast]);
 
 	const clearPendingTitleBlockReview = async () => {
 		if (!selectedProjectId) {
@@ -657,7 +664,7 @@ export function DrawingListManager({
 		setPendingTitleBlockReview(null);
 	};
 
-	const handleScan = async (options?: {
+	const handleScan = useCallback(async (options?: {
 		preferredSelectedRelativePaths?: string[];
 		stagedMessage?: string | null;
 	}) => {
@@ -700,7 +707,7 @@ export function DrawingListManager({
 		} finally {
 			setScanning(false);
 		}
-	};
+	}, [buildPayload, saveProfile, showToast]);
 
 	const handlePreview = async () => {
 		setPreviewing(true);

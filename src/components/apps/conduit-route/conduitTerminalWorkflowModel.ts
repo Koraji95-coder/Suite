@@ -2,7 +2,6 @@ import { DEFAULT_WIRE_FUNCTIONS, WIRE_COLORS } from "./conduitRouteData";
 import { buildTerminalLayout } from "./conduitTerminalEngine";
 import type { CableSystemType } from "./conduitRouteTypes";
 import type {
-	EtapCleanupCommand,
 	TerminalCadRuntimeStatus,
 	TerminalLayoutResult,
 	TerminalRouteRecord,
@@ -101,15 +100,6 @@ export const JUMPER_COLOR = {
 	stroke: "#fb923c",
 	aci: 30,
 } as const;
-
-export const ETAP_CLEANUP_COMMANDS: readonly EtapCleanupCommand[] = [
-	"ETAPFIX",
-	"ETAPTEXT",
-	"ETAPBLOCKS",
-	"ETAPLAYERFIX",
-	"ETAPOVERLAP",
-	"ETAPIMPORT",
-];
 
 export const CAD_SYNC_MAX_RETRIES = 2;
 export const CAD_SYNC_RETRY_BASE_DELAY_MS = 250;

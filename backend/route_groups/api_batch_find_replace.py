@@ -35,6 +35,7 @@ def create_batch_find_replace_blueprint(
     batch_session_cookie: str,
     batch_session_ttl_seconds: int,
     send_autocad_dotnet_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
+    send_autocad_acade_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
 ) -> Blueprint:
     """Create /api/batch-find-replace route group blueprint."""
     bp = Blueprint("batch_find_replace_api", __name__, url_prefix="/api/batch-find-replace")
@@ -242,15 +243,25 @@ def create_batch_find_replace_blueprint(
             "updated_files": updated_files,
         }
 
+    def _next_request_id() -> str:
+        return f"batch-{int(time.time() * 1000)}"
+
+    def _current_request_id(prefix: str = "batch") -> str:
+        header_value = str(request.headers.get("X-Request-ID") or "").strip()
+        if header_value:
+            return header_value
+        return f"{prefix}-{int(time.time() * 1000)}"
+
     def _call_dotnet_bridge_action(action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         if send_autocad_dotnet_command is None:
             raise RuntimeError("AutoCAD .NET bridge is not configured.")
 
+        request_id = str(payload.get("requestId") or _next_request_id()).strip() or _next_request_id()
         response = send_autocad_dotnet_command(
             action,
             {
                 **payload,
-                "requestId": f"batch-{int(time.time() * 1000)}",
+                "requestId": request_id,
             },
         )
         if not isinstance(response, dict):
@@ -263,6 +274,81 @@ def create_batch_find_replace_blueprint(
         if not isinstance(result_payload, dict):
             raise RuntimeError("Invalid .NET bridge result payload.")
         return result_payload
+
+    def _call_acade_host_action(action: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if send_autocad_acade_command is None:
+            raise RuntimeError("AutoCAD in-process ACADE host is not configured.")
+
+        request_id = str(payload.get("requestId") or _next_request_id()).strip() or _next_request_id()
+        response = send_autocad_acade_command(
+            action,
+            {
+                **payload,
+                "requestId": request_id,
+            },
+        )
+        if not isinstance(response, dict):
+            raise RuntimeError("Malformed response from the AutoCAD in-process ACADE host.")
+        if not response.get("ok"):
+            raise RuntimeError(
+                str(
+                    response.get("error")
+                    or response.get("message")
+                    or "Unknown in-process ACADE host error."
+                )
+            )
+
+        result_payload = response.get("result")
+        if not isinstance(result_payload, dict):
+            raise RuntimeError("Invalid in-process ACADE host result payload.")
+        return result_payload
+
+    def _cleanup_status_code_for_host_result(result: Dict[str, Any]) -> int:
+        code = str(result.get("code") or "").strip().upper()
+        if code == "INVALID_REQUEST":
+            return 400
+        if code == "AUTOCAD_NOT_READY":
+            return 503
+        if code.endswith("_FAILED"):
+            return 503
+        return 422
+
+    def _cleanup_error_response(
+        *,
+        code: str,
+        message: str,
+        request_id: str,
+        status_code: int,
+        warnings: Optional[List[str]] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ):
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "code": code,
+                    "message": message,
+                    "requestId": request_id,
+                    "data": None,
+                    "warnings": warnings or [],
+                    "meta": {"requestId": request_id, **(meta or {})},
+                }
+            ),
+            status_code,
+        )
+
+    def _normalize_cleanup_host_result(
+        result: Dict[str, Any], request_id: str
+    ) -> Dict[str, Any]:
+        normalized = dict(result)
+        meta = dict(normalized.get("meta") or {})
+        if not meta.get("requestId"):
+            meta["requestId"] = request_id
+        normalized["meta"] = meta
+        normalized["requestId"] = str(normalized.get("requestId") or meta.get("requestId") or request_id)
+        normalized.setdefault("warnings", [])
+        normalized.setdefault("data", None)
+        return normalized
 
     def _parse_batch_rules_from_json(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         parsed = payload.get("rules")
@@ -711,28 +797,28 @@ def create_batch_find_replace_blueprint(
         try:
             payload = request.get_json(silent=True) or {}
             rules = _parse_batch_rules_from_json(payload)
-            bridge_result = _call_dotnet_bridge_action(
+            host_result = _call_acade_host_action(
                 "suite_batch_find_replace_preview",
                 {
                     "rules": rules,
                     "blockNameHint": str(payload.get("blockNameHint") or "").strip(),
                 },
             )
-            if not bridge_result.get("success", False):
-                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
-                return jsonify(bridge_result), status_code
+            if not host_result.get("success", False):
+                status_code = 400 if host_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(host_result), status_code
 
-            data = bridge_result.get("data") or {}
+            data = host_result.get("data") or {}
             matches = data.get("matches") or []
             return jsonify(
                 {
                     "success": True,
-                    "requestId": bridge_result.get("meta", {}).get("requestId"),
+                    "requestId": host_result.get("meta", {}).get("requestId"),
                     "matches": matches,
                     "matchCount": len(matches),
-                    "warnings": bridge_result.get("warnings") or [],
+                    "warnings": host_result.get("warnings") or [],
                     "drawingName": data.get("drawingName"),
-                    "message": bridge_result.get("message") or "CAD preview completed.",
+                    "message": host_result.get("message") or "CAD preview completed.",
                 }
             )
         except ValueError as exc:
@@ -751,18 +837,18 @@ def create_batch_find_replace_blueprint(
             if not isinstance(matches, list) or len(matches) == 0:
                 raise ValueError("matches must contain at least one preview row.")
 
-            bridge_result = _call_dotnet_bridge_action(
+            host_result = _call_acade_host_action(
                 "suite_batch_find_replace_apply",
                 {
                     "matches": matches,
                     "blockNameHint": str(payload.get("blockNameHint") or "").strip(),
                 },
             )
-            if not bridge_result.get("success", False):
-                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
-                return jsonify(bridge_result), status_code
+            if not host_result.get("success", False):
+                status_code = 400 if host_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(host_result), status_code
 
-            data = bridge_result.get("data") or {}
+            data = host_result.get("data") or {}
             change_rows = data.get("changes") or []
             report_path, report_dir = export_batch_changes_to_excel(change_rows)
             schedule_cleanup(report_dir)
@@ -785,6 +871,110 @@ def create_batch_find_replace_blueprint(
             logger.exception("CAD batch apply failed")
             return jsonify({"success": False, "error": str(exc)}), 500
 
+    @bp.route("/cad/cleanup-preview", methods=["POST"])
+    @require_batch_session_or_api_key
+    @limiter.limit("20 per hour")
+    def api_batch_find_replace_cad_cleanup_preview():
+        request_id = _current_request_id("cleanup")
+        if not request.is_json:
+            return _cleanup_error_response(
+                code="INVALID_REQUEST",
+                message="Expected application/json payload.",
+                request_id=request_id,
+                status_code=400,
+                meta={"stage": "drawing_cleanup.preview.validation"},
+            )
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return _cleanup_error_response(
+                code="INVALID_REQUEST",
+                message="Request payload must be a JSON object.",
+                request_id=request_id,
+                status_code=400,
+                meta={"stage": "drawing_cleanup.preview.validation"},
+            )
+
+        try:
+            host_result = _normalize_cleanup_host_result(
+                _call_acade_host_action(
+                    "suite_drawing_cleanup_preview",
+                    {
+                        "requestId": request_id,
+                        "entryMode": str(payload.get("entryMode") or "").strip(),
+                        "preset": str(payload.get("preset") or "").strip(),
+                        "sourcePath": str(payload.get("sourcePath") or "").strip(),
+                        "saveDrawing": bool(payload.get("saveDrawing", False)),
+                        "timeoutMs": payload.get("timeoutMs", 90000),
+                    },
+                ),
+                request_id,
+            )
+            status_code = 200 if host_result.get("success") else _cleanup_status_code_for_host_result(host_result)
+            return jsonify(host_result), status_code
+        except Exception as exc:
+            logger.exception("CAD drawing cleanup preview failed")
+            return _cleanup_error_response(
+                code="ACADE_HOST_FAILED",
+                message=f"Drawing cleanup preview failed: {str(exc)}",
+                request_id=request_id,
+                status_code=503,
+                meta={"stage": "drawing_cleanup.preview.host"},
+            )
+
+    @bp.route("/cad/cleanup-apply", methods=["POST"])
+    @require_batch_session_or_api_key
+    @limiter.limit("15 per hour")
+    def api_batch_find_replace_cad_cleanup_apply():
+        request_id = _current_request_id("cleanup")
+        if not request.is_json:
+            return _cleanup_error_response(
+                code="INVALID_REQUEST",
+                message="Expected application/json payload.",
+                request_id=request_id,
+                status_code=400,
+                meta={"stage": "drawing_cleanup.apply.validation"},
+            )
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return _cleanup_error_response(
+                code="INVALID_REQUEST",
+                message="Request payload must be a JSON object.",
+                request_id=request_id,
+                status_code=400,
+                meta={"stage": "drawing_cleanup.apply.validation"},
+            )
+
+        try:
+            host_result = _normalize_cleanup_host_result(
+                _call_acade_host_action(
+                    "suite_drawing_cleanup_apply",
+                    {
+                        "requestId": request_id,
+                        "entryMode": str(payload.get("entryMode") or "").strip(),
+                        "preset": str(payload.get("preset") or "").strip(),
+                        "sourcePath": str(payload.get("sourcePath") or "").strip(),
+                        "saveDrawing": bool(payload.get("saveDrawing", False)),
+                        "timeoutMs": payload.get("timeoutMs", 90000),
+                        "selectedFixIds": payload.get("selectedFixIds") or [],
+                        "approvedReviewIds": payload.get("approvedReviewIds") or [],
+                    },
+                ),
+                request_id,
+            )
+            status_code = 200 if host_result.get("success") else _cleanup_status_code_for_host_result(host_result)
+            return jsonify(host_result), status_code
+        except Exception as exc:
+            logger.exception("CAD drawing cleanup apply failed")
+            return _cleanup_error_response(
+                code="ACADE_HOST_FAILED",
+                message=f"Drawing cleanup apply failed: {str(exc)}",
+                request_id=request_id,
+                status_code=503,
+                meta={"stage": "drawing_cleanup.apply.host"},
+            )
+
     @bp.route("/cad/project-preview", methods=["POST"])
     @require_batch_session_or_api_key
     @limiter.limit("20 per hour")
@@ -793,7 +983,7 @@ def create_batch_find_replace_blueprint(
             payload = request.get_json(silent=True) or {}
             rules = _parse_batch_rules_from_json(payload)
             drawings = _resolve_project_drawings(payload)
-            bridge_result = _call_dotnet_bridge_action(
+            host_result = _call_acade_host_action(
                 "suite_batch_find_replace_project_preview",
                 {
                     "rules": rules,
@@ -801,11 +991,11 @@ def create_batch_find_replace_blueprint(
                     "blockNameHint": str(payload.get("blockNameHint") or "").strip(),
                 },
             )
-            if not bridge_result.get("success", False):
-                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
-                return jsonify(bridge_result), status_code
+            if not host_result.get("success", False):
+                status_code = 400 if host_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(host_result), status_code
 
-            data = bridge_result.get("data") or {}
+            data = host_result.get("data") or {}
             matches = _normalize_project_preview_matches(data.get("matches") or [], drawings)
             drawing_summaries = _build_project_preview_drawings(drawings, matches)
             affected_drawings = sum(
@@ -814,12 +1004,12 @@ def create_batch_find_replace_blueprint(
             return jsonify(
                 {
                     "success": True,
-                    "requestId": bridge_result.get("meta", {}).get("requestId"),
+                    "requestId": host_result.get("meta", {}).get("requestId"),
                     "matches": matches,
                     "matchCount": len(matches),
                     "drawings": drawing_summaries,
-                    "warnings": bridge_result.get("warnings") or [],
-                    "message": bridge_result.get("message")
+                    "warnings": host_result.get("warnings") or [],
+                    "message": host_result.get("message")
                     or (
                         f"Project CAD preview completed: {len(matches)} replacement(s) "
                         f"across {affected_drawings} drawing(s)."
@@ -846,18 +1036,18 @@ def create_batch_find_replace_blueprint(
                     f"Too many project CAD apply rows. Maximum is {MAX_APPLY_CHANGE_ROWS}"
                 )
 
-            bridge_result = _call_dotnet_bridge_action(
+            host_result = _call_acade_host_action(
                 "suite_batch_find_replace_project_apply",
                 {
                     "matches": matches,
                     "blockNameHint": str(payload.get("blockNameHint") or "").strip(),
                 },
             )
-            if not bridge_result.get("success", False):
-                status_code = 400 if bridge_result.get("code") == "INVALID_REQUEST" else 503
-                return jsonify(bridge_result), status_code
+            if not host_result.get("success", False):
+                status_code = 400 if host_result.get("code") == "INVALID_REQUEST" else 503
+                return jsonify(host_result), status_code
 
-            data = bridge_result.get("data") or {}
+            data = host_result.get("data") or {}
             change_rows = data.get("changes") or []
             report_path, report_dir = export_batch_changes_to_excel(change_rows)
             schedule_cleanup(report_dir)
@@ -866,18 +1056,18 @@ def create_batch_find_replace_blueprint(
             return jsonify(
                 {
                     "success": True,
-                    "requestId": bridge_result.get("meta", {}).get("requestId"),
+                    "requestId": host_result.get("meta", {}).get("requestId"),
                     "updated": int(data.get("updated") or 0),
                     "changedDrawingCount": int(data.get("changedDrawingCount") or 0),
                     "changedItemCount": int(
                         data.get("changedItemCount") or data.get("updated") or 0
                     ),
                     "drawings": data.get("drawings") or [],
-                    "warnings": bridge_result.get("warnings") or [],
+                    "warnings": host_result.get("warnings") or [],
                     "reportId": report_id,
                     "reportFilename": report_filename,
                     "downloadUrl": f"/api/batch-find-replace/reports/{report_id}",
-                    "message": bridge_result.get("message")
+                    "message": host_result.get("message")
                     or "Project CAD apply completed.",
                 }
             )

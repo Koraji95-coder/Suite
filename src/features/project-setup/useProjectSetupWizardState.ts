@@ -140,16 +140,7 @@ export function useProjectSetupWizardState({
 	);
 	const basicsReady = useMemo(
 		() => hasCompleteProjectSetupBasics(formData, deadlineDate),
-		[
-			deadlineDate,
-			formData.category,
-			formData.description,
-			formData.name,
-			formData.priority,
-			formData.projectFirmNumber,
-			formData.projectPeName,
-			formData.status,
-		],
+		[deadlineDate, formData],
 	);
 	const trackingReady = useMemo(
 		() =>

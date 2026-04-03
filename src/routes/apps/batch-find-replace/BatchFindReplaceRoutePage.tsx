@@ -5,7 +5,7 @@ export default function BatchFindReplaceRoutePage() {
 	useRegisterPageHeader({
 		title: "Batch Find & Replace",
 		subtitle:
-			"Use file-based replacement or active-drawing AutoCAD cleanup from one shared surface.",
+			"Run drawing cleanup, active-drawing replacement, or file-based replacement from one shared surface.",
 	});
 
 	return <BatchFindReplaceApp />;

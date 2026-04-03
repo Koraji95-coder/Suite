@@ -59,7 +59,7 @@ def _repo_root() -> Path:
 
 
 def _named_pipe_bridge_autostart_enabled() -> bool:
-    return _parse_bool_env(os.environ.get("AUTOCAD_DOTNET_AUTOSTART_BRIDGE"), True)
+    return _parse_bool_env(os.environ.get("AUTOCAD_DOTNET_AUTOSTART_BRIDGE"), False)
 
 
 def _resolve_inprocess_acade_pipe_name() -> str:
@@ -212,11 +212,14 @@ def _autostart_inprocess_acade_host(pipe_name: str) -> bool:
 def _autostart_named_pipe_bridge(pipe_name: str) -> bool:
     global _AUTO_STARTED_BRIDGE_PROCESS
 
-    if os.name != "nt" or not _named_pipe_bridge_autostart_enabled():
+    if os.name != "nt":
         return False
 
     if _is_inprocess_acade_pipe_name(pipe_name):
         return _autostart_inprocess_acade_host(pipe_name)
+
+    if not _named_pipe_bridge_autostart_enabled():
+        return False
 
     with _AUTO_START_LOCK:
         if _AUTO_STARTED_BRIDGE_PROCESS is not None and _AUTO_STARTED_BRIDGE_PROCESS.poll() is None:
@@ -261,10 +264,17 @@ class DotNetPipeClient:
 
         pipe_path = self._pipe_path()
         if error_code == 2:
+            if _is_inprocess_acade_pipe_name(self.pipe_name):
+                return (
+                    f"Named pipe '{pipe_path}' not found. "
+                    "Start AutoCAD/ACADE with the suite-cad-authoring host loaded, "
+                    "or allow the in-process ACADE host autostart to launch it."
+                )
             return (
                 f"Named pipe '{pipe_path}' not found. "
-                "Start the .NET named pipe bridge server and verify "
-                "AUTOCAD_DOTNET_PIPE_NAME matches the server pipe name."
+                "The legacy named-pipe bridge is not started by default. "
+                "Start the .NET named pipe bridge server manually for explicit diagnostics "
+                "and verify AUTOCAD_DOTNET_PIPE_NAME matches the server pipe name."
             )
         if error_code == 231:
             return (

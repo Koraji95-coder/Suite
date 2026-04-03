@@ -85,19 +85,8 @@
 		{
 			"id": "batch-find-replace",
 			"title": "Batch Find & Replace",
-			"description": "Preview-first text remediation and active-drawing cleanup in the local workshop.",
+			"description": "Review-first drawing cleanup plus file and CAD replacement from one local workshop surface.",
 			"route": "/app/apps/batch-find-replace",
-			"group": "automation-lab",
-			"audience": "dev",
-			"releaseState": "developer_beta",
-			"futureProduct": true,
-			"runtimeRequirements": ["frontend", "backend", "gateway"]
-		},
-		{
-			"id": "etap-dxf-cleanup",
-			"title": "ETAP DXF Cleanup",
-			"description": "Developer-only bridge for ETAP cleanup commands and local AutoCAD remediation.",
-			"route": "/app/apps/etap-dxf-cleanup",
 			"group": "automation-lab",
 			"audience": "dev",
 			"releaseState": "developer_beta",

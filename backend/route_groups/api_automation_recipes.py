@@ -31,6 +31,7 @@ def create_automation_recipe_blueprint(
     require_supabase_user: Callable,
     is_valid_api_key: Callable[[Optional[str]], bool],
     send_autocad_dotnet_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
+    send_autocad_acade_command: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
 ) -> Blueprint:
     bp = Blueprint("automation_recipe_api", __name__, url_prefix="/api")
 
@@ -161,6 +162,27 @@ def create_automation_recipe_blueprint(
         result_payload = response.get("result")
         if not isinstance(result_payload, dict):
             raise RuntimeError("Invalid .NET bridge result payload.")
+        return result_payload
+
+    def _call_acade_host(action: str, payload: Dict[str, Any], request_id: str) -> Dict[str, Any]:
+        if send_autocad_acade_command is None:
+            raise RuntimeError("AutoCAD in-process ACADE host is not configured.")
+        response = send_autocad_acade_command(
+            action,
+            {
+                **payload,
+                "requestId": request_id,
+            },
+        )
+        if not isinstance(response, dict):
+            raise RuntimeError("Malformed response from the AutoCAD in-process ACADE host.")
+        if not response.get("ok"):
+            raise RuntimeError(
+                str(response.get("error") or response.get("message") or "Unknown ACADE host error.")
+            )
+        result_payload = response.get("result")
+        if not isinstance(result_payload, dict):
+            raise RuntimeError("Invalid in-process ACADE host result payload.")
         return result_payload
 
     def _candidate_plugin_roots() -> List[str]:
@@ -1018,7 +1040,7 @@ def create_automation_recipe_blueprint(
                             )
                         )
                         continue
-                    bridge_result = _call_bridge(
+                    host_result = _call_acade_host(
                         "suite_terminal_authoring_project_preview",
                         {
                             "projectId": _normalize_text(work_package.get("projectId")),
@@ -1034,19 +1056,19 @@ def create_automation_recipe_blueprint(
                         },
                         request_id,
                     )
-                    if not bridge_result.get("success", False):
+                    if not host_result.get("success", False):
                         raise RuntimeError(
-                            str(bridge_result.get("message") or "Wiring preview failed.")
+                            str(host_result.get("message") or "Wiring preview failed.")
                         )
                     selected_ids = set(_normalize_string_array(autowire_payload.get("selectedOperationIds")))
-                    raw_operations = (bridge_result.get("data") or {}).get("operations") or []
+                    raw_operations = (host_result.get("data") or {}).get("operations") or []
                     normalized_operations = [
                         _normalize_terminal_operation(entry, selected_ids=selected_ids)
                         for entry in raw_operations
                         if isinstance(entry, dict)
                     ]
                     operations.extend(normalized_operations)
-                    warnings.extend(_normalize_string_array(bridge_result.get("warnings")))
+                    warnings.extend(_normalize_string_array(host_result.get("warnings")))
                     step_summaries.append(
                         _build_step_summary(
                             source=source,
@@ -1056,10 +1078,10 @@ def create_automation_recipe_blueprint(
                             actionable=True,
                             planned_item_count=len(normalized_operations),
                             approved_item_count=sum(1 for entry in normalized_operations if entry["approved"]),
-                            warning_count=len(_normalize_string_array(bridge_result.get("warnings"))),
+                            warning_count=len(_normalize_string_array(host_result.get("warnings"))),
                             binding_kinds=["terminal-wiring", "schedule-row"],
-                            summary=bridge_result.get("message") or "Wiring preview ready.",
-                            request_id=(bridge_result.get("meta") or {}).get("requestId"),
+                            summary=host_result.get("message") or "Wiring preview ready.",
+                            request_id=(host_result.get("meta") or {}).get("requestId"),
                         )
                     )
                 elif source == "cad-utils":
@@ -1080,7 +1102,7 @@ def create_automation_recipe_blueprint(
                             )
                         )
                         continue
-                    bridge_result = _call_bridge(
+                    host_result = _call_acade_host(
                         "suite_batch_find_replace_project_preview",
                         {
                             "rules": [
@@ -1091,12 +1113,12 @@ def create_automation_recipe_blueprint(
                         },
                         request_id,
                     )
-                    if not bridge_result.get("success", False):
+                    if not host_result.get("success", False):
                         raise RuntimeError(
-                            str(bridge_result.get("message") or "CAD utilities preview failed.")
+                            str(host_result.get("message") or "CAD utilities preview failed.")
                         )
                     selected_keys = set(_normalize_string_array(cad_payload.get("selectedPreviewKeys")))
-                    raw_matches = (bridge_result.get("data") or {}).get("matches") or []
+                    raw_matches = (host_result.get("data") or {}).get("matches") or []
                     normalized_matches = [
                         _normalize_cad_match(entry, drawings, index)
                         for index, entry in enumerate(raw_matches)
@@ -1107,7 +1129,7 @@ def create_automation_recipe_blueprint(
                         for entry in normalized_matches
                     ]
                     operations.extend(normalized_operations)
-                    warnings.extend(_normalize_string_array(bridge_result.get("warnings")))
+                    warnings.extend(_normalize_string_array(host_result.get("warnings")))
                     step_summaries.append(
                         _build_step_summary(
                             source=source,
@@ -1117,10 +1139,10 @@ def create_automation_recipe_blueprint(
                             actionable=True,
                             planned_item_count=len(normalized_operations),
                             approved_item_count=sum(1 for entry in normalized_operations if entry["approved"]),
-                            warning_count=len(_normalize_string_array(bridge_result.get("warnings"))),
+                            warning_count=len(_normalize_string_array(host_result.get("warnings"))),
                             binding_kinds=["drawing-content"],
-                            summary=bridge_result.get("message") or "CAD utilities preview ready.",
-                            request_id=(bridge_result.get("meta") or {}).get("requestId"),
+                            summary=host_result.get("message") or "CAD utilities preview ready.",
+                            request_id=(host_result.get("meta") or {}).get("requestId"),
                         )
                     )
                 else:
@@ -1255,7 +1277,7 @@ def create_automation_recipe_blueprint(
                 and isinstance(entry.get("nativePayload"), dict)
             ]
             if autodraft_ops:
-                bridge_result = _call_bridge(
+                bridge_result = _call_acade_host(
                     "suite_markup_authoring_project_apply",
                     {
                         "projectId": _normalize_text(work_package.get("projectId")),
@@ -1287,7 +1309,7 @@ def create_automation_recipe_blueprint(
             ]
             if autowire_ops:
                 autowire_payload = step_payloads.get("autowire") if isinstance(step_payloads, dict) else {}
-                bridge_result = _call_bridge(
+                bridge_result = _call_acade_host(
                     "suite_terminal_authoring_project_apply",
                     {
                         "projectId": _normalize_text(work_package.get("projectId")),
@@ -1320,7 +1342,7 @@ def create_automation_recipe_blueprint(
             ]
             if cad_utils_matches:
                 cad_payload = step_payloads.get("cadUtils") if isinstance(step_payloads, dict) else {}
-                bridge_result = _call_bridge(
+                bridge_result = _call_acade_host(
                     "suite_batch_find_replace_project_apply",
                     {
                         "matches": cad_utils_matches,

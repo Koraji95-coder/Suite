@@ -1,42 +1,39 @@
 # Conduit Terminal Label Sync Rollout
 
-This runbook describes how to move terminal label sync from the legacy COM endpoint to the new bridge endpoint with a controlled rollback path.
+This runbook now documents the post-cutover state for conduit terminal label sync. The staged bridge rollout is complete; dotnet-backed label sync now uses the in-process ACADE host, and the old bridge endpoint remains only as a compatibility alias.
 
 ## Scope
 
-- Legacy endpoint: `/api/conduit-route/terminal-labels/sync`
-- Bridge endpoint: `/api/conduit-route/bridge/terminal-labels/sync`
+- Primary endpoint: `/api/conduit-route/terminal-labels/sync`
+- Compatibility alias: `/api/conduit-route/bridge/terminal-labels/sync`
 - Frontend switch: `VITE_CONDUIT_TERMINAL_LABEL_SYNC_MODE`
 
-## Prerequisites
+## Current Runtime Behavior
 
-- Backend bridge route is deployed.
-- .NET named-pipe bridge process is available in the environment.
-- Backend provider/runtime settings are already valid for your target environment (`CONDUIT_ROUTE_AUTOCAD_PROVIDER`, `AUTOCAD_DOTNET_*`).
+- `CONDUIT_ROUTE_AUTOCAD_PROVIDER=com` keeps the primary endpoint on the legacy COM manager path.
+- `CONDUIT_ROUTE_AUTOCAD_PROVIDER=dotnet` sends the primary endpoint to the in-process ACADE host.
+- `CONDUIT_ROUTE_AUTOCAD_PROVIDER=dotnet_fallback_com` sends the primary endpoint to the in-process ACADE host first and falls back to COM if that host call fails.
+- The compatibility alias also targets the in-process ACADE host; it exists only to preserve older callers and compatibility tests.
 - Existing auth flow remains unchanged.
 
 ## Frontend Mode Values
 
 - `legacy`: always use legacy COM endpoint.
-- `auto`: use bridge endpoint only when runtime provider is `dotnet` and bridge sender is ready.
-- `bridge`: always use bridge endpoint.
+- `auto`: use the primary endpoint and let backend provider selection choose COM or the in-process ACADE host.
+- `bridge`: force the compatibility alias path, which still reaches the in-process ACADE host for dotnet-backed runtime.
 
-## Recommended Rollout Sequence
+## Recommended Operational Baseline
 
-1. Set `VITE_CONDUIT_TERMINAL_LABEL_SYNC_MODE=legacy` in production baseline.
-2. Set `VITE_CONDUIT_TERMINAL_LABEL_SYNC_MODE=auto` in dev/staging.
-3. Validate parity using the checklist below.
-4. Keep `auto` for one full validation cycle in staging.
-5. Move staging to `bridge` once stable.
-6. Move production to `auto` first.
-7. Move production to `bridge` only after acceptance criteria are met.
+1. Use `VITE_CONDUIT_TERMINAL_LABEL_SYNC_MODE=auto` as the default frontend setting.
+2. Use `bridge` only when explicitly validating the compatibility alias.
+3. Use `legacy` only when you need to pin traffic to COM for investigation or rollback.
 
 ## Validation Checklist
 
 1. Scan terminal strips in a representative drawing.
 2. Run terminal label sync.
 3. Verify `TERMxx_LABEL` values match expected labels.
-4. Confirm status/diagnostics show `providerPath=dotnet` when bridge is active.
+4. Confirm status/diagnostics show `providerPath=dotnet` when the in-process ACADE host is active.
 5. Test unmatched target behavior and verify expected failure codes:
    - `NO_TARGET_STRIPS_MATCHED`
    - `NO_TERMINAL_STRIPS_FOUND`
@@ -47,19 +44,20 @@ This runbook describes how to move terminal label sync from the legacy COM endpo
 Rollback immediately if any of the following occur:
 
 - Terminal labels fail to write correctly.
-- Bridge endpoint returns repeated 5xx or `DOTNET_BRIDGE_FAILED`.
+- Dotnet-backed label sync returns repeated 5xx or `DOTNET_BRIDGE_FAILED`.
 - Runtime provider diagnostics are inconsistent with expected environment behavior.
 - User-facing sync failures exceed acceptable threshold for your team.
 
 ## Rollback Steps
 
 1. Set `VITE_CONDUIT_TERMINAL_LABEL_SYNC_MODE=legacy`.
-2. Redeploy frontend.
+2. If needed, also set `CONDUIT_ROUTE_AUTOCAD_PROVIDER=com` on the backend.
+3. Redeploy/restart the affected runtime.
 3. Re-run quick smoke:
    - scan
    - sync
-   - confirm legacy endpoint behavior is restored
-4. Keep bridge endpoint enabled in backend for investigation; do not remove until root cause is fixed.
+   - confirm COM endpoint behavior is restored
+4. Keep the compatibility alias enabled for investigation; it no longer proves named-pipe bridge behavior by itself.
 
 ## Verification Commands
 

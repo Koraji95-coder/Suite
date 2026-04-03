@@ -94,7 +94,7 @@ Current ownership:
 - ACADE project open/create/drawing-scan/title-block-apply lives in `suite-cad-authoring`
 - AutoCAD execution keeps the existing `success`, `code`, `message`, `requestId`, optional `meta` envelope
 - project setup/title-block now runs strictly `browser -> hosted core -> Runtime Control -> suite-cad-authoring`
-- the named-pipe bridge remains available only for other still-bridge-backed CAD flows in this tranche
+- the legacy named-pipe bridge is outside this slice and is now manual-only for explicit diagnostics
 
 ## Transitional Compatibility
 

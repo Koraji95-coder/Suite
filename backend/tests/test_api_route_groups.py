@@ -516,7 +516,8 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/autodraft/compare/feedback/export": ["GET"],
             "/api/autodraft/compare/reviewed-run/export": ["POST"],
             "/api/autodraft/compare/feedback/import": ["POST"],
-            "/api/etap/cleanup/run": ["POST"],
+            "/api/batch-find-replace/cad/cleanup-preview": ["POST"],
+            "/api/batch-find-replace/cad/cleanup-apply": ["POST"],
             "/api/autocad/ws-ticket": ["POST"],
             "/api/watchdog/config": ["PUT"],
             "/api/watchdog/heartbeat": ["POST"],
@@ -2252,8 +2253,12 @@ class TestApiRouteGroups(unittest.TestCase):
         response = self.client.post("/api/conduit-route/obstacles/scan")
         self.assertEqual(response.status_code, 401)
 
-    def test_etap_cleanup_run_endpoint_requires_auth(self) -> None:
-        response = self.client.post("/api/etap/cleanup/run")
+    def test_batch_find_replace_cleanup_preview_endpoint_requires_auth(self) -> None:
+        response = self.client.post("/api/batch-find-replace/cad/cleanup-preview")
+        self.assertEqual(response.status_code, 401)
+
+    def test_batch_find_replace_cleanup_apply_endpoint_requires_auth(self) -> None:
+        response = self.client.post("/api/batch-find-replace/cad/cleanup-apply")
         self.assertEqual(response.status_code, 401)
 
     def test_watchdog_endpoints_require_auth(self) -> None:

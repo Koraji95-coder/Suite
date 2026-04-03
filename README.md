@@ -74,13 +74,16 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
   - auth/pairing APIs
   - agent broker + orchestration APIs
   - transmittal/watchdog/dashboard support APIs
+- Project setup/title-block hosted-core ownership now stays on `api_project_setup.py`; legacy `api_title_block_sync.py` is removed and `/api/watchdog/pick-root` is retired.
 
 ### .NET Services
 
+- `dotnet/suite-cad-authoring` (`net8.0-windows`)
+  - in-process ACADE host for project setup, title-block apply, standards review, and other native CAD actions
 - `dotnet/autodraft-api-contract` (`net8.0`)
   - AutoDraft contract service (`/api/autodraft/*`)
 - `dotnet/named-pipe-bridge` (`net8.0`)
-  - local named-pipe bridge for AutoCAD-oriented actions
+  - local named-pipe bridge for remaining bridge-backed AutoCAD actions
 
 ### Suite Agent Gateway
 
@@ -98,14 +101,14 @@ The app is designed for day-to-day electrical/CAD production work, with emphasis
 - Backend: Flask, Flask-CORS, Flask-Limiter, Flask-Sock, pywin32
 - Auth: Supabase (email-link first, optional passkey rollout paths)
 - Agent runtime: Suite-native gateway + Ollama local models
-- .NET: ASP.NET Core (AutoDraft contract) + named-pipe bridge
+- .NET: ASP.NET Core (AutoDraft contract) + `suite-cad-authoring` + named-pipe bridge for remaining bridge-backed CAD flows
 - Quality: Biome, TypeScript typecheck, Vitest, Playwright, pytest, dotnet test
 
 ## Repository Layout
 
 - `src/` - frontend app, routes, components, services
 - `backend/` - Flask API bridge and route groups
-- `dotnet/` - .NET contract + named-pipe bridge projects
+- `dotnet/` - Runtime Control, CAD host, contract, and remaining bridge transport projects
 - `docs/` - canonical documentation and runbooks
 - `scripts/` - env sync, architecture model, gateway/dev orchestration helpers
 
@@ -138,6 +141,7 @@ python -m pip install -r backend/requirements-api.lock.txt
 
 ```bash
 dotnet restore dotnet/Suite.RuntimeControl/Suite.RuntimeControl.csproj
+dotnet restore dotnet/suite-cad-authoring/SuiteCadAuthoring.csproj
 dotnet restore dotnet/named-pipe-bridge/NamedPipeServer.csproj
 dotnet restore dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj
 ```
@@ -176,7 +180,7 @@ This orchestrates:
 - backend (`npm run backend:coords:dev`)
 - gateway (`npm run gateway:dev`)
 - AutoDraft .NET API (`dotnet run --project dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj`)
-- named-pipe bridge (`dotnet run --project dotnet/named-pipe-bridge/NamedPipeServer.csproj`)
+- named-pipe bridge for remaining bridge-backed CAD flows (`dotnet run --project dotnet/named-pipe-bridge/NamedPipeServer.csproj`)
 - Redis startup via Docker (`suite-redis-local` on `127.0.0.1:6379` by default)
 
 To disable AutoDraft .NET API autostart in full mode:
@@ -281,8 +285,8 @@ npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailySourcePath "C:\\
 
 Related docs:
 
-- `docs/development/supabase-workstation-bringup.md`
-- `docs/development/workstation-transfer-runbook.md`
+- `docs/runtime-control/workstation-bringup.md`
+- `docs/runtime-control/workstation-transfer-runbook.md`
 - `docs/development/electrical-drawing-program-test-readiness.md`
 
 ## Agent System Summary
@@ -396,8 +400,9 @@ High-signal sections:
 
 - `docs/agent/README.md`
 - `docs/autodraft/README.md`
-- `docs/backend/coordinates-grabber-api.md`
-- `docs/backend/named-pipe-bridge.md`
+- `docs/frontend/README.md`
+- `docs/runtime-control/README.md`
+- `docs/cad/README.md`
 - `docs/deep-repo-hardening-backlog.md`
 - `docs/development/realtime-agent-autowire-autodraft-state.md`
 

@@ -721,7 +721,7 @@ if (-not $ValidateOnly -and $canContinue) {
     if ($canContinue) {
         foreach ($project in @(
             @{ Id = "suite-runtime-control"; Label = "Suite Runtime Control"; Path = "dotnet\\Suite.RuntimeControl\\Suite.RuntimeControl.csproj" },
-            @{ Id = "suite-pipe-bridge"; Label = "Named Pipe Bridge"; Path = "dotnet\\named-pipe-bridge\\NamedPipeServer.csproj" },
+            @{ Id = "suite-pipe-bridge"; Label = "Named Pipe Bridge (remaining bridge-backed CAD flows)"; Path = "dotnet\\named-pipe-bridge\\NamedPipeServer.csproj" },
             @{ Id = "suite-autodraft-contract"; Label = "AutoDraft API Contract"; Path = "dotnet\\autodraft-api-contract\\AutoDraft.ApiContract.csproj" }
         )) {
             $restoreResult = Invoke-ExternalCommand -FilePath "dotnet" -Arguments @("restore", $project.Path) -WorkingDirectory $resolvedSuiteRoot

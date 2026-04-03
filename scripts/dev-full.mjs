@@ -571,6 +571,9 @@ async function main() {
 	await ensureAutoDraftApi(sharedEnv);
 	killStaleNamedPipeBridgeHosts();
 
+	console.log(
+		`[dev-full] Starting named-pipe bridge for remaining bridge-backed CAD flows on '${autocadPipeName}'. Project setup/title-block now runs through the in-process suite-cad-authoring host.`,
+	);
 	run(
 		"pipe-bridge",
 		"dotnet",

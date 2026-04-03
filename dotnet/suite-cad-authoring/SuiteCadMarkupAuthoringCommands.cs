@@ -429,23 +429,22 @@ namespace SuiteCadAuthoring
 
             var blockNameHint = ReadJsonString(operation.ExecuteTarget, "block_name_hint", "blockNameHint");
             var candidates = FindTitleBlockCandidates(database, transaction, attributeTags, blockNameHint);
-            if (candidates.Count <= 0)
+            var selection = SelectTitleBlockCandidate(candidates);
+            if (!selection.Found)
             {
                 AddMarkupWarning(warnings, operation, "Title block candidate could not be resolved from the drawing.");
                 AddMarkupChangeRow(envelope, drawingResult, operation, "skipped-missing");
                 return false;
             }
 
-            var bestScore = candidates.Max(candidate => candidate.Score);
-            var bestCandidates = candidates.Where(candidate => candidate.Score == bestScore).ToList();
-            if (bestCandidates.Count != 1)
+            if (selection.HasAmbiguousBestMatch)
             {
                 AddMarkupWarning(warnings, operation, "Title block update resolved to multiple candidate blocks and was skipped.");
                 AddMarkupChangeRow(envelope, drawingResult, operation, "skipped-ambiguous");
                 return false;
             }
 
-            var selected = bestCandidates[0];
+            var selected = selection.Selected!;
             var expectedCurrentValue = ReadExpectedCurrentValue(operation, "current_value");
             var currentValues = selected.Attributes
                 .Select(attribute => NormalizeText(attribute.TextString))
@@ -467,14 +466,7 @@ namespace SuiteCadAuthoring
             var changed = false;
             foreach (var attribute in selected.Attributes)
             {
-                if (string.Equals(NormalizeText(attribute.TextString), targetValue, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                attribute.UpgradeOpen();
-                attribute.TextString = targetValue;
-                changed = true;
+                changed |= ApplySharedTitleBlockAttributeValue(attribute, targetValue, warnings);
             }
 
             if (!changed)
@@ -1091,6 +1083,7 @@ namespace SuiteCadAuthoring
             foreach (var blockReference in EnumerateLayoutBlockReferences(database, transaction))
             {
                 var matchingAttributes = new List<AttributeReference>();
+                var attributesByTag = new Dictionary<string, AttributeReference>(StringComparer.OrdinalIgnoreCase);
                 foreach (ObjectId attributeId in blockReference.AttributeCollection)
                 {
                     if (!(transaction.GetObject(attributeId, OpenMode.ForWrite) is AttributeReference attribute))
@@ -1101,6 +1094,7 @@ namespace SuiteCadAuthoring
                     if (attributeTags.Contains(tag, StringComparer.OrdinalIgnoreCase))
                     {
                         matchingAttributes.Add(attribute);
+                        attributesByTag[tag] = attribute;
                     }
                 }
 
@@ -1122,12 +1116,98 @@ namespace SuiteCadAuthoring
                     {
                         BlockReference = blockReference,
                         Attributes = matchingAttributes,
+                        AttributesByTag = attributesByTag,
+                        BlockName = blockName,
+                        LayoutName = NormalizeText(owner.Name),
+                        Handle = ResolveTitleBlockHandle(blockReference),
+                        IsPaperSpace = paperSpaceScore > 0,
                         Score = score,
                     }
                 );
             }
 
             return candidates;
+        }
+
+        internal static TitleBlockCandidateSelectionResult SelectTitleBlockCandidate(
+            IReadOnlyList<TitleBlockCandidate> candidates
+        )
+        {
+            if (candidates == null || candidates.Count <= 0)
+            {
+                return new TitleBlockCandidateSelectionResult(null, false, false);
+            }
+
+            var descriptorSelection = SelectTitleBlockCandidateDescriptor(
+                candidates.Select(candidate =>
+                    new TitleBlockCandidateDescriptor(
+                        candidate.Score,
+                        candidate.LayoutName,
+                        candidate.BlockName,
+                        candidate.Handle,
+                        candidate.IsPaperSpace))
+                    .ToArray()
+            );
+
+            return new TitleBlockCandidateSelectionResult(
+                descriptorSelection.Found ? candidates[descriptorSelection.SelectedIndex] : null,
+                descriptorSelection.Found,
+                descriptorSelection.HasAmbiguousBestMatch
+            );
+        }
+
+        internal static TitleBlockCandidateDescriptorSelectionResult SelectTitleBlockCandidateDescriptor(
+            IReadOnlyList<TitleBlockCandidateDescriptor> candidates
+        )
+        {
+            if (candidates == null || candidates.Count <= 0)
+            {
+                return new TitleBlockCandidateDescriptorSelectionResult(-1, false, false);
+            }
+
+            var bestScore = candidates.Max(candidate => candidate.Score);
+            var bestCandidates = candidates
+                .Select((candidate, index) => new { Candidate = candidate, Index = index })
+                .Where(entry => entry.Candidate.Score == bestScore)
+                .OrderByDescending(entry => entry.Candidate.IsPaperSpace)
+                .ThenBy(entry => entry.Candidate.LayoutName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(entry => entry.Candidate.BlockName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(entry => entry.Candidate.Handle, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return new TitleBlockCandidateDescriptorSelectionResult(
+                bestCandidates[0].Index,
+                found: true,
+                hasAmbiguousBestMatch: bestCandidates.Count > 1
+            );
+        }
+
+        private static bool ApplySharedTitleBlockAttributeValue(
+            AttributeReference attribute,
+            string targetValue,
+            List<string> warnings
+        )
+        {
+            if (string.Equals(NormalizeText(attribute.TextString), targetValue, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            attribute.UpgradeOpen();
+            attribute.TextString = targetValue;
+            return true;
+        }
+
+        private static string ResolveTitleBlockHandle(BlockReference blockReference)
+        {
+            try
+            {
+                return NormalizeText(blockReference.Handle.ToString());
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private static IEnumerable<BlockReference> EnumerateLayoutBlockReferences(Database database, Transaction transaction)
@@ -1665,10 +1745,83 @@ namespace SuiteCadAuthoring
             return map;
         }
 
-        private sealed class TitleBlockCandidate
+        internal readonly struct TitleBlockCandidateSelectionResult
+        {
+            internal TitleBlockCandidateSelectionResult(
+                TitleBlockCandidate? selected,
+                bool found,
+                bool hasAmbiguousBestMatch
+            )
+            {
+                Selected = selected;
+                Found = found;
+                HasAmbiguousBestMatch = hasAmbiguousBestMatch;
+            }
+
+            internal TitleBlockCandidate? Selected { get; }
+
+            internal bool Found { get; }
+
+            internal bool HasAmbiguousBestMatch { get; }
+        }
+
+        internal readonly struct TitleBlockCandidateDescriptor
+        {
+            internal TitleBlockCandidateDescriptor(
+                int score,
+                string layoutName,
+                string blockName,
+                string handle,
+                bool isPaperSpace
+            )
+            {
+                Score = score;
+                LayoutName = layoutName ?? string.Empty;
+                BlockName = blockName ?? string.Empty;
+                Handle = handle ?? string.Empty;
+                IsPaperSpace = isPaperSpace;
+            }
+
+            internal int Score { get; }
+
+            internal string LayoutName { get; }
+
+            internal string BlockName { get; }
+
+            internal string Handle { get; }
+
+            internal bool IsPaperSpace { get; }
+        }
+
+        internal readonly struct TitleBlockCandidateDescriptorSelectionResult
+        {
+            internal TitleBlockCandidateDescriptorSelectionResult(
+                int selectedIndex,
+                bool found,
+                bool hasAmbiguousBestMatch
+            )
+            {
+                SelectedIndex = selectedIndex;
+                Found = found;
+                HasAmbiguousBestMatch = hasAmbiguousBestMatch;
+            }
+
+            internal int SelectedIndex { get; }
+
+            internal bool Found { get; }
+
+            internal bool HasAmbiguousBestMatch { get; }
+        }
+
+        internal sealed class TitleBlockCandidate
         {
             public BlockReference BlockReference { get; set; }
             public List<AttributeReference> Attributes { get; set; } = new List<AttributeReference>();
+            public Dictionary<string, AttributeReference> AttributesByTag { get; set; } = new Dictionary<string, AttributeReference>(StringComparer.OrdinalIgnoreCase);
+            public string BlockName { get; set; } = string.Empty;
+            public string LayoutName { get; set; } = string.Empty;
+            public string Handle { get; set; } = string.Empty;
+            public bool IsPaperSpace { get; set; }
             public int Score { get; set; }
         }
 

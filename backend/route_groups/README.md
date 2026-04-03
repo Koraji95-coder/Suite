@@ -68,15 +68,22 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_agent_orchestration_runtime.py`: persistent run-ledger + background worker orchestration runtime for parallel agent stages
 - `api_agent_orchestration_templates.py`: profile instruction templates + stage prompt builders for orchestration flows
 - `api_dashboard.py`: `/api/dashboard/load`, `/api/dashboard/load/<job_id>`
+- `api_project_setup.py`: `/api/project-setup/tickets`, `/api/project-setup/projects/<project_id>/profile`, `/api/project-setup/preview`, `/api/project-setup/results`
+- `api_project_standards.py`: `/api/project-standards/tickets`, `/api/project-standards/projects/<project_id>/profile`, `/api/project-standards/projects/<project_id>/latest-review`, `/api/project-standards/results`
 - `api_command_center.py`: `/api/command-center/supabase-sync-status`
 - `api_work_ledger.py`: `/api/work-ledger/publishers/worktale/readiness`, `/api/work-ledger/publishers/worktale/bootstrap`, `/api/work-ledger/entries/<entry_id>/publish/worktale`, `/api/work-ledger/entries/<entry_id>/publish-jobs`, `/api/work-ledger/entries/<entry_id>/publish-jobs/<job_id>/open-artifact-folder`
 - `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
 - `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
 - `api_transmittal_render.py`: `/api/transmittal/render`
 - `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/terminal-routes/draw`, `/api/conduit-route/terminal-labels/sync`, `/api/conduit-route/bridge/terminal-labels/sync`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`, `/api/etap/cleanup/run`
-- `api_watchdog.py`: `/api/watchdog/config`, `/api/watchdog/status`, `/api/watchdog/heartbeat`, `/api/watchdog/pick-root`
+- `api_autocad_reference_catalog.py`: `/api/autocad/reference/menu-index`, `/api/autocad/reference/standards`, `/api/autocad/reference/lookups/summary`, `/api/autocad/reference/lookups/<lookup_id>`
+- `api_watchdog.py`: `/api/watchdog/config`, `/api/watchdog/status`, `/api/watchdog/heartbeat` (`/api/watchdog/pick-root` is retired; project setup now uses the Runtime Control localhost bridge)
 - `api_health.py`: `/health`
 - `api_registry.py`: central route-group registration for the Flask app
+
+Removed route groups:
+
+- `api_title_block_sync.py`: deleted; project setup/title-block flows now stay on `api_project_setup.py` plus Runtime Control local actions
 
 ## Why this exists
 

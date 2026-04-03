@@ -58,8 +58,8 @@ export const ARCHITECTURE_DOMAINS: ArchitectureDomain[] = [
 		label: "Python Backend",
 		group: "backend",
 		summary:
-			"Flask APIs for auth/passkeys, AutoCAD workflows, batch tools, and broker endpoints.",
-		repoRoots: ["backend", "dotnet/named-pipe-bridge"],
+			"Flask APIs for auth/passkeys, hosted-core workflows, and workstation-facing CAD transport boundaries.",
+		repoRoots: ["backend", "dotnet/suite-cad-authoring", "dotnet/named-pipe-bridge"],
 	},
 	{
 		id: "data",
@@ -200,11 +200,20 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 		summary: "AutoCAD-focused automation scripts and geometry workflows.",
 	},
 	{
+		id: "suite-cad-host",
+		domainId: "backend",
+		label: "In-Process CAD Host",
+		path: "dotnet/suite-cad-authoring",
+		summary:
+			"In-process ACADE host for project setup, title-block apply, standards review, and other native CAD actions.",
+	},
+	{
 		id: "dotnet-bridge",
 		domainId: "backend",
-		label: "Named Pipe Bridge",
+		label: "Remaining CAD Pipe Bridge",
 		path: "backend/dotnet_bridge.py + dotnet/named-pipe-bridge",
-		summary: "Windows named-pipe interop prototype for batch-find/replace.",
+		summary:
+			"Remaining named-pipe transport for CAD flows that have not yet moved into suite-cad-authoring.",
 	},
 	{
 		id: "supabase-client",
@@ -406,9 +415,15 @@ export const ARCHITECTURE_DEPENDENCIES: ArchitectureDependency[] = [
 	},
 	{
 		sourceId: "api-server",
+		targetId: "suite-cad-host",
+		kind: "bridges",
+		weight: 0.72,
+	},
+	{
+		sourceId: "api-server",
 		targetId: "dotnet-bridge",
 		kind: "bridges",
-		weight: 0.7,
+		weight: 0.5,
 	},
 	{
 		sourceId: "api-server",

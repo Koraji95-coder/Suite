@@ -1,0 +1,30 @@
+# Runtime Control Docs
+
+This section is the canonical home for workstation-local companion behavior, bring-up, transfer, and local action ownership.
+
+## Code Roots
+
+- `dotnet/Suite.RuntimeControl/*`
+- workstation bootstrap and sync scripts under `scripts/*`
+
+## Canonical Docs
+
+- [Windows Workstation Bring-Up](./workstation-bringup.md)
+- [Workstation Transfer Runbook](./workstation-transfer-runbook.md)
+- [MCP Workstation Matrix](./mcp-workstation-matrix.md)
+- [Project Standards Native Review Flow](./project-standards-native-review.md)
+- [Frontend Project Setup Runtime Flow](../frontend/project-setup-title-block-runtime-flow.md)
+
+## Current Ownership Notes
+
+- Runtime Control is the workstation-local companion layer, not just a bootstrap shell.
+- Project setup local actions now terminate at Runtime Control localhost endpoints under `/api/workstation/project-setup/*`.
+- Native project standards review now terminates at `/api/workstation/project-standards/run-review`.
+- Folder picking is companion-owned. The old backend `/api/watchdog/pick-root` route is retired.
+
+## Relationship To CAD
+
+- Runtime Control owns the local HTTP boundary and workstation checks.
+- CAD execution details live under [CAD](../cad/README.md).
+- Project setup/title-block local CAD actions now dispatch only into the in-process `suite-cad-authoring` host.
+- The named-pipe bridge remains available only for other still-bridge-backed CAD flows in this tranche.
